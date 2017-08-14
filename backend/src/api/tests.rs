@@ -28,7 +28,7 @@ use TimestampingService;
 use blockchain::dto::{TxUpdateUser, TxPayment, TxTimestamp, UserInfo, UserInfoEntry, PaymentInfo,
                       Timestamp, TimestampEntry};
 use blockchain::schema::INITIAL_TIMESTAMPS;
-use api::PublicApi;
+use api::{PublicApi, ItemsTemplate};
 
 pub struct TimestampingSandbox {
     inner: Sandbox,
@@ -319,14 +319,16 @@ fn test_api_get_timestamps_range() {
     // Api checks
     let api = TimestampingApiSandbox::new(&sandbox);
     // Get timestamps list
-    let timestamps: Vec<TimestampEntry> = api.get("/v1/timestamps/first_user?count=10");
-    assert_eq!(timestamps.len(), 5);
+    let timestamps: ItemsTemplate<TimestampEntry> = api.get("/v1/timestamps/first_user?count=10");
+    assert_eq!(timestamps.items.len(), 5);
     // Get latest timestamp
-    let timestamps: Vec<TimestampEntry> = api.get("/v1/timestamps/first_user?count=1");
-    assert_eq!(timestamps.len(), 1);
+    let timestamps: ItemsTemplate<TimestampEntry> = api.get("/v1/timestamps/first_user?count=1");
+    assert_eq!(timestamps.items.len(), 1);
     // Get first timestamp
-    let timestamps: Vec<TimestampEntry> = api.get("/v1/timestamps/first_user?count=1&from=1");
-    assert_eq!(timestamps.len(), 1);
+    let timestamps: ItemsTemplate<TimestampEntry> =
+        api.get("/v1/timestamps/first_user?count=1&from=1");
+    assert_eq!(timestamps.items.len(), 1);
+    assert_eq!(timestamps.total_count, 5);
 }
 
 #[test]
@@ -356,12 +358,47 @@ fn test_api_get_payments_range() {
     // Api checks
     let api = TimestampingApiSandbox::new(&sandbox);
     // Get payments list
-    let payments: Vec<PaymentInfo> = api.get("/v1/payments/first_user?count=10");
-    assert_eq!(payments.len(), 5);
+    let payments: ItemsTemplate<PaymentInfo> = api.get("/v1/payments/first_user?count=10");
+    assert_eq!(payments.items.len(), 5);
     // Get latest payment
-    let payments: Vec<PaymentInfo> = api.get("/v1/payments/first_user?count=1");
-    assert_eq!(payments.len(), 1);
+    let payments: ItemsTemplate<PaymentInfo> = api.get("/v1/payments/first_user?count=1");
+    assert_eq!(payments.items.len(), 1);
     // Get first payment
-    let payments: Vec<PaymentInfo> = api.get("/v1/payments/first_user?count=1&from=1");
-    assert_eq!(payments.len(), 1);
+    let payments: ItemsTemplate<PaymentInfo> = api.get("/v1/payments/first_user?count=1&from=1");
+    assert_eq!(payments.items.len(), 1);
+    assert_eq!(payments.total_count, 5);
+}
+
+#[test]
+fn test_api_get_users_range() {
+    let _ = helpers::init_logger();
+
+    let sandbox = TimestampingSandbox::new();
+
+    // Create 5 users
+    for i in 0..5 {
+        let keypair = gen_keypair();
+        // Create user
+        let user_info = UserInfo::new(
+            &format!("user_{}", i),
+            &keypair.0,
+            &keypair.1[..].as_ref(),
+            &i.to_string(),
+        );
+        let keypair = sandbox.service_keypair();
+        let tx = TxUpdateUser::new(&keypair.0, user_info.clone(), &keypair.1);
+        sandbox.add_height_with_tx(tx);
+    }
+    // Api checks
+    let api = TimestampingApiSandbox::new(&sandbox);
+    // Get users list
+    let users: ItemsTemplate<UserInfoEntry> = api.get("/v1/users?count=10");
+    assert_eq!(users.items.len(), 5);
+    // Get latest user
+    let users: ItemsTemplate<UserInfoEntry> = api.get("/v1/users?count=1");
+    assert_eq!(users.items.len(), 1);
+    // Get first user
+    let users: ItemsTemplate<UserInfoEntry> = api.get("/v1/users?count=1&from=1");
+    assert_eq!(users.items.len(), 1);
+    assert_eq!(users.total_count, 5);
 }

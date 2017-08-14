@@ -54,6 +54,11 @@ where
         ListIndex::new(prefix, &self.view)
     }
 
+    pub fn users_history(&self) -> ListIndex<&T, Hash> {
+        let prefix = gen_prefix(TIMESTAMPING_SERVICE, 5, &());
+        ListIndex::new(prefix, &self.view) 
+    }
+
     pub fn state_hash(&self) -> Vec<Hash> {
         vec![self.users().root_hash()]
     }
@@ -88,6 +93,11 @@ impl<'a> Schema<&'a mut Fork> {
         ListIndex::new(prefix, &mut self.view)
     }
 
+    pub fn users_history_mut(&mut self) -> ListIndex<&mut Fork, Hash> {
+        let prefix = gen_prefix(TIMESTAMPING_SERVICE, 5, &());
+        ListIndex::new(prefix, &mut self.view) 
+    }
+
     pub fn add_user(&mut self, user: UserInfo) {
         // Add user key to known.
         self.known_keys_mut().put(
@@ -95,8 +105,9 @@ impl<'a> Schema<&'a mut Fork> {
             user.encrypted_secret_key().to_vec(),
         );
         // Add or modify user.
-        let user_id = user.id().to_hash();
-        let entry = if let Some(entry) = self.users().get(&user_id) {
+        let user_id_hash = user.id().to_hash();
+        let entry = if let Some(entry) = self.users().get(&user_id_hash) {
+            // Modify existing user
             UserInfoEntry::new(
                 user,
                 entry.available_timestamps(),
@@ -104,9 +115,11 @@ impl<'a> Schema<&'a mut Fork> {
                 entry.payments_hash(),
             )
         } else {
+            // Add user to history
+            self.users_history_mut().push(user_id_hash);
             UserInfoEntry::new(user, INITIAL_TIMESTAMPS, &Hash::zero(), &Hash::zero())
         };
-        self.users_mut().put(&user_id, entry);
+        self.users_mut().put(&user_id_hash, entry);
     }
 
     pub fn add_payment(&mut self, payment: PaymentInfo) {

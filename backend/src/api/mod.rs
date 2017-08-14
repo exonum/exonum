@@ -30,6 +30,12 @@ pub struct TimestampInfo {
     pub timestamp_proof: MapProof<TimestampEntry>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ItemsTemplate<T> {
+    pub total_count: u64,
+    pub items: Vec<T>,
+}
+
 #[derive(Clone)]
 pub struct PublicApi<T: TransactionSend + Clone + 'static> {
     channel: T,
@@ -63,7 +69,7 @@ where
         user_id: &str,
         count: u64,
         upper: Option<u64>,
-    ) -> Result<Vec<TimestampEntry>, ApiError> {
+    ) -> Result<ItemsTemplate<TimestampEntry>, ApiError> {
         let snap = self.blockchain.snapshot();
         let schema = ::blockchain::schema::Schema::new(&snap);
         let timestamps_history = schema.timestamps_history(user_id);
@@ -82,7 +88,10 @@ where
                 ))
             })
             .collect::<Vec<_>>();
-        Ok(timestamps)
+        Ok(ItemsTemplate {
+            items: timestamps,
+            total_count: max_len,
+        })
     }
 
     pub fn payments_range(
@@ -90,7 +99,7 @@ where
         user_id: &str,
         count: u64,
         upper: Option<u64>,
-    ) -> Result<Vec<PaymentInfo>, ApiError> {
+    ) -> Result<ItemsTemplate<PaymentInfo>, ApiError> {
         let snap = self.blockchain.snapshot();
         let schema = ::blockchain::schema::Schema::new(&snap);
         let payments_history = schema.payments(user_id);
@@ -103,9 +112,41 @@ where
             .rev()
             .map(|idx| payments_history.get(idx).unwrap())
             .collect::<Vec<_>>();
-        Ok(payments)
+        Ok(ItemsTemplate {
+            items: payments,
+            total_count: max_len,
+        })
     }
 
+    pub fn users_range(
+        &self,
+        count: u64,
+        upper: Option<u64>,
+    ) -> Result<ItemsTemplate<UserInfoEntry>, ApiError> {
+        let snap = self.blockchain.snapshot();
+        let schema = ::blockchain::schema::Schema::new(&snap);
+        let users_history = schema.users_history();
+        let users = schema.users();
+
+        let max_len = users_history.len();
+        let upper = upper.map(|x| cmp::min(x, max_len)).unwrap_or(max_len);
+        let lower = upper.checked_sub(count).unwrap_or(0);
+        // TODO use reverse iterators from storage
+        let users = (lower..upper)
+            .rev()
+            .map(|idx| {
+                let key = users_history.get(idx).unwrap();
+                users.get(&key).expect(&format!(
+                    "User with hash_id={:?} is absent in history table",
+                    key
+                ))
+            })
+            .collect::<Vec<_>>();
+        Ok(ItemsTemplate {
+            items: users,
+            total_count: max_len,
+        })
+    }
 
     pub fn timestamp_info(
         &self,
@@ -208,6 +249,19 @@ where
             api.ok_response(&json!(payments))
         };
 
+        let api = self.clone();
+        let get_users_range = move |req: &mut Request| -> IronResult<Response> {
+            let mut parser = RequestParser::new(req);
+            let count = parser.optional_param("count")?.ok_or_else(|| {
+                ApiError::IncorrectRequest("Required parameter of users 'count' is missing".into())
+            })?;
+            let from = parser.optional_param("from")?;
+
+            let users = api.users_range(count, from)?;
+            api.ok_response(&json!(users))
+        };
+
+
         self.make_put_request::<TxUpdateUser>(router, "/v1/users", "put_user");
         self.make_put_request::<TxPayment>(router, "/v1/payments", "put_payment");
         self.make_put_request::<TxTimestamp>(router, "/v1/timestamps", "put_timestamp");
@@ -227,5 +281,6 @@ where
             get_payments_range,
             "get_payments_range",
         );
+        router.get("/v1/users", get_users_range, "get_users_range");
     }
 }
