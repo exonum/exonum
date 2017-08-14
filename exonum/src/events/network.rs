@@ -123,7 +123,7 @@ impl Network {
             &listener,
             SERVER_ID,
             EventSet::readable(),
-            PollOpt::edge(),
+            PollOpt::level(),
         )?;
         self.listener = Some(listener);
         Ok(())
