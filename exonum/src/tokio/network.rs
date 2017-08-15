@@ -1,5 +1,4 @@
-use futures::{Future, Stream, Sink, IntoFuture, Poll, Async};
-use futures::stream::Fuse;
+use futures::{Future, Stream, Sink, IntoFuture};
 use futures::future::Either;
 use futures::sync::mpsc;
 use tokio_core::net::{TcpListener, TcpStream};
@@ -12,93 +11,48 @@ use std::thread;
 use std::time::Duration;
 use std::collections::hash_map::{HashMap, Entry};
 
-use messages::{Any, RawMessage};
-use events::{EventHandler, NetworkEvent};
-use node::{NodeTimeout, ExternalMessage};
+use messages::{Any, Connect, RawMessage};
+use events::EventHandler;
 
 use super::error::{other_error, result_ok, forget_result, into_other, log_error};
 use super::codec::MessagesCodec;
 use super::Node;
-use super::handler::NetworkRequest;
+use super::handler::{Event, EventsAggregator};
 
 #[derive(Debug)]
-pub enum Event {
-    Network(NetworkEvent),
-    Timeout(NodeTimeout),
-    Api(ExternalMessage),
+pub enum NetworkEvent {
+    MessageReceived(SocketAddr, RawMessage),
+    PeerConnected(SocketAddr, Connect),
+    PeerDisconnected(SocketAddr),
 }
 
-#[derive(Debug)]
-pub struct EventsAggregator<S1, S2, S3>
-where
-    S1: Stream,
-    S2: Stream,
-    S3: Stream,
-{
-    timeout: Fuse<S1>,
-    network: Fuse<S2>,
-    api: Fuse<S3>,
+#[derive(Debug, Clone)]
+pub enum NetworkRequest {
+    SendMessage(SocketAddr, RawMessage),
+    DisconnectWithPeer(SocketAddr),
 }
 
-impl<S1, S2, S3> EventsAggregator<S1, S2, S3>
-where
-    S1: Stream,
-    S2: Stream,
-    S3: Stream,
-{
-    pub fn new(timeout: S1, network: S2, api: S3) -> EventsAggregator<S1, S2, S3> {
-        EventsAggregator {
-            network: network.fuse(),
-            timeout: timeout.fuse(),
-            api: api.fuse(),
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+pub struct NetworkConfiguration {
+    // TODO: think more about config parameters
+    pub max_incoming_connections: usize,
+    pub max_outgoing_connections: usize,
+    pub tcp_nodelay: bool,
+    pub tcp_keep_alive: Option<u32>,
+    pub tcp_reconnect_timeout: u64,
+    pub tcp_reconnect_timeout_max: u64,
+}
+
+impl Default for NetworkConfiguration {
+    fn default() -> NetworkConfiguration {
+        NetworkConfiguration {
+            max_incoming_connections: 128,
+            max_outgoing_connections: 128,
+            tcp_keep_alive: None,
+            tcp_nodelay: false,
+            tcp_reconnect_timeout: 500,
+            tcp_reconnect_timeout_max: 600000,
         }
-    }
-}
-
-impl<S1, S2, S3> Stream for EventsAggregator<S1, S2, S3>
-where
-    S1: Stream<Item = NodeTimeout>,
-    S2: Stream<
-        Item = NetworkEvent,
-        Error = S1::Error,
-    >,
-    S3: Stream<
-        Item = ExternalMessage,
-        Error = S1::Error,
-    >,
-{
-    type Item = Event;
-    type Error = S1::Error;
-
-    fn poll(&mut self) -> Poll<Option<Event>, Self::Error> {
-        let mut stream_finished = false;
-        // Check timeout events
-        match self.timeout.poll()? {
-            Async::Ready(Some(item)) => return Ok(Async::Ready(Some(Event::Timeout(item)))),
-            // Just finish stream
-            Async::Ready(None) => stream_finished = true,
-            Async::NotReady => {}
-        };
-        // Check network events
-        match self.network.poll()? {
-            Async::Ready(Some(item)) => return Ok(Async::Ready(Some(Event::Network(item)))),
-            // Just finish stream
-            Async::Ready(None) => stream_finished = true,
-            Async::NotReady => {}
-        };
-        // Check api events
-        match self.api.poll()? {
-            Async::Ready(Some(item)) => return Ok(Async::Ready(Some(Event::Api(item)))),
-            // Just finish stream
-            Async::Ready(None) => stream_finished = true,
-            Async::NotReady => {}
-        };
-
-        Ok(if stream_finished {
-            Async::Ready(None)
-        } else {
-            Async::NotReady
-        })
     }
 }
 

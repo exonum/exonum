@@ -26,9 +26,10 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 use crypto::{PublicKey, SecretKey, Hash};
-use events::{NetworkConfiguration, NetworkEvent, Channel, Milliseconds, EventHandler};
+use events::{Channel, Milliseconds, EventHandler};
 use blockchain::{SharedNodeState, Blockchain, Schema, GenesisConfig, Transaction};
 use messages::{Connect, RawMessage, Message};
+use tokio::network::{NetworkConfiguration, NetworkEvent};
 
 pub use self::state::{State, Round, Height, RequestData, ValidatorId, TxPool, ValidatorState};
 pub use self::whitelist::Whitelist;
@@ -41,7 +42,6 @@ mod whitelist;
 pub mod state; // TODO: temporary solution to get access to WAIT consts
 pub mod timeout_adjuster;
 
-const PROFILE_ENV_VARIABLE_NAME: &'static str = "EXONUM_PROFILE_FILENAME";
 /// External messages.
 #[derive(Debug)]
 pub enum ExternalMessage {

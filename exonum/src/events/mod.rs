@@ -18,43 +18,13 @@ use std::io;
 use std::net::SocketAddr;
 use std::time::SystemTime;
 
-use messages::{RawMessage, Connect};
-
-#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
-pub struct NetworkConfiguration {
-    // TODO: think more about config parameters
-    pub max_incoming_connections: usize,
-    pub max_outgoing_connections: usize,
-    pub tcp_nodelay: bool,
-    pub tcp_keep_alive: Option<u32>,
-    pub tcp_reconnect_timeout: u64,
-    pub tcp_reconnect_timeout_max: u64,
-}
-
-impl Default for NetworkConfiguration {
-    fn default() -> NetworkConfiguration {
-        NetworkConfiguration {
-            max_incoming_connections: 128,
-            max_outgoing_connections: 128,
-            tcp_keep_alive: None,
-            tcp_nodelay: false,
-            tcp_reconnect_timeout: 500,
-            tcp_reconnect_timeout_max: 600000,
-        }
-    }
-}
+use messages::{RawMessage};
+use tokio::network::NetworkEvent;
 
 // #[cfg(test)]
 // mod tests;
 
 pub type Milliseconds = u64;
-
-#[derive(Debug)]
-pub enum NetworkEvent {
-    MessageReceived(SocketAddr, RawMessage),
-    PeerConnected(SocketAddr, Connect),
-    PeerDisconnected(SocketAddr),
-}
 
 pub trait EventHandler {
     type Timeout: Send;

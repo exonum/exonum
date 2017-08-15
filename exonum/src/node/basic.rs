@@ -28,7 +28,7 @@ where
     S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>,
 {
     /// Redirects message to the corresponding `handle_...` function.
-    pub fn handle_message(&mut self, peer: SocketAddr, raw: RawMessage) {
+    pub fn handle_message(&mut self, _peer: SocketAddr, raw: RawMessage) {
         // TODO: check message headers (network id, protocol version)
         // FIXME: call message.verify method
         //     if !raw.verify() {
