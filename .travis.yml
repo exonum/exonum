@@ -77,8 +77,8 @@ script: |
   case "$FEATURE" in
 
   "fmt" )
-      cargo audit
-      cargo fmt -p exonum -- --write-mode=diff
+      cargo audit &&
+      cargo fmt -p exonum -- --write-mode=diff &&
       cargo fmt -p sandbox -- --write-mode=diff
   ;;
 
