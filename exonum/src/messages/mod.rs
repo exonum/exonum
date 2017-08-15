@@ -47,7 +47,7 @@ pub enum Any {
     /// `Status` message.
     Status(Status),
     /// `Block` message.
-    Block(Block),
+    Block(BlockResponse),
     /// Consensus message.
     Consensus(ConsensusMessage),
     /// Request for the some data.
@@ -71,15 +71,15 @@ pub enum ConsensusMessage {
 #[derive(Clone, PartialEq)]
 pub enum RequestMessage {
     /// Propose request.
-    Propose(RequestPropose),
+    Propose(ProposeRequest),
     /// Transactions request.
-    Transactions(RequestTransactions),
+    Transactions(TransactionsRequest),
     /// Prevotes request.
-    Prevotes(RequestPrevotes),
+    Prevotes(PrevotesRequest),
     /// Peers request.
-    Peers(RequestPeers),
+    Peers(PeersRequest),
     /// Block request.
-    Block(RequestBlock),
+    Block(BlockRequest),
 }
 
 impl RequestMessage {
@@ -206,7 +206,7 @@ impl Any {
             match raw.message_type() {
                 CONNECT_MESSAGE_ID => Any::Connect(Connect::from_raw(raw)?),
                 STATUS_MESSAGE_ID => Any::Status(Status::from_raw(raw)?),
-                BLOCK_MESSAGE_ID => Any::Block(Block::from_raw(raw)?),
+                BLOCK_RESPONSE_MESSAGE_ID => Any::Block(BlockResponse::from_raw(raw)?),
 
                 PROPOSE_MESSAGE_ID => {
                     Any::Consensus(ConsensusMessage::Propose(Propose::from_raw(raw)?))
@@ -218,21 +218,22 @@ impl Any {
                     Any::Consensus(ConsensusMessage::Precommit(Precommit::from_raw(raw)?))
                 }
 
-                REQUEST_PROPOSE_MESSAGE_ID => {
-                    Any::Request(RequestMessage::Propose(RequestPropose::from_raw(raw)?))
+                PROPOSE_REQUEST_MESSAGE_ID => {
+                    Any::Request(RequestMessage::Propose(ProposeRequest::from_raw(raw)?))
                 }
-                REQUEST_TRANSACTIONS_MESSAGE_ID => Any::Request(RequestMessage::Transactions(
-                    RequestTransactions::from_raw(raw)?,
+                TRANSACTIONS_REQUEST_MESSAGE_ID => Any::Request(RequestMessage::Transactions(
+                    TransactionsRequest::from_raw(raw)?,
                 )),
-                REQUEST_PREVOTES_MESSAGE_ID => {
-                    Any::Request(RequestMessage::Prevotes(RequestPrevotes::from_raw(raw)?))
+                PREVOTES_REQUEST_MESSAGE_ID => {
+                    Any::Request(RequestMessage::Prevotes(PrevotesRequest::from_raw(raw)?))
                 }
-                REQUEST_PEERS_MESSAGE_ID => {
-                    Any::Request(RequestMessage::Peers(RequestPeers::from_raw(raw)?))
+                PEERS_REQUEST_MESSAGE_ID => {
+                    Any::Request(RequestMessage::Peers(PeersRequest::from_raw(raw)?))
                 }
-                REQUEST_BLOCK_MESSAGE_ID => {
-                    Any::Request(RequestMessage::Block(RequestBlock::from_raw(raw)?))
+                BLOCK_REQUEST_MESSAGE_ID => {
+                    Any::Request(RequestMessage::Block(BlockRequest::from_raw(raw)?))
                 }
+
                 message_type => {
                     return Err(Error::IncorrectMessageType { message_type });
                 }

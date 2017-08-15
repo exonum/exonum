@@ -19,7 +19,7 @@ use rand::Rng;
 use std::net::SocketAddr;
 use std::error::Error;
 
-use messages::{Any, RawMessage, Connect, Status, Message, RequestPeers};
+use messages::{Any, RawMessage, Connect, Status, Message, PeersRequest};
 use events::Channel;
 use super::{NodeHandler, RequestData, ExternalMessage, NodeTimeout, Height};
 
@@ -159,7 +159,7 @@ where
     }
 
     /// Handles the `RequestPeers` message. Node sends `Connect` messages of other peers as result.
-    pub fn handle_request_peers(&mut self, msg: RequestPeers) {
+    pub fn handle_request_peers(&mut self, msg: PeersRequest) {
         let peers: Vec<Connect> = self.state.peers().iter().map(|(_, b)| b.clone()).collect();
         trace!(
             "HANDLE REQUEST PEERS: Sending {:?} peers to {:?}",
@@ -196,7 +196,7 @@ where
                 .nth(gen_peer_id())
                 .unwrap();
             let peer = peer.clone();
-            let msg = RequestPeers::new(
+            let msg = PeersRequest::new(
                 self.state.consensus_public_key(),
                 peer.pub_key(),
                 self.state.consensus_secret_key(),

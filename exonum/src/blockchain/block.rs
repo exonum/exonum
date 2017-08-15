@@ -21,9 +21,14 @@ pub const BLOCK_SIZE: usize = 112;
 pub const SCHEMA_MAJOR_VERSION: u16 = 0;
 
 encoding_struct!(
-    /// Exonum block data structure. Block is essentially a list of transactions, which is
-    /// a result of the consensus algorithm (thus authenticated by the supermajority
-    /// of validators) and is applied atomically to the blockchain state.
+    /// Exonum block header data structure.
+    ///
+    /// Block is essentially a list of transactions, which is
+    /// a result of the consensus algorithm (thus authenticated by the supermajority of validators)
+    /// and is applied atomically to the blockchain state.
+    ///
+    /// Header only contains the amount of transactions and the transactions root hash as well as
+    /// other information, but not the transactions themselves.
     struct Block {
         const SIZE = BLOCK_SIZE;
 

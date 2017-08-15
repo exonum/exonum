@@ -16,8 +16,8 @@ use std::collections::HashSet;
 
 use crypto::{Hash, PublicKey, HexValue};
 use blockchain::{Schema, Transaction};
-use messages::{ConsensusMessage, Propose, Prevote, Precommit, Message, RequestPropose,
-               RequestTransactions, RequestPrevotes, RequestBlock, Block, RawTransaction};
+use messages::{ConsensusMessage, Propose, Prevote, Precommit, Message, ProposeRequest,
+               TransactionsRequest, PrevotesRequest, BlockRequest, BlockResponse, RawTransaction};
 use storage::Patch;
 use events::Channel;
 use super::{NodeHandler, Round, Height, RequestData, ExternalMessage, NodeTimeout};
@@ -144,7 +144,7 @@ where
     /// Handles the `Block` message. For details see the message documentation.
     // TODO write helper function which returns Result
     #[cfg_attr(feature = "flame_profile", flame)]
-    pub fn handle_block(&mut self, msg: Block) {
+    pub fn handle_block(&mut self, msg: BlockResponse) {
         // Request are sended to us
         if msg.to() != self.state.consensus_public_key() {
             error!(
@@ -689,7 +689,7 @@ where
 
             let message = match data {
                 RequestData::Propose(ref propose_hash) => {
-                    RequestPropose::new(
+                    ProposeRequest::new(
                         self.state.consensus_public_key(),
                         &peer,
                         self.state.height(),
@@ -706,7 +706,7 @@ where
                         .iter()
                         .cloned()
                         .collect();
-                    RequestTransactions::new(
+                    TransactionsRequest::new(
                         self.state.consensus_public_key(),
                         &peer,
                         &txs,
@@ -715,7 +715,7 @@ where
                         .clone()
                 }
                 RequestData::Prevotes(round, ref propose_hash) => {
-                    RequestPrevotes::new(
+                    PrevotesRequest::new(
                         self.state.consensus_public_key(),
                         &peer,
                         self.state.height(),
@@ -727,7 +727,7 @@ where
                         .clone()
                 }
                 RequestData::Block(height) => {
-                    RequestBlock::new(
+                    BlockRequest::new(
                         self.state.consensus_public_key(),
                         &peer,
                         height,

@@ -23,9 +23,9 @@ use std::time::{SystemTime, Duration, UNIX_EPOCH};
 use exonum::node::{ValidatorId, NodeHandler, Configuration, NodeTimeout, ExternalMessage,
                    ListenerConfig, ServiceConfig};
 use exonum::node::state::{Round, Height};
-use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
-                         Schema, Transaction, Service, ValidatorKeys, SharedNodeState, BlockProof,
-                         TimeoutAdjusterConfig};
+use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, Schema, Service,
+                         StoredConfiguration, Transaction, ValidatorKeys, SharedNodeState,
+                         BlockProof, TimeoutAdjusterConfig};
 use exonum::storage::{MemoryDB, MapProof};
 use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, Status};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
