@@ -36,13 +36,13 @@ use node::timeout_adjuster::{TimeoutAdjuster, Constant, Dynamic, MovingAverage};
 // TODO: move request timeouts into node configuration
 
 /// Timeout value for the `RequestPropose` message.
-pub const REQUEST_PROPOSE_TIMEOUT: Milliseconds = 100;
+pub const PROPOSE_REQUEST_TIMEOUT: Milliseconds = 100;
 /// Timeout value for the `RequestTransactions` message.
-pub const REQUEST_TRANSACTIONS_TIMEOUT: Milliseconds = 100;
+pub const TRANSACTIONS_REQUEST_TIMEOUT: Milliseconds = 100;
 /// Timeout value for the `RequestPrevotes` message.
-pub const REQUEST_PREVOTES_TIMEOUT: Milliseconds = 100;
+pub const PREVOTES_REQUEST_TIMEOUT: Milliseconds = 100;
 /// Timeout value for the `RequestBlock` message.
-pub const REQUEST_BLOCK_TIMEOUT: Milliseconds = 100;
+pub const BLOCK_REQUEST_TIMEOUT: Milliseconds = 100;
 
 /// Transactions pool.
 // TODO replace by persistent TxPool
@@ -248,10 +248,10 @@ impl RequestData {
     pub fn timeout(&self) -> Duration {
         #![cfg_attr(feature="cargo-clippy", allow(match_same_arms))]
         let ms = match *self {
-            RequestData::Propose(..) => REQUEST_PROPOSE_TIMEOUT,
-            RequestData::Transactions(..) => REQUEST_TRANSACTIONS_TIMEOUT,
-            RequestData::Prevotes(..) => REQUEST_PREVOTES_TIMEOUT,
-            RequestData::Block(..) => REQUEST_BLOCK_TIMEOUT,
+            RequestData::Propose(..) => PROPOSE_REQUEST_TIMEOUT,
+            RequestData::Transactions(..) => TRANSACTIONS_REQUEST_TIMEOUT,
+            RequestData::Prevotes(..) => PREVOTES_REQUEST_TIMEOUT,
+            RequestData::Block(..) => BLOCK_REQUEST_TIMEOUT,
         };
         Duration::from_millis(ms)
     }
