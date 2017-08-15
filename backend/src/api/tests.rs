@@ -283,10 +283,7 @@ fn test_api_get_timestamp_proof() {
 
     // get proof
     let api = TimestampingApiSandbox::new(&sandbox);
-    let _: serde_json::Value = api.get(&format!(
-        "/v1/timestamps/proof/{}",
-        Hash::zero().to_hex()
-    ));
+    let _: serde_json::Value = api.get(&format!("/v1/timestamps/proof/{}", Hash::zero().to_hex()));
 
     // TODO implement proof validation
 }
@@ -313,11 +310,9 @@ fn test_api_get_timestamp_entry() {
     sandbox.add_height_with_tx(tx.clone());
 
     let api = TimestampingApiSandbox::new(&sandbox);
-    let entry: Option<TimestampEntry> = api.get(&format!(
-        "/v1/timestamps/value/{}",
-        Hash::zero().to_hex()
-    ));
-    
+    let entry: Option<TimestampEntry> =
+        api.get(&format!("/v1/timestamps/value/{}", Hash::zero().to_hex()));
+
     let entry = entry.unwrap();
     assert_eq!(entry.timestamp(), info);
     assert_eq!(entry.tx_hash(), &tx.hash());

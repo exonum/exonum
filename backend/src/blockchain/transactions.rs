@@ -49,7 +49,11 @@ impl Transaction for TxTimestamp {
         let key_is_suitable = {
             let user_id_hash = self.content().user_id().to_hash();
             if let Some(entry) = schema.users().get(&user_id_hash) {
-                debug!("User key is not same, actual={:?}, expected={:?}", self.pub_key(), entry.info().pub_key());
+                debug!(
+                    "User key is not same, actual={:?}, expected={:?}",
+                    self.pub_key(),
+                    entry.info().pub_key()
+                );
                 entry.info().pub_key() == self.pub_key()
             } else {
                 debug!("User not found {}", self.content().user_id());
