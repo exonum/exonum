@@ -257,13 +257,11 @@ fn test_api_get_user() {
 
     assert_eq!(entry.info(), user_info);
     assert_eq!(entry.available_timestamps(), INITIAL_TIMESTAMPS);
-    assert_eq!(entry.timestamps_hash(), &Hash::zero());
     assert_eq!(entry.payments_hash(), &Hash::zero());
 }
 
-
 #[test]
-fn test_api_get_timestamp_exist() {
+fn test_api_get_timestamp_proof() {
     let _ = helpers::init_logger();
 
     let sandbox = TimestampingSandbox::new();
@@ -276,7 +274,6 @@ fn test_api_get_timestamp_exist() {
         &keypair.1[..].as_ref(),
         "metadata",
     );
-    let keypair = sandbox.service_keypair();
     let tx = TxUpdateUser::new(&keypair.0, user_info.clone(), &keypair.1);
     sandbox.add_height_with_tx(tx);
     // Create timestamp
@@ -287,10 +284,43 @@ fn test_api_get_timestamp_exist() {
     // get proof
     let api = TimestampingApiSandbox::new(&sandbox);
     let _: serde_json::Value = api.get(&format!(
-        "/v1/timestamps/first_user/{}",
+        "/v1/timestamps/proof/{}",
         Hash::zero().to_hex()
     ));
+
     // TODO implement proof validation
+}
+
+#[test]
+fn test_api_get_timestamp_entry() {
+    let _ = helpers::init_logger();
+
+    let sandbox = TimestampingSandbox::new();
+
+    let keypair = gen_keypair();
+    // Create user
+    let user_info = UserInfo::new(
+        "first_user",
+        &keypair.0,
+        &keypair.1[..].as_ref(),
+        "metadata",
+    );
+    let tx = TxUpdateUser::new(&keypair.0, user_info.clone(), &keypair.1);
+    sandbox.add_height_with_tx(tx);
+    // Create timestamp
+    let info = Timestamp::new("first_user", &Hash::zero(), "metadata");
+    let tx = TxTimestamp::new(&keypair.0, info.clone(), &keypair.1);
+    sandbox.add_height_with_tx(tx.clone());
+
+    let api = TimestampingApiSandbox::new(&sandbox);
+    let entry: Option<TimestampEntry> = api.get(&format!(
+        "/v1/timestamps/value/{}",
+        Hash::zero().to_hex()
+    ));
+    
+    let entry = entry.unwrap();
+    assert_eq!(entry.timestamp(), info);
+    assert_eq!(entry.tx_hash(), &tx.hash());
 }
 
 #[test]

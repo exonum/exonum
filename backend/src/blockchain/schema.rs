@@ -33,8 +33,8 @@ where
         ProofMapIndex::new(prefix, &self.view)
     }
 
-    pub fn timestamps(&self, user_id: &str) -> ProofMapIndex<&T, Hash, TimestampEntry> {
-        let prefix = gen_prefix(TIMESTAMPING_SERVICE, 1, &user_id.to_owned());
+    pub fn timestamps(&self) -> ProofMapIndex<&T, Hash, TimestampEntry> {
+        let prefix = gen_prefix(TIMESTAMPING_SERVICE, 1, &());
         ProofMapIndex::new(prefix, &self.view)
     }
 
@@ -56,11 +56,11 @@ where
 
     pub fn users_history(&self) -> ListIndex<&T, Hash> {
         let prefix = gen_prefix(TIMESTAMPING_SERVICE, 5, &());
-        ListIndex::new(prefix, &self.view) 
+        ListIndex::new(prefix, &self.view)
     }
 
     pub fn state_hash(&self) -> Vec<Hash> {
-        vec![self.users().root_hash()]
+        vec![self.timestamps().root_hash(), self.users().root_hash()]
     }
 }
 
@@ -70,11 +70,8 @@ impl<'a> Schema<&'a mut Fork> {
         ProofMapIndex::new(prefix, &mut self.view)
     }
 
-    pub fn timestamps_mut(
-        &mut self,
-        user_id: &str,
-    ) -> ProofMapIndex<&mut Fork, Hash, TimestampEntry> {
-        let prefix = gen_prefix(TIMESTAMPING_SERVICE, 1, &user_id.to_owned());
+    pub fn timestamps_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, TimestampEntry> {
+        let prefix = gen_prefix(TIMESTAMPING_SERVICE, 1, &());
         ProofMapIndex::new(prefix, &mut self.view)
     }
 
@@ -95,7 +92,7 @@ impl<'a> Schema<&'a mut Fork> {
 
     pub fn users_history_mut(&mut self) -> ListIndex<&mut Fork, Hash> {
         let prefix = gen_prefix(TIMESTAMPING_SERVICE, 5, &());
-        ListIndex::new(prefix, &mut self.view) 
+        ListIndex::new(prefix, &mut self.view)
     }
 
     pub fn add_user(&mut self, user: UserInfo) {
@@ -108,16 +105,11 @@ impl<'a> Schema<&'a mut Fork> {
         let user_id_hash = user.id().to_hash();
         let entry = if let Some(entry) = self.users().get(&user_id_hash) {
             // Modify existing user
-            UserInfoEntry::new(
-                user,
-                entry.available_timestamps(),
-                entry.timestamps_hash(),
-                entry.payments_hash(),
-            )
+            UserInfoEntry::new(user, entry.available_timestamps(), entry.payments_hash())
         } else {
             // Add user to history
             self.users_history_mut().push(user_id_hash);
-            UserInfoEntry::new(user, INITIAL_TIMESTAMPS, &Hash::zero(), &Hash::zero())
+            UserInfoEntry::new(user, INITIAL_TIMESTAMPS, &Hash::zero())
         };
         self.users_mut().put(&user_id_hash, entry);
     }
@@ -131,7 +123,6 @@ impl<'a> Schema<&'a mut Fork> {
             let entry = UserInfoEntry::new(
                 entry.info(),
                 entry.available_timestamps(),
-                entry.timestamps_hash(),
                 &self.payments(&user_id).root_hash(),
             );
             self.users_mut().put(&user_id_hash, entry);
@@ -140,21 +131,22 @@ impl<'a> Schema<&'a mut Fork> {
 
     pub fn add_timestamp(&mut self, timestamp_entry: TimestampEntry) {
         let timestamp = timestamp_entry.timestamp();
+        let content_hash = *timestamp.content_hash();
+        // Check that timestamp with given content_hash does not exist.
+        if self.timestamps().contains(&content_hash) {
+            return;
+        }
+
         let user_id = timestamp.user_id().to_owned();
         let user_id_hash = user_id.to_hash();
         if let Some(entry) = self.users().get(&user_id_hash) {
             // Add timestamp
-            let content_hash = *timestamp.content_hash();
-            self.timestamps_mut(&user_id).put(
-                &content_hash,
-                timestamp_entry,
-            );
+            self.timestamps_mut().put(&content_hash, timestamp_entry);
             self.timestamps_history_mut(&user_id).push(content_hash);
             // Update user info
             let entry = UserInfoEntry::new(
                 entry.info(),
                 entry.available_timestamps() - 1,
-                &self.timestamps(&user_id).root_hash(),
                 entry.payments_hash(),
             );
             self.users_mut().put(&user_id_hash, entry);

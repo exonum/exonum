@@ -53,16 +53,14 @@ encoding_struct! {
 encoding_struct! {
     /// User information entry.
     struct UserInfoEntry {
-        const SIZE = 80;
+        const SIZE = 48;
 
         /// User information entry.
         field info:                     UserInfo    [00 => 08]
         /// Total amount of available transactions
         field available_timestamps:     i64         [08 => 16]
-        /// Root hash of user timestamps.
-        field timestamps_hash:          &Hash       [16 => 48]
         /// Root hash of user payments.
-        field payments_hash:            &Hash       [48 => 80]
+        field payments_hash:            &Hash       [16 => 48]
     }
 }
 

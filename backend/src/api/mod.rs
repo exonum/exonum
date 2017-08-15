@@ -23,10 +23,9 @@ use blockchain::dto::{TxUpdateUser, TxTimestamp, TxPayment, UserInfoEntry, Times
 use api::parser::RequestParser;
 
 #[derive(Debug, Serialize)]
-pub struct TimestampInfo {
+pub struct TimestampProof {
     pub block_info: BlockProof,
     pub state_proof: MapProof<Hash>,
-    pub user_proof: MapProof<UserInfoEntry>,
     pub timestamp_proof: MapProof<TimestampEntry>,
 }
 
@@ -73,7 +72,7 @@ where
         let snap = self.blockchain.snapshot();
         let schema = ::blockchain::schema::Schema::new(&snap);
         let timestamps_history = schema.timestamps_history(user_id);
-        let timestamps = schema.timestamps(user_id);
+        let timestamps = schema.timestamps();
 
         let max_len = timestamps_history.len();
         let upper = upper.map(|x| cmp::min(x, max_len)).unwrap_or(max_len);
@@ -148,11 +147,7 @@ where
         })
     }
 
-    pub fn timestamp_info(
-        &self,
-        user_id: &str,
-        content_hash: &Hash,
-    ) -> Result<TimestampInfo, ApiError> {
+    pub fn timestamp_proof(&self, content_hash: &Hash) -> Result<TimestampProof, ApiError> {
         let snap = self.blockchain.snapshot();
         let (state_proof, block_info) = {
             let core_schema = CoreSchema::new(&snap);
@@ -164,15 +159,19 @@ where
         };
 
         let schema = Schema::new(&snap);
-        let user_proof = schema.users().get_proof(&user_id.to_hash());
-        let timestamp_proof = schema.timestamps(user_id).get_proof(content_hash);
+        let timestamp_proof = schema.timestamps().get_proof(content_hash);
 
-        Ok(TimestampInfo {
+        Ok(TimestampProof {
             block_info,
             state_proof,
-            user_proof,
             timestamp_proof,
         })
+    }
+
+    pub fn timestamp(&self, content_hash: &Hash) -> Result<Option<TimestampEntry>, ApiError> {
+        let snap = self.blockchain.snapshot();
+        let schema = ::blockchain::schema::Schema::new(&snap);
+        Ok(schema.timestamps().get(content_hash))
     }
 
     fn make_post_request<Tx>(&self, router: &mut Router, endpoint: &str, name: &str)
@@ -210,13 +209,21 @@ where
         };
 
         let api = self.clone();
-        let get_timestamp = move |req: &mut Request| -> IronResult<Response> {
+        let get_timestamp_proof = move |req: &mut Request| -> IronResult<Response> {
             let parser = RequestParser::new(req);
-            let user_id = parser.route_param::<String>("user_id")?;
             let content_hash = parser.route_param("content_hash")?;
 
-            let user_info = api.timestamp_info(&user_id, &content_hash)?;
-            api.ok_response(&json!(user_info))
+            let proof = api.timestamp_proof(&content_hash)?;
+            api.ok_response(&json!(proof))
+        };
+
+        let api = self.clone();
+        let get_timestamp = move |req: &mut Request| -> IronResult<Response> {
+            let parser = RequestParser::new(req);
+            let content_hash = parser.route_param("content_hash")?;
+
+            let timestamp = api.timestamp(&content_hash)?;
+            api.ok_response(&json!(timestamp))
         };
 
         let api = self.clone();
@@ -267,9 +274,14 @@ where
         self.make_post_request::<TxTimestamp>(router, "/v1/timestamps", "post_timestamp");
         router.get("/v1/users/:user_id", get_user, "get_user");
         router.get(
-            "/v1/timestamps/:user_id/:content_hash",
+            "/v1/timestamps/value/:content_hash",
             get_timestamp,
             "get_timestamp",
+        );
+        router.get(
+            "/v1/timestamps/proof/:content_hash",
+            get_timestamp_proof,
+            "get_timestamp_proof",
         );
         router.get(
             "/v1/timestamps/:user_id",
