@@ -26,8 +26,8 @@ use bit_vec::BitVec;
 use std::time::Duration;
 use std::collections::BTreeMap;
 
-use exonum::messages::{RawMessage, Message, Propose, Prevote, Precommit, RequestPropose,
-                       RequestTransactions, RequestPrevotes, CONSENSUS};
+use exonum::messages::{RawMessage, Message, Propose, Prevote, Precommit, ProposeRequest,
+                       TransactionsRequest, PrevotesRequest, CONSENSUS};
 use exonum::crypto::{Hash, Seed, gen_keypair, gen_keypair_from_seed};
 use exonum::blockchain::{Block, Blockchain, Schema};
 use exonum::node::state::{REQUEST_PREVOTES_TIMEOUT, REQUEST_PROPOSE_TIMEOUT,
@@ -188,7 +188,7 @@ fn test_retrieve_block_and_precommits() {
     // use serde_json;
     assert!(bl_proof_option.is_some());
     let block_proof = bl_proof_option.unwrap();
-    let block: Block = block_proof.block;
+    let block = block_proof.block;
     let precommits: Vec<Precommit> = block_proof.precommits;
     let expected_height = target_height.previous();
     let expected_block_hash = block.hash();
@@ -253,7 +253,7 @@ fn test_store_txs_positions() {
 // is fixed.
 #[cfg_attr(rustfmt, rustfmt_skip)]
 #[test]
-#[should_panic(expected = "Send unexpected message Request(RequestPropose")]
+#[should_panic(expected = "Send unexpected message Request(ProposeRequest")]
 fn test_queue_prevote_message_from_next_height() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
@@ -544,7 +544,7 @@ fn request_propose_when_get_prevote() {
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout() - 1));
     sandbox.send(
         sandbox.a(VALIDATOR_2),
-        RequestPropose::new(
+        ProposeRequest::new(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_2),
             HEIGHT_ONE,
@@ -565,7 +565,7 @@ fn response_to_request_txs() {
     let tx = gen_timestamping_tx();
     sandbox.recv(tx.clone());
 
-    sandbox.recv(RequestTransactions::new(
+    sandbox.recv(TransactionsRequest::new(
         &sandbox.p(VALIDATOR_1),
         &sandbox.p(VALIDATOR_0),
         &[tx.hash()],
@@ -633,7 +633,7 @@ fn responde_to_request_tx_propose_prevotes_precommits() {
 
     {
         // respond to RequestPropose
-        sandbox.recv(RequestPropose::new(
+        sandbox.recv(ProposeRequest::new(
             &sandbox.p(VALIDATOR_3),
             &sandbox.p(VALIDATOR_0),
             HEIGHT_ONE,
@@ -649,7 +649,7 @@ fn responde_to_request_tx_propose_prevotes_precommits() {
         let mut validators = BitVec::from_elem(sandbox.n_validators(), false);
         validators.set(VALIDATOR_3.into(), true);
 
-        sandbox.recv(RequestPrevotes::new(
+        sandbox.recv(PrevotesRequest::new(
             &sandbox.p(VALIDATOR_3),
             &sandbox.p(VALIDATOR_0),
             HEIGHT_ONE,
@@ -700,7 +700,7 @@ fn responde_to_request_tx_propose_prevotes_precommits() {
 
     {
         // respond to RequestTransactions
-        sandbox.recv(RequestTransactions::new(
+        sandbox.recv(TransactionsRequest::new(
             &sandbox.p(VALIDATOR_1),
             &sandbox.p(VALIDATOR_0),
             &[tx.hash()],
@@ -712,7 +712,7 @@ fn responde_to_request_tx_propose_prevotes_precommits() {
 
     {
         // respond to RequestPropose negative
-        sandbox.recv(RequestPropose::new(
+        sandbox.recv(ProposeRequest::new(
             &sandbox.p(VALIDATOR_3),
             &sandbox.p(VALIDATOR_0),
             HEIGHT_ONE,
@@ -732,7 +732,7 @@ fn responde_to_request_tx_propose_prevotes_precommits() {
         let mut validators = BitVec::from_elem(sandbox.n_validators(), false);
         validators.set(VALIDATOR_3.into(), true);
 
-        sandbox.recv(RequestPrevotes::new(
+        sandbox.recv(PrevotesRequest::new(
             &sandbox.p(VALIDATOR_3),
             &sandbox.p(VALIDATOR_0),
             HEIGHT_ONE,
@@ -782,7 +782,7 @@ fn not_request_txs_when_get_tx_and_propose() {
 // is fixed.
 #[cfg_attr(rustfmt, rustfmt_skip)]
 #[test]
-#[should_panic(expected = "Send unexpected message Request(RequestTransactions")]
+#[should_panic(expected = "Send unexpected message Request(TransactionsRequest")]
 fn handle_tx_verify_signature() {
     let sandbox = timestamping_sandbox();
 
@@ -828,7 +828,7 @@ fn request_txs_when_get_propose_or_prevote() {
 
     sandbox.send(
         sandbox.a(VALIDATOR_2),
-        RequestTransactions::new(
+        TransactionsRequest::new(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_2),
             &[tx.hash()],
@@ -851,7 +851,7 @@ fn request_txs_when_get_propose_or_prevote() {
 
     sandbox.send(
         sandbox.a(VALIDATOR_3),
-        RequestTransactions::new(
+        TransactionsRequest::new(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_3),
             &[tx.hash()],
@@ -878,7 +878,7 @@ fn request_prevotes_when_get_prevote_message() {
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout() - 1));
     sandbox.send(
         sandbox.a(VALIDATOR_2),
-        RequestPropose::new(
+        ProposeRequest::new(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_2),
             HEIGHT_ONE,
@@ -892,7 +892,7 @@ fn request_prevotes_when_get_prevote_message() {
 
     sandbox.send(
         sandbox.a(VALIDATOR_2),
-        RequestPrevotes::new(
+        PrevotesRequest::new(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_2),
             HEIGHT_ONE,
@@ -2380,7 +2380,7 @@ fn handle_tx_has_full_propose() {
     sandbox.add_time(Duration::from_millis(REQUEST_TRANSACTIONS_TIMEOUT));
     sandbox.send(
         sandbox.a(VALIDATOR_2),
-        RequestTransactions::new(
+        TransactionsRequest::new(
             &sandbox.p(VALIDATOR_0),
             &sandbox.p(VALIDATOR_2),
             &[tx.hash()],
@@ -2687,7 +2687,7 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
 // is fixed.
 #[cfg_attr(rustfmt, rustfmt_skip)]
 #[test]
-#[should_panic(expected = "Send unexpected message Request(RequestPropose")]
+#[should_panic(expected = "Send unexpected message Request(ProposeRequest")]
 fn test_handle_round_timeut_queue_prevote_message_from_next_round() {
     let sandbox = timestamping_sandbox();
 

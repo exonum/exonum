@@ -20,8 +20,8 @@ use std::time::Duration;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 
-use exonum::messages::{RawTransaction, Message, Propose, Prevote, Precommit, RequestPropose,
-                       RequestPrevotes};
+use exonum::messages::{RawTransaction, Message, Propose, Prevote, Precommit, ProposeRequest,
+                       PrevotesRequest};
 use exonum::blockchain::{Block, SCHEMA_MAJOR_VERSION};
 use exonum::crypto::{Hash, HASH_SIZE};
 use exonum::events::Milliseconds;
@@ -610,8 +610,8 @@ pub fn receive_valid_propose_with_transactions(
 pub fn make_request_propose_from_precommit(
     sandbox: &TimestampingSandbox,
     precommit: &Precommit,
-) -> RequestPropose {
-    RequestPropose::new(
+) -> ProposeRequest {
+    ProposeRequest::new(
         &sandbox.p(VALIDATOR_0),
         &sandbox.p(precommit.validator()),
         precommit.height(),
@@ -623,9 +623,9 @@ pub fn make_request_propose_from_precommit(
 pub fn make_request_prevote_from_precommit(
     sandbox: &TimestampingSandbox,
     precommit: &Precommit,
-) -> RequestPrevotes {
+) -> PrevotesRequest {
     let validators = BitVec::from_elem(sandbox.n_validators(), false);
-    RequestPrevotes::new(
+    PrevotesRequest::new(
         &sandbox.p(VALIDATOR_0),
         &sandbox.p(precommit.validator()),
         precommit.height(),

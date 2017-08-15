@@ -18,9 +18,9 @@ use std::net::SocketAddr;
 use std::time::SystemTime;
 
 use crypto::{hash, gen_keypair};
-use blockchain::{self, BlockProof};
-use messages::{RawMessage, Message, FromRaw, Connect, Propose, Prevote, Precommit, Status, Block,
-               RequestBlock};
+use blockchain::{self, BlockProof, Block};
+use messages::{RawMessage, Message, FromRaw, Connect, Propose, Prevote, Precommit, Status,
+               BlockResponse, BlockRequest};
 use helpers::{Height, Round, ValidatorId};
 
 use super::{Field, Offset};
@@ -304,7 +304,7 @@ fn test_block() {
     let txs = [2];
     let tx_count = txs.len() as u32;
 
-    let content = blockchain::Block::new(
+    let content = Block::new(
         blockchain::SCHEMA_MAJOR_VERSION,
         ValidatorId::zero(),
         Height(500),
@@ -354,7 +354,7 @@ fn test_block() {
             .raw()
             .clone(),
     ];
-    let block = Block::new(
+    let block = BlockResponse::new(
         &pub_key,
         &pub_key,
         content.clone(),
@@ -369,7 +369,7 @@ fn test_block() {
     assert_eq!(block.precommits(), precommits);
     assert_eq!(block.transactions(), transactions);
 
-    let block2 = Block::from_raw(block.raw().clone()).unwrap();
+    let block2 = BlockResponse::from_raw(block.raw().clone()).unwrap();
     assert_eq!(block2.from(), &pub_key);
     assert_eq!(block2.to(), &pub_key);
     assert_eq!(block2.block(), content);
@@ -388,7 +388,7 @@ fn test_block() {
 fn test_empty_block() {
     let (pub_key, secret_key) = gen_keypair();
 
-    let content = blockchain::Block::new(
+    let content = Block::new(
         blockchain::SCHEMA_MAJOR_VERSION,
         ValidatorId::zero(),
         Height(200),
@@ -400,7 +400,7 @@ fn test_empty_block() {
 
     let precommits = Vec::new();
     let transactions = Vec::new();
-    let block = Block::new(
+    let block = BlockResponse::new(
         &pub_key,
         &pub_key,
         content.clone(),
@@ -415,7 +415,7 @@ fn test_empty_block() {
     assert_eq!(block.precommits(), precommits);
     assert_eq!(block.transactions(), transactions);
 
-    let block2 = Block::from_raw(block.raw().clone()).unwrap();
+    let block2 = BlockResponse::from_raw(block.raw().clone()).unwrap();
     assert_eq!(block2.from(), &pub_key);
     assert_eq!(block2.to(), &pub_key);
     assert_eq!(block2.block(), content);
@@ -428,7 +428,7 @@ fn test_request_block() {
     let (public_key, secret_key) = gen_keypair();
 
     // write
-    let request = RequestBlock::new(&public_key, &public_key, Height(1), &secret_key);
+    let request = BlockRequest::new(&public_key, &public_key, Height(1), &secret_key);
     // read
     assert_eq!(request.from(), &public_key);
     assert_eq!(request.height(), Height(1));
