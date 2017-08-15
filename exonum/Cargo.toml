@@ -16,7 +16,6 @@ travis-ci = { repository = "https://github.com/exonum/exonum" }
 
 [dependencies]
 log = "0.3.8"
-mio = "0.5.0"
 byteorder = "1.1.0"
 hex = "0.2.0"
 bit-vec = "0.4.4"

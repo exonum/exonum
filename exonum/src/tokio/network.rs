@@ -15,7 +15,7 @@ use std::error::Error as StdError;
 
 use crypto::{gen_keypair, PublicKey, SecretKey};
 use messages::{RawMessage, Any, Connect, Message};
-use events::{EventHandler, Event};
+use events::{EventHandler, NetworkEvent};
 
 use super::error::{other_error, result_ok, forget_result, into_other, log_error};
 use super::codec::MessagesCodec;
@@ -27,8 +27,8 @@ pub fn run_node(node: Node) -> io::Result<()> {
     let listen_addr = sender.listen_addr;
     // Channels
     let (events_tx, events_rx) = mpsc::channel(64);
-    let (requests_tx, requests_rx) = (sender.network_sender, receiver.network_receiver);
-    let (timeouts_tx, timeouts_rx) = (sender.timeout_sender, receiver.timeout_receiver);
+    let (requests_tx, requests_rx) = (sender.network, receiver.network);
+    let (timeouts_tx, timeouts_rx) = (sender.timeout, receiver.timeout);
 
     let events_tx = events_tx.clone();
     let requests_tx = requests_tx.clone();
@@ -46,26 +46,17 @@ pub fn run_node(node: Node) -> io::Result<()> {
             debug!("Tokio: Handle request {:?}", request);
 
             match request {
-                NetworkRequest::ConnectWithPeer(peer) => {
-                    match outgoing_connections.entry(peer) {
-                        Entry::Occupied(_) => {}
+                NetworkRequest::SendMessage(peer, msg) => {
+                    let conn_tx = match outgoing_connections.entry(peer) {
+                        Entry::Occupied(entry) => entry.get().clone(),
                         Entry::Vacant(entry) => {
                             let (conn_tx, conn_rx) = mpsc::channel(10);
                             let socket = TcpStream::connect(&peer, &handle);
 
-                            let events_tx = events_tx.clone();
                             let requests_tx = requests_tx.clone();
                             let connect_handle = socket
                                 .and_then(move |sock| {
                                     info!("Tokio: Established connection with peer={}", peer);
-
-                                    // Send `Connected` event
-                                    // FIXME remove unwap
-                                    events_tx
-                                        .clone()
-                                        .send(Event::Connected(peer))
-                                        .wait()
-                                        .unwrap();
 
                                     let stream = sock.framed(MessagesCodec);
                                     let (sink, stream) = stream.split();
@@ -84,7 +75,7 @@ pub fn run_node(node: Node) -> io::Result<()> {
                                         })
                                 })
                                 .map_err(log_error)
-                                .then(move |reason| {
+                                .then(move |_| {
                                     info!("Tokio: Connection with peer={} closed", peer);
                                     let request = NetworkRequest::DisconnectWithPeer(peer);
                                     requests_tx
@@ -97,27 +88,45 @@ pub fn run_node(node: Node) -> io::Result<()> {
                             handle.spawn(connect_handle);
 
                             entry.insert(conn_tx.clone());
+                            conn_tx
                         }
-                    }
-                }
-                NetworkRequest::SendMessage(peer, msg) => {
-                    if let Some(conn_tx) = outgoing_connections.get(&peer) {
-                        let send_handle = conn_tx.clone().send(msg).map(forget_result).map_err(
-                            log_error,
-                        );
-                        handle.spawn(send_handle);
-                    }
+                    };
+
+                    let duration = Duration::from_secs(5);
+                    let send_timeout = Timeout::new(duration, &handle)
+                        .unwrap()
+                        .and_then(result_ok)
+                        .map_err(|_| other_error("Can't timeout"));
+
+                    let send_handle = conn_tx.send(msg).map(forget_result).map_err(log_error);
+
+                    let requests_tx = requests_tx.clone();
+                    let timeouted_connect = send_handle
+                        .select2(send_timeout)
+                        .map_err(|_| other_error("Unable to send message"))
+                        .and_then(move |either| match either {
+                            Either::A((send, _timeout_fut)) => Ok(send),
+                            Either::B((_, _connect_fut)) => Err(other_error("Send timeout")),
+                        })
+                        .or_else(move |_| {
+                            let request = NetworkRequest::DisconnectWithPeer(peer);
+                            requests_tx.clone().send(request).map(forget_result)
+                        })
+                        .map_err(log_error);
+
+                    handle.spawn(timeouted_connect);
                 }
                 NetworkRequest::DisconnectWithPeer(peer) => {
                     outgoing_connections.remove(&peer);
 
-                    let event = Event::Disconnected(peer);
+                    let event = NetworkEvent::PeerDisconnected(peer);
                     let event_handle = events_tx.clone().send(event).map(forget_result).map_err(
                         log_error,
                     );
                     handle.spawn(event_handle);
                 }
             }
+
             Ok(())
         });
 
@@ -127,25 +136,42 @@ pub fn run_node(node: Node) -> io::Result<()> {
         let server = listener
             .incoming()
             .fold(events_tx, move |events_tx, (sock, addr)| {
-                info!("Accepted incoming connection with peer={}", addr);
+                info!("Tokio: Accepted incoming connection with peer={}", addr);
 
                 let stream = sock.framed(MessagesCodec);
                 let (_, stream) = stream.split();
                 let events_tx = events_tx.clone();
+                stream
+                    .into_future()
+                    .map_err(|e| e.0)
+                    .and_then(move |(raw, stream)| {
+                        let msg = raw.map(Any::from_raw);
+                        if let Some(Ok(Any::Connect(msg))) = msg {
+                            Ok((msg, stream))
+                        } else {
+                            Err(other_error("First message is not Connect"))
+                        }
+                    })
+                    .and_then(move |(connect, stream)| {
+                        info!("Tokio: Received handshake message={:?}", connect);
 
-                let event = Event::Disconnected(addr);
-                let connect_event = events_tx.clone().send(event).map_err(into_other);
+                        let addr = connect.addr();
+                        let event = NetworkEvent::PeerConnected(addr, connect);
+                        let connect_event = events_tx.clone().send(event).map_err(into_other);
 
-                let messages_stream = stream.for_each(move |raw| {
-                    let event = Event::Incoming(raw);
-                    events_tx.clone().send(event).map(forget_result).map_err(
-                        into_other,
-                    )
-                });
+                        let events_tx = events_tx.clone();
+                        let messages_stream = stream.for_each(move |raw| {
+                            let event = NetworkEvent::MessageReceived(addr, raw);
+                            events_tx.clone().send(event).map(forget_result).map_err(
+                                into_other,
+                            )
+                        });
 
-                messages_stream
-                    .join(connect_event)
-                    .map(move |(_, stream)| stream)
+                        messages_stream
+                            .join(connect_event)
+                            .map(move |(_, stream)| stream)
+                            .map_err(into_other)
+                    })
                     .map_err(into_other)
             })
             .map(forget_result)
@@ -162,20 +188,20 @@ pub fn run_node(node: Node) -> io::Result<()> {
     let events_handle = events_rx.merge(timeouts_rx).for_each(move |item| {
         match item {
             MergedItem::First(event) => {
-                handler.handle_event(event);
+                handler.handle_network_event(event);
             }
             MergedItem::Second(timeout) => {
                 handler.handle_timeout(timeout);
             }
             MergedItem::Both(event, timeout) => {
                 handler.handle_timeout(timeout);
-                handler.handle_event(event);
+                handler.handle_network_event(event);
             }
         }
         Ok(())
     });
     core.run(events_handle).unwrap();
-    debug!("Handler thread is gone");
+    debug!("Tokio: Handler thread is gone");
 
     network_thread.join().unwrap();
     Ok(())

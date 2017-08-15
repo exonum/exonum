@@ -31,7 +31,6 @@ extern crate exonum_profiler as profiler;
 #[macro_use]
 extern crate log;
 extern crate byteorder;
-extern crate mio;
 extern crate sodiumoxide;
 extern crate exonum_leveldb as leveldb;
 extern crate rand;

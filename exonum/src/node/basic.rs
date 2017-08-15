@@ -28,7 +28,7 @@ where
     S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>,
 {
     /// Redirects message to the corresponding `handle_...` function.
-    pub fn handle_message(&mut self, raw: RawMessage) {
+    pub fn handle_message(&mut self, peer: SocketAddr, raw: RawMessage) {
         // TODO: check message headers (network id, protocol version)
         // FIXME: call message.verify method
         //     if !raw.verify() {
@@ -48,20 +48,20 @@ where
         }
     }
 
-    /// Handles the `Connected` event. Node's `Connect` message is sent as response.
-    pub fn handle_connected(&mut self, addr: &SocketAddr) {
-        info!("Connected to: {}", addr);
-        let message = self.state.our_connect_message().clone();
-        self.send_to_addr(addr, message.raw());
+    /// Handles the `Connected` event. Node's `Connect` message is sent as response
+    /// if received `Connect` message is correct.
+    pub fn handle_connected(&mut self, addr: SocketAddr, connect: Connect) {
+        info!("Received Connect message from peer: {}", addr);
+        self.handle_connect(connect);
     }
 
     /// Handles the `Disconnected` event. Node will try to connect to that address again if it was
     /// in the validators list.
-    pub fn handle_disconnected(&mut self, addr: &SocketAddr) {
+    pub fn handle_disconnected(&mut self, addr: SocketAddr) {
         info!("Disconnected from: {}", addr);
-        let need_reconnect = self.state.remove_peer_with_addr(addr);
+        let need_reconnect = self.state.remove_peer_with_addr(&addr);
         if need_reconnect {
-            self.connect(addr);
+            self.connect(&addr);
         }
     }
 

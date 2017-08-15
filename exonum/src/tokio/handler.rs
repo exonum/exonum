@@ -8,7 +8,7 @@ use std::error::Error as StdError;
 use std::time::{Duration, SystemTime};
 use std::net::SocketAddr;
 
-use events::{Channel, Error as EventsError};
+use events::Channel;
 use node::{ExternalMessage, NodeTimeout};
 use messages::RawMessage;
 
@@ -16,25 +16,24 @@ use super::error::{forget_result, log_error, into_other};
 
 #[derive(Debug, Clone)]
 pub enum NetworkRequest {
-    ConnectWithPeer(SocketAddr),
-    DisconnectWithPeer(SocketAddr),
     SendMessage(SocketAddr, RawMessage),
+    DisconnectWithPeer(SocketAddr),
 }
 
 /// Channel for messages and timeouts.
 #[derive(Debug, Clone)]
 pub struct NodeSender {
     pub listen_addr: SocketAddr,
-    pub timeout_sender: mpsc::Sender<NodeTimeout>,
-    pub network_sender: mpsc::Sender<NetworkRequest>,
-    pub external_sender: mpsc::Sender<ExternalMessage>,
+    pub timeout: mpsc::Sender<NodeTimeout>,
+    pub network: mpsc::Sender<NetworkRequest>,
+    pub external: mpsc::Sender<ExternalMessage>,
 }
 
 #[derive(Debug)]
 pub struct NodeReceiver {
-    pub timeout_receiver: mpsc::Receiver<NodeTimeout>,
-    pub network_receiver: mpsc::Receiver<NetworkRequest>,
-    pub external_receiver: mpsc::Receiver<ExternalMessage>,
+    pub timeout: mpsc::Receiver<NodeTimeout>,
+    pub network: mpsc::Receiver<NetworkRequest>,
+    pub external: mpsc::Receiver<ExternalMessage>,
 }
 
 #[derive(Debug)]
@@ -48,14 +47,14 @@ impl NodeChannel {
 
         let sender = NodeSender {
             listen_addr,
-            timeout_sender,
-            network_sender,
-            external_sender,
+            timeout: timeout_sender,
+            network: network_sender,
+            external: external_sender,
         };
         let receiver = NodeReceiver {
-            timeout_receiver,
-            network_receiver,
-            external_receiver,
+            timeout: timeout_receiver,
+            network: network_receiver,
+            external: external_receiver,
         };
         NodeChannel(sender, receiver)
     }
@@ -73,8 +72,8 @@ impl Channel for NodeSender {
         SystemTime::now()
     }
 
-    fn post_event(&self, handle: Handle, event: Self::ApplicationEvent) -> Result<(), EventsError> {
-        let event_futute = self.external_sender
+    fn post_event(&self, handle: Handle, event: Self::ApplicationEvent) -> Result<(), io::Error> {
+        let event_futute = self.external
             .clone()
             .send(event)
             .map(forget_result)
@@ -83,9 +82,9 @@ impl Channel for NodeSender {
         Ok(())
     }
 
-    fn send_to(&mut self, handle: Handle, address: &SocketAddr, message: RawMessage) {
-        let request = NetworkRequest::SendMessage(*address, message);
-        let send_future = self.network_sender
+    fn send_to(&mut self, handle: Handle, address: SocketAddr, message: RawMessage) {
+        let request = NetworkRequest::SendMessage(address, message);
+        let send_future = self.network
             .clone()
             .send(request)
             .map(forget_result)
@@ -93,21 +92,11 @@ impl Channel for NodeSender {
         handle.spawn(send_future);
     }
 
-    fn connect(&mut self, handle: Handle, address: &SocketAddr) {
-        let request = NetworkRequest::ConnectWithPeer(*address);
-        let connect_future = self.network_sender
-            .clone()
-            .send(request)
-            .map(forget_result)
-            .map_err(log_error);
-        handle.spawn(connect_future);
-    }
-
     fn add_timeout(&mut self, handle: Handle, timeout: Self::Timeout, time: SystemTime) {
         let duration = time.duration_since(self.get_time()).unwrap_or_else(|_| {
             Duration::from_secs(0)
         });
-        let sender = self.timeout_sender.clone();
+        let sender = self.timeout.clone();
         let timeout_handle = Timeout::new(duration, &handle)
             .expect("Unable to create timeout")
             .and_then(move |_| {
@@ -116,8 +105,4 @@ impl Channel for NodeSender {
             .map_err(|_| panic!("Can't timeout"));
         handle.spawn(timeout_handle);
     }
-}
-
-fn events_error<E: StdError>(e: E) -> EventsError {
-    EventsError::new(e.description())
 }
