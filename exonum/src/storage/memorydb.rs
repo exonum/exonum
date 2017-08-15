@@ -47,7 +47,9 @@ impl Database for MemoryDB {
     }
 
     fn snapshot(&self) -> Box<Snapshot> {
-        Box::new(Clone::clone(self))
+        Box::new(MemoryDB {
+            map: Arc::new(RwLock::new(self.map.read().unwrap().clone())),
+        })
     }
 
     fn merge(&mut self, patch: Patch) -> Result<()> {
@@ -95,4 +97,35 @@ impl<'a> Iterator for MemoryDBIter<'a> {
     fn peek(&mut self) -> Option<(&[u8], &[u8])> {
         self.iter.peek().map(|&(k, v)| (k.as_slice(), v.as_slice()))
     }
+}
+
+#[test]
+fn test_memorydb_snapshot() {
+    let mut db = MemoryDB::new();
+
+    {
+        let mut fork = db.fork();
+        fork.put(vec![1, 2, 3], vec![123]);
+        let _ = db.merge(fork.into_patch());
+    }
+
+    let snapshot = db.snapshot();
+    assert!(snapshot.contains(vec![1, 2, 3].as_slice()));
+
+    {
+        let mut fork = db.fork();
+        fork.put(vec![2, 3, 4], vec![234]);
+        let _ = db.merge(fork.into_patch());
+    }
+
+    assert!(!snapshot.contains(vec![2, 3, 4].as_slice()));
+
+    {
+        let db_clone = Clone::clone(&db);
+        let snap_clone = db_clone.snapshot();
+        assert!(snap_clone.contains(vec![2, 3, 4].as_slice()));
+    }
+
+    let snapshot = db.snapshot();
+    assert!(snapshot.contains(vec![2, 3, 4].as_slice()));
 }
