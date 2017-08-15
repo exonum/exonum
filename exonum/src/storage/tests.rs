@@ -194,17 +194,3 @@ fn test_memory_changelog() {
     changelog(memorydb_database())
 }
 
-#[test]
-fn test_shared_state_memorydb() {
-    let mut db = MemoryDB::new();
-    let db_clone = Database::clone(&db);
-
-    {
-        let mut fork = db.fork();
-        fork.put(vec![1, 2, 3], vec![2, 3, 4]);
-        db.merge(fork.into_patch()).unwrap();
-    }
-
-    assert_eq!(db.fork().get(&[1, 2, 3]), Some(vec![2, 3, 4]));
-    assert_eq!(db_clone.fork().get(&[1, 2, 3]), Some(vec![2, 3, 4]));
-}
