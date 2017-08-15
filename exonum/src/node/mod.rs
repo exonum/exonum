@@ -17,7 +17,9 @@
 //! For details about consensus message handling see messages module documentation.
 
 use toml::Value;
-use tokio_core::reactor::{Handle, Core};
+use futures::{Sink, Future};
+use futures::sync::mpsc::Sender;
+use tokio_core::reactor::Handle;
 
 use std::io;
 use std::net::SocketAddr;
@@ -26,15 +28,17 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 use crypto::{PublicKey, SecretKey, Hash};
-use events::{Channel, Milliseconds, EventHandler};
+use events::{Channel, Milliseconds};
 use blockchain::{SharedNodeState, Blockchain, Schema, GenesisConfig, Transaction};
 use messages::{Connect, RawMessage, Message};
-use tokio::network::{NetworkConfiguration, NetworkEvent};
+use tokio::network::NetworkConfiguration;
+use tokio::error::{into_other, forget_result};
 
 pub use self::state::{State, Round, Height, RequestData, ValidatorId, TxPool, ValidatorState};
 pub use self::whitelist::Whitelist;
 pub use tokio::{Node, NodeChannel, NodeSender};
 
+mod events;
 mod basic;
 mod consensus;
 mod requests;
@@ -70,12 +74,7 @@ pub enum NodeTimeout {
 
 /// Transactions sender.
 #[derive(Clone)]
-pub struct ApiSender<S>
-where
-    S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>,
-{
-    inner: S,
-}
+pub struct ApiSender(pub Sender<ExternalMessage>);
 
 /// Handler that that performs consensus algorithm.
 pub struct NodeHandler<S>
@@ -473,48 +472,6 @@ where
     }
 }
 
-impl<S> EventHandler for NodeHandler<S>
-where
-    S: Channel<
-        ApplicationEvent = ExternalMessage,
-        Timeout = NodeTimeout,
-    >,
-{
-    type Timeout = NodeTimeout;
-    type ApplicationEvent = ExternalMessage;
-
-    fn handle_network_event(&mut self, event: NetworkEvent) {
-        match event {
-            NetworkEvent::PeerConnected(peer, connect) => self.handle_connected(peer, connect),
-            NetworkEvent::PeerDisconnected(peer) => self.handle_disconnected(peer),
-            NetworkEvent::MessageReceived(peer, raw) => self.handle_message(peer, raw),
-        }
-    }
-
-    fn handle_application_event(&mut self, event: Self::ApplicationEvent) {
-        match event {
-            ExternalMessage::Transaction(tx) => {
-                self.handle_incoming_tx(tx);
-            }
-            ExternalMessage::PeerAdd(address) => {
-                info!("Send Connect message to {}", address);
-                self.connect(&address);
-            }
-        }
-    }
-
-    fn handle_timeout(&mut self, timeout: Self::Timeout) {
-        match timeout {
-            NodeTimeout::Round(height, round) => self.handle_round_timeout(height, round),
-            NodeTimeout::Request(data, peer) => self.handle_request_timeout(data, peer),
-            NodeTimeout::Status(height) => self.handle_status_timeout(height),
-            NodeTimeout::PeerExchange => self.handle_peer_exchange_timeout(),
-            NodeTimeout::UpdateApiState => self.handle_update_api_state_timeout(),
-            NodeTimeout::Propose(height, round) => self.handle_propose_timeout(height, round),
-        }
-    }
-}
-
 impl<S> fmt::Debug for NodeHandler<S>
 where
     S: Channel<
@@ -539,52 +496,35 @@ pub trait TransactionSend: Send + Sync {
     fn send(&self, tx: Box<Transaction>) -> io::Result<()>;
 }
 
-impl<S> ApiSender<S>
-where
-    S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>,
-{
+impl ApiSender {
     /// Creates new `ApiSender` with given channel.
-    pub fn new(inner: S) -> ApiSender<S> {
-        ApiSender { inner: inner }
-    }
-
-    /// Dummy handle
-    pub fn tokio_handle(&self) -> Handle {
-        let dummy_core = Core::new().unwrap();
-        dummy_core.handle()
+    pub fn new(inner: Sender<ExternalMessage>) -> ApiSender {
+        ApiSender(inner)
     }
 
     /// Addr peer to peer list
     pub fn peer_add(&self, addr: SocketAddr) -> io::Result<()> {
         let msg = ExternalMessage::PeerAdd(addr);
-        self.inner.post_event(self.tokio_handle(), msg)
+        self.0.clone().send(msg).wait().map(forget_result).map_err(
+            into_other,
+        )
     }
 }
 
-impl<S> TransactionSend for ApiSender<S>
-where
-    S: Channel<
-        ApplicationEvent = ExternalMessage,
-        Timeout = NodeTimeout,
-    >,
-{
+impl TransactionSend for ApiSender {
     fn send(&self, tx: Box<Transaction>) -> io::Result<()> {
         if !tx.verify() {
             let msg = "Unable to verify transaction";
             return Err(io::Error::new(io::ErrorKind::Other, msg));
         }
         let msg = ExternalMessage::Transaction(tx);
-        self.inner.post_event(self.tokio_handle(), msg)
+        self.0.clone().send(msg).wait().map(forget_result).map_err(
+            into_other,
+        )
     }
 }
 
-impl<T> fmt::Debug for ApiSender<T>
-where
-    T: Channel<
-        ApplicationEvent = ExternalMessage,
-        Timeout = NodeTimeout,
-    >,
-{
+impl fmt::Debug for ApiSender {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.pad("ApiSender { .. }")
     }

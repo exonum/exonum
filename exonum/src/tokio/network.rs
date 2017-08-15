@@ -12,12 +12,11 @@ use std::time::Duration;
 use std::collections::hash_map::{HashMap, Entry};
 
 use messages::{Any, Connect, RawMessage};
-use events::EventHandler;
 
 use super::error::{other_error, result_ok, forget_result, into_other, log_error};
 use super::codec::MessagesCodec;
 use super::Node;
-use super::handler::{Event, EventsAggregator};
+use super::handler::EventsAggregator;
 
 #[derive(Debug)]
 pub enum NetworkEvent {
@@ -222,11 +221,7 @@ pub fn run_node_handler(node: Node) -> io::Result<()> {
 
     let events_handle = EventsAggregator::new(timeouts_rx, events_rx, api_rx)
         .for_each(move |event| {
-            match event {
-                Event::Timeout(timeout) => handler.handle_timeout(timeout),
-                Event::Network(network) => handler.handle_network_event(network),
-                Event::Api(api) => handler.handle_application_event(api),
-            }
+            handler.handle_event(event);
             Ok(())
         });
     core.run(events_handle).unwrap();

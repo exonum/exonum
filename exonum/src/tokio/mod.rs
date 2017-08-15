@@ -184,8 +184,8 @@ impl Node {
     }
 
     /// Returns channel.
-    pub fn channel(&self) -> ApiSender<NodeSender> {
-        ApiSender::new(self.channel.0.clone())
+    pub fn channel(&self) -> ApiSender {
+        ApiSender::new(self.channel.0.external.clone())
     }
 }
 

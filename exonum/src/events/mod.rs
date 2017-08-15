@@ -19,21 +19,11 @@ use std::net::SocketAddr;
 use std::time::SystemTime;
 
 use messages::{RawMessage};
-use tokio::network::NetworkEvent;
 
 // #[cfg(test)]
 // mod tests;
 
 pub type Milliseconds = u64;
-
-pub trait EventHandler {
-    type Timeout: Send;
-    type ApplicationEvent: Send;
-
-    fn handle_network_event(&mut self, event: NetworkEvent);
-    fn handle_timeout(&mut self, timeout: Self::Timeout);
-    fn handle_application_event(&mut self, event: Self::ApplicationEvent);
-}
 
 pub trait Channel: Sync + Send + Clone {
     type ApplicationEvent: Send;

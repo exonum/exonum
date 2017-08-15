@@ -29,7 +29,7 @@ use crypto::{Hash, PublicKey, SecretKey};
 use storage::{Snapshot, Fork};
 use messages::{Message, RawTransaction};
 use encoding::Error as MessageError;
-use node::{Node, State, NodeSender, ApiSender};
+use node::{Node, State, ApiSender};
 use node::state::ValidatorState;
 use blockchain::{ConsensusConfig, Blockchain, ValidatorKeys};
 
@@ -346,7 +346,7 @@ impl SharedNodeState {
 /// Provides the current node state to api handlers.
 pub struct ApiContext {
     blockchain: Blockchain,
-    node_channel: ApiSender<NodeSender>,
+    node_channel: ApiSender,
     public_key: PublicKey,
     secret_key: SecretKey,
 }
@@ -370,7 +370,7 @@ impl ApiContext {
     }
 
     /// Returns reference to the transaction sender.
-    pub fn node_channel(&self) -> &ApiSender<NodeSender> {
+    pub fn node_channel(&self) -> &ApiSender {
         &self.node_channel
     }
 
