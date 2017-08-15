@@ -12,7 +12,7 @@ categories = ["cryptography", "database-implementations"]
 description = "An extensible framework for blockchain software projects."
 
 [badges]
-travis-ci = { repository = "https://github.com/exonum/exonum" }
+travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
 log = "0.3.8"
