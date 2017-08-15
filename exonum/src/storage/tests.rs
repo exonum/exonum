@@ -193,4 +193,3 @@ fn test_leveldb_changelog() {
 fn test_memory_changelog() {
     changelog(memorydb_database())
 }
-
