@@ -1,10 +1,8 @@
 use futures::{Sink, Future};
 use futures::sync::mpsc;
-use tokio_core::reactor::{Core, Handle, Timeout};
+use tokio_core::reactor::{Handle, Timeout};
 
 use std::io;
-use std::sync::{Mutex, Arc};
-use std::error::Error as StdError;
 use std::time::{Duration, SystemTime};
 use std::net::SocketAddr;
 

@@ -30,30 +30,38 @@ pub enum BlockchainAction {
 }
 
 pub struct BlockchainCommand<'a, 'b>
-    where 'a: 'b
+where
+    'a: 'b,
 {
     _p: PhantomData<App<'a, 'b>>,
 }
 
 impl<'a, 'b> BlockchainCommand<'a, 'b>
-    where 'a: 'b
+where
+    'a: 'b,
 {
     pub fn new() -> App<'a, 'b> {
         SubCommand::with_name("blockchain")
             .about("Blockchain explorer")
-            .arg(Arg::with_name("LEVELDB_PATH")
-                     .short("d")
-                     .long("leveldb-path")
-                     .value_name("LEVELDB_PATH")
-                     .help("Use leveldb database with the given path")
-                     .required(true)
-                     .takes_value(true))
-            .subcommand(SubCommand::with_name("find_tx")
-                            .about("Find transaction with given hash")
-                            .arg(Arg::with_name("TX_HASH")
-                                     .help("Transaction hash")
-                                     .required(true)
-                                     .index(1)))
+            .arg(
+                Arg::with_name("LEVELDB_PATH")
+                    .short("d")
+                    .long("leveldb-path")
+                    .value_name("LEVELDB_PATH")
+                    .help("Use leveldb database with the given path")
+                    .required(true)
+                    .takes_value(true),
+            )
+            .subcommand(
+                SubCommand::with_name("find_tx")
+                    .about("Find transaction with given hash")
+                    .arg(
+                        Arg::with_name("TX_HASH")
+                            .help("Transaction hash")
+                            .required(true)
+                            .index(1),
+                    ),
+            )
     }
 
     pub fn leveldb_path(matches: &'a ArgMatches<'a>) -> &'a Path {

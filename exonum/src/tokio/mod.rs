@@ -6,22 +6,19 @@ pub mod network;
 use router::Router;
 use mount::Mount;
 use iron::{Chain, Iron};
-use toml::Value;
 use tokio_core::reactor::Core;
 
 use std::io;
 use std::thread;
 
-use crypto::{self, PublicKey, SecretKey, Hash};
-use events::{NetworkConfiguration, Channel, Milliseconds};
-use blockchain::{SharedNodeState, Blockchain, Schema, GenesisConfig, Transaction, ApiContext};
-use messages::{Connect, RawMessage};
+use crypto;
+use blockchain::{SharedNodeState, Blockchain, ApiContext};
 use api::{Api, public, private};
 use node::{NodeConfig, Configuration, ListenerConfig, ServiceConfig, NodeHandler, NodeApiConfig,
            ApiSender};
-use node::state::{State, Round, Height, RequestData, ValidatorId, TxPool, ValidatorState};
+use node::state::State;
 
-use self::network::run_node;
+use self::network::run_node_handler;
 pub use self::handler::{NodeSender, NodeReceiver, NodeChannel};
 
 const PROFILE_ENV_VARIABLE_NAME: &'static str = "EXONUM_PROFILE_FILENAME";
@@ -95,8 +92,8 @@ impl Node {
 
     /// Launches only consensus messages handler.
     /// This may be used if you want to customize api with the `ApiContext`.
-    pub fn run_handler(&mut self) -> io::Result<()> {
-        unimplemented!();
+    pub fn run_handler(self) -> io::Result<()> {
+        run_node_handler(self)
     }
 
     /// A generic implementation that launches `Node` and optionally creates threads
@@ -105,7 +102,75 @@ impl Node {
     /// Public api prefix is `/api/services/{service_name}`
     /// Private api prefix is `/api/services/{service_name}`
     pub fn run(self) -> io::Result<()> {
-        run_node(self)
+        let blockchain = self.handler().blockchain.clone();
+        let channel = self.channel();
+
+        let private_config_api_thread = match self.api_options.private_api_address {
+            Some(listen_address) => {
+                let api_context = ApiContext::new(&self);
+                let mut mount = Mount::new();
+                mount.mount("api/services", api_context.mount_private_api());
+                let shared_api_state = self.handler().api_state().clone();
+                let mut router = Router::new();
+                let node_info =
+                    private::NodeInfo::new(blockchain.service_map().iter().map(|(_, s)| s));
+                let system_api = private::SystemApi::new(
+                    node_info,
+                    blockchain.clone(),
+                    shared_api_state,
+                    channel,
+                );
+                system_api.wire(&mut router);
+                mount.mount("api/system", router);
+
+                let thread = thread::spawn(move || {
+                    info!("Private exonum api started on {}", listen_address);
+                    let chain = Chain::new(mount);
+                    Iron::new(chain).http(listen_address).unwrap();
+                });
+                Some(thread)
+            }
+            None => None,
+        };
+        let public_config_api_thread = match self.api_options.public_api_address {
+            Some(listen_address) => {
+                let api_context = ApiContext::new(&self);
+                let mut mount = Mount::new();
+                mount.mount("api/services", api_context.mount_public_api());
+
+                let mut router = Router::new();
+                let pool = self.state().transactions().clone();
+                let system_api = public::SystemApi::new(pool, blockchain.clone());
+                system_api.wire(&mut router);
+                mount.mount("api/system", router);
+                if self.api_options.enable_blockchain_explorer {
+                    let mut router = Router::new();
+                    let explorer_api = public::ExplorerApi::new(blockchain);
+                    explorer_api.wire(&mut router);
+                    mount.mount("api/explorer", router);
+                }
+
+                let thread = thread::spawn(move || {
+                    info!("Public exonum api started on {}", listen_address);
+
+                    let chain = Chain::new(mount);
+                    Iron::new(chain).http(listen_address).unwrap();
+                });
+                Some(thread)
+            }
+            None => None,
+        };
+
+        run_node_handler(self)?;
+
+        if let Some(private_config_api_thread) = private_config_api_thread {
+            private_config_api_thread.join().unwrap();
+        }
+        if let Some(public_config_api_thread) = public_config_api_thread {
+            public_config_api_thread.join().unwrap();
+        }
+
+        Ok(())
     }
 
     /// Returns `State`.
@@ -125,80 +190,10 @@ impl Node {
 }
 
 
+// New traits
 
-// /// A generic implementation that launches `Node` and optionally creates threads
-// /// for public and private api handlers.
-// /// Explorer api prefix is `/api/explorer`
-// /// Public api prefix is `/api/services/{service_name}`
-// /// Private api prefix is `/api/services/{service_name}`
-// pub fn run(&mut self) -> io::Result<()> {
-//     let blockchain = self.handler().blockchain.clone();
-//     let channel = self.channel();
+use std::time::SystemTime;
 
-//     let private_config_api_thread = match self.api_options.private_api_address {
-//         Some(listen_address) => {
-//             let api_context = ApiContext::new(self);
-//             let mut mount = Mount::new();
-//             mount.mount("api/services", api_context.mount_private_api());
-//             let shared_api_state = self.handler().api_state().clone();
-//             let mut router = Router::new();
-//             let node_info =
-//                 private::NodeInfo::new(blockchain.service_map().iter().map(|(_, s)| s));
-//             let system_api = private::SystemApi::new(
-//                 node_info,
-//                 blockchain.clone(),
-//                 shared_api_state,
-//                 channel,
-//             );
-//             system_api.wire(&mut router);
-//             mount.mount("api/system", router);
-
-//             let thread = thread::spawn(move || {
-//                 info!("Private exonum api started on {}", listen_address);
-//                 let chain = Chain::new(mount);
-//                 Iron::new(chain).http(listen_address).unwrap();
-//             });
-//             Some(thread)
-//         }
-//         None => None,
-//     };
-//     let public_config_api_thread = match self.api_options.public_api_address {
-//         Some(listen_address) => {
-//             let api_context = ApiContext::new(self);
-//             let mut mount = Mount::new();
-//             mount.mount("api/services", api_context.mount_public_api());
-
-//             let mut router = Router::new();
-//             let pool = self.state().transactions().clone();
-//             let system_api = public::SystemApi::new(pool, blockchain.clone());
-//             system_api.wire(&mut router);
-//             mount.mount("api/system", router);
-//             if self.api_options.enable_blockchain_explorer {
-//                 let mut router = Router::new();
-//                 let explorer_api = public::ExplorerApi::new(blockchain);
-//                 explorer_api.wire(&mut router);
-//                 mount.mount("api/explorer", router);
-//             }
-
-//             let thread = thread::spawn(move || {
-//                 info!("Public exonum api started on {}", listen_address);
-
-//                 let chain = Chain::new(mount);
-//                 Iron::new(chain).http(listen_address).unwrap();
-//             });
-//             Some(thread)
-//         }
-//         None => None,
-//     };
-
-//     self.run_handler()?;
-
-//     if let Some(private_config_api_thread) = private_config_api_thread {
-//         private_config_api_thread.join().unwrap();
-//     }
-//     if let Some(public_config_api_thread) = public_config_api_thread {
-//         public_config_api_thread.join().unwrap();
-//     }
-
-//     Ok(())
-// }
+pub trait SystemStateProvider {
+    fn current_time(&self) -> SystemTime;
+}

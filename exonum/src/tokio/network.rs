@@ -1,20 +1,18 @@
-use futures::{future, stream, Future, Stream, Sink, IntoFuture};
+use futures::{Future, Stream, Sink, IntoFuture};
 use futures::stream::MergedItem;
-use futures::future::{Either, err};
+use futures::future::Either;
 use futures::sync::mpsc;
 use tokio_core::net::{TcpListener, TcpStream};
-use tokio_core::reactor::{Core, Handle, Timeout};
+use tokio_core::reactor::{Core, Timeout};
 use tokio_io::AsyncRead;
 
 use std::io;
 use std::net::SocketAddr;
 use std::thread;
-use std::time::{SystemTime, Duration};
+use std::time::Duration;
 use std::collections::hash_map::{HashMap, Entry};
-use std::error::Error as StdError;
 
-use crypto::{gen_keypair, PublicKey, SecretKey};
-use messages::{RawMessage, Any, Connect, Message};
+use messages::{Any, RawMessage};
 use events::{EventHandler, NetworkEvent};
 
 use super::error::{other_error, result_ok, forget_result, into_other, log_error};
@@ -22,13 +20,13 @@ use super::codec::MessagesCodec;
 use super::Node;
 use super::handler::NetworkRequest;
 
-pub fn run_node(node: Node) -> io::Result<()> {
+pub fn run_node_handler(node: Node) -> io::Result<()> {
     let (sender, receiver) = (node.channel.0, node.channel.1);
     let listen_addr = sender.listen_addr;
     // Channels
     let (events_tx, events_rx) = mpsc::channel(64);
     let (requests_tx, requests_rx) = (sender.network, receiver.network);
-    let (timeouts_tx, timeouts_rx) = (sender.timeout, receiver.timeout);
+    let timeouts_rx = receiver.timeout;
 
     let events_tx = events_tx.clone();
     let requests_tx = requests_tx.clone();

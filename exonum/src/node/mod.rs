@@ -16,9 +16,6 @@
 //!
 //! For details about consensus message handling see messages module documentation.
 
-use router::Router;
-use mount::Mount;
-use iron::{Chain, Iron};
 use toml::Value;
 use tokio_core::reactor::{Handle, Core};
 
@@ -26,14 +23,12 @@ use std::io;
 use std::net::SocketAddr;
 use std::time::{SystemTime, Duration};
 use std::collections::BTreeMap;
-use std::thread;
 use std::fmt;
 
-use crypto::{self, PublicKey, SecretKey, Hash};
+use crypto::{PublicKey, SecretKey, Hash};
 use events::{NetworkConfiguration, NetworkEvent, Channel, Milliseconds, EventHandler};
-use blockchain::{SharedNodeState, Blockchain, Schema, GenesisConfig, Transaction, ApiContext};
+use blockchain::{SharedNodeState, Blockchain, Schema, GenesisConfig, Transaction};
 use messages::{Connect, RawMessage, Message};
-use api::{Api, public, private};
 
 pub use self::state::{State, Round, Height, RequestData, ValidatorId, TxPool, ValidatorState};
 pub use self::whitelist::Whitelist;
