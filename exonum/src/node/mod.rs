@@ -138,7 +138,7 @@ pub struct NodeApiConfig {
 impl Default for NodeApiConfig {
     fn default() -> NodeApiConfig {
         NodeApiConfig {
-            state_update_timeout: 10000,
+            state_update_timeout: 10_000,
             enable_blockchain_explorer: true,
             public_api_address: None,
             private_api_address: None,
@@ -159,8 +159,8 @@ pub struct MemoryPoolConfig {
 impl Default for MemoryPoolConfig {
     fn default() -> MemoryPoolConfig {
         MemoryPoolConfig {
-            tx_pool_capacity: 100000,
-            events_pool_capacity: 400000,
+            tx_pool_capacity: 100_000,
+            events_pool_capacity: 400_000,
         }
     }
 }

@@ -71,7 +71,7 @@ impl Default for ConsensusConfig {
         ConsensusConfig {
             round_timeout: 3000,
             status_timeout: 5000,
-            peers_timeout: 10000,
+            peers_timeout: 10_000,
             txs_block_limit: 1000,
             timeout_adjuster: TimeoutAdjusterConfig::Constant { timeout: 500 },
         }

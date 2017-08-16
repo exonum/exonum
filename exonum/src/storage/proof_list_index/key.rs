@@ -15,7 +15,7 @@
 use super::super::StorageKey;
 
 const HEIGHT_SHIFT: u64 = 56;
-const MAX_INDEX: u64 = 72057594037927935; // 2 ** 56 - 1
+const MAX_INDEX: u64 = 72_057_594_037_927_935; // 2 ** 56 - 1
 
 #[derive(Debug, Copy, Clone)]
 pub struct ProofListKey {
@@ -81,7 +81,7 @@ impl ProofListKey {
     }
 
     pub fn is_left(&self) -> bool {
-        self.index & 1 == 0
+        self.index.trailing_zeros() >= 1
     }
 
     pub fn as_left(&self) -> Self {
