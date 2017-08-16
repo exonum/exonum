@@ -20,8 +20,9 @@ use std::net::SocketAddr;
 use std::error::Error;
 
 use messages::{Any, RawMessage, Connect, Status, Message, PeersRequest};
+use helpers::Height;
 use events::Channel;
-use super::{NodeHandler, RequestData, ExternalMessage, NodeTimeout, Height};
+use super::{NodeHandler, RequestData, ExternalMessage, NodeTimeout};
 
 impl<S> NodeHandler<S>
 where

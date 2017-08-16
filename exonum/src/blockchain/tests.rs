@@ -14,8 +14,10 @@
 
 #![allow(dead_code)]
 
-use crypto::Hash;
 use serde_json;
+
+use helpers::{Height, ValidatorId};
+use crypto::Hash;
 
 #[test]
 fn test_encode_decode() {
@@ -189,8 +191,8 @@ fn test_handling_tx_panic() {
     );
 
     let (_, patch) = blockchain.create_patch(
-        0,
-        0,
+        ValidatorId::zero(),
+        Height::zero(),
         &[tx_ok1.hash(), tx_failed.hash(), tx_ok2.hash()],
         &pool,
     );
@@ -281,8 +283,8 @@ fn test_handling_tx_panic_storage_error() {
     );
 
     blockchain.create_patch(
-        0,
-        0,
+        ValidatorId::zero(),
+        Height::zero(),
         &[tx_ok1.hash(), tx_storage_error.hash(), tx_ok2.hash()],
         &pool,
     );

@@ -20,6 +20,7 @@ use std::fmt;
 
 use crypto::PublicKey;
 use encoding::Error;
+use helpers::{Height, Round, ValidatorId};
 
 pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, Message, FromRaw, HEADER_LENGTH,
                     PROTOCOL_MAJOR_VERSION, TEST_NETWORK_ID};
@@ -143,7 +144,7 @@ impl fmt::Debug for RequestMessage {
 
 impl ConsensusMessage {
     /// Returns validator id of the message sender.
-    pub fn validator(&self) -> u16 {
+    pub fn validator(&self) -> ValidatorId {
         match *self {
             ConsensusMessage::Propose(ref msg) => msg.validator(),
             ConsensusMessage::Prevote(ref msg) => msg.validator(),
@@ -152,7 +153,7 @@ impl ConsensusMessage {
     }
 
     /// Returns height of the message.
-    pub fn height(&self) -> u64 {
+    pub fn height(&self) -> Height {
         match *self {
             ConsensusMessage::Propose(ref msg) => msg.height(),
             ConsensusMessage::Prevote(ref msg) => msg.height(),
@@ -161,7 +162,7 @@ impl ConsensusMessage {
     }
 
     /// Returns round of the message.
-    pub fn round(&self) -> u32 {
+    pub fn round(&self) -> Round {
         match *self {
             ConsensusMessage::Propose(ref msg) => msg.round(),
             ConsensusMessage::Prevote(ref msg) => msg.round(),

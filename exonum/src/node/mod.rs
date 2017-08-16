@@ -35,8 +35,9 @@ use events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, 
 use blockchain::{SharedNodeState, Blockchain, Schema, GenesisConfig, Transaction, ApiContext};
 use messages::{Connect, RawMessage};
 use api::{Api, public, private};
+use helpers::{Height, Round, ValidatorId};
 
-pub use self::state::{State, Round, Height, RequestData, ValidatorId, TxPool, ValidatorState};
+pub use self::state::{State, RequestData, TxPool, ValidatorState};
 pub use self::whitelist::Whitelist;
 
 mod basic;
@@ -238,7 +239,7 @@ where
         // FIXME: remove unwraps here, use FATAL log level instead
         let (last_hash, last_height) = {
             let block = blockchain.last_block();
-            (block.hash(), block.height() + 1)
+            (block.hash(), block.height().next())
         };
 
         let snapshot = blockchain.snapshot();
@@ -252,7 +253,7 @@ where
             .position(|pk| {
                 pk.consensus_key == config.listener.consensus_public_key
             })
-            .map(|id| id as ValidatorId);
+            .map(|id| ValidatorId(id as u16));
         info!("Validator id = '{:?}'", validator_id);
         let connect = Connect::new(
             &config.listener.consensus_public_key,
@@ -331,7 +332,7 @@ where
             info!("Trying to connect with peer {}", address);
         }
 
-        let round = 1;
+        let round = Round::first();
         self.state.jump_round(round);
         info!("Jump to round {}", round);
 
@@ -388,7 +389,7 @@ where
 
     /// Adds `NodeTimeout::Round` timeout to the channel.
     pub fn add_round_timeout(&mut self) {
-        let time = self.round_start_time(self.state.round() + 1);
+        let time = self.round_start_time(self.state.round().next());
         trace!(
             "ADD ROUND TIMEOUT: time={:?}, height={}, round={}",
             time,
@@ -455,7 +456,8 @@ where
 
     /// Returns start time of the requested round.
     pub fn round_start_time(&self, round: Round) -> SystemTime {
-        let ms = (round - 1) as u64 * self.round_timeout();
+        let previous_round: u64 = round.previous().into();
+        let ms = previous_round * self.round_timeout();
         self.state.height_start_time() + Duration::from_millis(ms)
     }
 }

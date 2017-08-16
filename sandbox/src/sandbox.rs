@@ -20,12 +20,11 @@ use std::net::{SocketAddr, Ipv4Addr, IpAddr};
 use std::ops::Drop;
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
-use exonum::node::{ValidatorId, NodeHandler, Configuration, NodeTimeout, ExternalMessage,
-                   ListenerConfig, ServiceConfig};
-use exonum::node::state::{Round, Height};
-use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, Schema, Service,
-                         StoredConfiguration, Transaction, ValidatorKeys, SharedNodeState,
-                         BlockProof, TimeoutAdjusterConfig};
+use exonum::node::{NodeHandler, Configuration, NodeTimeout, ExternalMessage, ListenerConfig,
+                   ServiceConfig};
+use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
+                         Schema, Transaction, Service, ValidatorKeys, SharedNodeState, BlockProof,
+                         TimeoutAdjusterConfig};
 use exonum::storage::{MemoryDB, MapProof};
 use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, Status};
 use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
@@ -33,10 +32,11 @@ use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, 
 use exonum::crypto::{Hash, PublicKey, SecretKey, Seed, gen_keypair_from_seed};
 #[cfg(test)]
 use exonum::crypto::gen_keypair;
-use exonum::helpers::init_logger;
+use exonum::helpers::{Height, Round, ValidatorId, init_logger};
 
 use timestamping::TimestampingService;
 use config_updater::ConfigUpdateService;
+use sandbox_tests_helper::VALIDATOR_0;
 
 type SandboxEvent = InternalEvent<ExternalMessage, NodeTimeout>;
 
@@ -221,9 +221,15 @@ impl Sandbox {
         start_index: usize,
         end_index: usize,
     ) {
-        let connect = Connect::new(&self.p(0), self.a(0), connect_message_time, self.s(0));
+        let connect = Connect::new(
+            &self.p(VALIDATOR_0),
+            self.a(VALIDATOR_0),
+            connect_message_time,
+            self.s(VALIDATOR_0),
+        );
 
         for validator in start_index..end_index {
+            let validator = ValidatorId(validator as u16);
             self.recv(Connect::new(
                 &self.p(validator),
                 self.a(validator),
@@ -261,25 +267,27 @@ impl Sandbox {
         reactor.handler.blockchain.tx_from_raw(raw)
     }
 
-    pub fn p(&self, id: usize) -> PublicKey {
-        self.validators()[id]
+    pub fn p(&self, id: ValidatorId) -> PublicKey {
+        self.validators()[id.0 as usize]
     }
 
-    pub fn s(&self, id: usize) -> &SecretKey {
+    pub fn s(&self, id: ValidatorId) -> &SecretKey {
         let p = self.p(id);
         &self.validators_map[&p]
     }
 
-    pub fn service_public_key(&self, id: usize) -> PublicKey {
+    pub fn service_public_key(&self, id: ValidatorId) -> PublicKey {
+        let id: usize = id.into();
         self.nodes_keys()[id].service_key
     }
 
-    pub fn service_secret_key(&self, id: usize) -> &SecretKey {
+    pub fn service_secret_key(&self, id: ValidatorId) -> &SecretKey {
         let public_key = self.service_public_key(id);
         &self.services_map[&public_key]
     }
 
-    pub fn a(&self, id: usize) -> SocketAddr {
+    pub fn a(&self, id: ValidatorId) -> SocketAddr {
+        let id: usize = id.into();
         self.addresses[id]
     }
 
@@ -501,7 +509,8 @@ impl Sandbox {
 
         let fork = {
             let mut fork = blockchain.fork();
-            let (_, patch) = blockchain.create_patch(0, self.current_height(), &hashes, &tx_pool);
+            let (_, patch) =
+                blockchain.create_patch(ValidatorId(0), self.current_height(), &hashes, &tx_pool);
             fork.merge(patch);
             fork
         };
@@ -557,7 +566,7 @@ impl Sandbox {
         self.reactor.borrow().handler.state().round()
     }
 
-    pub fn block_and_precommits(&self, height: u64) -> Option<BlockProof> {
+    pub fn block_and_precommits(&self, height: Height) -> Option<BlockProof> {
         let snapshot = self.reactor.borrow().handler.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
         schema.block_and_precommits(height)
@@ -717,70 +726,101 @@ pub fn timestamping_sandbox() -> Sandbox {
     ])
 }
 
-#[test]
-fn test_sandbox_init() {
-    timestamping_sandbox();
-}
+#[cfg(test)]
+mod tests {
+    use sandbox_tests_helper::{HEIGHT_ONE, ROUND_ONE, ROUND_TWO, VALIDATOR_1, VALIDATOR_2,
+                               VALIDATOR_3};
+    use super::*;
 
-#[test]
-fn test_sandbox_recv_and_send() {
-    let s = timestamping_sandbox();
-    let (public, secret) = gen_keypair();
-    s.recv(Connect::new(&public, s.a(2), s.time(), &secret));
-    s.send(s.a(2), Connect::new(&s.p(0), s.a(0), s.time(), s.s(0)));
-}
+    #[test]
+    fn test_sandbox_init() {
+        timestamping_sandbox();
+    }
 
-#[test]
-fn test_sandbox_assert_status() {
-    // TODO: remove this?
-    let s = timestamping_sandbox();
-    s.assert_state(1, 1);
-    s.add_time(Duration::from_millis(999));
-    s.assert_state(1, 1);
-    s.add_time(Duration::from_millis(1));
-    s.assert_state(1, 2);
-}
+    #[test]
+    fn test_sandbox_recv_and_send() {
+        let s = timestamping_sandbox();
+        let (public, secret) = gen_keypair();
+        s.recv(Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
+        s.send(
+            s.a(VALIDATOR_2),
+            Connect::new(
+                &s.p(VALIDATOR_0),
+                s.a(VALIDATOR_0),
+                s.time(),
+                s.s(VALIDATOR_0),
+            ),
+        );
+    }
 
-#[test]
-#[should_panic(expected = "Expected to send the message")]
-fn test_sandbox_expected_to_send_but_nothing_happened() {
-    let s = timestamping_sandbox();
-    s.send(s.a(1), Connect::new(&s.p(0), s.a(0), s.time(), s.s(0)));
-}
+    #[test]
+    fn test_sandbox_assert_status() {
+        // TODO: remove this?
+        let s = timestamping_sandbox();
+        s.assert_state(HEIGHT_ONE, ROUND_ONE);
+        s.add_time(Duration::from_millis(999));
+        s.assert_state(HEIGHT_ONE, ROUND_ONE);
+        s.add_time(Duration::from_millis(1));
+        s.assert_state(HEIGHT_ONE, ROUND_TWO);
+    }
 
-#[test]
-#[should_panic(expected = "Expected to send the message")]
-fn test_sandbox_expected_to_send_another_message() {
-    let s = timestamping_sandbox();
-    let (public, secret) = gen_keypair();
-    s.recv(Connect::new(&public, s.a(2), s.time(), &secret));
-    s.send(s.a(1), Connect::new(&s.p(0), s.a(0), s.time(), s.s(0)));
-}
+    #[test]
+    #[should_panic(expected = "Expected to send the message")]
+    fn test_sandbox_expected_to_send_but_nothing_happened() {
+        let s = timestamping_sandbox();
+        s.send(
+            s.a(VALIDATOR_1),
+            Connect::new(
+                &s.p(VALIDATOR_0),
+                s.a(VALIDATOR_0),
+                s.time(),
+                s.s(VALIDATOR_0),
+            ),
+        );
+    }
 
-#[test]
-#[should_panic(expected = "Send unexpected message")]
-fn test_sandbox_unexpected_message_when_drop() {
-    let s = timestamping_sandbox();
-    let (public, secret) = gen_keypair();
-    s.recv(Connect::new(&public, s.a(2), s.time(), &secret));
-}
+    #[test]
+    #[should_panic(expected = "Expected to send the message")]
+    fn test_sandbox_expected_to_send_another_message() {
+        let s = timestamping_sandbox();
+        let (public, secret) = gen_keypair();
+        s.recv(Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
+        s.send(
+            s.a(VALIDATOR_1),
+            Connect::new(
+                &s.p(VALIDATOR_0),
+                s.a(VALIDATOR_0),
+                s.time(),
+                s.s(VALIDATOR_0),
+            ),
+        );
+    }
 
-#[test]
-#[should_panic(expected = "Send unexpected message")]
-fn test_sandbox_unexpected_message_when_handle_another_message() {
-    let s = timestamping_sandbox();
-    let (public, secret) = gen_keypair();
-    s.recv(Connect::new(&public, s.a(2), s.time(), &secret));
-    s.recv(Connect::new(&public, s.a(3), s.time(), &secret));
-    panic!("Oops! We don't catch unexpected message");
-}
+    #[test]
+    #[should_panic(expected = "Send unexpected message")]
+    fn test_sandbox_unexpected_message_when_drop() {
+        let s = timestamping_sandbox();
+        let (public, secret) = gen_keypair();
+        s.recv(Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
+    }
 
-#[test]
-#[should_panic(expected = "Send unexpected message")]
-fn test_sandbox_unexpected_message_when_time_changed() {
-    let s = timestamping_sandbox();
-    let (public, secret) = gen_keypair();
-    s.recv(Connect::new(&public, s.a(2), s.time(), &secret));
-    s.add_time(Duration::from_millis(1000));
-    panic!("Oops! We don't catch unexpected message");
+    #[test]
+    #[should_panic(expected = "Send unexpected message")]
+    fn test_sandbox_unexpected_message_when_handle_another_message() {
+        let s = timestamping_sandbox();
+        let (public, secret) = gen_keypair();
+        s.recv(Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
+        s.recv(Connect::new(&public, s.a(VALIDATOR_3), s.time(), &secret));
+        panic!("Oops! We don't catch unexpected message");
+    }
+
+    #[test]
+    #[should_panic(expected = "Send unexpected message")]
+    fn test_sandbox_unexpected_message_when_time_changed() {
+        let s = timestamping_sandbox();
+        let (public, secret) = gen_keypair();
+        s.recv(Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
+        s.add_time(Duration::from_millis(1000));
+        panic!("Oops! We don't catch unexpected message");
+    }
 }
