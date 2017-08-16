@@ -33,7 +33,7 @@ impl NodeHandler
         //     }
 
         match Any::from_raw(raw) {
-            Ok(Any::Connect(msg)) => self.handle_connect(msg),
+            Ok(Any::Connect(msg)) => self.handle_connect(msg, true),
             Ok(Any::Status(msg)) => self.handle_status(msg),
             Ok(Any::Consensus(msg)) => self.handle_consensus(msg),
             Ok(Any::Request(msg)) => self.handle_request(msg),
@@ -49,7 +49,7 @@ impl NodeHandler
     /// if received `Connect` message is correct.
     pub fn handle_connected(&mut self, addr: SocketAddr, connect: Connect) {
         info!("Received Connect message from peer: {}", addr);
-        self.handle_connect(connect);
+        self.handle_connect(connect, false);
     }
 
     /// Handles the `Disconnected` event. Node will try to connect to that address again if it was
@@ -63,7 +63,7 @@ impl NodeHandler
     }
 
     /// Handles the `Connect` message and connects to a peer as result.
-    pub fn handle_connect(&mut self, message: Connect) {
+    pub fn handle_connect(&mut self, message: Connect, mut need_connect: bool) {
         // TODO add spam protection
         let address = message.addr();
         if address == self.state.our_connect_message().addr() {
@@ -89,7 +89,6 @@ impl NodeHandler
         }
 
         // Check if we have another connect message from peer with the given public_key.
-        let mut need_connect = true;
         if let Some(saved_message) = self.state.peers().get(&public_key) {
             if saved_message.time() > message.time() {
                 error!("Received outdated Connect message from {}", address);

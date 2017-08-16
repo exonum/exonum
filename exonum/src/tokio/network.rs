@@ -206,7 +206,6 @@ impl NetworkPart {
                     .and_then(move |(connect, stream)| {
                         info!("Tokio: Received handshake message={:?}", connect);
 
-                        let addr = connect.addr();
                         let event = NetworkEvent::PeerConnected(addr, connect);
                         let connect_event = network_tx.clone().send(event).map_err(into_other);
 
