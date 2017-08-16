@@ -151,17 +151,12 @@ impl NetworkPart {
 
                     let send_handle = conn_tx.send(msg).map(forget_result).map_err(log_error);
 
-                    let requests_tx = requests_tx.clone();
                     let timeouted_connect = send_handle
                         .select2(send_timeout)
                         .map_err(|_| other_error("Unable to send message"))
                         .and_then(move |either| match either {
                             Either::A((send, _timeout_fut)) => Ok(send),
                             Either::B((_, _connect_fut)) => Err(other_error("Send timeout")),
-                        })
-                        .or_else(move |_| {
-                            let request = NetworkRequest::DisconnectWithPeer(peer);
-                            requests_tx.clone().send(request).map(forget_result)
                         })
                         .map_err(log_error);
 

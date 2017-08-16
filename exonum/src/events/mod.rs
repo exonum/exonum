@@ -15,7 +15,7 @@
 use tokio_core::reactor::Handle;
 
 use std::net::SocketAddr;
-use std::time::SystemTime;
+use std::time::Duration;
 
 use messages::{RawMessage};
 
@@ -28,6 +28,6 @@ pub trait Channel {
     type ApplicationEvent: Send;
     type Timeout: Send;
 
-    fn send_to(&mut self, handle: Handle, address: SocketAddr, message: RawMessage);
-    fn add_timeout(&mut self, handle: Handle, timeout: Self::Timeout, time: SystemTime);
+    fn send_to(&self, handle: Handle, address: SocketAddr, message: RawMessage);
+    fn add_timeout(&self, handle: Handle, timeout: Self::Timeout, time: Duration);
 }

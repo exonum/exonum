@@ -12,7 +12,6 @@ use tokio_core::reactor::{Core, Timeout};
 
 use std::io;
 use std::thread;
-use std::time::{Duration, SystemTime};
 
 use crypto;
 use blockchain::{SharedNodeState, Blockchain, ApiContext};
@@ -77,7 +76,7 @@ impl Node {
         };
         let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
         let system_state = Box::new(DefaultSystemState(node_cfg.listen_address));
-        let channel = NodeChannel::new(64);
+        let channel = NodeChannel::new(256);
         let core = Core::new().unwrap();
         let handler = NodeHandler::new(
             blockchain,
@@ -187,7 +186,7 @@ impl Node {
     }
 
     pub fn into_reactor(self) -> (HandlerPart<NodeHandler>, NetworkPart) {
-        let (network_tx, network_rx) = mpsc::channel(64);
+        let (network_tx, network_rx) = mpsc::channel(256);
 
         let network_part = NetworkPart {
             listen_address: self.handler.system_state.listen_address(),
@@ -195,16 +194,12 @@ impl Node {
             network_tx: network_tx,
         };
 
-        let (timeout_tx, timeout_rx) = mpsc::channel(64);
+        let (timeout_tx, timeout_rx) = mpsc::channel(256);
         let handle = self.core.handle();
         let timeout_requests_rx = self.channel.1.timeout;
         let timeout_tx = timeout_tx.clone();
         let timeout_handler = timeout_requests_rx.for_each(move |request| {
-            let duration = request.0.duration_since(SystemTime::now()).unwrap_or_else(
-                |_| {
-                    Duration::from_secs(0)
-                },
-            );
+            let duration = request.0;
             let timeout_tx = timeout_tx.clone();
             let timeout = Timeout::new(duration, &handle)
                 .expect("Unable to create timeout")
@@ -216,7 +211,8 @@ impl Node {
                         .map_err(into_other)
                 })
                 .map_err(|_| panic!("Can't timeout"));
-            timeout
+            handle.spawn(timeout);
+            Ok(())
         });
         self.core.handle().spawn(timeout_handler);
 

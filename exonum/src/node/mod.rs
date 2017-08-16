@@ -78,8 +78,7 @@ pub enum NodeTimeout {
 pub struct ApiSender(pub Sender<ExternalMessage>);
 
 /// Handler that that performs consensus algorithm.
-pub struct NodeHandler
-{
+pub struct NodeHandler {
     /// State of the `NodeHandler`.
     pub state: State,
     /// Shared api state
@@ -208,8 +207,7 @@ pub struct Configuration {
     pub mempool: MemoryPoolConfig,
 }
 
-impl NodeHandler
-{
+impl NodeHandler {
     /// Creates `NodeHandler` using specified `Configuration`.
     pub fn new(
         blockchain: Blockchain,
@@ -314,7 +312,11 @@ impl NodeHandler
 
     /// Performs node initialization, so it starts consensus process from the first round.
     pub fn initialize(&mut self) {
-        info!("Start listening address={}", self.system_state.listen_address());
+        let addr = self.system_state.listen_address();
+        info!(
+            "Start listening address={}",
+            addr
+        );
         for address in &self.peer_discovery.clone() {
             if address == &self.system_state.listen_address() {
                 continue;
@@ -375,6 +377,17 @@ impl NodeHandler
         self.send_to_addr(address, connect.raw());
     }
 
+    /// Add timeout request.
+    pub fn add_timeout(&self, timeout: NodeTimeout, time: SystemTime) {
+        let duration = time.duration_since(self.system_state.current_time())
+            .unwrap_or_else(|_| Duration::from_millis(0));
+        self.channel.add_timeout(
+            self.tokio_handle(),
+            timeout,
+            duration,
+        );
+    }
+
     /// Adds request timeout if it isn't already requested.
     pub fn request(&mut self, data: RequestData, peer: PublicKey) {
         let is_new = self.state.request(data.clone(), peer);
@@ -393,8 +406,7 @@ impl NodeHandler
             self.state.round()
         );
         let timeout = NodeTimeout::Round(self.state.height(), self.state.round());
-        let handle = self.tokio_handle();
-        self.channel.add_timeout(handle, timeout, time);
+        self.add_timeout(timeout, time);
     }
 
     /// Adds `NodeTimeout::Propose` timeout to the channel.
@@ -410,55 +422,34 @@ impl NodeHandler
             self.state.round()
         );
         let timeout = NodeTimeout::Propose(self.state.height(), self.state.round());
-        let handle = self.tokio_handle();
-        self.channel.add_timeout(handle, timeout, time);
+        self.add_timeout(timeout, time);
     }
 
     /// Adds `NodeTimeout::Status` timeout to the channel.
     pub fn add_status_timeout(&mut self) {
         let time = self.system_state.current_time() + Duration::from_millis(self.status_timeout());
-        let handle = self.tokio_handle();
-        self.channel.add_timeout(
-            handle,
-            NodeTimeout::Status(self.state.height()),
-            time,
-        );
+        self.add_timeout(NodeTimeout::Status(self.state.height()), time);
     }
 
     /// Adds `NodeTimeout::Request` timeout with `RequestData` to the channel.
     pub fn add_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
         trace!("ADD REQUEST TIMEOUT");
         let time = self.system_state.current_time() + data.timeout();
-        let handle = self.tokio_handle();
-        self.channel.add_timeout(
-            handle,
-            NodeTimeout::Request(data, peer),
-            time,
-        );
+        self.add_timeout(NodeTimeout::Request(data, peer), time);
     }
 
     /// Adds `NodeTimeout::PeerExchange` timeout to the channel.
     pub fn add_peer_exchange_timeout(&mut self) {
         trace!("ADD PEER EXCHANGE TIMEOUT");
         let time = self.system_state.current_time() + Duration::from_millis(self.peers_timeout());
-        let handle = self.tokio_handle();
-        self.channel.add_timeout(
-            handle,
-            NodeTimeout::PeerExchange,
-            time,
-        );
+        self.add_timeout(NodeTimeout::PeerExchange, time);
     }
 
     /// Adds `NodeTimeout::UpdateApiState` timeout to the channel.
     pub fn add_update_api_state_timeout(&mut self) {
         let time = self.system_state.current_time() +
             Duration::from_millis(self.api_state().state_update_timeout());
-        let handle = self.tokio_handle();
-        self.channel.add_timeout(
-            handle,
-            NodeTimeout::UpdateApiState,
-            time,
-        );
+        self.add_timeout(NodeTimeout::UpdateApiState, time);
     }
 
     /// Returns hash of the last block.
@@ -473,8 +464,7 @@ impl NodeHandler
     }
 }
 
-impl fmt::Debug for NodeHandler
-{
+impl fmt::Debug for NodeHandler {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,

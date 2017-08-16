@@ -3,7 +3,7 @@ use futures::{Future, Stream, Sink, Poll, Async};
 use futures::stream::Fuse;
 use tokio_core::reactor::Handle;
 
-use std::time::{SystemTime};
+use std::time::{SystemTime, Duration};
 use std::net::SocketAddr;
 
 use events::Channel;
@@ -26,7 +26,7 @@ pub enum Event {
 }
 
 #[derive(Debug)]
-pub struct TimeoutRequest(pub SystemTime, pub NodeTimeout);
+pub struct TimeoutRequest(pub Duration, pub NodeTimeout);
 
 #[derive(Debug)]
 pub struct DefaultSystemState(pub SocketAddr);
@@ -78,7 +78,7 @@ impl Channel for NodeSender {
     type ApplicationEvent = ExternalMessage;
     type Timeout = NodeTimeout;
 
-    fn send_to(&mut self, handle: Handle, address: SocketAddr, message: RawMessage) {
+    fn send_to(&self, handle: Handle, address: SocketAddr, message: RawMessage) {
         let request = NetworkRequest::SendMessage(address, message);
         let send_future = self.network
             .clone()
@@ -88,8 +88,8 @@ impl Channel for NodeSender {
         handle.spawn(send_future);
     }
 
-    fn add_timeout(&mut self, handle: Handle, timeout: Self::Timeout, time: SystemTime) {
-        let request = TimeoutRequest(time, timeout);
+    fn add_timeout(&self, handle: Handle, timeout: Self::Timeout, duration: Duration) {
+        let request = TimeoutRequest(duration, timeout);
         let send_future = self.timeout
             .clone()
             .send(request)
