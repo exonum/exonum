@@ -101,7 +101,7 @@ script: |
       cd sandbox && cargo clippy -- -D warnings
   ;;
   "test-core" )
-      RUST_LOG=off cargo test -p exonum --tests --lib
+      RUST_LOG=off cargo test --manifest-path exonum/Cargo.toml --features rocksdb --tests --lib
   ;;
   "test-sandbox" )
       RUST_LOG=off cargo test -p sandbox

@@ -56,7 +56,7 @@ tempdir = "0.3.5"
 lazy_static = "0.2.8"
 
 [features]
-default = ["leveldb", "rocksdb"]
+default = ["leveldb"]
 leveldb = ["exonum_leveldb"]
 rocksdb = ["exonum_rocksdb"]
 long_benchmarks = []
