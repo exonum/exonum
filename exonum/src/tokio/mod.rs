@@ -95,9 +95,10 @@ impl Node {
 
     /// Launches only consensus messages handler.
     /// This may be used if you want to customize api with the `ApiContext`.
-    pub fn run_handler(self) -> io::Result<()> {
+    pub fn run_handler(mut self) -> io::Result<()> {
+        self.handler.initialize();
+        
         let (handler_part, network_part) = self.into_reactor();
-
         let network_thread = thread::spawn(move || {
             network_part.run().unwrap();
         });
@@ -184,7 +185,7 @@ impl Node {
         Ok(())
     }
 
-    pub fn into_reactor(self) -> (HandlerPart, NetworkPart) {
+    pub fn into_reactor(self) -> (HandlerPart<NodeHandler>, NetworkPart) {
         let (network_tx, network_rx) = mpsc::channel(64);
 
         let network_part = NetworkPart {

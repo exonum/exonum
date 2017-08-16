@@ -176,6 +176,6 @@ where
     }
 }
 
-pub trait EventsHandler {
+pub trait EventHandler {
     fn handle_event(&mut self, event: Event);
 }

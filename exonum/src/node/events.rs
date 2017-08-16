@@ -1,19 +1,19 @@
-use tokio::handler::Event;
+use tokio::handler::{Event, EventHandler};
 use tokio::network::NetworkEvent;
 
 use super::{NodeHandler, ExternalMessage, NodeTimeout};
 
-impl NodeHandler
-{
-    /// TODO
-    pub fn handle_event(&mut self, event: Event) {
+impl EventHandler for NodeHandler {
+    fn handle_event(&mut self, event: Event) {
         match event {
             Event::Network(network) => self.handle_network_event(network),
             Event::Timeout(timeout) => self.handle_timeout(timeout),
             Event::Api(api) => self.handle_api_event(api),
         }
     }
+}
 
+impl NodeHandler {
     fn handle_network_event(&mut self, event: NetworkEvent) {
         match event {
             NetworkEvent::PeerConnected(peer, connect) => self.handle_connected(peer, connect),

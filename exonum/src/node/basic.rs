@@ -20,7 +20,7 @@ use std::net::SocketAddr;
 use std::error::Error;
 
 use messages::{Any, RawMessage, Connect, Status, Message, RequestPeers};
-use super::{NodeHandler, RequestData, NodeTimeout, Height};
+use super::{NodeHandler, RequestData, Height};
 
 impl NodeHandler
 {

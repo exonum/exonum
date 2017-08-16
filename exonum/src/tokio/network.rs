@@ -10,11 +10,11 @@ use std::time::Duration;
 use std::collections::hash_map::{HashMap, Entry};
 
 use messages::{Any, Connect, RawMessage};
-use node::{NodeHandler, ExternalMessage, NodeTimeout};
+use node::{ExternalMessage, NodeTimeout};
 
 use super::error::{other_error, result_ok, forget_result, into_other, log_error};
 use super::codec::MessagesCodec;
-use super::handler::{EventsAggregator};
+use super::handler::{EventsAggregator, EventHandler};
 
 #[derive(Debug)]
 pub enum NetworkEvent {
@@ -54,9 +54,9 @@ impl Default for NetworkConfiguration {
 }
 
 #[derive(Debug)]
-pub struct HandlerPart {
+pub struct HandlerPart<H: EventHandler> {
     pub core: Core,
-    pub handler: NodeHandler,
+    pub handler: H,
     pub timeout_rx: mpsc::Receiver<NodeTimeout>,
     pub network_rx: mpsc::Receiver<NetworkEvent>,
     pub api_rx: mpsc::Receiver<ExternalMessage>,
@@ -69,13 +69,11 @@ pub struct NetworkPart {
     pub network_tx: mpsc::Sender<NetworkEvent>,
 }
 
-impl HandlerPart {
+impl<H: EventHandler> HandlerPart<H> {
     pub fn run(self) -> Result<(), ()> {
         let mut core = self.core;
         let mut handler = self.handler;
-
-        handler.initialize();
-
+        
         let events_handle = EventsAggregator::new(self.timeout_rx, self.network_rx, self.api_rx)
             .for_each(move |event| {
                 handler.handle_event(event);
