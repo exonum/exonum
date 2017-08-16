@@ -15,7 +15,7 @@
 use super::super::StorageKey;
 
 const HEIGHT_SHIFT: u64 = 56;
-const MAX_INDEX: u64 = 72_057_594_037_927_935; // 2 ** 56 - 1
+const MAX_INDEX: u64 = 0xFF_FFFF_FFFF_FFFF; // 2u64.pow(56) - 1
 
 #[derive(Debug, Copy, Clone)]
 pub struct ProofListKey {
