@@ -1,16 +1,16 @@
 use futures::sync::mpsc;
 use futures::{Future, Stream, Sink, Poll, Async};
 use futures::stream::Fuse;
-use tokio_core::reactor::{Handle, Timeout};
+use tokio_core::reactor::Handle;
 
-use std::time::{Duration, SystemTime};
+use std::time::{SystemTime};
 use std::net::SocketAddr;
 
 use events::Channel;
 use node::{ExternalMessage, NodeTimeout};
 use messages::RawMessage;
 
-use super::error::{forget_result, log_error, into_other};
+use super::error::{forget_result, log_error};
 use super::network::{NetworkEvent, NetworkRequest};
 
 pub trait SystemStateProvider: Send + Sync + 'static + ::std::fmt::Debug {
@@ -26,6 +26,9 @@ pub enum Event {
 }
 
 #[derive(Debug)]
+pub struct TimeoutRequest(pub SystemTime, pub NodeTimeout);
+
+#[derive(Debug)]
 pub struct DefaultSystemState(pub SocketAddr);
 
 impl SystemStateProvider for DefaultSystemState {
@@ -36,14 +39,14 @@ impl SystemStateProvider for DefaultSystemState {
 /// Channel for messages and timeouts.
 #[derive(Debug, Clone)]
 pub struct NodeSender {
-    pub timeout: mpsc::Sender<NodeTimeout>,
+    pub timeout: mpsc::Sender<TimeoutRequest>,
     pub network: mpsc::Sender<NetworkRequest>,
     pub external: mpsc::Sender<ExternalMessage>,
 }
 
 #[derive(Debug)]
 pub struct NodeReceiver {
-    pub timeout: mpsc::Receiver<NodeTimeout>,
+    pub timeout: mpsc::Receiver<TimeoutRequest>,
     pub network: mpsc::Receiver<NetworkRequest>,
     pub external: mpsc::Receiver<ExternalMessage>,
 }
@@ -86,19 +89,13 @@ impl Channel for NodeSender {
     }
 
     fn add_timeout(&mut self, handle: Handle, timeout: Self::Timeout, time: SystemTime) {
-        // TODO send timeout requests to HandlerPart
-
-        let duration = time.duration_since(SystemTime::now()).unwrap_or_else(|_| {
-            Duration::from_secs(0)
-        });
-        let sender = self.timeout.clone();
-        let timeout_handle = Timeout::new(duration, &handle)
-            .expect("Unable to create timeout")
-            .and_then(move |_| {
-                sender.send(timeout).map(forget_result).map_err(into_other)
-            })
-            .map_err(|_| panic!("Can't timeout"));
-        handle.spawn(timeout_handle);
+        let request = TimeoutRequest(time, timeout);
+        let send_future = self.timeout
+            .clone()
+            .send(request)
+            .map(forget_result)
+            .map_err(log_error);
+        handle.spawn(send_future);
     }
 }
 

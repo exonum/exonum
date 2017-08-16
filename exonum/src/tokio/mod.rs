@@ -6,11 +6,13 @@ pub mod network;
 use router::Router;
 use mount::Mount;
 use iron::{Chain, Iron};
-use tokio_core::reactor::Core;
+use futures::{Stream, Future, Sink};
 use futures::sync::mpsc;
+use tokio_core::reactor::{Core, Timeout};
 
 use std::io;
 use std::thread;
+use std::time::{Duration, SystemTime};
 
 use crypto;
 use blockchain::{SharedNodeState, Blockchain, ApiContext};
@@ -20,6 +22,7 @@ use node::{NodeConfig, Configuration, ListenerConfig, ServiceConfig, NodeHandler
 use node::state::State;
 
 use self::network::{NetworkPart, HandlerPart};
+use self::error::{forget_result, into_other};
 pub use self::handler::{NodeSender, NodeReceiver, NodeChannel, DefaultSystemState};
 
 const PROFILE_ENV_VARIABLE_NAME: &'static str = "EXONUM_PROFILE_FILENAME";
@@ -97,11 +100,9 @@ impl Node {
     /// This may be used if you want to customize api with the `ApiContext`.
     pub fn run_handler(mut self) -> io::Result<()> {
         self.handler.initialize();
-        
+
         let (handler_part, network_part) = self.into_reactor();
-        let network_thread = thread::spawn(move || {
-            network_part.run().unwrap();
-        });
+        let network_thread = thread::spawn(move || { network_part.run().unwrap(); });
 
         handler_part.run().unwrap();
         network_thread.join().unwrap();
@@ -191,12 +192,38 @@ impl Node {
         let network_part = NetworkPart {
             listen_address: self.handler.system_state.listen_address(),
             network_requests: (self.channel.0.network, self.channel.1.network),
-            network_tx: network_tx
+            network_tx: network_tx,
         };
+
+        let (timeout_tx, timeout_rx) = mpsc::channel(64);
+        let handle = self.core.handle();
+        let timeout_requests_rx = self.channel.1.timeout;
+        let timeout_tx = timeout_tx.clone();
+        let timeout_handler = timeout_requests_rx.for_each(move |request| {
+            let duration = request.0.duration_since(SystemTime::now()).unwrap_or_else(
+                |_| {
+                    Duration::from_secs(0)
+                },
+            );
+            let timeout_tx = timeout_tx.clone();
+            let timeout = Timeout::new(duration, &handle)
+                .expect("Unable to create timeout")
+                .and_then(move |_| {
+                    timeout_tx
+                        .clone()
+                        .send(request.1)
+                        .map(forget_result)
+                        .map_err(into_other)
+                })
+                .map_err(|_| panic!("Can't timeout"));
+            timeout
+        });
+        self.core.handle().spawn(timeout_handler);
+
         let handler_part = HandlerPart {
             core: self.core,
             handler: self.handler,
-            timeout_rx: self.channel.1.timeout,
+            timeout_rx,
             network_rx: network_rx,
             api_rx: self.channel.1.external,
         };
