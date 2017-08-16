@@ -17,13 +17,25 @@
 //! [Sodium library](https://github.com/jedisct1/libsodium) is used under the hood through
 //! [sodiumoxide rust bindings](https://github.com/dnaq/sodiumoxide).
 
-use sodiumoxide::crypto::sign::ed25519::{PublicKey as PublicKeySodium,
-                                         SecretKey as SecretKeySodium, Seed as SeedSodium,
-                                         Signature as SignatureSodium, State as SignState,
-                                         sign_detached, verify_detached, keypair_from_seed,
-                                         gen_keypair as gen_keypair_sodium};
-use sodiumoxide::crypto::hash::sha256::{Digest, State as HashState, hash as hash_sodium};
-use sodiumoxide;
+//use sodiumoxide::crypto::sign::ed25519::{PublicKey as PublicKeySodium,
+//                                         SecretKey as SecretKeySodium, Seed as SeedSodium,
+//                                         Signature as SignatureSodium, State as SignState,
+//                                         sign_detached, verify_detached, keypair_from_seed,
+//                                         gen_keypair as gen_keypair_sodium};
+//use sodiumoxide::crypto::hash::sha256::{Digest, State as HashState, hash as hash_sodium};
+//use sodiumoxide;
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+struct Digest {}
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+struct PublicKeySodium {}
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+struct SecretKeySodium {}
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+struct SeedSodium {}
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+struct SignatureSodium {}
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+struct SignState {}
 use serde::{Serialize, Serializer};
 use serde::de::{self, Visitor, Deserialize, Deserializer};
 use hex::{ToHex, FromHex};
@@ -32,11 +44,21 @@ use std::default::Default;
 use std::ops::{Index, Range, RangeFrom, RangeTo, RangeFull};
 use std::fmt;
 
-pub use sodiumoxide::crypto::sign::ed25519::{PUBLICKEYBYTES as PUBLIC_KEY_LENGTH,
-                                             SECRETKEYBYTES as SECRET_KEY_LENGTH,
-                                             SIGNATUREBYTES as SIGNATURE_LENGTH,
-                                             SEEDBYTES as SEED_LENGTH};
-pub use sodiumoxide::crypto::hash::sha256::DIGESTBYTES as HASH_SIZE;
+//pub use sodiumoxide::crypto::sign::ed25519::{PUBLICKEYBYTES as PUBLIC_KEY_LENGTH,
+//                                             SECRETKEYBYTES as SECRET_KEY_LENGTH,
+//                                             SIGNATUREBYTES as SIGNATURE_LENGTH,
+//                                             SEEDBYTES as SEED_LENGTH};
+/// 1
+pub const PUBLIC_KEY_LENGTH: usize = 64;
+/// 1
+pub const SECRET_KEY_LENGTH: usize = 64;
+/// 1
+pub const SIGNATURE_LENGTH: usize = 64;
+/// 1
+pub const SEED_LENGTH: usize = 64;
+//pub use sodiumoxide::crypto::hash::sha256::DIGESTBYTES as HASH_SIZE;
+/// 1
+pub const HASH_SIZE: usize = 8;
 
 pub use encoding::serialize::{FromHexError, HexValue};
 
@@ -57,8 +79,9 @@ const BYTES_IN_DEBUG: usize = 4;
 /// assert!(crypto::verify(&signature, &data, &public_key));
 /// ```
 pub fn sign(data: &[u8], secret_key: &SecretKey) -> Signature {
-    let sodium_signature = sign_detached(data, &secret_key.0);
-    Signature(sodium_signature)
+    unimplemented!()
+    //let sodium_signature = sign_detached(data, &secret_key.0);
+    //Signature(sodium_signature)
 }
 
 /// Computes a secret key and a corresponding public key from a `Seed`.
@@ -74,8 +97,9 @@ pub fn sign(data: &[u8], secret_key: &SecretKey) -> Signature {
 /// # drop(secret_key);
 /// ```
 pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
-    let (sod_pub_key, sod_secr_key) = keypair_from_seed(&seed.0);
-    (PublicKey(sod_pub_key), SecretKey(sod_secr_key))
+    unimplemented!()
+    //let (sod_pub_key, sod_secr_key) = keypair_from_seed(&seed.0);
+    //(PublicKey(sod_pub_key), SecretKey(sod_secr_key))
 }
 
 /// Randomly generates a secret key and a corresponding public key.
@@ -91,8 +115,9 @@ pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
 /// # drop(secret_key);
 /// ```
 pub fn gen_keypair() -> (PublicKey, SecretKey) {
-    let (pubkey, secrkey) = gen_keypair_sodium();
-    (PublicKey(pubkey), SecretKey(secrkey))
+    unimplemented!()
+    //let (pubkey, secrkey) = gen_keypair_sodium();
+    //(PublicKey(pubkey), SecretKey(secrkey))
 }
 
 /// Verifies that `data` is signed with a secret key corresponding to the given public key.
@@ -109,7 +134,8 @@ pub fn gen_keypair() -> (PublicKey, SecretKey) {
 /// assert!(crypto::verify(&signature, &data, &public_key));
 /// ```
 pub fn verify(sig: &Signature, data: &[u8], pubkey: &PublicKey) -> bool {
-    verify_detached(&sig.0, data, &pubkey.0)
+    unimplemented!()
+    //verify_detached(&sig.0, data, &pubkey.0)
 }
 
 /// Calculates `SHA256` hash of bytes slice.
@@ -125,8 +151,9 @@ pub fn verify(sig: &Signature, data: &[u8], pubkey: &PublicKey) -> bool {
 /// # drop(hash);
 /// ```
 pub fn hash(data: &[u8]) -> Hash {
-    let dig = hash_sodium(data);
-    Hash(dig)
+    unimplemented!()
+    //let dig = hash_sodium(data);
+    //Hash(dig)
 }
 
 /// Initializes the sodium library and chooses faster versions of the primitives if possible.
@@ -143,9 +170,9 @@ pub fn hash(data: &[u8]) -> Hash {
 /// crypto::init();
 /// ```
 pub fn init() {
-    if !sodiumoxide::init() {
-        panic!("Cryptographic library hasn't initialized.");
-    }
+//    if !sodiumoxide::init() {
+//        panic!("Cryptographic library hasn't initialized.");
+//    }
 }
 
 /// This structure provides a possibility to calculate hash for a stream of data
@@ -162,24 +189,26 @@ pub fn init() {
 /// let _ = hash_stream.hash();
 /// ```
 #[derive(Debug, Default)]
-pub struct HashStream(HashState);
+pub struct HashStream;
 
 impl HashStream {
     /// Creates a new instance of `HashStream`
     pub fn new() -> Self {
-        HashStream(HashState::init())
+        HashStream
     }
 
     /// Processes chunk of stream using state and returns instance of `HashStream`
     pub fn update(mut self, chunk: &[u8]) -> Self {
-        self.0.update(chunk);
-        self
+        unimplemented!()
+        //self.0.update(chunk);
+        //self
     }
 
     /// Completes process and returns final hash of stream data
     pub fn hash(self) -> Hash {
-        let dig = self.0.finalize();
-        Hash(dig)
+        unimplemented!()
+        //let dig = self.0.finalize();
+        //Hash(dig)
     }
 }
 
@@ -201,31 +230,34 @@ impl HashStream {
 /// assert!(verify_stream.verify(&file_sign, &pk));
 /// ```
 #[derive(Debug, Default)]
-pub struct SignStream(SignState);
+pub struct SignStream;
 
 impl SignStream {
     /// Creates a new instance of `SignStream`
     pub fn new() -> Self {
-        SignStream(SignState::init())
+        SignStream
     }
 
     /// Adds a new `chunk` to the message that will eventually be signed
     pub fn update(mut self, chunk: &[u8]) -> Self {
-        self.0.update(chunk);
-        self
+        unimplemented!()
+        //self.0.update(chunk);
+        //self
     }
 
     /// Computes a signature for the previously supplied messages
     /// using the secret key `secret_key` and returns `Signature`
     pub fn sign(&mut self, secret_key: &SecretKey) -> Signature {
-        Signature(self.0.finalize(&secret_key.0))
+        unimplemented!()
+        //Signature(self.0.finalize(&secret_key.0))
     }
 
     /// Verifies that `sig` is a valid signature for the message whose content
     /// has been previously supplied using `update` using the public key
     /// `public_key`
     pub fn verify(&mut self, sig: &Signature, public_key: &PublicKey) -> bool {
-        self.0.verify(&sig.0, &public_key.0)
+        unimplemented!()
+        //self.0.verify(&sig.0, &public_key.0)
     }
 }
 
@@ -245,18 +277,21 @@ macro_rules! implement_public_sodium_wrapper {
     impl $name {
         /// Creates a new instance from bytes array.
         pub fn new(ba: [u8; $size]) -> Self {
-            $name($name_from(ba))
+            unimplemented!()
+            //$name($name_from(ba))
         }
 
         /// Creates a new instance from bytes slice.
         pub fn from_slice(bs: &[u8]) -> Option<Self> {
-            $name_from::from_slice(bs).map($name)
+            unimplemented!()
+            //$name_from::from_slice(bs).map($name)
         }
     }
 
     impl AsRef<[u8]> for $name {
         fn as_ref(&self) -> &[u8] {
-            self.0.as_ref()
+            unimplemented!()
+            //self.0.as_ref()
         }
     }
 
@@ -282,30 +317,34 @@ macro_rules! implement_private_sodium_wrapper {
     impl $name {
         /// Creates a new instance filled with zeros.
         pub fn zero() -> Self {
-            $name::new([0; $size])
+            unimplemented!()
+            //$name::new([0; $size])
         }
     }
 
     impl $name {
         /// Creates a new instance from bytes array.
         pub fn new(ba: [u8; $size]) -> Self {
-            $name($name_from(ba))
+            unimplemented!()
+            //$name($name_from(ba))
         }
 
         /// Creates a new instance from bytes slice.
         pub fn from_slice(bs: &[u8]) -> Option<Self> {
-            $name_from::from_slice(bs).map($name)
+            unimplemented!()
+            //$name_from::from_slice(bs).map($name)
         }
     }
 
     impl fmt::Debug for $name {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            write!(f, stringify!($name))?;
-            write!(f, "(")?;
-            for i in &self[0..BYTES_IN_DEBUG] {
-                write!(f, "{:X}", i)?
-            }
-            write!(f, "...)")
+            unimplemented!()
+//            write!(f, stringify!($name))?;
+//            write!(f, "(")?;
+//            for i in &self[0..BYTES_IN_DEBUG] {
+//                write!(f, "{:X}", i)?
+//            }
+//            write!(f, "...)")
         }
     }
     )
@@ -396,17 +435,19 @@ macro_rules! implement_serde {
 ($name:ident) => (
     impl HexValue for $name {
         fn to_hex(&self) -> String {
-            let inner = &self.0;
-            inner.0.as_ref().to_hex()
+            unimplemented!()
+            //let inner = &self.0;
+            //inner.0.as_ref().to_hex()
         }
 
         fn from_hex<T: AsRef<str>>(v: T) -> Result<Self, FromHexError> {
-            let bytes: Vec<u8> = FromHex::from_hex(v.as_ref())?;
-            if let Some(self_value) = Self::from_slice(bytes.as_ref()) {
-                Ok(self_value)
-            } else {
-                Err(FromHexError::InvalidHexLength)
-            }
+            unimplemented!()
+//            let bytes: Vec<u8> = FromHex::from_hex(v.as_ref())?;
+//            if let Some(self_value) = Self::from_slice(bytes.as_ref()) {
+//                Ok(self_value)
+//            } else {
+//                Err(FromHexError::InvalidHexLength)
+//            }
         }
     }
 
@@ -463,29 +504,33 @@ macro_rules! implement_index_traits {
         impl Index<Range<usize>> for $newtype {
             type Output = [u8];
             fn index(&self, _index: Range<usize>) -> &[u8] {
-                let inner  = &self.0;
-                inner.0.index(_index)
+                unimplemented!()
+                //let inner  = &self.0;
+                //inner.0.index(_index)
             }
         }
         impl Index<RangeTo<usize>> for $newtype {
             type Output = [u8];
             fn index(&self, _index: RangeTo<usize>) -> &[u8] {
-                let inner  = &self.0;
-                inner.0.index(_index)
+                unimplemented!()
+                //let inner  = &self.0;
+                //inner.0.index(_index)
             }
         }
         impl Index<RangeFrom<usize>> for $newtype {
             type Output = [u8];
             fn index(&self, _index: RangeFrom<usize>) -> &[u8] {
-                let inner  = &self.0;
-                inner.0.index(_index)
+                unimplemented!()
+                //let inner  = &self.0;
+                //inner.0.index(_index)
             }
         }
         impl Index<RangeFull> for $newtype {
             type Output = [u8];
             fn index(&self, _index: RangeFull) -> &[u8] {
-                let inner  = &self.0;
-                inner.0.index(_index)
+                unimplemented!()
+                //let inner  = &self.0;
+                //inner.0.index(_index)
             }
         })
 }
