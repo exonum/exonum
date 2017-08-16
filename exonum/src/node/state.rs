@@ -875,7 +875,7 @@ impl State {
 
         let key = (msg.round(), *msg.propose_hash());
         let validators_len = self.validators().len();
-        let mut votes = self.prevotes.entry(key).or_insert_with(
+        let votes = self.prevotes.entry(key).or_insert_with(
             || Votes::new(validators_len),
         );
         votes.insert(msg);
@@ -991,7 +991,7 @@ impl State {
 
     /// Adds data-request to the queue. Returns `true` if it is a new request.
     pub fn request(&mut self, data: RequestData, peer: PublicKey) -> bool {
-        let mut state = self.requests.entry(data).or_insert_with(RequestState::new);
+        let state = self.requests.entry(data).or_insert_with(RequestState::new);
         let is_new = state.is_empty();
         state.insert(peer);
         is_new
@@ -1001,7 +1001,7 @@ impl State {
     /// the corresponding validators list, so next time request will be sent to a different peer.
     pub fn retry(&mut self, data: &RequestData, peer: Option<PublicKey>) -> Option<PublicKey> {
         let next = {
-            let mut state = if let Some(state) = self.requests.get_mut(data) {
+            let state = if let Some(state) = self.requests.get_mut(data) {
                 state
             } else {
                 return None;
