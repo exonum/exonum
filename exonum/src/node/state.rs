@@ -29,26 +29,20 @@ use storage::{Patch, Snapshot};
 use events::Milliseconds;
 use blockchain::{ValidatorKeys, ConsensusConfig, StoredConfiguration, Transaction,
                  TimeoutAdjusterConfig};
+use helpers::{Height, Round, ValidatorId};
 use node::whitelist::Whitelist;
 use node::timeout_adjuster::{TimeoutAdjuster, Constant, Dynamic, MovingAverage};
 
 // TODO: move request timeouts into node configuration
 
 /// Timeout value for the `RequestPropose` message.
-pub const REQUEST_PROPOSE_TIMEOUT: Milliseconds = 100;
+pub const PROPOSE_REQUEST_TIMEOUT: Milliseconds = 100;
 /// Timeout value for the `RequestTransactions` message.
-pub const REQUEST_TRANSACTIONS_TIMEOUT: Milliseconds = 100;
+pub const TRANSACTIONS_REQUEST_TIMEOUT: Milliseconds = 100;
 /// Timeout value for the `RequestPrevotes` message.
-pub const REQUEST_PREVOTES_TIMEOUT: Milliseconds = 100;
+pub const PREVOTES_REQUEST_TIMEOUT: Milliseconds = 100;
 /// Timeout value for the `RequestBlock` message.
-pub const REQUEST_BLOCK_TIMEOUT: Milliseconds = 100;
-
-/// Consensus round index.
-pub type Round = u32;
-/// Blockchain's height (number of blocks).
-pub type Height = u64;
-/// Validators id.
-pub type ValidatorId = u16;
+pub const BLOCK_REQUEST_TIMEOUT: Milliseconds = 100;
 
 /// Transactions pool.
 // TODO replace by persistent TxPool
@@ -225,7 +219,7 @@ where
 
     /// Inserts a new message if it hasn't been inserted yet.
     pub fn insert(&mut self, message: &T) {
-        let voter = message.validator() as usize;
+        let voter: usize = message.validator().into();
         if !self.validators[voter] {
             self.count += 1;
             self.validators.set(voter, true);
@@ -254,10 +248,10 @@ impl RequestData {
     pub fn timeout(&self) -> Duration {
         #![cfg_attr(feature="cargo-clippy", allow(match_same_arms))]
         let ms = match *self {
-            RequestData::Propose(..) => REQUEST_PROPOSE_TIMEOUT,
-            RequestData::Transactions(..) => REQUEST_TRANSACTIONS_TIMEOUT,
-            RequestData::Prevotes(..) => REQUEST_PREVOTES_TIMEOUT,
-            RequestData::Block(..) => REQUEST_BLOCK_TIMEOUT,
+            RequestData::Propose(..) => PROPOSE_REQUEST_TIMEOUT,
+            RequestData::Transactions(..) => TRANSACTIONS_REQUEST_TIMEOUT,
+            RequestData::Prevotes(..) => PREVOTES_REQUEST_TIMEOUT,
+            RequestData::Block(..) => BLOCK_REQUEST_TIMEOUT,
         };
         Duration::from_millis(ms)
     }
@@ -367,7 +361,7 @@ impl State {
         stored: StoredConfiguration,
         connect: Connect,
         last_hash: Hash,
-        last_height: u64,
+        last_height: Height,
         height_start_time: SystemTime,
     ) -> Self {
         State {
@@ -382,8 +376,8 @@ impl State {
             connections: HashMap::new(),
             height: last_height,
             height_start_time,
-            round: 0,
-            locked_round: 0,
+            round: Round::zero(),
+            locked_round: Round::zero(),
             locked_propose: None,
             last_hash,
 
@@ -467,7 +461,7 @@ impl State {
         self.validators()
             .iter()
             .position(|pk| pk.consensus_key == peer)
-            .map(|id| id as ValidatorId)
+            .map(|id| ValidatorId(id as u16))
     }
 
     /// Returns `ConsensusConfig`.
@@ -492,7 +486,7 @@ impl State {
             .validator_keys
             .iter()
             .position(|pk| pk.consensus_key == *self.consensus_public_key())
-            .map(|id| id as ValidatorId);
+            .map(|id| ValidatorId(id as u16));
         self.whitelist.set_validators(
             config.validator_keys.iter().map(|x| {
                 x.consensus_key
@@ -540,7 +534,8 @@ impl State {
 
     /// Returns public key of a validator identified by id.
     pub fn consensus_public_key_of(&self, id: ValidatorId) -> Option<PublicKey> {
-        self.validators().get(id as usize).map(|x| x.consensus_key)
+        let id: usize = id.into();
+        self.validators().get(id).map(|x| x.consensus_key)
     }
 
     /// Returns the consensus public key of the current node.
@@ -565,17 +560,21 @@ impl State {
 
     /// Returns the leader id for the specified round and current height.
     pub fn leader(&self, round: Round) -> ValidatorId {
-        ((self.height() + round as u64) % (self.validators().len() as u64)) as ValidatorId
+        let height: u64 = self.height().into();
+        let round: u64 = round.into();
+        ValidatorId(((height + round) % (self.validators().len() as u64)) as u16)
     }
 
     /// Returns the height for a validator identified by the public key.
     pub fn node_height(&self, key: &PublicKey) -> Height {
-        *self.nodes_max_height.get(key).unwrap_or(&0)
+        *self.nodes_max_height.get(key).unwrap_or(&Height::zero())
     }
 
     /// Updates known height for a validator identified by the public key.
     pub fn set_node_height(&mut self, key: PublicKey, height: Height) {
-        *self.nodes_max_height.entry(key).or_insert(0) = height;
+        *self.nodes_max_height.entry(key).or_insert_with(
+            Height::zero,
+        ) = height;
     }
 
     /// Returns a list of nodes whose height is bigger than one of the current node.
@@ -598,7 +597,7 @@ impl State {
     }
 
     /// Returns current height.
-    pub fn height(&self) -> u64 {
+    pub fn height(&self) -> Height {
         self.height
     }
 
@@ -661,16 +660,16 @@ impl State {
 
     /// Increments node's round by one.
     pub fn new_round(&mut self) {
-        self.round += 1;
+        self.round.increment();
     }
 
     /// Increments the node height by one and resets previous height data.
     // FIXME use block_hash
     pub fn new_height(&mut self, block_hash: &Hash, height_start_time: SystemTime) {
-        self.height += 1;
+        self.height.increment();
         self.height_start_time = height_start_time;
-        self.round = 1;
-        self.locked_round = 0;
+        self.round = Round::first();
+        self.locked_round = Round::zero();
         self.locked_propose = None;
         self.last_hash = *block_hash;
         {
@@ -876,7 +875,7 @@ impl State {
 
         let key = (msg.round(), *msg.propose_hash());
         let validators_len = self.validators().len();
-        let mut votes = self.prevotes.entry(key).or_insert_with(
+        let votes = self.prevotes.entry(key).or_insert_with(
             || Votes::new(validators_len),
         );
         votes.insert(msg);
@@ -974,7 +973,7 @@ impl State {
 
     /// Returns `true` if the node doesn't have proposes different from the locked one.
     pub fn have_incompatible_prevotes(&self) -> bool {
-        for round in self.locked_round + 1..self.round + 1 {
+        for round in self.locked_round.next().iter_to(self.round.next()) {
             match self.validator_state {
                 Some(ref validator_state) => {
                     if let Some(msg) = validator_state.our_prevotes.get(&round) {
@@ -992,7 +991,7 @@ impl State {
 
     /// Adds data-request to the queue. Returns `true` if it is a new request.
     pub fn request(&mut self, data: RequestData, peer: PublicKey) -> bool {
-        let mut state = self.requests.entry(data).or_insert_with(RequestState::new);
+        let state = self.requests.entry(data).or_insert_with(RequestState::new);
         let is_new = state.is_empty();
         state.insert(peer);
         is_new
@@ -1002,7 +1001,7 @@ impl State {
     /// the corresponding validators list, so next time request will be sent to a different peer.
     pub fn retry(&mut self, data: &RequestData, peer: Option<PublicKey>) -> Option<PublicKey> {
         let next = {
-            let mut state = if let Some(state) = self.requests.get_mut(data) {
+            let state = if let Some(state) = self.requests.get_mut(data) {
                 state
             } else {
                 return None;

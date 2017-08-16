@@ -18,6 +18,7 @@ use exonum::messages::{RawTransaction, Message, FromRaw};
 use exonum::storage::{Snapshot, Fork};
 use exonum::encoding::Error as MessageError;
 use exonum::blockchain::StoredConfiguration;
+use exonum::helpers::Height;
 
 pub const CONFIG_SERVICE: u16 = 1;
 pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 0;
@@ -30,7 +31,7 @@ message! {
 
         field from:               &PublicKey  [00 => 32]
         field config:             &[u8]       [32 => 40]
-        field actual_from_height: u64         [40 => 48]
+        field actual_from:        Height      [40 => 48]
     }
 }
 

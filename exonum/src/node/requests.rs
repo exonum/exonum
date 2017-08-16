@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use messages::{RequestMessage, Message, RequestPropose, RequestTransactions, RequestPrevotes,
-               RequestBlock, Block};
+use messages::{RequestMessage, Message, ProposeRequest, TransactionsRequest, PrevotesRequest,
+               BlockRequest, BlockResponse};
 use blockchain::Schema;
 use events::Channel;
 use super::{NodeHandler, ExternalMessage, NodeTimeout};
@@ -55,7 +55,7 @@ where
     }
 
     /// Handles `RequstPropose` message. For details see the message documentation.
-    pub fn handle_request_propose(&mut self, msg: RequestPropose) {
+    pub fn handle_request_propose(&mut self, msg: ProposeRequest) {
         trace!("HANDLE PROPOSE REQUEST");
         if msg.height() != self.state.height() {
             return;
@@ -75,7 +75,7 @@ where
     }
 
     /// Handles `RequestTransactions` message. For details see the message documentation.
-    pub fn handle_request_txs(&mut self, msg: RequestTransactions) {
+    pub fn handle_request_txs(&mut self, msg: TransactionsRequest) {
         trace!("HANDLE TRANSACTIONS REQUEST");
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
@@ -96,7 +96,7 @@ where
     }
 
     /// Handles `RequestPrevotes` message. For details see the message documentation.
-    pub fn handle_request_prevotes(&mut self, msg: RequestPrevotes) {
+    pub fn handle_request_prevotes(&mut self, msg: PrevotesRequest) {
         trace!("HANDLE PREVOTES REQUEST");
         if msg.height() != self.state.height() {
             return;
@@ -106,7 +106,7 @@ where
         let prevotes = self.state
             .prevotes(msg.round(), *msg.propose_hash())
             .iter()
-            .filter(|p| !has_prevotes[p.validator() as usize])
+            .filter(|p| !has_prevotes[p.validator().into()])
             .map(|p| p.raw().clone())
             .collect::<Vec<_>>();
 
@@ -116,7 +116,7 @@ where
     }
 
     /// Handles `RequestBlock` message. For details see the message documentation.
-    pub fn handle_request_block(&mut self, msg: RequestBlock) {
+    pub fn handle_request_block(&mut self, msg: BlockRequest) {
         trace!(
             "Handle block request with height:{}, our height: {}",
             msg.height(),
@@ -137,7 +137,7 @@ where
         let transactions = schema.block_txs(height);
 
 
-        let block_msg = Block::new(
+        let block_msg = BlockResponse::new(
             self.state.consensus_public_key(),
             msg.from(),
             block,

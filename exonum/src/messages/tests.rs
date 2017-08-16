@@ -13,6 +13,8 @@
 // limitations under the License.
 
 use crypto::SecretKey;
+use std::sync::Arc;
+use messages::raw::{FromRaw, MessageBuffer};
 
 #[test]
 fn test_message_without_fields() {
@@ -24,4 +26,22 @@ fn test_message_without_fields() {
         }
     }
     drop(NoFields::new(&SecretKey::new([1; 64])));
+}
+
+#[test]
+#[allow(dead_code)]
+#[should_panic(expected = "Found error in from_raw: UnexpectedlyShortPayload")]
+fn test_message_with_small_size() {
+    message! {
+        struct SmallField {
+            const TYPE = 0;
+            const ID = 0;
+            const SIZE = 1;
+            field test: bool [0 => 1]
+        }
+    }
+
+    let buff = vec![1; 1];
+    let raw = Arc::new(MessageBuffer::from_vec(buff));
+    let _message = <SmallField as FromRaw>::from_raw(raw).expect("Found error in from_raw");
 }

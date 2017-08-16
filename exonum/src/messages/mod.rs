@@ -20,6 +20,7 @@ use std::fmt;
 
 use crypto::PublicKey;
 use encoding::Error;
+use helpers::{Height, Round, ValidatorId};
 
 pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, Message, FromRaw, HEADER_LENGTH,
                     PROTOCOL_MAJOR_VERSION, TEST_NETWORK_ID};
@@ -47,7 +48,7 @@ pub enum Any {
     /// `Status` message.
     Status(Status),
     /// `Block` message.
-    Block(Block),
+    Block(BlockResponse),
     /// Consensus message.
     Consensus(ConsensusMessage),
     /// Request for the some data.
@@ -71,15 +72,15 @@ pub enum ConsensusMessage {
 #[derive(Clone, PartialEq)]
 pub enum RequestMessage {
     /// Propose request.
-    Propose(RequestPropose),
+    Propose(ProposeRequest),
     /// Transactions request.
-    Transactions(RequestTransactions),
+    Transactions(TransactionsRequest),
     /// Prevotes request.
-    Prevotes(RequestPrevotes),
+    Prevotes(PrevotesRequest),
     /// Peers request.
-    Peers(RequestPeers),
+    Peers(PeersRequest),
     /// Block request.
-    Block(RequestBlock),
+    Block(BlockRequest),
 }
 
 impl RequestMessage {
@@ -143,7 +144,7 @@ impl fmt::Debug for RequestMessage {
 
 impl ConsensusMessage {
     /// Returns validator id of the message sender.
-    pub fn validator(&self) -> u16 {
+    pub fn validator(&self) -> ValidatorId {
         match *self {
             ConsensusMessage::Propose(ref msg) => msg.validator(),
             ConsensusMessage::Prevote(ref msg) => msg.validator(),
@@ -152,7 +153,7 @@ impl ConsensusMessage {
     }
 
     /// Returns height of the message.
-    pub fn height(&self) -> u64 {
+    pub fn height(&self) -> Height {
         match *self {
             ConsensusMessage::Propose(ref msg) => msg.height(),
             ConsensusMessage::Prevote(ref msg) => msg.height(),
@@ -161,7 +162,7 @@ impl ConsensusMessage {
     }
 
     /// Returns round of the message.
-    pub fn round(&self) -> u32 {
+    pub fn round(&self) -> Round {
         match *self {
             ConsensusMessage::Propose(ref msg) => msg.round(),
             ConsensusMessage::Prevote(ref msg) => msg.round(),
@@ -206,7 +207,7 @@ impl Any {
             match raw.message_type() {
                 CONNECT_MESSAGE_ID => Any::Connect(Connect::from_raw(raw)?),
                 STATUS_MESSAGE_ID => Any::Status(Status::from_raw(raw)?),
-                BLOCK_MESSAGE_ID => Any::Block(Block::from_raw(raw)?),
+                BLOCK_RESPONSE_MESSAGE_ID => Any::Block(BlockResponse::from_raw(raw)?),
 
                 PROPOSE_MESSAGE_ID => {
                     Any::Consensus(ConsensusMessage::Propose(Propose::from_raw(raw)?))
@@ -218,21 +219,22 @@ impl Any {
                     Any::Consensus(ConsensusMessage::Precommit(Precommit::from_raw(raw)?))
                 }
 
-                REQUEST_PROPOSE_MESSAGE_ID => {
-                    Any::Request(RequestMessage::Propose(RequestPropose::from_raw(raw)?))
+                PROPOSE_REQUEST_MESSAGE_ID => {
+                    Any::Request(RequestMessage::Propose(ProposeRequest::from_raw(raw)?))
                 }
-                REQUEST_TRANSACTIONS_MESSAGE_ID => Any::Request(RequestMessage::Transactions(
-                    RequestTransactions::from_raw(raw)?,
+                TRANSACTIONS_REQUEST_MESSAGE_ID => Any::Request(RequestMessage::Transactions(
+                    TransactionsRequest::from_raw(raw)?,
                 )),
-                REQUEST_PREVOTES_MESSAGE_ID => {
-                    Any::Request(RequestMessage::Prevotes(RequestPrevotes::from_raw(raw)?))
+                PREVOTES_REQUEST_MESSAGE_ID => {
+                    Any::Request(RequestMessage::Prevotes(PrevotesRequest::from_raw(raw)?))
                 }
-                REQUEST_PEERS_MESSAGE_ID => {
-                    Any::Request(RequestMessage::Peers(RequestPeers::from_raw(raw)?))
+                PEERS_REQUEST_MESSAGE_ID => {
+                    Any::Request(RequestMessage::Peers(PeersRequest::from_raw(raw)?))
                 }
-                REQUEST_BLOCK_MESSAGE_ID => {
-                    Any::Request(RequestMessage::Block(RequestBlock::from_raw(raw)?))
+                BLOCK_REQUEST_MESSAGE_ID => {
+                    Any::Request(RequestMessage::Block(BlockRequest::from_raw(raw)?))
                 }
+
                 message_type => {
                     return Err(Error::IncorrectMessageType { message_type });
                 }

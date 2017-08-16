@@ -22,6 +22,7 @@ use iron::prelude::*;
 use blockchain::{Blockchain, Block};
 use explorer::{BlockInfo, BlockchainExplorer};
 use api::{Api, ApiError};
+use helpers::Height;
 
 const MAX_BLOCKS_PER_REQUEST: u64 = 1000;
 
@@ -55,7 +56,7 @@ impl ExplorerApi {
         Ok(explorer.blocks_range(count, from, skip_empty_blocks))
     }
 
-    fn get_block(&self, height: u64) -> Result<Option<BlockInfo>, ApiError> {
+    fn get_block(&self, height: Height) -> Result<Option<BlockInfo>, ApiError> {
         let explorer = BlockchainExplorer::new(&self.blockchain);
         Ok(explorer.block_info(height))
     }
@@ -107,7 +108,7 @@ impl Api for ExplorerApi {
                     let height: u64 = height_str.parse().map_err(|e: ParseIntError| {
                         ApiError::IncorrectRequest(Box::new(e))
                     })?;
-                    let info = _self.get_block(height)?;
+                    let info = _self.get_block(Height(height))?;
                     _self.ok_response(&::serde_json::to_value(info).unwrap())
                 }
                 None => {

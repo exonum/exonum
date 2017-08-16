@@ -18,28 +18,65 @@ use std::net::SocketAddr;
 use std::time::SystemTime;
 
 use crypto::{hash, gen_keypair};
-use blockchain::{self, BlockProof};
-use messages::{RawMessage, Message, FromRaw, Connect, Propose, Prevote, Precommit, Status, Block,
-               RequestBlock};
+use blockchain::{self, BlockProof, Block};
+use messages::{RawMessage, Message, FromRaw, Connect, Propose, Prevote, Precommit, Status,
+               BlockResponse, BlockRequest};
+use helpers::{Height, Round, ValidatorId};
 
 use super::{Field, Offset};
+
+static VALIDATOR: ValidatorId = ValidatorId(65_123);
+static HEIGHT: Height = Height(123_123_123);
+static ROUND: Round = Round(321_321_312);
+
+#[allow(dead_code)]
+// This structures used to test deserialize,
+// so we should ingore unused `new` method.
+mod ignore_new {
+    use crypto::Hash;
+    encoding_struct! {
+        struct Parent {
+            const SIZE = 8;
+            field child: Child [0 => 8]
+        }
+    }
+
+    encoding_struct! {
+        struct Child {
+            const SIZE = 32;
+            field child: &Hash [0 => 32]
+        }
+    }
+}
+
+use self::ignore_new::*;
+
+#[test]
+#[should_panic(expected = "Found error in check: UnexpectedlyShortPayload")]
+fn test_zero_size_segment() {
+    let buf = vec![8,0,0,0, // not overlap
+                   0,0,0,0,0]; // but with zero size
+
+    <Parent as Field>::check(&buf, 0.into(), 8.into(), 8.into()).expect("Found error in check");
+}
+
+#[test]
+#[should_panic(expected = "Found error in check: UnexpectedlyShortPayload")]
+fn test_incorrect_pointer() {
+    let buf = vec![8,0,0,0, // not overlap
+                   0,0,0,0,0]; // but with zero size
+
+    <Parent as Field>::check(&buf, 0.into(), 8.into(), 8.into()).expect("Found error in check");
+}
 
 #[test]
 #[should_panic(expected = "Found error in check: OffsetOverflow")]
 fn test_read_overflow_arithmetic() {
     let pos = <u32>::max_value();
-    let count: u32 = 4;
-    let dat = vec![0xCC as u8; 4]; // u32
-    let mut buf = vec![255; 8];
-    dat.write(&mut buf, 0, 8);
-    //rewrite header
-    pos.write(&mut buf, 0, 4);
-    count.write(&mut buf, 4, 8);
+    let buf = vec![255; 0];
 
-    // let x1 = unsafe{ <Vec<u8> as Field>::read(&buf, 0, 8 )};
-    // ^ "attempt to add with overflow" in segment.rs
-
-    <Vec<u8> as Field>::check(&buf, 0.into(), 8.into(), 8.into()).expect("Found error in check");
+    <Vec<u8> as Field>::check(&buf, pos.into(), 8.into(), pos.into())
+        .expect("Found error in check");
 }
 
 #[test]
@@ -160,9 +197,9 @@ fn test_segments_of_raw_buffers() {
 fn test_segments_of_raw_messages() {
     let (pub_key, sec_key) = gen_keypair();
 
-    let m1 = Status::new(&pub_key, 2, &hash(&[]), &sec_key);
-    let m2 = Status::new(&pub_key, 4, &hash(&[1]), &sec_key);
-    let m3 = Status::new(&pub_key, 5, &hash(&[3]), &sec_key);
+    let m1 = Status::new(&pub_key, Height(2), &hash(&[]), &sec_key);
+    let m2 = Status::new(&pub_key, Height(4), &hash(&[1]), &sec_key);
+    let m3 = Status::new(&pub_key, Height(5), &hash(&[3]), &sec_key);
 
     let dat = vec![m1.raw().clone(), m2.raw().clone(), m3.raw().clone()];
     assert_write_check_read(dat, 8);
@@ -178,9 +215,9 @@ fn test_empty_segments() {
 fn test_segments_of_status_messages() {
     let (pub_key, sec_key) = gen_keypair();
 
-    let m1 = Status::new(&pub_key, 2, &hash(&[]), &sec_key);
-    let m2 = Status::new(&pub_key, 4, &hash(&[1]), &sec_key);
-    let m3 = Status::new(&pub_key, 5, &hash(&[3]), &sec_key);
+    let m1 = Status::new(&pub_key, Height(2), &hash(&[]), &sec_key);
+    let m2 = Status::new(&pub_key, Height(4), &hash(&[1]), &sec_key);
+    let m3 = Status::new(&pub_key, Height(5), &hash(&[3]), &sec_key);
 
     let dat = vec![m1, m2, m3];
     assert_write_check_read(dat, 8);
@@ -205,19 +242,16 @@ fn test_connect() {
 
 #[test]
 fn test_propose() {
-    let validator = 65_123;
-    let height = 123_123_123;
-    let round = 321_321_312;
     let prev_hash = hash(&[1, 2, 3]);
     let txs = vec![hash(&[1]), hash(&[2]), hash(&[2])];
     let (public_key, secret_key) = gen_keypair();
 
     // write
-    let propose = Propose::new(validator, height, round, &prev_hash, &txs, &secret_key);
+    let propose = Propose::new(VALIDATOR, HEIGHT, ROUND, &prev_hash, &txs, &secret_key);
     // read
-    assert_eq!(propose.validator(), validator);
-    assert_eq!(propose.height(), height);
-    assert_eq!(propose.round(), round);
+    assert_eq!(propose.validator(), VALIDATOR);
+    assert_eq!(propose.height(), HEIGHT);
+    assert_eq!(propose.round(), ROUND);
     assert_eq!(propose.prev_hash(), &prev_hash);
     assert_eq!(propose.transactions().len(), 3);
     assert_eq!(propose.transactions()[0], txs[0]);
@@ -228,26 +262,23 @@ fn test_propose() {
 
 #[test]
 fn test_prevote() {
-    let validator = 65_123;
-    let height = 123_123_123;
-    let round = 321_321_312;
     let propose_hash = hash(&[1, 2, 3]);
-    let locked_round = 654_345;
+    let locked_round = Round(654_345);
     let (public_key, secret_key) = gen_keypair();
 
     // write
     let prevote = Prevote::new(
-        validator,
-        height,
-        round,
+        VALIDATOR,
+        HEIGHT,
+        ROUND,
         &propose_hash,
         locked_round,
         &secret_key,
     );
     // read
-    assert_eq!(prevote.validator(), validator);
-    assert_eq!(prevote.height(), height);
-    assert_eq!(prevote.round(), round);
+    assert_eq!(prevote.validator(), VALIDATOR);
+    assert_eq!(prevote.height(), HEIGHT);
+    assert_eq!(prevote.round(), ROUND);
     assert_eq!(prevote.propose_hash(), &propose_hash);
     assert_eq!(prevote.locked_round(), locked_round);
     assert!(prevote.verify_signature(&public_key));
@@ -255,9 +286,6 @@ fn test_prevote() {
 
 #[test]
 fn test_precommit() {
-    let validator = 65_123;
-    let height = 123_123_123;
-    let round = 321_321_312;
     let propose_hash = hash(&[1, 2, 3]);
     let block_hash = hash(&[3, 2, 1]);
     let (public_key, secret_key) = gen_keypair();
@@ -265,18 +293,18 @@ fn test_precommit() {
 
     // write
     let precommit = Precommit::new(
-        validator,
-        height,
-        round,
+        VALIDATOR,
+        HEIGHT,
+        ROUND,
         &propose_hash,
         &block_hash,
         time,
         &secret_key,
     );
     // read
-    assert_eq!(precommit.validator(), validator);
-    assert_eq!(precommit.height(), height);
-    assert_eq!(precommit.round(), round);
+    assert_eq!(precommit.validator(), VALIDATOR);
+    assert_eq!(precommit.height(), HEIGHT);
+    assert_eq!(precommit.round(), ROUND);
     assert_eq!(precommit.propose_hash(), &propose_hash);
     assert_eq!(precommit.block_hash(), &block_hash);
     assert!(precommit.verify_signature(&public_key));
@@ -289,15 +317,14 @@ fn test_precommit() {
 
 #[test]
 fn test_status() {
-    let height = 123_123_123;
     let last_hash = hash(&[3, 2, 1]);
     let (public_key, secret_key) = gen_keypair();
 
     // write
-    let commit = Status::new(&public_key, height, &last_hash, &secret_key);
+    let commit = Status::new(&public_key, HEIGHT, &last_hash, &secret_key);
     // read
     assert_eq!(commit.from(), &public_key);
-    assert_eq!(commit.height(), height);
+    assert_eq!(commit.height(), HEIGHT);
     assert_eq!(commit.last_hash(), &last_hash);
     assert!(commit.verify_signature(&public_key));
 }
@@ -309,10 +336,10 @@ fn test_block() {
     let txs = [2];
     let tx_count = txs.len() as u32;
 
-    let content = blockchain::Block::new(
+    let content = Block::new(
         blockchain::SCHEMA_MAJOR_VERSION,
-        0,
-        500,
+        ValidatorId::zero(),
+        Height(500),
         tx_count,
         &hash(&[1]),
         &hash(&txs),
@@ -321,27 +348,27 @@ fn test_block() {
 
     let precommits = vec![
         Precommit::new(
-            123,
-            15,
-            25,
+            ValidatorId(123),
+            Height(15),
+            Round(25),
             &hash(&[1, 2, 3]),
             &hash(&[3, 2, 1]),
             ts,
             &secret_key
         ),
         Precommit::new(
-            13,
-            25,
-            35,
+            ValidatorId(13),
+            Height(25),
+            Round(35),
             &hash(&[4, 2, 3]),
             &hash(&[3, 3, 1]),
             ts,
             &secret_key
         ),
         Precommit::new(
-            323,
-            15,
-            25,
+            ValidatorId(323),
+            Height(15),
+            Round(25),
             &hash(&[1, 1, 3]),
             &hash(&[5, 2, 1]),
             ts,
@@ -349,17 +376,17 @@ fn test_block() {
         ),
     ];
     let transactions = vec![
-        Status::new(&pub_key, 2, &hash(&[]), &secret_key)
+        Status::new(&pub_key, Height(2), &hash(&[]), &secret_key)
             .raw()
             .clone(),
-        Status::new(&pub_key, 4, &hash(&[2]), &secret_key)
+        Status::new(&pub_key, Height(4), &hash(&[2]), &secret_key)
             .raw()
             .clone(),
-        Status::new(&pub_key, 7, &hash(&[3]), &secret_key)
+        Status::new(&pub_key, Height(7), &hash(&[3]), &secret_key)
             .raw()
             .clone(),
     ];
-    let block = Block::new(
+    let block = BlockResponse::new(
         &pub_key,
         &pub_key,
         content.clone(),
@@ -374,7 +401,7 @@ fn test_block() {
     assert_eq!(block.precommits(), precommits);
     assert_eq!(block.transactions(), transactions);
 
-    let block2 = Block::from_raw(block.raw().clone()).unwrap();
+    let block2 = BlockResponse::from_raw(block.raw().clone()).unwrap();
     assert_eq!(block2.from(), &pub_key);
     assert_eq!(block2.to(), &pub_key);
     assert_eq!(block2.block(), content);
@@ -393,10 +420,10 @@ fn test_block() {
 fn test_empty_block() {
     let (pub_key, secret_key) = gen_keypair();
 
-    let content = blockchain::Block::new(
+    let content = Block::new(
         blockchain::SCHEMA_MAJOR_VERSION,
-        0,
-        200,
+        ValidatorId::zero(),
+        Height(200),
         1,
         &hash(&[1]),
         &hash(&[2]),
@@ -405,7 +432,7 @@ fn test_empty_block() {
 
     let precommits = Vec::new();
     let transactions = Vec::new();
-    let block = Block::new(
+    let block = BlockResponse::new(
         &pub_key,
         &pub_key,
         content.clone(),
@@ -420,7 +447,7 @@ fn test_empty_block() {
     assert_eq!(block.precommits(), precommits);
     assert_eq!(block.transactions(), transactions);
 
-    let block2 = Block::from_raw(block.raw().clone()).unwrap();
+    let block2 = BlockResponse::from_raw(block.raw().clone()).unwrap();
     assert_eq!(block2.from(), &pub_key);
     assert_eq!(block2.to(), &pub_key);
     assert_eq!(block2.block(), content);
@@ -433,10 +460,10 @@ fn test_request_block() {
     let (public_key, secret_key) = gen_keypair();
 
     // write
-    let request = RequestBlock::new(&public_key, &public_key, 1, &secret_key);
+    let request = BlockRequest::new(&public_key, &public_key, Height(1), &secret_key);
     // read
     assert_eq!(request.from(), &public_key);
-    assert_eq!(request.height(), 1);
+    assert_eq!(request.height(), Height(1));
     assert_eq!(request.to(), &public_key);
     assert!(request.verify_signature(&public_key));
 }
