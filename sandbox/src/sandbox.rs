@@ -638,8 +638,8 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
 
     let consensus = ConsensusConfig {
         round_timeout: 1000,
-        status_timeout: 600000,
-        peers_timeout: 600000,
+        status_timeout: 600_000,
+        peers_timeout: 600_000,
         txs_block_limit: 1000,
         timeout_adjuster: TimeoutAdjusterConfig::Constant { timeout: 200 },
     };
@@ -675,7 +675,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
 
     let inner = Arc::new(Mutex::new(SandboxInner {
         address: addresses[0],
-        time: UNIX_EPOCH + Duration::new(1486720340, 0),
+        time: UNIX_EPOCH + Duration::new(1_486_720_340, 0),
         sent: VecDeque::new(),
         events: VecDeque::new(),
         timers: BinaryHeap::new(),
