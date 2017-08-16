@@ -1,12 +1,9 @@
-use events::Channel;
 use tokio::handler::Event;
 use tokio::network::NetworkEvent;
 
 use super::{NodeHandler, ExternalMessage, NodeTimeout};
 
-impl<S> NodeHandler<S>
-where
-    S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>,
+impl NodeHandler
 {
     /// TODO
     pub fn handle_event(&mut self, event: Event) {

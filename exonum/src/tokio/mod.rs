@@ -7,6 +7,7 @@ use router::Router;
 use mount::Mount;
 use iron::{Chain, Iron};
 use tokio_core::reactor::Core;
+use futures::sync::mpsc;
 
 use std::io;
 use std::thread;
@@ -18,8 +19,8 @@ use node::{NodeConfig, Configuration, ListenerConfig, ServiceConfig, NodeHandler
            ApiSender};
 use node::state::State;
 
-use self::network::run_node_handler;
-pub use self::handler::{NodeSender, NodeReceiver, NodeChannel};
+use self::network::{NetworkPart, HandlerPart};
+pub use self::handler::{NodeSender, NodeReceiver, NodeChannel, DefaultSystemState};
 
 const PROFILE_ENV_VARIABLE_NAME: &'static str = "EXONUM_PROFILE_FILENAME";
 
@@ -27,7 +28,7 @@ const PROFILE_ENV_VARIABLE_NAME: &'static str = "EXONUM_PROFILE_FILENAME";
 #[derive(Debug)]
 pub struct Node {
     api_options: NodeApiConfig,
-    handler: NodeHandler<NodeSender>,
+    handler: NodeHandler,
     channel: NodeChannel,
     core: Core,
 }
@@ -72,12 +73,14 @@ impl Node {
             node_cfg.listen_address
         };
         let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
-        let channel = NodeChannel::new(node_cfg.listen_address, 64);
+        let system_state = Box::new(DefaultSystemState(node_cfg.listen_address));
+        let channel = NodeChannel::new(64);
         let core = Core::new().unwrap();
         let handler = NodeHandler::new(
             blockchain,
             external_address,
             channel.0.clone(),
+            system_state,
             config,
             api_state,
             core.handle(),
@@ -93,7 +96,15 @@ impl Node {
     /// Launches only consensus messages handler.
     /// This may be used if you want to customize api with the `ApiContext`.
     pub fn run_handler(self) -> io::Result<()> {
-        run_node_handler(self)
+        let (handler_part, network_part) = self.into_reactor();
+
+        let network_thread = thread::spawn(move || {
+            network_part.run().unwrap();
+        });
+
+        handler_part.run().unwrap();
+        network_thread.join().unwrap();
+        Ok(())
     }
 
     /// A generic implementation that launches `Node` and optionally creates threads
@@ -161,7 +172,7 @@ impl Node {
             None => None,
         };
 
-        run_node_handler(self)?;
+        self.run_handler()?;
 
         if let Some(private_config_api_thread) = private_config_api_thread {
             private_config_api_thread.join().unwrap();
@@ -173,13 +184,31 @@ impl Node {
         Ok(())
     }
 
+    pub fn into_reactor(self) -> (HandlerPart, NetworkPart) {
+        let (network_tx, network_rx) = mpsc::channel(64);
+
+        let network_part = NetworkPart {
+            listen_address: self.handler.system_state.listen_address(),
+            network_requests: (self.channel.0.network, self.channel.1.network),
+            network_tx: network_tx
+        };
+        let handler_part = HandlerPart {
+            core: self.core,
+            handler: self.handler,
+            timeout_rx: self.channel.1.timeout,
+            network_rx: network_rx,
+            api_rx: self.channel.1.external,
+        };
+        (handler_part, network_part)
+    }
+
     /// Returns `State`.
     pub fn state(&self) -> &State {
         self.handler.state()
     }
 
     /// Returns `NodeHandler`.
-    pub fn handler(&self) -> &NodeHandler<NodeSender> {
+    pub fn handler(&self) -> &NodeHandler {
         &self.handler
     }
 
@@ -187,13 +216,4 @@ impl Node {
     pub fn channel(&self) -> ApiSender {
         ApiSender::new(self.channel.0.external.clone())
     }
-}
-
-
-// New traits
-
-use std::time::SystemTime;
-
-pub trait SystemStateProvider {
-    fn current_time(&self) -> SystemTime;
 }

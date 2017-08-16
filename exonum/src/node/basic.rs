@@ -20,12 +20,9 @@ use std::net::SocketAddr;
 use std::error::Error;
 
 use messages::{Any, RawMessage, Connect, Status, Message, RequestPeers};
-use events::Channel;
-use super::{NodeHandler, RequestData, ExternalMessage, NodeTimeout, Height};
+use super::{NodeHandler, RequestData, NodeTimeout, Height};
 
-impl<S> NodeHandler<S>
-where
-    S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>,
+impl NodeHandler
 {
     /// Redirects message to the corresponding `handle_...` function.
     pub fn handle_message(&mut self, _peer: SocketAddr, raw: RawMessage) {

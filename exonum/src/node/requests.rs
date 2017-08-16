@@ -15,15 +15,12 @@
 use messages::{RequestMessage, Message, RequestPropose, RequestTransactions, RequestPrevotes,
                RequestBlock, Block};
 use blockchain::Schema;
-use events::Channel;
-use super::{NodeHandler, ExternalMessage, NodeTimeout};
+use super::{NodeHandler, NodeTimeout};
 
 // TODO: height should be updated after any message, not only after status (if signature is correct)
 // TODO: Request propose makes sense only if we know that node is on our height.
 
-impl<S> NodeHandler<S>
-where
-    S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>,
+impl NodeHandler
 {
     /// Validates request, then redirects it to the corresponding `handle_...` function.
     pub fn handle_request(&mut self, msg: RequestMessage) {

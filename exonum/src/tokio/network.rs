@@ -5,18 +5,16 @@ use tokio_core::net::{TcpListener, TcpStream};
 use tokio_core::reactor::{Core, Timeout};
 use tokio_io::AsyncRead;
 
-use std::io;
 use std::net::SocketAddr;
-use std::thread;
 use std::time::Duration;
 use std::collections::hash_map::{HashMap, Entry};
 
 use messages::{Any, Connect, RawMessage};
+use node::{NodeHandler, ExternalMessage, NodeTimeout};
 
 use super::error::{other_error, result_ok, forget_result, into_other, log_error};
 use super::codec::MessagesCodec;
-use super::Node;
-use super::handler::EventsAggregator;
+use super::handler::{EventsAggregator};
 
 #[derive(Debug)]
 pub enum NetworkEvent {
@@ -55,19 +53,41 @@ impl Default for NetworkConfiguration {
     }
 }
 
-pub fn run_node_handler(node: Node) -> io::Result<()> {
-    let (sender, receiver) = (node.channel.0, node.channel.1);
-    let listen_addr = sender.listen_addr;
-    // Channels
-    let (events_tx, events_rx) = mpsc::channel(64);
-    let (requests_tx, requests_rx) = (sender.network, receiver.network);
-    let timeouts_rx = receiver.timeout;
-    let api_rx = receiver.external;
+#[derive(Debug)]
+pub struct HandlerPart {
+    pub core: Core,
+    pub handler: NodeHandler,
+    pub timeout_rx: mpsc::Receiver<NodeTimeout>,
+    pub network_rx: mpsc::Receiver<NetworkEvent>,
+    pub api_rx: mpsc::Receiver<ExternalMessage>,
+}
 
-    let events_tx = events_tx.clone();
-    let requests_tx = requests_tx.clone();
-    let network_thread = thread::spawn(move || {
-        let mut core = Core::new().unwrap();
+#[derive(Debug)]
+pub struct NetworkPart {
+    pub listen_address: SocketAddr,
+    pub network_requests: (mpsc::Sender<NetworkRequest>, mpsc::Receiver<NetworkRequest>),
+    pub network_tx: mpsc::Sender<NetworkEvent>,
+}
+
+impl HandlerPart {
+    pub fn run(self) -> Result<(), ()> {
+        let mut core = self.core;
+        let mut handler = self.handler;
+
+        handler.initialize();
+
+        let events_handle = EventsAggregator::new(self.timeout_rx, self.network_rx, self.api_rx)
+            .for_each(move |event| {
+                handler.handle_event(event);
+                Ok(())
+            });
+        core.run(events_handle)
+    }
+}
+
+impl NetworkPart {
+    pub fn run(self) -> Result<(), ()> {
+       let mut core = Core::new().unwrap();
 
         // Outgoing connections handler
         let mut outgoing_connections: HashMap<SocketAddr, mpsc::Sender<RawMessage>> =
@@ -75,10 +95,9 @@ pub fn run_node_handler(node: Node) -> io::Result<()> {
 
         // Requests handler
         let handle = core.handle();
-        let events_tx = events_tx.clone();
-        let requests_handle = requests_rx.for_each(|request| {
-            debug!("Tokio: Handle request {:?}", request);
-
+        let network_tx = self.network_tx.clone();
+        let requests_tx = self.network_requests.0.clone();
+        let requests_handle = self.network_requests.1.for_each(|request| {
             match request {
                 NetworkRequest::SendMessage(peer, msg) => {
                     let conn_tx = match outgoing_connections.entry(peer) {
@@ -154,7 +173,7 @@ pub fn run_node_handler(node: Node) -> io::Result<()> {
                     outgoing_connections.remove(&peer);
 
                     let event = NetworkEvent::PeerDisconnected(peer);
-                    let event_handle = events_tx.clone().send(event).map(forget_result).map_err(
+                    let event_handle = network_tx.clone().send(event).map(forget_result).map_err(
                         log_error,
                     );
                     handle.spawn(event_handle);
@@ -165,16 +184,16 @@ pub fn run_node_handler(node: Node) -> io::Result<()> {
         });
 
         // Incoming connections handler
-        let listener = TcpListener::bind(&listen_addr, &core.handle()).unwrap();
-        let events_tx = events_tx.clone();
+        let listener = TcpListener::bind(&self.listen_address, &core.handle()).unwrap();
+        let network_tx = network_tx.clone();
         let server = listener
             .incoming()
-            .fold(events_tx, move |events_tx, (sock, addr)| {
+            .fold(network_tx, move |network_tx, (sock, addr)| {
                 info!("Tokio: Accepted incoming connection with peer={}", addr);
 
                 let stream = sock.framed(MessagesCodec);
                 let (_, stream) = stream.split();
-                let events_tx = events_tx.clone();
+                let network_tx = network_tx.clone();
                 stream
                     .into_future()
                     .map_err(|e| e.0)
@@ -191,12 +210,12 @@ pub fn run_node_handler(node: Node) -> io::Result<()> {
 
                         let addr = connect.addr();
                         let event = NetworkEvent::PeerConnected(addr, connect);
-                        let connect_event = events_tx.clone().send(event).map_err(into_other);
+                        let connect_event = network_tx.clone().send(event).map_err(into_other);
 
-                        let events_tx = events_tx.clone();
+                        let network_tx = network_tx.clone();
                         let messages_stream = stream.for_each(move |raw| {
                             let event = NetworkEvent::MessageReceived(addr, raw);
-                            events_tx.clone().send(event).map(forget_result).map_err(
+                            network_tx.clone().send(event).map(forget_result).map_err(
                                 into_other,
                             )
                         });
@@ -212,21 +231,6 @@ pub fn run_node_handler(node: Node) -> io::Result<()> {
             .map_err(log_error);
         core.handle().spawn(server);
 
-        core.run(requests_handle).unwrap();
-    });
-
-    let mut handler = node.handler;
-    let mut core = node.core;
-    handler.initialize();
-
-    let events_handle = EventsAggregator::new(timeouts_rx, events_rx, api_rx)
-        .for_each(move |event| {
-            handler.handle_event(event);
-            Ok(())
-        });
-    core.run(events_handle).unwrap();
-    debug!("Tokio: Handler thread is gone");
-
-    network_thread.join().unwrap();
-    Ok(())
+        core.run(requests_handle)
+    }
 }

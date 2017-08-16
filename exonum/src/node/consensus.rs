@@ -19,13 +19,10 @@ use blockchain::{Schema, Transaction};
 use messages::{ConsensusMessage, Propose, Prevote, Precommit, Message, RequestPropose,
                RequestTransactions, RequestPrevotes, RequestBlock, Block, RawTransaction};
 use storage::Patch;
-use events::Channel;
-use super::{NodeHandler, Round, Height, RequestData, ExternalMessage, NodeTimeout};
+use super::{NodeHandler, Round, Height, RequestData};
 
 // TODO reduce view invokations
-impl<S> NodeHandler<S>
-where
-    S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>,
+impl NodeHandler
 {
     /// Validates consensus message, then redirects it to the corresponding `handle_...` function.
     #[cfg_attr(feature = "flame_profile", flame)]
@@ -461,7 +458,7 @@ where
         let height = self.state.height();
 
         // Update state to new height
-        self.state.new_height(&block_hash, self.channel.get_time());
+        self.state.new_height(&block_hash, self.system_state.current_time());
 
         info!("COMMIT ====== height={}, proposer={}, round={}, committed={}, pool={}, hash={}",
               height,
@@ -870,7 +867,7 @@ where
             round,
             propose_hash,
             block_hash,
-            self.channel.get_time(),
+            self.system_state.current_time(),
             self.state.consensus_secret_key(),
         );
         self.state.add_precommit(&precommit);

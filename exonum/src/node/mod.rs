@@ -33,6 +33,7 @@ use blockchain::{SharedNodeState, Blockchain, Schema, GenesisConfig, Transaction
 use messages::{Connect, RawMessage, Message};
 use tokio::network::NetworkConfiguration;
 use tokio::error::{into_other, forget_result};
+use tokio::handler::SystemStateProvider;
 
 pub use self::state::{State, Round, Height, RequestData, ValidatorId, TxPool, ValidatorState};
 pub use self::whitelist::Whitelist;
@@ -77,16 +78,16 @@ pub enum NodeTimeout {
 pub struct ApiSender(pub Sender<ExternalMessage>);
 
 /// Handler that that performs consensus algorithm.
-pub struct NodeHandler<S>
-where
-    S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>,
+pub struct NodeHandler
 {
     /// State of the `NodeHandler`.
     pub state: State,
     /// Shared api state
     pub api_state: SharedNodeState,
+    /// System state
+    pub system_state: Box<SystemStateProvider>,
     /// Channel for messages and timeouts.
-    pub channel: S,
+    pub channel: NodeSender,
     /// Blockchain.
     pub blockchain: Blockchain,
     /// Known peer addresses.
@@ -207,15 +208,14 @@ pub struct Configuration {
     pub mempool: MemoryPoolConfig,
 }
 
-impl<S> NodeHandler<S>
-where
-    S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>,
+impl NodeHandler
 {
     /// Creates `NodeHandler` using specified `Configuration`.
     pub fn new(
         blockchain: Blockchain,
         external_address: SocketAddr,
-        sender: S,
+        sender: NodeSender,
+        system_state: Box<SystemStateProvider>,
         config: Configuration,
         api_state: SharedNodeState,
         handle: Handle,
@@ -242,7 +242,7 @@ where
         let connect = Connect::new(
             &config.listener.consensus_public_key,
             external_address,
-            sender.get_time(),
+            system_state.current_time(),
             &config.listener.consensus_secret_key,
         );
 
@@ -260,7 +260,7 @@ where
             connect,
             last_hash,
             last_height,
-            sender.get_time(),
+            system_state.current_time(),
         );
 
         // Adjust propose timeout for the first time.
@@ -269,6 +269,7 @@ where
         NodeHandler {
             blockchain,
             api_state,
+            system_state,
             state,
             channel: sender,
             peer_discovery: config.peer_discovery,
@@ -313,9 +314,9 @@ where
 
     /// Performs node initialization, so it starts consensus process from the first round.
     pub fn initialize(&mut self) {
-        info!("Start listening address={}", self.channel.address());
+        info!("Start listening address={}", self.system_state.listen_address());
         for address in &self.peer_discovery.clone() {
-            if address == &self.channel.address() {
+            if address == &self.system_state.listen_address() {
                 continue;
             }
             self.connect(address);
@@ -415,7 +416,7 @@ where
 
     /// Adds `NodeTimeout::Status` timeout to the channel.
     pub fn add_status_timeout(&mut self) {
-        let time = self.channel.get_time() + Duration::from_millis(self.status_timeout());
+        let time = self.system_state.current_time() + Duration::from_millis(self.status_timeout());
         let handle = self.tokio_handle();
         self.channel.add_timeout(
             handle,
@@ -427,7 +428,7 @@ where
     /// Adds `NodeTimeout::Request` timeout with `RequestData` to the channel.
     pub fn add_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
         trace!("ADD REQUEST TIMEOUT");
-        let time = self.channel.get_time() + data.timeout();
+        let time = self.system_state.current_time() + data.timeout();
         let handle = self.tokio_handle();
         self.channel.add_timeout(
             handle,
@@ -439,7 +440,7 @@ where
     /// Adds `NodeTimeout::PeerExchange` timeout to the channel.
     pub fn add_peer_exchange_timeout(&mut self) {
         trace!("ADD PEER EXCHANGE TIMEOUT");
-        let time = self.channel.get_time() + Duration::from_millis(self.peers_timeout());
+        let time = self.system_state.current_time() + Duration::from_millis(self.peers_timeout());
         let handle = self.tokio_handle();
         self.channel.add_timeout(
             handle,
@@ -450,7 +451,7 @@ where
 
     /// Adds `NodeTimeout::UpdateApiState` timeout to the channel.
     pub fn add_update_api_state_timeout(&mut self) {
-        let time = self.channel.get_time() +
+        let time = self.system_state.current_time() +
             Duration::from_millis(self.api_state().state_update_timeout());
         let handle = self.tokio_handle();
         self.channel.add_timeout(
@@ -472,12 +473,7 @@ where
     }
 }
 
-impl<S> fmt::Debug for NodeHandler<S>
-where
-    S: Channel<
-        ApplicationEvent = ExternalMessage,
-        Timeout = NodeTimeout,
-    >,
+impl fmt::Debug for NodeHandler
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(

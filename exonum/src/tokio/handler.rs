@@ -3,7 +3,6 @@ use futures::{Future, Stream, Sink, Poll, Async};
 use futures::stream::Fuse;
 use tokio_core::reactor::{Handle, Timeout};
 
-use std::io;
 use std::time::{Duration, SystemTime};
 use std::net::SocketAddr;
 
@@ -14,6 +13,11 @@ use messages::RawMessage;
 use super::error::{forget_result, log_error, into_other};
 use super::network::{NetworkEvent, NetworkRequest};
 
+pub trait SystemStateProvider: Send + Sync + 'static + ::std::fmt::Debug {
+    fn listen_address(&self) -> SocketAddr;
+    fn current_time(&self) -> SystemTime;
+}
+
 #[derive(Debug)]
 pub enum Event {
     Network(NetworkEvent),
@@ -21,10 +25,17 @@ pub enum Event {
     Api(ExternalMessage),
 }
 
+#[derive(Debug)]
+pub struct DefaultSystemState(pub SocketAddr);
+
+impl SystemStateProvider for DefaultSystemState {
+    fn listen_address(&self) -> SocketAddr { self.0 }
+    fn current_time(&self) -> SystemTime { SystemTime::now() }
+}
+
 /// Channel for messages and timeouts.
 #[derive(Debug, Clone)]
 pub struct NodeSender {
-    pub listen_addr: SocketAddr,
     pub timeout: mpsc::Sender<NodeTimeout>,
     pub network: mpsc::Sender<NetworkRequest>,
     pub external: mpsc::Sender<ExternalMessage>,
@@ -41,13 +52,12 @@ pub struct NodeReceiver {
 pub struct NodeChannel(pub NodeSender, pub NodeReceiver);
 
 impl NodeChannel {
-    pub fn new(listen_addr: SocketAddr, buffer: usize) -> NodeChannel {
+    pub fn new(buffer: usize) -> NodeChannel {
         let (timeout_sender, timeout_receiver) = mpsc::channel(buffer);
         let (network_sender, network_receiver) = mpsc::channel(buffer);
         let (external_sender, external_receiver) = mpsc::channel(buffer);
 
         let sender = NodeSender {
-            listen_addr,
             timeout: timeout_sender,
             network: network_sender,
             external: external_sender,
@@ -65,24 +75,6 @@ impl Channel for NodeSender {
     type ApplicationEvent = ExternalMessage;
     type Timeout = NodeTimeout;
 
-    fn address(&self) -> SocketAddr {
-        self.listen_addr
-    }
-
-    fn get_time(&self) -> SystemTime {
-        SystemTime::now()
-    }
-
-    fn post_event(&self, handle: Handle, event: Self::ApplicationEvent) -> Result<(), io::Error> {
-        let event_futute = self.external
-            .clone()
-            .send(event)
-            .map(forget_result)
-            .map_err(log_error);
-        handle.spawn(event_futute);
-        Ok(())
-    }
-
     fn send_to(&mut self, handle: Handle, address: SocketAddr, message: RawMessage) {
         let request = NetworkRequest::SendMessage(address, message);
         let send_future = self.network
@@ -94,7 +86,9 @@ impl Channel for NodeSender {
     }
 
     fn add_timeout(&mut self, handle: Handle, timeout: Self::Timeout, time: SystemTime) {
-        let duration = time.duration_since(self.get_time()).unwrap_or_else(|_| {
+        // TODO send timeout requests to HandlerPart
+
+        let duration = time.duration_since(SystemTime::now()).unwrap_or_else(|_| {
             Duration::from_secs(0)
         });
         let sender = self.timeout.clone();
@@ -180,4 +174,8 @@ where
             Async::NotReady
         })
     }
+}
+
+pub trait EventsHandler {
+    fn handle_event(&mut self, event: Event);
 }

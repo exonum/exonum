@@ -14,7 +14,6 @@
 
 use tokio_core::reactor::Handle;
 
-use std::io;
 use std::net::SocketAddr;
 use std::time::SystemTime;
 
@@ -25,14 +24,10 @@ use messages::{RawMessage};
 
 pub type Milliseconds = u64;
 
-pub trait Channel: Sync + Send + Clone {
+pub trait Channel {
     type ApplicationEvent: Send;
     type Timeout: Send;
 
-    fn get_time(&self) -> SystemTime;
-    fn address(&self) -> SocketAddr;
-
-    fn post_event(&self, handle: Handle, msg: Self::ApplicationEvent) -> Result<(), io::Error>;
     fn send_to(&mut self, handle: Handle, address: SocketAddr, message: RawMessage);
     fn add_timeout(&mut self, handle: Handle, timeout: Self::Timeout, time: SystemTime);
 }
