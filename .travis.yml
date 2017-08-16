@@ -95,7 +95,7 @@ script: |
   ;;
 
   "clippy-core" )
-      cd exonum && cargo clippy -- -D warnings
+      cd exonum && cargo clippy --features rocksdb -- -D warnings
   ;;
   "clippy-sandbox" )
       cd sandbox && cargo clippy -- -D warnings
