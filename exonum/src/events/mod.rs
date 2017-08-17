@@ -12,7 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// #[cfg(test)]
-// mod tests;
+pub mod codec;
+pub mod error;
+pub mod handler;
+pub mod network;
+
+pub use self::handler::{NodeSender, NodeReceiver, NodeChannel};
 
 pub type Milliseconds = u64;
+

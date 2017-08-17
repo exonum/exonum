@@ -16,17 +16,11 @@ use futures::sync::mpsc;
 use futures::{Stream, Poll, Async};
 use futures::stream::Fuse;
 
-use std::time::{SystemTime, Duration};
-use std::net::SocketAddr;
+use std::time::{Duration};
 
 use node::{ExternalMessage, NodeTimeout};
 
 use super::network::{NetworkEvent, NetworkRequest};
-
-pub trait SystemStateProvider: Send + Sync + 'static + ::std::fmt::Debug {
-    fn listen_address(&self) -> SocketAddr;
-    fn current_time(&self) -> SystemTime;
-}
 
 #[derive(Debug)]
 pub enum Event {
@@ -37,18 +31,6 @@ pub enum Event {
 
 #[derive(Debug)]
 pub struct TimeoutRequest(pub Duration, pub NodeTimeout);
-
-#[derive(Debug)]
-pub struct DefaultSystemState(pub SocketAddr);
-
-impl SystemStateProvider for DefaultSystemState {
-    fn listen_address(&self) -> SocketAddr {
-        self.0
-    }
-    fn current_time(&self) -> SystemTime {
-        SystemTime::now()
-    }
-}
 
 /// Channel for messages and timeouts.
 #[derive(Debug, Clone)]

@@ -17,8 +17,7 @@ use std::panic::{self, PanicInfo};
 use std::ffi::OsString;
 
 use blockchain::{Service, Blockchain};
-use node::NodeConfig;
-use tokio::Node;
+use node::{NodeConfig, Node};
 
 use super::internal::{CollectedCommand, Feedback};
 use super::clap_backend::ClapBackend;

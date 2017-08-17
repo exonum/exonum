@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use tokio::handler::{Event, EventHandler};
-use tokio::network::NetworkEvent;
+use events::handler::{Event, EventHandler};
+use events::network::NetworkEvent;
 
 use super::{NodeHandler, ExternalMessage, NodeTimeout};
 

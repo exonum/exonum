@@ -22,7 +22,6 @@ use tokio_io::AsyncRead;
 use std::net::SocketAddr;
 use std::time::Duration;
 use std::collections::HashMap;
-use std::rc::Rc;
 
 use messages::{Any, Connect, RawMessage};
 use node::{ExternalMessage, NodeTimeout};
