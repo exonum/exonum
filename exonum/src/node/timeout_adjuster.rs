@@ -206,7 +206,7 @@ mod tests {
     use env_logger;
 
     use super::*;
-    use events::Milliseconds;
+    use helpers::Milliseconds;
 
     #[test]
     fn dynamic_timeout_adjuster() {

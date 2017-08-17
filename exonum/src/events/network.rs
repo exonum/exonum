@@ -29,7 +29,7 @@ use node::{ExternalMessage, NodeTimeout};
 use super::EventHandler;
 use super::error::{other_error, result_ok, forget_result, into_other, log_error};
 use super::codec::MessagesCodec;
-use super::handler::{EventsAggregator};
+use super::handler::EventsAggregator;
 
 #[derive(Debug)]
 pub enum NetworkEvent {
