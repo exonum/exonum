@@ -5,7 +5,7 @@ use std::env;
 
 static USER_AGENT_FILE_NAME: &str = "user_agent";
 
-fn main () {
+fn main() {
     let package_name = option_env!("CARGO_PKG_NAME").unwrap_or("Exonum");
     let package_version = option_env!("CARGO_PKG_VERSION").unwrap_or("?");
     let rust_version = option_env!("CARGO_RUST_VERSION").unwrap_or("?");
@@ -14,5 +14,7 @@ fn main () {
     let out_dir = env::var("OUT_DIR").expect("Unable to get OUT_DIR");
     let dest_path = Path::new(&out_dir).join(USER_AGENT_FILE_NAME);
     let mut file = File::create(dest_path).expect("Unable to create output file");
-    file.write_all(user_agent.as_bytes()).expect("Unable to data to file");
+    file.write_all(user_agent.as_bytes()).expect(
+        "Unable to data to file",
+    );
 }

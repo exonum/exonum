@@ -232,7 +232,13 @@ fn test_connect() {
     let (public_key, secret_key) = gen_keypair();
 
     // write
-    let connect = Connect::new(&public_key, socket_address, time, &user_agent::get(), &secret_key);
+    let connect = Connect::new(
+        &public_key,
+        socket_address,
+        time,
+        &user_agent::get(),
+        &secret_key,
+    );
     // read
     assert_eq!(connect.pub_key(), &public_key);
     assert_eq!(connect.addr(), socket_address);
