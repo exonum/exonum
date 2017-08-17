@@ -15,7 +15,7 @@
 use std::error::Error as StdError;
 use std::io;
 
-// Common error helpers
+// Common error helpers (TODO move to helpers)
 
 pub fn other_error<S: AsRef<str>>(s: S) -> io::Error {
     io::Error::new(io::ErrorKind::Other, s.as_ref())
@@ -33,4 +33,19 @@ pub fn log_error<E: StdError>(err: E) {
 
 pub fn into_other<E: StdError>(err: E) -> io::Error {
     other_error(&format!("An error occured, {}", err.description()))
+}
+
+pub trait LogError {
+    fn log_error(self);
+}
+
+impl<T, E> LogError for ::std::result::Result<T, E>
+where
+    E: ::std::fmt::Display,
+{
+    fn log_error(self) {
+        if let Err(error) = self {
+            error!("An error occurred: {}", error);
+        }
+    }
 }

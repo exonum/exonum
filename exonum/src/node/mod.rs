@@ -22,7 +22,7 @@ use mount::Mount;
 use iron::{Chain, Iron};
 use futures::{Future, Sink, Stream};
 use futures::sync::mpsc;
-use tokio_core::reactor::{Core, Handle, Timeout};
+use tokio_core::reactor::{Core, Timeout};
 
 use std::io;
 use std::thread;
@@ -36,7 +36,7 @@ use blockchain::{ApiContext, Blockchain, GenesisConfig, Schema, SharedNodeState,
 use api::{private, public, Api};
 use messages::{Connect, Message, RawMessage};
 use events::network::{HandlerPart, NetworkConfiguration, NetworkPart, NetworkRequest};
-use events::error::{forget_result, into_other, log_error};
+use events::error::{LogError, forget_result, into_other};
 use events::handler::TimeoutRequest;
 use helpers::{Height, Round, ValidatorId, Milliseconds};
 
@@ -97,8 +97,6 @@ pub struct NodeHandler {
     /// Known peer addresses.
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
-    /// Event loop handle
-    pub handle: Handle,
 }
 
 /// Service configuration.
@@ -221,7 +219,6 @@ impl NodeHandler {
         system_state: Box<SystemStateProvider>,
         config: Configuration,
         api_state: SharedNodeState,
-        handle: Handle,
     ) -> Self {
         // FIXME: remove unwraps here, use FATAL log level instead
         let (last_hash, last_height) = {
@@ -276,13 +273,7 @@ impl NodeHandler {
             state,
             channel: sender,
             peer_discovery: config.peer_discovery,
-            handle,
         }
-    }
-
-    /// Events handle
-    pub fn tokio_handle(&self) -> Handle {
-        self.handle.clone()
     }
 
     /// Return internal `SharedNodeState`
@@ -357,13 +348,12 @@ impl NodeHandler {
     pub fn send_to_addr(&self, address: &SocketAddr, message: &RawMessage) {
         trace!("Send to address: {}", address);
         let request = NetworkRequest::SendMessage(*address, message.clone());
-        let send_future = self.channel
+        self.channel
             .network
             .clone()
             .send(request)
-            .map(forget_result)
-            .map_err(log_error);
-        self.tokio_handle().spawn(send_future);
+            .wait()
+            .log_error();
     }
 
     /// Broadcasts given message to all peers.
@@ -386,13 +376,12 @@ impl NodeHandler {
         let duration = time.duration_since(self.system_state.current_time())
             .unwrap_or_else(|_| Duration::from_millis(0));
         let request = TimeoutRequest(duration, timeout);
-        let send_future = self.channel
+        self.channel
             .timeout
             .clone()
             .send(request)
-            .map(forget_result)
-            .map_err(log_error);
-        self.tokio_handle().spawn(send_future);
+            .wait()
+            .log_error();
     }
 
     /// Adds request timeout if it isn't already requested.
@@ -553,7 +542,6 @@ pub struct Node {
     api_options: NodeApiConfig,
     handler: NodeHandler,
     channel: NodeChannel,
-    core: Core,
 }
 
 impl Node {
@@ -598,7 +586,6 @@ impl Node {
         let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
         let system_state = Box::new(DefaultSystemState(node_cfg.listen_address));
         let channel = NodeChannel::new(256);
-        let core = Core::new().unwrap();
         let handler = NodeHandler::new(
             blockchain,
             external_address,
@@ -606,13 +593,11 @@ impl Node {
             system_state,
             config,
             api_state,
-            core.handle(),
         );
         Node {
             api_options: node_cfg.api,
             handler,
             channel,
-            core,
         }
     }
 
@@ -716,8 +701,9 @@ impl Node {
             network_tx: network_tx,
         };
 
+        let core = Core::new().unwrap();
         let (timeout_tx, timeout_rx) = mpsc::channel(256);
-        let handle = self.core.handle();
+        let handle = core.handle();
         let timeout_requests_rx = self.channel.1.timeout;
         let timeout_tx = timeout_tx.clone();
         let timeout_handler = timeout_requests_rx.for_each(move |request| {
@@ -736,10 +722,10 @@ impl Node {
             handle.spawn(timeout);
             Ok(())
         });
-        self.core.handle().spawn(timeout_handler);
+        core.handle().spawn(timeout_handler);
 
         let handler_part = HandlerPart {
-            core: self.core,
+            core,
             handler: self.handler,
             timeout_rx,
             network_rx: network_rx,
