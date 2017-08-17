@@ -21,7 +21,8 @@ use tokio_io::AsyncRead;
 
 use std::net::SocketAddr;
 use std::time::Duration;
-use std::collections::hash_map::{HashMap, Entry};
+use std::collections::HashMap;
+use std::rc::Rc;
 
 use messages::{Any, Connect, RawMessage};
 use node::{ExternalMessage, NodeTimeout};
@@ -87,7 +88,7 @@ impl<H: EventHandler> HandlerPart<H> {
     pub fn run(self) -> Result<(), ()> {
         let mut core = self.core;
         let mut handler = self.handler;
-        
+
         let events_handle = EventsAggregator::new(self.timeout_rx, self.network_rx, self.api_rx)
             .for_each(move |event| {
                 handler.handle_event(event);
@@ -99,7 +100,7 @@ impl<H: EventHandler> HandlerPart<H> {
 
 impl NetworkPart {
     pub fn run(self) -> Result<(), ()> {
-       let mut core = Core::new().unwrap();
+        let mut core = Core::new().unwrap();
 
         // Outgoing connections handler
         let mut outgoing_connections: HashMap<SocketAddr, mpsc::Sender<RawMessage>> =
@@ -112,49 +113,46 @@ impl NetworkPart {
         let requests_handle = self.network_requests.1.for_each(|request| {
             match request {
                 NetworkRequest::SendMessage(peer, msg) => {
-                    let conn_tx = match outgoing_connections.entry(peer) {
-                        Entry::Occupied(entry) => entry.get().clone(),
-                        Entry::Vacant(entry) => {
-                            let (conn_tx, conn_rx) = mpsc::channel(10);
-                            let socket = TcpStream::connect(&peer, &handle);
+                    let conn_tx = if let Some(conn_tx) = outgoing_connections.get(&peer).cloned() {
+                        conn_tx
+                    } else {
+                        let (conn_tx, conn_rx) = mpsc::channel(10);
+                        outgoing_connections.insert(peer, conn_tx.clone());
 
-                            let requests_tx = requests_tx.clone();
-                            let connect_handle = socket
-                                .and_then(move |sock| {
-                                    info!("Tokio: Established connection with peer={}", peer);
+                        let requests_tx = requests_tx.clone();
+                        let connect_handle = TcpStream::connect(&peer, &handle)
+                            .and_then(move |sock| {
+                                info!("Established connection with peer={}", peer);
 
-                                    let stream = sock.framed(MessagesCodec);
-                                    let (sink, stream) = stream.split();
+                                let stream = sock.framed(MessagesCodec);
+                                let (sink, stream) = stream.split();
 
-                                    let writer = conn_rx
-                                        .map_err(|_| other_error("Can't send data into socket"))
-                                        .forward(sink);
-                                    let reader = stream.for_each(result_ok).map_err(into_other);
+                                let writer = conn_rx
+                                    .map_err(|_| other_error("Can't send data into socket"))
+                                    .forward(sink);
+                                let reader = stream.for_each(result_ok).map_err(into_other);
 
-                                    reader
-                                        .select2(writer)
-                                        .map_err(|_| other_error("Socket error"))
-                                        .and_then(|res| match res {
-                                            Either::A((_, _reader)) => Ok(()).into_future(),
-                                            Either::B((_, _writer)) => Ok(()).into_future(),
-                                        })
-                                })
-                                .map_err(log_error)
-                                .then(move |_| {
-                                    info!("Tokio: Connection with peer={} closed", peer);
-                                    let request = NetworkRequest::DisconnectWithPeer(peer);
-                                    requests_tx
-                                        .clone()
-                                        .send(request)
-                                        .map(forget_result)
-                                        .map_err(into_other)
-                                })
-                                .map_err(log_error);
-                            handle.spawn(connect_handle);
+                                reader
+                                    .select2(writer)
+                                    .map_err(|_| other_error("Socket error"))
+                                    .and_then(|res| match res {
+                                        Either::A((_, _reader)) => Ok(()).into_future(),
+                                        Either::B((_, _writer)) => Ok(()).into_future(),
+                                    })
+                            })
+                            .then(move |res| {
+                                info!("Connection with peer={} closed, reason={:?}", peer, res);
+                                // outgoing_connections.remove(&peer);
 
-                            entry.insert(conn_tx.clone());
-                            conn_tx
-                        }
+                                let request = NetworkRequest::DisconnectWithPeer(peer);
+                                requests_tx
+                                    .clone()
+                                    .send(request)
+                                    .map(forget_result)
+                                    .map_err(into_other)
+                            }).map_err(log_error);
+                        handle.spawn(connect_handle);
+                        conn_tx
                     };
 
                     let duration = Duration::from_secs(5);
@@ -196,7 +194,7 @@ impl NetworkPart {
         let server = listener
             .incoming()
             .fold(network_tx, move |network_tx, (sock, addr)| {
-                info!("Tokio: Accepted incoming connection with peer={}", addr);
+                info!("Accepted incoming connection with peer={}", addr);
 
                 let stream = sock.framed(MessagesCodec);
                 let (_, stream) = stream.split();
@@ -213,7 +211,7 @@ impl NetworkPart {
                         }
                     })
                     .and_then(move |(connect, stream)| {
-                        info!("Tokio: Received handshake message={:?}", connect);
+                        info!("Received handshake message={:?}", connect);
 
                         let event = NetworkEvent::PeerConnected(addr, connect);
                         let connect_event = network_tx.clone().send(event).map_err(into_other);
