@@ -1,16 +1,26 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use futures::sync::mpsc;
-use futures::{Future, Stream, Sink, Poll, Async};
+use futures::{Stream, Poll, Async};
 use futures::stream::Fuse;
-use tokio_core::reactor::Handle;
 
 use std::time::{SystemTime, Duration};
 use std::net::SocketAddr;
 
-use events::Channel;
 use node::{ExternalMessage, NodeTimeout};
-use messages::RawMessage;
 
-use super::error::{forget_result, log_error};
 use super::network::{NetworkEvent, NetworkRequest};
 
 pub trait SystemStateProvider: Send + Sync + 'static + ::std::fmt::Debug {
@@ -32,8 +42,12 @@ pub struct TimeoutRequest(pub Duration, pub NodeTimeout);
 pub struct DefaultSystemState(pub SocketAddr);
 
 impl SystemStateProvider for DefaultSystemState {
-    fn listen_address(&self) -> SocketAddr { self.0 }
-    fn current_time(&self) -> SystemTime { SystemTime::now() }
+    fn listen_address(&self) -> SocketAddr {
+        self.0
+    }
+    fn current_time(&self) -> SystemTime {
+        SystemTime::now()
+    }
 }
 
 /// Channel for messages and timeouts.
@@ -71,31 +85,6 @@ impl NodeChannel {
             external: external_receiver,
         };
         NodeChannel(sender, receiver)
-    }
-}
-
-impl Channel for NodeSender {
-    type ApplicationEvent = ExternalMessage;
-    type Timeout = NodeTimeout;
-
-    fn send_to(&self, handle: Handle, address: SocketAddr, message: RawMessage) {
-        let request = NetworkRequest::SendMessage(address, message);
-        let send_future = self.network
-            .clone()
-            .send(request)
-            .map(forget_result)
-            .map_err(log_error);
-        handle.spawn(send_future);
-    }
-
-    fn add_timeout(&self, handle: Handle, timeout: Self::Timeout, duration: Duration) {
-        let request = TimeoutRequest(duration, timeout);
-        let send_future = self.timeout
-            .clone()
-            .send(request)
-            .map(forget_result)
-            .map_err(log_error);
-        handle.spawn(send_future);
     }
 }
 

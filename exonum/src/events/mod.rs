@@ -12,22 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use tokio_core::reactor::Handle;
-
-use std::net::SocketAddr;
-use std::time::Duration;
-
-use messages::{RawMessage};
-
 // #[cfg(test)]
 // mod tests;
 
 pub type Milliseconds = u64;
-
-pub trait Channel {
-    type ApplicationEvent: Send;
-    type Timeout: Send;
-
-    fn send_to(&self, handle: Handle, address: SocketAddr, message: RawMessage);
-    fn add_timeout(&self, handle: Handle, timeout: Self::Timeout, time: Duration);
-}

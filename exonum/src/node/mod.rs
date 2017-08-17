@@ -28,12 +28,13 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 use crypto::{PublicKey, SecretKey, Hash};
-use events::{Channel, Milliseconds};
+use events::{Milliseconds};
 use blockchain::{SharedNodeState, Blockchain, Schema, GenesisConfig, Transaction};
 use messages::{Connect, RawMessage, Message};
 use tokio::network::NetworkConfiguration;
-use tokio::error::{into_other, forget_result};
-use tokio::handler::SystemStateProvider;
+use tokio::error::{into_other, forget_result, log_error};
+use tokio::handler::{SystemStateProvider, TimeoutRequest};
+use tokio::network::NetworkRequest;
 
 pub use self::state::{State, Round, Height, RequestData, ValidatorId, TxPool, ValidatorState};
 pub use self::whitelist::Whitelist;
@@ -336,43 +337,44 @@ impl NodeHandler {
     }
 
     /// Sends the given message to a peer by its id.
-    pub fn send_to_validator(&mut self, id: u32, message: &RawMessage) {
+    pub fn send_to_validator(&self, id: u32, message: &RawMessage) {
         // TODO: check validator id
         let public_key = self.state.validators()[id as usize].consensus_key;
         self.send_to_peer(public_key, message);
     }
 
     /// Sends the given message to a peer by its public key.
-    pub fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
+    pub fn send_to_peer(&self, public_key: PublicKey, message: &RawMessage) {
         if let Some(conn) = self.state.peers().get(&public_key) {
-            trace!("Send to address: {}", conn.addr());
-            let handle = self.tokio_handle();
-            self.channel.send_to(handle, conn.addr(), message.clone());
+            self.send_to_addr(&conn.addr(), message);
         } else {
             warn!("Hasn't connection with peer {:?}", public_key);
         }
     }
 
     /// Sends `RawMessage` to the specified address.
-    pub fn send_to_addr(&mut self, address: &SocketAddr, message: &RawMessage) {
+    pub fn send_to_addr(&self, address: &SocketAddr, message: &RawMessage) {
         trace!("Send to address: {}", address);
-        let handle = self.tokio_handle();
-        self.channel.send_to(handle, *address, message.clone());
+        let request = NetworkRequest::SendMessage(*address, message.clone());
+        let send_future = self.channel.network
+            .clone()
+            .send(request)
+            .map(forget_result)
+            .map_err(log_error);
+        self.tokio_handle().spawn(send_future);
     }
 
     /// Broadcasts given message to all peers.
     // TODO: use Into<RawMessage>
-    pub fn broadcast(&mut self, message: &RawMessage) {
+    pub fn broadcast(&self, message: &RawMessage) {
         for conn in self.state.peers().values() {
             let addr = conn.addr();
-            trace!("Send to address: {}", addr);
-            let handle = self.tokio_handle();
-            self.channel.send_to(handle, addr, message.clone());
+            self.send_to_addr(&addr, message);
         }
     }
 
     /// Performs connection to the specified network address.
-    pub fn connect(&mut self, address: &SocketAddr) {
+    pub fn connect(&self, address: &SocketAddr) {
         let connect = self.state.our_connect_message().clone();
         self.send_to_addr(address, connect.raw());
     }
@@ -381,11 +383,13 @@ impl NodeHandler {
     pub fn add_timeout(&self, timeout: NodeTimeout, time: SystemTime) {
         let duration = time.duration_since(self.system_state.current_time())
             .unwrap_or_else(|_| Duration::from_millis(0));
-        self.channel.add_timeout(
-            self.tokio_handle(),
-            timeout,
-            duration,
-        );
+        let request = TimeoutRequest(duration, timeout);
+        let send_future = self.channel.timeout
+            .clone()
+            .send(request)
+            .map(forget_result)
+            .map_err(log_error);
+        self.tokio_handle().spawn(send_future);
     }
 
     /// Adds request timeout if it isn't already requested.
@@ -397,7 +401,7 @@ impl NodeHandler {
     }
 
     /// Adds `NodeTimeout::Round` timeout to the channel.
-    pub fn add_round_timeout(&mut self) {
+    pub fn add_round_timeout(&self) {
         let time = self.round_start_time(self.state.round() + 1);
         trace!(
             "ADD ROUND TIMEOUT: time={:?}, height={}, round={}",
@@ -410,7 +414,7 @@ impl NodeHandler {
     }
 
     /// Adds `NodeTimeout::Propose` timeout to the channel.
-    pub fn add_propose_timeout(&mut self) {
+    pub fn add_propose_timeout(&self) {
         let adjusted_timeout = self.state.propose_timeout();
         let time = self.round_start_time(self.state.round()) +
             Duration::from_millis(adjusted_timeout);
@@ -426,27 +430,27 @@ impl NodeHandler {
     }
 
     /// Adds `NodeTimeout::Status` timeout to the channel.
-    pub fn add_status_timeout(&mut self) {
+    pub fn add_status_timeout(&self) {
         let time = self.system_state.current_time() + Duration::from_millis(self.status_timeout());
         self.add_timeout(NodeTimeout::Status(self.state.height()), time);
     }
 
     /// Adds `NodeTimeout::Request` timeout with `RequestData` to the channel.
-    pub fn add_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
+    pub fn add_request_timeout(&self, data: RequestData, peer: Option<PublicKey>) {
         trace!("ADD REQUEST TIMEOUT");
         let time = self.system_state.current_time() + data.timeout();
         self.add_timeout(NodeTimeout::Request(data, peer), time);
     }
 
     /// Adds `NodeTimeout::PeerExchange` timeout to the channel.
-    pub fn add_peer_exchange_timeout(&mut self) {
+    pub fn add_peer_exchange_timeout(&self) {
         trace!("ADD PEER EXCHANGE TIMEOUT");
         let time = self.system_state.current_time() + Duration::from_millis(self.peers_timeout());
         self.add_timeout(NodeTimeout::PeerExchange, time);
     }
 
     /// Adds `NodeTimeout::UpdateApiState` timeout to the channel.
-    pub fn add_update_api_state_timeout(&mut self) {
+    pub fn add_update_api_state_timeout(&self) {
         let time = self.system_state.current_time() +
             Duration::from_millis(self.api_state().state_update_timeout());
         self.add_timeout(NodeTimeout::UpdateApiState, time);
