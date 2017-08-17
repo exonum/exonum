@@ -76,10 +76,10 @@ pub enum BranchProofNode<V> {
         /// A key of the right child.
         right_key: DBKey,
     },
-    /// A branch of proof in which left child may contains the requested key.
+    /// A branch of proof in which left child may contain the requested key.
     LeftBranch {
         /// A left child node.
-        left_hash: Box<ProofNode<V>>,
+        left_node: Box<ProofNode<V>>,
         /// A hash of the right child.
         right_hash: Hash,
         /// A key of the left child.
@@ -87,12 +87,12 @@ pub enum BranchProofNode<V> {
         /// A key of the right child.
         right_key: DBKey,
     },
-    /// A branch of proof in which right child may contains the requested key.
+    /// A branch of proof in which right child may contain the requested key.
     RightBranch {
         /// A hash of the left child.
         left_hash: Hash,
         /// A right child node.
-        right_hash: Box<ProofNode<V>>,
+        right_node: Box<ProofNode<V>>,
         /// A key of the left child.
         left_key: DBKey,
         /// A key of the right child.
@@ -145,13 +145,13 @@ impl<V: StorageValue> BranchProofNode<V> {
                 hash(full_slice)
             }
             LeftBranch {
-                ref left_hash,
+                ref left_node,
                 ref right_hash,
                 ref left_key,
                 ref right_key,
             } => {
                 let full_slice = &[
-                    left_hash.root_hash().as_ref(),
+                    left_node.root_hash().as_ref(),
                     right_hash.as_ref(),
                     &left_key.to_vec(),
                     &right_key.to_vec(),
@@ -160,13 +160,13 @@ impl<V: StorageValue> BranchProofNode<V> {
             }
             RightBranch {
                 ref left_hash,
-                ref right_hash,
+                ref right_node,
                 ref left_key,
                 ref right_key,
             } => {
                 let full_slice = &[
                     left_hash.as_ref(),
-                    right_hash.root_hash().as_ref(),
+                    right_node.root_hash().as_ref(),
                     &left_key.to_vec(),
                     &right_key.to_vec(),
                 ].concat();
@@ -226,7 +226,7 @@ impl<V: Serialize> Serialize for BranchProofNode<V> {
                 state.serialize_entry(rkey, rhash)?;
             }
             LeftBranch {
-                left_hash: ref proof,
+                left_node: ref proof,
                 right_hash: ref rhash,
                 left_key: ref lkey,
                 right_key: ref rkey,
@@ -236,7 +236,7 @@ impl<V: Serialize> Serialize for BranchProofNode<V> {
             }
             RightBranch {
                 left_hash: ref lhash,
-                right_hash: ref proof,
+                right_node: ref proof,
                 left_key: ref lkey,
                 right_key: ref rkey,
             } => {
@@ -327,7 +327,7 @@ impl<V: fmt::Debug> BranchProofNode<V> {
         // if we inspect the topmost level of a proof
         let res: Option<&V> = match *self {
             LeftBranch {
-                left_hash: ref proof,
+                left_node: ref proof,
                 left_key: ref left_slice_key,
                 ..
             } => {
@@ -343,7 +343,7 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                 proof.validate_consistency(left_slice, searched_slice)?
             }
             RightBranch {
-                right_hash: ref proof,
+                right_node: ref proof,
                 right_key: ref right_slice_key,
                 ..
             } => {
@@ -391,7 +391,7 @@ impl<V: fmt::Debug> BranchProofNode<V> {
         // if we inspect sub-proofs of a proof
         let res: Option<&V> = match *self {
             LeftBranch {
-                left_hash: ref proof,
+                left_node: ref proof,
                 left_key: ref left_slice_key,
                 right_key: ref right_slice_key,
                 ..
@@ -419,7 +419,7 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                 proof.validate_consistency(&left_slice, searched_slice)?
             }
             RightBranch {
-                right_hash: ref proof,
+                right_node: ref proof,
                 left_key: ref left_slice_key,
                 right_key: ref right_slice_key,
                 ..
@@ -536,7 +536,7 @@ impl<V: fmt::Debug> fmt::Debug for BranchProofNode<V> {
         use self::BranchProofNode::*;
         match *self {
             LeftBranch {
-                ref left_hash,
+                ref left_node,
                 ref right_hash,
                 ref left_key,
                 ref right_key,
@@ -544,7 +544,7 @@ impl<V: fmt::Debug> fmt::Debug for BranchProofNode<V> {
                 write!(
                     f,
                     "{{\"left\":{:?},\"right\":{:?},\"left_slice\":{:?},\"right_slice\":{:?}}}",
-                    left_hash,
+                    left_node,
                     right_hash,
                     left_key,
                     right_key
@@ -552,7 +552,7 @@ impl<V: fmt::Debug> fmt::Debug for BranchProofNode<V> {
             }
             RightBranch {
                 ref left_hash,
-                ref right_hash,
+                ref right_node,
                 ref left_key,
                 ref right_key,
             } => {
@@ -560,7 +560,7 @@ impl<V: fmt::Debug> fmt::Debug for BranchProofNode<V> {
                     f,
                     "{{\"left\":{:?},\"right\":{:?},\"left_slice\":{:?},\"right_slice\":{:?}}}",
                     left_hash,
-                    right_hash,
+                    right_node,
                     left_key,
                     right_key
                 )

@@ -22,9 +22,11 @@ extern crate exonum;
 
 #[cfg(test)]
 mod tests {
-    use test::Bencher;
-
     use tempdir::TempDir;
+
+    use test::Bencher;
+    use std::collections::BTreeMap;
+
 
     use exonum::storage::{ProofMapIndex, Database, Fork, LevelDB, LevelDBOptions, LevelDBCache,
                           StorageValue, Patch, RocksDB, RocksDBOptions, RocksBlockOptions};
@@ -33,7 +35,7 @@ mod tests {
     use exonum::blockchain::{Blockchain, Transaction};
     use exonum::crypto::{gen_keypair, Hash, PublicKey, SecretKey};
     use exonum::messages::Message;
-
+    use exonum::helpers::{Height, ValidatorId};
 
     fn execute_timestamping(db: Box<Database>, b: &mut Bencher) {
         let mut blockchain = Blockchain::new(db, Vec::new());
@@ -76,7 +78,9 @@ mod tests {
             txs: &[Hash],
             pool: &BTreeMap<Hash, Box<Transaction>>,
         ) -> Patch {
-            blockchain.create_patch(0, height, txs, pool).1
+            blockchain
+                .create_patch(ValidatorId::zero(), Height(height), txs, pool)
+                .1
         }
 
         for i in 0..100 {
@@ -150,7 +154,9 @@ mod tests {
             txs: &[Hash],
             pool: &BTreeMap<Hash, Box<Transaction>>,
         ) -> Patch {
-            blockchain.create_patch(0, height, txs, pool).1
+            blockchain
+                .create_patch(ValidatorId::zero(), Height(height), txs, pool)
+                .1
         }
 
         for i in 0..100 {

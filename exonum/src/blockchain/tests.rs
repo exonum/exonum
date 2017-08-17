@@ -13,14 +13,17 @@
 // limitations under the License.
 
 #![allow(dead_code)]
-use rand::{thread_rng, Rng};
-
 use std::collections::BTreeMap;
+
+use rand::{thread_rng, Rng};
+use serde_json;
+
 use blockchain::{Blockchain, Schema, Transaction};
 use crypto::{gen_keypair, Hash};
 use storage::{Database, Fork, Error, ListIndex};
 use messages::Message;
-use serde_json;
+use helpers::{Height, ValidatorId};
+
 
 #[test]
 fn test_encode_decode() {
@@ -188,8 +191,8 @@ fn handling_tx_panic(blockchain: &Blockchain, db: &mut Box<Database>) {
     );
 
     let (_, patch) = blockchain.create_patch(
-        0,
-        0,
+        ValidatorId::zero(),
+        Height::zero(),
         &[tx_ok1.hash(), tx_failed.hash(), tx_ok2.hash()],
         &pool,
     );
@@ -268,8 +271,8 @@ fn handling_tx_panic_storage_error(blockchain: &Blockchain) {
     );
 
     blockchain.create_patch(
-        0,
-        0,
+        ValidatorId::zero(),
+        Height::zero(),
         &[tx_ok1.hash(), tx_storage_error.hash(), tx_ok2.hash()],
         &pool,
     );

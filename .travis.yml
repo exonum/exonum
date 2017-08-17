@@ -18,9 +18,9 @@ rust:
   - stable
 matrix:
   include:
-    - rust: nightly-2017-07-05
+    - rust: nightly-2017-08-15
       env: FEATURE=clippy-core
-    - rust: nightly-2017-07-05
+    - rust: nightly-2017-08-15
       env: FEATURE=clippy-sandbox
 
 cache:
@@ -34,8 +34,7 @@ sudo: required
 
 env:
   global:
-  - NIGHTLY_RUST=nightly-2017-07-05
-  - CLIPPY_VERS=0.0.142
+  - CLIPPY_VERS=0.0.152
   - RUSTFMT_VERS=0.9.0
   - SODIUM_VERS=1.0.13
   - ROCKSDB_VERS=5.6.1
@@ -89,8 +88,8 @@ script: |
   case "$FEATURE" in
 
   "fmt" )
-      cargo audit
-      cargo fmt -p exonum -- --write-mode=diff
+      cargo audit &&
+      cargo fmt -p exonum -- --write-mode=diff &&
       cargo fmt -p sandbox -- --write-mode=diff
   ;;
 

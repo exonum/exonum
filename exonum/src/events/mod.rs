@@ -380,7 +380,7 @@ impl error::Error for Error {
 
 fn num_milliseconds(duration: &Duration) -> Milliseconds {
     const MILLIS_PER_SEC: u64 = 1000;
-    const NANOS_PER_MILLI: u32 = 1000_000;
+    const NANOS_PER_MILLI: u32 = 1_000_000;
 
     let secs_part = duration.as_secs() * MILLIS_PER_SEC;
     let nanos_part = duration.subsec_nanos() / NANOS_PER_MILLI;

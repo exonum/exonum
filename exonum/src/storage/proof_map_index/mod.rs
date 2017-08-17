@@ -192,7 +192,7 @@ where
                     match child_proof_pos {
                         ChildKind::Left => {
                             ProofNode::Branch(BranchProofNode::LeftBranch {
-                                left_hash: Box::new(child_proof),
+                                left_node: Box::new(child_proof),
                                 right_hash: neighbour_child_hash,
                                 left_key: l_s.suffix(searched_slice.from() + c_pr_l),
                                 right_key: r_s.suffix(searched_slice.from() + c_pr_l),
@@ -201,7 +201,7 @@ where
                         ChildKind::Right => {
                             ProofNode::Branch(BranchProofNode::RightBranch {
                                 left_hash: neighbour_child_hash,
-                                right_hash: Box::new(child_proof),
+                                right_node: Box::new(child_proof),
                                 left_key: l_s.suffix(searched_slice.from() + c_pr_l),
                                 right_key: r_s.suffix(searched_slice.from() + c_pr_l),
                             })
@@ -343,7 +343,7 @@ where
                         match child_proof_pos {
                             ChildKind::Left => {
                                 MapProof::Branch(BranchProofNode::LeftBranch {
-                                    left_hash: Box::new(child_proof),
+                                    left_node: Box::new(child_proof),
                                     right_hash: neighbour_child_hash,
                                     left_key: l_s,
                                     right_key: r_s,
@@ -352,7 +352,7 @@ where
                             ChildKind::Right => {
                                 MapProof::Branch(BranchProofNode::RightBranch {
                                     left_hash: neighbour_child_hash,
-                                    right_hash: Box::new(child_proof),
+                                    right_node: Box::new(child_proof),
                                     left_key: l_s,
                                     right_key: r_s,
                                 })
