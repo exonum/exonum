@@ -12,206 +12,256 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::{VecDeque, BinaryHeap, HashSet, BTreeMap, HashMap};
-use std::iter::FromIterator;
-use std::cell::{RefCell, Ref, RefMut};
-use std::sync::{Arc, Mutex};
-use std::net::{SocketAddr, Ipv4Addr, IpAddr};
-use std::ops::Drop;
-use std::time::{SystemTime, Duration, UNIX_EPOCH};
+use futures::sync::mpsc;
+
+use std::sync::{Mutex, Arc};
+use std::time::{SystemTime, Duration};
+use std::net::{SocketAddr, Ipv4Addr};
+use std::thread::{self, JoinHandle};
+use std::collections::{BinaryHeap, VecDeque, HashMap, HashSet};
 
 use exonum::node::{NodeHandler, Configuration, NodeTimeout, ExternalMessage, ListenerConfig,
-                   ServiceConfig};
+                   ServiceConfig, SystemStateProvider};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
                          Schema, Transaction, Service, ValidatorKeys, SharedNodeState, BlockProof,
                          TimeoutAdjusterConfig};
 use exonum::storage::{MemoryDB, MapProof};
 use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, Status};
-use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, InternalEvent,
-                     EventHandler, Channel, Result as EventsResult, Milliseconds};
 use exonum::crypto::{Hash, PublicKey, SecretKey, Seed, gen_keypair_from_seed};
 #[cfg(test)]
 use exonum::crypto::gen_keypair;
-use exonum::helpers::{Height, Round, ValidatorId, init_logger};
+use exonum::helpers::{Height, Round, ValidatorId, Milliseconds, init_logger};
+use exonum::events::Event;
+use exonum::events::handler::TimeoutRequest;
 
 use timestamping::TimestampingService;
 use config_updater::ConfigUpdateService;
 use sandbox_tests_helper::VALIDATOR_0;
 
-type SandboxEvent = InternalEvent<ExternalMessage, NodeTimeout>;
+pub type SharedTime = Mutex<SystemTime>;
 
-#[derive(PartialEq, Eq)]
-pub struct TimerPair(pub SystemTime, pub NodeTimeout);
+#[derive(Debug)]
+pub struct SandboxSystemStateProvider
+{
+    listen_address: SocketAddr,
+    shared_time: SharedTime,
+}
 
-impl PartialOrd for TimerPair {
-    fn partial_cmp(&self, other: &Self) -> Option<::std::cmp::Ordering> {
-        Some((&self.0, &self.1).cmp(&(&other.0, &other.1)).reverse())
+impl SystemStateProvider for SandboxSystemStateProvider {
+    fn current_time(&self) -> SystemTime {
+        *self.shared_time.lock().unwrap()
+    }
+
+    fn listen_address(&self) -> SocketAddr {
+        self.listen_address
     }
 }
 
-impl Ord for TimerPair {
-    fn cmp(&self, other: &Self) -> ::std::cmp::Ordering {
-        (&self.0, &self.1).cmp(&(&other.0, &other.1)).reverse()
-    }
-}
-
+#[derive(Debug)]
 pub struct SandboxInner {
-    pub address: SocketAddr,
-    pub time: SystemTime,
+    pub time: SharedTime,
     pub sent: VecDeque<(SocketAddr, RawMessage)>,
-    pub events: VecDeque<SandboxEvent>,
-    pub timers: BinaryHeap<TimerPair>,
+    pub events: VecDeque<Event>,
+    pub timers: BinaryHeap<TimeoutRequest>,
 }
 
-#[derive(Clone)]
-pub struct SandboxChannel {
-    pub inner: Arc<Mutex<SandboxInner>>,
-}
+// use std::collections::{VecDeque, BinaryHeap, HashSet, BTreeMap, HashMap};
+// use std::iter::FromIterator;
+// use std::cell::{RefCell, Ref, RefMut};
+// use std::sync::{Arc, Mutex};
+// use std::net::{SocketAddr, Ipv4Addr, IpAddr};
+// use std::ops::Drop;
+// use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
-impl SandboxChannel {
-    fn send_event(&self, event: SandboxEvent) {
-        self.inner.lock().unwrap().events.push_back(event);
-    }
+// use exonum::node::{NodeHandler, Configuration, NodeTimeout, ExternalMessage, ListenerConfig,
+//                    ServiceConfig};
+// use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
+//                          Schema, Transaction, Service, ValidatorKeys, SharedNodeState, BlockProof,
+//                          TimeoutAdjusterConfig};
+// use exonum::storage::{MemoryDB, MapProof};
+// use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, Status};
+// use exonum::crypto::{Hash, PublicKey, SecretKey, Seed, gen_keypair_from_seed};
+// #[cfg(test)]
+// use exonum::crypto::gen_keypair;
+// use exonum::helpers::{Height, Round, ValidatorId, init_logger};
+// use exonum::events::Event;
 
-    fn send_message(&self, address: &SocketAddr, message: RawMessage) {
-        self.inner.lock().unwrap().sent.push_back(
-            (*address, message),
-        );
-    }
-}
+// use timestamping::TimestampingService;
+// use config_updater::ConfigUpdateService;
+// use sandbox_tests_helper::VALIDATOR_0;
 
-impl Channel for SandboxChannel {
-    type ApplicationEvent = ExternalMessage;
-    type Timeout = NodeTimeout;
+// #[derive(PartialEq, Eq)]
+// pub struct TimerPair(pub SystemTime, pub NodeTimeout);
 
-    fn address(&self) -> SocketAddr {
-        self.inner.lock().unwrap().address
-    }
+// impl PartialOrd for TimerPair {
+//     fn partial_cmp(&self, other: &Self) -> Option<::std::cmp::Ordering> {
+//         Some((&self.0, &self.1).cmp(&(&other.0, &other.1)).reverse())
+//     }
+// }
 
-    fn get_time(&self) -> SystemTime {
-        self.inner.lock().unwrap().time
-    }
+// impl Ord for TimerPair {
+//     fn cmp(&self, other: &Self) -> ::std::cmp::Ordering {
+//         (&self.0, &self.1).cmp(&(&other.0, &other.1)).reverse()
+//     }
+// }
 
-    fn post_event(&self, event: Self::ApplicationEvent) -> EventsResult<()> {
-        let msg = InternalEvent::Application(event);
-        self.send_event(msg);
-        Ok(())
-    }
+// pub struct SandboxInner {
+//     pub address: SocketAddr,
+//     pub time: SystemTime,
+//     pub sent: VecDeque<(SocketAddr, RawMessage)>,
+//     pub events: VecDeque<Event>,
+//     pub timers: BinaryHeap<TimerPair>,
+// }
 
-    fn send_to(&mut self, address: &SocketAddr, message: RawMessage) {
-        // TODO handle attempts to send message to offline nodes
-        self.send_message(address, message);
-    }
+// #[derive(Clone)]
+// pub struct SandboxChannel {
+//     pub inner: Arc<Mutex<SandboxInner>>,
+// }
 
-    fn connect(&mut self, address: &SocketAddr) {
-        let event = InternalEvent::Node(Event::Connected(*address));
-        self.send_event(event);
-    }
+// impl SandboxChannel {
+//     fn send_event(&self, event: SandboxEvent) {
+//         self.inner.lock().unwrap().events.push_back(event);
+//     }
 
-    fn add_timeout(&mut self, timeout: Self::Timeout, time: SystemTime) {
-        let pair = TimerPair(time, timeout);
-        self.inner.lock().unwrap().timers.push(pair);
-    }
-}
+//     fn send_message(&self, address: &SocketAddr, message: RawMessage) {
+//         self.inner.lock().unwrap().sent.push_back(
+//             (*address, message),
+//         );
+//     }
+// }
 
-pub struct SandboxReactor {
-    inner: Arc<Mutex<SandboxInner>>,
-    handler: NodeHandler<SandboxChannel>,
-}
+// impl Channel for SandboxChannel {
+//     type ApplicationEvent = ExternalMessage;
+//     type Timeout = NodeTimeout;
 
-impl Reactor<NodeHandler<SandboxChannel>> for SandboxReactor {
-    type Channel = SandboxChannel;
+//     fn address(&self) -> SocketAddr {
+//         self.inner.lock().unwrap().address
+//     }
 
-    fn bind(&mut self) -> ::std::io::Result<()> {
-        Ok(())
-    }
-    fn run(&mut self) -> ::std::io::Result<()> {
-        unreachable!();
-    }
-    fn run_once(&mut self, _: Option<usize>) -> ::std::io::Result<()> {
-        loop {
-            let result = self.inner.lock().unwrap().events.pop_front();
-            if let Some(event) = result {
-                match event {
-                    InternalEvent::Node(event) => {
-                        self.handler.handle_event(event);
-                    }
-                    InternalEvent::Application(event) => {
-                        self.handler.handle_application_event(event);
-                    }
-                    InternalEvent::Invoke(_) => {}
-                }
-            } else {
-                break;
-            }
-        }
-        Ok(())
-    }
-    fn get_time(&self) -> SystemTime {
-        self.inner.lock().unwrap().time
-    }
-    fn channel(&self) -> SandboxChannel {
-        SandboxChannel { inner: self.inner.clone() }
-    }
-}
+//     fn get_time(&self) -> SystemTime {
+//         self.inner.lock().unwrap().time
+//     }
 
-impl SandboxReactor {
-    pub fn is_leader(&self) -> bool {
-        self.handler.state().is_leader()
-    }
+//     fn post_event(&self, event: Self::ApplicationEvent) -> EventsResult<()> {
+//         let msg = InternalEvent::Application(event);
+//         self.send_event(msg);
+//         Ok(())
+//     }
 
-    pub fn leader(&self, round: Round) -> ValidatorId {
-        self.handler.state().leader(round)
-    }
+//     fn send_to(&mut self, address: &SocketAddr, message: RawMessage) {
+//         // TODO handle attempts to send message to offline nodes
+//         self.send_message(address, message);
+//     }
 
-    pub fn is_validator(&self) -> bool {
-        self.handler.state().is_validator()
-    }
+//     fn connect(&mut self, address: &SocketAddr) {
+//         let event = InternalEvent::Node(Event::Connected(*address));
+//         self.send_event(event);
+//     }
 
-    pub fn last_block(&self) -> Block {
-        self.handler.blockchain.last_block()
-    }
+//     fn add_timeout(&mut self, timeout: Self::Timeout, time: SystemTime) {
+//         let pair = TimerPair(time, timeout);
+//         self.inner.lock().unwrap().timers.push(pair);
+//     }
+// }
 
-    pub fn last_hash(&self) -> Hash {
-        self.handler.blockchain.last_hash()
-    }
+// pub struct SandboxReactor {
+//     inner: Arc<Mutex<SandboxInner>>,
+//     handler: NodeHandler<SandboxChannel>,
+// }
 
-    pub fn actual_config(&self) -> StoredConfiguration {
-        let snapshot = self.handler.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
-        schema.actual_configuration()
-    }
+// impl Reactor<NodeHandler<SandboxChannel>> for SandboxReactor {
+//     type Channel = SandboxChannel;
 
-    pub fn following_config(&self) -> Option<StoredConfiguration> {
-        let snapshot = self.handler.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
-        schema.following_configuration()
-    }
+//     fn bind(&mut self) -> ::std::io::Result<()> {
+//         Ok(())
+//     }
+//     fn run(&mut self) -> ::std::io::Result<()> {
+//         unreachable!();
+//     }
+//     fn run_once(&mut self, _: Option<usize>) -> ::std::io::Result<()> {
+//         loop {
+//             let result = self.inner.lock().unwrap().events.pop_front();
+//             if let Some(event) = result {
+//                 match event {
+//                     InternalEvent::Node(event) => {
+//                         self.handler.handle_event(event);
+//                     }
+//                     InternalEvent::Application(event) => {
+//                         self.handler.handle_application_event(event);
+//                     }
+//                     InternalEvent::Invoke(_) => {}
+//                 }
+//             } else {
+//                 break;
+//             }
+//         }
+//         Ok(())
+//     }
+//     fn get_time(&self) -> SystemTime {
+//         self.inner.lock().unwrap().time
+//     }
+//     fn channel(&self) -> SandboxChannel {
+//         SandboxChannel { inner: self.inner.clone() }
+//     }
+// }
 
-    pub fn handle_message(&mut self, msg: RawMessage) {
-        let event = Event::Incoming(msg);
-        self.handler.handle_event(event);
-    }
+// impl SandboxReactor {
+//     pub fn is_leader(&self) -> bool {
+//         self.handler.state().is_leader()
+//     }
 
-    pub fn handle_timeout(&mut self, timeout: NodeTimeout) {
-        self.handler.handle_timeout(timeout);
-    }
+//     pub fn leader(&self, round: Round) -> ValidatorId {
+//         self.handler.state().leader(round)
+//     }
 
-    pub fn public_key(&self) -> &PublicKey {
-        self.handler.state().consensus_public_key()
-    }
+//     pub fn is_validator(&self) -> bool {
+//         self.handler.state().is_validator()
+//     }
 
-    pub fn secret_key(&self) -> &SecretKey {
-        self.handler.state().consensus_secret_key()
-    }
-}
+//     pub fn last_block(&self) -> Block {
+//         self.handler.blockchain.last_block()
+//     }
+
+//     pub fn last_hash(&self) -> Hash {
+//         self.handler.blockchain.last_hash()
+//     }
+
+//     pub fn actual_config(&self) -> StoredConfiguration {
+//         let snapshot = self.handler.blockchain.snapshot();
+//         let schema = Schema::new(&snapshot);
+//         schema.actual_configuration()
+//     }
+
+//     pub fn following_config(&self) -> Option<StoredConfiguration> {
+//         let snapshot = self.handler.blockchain.snapshot();
+//         let schema = Schema::new(&snapshot);
+//         schema.following_configuration()
+//     }
+
+//     pub fn handle_message(&mut self, msg: RawMessage) {
+//         let event = Event::Incoming(msg);
+//         self.handler.handle_event(event);
+//     }
+
+//     pub fn handle_timeout(&mut self, timeout: NodeTimeout) {
+//         self.handler.handle_timeout(timeout);
+//     }
+
+//     pub fn public_key(&self) -> &PublicKey {
+//         self.handler.state().consensus_public_key()
+//     }
+
+//     pub fn secret_key(&self) -> &SecretKey {
+//         self.handler.state().consensus_secret_key()
+//     }
+// }
 
 pub struct Sandbox {
-    inner: Arc<Mutex<SandboxInner>>,
-    reactor: RefCell<SandboxReactor>,
     pub validators_map: HashMap<PublicKey, SecretKey>,
-    pub services_map: HashMap<PublicKey, SecretKey>,
+    pub services_map: HashMap<PublicKey, SecretKey>,    
+    inner: SandboxInner,
     addresses: Vec<SocketAddr>,
+    blockchain: Blockchain,
 }
 
 impl Sandbox {
@@ -263,8 +313,7 @@ impl Sandbox {
     }
 
     pub fn tx_from_raw(&self, raw: RawTransaction) -> Option<Box<Transaction>> {
-        let reactor = self.reactor.borrow_mut();
-        reactor.handler.blockchain.tx_from_raw(raw)
+        self.blockchain.tx_from_raw(raw)
     }
 
     pub fn p(&self, id: ValidatorId) -> PublicKey {
@@ -308,7 +357,7 @@ impl Sandbox {
     }
 
     pub fn time(&self) -> SystemTime {
-        self.inner.lock().unwrap().time
+        self.inner.time.lock().unwrap()
     }
 
     pub fn blockchain_ref(&self) -> Ref<Blockchain> {

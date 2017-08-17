@@ -525,7 +525,7 @@ impl fmt::Debug for ApiSender {
 }
 
 /// TODO
-pub trait SystemStateProvider: Send + Sync + 'static + ::std::fmt::Debug {
+pub trait SystemStateProvider: 'static + ::std::fmt::Debug {
     /// TODO
     fn listen_address(&self) -> SocketAddr;
     /// TODO

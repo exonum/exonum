@@ -22,8 +22,20 @@ use node::{ExternalMessage, NodeTimeout};
 
 use super::{Event, NetworkEvent, NetworkRequest};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct TimeoutRequest(pub Duration, pub NodeTimeout);
+
+impl PartialOrd for TimeoutRequest {
+    fn partial_cmp(&self, other: &Self) -> Option<::std::cmp::Ordering> {
+        Some((&self.0, &self.1).cmp(&(&other.0, &other.1)).reverse())
+    }
+}
+
+impl Ord for TimeoutRequest {
+    fn cmp(&self, other: &Self) -> ::std::cmp::Ordering {
+        (&self.0, &self.1).cmp(&(&other.0, &other.1)).reverse()
+    }
+}
 
 /// Channel for messages and timeouts.
 #[derive(Debug, Clone)]
