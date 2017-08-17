@@ -27,11 +27,8 @@ mod tests {
     use test::Bencher;
     use std::collections::BTreeMap;
 
-
     use exonum::storage::{ProofMapIndex, Database, Fork, LevelDB, LevelDBOptions, LevelDBCache,
                           StorageValue, Patch, RocksDB, RocksDBOptions, RocksBlockOptions};
-
-    use std::collections::BTreeMap;
     use exonum::blockchain::{Blockchain, Transaction};
     use exonum::crypto::{gen_keypair, Hash, PublicKey, SecretKey};
     use exonum::messages::Message;
