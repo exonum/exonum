@@ -24,7 +24,6 @@ use std::sync::{Arc, RwLock};
 use std::collections::{HashSet, HashMap};
 use std::net::SocketAddr;
 
-use events::Milliseconds;
 use crypto::{Hash, PublicKey, SecretKey};
 use storage::{Snapshot, Fork};
 use messages::{Message, RawTransaction};
@@ -32,7 +31,7 @@ use encoding::Error as MessageError;
 use node::{Node, State, ApiSender};
 use node::state::ValidatorState;
 use blockchain::{ConsensusConfig, Blockchain, ValidatorKeys};
-use helpers::{Height, Round};
+use helpers::{Height, Round, Milliseconds};
 
 /// A trait that describes transaction processing rules (a group of sequential operations
 /// with the Exonum storage) for the given `Message`.

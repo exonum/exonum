@@ -16,7 +16,7 @@
 
 use std::fmt::Debug;
 
-use events::Milliseconds;
+use helpers::Milliseconds;
 use storage::Snapshot;
 use blockchain::Schema;
 
@@ -28,7 +28,7 @@ use blockchain::Schema;
 ///
 /// ```
 /// use exonum::node::timeout_adjuster::TimeoutAdjuster;
-/// use exonum::events::Milliseconds;
+/// use exonum::helpers::Milliseconds;
 /// use exonum::storage::Snapshot;
 /// use exonum::blockchain::Schema;
 ///

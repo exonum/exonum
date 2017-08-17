@@ -35,11 +35,10 @@ use crypto::{self, Hash, PublicKey, SecretKey};
 use blockchain::{ApiContext, Blockchain, GenesisConfig, Schema, SharedNodeState, Transaction};
 use api::{private, public, Api};
 use messages::{Connect, Message, RawMessage};
-use events::Milliseconds;
 use events::network::{HandlerPart, NetworkConfiguration, NetworkPart, NetworkRequest};
 use events::error::{forget_result, into_other, log_error};
 use events::handler::TimeoutRequest;
-use helpers::{Height, Round, ValidatorId};
+use helpers::{Height, Round, ValidatorId, Milliseconds};
 
 pub use self::state::{State, RequestData, TxPool, ValidatorState};
 pub use self::whitelist::Whitelist;
