@@ -60,6 +60,7 @@ extern crate params;
 extern crate cookie;
 extern crate mount;
 extern crate atty;
+extern crate os_type;
 
 #[macro_use]
 pub mod encoding;

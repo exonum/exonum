@@ -35,7 +35,7 @@ use events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, 
 use blockchain::{SharedNodeState, Blockchain, Schema, GenesisConfig, Transaction, ApiContext};
 use messages::{Connect, RawMessage};
 use api::{Api, public, private};
-use helpers::{Height, Round, ValidatorId};
+use helpers::{Height, Round, ValidatorId, user_agent};
 
 pub use self::state::{State, RequestData, TxPool, ValidatorState};
 pub use self::whitelist::Whitelist;
@@ -259,6 +259,7 @@ where
             &config.listener.consensus_public_key,
             external_address,
             sender.get_time(),
+            &user_agent::get(),
             &config.listener.consensus_secret_key,
         );
 
