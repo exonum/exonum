@@ -5,7 +5,6 @@ addons:
     packages:
     - gcc
     - g++
-    - libleveldb-dev
     - libssl-dev
     - libcurl4-openssl-dev
     - libelf-dev

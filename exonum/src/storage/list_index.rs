@@ -499,36 +499,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "leveldb")]
-    mod leveldb_tests {
-        use std::path::Path;
-        use tempdir::TempDir;
-        use storage::{Database, LevelDB, LevelDBOptions};
-
-        fn create_database(path: &Path) -> Box<Database> {
-            let mut opts = LevelDBOptions::default();
-            opts.create_if_missing = true;
-            Box::new(LevelDB::open(path, opts).unwrap())
-        }
-
-        #[test]
-        fn test_list_index_methods() {
-            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-            let path = dir.path();
-            let db = create_database(path);
-            super::list_index_methods(db);
-        }
-
-        #[test]
-        fn test_list_index_iter() {
-            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-            let path = dir.path();
-            let db = create_database(path);
-            super::list_index_iter(db);
-        }
-    }
-
-    #[cfg(feature = "rocksdb")]
     mod rocksdb_tests {
         use std::path::Path;
         use tempdir::TempDir;

@@ -21,10 +21,8 @@
 //! which means that only the Exonum process can access it. You can interact with a `Database` from
 //! different threads by cloning its instance.
 //!
-//! Exonum provides three types of database: [`LevelDB`], [`RocksDB`] and [`MemoryDB`]. By default
-//! present all three types, but you can choose [`LevelDB`] or [`RocksDB`] with `--feature` param.
-//! [`MemoryDB`] presents always. Also, you can make your own implementations of [`Database`] trait.
-//! See its documentation for more.
+//! Exonum provides two types of database: [`RocksDB`] and [`MemoryDB`]. Also, you can make your own
+//! implementations of [`Database`] trait. See its documentation for more.
 //!
 //! # Snapshot and Fork
 //!
@@ -79,7 +77,6 @@
 //! to create a wrapper over [`BaseIndex`] structure. See their documentation for more.
 //!
 //! [`Database`]: trait.Database.html
-//! [`LevelDB`]: struct.LevelDB.html
 //! [`RocksDB`]: struct.RocksDB.html
 //! [`MemoryDB`]: struct.MemoryDB.html
 //! [`Snapshot`]: trait.Snapshot.html
@@ -109,9 +106,6 @@
 pub use self::error::Error;
 pub use self::db::{Database, Snapshot, Fork, Patch, Change, Iterator, Iter};
 
-#[cfg(feature = "leveldb")]
-pub use self::leveldb::{LevelDB, LevelDBOptions, LevelDBCache};
-#[cfg(feature = "rocksdb")]
 pub use self::rocksdb::{RocksDB, RocksDBOptions, RocksBlockOptions};
 pub use self::memorydb::MemoryDB;
 
@@ -133,9 +127,6 @@ pub type Result<T> = ::std::result::Result<T, Error>;
 
 mod error;
 mod db;
-#[cfg(feature = "leveldb")]
-mod leveldb;
-#[cfg(feature = "rocksdb")]
 mod rocksdb;
 mod memorydb;
 

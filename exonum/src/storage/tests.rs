@@ -180,34 +180,6 @@ mod memorydb_tests {
     }
 }
 
-#[cfg(feature = "leveldb")]
-mod leveldb_tests {
-    use std::path::Path;
-    use tempdir::TempDir;
-    use super::super::{LevelDB, LevelDBOptions};
-
-    fn leveldb_database(path: &Path) -> LevelDB {
-        let mut options = LevelDBOptions::new();
-        options.create_if_missing = true;
-        LevelDB::open(path, options).unwrap()
-    }
-
-    #[test]
-    fn test_leveldb_fork_iter() {
-        let dir = TempDir::new("exonum_leveldb1").unwrap();
-        let path = dir.path();
-        super::fork_iter(leveldb_database(path));
-    }
-
-    #[test]
-    fn test_leveldb_changelog() {
-        let dir = TempDir::new("exonum_leveldb2").unwrap();
-        let path = dir.path();
-        super::changelog(leveldb_database(path));
-    }
-}
-
-#[cfg(feature = "rocksdb")]
 mod rocksdb_tests {
     use std::path::Path;
     use tempdir::TempDir;

@@ -14,7 +14,6 @@
 
 #![feature(test)]
 #![allow(dead_code)]
-
 extern crate test;
 extern crate tempdir;
 #[macro_use]
@@ -23,12 +22,11 @@ extern crate exonum;
 #[cfg(test)]
 mod tests {
     use tempdir::TempDir;
-
     use test::Bencher;
     use std::collections::BTreeMap;
 
-    use exonum::storage::{ProofMapIndex, Database, Fork, LevelDB, LevelDBOptions, LevelDBCache,
-                          StorageValue, Patch, RocksDB, RocksDBOptions, RocksBlockOptions};
+    use exonum::storage::{ProofMapIndex, Database, Fork, StorageValue, Patch, RocksDB,
+                          RocksDBOptions, RocksBlockOptions};
     use exonum::blockchain::{Blockchain, Transaction};
     use exonum::crypto::{gen_keypair, Hash, PublicKey, SecretKey};
     use exonum::messages::Message;
@@ -183,44 +181,6 @@ mod tests {
         options.set_max_bytes_for_level_base(512 * 1024 * 1024);
         let db = Box::new(RocksDB::open(tempdir.path(), options).unwrap());
         db as Box<Database>
-    }
-
-    #[bench]
-    fn bench_execute_block_timestamping_leveldb(b: &mut Bencher) {
-        let mut options = LevelDBOptions::new();
-        options.create_if_missing = true;
-        let path = TempDir::new("exonum").unwrap();
-        let db = Box::new(LevelDB::open(path.path(), options).unwrap()) as Box<Database>;
-        execute_timestamping(db, b)
-    }
-
-    #[bench]
-    fn bench_execute_block_timestamping_leveldb_cache(b: &mut Bencher) {
-        let mut options = LevelDBOptions::new();
-        options.create_if_missing = true;
-        options.cache = Some(LevelDBCache::new(100_000_000));
-        let path = TempDir::new("exonum").unwrap();
-        let db = Box::new(LevelDB::open(path.path(), options).unwrap()) as Box<Database>;
-        execute_timestamping(db, b)
-    }
-
-    #[bench]
-    fn bench_execute_block_cryptocurrency_leveldb(b: &mut Bencher) {
-        let mut options = LevelDBOptions::new();
-        options.create_if_missing = true;
-        let path = TempDir::new("exonum").unwrap();
-        let db = Box::new(LevelDB::open(path.path(), options).unwrap()) as Box<Database>;
-        execute_cryptocurrency(db, b)
-    }
-
-    #[bench]
-    fn bench_execute_block_cryptocurrency_leveldb_cache(b: &mut Bencher) {
-        let mut options = LevelDBOptions::new();
-        options.create_if_missing = true;
-        options.cache = Some(LevelDBCache::new(100_000_000));
-        let path = TempDir::new("exonum").unwrap();
-        let db = Box::new(LevelDB::open(path.path(), options).unwrap()) as Box<Database>;
-        execute_cryptocurrency(db, b)
     }
 
     #[bench]
