@@ -180,7 +180,7 @@ mod tests {
         options.create_if_missing(true);
         options.increase_parallelism(4);
         options.set_max_write_buffer_number(16);
-        options.set_write_buffer_size(536870912);
+        options.set_write_buffer_size(536_870_912);
         options.set_max_open_files(-1);
         options.set_block_based_table_factory(&block_options);
         options.set_max_bytes_for_level_base(512 * 1024 * 1024);
