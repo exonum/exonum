@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use events::handler::{Event, EventHandler};
-use events::network::NetworkEvent;
-
+use events::{Event, EventHandler, NetworkEvent};
 use super::{NodeHandler, ExternalMessage, NodeTimeout};
 
 impl EventHandler for NodeHandler {

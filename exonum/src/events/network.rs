@@ -26,9 +26,10 @@ use std::collections::HashMap;
 use messages::{Any, Connect, RawMessage};
 use node::{ExternalMessage, NodeTimeout};
 
+use super::EventHandler;
 use super::error::{other_error, result_ok, forget_result, into_other, log_error};
 use super::codec::MessagesCodec;
-use super::handler::{EventsAggregator, EventHandler};
+use super::handler::{EventsAggregator};
 
 #[derive(Debug)]
 pub enum NetworkEvent {

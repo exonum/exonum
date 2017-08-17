@@ -17,4 +17,18 @@ pub mod error;
 pub mod handler;
 pub mod network;
 
+use node::{NodeTimeout, ExternalMessage};
+
 pub use self::handler::{NodeSender, NodeReceiver, NodeChannel};
+pub use self::network::{NetworkEvent, NetworkRequest};
+
+#[derive(Debug)]
+pub enum Event {
+    Network(NetworkEvent),
+    Timeout(NodeTimeout),
+    Api(ExternalMessage),
+}
+
+pub trait EventHandler {
+    fn handle_event(&mut self, event: Event);
+}

@@ -20,14 +20,7 @@ use std::time::Duration;
 
 use node::{ExternalMessage, NodeTimeout};
 
-use super::network::{NetworkEvent, NetworkRequest};
-
-#[derive(Debug)]
-pub enum Event {
-    Network(NetworkEvent),
-    Timeout(NodeTimeout),
-    Api(ExternalMessage),
-}
+use super::{Event, NetworkEvent, NetworkRequest};
 
 #[derive(Debug)]
 pub struct TimeoutRequest(pub Duration, pub NodeTimeout);
@@ -142,8 +135,4 @@ where
             Async::NotReady
         })
     }
-}
-
-pub trait EventHandler {
-    fn handle_event(&mut self, event: Event);
 }
