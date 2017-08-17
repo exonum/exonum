@@ -62,7 +62,7 @@ impl Default for NetworkConfiguration {
             tcp_keep_alive: None,
             tcp_nodelay: false,
             tcp_reconnect_timeout: 500,
-            tcp_reconnect_timeout_max: 600000,
+            tcp_reconnect_timeout_max: 600_000,
         }
     }
 }
@@ -149,7 +149,8 @@ impl NetworkPart {
                                     .send(request)
                                     .map(forget_result)
                                     .map_err(into_other)
-                            }).map_err(log_error);
+                            })
+                            .map_err(log_error);
                         handle.spawn(connect_handle);
                         conn_tx
                     };

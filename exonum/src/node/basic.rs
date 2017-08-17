@@ -19,11 +19,11 @@ use rand::Rng;
 use std::net::SocketAddr;
 use std::error::Error;
 
-use messages::{Any, RawMessage, Connect, Status, Message, RequestPeers};
-use super::{NodeHandler, RequestData, Height};
+use messages::{Any, RawMessage, Connect, Status, Message, PeersRequest};
+use helpers::Height;
+use super::{NodeHandler, RequestData};
 
-impl NodeHandler
-{
+impl NodeHandler {
     /// Redirects message to the corresponding `handle_...` function.
     pub fn handle_message(&mut self, _peer: SocketAddr, raw: RawMessage) {
         // TODO: check message headers (network id, protocol version)
@@ -164,7 +164,7 @@ impl NodeHandler
     }
 
     /// Handles the `RequestPeers` message. Node sends `Connect` messages of other peers as result.
-    pub fn handle_request_peers(&mut self, msg: RequestPeers) {
+    pub fn handle_request_peers(&mut self, msg: PeersRequest) {
         let peers: Vec<Connect> = self.state.peers().iter().map(|(_, b)| b.clone()).collect();
         trace!(
             "HANDLE REQUEST PEERS: Sending {:?} peers to {:?}",
@@ -201,7 +201,7 @@ impl NodeHandler
                 .nth(gen_peer_id())
                 .unwrap();
             let peer = peer.clone();
-            let msg = RequestPeers::new(
+            let msg = PeersRequest::new(
                 self.state.consensus_public_key(),
                 peer.pub_key(),
                 self.state.consensus_secret_key(),

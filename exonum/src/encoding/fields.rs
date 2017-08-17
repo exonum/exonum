@@ -19,6 +19,7 @@ use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
 use crypto::{Hash, PublicKey, Signature};
+use helpers::{Height, Round, ValidatorId};
 use super::{Error, CheckedOffset, Offset, Result};
 
 /// Trait for all types that could be a field in `encoding`.
@@ -86,8 +87,42 @@ macro_rules! implement_std_field {
     )
 }
 
+/// Implements `Field` for the tuple struct typedefs that contain simple types.
+macro_rules! implement_std_typedef_field {
+    ($name:ident ($t:ty) $fn_read:expr; $fn_write:expr) => (
+        impl<'a> Field<'a> for $name {
+            fn field_size() -> $crate::encoding::Offset {
+                mem::size_of::<$t>() as $crate::encoding::Offset
+            }
+
+            unsafe fn read(buffer: &'a [u8],
+                           from: $crate::encoding::Offset,
+                           to: $crate::encoding::Offset) -> $name {
+                $name($fn_read(&buffer[from as usize..to as usize]))
+            }
+
+            fn write(&self,
+                        buffer: &mut Vec<u8>,
+                        from: $crate::encoding::Offset,
+                        to: $crate::encoding::Offset) {
+                $fn_write(&mut buffer[from as usize..to as usize], self.to_owned().into())
+            }
+
+            fn check(_: &'a [u8],
+                        from: $crate::encoding::CheckedOffset,
+                        to: $crate::encoding::CheckedOffset,
+                        latest_segment: CheckedOffset)
+            ->  $crate::encoding::Result
+            {
+                debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
+                Ok(latest_segment)
+            }
+        }
+    )
+}
+
 /// Implement field helper for all POD types
-/// it writes POD type as bytearray in place.
+/// it writes POD type as byte array in place.
 ///
 /// **Beware of platform specific data representation.**
 #[macro_export]
@@ -131,7 +166,6 @@ macro_rules! implement_pod_as_ref_field {
 
     )
 }
-
 
 impl<'a> Field<'a> for bool {
     fn field_size() -> Offset {
@@ -221,6 +255,10 @@ implement_std_field!{u32 LittleEndian::read_u32; LittleEndian::write_u32}
 implement_std_field!{i32 LittleEndian::read_i32; LittleEndian::write_i32}
 implement_std_field!{u64 LittleEndian::read_u64; LittleEndian::write_u64}
 implement_std_field!{i64 LittleEndian::read_i64; LittleEndian::write_i64}
+
+implement_std_typedef_field!{Height(u64) LittleEndian::read_u64; LittleEndian::write_u64}
+implement_std_typedef_field!{Round(u32) LittleEndian::read_u32; LittleEndian::write_u32}
+implement_std_typedef_field!{ValidatorId(u16) LittleEndian::read_u16; LittleEndian::write_u16}
 
 implement_pod_as_ref_field! {Signature}
 implement_pod_as_ref_field! {PublicKey}

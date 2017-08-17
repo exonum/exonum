@@ -25,6 +25,10 @@ use blockchain::{GenesisConfig, ValidatorKeys};
 use node::NodeConfig;
 use crypto::gen_keypair;
 
+pub use self::types::{Height, Round, ValidatorId};
+
+mod types;
+
 pub mod fabric;
 pub mod config;
 
@@ -99,7 +103,7 @@ fn has_colors() -> bool {
 fn format_log_record(record: &LogRecord) -> String {
     let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
     let secs = ts.as_secs().to_string();
-    let millis = (ts.subsec_nanos() as u64 / 1000000).to_string();
+    let millis = (ts.subsec_nanos() as u64 / 1_000_000).to_string();
 
     let module = record.location().module_path();
     let file = record.location().file();

@@ -16,7 +16,7 @@ use futures::sync::mpsc;
 use futures::{Stream, Poll, Async};
 use futures::stream::Fuse;
 
-use std::time::{Duration};
+use std::time::Duration;
 
 use node::{ExternalMessage, NodeTimeout};
 

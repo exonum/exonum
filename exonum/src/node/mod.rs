@@ -31,8 +31,7 @@ use std::time::{Duration, SystemTime};
 use std::collections::BTreeMap;
 use std::fmt;
 
-use crypto;
-use crypto::{Hash, PublicKey, SecretKey};
+use crypto::{self, Hash, PublicKey, SecretKey};
 use blockchain::{ApiContext, Blockchain, GenesisConfig, Schema, SharedNodeState, Transaction};
 use api::{private, public, Api};
 use messages::{Connect, Message, RawMessage};
@@ -40,8 +39,9 @@ use events::Milliseconds;
 use events::network::{HandlerPart, NetworkConfiguration, NetworkPart, NetworkRequest};
 use events::error::{forget_result, into_other, log_error};
 use events::handler::TimeoutRequest;
+use helpers::{Height, Round, ValidatorId};
 
-pub use self::state::{Height, RequestData, Round, State, TxPool, ValidatorId, ValidatorState};
+pub use self::state::{State, RequestData, TxPool, ValidatorState};
 pub use self::whitelist::Whitelist;
 pub use events::{NodeChannel, NodeSender};
 
@@ -140,7 +140,7 @@ pub struct NodeApiConfig {
 impl Default for NodeApiConfig {
     fn default() -> NodeApiConfig {
         NodeApiConfig {
-            state_update_timeout: 10000,
+            state_update_timeout: 10_000,
             enable_blockchain_explorer: true,
             public_api_address: None,
             private_api_address: None,
@@ -161,8 +161,8 @@ pub struct MemoryPoolConfig {
 impl Default for MemoryPoolConfig {
     fn default() -> MemoryPoolConfig {
         MemoryPoolConfig {
-            tx_pool_capacity: 100000,
-            events_pool_capacity: 400000,
+            tx_pool_capacity: 100_000,
+            events_pool_capacity: 400_000,
         }
     }
 }
@@ -227,7 +227,7 @@ impl NodeHandler {
         // FIXME: remove unwraps here, use FATAL log level instead
         let (last_hash, last_height) = {
             let block = blockchain.last_block();
-            (block.hash(), block.height() + 1)
+            (block.hash(), block.height().next())
         };
 
         let snapshot = blockchain.snapshot();
@@ -241,7 +241,7 @@ impl NodeHandler {
             .position(|pk| {
                 pk.consensus_key == config.listener.consensus_public_key
             })
-            .map(|id| id as ValidatorId);
+            .map(|id| ValidatorId(id as u16));
         info!("Validator id = '{:?}'", validator_id);
         let connect = Connect::new(
             &config.listener.consensus_public_key,
@@ -328,7 +328,7 @@ impl NodeHandler {
             info!("Trying to connect with peer {}", address);
         }
 
-        let round = 1;
+        let round = Round::first();
         self.state.jump_round(round);
         info!("Jump to round {}", round);
 
@@ -406,7 +406,7 @@ impl NodeHandler {
 
     /// Adds `NodeTimeout::Round` timeout to the channel.
     pub fn add_round_timeout(&self) {
-        let time = self.round_start_time(self.state.round() + 1);
+        let time = self.round_start_time(self.state.round().next());
         trace!(
             "ADD ROUND TIMEOUT: time={:?}, height={}, round={}",
             time,
@@ -420,8 +420,8 @@ impl NodeHandler {
     /// Adds `NodeTimeout::Propose` timeout to the channel.
     pub fn add_propose_timeout(&self) {
         let adjusted_timeout = self.state.propose_timeout();
-        let time =
-            self.round_start_time(self.state.round()) + Duration::from_millis(adjusted_timeout);
+        let time = self.round_start_time(self.state.round()) +
+            Duration::from_millis(adjusted_timeout);
 
         trace!(
             "ADD PROPOSE TIMEOUT: time={:?}, height={}, round={}",
@@ -467,7 +467,8 @@ impl NodeHandler {
 
     /// Returns start time of the requested round.
     pub fn round_start_time(&self, round: Round) -> SystemTime {
-        let ms = (round - 1) as u64 * self.round_timeout();
+        let previous_round: u64 = round.previous().into();
+        let ms = previous_round * self.round_timeout();
         self.state.height_start_time() + Duration::from_millis(ms)
     }
 }
@@ -499,12 +500,9 @@ impl ApiSender {
     /// Addr peer to peer list
     pub fn peer_add(&self, addr: SocketAddr) -> io::Result<()> {
         let msg = ExternalMessage::PeerAdd(addr);
-        self.0
-            .clone()
-            .send(msg)
-            .wait()
-            .map(forget_result)
-            .map_err(into_other)
+        self.0.clone().send(msg).wait().map(forget_result).map_err(
+            into_other,
+        )
     }
 }
 
@@ -515,12 +513,9 @@ impl TransactionSend for ApiSender {
             return Err(io::Error::new(io::ErrorKind::Other, msg));
         }
         let msg = ExternalMessage::Transaction(tx);
-        self.0
-            .clone()
-            .send(msg)
-            .wait()
-            .map(forget_result)
-            .map_err(into_other)
+        self.0.clone().send(msg).wait().map(forget_result).map_err(
+            into_other,
+        )
     }
 }
 

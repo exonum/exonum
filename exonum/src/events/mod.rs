@@ -20,4 +20,3 @@ pub mod network;
 pub use self::handler::{NodeSender, NodeReceiver, NodeChannel};
 
 pub type Milliseconds = u64;
-

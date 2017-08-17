@@ -22,6 +22,7 @@ use std::collections::{BTreeMap, HashSet};
 use storage::StorageValue;
 use events::Milliseconds;
 use crypto::{hash, PublicKey, Hash};
+use helpers::Height;
 
 /// Public keys of a validator.
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -41,7 +42,7 @@ pub struct StoredConfiguration {
     /// For configuration in genesis block `hash` is just an array of zeroes.
     pub previous_cfg_hash: Hash,
     /// The height, starting from which this configuration becomes actual.
-    pub actual_from: u64,
+    pub actual_from: Height,
     /// List of validator's consensus and service public keys.
     pub validator_keys: Vec<ValidatorKeys>,
     /// Consensus algorithm parameters.
@@ -71,7 +72,7 @@ impl Default for ConsensusConfig {
         ConsensusConfig {
             round_timeout: 3000,
             status_timeout: 5000,
-            peers_timeout: 10000,
+            peers_timeout: 10_000,
             txs_block_limit: 1000,
             timeout_adjuster: TimeoutAdjusterConfig::Constant { timeout: 500 },
         }
@@ -359,7 +360,7 @@ mod tests {
 
         StoredConfiguration {
             previous_cfg_hash: Hash::zero(),
-            actual_from: 42,
+            actual_from: Height(42),
             validator_keys,
             consensus: ConsensusConfig::default(),
             services: BTreeMap::new(),
