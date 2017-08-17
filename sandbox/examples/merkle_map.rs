@@ -18,10 +18,6 @@ extern crate rand;
 extern crate clap;
 
 use rand::{SeedableRng, XorShiftRng, Rng};
-
-use std::path::Path;
-
-use exonum::storage::{LevelDB, LevelDBOptions};
 use exonum::storage::{Database, ProofMapIndex};
 
 /// usage
@@ -29,6 +25,29 @@ use exonum::storage::{Database, ProofMapIndex};
 /// `count` - Total amount of data items to write
 /// `data_len` - Length of data chunk
 /// `seed` - seed for rng
+#[cfg(feature = "leveldb")]
+fn create_database(path: &str) -> Box<Database> {
+    use std::path::Path;
+    use exonum::storage::{LevelDB, LevelDBOptions};
+    let mut options = LevelDBOptions::new();
+    options.create_if_missing = true;
+    Box::new(LevelDB::open(Path::new(path), options).unwrap())
+}
+
+#[cfg(feature = "rocksdb")]
+fn create_database(path: &str) -> Box<Database> {
+    use std::path::Path;
+    use exonum::storage::{RocksDB, RocksDBOptions};
+    let mut opts = RocksDBOptions::default();
+    opts.create_if_missing(true);
+    Box::new(RocksDB::open(Path::new(path), opts).unwrap())
+}
+
+#[cfg(any(not(any(feature = "leveldb", feature = "rocksdb"))))]
+fn create_database(_: &str) -> Box<Database> {
+    use exonum::storage::MemoryDB;
+    Box::new(MemoryDB::new())
+}
 
 fn main() {
     exonum::helpers::init_logger().unwrap();
@@ -65,9 +84,7 @@ fn main() {
         (k, v)
     };
 
-    let mut options = LevelDBOptions::new();
-    options.create_if_missing = true;
-    let mut db = LevelDB::open(Path::new(&path), options).unwrap();
+    let mut db = create_database(path);
 
     let patch;
     {

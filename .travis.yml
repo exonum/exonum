@@ -12,6 +12,7 @@ addons:
     - libdw-dev
     - binutils-dev
     - libiberty-dev
+    - libsnappy-dev
 
 rust:
   - stable
@@ -36,9 +37,12 @@ env:
   - CLIPPY_VERS=0.0.152
   - RUSTFMT_VERS=0.9.0
   - SODIUM_VERS=1.0.13
+  - ROCKSDB_VERS=5.6.1
   - CARGO_INCREMENTAL=1
   - RUSTFLAGS="-C link-dead-code"
   - CODECOV_TOKEN=90006bf6-e4b7-4825-b880-8d19c4e21c21
+  - ROCKSDB_LIB_DIR=$HOME/.local/lib
+  - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
   matrix:
   - FEATURE=fmt
   - FEATURE=test-core
@@ -55,6 +59,14 @@ install:
     ./configure --prefix=$HOME/.local
     make
     make install
+    cd ..
+  fi
+- |
+  if [ ! -f "$HOME/.local/lib/librocksdb.so" ]; then
+    wget -O rocksdb-$ROCKSDB_VERS.tar.gz https://github.com/facebook/rocksdb/archive/v$ROCKSDB_VERS.tar.gz
+    tar xvf rocksdb-$ROCKSDB_VERS.tar.gz
+    cd rocksdb-$ROCKSDB_VERS
+    INSTALL_PATH=$HOME/.local make install-shared
     cd ..
   fi
 - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.local/lib
@@ -82,13 +94,13 @@ script: |
   ;;
 
   "clippy-core" )
-      cd exonum && cargo clippy -- -D warnings
+      cd exonum && cargo clippy --features rocksdb -- -D warnings
   ;;
   "clippy-sandbox" )
       cd sandbox && cargo clippy -- -D warnings
   ;;
   "test-core" )
-      RUST_LOG=off cargo test -p exonum --tests --lib
+      RUST_LOG=off cargo test --manifest-path exonum/Cargo.toml --features rocksdb --tests --lib
   ;;
   "test-sandbox" )
       RUST_LOG=off cargo test -p sandbox
