@@ -46,8 +46,7 @@ use sandbox_tests_helper::VALIDATOR_0;
 pub type SharedTime = Arc<Mutex<SystemTime>>;
 
 #[derive(Debug)]
-pub struct SandboxSystemStateProvider
-{
+pub struct SandboxSystemStateProvider {
     listen_address: SocketAddr,
     shared_time: SharedTime,
 }
@@ -74,215 +73,42 @@ pub struct SandboxInner {
 
 impl SandboxInner {
     pub fn process_events(&mut self) {
+        debug!("Process events");
         loop {
-            if let Async::Ready(Some(network)) = self.events_receiver.network.poll().unwrap() {
+            debug!("Trying to get event");
+            let network_event = self.events_receiver.network.poll();
+            debug!("{:?}", network_event);
+            if let Ok(Async::Ready(Some(network))) = network_event {
+                debug!("Network request, {:?}", network);
                 match network {
                     NetworkRequest::SendMessage(peer, msg) => self.sent.push_back((peer, msg)),
-                    NetworkRequest::DisconnectWithPeer(peer) => {},
+                    NetworkRequest::DisconnectWithPeer(peer) => {}
                 }
-            } else if let Async::Ready(Some(timeout)) = self.events_receiver.timeout.poll().unwrap() {
-                self.timers.push(timeout);
             } else {
+                debug!("All events received");
                 break;
             }
+
+            // } else if let Ok(Async::Ready(Some(timeout))) = self.events_receiver.timeout.poll() {
+            //     debug!("Timer request, {:?}", timeout);
+            //     self.timers.push(timeout);
+            // } else {
+            //     debug!("Else");
+            //     break;
+            // }
         }
+    }
+
+    pub fn handle_event<E: Into<Event>>(&mut self, e: E) {
+        debug!("Handle event");
+        self.handler.handle_event(e.into());
+        self.process_events();
     }
 }
 
-// use std::collections::{VecDeque, BinaryHeap, HashSet, BTreeMap, HashMap};
-// use std::iter::FromIterator;
-// use std::cell::{RefCell, Ref, RefMut};
-// use std::sync::{Arc, Mutex};
-// use std::net::{SocketAddr, Ipv4Addr, IpAddr};
-// use std::ops::Drop;
-// use std::time::{SystemTime, Duration, UNIX_EPOCH};
-
-// use exonum::node::{NodeHandler, Configuration, NodeTimeout, ExternalMessage, ListenerConfig,
-//                    ServiceConfig};
-// use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
-//                          Schema, Transaction, Service, ValidatorKeys, SharedNodeState, BlockProof,
-//                          TimeoutAdjusterConfig};
-// use exonum::storage::{MemoryDB, MapProof};
-// use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, Status};
-// use exonum::crypto::{Hash, PublicKey, SecretKey, Seed, gen_keypair_from_seed};
-// #[cfg(test)]
-// use exonum::crypto::gen_keypair;
-// use exonum::helpers::{Height, Round, ValidatorId, init_logger};
-// use exonum::events::Event;
-
-// use timestamping::TimestampingService;
-// use config_updater::ConfigUpdateService;
-// use sandbox_tests_helper::VALIDATOR_0;
-
-// #[derive(PartialEq, Eq)]
-// pub struct TimerPair(pub SystemTime, pub NodeTimeout);
-
-// impl PartialOrd for TimerPair {
-//     fn partial_cmp(&self, other: &Self) -> Option<::std::cmp::Ordering> {
-//         Some((&self.0, &self.1).cmp(&(&other.0, &other.1)).reverse())
-//     }
-// }
-
-// impl Ord for TimerPair {
-//     fn cmp(&self, other: &Self) -> ::std::cmp::Ordering {
-//         (&self.0, &self.1).cmp(&(&other.0, &other.1)).reverse()
-//     }
-// }
-
-// pub struct SandboxInner {
-//     pub address: SocketAddr,
-//     pub time: SystemTime,
-//     pub sent: VecDeque<(SocketAddr, RawMessage)>,
-//     pub events: VecDeque<Event>,
-//     pub timers: BinaryHeap<TimerPair>,
-// }
-
-// #[derive(Clone)]
-// pub struct SandboxChannel {
-//     pub inner: Arc<Mutex<SandboxInner>>,
-// }
-
-// impl SandboxChannel {
-//     fn send_event(&self, event: SandboxEvent) {
-//         self.inner.lock().unwrap().events.push_back(event);
-//     }
-
-//     fn send_message(&self, address: &SocketAddr, message: RawMessage) {
-//         self.inner.lock().unwrap().sent.push_back(
-//             (*address, message),
-//         );
-//     }
-// }
-
-// impl Channel for SandboxChannel {
-//     type ApplicationEvent = ExternalMessage;
-//     type Timeout = NodeTimeout;
-
-//     fn address(&self) -> SocketAddr {
-//         self.inner.lock().unwrap().address
-//     }
-
-//     fn get_time(&self) -> SystemTime {
-//         self.inner.lock().unwrap().time
-//     }
-
-//     fn post_event(&self, event: Self::ApplicationEvent) -> EventsResult<()> {
-//         let msg = InternalEvent::Application(event);
-//         self.send_event(msg);
-//         Ok(())
-//     }
-
-//     fn send_to(&mut self, address: &SocketAddr, message: RawMessage) {
-//         // TODO handle attempts to send message to offline nodes
-//         self.send_message(address, message);
-//     }
-
-//     fn connect(&mut self, address: &SocketAddr) {
-//         let event = InternalEvent::Node(Event::Connected(*address));
-//         self.send_event(event);
-//     }
-
-//     fn add_timeout(&mut self, timeout: Self::Timeout, time: SystemTime) {
-//         let pair = TimerPair(time, timeout);
-//         self.inner.lock().unwrap().timers.push(pair);
-//     }
-// }
-
-// pub struct SandboxReactor {
-//     inner: Arc<Mutex<SandboxInner>>,
-//     handler: NodeHandler<SandboxChannel>,
-// }
-
-// impl Reactor<NodeHandler<SandboxChannel>> for SandboxReactor {
-//     type Channel = SandboxChannel;
-
-//     fn bind(&mut self) -> ::std::io::Result<()> {
-//         Ok(())
-//     }
-//     fn run(&mut self) -> ::std::io::Result<()> {
-//         unreachable!();
-//     }
-//     fn run_once(&mut self, _: Option<usize>) -> ::std::io::Result<()> {
-//         loop {
-//             let result = self.inner.lock().unwrap().events.pop_front();
-//             if let Some(event) = result {
-//                 match event {
-//                     InternalEvent::Node(event) => {
-//                         self.handler.handle_event(event);
-//                     }
-//                     InternalEvent::Application(event) => {
-//                         self.handler.handle_application_event(event);
-//                     }
-//                     InternalEvent::Invoke(_) => {}
-//                 }
-//             } else {
-//                 break;
-//             }
-//         }
-//         Ok(())
-//     }
-//     fn get_time(&self) -> SystemTime {
-//         self.inner.lock().unwrap().time
-//     }
-//     fn channel(&self) -> SandboxChannel {
-//         SandboxChannel { inner: self.inner.clone() }
-//     }
-// }
-
-// impl SandboxReactor {
-//     pub fn is_leader(&self) -> bool {
-//         self.handler.state().is_leader()
-//     }
-
-//     pub fn leader(&self, round: Round) -> ValidatorId {
-//         self.handler.state().leader(round)
-//     }
-
-//     pub fn is_validator(&self) -> bool {
-//         self.handler.state().is_validator()
-//     }
-
-//     pub fn last_block(&self) -> Block {
-//         self.handler.blockchain.last_block()
-//     }
-
-//     pub fn last_hash(&self) -> Hash {
-//         self.handler.blockchain.last_hash()
-//     }
-
-//     pub fn actual_config(&self) -> StoredConfiguration {
-//         let snapshot = self.handler.blockchain.snapshot();
-//         let schema = Schema::new(&snapshot);
-//         schema.actual_configuration()
-//     }
-
-//     pub fn following_config(&self) -> Option<StoredConfiguration> {
-//         let snapshot = self.handler.blockchain.snapshot();
-//         let schema = Schema::new(&snapshot);
-//         schema.following_configuration()
-//     }
-
-//     pub fn handle_message(&mut self, msg: RawMessage) {
-//         let event = Event::Incoming(msg);
-//         self.handler.handle_event(event);
-//     }
-
-//     pub fn handle_timeout(&mut self, timeout: NodeTimeout) {
-//         self.handler.handle_timeout(timeout);
-//     }
-
-//     pub fn public_key(&self) -> &PublicKey {
-//         self.handler.state().consensus_public_key()
-//     }
-
-//     pub fn secret_key(&self) -> &SecretKey {
-//         self.handler.state().consensus_secret_key()
-//     }
-// }
-
 pub struct Sandbox {
     pub validators_map: HashMap<PublicKey, SecretKey>,
-    pub services_map: HashMap<PublicKey, SecretKey>,    
+    pub services_map: HashMap<PublicKey, SecretKey>,
     inner: RefCell<SandboxInner>,
     addresses: Vec<SocketAddr>,
 }
@@ -389,8 +215,7 @@ impl Sandbox {
         Ref::map(self.inner.borrow(), |inner| &inner.handler)
     }
 
-    pub fn node_handler_mut(&self) -> RefMut<NodeHandler>
-    {
+    pub fn node_handler_mut(&self) -> RefMut<NodeHandler> {
         RefMut::map(self.inner.borrow_mut(), |inner| &mut inner.handler)
     }
 
@@ -403,14 +228,17 @@ impl Sandbox {
     }
 
     pub fn blockchain_mut(&self) -> RefMut<Blockchain> {
-        RefMut::map(self.inner.borrow_mut(), |inner| &mut inner.handler.blockchain)
+        RefMut::map(
+            self.inner.borrow_mut(),
+            |inner| &mut inner.handler.blockchain,
+        )
     }
 
     pub fn recv<T: Message>(&self, msg: T) {
-        // TODO Think about addresses. 
-        let dummy_addr = SocketAddr::from(([127, 0, 0, 1], 12039)); 
+        // TODO Think about addresses.
+        let dummy_addr = SocketAddr::from(([127, 0, 0, 1], 12039));
         let event = NetworkEvent::MessageReceived(dummy_addr, msg.raw().clone());
-        self.inner.borrow_mut().handler.handle_event(event.into());
+        self.inner.borrow_mut().handle_event(event);
     }
 
     pub fn send<T: Message>(&self, addr: SocketAddr, msg: T) {
@@ -515,7 +343,7 @@ impl Sandbox {
                     break;
                 }
             };
-            self.node_handler_mut().handle_event(timeout.into());
+            self.inner.borrow_mut().handle_event(timeout);
         }
     }
 
@@ -657,9 +485,7 @@ impl Sandbox {
     }
 
     pub fn current_leader(&self) -> ValidatorId {
-        self.node_state().leader(
-            self.current_round(),
-        )
+        self.node_state().leader(self.current_round())
     }
 
     pub fn assert_state(&self, expected_height: Height, expected_round: Round) {
@@ -757,9 +583,9 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
 
     // TODO use factory or other solution like set_handler or run
     let system_state = SandboxSystemStateProvider {
-            listen_address: addresses[0],
-            shared_time: SharedTime::new(Mutex::new(UNIX_EPOCH + Duration::new(1_486_720_340, 0)))
-        };
+        listen_address: addresses[0],
+        shared_time: SharedTime::new(Mutex::new(UNIX_EPOCH + Duration::new(1_486_720_340, 0))),
+    };
     let shared_time = system_state.shared_time.clone();
     let channel = NodeChannel::new(100);
     let mut handler = NodeHandler::new(
@@ -778,8 +604,8 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         timers: BinaryHeap::new(),
         events_receiver: channel.1,
         handler,
-        time: shared_time
-    };    
+        time: shared_time,
+    };
     let sandbox = Sandbox {
         inner: RefCell::new(inner),
         validators_map: HashMap::from_iter(validators.clone()),
