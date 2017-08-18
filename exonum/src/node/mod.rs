@@ -36,11 +36,11 @@ use blockchain::{ApiContext, Blockchain, GenesisConfig, Schema, SharedNodeState,
 use api::{private, public, Api};
 use messages::{Connect, Message, RawMessage};
 use events::network::{HandlerPart, NetworkConfiguration, NetworkPart, NetworkRequest};
-use events::error::{LogError, forget_result, into_other};
+use events::error::{forget_result, into_other, LogError};
 use events::handler::TimeoutRequest;
-use helpers::{Height, Round, ValidatorId, Milliseconds};
+use helpers::{Height, Milliseconds, Round, ValidatorId};
 
-pub use self::state::{State, RequestData, TxPool, ValidatorState};
+pub use self::state::{RequestData, State, TxPool, ValidatorState};
 pub use self::whitelist::Whitelist;
 pub use events::{NodeChannel, NodeSender};
 
@@ -373,9 +373,7 @@ impl NodeHandler {
 
     /// Add timeout request.
     pub fn add_timeout(&self, timeout: NodeTimeout, time: SystemTime) {
-        let duration = time.duration_since(self.system_state.current_time())
-            .unwrap_or_else(|_| Duration::from_millis(0));
-        let request = TimeoutRequest(duration, timeout);
+        let request = TimeoutRequest(time, timeout);
         self.channel
             .timeout
             .clone()
@@ -408,8 +406,8 @@ impl NodeHandler {
     /// Adds `NodeTimeout::Propose` timeout to the channel.
     pub fn add_propose_timeout(&self) {
         let adjusted_timeout = self.state.propose_timeout();
-        let time = self.round_start_time(self.state.round()) +
-            Duration::from_millis(adjusted_timeout);
+        let time =
+            self.round_start_time(self.state.round()) + Duration::from_millis(adjusted_timeout);
 
         trace!(
             "ADD PROPOSE TIMEOUT: time={:?}, height={}, round={}",
@@ -488,9 +486,12 @@ impl ApiSender {
     /// Addr peer to peer list
     pub fn peer_add(&self, addr: SocketAddr) -> io::Result<()> {
         let msg = ExternalMessage::PeerAdd(addr);
-        self.0.clone().send(msg).wait().map(forget_result).map_err(
-            into_other,
-        )
+        self.0
+            .clone()
+            .send(msg)
+            .wait()
+            .map(forget_result)
+            .map_err(into_other)
     }
 }
 
@@ -501,9 +502,12 @@ impl TransactionSend for ApiSender {
             return Err(io::Error::new(io::ErrorKind::Other, msg));
         }
         let msg = ExternalMessage::Transaction(tx);
-        self.0.clone().send(msg).wait().map(forget_result).map_err(
-            into_other,
-        )
+        self.0
+            .clone()
+            .send(msg)
+            .wait()
+            .map(forget_result)
+            .map_err(into_other)
     }
 }
 
@@ -707,7 +711,10 @@ impl Node {
         let timeout_requests_rx = self.channel.1.timeout;
         let timeout_tx = timeout_tx.clone();
         let timeout_handler = timeout_requests_rx.for_each(move |request| {
-            let duration = request.0;
+            let duration = request
+                .0
+                .duration_since(SystemTime::now())
+                .unwrap_or_else(|_| Duration::from_millis(0));
             let timeout_tx = timeout_tx.clone();
             let timeout = Timeout::new(duration, &handle)
                 .expect("Unable to create timeout")

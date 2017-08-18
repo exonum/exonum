@@ -12,16 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use futures::{Future, Stream, Sink};
+use futures::{Poll, Async};
 use futures::sync::mpsc;
 
+use std::ops::{AddAssign, Deref};
 use std::sync::{Mutex, Arc};
-use std::time::{SystemTime, Duration};
-use std::net::{SocketAddr, Ipv4Addr};
-use std::thread::{self, JoinHandle};
-use std::collections::{BinaryHeap, VecDeque, HashMap, HashSet};
+use std::cell::{RefCell, Ref, RefMut};
+use std::time::{UNIX_EPOCH, SystemTime, Duration};
+use std::net::{SocketAddr, Ipv4Addr, IpAddr};
+use std::collections::{BinaryHeap, VecDeque, HashMap, HashSet, BTreeMap};
+use std::iter::FromIterator;
 
 use exonum::node::{NodeHandler, Configuration, NodeTimeout, ExternalMessage, ListenerConfig,
-                   ServiceConfig, SystemStateProvider};
+                   ServiceConfig, SystemStateProvider, State};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
                          Schema, Transaction, Service, ValidatorKeys, SharedNodeState, BlockProof,
                          TimeoutAdjusterConfig};
@@ -31,14 +35,15 @@ use exonum::crypto::{Hash, PublicKey, SecretKey, Seed, gen_keypair_from_seed};
 #[cfg(test)]
 use exonum::crypto::gen_keypair;
 use exonum::helpers::{Height, Round, ValidatorId, Milliseconds, init_logger};
-use exonum::events::Event;
-use exonum::events::handler::TimeoutRequest;
+use exonum::events::{Event, NetworkRequest, NetworkEvent, EventHandler};
+use exonum::events::handler::{TimeoutRequest, NodeSender, NodeChannel, NodeReceiver};
+use exonum::events::network::NetworkConfiguration;
 
 use timestamping::TimestampingService;
 use config_updater::ConfigUpdateService;
 use sandbox_tests_helper::VALIDATOR_0;
 
-pub type SharedTime = Mutex<SystemTime>;
+pub type SharedTime = Arc<Mutex<SystemTime>>;
 
 #[derive(Debug)]
 pub struct SandboxSystemStateProvider
@@ -60,9 +65,28 @@ impl SystemStateProvider for SandboxSystemStateProvider {
 #[derive(Debug)]
 pub struct SandboxInner {
     pub time: SharedTime,
+    pub handler: NodeHandler,
     pub sent: VecDeque<(SocketAddr, RawMessage)>,
     pub events: VecDeque<Event>,
     pub timers: BinaryHeap<TimeoutRequest>,
+    pub events_receiver: NodeReceiver,
+}
+
+impl SandboxInner {
+    pub fn process_events(&mut self) {
+        loop {
+            if let Async::Ready(Some(network)) = self.events_receiver.network.poll().unwrap() {
+                match network {
+                    NetworkRequest::SendMessage(peer, msg) => self.sent.push_back((peer, msg)),
+                    NetworkRequest::DisconnectWithPeer(peer) => {},
+                }
+            } else if let Async::Ready(Some(timeout)) = self.events_receiver.timeout.poll().unwrap() {
+                self.timers.push(timeout);
+            } else {
+                break;
+            }
+        }
+    }
 }
 
 // use std::collections::{VecDeque, BinaryHeap, HashSet, BTreeMap, HashMap};
@@ -259,9 +283,8 @@ pub struct SandboxInner {
 pub struct Sandbox {
     pub validators_map: HashMap<PublicKey, SecretKey>,
     pub services_map: HashMap<PublicKey, SecretKey>,    
-    inner: SandboxInner,
+    inner: RefCell<SandboxInner>,
     addresses: Vec<SocketAddr>,
-    blockchain: Blockchain,
 }
 
 impl Sandbox {
@@ -306,14 +329,14 @@ impl Sandbox {
     }
 
     fn check_unexpected_message(&self) {
-        if let Some((addr, msg)) = self.inner.lock().unwrap().sent.pop_front() {
+        if let Some((addr, msg)) = self.inner.borrow_mut().sent.pop_front() {
             let any_msg = Any::from_raw(msg.clone()).expect("Send incorrect message");
             panic!("Send unexpected message {:?} to {}", any_msg, addr);
         }
     }
 
     pub fn tx_from_raw(&self, raw: RawTransaction) -> Option<Box<Transaction>> {
-        self.blockchain.tx_from_raw(raw)
+        self.blockchain_ref().tx_from_raw(raw)
     }
 
     pub fn p(&self, id: ValidatorId) -> PublicKey {
@@ -357,29 +380,42 @@ impl Sandbox {
     }
 
     pub fn time(&self) -> SystemTime {
-        self.inner.time.lock().unwrap()
+        let inner = self.inner.borrow();
+        let time = *inner.time.lock().unwrap().deref();
+        time
+    }
+
+    pub fn node_handler(&self) -> Ref<NodeHandler> {
+        Ref::map(self.inner.borrow(), |inner| &inner.handler)
+    }
+
+    pub fn node_handler_mut(&self) -> RefMut<NodeHandler>
+    {
+        RefMut::map(self.inner.borrow_mut(), |inner| &mut inner.handler)
+    }
+
+    pub fn node_state(&self) -> Ref<State> {
+        Ref::map(self.inner.borrow(), |inner| inner.handler.state())
     }
 
     pub fn blockchain_ref(&self) -> Ref<Blockchain> {
-        Ref::map(self.reactor.borrow(), |reactor| &reactor.handler.blockchain)
+        Ref::map(self.inner.borrow(), |inner| &inner.handler.blockchain)
     }
 
     pub fn blockchain_mut(&self) -> RefMut<Blockchain> {
-        RefMut::map(self.reactor.borrow_mut(), |reactor| {
-            &mut reactor.handler.blockchain
-        })
+        RefMut::map(self.inner.borrow_mut(), |inner| &mut inner.handler.blockchain)
     }
 
     pub fn recv<T: Message>(&self, msg: T) {
-        self.check_unexpected_message();
-        let mut reactor = self.reactor.borrow_mut();
-        reactor.handle_message(msg.raw().clone());
-        reactor.run_once(None).unwrap();
+        // TODO Think about addresses. 
+        let dummy_addr = SocketAddr::from(([127, 0, 0, 1], 12039)); 
+        let event = NetworkEvent::MessageReceived(dummy_addr, msg.raw().clone());
+        self.inner.borrow_mut().handler.handle_event(event.into());
     }
 
     pub fn send<T: Message>(&self, addr: SocketAddr, msg: T) {
         let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
-        let sended = self.inner.lock().unwrap().sent.pop_front();
+        let sended = self.inner.borrow_mut().sent.pop_front();
         if let Some((real_addr, real_msg)) = sended {
             let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
             if real_addr != addr || any_real_msg != any_expected_msg {
@@ -416,7 +452,7 @@ impl Sandbox {
         let mut expected_set: HashSet<_> = HashSet::from_iter(addresses);
 
         for _ in 0..expected_set.len() {
-            let sended = self.inner.lock().unwrap().sent.pop_front();
+            let sended = self.inner.borrow_mut().sent.pop_front();
             if let Some((real_addr, real_msg)) = sended {
                 let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
                 if any_real_msg != any_expected_msg {
@@ -459,17 +495,18 @@ impl Sandbox {
     pub fn add_time(&self, duration: Duration) {
         self.check_unexpected_message();
         let now = {
-            let mut inner = self.inner.lock().unwrap();
-            inner.time += duration;
-            inner.time
+            let mut inner = self.inner.borrow_mut();
+            let mut time = inner.time.lock().unwrap();
+            time.add_assign(duration);
+            *time.deref()
         };
         // handle timeouts if occurs
         loop {
             let timeout = {
-                let timers = &mut self.inner.lock().unwrap().timers;
-                if let Some(TimerPair(time, timeout)) = timers.pop() {
+                let timers = &mut self.inner.borrow_mut().timers;
+                if let Some(TimeoutRequest(time, timeout)) = timers.pop() {
                     if time > now {
-                        timers.push(TimerPair(time, timeout));
+                        timers.push(TimeoutRequest(time, timeout));
                         break;
                     } else {
                         timeout
@@ -478,40 +515,32 @@ impl Sandbox {
                     break;
                 }
             };
-            let mut reactor = self.reactor.borrow_mut();
-            reactor.handle_timeout(timeout);
-            reactor.run_once(None).unwrap();
+            self.node_handler_mut().handle_event(timeout.into());
         }
     }
 
     pub fn is_leader(&self) -> bool {
-        let reactor = self.reactor.borrow();
-        reactor.is_leader()
+        self.node_state().is_leader()
     }
 
     pub fn leader(&self, round: Round) -> ValidatorId {
-        let reactor = self.reactor.borrow();
-        reactor.leader(round)
+        self.node_state().leader(round)
     }
 
     pub fn is_validator(&self) -> bool {
-        let reactor = self.reactor.borrow();
-        reactor.is_validator()
+        self.node_state().is_validator()
     }
 
     pub fn last_block(&self) -> Block {
-        let reactor = self.reactor.borrow();
-        reactor.last_block()
+        self.blockchain_ref().last_block()
     }
 
     pub fn last_hash(&self) -> Hash {
-        let reactor = self.reactor.borrow();
-        reactor.last_hash()
+        self.blockchain_ref().last_hash()
     }
 
     pub fn last_state_hash(&self) -> Hash {
-        let reactor = self.reactor.borrow();
-        *reactor.last_block().state_hash()
+        *self.last_block().state_hash()
     }
 
     pub fn filter_present_transactions<'a, I>(&self, txs: I) -> Vec<RawMessage>
@@ -519,7 +548,7 @@ impl Sandbox {
         I: IntoIterator<Item = &'a RawMessage>,
     {
         let mut unique_set: HashSet<Hash> = HashSet::new();
-        let snapshot = self.reactor.borrow().handler.blockchain.snapshot();
+        let snapshot = self.blockchain_ref().snapshot();
         let schema = Schema::new(&snapshot);
         let schema_transactions = schema.transactions();
         txs.into_iter()
@@ -543,7 +572,7 @@ impl Sandbox {
     where
         I: IntoIterator<Item = &'a RawTransaction>,
     {
-        let blockchain = &self.reactor.borrow().handler.blockchain;
+        let blockchain = &self.blockchain_ref();
         let (hashes, tx_pool) = {
             let mut pool = BTreeMap::new();
             let mut hashes = Vec::new();
@@ -567,25 +596,27 @@ impl Sandbox {
     }
 
     pub fn get_proof_to_service_table(&self, service_id: u16, table_idx: usize) -> MapProof<Hash> {
-        let snapshot = self.reactor.borrow().handler.blockchain.snapshot();
+        let snapshot = self.blockchain_ref().snapshot();
         let schema = Schema::new(&snapshot);
         schema.get_proof_to_service_table(service_id, table_idx)
     }
 
     pub fn get_configs_root_hash(&self) -> Hash {
-        let snapshot = self.reactor.borrow().handler.blockchain.snapshot();
+        let snapshot = self.blockchain_ref().snapshot();
         let schema = Schema::new(&snapshot);
         schema.configs().root_hash()
     }
 
     pub fn cfg(&self) -> StoredConfiguration {
-        let reactor = self.reactor.borrow();
-        reactor.actual_config()
+        let snapshot = self.blockchain_ref().snapshot();
+        let schema = Schema::new(&snapshot);
+        schema.actual_configuration()
     }
 
     pub fn following_cfg(&self) -> Option<StoredConfiguration> {
-        let reactor = self.reactor.borrow();
-        reactor.following_config()
+        let snapshot = self.blockchain_ref().snapshot();
+        let schema = Schema::new(&snapshot);
+        schema.following_configuration()
     }
 
     pub fn propose_timeout(&self) -> Milliseconds {
@@ -604,36 +635,35 @@ impl Sandbox {
     }
 
     pub fn transactions_hashes(&self) -> Vec<Hash> {
-        let b = self.reactor.borrow();
-        let rlock = b.handler.state().transactions().read().expect(
+        let node_state = self.node_state();
+        let rlock = node_state.transactions().read().expect(
             "Expected read lock",
         );
         rlock.keys().cloned().collect()
     }
 
     pub fn current_round(&self) -> Round {
-        self.reactor.borrow().handler.state().round()
+        self.node_state().round()
     }
 
     pub fn block_and_precommits(&self, height: Height) -> Option<BlockProof> {
-        let snapshot = self.reactor.borrow().handler.blockchain.snapshot();
+        let snapshot = self.blockchain_ref().snapshot();
         let schema = Schema::new(&snapshot);
         schema.block_and_precommits(height)
     }
 
     pub fn current_height(&self) -> Height {
-        self.reactor.borrow().handler.state().height()
+        self.node_state().height()
     }
 
     pub fn current_leader(&self) -> ValidatorId {
-        self.reactor.borrow().handler.state().leader(
+        self.node_state().leader(
             self.current_round(),
         )
     }
 
     pub fn assert_state(&self, expected_height: Height, expected_round: Round) {
-        let reactor = self.reactor.borrow();
-        let state = &reactor.handler.state();
+        let state = self.node_state();
 
         let achual_height = state.height();
         let actual_round = state.round();
@@ -642,8 +672,7 @@ impl Sandbox {
     }
 
     pub fn assert_lock(&self, expected_round: Round, expected_hash: Option<Hash>) {
-        let reactor = self.reactor.borrow();
-        let state = reactor.handler.state();
+        let state = self.node_state();
 
         let actual_round = state.locked_round();
         let actual_hash = state.locked_propose();
@@ -652,13 +681,11 @@ impl Sandbox {
     }
 
     fn node_public_key(&self) -> PublicKey {
-        let reactor = self.reactor.borrow();
-        *reactor.public_key()
+        *self.node_state().consensus_public_key()
     }
 
     fn node_secret_key(&self) -> SecretKey {
-        let reactor = self.reactor.borrow();
-        reactor.secret_key().clone()
+        self.node_state().consensus_secret_key().clone()
     }
 }
 
@@ -724,38 +751,37 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
             service_secret_key: service_keys[0].1.clone(),
         },
         network: NetworkConfiguration::default(),
-        events: EventsConfiguration::new(),
         peer_discovery: Vec::new(),
         mempool: Default::default(),
     };
 
     // TODO use factory or other solution like set_handler or run
-
-    let inner = Arc::new(Mutex::new(SandboxInner {
-        address: addresses[0],
-        time: UNIX_EPOCH + Duration::new(1_486_720_340, 0),
-        sent: VecDeque::new(),
-        events: VecDeque::new(),
-        timers: BinaryHeap::new(),
-    }));
-
-    let channel = SandboxChannel { inner: inner.clone() };
-    let node = NodeHandler::new(
+    let system_state = SandboxSystemStateProvider {
+            listen_address: addresses[0],
+            shared_time: SharedTime::new(Mutex::new(UNIX_EPOCH + Duration::new(1_486_720_340, 0)))
+        };
+    let shared_time = system_state.shared_time.clone();
+    let channel = NodeChannel::new(100);
+    let mut handler = NodeHandler::new(
         blockchain.clone(),
         addresses[0],
-        channel,
+        channel.0,
+        Box::new(system_state),
         config.clone(),
         SharedNodeState::new(5000),
     );
+    handler.initialize();
 
-    let mut reactor = SandboxReactor {
-        inner: inner.clone(),
-        handler: node,
-    };
-    reactor.handler.initialize();
+    let inner = SandboxInner {
+        sent: VecDeque::new(),
+        events: VecDeque::new(),
+        timers: BinaryHeap::new(),
+        events_receiver: channel.1,
+        handler,
+        time: shared_time
+    };    
     let sandbox = Sandbox {
-        inner: inner.clone(),
-        reactor: RefCell::new(reactor),
+        inner: RefCell::new(inner),
         validators_map: HashMap::from_iter(validators.clone()),
         services_map: HashMap::from_iter(service_keys),
         addresses: addresses,

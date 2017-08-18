@@ -16,14 +16,14 @@ use futures::sync::mpsc;
 use futures::{Stream, Poll, Async};
 use futures::stream::Fuse;
 
-use std::time::Duration;
+use std::time::SystemTime;
 
 use node::{ExternalMessage, NodeTimeout};
 
 use super::{Event, NetworkEvent, NetworkRequest};
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct TimeoutRequest(pub Duration, pub NodeTimeout);
+pub struct TimeoutRequest(pub SystemTime, pub NodeTimeout);
 
 impl PartialOrd for TimeoutRequest {
     fn partial_cmp(&self, other: &Self) -> Option<::std::cmp::Ordering> {

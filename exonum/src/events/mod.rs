@@ -32,3 +32,21 @@ pub enum Event {
 pub trait EventHandler {
     fn handle_event(&mut self, event: Event);
 }
+
+impl Into<Event> for NetworkEvent {
+    fn into(self) -> Event {
+        Event::Network(self)
+    }
+}
+
+impl Into<Event> for NodeTimeout {
+    fn into(self) -> Event {
+        Event::Timeout(self)
+    }
+}
+
+impl Into<Event> for ExternalMessage {
+    fn into(self) -> Event {
+        Event::Api(self)
+    }
+}
