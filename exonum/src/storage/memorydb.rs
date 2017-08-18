@@ -18,7 +18,7 @@ use std::clone::Clone;
 use std::collections::btree_map::{BTreeMap, Range};
 use std::iter::Peekable;
 
-use super::{Database, Snapshot, Patch, Change, Iterator, Iter, Result};
+use super::{Database, Snapshot, Transaction, Patch, Change, Iterator, Iter, Result};
 
 /// Database implementation that stores all the data in memory.
 ///
@@ -50,6 +50,10 @@ impl Database for MemoryDB {
         Box::new(MemoryDB {
             map: Arc::new(RwLock::new(self.map.read().unwrap().clone())),
         })
+    }
+
+    fn transaction(&self) -> Box<Transaction> {
+        unimplemented!()
     }
 
     fn merge(&mut self, patch: Patch) -> Result<()> {

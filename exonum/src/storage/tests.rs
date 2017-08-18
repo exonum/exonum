@@ -183,7 +183,7 @@ mod memorydb_tests {
 mod rocksdb_tests {
     use std::path::Path;
     use tempdir::TempDir;
-    use super::super::{RocksDB, RocksDBOptions};
+    use super::super::{Database, RocksDB, RocksDBOptions};
 
     fn rocksdb_database(path: &Path) -> RocksDB {
         let mut options = RocksDBOptions::default();
@@ -203,5 +203,78 @@ mod rocksdb_tests {
         let dir = TempDir::new("exonum_rocksdb2").unwrap();
         let path = dir.path();
         super::changelog(rocksdb_database(path));
+    }
+
+    #[test]
+    fn test_rocksdb_transaction_commit() {
+        let dir = TempDir::new("exonum_rocksdb3").unwrap();
+        let path = dir.path();
+        let db = rocksdb_database(path);
+
+        {
+            let txn = db.transaction();
+
+            assert!(txn.get(b"123").is_none());
+            assert!(txn.put(b"123", b"234").is_ok());
+            assert!(txn.get(b"123").is_some());
+
+            let snap = db.snapshot();
+            assert!(!snap.contains(b"123"));
+            assert!(txn.commit().is_ok());
+        }
+
+        let snap = db.snapshot();
+        assert!(snap.contains(b"123"));
+    }
+
+    #[test]
+    fn test_rocksdb_transaction_rollback() {
+        let dir = TempDir::new("exonum_rocksdb4").unwrap();
+        let path = dir.path();
+        let db = rocksdb_database(path);
+
+        {
+            let txn = db.transaction();
+            assert!(txn.put(b"123", b"234").is_ok());
+            assert!(txn.get(b"123").is_some());
+            assert!(txn.rollback().is_ok());
+        }
+
+        let snap = db.snapshot();
+        assert!(!snap.contains(b"123"));
+    }
+
+    #[test]
+    fn test_rocksdb_transaction_isolation() {
+        let dir = TempDir::new("exonum_rocksdb5").unwrap();
+        let path = dir.path();
+        let db = rocksdb_database(path);
+        let txn1 = db.transaction();
+        let txn2 = db.transaction();
+
+        assert!(txn1.put(b"123", b"234").is_ok());
+        assert!(txn1.get(b"123").is_some());
+        assert!(txn2.get(b"123").is_none());
+        assert!(txn1.commit().is_ok());
+        assert!(txn2.get(b"123").is_some());
+    }
+
+    #[test]
+    fn test_rocksdb_transaction_iter() {
+        let dir = TempDir::new("exonum_rocksdb6").unwrap();
+        let path = dir.path();
+        let db = rocksdb_database(path);
+        let txn = db.transaction();
+
+        assert!(txn.put(&[1], &[1]).is_ok());
+        assert!(txn.put(&[2], &[2]).is_ok());
+        assert!(txn.put(&[3], &[3]).is_ok());
+
+        let mut iter = txn.iter();
+
+        assert_eq!(iter.next(), Some((vec![1].as_slice(), vec![1].as_slice())));
+        assert_eq!(iter.next(), Some((vec![2].as_slice(), vec![2].as_slice())));
+        assert_eq!(iter.next(), Some((vec![3].as_slice(), vec![3].as_slice())));
+        assert_eq!(iter.next(), None);
     }
 }

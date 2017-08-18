@@ -56,7 +56,6 @@ extern crate clap;
 extern crate hyper;
 extern crate iron;
 extern crate router;
-extern crate bodyparser;
 extern crate params;
 extern crate cookie;
 extern crate mount;

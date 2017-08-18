@@ -125,6 +125,10 @@ pub trait Database: Send + Sync + 'static {
     /// [`Snapshot`]: trait.Snapshot.html
     fn snapshot(&self) -> Box<Snapshot>;
 
+
+    /// Creates a new transaction of the database
+    fn transaction(&self) -> Box<Transaction>;
+
     /// Creates a new fork of the database from its current state.
     ///
     /// See [`Fork`] documentation for more.
@@ -172,6 +176,29 @@ pub trait Snapshot: 'static {
     /// Returns an iterator over the entries of the snapshot in ascending order starting from
     /// the specified key. The iterator element type is `(&[u8], &[u8])`.
     fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a>;
+}
+
+/// A trait that defines a transaction of storage backend.
+///
+pub trait Transaction {
+    /// Returns a value as raw vector of bytes corresponding to the specified key
+    /// or `None` if does not exist.
+    fn get(&self, key: &[u8]) -> Option<Vec<u8>>;
+
+    /// Stores key and value into database
+    fn put(&self, key: &[u8], value: &[u8]) -> Result<()>;
+
+    /// Removes value by key
+    fn delete(&self, key: &[u8]) -> Result<()>;
+
+    /// Returns an iterator over the entries of the transaction in ascending order.
+    fn iter(&self) -> Iter;
+
+    /// Commits transaction's changes
+    fn commit(&self) -> Result<()>;
+
+    /// Rollbacks transaction's changes
+    fn rollback(&self) -> Result<()>;
 }
 
 /// A trait that defines streaming iterator over storage view entries.

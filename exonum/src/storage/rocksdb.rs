@@ -14,9 +14,10 @@
 
 //! An implementation of `RocksDB` database.
 use exonum_profiler::ProfilerSpan;
-use rocksdb::TransactionDB as _RocksDB;
+use rocksdb::OptimisticTransactionDB as _RocksDB;
 use rocksdb::DBRawIterator;
-use rocksdb::Snapshot as _Snapshot;
+use rocksdb::optimistic_txn_db::Snapshot as _Snapshot;
+use rocksdb::Transaction as _Transaction;
 use rocksdb::Error as _Error;
 
 use std::mem;
@@ -27,9 +28,9 @@ use std::error;
 
 pub use rocksdb::Options as RocksDBOptions;
 pub use rocksdb::BlockBasedOptions as RocksBlockOptions;
-pub use rocksdb::{TransactionDBOptions, TransactionOptions, WriteOptions};
+pub use rocksdb::{OptimisticTransactionOptions, WriteOptions};
 
-use super::{Database, Iterator, Iter, Snapshot, Error, Patch, Change, Result};
+use super::{Database, Iterator, Iter, Snapshot, Transaction, Error, Patch, Change, Result};
 
 impl From<_Error> for Error {
     fn from(err: _Error) -> Self {
@@ -43,10 +44,15 @@ pub struct RocksDB {
     db: Arc<_RocksDB>,
 }
 
-/// A snapshot of a `RocksDB`.
+/// A snapshot of `RocksDB`.
 pub struct RocksDBSnapshot {
     snapshot: _Snapshot<'static>,
     _db: Arc<_RocksDB>,
+}
+
+/// A transaction of `RocksDB`
+pub struct RocksDBTransaction {
+    transaction: _Transaction,
 }
 
 /// An iterator over the entries of a `RocksDB`.
@@ -59,8 +65,7 @@ struct RocksDBIterator {
 impl RocksDB {
     /// Open a database stored in the specified path with the specified options.
     pub fn open(path: &Path, options: RocksDBOptions) -> Result<RocksDB> {
-        let txn_db_options = TransactionDBOptions::default();
-        let database = _RocksDB::open(&options, &txn_db_options, path)?;
+        let database = _RocksDB::open(&options, path)?;
         Ok(RocksDB { db: Arc::new(database) })
     }
 }
@@ -78,10 +83,20 @@ impl Database for RocksDB {
         })
     }
 
+    fn transaction(&self) -> Box<Transaction> {
+        let _p = ProfilerSpan::new("RocksDB::transaction");
+        let w_opts = WriteOptions::default();
+        let mut txn_opts = OptimisticTransactionOptions::default();
+        txn_opts.set_snapshot(true);
+        Box::new(RocksDBTransaction {
+            transaction: self.db.transaction_begin(&w_opts, &txn_opts),
+        })
+    }
+
     fn merge(&mut self, patch: Patch) -> Result<()> {
         let _p = ProfilerSpan::new("RocksDB::merge");
         let w_opts = WriteOptions::default();
-        let txn_opts = TransactionOptions::default();
+        let txn_opts = OptimisticTransactionOptions::default();
         let txn = self.db.transaction_begin(&w_opts, &txn_opts);
         for (key, change) in patch {
             match change {
@@ -94,6 +109,7 @@ impl Database for RocksDB {
 }
 
 impl Snapshot for RocksDBSnapshot {
+
     fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
         let _p = ProfilerSpan::new("RocksDBSnapshot::get");
         match self.snapshot.get(key) {
@@ -112,6 +128,44 @@ impl Snapshot for RocksDBSnapshot {
             value: None,
         })
     }
+
+}
+
+impl Transaction for RocksDBTransaction {
+
+    fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
+        match self.transaction.get(key) {
+            Ok(Some(value)) => Some(value.iter().cloned().collect::<Vec<_>>()),
+            _ => None,
+        }
+    }
+
+    fn put(&self, key: &[u8], value: &[u8]) -> Result<()> {
+        self.transaction.put(key, value).map_err(Into::into)
+    }
+
+    fn delete(&self, key: &[u8]) -> Result<()> {
+        self.transaction.delete(key).map_err(Into::into)
+    }
+
+    fn iter(&self) -> Iter {
+        let _p = ProfilerSpan::new("RocksDBTransaction::iter");
+        let iter = self.transaction.iterator().into();
+        Box::new(RocksDBIterator {
+            iter: iter,
+            key: None,
+            value: None,
+        })
+    }
+
+    fn commit(&self) -> Result<()> {
+        self.transaction.commit().map_err(Into::into)
+    }
+
+    fn rollback(&self) -> Result<()> {
+        self.transaction.rollback().map_err(Into::into)
+    }
+
 }
 
 impl<'a> Iterator for RocksDBIterator {
@@ -159,5 +213,11 @@ impl fmt::Debug for RocksDB {
 impl fmt::Debug for RocksDBSnapshot {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "RocksDBSnapshot(..)")
+    }
+}
+
+impl fmt::Debug for RocksDBTransaction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "RocksDBTransaction(..)")
     }
 }

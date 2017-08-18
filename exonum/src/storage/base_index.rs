@@ -16,7 +16,7 @@
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
-use super::{StorageKey, StorageValue, Snapshot, Fork, Iter};
+use super::{StorageKey, StorageValue, Snapshot, Fork, Transaction, Iter};
 
 /// Basic struct for all indices that implements common features.
 ///
@@ -170,6 +170,20 @@ impl<'a> BaseIndex<&'a mut Fork> {
     /// in the index.
     pub fn clear(&mut self) {
         self.view.remove_by_prefix(&self.prefix)
+    }
+}
+
+impl<'a> BaseIndex<&'a mut Transaction> {
+    /// Inserts the key-value pair into the index. Both key and value may be of *any* types.
+    pub fn put<K, V>(&mut self, key: &K, value: V)
+    where
+        K: StorageKey,
+        V: StorageValue,
+    {
+        let key = self.prefixed_key(key);
+        if let Err(e) = self.view.put(&key, value.into_bytes().as_slice()) {
+            println!("error while inserting: {}", e);
+        }
     }
 }
 
