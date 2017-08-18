@@ -126,12 +126,7 @@ impl NetworkPart {
                         outgoing_connections.insert(peer, conn_tx.clone());
 
                         let requests_tx = requests_tx.clone();
-                        let connect_handle = NewConnection::create(
-                            peer,
-                            handle.clone(),
-                            network_config.tcp_reconnect_timeout,
-                            network_config.tcp_reconnect_timeout_max,
-                        ).and_then(move |sock| {
+                        let connect_handle = TcpStream::connect(&peer, &handle).and_then(move |sock| {
                             sock.set_nodelay(network_config.tcp_nodelay).unwrap();
                             info!("Established connection with peer={}", peer);
 
