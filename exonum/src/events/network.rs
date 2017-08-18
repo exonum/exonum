@@ -12,19 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use futures::{Future, Stream, Sink, IntoFuture};
+use futures::{Future, Stream, Sink, IntoFuture, Poll, Async};
 use futures::future::Either;
 use futures::sync::mpsc;
-use tokio_core::net::{TcpListener, TcpStream};
-use tokio_core::reactor::{Core, Timeout};
+use tokio_core::net::{TcpListener, TcpStream, TcpStreamNew};
+use tokio_core::reactor::{Core, Timeout, Handle};
 use tokio_io::AsyncRead;
 
+use std::cmp;
+use std::io;
+use std::fmt;
 use std::net::SocketAddr;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 use std::collections::HashMap;
 
 use messages::{Any, Connect, RawMessage};
 use node::{ExternalMessage, NodeTimeout};
+use helpers::Milliseconds;
 
 use super::EventHandler;
 use super::error::{other_error, result_ok, forget_result, into_other, log_error};
@@ -111,6 +115,7 @@ impl NetworkPart {
         let handle = core.handle();
         let network_tx = self.network_tx.clone();
         let requests_tx = self.network_requests.0.clone();
+        let network_config = self.network_config.clone();
         let requests_handle = self.network_requests.1.for_each(|request| {
             match request {
                 NetworkRequest::SendMessage(peer, msg) => {
@@ -121,26 +126,31 @@ impl NetworkPart {
                         outgoing_connections.insert(peer, conn_tx.clone());
 
                         let requests_tx = requests_tx.clone();
-                        let connect_handle = TcpStream::connect(&peer, &handle)
-                            .and_then(move |sock| {
-                                info!("Established connection with peer={}", peer);
+                        let connect_handle = NewConnection::create(
+                            peer,
+                            handle.clone(),
+                            network_config.tcp_reconnect_timeout,
+                            network_config.tcp_reconnect_timeout_max,
+                        ).and_then(move |sock| {
+                            sock.set_nodelay(network_config.tcp_nodelay).unwrap();
+                            info!("Established connection with peer={}", peer);
 
-                                let stream = sock.framed(MessagesCodec);
-                                let (sink, stream) = stream.split();
+                            let stream = sock.framed(MessagesCodec);
+                            let (sink, stream) = stream.split();
 
-                                let writer = conn_rx
-                                    .map_err(|_| other_error("Can't send data into socket"))
-                                    .forward(sink);
-                                let reader = stream.for_each(result_ok).map_err(into_other);
+                            let writer = conn_rx
+                                .map_err(|_| other_error("Can't send data into socket"))
+                                .forward(sink);
+                            let reader = stream.for_each(result_ok).map_err(into_other);
 
-                                reader
-                                    .select2(writer)
-                                    .map_err(|_| other_error("Socket error"))
-                                    .and_then(|res| match res {
-                                        Either::A((_, _reader)) => Ok(()).into_future(),
-                                        Either::B((_, _writer)) => Ok(()).into_future(),
-                                    })
-                            })
+                            reader
+                                .select2(writer)
+                                .map_err(|_| other_error("Socket error"))
+                                .and_then(|res| match res {
+                                    Either::A((_, _reader)) => Ok(()).into_future(),
+                                    Either::B((_, _writer)) => Ok(()).into_future(),
+                                })
+                        })
                             .then(move |res| {
                                 info!("Connection with peer={} closed, reason={:?}", peer, res);
                                 // outgoing_connections.remove(&peer);
@@ -238,5 +248,96 @@ impl NetworkPart {
         core.handle().spawn(server);
 
         core.run(requests_handle)
+    }
+}
+
+pub struct NewConnection {
+    inner: Option<TcpStreamNew>,
+    address: SocketAddr,
+    handle: Handle,
+    groth_factor: f32,
+    start_time: SystemTime,
+    reconnect_timeout: Milliseconds,
+    reconnect_timeout_max: Milliseconds,
+}
+
+impl NewConnection {
+    pub fn create(
+        address: SocketAddr,
+        handle: Handle,
+        reconnect_timeout: Milliseconds,
+        reconnect_timeout_max: Milliseconds,
+    ) -> NewConnection {
+        NewConnection {
+            inner: Some(TcpStream::connect(&address, &handle)),
+            address,
+            handle,
+            groth_factor: 1.5,
+            start_time: SystemTime::now(),
+            reconnect_timeout,
+            reconnect_timeout_max,
+        }
+    }
+
+    fn next_attempt(&mut self, now: SystemTime) -> io::Result<()> {
+        self.start_time = now;
+        if self.reconnect_timeout == self.reconnect_timeout_max {
+            return Err(other_error(
+                &format!("Maximum reconnect timeout reached for connection with the peer: {}",
+                self.address,
+            ),
+            ));
+        }
+
+        self.reconnect_timeout = (self.reconnect_timeout as f32 * self.groth_factor) as
+            Milliseconds;
+        self.reconnect_timeout = cmp::min(self.reconnect_timeout, self.reconnect_timeout_max);
+        self.inner = Some(TcpStream::connect(&self.address, &self.handle));
+        trace!(
+            "Add reconnect timeout to {}, delay = {} ms",
+            self.address,
+            self.reconnect_timeout
+        );
+        Ok(())
+    }
+}
+
+impl Future for NewConnection {
+    type Item = TcpStream;
+    type Error = io::Error;
+
+    fn poll(&mut self) -> Poll<TcpStream, io::Error> {
+        debug!("Poll, stream={}", self.inner.is_some());
+        if let Some(mut stream) = self.inner.take() {
+            match stream.poll() {
+                Ok(Async::Ready(stream)) => Ok(Async::Ready(stream)),
+                Ok(Async::NotReady) => {
+                    self.inner = Some(stream);
+                    Ok(Async::NotReady)
+                }
+                Err(e) => {
+                    error!(
+                        "An error occured during connecting to the peer: {}, error: {}",
+                        self.address,
+                        e
+                    );
+                    self.inner = None;
+                    Ok(Async::NotReady)
+                }
+            }
+        } else {
+            let now = SystemTime::now();
+            let reconnect_timeout = Duration::from_millis(self.reconnect_timeout);
+            if now > self.start_time + reconnect_timeout {
+                self.next_attempt(now)?;
+            }
+            Ok(Async::NotReady)
+        }
+    }
+}
+
+impl fmt::Debug for NewConnection {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.pad("NewConnection { .. }")
     }
 }
