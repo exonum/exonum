@@ -13,7 +13,7 @@
 // limitations under the License.
 
 
-// Workaround: Clippy does not correctly handle borrowing checking rules for returned types. 
+// Workaround: Clippy does not correctly handle borrowing checking rules for returned types.
 #![cfg_attr(feature="cargo-clippy", allow(let_and_return))]
 
 use futures::{self, Async, Future, Stream};
