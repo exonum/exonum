@@ -29,7 +29,7 @@ use node::{ExternalMessage, NodeTimeout};
 use super::EventHandler;
 use super::error::{other_error, result_ok, forget_result, into_other, log_error};
 use super::codec::MessagesCodec;
-use super::handler::EventsAggregator;
+use super::EventsAggregator;
 
 #[derive(Debug)]
 pub enum NetworkEvent {
@@ -80,6 +80,7 @@ pub struct HandlerPart<H: EventHandler> {
 #[derive(Debug)]
 pub struct NetworkPart {
     pub listen_address: SocketAddr,
+    pub network_config: NetworkConfiguration,
     pub network_requests: (mpsc::Sender<NetworkRequest>, mpsc::Receiver<NetworkRequest>),
     pub network_tx: mpsc::Sender<NetworkEvent>,
 }

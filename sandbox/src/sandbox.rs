@@ -17,6 +17,7 @@
 #![cfg_attr(feature="cargo-clippy", allow(let_and_return))]
 
 use futures::{self, Async, Future, Stream};
+use futures::sync::mpsc;
 
 use std::ops::{AddAssign, Deref};
 use std::sync::{Arc, Mutex};
@@ -27,7 +28,7 @@ use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet, VecDeque};
 use std::iter::FromIterator;
 
 use exonum::node::{Configuration, ListenerConfig, NodeHandler, ServiceConfig, State,
-                   SystemStateProvider};
+                   SystemStateProvider, NodeSender};
 use exonum::blockchain::{Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema,
                          Service, SharedNodeState, StoredConfiguration, TimeoutAdjusterConfig,
                          Transaction, ValidatorKeys};
@@ -37,8 +38,7 @@ use exonum::crypto::{gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed};
 #[cfg(test)]
 use exonum::crypto::gen_keypair;
 use exonum::helpers::{init_logger, Height, Milliseconds, Round, ValidatorId};
-use exonum::events::{Event, EventHandler, NetworkEvent, NetworkRequest};
-use exonum::events::handler::{NodeChannel, NodeReceiver, TimeoutRequest};
+use exonum::events::{Event, EventHandler, NetworkEvent, NetworkRequest, TimeoutRequest};
 use exonum::events::network::NetworkConfiguration;
 
 use timestamping::TimestampingService;
@@ -70,7 +70,8 @@ pub struct SandboxInner {
     pub sent: VecDeque<(SocketAddr, RawMessage)>,
     pub events: VecDeque<Event>,
     pub timers: BinaryHeap<TimeoutRequest>,
-    pub events_receiver: NodeReceiver,
+    pub network_requests_rx: mpsc::Receiver<NetworkRequest>,
+    pub timeout_requests_rx: mpsc::Receiver<TimeoutRequest>,
 }
 
 impl SandboxInner {
@@ -86,8 +87,7 @@ impl SandboxInner {
 
     fn process_network_requests(&mut self) {
         let network_getter = futures::lazy(|| -> Result<(), ()> {
-            while let Async::Ready(Some(network)) = self.events_receiver.network.poll()? {
-                debug!("{:?}", network);
+            while let Async::Ready(Some(network)) = self.network_requests_rx.poll()? {
                 match network {
                     NetworkRequest::SendMessage(peer, msg) => self.sent.push_back((peer, msg)),
                     NetworkRequest::DisconnectWithPeer(_) => {}
@@ -100,8 +100,7 @@ impl SandboxInner {
 
     fn process_timeout_requests(&mut self) {
         let timeouts_getter = futures::lazy(|| -> Result<(), ()> {
-            while let Async::Ready(Some(timeout)) = self.events_receiver.timeout.poll()? {
-                debug!("{:?}", timeout);
+            while let Async::Ready(Some(timeout)) = self.timeout_requests_rx.poll()? {
                 self.timers.push(timeout);
             }
             Ok(())
@@ -592,11 +591,18 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         shared_time: SharedTime::new(Mutex::new(UNIX_EPOCH + Duration::new(1_486_720_340, 0))),
     };
     let shared_time = system_state.shared_time.clone();
-    let channel = NodeChannel::new(64);
+
+    let network_channel = mpsc::channel(100);
+    let timeout_channel = mpsc::channel(100);
+    let node_sender = NodeSender {
+        network_requests: network_channel.0.clone(),
+        timeout_requests: timeout_channel.0.clone(),
+    };
+
     let mut handler = NodeHandler::new(
         blockchain.clone(),
         addresses[0],
-        channel.0,
+        node_sender,
         Box::new(system_state),
         config.clone(),
         SharedNodeState::new(5000),
@@ -607,7 +613,8 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         sent: VecDeque::new(),
         events: VecDeque::new(),
         timers: BinaryHeap::new(),
-        events_receiver: channel.1,
+        timeout_requests_rx: timeout_channel.1,
+        network_requests_rx: network_channel.1,
         handler,
         time: shared_time,
     };

@@ -35,14 +35,13 @@ use crypto::{self, Hash, PublicKey, SecretKey};
 use blockchain::{ApiContext, Blockchain, GenesisConfig, Schema, SharedNodeState, Transaction};
 use api::{private, public, Api};
 use messages::{Connect, Message, RawMessage};
-use events::network::{HandlerPart, NetworkConfiguration, NetworkPart, NetworkRequest};
+use events::{NetworkRequest, TimeoutRequest, NetworkEvent};
+use events::network::{HandlerPart, NetworkConfiguration, NetworkPart};
 use events::error::{forget_result, into_other, LogError};
-use events::handler::TimeoutRequest;
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 
 pub use self::state::{RequestData, State, TxPool, ValidatorState};
 pub use self::whitelist::Whitelist;
-pub use events::{NodeChannel, NodeSender};
 
 mod events;
 mod basic;
@@ -76,6 +75,14 @@ pub enum NodeTimeout {
     UpdateApiState,
     /// Exchange peers timeout.
     PeerExchange,
+}
+
+/// TODO
+pub trait SystemStateProvider: 'static + ::std::fmt::Debug {
+    /// TODO
+    fn listen_address(&self) -> SocketAddr;
+    /// TODO
+    fn current_time(&self) -> SystemTime;
 }
 
 /// Transactions sender.
@@ -208,6 +215,15 @@ pub struct Configuration {
     pub peer_discovery: Vec<SocketAddr>,
     /// Memory pool configuration.
     pub mempool: MemoryPoolConfig,
+}
+
+/// Channel for messages and timeouts.
+#[derive(Debug, Clone)]
+pub struct NodeSender {
+    /// Timeout requests sender.
+    pub timeout_requests: mpsc::Sender<TimeoutRequest>,
+    /// Network requests sender.
+    pub network_requests: mpsc::Sender<NetworkRequest>,
 }
 
 impl NodeHandler {
@@ -349,7 +365,7 @@ impl NodeHandler {
         trace!("Send to address: {}", address);
         let request = NetworkRequest::SendMessage(*address, message.clone());
         self.channel
-            .network
+            .network_requests
             .clone()
             .send(request)
             .wait()
@@ -375,7 +391,7 @@ impl NodeHandler {
     pub fn add_timeout(&self, timeout: NodeTimeout, time: SystemTime) {
         let request = TimeoutRequest(time, timeout);
         self.channel
-            .timeout
+            .timeout_requests
             .clone()
             .send(request)
             .wait()
@@ -512,14 +528,6 @@ impl fmt::Debug for ApiSender {
 }
 
 /// TODO
-pub trait SystemStateProvider: 'static + ::std::fmt::Debug {
-    /// TODO
-    fn listen_address(&self) -> SocketAddr;
-    /// TODO
-    fn current_time(&self) -> SystemTime;
-}
-
-/// TODO
 #[derive(Debug)]
 pub struct DefaultSystemState(pub SocketAddr);
 
@@ -532,14 +540,48 @@ impl SystemStateProvider for DefaultSystemState {
     }
 }
 
+/// TODO
+#[derive(Debug)]
+pub struct NodeChannel {
+    /// Channel for network requests.
+    pub network_requests: (mpsc::Sender<NetworkRequest>, mpsc::Receiver<NetworkRequest>),
+    /// Channel for timeout requests.
+    pub timeout_requests: (mpsc::Sender<TimeoutRequest>, mpsc::Receiver<TimeoutRequest>),
+    /// Channel for api requests.
+    pub api_requests: (mpsc::Sender<ExternalMessage>, mpsc::Receiver<ExternalMessage>),
+    /// Channel for network events.
+    pub network_events: (mpsc::Sender<NetworkEvent>, mpsc::Receiver<NetworkEvent>),
+}
+
 const PROFILE_ENV_VARIABLE_NAME: &'static str = "EXONUM_PROFILE_FILENAME";
 
 /// Node that contains handler (`NodeHandler`) and `NodeApiConfig`.
 #[derive(Debug)]
 pub struct Node {
     api_options: NodeApiConfig,
+    network_config: NetworkConfiguration,
     handler: NodeHandler,
     channel: NodeChannel,
+}
+
+impl NodeChannel {
+    /// TODO
+    pub fn new(buffer_size: usize) -> NodeChannel {
+        NodeChannel {
+            network_requests: mpsc::channel(buffer_size),
+            timeout_requests: mpsc::channel(buffer_size),
+            api_requests: mpsc::channel(buffer_size),
+            network_events: mpsc::channel(buffer_size),
+        }
+    }
+
+    /// TODO
+    pub fn node_sender(&self) -> NodeSender {
+        NodeSender {
+            timeout_requests: self.timeout_requests.0.clone(),
+            network_requests: self.network_requests.0.clone(),
+        }
+    }
 }
 
 impl Node {
@@ -583,11 +625,12 @@ impl Node {
         };
         let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
         let system_state = Box::new(DefaultSystemState(node_cfg.listen_address));
-        let channel = NodeChannel::new(256);
+        let channel = NodeChannel::new(1000);
+        let network_config = config.network;
         let handler = NodeHandler::new(
             blockchain,
             external_address,
-            channel.0.clone(),
+            channel.node_sender(),
             system_state,
             config,
             api_state,
@@ -596,6 +639,7 @@ impl Node {
             api_options: node_cfg.api,
             handler,
             channel,
+            network_config,
         }
     }
 
@@ -619,7 +663,7 @@ impl Node {
     /// Private api prefix is `/api/services/{service_name}`
     pub fn run(self) -> io::Result<()> {
         let blockchain = self.handler().blockchain.clone();
-        let channel = self.channel();
+        let api_sender = self.channel();
 
         let private_config_api_thread = match self.api_options.private_api_address {
             Some(listen_address) => {
@@ -634,7 +678,7 @@ impl Node {
                     node_info,
                     blockchain.clone(),
                     shared_api_state,
-                    channel,
+                    api_sender,
                 );
                 system_api.wire(&mut router);
                 mount.mount("api/system", router);
@@ -691,18 +735,19 @@ impl Node {
 
     /// TODO
     pub fn into_reactor(self) -> (HandlerPart<NodeHandler>, NetworkPart) {
-        let (network_tx, network_rx) = mpsc::channel(256);
+        let (network_tx, network_rx) = self.channel.network_events;
 
         let network_part = NetworkPart {
             listen_address: self.handler.system_state.listen_address(),
-            network_requests: (self.channel.0.network, self.channel.1.network),
+            network_requests: self.channel.network_requests,
             network_tx: network_tx,
+            network_config: self.network_config,
         };
 
         let core = Core::new().unwrap();
         let (timeout_tx, timeout_rx) = mpsc::channel(256);
         let handle = core.handle();
-        let timeout_requests_rx = self.channel.1.timeout;
+        let timeout_requests_rx = self.channel.timeout_requests.1;
         let timeout_tx = timeout_tx.clone();
         let timeout_handler = timeout_requests_rx.for_each(move |request| {
             let duration = request.0.duration_since(SystemTime::now()).unwrap_or_else(
@@ -731,7 +776,7 @@ impl Node {
             handler: self.handler,
             timeout_rx,
             network_rx: network_rx,
-            api_rx: self.channel.1.external,
+            api_rx: self.channel.api_requests.1,
         };
         (handler_part, network_part)
     }
@@ -748,6 +793,6 @@ impl Node {
 
     /// Returns channel.
     pub fn channel(&self) -> ApiSender {
-        ApiSender::new(self.channel.0.external.clone())
+        ApiSender::new(self.channel.api_requests.0.clone())
     }
 }
