@@ -113,7 +113,7 @@ impl NodeHandler {
         info!(
             "Received Connect message from {}, {}",
             address,
-            need_connect, 
+            need_connect,
         );
         if need_connect {
             // TODO: reduce double sending of connect message

@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+
+// Workaround: Clippy does not correctly handle borrowing checking rules for returned types. 
+#![cfg_attr(feature="cargo-clippy", allow(let_and_return))]
+
 use futures::{self, Async, Future, Stream};
 
 use std::ops::{AddAssign, Deref};
@@ -237,7 +241,7 @@ impl Sandbox {
     pub fn recv<T: Message>(&self, msg: T) {
         self.check_unexpected_message();
         // TODO Think about addresses.
-        let dummy_addr = SocketAddr::from(([127, 0, 0, 1], 12039));
+        let dummy_addr = SocketAddr::from(([127, 0, 0, 1], 12_039));
         let event = NetworkEvent::MessageReceived(dummy_addr, msg.raw().clone());
         self.inner.borrow_mut().handle_event(event);
     }

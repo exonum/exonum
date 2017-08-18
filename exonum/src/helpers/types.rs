@@ -4,7 +4,7 @@ use serde::{Serialize, Serializer, Deserialize, Deserializer};
 
 use std::fmt;
 
-/// Number of milliseconds. 
+/// Number of milliseconds.
 pub type Milliseconds = u64;
 
 /// Blockchain's height (number of blocks).

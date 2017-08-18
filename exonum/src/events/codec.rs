@@ -51,7 +51,7 @@ impl Decoder for MessagesCodec {
             let raw = RawMessage::from(MessageBuffer::from_vec(data));
             return Ok(Some(raw));
         }
-        return Ok(None);
+        Ok(None)
     }
 }
 
