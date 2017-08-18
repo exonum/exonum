@@ -12,31 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use futures::{Future, Stream, Sink};
-use futures::{Poll, Async};
-use futures::sync::mpsc;
+use futures::{self, Async, Future, Stream};
 
 use std::ops::{AddAssign, Deref};
-use std::sync::{Mutex, Arc};
-use std::cell::{RefCell, Ref, RefMut};
-use std::time::{UNIX_EPOCH, SystemTime, Duration};
-use std::net::{SocketAddr, Ipv4Addr, IpAddr};
-use std::collections::{BinaryHeap, VecDeque, HashMap, HashSet, BTreeMap};
+use std::sync::{Arc, Mutex};
+use std::cell::{Ref, RefCell, RefMut};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet, VecDeque};
 use std::iter::FromIterator;
 
-use exonum::node::{NodeHandler, Configuration, NodeTimeout, ExternalMessage, ListenerConfig,
-                   ServiceConfig, SystemStateProvider, State};
-use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Block, StoredConfiguration,
-                         Schema, Transaction, Service, ValidatorKeys, SharedNodeState, BlockProof,
-                         TimeoutAdjusterConfig};
-use exonum::storage::{MemoryDB, MapProof};
-use exonum::messages::{Any, Message, RawMessage, Connect, RawTransaction, Status};
-use exonum::crypto::{Hash, PublicKey, SecretKey, Seed, gen_keypair_from_seed};
+use exonum::node::{Configuration, ListenerConfig, NodeHandler, ServiceConfig, State,
+                   SystemStateProvider};
+use exonum::blockchain::{Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema,
+                         Service, SharedNodeState, StoredConfiguration, TimeoutAdjusterConfig,
+                         Transaction, ValidatorKeys};
+use exonum::storage::{MapProof, MemoryDB};
+use exonum::messages::{Any, Connect, Message, RawMessage, RawTransaction, Status};
+use exonum::crypto::{gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed};
 #[cfg(test)]
 use exonum::crypto::gen_keypair;
-use exonum::helpers::{Height, Round, ValidatorId, Milliseconds, init_logger};
-use exonum::events::{Event, NetworkRequest, NetworkEvent, EventHandler};
-use exonum::events::handler::{TimeoutRequest, NodeSender, NodeChannel, NodeReceiver};
+use exonum::helpers::{init_logger, Height, Milliseconds, Round, ValidatorId};
+use exonum::events::{Event, EventHandler, NetworkEvent, NetworkRequest};
+use exonum::events::handler::{NodeChannel, NodeReceiver, TimeoutRequest};
 use exonum::events::network::NetworkConfiguration;
 
 use timestamping::TimestampingService;
@@ -73,36 +71,38 @@ pub struct SandboxInner {
 
 impl SandboxInner {
     pub fn process_events(&mut self) {
-        debug!("Process events");
-        loop {
-            debug!("Trying to get event");
-            let network_event = self.events_receiver.network.poll();
-            debug!("{:?}", network_event);
-            if let Ok(Async::Ready(Some(network))) = network_event {
-                debug!("Network request, {:?}", network);
-                match network {
-                    NetworkRequest::SendMessage(peer, msg) => self.sent.push_back((peer, msg)),
-                    NetworkRequest::DisconnectWithPeer(peer) => {}
-                }
-            } else {
-                debug!("All events received");
-                break;
-            }
-
-            // } else if let Ok(Async::Ready(Some(timeout))) = self.events_receiver.timeout.poll() {
-            //     debug!("Timer request, {:?}", timeout);
-            //     self.timers.push(timeout);
-            // } else {
-            //     debug!("Else");
-            //     break;
-            // }
-        }
+        self.process_network_requests();
+        self.process_timeout_requests();
     }
 
     pub fn handle_event<E: Into<Event>>(&mut self, e: E) {
-        debug!("Handle event");
         self.handler.handle_event(e.into());
         self.process_events();
+    }
+
+    fn process_network_requests(&mut self) {
+        let network_getter = futures::lazy(|| -> Result<(), ()> {
+            while let Async::Ready(Some(network)) = self.events_receiver.network.poll()? {
+                debug!("{:?}", network);
+                match network {
+                    NetworkRequest::SendMessage(peer, msg) => self.sent.push_back((peer, msg)),
+                    NetworkRequest::DisconnectWithPeer(_) => {}
+                }
+            }
+            Ok(())
+        });
+        network_getter.wait().unwrap();
+    }
+
+    fn process_timeout_requests(&mut self) {
+        let timeouts_getter = futures::lazy(|| -> Result<(), ()> {
+            while let Async::Ready(Some(timeout)) = self.events_receiver.timeout.poll()? {
+                debug!("{:?}", timeout);
+                self.timers.push(timeout);
+            }
+            Ok(())
+        });
+        timeouts_getter.wait().unwrap();
     }
 }
 
@@ -235,6 +235,7 @@ impl Sandbox {
     }
 
     pub fn recv<T: Message>(&self, msg: T) {
+        self.check_unexpected_message();
         // TODO Think about addresses.
         let dummy_addr = SocketAddr::from(([127, 0, 0, 1], 12039));
         let event = NetworkEvent::MessageReceived(dummy_addr, msg.raw().clone());
@@ -303,7 +304,7 @@ impl Sandbox {
             } else {
                 panic!(
                     "Expected to broadcast the message {:?} but someone don't recieve \
-                        messages: {:?}",
+                     messages: {:?}",
                     any_expected_msg,
                     expected_set
                 );
@@ -323,7 +324,7 @@ impl Sandbox {
     pub fn add_time(&self, duration: Duration) {
         self.check_unexpected_message();
         let now = {
-            let mut inner = self.inner.borrow_mut();
+            let inner = self.inner.borrow_mut();
             let mut time = inner.time.lock().unwrap();
             time.add_assign(duration);
             *time.deref()
@@ -587,7 +588,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         shared_time: SharedTime::new(Mutex::new(UNIX_EPOCH + Duration::new(1_486_720_340, 0))),
     };
     let shared_time = system_state.shared_time.clone();
-    let channel = NodeChannel::new(100);
+    let channel = NodeChannel::new(64);
     let mut handler = NodeHandler::new(
         blockchain.clone(),
         addresses[0],
@@ -629,8 +630,8 @@ pub fn timestamping_sandbox() -> Sandbox {
 
 #[cfg(test)]
 mod tests {
-    use sandbox_tests_helper::{HEIGHT_ONE, ROUND_ONE, ROUND_TWO, VALIDATOR_1, VALIDATOR_2,
-                               VALIDATOR_3};
+    use sandbox_tests_helper::{VALIDATOR_1, VALIDATOR_2, VALIDATOR_3, HEIGHT_ONE, ROUND_ONE,
+                               ROUND_TWO};
     use super::*;
 
     #[test]
