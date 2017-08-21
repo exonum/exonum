@@ -348,7 +348,7 @@ impl Future for NewConnection {
                     Ok(Async::NotReady)
                 }
                 Err(e) => {
-                    error!(
+                    trace!(
                         "An error occured during connecting to the peer: {}, error: {}",
                         self.address,
                         e
