@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use futures::{self, Future, Async, Poll, Sink, Stream};
+use futures::stream::Peekable;
 use futures::sync::mpsc;
 use tokio_core::reactor::{Core, Handle, Timeout};
 
@@ -30,73 +31,38 @@ use events::network::{NetworkPart, NetworkConfiguration};
 use node::{NodeChannel, EventsPoolCapacity};
 
 struct TestHandler {
-    events: Arc<Mutex<VecDeque<NetworkEvent>>>,
+    listen_address: SocketAddr,
+    network_events_rx: Option<mpsc::Receiver<NetworkEvent>>,
     network_requests_tx: mpsc::Sender<NetworkRequest>,
     handle: Handle,
 }
 
-struct EventFuture {
-    events: Arc<Mutex<VecDeque<NetworkEvent>>>,
-    timeout: Timeout,
-}
-
-impl EventFuture {
-    fn new(
-        events: Arc<Mutex<VecDeque<NetworkEvent>>>,
-        handle: &Handle,
-        duration: Duration,
-    ) -> EventFuture {
-        EventFuture {
-            events,
-            timeout: Timeout::new(duration, handle).unwrap(),
-        }
-    }
-}
-
-impl Future for EventFuture {
-    type Item = NetworkEvent;
-    type Error = ();
-
-    fn poll(&mut self) -> Poll<NetworkEvent, ()> {
-        debug!("Poll");
-        // Try to dequeue event
-        let mut events = self.events.lock().unwrap();
-        if !events.is_empty() {
-            return Ok(Async::Ready(events.pop_front().unwrap()));
-        }
-        // Poll timeout
-        debug!("Poll timeout");
-        match self.timeout.poll() {
-            Ok(Async::NotReady) => {
-                debug!("Timeout not ready");
-                Ok(Async::NotReady)
-            }
-            Ok(Async::Ready(_)) => {
-                debug!("Timeout ready");
-                Err(())
-            }
-            Err(_) => Err(()),
-        }
-    }
-}
-
 impl TestHandler {
-    fn new(handle: Handle, network_requests_tx: mpsc::Sender<NetworkRequest>) -> TestHandler {
+    fn new(
+        listen_address: SocketAddr,
+        handle: Handle,
+        network_requests_tx: mpsc::Sender<NetworkRequest>,
+        network_events_rx: mpsc::Receiver<NetworkEvent>,
+    ) -> TestHandler {
         TestHandler {
-            events: Arc::new(Mutex::default()),
+            listen_address,
             network_requests_tx,
+            network_events_rx: Some(network_events_rx),
             handle,
         }
     }
 
     fn wait_for_event(&mut self) -> Result<NetworkEvent, ()> {
-        debug!("Wait for event");
-        let duration = Duration::from_secs(1);
-        EventFuture::new(self.events.clone(), &self.handle, duration).wait()
+        // TODO add timeout
+        let mut wait = self.network_events_rx.take().unwrap().wait();
+        let item = wait.next().unwrap();
+        debug!("Event received {:?}", item);
+        self.network_events_rx = Some(wait.into_inner());
+        item
     }
 
-    fn connect_with(&mut self, addr: SocketAddr) {
-        let connect = connect_message(addr);
+    fn connect_with(&self, addr: SocketAddr) {
+        let connect = connect_message(self.listen_address);
         self.network_requests_tx
             .clone()
             .send(NetworkRequest::SendMessage(addr, connect.raw().clone()))
@@ -115,7 +81,6 @@ impl TestHandler {
 
 struct TestEvents {
     listen_address: SocketAddr,
-    handler: TestHandler,
     core: Core,
     channel: NodeChannel,
 }
@@ -123,7 +88,6 @@ struct TestEvents {
 struct TestHandlerPart {
     handler: TestHandler,
     core: Core,
-    network_rx: mpsc::Receiver<NetworkEvent>,
 }
 
 impl TestEvents {
@@ -132,7 +96,6 @@ impl TestEvents {
         let core = Core::new().unwrap();
         TestEvents {
             listen_address,
-            handler: TestHandler::new(core.handle(), channel.network_requests.0.clone()),
             core,
             channel,
         }
@@ -146,22 +109,6 @@ impl TestEvents {
         let network_thread = thread::spawn(move || network_part.run().unwrap());
 
         let mut handler = handler_part.handler;
-        let events = handler.events.clone();
-        let network_rx = handler_part.network_rx;
-        let events_thread = thread::spawn(move || {
-            let mut core = Core::new().unwrap();
-            let events_handle = network_rx
-                .for_each(move |event| {
-                    debug!("{:?}", event);
-                    events.lock().unwrap().push_back(event);
-                    Ok(())
-                })
-                .and_then(|r| {
-                    debug!("Handle closed");
-                    Ok(r)
-                });
-            core.run(events_handle).unwrap();
-        });
 
         let mut core = handler_part.core;
         let test_fut = futures::lazy(move || -> Result<(), ()> {
@@ -171,14 +118,15 @@ impl TestEvents {
         });
         core.run(test_fut).unwrap();
 
-        events_thread.join().unwrap();
-        network_thread.join().unwrap();
+        // TODO implement shutdown
+        // network_thread.join().unwrap();
     }
 
     fn into_reactor(self) -> (TestHandlerPart, NetworkPart) {
         let channel = self.channel;
         let network_config = NetworkConfiguration::default();
         let (network_tx, network_rx) = channel.network_events;
+        let network_requests_tx = channel.network_requests.0.clone();
 
         let network_part = NetworkPart {
             listen_address: self.listen_address,
@@ -187,10 +135,10 @@ impl TestEvents {
             network_tx: network_tx.clone(),
         };
 
+        let handle = self.core.handle();
         let handler_part = TestHandlerPart {
             core: self.core,
-            handler: self.handler,
-            network_rx,
+            handler: TestHandler::new(self.listen_address, handle, network_requests_tx, network_rx),
         };
         (handler_part, network_part)
     }
@@ -406,7 +354,6 @@ fn gen_message(id: u16, len: usize) -> RawMessage {
 
 #[test]
 fn test_network_handshake() {
-    unimplemented!();
     let _ = helpers::init_logger();
 
     let addrs: [SocketAddr; 2] =
@@ -416,7 +363,7 @@ fn test_network_handshake() {
         let e0 = TestEvents::with_addr(addrs[0]);
         e0.spawn(move |handler: &mut TestHandler| {
             handler.connect_with(addrs[1]);
-            // assert_eq!(handler.wait_for_connect(), connect_message(addrs[1]));
+            assert_eq!(handler.wait_for_connect(), connect_message(addrs[1]));
             debug!("t0 finished");
         });
     });
@@ -424,7 +371,7 @@ fn test_network_handshake() {
         let e1 = TestEvents::with_addr(addrs[1]);
         e1.spawn(move |handler: &mut TestHandler| {
             assert_eq!(handler.wait_for_connect(), connect_message(addrs[0]));
-            // handler.connect_with(addrs[0]);
+            handler.connect_with(addrs[0]);
             debug!("t1 finished");
         });
     });
