@@ -60,7 +60,7 @@ use messages::{RawMessage, MessageBuffer, Message};
 ///     }
 ///
 ///     fn hash(&self) -> Hash {
-///         let mut buffer = [0; 3];
+///         let mut buffer = [0; 6];
 ///         LittleEndian::write_i16(&mut buffer[0..2], self.a);
 ///         LittleEndian::write_u32(&mut buffer[2..6], self.b);
 ///         crypto::hash(&buffer)

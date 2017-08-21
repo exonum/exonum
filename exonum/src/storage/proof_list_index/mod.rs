@@ -16,7 +16,7 @@
 use std::cell::Cell;
 use std::marker::PhantomData;
 
-use crypto::{Hash, hash, HASH_SIZE};
+use crypto::{Hash, hash, HashStream};
 
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
 
@@ -91,10 +91,10 @@ impl<T, V> ProofListIndex<T, V> {
 }
 
 fn pair_hash(h1: &Hash, h2: &Hash) -> Hash {
-    let mut v = [0; HASH_SIZE * 2];
-    v[..HASH_SIZE].copy_from_slice(h1.as_ref());
-    v[HASH_SIZE..].copy_from_slice(h2.as_ref());
-    hash(&v)
+    HashStream::new()
+        .update(h1.as_ref())
+        .update(h2.as_ref())
+        .hash()
 }
 
 impl<T, V> ProofListIndex<T, V>

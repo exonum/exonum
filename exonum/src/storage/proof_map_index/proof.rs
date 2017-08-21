@@ -17,7 +17,7 @@ use std::fmt;
 use serde::{Serialize, Serializer};
 use serde::ser::SerializeMap;
 
-use crypto::{hash, Hash};
+use crypto::{Hash, HashStream};
 
 use super::super::{StorageValue, Error};
 use super::key::{ProofMapKey, DBKey, ChildKind, KEY_SIZE};
@@ -107,10 +107,16 @@ impl<V: StorageValue> MapProof<V> {
         match *self {
             Empty => Hash::zero(),
             LeafRootInclusive(ref root_key, ref root_val) => {
-                hash(&[&root_key.to_vec(), root_val.hash().as_ref()].concat())
+                HashStream::new()
+                    .update(&root_key.as_bytes())
+                    .update(root_val.hash().as_ref())
+                    .hash()
             }
             LeafRootExclusive(ref root_key, ref root_val_hash) => {
-                hash(&[&root_key.to_vec(), root_val_hash.as_ref()].concat())
+                HashStream::new()
+                    .update(&root_key.as_bytes())
+                    .update(root_val_hash.as_ref())
+                    .hash()
             }
             Branch(ref branch) => branch.root_hash(),
         }
@@ -136,13 +142,12 @@ impl<V: StorageValue> BranchProofNode<V> {
                 ref left_key,
                 ref right_key,
             } => {
-                let full_slice = &[
-                    left_hash.as_ref(),
-                    right_hash.as_ref(),
-                    &left_key.to_vec(),
-                    &right_key.to_vec(),
-                ].concat();
-                hash(full_slice)
+                HashStream::new()
+                    .update(left_hash.as_ref())
+                    .update(right_hash.as_ref())
+                    .update(&left_key.as_bytes())
+                    .update(&right_key.as_bytes())
+                    .hash()
             }
             LeftBranch {
                 ref left_node,
@@ -150,13 +155,12 @@ impl<V: StorageValue> BranchProofNode<V> {
                 ref left_key,
                 ref right_key,
             } => {
-                let full_slice = &[
-                    left_node.root_hash().as_ref(),
-                    right_hash.as_ref(),
-                    &left_key.to_vec(),
-                    &right_key.to_vec(),
-                ].concat();
-                hash(full_slice)
+                HashStream::new()
+                    .update(left_node.root_hash().as_ref())
+                    .update(right_hash.as_ref())
+                    .update(&left_key.as_bytes())
+                    .update(&right_key.as_bytes())
+                    .hash()
             }
             RightBranch {
                 ref left_hash,
@@ -164,13 +168,12 @@ impl<V: StorageValue> BranchProofNode<V> {
                 ref left_key,
                 ref right_key,
             } => {
-                let full_slice = &[
-                    left_hash.as_ref(),
-                    right_node.root_hash().as_ref(),
-                    &left_key.to_vec(),
-                    &right_key.to_vec(),
-                ].concat();
-                hash(full_slice)
+                HashStream::new()
+                    .update(left_hash.as_ref())
+                    .update(right_node.root_hash().as_ref())
+                    .update(&left_key.as_bytes())
+                    .update(&right_key.as_bytes())
+                    .hash()
             }
         }
     }
