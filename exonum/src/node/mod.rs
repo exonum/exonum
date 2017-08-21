@@ -152,6 +152,31 @@ impl Default for NodeApiConfig {
     }
 }
 
+/// Events pool capacities.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct EventsPoolCapacity {
+    /// Maximum number of queued outgoing network messages.
+    pub network_requests_capacity: usize,
+    /// Maximum number of queued incoming network messages.
+    pub network_events_capacity: usize,
+    /// Maximum number of queued timeout requests.
+    pub timeout_requests_capacity: usize,
+    /// Maximum number of queued requests from api.
+    pub api_requests_capacity: usize,
+}
+
+impl Default for EventsPoolCapacity {
+    fn default() -> EventsPoolCapacity {
+        EventsPoolCapacity {
+            network_requests_capacity: 512,
+            network_events_capacity: 512,
+            timeout_requests_capacity: 128,
+            api_requests_capacity: 1024,
+        }
+    }
+}
+
+
 /// Memory pool configuration parameters.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MemoryPoolConfig {
@@ -159,14 +184,14 @@ pub struct MemoryPoolConfig {
     pub tx_pool_capacity: usize,
     /// Sets the maximum number of messages that can be buffered on the event loop's
     /// notification channel before a send will fail.
-    pub events_pool_capacity: usize,
+    pub events_pool_capacity: EventsPoolCapacity,
 }
 
 impl Default for MemoryPoolConfig {
     fn default() -> MemoryPoolConfig {
         MemoryPoolConfig {
             tx_pool_capacity: 100_000,
-            events_pool_capacity: 400_000,
+            events_pool_capacity: EventsPoolCapacity::default(),
         }
     }
 }
@@ -566,12 +591,12 @@ pub struct Node {
 
 impl NodeChannel {
     /// TODO
-    pub fn new(buffer_size: usize) -> NodeChannel {
+    pub fn new(buffer_sizes: EventsPoolCapacity) -> NodeChannel {
         NodeChannel {
-            network_requests: mpsc::channel(buffer_size),
-            timeout_requests: mpsc::channel(buffer_size),
-            api_requests: mpsc::channel(buffer_size),
-            network_events: mpsc::channel(buffer_size),
+            network_requests: mpsc::channel(buffer_sizes.network_requests_capacity),
+            timeout_requests: mpsc::channel(buffer_sizes.timeout_requests_capacity),
+            api_requests: mpsc::channel(buffer_sizes.api_requests_capacity),
+            network_events: mpsc::channel(buffer_sizes.network_events_capacity),
         }
     }
 
@@ -625,7 +650,7 @@ impl Node {
         };
         let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
         let system_state = Box::new(DefaultSystemState(node_cfg.listen_address));
-        let channel = NodeChannel::new(1000);
+        let channel = NodeChannel::new(config.mempool.events_pool_capacity.clone());
         let network_config = config.network;
         let handler = NodeHandler::new(
             blockchain,
