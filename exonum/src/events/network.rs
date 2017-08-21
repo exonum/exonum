@@ -220,15 +220,16 @@ impl NetworkPart {
         // Incoming connections handler
         let listener = TcpListener::bind(&self.listen_address, &core.handle()).unwrap();
         let network_tx = network_tx.clone();
+        let handle = core.handle();
         let server = listener
             .incoming()
-            .fold(network_tx, move |network_tx, (sock, addr)| {
+            .for_each(move |(sock, addr)| {
                 info!("Accepted incoming connection with peer={}", addr);
 
                 let stream = sock.framed(MessagesCodec);
                 let (_, stream) = stream.split();
                 let network_tx = network_tx.clone();
-                stream
+                let connection_handler = stream
                     .into_future()
                     .map_err(|e| e.0)
                     .and_then(move |(raw, stream)| {
@@ -258,9 +259,11 @@ impl NetworkPart {
                             .map(move |(_, stream)| stream)
                             .map_err(into_other)
                     })
-                    .map_err(into_other)
+                    .map(forget_result)
+                    .map_err(log_error);
+                handle.spawn(connection_handler);
+                Ok(())
             })
-            .map(forget_result)
             .map_err(log_error);
         core.handle().spawn(server);
 
