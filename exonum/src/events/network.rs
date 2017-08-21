@@ -270,7 +270,7 @@ impl NetworkPart {
     }
 }
 
-pub struct NewConnection {
+struct NewConnection {
     socket: Option<TcpStreamNew>,
     timeout: Interval,
     address: SocketAddr,
