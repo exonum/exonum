@@ -16,7 +16,7 @@ use futures::{Future, Stream, Sink, IntoFuture, Poll, Async};
 use futures::future::Either;
 use futures::sync::mpsc;
 use tokio_core::net::{TcpListener, TcpStream, TcpStreamNew};
-use tokio_core::reactor::{Core, Timeout, Handle};
+use tokio_core::reactor::{Core, Timeout, Handle, Interval};
 use tokio_io::AsyncRead;
 
 use std::cmp;
@@ -54,7 +54,7 @@ pub struct NetworkConfiguration {
     pub max_incoming_connections: usize,
     pub max_outgoing_connections: usize,
     pub tcp_nodelay: bool,
-    pub tcp_keep_alive: Option<u32>,
+    pub tcp_keep_alive: Option<u64>,
     pub tcp_reconnect_timeout: u64,
     pub tcp_reconnect_timeout_max: u64,
 }
@@ -103,6 +103,17 @@ impl<H: EventHandler> HandlerPart<H> {
     }
 }
 
+macro_rules! try_future_boxed {
+    ($e:expr) =>(
+        match $e {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(into_other(e)).into_future().boxed();
+            }
+        }
+    )
+}
+
 impl NetworkPart {
     pub fn run(self) -> Result<(), ()> {
         let mut core = Core::new().unwrap();
@@ -126,8 +137,18 @@ impl NetworkPart {
                         outgoing_connections.insert(peer, conn_tx.clone());
 
                         let requests_tx = requests_tx.clone();
-                        let connect_handle = TcpStream::connect(&peer, &handle).and_then(move |sock| {
-                            sock.set_nodelay(network_config.tcp_nodelay).unwrap();
+                        // let connect_handle = TcpStream::connect(&peer, &handle)
+                        let connect_handle = NewConnection::create(
+                            peer,
+                            handle.clone(),
+                            network_config.tcp_reconnect_timeout,
+                            network_config.tcp_reconnect_timeout_max,
+                        ).and_then(move |sock| {
+                            try_future_boxed!(sock.set_nodelay(network_config.tcp_nodelay));
+                            try_future_boxed!(sock.set_keepalive(
+                                network_config.tcp_keep_alive.map(Duration::from_millis),
+                            ));
+
                             info!("Established connection with peer={}", peer);
 
                             let stream = sock.framed(MessagesCodec);
@@ -145,6 +166,7 @@ impl NetworkPart {
                                     Either::A((_, _reader)) => Ok(()).into_future(),
                                     Either::B((_, _writer)) => Ok(()).into_future(),
                                 })
+                                .boxed()
                         })
                             .then(move |res| {
                                 info!("Connection with peer={} closed, reason={:?}", peer, res);
@@ -247,7 +269,8 @@ impl NetworkPart {
 }
 
 pub struct NewConnection {
-    inner: Option<TcpStreamNew>,
+    socket: Option<TcpStreamNew>,
+    timeout: Interval,
     address: SocketAddr,
     handle: Handle,
     groth_factor: f32,
@@ -264,7 +287,8 @@ impl NewConnection {
         reconnect_timeout_max: Milliseconds,
     ) -> NewConnection {
         NewConnection {
-            inner: Some(TcpStream::connect(&address, &handle)),
+            socket: Some(TcpStream::connect(&address, &handle)),
+            timeout: Interval::new(Duration::from_millis(reconnect_timeout), &handle).unwrap(),
             address,
             handle,
             groth_factor: 1.5,
@@ -274,8 +298,8 @@ impl NewConnection {
         }
     }
 
-    fn next_attempt(&mut self, now: SystemTime) -> io::Result<()> {
-        self.start_time = now;
+    fn next_attempt(&mut self) -> Poll<TcpStream, io::Error> {
+        self.start_time = SystemTime::now();
         if self.reconnect_timeout == self.reconnect_timeout_max {
             return Err(other_error(
                 &format!("Maximum reconnect timeout reached for connection with the peer: {}",
@@ -287,13 +311,24 @@ impl NewConnection {
         self.reconnect_timeout = (self.reconnect_timeout as f32 * self.groth_factor) as
             Milliseconds;
         self.reconnect_timeout = cmp::min(self.reconnect_timeout, self.reconnect_timeout_max);
-        self.inner = Some(TcpStream::connect(&self.address, &self.handle));
+        self.socket = Some(TcpStream::connect(&self.address, &self.handle));
+        self.timeout = Interval::new(Duration::from_millis(self.reconnect_timeout), &self.handle)
+            .unwrap();
+
         trace!(
             "Add reconnect timeout to {}, delay = {} ms",
             self.address,
             self.reconnect_timeout
         );
-        Ok(())
+        self.socket.as_mut().unwrap().poll()
+    }
+
+    fn poll_timeout(&mut self) -> Poll<TcpStream, io::Error> {
+        match self.timeout.poll() {
+            Ok(Async::Ready(_)) => self.next_attempt(),
+            Ok(Async::NotReady) => Ok(Async::NotReady),
+            Err(e) => Err(into_other(e)),
+        }
     }
 }
 
@@ -302,12 +337,11 @@ impl Future for NewConnection {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<TcpStream, io::Error> {
-        debug!("Poll, stream={}", self.inner.is_some());
-        if let Some(mut stream) = self.inner.take() {
+        if let Some(mut stream) = self.socket.take() {
             match stream.poll() {
                 Ok(Async::Ready(stream)) => Ok(Async::Ready(stream)),
                 Ok(Async::NotReady) => {
-                    self.inner = Some(stream);
+                    self.socket = Some(stream);
                     Ok(Async::NotReady)
                 }
                 Err(e) => {
@@ -316,17 +350,12 @@ impl Future for NewConnection {
                         self.address,
                         e
                     );
-                    self.inner = None;
-                    Ok(Async::NotReady)
+                    self.socket = None;
+                    self.poll_timeout()
                 }
             }
         } else {
-            let now = SystemTime::now();
-            let reconnect_timeout = Duration::from_millis(self.reconnect_timeout);
-            if now > self.start_time + reconnect_timeout {
-                self.next_attempt(now)?;
-            }
-            Ok(Async::NotReady)
+            self.poll_timeout()
         }
     }
 }
