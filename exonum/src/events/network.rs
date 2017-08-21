@@ -126,7 +126,7 @@ impl NetworkPart {
         let handle = core.handle();
         let network_tx = self.network_tx.clone();
         let requests_tx = self.network_requests.0.clone();
-        let network_config = self.network_config.clone();
+        let network_config = self.network_config;
         let requests_handle = self.network_requests.1.for_each(|request| {
             match request {
                 NetworkRequest::SendMessage(peer, msg) => {
@@ -137,7 +137,6 @@ impl NetworkPart {
                         outgoing_connections.insert(peer, conn_tx.clone());
 
                         let requests_tx = requests_tx.clone();
-                        // let connect_handle = TcpStream::connect(&peer, &handle)
                         let connect_handle = NewConnection::create(
                             peer,
                             handle.clone(),
