@@ -15,6 +15,7 @@
 use futures::{Future, Stream, Sink, IntoFuture, Poll, Async};
 use futures::future::Either;
 use futures::sync::mpsc;
+use futures::unsync;
 use tokio_core::net::{TcpListener, TcpStream, TcpStreamNew};
 use tokio_core::reactor::{Core, Timeout, Handle, Interval};
 use tokio_io::AsyncRead;
@@ -46,6 +47,7 @@ pub enum NetworkEvent {
 pub enum NetworkRequest {
     SendMessage(SocketAddr, RawMessage),
     DisconnectWithPeer(SocketAddr),
+    Shutdown,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -118,6 +120,9 @@ impl NetworkPart {
     pub fn run(self) -> Result<(), ()> {
         let mut core = Core::new().unwrap();
 
+        // Cancelation token
+        let (cancel_sender, cancel_handler) = unsync::mpsc::channel(1);
+
         // Outgoing connections handler
         let mut outgoing_connections: HashMap<SocketAddr, mpsc::Sender<RawMessage>> =
             HashMap::new();
@@ -127,7 +132,8 @@ impl NetworkPart {
         let network_tx = self.network_tx.clone();
         let requests_tx = self.network_requests.0.clone();
         let network_config = self.network_config;
-        let requests_handle = self.network_requests.1.for_each(|request| {
+        let requests_handle = self.network_requests.1.for_each(move |request| {
+            let cancel_sender = cancel_sender.clone();
             match request {
                 NetworkRequest::SendMessage(peer, msg) => {
                     let conn_tx = if let Some(conn_tx) = outgoing_connections.get(&peer).cloned() {
@@ -211,6 +217,15 @@ impl NetworkPart {
                     );
                     handle.spawn(event_handle);
                 }
+                // Immediately stop the event loop.
+                NetworkRequest::Shutdown => {
+                    cancel_sender
+                        .clone()
+                        .send(())
+                        .map(forget_result)
+                        .map_err(log_error)
+                        .wait()?
+                }
             }
 
             Ok(())
@@ -218,7 +233,7 @@ impl NetworkPart {
 
         // Incoming connections handler
         let listener = TcpListener::bind(&self.listen_address, &core.handle()).unwrap();
-        let network_tx = network_tx.clone();
+        let network_tx = self.network_tx.clone();
         let handle = core.handle();
         let server = listener
             .incoming()
@@ -231,13 +246,14 @@ impl NetworkPart {
                 let connection_handler = stream
                     .into_future()
                     .map_err(|e| e.0)
-                    .and_then(move |(raw, stream)| {
-                        let msg = raw.map(Any::from_raw);
-                        if let Some(Ok(Any::Connect(msg))) = msg {
-                            Ok((msg, stream))
-                        } else {
-                            Err(other_error("First message is not Connect"))
-                        }
+                    .and_then(move |(raw, stream)| match raw.map(Any::from_raw) {
+                        Some(Ok(Any::Connect(msg))) => Ok((msg, stream)),
+                        Some(Ok(other)) => Err(other_error(&format!(
+                            "First message is not Connect, got={:?}",
+                            other
+                        ))),
+                        Some(Err(e)) => Err(into_other(e)),
+                        None => Err(other_error("Incoming socket closed")),
                     })
                     .and_then(move |(connect, stream)| {
                         info!("Received handshake message={:?}", connect);
@@ -264,9 +280,15 @@ impl NetworkPart {
                 Ok(())
             })
             .map_err(log_error);
-        core.handle().spawn(server);
 
-        core.run(requests_handle)
+        core.handle().spawn(server);
+        core.handle().spawn(requests_handle);
+        core.run(
+            cancel_handler
+                .into_future()
+                .map(|_| info!("Network thread shutdown"))
+                .map_err(|_| error!("An error during shutdown occured")),
+        )
     }
 }
 
