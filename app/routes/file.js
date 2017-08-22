@@ -119,7 +119,6 @@ router.get('/:hash', function(req, res, next) {
 
                 if (response.statusCode === 200) {
                     data['title'] = 'Certificate of proof ' + hash;
-                    data['url'] = encodeURIComponent(baseUrl + hash);
                     res.render('file', data);
                 } else if (data.type === 'FileNotFound') {
                     res.render('file-not-found', {title: 'File not found', hash: hash});
