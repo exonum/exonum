@@ -90,7 +90,8 @@ impl SandboxInner {
             while let Async::Ready(Some(network)) = self.network_requests_rx.poll()? {
                 match network {
                     NetworkRequest::SendMessage(peer, msg) => self.sent.push_back((peer, msg)),
-                    NetworkRequest::DisconnectWithPeer(_) => {}
+                    NetworkRequest::DisconnectWithPeer(_) => {},
+                    NetworkRequest::Shutdown => {},
                 }
             }
             Ok(())

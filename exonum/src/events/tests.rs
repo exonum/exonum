@@ -144,7 +144,7 @@ impl TestEvents {
             let test_fut = futures::lazy(move || -> Result<(), ()> {
                 // Waiting for network establishing
                 // FIXME replace by better solution.
-                thread::sleep(Duration::from_millis(500));
+                thread::sleep(Duration::from_millis(1000));
                 test_fn(&mut handler);
                 Ok(())
             });
