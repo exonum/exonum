@@ -285,7 +285,6 @@ fn test_queue_prevote_message_from_next_height() {
 #[test]
 #[should_panic(expected = "Send unexpected message Consensus(Prevote")]
 fn test_queue_propose_message_from_next_height() {
-    let _ = env_logger::init();
 
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
@@ -2107,7 +2106,6 @@ fn do_not_send_precommit_if_has_incompatible_prevotes() {
 ///     this early precommit will be queued and will be used after 1st height will be achieved
 #[test]
 fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
-    // blockchain_explorer::helpers::init_logger();
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
 

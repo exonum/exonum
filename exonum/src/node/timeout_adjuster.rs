@@ -203,8 +203,6 @@ impl TimeoutAdjuster for MovingAverage {
 
 #[cfg(test)]
 mod tests {
-    use env_logger;
-
     use super::*;
     use events::Milliseconds;
 
@@ -232,7 +230,6 @@ mod tests {
 
     #[test]
     fn moving_average_timeout_adjuster() {
-        let _ = env_logger::init();
 
         static MIN_TIMEOUT: Milliseconds = 1;
         static MAX_TIMEOUT: Milliseconds = 10000;
