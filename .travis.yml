@@ -22,6 +22,10 @@ matrix:
       env: FEATURE=clippy-core
     - rust: nightly-2017-08-15
       env: FEATURE=clippy-sandbox
+    - rust: nightly-2017-08-15
+      env: FEATURE=bench
+    - rust: nightly-2017-08-15
+      env: FEATURE=long-bench
 
 cache:
   directories:
@@ -48,9 +52,6 @@ env:
   - FEATURE=test-core
   - FEATURE=test-sandbox
   - FEATURE=test-doc
-  - FEATURE=bench
-  - FEATURE=long-bench
-
 
 install:
 - |
