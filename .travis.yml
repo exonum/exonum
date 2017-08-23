@@ -18,13 +18,13 @@ rust:
 matrix:
   include:
     - rust: nightly-2017-08-15
-      env: FEATURE=clippy-core
-    - rust: nightly-2017-08-15
-      env: FEATURE=clippy-sandbox
-    - rust: nightly-2017-08-15
       env: FEATURE=bench
     - rust: nightly-2017-08-15
       env: FEATURE=long-bench
+    - rust: nightly-2017-08-15
+      env: FEATURE=clippy-core
+    - rust: nightly-2017-08-15
+      env: FEATURE=clippy-sandbox
 
 cache:
   directories:
@@ -89,15 +89,6 @@ install:
 script: |
   case "$FEATURE" in
 
-  "bench" )
-        RUST_LOG=off cargo bench --manifest-path exonum/Cargo.toml --features rocksdb --no-run
-  ;;
-  "long-bench" )
-        RUST_LOG=off cargo bench --manifest-path exonum/Cargo.toml --features rocksdb,long_benchmarks --no-run
-  ;;
-  "test-doc" )
-      cargo test -p exonum --doc -- --test-threads=2
-  ;;
   "fmt" )
       cargo audit &&
       cargo fmt -p exonum -- --write-mode=diff &&
@@ -114,6 +105,15 @@ script: |
   ;;
   "test-sandbox" )
       RUST_LOG=off cargo test -p sandbox
+  ;;
+  "test-doc" )
+      cargo test -p exonum --doc -- --test-threads=2
+  ;;
+  "bench" )
+        RUST_LOG=off cargo bench --manifest-path exonum/Cargo.toml --features rocksdb --no-run
+  ;;
+  "long-bench" )
+        RUST_LOG=off cargo bench --manifest-path exonum/Cargo.toml --features rocksdb,long_benchmarks --no-run
   ;;
 
   esac
