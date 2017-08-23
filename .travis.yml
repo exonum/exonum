@@ -5,6 +5,7 @@ addons:
     packages:
     - gcc
     - g++
+    - libleveldb-dev
     - libssl-dev
     - libcurl4-openssl-dev
     - libelf-dev
@@ -18,9 +19,7 @@ rust:
 matrix:
   include:
     - rust: nightly-2017-08-15
-      env: FEATURE=bench
-    - rust: nightly-2017-08-15
-      env: FEATURE=long-bench
+      env: FEATURE=benchmarks
     - rust: nightly-2017-08-15
       env: FEATURE=clippy-core
     - rust: nightly-2017-08-15
@@ -50,7 +49,6 @@ env:
   - FEATURE=fmt
   - FEATURE=test-core
   - FEATURE=test-sandbox
-  - FEATURE=test-doc
 
 install:
 - |
@@ -95,24 +93,18 @@ script: |
       cargo fmt -p sandbox -- --write-mode=diff
   ;;
   "clippy-core" )
-      cd exonum && cargo clippy -- -D warnings
+      cd exonum && cargo clippy --features rocksdb -- -D warnings
   ;;
   "clippy-sandbox" )
       cd sandbox && cargo clippy -- -D warnings
   ;;
   "test-core" )
-      RUST_LOG=off cargo test -p exonum --tests --lib
+      RUST_LOG=off cargo test --manifest-path exonum/Cargo.toml --features rocksdb -- --test-threads=2
   ;;
   "test-sandbox" )
       RUST_LOG=off cargo test -p sandbox
   ;;
-  "test-doc" )
-      cargo test -p exonum --doc -- --test-threads=2
-  ;;
-  "bench" )
-        RUST_LOG=off cargo bench --manifest-path exonum/Cargo.toml --features rocksdb --no-run
-  ;;
-  "long-bench" )
+  "benchmarks" )
         RUST_LOG=off cargo bench --manifest-path exonum/Cargo.toml --features rocksdb,long_benchmarks --no-run
   ;;
 
