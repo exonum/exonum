@@ -19,7 +19,7 @@
 #![deny(missing_debug_implementations)]
 #![deny(missing_docs)]
 
-#![cfg_attr(all(feature = "nightly", test), feature(test))]
+#![cfg_attr(all(feature = "network_benchmarks", test), feature(test))]
 
 #![cfg_attr(feature="cargo-clippy", allow(zero_prefixed_literal))]
 
@@ -48,7 +48,7 @@ extern crate bit_vec;
 extern crate vec_map;
 #[cfg(test)]
 extern crate tempdir;
-#[cfg(all(feature = "nightly", test))]
+#[cfg(all(feature = "network_benchmarks", test))]
 extern crate test;
 extern crate env_logger;
 extern crate colored;

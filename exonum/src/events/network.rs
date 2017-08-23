@@ -259,20 +259,19 @@ impl NetworkPart {
                         info!("Received handshake message={:?}", connect);
 
                         let event = NetworkEvent::PeerConnected(addr, connect);
-                        let connect_event = network_tx.clone().send(event).map_err(into_other);
+                        let stream = network_tx
+                            .clone()
+                            .send(event)
+                            .map_err(into_other)
+                            .and_then(move |_| Ok(stream))
+                            .flatten_stream();
 
-                        let network_tx = network_tx.clone();
-                        let messages_stream = stream.for_each(move |raw| {
+                        stream.for_each(move |raw| {
                             let event = NetworkEvent::MessageReceived(addr, raw);
                             network_tx.clone().send(event).map(forget_result).map_err(
                                 into_other,
                             )
-                        });
-
-                        messages_stream
-                            .join(connect_event)
-                            .map(move |(_, stream)| stream)
-                            .map_err(into_other)
+                        })
                     })
                     .map(forget_result)
                     .map_err(log_error);
