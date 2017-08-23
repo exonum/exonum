@@ -110,7 +110,7 @@ script: |
       cargo test -p exonum --doc -- --test-threads=2
   ;;
   "benchmark-core" )
-      cd exonum && cargo bench --features "rocksdb network_benchmarks"
+      cd exonum && cargo bench --features "rocksdb network_benchmarks" --no-run
   ;;
 
   esac
