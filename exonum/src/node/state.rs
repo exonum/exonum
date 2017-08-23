@@ -511,7 +511,6 @@ impl State {
 
     /// Adds the public key, address, and `Connect` message of a validator.
     pub fn add_peer(&mut self, pubkey: PublicKey, msg: Connect) -> bool {
-        debug!("Add peer {:?}, msg={:?}", pubkey, msg);
         self.connections.insert(msg.addr(), pubkey);
         self.peers.insert(pubkey, msg).is_none()
     }
