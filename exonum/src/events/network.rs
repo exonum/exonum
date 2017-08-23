@@ -20,10 +20,10 @@ use tokio_core::net::{TcpListener, TcpStream, TcpStreamNew};
 use tokio_core::reactor::{Core, Timeout, Handle};
 use tokio_io::AsyncRead;
 use tokio_retry::{Retry, Action};
-use tokio_retry::strategy::{FibonacciBackoff, jitter};
+use tokio_retry::strategy::{FixedInterval, jitter};
 
 use std::net::SocketAddr;
-use std::time::{Duration};
+use std::time::Duration;
 use std::collections::HashMap;
 
 use messages::{Any, Connect, RawMessage};
@@ -67,7 +67,7 @@ impl Default for NetworkConfiguration {
             max_outgoing_connections: 128,
             tcp_keep_alive: None,
             tcp_nodelay: false,
-            tcp_connect_retry_timeout: 5000,
+            tcp_connect_retry_timeout: 15000,
             tcp_connect_max_retries: 10,
         }
     }
@@ -147,9 +147,9 @@ impl NetworkPart {
                         let max_tries = network_config.tcp_connect_max_retries as usize;
                         let connect_handle = Retry::spawn(
                             handle.clone(),
-                            FibonacciBackoff::from_millis(timeout)
-                                .map(jitter)
-                                .take(max_tries),
+                            FixedInterval::from_millis(timeout).map(jitter).take(
+                                max_tries,
+                            ),
                             TcpStreamConnectAction {
                                 handle: handle.clone(),
                                 peer,
