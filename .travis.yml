@@ -90,12 +90,20 @@ install:
 script: |
   case "$FEATURE" in
 
+  "bench" )
+        RUST_LOG=off cargo bench --manifest-path exonum/Cargo.toml --features rocksdb --no-run
+  ;;
+  "long-bench" )
+        RUST_LOG=off cargo bench --manifest-path exonum/Cargo.toml --features rocksdb,long_benchmarks --no-run
+  ;;
+  "test-doc" )
+      cargo test -p exonum --doc -- --test-threads=2
+  ;;
   "fmt" )
       cargo audit &&
       cargo fmt -p exonum -- --write-mode=diff &&
       cargo fmt -p sandbox -- --write-mode=diff
   ;;
-
   "clippy-core" )
       cd exonum && cargo clippy --features rocksdb -- -D warnings
   ;;
@@ -107,15 +115,6 @@ script: |
   ;;
   "test-sandbox" )
       RUST_LOG=off cargo test -p sandbox
-  ;;
-  "test-doc" )
-      cargo test -p exonum --doc -- --test-threads=2
-  ;;
-  "bench" )
-        RUST_LOG=off cargo bench --manifest-path exonum/Cargo.toml --features rocksdb --no-run
-  ;;
-  "long-bench" )
-        RUST_LOG=off cargo bench --manifest-path exonum/Cargo.toml --features rocksdb,long_benchmarks --no-run
   ;;
 
   esac
