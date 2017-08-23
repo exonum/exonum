@@ -67,7 +67,7 @@ impl Default for NetworkConfiguration {
             max_outgoing_connections: 128,
             tcp_keep_alive: None,
             tcp_nodelay: false,
-            tcp_connect_retry_timeout: 15000,
+            tcp_connect_retry_timeout: 15_000,
             tcp_connect_max_retries: 10,
         }
     }
