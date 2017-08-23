@@ -49,6 +49,7 @@ env:
   - FEATURE=fmt
   - FEATURE=test-core
   - FEATURE=test-sandbox
+  - FEATURE=test-doc
 
 install:
 - |
@@ -99,10 +100,13 @@ script: |
       cd sandbox && cargo clippy -- -D warnings
   ;;
   "test-core" )
-      RUST_LOG=off cargo test --manifest-path exonum/Cargo.toml --features rocksdb -- --test-threads=2
+      RUST_LOG=off cargo test --manifest-path exonum/Cargo.toml --features rocksdb --tests --lib
   ;;
   "test-sandbox" )
       RUST_LOG=off cargo test -p sandbox
+  ;;
+  "test-doc" )
+      cargo test -p exonum --doc -- --test-threads=2
   ;;
   "benchmarks" )
         RUST_LOG=off cargo bench --manifest-path exonum/Cargo.toml --features rocksdb,long_benchmarks --no-run
