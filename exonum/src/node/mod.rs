@@ -77,11 +77,12 @@ pub enum NodeTimeout {
     PeerExchange,
 }
 
-/// TODO
+/// A helper trait that provides the node with information about the state of the system such
+/// as current time or listen address.
 pub trait SystemStateProvider: 'static + ::std::fmt::Debug {
-    /// TODO
+    /// Returns the current address that the node listens on.
     fn listen_address(&self) -> SocketAddr;
-    /// TODO
+    /// Return the current system time.
     fn current_time(&self) -> SystemTime;
 }
 
@@ -242,7 +243,7 @@ pub struct Configuration {
     pub mempool: MemoryPoolConfig,
 }
 
-/// Channel for messages and timeouts.
+/// Channel for messages and timeouts requests.
 #[derive(Debug, Clone)]
 pub struct NodeSender {
     /// Timeout requests sender.
@@ -552,7 +553,8 @@ impl fmt::Debug for ApiSender {
     }
 }
 
-/// TODO
+/// Default system state provider implementation which just uses `SystemTime::now`
+/// to get current time.
 #[derive(Debug)]
 pub struct DefaultSystemState(pub SocketAddr);
 
@@ -565,7 +567,7 @@ impl SystemStateProvider for DefaultSystemState {
     }
 }
 
-/// TODO
+/// Channel between the `NodeHandler` and events source. 
 #[derive(Debug)]
 pub struct NodeChannel {
     /// Channel for network requests.
@@ -590,7 +592,7 @@ pub struct Node {
 }
 
 impl NodeChannel {
-    /// TODO
+    /// Creates `NodeChannel` with the given pool capacitites.
     pub fn new(buffer_sizes: EventsPoolCapacity) -> NodeChannel {
         NodeChannel {
             network_requests: mpsc::channel(buffer_sizes.network_requests_capacity),
@@ -600,7 +602,7 @@ impl NodeChannel {
         }
     }
 
-    /// TODO
+    /// Returns the channel for sending timeouts and networks requests.
     pub fn node_sender(&self) -> NodeSender {
         NodeSender {
             timeout_requests: self.timeout_requests.0.clone(),
@@ -758,7 +760,7 @@ impl Node {
         Ok(())
     }
 
-    /// TODO
+    #[doc(hidden)]
     pub fn into_reactor(self) -> (HandlerPart<NodeHandler>, NetworkPart) {
         let (network_tx, network_rx) = self.channel.network_events;
 

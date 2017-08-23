@@ -19,8 +19,6 @@
 #![deny(missing_debug_implementations)]
 #![deny(missing_docs)]
 
-#![cfg_attr(all(feature = "network_benchmarks", test), feature(test))]
-
 #![cfg_attr(feature="cargo-clippy", allow(zero_prefixed_literal))]
 
 #![cfg_attr(feature="flame_profile",feature(plugin, custom_attribute))]
@@ -48,8 +46,6 @@ extern crate bit_vec;
 extern crate vec_map;
 #[cfg(test)]
 extern crate tempdir;
-#[cfg(all(feature = "network_benchmarks", test))]
-extern crate test;
 extern crate env_logger;
 extern crate colored;
 extern crate term;
