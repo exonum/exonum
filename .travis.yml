@@ -48,6 +48,8 @@ env:
   - FEATURE=test-core
   - FEATURE=test-sandbox
   - FEATURE=test-doc
+  - FEATURE=bench
+  - FEATURE=long-bench
 
 
 install:
@@ -107,6 +109,12 @@ script: |
   ;;
   "test-doc" )
       cargo test -p exonum --doc -- --test-threads=2
+  ;;
+  "bench" )
+        RUST_LOG=off cargo bench --manifest-path exonum/Cargo.toml --features rocksdb --no-run
+  ;;
+  "long-bench" )
+        RUST_LOG=off cargo bench --manifest-path exonum/Cargo.toml --features rocksdb,long_benchmarks --no-run
   ;;
 
   esac
