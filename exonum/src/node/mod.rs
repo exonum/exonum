@@ -567,7 +567,7 @@ impl SystemStateProvider for DefaultSystemState {
     }
 }
 
-/// Channel between the `NodeHandler` and events source. 
+/// Channel between the `NodeHandler` and events source.
 #[derive(Debug)]
 pub struct NodeChannel {
     /// Channel for network requests.
