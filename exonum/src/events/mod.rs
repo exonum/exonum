@@ -27,8 +27,8 @@ pub use self::network::{Network, NetworkConfiguration, PeerId, EventSet};
 
 mod network;
 mod connection;
-#[cfg(test)]
-mod tests;
+#[cfg(any(test, feature = "long_benchmarks"))]
+pub mod tests;
 
 pub type EventsConfiguration = mio::EventLoopConfig;
 
