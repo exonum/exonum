@@ -64,10 +64,11 @@ extern crate cookie;
 extern crate mount;
 extern crate atty;
 extern crate bytes;
+extern crate futures;
 extern crate tokio_timer;
 extern crate tokio_core;
 extern crate tokio_io;
-extern crate futures;
+extern crate tokio_retry;
 
 #[macro_use]
 pub mod encoding;

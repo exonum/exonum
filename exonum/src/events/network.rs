@@ -12,19 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use futures::{Future, Stream, Sink, IntoFuture, Poll, Async};
+use futures::{Future, Stream, Sink, IntoFuture};
 use futures::future::Either;
 use futures::sync::mpsc;
 use futures::unsync;
 use tokio_core::net::{TcpListener, TcpStream, TcpStreamNew};
-use tokio_core::reactor::{Core, Timeout, Handle, Interval};
+use tokio_core::reactor::{Core, Timeout, Handle};
 use tokio_io::AsyncRead;
+use tokio_retry::{Retry, Action};
+use tokio_retry::strategy::{FibonacciBackoff, jitter};
 
-use std::cmp;
-use std::io;
-use std::fmt;
 use std::net::SocketAddr;
-use std::time::{Duration, SystemTime};
+use std::time::{Duration};
 use std::collections::HashMap;
 
 use messages::{Any, Connect, RawMessage};
@@ -57,8 +56,8 @@ pub struct NetworkConfiguration {
     pub max_outgoing_connections: usize,
     pub tcp_nodelay: bool,
     pub tcp_keep_alive: Option<u64>,
-    pub tcp_reconnect_timeout: u64,
-    pub tcp_reconnect_timeout_max: u64,
+    pub tcp_connect_retry_timeout: Milliseconds,
+    pub tcp_connect_max_retries: u64,
 }
 
 impl Default for NetworkConfiguration {
@@ -68,8 +67,8 @@ impl Default for NetworkConfiguration {
             max_outgoing_connections: 128,
             tcp_keep_alive: None,
             tcp_nodelay: false,
-            tcp_reconnect_timeout: 500,
-            tcp_reconnect_timeout_max: 600_000,
+            tcp_connect_retry_timeout: 5000,
+            tcp_connect_max_retries: 10,
         }
     }
 }
@@ -139,40 +138,48 @@ impl NetworkPart {
                     let conn_tx = if let Some(conn_tx) = outgoing_connections.get(&peer).cloned() {
                         conn_tx
                     } else {
+                        // Register outgoing channel.
                         let (conn_tx, conn_rx) = mpsc::channel(10);
                         outgoing_connections.insert(peer, conn_tx.clone());
-
+                        // Enable retry feature for outgoing connection.
                         let requests_tx = requests_tx.clone();
-                        let connect_handle = NewConnection::create(
-                            peer,
+                        let timeout = network_config.tcp_connect_retry_timeout;
+                        let max_tries = network_config.tcp_connect_max_retries as usize;
+                        let connect_handle = Retry::spawn(
                             handle.clone(),
-                            network_config.tcp_reconnect_timeout,
-                            network_config.tcp_reconnect_timeout_max,
-                        ).and_then(move |sock| {
-                            try_future_boxed!(sock.set_nodelay(network_config.tcp_nodelay));
-                            try_future_boxed!(sock.set_keepalive(
-                                network_config.tcp_keep_alive.map(Duration::from_millis),
-                            ));
+                            FibonacciBackoff::from_millis(timeout)
+                                .map(jitter)
+                                .take(max_tries),
+                            TcpStreamConnectAction {
+                                handle: handle.clone(),
+                                peer,
+                            },
+                        ).map_err(into_other)
+                            .and_then(move |sock| {
+                                try_future_boxed!(sock.set_nodelay(network_config.tcp_nodelay));
+                                try_future_boxed!(sock.set_keepalive(
+                                    network_config.tcp_keep_alive.map(Duration::from_millis),
+                                ));
 
-                            info!("Established connection with peer={}", peer);
+                                info!("Established connection with peer={}", peer);
 
-                            let stream = sock.framed(MessagesCodec);
-                            let (sink, stream) = stream.split();
+                                let stream = sock.framed(MessagesCodec);
+                                let (sink, stream) = stream.split();
 
-                            let writer = conn_rx
-                                .map_err(|_| other_error("Can't send data into socket"))
-                                .forward(sink);
-                            let reader = stream.for_each(result_ok).map_err(into_other);
+                                let writer = conn_rx
+                                    .map_err(|_| other_error("Can't send data into socket"))
+                                    .forward(sink);
+                                let reader = stream.for_each(result_ok).map_err(into_other);
 
-                            reader
-                                .select2(writer)
-                                .map_err(|_| other_error("Socket error"))
-                                .and_then(|res| match res {
-                                    Either::A((_, _reader)) => Ok(()).into_future(),
-                                    Either::B((_, _writer)) => Ok(()).into_future(),
-                                })
-                                .boxed()
-                        })
+                                reader
+                                    .select2(writer)
+                                    .map_err(|_| other_error("Socket error"))
+                                    .and_then(|res| match res {
+                                        Either::A((_, _reader)) => Ok(()).into_future(),
+                                        Either::B((_, _writer)) => Ok(()).into_future(),
+                                    })
+                                    .boxed()
+                            })
                             .then(move |res| {
                                 info!("Connection with peer={} closed, reason={:?}", peer, res);
                                 // outgoing_connections.remove(&peer);
@@ -291,100 +298,18 @@ impl NetworkPart {
     }
 }
 
-struct NewConnection {
-    socket: Option<TcpStreamNew>,
-    timeout: Interval,
-    address: SocketAddr,
+// Tcp streams source for retry action.
+struct TcpStreamConnectAction {
     handle: Handle,
-    groth_factor: f32,
-    start_time: SystemTime,
-    reconnect_timeout: Milliseconds,
-    reconnect_timeout_max: Milliseconds,
+    peer: SocketAddr,
 }
 
-impl NewConnection {
-    pub fn create(
-        address: SocketAddr,
-        handle: Handle,
-        reconnect_timeout: Milliseconds,
-        reconnect_timeout_max: Milliseconds,
-    ) -> NewConnection {
-        NewConnection {
-            socket: Some(TcpStream::connect(&address, &handle)),
-            timeout: Interval::new(Duration::from_millis(reconnect_timeout), &handle).unwrap(),
-            address,
-            handle,
-            groth_factor: 1.5,
-            start_time: SystemTime::now(),
-            reconnect_timeout,
-            reconnect_timeout_max,
-        }
-    }
+impl Action for TcpStreamConnectAction {
+    type Future = TcpStreamNew;
+    type Item = <TcpStreamNew as Future>::Item;
+    type Error = <TcpStreamNew as Future>::Error;
 
-    fn next_attempt(&mut self) -> Poll<TcpStream, io::Error> {
-        self.start_time = SystemTime::now();
-        if self.reconnect_timeout == self.reconnect_timeout_max {
-            return Err(other_error(
-                &format!("Maximum reconnect timeout reached for connection with the peer: {}",
-                self.address,
-            ),
-            ));
-        }
-
-        self.reconnect_timeout = (self.reconnect_timeout as f32 * self.groth_factor) as
-            Milliseconds;
-        self.reconnect_timeout = cmp::min(self.reconnect_timeout, self.reconnect_timeout_max);
-        self.socket = Some(TcpStream::connect(&self.address, &self.handle));
-        self.timeout = Interval::new(Duration::from_millis(self.reconnect_timeout), &self.handle)
-            .unwrap();
-
-        trace!(
-            "Add reconnect timeout to {}, delay = {} ms",
-            self.address,
-            self.reconnect_timeout
-        );
-        self.socket.as_mut().unwrap().poll()
-    }
-
-    fn poll_timeout(&mut self) -> Poll<TcpStream, io::Error> {
-        match self.timeout.poll() {
-            Ok(Async::Ready(_)) => self.next_attempt(),
-            Ok(Async::NotReady) => Ok(Async::NotReady),
-            Err(e) => Err(into_other(e)),
-        }
-    }
-}
-
-impl Future for NewConnection {
-    type Item = TcpStream;
-    type Error = io::Error;
-
-    fn poll(&mut self) -> Poll<TcpStream, io::Error> {
-        if let Some(mut stream) = self.socket.take() {
-            match stream.poll() {
-                Ok(Async::Ready(stream)) => Ok(Async::Ready(stream)),
-                Ok(Async::NotReady) => {
-                    self.socket = Some(stream);
-                    Ok(Async::NotReady)
-                }
-                Err(e) => {
-                    trace!(
-                        "An error occured during connecting to the peer: {}, error: {}",
-                        self.address,
-                        e
-                    );
-                    self.socket = None;
-                    self.poll_timeout()
-                }
-            }
-        } else {
-            self.poll_timeout()
-        }
-    }
-}
-
-impl fmt::Debug for NewConnection {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.pad("NewConnection { .. }")
+    fn run(&mut self) -> Self::Future {
+        TcpStream::connect(&self.peer, &self.handle)
     }
 }

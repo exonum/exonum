@@ -42,8 +42,8 @@ timeout_requests_capacity = 128
 max_incoming_connections = 128
 max_outgoing_connections = 128
 tcp_nodelay = false
-tcp_reconnect_timeout = 500
-tcp_reconnect_timeout_max = 600000
+tcp_connect_retry_timeout = 5000
+tcp_connect_max_retries = 10
 
 [services_configs]
 
