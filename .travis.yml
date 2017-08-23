@@ -22,6 +22,8 @@ matrix:
       env: FEATURE=clippy-core
     - rust: nightly-2017-08-15
       env: FEATURE=clippy-sandbox
+    - rust: nightly-2017-08-15
+      env: FEATURE=core-benchmark
 
 cache:
   directories:
@@ -92,7 +94,6 @@ script: |
       cargo fmt -p exonum -- --write-mode=diff &&
       cargo fmt -p sandbox -- --write-mode=diff
   ;;
-
   "clippy-core" )
       cd exonum && cargo clippy --features rocksdb -- -D warnings
   ;;
@@ -107,6 +108,13 @@ script: |
   ;;
   "test-doc" )
       cargo test -p exonum --doc -- --test-threads=2
+  ;;
+  "benchmark-core" )
+      if [ $TRAVIS_PULL_REQUEST = false ] && [ $TRAVIS_BRANCH = master ]; then
+        cd exonum && cargo bench --features "rocksdb network-benchmarks"
+      else
+        cd exonum && cargo bench --features "rocksdb network-benchmarks"
+      fi
   ;;
 
   esac
