@@ -22,6 +22,7 @@ use tokio_io::AsyncRead;
 use tokio_retry::{Retry, Action};
 use tokio_retry::strategy::{FixedInterval, jitter};
 
+use std::io;
 use std::net::SocketAddr;
 use std::time::Duration;
 use std::collections::HashMap;
@@ -116,8 +117,8 @@ macro_rules! try_future_boxed {
 }
 
 impl NetworkPart {
-    pub fn run(self) -> Result<(), ()> {
-        let mut core = Core::new().unwrap();
+    pub fn run(self) -> Result<(), io::Error> {
+        let mut core = Core::new()?;
         // Cancelation token
         let (cancel_sender, cancel_handler) = unsync::mpsc::channel(1);
         // Outgoing connections handler
@@ -218,7 +219,7 @@ impl NetworkPart {
         });
 
         // Incoming connections handler
-        let listener = TcpListener::bind(&self.listen_address, &core.handle()).unwrap();
+        let listener = TcpListener::bind(&self.listen_address, &core.handle())?;
         let network_tx = self.network_tx.clone();
         let handle = core.handle();
         let server = listener
@@ -271,7 +272,7 @@ impl NetworkPart {
             cancel_handler
                 .into_future()
                 .map(|_| trace!("Network thread shutdown"))
-                .map_err(|_| error!("An error during shutdown occured")),
+                .map_err(|_| other_error("An error during `Core` shutdown occured")),
         )
     }
 }
