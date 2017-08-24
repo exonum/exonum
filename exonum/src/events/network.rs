@@ -17,7 +17,7 @@ use futures::future::Either;
 use futures::sync::mpsc;
 use futures::unsync;
 use tokio_core::net::{TcpListener, TcpStream, TcpStreamNew};
-use tokio_core::reactor::{Core, Timeout, Handle};
+use tokio_core::reactor::{Core, Handle};
 use tokio_io::AsyncRead;
 use tokio_retry::{Retry, Action};
 use tokio_retry::strategy::{FixedInterval, jitter};
@@ -118,14 +118,11 @@ macro_rules! try_future_boxed {
 impl NetworkPart {
     pub fn run(self) -> Result<(), ()> {
         let mut core = Core::new().unwrap();
-
         // Cancelation token
         let (cancel_sender, cancel_handler) = unsync::mpsc::channel(1);
-
         // Outgoing connections handler
         let mut outgoing_connections: HashMap<SocketAddr, mpsc::Sender<RawMessage>> =
             HashMap::new();
-
         // Requests handler
         let handle = core.handle();
         let network_tx = self.network_tx.clone();
@@ -196,24 +193,8 @@ impl NetworkPart {
                         conn_tx
                     };
 
-                    let duration = Duration::from_secs(5);
-                    let send_timeout = Timeout::new(duration, &handle)
-                        .unwrap()
-                        .and_then(result_ok)
-                        .map_err(|_| other_error("Can't timeout"));
-
                     let send_handle = conn_tx.send(msg).map(forget_result).map_err(log_error);
-
-                    let timeouted_connect = send_handle
-                        .select2(send_timeout)
-                        .map_err(|_| other_error("Unable to send message"))
-                        .and_then(move |either| match either {
-                            Either::A((send, _timeout_fut)) => Ok(send),
-                            Either::B((_, _connect_fut)) => Err(other_error("Send timeout")),
-                        })
-                        .map_err(log_error);
-
-                    handle.spawn(timeouted_connect);
+                    handle.spawn(send_handle);
                 }
                 NetworkRequest::DisconnectWithPeer(peer) => {
                     outgoing_connections.remove(&peer);
