@@ -158,7 +158,7 @@ impl NetworkPart {
                                     network_config.tcp_keep_alive.map(Duration::from_millis),
                                 ));
 
-                                info!("Established connection with peer={}", peer);
+                                trace!("Established connection with peer={}", peer);
 
                                 let stream = sock.framed(MessagesCodec);
                                 let (sink, stream) = stream.split();
@@ -178,9 +178,7 @@ impl NetworkPart {
                                     .boxed()
                             })
                             .then(move |res| {
-                                info!("Connection with peer={} closed, reason={:?}", peer, res);
-                                // outgoing_connections.remove(&peer);
-
+                                trace!("Connection with peer={} closed, reason={:?}", peer, res);
                                 let request = NetworkRequest::DisconnectWithPeer(peer);
                                 requests_tx
                                     .clone()
@@ -226,7 +224,7 @@ impl NetworkPart {
         let server = listener
             .incoming()
             .for_each(move |(sock, addr)| {
-                info!("Accepted incoming connection with peer={}", addr);
+                trace!("Accepted incoming connection with peer={}", addr);
 
                 let stream = sock.framed(MessagesCodec);
                 let (_, stream) = stream.split();
@@ -244,8 +242,7 @@ impl NetworkPart {
                         None => Err(other_error("Incoming socket closed")),
                     })
                     .and_then(move |(connect, stream)| {
-                        info!("Received handshake message={:?}", connect);
-
+                        trace!("Received handshake message={:?}", connect);
                         let event = NetworkEvent::PeerConnected(addr, connect);
                         let stream = network_tx
                             .clone()
@@ -273,7 +270,7 @@ impl NetworkPart {
         core.run(
             cancel_handler
                 .into_future()
-                .map(|_| info!("Network thread shutdown"))
+                .map(|_| trace!("Network thread shutdown"))
                 .map_err(|_| error!("An error during shutdown occured")),
         )
     }
