@@ -26,6 +26,7 @@ use std::io;
 use std::net::SocketAddr;
 use std::time::Duration;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use messages::{Any, Connect, RawMessage};
 use node::{ExternalMessage, NodeTimeout};
@@ -218,6 +219,9 @@ impl NetworkPart {
             Ok(())
         });
 
+        // Incoming connections limiter
+        let incoming_connections_limit = network_config.max_incoming_connections;
+        let incoming_connections_counter: Rc<()> = Rc::default();
         // Incoming connections handler
         let listener = TcpListener::bind(&self.listen_address, &core.handle())?;
         let network_tx = self.network_tx.clone();
@@ -225,8 +229,19 @@ impl NetworkPart {
         let server = listener
             .incoming()
             .for_each(move |(sock, addr)| {
+                // Increment weak counter
+                let holder = Rc::downgrade(&incoming_connections_counter);
+                // Check incoming connections count
+                let connections_count = Rc::weak_count(&incoming_connections_counter);
+                if connections_count > incoming_connections_limit {
+                    warn!(
+                        "Rejected incoming connection with peer={}, \
+                        connections limit reached.",
+                        addr
+                    );
+                    return Ok(());
+                }
                 trace!("Accepted incoming connection with peer={}", addr);
-
                 let stream = sock.framed(MessagesCodec);
                 let (_, stream) = stream.split();
                 let network_tx = network_tx.clone();
@@ -259,7 +274,10 @@ impl NetworkPart {
                             )
                         })
                     })
-                    .map(forget_result)
+                    .map(|_| {
+                        // Ensure that holder lives until the stream ends.
+                        let _holder = holder;
+                    })
                     .map_err(log_error);
                 handle.spawn(connection_handler);
                 Ok(())
