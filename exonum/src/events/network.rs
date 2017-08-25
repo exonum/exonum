@@ -12,28 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use futures::{Future, Stream, Sink, IntoFuture};
+use futures::{Future, IntoFuture, Sink, Stream};
 use futures::future::Either;
 use futures::sync::mpsc;
 use futures::unsync;
 use tokio_core::net::{TcpListener, TcpStream, TcpStreamNew};
 use tokio_core::reactor::{Core, Handle};
 use tokio_io::AsyncRead;
-use tokio_retry::{Retry, Action};
-use tokio_retry::strategy::{FixedInterval, jitter};
+use tokio_retry::{Action, Retry};
+use tokio_retry::strategy::{jitter, FixedInterval};
 
 use std::io;
 use std::net::SocketAddr;
 use std::time::Duration;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::cell::RefCell;
 
 use messages::{Any, Connect, RawMessage};
 use node::{ExternalMessage, NodeTimeout};
 use helpers::Milliseconds;
 
 use super::EventHandler;
-use super::error::{other_error, result_ok, forget_result, into_other, log_error};
+use super::error::{forget_result, into_other, log_error, other_error, result_ok};
 use super::codec::MessagesCodec;
 use super::EventsAggregator;
 
@@ -92,6 +93,29 @@ pub struct NetworkPart {
     pub network_tx: mpsc::Sender<NetworkEvent>,
 }
 
+#[derive(Debug, Default, Clone)]
+struct ConnectionsPool {
+    inner: Rc<RefCell<HashMap<SocketAddr, mpsc::Sender<RawMessage>>>>,
+}
+
+impl ConnectionsPool {
+    fn new() -> ConnectionsPool {
+        ConnectionsPool::default()
+    }
+
+    fn insert(&self, peer: SocketAddr, sender: &mpsc::Sender<RawMessage>) {
+        self.inner.borrow_mut().insert(peer, sender.clone());
+    }
+
+    fn remove(&self, peer: &SocketAddr) {
+        self.inner.borrow_mut().remove(peer);
+    }
+
+    fn get(&self, peer: SocketAddr) -> Option<mpsc::Sender<RawMessage>> {
+        self.inner.borrow_mut().get(&peer).cloned()
+    }
+}
+
 impl<H: EventHandler> HandlerPart<H> {
     pub fn run(self) -> Result<(), ()> {
         let mut core = self.core;
@@ -119,36 +143,35 @@ macro_rules! try_future_boxed {
 
 impl NetworkPart {
     pub fn run(self) -> Result<(), io::Error> {
-        let mut core = Core::new()?;
+        let network_config = self.network_config;
         // Cancelation token
         let (cancel_sender, cancel_handler) = unsync::mpsc::channel(1);
-        // Outgoing connections handler
-        let mut outgoing_connections: HashMap<SocketAddr, mpsc::Sender<RawMessage>> =
-            HashMap::new();
+        // Outgoing connections
+        let outgoing_connections = ConnectionsPool::new();
         // Requests handler
+        let mut core = Core::new()?;
         let handle = core.handle();
         let network_tx = self.network_tx.clone();
-        let requests_tx = self.network_requests.0.clone();
-        let network_config = self.network_config;
         let requests_handle = self.network_requests.1.for_each(move |request| {
+            let network_tx = network_tx.clone();
             let cancel_sender = cancel_sender.clone();
+            let outgoing_connections = outgoing_connections.clone();
             match request {
                 NetworkRequest::SendMessage(peer, msg) => {
-                    let conn_tx = if let Some(conn_tx) = outgoing_connections.get(&peer).cloned() {
+                    let conn_tx = if let Some(conn_tx) = outgoing_connections.get(peer) {
                         conn_tx
                     } else {
                         // Register outgoing channel.
                         let (conn_tx, conn_rx) = mpsc::channel(10);
-                        outgoing_connections.insert(peer, conn_tx.clone());
+                        outgoing_connections.insert(peer, &conn_tx);
                         // Enable retry feature for outgoing connection.
-                        let requests_tx = requests_tx.clone();
                         let timeout = network_config.tcp_connect_retry_timeout;
                         let max_tries = network_config.tcp_connect_max_retries as usize;
                         let connect_handle = Retry::spawn(
                             handle.clone(),
-                            FixedInterval::from_millis(timeout).map(jitter).take(
-                                max_tries,
-                            ),
+                            FixedInterval::from_millis(timeout)
+                                .map(jitter)
+                                .take(max_tries),
                             TcpStreamConnectAction {
                                 handle: handle.clone(),
                                 peer,
@@ -181,10 +204,10 @@ impl NetworkPart {
                             })
                             .then(move |res| {
                                 trace!("Connection with peer={} closed, reason={:?}", peer, res);
-                                let request = NetworkRequest::DisconnectWithPeer(peer);
-                                requests_tx
+                                outgoing_connections.clone().remove(&peer);
+                                network_tx
                                     .clone()
-                                    .send(request)
+                                    .send(NetworkEvent::PeerDisconnected(peer))
                                     .map(forget_result)
                                     .map_err(into_other)
                             })
@@ -198,22 +221,15 @@ impl NetworkPart {
                 }
                 NetworkRequest::DisconnectWithPeer(peer) => {
                     outgoing_connections.remove(&peer);
-
-                    let event = NetworkEvent::PeerDisconnected(peer);
-                    let event_handle = network_tx.clone().send(event).map(forget_result).map_err(
-                        log_error,
-                    );
-                    handle.spawn(event_handle);
+                    Self::send_event(&handle, &network_tx, NetworkEvent::PeerDisconnected(peer));
                 }
                 // Immediately stop the event loop.
-                NetworkRequest::Shutdown => {
-                    cancel_sender
-                        .clone()
-                        .send(())
-                        .map(forget_result)
-                        .map_err(log_error)
-                        .wait()?
-                }
+                NetworkRequest::Shutdown => cancel_sender
+                    .clone()
+                    .send(())
+                    .map(forget_result)
+                    .map_err(log_error)
+                    .wait()?,
             }
 
             Ok(())
@@ -229,14 +245,14 @@ impl NetworkPart {
         let server = listener
             .incoming()
             .for_each(move |(sock, addr)| {
-                // Increment weak counter
+                // Increment reference counter
                 let holder = Rc::downgrade(&incoming_connections_counter);
                 // Check incoming connections count
                 let connections_count = Rc::weak_count(&incoming_connections_counter);
                 if connections_count > incoming_connections_limit {
                     warn!(
                         "Rejected incoming connection with peer={}, \
-                        connections limit reached.",
+                         connections limit reached.",
                         addr
                     );
                     return Ok(());
@@ -250,10 +266,9 @@ impl NetworkPart {
                     .map_err(|e| e.0)
                     .and_then(move |(raw, stream)| match raw.map(Any::from_raw) {
                         Some(Ok(Any::Connect(msg))) => Ok((msg, stream)),
-                        Some(Ok(other)) => Err(other_error(&format!(
-                            "First message is not Connect, got={:?}",
-                            other
-                        ))),
+                        Some(Ok(other)) => Err(other_error(
+                            &format!("First message is not Connect, got={:?}", other),
+                        )),
                         Some(Err(e)) => Err(into_other(e)),
                         None => Err(other_error("Incoming socket closed")),
                     })
@@ -269,9 +284,11 @@ impl NetworkPart {
 
                         stream.for_each(move |raw| {
                             let event = NetworkEvent::MessageReceived(addr, raw);
-                            network_tx.clone().send(event).map(forget_result).map_err(
-                                into_other,
-                            )
+                            network_tx
+                                .clone()
+                                .send(event)
+                                .map(forget_result)
+                                .map_err(into_other)
                         })
                     })
                     .map(|_| {
@@ -292,6 +309,16 @@ impl NetworkPart {
                 .map(|_| trace!("Network thread shutdown"))
                 .map_err(|_| other_error("An error during `Core` shutdown occured")),
         )
+    }
+
+    fn send_event(handle: &Handle, network_tx: &mpsc::Sender<NetworkEvent>, event: NetworkEvent) {
+        handle.spawn(
+            network_tx
+                .clone()
+                .send(event)
+                .map(forget_result)
+                .map_err(log_error),
+        );
     }
 }
 
