@@ -114,6 +114,10 @@ impl ConnectionsPool {
     fn get(&self, peer: SocketAddr) -> Option<mpsc::Sender<RawMessage>> {
         self.inner.borrow_mut().get(&peer).cloned()
     }
+
+    fn len(&self) -> usize {
+        self.inner.borrow_mut().len()
+    }
 }
 
 impl<H: EventHandler> HandlerPart<H> {
@@ -141,6 +145,8 @@ impl NetworkPart {
         let mut core = Core::new()?;
         let handle = core.handle();
         let network_tx = self.network_tx.clone();
+        // Outgoing connections limiter
+        let outgoing_connections_limit = network_config.max_outgoing_connections;
         let requests_handle = self.network_requests.1.for_each(move |request| {
             let network_tx = network_tx.clone();
             let cancel_sender = cancel_sender.clone();
@@ -150,6 +156,20 @@ impl NetworkPart {
                     let conn_tx = if let Some(conn_tx) = outgoing_connections.get(peer) {
                         conn_tx
                     } else {
+                        // Check limit
+                        if outgoing_connections.len() >= outgoing_connections_limit {
+                            warn!(
+                                "Rejected outgoing connection with peer={}, \
+                                 connections limit reached.",
+                                peer
+                            );
+                            Self::send_event(
+                                &handle,
+                                &network_tx,
+                                NetworkEvent::PeerDisconnected(peer),
+                            );
+                            return Ok(());
+                        }
                         // Register outgoing channel.
                         let (conn_tx, conn_rx) = mpsc::channel(10);
                         outgoing_connections.insert(peer, &conn_tx);
