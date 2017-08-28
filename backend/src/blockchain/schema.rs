@@ -95,14 +95,13 @@ impl<'a> Schema<&'a mut Fork> {
         ListIndex::new(prefix, &mut self.view)
     }
 
-    pub fn add_user(&mut self, user: UserInfo) {
+    pub fn add_user(&mut self, user_id_hash: Hash, user: UserInfo) {
         // Add user key to known.
         self.known_keys_mut().put(
             user.pub_key(),
             user.encrypted_secret_key().to_vec(),
         );
         // Add or modify user.
-        let user_id_hash = user.id().to_hash();
         let entry = if let Some(entry) = self.users().get(&user_id_hash) {
             // Modify existing user
             UserInfoEntry::new(user, entry.available_timestamps(), entry.payments_hash())
@@ -118,11 +117,13 @@ impl<'a> Schema<&'a mut Fork> {
         let user_id = payment.user_id().to_owned();
         let user_id_hash = user_id.to_hash();
         if let Some(entry) = self.users().get(&user_id_hash) {
+            // TODO check type safety
+            let total_amount = payment.total_amount() as i64;
             self.payments_mut(&user_id).push(payment);
             // Update user info
             let entry = UserInfoEntry::new(
                 entry.info(),
-                entry.available_timestamps(),
+                total_amount,
                 &self.payments(&user_id).root_hash(),
             );
             self.users_mut().put(&user_id_hash, entry);

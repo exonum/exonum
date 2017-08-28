@@ -12,7 +12,6 @@ router = "0.5.1"
 iron = "0.5.1"
 bodyparser = "0.7.0"
 
-chrono = "0.3.0"
 rand = "0.3.0"
 log = "0.3.0"
 byteorder = "1.0.0"

@@ -15,7 +15,16 @@ impl Transaction for TxUpdateUser {
 
     fn execute(&self, view: &mut Fork) {
         let mut schema = Schema::new(view);
-        schema.add_user(self.content());
+        let user = self.content();
+        // Checks that proper key used for user info modification.
+        let user_id_hash = user.id().to_hash();
+        if let Some(entry) = schema.users().get(&user_id_hash) {
+            if entry.info().pub_key() != self.pub_key() {
+                // Only owner can change user information.
+                return;
+            }
+        }
+        schema.add_user(user_id_hash, user);
     }
 
     fn info(&self) -> Value {

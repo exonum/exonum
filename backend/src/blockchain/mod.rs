@@ -1,6 +1,8 @@
 pub mod dto;
 pub mod schema;
 mod transactions;
+#[cfg(test)]
+mod tests;
 
 use exonum::crypto::{hash, Hash};
 
