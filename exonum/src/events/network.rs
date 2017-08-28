@@ -130,17 +130,6 @@ impl<H: EventHandler> HandlerPart<H> {
     }
 }
 
-macro_rules! try_future_boxed {
-    ($e:expr) =>(
-        match $e {
-            Ok(v) => v,
-            Err(e) => {
-                return Err(into_other(e)).into_future().boxed();
-            }
-        }
-    )
-}
-
 impl NetworkPart {
     pub fn run(self) -> Result<(), io::Error> {
         let network_config = self.network_config;
@@ -169,20 +158,27 @@ impl NetworkPart {
                         let max_tries = network_config.tcp_connect_max_retries as usize;
                         let connect_handle = Retry::spawn(
                             handle.clone(),
-                            FixedInterval::from_millis(timeout)
-                                .map(jitter)
-                                .take(max_tries),
+                            FixedInterval::from_millis(timeout).map(jitter).take(
+                                max_tries,
+                            ),
                             TcpStreamConnectAction {
                                 handle: handle.clone(),
                                 peer,
                             },
                         ).map_err(into_other)
+                            // Configure socket
                             .and_then(move |sock| {
-                                try_future_boxed!(sock.set_nodelay(network_config.tcp_nodelay));
-                                try_future_boxed!(sock.set_keepalive(
-                                    network_config.tcp_keep_alive.map(Duration::from_millis),
-                                ));
-
+                                sock.set_nodelay(network_config.tcp_nodelay)?;
+                                Ok(sock)
+                            })
+                            .and_then(move |sock| {
+                                let duration =
+                                    network_config.tcp_keep_alive.map(Duration::from_millis);
+                                sock.set_keepalive(duration)?;
+                                Ok(sock)
+                            })
+                            // Connect socket with the outgoing channel
+                            .and_then(move |sock| {
                                 trace!("Established connection with peer={}", peer);
 
                                 let stream = sock.framed(MessagesCodec);
@@ -200,7 +196,6 @@ impl NetworkPart {
                                         Either::A((_, _reader)) => Ok(()).into_future(),
                                         Either::B((_, _writer)) => Ok(()).into_future(),
                                     })
-                                    .boxed()
                             })
                             .then(move |res| {
                                 trace!("Connection with peer={} closed, reason={:?}", peer, res);
@@ -224,12 +219,14 @@ impl NetworkPart {
                     Self::send_event(&handle, &network_tx, NetworkEvent::PeerDisconnected(peer));
                 }
                 // Immediately stop the event loop.
-                NetworkRequest::Shutdown => cancel_sender
-                    .clone()
-                    .send(())
-                    .map(forget_result)
-                    .map_err(log_error)
-                    .wait()?,
+                NetworkRequest::Shutdown => {
+                    cancel_sender
+                        .clone()
+                        .send(())
+                        .map(forget_result)
+                        .map_err(log_error)
+                        .wait()?
+                }
             }
 
             Ok(())
@@ -266,9 +263,10 @@ impl NetworkPart {
                     .map_err(|e| e.0)
                     .and_then(move |(raw, stream)| match raw.map(Any::from_raw) {
                         Some(Ok(Any::Connect(msg))) => Ok((msg, stream)),
-                        Some(Ok(other)) => Err(other_error(
-                            &format!("First message is not Connect, got={:?}", other),
-                        )),
+                        Some(Ok(other)) => Err(other_error(&format!(
+                            "First message is not Connect, got={:?}",
+                            other
+                        ))),
                         Some(Err(e)) => Err(into_other(e)),
                         None => Err(other_error("Incoming socket closed")),
                     })
@@ -284,11 +282,9 @@ impl NetworkPart {
 
                         stream.for_each(move |raw| {
                             let event = NetworkEvent::MessageReceived(addr, raw);
-                            network_tx
-                                .clone()
-                                .send(event)
-                                .map(forget_result)
-                                .map_err(into_other)
+                            network_tx.clone().send(event).map(forget_result).map_err(
+                                into_other,
+                            )
                         })
                     })
                     .map(|_| {
@@ -312,13 +308,9 @@ impl NetworkPart {
     }
 
     fn send_event(handle: &Handle, network_tx: &mpsc::Sender<NetworkEvent>, event: NetworkEvent) {
-        handle.spawn(
-            network_tx
-                .clone()
-                .send(event)
-                .map(forget_result)
-                .map_err(log_error),
-        );
+        handle.spawn(network_tx.clone().send(event).map(forget_result).map_err(
+            log_error,
+        ));
     }
 }
 
