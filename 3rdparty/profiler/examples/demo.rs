@@ -1,6 +1,7 @@
-extern crate profiler;
+extern crate exonum_profiler as profiler;
 
 use std::fs::File;
+use profiler::ThreadFrame;
 
 pub fn main() {
     profiler::start("update");
@@ -31,5 +32,5 @@ pub fn main() {
         profiler::end();
     profiler::end();
 
-    profiler::dump_html(&mut File::create("out1.html").unwrap()).unwrap();
+    profiler::dump_html(&mut File::create("out1.html").unwrap(), &ThreadFrame::new()).unwrap();
 }

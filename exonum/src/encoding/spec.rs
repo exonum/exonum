@@ -80,6 +80,7 @@ macro_rules! encoding_struct {
             }
 
             #[allow(unused_variables)]
+            #[allow(unused_comparisons)]
             fn check(buffer: &'a [u8],
                         from_st_val: $crate::encoding::CheckedOffset,
                         to_st_val: $crate::encoding::CheckedOffset,
@@ -94,6 +95,14 @@ macro_rules! encoding_struct {
                     to_st_val.unchecked_offset())};
                 let latest_segment: $crate::encoding::CheckedOffset =
                     ($body as $crate::encoding::Offset).into();
+
+                if vec.len() < $body {
+                    return Err($crate::encoding::Error::UnexpectedlyShortPayload{
+                        actual_size: vec.len() as $crate::encoding::Offset,
+                        minimum_size: $body as $crate::encoding::Offset
+                    })
+                }
+
                 $(
                 let latest_segment = <$field_type as $crate::encoding::Field>::check(&vec,
                                                                         $from.into(),

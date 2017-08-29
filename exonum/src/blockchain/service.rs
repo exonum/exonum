@@ -32,6 +32,7 @@ use encoding::Error as MessageError;
 use node::{Node, State, NodeChannel, ApiSender};
 use node::state::ValidatorState;
 use blockchain::{ConsensusConfig, Blockchain, ValidatorKeys};
+use helpers::{Height, Round};
 
 /// A trait that describes transaction processing rules (a group of sequential operations
 /// with the Exonum storage) for the given `Message`.
@@ -139,12 +140,12 @@ impl<'a, 'b> ServiceContext<'a, 'b> {
     }
 
     /// Returns the current blockchain height. This height is 'height of last committed block` + 1.
-    pub fn height(&self) -> u64 {
+    pub fn height(&self) -> Height {
         self.state.height()
     }
 
     /// Returns the current node round.
-    pub fn round(&self) -> u32 {
+    pub fn round(&self) -> Round {
         self.state.round()
     }
 

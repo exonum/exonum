@@ -42,6 +42,7 @@ use crypto::{self, Hash};
 use messages::{RawMessage, Precommit, CONSENSUS as CORE_SERVICE};
 use node::State;
 use storage::{Patch, Database, Snapshot, Fork, Error};
+use helpers::{Height, ValidatorId};
 
 pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
 pub use self::schema::{Schema, TxLocation, gen_prefix};
@@ -147,7 +148,7 @@ impl Blockchain {
     pub fn create_genesis_block(&mut self, cfg: GenesisConfig) -> Result<(), Error> {
         let mut config_propose = StoredConfiguration {
             previous_cfg_hash: Hash::zero(),
-            actual_from: 0,
+            actual_from: Height::zero(),
             validator_keys: cfg.validator_keys,
             consensus: cfg.consensus,
             services: BTreeMap::new(),
@@ -170,14 +171,15 @@ impl Blockchain {
             // Commit actual configuration
             {
                 let mut schema = Schema::new(&mut fork);
-                if schema.block_hash_by_height(0).is_some() {
+                if schema.block_hash_by_height(Height::zero()).is_some() {
                     // TODO create genesis block for MemoryDB and compare in hash with zero block
                     return Ok(());
                 }
                 schema.commit_configuration(config_propose);
             };
             self.merge(fork.into_patch())?;
-            self.create_patch(0, 0, &[], &BTreeMap::new()).1
+            self.create_patch(ValidatorId::zero(), Height::zero(), &[], &BTreeMap::new())
+                .1
         };
         self.merge(patch)?;
         Ok(())
@@ -208,8 +210,8 @@ impl Blockchain {
     /// with the hash of resulting block.
     pub fn create_patch(
         &self,
-        proposer_id: u16,
-        height: u64,
+        proposer_id: ValidatorId,
+        height: Height,
         tx_hashes: &[Hash],
         pool: &BTreeMap<Hash, Box<Transaction>>,
     ) -> (Hash, Patch) {

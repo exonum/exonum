@@ -22,18 +22,17 @@ extern crate exonum;
 
 #[cfg(test)]
 mod tests {
-    use test::Bencher;
-
     use tempdir::TempDir;
 
-    use exonum::storage::{ProofMapIndex, Database, Fork, LevelDB, LevelDBOptions, LevelDBCache,
-                          StorageValue, Patch};
-
+    use test::Bencher;
     use std::collections::BTreeMap;
+
+    use exonum::storage::{ProofMapIndex, Database, Fork, LevelDB, LevelDBOptions, LevelDBCache,
+                          StorageValue, Patch, RocksDB, RocksDBOptions, RocksBlockOptions};
     use exonum::blockchain::{Blockchain, Transaction};
     use exonum::crypto::{gen_keypair, Hash, PublicKey, SecretKey};
     use exonum::messages::Message;
-
+    use exonum::helpers::{Height, ValidatorId};
 
     fn execute_timestamping(db: Box<Database>, b: &mut Bencher) {
         let mut blockchain = Blockchain::new(db, Vec::new());
@@ -76,7 +75,9 @@ mod tests {
             txs: &[Hash],
             pool: &BTreeMap<Hash, Box<Transaction>>,
         ) -> Patch {
-            blockchain.create_patch(0, height, txs, pool).1
+            blockchain
+                .create_patch(ValidatorId::zero(), Height(height), txs, pool)
+                .1
         }
 
         for i in 0..100 {
@@ -150,7 +151,9 @@ mod tests {
             txs: &[Hash],
             pool: &BTreeMap<Hash, Box<Transaction>>,
         ) -> Patch {
-            blockchain.create_patch(0, height, txs, pool).1
+            blockchain
+                .create_patch(ValidatorId::zero(), Height(height), txs, pool)
+                .1
         }
 
         for i in 0..100 {
@@ -164,6 +167,24 @@ mod tests {
         b.iter(|| execute_block(&blockchain, 100, &txs, &pool));
     }
 
+    fn create_rocksdb(tempdir: &TempDir) -> Box<Database> {
+        let mut block_options = RocksBlockOptions::default();
+        block_options.set_block_size(4 * 1024);
+        block_options.set_lru_cache(512 * 1024 * 1024);
+        block_options.set_bloom_filter(128, true);
+        block_options.set_cache_index_and_filter_blocks(true);
+        let mut options = RocksDBOptions::default();
+        options.create_if_missing(true);
+        options.increase_parallelism(4);
+        options.set_max_write_buffer_number(16);
+        options.set_write_buffer_size(536_870_912);
+        options.set_max_open_files(-1);
+        options.set_block_based_table_factory(&block_options);
+        options.set_max_bytes_for_level_base(512 * 1024 * 1024);
+        let db = Box::new(RocksDB::open(tempdir.path(), options).unwrap());
+        db as Box<Database>
+    }
+
     #[bench]
     fn bench_execute_block_timestamping_leveldb(b: &mut Bencher) {
         let mut options = LevelDBOptions::new();
@@ -172,7 +193,6 @@ mod tests {
         let db = Box::new(LevelDB::open(path.path(), options).unwrap()) as Box<Database>;
         execute_timestamping(db, b)
     }
-
 
     #[bench]
     fn bench_execute_block_timestamping_leveldb_cache(b: &mut Bencher) {
@@ -193,7 +213,6 @@ mod tests {
         execute_cryptocurrency(db, b)
     }
 
-
     #[bench]
     fn bench_execute_block_cryptocurrency_leveldb_cache(b: &mut Bencher) {
         let mut options = LevelDBOptions::new();
@@ -201,6 +220,20 @@ mod tests {
         options.cache = Some(LevelDBCache::new(100_000_000));
         let path = TempDir::new("exonum").unwrap();
         let db = Box::new(LevelDB::open(path.path(), options).unwrap()) as Box<Database>;
+        execute_cryptocurrency(db, b)
+    }
+
+    #[bench]
+    fn bench_execute_block_timestamping_rocksdb(b: &mut Bencher) {
+        let tempdir = TempDir::new("exonum").unwrap();
+        let db = create_rocksdb(&tempdir);
+        execute_timestamping(db, b)
+    }
+
+    #[bench]
+    fn bench_execute_block_cryptocurrency_rocksdb(b: &mut Bencher) {
+        let tempdir = TempDir::new("exonum").unwrap();
+        let db = create_rocksdb(&tempdir);
         execute_cryptocurrency(db, b)
     }
 }

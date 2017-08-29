@@ -20,9 +20,12 @@ use std::time::Duration;
 use exonum::messages::{Message, Propose, Prevote, Precommit};
 use exonum::blockchain::{Block, SCHEMA_MAJOR_VERSION};
 use exonum::crypto::Hash;
+use exonum::helpers::{Height, Round};
 
 use sandbox::timestamping_sandbox;
 use sandbox::sandbox_tests_helper::gen_timestamping_tx;
+use sandbox::sandbox_tests_helper::{HEIGHT_ONE, ROUND_ONE, ROUND_THREE, VALIDATOR_0, VALIDATOR_1,
+                                    VALIDATOR_2, VALIDATOR_3};
 
 #[test]
 fn test_send_propose_and_prevote() {
@@ -36,35 +39,70 @@ fn test_send_propose_and_prevote() {
     sandbox.add_time(Duration::from_millis(1000));
     sandbox.add_time(Duration::from_millis(1999));
 
-    sandbox.assert_state(1, 3);
+    sandbox.assert_state(HEIGHT_ONE, ROUND_THREE);
 
     // ok, we are leader
-    let propose = Propose::new(0, 1, 3, &sandbox.last_hash(), &[tx.hash()], sandbox.s(0));
+    let propose = Propose::new(
+        VALIDATOR_0,
+        HEIGHT_ONE,
+        ROUND_THREE,
+        &sandbox.last_hash(),
+        &[tx.hash()],
+        sandbox.s(VALIDATOR_0),
+    );
 
     sandbox.broadcast(propose.clone());
-    sandbox.broadcast(Prevote::new(0, 1, 3, &propose.hash(), 0, sandbox.s(0)));
+    sandbox.broadcast(Prevote::new(
+        VALIDATOR_0,
+        HEIGHT_ONE,
+        ROUND_THREE,
+        &propose.hash(),
+        Round::zero(),
+        sandbox.s(VALIDATOR_0),
+    ));
 }
 
 #[test]
 fn test_send_prevote() {
     let sandbox = timestamping_sandbox();
 
-    let propose = Propose::new(2, 1, 1, &sandbox.last_hash(), &[], sandbox.s(2));
+    let propose = Propose::new(
+        VALIDATOR_2,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &sandbox.last_hash(),
+        &[],
+        sandbox.s(VALIDATOR_2),
+    );
 
     sandbox.recv(propose.clone());
-    sandbox.broadcast(Prevote::new(0, 1, 1, &propose.hash(), 0, sandbox.s(0)));
+    sandbox.broadcast(Prevote::new(
+        VALIDATOR_0,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        Round::zero(),
+        sandbox.s(VALIDATOR_0),
+    ));
 }
 
 #[test]
 fn test_get_lock_and_send_precommit() {
     let sandbox = timestamping_sandbox();
 
-    let propose = Propose::new(2, 1, 1, &sandbox.last_hash(), &[], sandbox.s(2));
+    let propose = Propose::new(
+        VALIDATOR_2,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &sandbox.last_hash(),
+        &[],
+        sandbox.s(VALIDATOR_2),
+    );
 
     let block = Block::new(
         SCHEMA_MAJOR_VERSION,
-        2,
-        1,
+        VALIDATOR_2,
+        HEIGHT_ONE,
         0,
         &sandbox.last_hash(),
         &Hash::zero(),
@@ -72,32 +110,60 @@ fn test_get_lock_and_send_precommit() {
     );
 
     sandbox.recv(propose.clone());
-    sandbox.broadcast(Prevote::new(0, 1, 1, &propose.hash(), 0, sandbox.s(0)));
-    sandbox.recv(Prevote::new(1, 1, 1, &propose.hash(), 0, sandbox.s(1)));
-    sandbox.assert_lock(0, None);
-    sandbox.recv(Prevote::new(2, 1, 1, &propose.hash(), 0, sandbox.s(2)));
+    sandbox.broadcast(Prevote::new(
+        VALIDATOR_0,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        Round::zero(),
+        sandbox.s(VALIDATOR_0),
+    ));
+    sandbox.recv(Prevote::new(
+        VALIDATOR_1,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        Round::zero(),
+        sandbox.s(VALIDATOR_1),
+    ));
+    sandbox.assert_lock(Round::zero(), None);
+    sandbox.recv(Prevote::new(
+        VALIDATOR_2,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        Round::zero(),
+        sandbox.s(VALIDATOR_2),
+    ));
     sandbox.broadcast(Precommit::new(
-        0,
-        1,
-        1,
+        VALIDATOR_0,
+        HEIGHT_ONE,
+        ROUND_ONE,
         &propose.hash(),
         &block.hash(),
         sandbox.time(),
-        sandbox.s(0),
+        sandbox.s(VALIDATOR_0),
     ));
-    sandbox.assert_lock(1, Some(propose.hash()));
+    sandbox.assert_lock(ROUND_ONE, Some(propose.hash()));
 }
 
 #[test]
 fn test_commit() {
     let sandbox = timestamping_sandbox();
 
-    let propose = Propose::new(2, 1, 1, &sandbox.last_hash(), &[], sandbox.s(2));
+    let propose = Propose::new(
+        VALIDATOR_2,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &sandbox.last_hash(),
+        &[],
+        sandbox.s(VALIDATOR_2),
+    );
 
     let block = Block::new(
         SCHEMA_MAJOR_VERSION,
-        2,
-        1,
+        VALIDATOR_2,
+        HEIGHT_ONE,
         0,
         &sandbox.last_hash(),
         &Hash::zero(),
@@ -105,37 +171,58 @@ fn test_commit() {
     );
 
     sandbox.recv(propose.clone());
-    sandbox.broadcast(Prevote::new(0, 1, 1, &propose.hash(), 0, sandbox.s(0)));
-    sandbox.recv(Prevote::new(1, 1, 1, &propose.hash(), 0, sandbox.s(1)));
-    sandbox.recv(Prevote::new(2, 1, 1, &propose.hash(), 0, sandbox.s(2)));
+    sandbox.broadcast(Prevote::new(
+        VALIDATOR_0,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        Round::zero(),
+        sandbox.s(VALIDATOR_0),
+    ));
+    sandbox.recv(Prevote::new(
+        VALIDATOR_1,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        Round::zero(),
+        sandbox.s(VALIDATOR_1),
+    ));
+    sandbox.recv(Prevote::new(
+        VALIDATOR_2,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        Round::zero(),
+        sandbox.s(VALIDATOR_2),
+    ));
     sandbox.broadcast(Precommit::new(
-        0,
-        1,
-        1,
+        VALIDATOR_0,
+        HEIGHT_ONE,
+        ROUND_ONE,
         &propose.hash(),
         &block.hash(),
         sandbox.time(),
-        sandbox.s(0),
+        sandbox.s(VALIDATOR_0),
     ));
     sandbox.recv(Precommit::new(
-        2,
-        1,
-        1,
+        VALIDATOR_2,
+        HEIGHT_ONE,
+        ROUND_ONE,
         &propose.hash(),
         &propose.hash(),
         sandbox.time(),
-        sandbox.s(2),
+        sandbox.s(VALIDATOR_2),
     ));
     sandbox.recv(Precommit::new(
-        3,
-        1,
-        1,
+        VALIDATOR_3,
+        HEIGHT_ONE,
+        ROUND_ONE,
         &propose.hash(),
         &propose.hash(),
         sandbox.time(),
-        sandbox.s(3),
+        sandbox.s(VALIDATOR_3),
     ));
-    sandbox.assert_state(1, 1);
+    sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
 }
 
 // TODO: Remove `#[rustfmt_skip]` after https://github.com/rust-lang-nursery/rustfmt/issues/1777
@@ -146,8 +233,10 @@ fn test_commit() {
 fn received_unexpected_propose() {
     let sandbox = timestamping_sandbox();
 
-    let propose = Propose::new(1, 0, 1, &sandbox.last_hash(), &[], sandbox.s(1));
+    let propose = Propose::new(VALIDATOR_1, Height::zero(), ROUND_ONE,
+                               &sandbox.last_hash(), &[], sandbox.s(VALIDATOR_1));
 
     sandbox.recv(propose.clone());
-    sandbox.broadcast(Prevote::new(0, 0, 1, &propose.hash(), 0, sandbox.s(0)));
+    sandbox.broadcast(Prevote::new(VALIDATOR_0, Height::zero(), ROUND_ONE, &propose.hash(),
+                                   Round::zero(), sandbox.s(VALIDATOR_0)));
 }
