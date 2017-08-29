@@ -51,7 +51,8 @@ git = "https://github.com/exonum/exonum_rocksdb.git"
 optional = true
 
 [dependencies.exonum_sodiumoxide]
-git = "https://github.com/exonum/exonum_sodiumoxide.git"
+git = "https://github.com/darkeld3r/exonum_sodiumoxide.git"
+rev = "0e5c692fc1772727427727632ec620d9497c5d4b"
 
 [dev-dependencies]
 pretty_assertions = "0.2.1"
