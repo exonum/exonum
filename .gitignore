@@ -1,3 +1,6 @@
 /target/
 **/*.rs.bk
 Cargo.lock
+.idea/
+1.log
+cmake-build-debug/
