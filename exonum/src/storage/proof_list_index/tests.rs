@@ -246,7 +246,6 @@ fn list_index_proof(db: Box<Database>) {
 }
 
 fn randomly_generate_proofs(db: Box<Database>) {
-    let _ = ::helpers::init_logger();
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(vec![255], &mut fork);
     let num_vals = 100;
@@ -276,7 +275,7 @@ fn randomly_generate_proofs(db: Box<Database>) {
             }
         }
 
-        let proof_info = ProofInfo {
+        let _proof_info = ProofInfo {
             root_hash: table_root_hash,
             list_length: index.len(),
             proof: &range_proof,
@@ -284,8 +283,8 @@ fn randomly_generate_proofs(db: Box<Database>) {
             range_end: end_range,
         };
 
-        info!("{}", to_string(&proof_info).unwrap());
         let json_repr = to_string(&range_proof).unwrap();
+        assert!(json_repr.len() > 0);
         assert_eq!(range_proof, from_str(&json_repr).unwrap());
     }
 }
