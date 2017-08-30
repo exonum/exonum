@@ -289,7 +289,6 @@ fn test_network_reconnect() {
         // Handle second attempt
         assert_eq!(e.wait_for_connect(), c2);
         e.connect_with(addrs[1]);
-        e.disconnect_with(addrs[1]);
         assert_eq!(e.wait_for_disconnect(), addrs[1]);
     });
     // First connect attempt.
@@ -309,6 +308,7 @@ fn test_network_reconnect() {
         .spawn(move |e: &mut TestHandler| {
             e.connect_with(addrs[0]);
             assert_eq!(e.wait_for_connect(), c1_cloned);
+            e.disconnect_with(addrs[0]);
             assert_eq!(e.wait_for_disconnect(), addrs[0]);
         })
         .join()

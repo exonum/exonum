@@ -37,7 +37,7 @@ use exonum::messages::{Any, Connect, Message, RawMessage, RawTransaction, Status
 use exonum::crypto::{gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed};
 #[cfg(test)]
 use exonum::crypto::gen_keypair;
-use exonum::helpers::{init_logger, Height, Milliseconds, Round, ValidatorId};
+use exonum::helpers::{Height, Milliseconds, Round, ValidatorId};
 use exonum::events::{Event, EventHandler, NetworkEvent, NetworkRequest, TimeoutRequest};
 use exonum::events::network::NetworkConfiguration;
 
