@@ -5,7 +5,6 @@ dependencies = [
  "bodyparser 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "exonum 0.1.0 (git+https://github.com/exonum/exonum?rev=64518cec0b091d2eeca6c62356b78dc37d5942ee)",
  "iron 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "params 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "router 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.11 (registry+https://github.com/rust-lang/crates.io-index)",

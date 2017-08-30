@@ -21,7 +21,6 @@ extern crate exonum;
 extern crate router;
 extern crate bodyparser;
 extern crate iron;
-extern crate params;
 
 use exonum::blockchain::{self, Blockchain, Service, GenesisConfig, ValidatorKeys, Transaction,
                          ApiContext};
@@ -34,7 +33,6 @@ use exonum::api::{Api, ApiError};
 use iron::prelude::*;
 use iron::Handler;
 use router::Router;
-use params::{Params, Value};
 
 // // // // // // // // // // CONSTANTS // // // // // // // // // //
 
@@ -221,34 +219,33 @@ impl Api for CryptocurrencyApi {
         };
 
         let self_ = self.clone();
-        let wallets_info = move |req: &mut Request| -> IronResult<Response> {
-            let map = req.get_ref::<Params>().unwrap();
-            if let Some(&Value::String(ref pub_key_string)) = map.find(&["pubkey"]) {
-                let public_key = PublicKey::from_hex(pub_key_string).map_err(
-                    ApiError::FromHex,
-                )?;
-
-                if let Some(wallet) = self_.get_wallet(&public_key) {
-                    self_.ok_response(&serde_json::to_value(wallet).unwrap())
-                } else {
-                    self_.not_found_response(&serde_json::to_value("Wallet not found").unwrap())
-                }
-
+        let wallets_info = move |_: &mut Request| -> IronResult<Response> {
+            if let Some(wallets) = self_.get_wallets() {
+                self_.ok_response(&serde_json::to_value(wallets).unwrap())
             } else {
-                if let Some(wallets) = self_.get_wallets() {
-                    self_.ok_response(&serde_json::to_value(wallets).unwrap())
-                } else {
-                    self_.not_found_response(
-                        &serde_json::to_value("Wallets database is empty").unwrap(),
-                    )
-                }
+                self_.not_found_response(
+                    &serde_json::to_value("Wallets database is empty").unwrap(),
+                )
             }
         };
 
-        let route_post = "/v1/wallets/transaction";
-        let route_get = "/v1/wallets/info";
-        router.post(&route_post, transaction, "transaction");
-        router.get(&route_get, wallets_info, "wallets_info");
+        let self_ = self.clone();
+        let wallet_info = move |req: &mut Request| -> IronResult<Response> {
+            let path = req.url.path();
+            let wallet_key = path.last().unwrap();
+            let public_key = PublicKey::from_hex(wallet_key).map_err(
+                ApiError::FromHex,
+            )?;
+            if let Some(wallet) = self_.get_wallet(&public_key) {
+                self_.ok_response(&serde_json::to_value(wallet).unwrap())
+            } else {
+                self_.not_found_response(&serde_json::to_value("Wallet not found").unwrap())
+            }
+        };
+
+        router.post("/v1/wallets/transaction", transaction, "transaction");
+        router.get("/v1/wallets", wallets_info, "wallets_info");
+        router.get("/v1/wallet/:pub_key", wallet_info, "wallet_info");
     }
 }
 
