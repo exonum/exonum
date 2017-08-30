@@ -223,26 +223,24 @@ impl Api for CryptocurrencyApi {
         let self_ = self.clone();
         let wallets_info = move |req: &mut Request| -> IronResult<Response> {
             let map = req.get_ref::<Params>().unwrap();
-            match map.find(&["pubkey"]) {
-                Some(&Value::String(ref pub_key_string)) => {
-                    let public_key = PublicKey::from_hex(pub_key_string).map_err(
-                        ApiError::FromHex,
-                    )?;
-                    if let Some(wallet) = self_.get_wallet(&public_key) {
-                        self_.ok_response(&serde_json::to_value(wallet).unwrap())
-                    } else {
-                        self_.not_found_response(&serde_json::to_value("Wallet not found").unwrap())
-                    }
+            if let Some(&Value::String(ref pub_key_string)) = map.find(&["pubkey"]) {
+                let public_key = PublicKey::from_hex(pub_key_string).map_err(
+                    ApiError::FromHex,
+                )?;
 
+                if let Some(wallet) = self_.get_wallet(&public_key) {
+                    self_.ok_response(&serde_json::to_value(wallet).unwrap())
+                } else {
+                    self_.not_found_response(&serde_json::to_value("Wallet not found").unwrap())
                 }
-                _ => {
-                    if let Some(wallets) = self_.get_wallets() {
-                        self_.ok_response(&serde_json::to_value(wallets).unwrap())
-                    } else {
-                        self_.not_found_response(
-                            &serde_json::to_value("Wallets database is empty").unwrap(),
-                        )
-                    }
+
+            } else {
+                if let Some(wallets) = self_.get_wallets() {
+                    self_.ok_response(&serde_json::to_value(wallets).unwrap())
+                } else {
+                    self_.not_found_response(
+                        &serde_json::to_value("Wallets database is empty").unwrap(),
+                    )
                 }
             }
         };

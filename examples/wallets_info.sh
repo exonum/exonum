@@ -1,7 +1,5 @@
 #!/bin/bash
 
-args=$#
-
 function print_help {
     echo "Usage:
         --all           Display info for all wallets
