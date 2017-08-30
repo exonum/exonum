@@ -36,7 +36,7 @@ impl SparseListSize {
         SparseListSize::default()
     }
 
-    fn into_array(&self) -> [u8; 16] {
+    fn to_array(&self) -> [u8; 16] {
         let mut buf = [0; 16];
         BigEndian::write_u64(&mut buf[0..8], self.total_length);
         BigEndian::write_u64(&mut buf[8..16], self.items_count);
@@ -46,11 +46,11 @@ impl SparseListSize {
 
 impl StorageValue for SparseListSize {
     fn hash(&self) -> Hash {
-        hash(&self.into_array())
+        hash(&self.to_array())
     }
 
     fn into_bytes(self) -> Vec<u8> {
-        self.into_array().to_vec()
+        self.to_array().to_vec()
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
@@ -64,7 +64,12 @@ impl StorageValue for SparseListSize {
     }
 }
 
-/// TODO
+/// The list of items is similar to the [`ListIndex`], but it may contains null items.
+///
+/// `SparseListIndex` implements an array list, storing the element as values and using `u64` as an index.
+/// `SparseListIndex` requires that the elements implement the [`StorageValue`] trait.
+/// [`StorageValue`]: ../trait.StorageValue.html
+/// [`ListIndex`]: ../list_index/struct.ListIndex.html
 #[derive(Debug)]
 pub struct SparseListIndex<T, V> {
     base: BaseIndex<T>,
@@ -72,14 +77,38 @@ pub struct SparseListIndex<T, V> {
     _v: PhantomData<V>,
 }
 
-/// TODO
+/// An iterator over the items of a `SparseListIndex`.
+///
+/// This struct is created by the [`iter`] method on [`SparseListIndex`].
+/// See its documentation for more.
+///
+/// [`iter`]: struct.ListIndex.html#method.iter
+/// [`SparseListIndex`]: struct.SparseListIndex.html
 #[derive(Debug)]
 pub struct SparseListIndexIter<'a, V> {
     base_iter: BaseIndexIter<'a, u64, V>,
 }
 
 impl<T, V> SparseListIndex<T, V> {
-    /// TODO
+    /// Creates a new index representation based on the common prefix of its keys and storage view.
+    ///
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
+    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// available.
+    /// [`&Snapshot`]: ../trait.Snapshot.html
+    /// [`&mut Fork`]: ../struct.Fork.html
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, SparseListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let snapshot = db.snapshot();
+    /// let prefix = vec![1, 2, 3];
+    /// let index: SparseListIndex<_, u8> = SparseListIndex::new(prefix, &snapshot);
+    /// # drop(index);
+    /// ```
     pub fn new(prefix: Vec<u8>, view: T) -> Self {
         SparseListIndex {
             base: BaseIndex::new(prefix, view),
@@ -103,12 +132,45 @@ where
         size
     }
 
-    /// TODO
+    /// Returns an element at that position or `None` if out of bounds or it does not exist.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, SparseListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
+    /// assert_eq!(None, index.get(0));
+    ///
+    /// index.push(42);
+    /// assert_eq!(Some(42), index.get(0));
+    /// index.push(1);
+    /// index.remove(0);
+    /// assert_eq!(None, index.get(0));
+    /// assert_eq!(Some(1), index.get(1));
+    /// ```
     pub fn get(&self, index: u64) -> Option<V> {
         self.base.get(&index)
     }
 
-    /// TODO
+
+    /// Returns the last element of the list, or `None` if it is empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, SparseListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
+    /// assert_eq!(None, index.last());
+    ///
+    /// index.push(42);
+    /// assert_eq!(Some(42), index.last());
+    /// ```
     pub fn last(&self) -> Option<V> {
         match self.len() {
             0 => None,
@@ -116,22 +178,92 @@ where
         }
     }
 
-    /// TODO
+    /// Returns `true` if the list contains no elements.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, SparseListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
+    /// assert!(index.is_empty());
+    ///
+    /// index.push(42);
+    /// assert!(!index.is_empty());
+    /// ```
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
-    /// TODO
+
+    /// Returns the total number of elements (incudes null elements) in the list.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, SparseListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
+    /// assert_eq!(0, index.len());
+    ///
+    /// index.push(10);
+    /// index.push(12);
+    /// assert_eq!(2, index.len());
+    ///
+    /// index.remove(0);
+    ///
+    /// index.push(100);
+    /// assert_eq!(3, index.len());
+    /// ```
     pub fn len(&self) -> u64 {
         self.size().total_length
     }
 
-    /// TODO
+    /// Returns the total number of non-null elements in the list.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, SparseListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
+    /// assert_eq!(0, index.count());
+    ///
+    /// index.push(10);
+    /// assert_eq!(1, index.count());
+    ///
+    /// index.remove(0);
+    ///
+    /// index.push(100);
+    /// assert_eq!(1, index.count());
+    /// ```
     pub fn count(&self) -> u64 {
         self.size().items_count
     }
 
-    /// TODO
+    /// Returns an iterator over the list. The iterator element type is V.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, SparseListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
+    ///
+    /// index.extend([1, 2, 3, 4, 5].iter().cloned());
+    ///
+    /// for val in index.iter() {
+    ///     println!("{}", val);
+    /// }
+    /// ```
     pub fn iter(&self) -> SparseListIndexIter<V> {
         SparseListIndexIter { base_iter: self.base.iter_from(&(), &0u64) }
     }
@@ -152,7 +284,20 @@ where
         self.size.set(Some(size));
     }
 
-    /// TODO
+    /// Appends an element to the back of the list.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, SparseListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
+    ///
+    /// index.push(1);
+    /// assert!(!index.is_empty());
+    /// ```
     pub fn push(&mut self, value: V) {
         let mut size = self.size();
         self.base.put(&size.total_length, value);
@@ -161,7 +306,21 @@ where
         self.set_size(size);
     }
 
-    /// TODO
+    /// Removes the last element from the list and returns it, or None if it is empty.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, SparseListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
+    /// assert_eq!(None, index.pop());
+    ///
+    /// index.push(1);
+    /// assert_eq!(Some(1), index.pop());
+    /// ```
     pub fn pop(&mut self) -> Option<V> {
         // TODO: shoud we get and return dropped value?
         let mut size = self.size();
@@ -178,7 +337,34 @@ where
         }
     }
 
-    /// TODO
+    /// Removes the element with the given index from the list and returns it, or None if it is empty.
+    /// If elements count becomes zero after, it also sets the `len` to zero.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `index` is equal or greater than the list's current length.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, SparseListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
+    /// assert_eq!(0, index.len());
+    ///
+    /// index.push(10);
+    /// index.push(12);
+    ///
+    /// assert_eq!(Some(10), index.remove(0));
+    /// assert_eq!(None, index.remove(0));
+    /// assert_eq!(2, index.len());
+    /// assert_eq!(1, index.count());
+
+    /// assert_eq!(Some(12), index.remove(1));
+    /// assert_eq!(0, index.len());
+    /// ```
     pub fn remove(&mut self, index: u64) -> Option<V> {
         let mut size = self.size();
         if index >= size.total_length {
@@ -191,17 +377,35 @@ where
         }
         let v = self.base.get(&index);
         if v.is_some() {
-            self.base.remove(&index);
-            if index == size.total_length - 1 {
-                size.total_length -= 1;
+            if size.items_count == 1 {
+                self.clear();
+            } else {
+                self.base.remove(&index);
+                if index == size.total_length - 1 {
+                    size.total_length -= 1;
+                }
+                size.items_count -= 1;
+                self.set_size(size);
             }
-            size.items_count -= 1;
-            self.set_size(size);
         }
         v
     }
 
-    /// TODO
+    /// Extends the list with the contents of an iterator.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, SparseListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
+    /// assert!(index.is_empty());
+    ///
+    /// index.extend([1, 2, 3].iter().cloned());
+    /// assert_eq!(3, index.len());
+    /// ```
     pub fn extend<I>(&mut self, iter: I)
     where
         I: IntoIterator<Item = V>,
@@ -215,7 +419,25 @@ where
         self.set_size(size);
     }
 
-    /// TODO
+    /// Shortens the list, keeping the first `len` elements and dropping the rest.
+    ///
+    /// If `len` is greater than the list's current length, this has no effect.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, SparseListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
+    ///
+    /// index.extend([1, 2, 3, 4, 5].iter().cloned());
+    /// assert_eq!(5, index.len());
+    ///
+    /// index.truncate(3);
+    /// assert_eq!(3, index.len());
+    /// ```
     pub fn truncate(&mut self, len: u64) {
         // TODO: optimize this
         while self.len() > len {
@@ -223,7 +445,28 @@ where
         }
     }
 
-    /// TODO
+    /// Changes a value at the specified position. If the position contains null value it
+    /// also increments elements count.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `index` is equal or greater than the list's current length.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, SparseListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
+    ///
+    /// index.push(1);
+    /// assert_eq!(Some(1), index.get(0));
+    ///
+    /// index.set(0, 10);
+    /// assert_eq!(Some(10), index.get(0));
+    /// ```
     pub fn set(&mut self, index: u64, value: V) {
         let mut size = self.size();
         if index >= size.total_length {
@@ -242,7 +485,29 @@ where
         self.base.put(&index, value)
     }
 
-    /// TODO
+    /// Clears the list, removing all values.
+    ///
+    /// # Notes
+    ///
+    /// Currently this method is not optimized to delete large set of data. During the execution of
+    /// this method the amount of allocated memory is linearly dependent on the number of elements
+    /// in the index.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, SparseListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
+    ///
+    /// index.push(1);
+    /// assert!(!index.is_empty());
+    ///
+    /// index.clear();
+    /// assert!(index.is_empty());
+    /// ```
     pub fn clear(&mut self) {
         self.size.set(Some(SparseListSize::zero()));
         self.base.clear()
@@ -339,6 +604,10 @@ mod tests {
         assert_eq!(Some(777), list_index.remove(2));
         assert_eq!(2, list_index.len());
         assert_eq!(1, list_index.count());
+
+        assert_eq!(Some(45), list_index.remove(0));
+        assert_eq!(0, list_index.len());
+        assert_eq!(0, list_index.count());
     }
 
     fn list_index_iter(db: Box<Database>) {
