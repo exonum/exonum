@@ -13,7 +13,7 @@
 // limitations under the License.
 
 //! An implementation of `LevelDB` database.
-use profiler;
+use exonum_profiler::ProfilerSpan;
 
 use leveldb::database::Database as _LevelDB;
 use leveldb::iterator::{Iterator as _Iterator, Iterable};
@@ -94,7 +94,7 @@ impl Database for LevelDB {
     }
 
     fn snapshot(&self) -> Box<Snapshot> {
-        let _p = profiler::ProfilerSpan::new("LevelDB::snapshot");
+        let _p = ProfilerSpan::new("LevelDB::snapshot");
         Box::new(LevelDBSnapshot {
             snapshot: unsafe { mem::transmute(self.db.snapshot()) },
             _db: self.db.clone(),
@@ -102,7 +102,7 @@ impl Database for LevelDB {
     }
 
     fn merge(&mut self, patch: Patch) -> Result<()> {
-        let _p = profiler::ProfilerSpan::new("LevelDB::merge");
+        let _p = ProfilerSpan::new("LevelDB::merge");
         let mut batch = Writebatch::new();
         for (key, change) in patch {
             match change {
@@ -118,7 +118,7 @@ impl Database for LevelDB {
 
 impl Snapshot for LevelDBSnapshot {
     fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
-        let _p = profiler::ProfilerSpan::new("LevelDBSnapshot::get");
+        let _p = ProfilerSpan::new("LevelDBSnapshot::get");
         match self.snapshot.get(LEVELDB_READ_OPTIONS, key) {
             Ok(value) => value,
             Err(err) => panic!(err),
@@ -126,7 +126,7 @@ impl Snapshot for LevelDBSnapshot {
     }
 
     fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a> {
-        let _p = profiler::ProfilerSpan::new("LevelDBSnapshot::iter");
+        let _p = ProfilerSpan::new("LevelDBSnapshot::iter");
         let mut iter = self.snapshot.iter(LEVELDB_READ_OPTIONS);
         iter.seek(from);
         Box::new(LevelDBIterator { iter: iter })
@@ -135,12 +135,12 @@ impl Snapshot for LevelDBSnapshot {
 
 impl<'a> Iterator for LevelDBIterator<'a> {
     fn next(&mut self) -> Option<(&[u8], &[u8])> {
-        let _p = profiler::ProfilerSpan::new("LevelDBIterator::next");
+        let _p = ProfilerSpan::new("LevelDBIterator::next");
         self.iter.next()
     }
 
     fn peek(&mut self) -> Option<(&[u8], &[u8])> {
-        let _p = profiler::ProfilerSpan::new("LevelDBIterator::peek");
+        let _p = ProfilerSpan::new("LevelDBIterator::peek");
         self.iter.peek()
     }
 }

@@ -3,7 +3,7 @@
 extern crate test;
 extern crate exonum;
 
-#[cfg(all(test, feature = "network_benchmarks"))]
+#[cfg(all(test, feature = "long_benchmarks"))]
 #[cfg(test)]
 mod tests {
     use test::Bencher;

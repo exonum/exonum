@@ -19,11 +19,11 @@ rust:
 matrix:
   include:
     - rust: nightly-2017-08-15
+      env: FEATURE=benchmarks
+    - rust: nightly-2017-08-15
       env: FEATURE=clippy-core
     - rust: nightly-2017-08-15
       env: FEATURE=clippy-sandbox
-    - rust: nightly-2017-08-15
-      env: FEATURE=benchmark-core
 
 cache:
   directories:
@@ -50,7 +50,6 @@ env:
   - FEATURE=test-core
   - FEATURE=test-sandbox
   - FEATURE=test-doc
-
 
 install:
 - |
@@ -101,16 +100,16 @@ script: |
       cd sandbox && cargo clippy -- -D warnings
   ;;
   "test-core" )
-      RUST_LOG=off cargo test --manifest-path exonum/Cargo.toml --features rocksdb --tests --lib
+      cargo test --manifest-path exonum/Cargo.toml --features rocksdb --tests --lib
   ;;
   "test-sandbox" )
-      RUST_LOG=off cargo test -p sandbox
+      cargo test -p sandbox
   ;;
   "test-doc" )
       cargo test -p exonum --doc -- --test-threads=2
   ;;
-  "benchmark-core" )
-      cd exonum && cargo bench --features rocksdb,network_benchmarks --no-run
+  "benchmarks" )
+        RUST_LOG=off cargo bench --manifest-path exonum/Cargo.toml --features rocksdb,long_benchmarks --no-run
   ;;
 
   esac

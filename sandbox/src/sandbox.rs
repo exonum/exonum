@@ -633,7 +633,6 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
 }
 
 pub fn timestamping_sandbox() -> Sandbox {
-    let _ = init_logger();
     sandbox_with_services(vec![
         Box::new(TimestampingService::new()),
         Box::new(ConfigUpdateService::new()),
