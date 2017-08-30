@@ -224,7 +224,8 @@ impl Api for CryptocurrencyApi {
                 self_.ok_response(&serde_json::to_value(wallets).unwrap())
             } else {
                 self_.not_found_response(
-                    &serde_json::to_value("Wallets database is empty").unwrap(),
+                    &serde_json::to_value("Wallets database is empty")
+                        .unwrap(),
                 )
             }
         };
@@ -233,9 +234,7 @@ impl Api for CryptocurrencyApi {
         let wallet_info = move |req: &mut Request| -> IronResult<Response> {
             let path = req.url.path();
             let wallet_key = path.last().unwrap();
-            let public_key = PublicKey::from_hex(wallet_key).map_err(
-                ApiError::FromHex,
-            )?;
+            let public_key = PublicKey::from_hex(wallet_key).map_err(ApiError::FromHex)?;
             if let Some(wallet) = self_.get_wallet(&public_key) {
                 self_.ok_response(&serde_json::to_value(wallet).unwrap())
             } else {
