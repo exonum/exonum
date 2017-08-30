@@ -173,7 +173,6 @@ impl CryptocurrencyApi {
         let mut schema = CurrencySchema { view: &mut view };
         let idx = schema.wallets();
         let wallets: Vec<Wallet> = idx.values().collect();
-        println!("wallets count: {}", wallets.len());
         if wallets.is_empty() {
             None
         } else {
