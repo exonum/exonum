@@ -28,7 +28,9 @@ mod tests {
     use std::collections::BTreeMap;
 
     use exonum::storage::{ProofMapIndex, Database, Fork, LevelDB, LevelDBOptions, LevelDBCache,
-                          StorageValue, Patch, RocksDB, RocksDBOptions, RocksBlockOptions};
+                          StorageValue, Patch};
+    #[cfg(feature = "rocksdb")]
+    use exonum::storage::{RocksDB, RocksDBOptions, RocksBlockOptions};
     use exonum::blockchain::{Blockchain, Transaction};
     use exonum::crypto::{gen_keypair, Hash, PublicKey, SecretKey};
     use exonum::messages::Message;
@@ -167,6 +169,7 @@ mod tests {
         b.iter(|| execute_block(&blockchain, 100, &txs, &pool));
     }
 
+    #[cfg(feature = "rocksdb")]
     fn create_rocksdb(tempdir: &TempDir) -> Box<Database> {
         let mut block_options = RocksBlockOptions::default();
         block_options.set_block_size(4 * 1024);
@@ -223,6 +226,7 @@ mod tests {
         execute_cryptocurrency(db, b)
     }
 
+    #[cfg(feature = "rocksdb")]
     #[bench]
     fn bench_execute_block_timestamping_rocksdb(b: &mut Bencher) {
         let tempdir = TempDir::new("exonum").unwrap();
@@ -230,6 +234,7 @@ mod tests {
         execute_timestamping(db, b)
     }
 
+    #[cfg(feature = "rocksdb")]
     #[bench]
     fn bench_execute_block_cryptocurrency_rocksdb(b: &mut Bencher) {
         let tempdir = TempDir::new("exonum").unwrap();
