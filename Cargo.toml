@@ -28,3 +28,6 @@ router = "0.5.1"
 iron = "0.5.1"
 bodyparser = "0.7.0"
 params = "0.6.0"
+
+[replace]
+"exonum:0.1.0" = { git = "https://github.com/exonum/exonum.git", rev = "64518cec0b091d2eeca6c62356b78dc37d5942ee" }

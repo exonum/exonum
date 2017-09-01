@@ -36,7 +36,7 @@ use exonum::blockchain::{Service, Transaction};
 use exonum::events::Error as EventsError;
 use exonum::messages::{Message, RawMessage};
 use exonum::api::Api;
-use exonum::helpers::init_logger;
+use exonum::helpers::{init_logger, ValidatorId, Height};
 use exonum::encoding::serialize::json::reexport as serde_json;
 use sandbox::sandbox::{sandbox_with_services, Sandbox};
 use sandbox::sandbox_tests_helper::{add_one_height_with_transactions, SandboxState};
@@ -144,7 +144,7 @@ impl ConfigurationApiSandbox {
         }
     }
 
-    fn obtain_test_api(&self, validator_id: usize) -> Router {
+    fn obtain_test_api(&self, validator_id: ValidatorId) -> Router {
         let channel = TestTxSender { transactions: self.transactions.clone() };
         let blockchain = self.sandbox.blockchain_ref().clone();
         let keypair = (
@@ -176,12 +176,12 @@ impl ConfigurationApiSandbox {
     }
 
     fn get_actual_config(&self) -> IronResult<Response> {
-        let api = self.obtain_test_api(0);
+        let api = self.obtain_test_api(ValidatorId::zero());
         request_get("/v1/configs/actual", &api)
     }
 
     fn get_following_config(&self) -> IronResult<Response> {
-        let api = self.obtain_test_api(0);
+        let api = self.obtain_test_api(ValidatorId::zero());
         request_get("/v1/configs/following", &api)
     }
 
@@ -194,7 +194,7 @@ impl ConfigurationApiSandbox {
     }
 
     fn get_config_by_hash_str<A: AsRef<str>>(&self, hash_str: A) -> IronResult<Response> {
-        let api = self.obtain_test_api(0);
+        let api = self.obtain_test_api(ValidatorId::zero());
         request_get(format!("/v1/configs/{}", hash_str.as_ref()), &api)
     }
 
@@ -207,13 +207,13 @@ impl ConfigurationApiSandbox {
     }
 
     fn get_config_votes_by_str<A: AsRef<str>>(&self, hash_str: A) -> IronResult<Response> {
-        let api = self.obtain_test_api(0);
+        let api = self.obtain_test_api(ValidatorId::zero());
         request_get(format!("/v1/configs/{}/votes", hash_str.as_ref()), &api)
     }
 
     fn post_config_propose<T: Serialize>(
         &self,
-        validator_id: usize,
+        validator_id: ValidatorId,
         config: T,
     ) -> IronResult<Response> {
         let api = self.obtain_test_api(validator_id);
@@ -222,7 +222,7 @@ impl ConfigurationApiSandbox {
 
     fn post_config_vote<T: Serialize>(
         &self,
-        validator_id: usize,
+        validator_id: ValidatorId,
         config_hash: Hash,
         body: T,
     ) -> IronResult<Response> {
@@ -235,7 +235,7 @@ impl ConfigurationApiSandbox {
 
     fn post_config_vote_by_str<T: Serialize, A: AsRef<str>>(
         &self,
-        validator_id: usize,
+        validator_id: ValidatorId,
         hash_str: A,
         body: T,
     ) -> IronResult<Response> {
@@ -283,12 +283,16 @@ fn test_get_following_config() {
 
     let string_len = rng.gen_range(20u8, 255u8);
     let cfg_name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
-    let following_cfg =
-        generate_config_with_message(initial_cfg.hash(), 10, &cfg_name, &api_sandbox.sandbox);
+    let following_cfg = generate_config_with_message(
+        initial_cfg.hash(),
+        Height(10),
+        &cfg_name,
+        &api_sandbox.sandbox,
+    );
 
     {
         api_sandbox
-            .post_config_propose(0, following_cfg.clone())
+            .post_config_propose(ValidatorId::zero(), following_cfg.clone())
             .unwrap();
         api_sandbox.commit();
     }
@@ -296,8 +300,9 @@ fn test_get_following_config() {
         let n_validators = api_sandbox.sandbox.n_validators();
         (0..api_sandbox.sandbox.majority_count(n_validators))
             .inspect(|validator_id| {
+                let validator_id = ValidatorId((*validator_id) as u16);
                 api_sandbox
-                    .post_config_vote(*validator_id, following_cfg.hash(), validator_id)
+                    .post_config_vote(validator_id, following_cfg.hash(), validator_id)
                     .unwrap();
             })
             .collect::<Vec<_>>();
@@ -339,10 +344,14 @@ fn test_get_config_by_hash2() {
 
     let string_len = rng.gen_range(20u8, 255u8);
     let cfg_name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
-    let following_cfg =
-        generate_config_with_message(initial_cfg.hash(), 10, &cfg_name, &api_sandbox.sandbox);
+    let following_cfg = generate_config_with_message(
+        initial_cfg.hash(),
+        Height(10),
+        &cfg_name,
+        &api_sandbox.sandbox,
+    );
 
-    let proposer = 0;
+    let proposer = ValidatorId::zero();
     {
         api_sandbox
             .post_config_propose(proposer, following_cfg.clone())
@@ -396,10 +405,14 @@ fn test_get_config_by_hash3() {
 
     let string_len = rng.gen_range(20u8, 255u8);
     let cfg_name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
-    let following_cfg =
-        generate_config_with_message(initial_cfg.hash(), 10, &cfg_name, &api_sandbox.sandbox);
+    let following_cfg = generate_config_with_message(
+        initial_cfg.hash(),
+        Height(10),
+        &cfg_name,
+        &api_sandbox.sandbox,
+    );
 
-    let proposer = 0;
+    let proposer = ValidatorId::zero();
     {
         api_sandbox
             .post_config_propose(proposer, following_cfg.clone())
@@ -411,13 +424,15 @@ fn test_get_config_by_hash3() {
         let excluded_validator = 2;
         let votes = (0..api_sandbox.sandbox.majority_count(n_validators) + 1)
             .inspect(|validator_id| if *validator_id != excluded_validator {
+                let validator_id = ValidatorId((*validator_id) as u16);
                 api_sandbox
-                    .post_config_vote(*validator_id, following_cfg.hash(), validator_id)
+                    .post_config_vote(validator_id, following_cfg.hash(), validator_id)
                     .unwrap();
             })
             .map(|validator_id| if validator_id == excluded_validator {
                 ZEROVOTE.clone()
             } else {
+                let validator_id = ValidatorId(validator_id as u16);
                 let (pub_key, sec_key) =
                     (
                         api_sandbox.sandbox.service_public_key(validator_id),
@@ -473,15 +488,19 @@ fn test_get_config_votes() {
 
     let string_len = rng.gen_range(20u8, 255u8);
     let cfg_name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
-    let following_cfg =
-        generate_config_with_message(initial_cfg.hash(), 10, &cfg_name, &api_sandbox.sandbox);
+    let following_cfg = generate_config_with_message(
+        initial_cfg.hash(),
+        Height(10),
+        &cfg_name,
+        &api_sandbox.sandbox,
+    );
 
     let expected_body: ApiResponseVotesInfo = None;
     let resp_config_votes = api_sandbox.get_config_votes(following_cfg.hash()).unwrap();
     let actual_body = response_body(resp_config_votes);
     assert_eq!(actual_body, serde_json::to_value(expected_body).unwrap());
 
-    let proposer = 0;
+    let proposer = ValidatorId::zero();
     {
         api_sandbox
             .post_config_propose(proposer, following_cfg.clone())
@@ -502,13 +521,15 @@ fn test_get_config_votes() {
         let excluded_validator = 2;
         let votes = (0..api_sandbox.sandbox.majority_count(n_validators) + 1)
             .inspect(|validator_id| if *validator_id != excluded_validator {
+                let validator_id = ValidatorId((*validator_id) as u16);
                 api_sandbox
-                    .post_config_vote(*validator_id, following_cfg.hash(), validator_id)
+                    .post_config_vote(validator_id, following_cfg.hash(), validator_id)
                     .unwrap();
             })
             .map(|validator_id| if validator_id == excluded_validator {
                 None
             } else {
+                let validator_id = ValidatorId(validator_id as u16);
                 let (pub_key, sec_key) =
                     (
                         api_sandbox.sandbox.service_public_key(validator_id),
@@ -536,9 +557,13 @@ fn test_post_propose_response() {
 
     let string_len = rng.gen_range(20u8, 255u8);
     let cfg_name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
-    let following_cfg =
-        generate_config_with_message(initial_cfg.hash(), 10, &cfg_name, &api_sandbox.sandbox);
-    let proposer = 0;
+    let following_cfg = generate_config_with_message(
+        initial_cfg.hash(),
+        Height(10),
+        &cfg_name,
+        &api_sandbox.sandbox,
+    );
+    let proposer = ValidatorId::zero();
     let (pub_key, sec_key) = (
         api_sandbox.sandbox.service_public_key(proposer),
         api_sandbox.sandbox.service_secret_key(proposer).clone(),
@@ -570,11 +595,11 @@ fn test_post_vote_response() {
 
     let following_cfg = generate_config_with_message(
         initial_cfg.hash(),
-        10,
+        Height(10),
         "config which is voted for",
         &api_sandbox.sandbox,
     );
-    let voter = 0;
+    let voter = ValidatorId::zero();
     let (pub_key, sec_key) = (
         api_sandbox.sandbox.service_public_key(voter),
         api_sandbox.sandbox.service_secret_key(voter).clone(),
