@@ -235,11 +235,9 @@ impl PublicConfigApi {
         };
         actual_from = match map.find(&["actual_from"]) {
             Some(&Value::String(ref from_str)) => {
-                Some(from_str.parse().map(Height).map_err(
-                    |e: ParseIntError| {
-                        ApiError::IncorrectRequest(Box::new(e))
-                    },
-                )?)
+                Some(from_str.parse().map(Height).map_err(|e: ParseIntError| {
+                    ApiError::IncorrectRequest(Box::new(e))
+                })?)
             }
             _ => None,
         };

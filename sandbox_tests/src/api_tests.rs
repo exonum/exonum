@@ -176,12 +176,12 @@ impl ConfigurationApiSandbox {
     }
 
     fn get_actual_config(&self) -> IronResult<Response> {
-        let api = self.obtain_test_api(ValidatorId(0));
+        let api = self.obtain_test_api(ValidatorId::zero());
         request_get("/v1/configs/actual", &api)
     }
 
     fn get_following_config(&self) -> IronResult<Response> {
-        let api = self.obtain_test_api(ValidatorId(0));
+        let api = self.obtain_test_api(ValidatorId::zero());
         request_get("/v1/configs/following", &api)
     }
 
@@ -194,7 +194,7 @@ impl ConfigurationApiSandbox {
     }
 
     fn get_config_by_hash_str<A: AsRef<str>>(&self, hash_str: A) -> IronResult<Response> {
-        let api = self.obtain_test_api(ValidatorId(0));
+        let api = self.obtain_test_api(ValidatorId::zero());
         request_get(format!("/v1/configs/{}", hash_str.as_ref()), &api)
     }
 
@@ -207,7 +207,7 @@ impl ConfigurationApiSandbox {
     }
 
     fn get_config_votes_by_str<A: AsRef<str>>(&self, hash_str: A) -> IronResult<Response> {
-        let api = self.obtain_test_api(ValidatorId(0));
+        let api = self.obtain_test_api(ValidatorId::zero());
         request_get(format!("/v1/configs/{}/votes", hash_str.as_ref()), &api)
     }
 
@@ -292,7 +292,7 @@ fn test_get_following_config() {
 
     {
         api_sandbox
-            .post_config_propose(ValidatorId(0), following_cfg.clone())
+            .post_config_propose(ValidatorId::zero(), following_cfg.clone())
             .unwrap();
         api_sandbox.commit();
     }
@@ -351,7 +351,7 @@ fn test_get_config_by_hash2() {
         &api_sandbox.sandbox,
     );
 
-    let proposer = ValidatorId(0);
+    let proposer = ValidatorId::zero();
     {
         api_sandbox
             .post_config_propose(proposer, following_cfg.clone())
@@ -412,7 +412,7 @@ fn test_get_config_by_hash3() {
         &api_sandbox.sandbox,
     );
 
-    let proposer = ValidatorId(0);
+    let proposer = ValidatorId::zero();
     {
         api_sandbox
             .post_config_propose(proposer, following_cfg.clone())
@@ -500,7 +500,7 @@ fn test_get_config_votes() {
     let actual_body = response_body(resp_config_votes);
     assert_eq!(actual_body, serde_json::to_value(expected_body).unwrap());
 
-    let proposer = ValidatorId(0);
+    let proposer = ValidatorId::zero();
     {
         api_sandbox
             .post_config_propose(proposer, following_cfg.clone())
@@ -563,7 +563,7 @@ fn test_post_propose_response() {
         &cfg_name,
         &api_sandbox.sandbox,
     );
-    let proposer = ValidatorId(0);
+    let proposer = ValidatorId::zero();
     let (pub_key, sec_key) = (
         api_sandbox.sandbox.service_public_key(proposer),
         api_sandbox.sandbox.service_secret_key(proposer).clone(),
@@ -599,7 +599,7 @@ fn test_post_vote_response() {
         "config which is voted for",
         &api_sandbox.sandbox,
     );
-    let voter = ValidatorId(0);
+    let voter = ValidatorId::zero();
     let (pub_key, sec_key) = (
         api_sandbox.sandbox.service_public_key(voter),
         api_sandbox.sandbox.service_secret_key(voter).clone(),

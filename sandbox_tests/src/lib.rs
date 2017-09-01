@@ -127,9 +127,9 @@ mod tests {
         use serde_json::Value;
         let (sandbox, sandbox_state, initial_cfg) = configuration_sandbox();
 
-        sandbox.assert_state(Height(1), Round(1));
+        sandbox.assert_state(Height(1), Round::first());
         add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
-        sandbox.assert_state(Height(2), Round(1));
+        sandbox.assert_state(Height(2), Round::first());
 
         assert_eq!(sandbox.is_validator(), true);
 
@@ -176,7 +176,7 @@ mod tests {
             }
             add_one_height_with_transactions(&sandbox, &sandbox_state, &votes);
         }
-        sandbox.assert_state(Height(4), Round(1));
+        sandbox.assert_state(Height(4), Round::first());
         assert_eq!(full_node_cfg, sandbox.cfg());
         assert_eq!(sandbox.is_validator(), false);
 
@@ -215,7 +215,7 @@ mod tests {
             }
             add_one_height_with_transactions_from_other_validator(&sandbox, &sandbox_state, &votes);
         }
-        sandbox.assert_state(Height(6), Round(1));
+        sandbox.assert_state(Height(6), Round::first());
         assert_eq!(validator_cfg, sandbox.cfg());
         assert_eq!(sandbox.is_validator(), true);
 
@@ -225,7 +225,7 @@ mod tests {
     fn test_add_validators_to_config() {
         let (mut sandbox, sandbox_state, initial_cfg) = configuration_sandbox();
         let start_time = sandbox.time();
-        sandbox.assert_state(Height(1), Round(1));
+        sandbox.assert_state(Height(1), Round::first());
 
         let new_validator_keypairs: Vec<_> = (40..44)
             .map(|seed_num| {
@@ -270,7 +270,7 @@ mod tests {
                 sandbox.service_secret_key(ValidatorId(1)),
             );
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
-            sandbox.assert_state(Height(2), Round(1));
+            sandbox.assert_state(Height(2), Round::first());
         }
         {
             let mut votes = Vec::new();
@@ -286,7 +286,7 @@ mod tests {
                 );
             }
             add_one_height_with_transactions(&sandbox, &sandbox_state, &votes);
-            sandbox.assert_state(Height(3), Round(1));
+            sandbox.assert_state(Height(3), Round::first());
         }
         {
             let consensus_keys = new_validator_keypairs.iter().cloned().collect();
@@ -294,7 +294,7 @@ mod tests {
             sandbox.set_validators_map(new_len as u8, consensus_keys, service_keys);
             sandbox.initialize(start_time, old_len, new_len);
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
-            sandbox.assert_state(Height(4), Round(1));
+            sandbox.assert_state(Height(4), Round::first());
         }
         let new_cfg =
             generate_config_with_message(added_keys_cfg.hash(), Height(8), "First cfg", &sandbox);
@@ -305,7 +305,7 @@ mod tests {
                 sandbox.service_secret_key(ValidatorId(1)),
             );
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
-            sandbox.assert_state(Height(5), Round(1));
+            sandbox.assert_state(Height(5), Round::first());
         }
         {
             let mut votes = Vec::new();
@@ -321,7 +321,7 @@ mod tests {
                 );
             }
             add_one_height_with_transactions(&sandbox, &sandbox_state, &votes);
-            sandbox.assert_state(Height(6), Round(1));
+            sandbox.assert_state(Height(6), Round::first());
             assert_eq!(None, sandbox.following_cfg());
         }
         {
@@ -332,7 +332,7 @@ mod tests {
                 sandbox.service_secret_key(validator_5),
             );
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[last_vote.raw().clone()]);
-            sandbox.assert_state(Height(7), Round(1));
+            sandbox.assert_state(Height(7), Round::first());
             assert_eq!(Some(new_cfg), sandbox.following_cfg());
         }
     }
@@ -340,7 +340,7 @@ mod tests {
     #[test]
     fn test_exclude_sandbox_node_from_config() {
         let (sandbox, sandbox_state, initial_cfg) = configuration_sandbox();
-        sandbox.assert_state(Height(1), Round(1));
+        sandbox.assert_state(Height(1), Round::first());
 
         let new_public_keys = (40..44)
             .map(|seed| {
@@ -375,7 +375,7 @@ mod tests {
                 sandbox.service_secret_key(ValidatorId(1)),
             );
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
-            sandbox.assert_state(Height(2), Round(1));
+            sandbox.assert_state(Height(2), Round::first());
         }
         {
             let mut votes = Vec::new();
@@ -391,14 +391,14 @@ mod tests {
                 );
             }
             add_one_height_with_transactions(&sandbox, &sandbox_state, &votes);
-            sandbox.assert_state(Height(3), Round(1));
+            sandbox.assert_state(Height(3), Round::first());
         }
     }
 
     #[test]
     fn test_discard_propose_for_same_cfg() {
         let (sandbox, sandbox_state, initial_cfg) = configuration_sandbox();
-        sandbox.assert_state(Height(1), Round(1));
+        sandbox.assert_state(Height(1), Round::first());
         let new_cfg =
             generate_config_with_message(initial_cfg.hash(), Height(4), "First cfg", &sandbox);
         let propose_tx = TxConfigPropose::new(
@@ -408,14 +408,14 @@ mod tests {
         );
         {
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
-            sandbox.assert_state(Height(2), Round(1));
+            sandbox.assert_state(Height(2), Round::first());
             assert_eq!(
                 Some(propose_tx.clone()),
                 get_propose(&sandbox, new_cfg.hash())
             );
         }
         {
-            let validator_0 = ValidatorId(0);
+            let validator_0 = ValidatorId::zero();
             let duplicate_cfg_propose = TxConfigPropose::new(
                 &sandbox.service_public_key(validator_0),
                 str::from_utf8(new_cfg.clone().into_bytes().as_slice())
@@ -427,7 +427,7 @@ mod tests {
                 &sandbox_state,
                 &[duplicate_cfg_propose.raw().clone()],
             );
-            sandbox.assert_state(Height(3), Round(1));
+            sandbox.assert_state(Height(3), Round::first());
             assert_eq!(Some(propose_tx), get_propose(&sandbox, new_cfg.hash()));
         }
     }
@@ -435,7 +435,7 @@ mod tests {
     #[test]
     fn test_discard_vote_for_absent_propose() {
         let (sandbox, sandbox_state, initial_cfg) = configuration_sandbox();
-        sandbox.assert_state(Height(1), Round(1));
+        sandbox.assert_state(Height(1), Round::first());
         let new_cfg =
             generate_config_with_message(initial_cfg.hash(), Height(4), "First cfg", &sandbox);
         let absent_cfg =
@@ -448,7 +448,7 @@ mod tests {
                 sandbox.service_secret_key(validator_1),
             );
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
-            sandbox.assert_state(Height(2), Round(1));
+            sandbox.assert_state(Height(2), Round::first());
         }
         {
             let validator_3 = ValidatorId(3);
@@ -467,7 +467,7 @@ mod tests {
                 &sandbox_state,
                 &[legal_vote.raw().clone(), illegal_vote.raw().clone()],
             );
-            sandbox.assert_state(Height(3), Round(1));
+            sandbox.assert_state(Height(3), Round::first());
             let votes = get_votes_for_propose(&sandbox, new_cfg.hash());
             assert!(votes.contains(&Some(legal_vote)));
             assert!(!votes.contains(&Some(illegal_vote)));
@@ -483,7 +483,7 @@ mod tests {
             for _ in 1..target_height {
                 add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
             }
-            sandbox.assert_state(Height(target_height), Round(1));
+            sandbox.assert_state(Height(target_height), Round::first());
         }
         let new_cfg = generate_config_with_message(
             initial_cfg.hash(),
@@ -498,7 +498,7 @@ mod tests {
                 sandbox.service_secret_key(ValidatorId(1)),
             );
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
-            sandbox.assert_state(Height(target_height).next(), Round(1));
+            sandbox.assert_state(Height(target_height).next(), Round::first());
             assert_eq!(None, get_propose(&sandbox, new_cfg.hash()));
         }
     }
@@ -506,7 +506,7 @@ mod tests {
     #[test]
     fn test_discard_votes_with_expired_actual_from() {
         let (sandbox, sandbox_state, initial_cfg) = configuration_sandbox();
-        sandbox.assert_state(Height(1), Round(1));
+        sandbox.assert_state(Height(1), Round::first());
         let target_height = 10;
 
         let new_cfg = generate_config_with_message(
@@ -523,7 +523,7 @@ mod tests {
                 sandbox.service_secret_key(validator_1),
             );
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
-            sandbox.assert_state(Height(2), Round(1));
+            sandbox.assert_state(Height(2), Round::first());
             assert_eq!(Some(propose_tx), get_propose(&sandbox, new_cfg.hash()));
         }
         {
@@ -534,7 +534,7 @@ mod tests {
                 sandbox.service_secret_key(validator_3),
             );
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[legal_vote.raw().clone()]);
-            sandbox.assert_state(Height(3), Round(1));
+            sandbox.assert_state(Height(3), Round::first());
             let votes = get_votes_for_propose(&sandbox, new_cfg.hash());
             assert!(votes.contains(&Some(legal_vote)));
         }
@@ -542,10 +542,10 @@ mod tests {
             for _ in 3..target_height {
                 add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
             }
-            sandbox.assert_state(Height(target_height), Round(1));
+            sandbox.assert_state(Height(target_height), Round::first());
         }
         {
-            let validator_0 = ValidatorId(0);
+            let validator_0 = ValidatorId::zero();
             let illegal_vote = TxConfigVote::new(
                 &sandbox.service_public_key(validator_0),
                 &new_cfg.hash(),
@@ -556,7 +556,7 @@ mod tests {
                 &sandbox_state,
                 &[illegal_vote.raw().clone()],
             );
-            sandbox.assert_state(Height(target_height).next(), Round(1));
+            sandbox.assert_state(Height(target_height).next(), Round::first());
             let votes = get_votes_for_propose(&sandbox, new_cfg.hash());
             assert!(!votes.contains(&Some(illegal_vote)));
         }
@@ -565,7 +565,7 @@ mod tests {
     #[test]
     fn test_discard_invalid_config_json() {
         let (sandbox, sandbox_state, _) = configuration_sandbox();
-        sandbox.assert_state(Height(1), Round(1));
+        sandbox.assert_state(Height(1), Round::first());
         let cfg_bytes = [70; 74];
         let new_cfg = str::from_utf8(&cfg_bytes).unwrap(); // invalid json bytes
         {
@@ -575,7 +575,7 @@ mod tests {
                 sandbox.service_secret_key(ValidatorId(1)),
             );
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
-            sandbox.assert_state(Height(2), Round(1));
+            sandbox.assert_state(Height(2), Round::first());
             assert_eq!(None, get_propose(&sandbox, hash(new_cfg.as_bytes())));
         }
     }
@@ -589,7 +589,7 @@ mod tests {
             for _ in 0..target_height {
                 add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
             }
-            sandbox.assert_state(Height(target_height).next(), Round(1));
+            sandbox.assert_state(Height(target_height).next(), Round::first());
         }
         let new_cfg = generate_config_with_message(
             initial_cfg.hash(),
@@ -604,7 +604,7 @@ mod tests {
                 sandbox.service_secret_key(ValidatorId(1)),
             );
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
-            sandbox.assert_state(Height(target_height + 2), Round(1));
+            sandbox.assert_state(Height(target_height + 2), Round::first());
             assert_eq!(propose_tx, get_propose(&sandbox, new_cfg.hash()).unwrap());
         }
         {
@@ -627,7 +627,7 @@ mod tests {
                 sandbox.service_secret_key(validator_2),
             );
             add_one_height_with_transactions(&sandbox, &sandbox_state, &expected_votes);
-            sandbox.assert_state(Height(target_height + 3), Round(1));
+            sandbox.assert_state(Height(target_height + 3), Round::first());
             let actual_votes = get_votes_for_propose(&sandbox, new_cfg.hash());
             for raw_vote in expected_votes {
                 let exp_vote = TxConfigVote::from_raw(raw_vote).unwrap();
@@ -645,7 +645,7 @@ mod tests {
                 sandbox.service_secret_key(validator_2),
             );
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[vote3.raw().clone()]);
-            sandbox.assert_state(Height(target_height + 4), Round(1));
+            sandbox.assert_state(Height(target_height + 4), Round::first());
             let votes = get_votes_for_propose(&sandbox, new_cfg.hash());
             assert!(votes.contains(&Some(vote3)));
             assert_eq!(new_cfg, sandbox.cfg());
@@ -655,7 +655,7 @@ mod tests {
     #[test]
     fn test_config_txs_discarded_when_following_config_present() {
         let (sandbox, sandbox_state, initial_cfg) = configuration_sandbox();
-        sandbox.assert_state(Height(1), Round(1));
+        sandbox.assert_state(Height(1), Round::first());
 
         let following_config = generate_config_with_message(
             initial_cfg.hash(),
@@ -672,7 +672,7 @@ mod tests {
                 sandbox.service_secret_key(ValidatorId(1)),
             );
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[propose_tx.raw().clone()]);
-            sandbox.assert_state(Height(2), Round(1));
+            sandbox.assert_state(Height(2), Round::first());
             assert_eq!(
                 Some(propose_tx),
                 get_propose(&sandbox, following_config.hash())
@@ -691,7 +691,7 @@ mod tests {
                 })
                 .collect::<Vec<_>>();
             add_one_height_with_transactions(&sandbox, &sandbox_state, &votes);
-            sandbox.assert_state(Height(3), Round(1));
+            sandbox.assert_state(Height(3), Round::first());
             assert_eq!(sandbox.cfg(), initial_cfg);
             assert_eq!(sandbox.following_cfg(), Some(following_config.clone()));
         }
@@ -709,14 +709,14 @@ mod tests {
                 &sandbox_state,
                 &[propose_tx_new.raw().clone()],
             );
-            sandbox.assert_state(Height(4), Round(1));
+            sandbox.assert_state(Height(4), Round::first());
 
             assert_eq!(None, get_propose(&sandbox, new_cfg.hash()));
         }
         let vote_validator_0 = TxConfigVote::new(
-            &sandbox.service_public_key(ValidatorId(0)),
+            &sandbox.service_public_key(ValidatorId::zero()),
             &following_config.hash(),
-            sandbox.service_secret_key(ValidatorId(0)),
+            sandbox.service_secret_key(ValidatorId::zero()),
         );
         let vote_validator_3 = TxConfigVote::new(
             &sandbox.service_public_key(ValidatorId(3)),
@@ -729,7 +729,7 @@ mod tests {
                 &sandbox_state,
                 &[vote_validator_3.raw().clone()],
             );
-            sandbox.assert_state(Height(5), Round(1));
+            sandbox.assert_state(Height(5), Round::first());
 
             let votes = get_votes_for_propose(&sandbox, following_config.hash());
             assert!(votes.contains(&Some(vote_validator_0)));
@@ -738,7 +738,7 @@ mod tests {
         }
         {
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
-            sandbox.assert_state(Height(6), Round(1));
+            sandbox.assert_state(Height(6), Round::first());
             assert_eq!(following_config, sandbox.cfg());
         }
     }
@@ -746,7 +746,7 @@ mod tests {
     #[test]
     fn test_config_txs_discarded_when_not_referencing_actual_config_or_sent_by_illegal_validator() {
         let (sandbox, sandbox_state, initial_cfg) = configuration_sandbox();
-        sandbox.assert_state(Height(1), Round(1));
+        sandbox.assert_state(Height(1), Round::first());
 
         let new_cfg_bad_previous_cfg = generate_config_with_message(
             Hash::new([11; HASH_SIZE]),
@@ -793,7 +793,7 @@ mod tests {
                     illegal_propose2.raw().clone(),
                 ],
             );
-            sandbox.assert_state(Height(2), Round(1));
+            sandbox.assert_state(Height(2), Round::first());
             assert_eq!(None, get_propose(&sandbox, new_cfg_bad_previous_cfg.hash()));
             assert_eq!(None, get_propose(&sandbox, new_cfg.hash()));
         }
@@ -814,7 +814,7 @@ mod tests {
                 &sandbox_state,
                 &[legal_propose1.raw().clone(), legal_propose2.raw().clone()],
             );
-            sandbox.assert_state(Height(3), Round(1));
+            sandbox.assert_state(Height(3), Round::first());
             assert_eq!(Some(legal_propose1), get_propose(&sandbox, new_cfg.hash()));
             assert_eq!(
                 Some(legal_propose2),
@@ -829,7 +829,7 @@ mod tests {
                 &sandbox_state,
                 &[illegal_validator_vote.raw().clone()],
             );
-            sandbox.assert_state(Height(4), Round(1));
+            sandbox.assert_state(Height(4), Round::first());
             let votes = get_votes_for_propose(&sandbox, discarded_votes_cfg.hash());
             assert!(!votes.contains(&Some(illegal_validator_vote)));
         }
@@ -846,13 +846,13 @@ mod tests {
                 })
                 .collect::<Vec<_>>();
             add_one_height_with_transactions(&sandbox, &sandbox_state, &votes);
-            sandbox.assert_state(Height(5), Round(1));
+            sandbox.assert_state(Height(5), Round::first());
             assert_eq!(initial_cfg, sandbox.cfg());
             assert_eq!(Some(new_cfg.clone()), sandbox.following_cfg());
         }
         {
             add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
-            sandbox.assert_state(Height(6), Round(1));
+            sandbox.assert_state(Height(6), Round::first());
             assert_eq!(new_cfg, sandbox.cfg());
             assert_eq!(None, sandbox.following_cfg());
         }
@@ -869,7 +869,7 @@ mod tests {
                 })
                 .collect::<Vec<_>>();
             add_one_height_with_transactions(&sandbox, &sandbox_state, &expected_votes);
-            sandbox.assert_state(Height(7), Round(1));
+            sandbox.assert_state(Height(7), Round::first());
             let actual_votes = get_votes_for_propose(&sandbox, discarded_votes_cfg.hash());
             for raw_vote in expected_votes {
                 let exp_vote = TxConfigVote::from_raw(raw_vote).unwrap();
@@ -882,7 +882,7 @@ mod tests {
     #[test]
     fn test_regression_majority_votes_for_different_proposes() {
         let (sandbox, sandbox_state, initial_cfg) = configuration_sandbox();
-        sandbox.assert_state(Height(1), Round(1));
+        sandbox.assert_state(Height(1), Round::first());
 
         let actual_from = Height(5);
 
@@ -904,7 +904,7 @@ mod tests {
             }
 
             add_one_height_with_transactions(&sandbox, &sandbox_state, &proposes);
-            sandbox.assert_state(Height(2), Round(1));
+            sandbox.assert_state(Height(2), Round::first());
         }
         {
             let mut votes = Vec::new();
@@ -921,7 +921,7 @@ mod tests {
             }
 
             add_one_height_with_transactions(&sandbox, &sandbox_state, &votes);
-            sandbox.assert_state(Height(3), Round(1));
+            sandbox.assert_state(Height(3), Round::first());
             assert_eq!(initial_cfg, sandbox.cfg());
         }
         {
@@ -937,7 +937,7 @@ mod tests {
                 &sandbox_state,
                 &[prop2_validator2.raw().clone()],
             );
-            sandbox.assert_state(Height(4), Round(1));
+            sandbox.assert_state(Height(4), Round::first());
             assert_eq!(initial_cfg, sandbox.cfg());
         }
         {
@@ -953,7 +953,7 @@ mod tests {
                 &sandbox_state,
                 &[prop1_validator2.raw().clone()],
             );
-            sandbox.assert_state(Height(5), Round(1));
+            sandbox.assert_state(Height(5), Round::first());
             assert_eq!(new_cfg1, sandbox.cfg());
         }
     }
@@ -961,7 +961,7 @@ mod tests {
     #[test]
     fn test_regression_new_vote_for_older_config_applies_old_config() {
         let (sandbox, sandbox_state, initial_cfg) = configuration_sandbox();
-        sandbox.assert_state(Height(1), Round(1));
+        sandbox.assert_state(Height(1), Round::first());
 
         let new_cfg1 =
             generate_config_with_message(initial_cfg.hash(), Height(3), "First cfg", &sandbox);
@@ -980,7 +980,7 @@ mod tests {
                 &sandbox_state,
                 &[propose_tx1.raw().clone()],
             );
-            sandbox.assert_state(Height(2), Round(1));
+            sandbox.assert_state(Height(2), Round::first());
         }
         {
             let mut votes_for_new_cfg1 = Vec::new();
@@ -996,7 +996,7 @@ mod tests {
                 );
             }
             add_one_height_with_transactions(&sandbox, &sandbox_state, &votes_for_new_cfg1);
-            sandbox.assert_state(Height(3), Round(1));
+            sandbox.assert_state(Height(3), Round::first());
             assert_eq!(new_cfg1, sandbox.cfg());
         }
         {
@@ -1011,7 +1011,7 @@ mod tests {
                 &sandbox_state,
                 &[propose_tx2.raw().clone()],
             );
-            sandbox.assert_state(Height(4), Round(1));
+            sandbox.assert_state(Height(4), Round::first());
         }
         {
             let mut votes_for_new_cfg2 = Vec::new();
@@ -1027,7 +1027,7 @@ mod tests {
                 );
             }
             add_one_height_with_transactions(&sandbox, &sandbox_state, &votes_for_new_cfg2);
-            sandbox.assert_state(Height(5), Round(1));
+            sandbox.assert_state(Height(5), Round::first());
             assert_eq!(new_cfg2, sandbox.cfg());
         }
         {
@@ -1042,7 +1042,7 @@ mod tests {
                 &sandbox_state,
                 &[prop1_validator3.raw().clone()],
             );
-            sandbox.assert_state(Height(6), Round(1));
+            sandbox.assert_state(Height(6), Round::first());
             assert_eq!(new_cfg2, sandbox.cfg());
         }
     }
