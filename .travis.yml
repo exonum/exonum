@@ -94,7 +94,7 @@ script: |
       cargo fmt -p sandbox -- --write-mode=diff
   ;;
   "clippy-core" )
-      cd exonum && cargo clippy --features rocksdb -- -D warnings
+      cd exonum && cargo clippy --features long_benchmarks,rocksdb -- -D warnings
   ;;
   "clippy-sandbox" )
       cd sandbox && cargo clippy -- -D warnings
