@@ -623,7 +623,7 @@ impl Drop for Sandbox {
 
 fn gen_primitive_socket_addr(idx: u8) -> SocketAddr {
     let addr = Ipv4Addr::new(idx, idx, idx, idx);
-    SocketAddr::new(IpAddr::V4(addr), idx as u16)
+    SocketAddr::new(IpAddr::V4(addr), u16::from(idx))
 }
 
 pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {

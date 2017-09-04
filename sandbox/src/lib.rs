@@ -15,8 +15,6 @@
 extern crate rand;
 #[macro_use]
 extern crate log;
-extern crate env_logger;
-extern crate clap;
 #[macro_use]
 extern crate exonum;
 extern crate bit_vec;

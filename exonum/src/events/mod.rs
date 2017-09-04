@@ -384,5 +384,5 @@ fn num_milliseconds(duration: &Duration) -> Milliseconds {
 
     let secs_part = duration.as_secs() * MILLIS_PER_SEC;
     let nanos_part = duration.subsec_nanos() / NANOS_PER_MILLI;
-    secs_part + nanos_part as Milliseconds
+    secs_part + u64::from(nanos_part)
 }
