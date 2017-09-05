@@ -164,7 +164,7 @@ mod tests {
 
         b.iter(|| execute_block(&blockchain, 100, &txs, &pool));
     }
-
+    
     fn create_rocksdb(tempdir: &TempDir) -> Box<Database> {
         let mut block_options = RocksBlockOptions::default();
         block_options.set_block_size(4 * 1024);

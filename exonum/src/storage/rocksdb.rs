@@ -44,13 +44,13 @@ pub struct RocksDB {
     db: Arc<_RocksDB>,
 }
 
-/// A snapshot of `RocksDB`.
+/// A snapshot of a `RocksDB`.
 pub struct RocksDBSnapshot {
     snapshot: _Snapshot<'static>,
     _db: Arc<_RocksDB>,
 }
 
-/// A transaction of `RocksDB`
+/// A transaction of a `RocksDB`
 pub struct RocksDBTransaction {
     transaction: _Transaction,
 }
