@@ -278,25 +278,30 @@ fn test_network_reconnect() {
     let addrs: [SocketAddr; 2] =
         ["127.0.0.1:19100".parse().unwrap(), "127.0.0.1:19101".parse().unwrap()];
 
-
+    let msg = raw_message(11, 400);
     let c1 = connect_message(addrs[0]);
     let c2 = connect_message(addrs[1]);
+    let msg_cloned = msg.clone();
     let t1 = TestEvents::with_addr(addrs[0]).spawn(move |e: &mut TestHandler| {
         // Handle first attempt
         e.connect_with(addrs[1]);
         assert_eq!(e.wait_for_connect(), c2);
+        assert_eq!(e.wait_for_message(), msg_cloned);
         assert_eq!(e.wait_for_disconnect(), addrs[1]);
         // Handle second attempt
         assert_eq!(e.wait_for_connect(), c2);
         e.connect_with(addrs[1]);
+        assert_eq!(e.wait_for_message(), msg_cloned);
         assert_eq!(e.wait_for_disconnect(), addrs[1]);
     });
     // First connect attempt.
     let c1_cloned = c1.clone();
+    let msg_cloned = msg.clone();
     TestEvents::with_addr(addrs[1])
         .spawn(move |e: &mut TestHandler| {
             assert_eq!(e.wait_for_connect(), c1_cloned);
             e.connect_with(addrs[0]);
+            e.send_to(addrs[0], msg_cloned.clone());
             e.disconnect_with(addrs[0]);
             assert_eq!(e.wait_for_disconnect(), addrs[0]);
         })
@@ -304,10 +309,12 @@ fn test_network_reconnect() {
         .unwrap();
     // Second connect attempt.
     let c1_cloned = c1.clone();
+    let msg_cloned = msg.clone();
     TestEvents::with_addr(addrs[1])
         .spawn(move |e: &mut TestHandler| {
             e.connect_with(addrs[0]);
             assert_eq!(e.wait_for_connect(), c1_cloned);
+            e.send_to(addrs[0], msg_cloned.clone());
             e.disconnect_with(addrs[0]);
             assert_eq!(e.wait_for_disconnect(), addrs[0]);
         })
