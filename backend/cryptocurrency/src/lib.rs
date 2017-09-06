@@ -31,6 +31,7 @@ use exonum::storage::{Snapshot, Fork, ProofListIndex, ProofMapIndex};
 use exonum::blockchain::{Service, Transaction, ApiContext};
 use exonum::encoding::serialize::json::reexport as serde_json;
 use exonum::encoding::Error as StreamStructError;
+use exonum::helpers::fabric::{ServiceFactory, Context};
 use serde_json::{Value, to_value};
 
 use wallet::Wallet;
@@ -366,6 +367,12 @@ impl Service for CurrencyService {
         };
         api.wire(&mut router);
         Some(Box::new(router))
+    }
+}
+
+impl ServiceFactory for CurrencyService {
+    fn make_service(_: &Context) -> Box<Service> {
+        Box::new(CurrencyService::new())
     }
 }
 

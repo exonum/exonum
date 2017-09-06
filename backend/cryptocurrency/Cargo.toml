@@ -4,9 +4,10 @@ version = "0.1.0"
 authors = ["Exonum Team <exonum@bitfury.com>"]
 
 [dependencies]
+exonum = "0.1"
+exonum-configuration = "0.1"
 env_logger = "0.3"
 clap = {version="2.14", features=["unstable"]}
-
 time = "0.1"
 rand = "0.3"
 log = "0.3"
@@ -22,13 +23,3 @@ hyper = "0.10.4"
 cookie = "0.6.0"
 tempdir = "0.3.5"
 params = "0.6.0"
-
-[dependencies.exonum]
-git = "ssh://git@github.com/exonum/exonum.git"
-version = "0.1.0"
-rev = "17b4e7ced336f8f0fd3055c2c945ecb576c90c9b"
-
-# [dependencies.configuration_service]
-# git = "ssh://git@github.com/exonum/exonum-configuration.git"
-# version = "0.1.0"
-# rev = "fd753203427ffd95362839b7f166891f5ca097d0"

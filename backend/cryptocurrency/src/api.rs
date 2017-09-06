@@ -11,10 +11,10 @@ use std::fmt;
 
 use exonum::api::{Api, ApiError};
 use exonum::node::TransactionSend;
-use exonum::messages::{BlockProof, Message};
+use exonum::messages::Message;
 use exonum::crypto::{HexValue, PublicKey, Hash};
 use exonum::storage::{MapProof, ListProof};
-use exonum::blockchain::{self, Blockchain};
+use exonum::blockchain::{self, Blockchain, BlockProof};
 
 use super::tx_metarecord::TxMetaRecord;
 use super::wallet::Wallet;
@@ -72,7 +72,7 @@ impl<T> CryptocurrencyApi<T>
 
         {
             let wallets_root_hash = currency_schema.wallets_proof().root_hash(); //debug code
-            let check_result = to_wallets_table.verify_root_proof_consistency(
+            let check_result = to_wallets_table.validate(
                 &Blockchain::service_table_unique_key(CRYPTOCURRENCY_SERVICE_ID, 0),
                 state_hash); //debug code
             debug_assert_eq!(wallets_root_hash, *check_result.unwrap().unwrap());

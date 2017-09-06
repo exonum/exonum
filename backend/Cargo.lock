@@ -3,13 +3,13 @@ name = "cryptocurrency_api_tests"
 version = "0.1.0"
 dependencies = [
  "cryptocurrency 0.1.0",
- "exonum 0.1.0 (git+ssh://git@github.com/exonum/exonum.git?rev=17b4e7ced336f8f0fd3055c2c945ecb576c90c9b)",
+ "exonum 0.1.0 (git+https://github.com/exonum/exonum.git?tag=v0.1)",
  "iron 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "iron-test 0.5.0 (git+https://github.com/reem/iron-test)",
  "log 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "router 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "sandbox 0.1.0 (git+ssh://git@github.com/exonum/exonum.git?rev=17b4e7ced336f8f0fd3055c2c945ecb576c90c9b)",
+ "sandbox 0.1.0 (git+https://github.com/exonum/exonum.git?tag=v0.1)",
  "serde 1.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -158,7 +158,8 @@ dependencies = [
  "clap 2.25.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "cookie 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "exonum 0.1.0 (git+ssh://git@github.com/exonum/exonum.git?rev=17b4e7ced336f8f0fd3055c2c945ecb576c90c9b)",
+ "exonum 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "exonum-configuration 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "headers 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.10.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "iron 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -171,6 +172,16 @@ dependencies = [
  "serde_derive 1.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempdir 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.37 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "ctrlc"
+version = "3.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "kernel32-sys 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.24 (registry+https://github.com/rust-lang/crates.io-index)",
+ "winapi 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -204,7 +215,7 @@ dependencies = [
 [[package]]
 name = "exonum"
 version = "0.1.0"
-source = "git+ssh://git@github.com/exonum/exonum.git?rev=17b4e7ced336f8f0fd3055c2c945ecb576c90c9b#17b4e7ced336f8f0fd3055c2c945ecb576c90c9b"
+source = "git+https://github.com/exonum/exonum.git?tag=v0.1#9492809d6f5c2de4cf74b1e5c598e93ab7053f7b"
 dependencies = [
  "bit-vec 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "bodyparser 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -213,16 +224,16 @@ dependencies = [
  "colored 1.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "cookie 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "exonum_leveldb 0.9.0 (git+https://github.com/exonum/exonum.git?tag=v0.1)",
+ "exonum_profiler 0.1.0 (git+https://github.com/exonum/exonum.git?tag=v0.1)",
  "headers 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "hex 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "hyper 0.10.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "iron 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "leveldb 0.9.0 (git+ssh://git@github.com/exonum/exonum.git?rev=17b4e7ced336f8f0fd3055c2c945ecb576c90c9b)",
  "log 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "mio 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "mount 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "params 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "profiler 0.1.0 (git+ssh://git@github.com/exonum/exonum.git?rev=17b4e7ced336f8f0fd3055c2c945ecb576c90c9b)",
  "rand 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)",
  "router 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -232,6 +243,96 @@ dependencies = [
  "term 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "toml 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "vec_map 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "exonum"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "bit-vec 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bodyparser 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "byteorder 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "clap 2.25.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "colored 1.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cookie 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "env_logger 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "exonum_leveldb 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "exonum_profiler 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "headers 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hex 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hyper 0.10.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "iron 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mio 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mount 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "params 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)",
+ "router 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sodiumoxide 0.0.14 (registry+https://github.com/rust-lang/crates.io-index)",
+ "term 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "toml 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "vec_map 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "exonum-configuration"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "bodyparser 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "clap 2.25.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "env_logger 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "exonum 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "iron 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "params 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "router 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tempdir 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "exonum_leveldb"
+version = "0.9.0"
+source = "git+https://github.com/exonum/exonum.git?tag=v0.1#9492809d6f5c2de4cf74b1e5c598e93ab7053f7b"
+dependencies = [
+ "leveldb-sys 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.24 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "exonum_leveldb"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "leveldb-sys 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.24 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "exonum_profiler"
+version = "0.1.0"
+source = "git+https://github.com/exonum/exonum.git?tag=v0.1#9492809d6f5c2de4cf74b1e5c598e93ab7053f7b"
+dependencies = [
+ "ctrlc 3.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "thread-id 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "exonum_profiler"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "ctrlc 3.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "thread-id 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -345,18 +446,9 @@ version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "leveldb"
-version = "0.9.0"
-source = "git+ssh://git@github.com/exonum/exonum.git?rev=17b4e7ced336f8f0fd3055c2c945ecb576c90c9b#17b4e7ced336f8f0fd3055c2c945ecb576c90c9b"
-dependencies = [
- "leveldb-sys 3.0.0 (git+ssh://git@github.com/exonum/exonum.git?rev=17b4e7ced336f8f0fd3055c2c945ecb576c90c9b)",
- "libc 0.2.24 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "leveldb-sys"
-version = "3.0.0"
-source = "git+ssh://git@github.com/exonum/exonum.git?rev=17b4e7ced336f8f0fd3055c2c945ecb576c90c9b#17b4e7ced336f8f0fd3055c2c945ecb576c90c9b"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "libc 0.2.24 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -640,15 +732,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "profiler"
-version = "0.1.0"
-source = "git+ssh://git@github.com/exonum/exonum.git?rev=17b4e7ced336f8f0fd3055c2c945ecb576c90c9b#17b4e7ced336f8f0fd3055c2c945ecb576c90c9b"
-dependencies = [
- "lazy_static 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "thread-id 2.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
 name = "quote"
 version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -706,11 +789,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 [[package]]
 name = "sandbox"
 version = "0.1.0"
-source = "git+ssh://git@github.com/exonum/exonum.git?rev=17b4e7ced336f8f0fd3055c2c945ecb576c90c9b#17b4e7ced336f8f0fd3055c2c945ecb576c90c9b"
+source = "git+https://github.com/exonum/exonum.git?tag=v0.1#9492809d6f5c2de4cf74b1e5c598e93ab7053f7b"
 dependencies = [
+ "bit-vec 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.25.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
- "exonum 0.1.0 (git+ssh://git@github.com/exonum/exonum.git?rev=17b4e7ced336f8f0fd3055c2c945ecb576c90c9b)",
+ "exonum 0.1.0 (git+https://github.com/exonum/exonum.git?tag=v0.1)",
  "log 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -1040,11 +1124,18 @@ dependencies = [
 "checksum colored 1.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "66e436adfcba3a50905f943d990f5ef7c230ebe2d9476ab5c7dc2427afe357ee"
 "checksum conduit-mime-types 0.7.3 (registry+https://github.com/rust-lang/crates.io-index)" = "95ca30253581af809925ef68c2641cc140d6183f43e12e0af4992d53768bd7b8"
 "checksum cookie 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)" = "30b3493e12a550c2f96be785088d1da8d93189e7237c8a8d0d871bc9070334c3"
+"checksum ctrlc 3.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "1c663ee353d7e03e4f895af66ff7d3537f94c09deaa341a2f450684a3d45cb46"
 "checksum dtoa 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "0dd841b58510c9618291ffa448da2e4e0f699d984d436122372f446dae62263d"
 "checksum dtoa 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)" = "80c8b71fd71146990a9742fc06dcbbde19161a267e0ad4e572c35162f4578c90"
 "checksum env_logger 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)" = "15abd780e45b3ea4f76b4e9a26ff4843258dd8a3eed2775a0e7368c2e7936c2f"
 "checksum error 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "a6e606f14042bb87cc02ef6a14db6c90ab92ed6f62d87e69377bc759fd7987cc"
-"checksum exonum 0.1.0 (git+ssh://git@github.com/exonum/exonum.git?rev=17b4e7ced336f8f0fd3055c2c945ecb576c90c9b)" = "<none>"
+"checksum exonum 0.1.0 (git+https://github.com/exonum/exonum.git?tag=v0.1)" = "<none>"
+"checksum exonum 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "bd7a8f4d6b791b4cf5b90fdfa301894b7bfc3456509d328c8d10d61d04959342"
+"checksum exonum-configuration 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "751002338cfd7bc98f961ddc10c4142667c8da8753bffbaa6e66f72578154187"
+"checksum exonum_leveldb 0.9.0 (git+https://github.com/exonum/exonum.git?tag=v0.1)" = "<none>"
+"checksum exonum_leveldb 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "00e7d6aec7329f2e84c8b5b128615ebe58e98a2cfdca813f02f60d8a6db4c607"
+"checksum exonum_profiler 0.1.0 (git+https://github.com/exonum/exonum.git?tag=v0.1)" = "<none>"
+"checksum exonum_profiler 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1ae03b97d670211a5e3f585512572af4fbba31b9e2f1ecee6819632c1ea310ba"
 "checksum headers 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "cbedbc6e41e7528e14e81b4e99bf4b2e73af553ab3d96e6bbf24f58255d3a86d"
 "checksum hex 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "d6a22814455d41612f41161581c2883c0c6a1c41852729b17d5ed88f01e153aa"
 "checksum httparse 1.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "af2f2dd97457e8fb1ae7c5a420db346af389926e36f43768b96f101546b04a07"
@@ -1058,8 +1149,7 @@ dependencies = [
 "checksum kernel32-sys 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7507624b29483431c0ba2d82aece8ca6cdba9382bff4ddd0f7490560c056098d"
 "checksum language-tags 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "a91d884b6667cd606bb5a69aa0c99ba811a115fc68915e7056ec08a46e93199a"
 "checksum lazy_static 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)" = "3b37545ab726dd833ec6420aaba8231c5b320814b9029ad585555d2a03e94fbf"
-"checksum leveldb 0.9.0 (git+ssh://git@github.com/exonum/exonum.git?rev=17b4e7ced336f8f0fd3055c2c945ecb576c90c9b)" = "<none>"
-"checksum leveldb-sys 3.0.0 (git+ssh://git@github.com/exonum/exonum.git?rev=17b4e7ced336f8f0fd3055c2c945ecb576c90c9b)" = "<none>"
+"checksum leveldb-sys 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "4a4e97b4e1ee52602c3af5f47c1959e9f349217a41f1510fe4a8ac02ce3dc818"
 "checksum libc 0.2.24 (registry+https://github.com/rust-lang/crates.io-index)" = "38f5c2b18a287cf78b4097db62e20f43cace381dc76ae5c0a3073067f78b7ddc"
 "checksum libsodium-sys 0.0.14 (registry+https://github.com/rust-lang/crates.io-index)" = "cbbc6e46017815abf8698de0ed4847fad45fd8cad2909ac38ac6de79673c1ad1"
 "checksum log 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)" = "880f77541efa6e5cc74e76910c9884d9859683118839d6a1dc3b11e63512565b"
@@ -1091,7 +1181,6 @@ dependencies = [
 "checksum phf_shared 0.7.21 (registry+https://github.com/rust-lang/crates.io-index)" = "07e24b0ca9643bdecd0632f2b3da6b1b89bbb0030e0b992afc1113b23a7bc2f2"
 "checksum pkg-config 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)" = "3a8b4c6b8165cd1a1cd4b9b120978131389f64bdaf456435caa41e630edba903"
 "checksum plugin 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)" = "1a6a0dc3910bc8db877ffed8e457763b317cf880df4ae19109b9f77d277cf6e0"
-"checksum profiler 0.1.0 (git+ssh://git@github.com/exonum/exonum.git?rev=17b4e7ced336f8f0fd3055c2c945ecb576c90c9b)" = "<none>"
 "checksum quote 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)" = "7a6e920b65c65f10b2ae65c831a81a073a89edd28c7cce89475bff467ab4167a"
 "checksum rand 0.3.15 (registry+https://github.com/rust-lang/crates.io-index)" = "022e0636ec2519ddae48154b028864bdce4eaf7d35226ab8e65c611be97b189d"
 "checksum redox_syscall 0.1.19 (registry+https://github.com/rust-lang/crates.io-index)" = "e4a357d14a12e90a37d658725df0e6468504750b5948b9710f83f94a0c5818e8"
@@ -1100,7 +1189,7 @@ dependencies = [
 "checksum route-recognizer 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)" = "cf3255338088df8146ba63d60a9b8e3556f1146ce2973bc05a75181a42ce2256"
 "checksum router 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "b9b1797ff166029cb632237bb5542696e54961b4cf75a324c6f05c9cf0584e4e"
 "checksum rustc-serialize 0.3.24 (registry+https://github.com/rust-lang/crates.io-index)" = "dcf128d1287d2ea9d80910b5f1120d0b8eede3fbf1abe91c40d39ea7d51e6fda"
-"checksum sandbox 0.1.0 (git+ssh://git@github.com/exonum/exonum.git?rev=17b4e7ced336f8f0fd3055c2c945ecb576c90c9b)" = "<none>"
+"checksum sandbox 0.1.0 (git+https://github.com/exonum/exonum.git?tag=v0.1)" = "<none>"
 "checksum sequence_trie 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "c915714ca833b1d4d6b8f6a9d72a3ff632fe45b40a8d184ef79c81bec6327eed"
 "checksum serde 0.8.23 (registry+https://github.com/rust-lang/crates.io-index)" = "9dad3f759919b92c3068c696c15c3d17238234498bbdcc80f2c469606f948ac8"
 "checksum serde 0.9.15 (registry+https://github.com/rust-lang/crates.io-index)" = "34b623917345a631dc9608d5194cc206b3fe6c3554cd1c75b937e55e285254af"
