@@ -48,12 +48,14 @@ impl Wallet {
 }
 
 #[cfg(test)]
-pub fn assert_wallet(wallet: &Wallet,
-                     pub_key: &PublicKey,
-                     name: &str,
-                     balance: u64,
-                     history_len: u64,
-                     history_hash: &Hash) {
+pub fn assert_wallet(
+    wallet: &Wallet,
+    pub_key: &PublicKey,
+    name: &str,
+    balance: u64,
+    history_len: u64,
+    history_hash: &Hash,
+) {
     assert_eq!(wallet.pub_key(), pub_key);
     assert_eq!(wallet.name(), name);
     assert_eq!(wallet.balance(), balance);
@@ -96,19 +98,23 @@ mod tests {
             let hash = Hash::new(hash_bytes);
             Wallet::new(&pub_key, &name, balance, history_len, &hash)
         };
-        let wallet_non_ascii = Wallet::new(&gen_keypair().0,
-                                           "foobar abacaba Юникод всяуи",
-                                           100500,
-                                           0,
-                                           &Hash::new([2; HASH_SIZE]));
+        let wallet_non_ascii = Wallet::new(
+            &gen_keypair().0,
+            "foobar abacaba Юникод всяуи",
+            100500,
+            0,
+            &Hash::new([2; HASH_SIZE]),
+        );
         let mut wallets = (0..50).map(generator).collect::<Vec<_>>();
         wallets.push(wallet_non_ascii);
         for wallet in wallets {
             let json_str = serde_json::to_string(&wallet).unwrap();
             let wallet1: Wallet = serde_json::from_str(&json_str).unwrap();
             assert_eq!(wallet, wallet1);
-            trace!("wallet test data: {}",
-                   serde_json::to_string(&WalletTestData::new(wallet)).unwrap());
+            trace!(
+                "wallet test data: {}",
+                serde_json::to_string(&WalletTestData::new(wallet)).unwrap()
+            );
         }
     }
 

@@ -65,8 +65,10 @@ mod tests {
             let json_str = serde_json::to_string(&datum).unwrap();
             let datum_round_trip: TxMetaRecord = serde_json::from_str(&json_str).unwrap();
             assert_eq!(datum, datum_round_trip);
-            trace!("TxMetaRecord test data: {}",
-                   serde_json::to_string(&TxMetaRecordTestData::new(datum)).unwrap());
+            trace!(
+                "TxMetaRecord test data: {}",
+                serde_json::to_string(&TxMetaRecordTestData::new(datum)).unwrap()
+            );
         }
     }
 }

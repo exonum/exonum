@@ -52,7 +52,8 @@ pub struct CryptocurrencyApi<T: TransactionSend + Clone> {
 }
 
 impl<T> CryptocurrencyApi<T>
-    where T: TransactionSend + Clone
+where
+    T: TransactionSend + Clone,
 {
     fn wallet_info(&self, pub_key: &PublicKey) -> Result<WalletInfo, ApiError> {
         let view = self.blockchain.snapshot();
@@ -72,9 +73,11 @@ impl<T> CryptocurrencyApi<T>
 
         {
             let wallets_root_hash = currency_schema.wallets_proof().root_hash(); //debug code
-            let check_result = to_wallets_table.validate(
-                &Blockchain::service_table_unique_key(CRYPTOCURRENCY_SERVICE_ID, 0),
-                state_hash); //debug code
+            let check_result =
+                to_wallets_table.validate(
+                    &Blockchain::service_table_unique_key(CRYPTOCURRENCY_SERVICE_ID, 0),
+                    state_hash,
+                ); //debug code
             debug_assert_eq!(wallets_root_hash, *check_result.unwrap().unwrap());
         }
 
@@ -132,7 +135,8 @@ impl<T: Clone + TransactionSend> fmt::Debug for CryptocurrencyApi<T> {
 }
 
 impl<T> Api for CryptocurrencyApi<T>
-    where T: 'static + TransactionSend + Clone
+where
+    T: 'static + TransactionSend + Clone,
 {
     fn wire(&self, router: &mut Router) {
         let self_ = self.clone();
@@ -140,15 +144,18 @@ impl<T> Api for CryptocurrencyApi<T>
             let map = req.get_ref::<Params>().unwrap();
             match map.find(&["pubkey"]) {
                 Some(&Value::String(ref pub_key_string)) => {
-                    let public_key = PublicKey::from_hex(pub_key_string)
-                        .map_err(ApiError::FromHex)?;
+                    let public_key = PublicKey::from_hex(pub_key_string).map_err(
+                        ApiError::FromHex,
+                    )?;
                     let info = self_.wallet_info(&public_key)?;
                     self_.ok_response(&to_value(&info).unwrap())
                 }
                 _ => {
-                    Err(ApiError::IncorrectRequest("Required parameter of \
+                    Err(ApiError::IncorrectRequest(
+                        "Required parameter of \
                                                      wallet 'pubkey' is missing"
-                                                           .into()))?
+                            .into(),
+                    ))?
                 }
             }
         };
