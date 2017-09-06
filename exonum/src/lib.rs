@@ -60,6 +60,7 @@ extern crate mount;
 extern crate atty;
 extern crate bytes;
 extern crate futures;
+#[cfg(any(test, feature = "long_benchmarks"))]
 extern crate tokio_timer;
 extern crate tokio_core;
 extern crate tokio_io;

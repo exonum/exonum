@@ -209,12 +209,12 @@ fn test_network_handshake() {
     let t1 = e1.spawn(move |e: &mut TestHandler| {
         e.connect_with(addrs[1]);
         assert_eq!(e.wait_for_connect(), c2);
+        e.disconnect_with(addrs[1]);
         assert_eq!(e.wait_for_disconnect(), addrs[1]);
     });
     let t2 = e2.spawn(move |e: &mut TestHandler| {
         assert_eq!(e.wait_for_connect(), c1);
         e.connect_with(addrs[0]);
-        e.disconnect_with(addrs[0]);
         assert_eq!(e.wait_for_disconnect(), addrs[0]);
     });
 

@@ -18,12 +18,13 @@ pub mod codec;
 pub mod error;
 pub mod network;
 
-use futures::{Stream, Poll, Async};
+use futures::{Async, Poll, Stream};
 use futures::stream::Fuse;
 
 use std::time::SystemTime;
+use std::cmp::Ordering;
 
-use node::{NodeTimeout, ExternalMessage};
+use node::{ExternalMessage, NodeTimeout};
 
 pub use self::network::{NetworkEvent, NetworkRequest};
 
@@ -42,13 +43,13 @@ pub trait EventHandler {
 pub struct TimeoutRequest(pub SystemTime, pub NodeTimeout);
 
 impl PartialOrd for TimeoutRequest {
-    fn partial_cmp(&self, other: &Self) -> Option<::std::cmp::Ordering> {
-        Some((&self.0, &self.1).cmp(&(&other.0, &other.1)).reverse())
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for TimeoutRequest {
-    fn cmp(&self, other: &Self) -> ::std::cmp::Ordering {
+    fn cmp(&self, other: &Self) -> Ordering {
         (&self.0, &self.1).cmp(&(&other.0, &other.1)).reverse()
     }
 }

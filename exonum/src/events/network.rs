@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use futures::{Future, IntoFuture, Sink, Stream};
+use futures::{unsync, Future, IntoFuture, Sink, Stream};
 use futures::future::Either;
 use futures::sync::mpsc;
-use futures::unsync;
 use tokio_core::net::{TcpListener, TcpStream, TcpStreamNew};
 use tokio_core::reactor::{Core, Handle};
 use tokio_io::AsyncRead;
@@ -33,10 +32,9 @@ use messages::{Any, Connect, RawMessage};
 use node::{ExternalMessage, NodeTimeout};
 use helpers::Milliseconds;
 
-use super::EventHandler;
-use super::error::{forget_result, into_other, log_error, other_error, result_ok};
+use super::error::{into_other, log_error, other_error, result_ok};
 use super::codec::MessagesCodec;
-use super::EventsAggregator;
+use super::{EventsAggregator, EventHandler};
 
 #[derive(Debug)]
 pub enum NetworkEvent {
@@ -207,7 +205,7 @@ impl NetworkPart {
                                 let writer = conn_rx
                                     .map_err(|_| other_error("Can't send data into socket"))
                                     .forward(sink);
-                                let reader = stream.for_each(result_ok).map_err(into_other);
+                                let reader = stream.for_each(result_ok);
 
                                 reader
                                     .select2(writer)
@@ -223,15 +221,14 @@ impl NetworkPart {
                                 network_tx
                                     .clone()
                                     .send(NetworkEvent::PeerDisconnected(peer))
-                                    .map(forget_result)
-                                    .map_err(into_other)
+                                    .map(drop)
                             })
                             .map_err(log_error);
                         handle.spawn(connect_handle);
                         conn_tx
                     };
 
-                    let send_handle = conn_tx.send(msg).map(forget_result).map_err(log_error);
+                    let send_handle = conn_tx.send(msg).map_err(log_error).map(drop);
                     handle.spawn(send_handle);
                 }
                 NetworkRequest::DisconnectWithPeer(peer) => {
@@ -243,7 +240,7 @@ impl NetworkPart {
                     cancel_sender
                         .clone()
                         .send(())
-                        .map(forget_result)
+                        .map(drop)
                         .map_err(log_error)
                         .wait()?
                 }
@@ -302,9 +299,7 @@ impl NetworkPart {
 
                         stream.for_each(move |raw| {
                             let event = NetworkEvent::MessageReceived(addr, raw);
-                            network_tx.clone().send(event).map(forget_result).map_err(
-                                into_other,
-                            )
+                            network_tx.clone().send(event).map_err(into_other).map(drop)
                         })
                     })
                     .map(|_| {
@@ -328,9 +323,7 @@ impl NetworkPart {
     }
 
     fn send_event(handle: &Handle, network_tx: &mpsc::Sender<NetworkEvent>, event: NetworkEvent) {
-        handle.spawn(network_tx.clone().send(event).map(forget_result).map_err(
-            log_error,
-        ));
+        handle.spawn(network_tx.clone().send(event).map(drop).map_err(log_error));
     }
 }
 

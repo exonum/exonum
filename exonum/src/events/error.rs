@@ -24,8 +24,6 @@ pub fn other_error<S: AsRef<str>>(s: S) -> io::Error {
     io::Error::new(io::ErrorKind::Other, s.as_ref())
 }
 
-pub fn forget_result<T>(_: T) {}
-
 pub fn result_ok<T, E: StdError>(_: T) -> Result<(), E> {
     Ok(())
 }
@@ -42,7 +40,7 @@ pub trait LogError {
     fn log_error(self);
 }
 
-impl<T, E> LogError for ::std::result::Result<T, E>
+impl<T, E> LogError for Result<T, E>
 where
     E: ::std::fmt::Display,
 {

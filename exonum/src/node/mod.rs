@@ -37,7 +37,7 @@ use api::{private, public, Api};
 use messages::{Connect, Message, RawMessage};
 use events::{NetworkRequest, TimeoutRequest, NetworkEvent};
 use events::network::{HandlerPart, NetworkConfiguration, NetworkPart};
-use events::error::{forget_result, into_other, LogError};
+use events::error::{into_other, LogError};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 
 pub use self::state::{RequestData, State, TxPool, ValidatorState};
@@ -528,7 +528,7 @@ impl ApiSender {
     /// Addr peer to peer list
     pub fn peer_add(&self, addr: SocketAddr) -> io::Result<()> {
         let msg = ExternalMessage::PeerAdd(addr);
-        self.0.clone().send(msg).wait().map(forget_result).map_err(
+        self.0.clone().send(msg).wait().map(drop).map_err(
             into_other,
         )
     }
@@ -541,7 +541,7 @@ impl TransactionSend for ApiSender {
             return Err(io::Error::new(io::ErrorKind::Other, msg));
         }
         let msg = ExternalMessage::Transaction(tx);
-        self.0.clone().send(msg).wait().map(forget_result).map_err(
+        self.0.clone().send(msg).wait().map(drop).map_err(
             into_other,
         )
     }
@@ -788,11 +788,9 @@ impl Node {
             let timeout = Timeout::new(duration, &handle)
                 .expect("Unable to create timeout")
                 .and_then(move |_| {
-                    timeout_tx
-                        .clone()
-                        .send(request.1)
-                        .map(forget_result)
-                        .map_err(into_other)
+                    timeout_tx.clone().send(request.1).map(drop).map_err(
+                        into_other,
+                    )
                 })
                 .map_err(|_| panic!("Can't timeout"));
             handle.spawn(timeout);
