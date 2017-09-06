@@ -64,9 +64,10 @@ impl StorageValue for SparseListSize {
     }
 }
 
-/// The list of items is similar to the [`ListIndex`], but it may contains null items.
+/// The list of items is similar to the [`ListIndex`], but it may contain null items.
 ///
-/// `SparseListIndex` implements an array list, storing the element as values and using `u64` as an index.
+/// `SparseListIndex` implements an array list, storing the element as values and using `u64`
+/// as an index.
 /// `SparseListIndex` requires that the elements implement the [`StorageValue`] trait.
 /// [`StorageValue`]: ../trait.StorageValue.html
 /// [`ListIndex`]: ../list_index/struct.ListIndex.html
@@ -337,8 +338,9 @@ where
         }
     }
 
-    /// Removes the element with the given index from the list and returns it, or None if it is empty.
-    /// If elements count becomes zero after, it also sets the `len` to zero.
+    /// Removes the element with the given index from the list and returns it,
+    /// or None if it is empty. If elements count becomes zero after,
+    /// it also sets the `len` to zero.
     ///
     /// # Panics
     ///
@@ -489,8 +491,9 @@ where
     ///
     /// # Notes
     ///
-    /// Currently this method is not optimized to delete large set of data. During the execution of
-    /// this method the amount of allocated memory is linearly dependent on the number of elements
+    /// Currently this method is not optimized to delete a large set of data.
+    /// During the execution of this method the amount of allocated memory
+    /// is linearly dependent on the number of elements
     /// in the index.
     ///
     /// # Examples

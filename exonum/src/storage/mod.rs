@@ -67,7 +67,7 @@
 //! - [`ListIndex`] is a list of items stored in sequential order. Similar to [`Vec`] collection
 //! from standard library.
 //! - [`SparseListIndex`] is a list of items stored in sequential order. Similar to `ListIndex`
-//! but it may contains null items.
+//! but it may contain null items.
 //! - [`MapIndex`] is a map of keys and values. Similar to [`BTreeMap`] collection from standard
 //! library.
 //! - [`ProofListIndex`] is a Merklized version of `ListIndex` which supports the cryptographic
