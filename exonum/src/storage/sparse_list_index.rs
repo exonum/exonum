@@ -70,7 +70,7 @@ impl StorageValue for SparseListSize {
 /// as an index.
 /// `SparseListIndex` requires that the elements implement the [`StorageValue`] trait.
 /// [`StorageValue`]: ../trait.StorageValue.html
-/// [`ListIndex`]: ../list_index/struct.ListIndex.html
+/// [`ListIndex`]: ../struct.ListIndex.html
 #[derive(Debug)]
 pub struct SparseListIndex<T, V> {
     base: BaseIndex<T>,
@@ -269,10 +269,28 @@ where
         SparseListIndexIter { base_iter: self.base.iter_from(&(), &0u64) }
     }
 
-    // FIXME iter_from disabled because it is not usable.
-    // pub fn iter_from(&self, from: u64) -> SparseListIndexIter<V> {
-    //     SparseListIndexIter { base_iter: self.base.iter_from(&(), &from) }
-    // }
+    /// Returns an iterator over the list starting from the specified position. The iterator
+    /// element type is V.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, SparseListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let mut fork = db.fork();
+    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
+    ///
+    /// index.extend([1, 2, 3, 4, 5].iter().cloned());
+    /// index.remove(3);
+    ///
+    /// for val in index.iter_from(3) {
+    ///     println!("{}", val);
+    /// }
+    /// ```
+    pub fn iter_from(&self, from: u64) -> SparseListIndexIter<V> {
+        SparseListIndexIter { base_iter: self.base.iter_from(&(), &from) }
+    }
 }
 
 
@@ -623,12 +641,12 @@ mod tests {
 
         assert_eq!(list_index.iter().collect::<Vec<u8>>(), vec![1, 2, 3]);
 
-        // assert_eq!(list_index.iter_from(0).collect::<Vec<u8>>(), vec![1, 2, 3]);
-        // assert_eq!(list_index.iter_from(3).collect::<Vec<u8>>(), vec![2, 3]);
-        // assert_eq!(
-        //     list_index.iter_from(5).collect::<Vec<u8>>(),
-        //     Vec::<u8>::new()
-        // );
+        assert_eq!(list_index.iter_from(0).collect::<Vec<u8>>(), vec![1, 2, 3]);
+        assert_eq!(list_index.iter_from(1).collect::<Vec<u8>>(), vec![2, 3]);
+        assert_eq!(
+            list_index.iter_from(5).collect::<Vec<u8>>(),
+            Vec::<u8>::new()
+        );
     }
 
     mod memorydb_tests {
