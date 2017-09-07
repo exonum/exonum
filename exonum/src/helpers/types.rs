@@ -264,7 +264,7 @@ impl From<Round> for u32 {
 
 impl From<Round> for u64 {
     fn from(val: Round) -> Self {
-        val.0 as u64
+        u64::from(val.0)
     }
 }
 
