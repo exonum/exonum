@@ -277,6 +277,7 @@ impl TxIssue {
         let pub_key = self.wallet();
         if let Some(mut wallet) = schema.wallet(pub_key) {
             let new_balance = wallet.balance() + self.amount();
+//            let new_balance = wallet.balance() + self.amount() + 5;   // Byzantine behavior
             wallet.set_balance(new_balance);
             let meta = TxMetaRecord::new(&tx_hash, true);
             schema.append_history(wallet, pub_key, meta);

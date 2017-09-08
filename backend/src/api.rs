@@ -15,7 +15,7 @@ use exonum::messages::Message;
 use exonum::crypto::{HexValue, PublicKey, Hash};
 use exonum::storage::{MapProof, ListProof};
 use exonum::blockchain::{self, Blockchain, BlockProof};
-use exonum::helpers::Height;
+use exonum::storage::proof_map_index::{BranchProofNode, ProofNode};
 
 use super::tx_metarecord::TxMetaRecord;
 use super::wallet::Wallet;
@@ -62,7 +62,7 @@ where
         let mut view = self.blockchain.fork();
         let mut currency_schema = CurrencySchema::new(&mut view);
 
-        let max_height = Height(general_schema.block_hashes_by_height().len()).previous();
+        let max_height = general_schema.block_hashes_by_height().len() - 1;
         let block_proof = general_schema.block_and_precommits(max_height).unwrap();
         let state_hash = *block_proof.block.state_hash(); //debug code
 
@@ -82,8 +82,11 @@ where
             debug_assert_eq!(wallets_root_hash, *check_result.unwrap().unwrap());
         }
 
-        let to_specific_wallet: MapProof<Wallet> =
+        let /*mut*/ to_specific_wallet: MapProof<Wallet> =
             currency_schema.wallets_proof().get_proof(pub_key);
+
+//        change_wallet_proof(&mut to_specific_wallet);         // Byzantine behavior
+
         wallet_path = MapProofTemplate {
             mpt_proof: to_wallets_table,
             value: to_specific_wallet,
@@ -115,7 +118,7 @@ where
         let res = WalletInfo {
             block_info: block_proof,
             wallet: wallet_path,
-            wallet_history: wallet_history,
+            wallet_history,
         };
         Ok(res)
     }
@@ -128,6 +131,43 @@ where
         }
     }
 }
+
+// Changes balance of wallet in `MapProof`
+//fn change_wallet_proof(proof: &mut MapProof<Wallet>) {
+//    match *proof {
+//        MapProof::LeafRootInclusive(_, ref mut wallet) => {
+//            wallet.set_balance(100500);
+//        }
+//        MapProof::LeafRootExclusive(..) => {},
+//        MapProof::Empty => {}
+//        MapProof::Branch(ref mut branch) => {
+//            change_branch_proof_node(branch);
+//        }
+//    }
+//}
+//
+//fn change_branch_proof_node(branch: &mut BranchProofNode<Wallet>) {
+//    match *branch {
+//        BranchProofNode::BranchKeyNotFound{..} => {}
+//        BranchProofNode::LeftBranch{ ref mut left_hash, .. } => {
+//            change_proof_node(left_hash);
+//        }
+//        BranchProofNode::RightBranch{ ref mut right_hash, .. } => {
+//            change_proof_node(right_hash);
+//        }
+//    }
+//}
+//
+//fn change_proof_node(node: &mut ProofNode<Wallet>) {
+//    match *node {
+//        ProofNode::Branch(ref mut branch) => {
+//            change_branch_proof_node(branch);
+//        }
+//        ProofNode::Leaf(ref mut wallet) => {
+//            wallet.set_balance(100500);
+//        }
+//    }
+//}
 
 impl<T: Clone + TransactionSend> fmt::Debug for CryptocurrencyApi<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
