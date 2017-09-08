@@ -77,7 +77,7 @@
 
             if (error) {
 //                self.notify('error', error.message);
-                self.notify('error', 'An error occurred while trying to parse the wallet.');
+                self.notify('error', 'An error occurred while trying to parse the wallet.', false);
                 return;
             }
 

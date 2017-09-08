@@ -26,10 +26,10 @@
                     riot.mixin({
                         service: service,
 
-                        notify: function(type, text) {
+                        notify: function(type, text, timeout) {
                             noty({
                                 layout: 'topCenter',
-                                timeout: 5000,
+                                timeout: timeout || 5000,
                                 type: type || 'information',
                                 text: text
                             });
