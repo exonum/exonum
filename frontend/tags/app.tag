@@ -29,7 +29,7 @@
                         notify: function(type, text, timeout) {
                             noty({
                                 layout: 'topCenter',
-                                timeout: timeout || 5000,
+                                timeout: typeof timeout === 'undefined' ? 5000 : timeout,
                                 type: type || 'information',
                                 text: text
                             });
