@@ -1,6 +1,18 @@
 # Cryptocurrency (demo)
 
-Minimal Exonum blockchain example.
+[![Build status][travis-image]][travis-url]
+[![Gitter][gitter-image]][gitter-url]
+
+[travis-image]: https://img.shields.io/travis/exonum/cryptocurrency.svg?style=flat-square
+[travis-url]: https://travis-ci.org/exonum/cryptocurrency
+[gitter-image]: https://img.shields.io/gitter/room/exonum/exonum.svg?style=flat-square
+[gitter-url]: https://gitter.im/exonum/exonum
+
+Minimal Exonum blockchain example that uses the [Exonum](https://github.com/exonum/exonum) framework
+to implement a simple cryptocurrency.
+
+See [the documentation](https://exonum.com/doc/get-started/create-service)
+for a detailed step-by-step guide how to approach this example.
 
 ## Prerequisites
 
