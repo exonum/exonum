@@ -869,7 +869,8 @@ where
         self.broadcast(prevote.raw());
 
         // save outgoing prevote to the consensus messages cache
-        // TODO: Add checking whether the Propose for this prevote has been saved and save if not done already
+        // TODO: Add checking whether the Propose for this prevote has been saved and save if not
+        // done already
         self.blockchain.save_message(prevote.raw());
 
         has_majority_prevotes

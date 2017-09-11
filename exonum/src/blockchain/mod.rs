@@ -398,7 +398,8 @@ impl Blockchain {
         self.merge(fork.into_patch()).unwrap();
     }
 
-    /// Saves a collection of RawMessage to the consensus messages cache with single access to the Fork instance
+    /// Saves a collection of RawMessage to the consensus messages cache with single access to the
+    /// Fork instance
     pub fn save_messages<'a, I>(&mut self, iter: I)
     where
         I: Iterator<Item = &'a RawMessage>,
