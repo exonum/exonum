@@ -386,7 +386,7 @@ impl Blockchain {
     }
 
     /// Saves raw message to the consensus messages cache
-    pub fn save_message(&mut self, raw: &RawMessage) {
+    pub fn save_message(&mut self, raw: &RawMessage) -> Result<(), Error> {
         let mut fork = self.fork();
 
         {
@@ -394,13 +394,13 @@ impl Blockchain {
             schema.consensus_messages_cache_mut().push(raw.clone());
         }
 
-        // apply changes
-        self.merge(fork.into_patch()).unwrap();
+        self.merge(fork.into_patch())?;
+        Ok(())
     }
 
     /// Saves a collection of RawMessage to the consensus messages cache with single access to the
     /// Fork instance
-    pub fn save_messages<'a, I>(&mut self, iter: I)
+    pub fn save_messages<'a, I>(&mut self, iter: I) -> Result<(), Error>
     where
         I: Iterator<Item = &'a RawMessage>,
     {
@@ -416,8 +416,8 @@ impl Blockchain {
             }
         }
 
-        // apply changes
-        self.merge(fork.into_patch()).unwrap();
+        self.merge(fork.into_patch())?;
+        Ok(())
     }
 }
 

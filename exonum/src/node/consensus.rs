@@ -678,7 +678,7 @@ where
             self.broadcast(propose.raw());
 
             // Put our propose to the consensus messages cache
-            self.blockchain.save_message(propose.raw());
+            self.blockchain.save_message(propose.raw()).unwrap();
 
             // Save our propose into state
             let hash = self.state.add_self_propose(propose);
@@ -871,7 +871,7 @@ where
         // save outgoing prevote to the consensus messages cache
         // TODO: Add checking whether the Propose for this prevote has been saved and save if not
         // done already
-        self.blockchain.save_message(prevote.raw());
+        self.blockchain.save_message(prevote.raw()).unwrap();
 
         has_majority_prevotes
     }
@@ -896,7 +896,7 @@ where
 
         // save outgoing Precommit to the cached consensus messages
         // TODO save corresponding Prevote as well
-        self.blockchain.save_message(precommit.raw());
+        self.blockchain.save_message(precommit.raw()).unwrap();
     }
 
     /// Checks that pre-commits count is correct and calls `verify_precommit` for each of them.
