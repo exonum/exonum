@@ -1,4 +1,4 @@
-# Cryptocurrency (demo)
+# Cryptocurrency Tutorial
 
 [![Build status][travis-image]][travis-url]
 [![Gitter][gitter-image]][gitter-url]
@@ -21,7 +21,7 @@ compiler and [third-party libraries](http://exonum.com/doc/get-started/install/)
 
 ## Build & Run
 
-### Blockchain node
+### Blockchain Node
 
 To build and run a single node use:
 
@@ -36,7 +36,7 @@ cargo run
 
 Now the node is listening HTTP requests on `localhost:8000`.
 
-### Sample transactions and read requests
+### Sample Transactions & Read Requests
 
 When node is launched, you can use transaction examples to check that it works properly.
 A simplest way to do this is launching the [`test.sh`](examples/test.sh)
@@ -48,6 +48,6 @@ on [the transaction endpoint](http://127.0.0.1:8000/api/services/cryptocurrency/
 and read data from wallet endpoints (the [`wallets_info.sh`](examples/wallets_info.sh) script
 provides a handy way to do this).
 
-## LICENSE
+## License
 
 Cryptocurrency is licensed under the Apache License (Version 2.0). See [LICENSE](LICENSE) for details.
