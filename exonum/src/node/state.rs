@@ -134,6 +134,8 @@ pub struct ProposeState {
     propose: Propose,
     unknown_txs: HashSet<Hash>,
     block_hash: Option<Hash>,
+    // Whether the message has been saved to the consensus messages' cache or not.
+    is_saved: bool,
 }
 
 /// State of a block.
@@ -312,6 +314,11 @@ impl ProposeState {
     /// Returns `true` if there are unknown transactions in the propose.
     pub fn has_unknown_txs(&self) -> bool {
         !self.unknown_txs.is_empty()
+    }
+
+    /// Indicates whether Propose has been saved to the consensus messages cache
+    pub fn is_saved(&self) -> bool {
+        self.is_saved
     }
 }
 
@@ -793,6 +800,9 @@ impl State {
                 propose: msg,
                 unknown_txs: HashSet::new(),
                 block_hash: None,
+                // FIXME: for the moment it's true because this code gets called immediately after
+                // saving a propose to the cache. Think about making this approach less error-prone
+                is_saved: true,
             },
         );
 
@@ -820,6 +830,7 @@ impl State {
                     propose: msg.clone(),
                     unknown_txs: unknown_txs,
                     block_hash: None,
+                    is_saved: false,
                 }))
             }
         }

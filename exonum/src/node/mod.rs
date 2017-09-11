@@ -83,7 +83,7 @@ where
     inner: S,
 }
 
-/// Handler that that performs consensus algorithm.
+/// Handler that performs consensus algorithm.
 pub struct NodeHandler<S>
 where
     S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>,
@@ -340,6 +340,15 @@ where
         self.add_status_timeout();
         self.add_peer_exchange_timeout();
         self.add_update_api_state_timeout();
+
+        // Recover cached consensus messages if any. We do this after main initialisation and before
+        // the start of event processing.
+        let snapshot = self.blockchain.snapshot();
+        let schema = Schema::new(&snapshot);
+        let messages = schema.consensus_messages_cache();
+        for msg in messages.iter() {
+            self.handle_message(msg);
+        }
     }
 
     /// Sends the given message to a peer by its id.

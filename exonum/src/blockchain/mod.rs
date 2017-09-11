@@ -318,7 +318,7 @@ impl Blockchain {
 
     /// Commits to the storage block that proposes by node `State`.
     /// After that invokes `handle_commit` for each service in order of their identifiers
-    /// and returns the list of transactions which which were created by the `handle_commit` event.
+    /// and returns the list of transactions which were created by the `handle_commit` event.
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn commit<'a, I>(
         &mut self,
@@ -342,6 +342,9 @@ impl Blockchain {
                 for precommit in precommits {
                     schema.precommits_mut(&block_hash).push(precommit.clone());
                 }
+
+                // cleanup the consensus messages cache
+                schema.consensus_messages_cache_mut().clear();
 
                 state.update_config(schema.actual_configuration());
             }
@@ -380,6 +383,38 @@ impl Blockchain {
             }
         }
         mount
+    }
+
+    /// Saves raw message to the consensus messages cache
+    pub fn save_message(&mut self, raw: &RawMessage) {
+        let mut fork = self.fork();
+
+        {
+            let mut schema = Schema::new(&mut fork);
+            schema.consensus_messages_cache_mut().push(raw.clone());
+        }
+
+        // apply changes
+        self.merge(fork.into_patch()).unwrap();
+    }
+
+    /// Saves a collection of RawMessage to the consensus messages cache with single access to the Fork instance
+    pub fn save_messages<'a, I>(&mut self, iter: I)
+        where I: Iterator<Item = &'a RawMessage> {
+
+        // prepare DB
+        let mut fork = self.fork();
+
+        {
+            let mut schema = Schema::new(&mut fork);
+            let mut index = schema.consensus_messages_cache_mut();
+            for msg in iter {
+                index.push(msg.clone());
+            }
+        }
+
+        // apply changes
+        self.merge(fork.into_patch()).unwrap();
     }
 }
 

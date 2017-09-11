@@ -62,6 +62,9 @@ pub struct Schema<T> {
     view: T,
 }
 
+/// Constants for the 'ord' values used in prefix generation
+const CONSENSUS_MESSAGES_CACHE_ORD: u8 = 9;
+
 impl<T> Schema<T>
 where
     T: AsRef<Snapshot>,
@@ -133,6 +136,12 @@ where
     /// service_id. Their vector is returned by `core_state_hash` method.
     pub fn state_hash_aggregator(&self) -> ProofMapIndex<&T, Hash, Hash> {
         ProofMapIndex::new(gen_prefix(CONSENSUS, 8, &()), &self.view)
+    }
+
+    /// Returns consensus messages that have to be recovered in case of process' restart
+    /// after abnormal termination
+    pub fn consensus_messages_cache(&self) -> ListIndex<&T, RawMessage> {
+        ListIndex::new(gen_prefix(CONSENSUS, CONSENSUS_MESSAGES_CACHE_ORD, &()), &self.view)
     }
 
     /// Returns block hash for the given height.
@@ -360,6 +369,13 @@ impl<'a> Schema<&'a mut Fork> {
     /// [1]: struct.Schema.html#method.state_hash_aggregator
     pub fn state_hash_aggregator_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, Hash> {
         ProofMapIndex::new(gen_prefix(CONSENSUS, 8, &()), &mut self.view)
+    }
+
+    /// Mutable reference to the [`consensus_messages_cache`][1] index.
+    ///
+    /// [1]: struct.Schema.html#method.consensus_messages
+    pub fn consensus_messages_cache_mut(&mut self) -> ListIndex<&mut Fork, RawMessage> {
+        ListIndex::new(gen_prefix(CONSENSUS, CONSENSUS_MESSAGES_CACHE_ORD, &()), &mut self.view)
     }
 
     /// Adds a new configuration to the blockchain, which will become an actual at

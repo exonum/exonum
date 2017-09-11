@@ -42,7 +42,7 @@ where
         }
 
         // Queued messages from next height or round
-        // TODO: shoud we ignore messages from far rounds?
+        // TODO: should we ignore messages from far rounds?
         if msg.height() == self.state.height().next() || msg.round() > self.state.round() {
             trace!(
                 "Received consensus message from future round: msg.height={}, msg.round={}, \
@@ -384,6 +384,13 @@ where
 
             // Change lock
             if self.state.has_majority_prevotes(round, propose_hash) {
+
+                // Put our consensus messages to the cache. This is for validators only.
+                if self.state.is_validator() {
+                    // TODO: Create temporary collection of messages and save it with single access
+                    // to the db's Fork for optimization purposes
+                }
+
                 self.state.lock(round, propose_hash);
                 // Send precommit
                 if self.state.is_validator() && !self.state.have_incompatible_prevotes() {
@@ -670,6 +677,9 @@ where
             trace!("Broadcast propose: {:?}", propose);
             self.broadcast(propose.raw());
 
+            // Put our propose to the consensus messages cache
+            self.blockchain.save_message(propose.raw());
+
             // Save our propose into state
             let hash = self.state.add_self_propose(propose);
 
@@ -857,6 +867,11 @@ where
         let has_majority_prevotes = self.state.add_prevote(&prevote);
         trace!("Broadcast prevote: {:?}", prevote);
         self.broadcast(prevote.raw());
+
+        // save outgoing prevote to the consensus messages cache
+        // TODO: Add checking whether the Propose for this prevote has been saved and save if not done already
+        self.blockchain.save_message(prevote.raw());
+
         has_majority_prevotes
     }
 
@@ -877,6 +892,10 @@ where
         self.state.add_precommit(&precommit);
         trace!("Broadcast precommit: {:?}", precommit);
         self.broadcast(precommit.raw());
+
+        // save outgoing Precommit to the cached consensus messages
+        // TODO save corresponding Prevote as well
+        self.blockchain.save_message(precommit.raw());
     }
 
     /// Checks that pre-commits count is correct and calls `verify_precommit` for each of them.
