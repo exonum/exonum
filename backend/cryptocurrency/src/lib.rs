@@ -4,11 +4,9 @@
 // #![deny(missing_docs)]
 #![deny(missing_debug_implementations)]
 
-extern crate rand;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate byteorder;
 #[macro_use]
 extern crate log;
 #[cfg(test)]
@@ -19,6 +17,11 @@ extern crate params;
 extern crate router;
 extern crate iron;
 extern crate bodyparser;
+
+#[cfg(test)]
+extern crate rand;
+#[cfg(test)]
+extern crate byteorder;
 
 use iron::Handler;
 use router::Router;
