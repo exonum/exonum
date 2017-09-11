@@ -141,7 +141,10 @@ where
     /// Returns consensus messages that have to be recovered in case of process' restart
     /// after abnormal termination
     pub fn consensus_messages_cache(&self) -> ListIndex<&T, RawMessage> {
-        ListIndex::new(gen_prefix(CONSENSUS, CONSENSUS_MESSAGES_CACHE_ORD, &()), &self.view)
+        ListIndex::new(
+            gen_prefix(CONSENSUS, CONSENSUS_MESSAGES_CACHE_ORD, &()),
+            &self.view,
+        )
     }
 
     /// Returns block hash for the given height.
@@ -375,7 +378,10 @@ impl<'a> Schema<&'a mut Fork> {
     ///
     /// [1]: struct.Schema.html#method.consensus_messages
     pub fn consensus_messages_cache_mut(&mut self) -> ListIndex<&mut Fork, RawMessage> {
-        ListIndex::new(gen_prefix(CONSENSUS, CONSENSUS_MESSAGES_CACHE_ORD, &()), &mut self.view)
+        ListIndex::new(
+            gen_prefix(CONSENSUS, CONSENSUS_MESSAGES_CACHE_ORD, &()),
+            &mut self.view,
+        )
     }
 
     /// Adds a new configuration to the blockchain, which will become an actual at
