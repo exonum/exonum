@@ -24,27 +24,17 @@ cargo run
 
 Now the node is listening HTTP requests on `localhost:8000`.
 
-### Sample transactions
+### Sample transactions and read requests
 
-When node is launched you can use transaction examples to check it:
+When node is launched, you can use transaction examples to check that it works properly.
+A simplest way to do this is launching the [`test.sh`](examples/test.sh)
+script in the **examples** directory. This script creates two wallets, performs a transfer
+among them, and then verifies that the wallet status was correctly updated.
 
-```sh
-cd ./examples
-
-# every `curl` call returns hash of sent transactions
-
-# create 1st wallet and add funds
-curl -H "Content-Type: application/json" -X POST -d @create-wallet-1.json \
-    http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets/transaction
-
-# create 2nd wallet and add funds
-curl -H "Content-Type: application/json" -X POST -d @create-wallet-2.json \
-    http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets/transaction
-
-# transfer funds from 1st to 2nd
-curl -H "Content-Type: application/json" -X POST -d @transfer-funds.json \
-    http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets/transaction
-```
+Alternatively, you may use command-line utilities, such as `curl`, to manually POST transactions
+on [the transaction endpoint](http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets/transaction)
+and read data from wallet endpoints (the [`wallets_info.sh`](examples/wallets_info.sh) script
+provides a handy way to do this).
 
 ## LICENSE
 
