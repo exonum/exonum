@@ -387,8 +387,9 @@ where
 
                 // Put our consensus messages to the cache. This is for validators only.
                 if self.state.is_validator() {
-                    // TODO: Create temporary collection of messages and save it with single access
-                    // to the db's Fork for optimization purposes
+                    self.blockchain
+                        .save_messages(self.state.prepare_consensus_messages().into_iter())
+                        .unwrap();
                 }
 
                 self.state.lock(round, propose_hash);

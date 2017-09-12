@@ -400,9 +400,9 @@ impl Blockchain {
 
     /// Saves a collection of RawMessage to the consensus messages cache with single access to the
     /// Fork instance
-    pub fn save_messages<'a, I>(&mut self, iter: I) -> Result<(), Error>
+    pub fn save_messages<I>(&mut self, iter: I) -> Result<(), Error>
     where
-        I: Iterator<Item = &'a RawMessage>,
+        I: Iterator<Item = RawMessage>,
     {
 
         // prepare DB
@@ -412,7 +412,7 @@ impl Blockchain {
             let mut schema = Schema::new(&mut fork);
             let mut index = schema.consensus_messages_cache_mut();
             for msg in iter {
-                index.push(msg.clone());
+                index.push(msg);
             }
         }
 
