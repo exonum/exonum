@@ -894,9 +894,7 @@ where
         self.broadcast(precommit.raw());
 
         // save outgoing Precommit and related messages to the cached consensus messages
-        let prevotes: Vec<Prevote> = self.state
-            .prevotes(round, *propose_hash)
-            .to_vec();
+        let prevotes: Vec<Prevote> = self.state.prevotes(round, *propose_hash).to_vec();
         for prevote in prevotes {
             self.save_prevote(propose_hash, &prevote);
         }
@@ -979,7 +977,7 @@ where
         Ok(())
     }
 
-    // Saves Prevote message and corresponding Propose if not saved yet
+    /// Saves Prevote message and corresponding Propose if not saved yet
     fn save_prevote(&mut self, propose_hash: &Hash, prevote: &Prevote) {
         if let Some(propose_state) = self.state.propose_mut(propose_hash) {
             if !propose_state.is_saved() {
