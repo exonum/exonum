@@ -307,8 +307,16 @@ fn test_timestamp_exists_content_hash() {
         user_info2.clone(),
         &keypair2.1,
     ));
-    blockchain.execute_transaction(TxTimestamp::new(&keypair1.0, timestamp1.clone(), &keypair1.1));
-    blockchain.execute_transaction(TxTimestamp::new(&keypair2.0, timestamp2.clone(), &keypair2.1));
+    blockchain.execute_transaction(TxTimestamp::new(
+        &keypair1.0,
+        timestamp1.clone(),
+        &keypair1.1,
+    ));
+    blockchain.execute_transaction(TxTimestamp::new(
+        &keypair2.0,
+        timestamp2.clone(),
+        &keypair2.1,
+    ));
     // check result
     let schema = Schema::new(blockchain.snapshot());
     // Make sure that timestamp2 is ignored.
