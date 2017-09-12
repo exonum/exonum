@@ -394,8 +394,7 @@ impl Blockchain {
             schema.consensus_messages_cache_mut().push(raw.clone());
         }
 
-        self.merge(fork.into_patch())?;
-        Ok(())
+        self.merge(fork.into_patch())
     }
 
     /// Saves a collection of RawMessage to the consensus messages cache with single access to the
@@ -416,8 +415,7 @@ impl Blockchain {
             }
         }
 
-        self.merge(fork.into_patch())?;
-        Ok(())
+        self.merge(fork.into_patch())
     }
 }
 
