@@ -1,27 +1,86 @@
 language: rust
+
+addons:
+  apt:
+    packages:
+    - gcc
+    - g++
+    - libleveldb-dev
+    - libssl-dev
+    - libcurl4-openssl-dev
+    - libelf-dev
+    - libdw-dev
+    - binutils-dev
+    - libiberty-dev
+
 rust:
   - stable
-cache: cargo
-sudo: required
+matrix:
+  include:
+    - rust: nightly-2017-08-08
+      env: FEATURE=clippy
+
+cache:
+  directories:
+  - $HOME/.cargo
+  - $HOME/.local
+  - $TRAVIS_BUILD_DIR/target
+
 dist: trusty
+sudo: false
+
 env:
   global:
-    - NIGHTLY_RUST=nightly-2017-05-29
-    - CLIPPY_VERS=0.0.136
-    - RUSTFMT_VERS=0.9.0
-before_install:
-- rustfmt --version | grep $RUSTFMT_VERS || cargo install rustfmt --force --vers $RUSTFMT_VERS
-- rustup toolchain install $NIGHTLY_RUST
-- cargo +$NIGHTLY_RUST clippy --version | grep $CLIPPY_VERS || cargo +$NIGHTLY_RUST install clippy --force --vers $CLIPPY_VERS
-- sudo add-apt-repository -y ppa:chris-lea/libsodium
-- sudo apt-get -qq update
+  - NIGHTLY_RUST=nightly-2017-08-08
+  - CLIPPY_VERS=0.0.149
+  - RUSTFMT_VERS=0.9.0
+  - SODIUM_VERS=1.0.13
+  - CARGO_INCREMENTAL=1
+  - RUSTFLAGS="-C link-dead-code"
+  matrix:
+  - FEATURE=fmt
+  - FEATURE=test
+
 install:
-- sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libssl-dev
-script:
-- cd backend
-- cargo fmt -- --write-mode=diff
-- cargo +$NIGHTLY_RUST clippy
-- cargo test
+- |
+  if [ ! -f "$HOME/.local/lib/libsodium.a" ]; then
+    wget "https://github.com/jedisct1/libsodium/releases/download/$SODIUM_VERS/libsodium-$SODIUM_VERS.tar.gz" -t 5 -O "libsodium.tar.gz"
+    tar xvf libsodium.tar.gz
+    cd libsodium-$SODIUM_VERS
+    ./configure --prefix=$HOME/.local
+    make
+    make install
+    cd ..
+  fi
+- export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.local/lib
+- export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$HOME/.local/lib/pkgconfig
+- |
+  if [[ "$FEATURE" == "fmt" ]]; then
+    cargo-audit -V || cargo install cargo-audit --force
+    rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
+    cargo update
+    fi
+- |
+  case "$FEATURE" in
+  clippy* )
+    cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
+  ;;
+  esac
+- cargo install --list
+
+script: |
+  case "$FEATURE" in
+  "fmt" )
+      cargo fmt -p timestamping -- --write-mode=diff
+  ;;
+  "clippy" )
+      cd backend && cargo clippy -- -D warnings
+  ;;
+  "test" )
+      RUST_LOG=off cargo test -p timestamping
+  ;;
+  esac
+
 notifications:
   slack:
     rooms:

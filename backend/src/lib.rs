@@ -1,15 +1,18 @@
+#![cfg_attr(feature="cargo-clippy", allow(zero_prefixed_literal))]
+
 #[macro_use]
 extern crate exonum;
 extern crate serde;
 #[macro_use]
+extern crate serde_derive;
+#[macro_use]
 extern crate serde_json;
-extern crate chrono;
 extern crate bodyparser;
 
 extern crate iron;
 extern crate router;
+extern crate params;
 
-#[cfg(test)]
 #[macro_use]
 extern crate log;
 #[cfg(test)]
@@ -20,10 +23,9 @@ extern crate mime;
 extern crate sandbox;
 
 pub mod api;
+pub mod blockchain;
 mod service;
-mod blockchain;
 
-pub use service::{TimestampingService, TIMESTAMPING_SERVICE_ID};
-pub use blockchain::{TimestampingSchema, TimestampTx, Content};
+pub use service::{TimestampingService, TIMESTAMPING_SERVICE};
 
 pub const TIMESTAMPING_TX_ID: u16 = 0;

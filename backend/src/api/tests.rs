@@ -13,7 +13,8 @@ use serde_json;
 
 use exonum::api::Api;
 use exonum::blockchain::Transaction;
-use exonum::crypto::{hash, HexValue, Signature};
+use exonum::encoding::serialize::HexValue;
+use exonum::crypto::{gen_keypair, hash, Hash, PublicKey, SecretKey};
 use exonum::events::Error as EventsError;
 use exonum::messages::{Message, RawMessage, FromRaw};
 use exonum::node::TransactionSend;
@@ -23,9 +24,11 @@ use sandbox::sandbox::{Sandbox, sandbox_with_services};
 use sandbox::sandbox_tests_helper::add_one_height_with_transactions;
 use sandbox::sandbox_tests_helper::SandboxState;
 
-use {TimestampingService, TimestampTx, Content};
-use blockchain::TimestampingSchema;
-use api::PublicApi;
+use TimestampingService;
+use blockchain::dto::{TxUpdateUser, TxPayment, TxTimestamp, UserInfo, UserInfoEntry, PaymentInfo,
+                      Timestamp, TimestampEntry};
+use blockchain::schema::INITIAL_TIMESTAMPS;
+use api::{PublicApi, ItemsTemplate};
 
 pub struct TimestampingSandbox {
     inner: Sandbox,
@@ -62,6 +65,10 @@ impl TimestampingSandbox {
             inner: sandbox,
             state: SandboxState::new().into(),
         }
+    }
+
+    pub fn service_keypair(&self) -> (PublicKey, SecretKey) {
+        gen_keypair()
     }
 
     pub fn state_ref(&self) -> Ref<SandboxState> {
@@ -102,7 +109,7 @@ impl TestTxSender {
     }
 }
 
-fn request_put<A: AsRef<str>, B, C>(router: &Router, route: A, value: B) -> C
+fn request_post<A: AsRef<str>, B, C>(router: &Router, route: A, value: B) -> C
 where
     A: AsRef<str>,
     B: Serialize,
@@ -115,9 +122,9 @@ where
     let mime: Mime = "application/json".parse().unwrap();
     headers.set(ContentType(mime));
 
-    info!("PUT request: `{}` body={}", endpoint, body);
+    info!("POST request: `{}` body={}", endpoint, body);
 
-    let response = iron_test::request::put(&endpoint, headers, &body, router).unwrap();
+    let response = iron_test::request::post(&endpoint, headers, &body, router).unwrap();
     serde_json::from_value(response_body(response)).unwrap()
 }
 
@@ -157,12 +164,12 @@ impl TimestampingApiSandbox {
         TimestampingApiSandbox { router, channel }
     }
 
-    pub fn put<B, C>(&self, route: &str, value: B) -> C
+    pub fn post<B, C>(&self, route: &str, value: B) -> C
     where
         B: Serialize,
         for<'de> C: Deserialize<'de>,
     {
-        request_put(&self.router, route, value)
+        request_post(&self.router, route, value)
     }
 
     pub fn get<B>(&self, route: &str) -> B
@@ -174,58 +181,249 @@ impl TimestampingApiSandbox {
 }
 
 #[test]
-fn test_timestamping_put() {
+fn test_api_post_user() {
     let _ = helpers::init_logger();
 
     let sandbox = TimestampingSandbox::new();
 
-    let hash = hash(&[1, 2, 3]);
-    let description = "My first hash";
-    let content = Content::new(description, &hash);
+    let user_info = {
+        let (p, s) = gen_keypair();
+        UserInfo::new("User", &p, &s[..].as_ref(), "metadata")
+    };
+    let keypair = sandbox.service_keypair();
+    let tx = TxUpdateUser::new(&keypair.0, user_info, &keypair.1);
 
     let api = TimestampingApiSandbox::new(&sandbox);
-
-    let tx2: TimestampTx = api.put("/v1/content", content);
-    let tx = TimestampTx::from_raw(api.channel.txs()[0].clone()).unwrap();
+    let tx_hash: Hash = api.post("/v1/users", tx.clone());
+    let tx2 = TxUpdateUser::from_raw(api.channel.txs()[0].clone()).unwrap();
 
     assert_eq!(tx2, tx);
+    assert_eq!(tx2.hash(), tx_hash);
 }
 
 #[test]
-fn test_timestamping_get_value() {
+fn test_api_post_payment() {
     let _ = helpers::init_logger();
 
     let sandbox = TimestampingSandbox::new();
 
-    let hash = hash(&[1, 2, 3]);
-    let description = "My first hash";
-    let content = Content::new(description, &hash);
-    let tx = TimestampTx::new_with_signature(content.clone(), &Signature::zero());
-    sandbox.add_height_with_tx(tx.clone());
+    let info = PaymentInfo::new("User", 1000, "metadata");
+    let keypair = sandbox.service_keypair();
+    let tx = TxPayment::new(&keypair.0, info, &keypair.1);
 
     let api = TimestampingApiSandbox::new(&sandbox);
-    let content2: Content = api.get(&format!("/v1/content/{}", hash.to_hex()));
-    assert_eq!(content2, content);
+    let tx_hash: Hash = api.post("/v1/payments", tx.clone());
+    let tx2 = TxPayment::from_raw(api.channel.txs()[0].clone()).unwrap();
+
+    assert_eq!(tx2, tx);
+    assert_eq!(tx2.hash(), tx_hash);
 }
 
 #[test]
-fn test_timestamping_get_proof() {
+fn test_api_post_timestamp() {
     let _ = helpers::init_logger();
 
     let sandbox = TimestampingSandbox::new();
 
-    let hash = hash(&[1, 2, 3]);
-    let description = "My first hash";
-    let content = Content::new(description, &hash);
-    let tx = TimestampTx::new_with_signature(content.clone(), &Signature::zero());
-    sandbox.add_height_with_tx(tx.clone());
-    let proof = {
-        let blockchain = sandbox.blockchain_ref().clone();
-        let snap = blockchain.snapshot();
-        TimestampingSchema::new(snap).contents().get_proof(&hash)
+    let info = Timestamp::new("User", &Hash::zero(), "metadata");
+    let keypair = gen_keypair();
+    let tx = TxTimestamp::new(&keypair.0, info, &keypair.1);
+
+    let api = TimestampingApiSandbox::new(&sandbox);
+    let tx_hash: Hash = api.post("/v1/timestamps", tx.clone());
+    let tx2 = TxTimestamp::from_raw(api.channel.txs()[0].clone()).unwrap();
+
+    assert_eq!(tx2, tx);
+    assert_eq!(tx2.hash(), tx_hash);
+}
+
+#[test]
+fn test_api_get_user() {
+    let _ = helpers::init_logger();
+
+    let sandbox = TimestampingSandbox::new();
+
+    let user_info = {
+        let (p, s) = gen_keypair();
+        UserInfo::new("first_user", &p, &s[..].as_ref(), "metadata")
     };
+    let keypair = sandbox.service_keypair();
+    let tx = TxUpdateUser::new(&keypair.0, user_info.clone(), &keypair.1);
+    sandbox.add_height_with_tx(tx);
+
+    // Checks results
+    let api = TimestampingApiSandbox::new(&sandbox);
+    let entry: UserInfoEntry = api.get("/v1/users/first_user");
+
+    assert_eq!(entry.info(), user_info);
+    assert_eq!(entry.available_timestamps(), INITIAL_TIMESTAMPS);
+    assert_eq!(entry.payments_hash(), &Hash::zero());
+}
+
+#[test]
+fn test_api_get_timestamp_proof() {
+    let _ = helpers::init_logger();
+
+    let sandbox = TimestampingSandbox::new();
+
+    let keypair = gen_keypair();
+    // Create user
+    let user_info = UserInfo::new(
+        "first_user",
+        &keypair.0,
+        &keypair.1[..].as_ref(),
+        "metadata",
+    );
+    let tx = TxUpdateUser::new(&keypair.0, user_info.clone(), &keypair.1);
+    sandbox.add_height_with_tx(tx);
+    // Create timestamp
+    let info = Timestamp::new("first_user", &Hash::zero(), "metadata");
+    let tx = TxTimestamp::new(&keypair.0, info, &keypair.1);
+    sandbox.add_height_with_tx(tx);
+
+    // get proof
+    let api = TimestampingApiSandbox::new(&sandbox);
+    let _: serde_json::Value = api.get(&format!("/v1/timestamps/proof/{}", Hash::zero().to_hex()));
+
+    // TODO implement proof validation
+}
+
+#[test]
+fn test_api_get_timestamp_entry() {
+    let _ = helpers::init_logger();
+
+    let sandbox = TimestampingSandbox::new();
+
+    let keypair = gen_keypair();
+    // Create user
+    let user_info = UserInfo::new(
+        "first_user",
+        &keypair.0,
+        &keypair.1[..].as_ref(),
+        "metadata",
+    );
+    let tx = TxUpdateUser::new(&keypair.0, user_info.clone(), &keypair.1);
+    sandbox.add_height_with_tx(tx);
+    // Create timestamp
+    let info = Timestamp::new("first_user", &Hash::zero(), "metadata");
+    let tx = TxTimestamp::new(&keypair.0, info.clone(), &keypair.1);
+    sandbox.add_height_with_tx(tx.clone());
 
     let api = TimestampingApiSandbox::new(&sandbox);
-    let proof2: serde_json::Value = api.get(&format!("/v1/proof/{}", hash.to_hex()));
-    assert_eq!(proof2, json!(proof));
+    let entry: Option<TimestampEntry> =
+        api.get(&format!("/v1/timestamps/value/{}", Hash::zero().to_hex()));
+
+    let entry = entry.unwrap();
+    assert_eq!(entry.timestamp(), info);
+    assert_eq!(entry.tx_hash(), &tx.hash());
+}
+
+#[test]
+fn test_api_get_timestamps_range() {
+    let _ = helpers::init_logger();
+
+    let sandbox = TimestampingSandbox::new();
+
+    let keypair = gen_keypair();
+    // Create user
+    let user_info = UserInfo::new(
+        "first_user",
+        &keypair.0,
+        &keypair.1[..].as_ref(),
+        "metadata",
+    );
+    let tx = TxUpdateUser::new(&keypair.0, user_info.clone(), &keypair.1);
+    sandbox.add_height_with_tx(tx);
+    // Create 5 timestamps
+    for i in 0..5 {
+        let hash = hash(&[i]);
+        let info = Timestamp::new("first_user", &hash, &i.to_string());
+        let tx = TxTimestamp::new(&keypair.0, info, &keypair.1);
+        sandbox.add_height_with_tx(tx);
+    }
+    // Api checks
+    let api = TimestampingApiSandbox::new(&sandbox);
+    // Get timestamps list
+    let timestamps: ItemsTemplate<TimestampEntry> = api.get("/v1/timestamps/first_user?count=10");
+    assert_eq!(timestamps.items.len(), 5);
+    // Get latest timestamp
+    let timestamps: ItemsTemplate<TimestampEntry> = api.get("/v1/timestamps/first_user?count=1");
+    assert_eq!(timestamps.items.len(), 1);
+    // Get first timestamp
+    let timestamps: ItemsTemplate<TimestampEntry> =
+        api.get("/v1/timestamps/first_user?count=1&from=1");
+    assert_eq!(timestamps.items.len(), 1);
+    assert_eq!(timestamps.total_count, 5);
+}
+
+#[test]
+fn test_api_get_payments_range() {
+    let _ = helpers::init_logger();
+
+    let sandbox = TimestampingSandbox::new();
+
+    let keypair = gen_keypair();
+    // Create user
+    let user_info = UserInfo::new(
+        "first_user",
+        &keypair.0,
+        &keypair.1[..].as_ref(),
+        "metadata",
+    );
+    let keypair = sandbox.service_keypair();
+    let tx = TxUpdateUser::new(&keypair.0, user_info.clone(), &keypair.1);
+    sandbox.add_height_with_tx(tx);
+    // Create 5 payments
+    for i in 0..5 {
+        let info = PaymentInfo::new("first_user", i, &i.to_string());
+        let keypair = sandbox.service_keypair();
+        let tx = TxPayment::new(&keypair.0, info, &keypair.1);
+        sandbox.add_height_with_tx(tx);
+    }
+    // Api checks
+    let api = TimestampingApiSandbox::new(&sandbox);
+    // Get payments list
+    let payments: ItemsTemplate<PaymentInfo> = api.get("/v1/payments/first_user?count=10");
+    assert_eq!(payments.items.len(), 5);
+    // Get latest payment
+    let payments: ItemsTemplate<PaymentInfo> = api.get("/v1/payments/first_user?count=1");
+    assert_eq!(payments.items.len(), 1);
+    // Get first payment
+    let payments: ItemsTemplate<PaymentInfo> = api.get("/v1/payments/first_user?count=1&from=1");
+    assert_eq!(payments.items.len(), 1);
+    assert_eq!(payments.total_count, 5);
+}
+
+#[test]
+fn test_api_get_users_range() {
+    let _ = helpers::init_logger();
+
+    let sandbox = TimestampingSandbox::new();
+
+    // Create 5 users
+    for i in 0..5 {
+        let keypair = gen_keypair();
+        // Create user
+        let user_info = UserInfo::new(
+            &format!("user_{}", i),
+            &keypair.0,
+            &keypair.1[..].as_ref(),
+            &i.to_string(),
+        );
+        let keypair = sandbox.service_keypair();
+        let tx = TxUpdateUser::new(&keypair.0, user_info.clone(), &keypair.1);
+        sandbox.add_height_with_tx(tx);
+    }
+    // Api checks
+    let api = TimestampingApiSandbox::new(&sandbox);
+    // Get users list
+    let users: ItemsTemplate<UserInfoEntry> = api.get("/v1/users?count=10");
+    assert_eq!(users.items.len(), 5);
+    // Get latest user
+    let users: ItemsTemplate<UserInfoEntry> = api.get("/v1/users?count=1");
+    assert_eq!(users.items.len(), 1);
+    // Get first user
+    let users: ItemsTemplate<UserInfoEntry> = api.get("/v1/users?count=1&from=1");
+    assert_eq!(users.items.len(), 1);
+    assert_eq!(users.total_count, 5);
 }
