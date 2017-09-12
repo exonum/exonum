@@ -1055,7 +1055,7 @@ impl State {
         let mut retval = Vec::new();
 
         // collect Proposes
-        for mut propose_state in self.proposes.values_mut() {
+        for propose_state in self.proposes.values_mut() {
             if !propose_state.is_saved() {
                 retval.push(propose_state.message().raw().clone());
                 propose_state.set_saved(true);
@@ -1064,14 +1064,14 @@ impl State {
 
         // collect Prevotes
         for vote in self.prevotes.values() {
-            for msg in vote.messages.iter() {
+            for msg in &vote.messages {
                 retval.push(msg.raw().clone());
             }
         }
 
         // collect Precommits
         for vote in self.precommits.values() {
-            for msg in vote.messages.iter() {
+            for msg in &vote.messages {
                 retval.push(msg.raw().clone());
             }
         }
