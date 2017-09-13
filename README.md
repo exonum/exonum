@@ -17,7 +17,8 @@ blockchain infrastructure providers.
 * [Full Specification](https://exonum.com/doc/)
 * [Reference documentation](https://docs.rs/exonum)
 * [Contributing guide](https://github.com/exonum/exonum/blob/master/CONTRIBUTING.md)
+* [Changelog](https://github.com/exonum/exonum/blob/master/CHANGELOG.md)
 
 ## LICENSE
 
-Exonum core library is licensed under the Apache License (Version 2.0). See [LICENSE](https://github.com/exonum/exonum-btc-anchoring/blob/master/LICENSE) for details.
+Exonum core library is licensed under the Apache License (Version 2.0). See [LICENSE](https://github.com/exonum/exonum/blob/master/LICENSE) for details.
