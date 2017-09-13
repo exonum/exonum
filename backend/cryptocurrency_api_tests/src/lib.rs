@@ -1,16 +1,23 @@
 #[cfg(test)]
 #[macro_use]
 extern crate log;
+#[cfg(test)]
 extern crate exonum;
+#[cfg(test)]
 extern crate sandbox;
+#[cfg(test)]
 extern crate cryptocurrency;
+#[cfg(test)]
 extern crate iron;
+#[cfg(test)]
 extern crate router;
+#[cfg(test)]
 extern crate serde;
+#[cfg(test)]
+extern crate rand;
 #[cfg(test)]
 #[macro_use]
 extern crate serde_derive;
-extern crate rand;
 
 #[cfg(test)]
 mod tests {
