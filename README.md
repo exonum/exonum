@@ -17,6 +17,7 @@ blockchain infrastructure providers.
 * [Full Specification](https://exonum.com/doc/)
 * [Reference documentation](https://docs.rs/exonum)
 * [Contributing guide](https://github.com/exonum/exonum/blob/master/CONTRIBUTING.md)
+* [Changelog](https://github.com/exonum/exonum/blob/master/CHANGELOG.md)
 
 ## LICENSE
 

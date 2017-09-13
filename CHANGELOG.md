@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
-## [0.2.0] - 2017-09-13
+## 0.2 - 2017-09-13
 
 ### Added
 - Add `RockDB` support (#273)
@@ -30,13 +30,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Fix snapshot behavior for `MemoryDB` (#292)
 - Dissalow generate-testnet with 0 nodes (#258)
 
-## [0.1.1] - 2017-09-13
+## 0.1.1 - 2017-09-13
 
 ### Fixed
 - Fix segfault when `LevelDBSnapshot` is destroyed after `LevelDB` (#285)
 - Fix panic during `BlockResponse` message processing if the transaction pool is full (#264)
 - Fix panic during deseralizaion of malformed messages (#278 #297)
 
-## [0.1.0] - 2017-07-17
+## 0.1 - 2017-07-17
 
 The first release of Exonum.
