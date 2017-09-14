@@ -22,7 +22,6 @@ hex = "0.2.0"
 bit-vec = "0.4.4"
 vec_map = "0.8.0"
 rand = "0.3.15"
-exonum_leveldb = {version="0.9.1", path="../3rdparty/leveldb", optional = true}
 serde = "1.0.10"
 serde_derive = "1.0.10"
 serde_json = "1.0.2"
@@ -40,15 +39,12 @@ bodyparser = "0.7.0"
 params = "0.6.0"
 mount = "0.3.0"
 atty = "0.2.2"
-exonum_profiler = { version = "^0.1.1", path="../3rdparty/profiler/" }
-exonum_flamer = { version = "^0.1.5", path="../3rdparty/flamer/", optional = true }
 
-[dependencies.exonum_rocksdb]
-git = "https://github.com/exonum/exonum_rocksdb.git"
-optional = true
-
-[dependencies.exonum_sodiumoxide]
-git = "https://github.com/exonum/exonum_sodiumoxide.git"
+exonum_sodiumoxide = { version = "0.0.14" }
+exonum_rocksdb = { version = "0.6.1", optional = true }
+exonum_leveldb = { version = "0.9.1", optional = true }
+exonum_profiler = { version = "0.1.1" }
+exonum_flamer = { version = "0.1.5", optional = true }
 
 [dev-dependencies]
 pretty_assertions = "0.2.1"
