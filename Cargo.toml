@@ -7,7 +7,7 @@ readme = "README.md"
 license = "Apache-2.0"
 
 [dependencies]
-exonum = { git = "https://github.com/exonum/exonum", rev = "64518cec0b091d2eeca6c62356b78dc37d5942ee" }
+exonum = "0.2.0"
 iron = "0.5.1"
 bodyparser = "0.7.0"
 router = "0.5.1"
