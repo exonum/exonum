@@ -17,7 +17,7 @@ rust:
   - stable
 matrix:
   include:
-    - rust: nightly-2017-09-13
+    - rust: nightly-2017-09-14
       env: FEATURE=clippy
 
 cache:
@@ -31,7 +31,7 @@ sudo: false
 
 env:
   global:
-  - NIGHTLY_RUST=nightly-2017-09-13
+  - NIGHTLY_RUST=nightly-2017-09-14
   - CLIPPY_VERS=0.0.161
   - RUSTFMT_VERS=0.9.0
   - SODIUM_VERS=1.0.13
@@ -58,7 +58,7 @@ install:
   if [[ "$FEATURE" == "fmt" ]]; then
     cargo-audit -V || cargo install cargo-audit --force
     rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
-    cargo update
+    cd backend && cargo update && cd ..
     fi
 - |
   case "$FEATURE" in
