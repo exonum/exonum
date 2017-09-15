@@ -1,5 +1,0 @@
-[workspace]
-members = ["backend"]
-
-[replace]
-"exonum:0.1.0" = { git = "https://github.com/exonum/exonum.git", rev="04b05a5bef94b0e6db746d82efd436f611c51c62" }
