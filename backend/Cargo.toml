@@ -15,15 +15,14 @@ bodyparser = "0.7.0"
 rand = "0.3.0"
 log = "0.3.0"
 byteorder = "1.0.0"
-bitcoin = "0.9.1"
 
 serde = "1.0.0"
 serde_derive = "1.0.0"
 serde_json = "1.0.0"
 
-exonum = "0.1.0"
-exonum-configuration = "0.1.0"
-exonum-btc-anchoring = { version = "0.1.0", optional = true }
+exonum = "0.2.0"
+exonum-configuration = "0.2.0"
+exonum-btc-anchoring = { version = "0.2.0", optional = true }
 
 [dev-dependencies]
 iron-test = "0.5.0"
@@ -31,8 +30,12 @@ mime = "0.2.0"
 
 [dev-dependencies.sandbox]
 git = "https://github.com/exonum/exonum.git"
-version = "0.1.0"
-rev = "04b05a5bef94b0e6db746d82efd436f611c51c62"
+version = "0.2.0"
+tag = "v0.2"
+
+[replace."exonum:0.2.0"]
+git = "https://github.com/exonum/exonum.git"
+tag = "v0.2"
 
 [features]
 default = []
