@@ -68,6 +68,8 @@ extern crate atty;
 pub mod encoding;
 #[macro_use]
 pub mod messages;
+#[macro_use]
+pub mod helpers;
 #[doc(hidden)]
 pub mod events;
 pub mod crypto;
@@ -75,5 +77,4 @@ pub mod node;
 pub mod storage;
 pub mod blockchain;
 pub mod explorer;
-pub mod helpers;
 pub mod api;

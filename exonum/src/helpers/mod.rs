@@ -31,6 +31,8 @@ mod types;
 
 pub mod fabric;
 pub mod config;
+#[macro_use]
+pub mod metrics;
 
 /// Performs the logger initialization.
 pub fn init_logger() -> Result<(), SetLoggerError> {

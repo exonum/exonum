@@ -461,6 +461,13 @@ where
 
         let height = self.state.height();
 
+        let mempool_size = self.state
+            .transactions()
+            .read()
+            .expect("Expected read lock")
+            .len();
+        metric!("node.mempool", "{}", mempool_size);
+
         // Update state to new height
         self.state.new_height(&block_hash, self.channel.get_time());
 
@@ -469,11 +476,7 @@ where
               proposer,
               round.map(|x| format!("{}", x)).unwrap_or_else(|| "?".into()),
               commited_txs,
-              self.state
-                  .transactions()
-                  .read()
-                  .expect("Expected read lock")
-                  .len(),
+              mempool_size,
               block_hash.to_hex(),
               );
 
