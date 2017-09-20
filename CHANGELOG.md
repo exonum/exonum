@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 
 ### Added
+- Implement `FromStr` and `ToString` traits for public sodium types (#318)
 - Base support for metrics infrastructure.
 
 ## 0.2 - 2017-09-13
