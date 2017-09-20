@@ -19,8 +19,8 @@ use std::fmt::Arguments;
 
 /// Adds given metric with given value.
 ///
-/// Metric name should be in the following format: "module_name.metric_name", where "module_name"
-/// is a high level name. For example "storage" or "node" (not "storage_proof_list_index").
+/// Metric name should be in the following format: `module_name.metric_name`, where `module_name`
+/// is a high level name. For example `storage` or `node` (not `storage_proof_list_index`).
 ///
 /// Value is a string and can be formatted similar to the `println!`. See `std::fmt` and example
 /// for details.
