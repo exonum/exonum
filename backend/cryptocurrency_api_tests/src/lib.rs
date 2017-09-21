@@ -1,16 +1,23 @@
 #[cfg(test)]
 #[macro_use]
 extern crate log;
+#[cfg(test)]
 extern crate exonum;
+#[cfg(test)]
 extern crate sandbox;
+#[cfg(test)]
 extern crate cryptocurrency;
+#[cfg(test)]
 extern crate iron;
+#[cfg(test)]
 extern crate router;
+#[cfg(test)]
 extern crate serde;
+#[cfg(test)]
+extern crate rand;
 #[cfg(test)]
 #[macro_use]
 extern crate serde_derive;
-extern crate rand;
 
 #[cfg(test)]
 mod tests {
@@ -63,7 +70,7 @@ mod tests {
             if ind == 0 {
                 let (p, s) = gen_keypair_from_seed(&Seed::new([255; 32]));
                 return TxCreateWallet::new(&p, "babd, Юникод еще работает", &s)
-                           .into();
+                    .into();
             }
             let (p, s) = gen_keypair();
             let string_len = rng.gen_range(20u8, 255u8);
@@ -156,9 +163,11 @@ mod tests {
         let sandbox = CurrencySandbox::new();
         let tx_malformed_mes_id = from_file("test_data/message_id_from_other.json");
         let resp = sandbox.post_transaction(tx_malformed_mes_id);
-        assert_response_status(resp,
-                               Status::Conflict,
-                               "data did not match any variant of untagged enum CurrencyTx");
+        assert_response_status(
+            resp,
+            Status::Conflict,
+            "data did not match any variant of untagged enum CurrencyTx",
+        );
     }
 
     #[test]
@@ -167,9 +176,11 @@ mod tests {
         let sandbox = CurrencySandbox::new();
         let tx_malformed_mes_id = from_file("test_data/invalid_message_id.json");
         let resp = sandbox.post_transaction(tx_malformed_mes_id);
-        assert_response_status(resp,
-                               Status::Conflict,
-                               "data did not match any variant of untagged enum CurrencyTx");
+        assert_response_status(
+            resp,
+            Status::Conflict,
+            "data did not match any variant of untagged enum CurrencyTx",
+        );
     }
 
     #[test]
@@ -178,9 +189,11 @@ mod tests {
         let sandbox = CurrencySandbox::new();
         let tx_malformed_mes_id = from_file("test_data/invalid_service_id.json");
         let resp = sandbox.post_transaction(tx_malformed_mes_id);
-        assert_response_status(resp,
-                               Status::Conflict,
-                               "data did not match any variant of untagged enum CurrencyTx");
+        assert_response_status(
+            resp,
+            Status::Conflict,
+            "data did not match any variant of untagged enum CurrencyTx",
+        );
     }
 
     #[test]
@@ -204,13 +217,15 @@ mod tests {
         let (p4, s4) = gen_keypair_from_seed(&Seed::new([14; 32]));
         let (p5, s5) = gen_keypair_from_seed(&Seed::new([15; 32]));
         let (p6, s6) = gen_keypair_from_seed(&Seed::new([16; 32]));
-        let txs: Vec<CurrencyTx> = vec![TxCreateWallet::new(&p1, "Jane Doe", &s1).into(),
-                                        TxCreateWallet::new(&p2, "Dillinger Escape Plan", &s2)
-                                            .into(),
-                                        TxCreateWallet::new(&p3, "wallet3", &s3).into(),
-                                        TxCreateWallet::new(&p4, "walet4", &s4).into(),
-                                        TxCreateWallet::new(&p5, "wallet5", &s5).into(),
-                                        TxCreateWallet::new(&p6, "wallet6", &s6).into()];
+        let txs: Vec<CurrencyTx> = vec![
+            TxCreateWallet::new(&p1, "Jane Doe", &s1).into(),
+            TxCreateWallet::new(&p2, "Dillinger Escape Plan", &s2)
+                .into(),
+            TxCreateWallet::new(&p3, "wallet3", &s3).into(),
+            TxCreateWallet::new(&p4, "walet4", &s4).into(),
+            TxCreateWallet::new(&p5, "wallet5", &s5).into(),
+            TxCreateWallet::new(&p6, "wallet6", &s6).into(),
+        ];
         txs.iter()
             .inspect(|tx| { sandbox.post_transaction((*tx).clone()).unwrap(); })
             .collect::<Vec<_>>();
@@ -232,13 +247,15 @@ mod tests {
         let (p4, s4) = gen_keypair_from_seed(&Seed::new([14; 32]));
         let (p5, s5) = gen_keypair_from_seed(&Seed::new([15; 32]));
         let (p6, s6) = gen_keypair_from_seed(&Seed::new([16; 32]));
-        let txs: Vec<CurrencyTx> = vec![TxCreateWallet::new(&p1, "Jane Doe", &s1).into(),
-                                        TxCreateWallet::new(&p2, "Dillinger Escape Plan", &s2)
-                                            .into(),
-                                        TxCreateWallet::new(&p3, "wallet3", &s3).into(),
-                                        TxCreateWallet::new(&p4, "walet4", &s4).into(),
-                                        TxCreateWallet::new(&p5, "wallet5", &s5).into(),
-                                        TxCreateWallet::new(&p6, "wallet6", &s6).into()];
+        let txs: Vec<CurrencyTx> = vec![
+            TxCreateWallet::new(&p1, "Jane Doe", &s1).into(),
+            TxCreateWallet::new(&p2, "Dillinger Escape Plan", &s2)
+                .into(),
+            TxCreateWallet::new(&p3, "wallet3", &s3).into(),
+            TxCreateWallet::new(&p4, "walet4", &s4).into(),
+            TxCreateWallet::new(&p5, "wallet5", &s5).into(),
+            TxCreateWallet::new(&p6, "wallet6", &s6).into(),
+        ];
         txs.iter()
             .inspect(|tx| { sandbox.post_transaction((*tx).clone()).unwrap(); })
             .collect::<Vec<_>>();
@@ -280,13 +297,15 @@ mod tests {
         let (p4, s4) = gen_keypair_from_seed(&Seed::new([14; 32]));
         let (p5, s5) = gen_keypair_from_seed(&Seed::new([15; 32]));
         let (p6, s6) = gen_keypair_from_seed(&Seed::new([16; 32]));
-        let txs: Vec<CurrencyTx> = vec![TxCreateWallet::new(&p1, "Jane Doe", &s1).into(),
-                                        TxCreateWallet::new(&p2, "Dillinger Escape Plan", &s2)
-                                            .into(),
-                                        TxCreateWallet::new(&p3, "wallet3", &s3).into(),
-                                        TxCreateWallet::new(&p4, "walet4", &s4).into(),
-                                        TxCreateWallet::new(&p5, "wallet5", &s5).into(),
-                                        TxCreateWallet::new(&p6, "wallet6", &s6).into()];
+        let txs: Vec<CurrencyTx> = vec![
+            TxCreateWallet::new(&p1, "Jane Doe", &s1).into(),
+            TxCreateWallet::new(&p2, "Dillinger Escape Plan", &s2)
+                .into(),
+            TxCreateWallet::new(&p3, "wallet3", &s3).into(),
+            TxCreateWallet::new(&p4, "walet4", &s4).into(),
+            TxCreateWallet::new(&p5, "wallet5", &s5).into(),
+            TxCreateWallet::new(&p6, "wallet6", &s6).into(),
+        ];
         txs.iter()
             .inspect(|tx| { sandbox.post_transaction((*tx).clone()).unwrap(); })
             .collect::<Vec<_>>();
@@ -313,23 +332,29 @@ mod tests {
         assert_eq!(body1, expected_body1, "wallet1_query.json");
 
         sandbox
-            .post_transaction(CurrencyTx::from(TxCreateWallet::new(&p1,
-                                                                   "Change name of existing \
+            .post_transaction(CurrencyTx::from(TxCreateWallet::new(
+                &p1,
+                "Change name of existing \
                                                                     wallet",
-                                                                   &s1)))
+                &s1,
+            )))
             .unwrap();
         sandbox.commit();
 
         let resp_wallet1 = sandbox.request_wallet_info(&p1).unwrap();
         let body1 = response_body(resp_wallet1);
         let expected_body1 = from_file("test_data/tx_create_wallet_false_execution_status.json");
-        assert_eq!(body1,
-                   expected_body1,
-                   "tx_create_wallet_false_execution_status.json");
+        assert_eq!(
+            body1,
+            expected_body1,
+            "tx_create_wallet_false_execution_status.json"
+        );
 
         let (p_absent, s_absent) = gen_keypair_from_seed(&Seed::new([27; 32]));
         sandbox
-            .post_transaction(CurrencyTx::from(TxIssue::new(&p_absent, 6000, 329832, &s_absent)))
+            .post_transaction(CurrencyTx::from(
+                TxIssue::new(&p_absent, 6000, 329832, &s_absent),
+            ))
             .unwrap();
         sandbox.commit();
 
@@ -339,16 +364,20 @@ mod tests {
         assert_eq!(body1, expected_body1, "no_state_change2.json");
 
         sandbox
-            .post_transaction(CurrencyTx::from(TxTransfer::new(&p1, &p2, 1_000_000, 329832, &s1)))
+            .post_transaction(CurrencyTx::from(
+                TxTransfer::new(&p1, &p2, 1_000_000, 329832, &s1),
+            ))
             .unwrap();
         sandbox.commit();
 
         let resp_wallet1 = sandbox.request_wallet_info(&p1).unwrap();
         let body1 = response_body(resp_wallet1);
         let expected_body1 = from_file("test_data/commit_new_transfer_not_sufficient_funds.json");
-        assert_eq!(body1,
-                   expected_body1,
-                   "commit_new_transfer_not_sufficient_funds.json");
+        assert_eq!(
+            body1,
+            expected_body1,
+            "commit_new_transfer_not_sufficient_funds.json"
+        );
     }
 
     #[test]
@@ -361,13 +390,15 @@ mod tests {
         let (p4, s4) = gen_keypair_from_seed(&Seed::new([14; 32]));
         let (p5, s5) = gen_keypair_from_seed(&Seed::new([15; 32]));
         let (p6, s6) = gen_keypair_from_seed(&Seed::new([16; 32]));
-        let txs: Vec<CurrencyTx> = vec![TxCreateWallet::new(&p1, "Jane Doe", &s1).into(),
-                                        TxCreateWallet::new(&p2, "Dillinger Escape Plan", &s2)
-                                            .into(),
-                                        TxCreateWallet::new(&p3, "wallet3", &s3).into(),
-                                        TxCreateWallet::new(&p4, "walet4", &s4).into(),
-                                        TxCreateWallet::new(&p5, "wallet5", &s5).into(),
-                                        TxCreateWallet::new(&p6, "wallet6", &s6).into()];
+        let txs: Vec<CurrencyTx> = vec![
+            TxCreateWallet::new(&p1, "Jane Doe", &s1).into(),
+            TxCreateWallet::new(&p2, "Dillinger Escape Plan", &s2)
+                .into(),
+            TxCreateWallet::new(&p3, "wallet3", &s3).into(),
+            TxCreateWallet::new(&p4, "walet4", &s4).into(),
+            TxCreateWallet::new(&p5, "wallet5", &s5).into(),
+            TxCreateWallet::new(&p6, "wallet6", &s6).into(),
+        ];
         txs.iter()
             .inspect(|tx| { sandbox.post_transaction((*tx).clone()).unwrap(); })
             .collect::<Vec<_>>();
@@ -391,16 +422,20 @@ mod tests {
         let resp_wallet1 = sandbox.request_wallet_info(&p1).unwrap();
         let body1 = response_body(resp_wallet1);
         let expected_body1 = from_file("test_data/no_txs_committed_no_state_change.json");
-        assert_eq!(body1,
-                   expected_body1,
-                   "no_txs_committed_no_state_change.json");
+        assert_eq!(
+            body1,
+            expected_body1,
+            "no_txs_committed_no_state_change.json"
+        );
     }
 
 
 
-    fn assert_response_status(response: IronResult<Response>,
-                              expected_status: Status,
-                              expected_message: &str) {
+    fn assert_response_status(
+        response: IronResult<Response>,
+        expected_status: Status,
+        expected_message: &str,
+    ) {
         assert!(response.is_err());
         match response {
             Err(iron_error) => {
@@ -415,17 +450,18 @@ mod tests {
     }
 
     fn test_txs_post<F>(sandbox: &CurrencySandbox, generator: F)
-        where F: FnMut(usize) -> CurrencyTx
+    where
+        F: FnMut(usize) -> CurrencyTx,
     {
         (0..50)
             .map(generator)
             .inspect(|tx| {
-                         let expected_tx_hash = tx.hash();
-                         let resp = sandbox.post_transaction(tx.clone()).unwrap();
-                         let body = response_body(resp);
-                         let tx_response_res = serde_json::from_value::<TxResponse>(body).unwrap();
-                         assert_eq!(expected_tx_hash, tx_response_res.tx_hash);
-                     })
+                let expected_tx_hash = tx.hash();
+                let resp = sandbox.post_transaction(tx.clone()).unwrap();
+                let body = response_body(resp);
+                let tx_response_res = serde_json::from_value::<TxResponse>(body).unwrap();
+                assert_eq!(expected_tx_hash, tx_response_res.tx_hash);
+            })
             .collect::<Vec<CurrencyTx>>();
     }
 
@@ -438,15 +474,13 @@ mod tests {
     }
 
     fn response_body_str(response: Response) -> Option<String> {
-        response
-            .body
-            .map(|mut body| {
-                     let mut buf = Vec::new();
-                     body.write_body(&mut buf).unwrap();
-                     let s = String::from_utf8(buf).unwrap();
-                     debug!("Received response body:'{}'", &s);
-                     s
-                 })
+        response.body.map(|mut body| {
+            let mut buf = Vec::new();
+            body.write_body(&mut buf).unwrap();
+            let s = String::from_utf8(buf).unwrap();
+            debug!("Received response body:'{}'", &s);
+            s
+        })
     }
 
     fn request_get<A: AsRef<str>>(route: A, router: &Router) -> IronResult<Response> {
@@ -455,10 +489,11 @@ mod tests {
         iron_test::request::get(&url, Headers::new(), router)
     }
 
-    fn request_post_str<B: AsRef<str>, A: AsRef<str>>(route: A,
-                                                      body: B,
-                                                      router: &Router)
-                                                      -> IronResult<Response> {
+    fn request_post_str<B: AsRef<str>, A: AsRef<str>>(
+        route: A,
+        body: B,
+        router: &Router,
+    ) -> IronResult<Response> {
         let body_str = body.as_ref();
         let mut headers = Headers::new();
         headers.set(ContentType::json());
@@ -467,10 +502,11 @@ mod tests {
         iron_test::request::post(&url, headers, body_str, router)
     }
 
-    fn request_post_body<T: Serialize, A: AsRef<str>>(route: A,
-                                                      body: T,
-                                                      router: &Router)
-                                                      -> IronResult<Response> {
+    fn request_post_body<T: Serialize, A: AsRef<str>>(
+        route: A,
+        body: T,
+        router: &Router,
+    ) -> IronResult<Response> {
         let body_str: &str = &serde_json::to_string(&body).unwrap();
         request_post_str(route, body_str, router)
     }
@@ -509,8 +545,10 @@ mod tests {
         fn new() -> CurrencySandbox {
             let services: Vec<Box<Service>> = vec![Box::new(CurrencyService::new())];
             let sandbox = sandbox_with_services(services);
-            info!("Sandbox validators list: {}",
-                  serde_json::to_string(&sandbox.validators()).unwrap());
+            info!(
+                "Sandbox validators list: {}",
+                serde_json::to_string(&sandbox.validators()).unwrap()
+            );
             let state = SandboxState::new();
             CurrencySandbox {
                 sandbox: sandbox,
@@ -542,9 +580,10 @@ mod tests {
             add_one_height_with_transactions(&self.sandbox, &self.state, txs.iter());
         }
 
-        fn request_wallet_info_str<A: AsRef<str>>(&self,
-                                                  public_key_str: A)
-                                                  -> IronResult<Response> {
+        fn request_wallet_info_str<A: AsRef<str>>(
+            &self,
+            public_key_str: A,
+        ) -> IronResult<Response> {
             let api = self.obtain_test_api();
             let get_route = format!("/v1/wallets/info?pubkey={}", public_key_str.as_ref());
             request_get(get_route, &api)

@@ -4,11 +4,9 @@
 // #![deny(missing_docs)]
 #![deny(missing_debug_implementations)]
 
-extern crate rand;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate byteorder;
 #[macro_use]
 extern crate log;
 #[cfg(test)]
@@ -19,6 +17,11 @@ extern crate params;
 extern crate router;
 extern crate iron;
 extern crate bodyparser;
+
+#[cfg(test)]
+extern crate rand;
+#[cfg(test)]
+extern crate byteorder;
 
 use iron::Handler;
 use router::Router;
@@ -31,6 +34,7 @@ use exonum::storage::{Snapshot, Fork, ProofListIndex, ProofMapIndex};
 use exonum::blockchain::{Service, Transaction, ApiContext};
 use exonum::encoding::serialize::json::reexport as serde_json;
 use exonum::encoding::Error as StreamStructError;
+use exonum::helpers::fabric::{ServiceFactory, Context};
 use serde_json::{Value, to_value};
 
 use wallet::Wallet;
@@ -129,7 +133,9 @@ impl FromRaw for CurrencyTx {
             TX_TRANSFER_ID => Ok(CurrencyTx::Transfer(TxTransfer::from_raw(raw)?)),
             TX_ISSUE_ID => Ok(CurrencyTx::Issue(TxIssue::from_raw(raw)?)),
             TX_WALLET_ID => Ok(CurrencyTx::CreateWallet(TxCreateWallet::from_raw(raw)?)),
-            _ => Err(StreamStructError::IncorrectMessageType { message_type: raw.message_type() }),
+            _ => Err(StreamStructError::IncorrectMessageType {
+                message_type: raw.message_type(),
+            }),
         }
     }
 }
@@ -176,7 +182,8 @@ impl<T> fmt::Debug for CurrencySchema<T> {
 }
 
 impl<T> CurrencySchema<T>
-    where T: AsRef<Snapshot>
+where
+    T: AsRef<Snapshot>,
 {
     /// Constructs schema from the database view.
     pub fn new(view: T) -> Self {
@@ -206,9 +213,10 @@ impl<'a> CurrencySchema<&'a mut Fork> {
     }
 
     /// Returns history for the wallet by the given public key.
-    pub fn wallet_history(&mut self,
-                          public_key: &PublicKey)
-                          -> ProofListIndex<&mut Fork, TxMetaRecord> {
+    pub fn wallet_history(
+        &mut self,
+        public_key: &PublicKey,
+    ) -> ProofListIndex<&mut Fork, TxMetaRecord> {
         let mut prefix = vec![19; 1 + PUBLIC_KEY_LENGTH];
         prefix[1..].copy_from_slice(public_key.as_ref());
         ProofListIndex::new(prefix, self.view)
@@ -292,11 +300,13 @@ impl TxCreateWallet {
                 wallet.grow_length_set_history_hash(&history.root_hash());
                 wallet
             } else {
-                Wallet::new(self.pub_key(),
-                            self.name(),
-                            0,
-                            1, // history_len
-                            &history.root_hash())
+                Wallet::new(
+                    self.pub_key(),
+                    self.name(),
+                    0,
+                    1, // history_len
+                    &history.root_hash(),
+                )
             }
         };
         schema.wallets().put(self.pub_key(), wallet)
@@ -369,6 +379,12 @@ impl Service for CurrencyService {
     }
 }
 
+impl ServiceFactory for CurrencyService {
+    fn make_service(_: &Context) -> Box<Service> {
+        Box::new(CurrencyService::new())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use byteorder::{ByteOrder, LittleEndian};
@@ -401,8 +417,10 @@ mod tests {
             let json_str = serde_json::to_string(&wrapped_tx).unwrap();
             let parsed_json: CurrencyTx = serde_json::from_str(&json_str).unwrap();
             assert_eq!(wrapped_tx, parsed_json);
-            trace!("tx issue test_data: {}",
-                   serde_json::to_string(&TransactionTestData::new(wrapped_tx)).unwrap());
+            trace!(
+                "tx issue test_data: {}",
+                serde_json::to_string(&TransactionTestData::new(wrapped_tx)).unwrap()
+            );
         }
     }
 
@@ -421,8 +439,10 @@ mod tests {
             let json_str = serde_json::to_string(&wrapped_tx).unwrap();
             let parsed_json: CurrencyTx = serde_json::from_str(&json_str).unwrap();
             assert_eq!(wrapped_tx, parsed_json);
-            trace!("tx issue test_data: {}",
-                   serde_json::to_string(&TransactionTestData::new(wrapped_tx)).unwrap());
+            trace!(
+                "tx issue test_data: {}",
+                serde_json::to_string(&TransactionTestData::new(wrapped_tx)).unwrap()
+            );
         }
     }
 
@@ -445,8 +465,10 @@ mod tests {
             let json_str = serde_json::to_string(&wrapped_tx).unwrap();
             let parsed_json: CurrencyTx = serde_json::from_str(&json_str).unwrap();
             assert_eq!(wrapped_tx, parsed_json);
-            trace!("tx issue test_data: {}",
-                   serde_json::to_string(&TransactionTestData::new(wrapped_tx)).unwrap());
+            trace!(
+                "tx issue test_data: {}",
+                serde_json::to_string(&TransactionTestData::new(wrapped_tx)).unwrap()
+            );
         }
     }
 
@@ -460,15 +482,19 @@ mod tests {
         let tx_issue_1 = TxIssue::new(&p1, 6000, rng.next_u64(), &s1);
         let tx_transfer_1 = TxTransfer::new(&p1, &p2, 3000, rng.next_u64(), &s1);
         let tx_transfer_2 = TxTransfer::new(&p2, &p1, 1000, rng.next_u64(), &s2);
-        let txs: Vec<CurrencyTx> = vec![tx_create_1.into(),
-                                        tx_create_2.into(),
-                                        tx_issue_1.into(),
-                                        tx_transfer_1.into(),
-                                        tx_transfer_2.into()];
+        let txs: Vec<CurrencyTx> = vec![
+            tx_create_1.into(),
+            tx_create_2.into(),
+            tx_issue_1.into(),
+            tx_transfer_1.into(),
+            tx_transfer_2.into(),
+        ];
         for (idx, tx) in txs.iter().enumerate() {
-            trace!("transaction #{}: {}",
-                   idx,
-                   serde_json::to_string(tx).unwrap());
+            trace!(
+                "transaction #{}: {}",
+                idx,
+                serde_json::to_string(tx).unwrap()
+            );
         }
     }
 
@@ -639,12 +665,12 @@ mod tests {
         assert_eq!(h2, vec![meta_create2, meta_issue2, meta_transfer]);
     }
 
-    #[cfg(feature="memorydb")]
+    #[cfg(feature = "memorydb")]
     fn create_db() -> Box<Database> {
         Box::new(storage::MemoryDB::new())
     }
 
-    #[cfg(not(feature="memorydb"))]
+    #[cfg(not(feature = "memorydb"))]
     fn create_db() -> Box<Database> {
         let mut options = storage::LevelDBOptions::new();
         options.create_if_missing = true;
@@ -671,9 +697,10 @@ mod tests {
         }
     }
 
-    fn get_wallet_and_history(schema: &mut CurrencySchema<&mut Fork>,
-                              pub_key: &PublicKey)
-                              -> (Option<Wallet>, Hash) {
+    fn get_wallet_and_history(
+        schema: &mut CurrencySchema<&mut Fork>,
+        pub_key: &PublicKey,
+    ) -> (Option<Wallet>, Hash) {
         let w = schema.wallet(pub_key);
         let h = schema.wallet_history(pub_key).root_hash();
         (w, h)

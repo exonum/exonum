@@ -11,14 +11,17 @@ rand = "0.3"
 router = "0.5.1"
 log = "0.3"
 iron-test = { git = "https://github.com/reem/iron-test" }
-cryptocurrency = {version="0.1.0", path="../cryptocurrency"}
+cryptocurrency = {version="0.1.0", path=".."}
 
 [dependencies.exonum]
-git = "ssh://git@github.com/exonum/exonum.git"
+git = "https://github.com/exonum/exonum.git"
 version = "0.1.0"
-rev = "17b4e7ced336f8f0fd3055c2c945ecb576c90c9b"
+tag = "v0.1"
 
 [dependencies.sandbox]
-git = "ssh://git@github.com/exonum/exonum.git"
+git = "https://github.com/exonum/exonum.git"
 version = "0.1.0"
-rev = "17b4e7ced336f8f0fd3055c2c945ecb576c90c9b"
+tag = "v0.1"
+
+[replace]
+"exonum:0.1.0" = { git = "https://github.com/exonum/exonum.git", tag="v0.1" }
