@@ -15,6 +15,7 @@ use exonum::messages::Message;
 use exonum::crypto::{HexValue, PublicKey, Hash};
 use exonum::storage::{MapProof, ListProof};
 use exonum::blockchain::{self, Blockchain, BlockProof};
+use exonum::helpers::Height;
 
 use super::tx_metarecord::TxMetaRecord;
 use super::wallet::Wallet;
@@ -61,7 +62,7 @@ where
         let mut view = self.blockchain.fork();
         let mut currency_schema = CurrencySchema::new(&mut view);
 
-        let max_height = general_schema.block_hashes_by_height().len() - 1;
+        let max_height = Height(general_schema.block_hashes_by_height().len()).previous();
         let block_proof = general_schema.block_and_precommits(max_height).unwrap();
         let state_hash = *block_proof.block.state_hash(); //debug code
 
