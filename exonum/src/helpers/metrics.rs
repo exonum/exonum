@@ -48,19 +48,23 @@ macro_rules! metric {
 
 // Do not use directly, use `metric!` macro instead.
 #[doc(hidden)]
+#[allow(unused_variables)]
 pub fn add_metric(metric_name: &str, value: &Arguments) {
     // TODO: Convert time to some meaningful format.
     let time = format!("{:?}", SystemTime::now());
 
-    if cfg!(feature = "metrics-hadoop") {
+    #[cfg(feature = "metrics-hadoop")]
+    {
         write_to_hadoop(metric_name, value, &time);
     }
 
-    if cfg!(feature = "metrics-log") {
+    #[cfg(feature = "metrics-log")]
+    {
         trace!("{} {} {}", metric_name, value, time);
     }
 }
 
+#[cfg(feature = "metrics-hadoop")]
 fn write_to_hadoop(_metric_name: &str, _value: &Arguments, _time: &str) {
     // TODO: Add implementation.
 }
