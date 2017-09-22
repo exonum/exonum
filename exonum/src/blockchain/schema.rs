@@ -85,7 +85,10 @@ where
 
     /// Returns table that represents a map from transaction hash into raw transaction message.
     pub fn transactions(&self) -> MapIndex<&T, Hash, RawMessage> {
-        MapIndex::new(gen_prefix(CONSENSUS, TRANSACTION_BY_HASH_ORD, &()), &self.view)
+        MapIndex::new(
+            gen_prefix(CONSENSUS, TRANSACTION_BY_HASH_ORD, &()),
+            &self.view,
+        )
     }
 
     /// Returns table that keeps the block height and tx position inside block for every
@@ -101,7 +104,10 @@ where
 
     /// Returns table that keeps block hash for the corresponding height.
     pub fn block_hashes_by_height(&self) -> ListIndex<&T, Hash> {
-        ListIndex::new(gen_prefix(CONSENSUS, BLOCK_HASH_BY_HEIGHT_ORD, &()), &self.view)
+        ListIndex::new(
+            gen_prefix(CONSENSUS, BLOCK_HASH_BY_HEIGHT_ORD, &()),
+            &self.view,
+        )
     }
 
     /// Returns table that keeps a list of transactions for the each block.
@@ -112,20 +118,29 @@ where
 
     /// Returns table that saves a list of precommits for block with given hash.
     pub fn precommits(&self, hash: &Hash) -> ListIndex<&T, Precommit> {
-        ListIndex::new(gen_prefix(CONSENSUS, PRECOMMITS_FOR_BLOCK_ORD, hash), &self.view)
+        ListIndex::new(
+            gen_prefix(CONSENSUS, PRECOMMITS_FOR_BLOCK_ORD, hash),
+            &self.view,
+        )
     }
 
     /// Returns table that represents a map from configuration hash into contents.
     pub fn configs(&self) -> ProofMapIndex<&T, Hash, StoredConfiguration> {
         // configs patricia merkletree <block height> json
-        ProofMapIndex::new(gen_prefix(CONSENSUS, STORED_CONFIG_BY_HASH_ORD, &()), &self.view)
+        ProofMapIndex::new(
+            gen_prefix(CONSENSUS, STORED_CONFIG_BY_HASH_ORD, &()),
+            &self.view,
+        )
     }
 
     /// Returns auxiliary table that keeps hash references to configurations in order
     /// of increasing their `actual_from` height.
     pub fn configs_actual_from(&self) -> ListIndex<&T, ConfigReference> {
         // TODO: consider List index to reduce storage volume
-        ListIndex::new(gen_prefix(CONSENSUS, CONFIGS_ACTUAL_FROM_ORD, &()), &self.view)
+        ListIndex::new(
+            gen_prefix(CONSENSUS, CONFIGS_ACTUAL_FROM_ORD, &()),
+            &self.view,
+        )
     }
 
     /// Returns the accessory `ProofMapIndex` for calculating
@@ -144,7 +159,10 @@ where
     /// Core tables participate in resulting state_hash with `CORE_SERVICE`
     /// service_id. Their vector is returned by `core_state_hash` method.
     pub fn state_hash_aggregator(&self) -> ProofMapIndex<&T, Hash, Hash> {
-        ProofMapIndex::new(gen_prefix(CONSENSUS, STATE_HASH_AGGREGATOR_ORD, &()), &self.view)
+        ProofMapIndex::new(
+            gen_prefix(CONSENSUS, STATE_HASH_AGGREGATOR_ORD, &()),
+            &self.view,
+        )
     }
 
     /// Returns consensus messages that have to be recovered in case of process' restart
@@ -316,28 +334,40 @@ impl<'a> Schema<&'a mut Fork> {
     ///
     /// [1]: struct.Schema.html#method.transactions
     pub fn transactions_mut(&mut self) -> MapIndex<&mut Fork, Hash, RawMessage> {
-        MapIndex::new(gen_prefix(CONSENSUS, TRANSACTION_BY_HASH_ORD, &()), &mut self.view)
+        MapIndex::new(
+            gen_prefix(CONSENSUS, TRANSACTION_BY_HASH_ORD, &()),
+            &mut self.view,
+        )
     }
 
     /// Mutable reference to the [`tx_location_by_tx_hash`][1] index.
     ///
     /// [1]: struct.Schema.html#method.tx_location_by_tx_hash
     pub fn tx_location_by_tx_hash_mut(&mut self) -> MapIndex<&mut Fork, Hash, TxLocation> {
-        MapIndex::new(gen_prefix(CONSENSUS, LOCATION_BY_HASH_ORD, &()), &mut self.view)
+        MapIndex::new(
+            gen_prefix(CONSENSUS, LOCATION_BY_HASH_ORD, &()),
+            &mut self.view,
+        )
     }
 
     /// Mutable reference to the [`blocks][1] index.
     ///
     /// [1]: struct.Schema.html#method.blocks
     pub fn blocks_mut(&mut self) -> MapIndex<&mut Fork, Hash, Block> {
-        MapIndex::new(gen_prefix(CONSENSUS, BLOCK_BY_HEIGHT_ORD, &()), &mut self.view)
+        MapIndex::new(
+            gen_prefix(CONSENSUS, BLOCK_BY_HEIGHT_ORD, &()),
+            &mut self.view,
+        )
     }
 
     /// Mutable reference to the [`block_hashes_by_height_mut`][1] index.
     ///
     /// [1]: struct.Schema.html#method.block_hashes_by_height_mut
-    pub fn block_hashes_by_height_mut(&mut self) -> ListIndex<&mut Fork, Hash>  {
-        ListIndex::new(gen_prefix(CONSENSUS, BLOCK_HASH_BY_HEIGHT_ORD, &()), &mut self.view)
+    pub fn block_hashes_by_height_mut(&mut self) -> ListIndex<&mut Fork, Hash> {
+        ListIndex::new(
+            gen_prefix(CONSENSUS, BLOCK_HASH_BY_HEIGHT_ORD, &()),
+            &mut self.view,
+        )
     }
 
     /// Mutable reference to the [`block_hash_by_height`][1] index.
@@ -352,28 +382,40 @@ impl<'a> Schema<&'a mut Fork> {
     /// [1]: struct.Schema.html#method.block_txs
     pub fn block_txs_mut(&mut self, height: Height) -> ProofListIndex<&mut Fork, Hash> {
         let height: u64 = height.into();
-        ProofListIndex::new(gen_prefix(CONSENSUS, BLOCK_TXS_ORD, &height), &mut self.view)
+        ProofListIndex::new(
+            gen_prefix(CONSENSUS, BLOCK_TXS_ORD, &height),
+            &mut self.view,
+        )
     }
 
     /// Mutable reference to the [`precommits`][1] index.
     ///
     /// [1]: struct.Schema.html#method.precommits
     pub fn precommits_mut(&mut self, hash: &Hash) -> ListIndex<&mut Fork, Precommit> {
-        ListIndex::new(gen_prefix(CONSENSUS, PRECOMMITS_FOR_BLOCK_ORD, hash), &mut self.view)
+        ListIndex::new(
+            gen_prefix(CONSENSUS, PRECOMMITS_FOR_BLOCK_ORD, hash),
+            &mut self.view,
+        )
     }
 
     /// Mutable reference to the [`configs`][1] index.
     ///
     /// [1]: struct.Schema.html#method.configs
     pub fn configs_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, StoredConfiguration> {
-        ProofMapIndex::new(gen_prefix(CONSENSUS, STORED_CONFIG_BY_HASH_ORD, &()), &mut self.view)
+        ProofMapIndex::new(
+            gen_prefix(CONSENSUS, STORED_CONFIG_BY_HASH_ORD, &()),
+            &mut self.view,
+        )
     }
 
     /// Mutable reference to the [`configs_actual_from`][1] index.
     ///
     /// [1]: struct.Schema.html#method.configs_actual_from
     pub fn configs_actual_from_mut(&mut self) -> ListIndex<&mut Fork, ConfigReference> {
-        ListIndex::new(gen_prefix(CONSENSUS, CONFIGS_ACTUAL_FROM_ORD, &()), &mut self.view)
+        ListIndex::new(
+            gen_prefix(CONSENSUS, CONFIGS_ACTUAL_FROM_ORD, &()),
+            &mut self.view,
+        )
     }
 
     /// Mutable reference to the [`state_hash_aggregator`][1] index.
