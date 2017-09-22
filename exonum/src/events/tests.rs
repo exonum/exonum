@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use futures::{self, Future, Stream, Sink};
+use futures::{self, Future, Sink, Stream};
 use futures::stream::Wait;
 use futures::sync::mpsc;
 use tokio_core::reactor::Core;
@@ -22,10 +22,10 @@ use std::thread;
 use std::time::{self, Duration};
 
 use crypto::{gen_keypair, PublicKey, Signature};
-use messages::{MessageWriter, RawMessage, Connect, Message};
+use messages::{Connect, Message, MessageWriter, RawMessage};
 use events::{NetworkEvent, NetworkRequest};
-use events::network::{NetworkPart, NetworkConfiguration};
-use node::{NodeChannel, EventsPoolCapacity};
+use events::network::{NetworkConfiguration, NetworkPart};
+use node::{EventsPoolCapacity, NodeChannel};
 
 #[derive(Debug)]
 pub struct TestHandler {
@@ -83,7 +83,7 @@ impl TestHandler {
         match self.wait_for_event() {
             Ok(NetworkEvent::PeerConnected(_addr, connect)) => connect,
             Ok(other) => panic!("Unexpected connect received, {:?}", other),
-            Err(e) => panic!("An error occured, {:?}", e),
+            Err(e) => panic!("An error during wait for connect occured, {:?}", e),
         }
     }
 
@@ -91,7 +91,7 @@ impl TestHandler {
         match self.wait_for_event() {
             Ok(NetworkEvent::PeerDisconnected(addr)) => addr,
             Ok(other) => panic!("Unexpected disconnect received, {:?}", other),
-            Err(e) => panic!("An error occured, {:?}", e),
+            Err(e) => panic!("An error during wait for disconnect occured, {:?}", e),
         }
     }
 
@@ -99,7 +99,7 @@ impl TestHandler {
         match self.wait_for_event() {
             Ok(NetworkEvent::MessageReceived(_addr, msg)) => msg,
             Ok(other) => panic!("Unexpected message received, {:?}", other),
-            Err(e) => panic!("An error occured, {:?}", e),
+            Err(e) => panic!("An error during wait for message occured, {:?}", e),
         }
     }
 }
@@ -278,7 +278,7 @@ fn test_network_reconnect() {
     let addrs: [SocketAddr; 2] =
         ["127.0.0.1:19100".parse().unwrap(), "127.0.0.1:19101".parse().unwrap()];
 
-    let msg = raw_message(11, 400);
+    let msg = raw_message(11, 1000);
     let c1 = connect_message(addrs[0]);
     let c2 = connect_message(addrs[1]);
     let msg_cloned = msg.clone();
@@ -292,6 +292,7 @@ fn test_network_reconnect() {
         assert_eq!(e.wait_for_connect(), c2);
         e.connect_with(addrs[1]);
         assert_eq!(e.wait_for_message(), msg_cloned);
+        e.disconnect_with(addrs[1]);
         assert_eq!(e.wait_for_disconnect(), addrs[1]);
     });
     // First connect attempt.
