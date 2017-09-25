@@ -1,7 +1,5 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
-extern crate thread_id;
-extern crate ctrlc;
 #[macro_use]
 extern crate lazy_static;
 

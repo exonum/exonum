@@ -13,8 +13,10 @@
 // limitations under the License.
 
 #![feature(test)]
+#![allow(dead_code)]
 extern crate test;
 extern crate rand;
+#[cfg(feature = "rocksdb")]
 extern crate tempdir;
 extern crate exonum;
 
@@ -23,6 +25,7 @@ mod tests {
     use std::collections::HashSet;
     use test::Bencher;
     use rand::{Rng, thread_rng, XorShiftRng, SeedableRng};
+    #[cfg(feature = "rocksdb")]
     use tempdir::TempDir;
     use exonum::storage::{Database, MemoryDB};
     #[cfg(feature = "rocksdb")]
@@ -41,7 +44,7 @@ mod tests {
             let mut v = vec![0; 8];
 
             // Generate only unique keys
-            let mut k = base.clone();
+            let mut k = base;
             let byte: usize = rng.gen_range(0, 31);
             k[byte] = rng.gen::<u8>();
 
@@ -49,7 +52,7 @@ mod tests {
             while exists_keys.contains(&k) {
                 rng.fill_bytes(&mut k);
             }
-            exists_keys.insert(k.clone());
+            exists_keys.insert(k);
             (k, v)
         };
 
@@ -121,8 +124,7 @@ mod tests {
     fn create_rocksdb(tempdir: &TempDir) -> RocksDB {
         let mut options = RocksDBOptions::default();
         options.create_if_missing(true);
-        let db = RocksDB::open(tempdir.path(), options).unwrap();
-        db
+        RocksDB::open(tempdir.path(), options).unwrap()
     }
 
     #[bench]
