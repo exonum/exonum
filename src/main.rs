@@ -32,7 +32,7 @@ use exonum::node::{Node, NodeConfig, NodeApiConfig, TransactionSend, ApiSender, 
 use exonum::messages::{RawTransaction, FromRaw, Message};
 use exonum::storage::{Fork, MemoryDB, MapIndex};
 use exonum::crypto::{PublicKey, Hash, HexValue};
-use exonum::encoding::{self, Field};
+use exonum::encoding;
 use exonum::api::{Api, ApiError};
 use iron::prelude::*;
 use iron::Handler;
@@ -74,14 +74,14 @@ encoding_struct! {
 
 /// Add methods to the `Wallet` type for changing balance.
 impl Wallet {
-    pub fn increase(&mut self, amount: u64) {
+    pub fn increase(self, amount: u64) -> Self {
         let balance = self.balance() + amount;
-        Field::write(&balance, &mut self.raw, 40, 48);
+        Self::new(self.pub_key(), self.name(), balance)
     }
 
-    pub fn decrease(&mut self, amount: u64) {
+    pub fn decrease(self, amount: u64) -> Self {
         let balance = self.balance() - amount;
-        Field::write(&balance, &mut self.raw, 40, 48);
+        Self::new(self.pub_key(), self.name(), balance)
     }
 }
 
@@ -173,11 +173,11 @@ impl Transaction for TxTransfer {
         let mut schema = CurrencySchema { view };
         let sender = schema.wallet(self.from());
         let receiver = schema.wallet(self.to());
-        if let (Some(mut sender), Some(mut receiver)) = (sender, receiver) {
+        if let (Some(sender), Some(receiver)) = (sender, receiver) {
             let amount = self.amount();
             if sender.balance() >= amount {
-                sender.decrease(amount);
-                receiver.increase(amount);
+                let sender = sender.decrease(amount);
+                let receiver = receiver.increase(amount);
                 println!("Transfer between wallets: {:?} => {:?}", sender, receiver);
                 let mut wallets = schema.wallets();
                 wallets.put(self.from(), sender);
