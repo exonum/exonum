@@ -4,6 +4,10 @@ rust:
 cache: cargo
 sudo: required
 dist: trusty
+addons:
+  apt:
+    packages:
+    - jq
 env:
   global:
   - NIGHTLY_RUST=nightly-2017-08-15

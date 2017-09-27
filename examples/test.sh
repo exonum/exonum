@@ -30,7 +30,7 @@ function send-transaction {
 }
 
 function check-transaction {
-    if echo $RESP | grep "\"tx_hash\":.*\"$1[0-9a-fA-F]*\"" &>/dev/null; then
+    if [[ `echo $RESP | jq .tx_hash` =~ ^\"$1 ]]; then
         echo "OK, got expected transaction hash $1"
     else
         echo "Unexpected response: $RESP"
@@ -39,9 +39,10 @@ function check-transaction {
 }
 
 function check-request {
-    if echo $RESP | grep "\"balance\":.*$2.*\"name\":.*\"$1\"" &>/dev/null; then
+    if [[ ( `echo $3 | jq .name` == "\"$1\"" ) && ( `echo $3 | jq .balance` == "\"$2\"" ) ]]; then
         echo "OK, got expected transaction balance $2 for user $1"
     else
+        # $RESP here is intentional; we want to output the entire incorrect response
         echo "Unexpected response: $RESP"
         STATUS=1
     fi
@@ -67,12 +68,12 @@ sleep 7
 
 echo "Retrieving info on all wallets..."
 RESP=`curl http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets 2>/dev/null`
-check-request "Johnny Doe" 90
-check-request "Janie Roe" 110
+check-request "Johnny Doe" 90 "`echo $RESP | jq .[0]`"
+check-request "Janie Roe" 110 "`echo $RESP | jq .[1]`"
 
 echo "Retrieving info on Johnny's wallet..."
 RESP=`curl http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallet/03e657ae71e51be60a45b4bd20bcf79ff52f0c037ae6da0540a0e0066132b472 2>/dev/null`
-check-request "Johnny Doe" 90
+check-request "Johnny Doe" 90 "$RESP"
 
 kill-server
 exit $STATUS
