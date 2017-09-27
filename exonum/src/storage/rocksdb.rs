@@ -13,8 +13,7 @@
 // limitations under the License.
 
 //! An implementation of `RocksDB` database.
-use profiler;
-
+use exonum_profiler::ProfilerSpan;
 use rocksdb::TransactionDB as _RocksDB;
 use rocksdb::DBRawIterator;
 use rocksdb::Snapshot as _Snapshot;
@@ -72,7 +71,7 @@ impl Database for RocksDB {
     }
 
     fn snapshot(&self) -> Box<Snapshot> {
-        let _p = profiler::ProfilerSpan::new("RocksDB::snapshot");
+        let _p = ProfilerSpan::new("RocksDB::snapshot");
         Box::new(RocksDBSnapshot {
             snapshot: unsafe { mem::transmute(self.db.snapshot()) },
             _db: self.db.clone(),
@@ -80,7 +79,7 @@ impl Database for RocksDB {
     }
 
     fn merge(&mut self, patch: Patch) -> Result<()> {
-        let _p = profiler::ProfilerSpan::new("RocksDB::merge");
+        let _p = ProfilerSpan::new("RocksDB::merge");
         let w_opts = WriteOptions::default();
         let txn_opts = TransactionOptions::default();
         let txn = self.db.transaction_begin(&w_opts, &txn_opts);
@@ -96,7 +95,7 @@ impl Database for RocksDB {
 
 impl Snapshot for RocksDBSnapshot {
     fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
-        let _p = profiler::ProfilerSpan::new("RocksDBSnapshot::get");
+        let _p = ProfilerSpan::new("RocksDBSnapshot::get");
         match self.snapshot.get(key) {
             Ok(value) => value.map(|v| v.to_vec()),
             Err(e) => panic!(e),
@@ -104,7 +103,7 @@ impl Snapshot for RocksDBSnapshot {
     }
 
     fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a> {
-        let _p = profiler::ProfilerSpan::new("RocksDBSnapshot::iter");
+        let _p = ProfilerSpan::new("RocksDBSnapshot::iter");
         let mut iter = self.snapshot.raw_iterator();
         iter.seek(from);
         Box::new(RocksDBIterator {
@@ -117,7 +116,7 @@ impl Snapshot for RocksDBSnapshot {
 
 impl<'a> Iterator for RocksDBIterator {
     fn next(&mut self) -> Option<(&[u8], &[u8])> {
-        let _p = profiler::ProfilerSpan::new("RocksDBIterator::next");
+        let _p = ProfilerSpan::new("RocksDBIterator::next");
         let result = if self.iter.valid() {
             self.key = Some(unsafe { self.iter.key_inner().unwrap().to_vec() });
             self.value = Some(unsafe { self.iter.value_inner().unwrap().to_vec() });
@@ -137,7 +136,7 @@ impl<'a> Iterator for RocksDBIterator {
     }
 
     fn peek(&mut self) -> Option<(&[u8], &[u8])> {
-        let _p = profiler::ProfilerSpan::new("RocksDBIterator::peek");
+        let _p = ProfilerSpan::new("RocksDBIterator::peek");
         if self.iter.valid() {
             self.key = Some(unsafe { self.iter.key_inner().unwrap().to_vec() });
             self.value = Some(unsafe { self.iter.value_inner().unwrap().to_vec() });

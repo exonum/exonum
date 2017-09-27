@@ -13,8 +13,10 @@
 // limitations under the License.
 
 #![feature(test)]
+#![allow(dead_code)]
 extern crate test;
 extern crate rand;
+#[cfg(feature = "rocksdb")]
 extern crate tempdir;
 extern crate exonum;
 
@@ -23,10 +25,13 @@ mod tests {
     use std::collections::HashSet;
     use test::Bencher;
     use rand::{Rng, thread_rng, XorShiftRng, SeedableRng};
+    #[cfg(feature = "rocksdb")]
     use tempdir::TempDir;
-    use exonum::storage::{Database, MemoryDB, RocksDB, RocksDBOptions};
+    use exonum::storage::{Database, MemoryDB};
+    #[cfg(feature = "rocksdb")]
+    use exonum::storage::{RocksDB, RocksDBOptions};
     use exonum::storage::{ProofMapIndex, ProofListIndex};
-    use exonum::storage::proof_map_index::KEY_SIZE;
+    use exonum::storage::proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE;
 
     fn generate_random_kv(len: usize) -> Vec<([u8; KEY_SIZE], Vec<u8>)> {
         let mut rng = thread_rng();
@@ -39,7 +44,7 @@ mod tests {
             let mut v = vec![0; 8];
 
             // Generate only unique keys
-            let mut k = base.clone();
+            let mut k = base;
             let byte: usize = rng.gen_range(0, 31);
             k[byte] = rng.gen::<u8>();
 
@@ -47,7 +52,7 @@ mod tests {
             while exists_keys.contains(&k) {
                 rng.fill_bytes(&mut k);
             }
-            exists_keys.insert(k.clone());
+            exists_keys.insert(k);
             (k, v)
         };
 
@@ -115,11 +120,11 @@ mod tests {
         });
     }
 
+    #[cfg(feature = "rocksdb")]
     fn create_rocksdb(tempdir: &TempDir) -> RocksDB {
         let mut options = RocksDBOptions::default();
         options.create_if_missing(true);
-        let db = RocksDB::open(tempdir.path(), options).unwrap();
-        db
+        RocksDB::open(tempdir.path(), options).unwrap()
     }
 
     #[bench]
@@ -128,6 +133,7 @@ mod tests {
         merkle_table_insertion(b, &db);
     }
 
+    #[cfg(feature = "rocksdb")]
     #[bench]
     fn bench_merkle_table_append_rocksdb(b: &mut Bencher) {
         let tempdir = TempDir::new("exonum").unwrap();
@@ -142,12 +148,20 @@ mod tests {
     }
 
     #[bench]
+    fn bench_merkle_patricia_table_insertion_fork_memorydb(b: &mut Bencher) {
+        let db = MemoryDB::new();
+        merkle_patricia_table_insertion_fork(b, &db);
+    }
+
+    #[cfg(feature = "rocksdb")]
+    #[bench]
     fn bench_merkle_patricia_table_insertion_rocksdb(b: &mut Bencher) {
         let tempdir = TempDir::new("exonum").unwrap();
         let db = create_rocksdb(&tempdir);
         merkle_patricia_table_insertion(b, &db);
     }
 
+    #[cfg(feature = "rocksdb")]
     #[bench]
     fn bench_merkle_patricia_table_insertion_fork_rocksdb(b: &mut Bencher) {
         let tempdir = TempDir::new("exonum").unwrap();
@@ -161,6 +175,7 @@ mod tests {
         merkle_patricia_table_insertion_large_map(b, &db);
     }
 
+    #[cfg(feature = "rocksdb")]
     #[bench]
     fn long_bench_merkle_patricia_table_insertion_rocksdb(b: &mut Bencher) {
         let tempdir = TempDir::new("exonum").unwrap();

@@ -24,12 +24,14 @@ use super::clap_backend::ClapBackend;
 use super::ServiceFactory;
 use super::details::{Run, Finalize, GenerateNodeConfig, GenerateCommonConfig, GenerateTestnet};
 
+type ServiceConstructor = Box<FnMut(&Context) -> Box<Service>>;
+
 /// `NodeBuilder` is a high level object,
 /// usable for fast prototyping and creating app from services list.
 #[derive(Default)]
 pub struct NodeBuilder {
     commands: Vec<CollectedCommand>,
-    service_factories: Vec<Box<ServiceFactory>>,
+    service_constructors: Vec<ServiceConstructor>,
 }
 
 impl NodeBuilder {
