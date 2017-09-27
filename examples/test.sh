@@ -10,7 +10,7 @@ function launch-server {
     cargo run &
     CTR=0
     MAXCTR=60
-    while [[ ( -z `ps -e --format pid,command | grep '\btarget/debug/cryptocurrency\b' | grep -v 'grep'` ) && ( $CTR -lt $MAXCTR ) ]]; do
+    while [[ ( -z `netstat -tlp 2>/dev/null | awk '{ if ($4 == "*:8000") { split($7, pid, /\//); print pid[1] } }'` ) && ( $CTR -lt $MAXCTR ) ]]; do
       sleep 1
       CTR=$(( $CTR + 1 ))
     done
@@ -22,7 +22,7 @@ function launch-server {
 }
 
 function kill-server {
-    ps -e --format pid,command | grep 'target/.*/cryptocurrency' | grep -v 'grep' | awk '{ print $1 }' | xargs -r kill -KILL
+    netstat -tlp 2>/dev/null | awk '{ if ($4 == "*:8000") { split($7, pid, /\//); print pid[1] } }' | xargs -r kill -KILL
 }
 
 function send-transaction {
