@@ -233,9 +233,15 @@ fn test_consensus_cache_outgoing() {
 
     assert_eq!(2, messages.len());
     let raw_propose: &RawMessage = messages.get(0).unwrap();
-    assert_eq!(exonum::messages::PROPOSE_MESSAGE_ID, raw_propose.message_type());
+    assert_eq!(
+        exonum::messages::PROPOSE_MESSAGE_ID,
+        raw_propose.message_type()
+    );
     let raw_prevote: &RawMessage = messages.get(1).unwrap();
-    assert_eq!(exonum::messages::PREVOTE_MESSAGE_ID, raw_prevote.message_type());
+    assert_eq!(
+        exonum::messages::PREVOTE_MESSAGE_ID,
+        raw_prevote.message_type()
+    );
 
 
     sandbox.recv(Prevote::new(
@@ -268,12 +274,21 @@ fn test_consensus_cache_outgoing() {
 
     let messages = get_consensus_messages(&sandbox.blockchain_ref());
 
-    let raw_prevote1: &RawMessage = messages.get(messages.len()-3).unwrap();
-    assert_eq!(exonum::messages::PREVOTE_MESSAGE_ID, raw_prevote1.message_type());
-    let raw_prevote2: &RawMessage = messages.get(messages.len()-2).unwrap();
-    assert_eq!(exonum::messages::PREVOTE_MESSAGE_ID, raw_prevote2.message_type());
-    let raw_precommit: &RawMessage = messages.get(messages.len()-1).unwrap();
-    assert_eq!(exonum::messages::PRECOMMIT_MESSAGE_ID, raw_precommit.message_type());
+    let raw_prevote1: &RawMessage = messages.get(messages.len() - 3).unwrap();
+    assert_eq!(
+        exonum::messages::PREVOTE_MESSAGE_ID,
+        raw_prevote1.message_type()
+    );
+    let raw_prevote2: &RawMessage = messages.get(messages.len() - 2).unwrap();
+    assert_eq!(
+        exonum::messages::PREVOTE_MESSAGE_ID,
+        raw_prevote2.message_type()
+    );
+    let raw_precommit: &RawMessage = messages.get(messages.len() - 1).unwrap();
+    assert_eq!(
+        exonum::messages::PRECOMMIT_MESSAGE_ID,
+        raw_precommit.message_type()
+    );
 }
 
 /// Idea: - Node receives Propose
@@ -301,10 +316,17 @@ fn test_consensus_cache_incoming() {
     let messages = get_consensus_messages(&sandbox.blockchain_ref());
 
     // Outgoing Prevote & corresponding Propose should be put to cache
-    assert_eq!(2, messages.len(), "Cache should contain Prevote and it's Propose for the moment");
+    assert_eq!(
+        2,
+        messages.len(),
+        "Cache should contain Prevote and it's Propose for the moment"
+    );
 
     let raw_prevote: &RawMessage = messages.get(1).unwrap();
-    assert_eq!(exonum::messages::PREVOTE_MESSAGE_ID, raw_prevote.message_type());
+    assert_eq!(
+        exonum::messages::PREVOTE_MESSAGE_ID,
+        raw_prevote.message_type()
+    );
     let prevote = exonum::messages::Any::from_raw(raw_prevote.clone());
     assert!(prevote.is_ok());
 
@@ -318,7 +340,11 @@ fn test_consensus_cache_incoming() {
     ));
 
     let messages = get_consensus_messages(&sandbox.blockchain_ref());
-    assert_eq!(2, messages.len(), "Cache should contain Prevote and it's Propose for the moment");
+    assert_eq!(
+        2,
+        messages.len(),
+        "Cache should contain Prevote and it's Propose for the moment"
+    );
     assert!(messages.get(0).is_some());
     assert!(messages.get(1).is_some());
 
@@ -351,12 +377,21 @@ fn test_consensus_cache_incoming() {
     ));
     let messages = get_consensus_messages(&sandbox.blockchain_ref());
 
-    let raw_prevote1: &RawMessage = messages.get(messages.len()-3).unwrap();
-    assert_eq!(exonum::messages::PREVOTE_MESSAGE_ID, raw_prevote1.message_type());
-    let raw_prevote2: &RawMessage = messages.get(messages.len()-2).unwrap();
-    assert_eq!(exonum::messages::PREVOTE_MESSAGE_ID, raw_prevote2.message_type());
-    let raw_precommit: &RawMessage = messages.get(messages.len()-1).unwrap();
-    assert_eq!(exonum::messages::PRECOMMIT_MESSAGE_ID, raw_precommit.message_type());
+    let raw_prevote1: &RawMessage = messages.get(messages.len() - 3).unwrap();
+    assert_eq!(
+        exonum::messages::PREVOTE_MESSAGE_ID,
+        raw_prevote1.message_type()
+    );
+    let raw_prevote2: &RawMessage = messages.get(messages.len() - 2).unwrap();
+    assert_eq!(
+        exonum::messages::PREVOTE_MESSAGE_ID,
+        raw_prevote2.message_type()
+    );
+    let raw_precommit: &RawMessage = messages.get(messages.len() - 1).unwrap();
+    assert_eq!(
+        exonum::messages::PRECOMMIT_MESSAGE_ID,
+        raw_precommit.message_type()
+    );
 }
 
 /// Checks that node gets locked after restart

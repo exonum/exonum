@@ -388,7 +388,7 @@ where
                 // Put our consensus messages to the cache. This is for validators only.
                 if self.state.is_validator() {
                     self.blockchain
-                        .save_messages(self.state.prepare_consensus_messages().into_iter())
+                        .save_messages(self.state.prepare_consensus_messages())
                         .unwrap();
                 }
 

@@ -401,7 +401,7 @@ impl Blockchain {
     /// Fork instance
     pub fn save_messages<I>(&mut self, iter: I) -> Result<(), Error>
     where
-        I: Iterator<Item = RawMessage>,
+        I: IntoIterator<Item = RawMessage>,
     {
         let mut fork = self.fork();
 
