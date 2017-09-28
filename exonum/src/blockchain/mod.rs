@@ -403,8 +403,6 @@ impl Blockchain {
     where
         I: Iterator<Item = RawMessage>,
     {
-
-        // prepare DB
         let mut fork = self.fork();
 
         {
