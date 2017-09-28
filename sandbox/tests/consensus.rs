@@ -232,12 +232,12 @@ fn test_consensus_cache_outgoing() {
     let messages = get_consensus_messages(&sandbox.blockchain_ref());
 
     assert_eq!(2, messages.len());
-    let raw_propose: &RawMessage = messages.get(0).unwrap();
+    let raw_propose: &RawMessage = &messages[0];
     assert_eq!(
         exonum::messages::PROPOSE_MESSAGE_ID,
         raw_propose.message_type()
     );
-    let raw_prevote: &RawMessage = messages.get(1).unwrap();
+    let raw_prevote: &RawMessage = &messages[1];
     assert_eq!(
         exonum::messages::PREVOTE_MESSAGE_ID,
         raw_prevote.message_type()
@@ -274,17 +274,17 @@ fn test_consensus_cache_outgoing() {
 
     let messages = get_consensus_messages(&sandbox.blockchain_ref());
 
-    let raw_prevote1: &RawMessage = messages.get(messages.len() - 3).unwrap();
+    let raw_prevote1: &RawMessage = &messages[messages.len() - 3];
     assert_eq!(
         exonum::messages::PREVOTE_MESSAGE_ID,
         raw_prevote1.message_type()
     );
-    let raw_prevote2: &RawMessage = messages.get(messages.len() - 2).unwrap();
+    let raw_prevote2: &RawMessage = &messages[messages.len() - 2];
     assert_eq!(
         exonum::messages::PREVOTE_MESSAGE_ID,
         raw_prevote2.message_type()
     );
-    let raw_precommit: &RawMessage = messages.get(messages.len() - 1).unwrap();
+    let raw_precommit: &RawMessage = &messages[messages.len() - 1];
     assert_eq!(
         exonum::messages::PRECOMMIT_MESSAGE_ID,
         raw_precommit.message_type()
@@ -322,7 +322,7 @@ fn test_consensus_cache_incoming() {
         "Cache should contain Prevote and it's Propose for the moment"
     );
 
-    let raw_prevote: &RawMessage = messages.get(1).unwrap();
+    let raw_prevote: &RawMessage = &messages[1];
     assert_eq!(
         exonum::messages::PREVOTE_MESSAGE_ID,
         raw_prevote.message_type()
@@ -377,17 +377,17 @@ fn test_consensus_cache_incoming() {
     ));
     let messages = get_consensus_messages(&sandbox.blockchain_ref());
 
-    let raw_prevote1: &RawMessage = messages.get(messages.len() - 3).unwrap();
+    let raw_prevote1: &RawMessage = &messages[messages.len() - 3];
     assert_eq!(
         exonum::messages::PREVOTE_MESSAGE_ID,
         raw_prevote1.message_type()
     );
-    let raw_prevote2: &RawMessage = messages.get(messages.len() - 2).unwrap();
+    let raw_prevote2: &RawMessage = &messages[messages.len() - 2];
     assert_eq!(
         exonum::messages::PREVOTE_MESSAGE_ID,
         raw_prevote2.message_type()
     );
-    let raw_precommit: &RawMessage = messages.get(messages.len() - 1).unwrap();
+    let raw_precommit: &RawMessage = &messages[messages.len() - 1];
     assert_eq!(
         exonum::messages::PRECOMMIT_MESSAGE_ID,
         raw_precommit.message_type()
