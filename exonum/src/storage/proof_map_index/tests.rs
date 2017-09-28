@@ -344,7 +344,6 @@ fn build_proof_in_leaf_tree(db: Box<Database>) {
 }
 
 fn fuzz_insert_build_proofs_in_table_filled_with_hashes(db: Box<Database>) {
-    let _ = ::helpers::init_logger();
     let data: Vec<(Hash, Hash)> = generate_fully_random_data_keys(100)
         .into_iter()
         .map(|el| {
@@ -372,15 +371,13 @@ fn fuzz_insert_build_proofs_in_table_filled_with_hashes(db: Box<Database>) {
     };
 
     let json_repre = to_string(&proof_info).unwrap();
-    info!("{}", json_repre);
-
+    assert!(json_repre.len() > 0);
     let check_res = proof_path_to_key.validate(&item.0, table_root_hash);
     let proved_value: Option<&Hash> = check_res.unwrap();
     assert_eq!(proved_value.unwrap(), &item.1);
 }
 
 fn fuzz_insert_build_proofs(db: Box<Database>) {
-    let _ = ::helpers::init_logger();
     let data = generate_fully_random_data_keys(100);
     let mut storage = db.fork();
     let mut table = ProofMapIndex::new(vec![255], &mut storage);
@@ -405,7 +402,7 @@ fn fuzz_insert_build_proofs(db: Box<Database>) {
         };
 
         let json_repre = to_string(&proof_info).unwrap();
-        info!("{}", json_repre);
+        assert!(json_repre.len() > 0);
     }
 }
 

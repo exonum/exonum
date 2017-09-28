@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[cfg(test)]
 use env_logger;
 
 use std::io;
-use std::thread;
 use std::net::SocketAddr;
 use std::collections::VecDeque;
+#[cfg(test)]
+use std::thread;
 use std::time::{SystemTime, Duration};
 
 use messages::{MessageWriter, RawMessage};
@@ -28,6 +30,14 @@ use super::{Events, Reactor, Event, InternalEvent, Channel, Network, NetworkConf
 
 pub type TestEvent = InternalEvent<(), u32>;
 
+#[derive(Debug)]
+pub struct BenchConfig {
+    pub times: usize,
+    pub len: usize,
+    pub tcp_nodelay: bool,
+}
+
+#[derive(Debug)]
 pub struct TestHandler {
     events: VecDeque<TestEvent>,
     messages: VecDeque<RawMessage>,
@@ -38,8 +48,8 @@ pub trait TestPoller {
     fn message(&mut self) -> Option<RawMessage>;
 }
 
-impl TestHandler {
-    pub fn new() -> TestHandler {
+impl Default for TestHandler {
+    fn default() -> Self {
         TestHandler {
             events: VecDeque::new(),
             messages: VecDeque::new(),
@@ -75,6 +85,7 @@ impl EventHandler for TestHandler {
     }
 }
 
+#[derive(Debug)]
 pub struct TestEvents(pub Events<TestHandler>);
 
 impl TestEvents {
@@ -87,11 +98,11 @@ impl TestEvents {
                 tcp_nodelay: true,
                 tcp_keep_alive: Some(1),
                 tcp_reconnect_timeout: 1000,
-                tcp_reconnect_timeout_max: 600000,
+                tcp_reconnect_timeout_max: 600_000,
             },
             SharedNodeState::new(0),
         );
-        let handler = TestHandler::new();
+        let handler = TestHandler::default();
 
         TestEvents(Events::new(network, handler).unwrap())
     }
@@ -108,13 +119,12 @@ impl TestEvents {
         loop {
             self.process_events().unwrap();
 
-            if start + Duration::from_millis(10000) < SystemTime::now() {
+            if start + Duration::from_millis(10_000) < SystemTime::now() {
                 return None;
             }
             while let Some(e) = self.0.inner.handler.event() {
-                match e {
-                    InternalEvent::Node(Event::Connected(_)) => return Some(()),
-                    _ => {}
+                if let InternalEvent::Node(Event::Connected(_)) = e {
+                    return Some(());
                 }
             }
         }
@@ -130,11 +140,8 @@ impl TestEvents {
             }
 
             while let Some(e) = self.0.inner.handler.event() {
-                match e {
-                    InternalEvent::Node(Event::Error(e)) => {
-                        error!("An error during wait occured {:?}", e);
-                    }
-                    _ => {}
+                if let InternalEvent::Node(Event::Error(e)) = e {
+                    error!("An error during wait occured {:?}", e);
                 }
             }
 
@@ -180,9 +187,8 @@ impl TestEvents {
                 return None;
             }
             while let Some(e) = self.0.inner.handler.event() {
-                match e {
-                    InternalEvent::Node(Event::Disconnected(_)) => return Some(()),
-                    _ => {}
+                if let InternalEvent::Node(Event::Disconnected(_)) = e {
+                    return Some(());
                 }
             }
         }
@@ -195,6 +201,17 @@ impl TestEvents {
 
     pub fn process_events(&mut self) -> io::Result<()> {
         self.0.run_once(Some(100))
+    }
+
+    pub fn with_cfg(_: &BenchConfig, addr: SocketAddr) -> TestEvents {
+        let network = Network::with_config(
+            addr,
+            NetworkConfiguration::default(),
+            SharedNodeState::new(1000),
+        );
+        let handler = TestHandler::default();
+
+        TestEvents(Events::new(network, handler).unwrap())
     }
 }
 
@@ -355,163 +372,4 @@ fn reconnect() {
 
     t2.join().unwrap();
     t1.join().unwrap();
-}
-
-#[cfg(feature = "long_benchmarks")]
-mod benches {
-
-    use std::thread;
-    use std::net::SocketAddr;
-
-    use time::Duration;
-
-    use events::{Network, NetworkConfiguration, Events, Reactor};
-    use super::{gen_message, TestEvents, TestHandler};
-
-    use test::Bencher;
-
-    struct BenchConfig {
-        times: usize,
-        len: usize,
-        tcp_nodelay: bool,
-    }
-
-    impl TestEvents {
-        fn with_cfg(cfg: &BenchConfig, addr: SocketAddr) -> TestEvents {
-            let network = Network::with_config(
-                addr,
-                NetworkConfiguration {
-                    max_incoming_connections: 128,
-                    max_outgoing_connections: 128,
-                    tcp_nodelay: cfg.tcp_nodelay,
-                    tcp_keep_alive: None,
-                    tcp_reconnect_timeout: 1000,
-                    tcp_reconnect_timeout_max: 600000,
-                },
-            );
-            let handler = TestHandler::new();
-
-            TestEvents(Events::new(network, handler).unwrap())
-        }
-    }
-
-    fn bench_network(b: &mut Bencher, addrs: [SocketAddr; 2], cfg: BenchConfig) {
-        b.iter(|| {
-            let mut e1 = TestEvents::with_cfg(&cfg, addrs[0]);
-            let mut e2 = TestEvents::with_cfg(&cfg, addrs[1]);
-            e1.0.bind().unwrap();
-            e2.0.bind().unwrap();
-
-            let timeout = Duration::seconds(30);
-            let len = cfg.len;
-            let times = cfg.times;
-            let t1 = thread::spawn(move || {
-                e1.wait_for_connect(&addrs[1]).unwrap();
-                for _ in 0..times {
-                    let msg = gen_message(0, len);
-                    e1.send_to(&addrs[1], msg);
-                    e1.wait_for_messages(1, timeout).unwrap();
-                }
-                e1.wait_for_disconnect(Duration::from_millis(1000)).unwrap();
-            });
-            let t2 = thread::spawn(move || {
-                e2.wait_for_connect(&addrs[0]).unwrap();
-                for _ in 0..times {
-                    let msg = gen_message(1, len);
-                    e2.send_to(&addrs[0], msg);
-                    e2.wait_for_messages(1, timeout).unwrap();
-                }
-            });
-            t1.join().unwrap();
-            t2.join().unwrap();
-        })
-    }
-
-    #[bench]
-    fn bench_msg_short_100(b: &mut Bencher) {
-        let cfg = BenchConfig {
-            tcp_nodelay: false,
-            len: 100,
-            times: 100,
-        };
-        let addrs = ["127.0.0.1:6990".parse().unwrap(), "127.0.0.1:6991".parse().unwrap()];
-        bench_network(b, addrs, cfg);
-    }
-
-    #[bench]
-    fn bench_msg_short_1000(b: &mut Bencher) {
-        let cfg = BenchConfig {
-            tcp_nodelay: false,
-            len: 100,
-            times: 1000,
-        };
-        let addrs = ["127.0.0.1:9792".parse().unwrap(), "127.0.0.1:9793".parse().unwrap()];
-        bench_network(b, addrs, cfg);
-    }
-
-    #[bench]
-    fn bench_msg_short_10000(b: &mut Bencher) {
-        let cfg = BenchConfig {
-            tcp_nodelay: false,
-            len: 100,
-            times: 10000,
-        };
-        let addrs = ["127.0.0.1:9982".parse().unwrap(), "127.0.0.1:9983".parse().unwrap()];
-        bench_network(b, addrs, cfg);
-    }
-
-    #[bench]
-    fn bench_msg_short_100_nodelay(b: &mut Bencher) {
-        let cfg = BenchConfig {
-            tcp_nodelay: true,
-            len: 100,
-            times: 100,
-        };
-        let addrs = ["127.0.0.1:4990".parse().unwrap(), "127.0.0.1:4991".parse().unwrap()];
-        bench_network(b, addrs, cfg);
-    }
-
-    #[bench]
-    fn bench_msg_short_10000_nodelay(b: &mut Bencher) {
-        let cfg = BenchConfig {
-            tcp_nodelay: true,
-            len: 100,
-            times: 10000,
-        };
-        let addrs = ["127.0.0.1:5990".parse().unwrap(), "127.0.0.1:5991".parse().unwrap()];
-        bench_network(b, addrs, cfg);
-    }
-
-    #[bench]
-    fn bench_msg_long_10(b: &mut Bencher) {
-        let cfg = BenchConfig {
-            tcp_nodelay: false,
-            len: 100000,
-            times: 10,
-        };
-        let addrs = ["127.0.0.1:9984".parse().unwrap(), "127.0.0.1:9985".parse().unwrap()];
-        bench_network(b, addrs, cfg);
-    }
-
-    #[bench]
-    fn bench_msg_long_100(b: &mut Bencher) {
-        let cfg = BenchConfig {
-            tcp_nodelay: false,
-            len: 100000,
-            times: 100,
-        };
-        let addrs = ["127.0.0.1:9946".parse().unwrap(), "127.0.0.1:9947".parse().unwrap()];
-        bench_network(b, addrs, cfg);
-    }
-
-    #[bench]
-    fn bench_msg_long_100_nodelay(b: &mut Bencher) {
-        let cfg = BenchConfig {
-            tcp_nodelay: true,
-            len: 100000,
-            times: 100,
-        };
-        let addrs = ["127.0.0.1:9198".parse().unwrap(), "127.0.0.1:9199".parse().unwrap()];
-        bench_network(b, addrs, cfg);
-    }
 }

@@ -32,7 +32,7 @@ use exonum::events::{Reactor, Event, EventsConfiguration, NetworkConfiguration, 
 use exonum::crypto::{Hash, PublicKey, SecretKey, Seed, gen_keypair_from_seed};
 #[cfg(test)]
 use exonum::crypto::gen_keypair;
-use exonum::helpers::{Height, Round, ValidatorId, init_logger};
+use exonum::helpers::{Height, Round, ValidatorId};
 
 use timestamping::TimestampingService;
 use config_updater::ConfigUpdateService;
@@ -623,7 +623,7 @@ impl Drop for Sandbox {
 
 fn gen_primitive_socket_addr(idx: u8) -> SocketAddr {
     let addr = Ipv4Addr::new(idx, idx, idx, idx);
-    SocketAddr::new(IpAddr::V4(addr), idx as u16)
+    SocketAddr::new(IpAddr::V4(addr), u16::from(idx))
 }
 
 pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
@@ -719,7 +719,6 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
 }
 
 pub fn timestamping_sandbox() -> Sandbox {
-    let _ = init_logger();
     sandbox_with_services(vec![
         Box::new(TimestampingService::new()),
         Box::new(ConfigUpdateService::new()),

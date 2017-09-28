@@ -16,8 +16,9 @@ blockchain infrastructure providers.
 * [Roadmap](https://exonum.com/doc/roadmap/)
 * [Full Specification](https://exonum.com/doc/)
 * [Reference documentation](https://docs.rs/exonum)
-* [Contributing guide](CONTRIBUTING.md)
+* [Contributing guide](https://github.com/exonum/exonum/blob/master/CONTRIBUTING.md)
+* [Changelog](https://github.com/exonum/exonum/blob/master/CHANGELOG.md)
 
 ## LICENSE
 
-Exonum core library is licensed under the Apache License (Version 2.0). See [LICENSE](LICENSE) for details.
+Exonum core library is licensed under the Apache License (Version 2.0). See [LICENSE](https://github.com/exonum/exonum/blob/master/LICENSE) for details.

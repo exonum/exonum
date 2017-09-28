@@ -106,15 +106,16 @@ where
     ///
     /// ```
     /// use exonum::storage::{MemoryDB, Database, Entry};
-    /// use exonum::crypto::Hash;
+    /// use exonum::crypto::{self, Hash};
     ///
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = Entry::new(vec![1, 2, 3], &mut fork);
     /// assert_eq!(Hash::default(), index.hash());
     ///
-    /// index.set(10);
-    /// assert_ne!(Hash::default(), index.hash());
+    /// let value = 10;
+    /// index.set(value);
+    /// assert_eq!(crypto::hash(&[value]), index.hash());
     /// ```
     pub fn hash(&self) -> Hash {
         self.base
