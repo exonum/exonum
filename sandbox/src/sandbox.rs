@@ -602,6 +602,11 @@ impl Sandbox {
         assert_eq!(actual_hash, expected_hash);
     }
 
+    /// Creates new sandbox with "restarted" node. Old sandbox instance gets dropped.
+    pub fn restart(self) -> Sandbox {
+        sandbox_with_blockchain(self.blockchain_mut().clone())
+    }
+
     fn node_public_key(&self) -> PublicKey {
         let reactor = self.reactor.borrow();
         *reactor.public_key()
@@ -627,6 +632,11 @@ fn gen_primitive_socket_addr(idx: u8) -> SocketAddr {
 }
 
 pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
+    let blockchain = Blockchain::new(Box::new(MemoryDB::new()), services);
+    sandbox_with_blockchain(blockchain)
+}
+
+pub fn sandbox_with_blockchain(mut blockchain: Blockchain) -> Sandbox {
     let validators = vec![
         gen_keypair_from_seed(&Seed::new([12; 32])),
         gen_keypair_from_seed(&Seed::new([13; 32])),
@@ -641,9 +651,6 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
     ];
 
     let addresses: Vec<SocketAddr> = (1..5).map(gen_primitive_socket_addr).collect::<Vec<_>>();
-
-    let db = Box::new(MemoryDB::new());
-    let mut blockchain = Blockchain::new(db, services);
 
     let consensus = ConsensusConfig {
         round_timeout: 1000,
