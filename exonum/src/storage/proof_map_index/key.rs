@@ -91,25 +91,28 @@ impl DBKey {
         }
     }
 
+    #[doc(hidden)]
     pub fn from(&self) -> u16 {
         self.from
     }
 
     // TODO: terrible hack, try to remove this
+    #[doc(hidden)]
     pub fn set_from(&mut self, from: u16) {
         self.from = from
     }
 
+    #[doc(hidden)]
     pub fn to(&self) -> u16 {
         self.to
     }
 
-    /// Length of the `DBKey`
+    /// Returns length of the `DBKey`.
     pub fn len(&self) -> u16 {
         self.to - self.from
     }
 
-    /// Returns true if `DBKey` has zero length
+    /// Returns true if `DBKey` has zero length.
     pub fn is_empty(&self) -> bool {
         self.to == self.from
     }
@@ -192,6 +195,7 @@ impl DBKey {
     }
 
     // TODO: terrible hack, try to remove this
+    /// Writes `DBKey` into the vector and returns it (see `write` method of the `StorageKey`).
     pub fn to_vec(&self) -> Vec<u8> {
         let mut buffer = vec![0u8; DB_KEY_SIZE as usize];
         self.write(&mut buffer);
