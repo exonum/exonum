@@ -13,11 +13,12 @@
 // limitations under the License.
 
 //! An implementation of set for items that implement `StorageValue` trait.
+use std::sync::Arc;
 use std::marker::PhantomData;
 
 use crypto::Hash;
 
-use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
+use super::{BaseIndex, BaseIndexIter, View, StorageValue};
 
 /// A set of items that implement `StorageValue` trait.
 ///
@@ -25,8 +26,8 @@ use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
 /// `ValueSetIndex` requires that the elements implement the [`StorageValue`] trait.
 /// [`StorageValue`]: ../trait.StorageValue.html
 #[derive(Debug)]
-pub struct ValueSetIndex<T, V> {
-    base: BaseIndex<T>,
+pub struct ValueSetIndex<V> {
+    base: BaseIndex,
     _v: PhantomData<V>,
 }
 
@@ -39,8 +40,8 @@ pub struct ValueSetIndex<T, V> {
 /// [`iter_from`]: struct.ValueSetIndex.html#method.iter_from
 /// [`ValueSetIndex`]: struct.ValueSetIndex.html
 #[derive(Debug)]
-pub struct ValueSetIndexIter<'a, V> {
-    base_iter: BaseIndexIter<'a, Hash, V>,
+pub struct ValueSetIndexIter<V> {
+    base_iter: BaseIndexIter<Hash, V>,
 }
 
 /// An iterator over the hashes of items of a `ValueSetIndex`.
@@ -52,11 +53,11 @@ pub struct ValueSetIndexIter<'a, V> {
 /// [`hashes_from`]: struct.ValueSetIndex.html#method.iter_from
 /// [`ValueSetIndex`]: struct.ValueSetIndex.html
 #[derive(Debug)]
-pub struct ValueSetIndexHashes<'a> {
-    base_iter: BaseIndexIter<'a, Hash, ()>,
+pub struct ValueSetIndexHashes {
+    base_iter: BaseIndexIter<Hash, ()>,
 }
 
-impl<T, V> ValueSetIndex<T, V> {
+impl<V> ValueSetIndex<V> {
     /// Creates a new index representation based on the common prefix of its keys and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
@@ -72,21 +73,19 @@ impl<T, V> ValueSetIndex<T, V> {
     ///
     /// let db = MemoryDB::new();
     /// let snapshot = db.snapshot();
-    /// let prefix = vec![1, 2, 3];
-    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(prefix, &snapshot);
+    /// let index: ValueSetIndex<u8> = ValueSetIndex::new("abc", snapshot);
     /// # drop(index);
     /// ```
-    pub fn new(prefix: Vec<u8>, view: T) -> Self {
+    pub fn new(name: &str, view: Arc<View>) -> Self {
         ValueSetIndex {
-            base: BaseIndex::new(prefix, view),
+            base: BaseIndex::new(name, view),
             _v: PhantomData,
         }
     }
 }
 
-impl<T, V> ValueSetIndex<T, V>
+impl<V> ValueSetIndex<V>
 where
-    T: AsRef<Snapshot>,
     V: StorageValue,
 {
     /// Returns `true` if the set contains a value.
@@ -97,8 +96,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, ValueSetIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = ValueSetIndex::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = ValueSetIndex::new("abc", fork);
     /// assert!(!index.contains(&1));
     ///
     /// index.insert(1);
@@ -117,8 +116,8 @@ where
     /// use exonum::crypto;
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = ValueSetIndex::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = ValueSetIndex::new("abc", fork);
     ///
     /// let data = vec![1, 2, 3];
     /// let data_hash = crypto::hash(&data);
@@ -139,15 +138,14 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let snapshot = db.snapshot();
-    /// let prefix = vec![1, 2, 3];
-    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(prefix, &snapshot);
+    /// let index: ValueSetIndex<u8> = ValueSetIndex::new("abc", snapshot);
     ///
     /// for val in index.iter() {
     ///     println!("{:?}", val);
     /// }
     /// ```
     pub fn iter(&self) -> ValueSetIndexIter<V> {
-        ValueSetIndexIter { base_iter: self.base.iter(&()) }
+        ValueSetIndexIter { base_iter: self.base.iter() }
     }
 
     /// An iterator visiting all elements in arbitrary order starting from the specified hash of
@@ -161,8 +159,7 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let snapshot = db.snapshot();
-    /// let prefix = vec![1, 2, 3];
-    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(prefix, &snapshot);
+    /// let index: ValueSetIndex<u8> = ValueSetIndex::new("abc", snapshot);
     ///
     /// let hash = Hash::default();
     ///
@@ -171,7 +168,7 @@ where
     /// }
     /// ```
     pub fn iter_from(&self, from: &Hash) -> ValueSetIndexIter<V> {
-        ValueSetIndexIter { base_iter: self.base.iter_from(&(), from) }
+        ValueSetIndexIter { base_iter: self.base.iter_from(from) }
     }
 
     /// An iterator visiting hashes of all elements in ascending order. The iterator element type
@@ -184,15 +181,14 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let snapshot = db.snapshot();
-    /// let prefix = vec![1, 2, 3];
-    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(prefix, &snapshot);
+    /// let index: ValueSetIndex<u8> = ValueSetIndex::new("abc", snapshot);
     ///
     /// for val in index.hashes() {
     ///     println!("{:?}", val);
     /// }
     /// ```
     pub fn hashes(&self) -> ValueSetIndexHashes {
-        ValueSetIndexHashes { base_iter: self.base.iter(&()) }
+        ValueSetIndexHashes { base_iter: self.base.iter() }
     }
 
     /// An iterator visiting hashes of all elements in ascending order starting from the specified
@@ -206,8 +202,7 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let snapshot = db.snapshot();
-    /// let prefix = vec![1, 2, 3];
-    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(prefix, &snapshot);
+    /// let index: ValueSetIndex<u8> = ValueSetIndex::new("abc", snapshot);
     ///
     /// let hash = Hash::default();
     ///
@@ -216,14 +211,9 @@ where
     /// }
     /// ```
     pub fn hashes_from(&self, from: &Hash) -> ValueSetIndexHashes {
-        ValueSetIndexHashes { base_iter: self.base.iter_from(&(), from) }
+        ValueSetIndexHashes { base_iter: self.base.iter_from(from) }
     }
-}
 
-impl<'a, V> ValueSetIndex<&'a mut Fork, V>
-where
-    V: StorageValue,
-{
     /// Adds a value to the set.
     ///
     /// # Examples
@@ -232,8 +222,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, ValueSetIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = ValueSetIndex::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = ValueSetIndex::new("abc", fork);
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -250,8 +240,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, ValueSetIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = ValueSetIndex::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = ValueSetIndex::new("abc", fork);
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -272,8 +262,8 @@ where
     /// use exonum::crypto;
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = ValueSetIndex::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = ValueSetIndex::new("abc", fork);
     ///
     /// let data = vec![1, 2, 3];
     /// let data_hash = crypto::hash(&data);
@@ -299,8 +289,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, ValueSetIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = ValueSetIndex::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = ValueSetIndex::new("abc", fork);
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -313,13 +303,12 @@ where
     }
 }
 
-impl<'a, T, V> ::std::iter::IntoIterator for &'a ValueSetIndex<T, V>
+impl<V> ::std::iter::IntoIterator for ValueSetIndex<V>
 where
-    T: AsRef<Snapshot>,
     V: StorageValue,
 {
     type Item = (Hash, V);
-    type IntoIter = ValueSetIndexIter<'a, V>;
+    type IntoIter = ValueSetIndexIter<V>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
@@ -327,7 +316,7 @@ where
 }
 
 
-impl<'a, V> Iterator for ValueSetIndexIter<'a, V>
+impl<V> Iterator for ValueSetIndexIter<V>
 where
     V: StorageValue,
 {
@@ -338,7 +327,7 @@ where
     }
 }
 
-impl<'a> Iterator for ValueSetIndexHashes<'a> {
+impl Iterator for ValueSetIndexHashes {
     type Item = Hash;
 
     fn next(&mut self) -> Option<Self::Item> {

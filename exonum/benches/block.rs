@@ -21,19 +21,21 @@ extern crate exonum;
 
 #[cfg(test)]
 mod tests {
-    use tempdir::TempDir;
-    use test::Bencher;
+    use std::sync::Arc;
     use std::collections::BTreeMap;
 
-    use exonum::storage::{ProofMapIndex, Database, Fork, StorageValue, Patch, RocksDB,
-                          RocksDBOptions, RocksBlockOptions};
+    use tempdir::TempDir;
+    use test::Bencher;
+
+    use exonum::storage::{ProofMapIndex, Database, View, StorageValue, RocksDB, RocksDBOptions,
+                          RocksBlockOptions};
     use exonum::blockchain::{Blockchain, Transaction};
     use exonum::crypto::{gen_keypair, Hash, PublicKey, SecretKey};
     use exonum::messages::Message;
     use exonum::helpers::{Height, ValidatorId};
 
     fn execute_timestamping(db: Box<Database>, b: &mut Bencher) {
-        let mut blockchain = Blockchain::new(db, Vec::new());
+        let blockchain = Blockchain::new(db, Vec::new());
 
         message! {
             struct Tx {
@@ -51,7 +53,7 @@ mod tests {
                 self.verify_signature(self.from())
             }
 
-            fn execute(&self, _: &mut Fork) {}
+            fn execute(&self, _: Arc<View>) {}
         }
 
         fn prepare_txs(height: u64, count: u64) -> (Vec<Hash>, BTreeMap<Hash, Box<Transaction>>) {
@@ -72,25 +74,25 @@ mod tests {
             height: u64,
             txs: &[Hash],
             pool: &BTreeMap<Hash, Box<Transaction>>,
-        ) -> Patch {
+        ) -> Arc<View> {
             blockchain
-                .create_patch(ValidatorId::zero(), Height(height), txs, pool)
+                .create_block(ValidatorId::zero(), Height(height), txs, pool)
                 .1
         }
 
         for i in 0..100 {
             let (txs, pool) = prepare_txs(i, 1000);
-            let patch = execute_block(&blockchain, i, &txs, &pool);
-            blockchain.merge(patch).unwrap();
+            let _fork = execute_block(&blockchain, i, &txs, &pool);
+            //            fork.commit();
+            //            blockchain.merge(patch).unwrap();
         }
 
         let (txs, pool) = prepare_txs(100, 1000);
-
         b.iter(|| execute_block(&blockchain, 100, &txs, &pool));
     }
 
     fn execute_cryptocurrency(db: Box<Database>, b: &mut Bencher) {
-        let mut blockchain = Blockchain::new(db, Vec::new());
+        let blockchain = Blockchain::new(db, Vec::new());
 
         message! {
             struct Tx {
@@ -108,8 +110,8 @@ mod tests {
                 self.verify_signature(self.from())
             }
 
-            fn execute(&self, view: &mut Fork) {
-                let mut index = ProofMapIndex::new(vec![1], view);
+            fn execute(&self, view: Arc<View>) {
+                let mut index = ProofMapIndex::new("a", view);
                 let from_balance = index.get(self.from()).unwrap_or(0u64);
                 let to_balance = index.get(self.to()).unwrap_or(0u64);
                 index.put(self.from(), from_balance - 1);
@@ -148,23 +150,23 @@ mod tests {
             height: u64,
             txs: &[Hash],
             pool: &BTreeMap<Hash, Box<Transaction>>,
-        ) -> Patch {
+        ) -> Arc<View> {
             blockchain
-                .create_patch(ValidatorId::zero(), Height(height), txs, pool)
+                .create_block(ValidatorId::zero(), Height(height), txs, pool)
                 .1
         }
 
         for i in 0..100 {
             let (txs, pool) = prepare_txs(i, 1000, &keys);
-            let patch = execute_block(&blockchain, i, &txs, &pool);
-            blockchain.merge(patch).unwrap();
+            let _fork = execute_block(&blockchain, i, &txs, &pool);
+            //            fork.commit();
+            //            blockchain.merge(patch).unwrap();
         }
 
         let (txs, pool) = prepare_txs(100, 1000, &keys);
-
         b.iter(|| execute_block(&blockchain, 100, &txs, &pool));
     }
-    
+
     fn create_rocksdb(tempdir: &TempDir) -> Box<Database> {
         let mut block_options = RocksBlockOptions::default();
         block_options.set_block_size(4 * 1024);

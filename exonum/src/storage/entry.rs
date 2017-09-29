@@ -14,22 +14,23 @@
 
 //! An implementation of index that may only contain one element.
 use std::marker::PhantomData;
+use std::sync::Arc;
 
 use crypto::Hash;
 
-use super::{BaseIndex, Snapshot, Fork, StorageValue};
+use super::{BaseIndex, View, StorageValue};
 
 /// An index that may only contain one element.
 ///
 /// A value should implement [`StorageValue`] trait.
 /// [`StorageValue`]: ../trait.StorageValue.html
 #[derive(Debug)]
-pub struct Entry<T, V> {
-    base: BaseIndex<T>,
+pub struct Entry<V> {
+    base: BaseIndex,
     _v: PhantomData<V>,
 }
 
-impl<T, V> Entry<T, V> {
+impl<V> Entry<V> {
     /// Creates a new index representation based on the prefix and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
@@ -45,21 +46,20 @@ impl<T, V> Entry<T, V> {
     ///
     /// let db = MemoryDB::new();
     /// let snapshot = db.snapshot();
-    /// let prefix = vec![1, 2, 3];
-    /// let index: Entry<_, u8> = Entry::new(prefix, &snapshot);
+    /// let name = "abc";
+    /// let index: Entry<u8> = Entry::new(name, snapshot);
     /// # drop(index);
     /// ```
-    pub fn new(prefix: Vec<u8>, view: T) -> Self {
+    pub fn new(name: &str, view: Arc<View>) -> Self {
         Entry {
-            base: BaseIndex::new(prefix, view),
+            base: BaseIndex::new(name, view),
             _v: PhantomData,
         }
     }
 }
 
-impl<T, V> Entry<T, V>
+impl<V> Entry<V>
 where
-    T: AsRef<Snapshot>,
     V: StorageValue,
 {
     /// Returns a value of the entry or `None` if does not exist.
@@ -70,8 +70,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, Entry};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = Entry::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = Entry::new("abc", fork);
     /// assert_eq!(None, index.get());
     ///
     /// index.set(10);
@@ -89,8 +89,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, Entry};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = Entry::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = Entry::new("abc", fork);
     /// assert!(!index.exists());
     ///
     /// index.set(10);
@@ -109,8 +109,8 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = Entry::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = Entry::new("abc", fork);
     /// assert_eq!(Hash::default(), index.hash());
     ///
     /// index.set(10);
@@ -122,12 +122,12 @@ where
             .map(|v| v.hash())
             .unwrap_or_default()
     }
-}
-
-impl<'a, V> Entry<&'a mut Fork, V>
-where
-    V: StorageValue,
-{
+    //}
+    //
+    //impl<'a, V>Entry<&'a mut View, V>
+    //where
+    //    V: StorageValue,
+    //{
     /// Changes a value of the entry.
     ///
     /// # Examples
@@ -136,8 +136,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, Entry};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = Entry::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = Entry::new("abc", fork);
     ///
     /// index.set(10);
     /// assert_eq!(Some(10), index.get());
@@ -154,8 +154,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, Entry};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = Entry::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = Entry::new("abc", fork);
     ///
     /// index.set(10);
     /// assert_eq!(Some(10), index.get());

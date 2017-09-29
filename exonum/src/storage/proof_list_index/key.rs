@@ -19,17 +19,14 @@ const MAX_INDEX: u64 = 0xFF_FFFF_FFFF_FFFF; // 2u64.pow(56) - 1
 
 #[derive(Debug, Copy, Clone)]
 pub struct ProofListKey {
-    index: u64,
     height: u8,
+    index: u64,
 }
 
 impl ProofListKey {
     pub fn new(height: u8, index: u64) -> Self {
         debug_assert!(height <= 58 && index <= MAX_INDEX);
-        Self {
-            height: height,
-            index: index,
-        }
+        Self { height, index }
     }
 
     pub fn height(&self) -> u8 {
@@ -45,7 +42,7 @@ impl ProofListKey {
     }
 
     pub fn as_db_key(&self) -> u64 {
-        ((self.height as u64) << HEIGHT_SHIFT) + self.index
+        ((u64::from(self.height)) << HEIGHT_SHIFT) + self.index
     }
 
     pub fn from_db_key(key: u64) -> Self {

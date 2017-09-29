@@ -27,6 +27,7 @@ use std::time::{SystemTime, Duration};
 use std::collections::BTreeMap;
 use std::thread;
 use std::fmt;
+use std::sync::Arc;
 
 use crypto::{self, PublicKey, SecretKey, Hash};
 use events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, Channel,
@@ -244,7 +245,7 @@ where
 
         let snapshot = blockchain.snapshot();
 
-        let stored = Schema::new(&snapshot).actual_configuration();
+        let stored = Schema::new(Arc::clone(&snapshot)).actual_configuration();
         info!("Creating a node with config: {:#?}", stored);
 
         let validator_id = stored
@@ -280,7 +281,7 @@ where
         );
 
         // Adjust propose timeout for the first time.
-        state.adjust_timeout(&*snapshot);
+        state.adjust_timeout(snapshot);
 
         NodeHandler {
             blockchain,

@@ -13,31 +13,39 @@
 // limitations under the License.
 
 //! An implementation of `MemoryDB` database.
-use std::sync::{Arc, RwLock, RwLockReadGuard};
+use std::sync::Arc;
 use std::clone::Clone;
-use std::collections::btree_map::{BTreeMap, Range};
-use std::iter::Peekable;
 
-use super::{Database, Snapshot, Transaction, Patch, Change, Iterator, Iter, Result};
+use tempdir::TempDir;
+
+use super::{Database, View, RocksDB, RocksDBOptions};
 
 /// Database implementation that stores all the data in memory.
 ///
 /// It's mainly used for testing and not designed to be efficient.
-#[derive(Default, Clone, Debug)]
+#[derive(Debug, Clone)]
 pub struct MemoryDB {
-    map: Arc<RwLock<BTreeMap<Vec<u8>, Vec<u8>>>>,
-}
-
-/// An iterator over the entries of a `MemoryDB`.
-struct MemoryDBIter<'a> {
-    iter: Peekable<Range<'a, Vec<u8>, Vec<u8>>>,
-    _guard: RwLockReadGuard<'a, BTreeMap<Vec<u8>, Vec<u8>>>,
+    db: RocksDB,
+    tmp_dir: Arc<TempDir>,
 }
 
 impl MemoryDB {
     /// Creates a new, empty database.
-    pub fn new() -> MemoryDB {
-        MemoryDB { map: Arc::new(RwLock::new(BTreeMap::new())) }
+    pub fn new() -> Self {
+        let tmp_dir = TempDir::new("tmpdir").unwrap();
+        let mut opts = RocksDBOptions::default();
+        opts.create_if_missing(true);
+        opts.set_use_fsync(false);
+        MemoryDB {
+            db: RocksDB::open(tmp_dir.path(), opts).unwrap(),
+            tmp_dir: Arc::new(tmp_dir),
+        }
+    }
+}
+
+impl Default for MemoryDB {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -46,90 +54,36 @@ impl Database for MemoryDB {
         Box::new(Clone::clone(self))
     }
 
-    fn snapshot(&self) -> Box<Snapshot> {
-        Box::new(MemoryDB {
-            map: Arc::new(RwLock::new(self.map.read().unwrap().clone())),
-        })
+    fn snapshot(&self) -> Arc<View> {
+        self.db.snapshot()
     }
 
-    fn transaction(&self) -> Box<Transaction> {
-        unimplemented!()
-    }
-
-    fn merge(&mut self, patch: Patch) -> Result<()> {
-        for (key, change) in patch {
-            match change {
-                Change::Put(value) => {
-                    self.map.write().unwrap().insert(key, value);
-                }
-                Change::Delete => {
-                    self.map.write().unwrap().remove(&key);
-                }
-            }
-        }
-        Ok(())
-    }
-}
-
-impl Snapshot for MemoryDB {
-    fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
-        self.map.read().unwrap().get(key).cloned()
-    }
-
-    fn contains(&self, key: &[u8]) -> bool {
-        self.map.read().unwrap().contains_key(key)
-    }
-
-    fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a> {
-        use std::collections::Bound::{Included, Unbounded};
-        use std::mem::transmute;
-        let range = (Included(from), Unbounded);
-        let guard = self.map.read().unwrap();
-
-        Box::new(MemoryDBIter {
-            iter: unsafe { transmute(guard.range::<[u8], _>(range).peekable()) },
-            _guard: guard,
-        })
-    }
-}
-
-impl<'a> Iterator for MemoryDBIter<'a> {
-    fn next(&mut self) -> Option<(&[u8], &[u8])> {
-        self.iter.next().map(|(k, v)| (k.as_slice(), v.as_slice()))
-    }
-
-    fn peek(&mut self) -> Option<(&[u8], &[u8])> {
-        self.iter.peek().map(|&(k, v)| (k.as_slice(), v.as_slice()))
+    fn fork(&self) -> Arc<View> {
+        self.db.fork()
     }
 }
 
 #[test]
 fn test_memorydb_snapshot() {
-    let mut db = MemoryDB::new();
+    let db = MemoryDB::new();
 
     {
-        let mut fork = db.fork();
-        fork.put(vec![1, 2, 3], vec![123]);
-        let _ = db.merge(fork.into_patch());
+        let fork = db.fork();
+        fork.put("a", &[1, 2, 3], &[123]);
+        fork.commit();
     }
 
     let snapshot = db.snapshot();
-    assert!(snapshot.contains(vec![1, 2, 3].as_slice()));
+    assert!(snapshot.contains("a", &[1, 2, 3]));
 
     {
-        let mut fork = db.fork();
-        fork.put(vec![2, 3, 4], vec![234]);
-        let _ = db.merge(fork.into_patch());
+        let fork = db.fork();
+        fork.put("a", &[2, 3, 4], &[234]);
+        fork.commit();
     }
 
-    assert!(!snapshot.contains(vec![2, 3, 4].as_slice()));
-
-    {
-        let db_clone = Clone::clone(&db);
-        let snap_clone = db_clone.snapshot();
-        assert!(snap_clone.contains(vec![2, 3, 4].as_slice()));
-    }
+    assert!(!snapshot.contains("a", &[2, 3, 4]));
 
     let snapshot = db.snapshot();
-    assert!(snapshot.contains(vec![2, 3, 4].as_slice()));
+    assert!(snapshot.contains("a", &[2, 3, 4]));
 }

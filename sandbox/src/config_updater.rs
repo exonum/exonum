@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::sync::Arc;
+
 use exonum::crypto::{PublicKey, Hash};
 use exonum::blockchain::{Service, Transaction, Schema};
 use exonum::messages::{RawTransaction, Message, FromRaw};
-use exonum::storage::{Snapshot, Fork};
+use exonum::storage::View;
 use exonum::encoding::Error as MessageError;
 use exonum::blockchain::StoredConfiguration;
 use exonum::helpers::Height;
@@ -49,7 +51,7 @@ impl Transaction for TxConfig {
         self.verify_signature(self.from())
     }
 
-    fn execute(&self, fork: &mut Fork) {
+    fn execute(&self, fork: Arc<View>) {
         let mut schema = Schema::new(fork);
         schema.commit_configuration(StoredConfiguration::try_deserialize(self.config()).unwrap())
     }
@@ -64,7 +66,7 @@ impl Service for ConfigUpdateService {
         CONFIG_SERVICE
     }
 
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: Arc<View>) -> Vec<Hash> {
         vec![]
     }
 

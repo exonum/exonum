@@ -26,7 +26,7 @@ use std::net::SocketAddr;
 
 use events::Milliseconds;
 use crypto::{Hash, PublicKey, SecretKey};
-use storage::{Snapshot, Fork};
+use storage::View;
 use messages::{Message, RawTransaction};
 use encoding::Error as MessageError;
 use node::{Node, State, NodeChannel, ApiSender};
@@ -54,7 +54,7 @@ pub trait Transaction: Message + 'static {
     /// to the state and return early if these checks fail.
     /// - If the execute method of a transaction raises a `panic`, the changes made by the
     /// transactions are discarded, but the transaction itself is still considered committed.
-    fn execute(&self, fork: &mut Fork);
+    fn execute(&self, fork: Arc<View>);
     /// Returns the useful information about the transaction in the JSON format.
     fn info(&self) -> Value {
         Value::Null
@@ -78,7 +78,7 @@ pub trait Service: Send + Sync + 'static {
     ///
     /// [1]: struct.Schema.html#method.state_hash_aggregator
     /// [2]: struct.Blockchain.html#method.service_table_unique_key
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: Arc<View>) -> Vec<Hash> {
         Vec::new()
     }
 
@@ -88,7 +88,7 @@ pub trait Service: Send + Sync + 'static {
     /// By this method you can initialize information schema of service
     /// and generates initial service configuration.
     /// This method is called on genesis block creation event.
-    fn initialize(&self, fork: &mut Fork) -> Value {
+    fn initialize(&self, fork: Arc<View>) -> Value {
         Value::Null
     }
 
@@ -111,19 +111,19 @@ pub trait Service: Send + Sync + 'static {
 
 /// The current node state on which the blockchain is running, or in other words
 /// execution context.
-pub struct ServiceContext<'a, 'b> {
+pub struct ServiceContext<'a> {
     state: &'a mut State,
-    snapshot: &'b Snapshot,
+    snapshot: Arc<View>,
     txs: Vec<Box<Transaction>>,
 }
 
 
-impl<'a, 'b> ServiceContext<'a, 'b> {
+impl<'a> ServiceContext<'a> {
     #[doc(hidden)]
-    pub fn new(state: &'a mut State, snapshot: &'b Snapshot) -> ServiceContext<'a, 'b> {
+    pub fn new(state: &'a mut State, snapshot: Arc<View>) -> ServiceContext<'a> {
         ServiceContext {
-            state: state,
-            snapshot: snapshot,
+            state,
+            snapshot,
             txs: Vec::new(),
         }
     }
@@ -135,8 +135,8 @@ impl<'a, 'b> ServiceContext<'a, 'b> {
     }
 
     /// Returns the current database snapshot.
-    pub fn snapshot(&self) -> &'b Snapshot {
-        self.snapshot
+    pub fn snapshot(&self) -> Arc<View> {
+        self.snapshot.clone()
     }
 
     /// Returns the current blockchain height. This height is 'height of last committed block` + 1.
@@ -188,7 +188,7 @@ impl<'a, 'b> ServiceContext<'a, 'b> {
     }
 }
 
-impl<'a, 'b> fmt::Debug for ServiceContext<'a, 'b> {
+impl<'a> fmt::Debug for ServiceContext<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,

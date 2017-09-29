@@ -13,9 +13,10 @@
 // limitations under the License.
 
 //! An implementation of set for items that implement `StorageKey` trait.
+use std::sync::Arc;
 use std::marker::PhantomData;
 
-use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageKey};
+use super::{BaseIndex, BaseIndexIter, View, StorageKey};
 
 /// A set of items that implement `StorageKey` trait.
 ///
@@ -23,8 +24,8 @@ use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageKey};
 /// `KeySetIndex` requires that the elements implement the [`StorageKey`] trait.
 /// [`StorageKey`]: ../trait.StorageKey.html
 #[derive(Debug)]
-pub struct KeySetIndex<T, K> {
-    base: BaseIndex<T>,
+pub struct KeySetIndex<K> {
+    base: BaseIndex,
     _k: PhantomData<K>,
 }
 
@@ -37,11 +38,11 @@ pub struct KeySetIndex<T, K> {
 /// [`iter_from`]: struct.KeySetIndex.html#method.iter_from
 /// [`KeySetIndex`]: struct.KeySetIndex.html
 #[derive(Debug)]
-pub struct KeySetIndexIter<'a, K> {
-    base_iter: BaseIndexIter<'a, K, ()>,
+pub struct KeySetIndexIter<K> {
+    base_iter: BaseIndexIter<K, ()>,
 }
 
-impl<T, K> KeySetIndex<T, K> {
+impl<K> KeySetIndex<K> {
     /// Creates a new index representation based on the common prefix of its keys and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
@@ -57,21 +58,20 @@ impl<T, K> KeySetIndex<T, K> {
     ///
     /// let db = MemoryDB::new();
     /// let snapshot = db.snapshot();
-    /// let prefix = vec![1, 2, 3];
-    /// let index: KeySetIndex<_, u8> = KeySetIndex::new(prefix, &snapshot);
+    /// let name = "abc";
+    /// let index: KeySetIndex<u8> = KeySetIndex::new(name, snapshot);
     /// # drop(index);
     /// ```
-    pub fn new(prefix: Vec<u8>, view: T) -> Self {
+    pub fn new(name: &str, view: Arc<View>) -> Self {
         KeySetIndex {
-            base: BaseIndex::new(prefix, view),
+            base: BaseIndex::new(name, view),
             _k: PhantomData,
         }
     }
 }
 
-impl<T, K> KeySetIndex<T, K>
+impl<K> KeySetIndex<K>
 where
-    T: AsRef<Snapshot>,
     K: StorageKey,
 {
     /// Returns `true` if the set contains a value.
@@ -82,8 +82,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = KeySetIndex::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = KeySetIndex::new("abc", fork);
     /// assert!(!index.contains(&1));
     ///
     /// index.insert(1);
@@ -102,14 +102,14 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let snapshot = db.snapshot();
-    /// let index: KeySetIndex<_, u8> = KeySetIndex::new(vec![1, 2, 3], &snapshot);
+    /// let index: KeySetIndex<u8> = KeySetIndex::new("abc", snapshot);
     ///
     /// for val in index.iter() {
     ///     println!("{}", val);
     /// }
     /// ```
     pub fn iter(&self) -> KeySetIndexIter<K> {
-        KeySetIndexIter { base_iter: self.base.iter(&()) }
+        KeySetIndexIter { base_iter: self.base.iter() }
     }
 
     /// An iterator visiting all elements in arbitrary order starting from the specified value.
@@ -122,21 +122,16 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let snapshot = db.snapshot();
-    /// let index: KeySetIndex<_, u8> = KeySetIndex::new(vec![1, 2, 3], &snapshot);
+    /// let index: KeySetIndex<u8> = KeySetIndex::new("abc", snapshot);
     ///
     /// for val in index.iter_from(&2) {
     ///     println!("{}", val);
     /// }
     /// ```
     pub fn iter_from(&self, from: &K) -> KeySetIndexIter<K> {
-        KeySetIndexIter { base_iter: self.base.iter_from(&(), from) }
+        KeySetIndexIter { base_iter: self.base.iter_from(from) }
     }
-}
 
-impl<'a, K> KeySetIndex<&'a mut Fork, K>
-where
-    K: StorageKey,
-{
     /// Adds a value to the set.
     ///
     /// # Examples
@@ -145,8 +140,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = KeySetIndex::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = KeySetIndex::new("abc", fork);
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -163,8 +158,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = KeySetIndex::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = KeySetIndex::new("abc", fork);
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -189,8 +184,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = KeySetIndex::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = KeySetIndex::new("abc", fork);
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -203,20 +198,19 @@ where
     }
 }
 
-impl<'a, T, K> ::std::iter::IntoIterator for &'a KeySetIndex<T, K>
+impl<K> ::std::iter::IntoIterator for KeySetIndex<K>
 where
-    T: AsRef<Snapshot>,
     K: StorageKey,
 {
     type Item = K;
-    type IntoIter = KeySetIndexIter<'a, K>;
+    type IntoIter = KeySetIndexIter<K>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a, K> Iterator for KeySetIndexIter<'a, K>
+impl<K> Iterator for KeySetIndexIter<K>
 where
     K: StorageKey,
 {

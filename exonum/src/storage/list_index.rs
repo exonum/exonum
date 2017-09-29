@@ -14,9 +14,10 @@
 
 //! An implementation of array list of items.
 use std::cell::Cell;
+use std::sync::Arc;
 use std::marker::PhantomData;
 
-use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
+use super::{BaseIndex, BaseIndexIter, View, StorageValue};
 
 /// A list of items that implement `StorageValue` trait.
 ///
@@ -24,8 +25,8 @@ use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
 /// `ListIndex` requires that the elements implement the [`StorageValue`] trait.
 /// [`StorageValue`]: ../trait.StorageValue.html
 #[derive(Debug)]
-pub struct ListIndex<T, V> {
-    base: BaseIndex<T>,
+pub struct ListIndex<V> {
+    base: BaseIndex,
     length: Cell<Option<u64>>,
     _v: PhantomData<V>,
 }
@@ -39,11 +40,11 @@ pub struct ListIndex<T, V> {
 /// [`iter_from`]: struct.ListIndex.html#method.iter_from
 /// [`ListIndex`]: struct.ListIndex.html
 #[derive(Debug)]
-pub struct ListIndexIter<'a, V> {
-    base_iter: BaseIndexIter<'a, u64, V>,
+pub struct ListIndexIter<V> {
+    base_iter: BaseIndexIter<u64, V>,
 }
 
-impl<T, V> ListIndex<T, V> {
+impl<V> ListIndex<V> {
     /// Creates a new index representation based on the common prefix of its keys and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
@@ -59,22 +60,21 @@ impl<T, V> ListIndex<T, V> {
     ///
     /// let db = MemoryDB::new();
     /// let snapshot = db.snapshot();
-    /// let prefix = vec![1, 2, 3];
-    /// let index: ListIndex<_, u8> = ListIndex::new(prefix, &snapshot);
+    /// let name = "abc";
+    /// let index: ListIndex<u8> = ListIndex::new(name, snapshot);
     /// # drop(index);
     /// ```
-    pub fn new(prefix: Vec<u8>, view: T) -> Self {
+    pub fn new(name: &str, view: Arc<View>) -> Self {
         ListIndex {
-            base: BaseIndex::new(prefix, view),
+            base: BaseIndex::new(name, view),
             length: Cell::new(None),
             _v: PhantomData,
         }
     }
 }
 
-impl<T, V> ListIndex<T, V>
+impl<V> ListIndex<V>
 where
-    T: AsRef<Snapshot>,
     V: StorageValue,
 {
     /// Returns an element at that position or `None` if out of bounds.
@@ -85,8 +85,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = ListIndex::new("abc", fork);
     /// assert_eq!(None, index.get(0));
     ///
     /// index.push(42);
@@ -104,8 +104,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = ListIndex::new("abc", fork);
     /// assert_eq!(None, index.last());
     ///
     /// index.push(42);
@@ -126,8 +126,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = ListIndex::new("abc", fork);
     /// assert!(index.is_empty());
     ///
     /// index.push(42);
@@ -145,8 +145,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = ListIndex::new("abc", fork);
     /// assert_eq!(0, index.len());
     ///
     /// index.push(10);
@@ -172,8 +172,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = ListIndex::new("abc", fork);
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     ///
@@ -182,7 +182,7 @@ where
     /// }
     /// ```
     pub fn iter(&self) -> ListIndexIter<V> {
-        ListIndexIter { base_iter: self.base.iter_from(&(), &0u64) }
+        ListIndexIter { base_iter: self.base.iter_from(&0u64) }
     }
 
     /// Returns an iterator over the list starting from the specified position. The iterator
@@ -194,8 +194,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = ListIndex::new("abc", fork);
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     ///
@@ -204,14 +204,15 @@ where
     /// }
     /// ```
     pub fn iter_from(&self, from: u64) -> ListIndexIter<V> {
-        ListIndexIter { base_iter: self.base.iter_from(&(), &from) }
+        ListIndexIter { base_iter: self.base.iter_from(&from) }
     }
-}
 
-impl<'a, V> ListIndex<&'a mut Fork, V>
-where
-    V: StorageValue,
-{
+    //}
+    //impl<'a, T, V> ListIndex<T, V>
+    //where
+    //    T: AsRef<View>,
+    //    V: StorageValue,
+    //{
     fn set_len(&mut self, len: u64) {
         self.base.put(&(), len);
         self.length.set(Some(len));
@@ -225,8 +226,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = ListIndex::new("abc", fork);
     ///
     /// index.push(1);
     /// assert!(!index.is_empty());
@@ -245,8 +246,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = ListIndex::new("abc", fork);
     /// assert_eq!(None, index.pop());
     ///
     /// index.push(1);
@@ -273,8 +274,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = ListIndex::new("abc", fork);
     /// assert!(index.is_empty());
     ///
     /// index.extend([1, 2, 3].iter().cloned());
@@ -303,8 +304,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = ListIndex::new("abc", fork);
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     /// assert_eq!(5, index.len());
@@ -331,8 +332,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = ListIndex::new("abc", fork);
     ///
     /// index.push(1);
     /// assert_eq!(Some(1), index.get(0));
@@ -366,8 +367,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = ListIndex::new("abc", fork);
     ///
     /// index.push(1);
     /// assert!(!index.is_empty());
@@ -381,20 +382,19 @@ where
     }
 }
 
-impl<'a, T, V> ::std::iter::IntoIterator for &'a ListIndex<T, V>
+impl<V> ::std::iter::IntoIterator for ListIndex<V>
 where
-    T: AsRef<Snapshot>,
     V: StorageValue,
 {
     type Item = V;
-    type IntoIter = ListIndexIter<'a, V>;
+    type IntoIter = ListIndexIter<V>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a, V> Iterator for ListIndexIter<'a, V>
+impl<V> Iterator for ListIndexIter<V>
 where
     V: StorageValue,
 {
@@ -412,12 +412,12 @@ mod tests {
     use storage::db::Database;
 
     fn gen_tempdir_name() -> String {
-        thread_rng().gen_ascii_chars().take(10).collect()
+        thread_rng().gen_ascii_chars().take(20).collect()
     }
 
     fn list_index_methods(db: Box<Database>) {
-        let mut fork = db.fork();
-        let mut list_index = ListIndex::new(vec![255], &mut fork);
+        let fork = db.fork();
+        let mut list_index = ListIndex::new("a", fork.clone());
 
         assert!(list_index.is_empty());
         assert_eq!(0, list_index.len());
@@ -458,13 +458,24 @@ mod tests {
     }
 
     fn list_index_iter(db: Box<Database>) {
-        let mut fork = db.fork();
-        let mut list_index = ListIndex::new(vec![255], &mut fork);
+        let fork = db.fork();
+        let mut list_index = ListIndex::new("a", fork.clone());
 
         list_index.extend(vec![1u8, 2, 3]);
 
         assert_eq!(list_index.iter().collect::<Vec<u8>>(), vec![1, 2, 3]);
+        assert_eq!(list_index.iter_from(0).collect::<Vec<u8>>(), vec![1, 2, 3]);
+        assert_eq!(list_index.iter_from(1).collect::<Vec<u8>>(), vec![2, 3]);
+        assert_eq!(
+            list_index.iter_from(3).collect::<Vec<u8>>(),
+            Vec::<u8>::new()
+        );
 
+        fork.commit();
+
+        let snapshot = db.snapshot();
+        let list_index = ListIndex::new("a", snapshot);
+        assert_eq!(list_index.iter().collect::<Vec<u8>>(), vec![1, 2, 3]);
         assert_eq!(list_index.iter_from(0).collect::<Vec<u8>>(), vec![1, 2, 3]);
         assert_eq!(list_index.iter_from(1).collect::<Vec<u8>>(), vec![2, 3]);
         assert_eq!(
@@ -474,35 +485,31 @@ mod tests {
     }
 
     mod memorydb_tests {
-        use std::path::Path;
-        use tempdir::TempDir;
         use storage::{Database, MemoryDB};
 
-        fn create_database(_: &Path) -> Box<Database> {
+        fn create_database() -> Box<Database> {
             Box::new(MemoryDB::new())
         }
 
         #[test]
         fn test_list_index_methods() {
-            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-            let path = dir.path();
-            let db = create_database(path);
+            let db = create_database();
             super::list_index_methods(db);
         }
 
         #[test]
         fn test_list_index_iter() {
-            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-            let path = dir.path();
-            let db = create_database(path);
+            let db = create_database();
             super::list_index_iter(db);
         }
     }
 
     mod rocksdb_tests {
+        use std::sync::Arc;
         use std::path::Path;
         use tempdir::TempDir;
         use storage::{Database, RocksDB, RocksDBOptions};
+        use storage::ListIndex;
 
         fn create_database(path: &Path) -> Box<Database> {
             let mut opts = RocksDBOptions::default();
@@ -524,6 +531,29 @@ mod tests {
             let path = dir.path();
             let db = create_database(path);
             super::list_index_iter(db);
+        }
+
+        #[test]
+        fn test_fork_and_snapshot_isolation() {
+            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let path = dir.path();
+            let db = create_database(path);
+            let fork = db.fork();
+            {
+                let mut idx = ListIndex::new("a", Arc::clone(&fork));
+                idx.push(1);
+            }
+            let snapshot = db.snapshot();
+            {
+                let idx: ListIndex<i32> = ListIndex::new("a", Arc::clone(&snapshot));
+                assert!(idx.is_empty());
+            }
+            fork.commit();
+            let snapshot = db.snapshot();
+            {
+                let idx: ListIndex<i32> = ListIndex::new("a", Arc::clone(&snapshot));
+                assert!(!idx.is_empty());
+            }
         }
     }
 }

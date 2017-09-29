@@ -104,7 +104,7 @@
 //! [`HashSet`]: https://doc.rust-lang.org/std/collections/struct.HashSet.html
 
 pub use self::error::Error;
-pub use self::db::{Database, Snapshot, Transaction, Fork, Patch, Change, Iterator, Iter};
+pub use self::db::{Database, View, Iterator, Iter};
 
 pub use self::rocksdb::{RocksDB, RocksDBOptions, RocksBlockOptions};
 pub use self::memorydb::MemoryDB;
@@ -115,8 +115,8 @@ pub use self::values::StorageValue;
 pub use self::entry::Entry;
 
 pub use self::base_index::{BaseIndex, BaseIndexIter};
-pub use self::map_index::MapIndex;
 pub use self::list_index::ListIndex;
+pub use self::map_index::MapIndex;
 pub use self::key_set_index::KeySetIndex;
 pub use self::value_set_index::ValueSetIndex;
 pub use self::proof_list_index::{ProofListIndex, ListProof};
@@ -136,9 +136,8 @@ mod values;
 mod entry;
 
 pub mod base_index;
-
-pub mod map_index;
 pub mod list_index;
+pub mod map_index;
 pub mod key_set_index;
 pub mod value_set_index;
 pub mod proof_list_index;

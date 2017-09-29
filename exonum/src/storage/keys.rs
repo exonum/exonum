@@ -13,6 +13,8 @@
 // limitations under the License.
 
 //! A definition of `StorageKey` trait and implementations for common types.
+use std::mem::size_of_val;
+
 use byteorder::{ByteOrder, BigEndian};
 use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 
@@ -59,7 +61,9 @@ use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 /// ```
 pub trait StorageKey {
     /// Returns the size of the serialized key in bytes.
-    fn size(&self) -> usize;
+    fn size(&self) -> usize {
+        size_of_val(self)
+    }
 
     /// Serialize a key into the specified buffer of bytes.
     ///
@@ -74,10 +78,6 @@ pub trait StorageKey {
 }
 
 impl StorageKey for () {
-    fn size(&self) -> usize {
-        0
-    }
-
     fn write(&self, _buffer: &mut [u8]) {
         // no-op
     }
@@ -88,10 +88,6 @@ impl StorageKey for () {
 }
 
 impl StorageKey for u8 {
-    fn size(&self) -> usize {
-        1
-    }
-
     fn write(&self, buffer: &mut [u8]) {
         buffer[0] = *self
     }
@@ -102,10 +98,6 @@ impl StorageKey for u8 {
 }
 
 impl StorageKey for u16 {
-    fn size(&self) -> usize {
-        2
-    }
-
     fn write(&self, buffer: &mut [u8]) {
         BigEndian::write_u16(buffer, *self)
     }
@@ -116,10 +108,6 @@ impl StorageKey for u16 {
 }
 
 impl StorageKey for u32 {
-    fn size(&self) -> usize {
-        4
-    }
-
     fn write(&self, buffer: &mut [u8]) {
         BigEndian::write_u32(buffer, *self)
     }
@@ -130,10 +118,6 @@ impl StorageKey for u32 {
 }
 
 impl StorageKey for u64 {
-    fn size(&self) -> usize {
-        8
-    }
-
     fn write(&self, buffer: &mut [u8]) {
         BigEndian::write_u64(buffer, *self)
     }
@@ -144,10 +128,6 @@ impl StorageKey for u64 {
 }
 
 impl StorageKey for i8 {
-    fn size(&self) -> usize {
-        1
-    }
-
     fn write(&self, buffer: &mut [u8]) {
         buffer[0] = *self as u8
     }
@@ -158,10 +138,6 @@ impl StorageKey for i8 {
 }
 
 impl StorageKey for i16 {
-    fn size(&self) -> usize {
-        2
-    }
-
     fn write(&self, buffer: &mut [u8]) {
         BigEndian::write_i16(buffer, *self)
     }
@@ -172,10 +148,6 @@ impl StorageKey for i16 {
 }
 
 impl StorageKey for i32 {
-    fn size(&self) -> usize {
-        4
-    }
-
     fn write(&self, buffer: &mut [u8]) {
         BigEndian::write_i32(buffer, *self)
     }
@@ -186,10 +158,6 @@ impl StorageKey for i32 {
 }
 
 impl StorageKey for i64 {
-    fn size(&self) -> usize {
-        8
-    }
-
     fn write(&self, buffer: &mut [u8]) {
         BigEndian::write_i64(buffer, *self)
     }
@@ -254,3 +222,17 @@ impl StorageKey for String {
         unsafe { ::std::str::from_utf8_unchecked(buffer).to_string() }
     }
 }
+
+//impl<'a> StorageKey for &'a [u8] {
+//    fn size(&self) -> usize {
+//        unimplemented!()
+//    }
+//
+//    fn write(&self, buffer: &mut [u8]) {
+//        unimplemented!()
+//    }
+//
+//    fn read(buffer: &[u8]) -> Self {
+//        unimplemented!()
+//    }
+//}

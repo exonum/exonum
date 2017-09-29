@@ -38,6 +38,8 @@ headers = "0.1.0"
 params = "0.6.0"
 mount = "0.3.0"
 atty = "0.2.2"
+tempdir = "0.3.5"
+exonum_sodiumoxide = "0.0.14"
 exonum_profiler = { version = "^0.1.0", path="../3rdparty/profiler/" }
 exonum_flamer = { version = "^0.1.3", path="../3rdparty/flamer/", optional = true }
 
@@ -45,12 +47,8 @@ exonum_flamer = { version = "^0.1.3", path="../3rdparty/flamer/", optional = tru
 git = "https://github.com/aleksuss/exonum_rocksdb.git"
 branch = "optimistic-db"
 
-[dependencies.exonum_sodiumoxide]
-git = "https://github.com/exonum/exonum_sodiumoxide.git"
-
 [dev-dependencies]
 pretty_assertions = "0.2.1"
-tempdir = "0.3.5"
 
 [features]
 default = []

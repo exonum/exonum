@@ -19,18 +19,20 @@ use rocksdb::DBRawIterator;
 use rocksdb::optimistic_txn_db::Snapshot as _Snapshot;
 use rocksdb::Transaction as _Transaction;
 use rocksdb::Error as _Error;
+use rocksdb::IteratorMode;
+//use rocksdb::utils::get_cf_names;
 
-use std::mem;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::path::Path;
 use std::fmt;
 use std::error;
 
+pub use rocksdb::WriteBatch as Patch;
 pub use rocksdb::Options as RocksDBOptions;
 pub use rocksdb::BlockBasedOptions as RocksBlockOptions;
-pub use rocksdb::{OptimisticTransactionOptions, WriteOptions};
+pub use rocksdb::{OptimisticTransactionOptions, WriteOptions, ColumnFamily};
 
-use super::{Database, Iterator, Iter, Snapshot, Transaction, Error, Patch, Change, Result};
+use super::{Database, Iterator, Iter, View, Error, Result};
 
 impl From<_Error> for Error {
     fn from(err: _Error) -> Self {
@@ -41,18 +43,20 @@ impl From<_Error> for Error {
 /// Database implementation on the top of `RocksDB` backend.
 #[derive(Clone)]
 pub struct RocksDB {
-    db: Arc<_RocksDB>,
+    db: Arc<RwLock<_RocksDB>>,
 }
 
 /// A snapshot of a `RocksDB`.
 pub struct RocksDBSnapshot {
-    snapshot: _Snapshot<'static>,
-    _db: Arc<_RocksDB>,
+    snapshot: _Snapshot,
+    _db: Arc<RwLock<_RocksDB>>,
 }
 
 /// A transaction of a `RocksDB`
+#[derive(Clone)]
 pub struct RocksDBTransaction {
     transaction: _Transaction,
+    _db: Arc<RwLock<_RocksDB>>,
 }
 
 /// An iterator over the entries of a `RocksDB`.
@@ -65,8 +69,21 @@ struct RocksDBIterator {
 impl RocksDB {
     /// Open a database stored in the specified path with the specified options.
     pub fn open(path: &Path, options: RocksDBOptions) -> Result<RocksDB> {
-        let database = _RocksDB::open(&options, path)?;
-        Ok(RocksDB { db: Arc::new(database) })
+        // TODO Crashes doc tests. Will be fixing later
+        //        let db = match get_cf_names(path) {
+        //            Ok(names) => {
+        //                let cf_names = names.iter().map(|name| name.as_str()).collect::<Vec<_>>();
+        //                _RocksDB::open_cf(&options, path, cf_names.as_ref())?
+        //            }
+        //            Err(_) => _RocksDB::open(&options, path)?,
+        //        };
+        let db = _RocksDB::open(&options, path)?;
+        Ok(RocksDB { db: Arc::new(RwLock::new(db)) })
+    }
+
+    /// Destroy database
+    pub fn destroy<P: AsRef<Path>>(path: P) {
+        let _ = _RocksDB::destroy(&RocksDBOptions::default(), path);
     }
 }
 
@@ -75,97 +92,191 @@ impl Database for RocksDB {
         Box::new(Clone::clone(self))
     }
 
-    fn snapshot(&self) -> Box<Snapshot> {
+    fn snapshot(&self) -> Arc<View> {
         let _p = ProfilerSpan::new("RocksDB::snapshot");
-        Box::new(RocksDBSnapshot {
-            snapshot: unsafe { mem::transmute(self.db.snapshot()) },
+        Arc::new(RocksDBSnapshot {
+            snapshot: self.db.read().unwrap().snapshot(),
             _db: self.db.clone(),
         })
     }
 
-    fn transaction(&self) -> Box<Transaction> {
+    fn fork(&self) -> Arc<View> {
         let _p = ProfilerSpan::new("RocksDB::transaction");
         let w_opts = WriteOptions::default();
-        let mut txn_opts = OptimisticTransactionOptions::default();
-        txn_opts.set_snapshot(true);
-        Box::new(RocksDBTransaction {
-            transaction: self.db.transaction_begin(&w_opts, &txn_opts),
+        let txn_opts = OptimisticTransactionOptions::default();
+        Arc::new(RocksDBTransaction {
+            transaction: self.db.read().unwrap().transaction_begin(
+                &w_opts,
+                &txn_opts,
+            ),
+            _db: self.db.clone(),
+        })
+    }
+}
+
+impl View for RocksDBSnapshot {
+    fn get(&self, cf_name: &str, key: &[u8]) -> Option<Vec<u8>> {
+        let _p = ProfilerSpan::new("RocksDBSnapshot::get");
+        if let Some(column_family) = self._db.read().unwrap().cf_handle(cf_name) {
+            match self.snapshot.get_cf(column_family, key) {
+                Ok(value) => value.map(|v| v.to_vec()),
+                Err(e) => panic!(e),
+            }
+        } else {
+            None
+        }
+    }
+
+    fn iter(&self, cf_name: &str, from: Option<&[u8]>) -> Iter {
+        let _p = ProfilerSpan::new("RocksDBSnapshot::iter");
+        let iter = match self._db.read().unwrap().cf_handle(cf_name) {
+            Some(column_family) => {
+                let mut iter: DBRawIterator = self.snapshot
+                    .iterator_cf(column_family, IteratorMode::Start)
+                    .unwrap()
+                    .into();
+                if let Some(f) = from {
+                    iter.seek(f);
+                }
+                iter
+            }
+            None => self.snapshot.raw_iterator(),
+        };
+        Box::new(RocksDBIterator {
+            iter,
+            key: None,
+            value: None,
         })
     }
 
-    fn merge(&mut self, patch: Patch) -> Result<()> {
-        let _p = ProfilerSpan::new("RocksDB::merge");
-        let w_opts = WriteOptions::default();
-        let txn_opts = OptimisticTransactionOptions::default();
-        let txn = self.db.transaction_begin(&w_opts, &txn_opts);
-        for (key, change) in patch {
-            match change {
-                Change::Put(ref value) => txn.put(&key, value)?,
-                Change::Delete => txn.delete(&key)?,
+    fn put(&self, _: &str, _: &[u8], _: &[u8]) {
+        panic!("PUT is unsupported. Snapshot is read only");
+    }
+
+    fn delete(&self, _: &str, _: &[u8]) {
+        panic!("DELETE is unsupported. Snapshot is read only");
+    }
+
+    fn clear(&self, _: &str) {
+        panic!("CLEAR is unsupported. Snapshot is read only");
+    }
+
+    fn commit(&self) {
+        panic!("COMMIT is unsupported. Snapshot is read only");
+    }
+
+    fn rollback(&self) {
+        panic!("ROLLBACK is unsupported. Snapshot is read only");
+    }
+
+    fn savepoint(&self) {
+        panic!("SAVEPOINT is unsupported. Snapshot is read only");
+    }
+
+    fn rollback_to_savepoint(&self) {
+        panic!("ROLLBACK_TO_SAVEPOINT is unsupported. Snapshot is read only");
+    }
+}
+
+impl RocksDBTransaction {
+    fn delete_cf(&self, cf: ColumnFamily, key: &[u8]) {
+        if let Err(e) = self.transaction.delete_cf(cf, key) {
+            error!("Error while deleting, {}", e);
+        }
+    }
+
+    fn get_column_family(&self, cf_name: &str) -> Option<ColumnFamily> {
+        self._db.read().unwrap().cf_handle(cf_name)
+    }
+}
+
+impl View for RocksDBTransaction {
+    fn get(&self, cf_name: &str, key: &[u8]) -> Option<Vec<u8>> {
+        if let Some(column_family) = self.get_column_family(cf_name) {
+            match self.transaction.get_cf(column_family, key) {
+                Ok(Some(value)) => Some(value.iter().cloned().collect::<Vec<_>>()),
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+
+    fn put(&self, cf_name: &str, key: &[u8], value: &[u8]) {
+        let cf = self.get_column_family(cf_name);
+        let column_family = match cf {
+            Some(cf) => cf,
+            None => {
+                let opts = RocksDBOptions::default();
+                match self._db.write().unwrap().create_cf(cf_name, &opts) {
+                    Ok(cf) => cf,
+                    Err(e) => {
+                        panic!("Error while creating column family: {}", e);
+                    }
+                }
+            }
+        };
+        if let Err(e) = self.transaction.put_cf(column_family, key, value) {
+            error!("Error while putting, {}", e);
+        }
+    }
+
+    fn delete(&self, cf_name: &str, key: &[u8]) {
+        if let Some(column_family) = self.get_column_family(cf_name) {
+            self.delete_cf(column_family, key);
+        }
+    }
+
+    fn clear(&self, cf_name: &str) {
+        if let Some(column_family) = self.get_column_family(cf_name) {
+            let mut iter = self.iter(cf_name, None);
+            while let Some((key, _)) = iter.next() {
+                self.delete_cf(column_family, key);
             }
         }
-        txn.commit().map_err(Into::into)
-    }
-}
-
-impl Snapshot for RocksDBSnapshot {
-
-    fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
-        let _p = ProfilerSpan::new("RocksDBSnapshot::get");
-        match self.snapshot.get(key) {
-            Ok(value) => value.map(|v| v.to_vec()),
-            Err(e) => panic!(e),
-        }
     }
 
-    fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a> {
-        let _p = ProfilerSpan::new("RocksDBSnapshot::iter");
-        let mut iter = self.snapshot.raw_iterator();
-        iter.seek(from);
-        Box::new(RocksDBIterator {
-            iter: iter,
-            key: None,
-            value: None,
-        })
-    }
-
-}
-
-impl Transaction for RocksDBTransaction {
-
-    fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
-        match self.transaction.get(key) {
-            Ok(Some(value)) => Some(value.iter().cloned().collect::<Vec<_>>()),
-            _ => None,
-        }
-    }
-
-    fn put(&self, key: &[u8], value: &[u8]) -> Result<()> {
-        self.transaction.put(key, value).map_err(Into::into)
-    }
-
-    fn delete(&self, key: &[u8]) -> Result<()> {
-        self.transaction.delete(key).map_err(Into::into)
-    }
-
-    fn iter(&self) -> Iter {
+    fn iter(&self, cf_name: &str, from: Option<&[u8]>) -> Iter {
         let _p = ProfilerSpan::new("RocksDBTransaction::iter");
-        let iter = self.transaction.iterator().into();
+        let iter = match self.get_column_family(cf_name) {
+            Some(column_family) => {
+                let mut iter: DBRawIterator =
+                    self.transaction.iterator_cf(column_family).unwrap().into();
+                if let Some(f) = from {
+                    iter.seek(f);
+                }
+                iter
+            }
+            None => self.transaction.iterator().into(),
+        };
         Box::new(RocksDBIterator {
-            iter: iter,
+            iter,
             key: None,
             value: None,
         })
     }
 
-    fn commit(&self) -> Result<()> {
-        self.transaction.commit().map_err(Into::into)
+    fn commit(&self) {
+        if let Err(e) = self.transaction.commit() {
+            error!("Commit error, {}", e);
+        }
     }
 
-    fn rollback(&self) -> Result<()> {
-        self.transaction.rollback().map_err(Into::into)
+    fn rollback(&self) {
+        if let Err(e) = self.transaction.rollback() {
+            error!("Rollback error: {}", e);
+        }
     }
 
+    fn savepoint(&self) {
+        self.transaction.savepoint();
+    }
+
+    fn rollback_to_savepoint(&self) {
+        if let Err(e) = self.transaction.rollback_to_savepoint() {
+            error!("Rollback to save point error: {}", e);
+        }
+    }
 }
 
 impl<'a> Iterator for RocksDBIterator {
@@ -221,3 +332,75 @@ impl fmt::Debug for RocksDBTransaction {
         write!(f, "RocksDBTransaction(..)")
     }
 }
+
+#[test]
+fn test_rocksdb() {
+    use tempdir::TempDir;
+
+    let dir = TempDir::new("xxxxxxxx").unwrap();
+    let mut opts = RocksDBOptions::default();
+    opts.create_if_missing(true);
+    let db = RocksDB::open(dir.path(), opts).unwrap();
+    let fork = db.fork();
+
+    assert!(!fork.contains("a", b"a"));
+    fork.put("a", b"a", b"a");
+    assert!(fork.contains("a", b"a"));
+
+    let snapshot = db.snapshot();
+    assert!(!snapshot.contains("a", b"a"));
+    fork.commit();
+    assert!(!snapshot.contains("a", b"a"));
+    let snapshot = db.snapshot();
+    assert!(snapshot.contains("a", b"a"));
+}
+
+#[test]
+fn test_rocksdb_clean() {
+    use tempdir::TempDir;
+
+    let dir = TempDir::new("xxxxxxxx").unwrap();
+    let mut opts = RocksDBOptions::default();
+    opts.create_if_missing(true);
+    let db = RocksDB::open(dir.path(), opts).unwrap();
+    let fork = db.fork();
+
+    fork.clear("a");
+    assert!(!fork.contains("a", b"a"));
+    fork.put("a", b"a", b"a");
+    fork.put("a", b"b", b"b");
+    assert!(fork.contains("a", b"a"));
+    fork.commit();
+    fork.clear("a");
+    assert!(!fork.contains("a", b"a"));
+    assert!(!fork.contains("a", b"b"));
+}
+
+//#[test]
+//fn test_rocksdb_check_saved_data() {
+//    use tempdir::TempDir;
+//
+//    let dir = TempDir::new("xxxxxxxx").unwrap();
+//    {
+//        let mut opts = RocksDBOptions::default();
+//        opts.create_if_missing(true);
+//        let db = RocksDB::open(dir.path(), opts).unwrap();
+//        let fork = db.fork();
+//
+//        assert!(!fork.contains("a", b"a"));
+//        fork.put("a", b"a", b"a");
+//        fork.put("a", b"b", b"b");
+//        assert!(fork.contains("a", b"a"));
+//        fork.commit();
+//    }
+//    {
+//        let opts = RocksDBOptions::default();
+//        let db = match RocksDB::open(dir.path(), opts) {
+//            Ok(db) => db,
+//            Err(e) => panic!("Error while opening db: {}", e),
+//        };
+//        let fork = db.fork();
+//        assert!(fork.contains("a", b"a"));
+//        assert!(fork.contains("a", b"b"));
+//    }
+//}

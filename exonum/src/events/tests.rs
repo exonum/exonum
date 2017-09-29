@@ -37,7 +37,7 @@ pub struct BenchConfig {
     pub tcp_nodelay: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct TestHandler {
     events: VecDeque<TestEvent>,
     messages: VecDeque<RawMessage>,
@@ -98,7 +98,7 @@ impl TestEvents {
                 tcp_nodelay: true,
                 tcp_keep_alive: Some(1),
                 tcp_reconnect_timeout: 1000,
-                tcp_reconnect_timeout_max: 600000,
+                tcp_reconnect_timeout_max: 600_000,
             },
             SharedNodeState::new(0),
         );
@@ -119,14 +119,11 @@ impl TestEvents {
         loop {
             self.process_events().unwrap();
 
-            if start + Duration::from_millis(10000) < SystemTime::now() {
+            if start + Duration::from_millis(10_000) < SystemTime::now() {
                 return None;
             }
             while let Some(e) = self.0.inner.handler.event() {
-                match e {
-                    InternalEvent::Node(Event::Connected(_)) => return Some(()),
-                    _ => {}
-                }
+                if let InternalEvent::Node(Event::Connected(_)) = e { return Some(()) }
             }
         }
     }
@@ -141,11 +138,8 @@ impl TestEvents {
             }
 
             while let Some(e) = self.0.inner.handler.event() {
-                match e {
-                    InternalEvent::Node(Event::Error(e)) => {
-                        error!("An error during wait occured {:?}", e);
-                    }
-                    _ => {}
+                if let InternalEvent::Node(Event::Error(e)) = e {
+                    error!("An error during wait occurred {:?}", e);
                 }
             }
 
@@ -191,10 +185,7 @@ impl TestEvents {
                 return None;
             }
             while let Some(e) = self.0.inner.handler.event() {
-                match e {
-                    InternalEvent::Node(Event::Disconnected(_)) => return Some(()),
-                    _ => {}
-                }
+                if let InternalEvent::Node(Event::Disconnected(_)) = e { return Some(()) }
             }
         }
     }

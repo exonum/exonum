@@ -13,11 +13,12 @@
 // limitations under the License.
 
 //! An implementation of a Merklized version of a map (Merkle Patricia tree).
+use std::sync::Arc;
 use std::marker::PhantomData;
 
 use crypto::{hash, Hash};
 
-use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
+use super::{BaseIndex, BaseIndexIter, View, StorageValue};
 
 use self::key::{DBKey, ChildKind, LEAF_KEY_PREFIX};
 use self::node::{Node, BranchNode};
@@ -45,8 +46,8 @@ mod proof;
 /// [`Hash`]: ../../crypto/struct.Hash.html
 /// [`PublicKey`]: ../../crypto/struct.PublicKey.html
 #[derive(Debug)]
-pub struct ProofMapIndex<T, K, V> {
-    base: BaseIndex<T>,
+pub struct ProofMapIndex<K, V> {
+    base: BaseIndex,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
 }
@@ -60,8 +61,8 @@ pub struct ProofMapIndex<T, K, V> {
 /// [`iter_from`]: struct.ProofMapIndex.html#method.iter_from
 /// [`ProofMapIndex`]: struct.ProofMapIndex.html
 #[derive(Debug)]
-pub struct ProofMapIndexIter<'a, K, V> {
-    base_iter: BaseIndexIter<'a, DBKey, V>,
+pub struct ProofMapIndexIter<K, V> {
+    base_iter: BaseIndexIter<DBKey, V>,
     _k: PhantomData<K>,
 }
 
@@ -74,8 +75,8 @@ pub struct ProofMapIndexIter<'a, K, V> {
 /// [`keys_from`]: struct.ProofMapIndex.html#method.keys_from
 /// [`ProofMapIndex`]: struct.MapIndex.html
 #[derive(Debug)]
-pub struct ProofMapIndexKeys<'a, K> {
-    base_iter: BaseIndexIter<'a, DBKey, ()>,
+pub struct ProofMapIndexKeys<K> {
+    base_iter: BaseIndexIter<DBKey, ()>,
     _k: PhantomData<K>,
 }
 
@@ -88,8 +89,8 @@ pub struct ProofMapIndexKeys<'a, K> {
 /// [`values_from`]: struct.ProofMapIndex.html#method.values_from
 /// [`ProofMapIndex`]: struct.ProofMapIndex.html
 #[derive(Debug)]
-pub struct ProofMapIndexValues<'a, V> {
-    base_iter: BaseIndexIter<'a, DBKey, V>,
+pub struct ProofMapIndexValues<V> {
+    base_iter: BaseIndexIter<DBKey, V>,
 }
 
 enum RemoveResult {
@@ -99,7 +100,11 @@ enum RemoveResult {
     UpdateHash(Hash),
 }
 
-impl<T, K, V> ProofMapIndex<T, K, V> {
+impl<K, V> ProofMapIndex<K, V>
+where
+    K: ProofMapKey,
+    V: StorageValue,
+{
     /// Creates a new index representation based on the common prefix of its keys and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
@@ -115,33 +120,26 @@ impl<T, K, V> ProofMapIndex<T, K, V> {
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "abc";
     ///
     /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix.clone(), &snapshot);
+    /// let index: ProofMapIndex<Hash, u8> = ProofMapIndex::new(name, snapshot);
     ///
-    /// let mut fork = db.fork();
-    /// let mut mut_index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &mut fork);
+    /// let fork = db.fork();
+    /// let mut mut_index: ProofMapIndex<Hash, u8> = ProofMapIndex::new(name, fork);
     /// # drop(index);
     /// # drop(mut_index);
     /// ```
-    pub fn new(prefix: Vec<u8>, view: T) -> Self {
+    pub fn new(name: &str, view: Arc<View>) -> Self {
         ProofMapIndex {
-            base: BaseIndex::new(prefix, view),
+            base: BaseIndex::new(name, view),
             _k: PhantomData,
             _v: PhantomData,
         }
     }
-}
 
-impl<T, K, V> ProofMapIndex<T, K, V>
-where
-    T: AsRef<Snapshot>,
-    K: ProofMapKey,
-    V: StorageValue,
-{
     fn get_root_key(&self) -> Option<DBKey> {
-        self.base.iter(&()).next().map(|(k, _): (DBKey, ())| k)
+        self.base.iter().next().map(|(k, _): (DBKey, ())| k)
     }
 
     fn get_root_node(&self) -> Option<(DBKey, Node<V>)> {
@@ -233,9 +231,9 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
-    /// let mut fork = db.fork();
-    /// let mut index = ProofMapIndex::new(prefix, &mut fork);
+    /// let name = "abc";
+    /// let fork = db.fork();
+    /// let mut index = ProofMapIndex::new(name, fork);
     ///
     /// let default_hash = index.root_hash();
     /// assert_eq!(Hash::default(), default_hash);
@@ -261,9 +259,9 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
-    /// let mut fork = db.fork();
-    /// let mut index = ProofMapIndex::new(prefix, &mut fork);
+    /// let name = "abc";
+    /// let fork = db.fork();
+    /// let mut index = ProofMapIndex::new(name, fork);
     ///
     /// let hash = Hash::default();
     /// assert_eq!(None, index.get(&hash));
@@ -284,9 +282,9 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
-    /// let mut fork = db.fork();
-    /// let mut index = ProofMapIndex::new(prefix, &mut fork);
+    /// let name = "abc";
+    /// let fork = db.fork();
+    /// let mut index = ProofMapIndex::new(name, fork);
     ///
     /// let hash = Hash::default();
     /// assert!(!index.contains(&hash));
@@ -307,9 +305,9 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "abc";
     /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &snapshot);
+    /// let index: ProofMapIndex<Hash, u8> = ProofMapIndex::new(name, snapshot);
     ///
     /// let hash = Hash::default();
     /// let proof = index.get_proof(&hash);
@@ -397,9 +395,9 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "abc";
     /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &snapshot);
+    /// let index: ProofMapIndex<Hash, u8> = ProofMapIndex::new(name, snapshot);
     ///
     /// for val in index.iter() {
     ///     println!("{:?}", val);
@@ -407,7 +405,7 @@ where
     /// ```
     pub fn iter(&self) -> ProofMapIndexIter<K, V> {
         ProofMapIndexIter {
-            base_iter: self.base.iter(&LEAF_KEY_PREFIX),
+            base_iter: self.base.iter_from(&LEAF_KEY_PREFIX),
             _k: PhantomData,
         }
     }
@@ -422,9 +420,9 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "abc";
     /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &snapshot);
+    /// let index: ProofMapIndex<Hash, u8> = ProofMapIndex::new(name, snapshot);
     ///
     /// for key in index.keys() {
     ///     println!("{:?}", key);
@@ -432,7 +430,7 @@ where
     /// ```
     pub fn keys(&self) -> ProofMapIndexKeys<K> {
         ProofMapIndexKeys {
-            base_iter: self.base.iter(&LEAF_KEY_PREFIX),
+            base_iter: self.base.iter_from(&LEAF_KEY_PREFIX),
             _k: PhantomData,
         }
     }
@@ -447,16 +445,16 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "abc";
     /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &snapshot);
+    /// let index: ProofMapIndex<Hash, u8> = ProofMapIndex::new(name, snapshot);
     ///
     /// for val in index.values() {
     ///     println!("{}", val);
     /// }
     /// ```
     pub fn values(&self) -> ProofMapIndexValues<V> {
-        ProofMapIndexValues { base_iter: self.base.iter(&LEAF_KEY_PREFIX) }
+        ProofMapIndexValues { base_iter: self.base.iter_from(&LEAF_KEY_PREFIX) }
     }
 
     /// Returns an iterator over the entries of the map in ascending order starting from the
@@ -469,9 +467,9 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "abc";
     /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &snapshot);
+    /// let index: ProofMapIndex<Hash, u8> = ProofMapIndex::new(name, snapshot);
     ///
     /// let hash = Hash::default();
     /// for val in index.iter_from(&hash) {
@@ -480,7 +478,7 @@ where
     /// ```
     pub fn iter_from(&self, from: &K) -> ProofMapIndexIter<K, V> {
         ProofMapIndexIter {
-            base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &DBKey::leaf(from)),
+            base_iter: self.base.iter_from(&DBKey::leaf(from)),
             _k: PhantomData,
         }
     }
@@ -495,9 +493,9 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "abc";
     /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &snapshot);
+    /// let index: ProofMapIndex<Hash, u8> = ProofMapIndex::new(name, snapshot);
     ///
     /// let hash = Hash::default();
     /// for key in index.keys_from(&hash) {
@@ -506,7 +504,7 @@ where
     /// ```
     pub fn keys_from(&self, from: &K) -> ProofMapIndexKeys<K> {
         ProofMapIndexKeys {
-            base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &DBKey::leaf(from)),
+            base_iter: self.base.iter_from(&DBKey::leaf(from)),
             _k: PhantomData,
         }
     }
@@ -521,9 +519,9 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "abc";
     /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &snapshot);
+    /// let index: ProofMapIndex<Hash, u8> = ProofMapIndex::new(name, snapshot);
     ///
     /// let hash = Hash::default();
     /// for val in index.values_from(&hash) {
@@ -531,15 +529,9 @@ where
     /// }
     /// ```
     pub fn values_from(&self, from: &K) -> ProofMapIndexValues<V> {
-        ProofMapIndexValues { base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &DBKey::leaf(from)) }
+        ProofMapIndexValues { base_iter: self.base.iter_from(&DBKey::leaf(from)) }
     }
-}
 
-impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V>
-where
-    K: ProofMapKey,
-    V: StorageValue,
-{
     fn insert_leaf(&mut self, key: &DBKey, value: V) -> Hash {
         debug_assert!(key.is_leaf());
         let hash = value.hash();
@@ -618,9 +610,9 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
-    /// let mut fork = db.fork();
-    /// let mut index = ProofMapIndex::new(prefix, &mut fork);
+    /// let name = "abc";
+    /// let fork = db.fork();
+    /// let mut index = ProofMapIndex::new(name, fork);
     ///
     /// let hash = Hash::default();
     /// index.put(&hash, 2);
@@ -737,9 +729,9 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
-    /// let mut fork = db.fork();
-    /// let mut index = ProofMapIndex::new(prefix, &mut fork);
+    /// let name = "abc";
+    /// let fork = db.fork();
+    /// let mut index = ProofMapIndex::new(name, fork);
     ///
     /// let hash = Hash::default();
     /// index.put(&hash, 2);
@@ -798,9 +790,9 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
-    /// let mut fork = db.fork();
-    /// let mut index = ProofMapIndex::new(prefix, &mut fork);
+    /// let name = "abc";
+    /// let fork = db.fork();
+    /// let mut index = ProofMapIndex::new(name, fork);
     ///
     /// let hash = Hash::default();
     /// index.put(&hash, 2);
@@ -814,21 +806,20 @@ where
     }
 }
 
-impl<'a, T, K, V> ::std::iter::IntoIterator for &'a ProofMapIndex<T, K, V>
+impl<K, V> ::std::iter::IntoIterator for ProofMapIndex<K, V>
 where
-    T: AsRef<Snapshot>,
     K: ProofMapKey,
     V: StorageValue,
 {
     type Item = (K, V);
-    type IntoIter = ProofMapIndexIter<'a, K, V>;
+    type IntoIter = ProofMapIndexIter<K, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a, K, V> Iterator for ProofMapIndexIter<'a, K, V>
+impl<K, V> Iterator for ProofMapIndexIter<K, V>
 where
     K: ProofMapKey,
     V: StorageValue,
@@ -841,7 +832,7 @@ where
 }
 
 
-impl<'a, K> Iterator for ProofMapIndexKeys<'a, K>
+impl<K> Iterator for ProofMapIndexKeys<K>
 where
     K: ProofMapKey,
 {
@@ -852,7 +843,7 @@ where
     }
 }
 
-impl<'a, V> Iterator for ProofMapIndexValues<'a, V>
+impl<V> Iterator for ProofMapIndexValues<V>
 where
     V: StorageValue,
 {

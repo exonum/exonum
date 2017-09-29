@@ -13,10 +13,11 @@
 // limitations under the License.
 
 //! An implementation of base index with most common features.
+use std::sync::Arc;
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
-use super::{StorageKey, StorageValue, Snapshot, Fork, Transaction, Iter};
+use super::{StorageKey, StorageValue, View, Iter};
 
 /// Basic struct for all indices that implements common features.
 ///
@@ -29,9 +30,9 @@ use super::{StorageKey, StorageValue, Snapshot, Fork, Transaction, Iter};
 /// [`StorageKey`]: ../trait.StorageKey.html
 /// [`StorageValue`]: ../trait.StorageValue.html
 #[derive(Debug)]
-pub struct BaseIndex<T> {
-    prefix: Vec<u8>,
-    view: T,
+pub struct BaseIndex {
+    name: String,
+    view: Arc<View>,
 }
 
 /// An iterator over the entries of a `BaseIndex`.
@@ -42,16 +43,14 @@ pub struct BaseIndex<T> {
 /// [`iter`]: struct.BaseIndex.html#method.iter
 /// [`iter_from`]: struct.BaseIndex.html#method.iter_from
 /// [`BaseIndex`]: struct.BaseIndex.html
-pub struct BaseIndexIter<'a, K, V> {
-    base_iter: Iter<'a>,
-    base_prefix_len: usize,
-    prefix: Vec<u8>,
+pub struct BaseIndexIter<K, V> {
+    base_iter: Iter,
     ended: bool,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
 }
 
-impl<T> BaseIndex<T> {
+impl BaseIndex {
     /// Creates a new index representation based on the common prefix of its keys and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
@@ -59,32 +58,29 @@ impl<T> BaseIndex<T> {
     /// available.
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
-    pub fn new(prefix: Vec<u8>, view: T) -> Self {
-        BaseIndex {
-            prefix: prefix,
-            view: view,
-        }
-    }
+    pub fn new(name: &str, view: Arc<View>) -> Self {
 
-    fn prefixed_key<K: StorageKey>(&self, key: &K) -> Vec<u8> {
-        let mut v = vec![0; self.prefix.len() + key.size()];
-        v[..self.prefix.len()].copy_from_slice(&self.prefix);
-        key.write(&mut v[self.prefix.len()..]);
-        v
+        BaseIndex {
+            name: name.to_string(),
+            view,
+        }
     }
 }
 
-impl<T> BaseIndex<T>
-where
-    T: AsRef<Snapshot>,
-{
+fn gen_key<K: StorageKey>(key: &K) -> Vec<u8> {
+    let mut v = vec![0; key.size()];
+    key.write(&mut v);
+    v
+}
+
+impl BaseIndex {
     /// Returns a value of *any* type corresponding to the key of *any* type.
     pub fn get<K, V>(&self, key: &K) -> Option<V>
     where
         K: StorageKey,
         V: StorageValue,
     {
-        self.view.as_ref().get(&self.prefixed_key(key)).map(|v| {
+        self.view.get(&self.name, &gen_key(key)).map(|v| {
             StorageValue::from_bytes(Cow::Owned(v))
         })
     }
@@ -95,23 +91,19 @@ where
     where
         K: StorageKey,
     {
-        self.view.as_ref().contains(&self.prefixed_key(key))
+        self.view.contains(&self.name, &gen_key(key))
     }
 
     /// Returns an iterator over the entries of the index in ascending order. The iterator element
     /// type is *any* key-value pair. An argument `subprefix` allows to specify a subset of keys
     /// for iteration.
-    pub fn iter<P, K, V>(&self, subprefix: &P) -> BaseIndexIter<K, V>
+    pub fn iter<K, V>(&self) -> BaseIndexIter<K, V>
     where
-        P: StorageKey,
         K: StorageKey,
         V: StorageValue,
     {
-        let iter_prefix = self.prefixed_key(subprefix);
         BaseIndexIter {
-            base_iter: self.view.as_ref().iter(&iter_prefix),
-            base_prefix_len: self.prefix.len(),
-            prefix: iter_prefix,
+            base_iter: self.view.iter(&self.name, None),
             ended: false,
             _k: PhantomData,
             _v: PhantomData,
@@ -121,35 +113,33 @@ where
     /// Returns an iterator over the entries of the index in ascending order starting from the
     /// specified key. The iterator element type is *any* key-value pair. An argument `subprefix`
     /// allows to specify a subset of iteration.
-    pub fn iter_from<P, F, K, V>(&self, subprefix: &P, from: &F) -> BaseIndexIter<K, V>
+    pub fn iter_from<F, K, V>(&self, from: &F) -> BaseIndexIter<K, V>
     where
-        P: StorageKey,
-        F: StorageKey,
         K: StorageKey,
+        F: StorageKey,
         V: StorageValue,
     {
-        let iter_prefix = self.prefixed_key(subprefix);
-        let iter_from = self.prefixed_key(from);
         BaseIndexIter {
-            base_iter: self.view.as_ref().iter(&iter_from),
-            base_prefix_len: self.prefix.len(),
-            prefix: iter_prefix,
+            base_iter: self.view.iter(&self.name, Some(&gen_key(from))),
             ended: false,
             _k: PhantomData,
             _v: PhantomData,
         }
     }
-}
-
-impl<'a> BaseIndex<&'a mut Fork> {
+    //}
+    //
+    //impl<'a>BaseIndex<&'a mut View> {
     /// Inserts the key-value pair into the index. Both key and value may be of *any* types.
     pub fn put<K, V>(&mut self, key: &K, value: V)
     where
         K: StorageKey,
         V: StorageValue,
     {
-        let key = self.prefixed_key(key);
-        self.view.put(key, value.into_bytes());
+        self.view.put(
+            &self.name,
+            &gen_key(key),
+            value.into_bytes().as_ref(),
+        );
     }
 
     /// Removes the key of *any* type from the index.
@@ -157,8 +147,7 @@ impl<'a> BaseIndex<&'a mut Fork> {
     where
         K: StorageKey,
     {
-        let key = self.prefixed_key(key);
-        self.view.remove(key);
+        self.view.delete(&self.name, &gen_key(key));
     }
 
     /// Clears the index, removing all entries.
@@ -169,25 +158,11 @@ impl<'a> BaseIndex<&'a mut Fork> {
     /// this method the amount of allocated memory is linearly dependent on the number of elements
     /// in the index.
     pub fn clear(&mut self) {
-        self.view.remove_by_prefix(&self.prefix)
+        self.view.clear(&self.name)
     }
 }
 
-impl<'a> BaseIndex<&'a mut Transaction> {
-    /// Inserts the key-value pair into the index. Both key and value may be of *any* types.
-    pub fn put<K, V>(&mut self, key: &K, value: V)
-    where
-        K: StorageKey,
-        V: StorageValue,
-    {
-        let key = self.prefixed_key(key);
-        if let Err(e) = self.view.put(&key, value.into_bytes().as_slice()) {
-            println!("error while inserting: {}", e);
-        }
-    }
-}
-
-impl<'a, K, V> Iterator for BaseIndexIter<'a, K, V>
+impl<K, V> Iterator for BaseIndexIter<K, V>
 where
     K: StorageKey,
     V: StorageValue,
@@ -199,19 +174,15 @@ where
             return None;
         }
         if let Some((k, v)) = self.base_iter.next() {
-            if k.starts_with(&self.prefix) {
-                return Some((
-                    K::read(&k[self.base_prefix_len..]),
-                    V::from_bytes(Cow::Borrowed(v)),
-                ));
-            }
+            Some((K::read(&k[..]), V::from_bytes(Cow::Borrowed(v))))
+        } else {
+            self.ended = true;
+            None
         }
-        self.ended = true;
-        None
     }
 }
 
-impl<'a, K, V> ::std::fmt::Debug for BaseIndexIter<'a, K, V> {
+impl<K, V> ::std::fmt::Debug for BaseIndexIter<K, V> {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         write!(f, "BaseIndexIter(..)")
     }

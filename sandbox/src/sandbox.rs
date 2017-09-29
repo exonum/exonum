@@ -178,13 +178,13 @@ impl SandboxReactor {
 
     pub fn actual_config(&self) -> StoredConfiguration {
         let snapshot = self.handler.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = Schema::new(snapshot);
         schema.actual_configuration()
     }
 
     pub fn following_config(&self) -> Option<StoredConfiguration> {
         let snapshot = self.handler.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = Schema::new(snapshot);
         schema.following_configuration()
     }
 
@@ -471,20 +471,11 @@ impl Sandbox {
     {
         let mut unique_set: HashSet<Hash> = HashSet::new();
         let snapshot = self.reactor.borrow().handler.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = Schema::new(snapshot);
         let schema_transactions = schema.transactions();
         txs.into_iter()
-            .filter(|elem| {
-                let hash_elem = elem.hash();
-                if unique_set.contains(&hash_elem) {
-                    return false;
-                }
-                unique_set.insert(hash_elem);
-                if schema_transactions.contains(&hash_elem) {
-                    return false;
-                }
-                true
-            })
+            .filter(|tx| !schema_transactions.contains(&tx.hash()))
+            .filter(|tx| unique_set.insert(tx.hash()))
             .cloned()
             .collect()
     }
@@ -507,25 +498,20 @@ impl Sandbox {
             (hashes, pool)
         };
 
-        let fork = {
-            let mut fork = blockchain.fork();
-            let (_, patch) =
-                blockchain.create_patch(ValidatorId(0), self.current_height(), &hashes, &tx_pool);
-            fork.merge(patch);
-            fork
-        };
-        *Schema::new(&fork).last_block().unwrap().state_hash()
+        let (_, fork) =
+            blockchain.create_block(ValidatorId(0), self.current_height(), &hashes, &tx_pool);
+        *Schema::new(fork).last_block().unwrap().state_hash()
     }
 
     pub fn get_proof_to_service_table(&self, service_id: u16, table_idx: usize) -> MapProof<Hash> {
         let snapshot = self.reactor.borrow().handler.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = Schema::new(snapshot);
         schema.get_proof_to_service_table(service_id, table_idx)
     }
 
     pub fn get_configs_root_hash(&self) -> Hash {
         let snapshot = self.reactor.borrow().handler.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = Schema::new(snapshot);
         schema.configs().root_hash()
     }
 
@@ -568,7 +554,7 @@ impl Sandbox {
 
     pub fn block_and_precommits(&self, height: Height) -> Option<BlockProof> {
         let snapshot = self.reactor.borrow().handler.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = Schema::new(snapshot);
         schema.block_and_precommits(height)
     }
 
@@ -584,7 +570,7 @@ impl Sandbox {
 
     pub fn assert_state(&self, expected_height: Height, expected_round: Round) {
         let reactor = self.reactor.borrow();
-        let state = &reactor.handler.state();
+        let state = reactor.handler.state();
 
         let achual_height = state.height();
         let actual_round = state.round();
@@ -623,7 +609,7 @@ impl Drop for Sandbox {
 
 fn gen_primitive_socket_addr(idx: u8) -> SocketAddr {
     let addr = Ipv4Addr::new(idx, idx, idx, idx);
-    SocketAddr::new(IpAddr::V4(addr), idx as u16)
+    SocketAddr::new(IpAddr::V4(addr), u16::from(idx))
 }
 
 pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
@@ -661,6 +647,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
             }
         }),
     );
+
     blockchain.create_genesis_block(genesis).unwrap();
 
     let config = Configuration {
@@ -709,7 +696,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         reactor: RefCell::new(reactor),
         validators_map: HashMap::from_iter(validators.clone()),
         services_map: HashMap::from_iter(service_keys),
-        addresses: addresses,
+        addresses,
     };
 
     sandbox.initialize(sandbox.time(), 1, validators.len());

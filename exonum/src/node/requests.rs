@@ -78,7 +78,7 @@ where
     pub fn handle_request_txs(&mut self, msg: TransactionsRequest) {
         trace!("HANDLE TRANSACTIONS REQUEST");
         let snapshot = self.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = Schema::new(snapshot);
         for hash in msg.txs() {
             let tx = self.state
                 .transactions()
@@ -127,7 +127,7 @@ where
         }
 
         let snapshot = self.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = Schema::new(snapshot);
 
         let height = msg.height();
         let block_hash = schema.block_hash_by_height(height).unwrap();

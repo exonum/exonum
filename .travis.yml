@@ -63,9 +63,8 @@ install:
   fi
 - |
   if [ ! -f "$HOME/.local/lib/librocksdb.so" ]; then
-    wget -O rocksdb-$ROCKSDB_VERS.tar.gz https://github.com/facebook/rocksdb/archive/v$ROCKSDB_VERS.tar.gz
-    tar xvf rocksdb-$ROCKSDB_VERS.tar.gz
-    cd rocksdb-$ROCKSDB_VERS
+    git clone https://github.com/facebook/rocksdb
+    cd rocksdb
     INSTALL_PATH=$HOME/.local make install-shared
     cd ..
   fi

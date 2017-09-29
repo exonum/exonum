@@ -76,8 +76,7 @@ impl<'a> BlockBuilder<'a> {
             tx_hash: None,
             state_hash: None,
             tx_count: None,
-
-            sandbox: sandbox,
+            sandbox,
         }
     }
 
@@ -162,7 +161,7 @@ impl<'a> ProposeBuilder<'a> {
             duration_since_sandbox_time: None,
             prev_hash: None,
             tx_hashes: None,
-            sandbox: sandbox,
+            sandbox,
         }
     }
 
@@ -248,8 +247,9 @@ pub fn compute_txs_root_hash(txs: &[Hash]) -> Hash {
     // TODO use special function
     use exonum::storage::{MemoryDB, ProofListIndex};
 
-    let mut fork = MemoryDB::new().fork();
-    let mut hashes = ProofListIndex::new(vec![], &mut fork);
+    let db = MemoryDB::new();
+    let fork = db.fork();
+    let mut hashes = ProofListIndex::new("a", fork);
     hashes.extend(txs.iter().cloned());
     hashes.root_hash()
 }
@@ -325,22 +325,19 @@ where
     // assert 1st round
     sandbox.assert_state(initial_height, ROUND_ONE);
 
-    let hashes = {
-        let mut hashes = Vec::new();
-        for tx in txs.iter() {
+    let hashes = txs.iter()
+        .map(|tx| {
             sandbox.recv(tx.clone());
-            hashes.push(tx.hash());
-        }
-        hashes
-    };
+            tx.hash()
+        })
+        .collect::<Vec<_>>();
     {
         *sandbox_state.committed_transaction_hashes.borrow_mut() = hashes.clone();
     }
     let mut propose: Option<Propose>;
-
     let n_validators = sandbox.n_validators();
     for _ in 0..n_validators {
-        propose = add_round_with_transactions(sandbox, sandbox_state, hashes.as_ref());
+        propose = add_round_with_transactions(sandbox, sandbox_state, &hashes);
         let round = sandbox.current_round();
         if sandbox.is_leader() {
             // ok, we are leader
@@ -351,7 +348,6 @@ where
             {
                 *sandbox_state.accepted_propose_hash.borrow_mut() = propose.hash();
             }
-
 
             for val_idx in 1..sandbox.majority_count(n_validators) {
                 let val_idx = ValidatorId(val_idx as u16);
