@@ -211,6 +211,8 @@ pub trait CommandExtension {
 }
 
 /// Factory for service creation.
+///
+/// Services should provide implementation of this trait.
 pub trait ServiceFactory: 'static {
     //TODO: we could move
     // `service_name` and `service_id` from `Service` trait into this one
