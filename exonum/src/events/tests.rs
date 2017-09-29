@@ -123,7 +123,9 @@ impl TestEvents {
                 return None;
             }
             while let Some(e) = self.0.inner.handler.event() {
-                if let InternalEvent::Node(Event::Connected(_)) = e { return Some(()) }
+                if let InternalEvent::Node(Event::Connected(_)) = e {
+                    return Some(());
+                }
             }
         }
     }
@@ -185,7 +187,9 @@ impl TestEvents {
                 return None;
             }
             while let Some(e) = self.0.inner.handler.event() {
-                if let InternalEvent::Node(Event::Disconnected(_)) = e { return Some(()) }
+                if let InternalEvent::Node(Event::Disconnected(_)) = e {
+                    return Some(());
+                }
             }
         }
     }
