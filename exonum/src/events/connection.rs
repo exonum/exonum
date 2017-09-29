@@ -14,14 +14,14 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use mio::tcp::TcpStream;
-use mio::{TryWrite, TryRead, EventSet};
+use mio::{EventSet, TryRead, TryWrite};
 
 use std::io;
 use std::mem::swap;
 use std::net::SocketAddr;
 use std::collections::VecDeque;
 
-use messages::{RawMessage, MessageBuffer, HEADER_LENGTH};
+use messages::{MessageBuffer, RawMessage, HEADER_LENGTH};
 
 const MAX_MESSAGE_LEN: usize = 1024 * 1024; // 1 MB
 
@@ -61,6 +61,11 @@ impl MessageReader {
                     size,
                     MAX_MESSAGE_LEN
                 ),
+            ))
+        } else if size < HEADER_LENGTH {
+            Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("Received malicious message with len {}", size,),
             ))
         } else {
             self.raw.resize(size, 0);
