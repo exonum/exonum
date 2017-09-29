@@ -389,7 +389,7 @@ where
                 if self.state.is_validator() {
                     self.blockchain
                         .save_messages(self.state.prepare_consensus_messages())
-                        .unwrap();
+                        .expect("Unable to save consensus messages to cache");
                 }
 
                 self.state.lock(round, propose_hash);
@@ -679,7 +679,9 @@ where
             self.broadcast(propose.raw());
 
             // Put our propose to the consensus messages cache
-            self.blockchain.save_message(propose.raw()).unwrap();
+            self.blockchain.save_message(propose.raw()).expect(
+                "Unable to save Propose to the cache of consensus messages",
+            );
 
             // Save our propose into state
             let hash = self.state.add_self_propose(propose);
@@ -894,7 +896,9 @@ where
         self.broadcast(precommit.raw());
 
         self.check_propose_saved(propose_hash);
-        self.blockchain.save_message(precommit.raw()).unwrap();
+        self.blockchain.save_message(precommit.raw()).expect(
+            "Unable to save Precommit to the cache of consensus messages",
+        );
     }
 
     /// Checks that pre-commits count is correct and calls `verify_precommit` for each of them.
@@ -976,7 +980,9 @@ where
     /// Saves Prevote message and corresponding Propose to the consensus cache if not saved yet
     fn save_prevote(&mut self, propose_hash: &Hash, prevote: &Prevote) {
         self.check_propose_saved(propose_hash);
-        self.blockchain.save_message(prevote.raw()).unwrap();
+        self.blockchain.save_message(prevote.raw()).expect(
+            "Unable to save Prevote to the cache of consensus messages",
+        );
     }
 
     /// Check whether Propose is saved to the consensus cache and saves if not
@@ -985,7 +991,7 @@ where
             if !propose_state.is_saved() {
                 self.blockchain
                     .save_message(propose_state.message().raw())
-                    .unwrap();
+                    .expect("Unable to save Propose to the cache of consensus messages");
                 propose_state.set_saved(true);
             }
         }
