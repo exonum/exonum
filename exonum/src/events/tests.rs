@@ -123,11 +123,6 @@ pub struct TestEvents {
     pub events_config: EventsPoolCapacity,
 }
 
-struct TestHandlerPart {
-    handler: TestHandler,
-    core: Core,
-}
-
 impl TestEvents {
     pub fn with_addr(listen_address: SocketAddr) -> TestEvents {
         TestEvents {
@@ -142,24 +137,20 @@ impl TestEvents {
         F: Fn(&mut TestHandler) + 'static + Send,
     {
         thread::spawn(move || {
-            let (handler_part, network_part) = self.into_reactor();
-            let network_thread = thread::spawn(move || network_part.run().unwrap());
+            let mut core = Core::new().unwrap();
+            let (mut handler_part, network_part) = self.into_reactor();
+            network_part.run(core.handle());
 
-            let mut handler = handler_part.handler;
-
-            let mut core = handler_part.core;
             let test_fut = futures::lazy(move || -> Result<(), ()> {
-                test_fn(&mut handler);
+                test_fn(&mut handler_part);
                 Ok(())
             });
             core.run(test_fut).unwrap();
-            network_thread.join().unwrap();
         })
     }
 
-    fn into_reactor(self) -> (TestHandlerPart, NetworkPart) {
+    fn into_reactor(self) -> (TestHandler, NetworkPart) {
         let channel = NodeChannel::new(self.events_config);
-        let core = Core::new().unwrap();
         let network_config = self.network_config;
         let (network_tx, network_rx) = channel.network_events;
         let network_requests_tx = channel.network_requests.0.clone();
@@ -171,10 +162,8 @@ impl TestEvents {
             network_tx: network_tx.clone(),
         };
 
-        let handler_part = TestHandlerPart {
-            core,
-            handler: TestHandler::new(self.listen_address, network_requests_tx, network_rx),
-        };
+        let handler_part =
+            TestHandler::new(self.listen_address, network_requests_tx, network_rx);
         (handler_part, network_part)
     }
 }

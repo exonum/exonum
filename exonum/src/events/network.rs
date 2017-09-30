@@ -16,12 +16,11 @@ use futures::{unsync, Future, IntoFuture, Sink, Stream};
 use futures::future::Either;
 use futures::sync::mpsc;
 use tokio_core::net::{TcpListener, TcpStream, TcpStreamNew};
-use tokio_core::reactor::{Core, Handle};
+use tokio_core::reactor::Handle;
 use tokio_io::AsyncRead;
 use tokio_retry::{Action, Retry};
 use tokio_retry::strategy::{jitter, FixedInterval};
 
-use std::io;
 use std::net::SocketAddr;
 use std::time::Duration;
 use std::collections::HashMap;
@@ -76,7 +75,6 @@ impl Default for NetworkConfiguration {
 
 #[derive(Debug)]
 pub struct HandlerPart<H: EventHandler> {
-    pub core: Core,
     pub handler: H,
     pub timeout_rx: mpsc::Receiver<NodeTimeout>,
     pub network_rx: mpsc::Receiver<NetworkEvent>,
@@ -118,35 +116,34 @@ impl ConnectionsPool {
     }
 }
 
-impl<H: EventHandler> HandlerPart<H> {
-    pub fn run(self) -> Result<(), ()> {
-        let mut core = self.core;
+impl<H: EventHandler + 'static> HandlerPart<H> {
+    pub fn run(self) -> Box<Future<Item=(), Error=()>> {
         let mut handler = self.handler;
 
-        let events_handle = EventsAggregator::new(self.timeout_rx, self.network_rx, self.api_rx)
+        let fut = EventsAggregator::new(self.timeout_rx, self.network_rx, self.api_rx)
             .for_each(move |event| {
                 handler.handle_event(event);
                 Ok(())
             });
-        core.run(events_handle)
+
+        Box::new(fut)
     }
 }
 
 impl NetworkPart {
-    pub fn run(self) -> Result<(), io::Error> {
+    pub fn run(self, handle_orig: Handle) {
         let network_config = self.network_config;
         // Cancelation token
         let (cancel_sender, cancel_handler) = unsync::oneshot::channel();
         let mut cancel_sender = Some(cancel_sender);
         // Outgoing connections
         let outgoing_connections = ConnectionsPool::new();
-        // Requests handler
-        let mut core = Core::new()?;
-        let handle = core.handle();
         let network_tx = self.network_tx.clone();
         // Outgoing connections limiter
         let outgoing_connections_limit = network_config.max_outgoing_connections;
+        let handle = handle_orig.clone();
         let requests_handle = self.network_requests.1.for_each(move |request| {
+            let handle = handle.clone();
             let network_tx = network_tx.clone();
             let outgoing_connections = outgoing_connections.clone();
             match request {
@@ -256,12 +253,14 @@ impl NetworkPart {
         let incoming_connections_limit = network_config.max_incoming_connections;
         let incoming_connections_counter: Rc<()> = Rc::default();
         // Incoming connections handler
-        let listener = TcpListener::bind(&self.listen_address, &core.handle())?;
+        // TODO Don't use unwrap here!
+        let listener = TcpListener::bind(&self.listen_address, &handle_orig).unwrap();
         let network_tx = self.network_tx.clone();
-        let handle = core.handle();
+        let handle = handle_orig.clone();
         let server = listener
             .incoming()
             .for_each(move |(sock, addr)| {
+                let handle = handle.clone();
                 // Increment reference counter
                 let holder = Rc::downgrade(&incoming_connections_counter);
                 // Check incoming connections count
@@ -315,13 +314,11 @@ impl NetworkPart {
             })
             .map_err(log_error);
 
-        core.handle().spawn(server);
-        core.handle().spawn(requests_handle);
-        core.run(
-            cancel_handler
-                .map(|_| trace!("Network thread shutdown"))
-                .map_err(|_| other_error("An error during `Core` shutdown occured")),
-        )
+        let handle = handle_orig.clone();
+        handle.spawn(server);
+        handle.spawn(requests_handle);
+        let cancel_handler = cancel_handler.map_err(|_| ());
+        handle.spawn(cancel_handler);
     }
 
     fn send_event(handle: &Handle, network_tx: &mpsc::Sender<NetworkEvent>, event: NetworkEvent) {
