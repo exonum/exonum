@@ -136,7 +136,8 @@ impl NetworkPart {
     pub fn run(self) -> Result<(), io::Error> {
         let network_config = self.network_config;
         // Cancelation token
-        let (cancel_sender, cancel_handler) = unsync::mpsc::channel(1);
+        let (cancel_sender, cancel_handler) = unsync::oneshot::channel();
+        let mut cancel_sender = Some(cancel_sender);
         // Outgoing connections
         let outgoing_connections = ConnectionsPool::new();
         // Requests handler
@@ -147,7 +148,6 @@ impl NetworkPart {
         let outgoing_connections_limit = network_config.max_outgoing_connections;
         let requests_handle = self.network_requests.1.for_each(move |request| {
             let network_tx = network_tx.clone();
-            let cancel_sender = cancel_sender.clone();
             let outgoing_connections = outgoing_connections.clone();
             match request {
                 NetworkRequest::SendMessage(peer, msg) => {
@@ -238,11 +238,14 @@ impl NetworkPart {
                 // Immediately stop the event loop.
                 NetworkRequest::Shutdown => {
                     cancel_sender
-                        .clone()
-                        .send(())
-                        .map(drop)
-                        .map_err(log_error)
-                        .wait()?
+                        .take()
+                        .ok_or_else(|| other_error("Shutdown twice"))
+                        .and_then(|sender| {
+                            sender.send(()).map_err(
+                                |_| other_error("Can't send shutdown signal"),
+                            )
+                        })
+                        .map_err(log_error)?
                 }
             }
 
@@ -316,7 +319,6 @@ impl NetworkPart {
         core.handle().spawn(requests_handle);
         core.run(
             cancel_handler
-                .into_future()
                 .map(|_| trace!("Network thread shutdown"))
                 .map_err(|_| other_error("An error during `Core` shutdown occured")),
         )
