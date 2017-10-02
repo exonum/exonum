@@ -21,9 +21,17 @@ use std::ffi::OsStr;
 
 use super::fabric::ServiceFactory;
 
-const CREATE_SERVICE_FN: &[u8; 22] = b"create_service_factory";
-
 /// Provides interface for manipulating with dynamic services.
+///
+/// # Examples
+///
+/// ```no_run
+/// use exonum::helpers::service_loader::DynamicServiceLoader;
+///
+/// let loader = DynamicServiceLoader::new("path_to_service_lib").unwrap();
+/// let factory = loader.service_factory().unwrap();
+/// # drop(factory);
+/// ```
 #[derive(Debug)]
 pub struct DynamicServiceLoader {
     lib: Library,
@@ -33,15 +41,18 @@ impl DynamicServiceLoader {
     /// Creates a new `DynamicServiceLoader` instance associated with specified dynamic library.
     pub fn new<P: AsRef<OsStr>>(lib_path: P) -> Result<Self, Box<Error>> {
         let lib = Library::new(lib_path)?;
-        Self { lib }
+        Ok(Self { lib })
     }
 
     /// Returns a new `ServiceFactory` instance from the loaded library.
     ///
     /// Given library must export `create_service_factory` function.
     pub fn service_factory(&self) -> Result<Box<ServiceFactory>, Box<Error>> {
+        let create_service_fn = b"create_service_factory";
+
         let create_factory: Symbol<fn() -> Box<ServiceFactory>> =
-            unsafe { lib.get(CREATE_SERVICE_FN)? };
+            unsafe { self.lib.get(create_service_fn)? };
+
         Ok(create_factory())
     }
 }
