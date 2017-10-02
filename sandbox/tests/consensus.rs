@@ -527,6 +527,40 @@ fn should_not_send_prevote_after_node_restart() {
     // Here sandbox goes out of scope and sandbox.drop() will cause panic if there any sent messages
 }
 
+/// Scenario:
+/// - Node sends Propose and Prevote
+/// - Node restarts
+/// - Node should recover to previous state --> not send Propose & Prevote again
+#[test]
+fn should_not_send_propose_and_prevote_after_node_restart() {
+    let sandbox = timestamping_sandbox();
+
+    // round happens
+    sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
+    sandbox.add_time(Duration::from_millis(
+        sandbox.round_timeout() + sandbox.propose_timeout(),
+    ));
+
+    sandbox.assert_state(HEIGHT_ONE, ROUND_THREE);
+
+    // ok, we are leader
+    let propose = ProposeBuilder::new(&sandbox)
+        .with_duration_since_sandbox_time(sandbox.propose_timeout())
+        .build();
+
+    sandbox.broadcast(propose.clone());
+    sandbox.broadcast(make_prevote_from_propose(&sandbox, &propose.clone()));
+
+    let sandbox_restarted = sandbox.restart();
+
+    assert!(!get_consensus_messages(&sandbox_restarted.blockchain_ref()).is_empty());
+    sandbox_restarted.assert_lock(LOCK_ZERO, None);
+
+    // Now we should be sure that node recovered its state but didn't send any messages.
+    // Here sandbox_restarted goes out of scope and sandbox_restarted.drop() will cause panic
+    // if there any sent messages
+}
+
 /// Checks that consensus cache gets cleaned up immediately after new height has been reached
 #[test]
 fn test_consensus_cache_should_be_clean_on_new_height() {
