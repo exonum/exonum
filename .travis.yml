@@ -65,6 +65,7 @@ install:
   if [ ! -f "$HOME/.local/lib/librocksdb.so" ]; then
     git clone https://github.com/facebook/rocksdb
     cd rocksdb
+    git checkout 382277d0fe79ece86b799e3925919cf44c3afb4c
     INSTALL_PATH=$HOME/.local make install-shared
     cd ..
   fi
