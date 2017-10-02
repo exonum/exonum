@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 - Implement `FromStr` and `ToString` traits for public sodium types (#318)
+- Add `DynamicServiceLoader` helper for working with dynamic services (#288).
 
 ## 0.2 - 2017-09-13
 
@@ -31,14 +32,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Fixed
 - Fix network discover failure due to incorrect processing of the incoming buffer (#299)
 - Fix snapshot behavior for `MemoryDB` (#292)
-- Dissalow generate-testnet with 0 nodes (#258)
+- Disallow generate-testnet with 0 nodes (#258)
 
 ## 0.1.1 - 2017-09-13
 
 ### Fixed
 - Fix segfault when `LevelDBSnapshot` is destroyed after `LevelDB` (#285)
 - Fix panic during `BlockResponse` message processing if the transaction pool is full (#264)
-- Fix panic during deseralizaion of malformed messages (#278 #297)
+- Fix panic during deserialization of malformed messages (#278 #297)
 
 ## 0.1 - 2017-07-17
 

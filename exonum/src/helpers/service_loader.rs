@@ -25,14 +25,21 @@ const CREATE_SERVICE_FN: &[u8; 22] = b"create_service_factory";
 
 /// Provides interface for manipulating with dynamic services.
 #[derive(Debug)]
-pub struct DynamicServiceLoader {}
+pub struct DynamicServiceLoader {
+    lib: Library,
+}
 
 impl DynamicServiceLoader {
-    /// Loads dynamic library by path and returns `ServiceFactory`.
+    /// Creates a new `DynamicServiceLoader` instance associated with specified dynamic library.
+    pub fn new<P: AsRef<OsStr>>(lib_path: P) -> Result<Self, Box<Error>> {
+        let lib = Library::new(lib_path)?;
+        Self { lib }
+    }
+
+    /// Returns a new `ServiceFactory` instance from the loaded library.
     ///
     /// Given library must export `create_service_factory` function.
-    pub fn load<P: AsRef<OsStr>>(lib_path: P) -> Result<Box<ServiceFactory>, Box<Error>> {
-        let lib = Library::new(lib_path)?;
+    pub fn service_factory(&self) -> Result<Box<ServiceFactory>, Box<Error>> {
         let create_factory: Symbol<fn() -> Box<ServiceFactory>> =
             unsafe { lib.get(CREATE_SERVICE_FN)? };
         Ok(create_factory())
