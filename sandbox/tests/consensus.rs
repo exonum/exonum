@@ -553,7 +553,8 @@ fn should_not_send_propose_and_prevote_after_node_restart() {
 
     let sandbox_restarted = sandbox.restart();
 
-    assert!(!get_consensus_messages(&sandbox_restarted.blockchain_ref()).is_empty());
+    assert!(!get_consensus_messages(&sandbox_restarted.blockchain_ref())
+        .is_empty());
     sandbox_restarted.assert_lock(LOCK_ZERO, None);
 
     // Now we should be sure that node recovered its state but didn't send any messages.
