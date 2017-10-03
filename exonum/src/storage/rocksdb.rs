@@ -20,7 +20,7 @@ use rocksdb::optimistic_txn_db::Snapshot as _Snapshot;
 use rocksdb::Transaction as _Transaction;
 use rocksdb::Error as _Error;
 use rocksdb::IteratorMode;
-//use rocksdb::utils::get_cf_names;
+use rocksdb::utils::get_cf_names;
 
 use std::sync::{Arc, RwLock};
 use std::path::Path;
@@ -69,15 +69,14 @@ struct RocksDBIterator {
 impl RocksDB {
     /// Open a database stored in the specified path with the specified options.
     pub fn open(path: &Path, options: RocksDBOptions) -> Result<RocksDB> {
-        // TODO Crashes doc tests. Will be fixing later
-        //        let db = match get_cf_names(path) {
-        //            Ok(names) => {
-        //                let cf_names = names.iter().map(|name| name.as_str()).collect::<Vec<_>>();
-        //                _RocksDB::open_cf(&options, path, cf_names.as_ref())?
-        //            }
-        //            Err(_) => _RocksDB::open(&options, path)?,
-        //        };
-        let db = _RocksDB::open(&options, path)?;
+        let db = {
+            if let Ok(names) = get_cf_names(path) {
+                let cf_names = names.iter().map(|name| name.as_str()).collect::<Vec<_>>();
+                _RocksDB::open_cf(&options, path, cf_names.as_ref())?
+            } else {
+                _RocksDB::open(&options, path)?
+            }
+        };
         Ok(RocksDB { db: Arc::new(RwLock::new(db)) })
     }
 
@@ -376,31 +375,31 @@ fn test_rocksdb_clean() {
     assert!(!fork.contains("a", b"b"));
 }
 
-//#[test]
-//fn test_rocksdb_check_saved_data() {
-//    use tempdir::TempDir;
-//
-//    let dir = TempDir::new("xxxxxxxx").unwrap();
-//    {
-//        let mut opts = RocksDBOptions::default();
-//        opts.create_if_missing(true);
-//        let db = RocksDB::open(dir.path(), opts).unwrap();
-//        let fork = db.fork();
-//
-//        assert!(!fork.contains("a", b"a"));
-//        fork.put("a", b"a", b"a");
-//        fork.put("a", b"b", b"b");
-//        assert!(fork.contains("a", b"a"));
-//        fork.commit();
-//    }
-//    {
-//        let opts = RocksDBOptions::default();
-//        let db = match RocksDB::open(dir.path(), opts) {
-//            Ok(db) => db,
-//            Err(e) => panic!("Error while opening db: {}", e),
-//        };
-//        let fork = db.fork();
-//        assert!(fork.contains("a", b"a"));
-//        assert!(fork.contains("a", b"b"));
-//    }
-//}
+#[test]
+fn test_rocksdb_check_saved_data() {
+    use tempdir::TempDir;
+
+    let dir = TempDir::new("xxxxxxxx").unwrap();
+    {
+        let mut opts = RocksDBOptions::default();
+        opts.create_if_missing(true);
+        let db = RocksDB::open(dir.path(), opts).unwrap();
+        let fork = db.fork();
+
+        assert!(!fork.contains("a", b"a"));
+        fork.put("a", b"a", b"a");
+        fork.put("a", b"b", b"b");
+        assert!(fork.contains("a", b"a"));
+        fork.commit();
+    }
+    {
+        let opts = RocksDBOptions::default();
+        let db = match RocksDB::open(dir.path(), opts) {
+            Ok(db) => db,
+            Err(e) => panic!("Error while opening db: {}", e),
+        };
+        let fork = db.fork();
+        assert!(fork.contains("a", b"a"));
+        assert!(fork.contains("a", b"b"));
+    }
+}

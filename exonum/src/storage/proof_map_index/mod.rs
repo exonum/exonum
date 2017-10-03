@@ -126,7 +126,7 @@ where
     /// let index: ProofMapIndex<Hash, u8> = ProofMapIndex::new(name, snapshot);
     ///
     /// let fork = db.fork();
-    /// let mut mut_index: ProofMapIndex<Hash, u8> = ProofMapIndex::new(name, fork);
+    /// let mut_index: ProofMapIndex<Hash, u8> = ProofMapIndex::new(name, fork);
     /// # drop(index);
     /// # drop(mut_index);
     /// ```

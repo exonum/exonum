@@ -32,12 +32,12 @@ pub struct MemoryDB {
 impl MemoryDB {
     /// Creates a new, empty database.
     pub fn new() -> Self {
-        let tmp_dir = TempDir::new("tmpdir").unwrap();
+        let tmp_dir = TempDir::new("tmpdir").expect("couldn't create tmp dir");
         let mut opts = RocksDBOptions::default();
         opts.create_if_missing(true);
         opts.set_use_fsync(false);
         MemoryDB {
-            db: RocksDB::open(tmp_dir.path(), opts).unwrap(),
+            db: RocksDB::open(tmp_dir.path(), opts).expect("couldn't open db"),
             tmp_dir: Arc::new(tmp_dir),
         }
     }
