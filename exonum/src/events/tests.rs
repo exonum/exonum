@@ -37,7 +37,7 @@ pub struct BenchConfig {
     pub tcp_nodelay: bool,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct TestHandler {
     events: VecDeque<TestEvent>,
     messages: VecDeque<RawMessage>,
