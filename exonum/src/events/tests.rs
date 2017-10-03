@@ -48,8 +48,8 @@ pub trait TestPoller {
     fn message(&mut self) -> Option<RawMessage>;
 }
 
-impl TestHandler {
-    pub fn new() -> TestHandler {
+impl Default for TestHandler {
+    fn default() -> Self {
         TestHandler {
             events: VecDeque::new(),
             messages: VecDeque::new(),
@@ -102,7 +102,7 @@ impl TestEvents {
             },
             SharedNodeState::new(0),
         );
-        let handler = TestHandler::new();
+        let handler = TestHandler::default();
 
         TestEvents(Events::new(network, handler).unwrap())
     }
@@ -209,7 +209,7 @@ impl TestEvents {
             NetworkConfiguration::default(),
             SharedNodeState::new(1000),
         );
-        let handler = TestHandler::new();
+        let handler = TestHandler::default();
 
         TestEvents(Events::new(network, handler).unwrap())
     }

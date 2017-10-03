@@ -1,6 +1,6 @@
 [package]
 name = "exonum"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 homepage = "https://exonum.com/"
 repository = "https://github.com/exonum/exonum"
@@ -35,13 +35,14 @@ cookie = "0.9.1"
 router = "0.5.1"
 iron = "0.5.1"
 headers = "0.1.0"
+bodyparser = "0.7.0"
 params = "0.6.0"
 mount = "0.3.0"
 atty = "0.2.2"
 tempdir = "0.3.5"
-exonum_sodiumoxide = "0.0.14"
-exonum_profiler = { version = "^0.1.0", path="../3rdparty/profiler/" }
-exonum_flamer = { version = "^0.1.3", path="../3rdparty/flamer/", optional = true }
+exonum_sodiumoxide = { version = "0.0.14" }
+exonum_profiler = { version = "0.1.1" }
+exonum_flamer = { version = "0.1.5", optional = true }
 
 [dependencies.exonum_rocksdb]
 git = "https://github.com/aleksuss/exonum_rocksdb.git"

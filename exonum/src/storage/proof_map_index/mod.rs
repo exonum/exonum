@@ -23,7 +23,7 @@ use super::{BaseIndex, BaseIndexIter, View, StorageValue};
 use self::key::{DBKey, ChildKind, LEAF_KEY_PREFIX};
 use self::node::{Node, BranchNode};
 
-pub use self::key::{ProofMapKey, KEY_SIZE as PROOF_MAP_KEY_SIZE};
+pub use self::key::{ProofMapKey, KEY_SIZE as PROOF_MAP_KEY_SIZE, DBKey as ProofMapDBKey};
 pub use self::proof::{MapProof, ProofNode, BranchProofNode};
 
 #[cfg(test)]

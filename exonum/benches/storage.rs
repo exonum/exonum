@@ -13,8 +13,10 @@
 // limitations under the License.
 
 #![feature(test)]
+#![allow(dead_code)]
 extern crate test;
 extern crate rand;
+#[cfg(feature = "rocksdb")]
 extern crate tempdir;
 extern crate exonum;
 
@@ -23,6 +25,7 @@ mod tests {
     use std::collections::HashSet;
     use test::Bencher;
     use rand::{Rng, thread_rng, XorShiftRng, SeedableRng};
+    #[cfg(feature = "rocksdb")]
     use tempdir::TempDir;
     use exonum::storage::Database; //, MemoryDB};
     use exonum::storage::{RocksDB, RocksDBOptions};
