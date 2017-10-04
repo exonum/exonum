@@ -332,7 +332,8 @@ impl Sandbox {
         let any_expected_msg = Any::from_raw(Arc::clone(msg.raw())).unwrap();
         let sended = self.inner.lock().unwrap().sent.pop_front();
         if let Some((real_addr, real_msg)) = sended {
-            let any_real_msg = Any::from_raw(Arc::clone(&real_msg)).expect("Send incorrect message");
+            let any_real_msg =
+                Any::from_raw(Arc::clone(&real_msg)).expect("Send incorrect message");
             if real_addr != addr || any_real_msg != any_expected_msg {
                 panic!(
                     "Expected to send the message {:?} to {} instead sending {:?} to {}",
@@ -369,7 +370,8 @@ impl Sandbox {
         for _ in 0..expected_set.len() {
             let sended = self.inner.lock().unwrap().sent.pop_front();
             if let Some((real_addr, real_msg)) = sended {
-                let any_real_msg = Any::from_raw(Arc::clone(&real_msg)).expect("Send incorrect message");
+                let any_real_msg =
+                    Any::from_raw(Arc::clone(&real_msg)).expect("Send incorrect message");
                 if any_real_msg != any_expected_msg {
                     panic!(
                         "Expected to broadcast the message {:?} instead sending {:?} to {}",
