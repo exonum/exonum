@@ -255,6 +255,7 @@ implement_std_field!{u32 LittleEndian::read_u32; LittleEndian::write_u32}
 implement_std_field!{i32 LittleEndian::read_i32; LittleEndian::write_i32}
 implement_std_field!{u64 LittleEndian::read_u64; LittleEndian::write_u64}
 implement_std_field!{i64 LittleEndian::read_i64; LittleEndian::write_i64}
+implement_std_field!{f64 LittleEndian::read_f64; LittleEndian::write_f64}
 
 implement_std_typedef_field!{Height(u64) LittleEndian::read_u64; LittleEndian::write_u64}
 implement_std_typedef_field!{Round(u32) LittleEndian::read_u32; LittleEndian::write_u32}
