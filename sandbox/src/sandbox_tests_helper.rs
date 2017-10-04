@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// purpose of this module is to keep functions with reusable code used for sandbox tests
+/// Purpose of this module is to keep functions with reusable code used for sandbox tests
 
-use bit_vec::BitVec;
-
+use std::sync::Arc;
 use std::time::Duration;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
+
+use bit_vec::BitVec;
 
 use exonum::messages::{RawTransaction, Message, Propose, Prevote, Precommit, ProposeRequest,
                        PrevotesRequest};
@@ -302,7 +303,7 @@ pub fn gen_timestamping_tx() -> TimestampTx {
 pub fn add_one_height(sandbox: &TimestampingSandbox, sandbox_state: &SandboxState) {
     // gen some tx
     let tx = gen_timestamping_tx();
-    add_one_height_with_transactions(sandbox, sandbox_state, &[tx.raw().clone()]);
+    add_one_height_with_transactions(sandbox, sandbox_state, &[Arc::clone(tx.raw())]);
 }
 
 pub fn add_one_height_with_transactions<'a, I>(
@@ -316,7 +317,7 @@ where
     // sort transaction in order accordingly their hashes
     let txs = sandbox.filter_present_transactions(txs);
     let mut tx_pool = BTreeMap::new();
-    tx_pool.extend(txs.into_iter().map(|tx| (tx.hash(), tx.clone())));
+    tx_pool.extend(txs.into_iter().map(|tx| (tx.hash(), Arc::clone(&tx))));
     let raw_txs = tx_pool.values().cloned().collect::<Vec<_>>();
     let txs: &[RawTransaction] = raw_txs.as_ref();
 
@@ -327,7 +328,7 @@ where
 
     let hashes = txs.iter()
         .map(|tx| {
-            sandbox.recv(tx.clone());
+            sandbox.recv(Arc::clone(tx));
             tx.hash()
         })
         .collect::<Vec<_>>();
@@ -425,7 +426,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
 ) -> Vec<Hash> {
     // sort transaction in order accordingly their hashes
     let mut tx_pool = BTreeMap::new();
-    tx_pool.extend(txs.into_iter().map(|tx| (tx.hash(), tx.clone())));
+    tx_pool.extend(txs.into_iter().map(|tx| (tx.hash(), Arc::clone(tx))));
     let raw_txs = tx_pool.values().cloned().collect::<Vec<_>>();
     let txs: &[RawTransaction] = raw_txs.as_ref();
 
@@ -438,7 +439,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
     let hashes = {
         let mut hashes = Vec::new();
         for tx in txs.iter() {
-            sandbox.recv(tx.clone());
+            sandbox.recv(Arc::clone(tx));
             hashes.push(tx.hash());
         }
         hashes

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::sync::Arc;
+
 use messages::{RequestMessage, Message, ProposeRequest, TransactionsRequest, PrevotesRequest,
                BlockRequest, BlockResponse};
 use blockchain::Schema;
@@ -63,7 +65,7 @@ where
 
         let propose = if msg.height() == self.state.height() {
             self.state.propose(msg.propose_hash()).map(|p| {
-                p.message().raw().clone()
+                Arc::clone(p.message().raw())
             })
         } else {
             return;
@@ -107,7 +109,7 @@ where
             .prevotes(msg.round(), *msg.propose_hash())
             .iter()
             .filter(|p| !has_prevotes[p.validator().into()])
-            .map(|p| p.raw().clone())
+            .map(|p| Arc::clone(p.raw()))
             .collect::<Vec<_>>();
 
         for prevote in &prevotes {

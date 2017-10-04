@@ -232,7 +232,7 @@ impl Blockchain {
             }
 
             let mut schema = Schema::new(Arc::clone(&fork));
-            schema.transactions_mut().put(hash, tx.raw().clone());
+            schema.transactions_mut().put(hash, Arc::clone(tx.raw()));
             schema.block_txs_mut(height).push(*hash);
             let location = TxLocation::new(height, index as u64);
             schema.tx_location_by_tx_hash_mut().put(hash, location);
@@ -364,7 +364,7 @@ impl Clone for Blockchain {
     fn clone(&self) -> Blockchain {
         Blockchain {
             db: self.db.clone(),
-            service_map: self.service_map.clone(),
+            service_map: Arc::clone(&self.service_map),
         }
     }
 }

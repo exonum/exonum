@@ -136,7 +136,7 @@ impl<'a> ServiceContext<'a> {
 
     /// Returns the current database snapshot.
     pub fn snapshot(&self) -> Arc<View> {
-        self.snapshot.clone()
+        Arc::clone(&self.snapshot)
     }
 
     /// Returns the current blockchain height. This height is 'height of last committed block` + 1.

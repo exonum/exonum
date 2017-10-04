@@ -83,8 +83,8 @@ mod tests {
         for i in 0..100 {
             let (txs, pool) = prepare_txs(i, 1000);
             let _fork = execute_block(&blockchain, i, &txs, &pool);
-            //            fork.commit();
-            //            blockchain.merge(patch).unwrap();
+            //  fork.commit();
+            //  blockchain.merge(patch).unwrap();
         }
 
         let (txs, pool) = prepare_txs(100, 1000);
@@ -119,11 +119,7 @@ mod tests {
             }
         }
 
-        let mut keys = Vec::new();
-
-        for _ in 0..10_000 {
-            keys.push(gen_keypair());
-        }
+        let keys = (0..10_000).map(|_| gen_keypair()).collect::<Vec<_>>();
 
         fn prepare_txs(
             height: u64,
@@ -132,6 +128,7 @@ mod tests {
         ) -> (Vec<Hash>, BTreeMap<Hash, Box<Transaction>>) {
             let mut txs = Vec::new();
             let mut pool = BTreeMap::new();
+            #[cfg_attr(feature = "cargo-clippy", allow(needless_range_loop))]
             for i in (height * count)..((height + 1) * count) {
                 let tx = Tx::new(
                     &keys[i as usize % 10_000].0,
@@ -159,8 +156,8 @@ mod tests {
         for i in 0..100 {
             let (txs, pool) = prepare_txs(i, 1000, &keys);
             let _fork = execute_block(&blockchain, i, &txs, &pool);
-            //            fork.commit();
-            //            blockchain.merge(patch).unwrap();
+            //  fork.commit();
+            //  blockchain.merge(patch).unwrap();
         }
 
         let (txs, pool) = prepare_txs(100, 1000, &keys);

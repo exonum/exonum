@@ -95,7 +95,7 @@ impl Database for RocksDB {
         let _p = ProfilerSpan::new("RocksDB::snapshot");
         Arc::new(RocksDBSnapshot {
             snapshot: self.db.read().unwrap().snapshot(),
-            _db: self.db.clone(),
+            _db: Arc::clone(&self.db),
         })
     }
 
@@ -108,7 +108,7 @@ impl Database for RocksDB {
                 &w_opts,
                 &txn_opts,
             ),
-            _db: self.db.clone(),
+            _db: Arc::clone(&self.db),
         })
     }
 }

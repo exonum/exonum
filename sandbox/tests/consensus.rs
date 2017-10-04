@@ -227,7 +227,7 @@ fn test_store_txs_positions() {
     let num_txs = rng.gen_range(3, 100);
     let committed_block1 = generator
         .take(num_txs)
-        .map(|tx| (tx.hash(), tx.raw().clone()))
+        .map(|tx| (tx.hash(), Arc::clone(tx.raw())))
         .collect::<BTreeMap<Hash, RawMessage>>();
 
     let hashes =
@@ -311,7 +311,7 @@ fn test_queue_propose_message_from_next_height() {
 
     sandbox.recv(future_propose.clone());
 
-    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.raw().clone()]);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[Arc::clone(tx.raw())]);
 
     info!("last_block={:#?}, hash={:?}",
           sandbox.last_block(),
@@ -2177,7 +2177,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     sandbox.recv(precommit_1.clone()); //early precommit from future height
 
     sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
-    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.raw().clone()]);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[Arc::clone(tx.raw())]);
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
     assert_eq!(first_block.hash(), sandbox.last_hash());
 
@@ -2443,7 +2443,7 @@ fn handle_tx_ignore_existing_tx_in_blockchain() {
     // option: with transaction
     let tx = gen_timestamping_tx();
 
-    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.raw().clone()]);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[Arc::clone(tx.raw())]);
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
 
     // add rounds & become leader
@@ -2731,7 +2731,7 @@ fn test_exclude_validator_from_consensus() {
         )
     };
 
-    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.raw().clone()]);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[Arc::clone(tx_cfg.raw())]);
     add_one_height(&sandbox, &sandbox_state);
     // node loses validator status
     add_one_height_with_transactions_from_other_validator(&sandbox, &sandbox_state, &[]);
@@ -2778,7 +2778,7 @@ fn test_schema_config_changes() {
         prev_cfg
     );
     // Commit a new configuration
-    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.raw().clone()]);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[Arc::clone(tx_cfg.raw())]);
     let snapshot = sandbox.blockchain_ref().snapshot();
     // Check that following configuration is visible
     assert_eq!(

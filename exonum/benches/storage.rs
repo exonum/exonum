@@ -16,18 +16,17 @@
 #![allow(dead_code)]
 extern crate test;
 extern crate rand;
-#[cfg(feature = "rocksdb")]
 extern crate tempdir;
 extern crate exonum;
 
 #[cfg(all(test, feature = "long_benchmarks"))]
 mod tests {
+    use std::sync::Arc;
     use std::collections::HashSet;
     use test::Bencher;
     use rand::{Rng, thread_rng, XorShiftRng, SeedableRng};
-    #[cfg(feature = "rocksdb")]
     use tempdir::TempDir;
-    use exonum::storage::Database; //, MemoryDB};
+    use exonum::storage::Database;
     use exonum::storage::{RocksDB, RocksDBOptions};
     use exonum::storage::{ProofMapIndex, ProofListIndex};
     use exonum::storage::proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE;
@@ -93,7 +92,7 @@ mod tests {
             {
                 let fork = db.fork();
                 {
-                    let mut table = ProofMapIndex::new("a", fork.clone());
+                    let mut table = ProofMapIndex::new("a", Arc::clone(&fork));
                     for item in &data {
                         table.put(&item.0, item.1.clone());
                     }

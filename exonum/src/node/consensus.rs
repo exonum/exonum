@@ -693,14 +693,15 @@ where
 
             let message = match data {
                 RequestData::Propose(ref propose_hash) => {
-                    ProposeRequest::new(
-                        self.state.consensus_public_key(),
-                        &peer,
-                        self.state.height(),
-                        propose_hash,
-                        self.state.consensus_secret_key(),
-                    ).raw()
-                        .clone()
+                    Arc::clone(
+                        ProposeRequest::new(
+                            self.state.consensus_public_key(),
+                            &peer,
+                            self.state.height(),
+                            propose_hash,
+                            self.state.consensus_secret_key(),
+                        ).raw(),
+                    )
                 }
                 RequestData::Transactions(ref propose_hash) => {
                     let txs: Vec<_> = self.state
@@ -710,34 +711,37 @@ where
                         .iter()
                         .cloned()
                         .collect();
-                    TransactionsRequest::new(
-                        self.state.consensus_public_key(),
-                        &peer,
-                        &txs,
-                        self.state.consensus_secret_key(),
-                    ).raw()
-                        .clone()
+                    Arc::clone(
+                        TransactionsRequest::new(
+                            self.state.consensus_public_key(),
+                            &peer,
+                            &txs,
+                            self.state.consensus_secret_key(),
+                        ).raw(),
+                    )
                 }
                 RequestData::Prevotes(round, ref propose_hash) => {
-                    PrevotesRequest::new(
-                        self.state.consensus_public_key(),
-                        &peer,
-                        self.state.height(),
-                        round,
-                        propose_hash,
-                        self.state.known_prevotes(round, propose_hash),
-                        self.state.consensus_secret_key(),
-                    ).raw()
-                        .clone()
+                    Arc::clone(
+                        PrevotesRequest::new(
+                            self.state.consensus_public_key(),
+                            &peer,
+                            self.state.height(),
+                            round,
+                            propose_hash,
+                            self.state.known_prevotes(round, propose_hash),
+                            self.state.consensus_secret_key(),
+                        ).raw(),
+                    )
                 }
                 RequestData::Block(height) => {
-                    BlockRequest::new(
-                        self.state.consensus_public_key(),
-                        &peer,
-                        height,
-                        self.state.consensus_secret_key(),
-                    ).raw()
-                        .clone()
+                    Arc::clone(
+                        BlockRequest::new(
+                            self.state.consensus_public_key(),
+                            &peer,
+                            height,
+                            self.state.consensus_secret_key(),
+                        ).raw(),
+                    )
                 }
             };
             trace!("Send request {:?} to peer {:?}", data, peer);
