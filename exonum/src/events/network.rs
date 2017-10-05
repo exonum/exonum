@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use futures::{unsync, Future, IntoFuture, Sink, Stream};
+use futures::{future, unsync, Future, IntoFuture, Sink, Stream};
 use futures::future::Either;
 use futures::sync::mpsc;
 use tokio_core::net::{TcpListener, TcpStream, TcpStreamNew};
@@ -131,7 +131,7 @@ impl<H: EventHandler + 'static> HandlerPart<H> {
 }
 
 impl NetworkPart {
-    pub fn run(self, handle_orig: Handle) {
+    pub fn run(self, handle_orig: Handle) -> Box<Future<Item=(), Error=()>> {
         let network_config = self.network_config;
         // Cancelation token
         let (cancel_sender, cancel_handler) = unsync::oneshot::channel();
@@ -314,16 +314,23 @@ impl NetworkPart {
             })
             .map_err(log_error);
 
-        let handle = handle_orig.clone();
-        handle.spawn(server);
-        handle.spawn(requests_handle);
         let cancel_handler = cancel_handler.map_err(|_| ());
-        handle.spawn(cancel_handler);
+        let tasks = vec![
+            tobox(server),
+            tobox(requests_handle),
+            tobox(cancel_handler)
+        ];
+        tobox(future::join_all(tasks))
     }
 
     fn send_event(handle: &Handle, network_tx: &mpsc::Sender<NetworkEvent>, event: NetworkEvent) {
         handle.spawn(network_tx.clone().send(event).map(drop).map_err(log_error));
     }
+}
+
+fn tobox<F: Future + 'static>(f: F) -> Box<Future<Item=(), Error=F::Error>> {
+    let fut = f.map(|_| ());
+    Box::new(fut)
 }
 
 // Tcp streams source for retry action.
