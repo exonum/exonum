@@ -250,56 +250,53 @@ fn test_network_big_message() {
     assert_eq!(e2.wait_for_disconnect(), addrs[0]);
 }
 
-/*
 #[test]
 fn test_network_reconnect() {
-    let addrs: [SocketAddr; 2] =
-        ["127.0.0.1:19100".parse().unwrap(), "127.0.0.1:19101".parse().unwrap()];
+    let first = "127.0.0.1:19100".parse().unwrap();
+    let second = "127.0.0.1:19101".parse().unwrap();
 
     let msg = raw_message(11, 1000);
-    let c1 = connect_message(addrs[0]);
-    let c2 = connect_message(addrs[1]);
-    let msg_cloned = msg.clone();
-    let t1 = TestEvents::with_addr(addrs[0]).spawn(move |e: &mut TestHandler| {
+    let c1 = connect_message(first);
+    let c2 = connect_message(second);
+
+    let mut t1 = TestEvents::with_addr(first).spawn();
+
+    {
+        // First connect attempt.
+        let mut t2 = TestEvents::with_addr(second).spawn();
+
         // Handle first attempt
-        e.connect_with(addrs[1]);
-        assert_eq!(e.wait_for_connect(), c2);
-        assert_eq!(e.wait_for_message(), msg_cloned);
-        assert_eq!(e.wait_for_disconnect(), addrs[1]);
+        t1.connect_with(second);
+        assert_eq!(t2.wait_for_connect(), c1);
+
+        t2.connect_with(first);
+        assert_eq!(t1.wait_for_connect(), c2);
+
+        t2.send_to(first, msg.clone());
+        assert_eq!(t1.wait_for_message(), msg);
+
+        t2.disconnect_with(first);
+        assert_eq!(t2.wait_for_disconnect(), first);
+
+        t1.disconnect_with(second);
+        assert_eq!(t1.wait_for_disconnect(), second);
+
+        let mut t2 = TestEvents::with_addr(second).spawn();
+
         // Handle second attempt
-        assert_eq!(e.wait_for_connect(), c2);
-        e.connect_with(addrs[1]);
-        assert_eq!(e.wait_for_message(), msg_cloned);
-        e.disconnect_with(addrs[1]);
-        assert_eq!(e.wait_for_disconnect(), addrs[1]);
-    });
-    // First connect attempt.
-    let c1_cloned = c1.clone();
-    let msg_cloned = msg.clone();
-    TestEvents::with_addr(addrs[1])
-        .spawn(move |e: &mut TestHandler| {
-            assert_eq!(e.wait_for_connect(), c1_cloned);
-            e.connect_with(addrs[0]);
-            e.send_to(addrs[0], msg_cloned.clone());
-            e.disconnect_with(addrs[0]);
-            assert_eq!(e.wait_for_disconnect(), addrs[0]);
-        })
-        .join()
-        .unwrap();
-    // Second connect attempt.
-    let c1_cloned = c1.clone();
-    let msg_cloned = msg.clone();
-    TestEvents::with_addr(addrs[1])
-        .spawn(move |e: &mut TestHandler| {
-            e.connect_with(addrs[0]);
-            assert_eq!(e.wait_for_connect(), c1_cloned);
-            e.send_to(addrs[0], msg_cloned.clone());
-            e.disconnect_with(addrs[0]);
-            assert_eq!(e.wait_for_disconnect(), addrs[0]);
-        })
-        .join()
-        .unwrap();
-    // Wait for first server
-    t1.join().unwrap();
+        t2.connect_with(first);
+        assert_eq!(t1.wait_for_connect(), c2);
+
+        t1.connect_with(second);
+        assert_eq!(t2.wait_for_connect(), c1);
+
+        t2.send_to(first, msg.clone());
+        assert_eq!(t1.wait_for_message(), msg);
+
+        t2.disconnect_with(first);
+        assert_eq!(t2.wait_for_disconnect(), first);
+
+        t1.disconnect_with(second);
+        assert_eq!(t1.wait_for_disconnect(), second);
+    }
 }
-*/
