@@ -385,12 +385,14 @@ where
             // Change lock
             if self.state.has_majority_prevotes(round, propose_hash) {
 
-                // Put our consensus messages to the cache. This is for validators only.
-                if self.state.is_validator() {
-                    self.blockchain
-                        .save_messages(self.state.prepare_consensus_messages())
-                        .expect("Unable to save consensus messages to cache");
-                }
+                // Put consensus messages for current Propose and this round to the cache.
+                self.check_propose_saved(&propose_hash);
+                let raw_msgs = self.state
+                    .prevotes(prevote_round, propose_hash)
+                    .iter()
+                    .map(|msg| msg.raw().clone())
+                    .collect::<Vec<_>>();
+                self.blockchain.save_messages(raw_msgs);
 
                 self.state.lock(round, propose_hash);
                 // Send precommit
@@ -675,13 +677,12 @@ where
                 &txs,
                 self.state.consensus_secret_key(),
             );
-            trace!("Broadcast propose: {:?}", propose);
-            self.broadcast(propose.raw());
 
             // Put our propose to the consensus messages cache
-            self.blockchain.save_message(propose.raw()).expect(
-                "Unable to save Propose to the cache of consensus messages",
-            );
+            self.blockchain.save_message(propose.raw());
+
+            trace!("Broadcast propose: {:?}", propose);
+            self.broadcast(propose.raw());
 
             // Save our propose into state
             let hash = self.state.add_self_propose(propose);
@@ -868,11 +869,13 @@ where
             self.state.consensus_secret_key(),
         );
         let has_majority_prevotes = self.state.add_prevote(&prevote);
+
+        // save outgoing Prevote to the consensus messages cache before broadcast
+        self.check_propose_saved(propose_hash);
+        self.blockchain.save_message(prevote.raw());
+
         trace!("Broadcast prevote: {:?}", prevote);
         self.broadcast(prevote.raw());
-
-        // save outgoing prevote to the consensus messages cache
-        self.save_prevote(propose_hash, &prevote);
 
         has_majority_prevotes
     }
@@ -892,13 +895,12 @@ where
             self.state.consensus_secret_key(),
         );
         self.state.add_precommit(&precommit);
+
+        // Put our Precommit to the consensus cache before broadcast
+        self.blockchain.save_message(precommit.raw());
+
         trace!("Broadcast precommit: {:?}", precommit);
         self.broadcast(precommit.raw());
-
-        self.check_propose_saved(propose_hash);
-        self.blockchain.save_message(precommit.raw()).expect(
-            "Unable to save Precommit to the cache of consensus messages",
-        );
     }
 
     /// Checks that pre-commits count is correct and calls `verify_precommit` for each of them.
@@ -977,21 +979,11 @@ where
         Ok(())
     }
 
-    /// Saves Prevote message and corresponding Propose to the consensus cache if not saved yet
-    fn save_prevote(&mut self, propose_hash: &Hash, prevote: &Prevote) {
-        self.check_propose_saved(propose_hash);
-        self.blockchain.save_message(prevote.raw()).expect(
-            "Unable to save Prevote to the cache of consensus messages",
-        );
-    }
-
-    /// Check whether Propose is saved to the consensus cache and saves if not
+    /// Check whether Propose is saved to the consensus cache and saves it otherwise
     fn check_propose_saved(&mut self, propose_hash: &Hash) {
         if let Some(propose_state) = self.state.propose_mut(propose_hash) {
             if !propose_state.is_saved() {
-                self.blockchain
-                    .save_message(propose_state.message().raw())
-                    .expect("Unable to save Propose to the cache of consensus messages");
+                self.blockchain.save_message(propose_state.message().raw());
                 propose_state.set_saved(true);
             }
         }

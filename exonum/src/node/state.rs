@@ -23,7 +23,7 @@ use std::sync::{Arc, RwLock};
 use std::net::SocketAddr;
 use std::time::{SystemTime, Duration};
 
-use messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect, RawMessage};
+use messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect};
 use crypto::{PublicKey, SecretKey, Hash};
 use storage::{Patch, Snapshot};
 use events::Milliseconds;
@@ -1048,35 +1048,6 @@ impl State {
     /// Updates the `Connect` message of the current node.
     pub fn set_our_connect_message(&mut self, msg: Connect) {
         self.our_connect_message = msg;
-    }
-
-    /// Returns a collection of all messages collected of type Propose, Prevote and Precommit
-    pub fn prepare_consensus_messages(&mut self) -> Vec<RawMessage> {
-        let mut retval = Vec::new();
-
-        // collect Proposes
-        for propose_state in self.proposes.values_mut() {
-            if !propose_state.is_saved() {
-                retval.push(propose_state.message().raw().clone());
-                propose_state.set_saved(true);
-            }
-        }
-
-        // collect Prevotes
-        for vote in self.prevotes.values() {
-            for msg in &vote.messages {
-                retval.push(msg.raw().clone());
-            }
-        }
-
-        // collect Precommits
-        for vote in self.precommits.values() {
-            for msg in &vote.messages {
-                retval.push(msg.raw().clone());
-            }
-        }
-
-        retval
     }
 }
 
