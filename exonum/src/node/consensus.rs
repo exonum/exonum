@@ -386,13 +386,13 @@ where
             if self.state.has_majority_prevotes(round, propose_hash) {
 
                 // Put consensus messages for current Propose and this round to the cache.
-                self.check_propose_saved(&propose_hash);
+                self.check_propose_saved(round, &propose_hash);
                 let raw_msgs = self.state
                     .prevotes(prevote_round, propose_hash)
                     .iter()
                     .map(|msg| msg.raw().clone())
                     .collect::<Vec<_>>();
-                self.blockchain.save_messages(raw_msgs);
+                self.blockchain.save_messages(round, raw_msgs);
 
                 self.state.lock(round, propose_hash);
                 // Send precommit
@@ -679,7 +679,7 @@ where
             );
 
             // Put our propose to the consensus messages cache
-            self.blockchain.save_message(propose.raw());
+            self.blockchain.save_message(round, propose.raw());
 
             trace!("Broadcast propose: {:?}", propose);
             self.broadcast(propose.raw());
@@ -871,8 +871,8 @@ where
         let has_majority_prevotes = self.state.add_prevote(&prevote);
 
         // save outgoing Prevote to the consensus messages cache before broadcast
-        self.check_propose_saved(propose_hash);
-        self.blockchain.save_message(prevote.raw());
+        self.check_propose_saved(round, propose_hash);
+        self.blockchain.save_message(round, prevote.raw());
 
         trace!("Broadcast prevote: {:?}", prevote);
         self.broadcast(prevote.raw());
@@ -897,7 +897,7 @@ where
         self.state.add_precommit(&precommit);
 
         // Put our Precommit to the consensus cache before broadcast
-        self.blockchain.save_message(precommit.raw());
+        self.blockchain.save_message(round, precommit.raw());
 
         trace!("Broadcast precommit: {:?}", precommit);
         self.broadcast(precommit.raw());
@@ -980,10 +980,13 @@ where
     }
 
     /// Check whether Propose is saved to the consensus cache and saves it otherwise
-    fn check_propose_saved(&mut self, propose_hash: &Hash) {
+    fn check_propose_saved(&mut self, round: Round, propose_hash: &Hash) {
         if let Some(propose_state) = self.state.propose_mut(propose_hash) {
             if !propose_state.is_saved() {
-                self.blockchain.save_message(propose_state.message().raw());
+                self.blockchain.save_message(
+                    round,
+                    propose_state.message().raw(),
+                );
                 propose_state.set_saved(true);
             }
         }

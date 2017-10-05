@@ -19,7 +19,7 @@ use std::mem;
 use crypto::Hash;
 use messages::{RawMessage, Precommit, CONSENSUS};
 use storage::{Snapshot, Fork, StorageKey, StorageValue, ListIndex, MapIndex, ProofListIndex,
-              ProofMapIndex, MapProof};
+              ProofMapIndex, MapProof, Entry};
 use helpers::Height;
 use super::{Block, BlockProof, Blockchain};
 use super::config::StoredConfiguration;
@@ -73,6 +73,7 @@ const STORED_CONFIG_BY_HASH_ORD: u8 = 6;
 const CONFIGS_ACTUAL_FROM_ORD: u8 = 7;
 const STATE_HASH_AGGREGATOR_ORD: u8 = 8;
 const CONSENSUS_MESSAGES_CACHE_ORD: u8 = 9;
+const SAVED_ROUND_ORD: u8 = 10;
 
 impl<T> Schema<T>
 where
@@ -166,12 +167,17 @@ where
     }
 
     /// Returns consensus messages that have to be recovered in case of process' restart
-    /// after abnormal termination
+    /// after abnormal termination.
     pub fn consensus_messages_cache(&self) -> ListIndex<&T, RawMessage> {
         ListIndex::new(
             gen_prefix(CONSENSUS, CONSENSUS_MESSAGES_CACHE_ORD, &()),
             &self.view,
         )
+    }
+
+    /// Returns value for saved Round.
+    pub fn saved_round(&self) -> Entry<&T, u32> {
+        Entry::new(gen_prefix(CONSENSUS, SAVED_ROUND_ORD, &()), &self.view)
     }
 
     /// Returns block hash for the given height.
@@ -433,6 +439,13 @@ impl<'a> Schema<&'a mut Fork> {
             gen_prefix(CONSENSUS, CONSENSUS_MESSAGES_CACHE_ORD, &()),
             &mut self.view,
         )
+    }
+
+    /// Mutable reference to the [`saved_round`][1] index.
+    ///
+    /// [1]: struct.Schema.html#method.saved_round
+    pub fn saved_round_mut(&mut self) -> Entry<&mut Fork, u32> {
+        Entry::new(gen_prefix(CONSENSUS, SAVED_ROUND_ORD, &()), &mut self.view)
     }
 
     /// Adds a new configuration to the blockchain, which will become an actual at

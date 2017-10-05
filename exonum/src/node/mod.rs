@@ -332,7 +332,14 @@ where
             info!("Trying to connect with peer {}", address);
         }
 
-        let round = Round::first();
+        let snapshot = self.blockchain.snapshot();
+        let schema = Schema::new(&snapshot);
+
+        // Recover previous saved round if any
+        let round = match schema.saved_round().get() {
+            Some(round) => Round(round),
+            None => Round::first(),
+        };
         self.state.jump_round(round);
         info!("Jump to round {}", round);
 
@@ -343,8 +350,6 @@ where
 
         // Recover cached consensus messages if any. We do this after main initialisation and before
         // the start of event processing.
-        let snapshot = self.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
         let messages = schema.consensus_messages_cache();
         for msg in messages.iter() {
             self.handle_message(msg);
