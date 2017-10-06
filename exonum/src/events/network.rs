@@ -35,6 +35,8 @@ use super::error::{into_other, log_error, other_error, result_ok};
 use super::codec::MessagesCodec;
 use super::{EventsAggregator, EventHandler};
 
+const OUTGOING_CHANNEL_SIZE: usize = 10;
+
 #[derive(Debug)]
 pub enum NetworkEvent {
     MessageReceived(SocketAddr, RawMessage),
@@ -159,7 +161,7 @@ impl NetworkPart {
                             None
                         } else {
                             // Register outgoing channel.
-                            let (conn_tx, conn_rx) = mpsc::channel(10);
+                            let (conn_tx, conn_rx) = mpsc::channel(OUTGOING_CHANNEL_SIZE);
                             outgoing_connections.insert(peer, &conn_tx);
                             // Enable retry feature for outgoing connection.
                             let timeout = network_config.tcp_connect_retry_timeout;
