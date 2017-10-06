@@ -680,7 +680,9 @@ impl Node {
         let mut core = Core::new()?;
         let (handler_part, network_part) = self.into_reactor();
         network_part.run(core.handle());
-        core.run(handler_part.run()).map_err(|_| other_error(""))
+        core.run(handler_part.run()).map_err(|_| {
+            other_error("can't run node handler")
+        })
     }
 
     /// A generic implementation that launches `Node` and optionally creates threads
