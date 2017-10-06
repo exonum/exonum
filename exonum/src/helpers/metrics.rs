@@ -15,7 +15,6 @@
 //! Utilities for collecting metrics.
 
 use std::time::SystemTime;
-use std::fmt::Arguments;
 
 /// Adds given metric with given value.
 ///
@@ -34,37 +33,25 @@ use std::fmt::Arguments;
 /// # extern crate exonum;
 /// # fn main() {
 /// let val = 10;
-/// let other_val = "some value";
-///
-/// metric!("mod_name.metric_name", "{} and {}", val, other_val);
+/// metric!("mod_name.metric_name", val);
 /// # }
 /// ```
 #[macro_export]
 macro_rules! metric {
-    ($name:expr, $($arg:tt)+) => ({
-        $crate::helpers::metrics::add_metric($name, &format_args!($($arg)+));
+    ($name:expr, $value:expr) => ({
+        $crate::helpers::metrics::add_metric($name, $value as i64);
     })
 }
 
 // Do not use directly, use `metric!` macro instead.
 #[doc(hidden)]
 #[allow(unused_variables)]
-pub fn add_metric(metric_name: &str, value: &Arguments) {
+pub fn add_metric(metric_name: &str, value: i64) {
     // TODO: Convert time to some meaningful format.
     let time = format!("{:?}", SystemTime::now());
-
-    #[cfg(feature = "metrics-hadoop")]
-    {
-        write_to_hadoop(metric_name, value, &time);
-    }
 
     #[cfg(feature = "metrics-log")]
     {
         trace!("{} {} {}", metric_name, value, time);
     }
-}
-
-#[cfg(feature = "metrics-hadoop")]
-fn write_to_hadoop(_metric_name: &str, _value: &Arguments, _time: &str) {
-    // TODO: Add implementation.
 }

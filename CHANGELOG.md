@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 - Implement `FromStr` and `ToString` traits for public sodium types (#318)
-- Base support for metrics infrastructure.
+- Add a new macro `metric!` for collecting statistical information.
 
 ## 0.2 - 2017-09-13
 

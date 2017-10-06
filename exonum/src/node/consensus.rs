@@ -466,7 +466,7 @@ where
             .read()
             .expect("Expected read lock")
             .len();
-        metric!("node.mempool", "{}", mempool_size);
+        metric!("node.mempool", mempool_size);
 
         // Update state to new height
         self.state.new_height(&block_hash, self.channel.get_time());
