@@ -15,10 +15,10 @@
 use futures::{future, unsync, Future, IntoFuture, Sink, Stream};
 use futures::future::Either;
 use futures::sync::mpsc;
-use tokio_core::net::{TcpListener, TcpStream, TcpStreamNew};
+use tokio_core::net::{TcpListener, TcpStream};
 use tokio_core::reactor::Handle;
 use tokio_io::AsyncRead;
-use tokio_retry::{Action, Retry};
+use tokio_retry::Retry;
 use tokio_retry::strategy::{jitter, FixedInterval};
 
 use std::net::SocketAddr;
@@ -168,22 +168,18 @@ impl NetworkPart {
                             // Enable retry feature for outgoing connection.
                             let timeout = network_config.tcp_connect_retry_timeout;
                             let max_tries = network_config.tcp_connect_max_retries as usize;
-                            let connect_handle = Retry::spawn(
-                                handle.clone(),
-                                FixedInterval::from_millis(timeout).map(jitter).take(
-                                    max_tries,
-                                ),
-                                TcpStreamConnectAction {
-                                    handle: handle.clone(),
-                                    peer,
-                                },
-                            ).map_err(into_other)
+                            let strategy = FixedInterval::from_millis(timeout)
+                                .map(jitter)
+                                .take(max_tries);
+                            let handle_cloned = handle.clone();
+                            let action = move || {
+                                TcpStream::connect(&peer, &handle_cloned)
+                            };
+                            let connect_handle = Retry::spawn(handle.clone(), strategy, action)
+                                .map_err(into_other)
                                 // Configure socket
                                 .and_then(move |sock| {
                                     sock.set_nodelay(network_config.tcp_nodelay)?;
-                                    Ok(sock)
-                                })
-                                .and_then(move |sock| {
                                     let duration =
                                         network_config.tcp_keep_alive.map(Duration::from_millis);
                                     sock.set_keepalive(duration)?;
@@ -205,8 +201,8 @@ impl NetworkPart {
                                         .select2(writer)
                                         .map_err(|_| other_error("Socket error"))
                                         .and_then(|res| match res {
-                                            Either::A((_, _reader)) => Ok(()).into_future(),
-                                            Either::B((_, _writer)) => Ok(()).into_future(),
+                                            Either::A((_, _reader)) => Ok("by reader"),
+                                            Either::B((_, _writer)) => Ok("by writer"),
                                         })
                                 })
                                 .then(move |res| {
@@ -325,18 +321,3 @@ fn tobox<F: Future + 'static>(f: F) -> Box<Future<Item=(), Error=F::Error>> {
     Box::new(fut)
 }
 
-// Tcp streams source for retry action.
-struct TcpStreamConnectAction {
-    handle: Handle,
-    peer: SocketAddr,
-}
-
-impl Action for TcpStreamConnectAction {
-    type Future = TcpStreamNew;
-    type Item = <TcpStreamNew as Future>::Item;
-    type Error = <TcpStreamNew as Future>::Error;
-
-    fn run(&mut self) -> Self::Future {
-        TcpStream::connect(&self.peer, &self.handle)
-    }
-}
