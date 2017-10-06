@@ -21,6 +21,7 @@ use tokio_io::AsyncRead;
 use tokio_retry::Retry;
 use tokio_retry::strategy::{jitter, FixedInterval};
 
+use std::io;
 use std::net::SocketAddr;
 use std::time::Duration;
 use std::collections::HashMap;
@@ -133,7 +134,7 @@ impl<H: EventHandler + 'static> HandlerPart<H> {
 }
 
 impl NetworkPart {
-    pub fn run(self, handle_orig: Handle) -> Box<Future<Item = (), Error = ()>> {
+    pub fn run(self, handle_orig: Handle) -> Box<Future<Item = (), Error = io::Error>> {
         let network_config = self.network_config;
         // Cancelation token
         let (cancel_sender, cancel_handler) = unsync::oneshot::channel();
@@ -144,7 +145,7 @@ impl NetworkPart {
         // Outgoing connections limiter
         let outgoing_connections_limit = network_config.max_outgoing_connections;
         let handle = handle_orig.clone();
-        let requests_handle = self.network_requests.1.for_each(move |request| {
+        let requests_handle = self.network_requests.1.map_err(|_| other_error("no network requests")).for_each(move |request| {
             let handle = handle.clone();
             let outgoing_connections = outgoing_connections.clone();
             match request {
@@ -220,14 +221,16 @@ impl NetworkPart {
                     };
                     let conn_tx = outgoing_connections.get(peer).or_else(new_connection);
                     if let Some(conn_tx) = conn_tx {
-                        let send_handle = conn_tx.send(msg).map_err(log_error);
-                        tobox(send_handle)
+                        let fut = conn_tx
+                            .send(msg)
+                            .map_err(|_| other_error("can't send message to a connection"));
+                        tobox(fut)
                     } else {
                         let event = NetworkEvent::PeerDisconnected(peer);
                         let fut = network_tx
                             .clone()
                             .send(event)
-                            .map_err(log_error)
+                            .map_err(|_| other_error("can't send network event"))
                             .into_future();
                         tobox(fut)
                     }
@@ -235,20 +238,22 @@ impl NetworkPart {
                 NetworkRequest::DisconnectWithPeer(peer) => {
                     outgoing_connections.remove(&peer);
                     let event = NetworkEvent::PeerDisconnected(peer);
-                    let fut = network_tx.clone().send(event).map(drop).map_err(log_error);
+                    let fut = network_tx
+                        .clone()
+                        .send(event)
+                        .map_err(|_| other_error("can't send network event"));
                     tobox(fut)
                 }
                 // Immediately stop the event loop.
                 NetworkRequest::Shutdown => {
                     let fut = cancel_sender
                         .take()
-                        .ok_or_else(|| other_error("Shutdown twice"))
+                        .ok_or_else(|| other_error("shutdown twice"))
                         .and_then(|sender| {
                             sender.send(()).map_err(
-                                |_| other_error("Can't send shutdown signal"),
+                                |_| other_error("can't send shutdown signal"),
                             )
                         })
-                        .map_err(log_error)
                         .into_future();
                     tobox(fut)
                 }
@@ -314,16 +319,14 @@ impl NetworkPart {
                         });
                     tobox(connection_handler)
                 }
-            })
-            .map_err(log_error);
+            });
 
-        let cancel_handler = cancel_handler.map_err(drop);
+        let cancel_handler = cancel_handler.map_err(|_| other_error("can't cancel routine"));
         let fut = server
             .join(requests_handle)
             .map(drop)
             .select(cancel_handler)
-            .map_err(drop);
-
+            .map_err(|(e, _)| e);
         tobox(fut)
     }
 }

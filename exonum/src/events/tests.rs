@@ -25,10 +25,12 @@ use crypto::{gen_keypair, PublicKey, Signature};
 use messages::{Connect, Message, MessageWriter, RawMessage};
 use events::{NetworkEvent, NetworkRequest};
 use events::network::{NetworkConfiguration, NetworkPart};
+use events::error::log_error;
 use node::{EventsPoolCapacity, NodeChannel};
 
 #[derive(Debug)]
 pub struct TestHandler {
+    handle: Option<thread::JoinHandle<()>>,
     listen_address: SocketAddr,
     network_events_rx: Wait<TimeoutStream<mpsc::Receiver<NetworkEvent>>>,
     network_requests_tx: mpsc::Sender<NetworkRequest>,
@@ -43,6 +45,7 @@ impl TestHandler {
         let timer = Timer::default();
         let receiver = timer.timeout_stream(network_events_rx, Duration::from_secs(30));
         TestHandler {
+            handle: None,
             listen_address,
             network_requests_tx,
             network_events_rx: receiver.wait(),
@@ -102,16 +105,25 @@ impl TestHandler {
             Err(e) => panic!("An error during wait for message occured, {:?}", e),
         }
     }
+
+    pub fn shutdown(&mut self) {
+        self.network_requests_tx
+            .clone()
+            .send(NetworkRequest::Shutdown)
+            .wait()
+            .unwrap();
+        self.handle
+            .take()
+            .expect("shutdown twice")
+            .join()
+            .unwrap();
+    }
 }
 
 impl Drop for TestHandler {
     fn drop(&mut self) {
         if !::std::thread::panicking() {
-            self.network_requests_tx
-                .clone()
-                .send(NetworkRequest::Shutdown)
-                .wait()
-                .unwrap();
+            self.shutdown();
         }
     }
 }
@@ -133,12 +145,13 @@ impl TestEvents {
     }
 
     pub fn spawn(self) -> TestHandler {
-        let (handler_part, network_part) = self.into_reactor();
-        thread::spawn(move || {
+        let (mut handler_part, network_part) = self.into_reactor();
+        let handle = thread::spawn(move || {
             let mut core = Core::new().unwrap();
             let fut = network_part.run(core.handle());
-            core.run(fut)
+            core.run(fut).map_err(log_error).unwrap();
         });
+        handler_part.handle = Some(handle);
         handler_part
     }
 
