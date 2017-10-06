@@ -21,7 +21,7 @@ fn main() {
 }
 
 fn rust_version() -> Option<String> {
-    let rustc = env!("RUSTC");
+    let rustc = option_env!("RUSTC").unwrap_or("rustc");
 
     if let Ok(output) = Command::new(rustc).arg("-V").output().map(|x| x.stdout) {
         String::from_utf8(output).ok()

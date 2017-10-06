@@ -1,6 +1,6 @@
 //! Information about current node including Exonum, Rust and OS versions.
 
-use os_type;
+use os_info;
 
 static USER_AGENT: &str = include_str!(concat!(env!("OUT_DIR"), "/user_agent"));
 
@@ -15,8 +15,8 @@ static USER_AGENT: &str = include_str!(concat!(env!("OUT_DIR"), "/user_agent"));
 /// println!("{}", user_agent);
 /// ```
 pub fn get() -> String {
-    let os = os_type::current_platform();
-    format!("{}/{:?} {}", USER_AGENT, os.os_type, os.version)
+    let os = os_info::get();
+    format!("{}/{}", USER_AGENT, os)
 }
 
 #[cfg(test)]

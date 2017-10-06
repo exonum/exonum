@@ -39,7 +39,7 @@ bodyparser = "0.7.0"
 params = "0.6.0"
 mount = "0.3.0"
 atty = "0.2.2"
-os_type="1.0.0"
+os_info="0.1.1"
 
 exonum_sodiumoxide = { version = "0.0.14" }
 exonum_rocksdb = { version = "0.6.1", optional = true }
