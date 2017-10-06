@@ -180,74 +180,74 @@ pub fn raw_message(id: u16, len: usize) -> RawMessage {
 
 #[test]
 fn test_network_handshake() {
-    let addrs: [SocketAddr; 2] =
-        ["127.0.0.1:17230".parse().unwrap(), "127.0.0.1:17231".parse().unwrap()];
+    let first = "127.0.0.1:17230".parse().unwrap();
+    let second = "127.0.0.1:17231".parse().unwrap();
 
-    let e1 = TestEvents::with_addr(addrs[0]);
-    let e2 = TestEvents::with_addr(addrs[1]);
+    let e1 = TestEvents::with_addr(first);
+    let e2 = TestEvents::with_addr(second);
 
-    let c1 = connect_message(addrs[0]);
-    let c2 = connect_message(addrs[1]);
+    let c1 = connect_message(first);
+    let c2 = connect_message(second);
 
     let mut e1 = e1.spawn();
     let mut e2 = e2.spawn();
 
-    e1.connect_with(addrs[1]);
+    e1.connect_with(second);
     assert_eq!(e2.wait_for_connect(), c1);
 
-    e2.connect_with(addrs[0]);
+    e2.connect_with(first);
     assert_eq!(e1.wait_for_connect(), c2);
 
-    e1.disconnect_with(addrs[1]);
-    assert_eq!(e1.wait_for_disconnect(), addrs[1]);
+    e1.disconnect_with(second);
+    assert_eq!(e1.wait_for_disconnect(), second);
 
-    e2.disconnect_with(addrs[0]);
-    assert_eq!(e2.wait_for_disconnect(), addrs[0]);
+    e2.disconnect_with(first);
+    assert_eq!(e2.wait_for_disconnect(), first);
 }
 
 #[test]
 fn test_network_big_message() {
-    let addrs: [SocketAddr; 2] =
-        ["127.0.0.1:17200".parse().unwrap(), "127.0.0.1:17201".parse().unwrap()];
+    let first = "127.0.0.1:17200".parse().unwrap();
+    let second = "127.0.0.1:17201".parse().unwrap();
 
     let m1 = raw_message(15, 100000);
     let m2 = raw_message(16, 400);
 
-    let e1 = TestEvents::with_addr(addrs[0]);
-    let e2 = TestEvents::with_addr(addrs[1]);
+    let e1 = TestEvents::with_addr(first);
+    let e2 = TestEvents::with_addr(second);
 
     let mut e1 = e1.spawn();
     let mut e2 = e2.spawn();
 
-    e1.connect_with(addrs[1]);
+    e1.connect_with(second);
     e2.wait_for_connect();
 
-    e2.connect_with(addrs[0]);
+    e2.connect_with(first);
     e1.wait_for_connect();
 
-    e1.send_to(addrs[1], m1.clone());
+    e1.send_to(second, m1.clone());
     assert_eq!(e2.wait_for_message(), m1);
 
-    e1.send_to(addrs[1], m2.clone());
+    e1.send_to(second, m2.clone());
     assert_eq!(e2.wait_for_message(), m2);
 
-    e1.send_to(addrs[1], m1.clone());
+    e1.send_to(second, m1.clone());
     assert_eq!(e2.wait_for_message(), m1);
 
-    e2.send_to(addrs[0], m2.clone());
+    e2.send_to(first, m2.clone());
     assert_eq!(e1.wait_for_message(), m2);
 
-    e2.send_to(addrs[0], m1.clone());
+    e2.send_to(first, m1.clone());
     assert_eq!(e1.wait_for_message(), m1);
 
-    e2.send_to(addrs[0], m2.clone());
+    e2.send_to(first, m2.clone());
     assert_eq!(e1.wait_for_message(), m2);
 
-    e1.disconnect_with(addrs[1]);
-    assert_eq!(e1.wait_for_disconnect(), addrs[1]);
+    e1.disconnect_with(second);
+    assert_eq!(e1.wait_for_disconnect(), second);
 
-    e2.disconnect_with(addrs[0]);
-    assert_eq!(e2.wait_for_disconnect(), addrs[0]);
+    e2.disconnect_with(first);
+    assert_eq!(e2.wait_for_disconnect(), first);
 }
 
 #[test]
