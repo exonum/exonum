@@ -205,332 +205,11 @@ fn test_retrieve_block_and_precommits() {
     assert!(bl_proof_option.is_none());
 }
 
-/// Idea: As soon as we sent Propose and Prevote they should appear in the consensus cache
-#[test]
-fn test_consensus_cache_outgoing() {
-    let sandbox = timestamping_sandbox();
-
-    // round happens
-    sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
-    sandbox.add_time(Duration::from_millis(
-        sandbox.round_timeout() + sandbox.propose_timeout(),
-    ));
-
-    sandbox.assert_state(HEIGHT_ONE, ROUND_THREE);
-
-    // ok, we are leader
-    let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(sandbox.propose_timeout())
-        .build();
-
-    let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(sandbox.propose_timeout())
-        .build();
-
-    sandbox.broadcast(propose.clone());
-    sandbox.broadcast(make_prevote_from_propose(&sandbox, &propose.clone()));
-    let messages = get_consensus_messages(&sandbox.blockchain_ref());
-
-    assert_eq!(2, messages.len());
-    let raw_propose: &RawMessage = &messages[0];
-    assert_eq!(
-        exonum::messages::PROPOSE_MESSAGE_ID,
-        raw_propose.message_type()
-    );
-    let raw_prevote: &RawMessage = &messages[1];
-    assert_eq!(
-        exonum::messages::PREVOTE_MESSAGE_ID,
-        raw_prevote.message_type()
-    );
-
-
-    sandbox.recv(Prevote::new(
-        VALIDATOR_1,
-        HEIGHT_ONE,
-        ROUND_THREE,
-        &propose.hash(),
-        LOCK_ZERO,
-        sandbox.s(VALIDATOR_1),
-    ));
-
-    sandbox.recv(Prevote::new(
-        VALIDATOR_2,
-        HEIGHT_ONE,
-        ROUND_THREE,
-        &propose.hash(),
-        LOCK_ZERO,
-        sandbox.s(VALIDATOR_2),
-    ));
-
-    sandbox.broadcast(Precommit::new(
-        VALIDATOR_0,
-        HEIGHT_ONE,
-        ROUND_THREE,
-        &propose.hash(),
-        &block.hash(),
-        sandbox.time(),
-        sandbox.s(VALIDATOR_0),
-    ));
-
-    let messages = get_consensus_messages(&sandbox.blockchain_ref());
-
-    let raw_prevote1: &RawMessage = &messages[messages.len() - 3];
-    assert_eq!(
-        exonum::messages::PREVOTE_MESSAGE_ID,
-        raw_prevote1.message_type()
-    );
-    let raw_prevote2: &RawMessage = &messages[messages.len() - 2];
-    assert_eq!(
-        exonum::messages::PREVOTE_MESSAGE_ID,
-        raw_prevote2.message_type()
-    );
-    let raw_precommit: &RawMessage = &messages[messages.len() - 1];
-    assert_eq!(
-        exonum::messages::PRECOMMIT_MESSAGE_ID,
-        raw_precommit.message_type()
-    );
-}
-
-/// Idea: - Node receives Propose
-/// - Node sends Prevote
-/// - At this moment these messages should be in cache
-/// (similar to above test but for incoming Propose)
-#[test]
-fn test_consensus_cache_incoming() {
-    let sandbox = timestamping_sandbox();
-
-    // assert there are no consensus messages saved
-    let messages = get_consensus_messages(&sandbox.blockchain_ref());
-    assert!(messages.is_empty());
-
-    let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(sandbox.propose_timeout())
-        .build();
-
-    let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(sandbox.propose_timeout())
-        .build();
-
-    sandbox.recv(propose.clone());
-
-    let messages = get_consensus_messages(&sandbox.blockchain_ref());
-
-    // Outgoing Prevote & corresponding Propose should be put to cache
-    assert_eq!(
-        2,
-        messages.len(),
-        "Cache should contain Prevote and it's Propose for the moment"
-    );
-
-    let raw_prevote: &RawMessage = &messages[1];
-    assert_eq!(
-        exonum::messages::PREVOTE_MESSAGE_ID,
-        raw_prevote.message_type()
-    );
-    let prevote = exonum::messages::Any::from_raw(raw_prevote.clone());
-    assert!(prevote.is_ok());
-
-    sandbox.broadcast(Prevote::new(
-        VALIDATOR_0,
-        HEIGHT_ONE,
-        ROUND_ONE,
-        &propose.hash(),
-        LOCK_ZERO,
-        sandbox.s(VALIDATOR_0),
-    ));
-
-    let messages = get_consensus_messages(&sandbox.blockchain_ref());
-    assert_eq!(
-        2,
-        messages.len(),
-        "Cache should contain Prevote and it's Propose for the moment"
-    );
-    assert!(messages.get(0).is_some());
-    assert!(messages.get(1).is_some());
-
-    sandbox.recv(Prevote::new(
-        VALIDATOR_1,
-        HEIGHT_ONE,
-        ROUND_ONE,
-        &propose.hash(),
-        LOCK_ZERO,
-        sandbox.s(VALIDATOR_1),
-    ));
-
-    sandbox.recv(Prevote::new(
-        VALIDATOR_2,
-        HEIGHT_ONE,
-        ROUND_ONE,
-        &propose.hash(),
-        LOCK_ZERO,
-        sandbox.s(VALIDATOR_2),
-    ));
-
-    sandbox.broadcast(Precommit::new(
-        VALIDATOR_0,
-        HEIGHT_ONE,
-        ROUND_ONE,
-        &propose.hash(),
-        &block.hash(),
-        sandbox.time(),
-        sandbox.s(VALIDATOR_0),
-    ));
-    let messages = get_consensus_messages(&sandbox.blockchain_ref());
-
-    let raw_prevote1: &RawMessage = &messages[messages.len() - 3];
-    assert_eq!(
-        exonum::messages::PREVOTE_MESSAGE_ID,
-        raw_prevote1.message_type()
-    );
-    let raw_prevote2: &RawMessage = &messages[messages.len() - 2];
-    assert_eq!(
-        exonum::messages::PREVOTE_MESSAGE_ID,
-        raw_prevote2.message_type()
-    );
-    let raw_precommit: &RawMessage = &messages[messages.len() - 1];
-    assert_eq!(
-        exonum::messages::PRECOMMIT_MESSAGE_ID,
-        raw_precommit.message_type()
-    );
-}
-
-/// Checks that node gets locked after restart
-#[test]
-fn should_lock_after_node_restart() {
-    let sandbox = timestamping_sandbox();
-
-    let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(sandbox.propose_timeout())
-        .build();
-
-    let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(sandbox.propose_timeout())
-        .build();
-
-    sandbox.recv(propose.clone());
-
-    sandbox.broadcast(Prevote::new(
-        VALIDATOR_0,
-        HEIGHT_ONE,
-        ROUND_ONE,
-        &propose.hash(),
-        LOCK_ZERO,
-        sandbox.s(VALIDATOR_0),
-    ));
-
-    sandbox.recv(Prevote::new(
-        VALIDATOR_1,
-        HEIGHT_ONE,
-        ROUND_ONE,
-        &propose.hash(),
-        LOCK_ZERO,
-        sandbox.s(VALIDATOR_1),
-    ));
-    sandbox.assert_lock(LOCK_ZERO, None); //do not lock if <2/3 prevotes
-
-    sandbox.recv(Prevote::new(
-        VALIDATOR_2,
-        HEIGHT_ONE,
-        ROUND_ONE,
-        &propose.hash(),
-        LOCK_ZERO,
-        sandbox.s(VALIDATOR_2),
-    ));
-    sandbox.assert_lock(LOCK_ONE, Some(propose.hash()));
-
-    sandbox.broadcast(Precommit::new(
-        VALIDATOR_0,
-        HEIGHT_ONE,
-        ROUND_ONE,
-        &propose.hash(),
-        &block.hash(),
-        sandbox.time(),
-        sandbox.s(VALIDATOR_0),
-    ));
-    sandbox.assert_lock(LOCK_ONE, Some(propose.hash()));
-
-    // Simulate node restart
-    let sandbox_restarted = sandbox.restart();
-
-    // assert that consensus messages were recovered and we're in locked state now
-    sandbox_restarted.assert_lock(LOCK_ONE, Some(propose.hash()));
-}
-
-/// Checks that node is locked on first Propose and won't vote for any other Propose after restart
-#[test]
-fn should_not_send_prevote_after_node_restart() {
-    let sandbox = timestamping_sandbox();
-
-    let propose = ProposeBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(sandbox.propose_timeout())
-        .build();
-
-    let block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(sandbox.propose_timeout())
-        .build();
-
-    sandbox.recv(propose.clone());
-
-    sandbox.broadcast(Prevote::new(
-        VALIDATOR_0,
-        HEIGHT_ONE,
-        ROUND_ONE,
-        &propose.hash(),
-        LOCK_ZERO,
-        sandbox.s(VALIDATOR_0),
-    ));
-
-    sandbox.recv(Prevote::new(
-        VALIDATOR_1,
-        HEIGHT_ONE,
-        ROUND_ONE,
-        &propose.hash(),
-        LOCK_ZERO,
-        sandbox.s(VALIDATOR_1),
-    ));
-    sandbox.assert_lock(LOCK_ZERO, None); //do not lock if <2/3 prevotes
-
-    sandbox.recv(Prevote::new(
-        VALIDATOR_2,
-        HEIGHT_ONE,
-        ROUND_ONE,
-        &propose.hash(),
-        LOCK_ZERO,
-        sandbox.s(VALIDATOR_2),
-    ));
-    sandbox.assert_lock(LOCK_ONE, Some(propose.hash())); //only if round > locked round
-
-    sandbox.broadcast(Precommit::new(
-        VALIDATOR_0,
-        HEIGHT_ONE,
-        ROUND_ONE,
-        &propose.hash(),
-        &block.hash(),
-        sandbox.time(),
-        sandbox.s(VALIDATOR_0),
-    ));
-    sandbox.assert_lock(LOCK_ONE, Some(propose.hash()));
-
-    // Simulate node restart
-    let sandbox_restarted = sandbox.restart();
-
-    // assert that consensus messages were recovered and we're in locked state now
-    sandbox_restarted.assert_lock(LOCK_ONE, Some(propose.hash())); //only if round > locked round
-
-    // Receive another propose within the round
-    let propose2 = ProposeBuilder::new(&sandbox_restarted)
-        .with_duration_since_sandbox_time(sandbox_restarted.propose_timeout())
-        .build();
-
-    sandbox_restarted.recv(propose2);
-
-    // Here sandbox goes out of scope and sandbox.drop() will cause panic if there any sent messages
-}
-
 /// Scenario:
 /// - Node sends Propose and Prevote
 /// - Node restarts
-/// - Node should recover to previous state --> not send Propose & Prevote again
+/// - Node should recover to previous state --> jumps into the round before stop and does not send
+/// Propose & Prevote again
 #[test]
 fn should_not_send_propose_and_prevote_after_node_restart() {
     let sandbox = timestamping_sandbox();
@@ -551,27 +230,127 @@ fn should_not_send_propose_and_prevote_after_node_restart() {
     sandbox.broadcast(propose.clone());
     sandbox.broadcast(make_prevote_from_propose(&sandbox, &propose.clone()));
 
+    let curr_height = sandbox.current_height();
+    let curr_round = sandbox.current_round();
+
     let sandbox_restarted = sandbox.restart();
 
-    assert!(!get_consensus_messages(&sandbox_restarted.blockchain_ref())
-        .is_empty());
     sandbox_restarted.assert_lock(LOCK_ZERO, None);
+    sandbox_restarted.assert_state(curr_height, curr_round);
 
     // Now we should be sure that node recovered its state but didn't send any messages.
     // Here sandbox_restarted goes out of scope and sandbox_restarted.drop() will cause panic
     // if there any sent messages
 }
 
-/// Checks that consensus cache gets cleaned up immediately after new height has been reached
+/// Scenario:
+/// - Node receives Propose and sends Prevote
+/// - Node restarts
+/// - Node should recover to previous state --> jumps into the round before stop and does not send
+/// Prevote again
 #[test]
-fn test_consensus_cache_should_be_clean_on_new_height() {
+fn should_not_send_propose_and_prevote_after_node_restart_incoming() {
     let sandbox = timestamping_sandbox();
-    let sandbox_state = SandboxState::new();
+    let tx = gen_timestamping_tx();
 
-    add_one_height(&sandbox, &sandbox_state);
-    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
 
-    assert!(get_consensus_messages(&sandbox.blockchain_ref()).is_empty());
+    let propose = ProposeBuilder::new(&sandbox)
+        .with_duration_since_sandbox_time(sandbox.propose_timeout())
+        .build();
+
+    sandbox.recv(propose.clone());
+
+    sandbox.broadcast(Prevote::new(
+        VALIDATOR_0,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        LOCK_ZERO,
+        sandbox.s(VALIDATOR_0),
+    ));
+
+    let curr_height = sandbox.current_height();
+    let curr_round = sandbox.current_round();
+
+    let sandbox_restarted = sandbox.restart();
+
+    sandbox_restarted.assert_lock(LOCK_ZERO, None);
+    sandbox_restarted.assert_state(curr_height, curr_round);
+}
+
+/// Idea:
+/// - Node gets locked on some Propose from certain validator
+/// - Node restarts.
+/// - Node receives other Propose in the same round
+/// - Make sure node doesn't vote for new propose
+#[test]
+fn should_not_vote_after_node_restart() {
+    let sandbox = timestamping_sandbox();
+
+    let propose = ProposeBuilder::new(&sandbox)
+        .with_duration_since_sandbox_time(sandbox.propose_timeout())
+        .build();
+
+    let block = BlockBuilder::new(&sandbox)
+        .with_duration_since_sandbox_time(sandbox.propose_timeout())
+        .build();
+
+    sandbox.recv(propose.clone());
+
+    sandbox.broadcast(Prevote::new(
+        VALIDATOR_0,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        LOCK_ZERO,
+        sandbox.s(VALIDATOR_0),
+    ));
+
+    sandbox.recv(Prevote::new(
+        VALIDATOR_1,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        LOCK_ZERO,
+        sandbox.s(VALIDATOR_1),
+    ));
+    sandbox.assert_lock(LOCK_ZERO, None); //do not lock if <2/3 prevotes
+
+    sandbox.recv(Prevote::new(
+        VALIDATOR_2,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        LOCK_ZERO,
+        sandbox.s(VALIDATOR_2),
+    ));
+    sandbox.assert_lock(LOCK_ONE, Some(propose.hash()));
+
+    sandbox.broadcast(Precommit::new(
+        VALIDATOR_0,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        &block.hash(),
+        sandbox.time(),
+        sandbox.s(VALIDATOR_0),
+    ));
+    sandbox.assert_lock(LOCK_ONE, Some(propose.hash()));
+    let curr_height = sandbox.current_height();
+    let curr_round = sandbox.current_round();
+
+    // Simulate node restart
+    let sandbox_restarted = sandbox.restart();
+
+    // assert that consensus messages were recovered and we're in locked state now
+    sandbox_restarted.assert_lock(LOCK_ONE, Some(propose.hash()));
+    sandbox_restarted.assert_state(curr_height, curr_round);
+
+    // Receive another propose within the round
+    let tx = gen_timestamping_tx();
+    receive_valid_propose_with_transactions(&sandbox_restarted, &[tx.hash()]);
+
+    // Here sandbox goes out of scope and sandbox.drop() will cause panic if there any sent messages
 }
 
 #[test]
@@ -3178,13 +2957,13 @@ fn test_schema_config_changes() {
 }
 
 // helper method to check for messages in consensus cache
-fn get_consensus_messages(blockchain: &Blockchain) -> Vec<RawMessage> {
-    let snapshot = blockchain.snapshot();
-    let schema = Schema::new(&snapshot);
-    let msgs = schema.consensus_messages_cache();
-    let messages: Vec<RawMessage> = msgs.iter().collect();
-    messages
-}
+//fn get_consensus_messages(blockchain: &Blockchain) -> Vec<RawMessage> {
+//    let snapshot = blockchain.snapshot();
+//    let schema = Schema::new(&snapshot);
+//    let msgs = schema.consensus_messages_cache();
+//    let messages: Vec<RawMessage> = msgs.iter().collect();
+//    messages
+//}
 
 
 // - lock to propose when get +2/3 prevote
