@@ -48,7 +48,7 @@ impl Run {
     }
 
     /// Returns created database instance.
-    #[cfg(not(feature = "memorydb"))]
+    #[cfg(feature = "leveldb")]
     pub fn db_helper(ctx: &Context) -> Box<Database> {
         use storage::{LevelDB, LevelDBOptions};
 
@@ -61,7 +61,20 @@ impl Run {
     }
 
     /// Returns created database instance.
-    #[cfg(feature = "memorydb")]
+    #[cfg(all(feature = "rocksdb", not(feature = "leveldb")))]
+    pub fn db_helper(ctx: &Context) -> Box<Database> {
+        use storage::{RocksDB, RocksDBOptions};
+
+        let path = ctx.arg::<String>("ROCKSDB_PATH").expect(
+            "ROCKSDB_PATH not found.",
+        );
+        let mut options = RocksDBOptions::default();
+        options.create_if_missing(true);
+        Box::new(RocksDB::open(Path::new(&path), options).unwrap())
+    }
+
+    /// Returns created database instance.
+    #[cfg(all(not(feature = "leveldb"), not(feature = "rocksdb")))]
     pub fn db_helper(_: &Context) -> Box<Database> {
         use storage::MemoryDB;
         Box::new(MemoryDB::new())
@@ -94,12 +107,22 @@ impl Command for Run {
                 "node-config",
                 false
             ),
+            #[cfg(feature = "leveldb")]
             Argument::new_named(
                 "LEVELDB_PATH",
                 true,
                 "Use leveldb database with the given path.",
                 "d",
                 "leveldb",
+                false
+            ),
+            #[cfg(all(feature = "rocksdb", not(feature = "leveldb")))]
+            Argument::new_named(
+                "ROCKSDB_PATH",
+                true,
+                "Use rocksdb database with the given path.",
+                "d",
+                "rocksdb",
                 false
             ),
             Argument::new_named(
@@ -356,7 +379,7 @@ impl Finalize {
         }
         (
             common,
-            map.iter().map(|(_, &ref c)| c.clone()).collect(),
+            map.iter().map(|(_, c)| c.clone()).collect(),
             map.get(&our_config.consensus_public_key)
                 .expect("our key not found in config")
                 .clone(),

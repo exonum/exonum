@@ -23,17 +23,21 @@
 
 #![cfg_attr(feature="cargo-clippy", allow(zero_prefixed_literal))]
 
-#![cfg_attr(feature="flame_profile",feature(plugin, custom_attribute))]
-#![cfg_attr(feature="flame_profile",plugin(exonum_flamer))]
+#![cfg_attr(feature="flame_profile", feature(plugin, custom_attribute))]
+#![cfg_attr(feature="flame_profile", plugin(exonum_flamer))]
 
 #[macro_use]
-extern crate exonum_profiler as profiler;
+extern crate exonum_profiler;
 #[macro_use]
 extern crate log;
 extern crate byteorder;
 extern crate mio;
-extern crate sodiumoxide;
+extern crate exonum_sodiumoxide as sodiumoxide;
+#[cfg(feature = "leveldb")]
 extern crate exonum_leveldb as leveldb;
+#[cfg(feature = "rocksdb")]
+extern crate exonum_rocksdb as rocksdb;
+
 extern crate rand;
 extern crate serde;
 #[macro_use]
@@ -55,7 +59,6 @@ extern crate clap;
 extern crate hyper;
 extern crate iron;
 extern crate router;
-extern crate bodyparser;
 extern crate params;
 extern crate cookie;
 extern crate mount;

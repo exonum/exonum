@@ -165,7 +165,6 @@ where
 {
     let mut buffer = vec![0; header_size as usize];
     Field::write(&input, &mut buffer, 0, header_size);
-    trace!("buffer ={:?}", buffer);
     <T as Field>::check(&buffer, 0.into(), header_size.into(), header_size.into()).unwrap();
     let new_buffer = buffer.clone();
     //clear buffer
@@ -316,7 +315,7 @@ fn test_precommit() {
     assert!(precommit.verify_signature(&public_key));
     assert_eq!(precommit.time(), time);
     let json_str = ::serde_json::to_string(&precommit).unwrap();
-    trace!("{}", json_str);
+    assert!(json_str.len() > 0);
     let precommit1: Precommit = ::serde_json::from_str(&json_str).unwrap();
     assert_eq!(precommit, precommit1);
 }

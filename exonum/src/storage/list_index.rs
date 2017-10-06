@@ -407,12 +407,16 @@ where
 
 #[cfg(test)]
 mod tests {
+    use rand::{thread_rng, Rng};
     use super::ListIndex;
-    use super::super::{MemoryDB, Database};
+    use storage::db::Database;
 
-    #[test]
-    fn test_list_index_methods() {
-        let mut fork = MemoryDB::new().fork();
+    fn gen_tempdir_name() -> String {
+        thread_rng().gen_ascii_chars().take(10).collect()
+    }
+
+    fn list_index_methods(db: Box<Database>) {
+        let mut fork = db.fork();
         let mut list_index = ListIndex::new(vec![255], &mut fork);
 
         assert!(list_index.is_empty());
@@ -453,9 +457,8 @@ mod tests {
         assert_eq!(Some(777), list_index.last());
     }
 
-    #[test]
-    fn test_list_index_iter() {
-        let mut fork = MemoryDB::new().fork();
+    fn list_index_iter(db: Box<Database>) {
+        let mut fork = db.fork();
         let mut list_index = ListIndex::new(vec![255], &mut fork);
 
         list_index.extend(vec![1u8, 2, 3]);
@@ -468,5 +471,89 @@ mod tests {
             list_index.iter_from(3).collect::<Vec<u8>>(),
             Vec::<u8>::new()
         );
+    }
+
+    mod memorydb_tests {
+        use std::path::Path;
+        use tempdir::TempDir;
+        use storage::{Database, MemoryDB};
+
+        fn create_database(_: &Path) -> Box<Database> {
+            Box::new(MemoryDB::new())
+        }
+
+        #[test]
+        fn test_list_index_methods() {
+            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let path = dir.path();
+            let db = create_database(path);
+            super::list_index_methods(db);
+        }
+
+        #[test]
+        fn test_list_index_iter() {
+            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let path = dir.path();
+            let db = create_database(path);
+            super::list_index_iter(db);
+        }
+    }
+
+    #[cfg(feature = "leveldb")]
+    mod leveldb_tests {
+        use std::path::Path;
+        use tempdir::TempDir;
+        use storage::{Database, LevelDB, LevelDBOptions};
+
+        fn create_database(path: &Path) -> Box<Database> {
+            let mut opts = LevelDBOptions::default();
+            opts.create_if_missing = true;
+            Box::new(LevelDB::open(path, opts).unwrap())
+        }
+
+        #[test]
+        fn test_list_index_methods() {
+            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let path = dir.path();
+            let db = create_database(path);
+            super::list_index_methods(db);
+        }
+
+        #[test]
+        fn test_list_index_iter() {
+            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let path = dir.path();
+            let db = create_database(path);
+            super::list_index_iter(db);
+        }
+    }
+
+    #[cfg(feature = "rocksdb")]
+    mod rocksdb_tests {
+        use std::path::Path;
+        use tempdir::TempDir;
+        use storage::{Database, RocksDB, RocksDBOptions};
+
+        fn create_database(path: &Path) -> Box<Database> {
+            let mut opts = RocksDBOptions::default();
+            opts.create_if_missing(true);
+            Box::new(RocksDB::open(path, opts).unwrap())
+        }
+
+        #[test]
+        fn test_list_index_methods() {
+            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let path = dir.path();
+            let db = create_database(path);
+            super::list_index_methods(db);
+        }
+
+        #[test]
+        fn test_list_index_iter() {
+            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let path = dir.path();
+            let db = create_database(path);
+            super::list_index_iter(db);
+        }
     }
 }

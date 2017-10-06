@@ -13,158 +13,173 @@
 // limitations under the License.
 
 #![feature(test)]
-
+#![allow(dead_code)]
 extern crate test;
 extern crate rand;
+#[cfg(feature = "rocksdb")]
 extern crate tempdir;
 extern crate exonum;
 
-#[cfg(test)]
-#[cfg(feature = "long_benchmarks")]
+#[cfg(all(test, feature = "long_benchmarks"))]
 mod tests {
+    use std::collections::HashSet;
     use test::Bencher;
-    use rand::{SeedableRng, XorShiftRng, Rng};
+    use rand::{Rng, thread_rng, XorShiftRng, SeedableRng};
+    #[cfg(feature = "rocksdb")]
     use tempdir::TempDir;
-    use exonum::storage::{ProofListIndex, ProofMapIndex, Database, MapIndex, Fork, MemoryDB,
-                          LevelDB, LevelDBOptions};
+    use exonum::storage::{Database, MemoryDB};
+    #[cfg(feature = "rocksdb")]
+    use exonum::storage::{RocksDB, RocksDBOptions};
+    use exonum::storage::{ProofMapIndex, ProofListIndex};
+    use exonum::storage::proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE;
 
-    fn generate_random_kv<Gen: Rng>(rng: &mut Gen, len: usize) -> Vec<(Vec<u8>, Vec<u8>)> {
+    fn generate_random_kv(len: usize) -> Vec<([u8; KEY_SIZE], Vec<u8>)> {
+        let mut rng = thread_rng();
+        let mut exists_keys = HashSet::new();
+        let mut base = [0; KEY_SIZE];
+        rng.fill_bytes(&mut base);
+        let base = base;
+
         let kv_generator = |_| {
             let mut v = vec![0; 8];
-            let mut k: Vec<u8> = vec![0; 32];
+
+            // Generate only unique keys
+            let mut k = base;
+            let byte: usize = rng.gen_range(0, 31);
+            k[byte] = rng.gen::<u8>();
 
             rng.fill_bytes(&mut v);
-            rng.fill_bytes(&mut k);
+            while exists_keys.contains(&k) {
+                rng.fill_bytes(&mut k);
+            }
+            exists_keys.insert(k);
             (k, v)
         };
+
         (0..len).map(kv_generator).collect::<Vec<_>>()
     }
 
     fn merkle_table_insertion<T: Database>(b: &mut Bencher, db: &T) {
         let mut rng = XorShiftRng::from_seed([192, 168, 56, 1]);
-        let map = MapIndex::new(vec![123], db);
-        let table = ProofListIndex::new(map);
-        table.get(0u32).unwrap();
+        let mut storage = db.fork();
+        let mut table = ProofListIndex::new(vec![123], &mut storage);
+
         b.iter(|| {
             let v_generator = |_| {
-                let mut chunk = vec![0; 16];
+                let mut chunk = vec![0; 10];
                 rng.fill_bytes(&mut chunk);
                 chunk
             };
 
             for item in (0..1000).map(v_generator) {
-                table.append(item).unwrap();
+                table.push(item);
             }
         });
     }
 
     fn merkle_patricia_table_insertion<T: Database>(b: &mut Bencher, db: &T) {
-        let mut rng = XorShiftRng::from_seed([192, 168, 56, 1]);
-        let data = generate_random_kv(&mut rng, 200);
+        let data = generate_random_kv(200);
+        let mut storage = db.fork();
+        let mut table = ProofMapIndex::new(vec![123], &mut storage);
 
-        let map = MapIndex::new(vec![234], db);
-        let table = ProofMapIndex::new(map);
         b.iter(|| for item in &data {
-            table.put(&item.0, item.1.clone()).unwrap();
+            table.put(&item.0, item.1.clone());
         });
     }
 
     fn merkle_patricia_table_insertion_fork<T: Database>(b: &mut Bencher, db: &T) {
-        let mut rng = XorShiftRng::from_seed([192, 168, 56, 1]);
-        let data = generate_random_kv(&mut rng, 200);
+        let data = generate_random_kv(200);
 
         b.iter(|| {
             let patch;
             {
-                let fork = db.fork();
+                let mut fork = db.fork();
                 {
-                    let map = MapIndex::new(vec![234], &fork);
-                    let table = ProofMapIndex::new(map);
+                    let mut table = ProofMapIndex::new(vec![234], &mut fork);
                     for item in &data {
-                        table.put(&item.0, item.1.clone()).unwrap();
+                        table.put(&item.0, item.1.clone());
                     }
                 }
                 patch = fork.into_patch();
             }
-            db.merge(&patch).unwrap();
+            db.fork().merge(patch);
         });
     }
 
     fn merkle_patricia_table_insertion_large_map<T: Database>(b: &mut Bencher, db: &T) {
-        let mut rng = XorShiftRng::from_seed([192, 168, 140, 52]);
-        let data = generate_random_kv(&mut rng, 200);
-        let kv_generator = |_| {
-            let mut v = vec![0; 8];
-            let mut k: Vec<u8> = vec![0; 32];
+        let data = generate_random_kv(200);
+        let mut storage = db.fork();
+        let mut table = ProofMapIndex::new(vec![134], &mut storage);
 
-            rng.fill_bytes(&mut v);
-            rng.fill_bytes(&mut k);
-            (k, v)
-        };
-
-        let map = MapIndex::new(vec![134], db);
-        let table = ProofMapIndex::new(map);
-        for item in (0..10000).map(kv_generator) {
-            table.put(&item.0, item.1.clone()).unwrap();
+        for item in &data {
+            table.put(&item.0, item.1.clone());
         }
 
         b.iter(|| for item in &data {
-            table.put(&item.0, item.1.clone()).unwrap();
+            table.put(&item.0, item.1.clone());
         });
+    }
+
+    #[cfg(feature = "rocksdb")]
+    fn create_rocksdb(tempdir: &TempDir) -> RocksDB {
+        let mut options = RocksDBOptions::default();
+        options.create_if_missing(true);
+        RocksDB::open(tempdir.path(), options).unwrap()
     }
 
     #[bench]
     fn bench_merkle_table_append_memorydb(b: &mut Bencher) {
         let db = MemoryDB::new();
-        merkle_table_insertion(b, db);
+        merkle_table_insertion(b, &db);
     }
 
+    #[cfg(feature = "rocksdb")]
     #[bench]
-    fn bench_merkle_table_append_leveldb(b: &mut Bencher) {
-        let mut options = LevelDBOptions::new();
-        options.create_if_missing = true;
-        let dir = TempDir::new("da_bench").unwrap();
-        let db = LevelDB::open(dir.path(), options).unwrap();
-        merkle_table_insertion(b, db);
+    fn bench_merkle_table_append_rocksdb(b: &mut Bencher) {
+        let tempdir = TempDir::new("exonum").unwrap();
+        let db = create_rocksdb(&tempdir);
+        merkle_table_insertion(b, &db);
     }
 
     #[bench]
     fn bench_merkle_patricia_table_insertion_memorydb(b: &mut Bencher) {
         let db = MemoryDB::new();
-        merkle_patricia_table_insertion(b, db);
+        merkle_patricia_table_insertion(b, &db);
     }
 
     #[bench]
-    fn bench_merkle_patricia_table_insertion_leveldb(b: &mut Bencher) {
-        let mut options = LevelDBOptions::new();
-        options.create_if_missing = true;
-        let dir = TempDir::new("da_bench").unwrap();
-        let db = LevelDB::open(dir.path(), options).unwrap();
-        merkle_patricia_table_insertion(b, db);
+    fn bench_merkle_patricia_table_insertion_fork_memorydb(b: &mut Bencher) {
+        let db = MemoryDB::new();
+        merkle_patricia_table_insertion_fork(b, &db);
     }
 
+    #[cfg(feature = "rocksdb")]
     #[bench]
-    fn bench_merkle_patricia_table_insertion_fork_leveldb(b: &mut Bencher) {
-        let mut options = LevelDBOptions::new();
-        options.create_if_missing = true;
-        let dir = TempDir::new("da_bench").unwrap();
-        let db = LevelDB::open(dir.path(), options).unwrap();
-        merkle_patricia_table_insertion_fork(b, db);
+    fn bench_merkle_patricia_table_insertion_rocksdb(b: &mut Bencher) {
+        let tempdir = TempDir::new("exonum").unwrap();
+        let db = create_rocksdb(&tempdir);
+        merkle_patricia_table_insertion(b, &db);
+    }
+
+    #[cfg(feature = "rocksdb")]
+    #[bench]
+    fn bench_merkle_patricia_table_insertion_fork_rocksdb(b: &mut Bencher) {
+        let tempdir = TempDir::new("exonum").unwrap();
+        let db = create_rocksdb(&tempdir);
+        merkle_patricia_table_insertion_fork(b, &db);
     }
 
     #[bench]
     fn long_bench_merkle_patricia_table_insertion_memorydb(b: &mut Bencher) {
         let db = MemoryDB::new();
-        merkle_patricia_table_insertion_large_map(b, db);
+        merkle_patricia_table_insertion_large_map(b, &db);
     }
 
+    #[cfg(feature = "rocksdb")]
     #[bench]
-    fn long_bench_merkle_patricia_table_insertion_leveldb(b: &mut Bencher) {
-        let mut options = LevelDBOptions::new();
-        options.create_if_missing = true;
-        let dir = TempDir::new("da_bench").unwrap();
-        let db = LevelDB::open(dir.path(), options).unwrap();
-        merkle_patricia_table_insertion_large_map(b, db);
+    fn long_bench_merkle_patricia_table_insertion_rocksdb(b: &mut Bencher) {
+        let tempdir = TempDir::new("exonum").unwrap();
+        let db = create_rocksdb(&tempdir);
+        merkle_patricia_table_insertion_large_map(b, &db);
     }
-
 }

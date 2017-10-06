@@ -260,6 +260,19 @@ macro_rules! implement_public_sodium_wrapper {
         }
     }
 
+    impl ::std::str::FromStr for $name {
+        type Err = ::encoding::serialize::FromHexError;
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            $name::from_hex(s)
+        }
+    }
+
+    impl ToString for $name {
+        fn to_string(&self) -> String {
+            ::crypto::HexValue::to_hex(self)
+        }
+    }
+
     impl fmt::Debug for $name {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write!(f, stringify!($name))?;

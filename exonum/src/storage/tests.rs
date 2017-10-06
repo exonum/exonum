@@ -12,20 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use tempdir::TempDir;
-
-use super::{Database, LevelDB, LevelDBOptions, MemoryDB, Snapshot, Fork};
-
-
-fn leveldb_database() -> LevelDB {
-    let mut options = LevelDBOptions::new();
-    options.create_if_missing = true;
-    LevelDB::open(TempDir::new("exonum").unwrap().path(), options).unwrap()
-}
-
-fn memorydb_database() -> MemoryDB {
-    MemoryDB::new()
-}
+use super::{Database, Snapshot, Fork};
 
 fn fork_iter<T: Database>(mut db: T) {
     let mut fork = db.fork();
@@ -174,22 +161,75 @@ fn changelog<T: Database>(db: T) {
     assert_eq!(fork.get(&[4]), None);
 }
 
-#[test]
-fn test_leveldb_fork_iter() {
-    fork_iter(leveldb_database())
+
+mod memorydb_tests {
+    use super::super::MemoryDB;
+
+    fn memorydb_database() -> MemoryDB {
+        MemoryDB::new()
+    }
+
+    #[test]
+    fn test_memory_fork_iter() {
+        super::fork_iter(memorydb_database());
+    }
+
+    #[test]
+    fn test_memory_changelog() {
+        super::changelog(memorydb_database());
+    }
 }
 
-#[test]
-fn test_memory_fork_iter() {
-    fork_iter(memorydb_database())
+#[cfg(feature = "leveldb")]
+mod leveldb_tests {
+    use std::path::Path;
+    use tempdir::TempDir;
+    use super::super::{LevelDB, LevelDBOptions};
+
+    fn leveldb_database(path: &Path) -> LevelDB {
+        let mut options = LevelDBOptions::new();
+        options.create_if_missing = true;
+        LevelDB::open(path, options).unwrap()
+    }
+
+    #[test]
+    fn test_leveldb_fork_iter() {
+        let dir = TempDir::new("exonum_leveldb1").unwrap();
+        let path = dir.path();
+        super::fork_iter(leveldb_database(path));
+    }
+
+    #[test]
+    fn test_leveldb_changelog() {
+        let dir = TempDir::new("exonum_leveldb2").unwrap();
+        let path = dir.path();
+        super::changelog(leveldb_database(path));
+    }
 }
 
-#[test]
-fn test_leveldb_changelog() {
-    changelog(leveldb_database())
-}
+#[cfg(feature = "rocksdb")]
+mod rocksdb_tests {
+    use std::path::Path;
+    use tempdir::TempDir;
+    use super::super::{RocksDB, RocksDBOptions};
 
-#[test]
-fn test_memory_changelog() {
-    changelog(memorydb_database())
+    fn rocksdb_database(path: &Path) -> RocksDB {
+        let mut options = RocksDBOptions::default();
+        options.create_if_missing(true);
+        RocksDB::open(path, options).unwrap()
+    }
+
+    #[test]
+    fn test_rocksdb_fork_iter() {
+        let dir = TempDir::new("exonum_rocksdb1").unwrap();
+        let path = dir.path();
+        super::fork_iter(rocksdb_database(path));
+    }
+
+    #[test]
+    fn test_rocksdb_changelog() {
+        let dir = TempDir::new("exonum_rocksdb2").unwrap();
+        let path = dir.path();
+        super::changelog(rocksdb_database(path));
+    }
 }
