@@ -429,8 +429,6 @@ mod tests {
         );
     }
 
-
-
     fn assert_response_status(
         response: IronResult<Response>,
         expected_status: Status,

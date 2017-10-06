@@ -7,8 +7,8 @@ authors = ["Exonum Team <exonum@bitfury.com>"]
 members = ["cryptocurrency_api_tests"]
 
 [dependencies]
-exonum = "0.1"
-exonum-configuration = "0.1"
+exonum = "0.2"
+exonum-configuration = "0.2"
 env_logger = "0.3"
 clap = {version="2.14", features=["unstable"]}
 time = "0.1"
@@ -28,4 +28,4 @@ tempdir = "0.3.5"
 params = "0.6.0"
 
 [replace]
-"exonum:0.1.0" = { git = "https://github.com/exonum/exonum.git", tag="v0.1" }
+"exonum:0.2.0" = { git = "https://github.com/exonum/exonum.git", tag="v0.2" }
