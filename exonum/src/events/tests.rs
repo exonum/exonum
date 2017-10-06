@@ -257,46 +257,30 @@ fn test_network_reconnect() {
 
     let msg = raw_message(11, 1000);
     let c1 = connect_message(first);
-    let c2 = connect_message(second);
 
     let mut t1 = TestEvents::with_addr(first).spawn();
 
-    {
-        // First connect attempt.
-        let mut t2 = TestEvents::with_addr(second).spawn();
+    // First connect attempt.
+    let mut t2 = TestEvents::with_addr(second).spawn();
 
-        // Handle first attempt
-        t1.connect_with(second);
-        assert_eq!(t2.wait_for_connect(), c1);
+    // Handle first attempt
+    t1.connect_with(second);
+    assert_eq!(t2.wait_for_connect(), c1);
 
-        t2.connect_with(first);
-        assert_eq!(t1.wait_for_connect(), c2);
+    t1.send_to(second, msg.clone());
+    assert_eq!(t2.wait_for_message(), msg);
 
-        t2.send_to(first, msg.clone());
-        assert_eq!(t1.wait_for_message(), msg);
+    drop(t2);
 
-        t2.disconnect_with(first);
-        assert_eq!(t2.wait_for_disconnect(), first);
+    // Handle second attempt
+    let mut t2 = TestEvents::with_addr(second).spawn();
 
-        t1.disconnect_with(second);
-        assert_eq!(t1.wait_for_disconnect(), second);
+    t1.connect_with(second);
+    assert_eq!(t2.wait_for_connect(), c1);
 
-        let mut t2 = TestEvents::with_addr(second).spawn();
+    t1.send_to(second, msg.clone());
+    assert_eq!(t2.wait_for_message(), msg);
 
-        // Handle second attempt
-        t2.connect_with(first);
-        assert_eq!(t1.wait_for_connect(), c2);
-
-        t1.connect_with(second);
-        assert_eq!(t2.wait_for_connect(), c1);
-
-        t2.send_to(first, msg.clone());
-        assert_eq!(t1.wait_for_message(), msg);
-
-        t2.disconnect_with(first);
-        assert_eq!(t2.wait_for_disconnect(), first);
-
-        t1.disconnect_with(second);
-        assert_eq!(t1.wait_for_disconnect(), second);
-    }
+    t1.disconnect_with(second);
+    assert_eq!(t1.wait_for_disconnect(), second);
 }
