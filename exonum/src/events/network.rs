@@ -310,12 +310,12 @@ impl NetworkPart {
             .map_err(log_error);
 
         let cancel_handler = cancel_handler.map_err(drop);
-        let tasks = vec![
-            tobox(server),
-            tobox(requests_handle),
-            tobox(cancel_handler)
-        ];
-        tobox(future::join_all(tasks))
+        let fut = server.join(requests_handle)
+            .map(drop)
+            .select(cancel_handler)
+            .map_err(drop);
+
+        tobox(fut)
     }
 }
 
