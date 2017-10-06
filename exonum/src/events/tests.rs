@@ -112,11 +112,7 @@ impl TestHandler {
             .send(NetworkRequest::Shutdown)
             .wait()
             .unwrap();
-        self.handle
-            .take()
-            .expect("shutdown twice")
-            .join()
-            .unwrap();
+        self.handle.take().expect("shutdown twice").join().unwrap();
     }
 }
 
