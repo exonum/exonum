@@ -72,7 +72,7 @@ pub struct ProofMapIndexIter<'a, K, V> {
 ///
 /// [`keys`]: struct.ProofMapIndex.html#method.keys
 /// [`keys_from`]: struct.ProofMapIndex.html#method.keys_from
-/// [`ProofMapIndex`]: struct.MapIndex.html
+/// [`ProofMapIndex`]: struct.ProofMapIndex.html
 #[derive(Debug)]
 pub struct ProofMapIndexKeys<'a, K> {
     base_iter: BaseIndexIter<'a, DBKey, ()>,
