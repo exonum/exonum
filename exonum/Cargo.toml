@@ -39,12 +39,17 @@ bodyparser = "0.7.0"
 params = "0.6.0"
 mount = "0.3.0"
 atty = "0.2.2"
+libloading = "0.4.2"
 
-exonum_sodiumoxide = { version = "0.0.14" }
+# exonum_sodiumoxide = { version = "0.0.14" }
 exonum_rocksdb = { version = "0.6.1", optional = true }
 exonum_leveldb = { version = "0.9.1", optional = true }
 exonum_profiler = { version = "0.1.1" }
 exonum_flamer = { version = "0.1.5", optional = true }
+
+[dependencies.exonum_sodiumoxide]
+git = "https://github.com/darkeld3r/exonum_sodiumoxide.git"
+rev = "0e5c692fc1772727427727632ec620d9497c5d4b"
 
 [dev-dependencies]
 pretty_assertions = "0.2.1"
