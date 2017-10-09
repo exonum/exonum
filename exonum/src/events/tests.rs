@@ -279,6 +279,8 @@ fn test_network_reconnect() {
 
     drop(t2);
 
+    assert_eq!(t1.wait_for_disconnect(), second);
+
     // Handle second attempt
     let mut t2 = TestEvents::with_addr(second).spawn();
 
