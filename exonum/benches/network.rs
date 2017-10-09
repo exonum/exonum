@@ -9,10 +9,11 @@ mod tests {
     use test::Bencher;
 
     use std::net::SocketAddr;
+    use std::thread;
 
     use exonum::node::EventsPoolCapacity;
     use exonum::events::network::NetworkConfiguration;
-    use exonum::events::tests::{connect_message, raw_message, TestEvents, TestHandler};
+    use exonum::events::tests::{connect_message, raw_message, TestEvents};
 
     struct BenchConfig {
         times: usize,
@@ -36,34 +37,49 @@ mod tests {
         b.iter(|| {
             let times = cfg.times;
             let len = cfg.len;
+            let first = addrs[0];
+            let second = addrs[1];
 
-            let c1 = connect_message(addrs[0]);
-            let c2 = connect_message(addrs[1]);
+            let c1 = connect_message(first);
+            let c2 = connect_message(second);
 
-            let t1 = test_events(cfg, addrs[0]).spawn(move |e: &mut TestHandler| {
-                e.connect_with(addrs[1]);
-                assert_eq!(e.wait_for_connect(), c2);
+            let mut t1 = test_events(cfg, first).spawn();
+            let mut t2 = test_events(cfg, second).spawn();
+
+            t1.connect_with(second);
+            t2.connect_with(first);
+            assert_eq!(t1.wait_for_connect(), c2);
+            assert_eq!(t2.wait_for_connect(), c1);
+
+            let t1 = thread::spawn(move || {
                 for _ in 0..times {
                     let msg = raw_message(0, len);
-                    e.send_to(addrs[1], msg);
-                    e.wait_for_message();
+                    t1.send_to(second, msg);
+                    t1.wait_for_message();
                 }
-                e.disconnect_with(addrs[1]);
-                assert_eq!(e.wait_for_disconnect(), addrs[1]);
-            });
-            let t2 = test_events(cfg, addrs[1]).spawn(move |e: &mut TestHandler| {
-                assert_eq!(e.wait_for_connect(), c1);
-                e.connect_with(addrs[0]);
-                for _ in 0..times {
-                    let msg = raw_message(1, len);
-                    e.send_to(addrs[0], msg);
-                    e.wait_for_message();
-                }
-                assert_eq!(e.wait_for_disconnect(), addrs[0]);
+                t1
             });
 
-            t1.join().unwrap();
-            t2.join().unwrap();
+            let t2 = thread::spawn(move || {
+                for _ in 0..times {
+                    let msg = raw_message(1, len);
+                    t2.send_to(first, msg);
+                    t2.wait_for_message();
+                }
+                t2
+            });
+
+            let mut t1 = t1.join().unwrap();
+            let mut t2 = t2.join().unwrap();
+
+            t1.disconnect_with(second);
+            t2.disconnect_with(first);
+
+            assert_eq!(t1.wait_for_disconnect(), second);
+            assert_eq!(t2.wait_for_disconnect(), first);
+
+            drop(t1);
+            drop(t2);
         })
     }
 

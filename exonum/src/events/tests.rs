@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use futures::{self, Future, Sink, Stream};
+use futures::{Future, Sink, Stream};
 use futures::stream::Wait;
 use futures::sync::mpsc;
 use tokio_core::reactor::Core;
@@ -25,10 +25,12 @@ use crypto::{gen_keypair, PublicKey, Signature};
 use messages::{Connect, Message, MessageWriter, RawMessage};
 use events::{NetworkEvent, NetworkRequest};
 use events::network::{NetworkConfiguration, NetworkPart};
+use events::error::log_error;
 use node::{EventsPoolCapacity, NodeChannel};
 
 #[derive(Debug)]
 pub struct TestHandler {
+    handle: Option<thread::JoinHandle<()>>,
     listen_address: SocketAddr,
     network_events_rx: Wait<TimeoutStream<mpsc::Receiver<NetworkEvent>>>,
     network_requests_tx: mpsc::Sender<NetworkRequest>,
@@ -43,6 +45,7 @@ impl TestHandler {
         let timer = Timer::default();
         let receiver = timer.timeout_stream(network_events_rx, Duration::from_secs(30));
         TestHandler {
+            handle: None,
             listen_address,
             network_requests_tx,
             network_events_rx: receiver.wait(),
@@ -102,16 +105,21 @@ impl TestHandler {
             Err(e) => panic!("An error during wait for message occured, {:?}", e),
         }
     }
+
+    pub fn shutdown(&mut self) {
+        self.network_requests_tx
+            .clone()
+            .send(NetworkRequest::Shutdown)
+            .wait()
+            .unwrap();
+        self.handle.take().expect("shutdown twice").join().unwrap();
+    }
 }
 
 impl Drop for TestHandler {
     fn drop(&mut self) {
         if !::std::thread::panicking() {
-            self.network_requests_tx
-                .clone()
-                .send(NetworkRequest::Shutdown)
-                .wait()
-                .unwrap();
+            self.shutdown();
         }
     }
 }
@@ -123,11 +131,6 @@ pub struct TestEvents {
     pub events_config: EventsPoolCapacity,
 }
 
-struct TestHandlerPart {
-    handler: TestHandler,
-    core: Core,
-}
-
 impl TestEvents {
     pub fn with_addr(listen_address: SocketAddr) -> TestEvents {
         TestEvents {
@@ -137,29 +140,19 @@ impl TestEvents {
         }
     }
 
-    pub fn spawn<F>(self, test_fn: F) -> thread::JoinHandle<()>
-    where
-        F: Fn(&mut TestHandler) + 'static + Send,
-    {
-        thread::spawn(move || {
-            let (handler_part, network_part) = self.into_reactor();
-            let network_thread = thread::spawn(move || network_part.run().unwrap());
-
-            let mut handler = handler_part.handler;
-
-            let mut core = handler_part.core;
-            let test_fut = futures::lazy(move || -> Result<(), ()> {
-                test_fn(&mut handler);
-                Ok(())
-            });
-            core.run(test_fut).unwrap();
-            network_thread.join().unwrap();
-        })
+    pub fn spawn(self) -> TestHandler {
+        let (mut handler_part, network_part) = self.into_reactor();
+        let handle = thread::spawn(move || {
+            let mut core = Core::new().unwrap();
+            let fut = network_part.run(core.handle());
+            core.run(fut).map_err(log_error).unwrap();
+        });
+        handler_part.handle = Some(handle);
+        handler_part
     }
 
-    fn into_reactor(self) -> (TestHandlerPart, NetworkPart) {
+    fn into_reactor(self) -> (TestHandler, NetworkPart) {
         let channel = NodeChannel::new(self.events_config);
-        let core = Core::new().unwrap();
         let network_config = self.network_config;
         let (network_tx, network_rx) = channel.network_events;
         let network_requests_tx = channel.network_requests.0.clone();
@@ -171,10 +164,7 @@ impl TestEvents {
             network_tx: network_tx.clone(),
         };
 
-        let handler_part = TestHandlerPart {
-            core,
-            handler: TestHandler::new(self.listen_address, network_requests_tx, network_rx),
-        };
+        let handler_part = TestHandler::new(self.listen_address, network_requests_tx, network_rx);
         (handler_part, network_part)
     }
 }
@@ -197,130 +187,109 @@ pub fn raw_message(id: u16, len: usize) -> RawMessage {
 
 #[test]
 fn test_network_handshake() {
-    let addrs: [SocketAddr; 2] =
-        ["127.0.0.1:17230".parse().unwrap(), "127.0.0.1:17231".parse().unwrap()];
+    let first = "127.0.0.1:17230".parse().unwrap();
+    let second = "127.0.0.1:17231".parse().unwrap();
 
-    let e1 = TestEvents::with_addr(addrs[0]);
-    let e2 = TestEvents::with_addr(addrs[1]);
+    let e1 = TestEvents::with_addr(first);
+    let e2 = TestEvents::with_addr(second);
 
-    let c1 = connect_message(addrs[0]);
-    let c2 = connect_message(addrs[1]);
+    let c1 = connect_message(first);
+    let c2 = connect_message(second);
 
-    let t1 = e1.spawn(move |e: &mut TestHandler| {
-        e.connect_with(addrs[1]);
-        assert_eq!(e.wait_for_connect(), c2);
-        e.disconnect_with(addrs[1]);
-        assert_eq!(e.wait_for_disconnect(), addrs[1]);
-    });
-    let t2 = e2.spawn(move |e: &mut TestHandler| {
-        assert_eq!(e.wait_for_connect(), c1);
-        e.connect_with(addrs[0]);
-        assert_eq!(e.wait_for_disconnect(), addrs[0]);
-    });
+    let mut e1 = e1.spawn();
+    let mut e2 = e2.spawn();
 
-    t1.join().unwrap();
-    t2.join().unwrap();
+    e1.connect_with(second);
+    assert_eq!(e2.wait_for_connect(), c1);
+
+    e2.connect_with(first);
+    assert_eq!(e1.wait_for_connect(), c2);
+
+    e1.disconnect_with(second);
+    assert_eq!(e1.wait_for_disconnect(), second);
+
+    e2.disconnect_with(first);
+    assert_eq!(e2.wait_for_disconnect(), first);
 }
 
 #[test]
 fn test_network_big_message() {
-    let addrs: [SocketAddr; 2] =
-        ["127.0.0.1:17200".parse().unwrap(), "127.0.0.1:17201".parse().unwrap()];
+    let first = "127.0.0.1:17200".parse().unwrap();
+    let second = "127.0.0.1:17201".parse().unwrap();
 
-    let msg1 = raw_message(15, 100000);
-    let msg2 = raw_message(16, 400);
+    let m1 = raw_message(15, 100000);
+    let m2 = raw_message(16, 400);
 
-    let e1 = TestEvents::with_addr(addrs[0]);
-    let e2 = TestEvents::with_addr(addrs[1]);
+    let e1 = TestEvents::with_addr(first);
+    let e2 = TestEvents::with_addr(second);
 
-    let m1 = msg1.clone();
-    let m2 = msg2.clone();
-    let t1 = e1.spawn(move |e: &mut TestHandler| {
-        e.connect_with(addrs[1]);
-        e.wait_for_connect();
+    let mut e1 = e1.spawn();
+    let mut e2 = e2.spawn();
 
-        e.send_to(addrs[1], m1.clone());
-        e.send_to(addrs[1], m2.clone());
-        e.send_to(addrs[1], m1.clone());
+    e1.connect_with(second);
+    e2.wait_for_connect();
 
-        assert_eq!(e.wait_for_message(), m2);
-        assert_eq!(e.wait_for_message(), m1);
-        assert_eq!(e.wait_for_message(), m2);
+    e2.connect_with(first);
+    e1.wait_for_connect();
 
-        e.disconnect_with(addrs[1]);
-        assert_eq!(e.wait_for_disconnect(), addrs[1]);
-    });
+    e1.send_to(second, m1.clone());
+    assert_eq!(e2.wait_for_message(), m1);
 
-    let m1 = msg1.clone();
-    let m2 = msg2.clone();
-    let t2 = e2.spawn(move |e: &mut TestHandler| {
-        e.connect_with(addrs[0]);
-        e.wait_for_connect();
+    e1.send_to(second, m2.clone());
+    assert_eq!(e2.wait_for_message(), m2);
 
-        e.send_to(addrs[0], m2.clone());
-        e.send_to(addrs[0], m1.clone());
-        e.send_to(addrs[0], m2.clone());
+    e1.send_to(second, m1.clone());
+    assert_eq!(e2.wait_for_message(), m1);
 
-        assert_eq!(e.wait_for_message(), m1);
-        assert_eq!(e.wait_for_message(), m2);
-        assert_eq!(e.wait_for_message(), m1);
+    e2.send_to(first, m2.clone());
+    assert_eq!(e1.wait_for_message(), m2);
 
-        e.disconnect_with(addrs[0]);
-        assert_eq!(e.wait_for_disconnect(), addrs[0]);
-    });
+    e2.send_to(first, m1.clone());
+    assert_eq!(e1.wait_for_message(), m1);
 
-    t2.join().unwrap();
-    t1.join().unwrap();
+    e2.send_to(first, m2.clone());
+    assert_eq!(e1.wait_for_message(), m2);
+
+    e1.disconnect_with(second);
+    assert_eq!(e1.wait_for_disconnect(), second);
+
+    e2.disconnect_with(first);
+    assert_eq!(e2.wait_for_disconnect(), first);
 }
 
 #[test]
 fn test_network_reconnect() {
-    let addrs: [SocketAddr; 2] =
-        ["127.0.0.1:19100".parse().unwrap(), "127.0.0.1:19101".parse().unwrap()];
+    let first = "127.0.0.1:19100".parse().unwrap();
+    let second = "127.0.0.1:19101".parse().unwrap();
 
     let msg = raw_message(11, 1000);
-    let c1 = connect_message(addrs[0]);
-    let c2 = connect_message(addrs[1]);
-    let msg_cloned = msg.clone();
-    let t1 = TestEvents::with_addr(addrs[0]).spawn(move |e: &mut TestHandler| {
-        // Handle first attempt
-        e.connect_with(addrs[1]);
-        assert_eq!(e.wait_for_connect(), c2);
-        assert_eq!(e.wait_for_message(), msg_cloned);
-        assert_eq!(e.wait_for_disconnect(), addrs[1]);
-        // Handle second attempt
-        assert_eq!(e.wait_for_connect(), c2);
-        e.connect_with(addrs[1]);
-        assert_eq!(e.wait_for_message(), msg_cloned);
-        e.disconnect_with(addrs[1]);
-        assert_eq!(e.wait_for_disconnect(), addrs[1]);
-    });
+    let c1 = connect_message(first);
+
+    let mut t1 = TestEvents::with_addr(first).spawn();
+
     // First connect attempt.
-    let c1_cloned = c1.clone();
-    let msg_cloned = msg.clone();
-    TestEvents::with_addr(addrs[1])
-        .spawn(move |e: &mut TestHandler| {
-            assert_eq!(e.wait_for_connect(), c1_cloned);
-            e.connect_with(addrs[0]);
-            e.send_to(addrs[0], msg_cloned.clone());
-            e.disconnect_with(addrs[0]);
-            assert_eq!(e.wait_for_disconnect(), addrs[0]);
-        })
-        .join()
-        .unwrap();
-    // Second connect attempt.
-    let c1_cloned = c1.clone();
-    let msg_cloned = msg.clone();
-    TestEvents::with_addr(addrs[1])
-        .spawn(move |e: &mut TestHandler| {
-            e.connect_with(addrs[0]);
-            assert_eq!(e.wait_for_connect(), c1_cloned);
-            e.send_to(addrs[0], msg_cloned.clone());
-            e.disconnect_with(addrs[0]);
-            assert_eq!(e.wait_for_disconnect(), addrs[0]);
-        })
-        .join()
-        .unwrap();
-    // Wait for first server
-    t1.join().unwrap();
+    let mut t2 = TestEvents::with_addr(second).spawn();
+
+    // Handle first attempt
+    t1.connect_with(second);
+    assert_eq!(t2.wait_for_connect(), c1);
+
+    t1.send_to(second, msg.clone());
+    assert_eq!(t2.wait_for_message(), msg);
+
+    drop(t2);
+
+    assert_eq!(t1.wait_for_disconnect(), second);
+
+    // Handle second attempt
+    let mut t2 = TestEvents::with_addr(second).spawn();
+
+    t1.connect_with(second);
+    assert_eq!(t2.wait_for_connect(), c1);
+
+    t1.send_to(second, msg.clone());
+    assert_eq!(t2.wait_for_message(), msg);
+
+    t1.disconnect_with(second);
+    assert_eq!(t1.wait_for_disconnect(), second);
 }

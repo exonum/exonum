@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use futures::{unsync, Future, IntoFuture, Sink, Stream};
+use futures::{future, unsync, Future, IntoFuture, Sink, Stream};
 use futures::future::Either;
 use futures::sync::mpsc;
-use tokio_core::net::{TcpListener, TcpStream, TcpStreamNew};
-use tokio_core::reactor::{Core, Handle};
+use tokio_core::net::{TcpListener, TcpStream};
+use tokio_core::reactor::Handle;
 use tokio_io::AsyncRead;
-use tokio_retry::{Action, Retry};
+use tokio_retry::Retry;
 use tokio_retry::strategy::{jitter, FixedInterval};
 
 use std::io;
@@ -35,6 +35,8 @@ use helpers::Milliseconds;
 use super::error::{into_other, log_error, other_error, result_ok};
 use super::codec::MessagesCodec;
 use super::{EventsAggregator, EventHandler};
+
+const OUTGOING_CHANNEL_SIZE: usize = 10;
 
 #[derive(Debug)]
 pub enum NetworkEvent {
@@ -76,7 +78,6 @@ impl Default for NetworkConfiguration {
 
 #[derive(Debug)]
 pub struct HandlerPart<H: EventHandler> {
-    pub core: Core,
     pub handler: H,
     pub timeout_rx: mpsc::Receiver<NodeTimeout>,
     pub network_rx: mpsc::Receiver<NetworkEvent>,
@@ -118,159 +119,169 @@ impl ConnectionsPool {
     }
 }
 
-impl<H: EventHandler> HandlerPart<H> {
-    pub fn run(self) -> Result<(), ()> {
-        let mut core = self.core;
+impl<H: EventHandler + 'static> HandlerPart<H> {
+    pub fn run(self) -> Box<Future<Item = (), Error = ()>> {
         let mut handler = self.handler;
 
-        let events_handle = EventsAggregator::new(self.timeout_rx, self.network_rx, self.api_rx)
+        let fut = EventsAggregator::new(self.timeout_rx, self.network_rx, self.api_rx)
             .for_each(move |event| {
                 handler.handle_event(event);
                 Ok(())
             });
-        core.run(events_handle)
+
+        tobox(fut)
     }
 }
 
 impl NetworkPart {
-    pub fn run(self) -> Result<(), io::Error> {
+    pub fn run(self, handle_orig: Handle) -> Box<Future<Item = (), Error = io::Error>> {
         let network_config = self.network_config;
         // Cancelation token
-        let (cancel_sender, cancel_handler) = unsync::mpsc::channel(1);
+        let (cancel_sender, cancel_handler) = unsync::oneshot::channel();
+        let mut cancel_sender = Some(cancel_sender);
         // Outgoing connections
         let outgoing_connections = ConnectionsPool::new();
-        // Requests handler
-        let mut core = Core::new()?;
-        let handle = core.handle();
         let network_tx = self.network_tx.clone();
         // Outgoing connections limiter
         let outgoing_connections_limit = network_config.max_outgoing_connections;
-        let requests_handle = self.network_requests.1.for_each(move |request| {
-            let network_tx = network_tx.clone();
-            let cancel_sender = cancel_sender.clone();
-            let outgoing_connections = outgoing_connections.clone();
-            match request {
-                NetworkRequest::SendMessage(peer, msg) => {
-                    let conn_tx = if let Some(conn_tx) = outgoing_connections.get(peer) {
-                        conn_tx
-                    } else {
-                        // Check limit
-                        if outgoing_connections.len() >= outgoing_connections_limit {
-                            warn!(
-                                "Rejected outgoing connection with peer={}, \
+        let handle = handle_orig.clone();
+        let requests_handle = self.network_requests
+            .1
+            .map_err(|_| other_error("no network requests"))
+            .for_each(move |request| {
+                let handle = handle.clone();
+                let outgoing_connections = outgoing_connections.clone();
+                match request {
+                    NetworkRequest::SendMessage(peer, msg) => {
+                        let network_tx_cloned = network_tx.clone();
+                        let outgoing_connections_cloned = outgoing_connections.clone();
+                        let new_connection = || {
+                            if outgoing_connections_cloned.len() >= outgoing_connections_limit {
+                                warn!(
+                                    "Rejected outgoing connection with peer={}, \
                                  connections limit reached.",
-                                peer
-                            );
-                            Self::send_event(
-                                &handle,
-                                &network_tx,
-                                NetworkEvent::PeerDisconnected(peer),
-                            );
-                            return Ok(());
+                                    peer
+                                );
+                                None
+                            } else {
+                                // Register outgoing channel.
+                                let (conn_tx, conn_rx) = mpsc::channel(OUTGOING_CHANNEL_SIZE);
+                                outgoing_connections.insert(peer, &conn_tx);
+                                // Enable retry feature for outgoing connection.
+                                let timeout = network_config.tcp_connect_retry_timeout;
+                                let max_tries = network_config.tcp_connect_max_retries as usize;
+                                let strategy = FixedInterval::from_millis(timeout)
+                                    .map(jitter)
+                                    .take(max_tries);
+                                let handle_cloned = handle.clone();
+                                let action = move || TcpStream::connect(&peer, &handle_cloned);
+                                let connect_handle = Retry::spawn(handle.clone(), strategy, action)
+                                .map_err(into_other)
+                                // Configure socket
+                                .and_then(move |sock| {
+                                    sock.set_nodelay(network_config.tcp_nodelay)?;
+                                    let duration =
+                                        network_config.tcp_keep_alive.map(Duration::from_millis);
+                                    sock.set_keepalive(duration)?;
+                                    Ok(sock)
+                                })
+                                // Connect socket with the outgoing channel
+                                .and_then(move |sock| {
+                                    trace!("Established connection with peer={}", peer);
+
+                                    let stream = sock.framed(MessagesCodec);
+                                    let (sink, stream) = stream.split();
+
+                                    let writer = conn_rx
+                                        .map_err(|_| other_error("Can't send data into socket"))
+                                        .forward(sink);
+                                    let reader = stream.for_each(result_ok);
+
+                                    reader
+                                        .select2(writer)
+                                        .map_err(|_| other_error("Socket error"))
+                                        .and_then(|res| match res {
+                                            Either::A((_, _reader)) => Ok("by reader"),
+                                            Either::B((_, _writer)) => Ok("by writer"),
+                                        })
+                                })
+                                .then(move |res| {
+                                    trace!(
+                                        "Connection with peer={} closed, reason={:?}",
+                                        peer,
+                                        res
+                                    );
+                                    outgoing_connections_cloned.clone().remove(&peer);
+                                    network_tx_cloned
+                                        .clone()
+                                        .send(NetworkEvent::PeerDisconnected(peer))
+                                        .map(drop)
+                                })
+                                .map_err(log_error);
+                                handle.spawn(connect_handle);
+                                Some(conn_tx)
+                            }
+                        };
+                        let conn_tx = outgoing_connections.get(peer).or_else(new_connection);
+                        if let Some(conn_tx) = conn_tx {
+                            let fut = conn_tx.send(msg).map_err(|_| {
+                                other_error("can't send message to a connection")
+                            });
+                            tobox(fut)
+                        } else {
+                            let event = NetworkEvent::PeerDisconnected(peer);
+                            let fut = network_tx
+                                .clone()
+                                .send(event)
+                                .map_err(|_| other_error("can't send network event"))
+                                .into_future();
+                            tobox(fut)
                         }
-                        // Register outgoing channel.
-                        let (conn_tx, conn_rx) = mpsc::channel(10);
-                        outgoing_connections.insert(peer, &conn_tx);
-                        // Enable retry feature for outgoing connection.
-                        let timeout = network_config.tcp_connect_retry_timeout;
-                        let max_tries = network_config.tcp_connect_max_retries as usize;
-                        let connect_handle = Retry::spawn(
-                            handle.clone(),
-                            FixedInterval::from_millis(timeout).map(jitter).take(
-                                max_tries,
-                            ),
-                            TcpStreamConnectAction {
-                                handle: handle.clone(),
-                                peer,
-                            },
-                        ).map_err(into_other)
-                            // Configure socket
-                            .and_then(move |sock| {
-                                sock.set_nodelay(network_config.tcp_nodelay)?;
-                                Ok(sock)
+                    }
+                    NetworkRequest::DisconnectWithPeer(peer) => {
+                        outgoing_connections.remove(&peer);
+                        let event = NetworkEvent::PeerDisconnected(peer);
+                        let fut = network_tx.clone().send(event).map_err(|_| {
+                            other_error("can't send network event")
+                        });
+                        tobox(fut)
+                    }
+                    // Immediately stop the event loop.
+                    NetworkRequest::Shutdown => {
+                        let fut = cancel_sender
+                            .take()
+                            .ok_or_else(|| other_error("shutdown twice"))
+                            .and_then(|sender| {
+                                sender.send(()).map_err(
+                                    |_| other_error("can't send shutdown signal"),
+                                )
                             })
-                            .and_then(move |sock| {
-                                let duration =
-                                    network_config.tcp_keep_alive.map(Duration::from_millis);
-                                sock.set_keepalive(duration)?;
-                                Ok(sock)
-                            })
-                            // Connect socket with the outgoing channel
-                            .and_then(move |sock| {
-                                trace!("Established connection with peer={}", peer);
-
-                                let stream = sock.framed(MessagesCodec);
-                                let (sink, stream) = stream.split();
-
-                                let writer = conn_rx
-                                    .map_err(|_| other_error("Can't send data into socket"))
-                                    .forward(sink);
-                                let reader = stream.for_each(result_ok);
-
-                                reader
-                                    .select2(writer)
-                                    .map_err(|_| other_error("Socket error"))
-                                    .and_then(|res| match res {
-                                        Either::A((_, _reader)) => Ok(()).into_future(),
-                                        Either::B((_, _writer)) => Ok(()).into_future(),
-                                    })
-                            })
-                            .then(move |res| {
-                                trace!("Connection with peer={} closed, reason={:?}", peer, res);
-                                outgoing_connections.clone().remove(&peer);
-                                network_tx
-                                    .clone()
-                                    .send(NetworkEvent::PeerDisconnected(peer))
-                                    .map(drop)
-                            })
-                            .map_err(log_error);
-                        handle.spawn(connect_handle);
-                        conn_tx
-                    };
-
-                    let send_handle = conn_tx.send(msg).map_err(log_error).map(drop);
-                    handle.spawn(send_handle);
+                            .into_future();
+                        tobox(fut)
+                    }
                 }
-                NetworkRequest::DisconnectWithPeer(peer) => {
-                    outgoing_connections.remove(&peer);
-                    Self::send_event(&handle, &network_tx, NetworkEvent::PeerDisconnected(peer));
-                }
-                // Immediately stop the event loop.
-                NetworkRequest::Shutdown => {
-                    cancel_sender
-                        .clone()
-                        .send(())
-                        .map(drop)
-                        .map_err(log_error)
-                        .wait()?
-                }
-            }
-
-            Ok(())
-        });
+            });
 
         // Incoming connections limiter
         let incoming_connections_limit = network_config.max_incoming_connections;
         let incoming_connections_counter: Rc<()> = Rc::default();
         // Incoming connections handler
-        let listener = TcpListener::bind(&self.listen_address, &core.handle())?;
+        // TODO Don't use unwrap here!
+        let listener = TcpListener::bind(&self.listen_address, &handle_orig).unwrap();
         let network_tx = self.network_tx.clone();
-        let handle = core.handle();
-        let server = listener
-            .incoming()
-            .for_each(move |(sock, addr)| {
-                // Increment reference counter
-                let holder = Rc::downgrade(&incoming_connections_counter);
-                // Check incoming connections count
-                let connections_count = Rc::weak_count(&incoming_connections_counter);
-                if connections_count > incoming_connections_limit {
-                    warn!(
-                        "Rejected incoming connection with peer={}, \
+        let server = listener.incoming().for_each(move |(sock, addr)| {
+            // Increment reference counter
+            let holder = Rc::downgrade(&incoming_connections_counter);
+            // Check incoming connections count
+            let connections_count = Rc::weak_count(&incoming_connections_counter);
+            if connections_count > incoming_connections_limit {
+                warn!(
+                    "Rejected incoming connection with peer={}, \
                          connections limit reached.",
-                        addr
-                    );
-                    return Ok(());
-                }
+                    addr
+                );
+                tobox(future::ok(()))
+            } else {
                 trace!("Accepted incoming connection with peer={}", addr);
                 let stream = sock.framed(MessagesCodec);
                 let (_, stream) = stream.split();
@@ -305,40 +316,21 @@ impl NetworkPart {
                     .map(|_| {
                         // Ensure that holder lives until the stream ends.
                         let _holder = holder;
-                    })
-                    .map_err(log_error);
-                handle.spawn(connection_handler);
-                Ok(())
-            })
-            .map_err(log_error);
+                    });
+                tobox(connection_handler)
+            }
+        });
 
-        core.handle().spawn(server);
-        core.handle().spawn(requests_handle);
-        core.run(
-            cancel_handler
-                .into_future()
-                .map(|_| trace!("Network thread shutdown"))
-                .map_err(|_| other_error("An error during `Core` shutdown occured")),
-        )
-    }
-
-    fn send_event(handle: &Handle, network_tx: &mpsc::Sender<NetworkEvent>, event: NetworkEvent) {
-        handle.spawn(network_tx.clone().send(event).map(drop).map_err(log_error));
+        let cancel_handler = cancel_handler.map_err(|_| other_error("can't cancel routine"));
+        let fut = server
+            .join(requests_handle)
+            .map(drop)
+            .select(cancel_handler)
+            .map_err(|(e, _)| e);
+        tobox(fut)
     }
 }
 
-// Tcp streams source for retry action.
-struct TcpStreamConnectAction {
-    handle: Handle,
-    peer: SocketAddr,
-}
-
-impl Action for TcpStreamConnectAction {
-    type Future = TcpStreamNew;
-    type Item = <TcpStreamNew as Future>::Item;
-    type Error = <TcpStreamNew as Future>::Error;
-
-    fn run(&mut self) -> Self::Future {
-        TcpStream::connect(&self.peer, &self.handle)
-    }
+fn tobox<F: Future + 'static>(f: F) -> Box<Future<Item = (), Error = F::Error>> {
+    Box::new(f.map(drop))
 }

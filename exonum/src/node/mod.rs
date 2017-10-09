@@ -37,7 +37,7 @@ use api::{private, public, Api};
 use messages::{Connect, Message, RawMessage};
 use events::{NetworkRequest, TimeoutRequest, NetworkEvent};
 use events::network::{HandlerPart, NetworkConfiguration, NetworkPart};
-use events::error::{into_other, LogError};
+use events::error::{into_other, other_error, LogError};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 
 pub use self::state::{RequestData, State, TxPool, ValidatorState};
@@ -677,12 +677,12 @@ impl Node {
     pub fn run_handler(mut self) -> io::Result<()> {
         self.handler.initialize();
 
+        let mut core = Core::new()?;
         let (handler_part, network_part) = self.into_reactor();
-        let network_thread = thread::spawn(move || { network_part.run().unwrap(); });
-
-        handler_part.run().unwrap();
-        network_thread.join().unwrap();
-        Ok(())
+        network_part.run(core.handle());
+        core.run(handler_part.run()).map_err(|_| {
+            other_error("can't run node handler")
+        })
     }
 
     /// A generic implementation that launches `Node` and optionally creates threads
@@ -799,7 +799,6 @@ impl Node {
         core.handle().spawn(timeout_handler);
 
         let handler_part = HandlerPart {
-            core,
             handler: self.handler,
             timeout_rx,
             network_rx: network_rx,
