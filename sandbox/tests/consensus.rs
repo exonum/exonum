@@ -220,6 +220,7 @@ fn should_not_send_propose_and_prevote_after_node_restart() {
         sandbox.round_timeout() + sandbox.propose_timeout(),
     ));
 
+    assert!(sandbox.is_leader());
     sandbox.assert_state(HEIGHT_ONE, ROUND_THREE);
 
     // ok, we are leader
@@ -249,10 +250,8 @@ fn should_not_send_propose_and_prevote_after_node_restart() {
 /// - Node should recover to previous state --> jumps into the round before stop and does not send
 /// Prevote again
 #[test]
-fn should_not_send_propose_and_prevote_after_node_restart_incoming() {
+fn should_not_send_prevote_after_node_restart_incoming() {
     let sandbox = timestamping_sandbox();
-    let tx = gen_timestamping_tx();
-
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
@@ -351,6 +350,228 @@ fn should_not_vote_after_node_restart() {
     receive_valid_propose_with_transactions(&sandbox_restarted, &[tx.hash()]);
 
     // Here sandbox goes out of scope and sandbox.drop() will cause panic if there any sent messages
+}
+
+/// Idea: we should check whether outgoing Precommit gets saved and recovered from cache
+/// - Node locks on some Propose and broadcasts Precommit
+/// - Node restarts
+/// - Node receives Precommits from two other validators. With our recovered one it's already
+/// +2/3 of Precommits, and node reaches new height
+#[test]
+fn should_save_precommit_to_consensus_cache() {
+    let sandbox = timestamping_sandbox();
+
+    let propose = ProposeBuilder::new(&sandbox)
+        .with_duration_since_sandbox_time(sandbox.propose_timeout())
+        .build();
+
+    let block = BlockBuilder::new(&sandbox)
+        .with_duration_since_sandbox_time(sandbox.propose_timeout())
+        .build();
+
+    sandbox.recv(propose.clone());
+
+    sandbox.broadcast(Prevote::new(
+        VALIDATOR_0,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        LOCK_ZERO,
+        sandbox.s(VALIDATOR_0),
+    ));
+
+    sandbox.recv(Prevote::new(
+        VALIDATOR_1,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        LOCK_ZERO,
+        sandbox.s(VALIDATOR_1),
+    ));
+    sandbox.assert_lock(LOCK_ZERO, None); //do not lock if <2/3 prevotes
+
+    sandbox.recv(Prevote::new(
+        VALIDATOR_2,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        LOCK_ZERO,
+        sandbox.s(VALIDATOR_2),
+    ));
+    sandbox.assert_lock(LOCK_ONE, Some(propose.hash()));
+
+    sandbox.broadcast(Precommit::new(
+        VALIDATOR_0,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        &block.hash(),
+        sandbox.time(),
+        sandbox.s(VALIDATOR_0),
+    ));
+
+    let curr_height = sandbox.current_height();
+    let curr_round = sandbox.current_round();
+
+    // Simulate node restart
+    let sandbox_restarted = sandbox.restart();
+
+    // assert that consensus messages were recovered and we're in locked state now
+    sandbox_restarted.assert_lock(LOCK_ONE, Some(propose.hash()));
+    sandbox_restarted.assert_state(curr_height, curr_round);
+
+    sandbox_restarted.recv(Precommit::new(
+        VALIDATOR_1,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        &block.hash(),
+        sandbox_restarted.time(),
+        sandbox_restarted.s(VALIDATOR_1),
+    ));
+
+    sandbox_restarted.recv(Precommit::new(
+        VALIDATOR_2,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        &block.hash(),
+        sandbox_restarted.time(),
+        sandbox_restarted.s(VALIDATOR_2),
+    ));
+
+    sandbox_restarted.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox_restarted.check_broadcast_status(HEIGHT_TWO, &block.hash());
+}
+
+/// Idea:
+/// - Node locks on some Propose
+/// - Node doesn't get any Precommits within the round
+/// - Next round appears
+/// - Node receives new propose from new leader and locks on it
+/// - Node restarts
+/// - Node should recover in same round and locked on same Propose
+#[test]
+fn test_recover_consensus_messages_in_other_round() {
+    let sandbox = timestamping_sandbox();
+
+    let propose = ProposeBuilder::new(&sandbox)
+        .with_duration_since_sandbox_time(sandbox.propose_timeout())
+        .build();
+
+    let block = BlockBuilder::new(&sandbox)
+        .with_duration_since_sandbox_time(sandbox.propose_timeout())
+        .build();
+
+    sandbox.recv(propose.clone());
+
+    sandbox.broadcast(Prevote::new(
+        VALIDATOR_0,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        LOCK_ZERO,
+        sandbox.s(VALIDATOR_0),
+    ));
+
+    sandbox.recv(Prevote::new(
+        VALIDATOR_1,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        LOCK_ZERO,
+        sandbox.s(VALIDATOR_1),
+    ));
+    sandbox.assert_lock(LOCK_ZERO, None); //do not lock if <2/3 prevotes
+
+    sandbox.recv(Prevote::new(
+        VALIDATOR_2,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        LOCK_ZERO,
+        sandbox.s(VALIDATOR_2),
+    ));
+    sandbox.assert_lock(LOCK_ONE, Some(propose.hash()));
+
+    sandbox.broadcast(Precommit::new(
+        VALIDATOR_0,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        &block.hash(),
+        sandbox.time(),
+        sandbox.s(VALIDATOR_0),
+    ));
+
+    sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
+    sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
+    sandbox.assert_state(HEIGHT_ONE, ROUND_TWO);
+
+    // make sure we broadcasted same Prevote for second round
+    sandbox.broadcast(Prevote::new(
+        VALIDATOR_0,
+        HEIGHT_ONE,
+        ROUND_TWO,
+        &propose.hash(),
+        LOCK_ONE,
+        sandbox.s(VALIDATOR_0),
+    ));
+
+    let propose_new = ProposeBuilder::new(&sandbox)
+        .with_duration_since_sandbox_time(sandbox.propose_timeout())
+        .build();
+    let block = BlockBuilder::new(&sandbox)
+        .with_duration_since_sandbox_time(sandbox.propose_timeout())
+        .build();
+
+    sandbox.recv(propose_new.clone());
+
+    sandbox.recv(Prevote::new(
+        VALIDATOR_1,
+        HEIGHT_ONE,
+        ROUND_TWO,
+        &propose_new.hash(),
+        LOCK_ZERO,
+        sandbox.s(VALIDATOR_1),
+    ));
+
+    sandbox.recv(Prevote::new(
+        VALIDATOR_2,
+        HEIGHT_ONE,
+        ROUND_TWO,
+        &propose_new.hash(),
+        LOCK_ZERO,
+        sandbox.s(VALIDATOR_2),
+    ));
+
+    sandbox.assert_lock(LOCK_ONE, Some(propose.hash()));
+
+    sandbox.recv(Prevote::new(
+        VALIDATOR_3,
+        HEIGHT_ONE,
+        ROUND_TWO,
+        &propose_new.hash(),
+        LOCK_ZERO,
+        sandbox.s(VALIDATOR_3),
+    ));
+
+    sandbox.assert_lock(LOCK_TWO, Some(propose_new.hash()));
+
+    sandbox.broadcast(Precommit::new(
+        VALIDATOR_0,
+        HEIGHT_ONE,
+        ROUND_TWO,
+        &propose_new.hash(),
+        &block.hash(),
+        sandbox.time(),
+        sandbox.s(VALIDATOR_0),
+    ));
+
+    // restart node
+    let sandbox_new = sandbox.restart();
+
+    sandbox_new.assert_lock(LOCK_TWO, Some(propose_new.hash()));
 }
 
 #[test]
