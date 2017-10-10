@@ -428,7 +428,7 @@ impl<'a> Schema<&'a mut Fork> {
     ///
     /// [1]: struct.Schema.html#method.state_hash_aggregator
     pub fn state_hash_aggregator_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, Hash> {
-        ProofMapIndex::new(gen_prefix(CONSENSUS, 8, &()), &mut self.view)
+        ProofMapIndex::new(gen_prefix(CONSENSUS, STATE_HASH_AGGREGATOR_ORD, &()), &mut self.view)
     }
 
     /// Mutable reference to the [`consensus_messages_cache`][1] index.

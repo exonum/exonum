@@ -3177,7 +3177,6 @@ fn test_schema_config_changes() {
     );
 }
 
-// helper method to check for messages in consensus cache
 //fn get_consensus_messages(blockchain: &Blockchain) -> Vec<RawMessage> {
 //    let snapshot = blockchain.snapshot();
 //    let schema = Schema::new(&snapshot);
