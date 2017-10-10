@@ -2,7 +2,7 @@
 #![allow(unused_variables)]
 #[macro_use]
 extern crate lazy_static;
-
+extern crate ctrlc;
 mod html;
 
 use std::cell::RefCell;
@@ -228,7 +228,7 @@ pub fn init_handler(file: String) {
     *SETTED_NAME.lock().unwrap() = Some(file);
 
     let r = INTERRUPTED_TICKS.clone();
-    ctrlc::set_handler(move || {
+    ::ctrlc::set_handler(move || {
         let secs = SystemTime::now()
                             .duration_since(UNIX_EPOCH)
                             .unwrap().as_secs() as usize;
