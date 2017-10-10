@@ -3,7 +3,7 @@
 #[macro_use]
 extern crate lazy_static;
 extern crate ctrlc;
-mod html;
+pub mod html;
 
 use std::cell::RefCell;
 use std::rc::Rc;
