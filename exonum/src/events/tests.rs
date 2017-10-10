@@ -277,9 +277,10 @@ fn test_network_reconnect() {
     t1.send_to(second, msg.clone());
     assert_eq!(t2.wait_for_message(), msg);
 
-    drop(t2);
-
+    t1.disconnect_with(second);
     assert_eq!(t1.wait_for_disconnect(), second);
+
+    drop(t2);
 
     // Handle second attempt
     let mut t2 = TestEvents::with_addr(second).spawn();
@@ -290,6 +291,7 @@ fn test_network_reconnect() {
     t1.send_to(second, msg.clone());
     assert_eq!(t2.wait_for_message(), msg);
 
-    t1.disconnect_with(second);
+    drop(t2);
+
     assert_eq!(t1.wait_for_disconnect(), second);
 }

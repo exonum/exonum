@@ -106,8 +106,8 @@ impl ConnectionsPool {
         self.inner.borrow_mut().insert(peer, sender.clone());
     }
 
-    fn remove(&self, peer: &SocketAddr) {
-        self.inner.borrow_mut().remove(peer);
+    fn remove(&self, peer: &SocketAddr) -> Result<mpsc::Sender<RawMessage>, &'static str> {
+        self.inner.borrow_mut().remove(peer).ok_or("there is no sender in the connection pool")
     }
 
     fn get(&self, peer: SocketAddr) -> Option<mpsc::Sender<RawMessage>> {
@@ -207,14 +207,19 @@ impl NetworkPart {
                                 })
                                 .then(move |res| {
                                     trace!(
-                                        "Connection with peer={} closed, reason={:?}",
+                                        "Disconnection with peer={}, reason={:?}",
                                         peer,
                                         res
                                     );
-                                    outgoing_connections_cloned.clone().remove(&peer);
-                                    network_tx_cloned
-                                        .clone()
-                                        .send(NetworkEvent::PeerDisconnected(peer))
+                                    let network_tx = network_tx_cloned.clone();
+                                    outgoing_connections_cloned.clone().remove(&peer)
+                                        .into_future()
+                                        .map_err(other_error)
+                                        .and_then(move |_| {
+                                            network_tx
+                                                .send(NetworkEvent::PeerDisconnected(peer))
+                                                .map_err(|_| other_error("can't send disconnect"))
+                                        })
                                         .map(drop)
                                 })
                                 .map_err(log_error);
@@ -239,11 +244,16 @@ impl NetworkPart {
                         }
                     }
                     NetworkRequest::DisconnectWithPeer(peer) => {
-                        outgoing_connections.remove(&peer);
-                        let event = NetworkEvent::PeerDisconnected(peer);
-                        let fut = network_tx.clone().send(event).map_err(|_| {
-                            other_error("can't send network event")
-                        });
+                        let network_tx = network_tx.clone();
+                        let fut = outgoing_connections.remove(&peer)
+                            .into_future()
+                            .map_err(other_error)
+                            .and_then(move |_| {
+                                network_tx
+                                    .send(NetworkEvent::PeerDisconnected(peer))
+                                    .map_err(|_| other_error("can't send disconnect"))
+                            })
+                            .map(drop);
                         tobox(fut)
                     }
                     // Immediately stop the event loop.
