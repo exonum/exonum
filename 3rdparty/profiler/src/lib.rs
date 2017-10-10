@@ -16,7 +16,7 @@ use std::sync::{Mutex, Arc};
 
 
 pub type SpanPtr = RefCell<Span>;
-thread_local!(static THREAD_FRAME: RefCell<ThreadFrame> = RefCell::new(ThreadFrame::new()));
+thread_local!(pub static THREAD_FRAME: RefCell<ThreadFrame> = RefCell::new(ThreadFrame::new()));
 
 lazy_static!{
     static ref SETTED_NAME: Mutex<Option<String>> = Mutex::new(None);
