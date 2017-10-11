@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::cmp::min;
+use std::cmp::{min, Ordering};
 
 use crypto::{Hash, PublicKey, HASH_SIZE};
 
@@ -59,7 +59,7 @@ pub enum ChildKind {
 }
 
 /// A struct that represents a bit slices of the proof map keys.
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct DBKey {
     data: [u8; KEY_SIZE],
     from: u16,
@@ -163,30 +163,48 @@ impl DBKey {
         }
     }
 
+    /// Shortens this `DBKey` to the specified length. Unlike `truncate()`, the transformation
+    /// is performed in place.
+    pub fn truncate_in_place(&mut self, size: u16) {
+        debug_assert!(self.from + size <= self.to);
+        self.to = self.from + size;
+    }
+
+    /// Returns the number of matching bits with `other` starting from position `from`.
+    fn match_len(&self, other: &Self, from: u16) -> u16 {
+        let from = from / 8;
+        let to = min((self.to + 7) / 8, (other.to + 7) / 8);
+        let max_len = min(self.len(), other.len());
+
+        for i in from..to {
+            let x = self.data[i as usize] ^ other.data[i as usize];
+            if x != 0 {
+                let tail = x.leading_zeros() as u16;
+                return min(i * 8 + tail - self.from, max_len);
+            }
+        }
+        max_len
+    }
+
     /// Returns how many bits at the beginning matches with `other`
     pub fn common_prefix(&self, other: &Self) -> u16 {
         // We assume that all slices created from byte arrays with the same length
         if self.from != other.from {
             0
         } else {
-            let from = self.from / 8;
-            let to = min((self.to + 7) / 8, (other.to + 7) / 8);
-            let max_len = min(self.len(), other.len());
-
-            for i in from..to {
-                let x = self.data[i as usize] ^ other.data[i as usize];
-                if x != 0 {
-                    let tail = x.leading_zeros() as u16;
-                    return min(i * 8 + tail - self.from, max_len);
-                }
-            }
-            max_len
+            self.match_len(other, self.from)
         }
     }
 
     /// Returns true if we starts with the same prefix at the whole of `Other`
     pub fn starts_with(&self, other: &Self) -> bool {
         self.common_prefix(other) == other.len()
+    }
+
+    #[doc(hidden)]
+    pub fn matches_from(&self, other: &Self, from: u16) -> bool {
+        debug_assert!(from >= self.from);
+        self.match_len(other, from) == other.len()
     }
 
     /// Returns true if self.to not changed
@@ -252,6 +270,46 @@ impl StorageKey for DBKey {
 impl PartialEq for DBKey {
     fn eq(&self, other: &Self) -> bool {
         self.len() == other.len() && self.starts_with(other)
+    }
+}
+
+impl PartialOrd for DBKey {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if self.from != other.from {
+            None
+        } else {
+            let from = self.from / 8;
+            let to = min(self.to / 8, other.to / 8);
+
+            for i in from..to {
+                let ord = self.data[i as usize].cmp(&other.data[i as usize]);
+                if ord != Ordering::Equal {
+                    return Some(ord);
+                }
+            }
+
+            let bits = min(self.to - to * 8, other.to - to * 8);
+            let mask: u8 = match bits {
+                0 => return Some(self.to.cmp(&other.to)),
+                1 => 0b_1000_0000,
+                2 => 0b_1100_0000,
+                3 => 0b_1110_0000,
+                4 => 0b_1111_0000,
+                5 => 0b_1111_1000,
+                6 => 0b_1111_1100,
+                7 => 0b_1111_1110,
+                _ => unreachable!("Unexpected number of trailing bits in DBKey comparison"),
+            };
+
+            // Here, `to < 32`. Indeed, `to == 32` is possible only if `self.to == other.to == 256`,
+            // in which case `bits == 0`, which is handled in the match above.
+            let ord = (self.data[to as usize] & mask).cmp(&(other.data[to as usize] & mask));
+            if ord != Ordering::Equal {
+                return Some(ord);
+            }
+
+            Some(self.to.cmp(&other.to))
+        }
     }
 }
 

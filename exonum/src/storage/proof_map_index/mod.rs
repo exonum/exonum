@@ -23,7 +23,7 @@ use self::key::{DBKey, ChildKind, LEAF_KEY_PREFIX};
 use self::node::{Node, BranchNode};
 
 pub use self::key::{ProofMapKey, KEY_SIZE as PROOF_MAP_KEY_SIZE, DBKey as ProofMapDBKey};
-pub use self::proof::{MapProof, ProofNode, BranchProofNode};
+pub use self::proof::MapProof;
 
 #[cfg(test)]
 mod tests;
@@ -199,67 +199,6 @@ where
         }
     }
 
-    fn construct_proof(
-        &self,
-        current_branch: &BranchNode,
-        searched_slice: &DBKey,
-    ) -> Option<ProofNode<V>> {
-
-        let mut child_slice = current_branch.child_slice(searched_slice.get(0));
-        child_slice.set_from(searched_slice.from());
-        let c_pr_l = child_slice.common_prefix(searched_slice);
-        debug_assert!(c_pr_l > 0);
-        if c_pr_l < child_slice.len() {
-            return None;
-        }
-
-        let res: ProofNode<V> = match self.get_node_unchecked(&child_slice) {
-            Node::Leaf(child_value) => ProofNode::Leaf(child_value),
-            Node::Branch(child_branch) => {
-                let l_s = child_branch.child_slice(ChildKind::Left);
-                let r_s = child_branch.child_slice(ChildKind::Right);
-                let suf_searched_slice = searched_slice.suffix(c_pr_l);
-                let proof_from_level_below: Option<ProofNode<V>> =
-                    self.construct_proof(&child_branch, &suf_searched_slice);
-
-                if let Some(child_proof) = proof_from_level_below {
-                    let child_proof_pos = suf_searched_slice.get(0);
-                    let neighbour_child_hash = *child_branch.child_hash(!child_proof_pos);
-                    match child_proof_pos {
-                        ChildKind::Left => {
-                            ProofNode::Branch(BranchProofNode::LeftBranch {
-                                left_node: Box::new(child_proof),
-                                right_hash: neighbour_child_hash,
-                                left_key: l_s.suffix(searched_slice.from() + c_pr_l),
-                                right_key: r_s.suffix(searched_slice.from() + c_pr_l),
-                            })
-                        }
-                        ChildKind::Right => {
-                            ProofNode::Branch(BranchProofNode::RightBranch {
-                                left_hash: neighbour_child_hash,
-                                right_node: Box::new(child_proof),
-                                left_key: l_s.suffix(searched_slice.from() + c_pr_l),
-                                right_key: r_s.suffix(searched_slice.from() + c_pr_l),
-                            })
-                        }
-                    }
-                } else {
-                    let l_h = *child_branch.child_hash(ChildKind::Left); //copy
-                    let r_h = *child_branch.child_hash(ChildKind::Right); //copy
-                    ProofNode::Branch(BranchProofNode::BranchKeyNotFound {
-                        left_hash: l_h,
-                        right_hash: r_h,
-                        left_key: l_s.suffix(searched_slice.from() + c_pr_l),
-                        right_key: r_s.suffix(searched_slice.from() + c_pr_l),
-                    })
-                    // proof of exclusion of a key, because none of child slices is a
-                    // prefix(searched_slice)
-                }
-            }
-        };
-        Some(res)
-    }
-
     /// Returns the root hash of the proof map or default hash value if it is empty.
     ///
     /// # Examples
@@ -356,75 +295,84 @@ where
     /// let proof = index.get_proof(&hash);
     /// # drop(proof);
     /// ```
-    pub fn get_proof(&self, key: &K) -> MapProof<V> {
-        let searched_slice = DBKey::leaf(key);
+    pub fn get_proof(&self, key: K) -> MapProof<K, V> {
+        // How many key-hash pairs are expected to be on each side relative to the searched key
+        const DEFAULT_CAPACITY: usize = 8;
+
+        fn combine(
+            mut left_hashes: Vec<(DBKey, Hash)>,
+            right_hashes: Vec<(DBKey, Hash)>,
+        ) -> Vec<(DBKey, Hash)> {
+            left_hashes.extend(right_hashes.into_iter().rev());
+            left_hashes
+        }
+
+        let searched_key = DBKey::leaf(&key);
 
         match self.get_root_node() {
-            Some((root_db_key, Node::Leaf(root_value))) => {
-                if searched_slice == root_db_key {
-                    MapProof::LeafRootInclusive(root_db_key, root_value)
-                } else {
-                    MapProof::LeafRootExclusive(root_db_key, root_value.hash())
-                }
-            }
-            Some((root_db_key, Node::Branch(branch))) => {
-                let root_slice = root_db_key;
-                let l_s = branch.child_slice(ChildKind::Left);
-                let r_s = branch.child_slice(ChildKind::Right);
+            Some((root_key, Node::Branch(root_branch))) => {
+                let mut left_hashes: Vec<(DBKey, Hash)> = Vec::with_capacity(DEFAULT_CAPACITY);
+                let mut right_hashes: Vec<(DBKey, Hash)> = Vec::with_capacity(DEFAULT_CAPACITY);
 
-                let c_pr_l = root_slice.common_prefix(&searched_slice);
-                if c_pr_l == root_slice.len() {
-                    let suf_searched_slice = searched_slice.suffix(c_pr_l);
-                    let proof_from_level_below: Option<ProofNode<V>> =
-                        self.construct_proof(&branch, &suf_searched_slice);
+                // Currently visited branch and its key, respectively
+                let (mut branch, mut node_key) = (root_branch, root_key);
 
-                    if let Some(child_proof) = proof_from_level_below {
-                        let child_proof_pos = suf_searched_slice.get(0);
-                        let neighbour_child_hash = *branch.child_hash(!child_proof_pos);
-                        match child_proof_pos {
-                            ChildKind::Left => {
-                                MapProof::Branch(BranchProofNode::LeftBranch {
-                                    left_node: Box::new(child_proof),
-                                    right_hash: neighbour_child_hash,
-                                    left_key: l_s,
-                                    right_key: r_s,
-                                })
-                            }
-                            ChildKind::Right => {
-                                MapProof::Branch(BranchProofNode::RightBranch {
-                                    left_hash: neighbour_child_hash,
-                                    right_node: Box::new(child_proof),
-                                    left_key: l_s,
-                                    right_key: r_s,
-                                })
+                // Do at least one loop, even if the supplied key does not match the root key.
+                // This is necessary to put both children of the root node into the proof
+                // in this case.
+                loop {
+                    // <256 by induction; `branch` is always a branch node, and `node_key`
+                    // is its key
+                    let next_height = node_key.len();
+                    let next_bit = searched_key.get(next_height);
+                    node_key = branch.child_slice(next_bit);
+
+                    // XXX: strictly speaking, one of `*branch.child_hash()` copies could
+                    // be avoided by dismatling `branch` via a consuming method
+                    let other_key_and_hash =
+                        (branch.child_slice(!next_bit), *branch.child_hash(!next_bit));
+                    match !next_bit {
+                        ChildKind::Left => left_hashes.push(other_key_and_hash),
+                        ChildKind::Right => right_hashes.push(other_key_and_hash),
+                    }
+
+                    if !searched_key.matches_from(&node_key, next_height) {
+                        // Both children of `branch` do not fit
+
+                        let next_hash = *branch.child_hash(next_bit);
+                        match next_bit {
+                            ChildKind::Left => left_hashes.push((node_key, next_hash)),
+                            ChildKind::Right => right_hashes.push((node_key, next_hash)),
+                        }
+
+                        return MapProof::for_absent_key(key, combine(left_hashes, right_hashes));
+                    } else {
+                        let node = self.get_node_unchecked(&node_key);
+                        match node {
+                            Node::Branch(branch_) => branch = branch_,
+                            Node::Leaf(value) => {
+                                // We have reached the leaf node and haven't diverged!
+                                // The key is there, we've just gotten the value, so we just need to
+                                // return it.
+                                return MapProof::for_entry(
+                                    (key, value),
+                                    combine(left_hashes, right_hashes),
+                                );
                             }
                         }
-                    } else {
-                        let l_h = *branch.child_hash(ChildKind::Left); //copy
-                        let r_h = *branch.child_hash(ChildKind::Right); //copy
-                        MapProof::Branch(BranchProofNode::BranchKeyNotFound {
-                            left_hash: l_h,
-                            right_hash: r_h,
-                            left_key: l_s,
-                            right_key: r_s,
-                        })
-                        // proof of exclusion of a key, because none of child slices is a
-                        // prefix(searched_slice)
                     }
-                } else {
-                    // if common prefix length with root_slice is less than root_slice length
-                    let l_h = *branch.child_hash(ChildKind::Left); //copy
-                    let r_h = *branch.child_hash(ChildKind::Right); //copy
-                    MapProof::Branch(BranchProofNode::BranchKeyNotFound {
-                        left_hash: l_h,
-                        right_hash: r_h,
-                        left_key: l_s,
-                        right_key: r_s,
-                    })
-                    // proof of exclusion of a key, because root_slice != prefix(searched_slice)
                 }
             }
-            None => MapProof::Empty,
+
+            Some((root_key, Node::Leaf(root_value))) => {
+                if root_key == searched_key {
+                    MapProof::for_entry((key, root_value), vec![])
+                } else {
+                    MapProof::for_absent_key(key, vec![(root_key, root_value.hash())])
+                }
+            }
+
+            None => MapProof::empty(),
         }
     }
 
@@ -747,7 +695,7 @@ where
                             return RemoveResult::Branch((key, *hash));
                         }
                         RemoveResult::Branch((key, hash)) => {
-                            let mut new_child_slice = key.clone();
+                            let mut new_child_slice = key;
                             new_child_slice.set_from(suffix_slice.from());
 
                             branch.set_child(suffix_slice.get(0), &new_child_slice, &hash);
@@ -807,7 +755,7 @@ where
                     match self.remove_node(&branch, &suffix_slice) {
                         RemoveResult::Leaf => self.base.remove(&prefix),
                         RemoveResult::Branch((key, hash)) => {
-                            let mut new_child_slice = key.clone();
+                            let mut new_child_slice = key;
                             new_child_slice.set_from(suffix_slice.from());
                             branch.set_child(suffix_slice.get(0), &new_child_slice, &hash);
                             self.base.put(&prefix, branch);
