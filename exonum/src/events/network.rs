@@ -107,7 +107,9 @@ impl ConnectionsPool {
     }
 
     fn remove(&self, peer: &SocketAddr) -> Result<mpsc::Sender<RawMessage>, &'static str> {
-        self.inner.borrow_mut().remove(peer).ok_or("there is no sender in the connection pool")
+        self.inner.borrow_mut().remove(peer).ok_or(
+            "there is no sender in the connection pool",
+        )
     }
 
     fn get(&self, peer: SocketAddr) -> Option<mpsc::Sender<RawMessage>> {
@@ -245,7 +247,8 @@ impl NetworkPart {
                     }
                     NetworkRequest::DisconnectWithPeer(peer) => {
                         let network_tx = network_tx.clone();
-                        let fut = outgoing_connections.remove(&peer)
+                        let fut = outgoing_connections
+                            .remove(&peer)
                             .into_future()
                             .map_err(other_error)
                             .and_then(move |_| {
