@@ -677,12 +677,19 @@ impl Node {
     pub fn run_handler(mut self) -> io::Result<()> {
         self.handler.initialize();
 
-        let mut core = Core::new()?;
         let (handler_part, network_part) = self.into_reactor();
-        network_part.run(core.handle());
+        let network_thread = thread::spawn(move || {
+            let mut core = Core::new()?;
+            let fut = network_part.run(core.handle());
+            core.run(fut).map(drop).map_err(|e| {
+                other_error(&format!("An error in the `Network` thread occured: {}", e))
+            })
+        });
+        let mut core = Core::new()?;
         core.run(handler_part.run()).map_err(|_| {
-            other_error("can't run node handler")
-        })
+            other_error("An error in the `Handler` thread occured")
+        })?;
+        network_thread.join().unwrap()
     }
 
     /// A generic implementation that launches `Node` and optionally creates threads
