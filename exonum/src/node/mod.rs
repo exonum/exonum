@@ -48,6 +48,8 @@ mod basic;
 mod consensus;
 mod requests;
 mod whitelist;
+#[cfg(test)]
+mod tests;
 pub mod state; // TODO: temporary solution to get access to WAIT consts
 pub mod timeout_adjuster;
 
