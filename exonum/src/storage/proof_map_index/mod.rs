@@ -292,7 +292,7 @@ where
     /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &snapshot);
     ///
     /// let hash = Hash::default();
-    /// let proof = index.get_proof(&hash);
+    /// let proof = index.get_proof(hash);
     /// # drop(proof);
     /// ```
     pub fn get_proof(&self, key: K) -> MapProof<K, V> {
