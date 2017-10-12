@@ -306,7 +306,7 @@ fn check_map_proof<K, V>(
     assert_eq!(proof.try_into().unwrap(), (entries, table.root_hash()));
 }
 
-const MAX_CHECKED_ELEMENTS: usize = 256;
+const MAX_CHECKED_ELEMENTS: usize = 1_024;
 
 fn check_proofs_for_data<K, V>(db: &Box<Database>, data: Vec<(K, V)>, nonexisting_keys: Vec<K>)
 where
@@ -559,7 +559,8 @@ fn fuzz_insert_build_proofs_in_table_filled_with_hashes(db: Box<Database>) {
             .map(|(key, val)| (hash(&key), hash(&val)))
             .collect();
 
-        let nonexisting_keys: Vec<_> = generate_fully_random_data_keys(MAX_CHECKED_ELEMENTS / 2)
+        let nonexisting_count = ::std::cmp::min(MAX_CHECKED_ELEMENTS, batch_size);
+        let nonexisting_keys: Vec<_> = generate_fully_random_data_keys(nonexisting_count / 2)
             .into_iter()
             .flat_map(|(key, val)| vec![hash(&key), hash(&val)])
             .collect();
@@ -571,7 +572,9 @@ fn fuzz_insert_build_proofs_in_table_filled_with_hashes(db: Box<Database>) {
 fn fuzz_insert_build_proofs(db: Box<Database>) {
     for batch_size in (1..11).map(|x| (1 << x) - 1) {
         let data = generate_fully_random_data_keys(batch_size);
-        let nonexisting_keys: Vec<_> = generate_fully_random_data_keys(MAX_CHECKED_ELEMENTS)
+
+        let nonexisting_count = ::std::cmp::min(MAX_CHECKED_ELEMENTS, batch_size);
+        let nonexisting_keys: Vec<_> = generate_fully_random_data_keys(nonexisting_count)
             .into_iter()
             .map(|(key, _)| key)
             .collect();
