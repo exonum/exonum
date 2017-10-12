@@ -38,7 +38,6 @@ env:
   global:
   - CLIPPY_VERS=0.0.156
   - RUSTFMT_VERS=0.9.0
-  - DEADLINKS_VERS=0.2.0
   - SODIUM_VERS=1.0.13
   - ROCKSDB_VERS=5.6.1
   - CARGO_INCREMENTAL=1
@@ -76,7 +75,6 @@ install:
 - |
   if [[ "$FEATURE" == "fmt" ]]; then
     cargo-audit -V || cargo install cargo-audit --force
-    cargo-deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
     rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
     cargo update
     fi
@@ -91,8 +89,6 @@ script: |
   case "$FEATURE" in
 
   "fmt" )
-      cargo doc --no-deps -p exonum &&
-      cargo deadlinks --dir target/doc &&
       cargo audit &&
       cargo fmt -p exonum -- --write-mode=diff &&
       cargo fmt -p sandbox -- --write-mode=diff
