@@ -127,7 +127,6 @@ impl<H: EventHandler + 'static> HandlerPart<H> {
 
         let fut = EventsAggregator::new(self.timeout_rx, self.network_rx, self.api_rx)
             .for_each(move |event| {
-                debug!("Handle event: {:?}", event);
                 handler.handle_event(event);
                 Ok(())
             });
@@ -204,8 +203,8 @@ impl NetworkPart {
                                         .select2(writer)
                                         .map_err(|_| other_error("Socket error"))
                                         .and_then(|res| match res {
-                                            Either::A((_, _reader)) => Ok("Closed by reader"),
-                                            Either::B((_, _writer)) => Ok("Closed by writer"),
+                                            Either::A((_, _reader)) => Ok("by reader"),
+                                            Either::B((_, _writer)) => Ok("by writer"),
                                         })
                                 })
                                 .then(move |res| {
@@ -338,9 +337,9 @@ impl NetworkPart {
         let cancel_handler = cancel_handler.map_err(|_| other_error("can't cancel routine"));
         let fut = server
             .join(requests_handle)
-            .map(drop);
-            // .select(cancel_handler)
-            // .map_err(|(e, _)| e);
+            .map(drop)
+            .select(cancel_handler)
+            .map_err(|(e, _)| e);
         tobox(fut)
     }
 }

@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use futures::{Future, Sink, Stream};
 use futures::sync::mpsc;
-use tokio_timer::{Timer};
+use tokio_timer::Timer;
 
 use blockchain::{Blockchain, Service, ServiceContext, Transaction};
 use encoding::Error as EncodingError;
@@ -28,7 +28,6 @@ impl Service for CommitWatcherService {
     }
 
     fn handle_commit(&self, _context: &mut ServiceContext) {
-        debug!("Handle commit!");
         self.0.clone().send(()).wait().unwrap();
     }
 }
@@ -57,11 +56,9 @@ fn test_node_run() {
     let (_, commit_rxs) = run_nodes(2);
 
     let timer = Timer::default();
-    let duration = Duration::from_secs(30);
+    let duration = Duration::from_secs(60);
     for rx in commit_rxs {
         let rx = timer.timeout_stream(rx, duration);
-        let r = rx.wait().next();
-        debug!("{:?}", r);
-        r.unwrap().unwrap();
+        rx.wait().next().unwrap().unwrap();
     }
 }

@@ -679,7 +679,15 @@ impl Node {
     pub fn run_handler(mut self) -> io::Result<()> {
         self.handler.initialize();
 
-        let (handler_part, network_part) = self.into_reactor();
+        let (handler_part, network_part, timeout_tx, timeout_requests_rx) = self.into_reactor();
+
+        // let mut core = Core::new()?;
+        // let network_future = network_part.run(core.handle()).map(drop).map_err(|e| {
+        // other_error(&format!("An error in the `Network` thread occured: {}", e))
+        // });
+        // core.handle().spawn(handler_part.run());
+        // core.run(network_future)
+
         let network_thread = thread::spawn(move || {
             let mut core = Core::new()?;
             let fut = network_part.run(core.handle());
@@ -688,6 +696,29 @@ impl Node {
             })
         });
         let mut core = Core::new()?;
+
+        let handle = core.handle();
+        let timeout_tx = timeout_tx.clone();
+        let timeout_handler = timeout_requests_rx.for_each(move |request| {
+            let duration = request.0.duration_since(SystemTime::now()).unwrap_or_else(
+                |_| {
+                    Duration::from_millis(0)
+                },
+            );
+            let timeout_tx = timeout_tx.clone();
+            let timeout = Timeout::new(duration, &handle)
+                .expect("Unable to create timeout")
+                .and_then(move |_| {
+                    timeout_tx.clone().send(request.1).map(drop).map_err(
+                        into_other,
+                    )
+                })
+                .map_err(|_| panic!("Can't timeout"));
+            handle.spawn(timeout);
+            Ok(())
+        });
+        core.handle().spawn(timeout_handler);
+
         core.run(handler_part.run()).map_err(|_| {
             other_error("An error in the `Handler` thread occured")
         })?;
@@ -772,8 +803,14 @@ impl Node {
     }
 
     #[doc(hidden)]
-    pub fn into_reactor(self) -> (HandlerPart<NodeHandler>, NetworkPart) {
+    pub fn into_reactor(
+        self,
+    ) -> (HandlerPart<NodeHandler>,
+              NetworkPart,
+              mpsc::Sender<NodeTimeout>,
+              mpsc::Receiver<TimeoutRequest>) {
         let (network_tx, network_rx) = self.channel.network_events;
+        let timeout_requests_rx = self.channel.timeout_requests.1;
 
         let network_part = NetworkPart {
             listen_address: self.handler.system_state.listen_address(),
@@ -782,38 +819,14 @@ impl Node {
             network_config: self.network_config,
         };
 
-        let core = Core::new().unwrap();
         let (timeout_tx, timeout_rx) = mpsc::channel(256);
-        let handle = core.handle();
-        let timeout_requests_rx = self.channel.timeout_requests.1;
-        let timeout_tx = timeout_tx.clone();
-        let timeout_handler = timeout_requests_rx.for_each(move |request| {
-            let duration = request.0.duration_since(SystemTime::now()).unwrap_or_else(
-                |_| {
-                    Duration::from_millis(0)
-                },
-            );
-            let timeout_tx = timeout_tx.clone();
-            let timeout = Timeout::new(duration, &handle)
-                .expect("Unable to create timeout")
-                .and_then(move |_| {
-                    timeout_tx.clone().send(request.1).map(drop).map_err(
-                        into_other,
-                    )
-                })
-                .map_err(|_| panic!("Can't timeout"));
-            handle.spawn(timeout);
-            Ok(())
-        });
-        core.handle().spawn(timeout_handler);
-
         let handler_part = HandlerPart {
             handler: self.handler,
             timeout_rx,
             network_rx: network_rx,
             api_rx: self.channel.api_requests.1,
         };
-        (handler_part, network_part)
+        (handler_part, network_part, timeout_tx, timeout_requests_rx)
     }
 
     /// Returns `State`.
