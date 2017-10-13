@@ -569,7 +569,7 @@ impl SystemStateProvider for DefaultSystemState {
 
 /// Channel between the `NodeHandler` and events source.
 #[derive(Debug)]
-pub struct NodeChannel {
+struct NodeChannel {
     /// Channel for network requests.
     pub network_requests: (mpsc::Sender<NetworkRequest>, mpsc::Receiver<NetworkRequest>),
     /// Channel for timeout requests.
@@ -578,6 +578,8 @@ pub struct NodeChannel {
     pub api_requests: (mpsc::Sender<ExternalMessage>, mpsc::Receiver<ExternalMessage>),
     /// Channel for network events.
     pub network_events: (mpsc::Sender<NetworkEvent>, mpsc::Receiver<NetworkEvent>),
+    /// Channel for timeout events.
+    pub timeout_events: (mpsc::Sender<NodeTimeout>, mpsc::Receiver<NodeTimeout>)
 }
 
 const PROFILE_ENV_VARIABLE_NAME: &'static str = "EXONUM_PROFILE_FILENAME";
@@ -597,6 +599,7 @@ impl NodeChannel {
         NodeChannel {
             network_requests: mpsc::channel(buffer_sizes.network_requests_capacity),
             timeout_requests: mpsc::channel(buffer_sizes.timeout_requests_capacity),
+            timeout_events: mpsc::channel(buffer_sizes.timeout_requests_capacity),
             api_requests: mpsc::channel(buffer_sizes.api_requests_capacity),
             network_events: mpsc::channel(buffer_sizes.network_events_capacity),
         }
@@ -788,7 +791,7 @@ impl Node {
             network_config: self.network_config,
         };
 
-        let (timeout_tx, timeout_rx) = mpsc::channel(256);
+        let (timeout_tx, timeout_rx) = self.channel.timeout_events;
         let handler_part = HandlerPart {
             handler: self.handler,
             timeout_rx,
