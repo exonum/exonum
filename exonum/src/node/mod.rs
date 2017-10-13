@@ -569,7 +569,7 @@ impl SystemStateProvider for DefaultSystemState {
 
 /// Channel between the `NodeHandler` and events source.
 #[derive(Debug)]
-struct NodeChannel {
+pub struct NodeChannel {
     /// Channel for network requests.
     pub network_requests: (mpsc::Sender<NetworkRequest>, mpsc::Receiver<NetworkRequest>),
     /// Channel for timeout requests.
@@ -579,7 +579,7 @@ struct NodeChannel {
     /// Channel for network events.
     pub network_events: (mpsc::Sender<NetworkEvent>, mpsc::Receiver<NetworkEvent>),
     /// Channel for timeout events.
-    pub timeout_events: (mpsc::Sender<NodeTimeout>, mpsc::Receiver<NodeTimeout>)
+    pub timeout_events: (mpsc::Sender<NodeTimeout>, mpsc::Receiver<NodeTimeout>),
 }
 
 const PROFILE_ENV_VARIABLE_NAME: &'static str = "EXONUM_PROFILE_FILENAME";
