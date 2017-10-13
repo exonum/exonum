@@ -58,7 +58,7 @@ impl Service for CommitWatcherService {
 fn run_nodes(count: u8) -> (Vec<JoinHandle<()>>, Vec<oneshot::Receiver<()>>) {
     let mut node_threads = Vec::new();
     let mut commit_rxs = Vec::new();
-    for node_cfg in helpers::generate_testnet_config(count, 16300) {
+    for node_cfg in helpers::generate_testnet_config(count, 16_300) {
         let (commit_tx, commit_rx) = oneshot::channel();
         let service = Box::new(CommitWatcherService(Mutex::new(Some(commit_tx))));
         let blockchain = Blockchain::new(Box::new(MemoryDB::new()), vec![service]);
