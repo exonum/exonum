@@ -20,9 +20,9 @@ use toml::Value;
 use router::Router;
 use mount::Mount;
 use iron::{Chain, Iron};
-use futures::{Future, Sink, Stream};
+use futures::{Future, Sink};
 use futures::sync::mpsc;
-use tokio_core::reactor::{Core, Timeout};
+use tokio_core::reactor::Core;
 
 use std::io;
 use std::thread;
@@ -36,8 +36,8 @@ use blockchain::{ApiContext, Blockchain, GenesisConfig, Schema, SharedNodeState,
 use api::{private, public, Api};
 use messages::{Connect, Message, RawMessage};
 use events::{NetworkRequest, TimeoutRequest, NetworkEvent};
-use events::network::{HandlerPart, NetworkConfiguration, NetworkPart};
-use events::error::{into_other, other_error, LogError};
+use events::network::{HandlerPart, NetworkConfiguration, NetworkPart, TimeoutsPart};
+use events::error::{into_other, other_error, LogError, log_error};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 
 pub use self::state::{RequestData, State, TxPool, ValidatorState};
@@ -48,8 +48,6 @@ mod basic;
 mod consensus;
 mod requests;
 mod whitelist;
-#[cfg(test)]
-mod tests;
 pub mod state; // TODO: temporary solution to get access to WAIT consts
 pub mod timeout_adjuster;
 
@@ -679,45 +677,19 @@ impl Node {
     pub fn run_handler(mut self) -> io::Result<()> {
         self.handler.initialize();
 
-        let (handler_part, network_part, timeout_tx, timeout_requests_rx) = self.into_reactor();
-
-        // let mut core = Core::new()?;
-        // let network_future = network_part.run(core.handle()).map(drop).map_err(|e| {
-        // other_error(&format!("An error in the `Network` thread occured: {}", e))
-        // });
-        // core.handle().spawn(handler_part.run());
-        // core.run(network_future)
+        let (handler_part, network_part, timeouts_part) = self.into_reactor();
 
         let network_thread = thread::spawn(move || {
             let mut core = Core::new()?;
-            let fut = network_part.run(core.handle());
-            core.run(fut).map(drop).map_err(|e| {
+            let network_handler = network_part.run(core.handle());
+            core.run(network_handler).map(drop).map_err(|e| {
                 other_error(&format!("An error in the `Network` thread occured: {}", e))
             })
         });
-        let mut core = Core::new()?;
 
+        let mut core = Core::new()?;
         let handle = core.handle();
-        let timeout_tx = timeout_tx.clone();
-        let timeout_handler = timeout_requests_rx.for_each(move |request| {
-            let duration = request.0.duration_since(SystemTime::now()).unwrap_or_else(
-                |_| {
-                    Duration::from_millis(0)
-                },
-            );
-            let timeout_tx = timeout_tx.clone();
-            let timeout = Timeout::new(duration, &handle)
-                .expect("Unable to create timeout")
-                .and_then(move |_| {
-                    timeout_tx.clone().send(request.1).map(drop).map_err(
-                        into_other,
-                    )
-                })
-                .map_err(|_| panic!("Can't timeout"));
-            handle.spawn(timeout);
-            Ok(())
-        });
-        core.handle().spawn(timeout_handler);
+        core.handle().spawn(timeouts_part.run(handle).map_err(log_error));
 
         core.run(handler_part.run()).map_err(|_| {
             other_error("An error in the `Handler` thread occured")
@@ -803,12 +775,7 @@ impl Node {
     }
 
     #[doc(hidden)]
-    pub fn into_reactor(
-        self,
-    ) -> (HandlerPart<NodeHandler>,
-              NetworkPart,
-              mpsc::Sender<NodeTimeout>,
-              mpsc::Receiver<TimeoutRequest>) {
+    pub fn into_reactor(self) -> (HandlerPart<NodeHandler>, NetworkPart, TimeoutsPart) {
         let (network_tx, network_rx) = self.channel.network_events;
         let timeout_requests_rx = self.channel.timeout_requests.1;
 
@@ -826,7 +793,12 @@ impl Node {
             network_rx: network_rx,
             api_rx: self.channel.api_requests.1,
         };
-        (handler_part, network_part, timeout_tx, timeout_requests_rx)
+
+        let timeouts_part = TimeoutsPart {
+            timeout_tx,
+            timeout_requests_rx,
+        };
+        (handler_part, network_part, timeouts_part)
     }
 
     /// Returns `State`.

@@ -15,6 +15,7 @@
 use futures::{future, unsync, Future, IntoFuture, Sink, Stream};
 use futures::future::Either;
 use futures::sync::mpsc;
+use tokio_core::reactor::Timeout;
 use tokio_core::net::{TcpListener, TcpStream};
 use tokio_core::reactor::Handle;
 use tokio_io::AsyncRead;
@@ -23,7 +24,7 @@ use tokio_retry::strategy::{jitter, FixedInterval};
 
 use std::io;
 use std::net::SocketAddr;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -34,7 +35,7 @@ use helpers::Milliseconds;
 
 use super::error::{into_other, log_error, other_error, result_ok};
 use super::codec::MessagesCodec;
-use super::{EventsAggregator, EventHandler};
+use super::{EventHandler, EventsAggregator, TimeoutRequest};
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 
@@ -90,6 +91,12 @@ pub struct NetworkPart {
     pub network_config: NetworkConfiguration,
     pub network_requests: (mpsc::Sender<NetworkRequest>, mpsc::Receiver<NetworkRequest>),
     pub network_tx: mpsc::Sender<NetworkEvent>,
+}
+
+#[derive(Debug)]
+pub struct TimeoutsPart {
+    pub timeout_tx: mpsc::Sender<NodeTimeout>,
+    pub timeout_requests_rx: mpsc::Receiver<TimeoutRequest>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -161,7 +168,7 @@ impl NetworkPart {
                             if outgoing_connections_cloned.len() >= outgoing_connections_limit {
                                 warn!(
                                     "Rejected outgoing connection with peer={}, \
-                                 connections limit reached.",
+                                     connections limit reached.",
                                     peer
                                 );
                                 None
@@ -290,7 +297,7 @@ impl NetworkPart {
             if connections_count > incoming_connections_limit {
                 warn!(
                     "Rejected incoming connection with peer={}, \
-                         connections limit reached.",
+                     connections limit reached.",
                     addr
                 );
                 tobox(future::ok(()))
@@ -340,6 +347,31 @@ impl NetworkPart {
             .map(drop)
             .select(cancel_handler)
             .map_err(|(e, _)| e);
+        tobox(fut)
+    }
+}
+
+impl TimeoutsPart {
+    pub fn run(self, handle: Handle) -> Box<Future<Item = (), Error = io::Error>> {
+        let timeout_tx = self.timeout_tx.clone();
+        let fut = self.timeout_requests_rx.for_each(move |request| {
+            let duration = request.0.duration_since(SystemTime::now()).unwrap_or_else(
+                |_| {
+                    Duration::from_millis(0)
+                },
+            );
+            let timeout_tx = timeout_tx.clone();
+            let timeout = Timeout::new(duration, &handle)
+                .expect("Unable to create timeout")
+                .and_then(move |_| {
+                    timeout_tx.clone().send(request.1).map(drop).map_err(
+                        into_other,
+                    )
+                })
+                .map_err(|_| panic!("Can't timeout"));
+            handle.spawn(timeout);
+            Ok(())
+        }).map_err(|_| other_error("Can't handle timeout request"));
         tobox(fut)
     }
 }

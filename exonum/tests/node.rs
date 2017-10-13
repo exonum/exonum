@@ -1,3 +1,22 @@
+// Copyright 2017 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// This is regression test for exonum node.
+extern crate exonum;
+extern crate futures;
+extern crate tokio_timer;
+
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
@@ -5,12 +24,12 @@ use futures::{Future, Sink, Stream};
 use futures::sync::mpsc;
 use tokio_timer::Timer;
 
-use blockchain::{Blockchain, Service, ServiceContext, Transaction};
-use encoding::Error as EncodingError;
-use messages::RawTransaction;
-use node::Node;
-use storage::MemoryDB;
-use helpers;
+use exonum::blockchain::{Blockchain, Service, ServiceContext, Transaction};
+use exonum::encoding::Error as EncodingError;
+use exonum::messages::RawTransaction;
+use exonum::node::Node;
+use exonum::storage::MemoryDB;
+use exonum::helpers;
 
 struct CommitWatcherService(pub mpsc::Sender<()>);
 
@@ -51,8 +70,6 @@ fn run_nodes(count: u8) -> (Vec<JoinHandle<()>>, Vec<mpsc::Receiver<()>>) {
 
 #[test]
 fn test_node_run() {
-    let _ = helpers::init_logger();
-
     let (_, commit_rxs) = run_nodes(2);
 
     let timer = Timer::default();
