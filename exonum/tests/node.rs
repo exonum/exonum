@@ -19,9 +19,10 @@ extern crate tokio_timer;
 
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
+use std::sync::Mutex;
 
-use futures::{Future, Sink, Stream};
-use futures::sync::mpsc;
+use futures::Future;
+use futures::sync::oneshot;
 use tokio_timer::Timer;
 
 use exonum::blockchain::{Blockchain, Service, ServiceContext, Transaction};
@@ -31,7 +32,7 @@ use exonum::node::Node;
 use exonum::storage::MemoryDB;
 use exonum::helpers;
 
-struct CommitWatcherService(pub mpsc::Sender<()>);
+struct CommitWatcherService(pub Mutex<Option<oneshot::Sender<()>>>);
 
 impl Service for CommitWatcherService {
     fn service_id(&self) -> u16 {
@@ -47,16 +48,19 @@ impl Service for CommitWatcherService {
     }
 
     fn handle_commit(&self, _context: &mut ServiceContext) {
-        self.0.clone().send(()).wait().unwrap();
+        let oneshot = self.0.lock().unwrap().take().expect(
+            "Can't send event twice",
+        );
+        oneshot.send(()).unwrap()
     }
 }
 
-fn run_nodes(count: u8) -> (Vec<JoinHandle<()>>, Vec<mpsc::Receiver<()>>) {
+fn run_nodes(count: u8) -> (Vec<JoinHandle<()>>, Vec<oneshot::Receiver<()>>) {
     let mut node_threads = Vec::new();
     let mut commit_rxs = Vec::new();
     for node_cfg in helpers::generate_testnet_config(count, 16300) {
-        let (commit_tx, commit_rx) = mpsc::channel(1);
-        let service = Box::new(CommitWatcherService(commit_tx));
+        let (commit_tx, commit_rx) = oneshot::channel();
+        let service = Box::new(CommitWatcherService(Mutex::new(Some(commit_tx))));
         let blockchain = Blockchain::new(Box::new(MemoryDB::new()), vec![service]);
         let node_thread = thread::spawn(move || {
             let node = Node::new(blockchain, node_cfg);
@@ -75,7 +79,7 @@ fn test_node_run() {
     let timer = Timer::default();
     let duration = Duration::from_secs(60);
     for rx in commit_rxs {
-        let rx = timer.timeout_stream(rx, duration);
-        rx.wait().next().unwrap().unwrap();
+        let rx = timer.timeout(rx.map_err(drop), duration);
+        rx.wait().unwrap();
     }
 }

@@ -689,7 +689,9 @@ impl Node {
 
         let mut core = Core::new()?;
         let handle = core.handle();
-        core.handle().spawn(timeouts_part.run(handle).map_err(log_error));
+        core.handle().spawn(
+            timeouts_part.run(handle).map_err(log_error),
+        );
 
         core.run(handler_part.run()).map_err(|_| {
             other_error("An error in the `Handler` thread occured")

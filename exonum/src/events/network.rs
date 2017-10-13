@@ -354,24 +354,26 @@ impl NetworkPart {
 impl TimeoutsPart {
     pub fn run(self, handle: Handle) -> Box<Future<Item = (), Error = io::Error>> {
         let timeout_tx = self.timeout_tx.clone();
-        let fut = self.timeout_requests_rx.for_each(move |request| {
-            let duration = request.0.duration_since(SystemTime::now()).unwrap_or_else(
-                |_| {
-                    Duration::from_millis(0)
-                },
-            );
-            let timeout_tx = timeout_tx.clone();
-            let timeout = Timeout::new(duration, &handle)
-                .expect("Unable to create timeout")
-                .and_then(move |_| {
-                    timeout_tx.clone().send(request.1).map(drop).map_err(
-                        into_other,
-                    )
-                })
-                .map_err(|_| panic!("Can't timeout"));
-            handle.spawn(timeout);
-            Ok(())
-        }).map_err(|_| other_error("Can't handle timeout request"));
+        let fut = self.timeout_requests_rx
+            .for_each(move |request| {
+                let duration = request.0.duration_since(SystemTime::now()).unwrap_or_else(
+                    |_| {
+                        Duration::from_millis(0)
+                    },
+                );
+                let timeout_tx = timeout_tx.clone();
+                let timeout = Timeout::new(duration, &handle)
+                    .expect("Unable to create timeout")
+                    .and_then(move |_| {
+                        timeout_tx.clone().send(request.1).map(drop).map_err(
+                            into_other,
+                        )
+                    })
+                    .map_err(|_| panic!("Can't timeout"));
+                handle.spawn(timeout);
+                Ok(())
+            })
+            .map_err(|_| other_error("Can't handle timeout request"));
         tobox(fut)
     }
 }
