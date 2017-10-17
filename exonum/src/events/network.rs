@@ -43,7 +43,7 @@ pub enum NetworkEvent {
     MessageReceived(SocketAddr, RawMessage),
     PeerConnected(SocketAddr, Connect),
     PeerDisconnected(SocketAddr),
-    CantConnectToPeer(SocketAddr),
+    UnableConnectToPeer(SocketAddr),
 }
 
 #[derive(Debug, Clone)]
@@ -267,7 +267,7 @@ impl RequestHandler {
                             });
                             tobox(fut)
                         } else {
-                            let event = NetworkEvent::CantConnectToPeer(peer);
+                            let event = NetworkEvent::UnableConnectToPeer(peer);
                             let fut = network_tx
                                 .clone()
                                 .send(event)
@@ -369,7 +369,8 @@ impl Listener {
                 .map(|_| {
                     // Ensure that holder lives until the stream ends.
                     let _holder = holder;
-                });
+                })
+                .map_err(log_error);
             handle.spawn(tobox(connection_handler));
             tobox(future::ok(()))
         });
