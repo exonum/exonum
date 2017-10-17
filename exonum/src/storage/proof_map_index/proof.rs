@@ -55,6 +55,31 @@ pub enum MapProofError {
         /// Key containing the prefix
         key: DBKey,
     },
+
+    /// One key is mentioned several times in the proof
+    DuplicateKey(DBKey),
+
+    /// Entries in the proof are not ordered by increasing key
+    InvalidOrdering(DBKey, DBKey),
+}
+
+impl ::std::fmt::Display for MapProofError {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        write!(f, "{:?}", &self)
+    }
+}
+
+impl ::std::error::Error for MapProofError {
+    fn description(&self) -> &str {
+        use self::MapProofError::*;
+
+        match *self {
+            NonTerminalNode(_) => &"Non-terminal node as a single key in a map proof",
+            EmbeddedKeys { .. } => &"Embedded keys in a map proof",
+            DuplicateKey(_) => &"Duplicate keys in a map proof",
+            InvalidOrdering(_, _) => &"Invalid key ordering in a map proof",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -192,6 +217,8 @@ fn hash_isolated_node(key: &DBKey, h: &Hash) -> Hash {
 /// the nodes in the right contour may be updated on each step. Further, on each step
 /// zero or more nodes are evicted from the contour, and a single new node is
 /// added to it.
+///
+/// `entries` are assumed to be sorted by the key in increasing order.
 fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
     match entries.len() {
         0 => Ok(Hash::default()),
@@ -205,19 +232,6 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
         }
 
         _ => {
-            // Check the embedding of keys before performing any hash operations
-            for w in entries.windows(2) {
-                let (prev, entry) = (&w[0], &w[1]);
-
-                debug_assert!(prev.key <= entry.key); // keys should be ordered by the caller
-                if entry.key.starts_with(&prev.key) {
-                    return Err(MapProofError::EmbeddedKeys {
-                        prefix: prev.key,
-                        key: entry.key,
-                    });
-                }
-            }
-
             let root = ContourNode::root(&entries[0].key);
             let mut right_contour = vec![root];
 
@@ -286,12 +300,6 @@ impl<K, V> MapProofBuilder<K, V> {
     }
 
     /// Adds a proof entry into the builder.
-        debug_assert!(if let Some(&(last_key, _)) = self.proof.last() {
-            last_key < key
-        } else {
-            true
-        });
-
     pub fn add_proof_entry(mut self, key: DBKey, hash: Hash) -> Self {
         self.proof.push((key, hash));
         self
@@ -351,6 +359,69 @@ where
         self.proof.iter().cloned().map(|e| e.into()).collect()
     }
 
+    fn validate(&self) -> Result<(), MapProofError> {
+        use std::cmp::Ordering;
+
+        // Check that entries in proof are in increasing order
+        for w in self.proof.windows(2) {
+            let (prev_key, key) = (&w[0].key, &w[1].key);
+            match prev_key.partial_cmp(key) {
+                Some(Ordering::Less) => {
+                    if key.starts_with(prev_key) {
+                        return Err(MapProofError::EmbeddedKeys {
+                            prefix: *prev_key,
+                            key: *key,
+                        });
+                    }
+                }
+                Some(Ordering::Equal) => { return Err(MapProofError::DuplicateKey(*key)); }
+                Some(Ordering::Greater) => { return Err(MapProofError::InvalidOrdering(*prev_key, *key)); }
+                None => unreachable!("Uncomparable keys in proof"),
+            }
+        }
+
+        // Check that no entry has a prefix among the keys in the proof entries.
+        // In order to do this, it suffices to locate the closest smaller key in the proof entries
+        // and check only it.
+        for e in &self.entries {
+            let key = DBKey::leaf(e.key());
+
+            match self.proof.binary_search_by(|pe| pe.key.partial_cmp(&key).expect("Uncomparable keys in proof")) {
+                Ok(_) => { return Err(MapProofError::DuplicateKey(key)); }
+
+                Err(index) if index > 0 => {
+                    let prev_key = self.proof[index - 1].key;
+
+                    if key.starts_with(&prev_key) {
+                        return Err(MapProofError::EmbeddedKeys {
+                            prefix: prev_key,
+                            key,
+                        });
+                    }
+                }
+
+                _ => {}
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Retrieves references to keys that the proof shows as missing from the map.
+    /// This method does not perform any integrity checks of the proof.
+    pub fn missing_keys_unchecked<'a>(&'a self) -> Vec<&'a K> {
+        self.entries.iter()
+            .filter_map(|e| e.get_missing())
+            .collect()
+    }
+
+    /// Retrieves references to keys that the proof shows as missing from the map.
+    /// Fails if the proof is malformed.
+    pub fn missing_keys<'a>(&'a self) -> Result<Vec<&'a K>, MapProofError> {
+        self.validate()?;
+        Ok(self.missing_keys_unchecked())
+    }
+
     /// Consumes this view producing a pair of:
     /// - Collection from key-value pairs present in the view
     /// - Hash of the `ProofMapIndex` that backs the view
@@ -360,6 +431,7 @@ where
     where
         T: FromIterator<(K, V)>,
     {
+        self.validate()?;
         let (mut proof, entries) = (self.proof, self.entries);
 
         proof.extend(entries.iter().filter_map(|e| {
