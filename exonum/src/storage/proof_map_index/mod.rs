@@ -416,7 +416,10 @@ where
             }
 
             // Adds this contour node into a proof builder.
-            fn add_to_proof<K, V>(self, mut builder: MapProofBuilder<K, V>) -> MapProofBuilder<K, V> {
+            fn add_to_proof<K, V>(
+                self,
+                mut builder: MapProofBuilder<K, V>,
+            ) -> MapProofBuilder<K, V> {
                 if !self.visited_right {
                     // This works due to the following observation: If neither of the child nodes
                     // were visited when the node is being ejected from the contour,
@@ -492,8 +495,12 @@ where
                                     ChildKind::Right => {
                                         if !contour_tip.visited_left {
                                             builder = builder.add_proof_entry(
-                                                contour_tip.branch.child_slice(ChildKind::Left),
-                                                *contour_tip.branch.child_hash(ChildKind::Left),
+                                                contour_tip.branch.child_slice(
+                                                    ChildKind::Left,
+                                                ),
+                                                *contour_tip.branch.child_hash(
+                                                    ChildKind::Left,
+                                                ),
                                             );
                                         }
 

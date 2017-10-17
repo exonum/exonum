@@ -333,11 +333,9 @@ fn check_map_multiproof<K, V>(
     };
 
     // XXX: is it possible to compare real and expected missing keys without cloning?
-    let real_missing_keys = HashSet::from_iter(
-        proof.missing_keys_unchecked()
-            .into_iter()
-            .map(|k| k.clone()),
-    );
+    let real_missing_keys = HashSet::from_iter(proof.missing_keys_unchecked().into_iter().map(
+        |k| k.clone(),
+    ));
     assert_eq!(real_missing_keys, missing_keys);
     assert_eq!(proof.try_into().unwrap(), (entries, table.root_hash()));
 }
@@ -409,45 +407,63 @@ where
 
 #[test]
 fn test_invalid_map_proofs() {
-    use ::std::error::Error;
+    use std::error::Error;
 
     let h = hash(&vec![1]);
 
     let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::builder()
         .add_proof_entry(DBKey::leaf(&[1; 32]).truncate(240), h)
         .create();
-    assert_eq!(proof.try_into::<Vec<_>>().unwrap_err().description(), "Non-terminal node as a single key in a map proof");
+    assert_eq!(
+        proof.try_into::<Vec<_>>().unwrap_err().description(),
+        "Non-terminal node as a single key in a map proof"
+    );
 
     let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::builder()
         .add_proof_entry(DBKey::leaf(&[1; 32]).truncate(8), h)
         .add_proof_entry(DBKey::leaf(&[0; 32]).truncate(10), h)
         .create();
-    assert_eq!(proof.try_into::<Vec<_>>().unwrap_err().description(), "Invalid key ordering in a map proof");
+    assert_eq!(
+        proof.try_into::<Vec<_>>().unwrap_err().description(),
+        "Invalid key ordering in a map proof"
+    );
 
     let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::builder()
         .add_proof_entry(DBKey::leaf(&[1; 32]).truncate(3), h)
         .add_proof_entry(DBKey::leaf(&[1; 32]).truncate(77), h)
         .create();
-    assert_eq!(proof.try_into::<Vec<_>>().unwrap_err().description(), "Embedded keys in a map proof");
+    assert_eq!(
+        proof.try_into::<Vec<_>>().unwrap_err().description(),
+        "Embedded keys in a map proof"
+    );
 
     let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::builder()
         .add_proof_entry(DBKey::leaf(&[1; 32]).truncate(3), h)
         .add_entry([1; 32], vec![1, 2, 3])
         .create();
-    assert_eq!(proof.try_into::<Vec<_>>().unwrap_err().description(), "Embedded keys in a map proof");
+    assert_eq!(
+        proof.try_into::<Vec<_>>().unwrap_err().description(),
+        "Embedded keys in a map proof"
+    );
 
     let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::builder()
         .add_proof_entry(DBKey::leaf(&[1; 32]).truncate(3), h)
         .add_entry([1; 32], vec![1, 2, 3])
         .create();
-    assert_eq!(proof.try_into::<Vec<_>>().unwrap_err().description(), "Embedded keys in a map proof");
+    assert_eq!(
+        proof.try_into::<Vec<_>>().unwrap_err().description(),
+        "Embedded keys in a map proof"
+    );
 
     let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::builder()
         .add_proof_entry(DBKey::leaf(&[0; 32]).truncate(10), h)
         .add_proof_entry(DBKey::leaf(&[1; 32]), h)
         .add_entry([1; 32], vec![1, 2, 3])
         .create();
-    assert_eq!(proof.try_into::<Vec<_>>().unwrap_err().description(), "Duplicate keys in a map proof");
+    assert_eq!(
+        proof.try_into::<Vec<_>>().unwrap_err().description(),
+        "Duplicate keys in a map proof"
+    );
 }
 
 fn build_proof_in_empty_tree(db: Box<Database>) {

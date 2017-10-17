@@ -74,10 +74,10 @@ impl ::std::error::Error for MapProofError {
         use self::MapProofError::*;
 
         match *self {
-            NonTerminalNode(_) => &"Non-terminal node as a single key in a map proof",
-            EmbeddedKeys { .. } => &"Embedded keys in a map proof",
-            DuplicateKey(_) => &"Duplicate keys in a map proof",
-            InvalidOrdering(_, _) => &"Invalid key ordering in a map proof",
+            NonTerminalNode(_) => "Non-terminal node as a single key in a map proof",
+            EmbeddedKeys { .. } => "Embedded keys in a map proof",
+            DuplicateKey(_) => "Duplicate keys in a map proof",
+            InvalidOrdering(_, _) => "Invalid key ordering in a map proof",
         }
     }
 }
@@ -181,7 +181,7 @@ impl<K, V> OptionalEntry<K, V> {
 
     fn get_value(&self) -> Option<(&K, &V)> {
         let (key, value) = (&(self.0).0, &(self.0).1);
-        if let &Some(ref v) = value {
+        if let Some(ref v) = *value {
             Some((key, v))
         } else {
             None
@@ -352,7 +352,7 @@ where
         KI: IntoIterator<Item = K>,
     {
         MapProof {
-            entries: keys.into_iter().map(|key| OptionalEntry::missing(key)).collect(),
+            entries: keys.into_iter().map(OptionalEntry::missing).collect(),
             proof: vec![],
         }
     }
@@ -377,9 +377,13 @@ where
                         });
                     }
                 }
-                Some(Ordering::Equal) => { return Err(MapProofError::DuplicateKey(*key)); }
-                Some(Ordering::Greater) => { return Err(MapProofError::InvalidOrdering(*prev_key, *key)); }
-                None => unreachable!("Uncomparable keys in proof"),
+                Some(Ordering::Equal) => {
+                    return Err(MapProofError::DuplicateKey(*key));
+                }
+                Some(Ordering::Greater) => {
+                    return Err(MapProofError::InvalidOrdering(*prev_key, *key));
+                }
+                None => unreachable!("Incomparable keys in proof"),
             }
         }
 
@@ -389,8 +393,14 @@ where
         for e in &self.entries {
             let key = DBKey::leaf(e.key());
 
-            match self.proof.binary_search_by(|pe| pe.key.partial_cmp(&key).expect("Uncomparable keys in proof")) {
-                Ok(_) => { return Err(MapProofError::DuplicateKey(key)); }
+            match self.proof.binary_search_by(|pe| {
+                pe.key.partial_cmp(&key).expect(
+                    "Incomparable keys in proof",
+                )
+            }) {
+                Ok(_) => {
+                    return Err(MapProofError::DuplicateKey(key));
+                }
 
                 Err(index) if index > 0 => {
                     let prev_key = self.proof[index - 1].key;
@@ -412,15 +422,16 @@ where
 
     /// Retrieves references to keys that the proof shows as missing from the map.
     /// This method does not perform any integrity checks of the proof.
-    pub fn missing_keys_unchecked<'a>(&'a self) -> Vec<&'a K> {
-        self.entries.iter()
+    pub fn missing_keys_unchecked(&self) -> Vec<&K> {
+        self.entries
+            .iter()
             .filter_map(|e| e.get_missing())
             .collect()
     }
 
     /// Retrieves references to keys that the proof shows as missing from the map.
     /// Fails if the proof is malformed.
-    pub fn missing_keys<'a>(&'a self) -> Result<Vec<&'a K>, MapProofError> {
+    pub fn missing_keys(&self) -> Result<Vec<&K>, MapProofError> {
         self.validate()?;
         Ok(self.missing_keys_unchecked())
     }
@@ -438,7 +449,9 @@ where
         let (mut proof, entries) = (self.proof, self.entries);
 
         proof.extend(entries.iter().filter_map(|e| {
-            e.get_value().map(|(k, v)| (DBKey::leaf(k), v.hash()).into())
+            e.get_value().map(
+                |(k, v)| (DBKey::leaf(k), v.hash()).into(),
+            )
         }));
         // Rust docs state that in the case `self.proof` and `self.entries` are sorted
         // (which is the case for `MapProof`s returned by `ProofMapIndex.get_proof()`),
@@ -450,6 +463,14 @@ where
             )
         });
 
-        collect(&proof).map(|h| (entries.into_iter().filter_map(OptionalEntry::into_value).collect(), h))
+        collect(&proof).map(|h| {
+            (
+                entries
+                    .into_iter()
+                    .filter_map(OptionalEntry::into_value)
+                    .collect(),
+                h,
+            )
+        })
     }
 }
