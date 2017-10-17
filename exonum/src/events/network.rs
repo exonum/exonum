@@ -289,6 +289,7 @@ impl NetworkPart {
         // TODO Don't use unwrap here!
         let listener = TcpListener::bind(&self.listen_address, &handle_orig).unwrap();
         let network_tx = self.network_tx.clone();
+        let handle = handle_orig.clone();
         let server = listener.incoming().for_each(move |(sock, addr)| {
             // Increment reference counter
             let holder = Rc::downgrade(&incoming_connections_counter);
@@ -336,8 +337,10 @@ impl NetworkPart {
                     .map(|_| {
                         // Ensure that holder lives until the stream ends.
                         let _holder = holder;
-                    });
-                tobox(connection_handler)
+                    })
+                    .map_err(log_error);
+                handle.spawn(tobox(connection_handler));
+                tobox(future::ok(()))
             }
         });
 

@@ -48,10 +48,9 @@ impl Service for CommitWatcherService {
     }
 
     fn handle_commit(&self, _context: &mut ServiceContext) {
-        let oneshot = self.0.lock().unwrap().take().expect(
-            "Can't send event twice",
-        );
-        oneshot.send(()).unwrap()
+        if let Some(oneshot) = self.0.lock().unwrap().take() {
+            oneshot.send(()).unwrap();
+        }
     }
 }
 
@@ -74,7 +73,7 @@ fn run_nodes(count: u8) -> (Vec<JoinHandle<()>>, Vec<oneshot::Receiver<()>>) {
 
 #[test]
 fn test_node_run() {
-    let (_, commit_rxs) = run_nodes(2);
+    let (_, commit_rxs) = run_nodes(4);
 
     let timer = Timer::default();
     let duration = Duration::from_secs(60);
