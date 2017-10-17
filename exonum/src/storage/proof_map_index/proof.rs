@@ -130,11 +130,50 @@ impl ContourNode {
     }
 }
 
+#[derive(Debug, Clone, Serialize)]
+struct OptionalEntry<K, V>((K, Option<V>));
+
+impl<K, V> OptionalEntry<K, V> {
+    fn missing(key: K) -> Self {
+        OptionalEntry((key, None))
+    }
+
+    fn value(key: K, value: V) -> Self {
+        OptionalEntry((key, Some(value)))
+    }
+
+    fn key(&self) -> &K {
+        &(self.0).0
+    }
+
+    fn get_missing(&self) -> Option<&K> {
+        if (self.0).1.is_none() {
+            Some(&(self.0).0)
+        } else {
+            None
+        }
+    }
+
+    fn get_value(&self) -> Option<(&K, &V)> {
+        let (key, value) = (&(self.0).0, &(self.0).1);
+        if let &Some(ref v) = value {
+            Some((key, v))
+        } else {
+            None
+        }
+    }
+
+    fn into_value(self) -> Option<(K, V)> {
+        let key = (self.0).0;
+        (self.0).1.map(|value| (key, value))
+    }
+}
+
 /// View of a `ProofMapIndex`, i.e., a subset of its elements coupled with a *proof*,
 /// which jointly allow to restore the `root_hash()` of the index.
 #[derive(Debug, Serialize)]
 pub struct MapProof<K, V> {
-    entries: Vec<(K, V)>,
+    entries: Vec<OptionalEntry<K, V>>,
     proof: Vec<MapProofEntry>,
 }
 
@@ -221,7 +260,7 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
 /// Builder for `MapProof`s.
 #[derive(Debug)]
 pub struct MapProofBuilder<K, V> {
-    entries: Vec<(K, V)>,
+    entries: Vec<OptionalEntry<K, V>>,
     proof: Vec<(DBKey, Hash)>,
 }
 
@@ -283,18 +322,18 @@ where
         I: IntoIterator<Item = (DBKey, Hash)>,
     {
         MapProof {
-            entries: vec![entry],
+            entries: vec![OptionalEntry::value(entry.0, entry.1)],
             proof: proof.into_iter().map(|e| e.into()).collect(),
         }
     }
 
     /// Creates a proof of absence of a key.
-    pub fn for_absent_key<I>(_: K, proof: I) -> Self
+    pub fn for_absent_key<I>(key: K, proof: I) -> Self
     where
         I: IntoIterator<Item = (DBKey, Hash)>,
     {
         MapProof {
-            entries: vec![],
+            entries: vec![OptionalEntry::missing(key)],
             proof: proof.into_iter().map(|e| e.into()).collect(),
         }
     }
@@ -323,8 +362,8 @@ where
     {
         let (mut proof, entries) = (self.proof, self.entries);
 
-        proof.extend(entries.iter().map(|&(ref k, ref v)| {
-            (DBKey::leaf(k), v.hash()).into()
+        proof.extend(entries.iter().filter_map(|e| {
+            e.get_value().map(|(k, v)| (DBKey::leaf(k), v.hash()).into())
         }));
         // Rust docs state that in the case `self.proof` and `self.entries` are sorted
         // (which is the case for `MapProof`s returned by `ProofMapIndex.get_proof()`),
@@ -336,6 +375,6 @@ where
             )
         });
 
-        collect(&proof).map(|h| (entries.into_iter().collect(), h))
+        collect(&proof).map(|h| (entries.into_iter().filter_map(OptionalEntry::into_value).collect(), h))
     }
 }
