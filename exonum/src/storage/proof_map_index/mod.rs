@@ -442,6 +442,81 @@ where
             }
         }
 
+        // // // // Processing for a single key in a map with multiple entries // // // //
+
+        fn process_key<K, V, F>(
+            contour: &mut Vec<ContourNode>,
+            mut builder: MapProofBuilder<K, V>,
+            db_key: DBKey,
+            key: K,
+            lookup: F,
+        ) -> MapProofBuilder<K, V>
+        where
+            V: StorageValue,
+            F: Fn(&DBKey) -> Node<V>,
+        {
+            // `unwrap()` is safe: there is at least 1 element in the contour by design
+            let common_prefix = db_key.common_prefix(&contour.last().unwrap().key);
+
+            // Eject nodes from the contour while they will they can be "finalized"
+            while let Some(node) = contour.pop() {
+                if contour.is_empty() || node.key.len() <= common_prefix {
+                    contour.push(node);
+                    break;
+                } else {
+                    builder = node.add_to_proof(builder);
+                }
+            }
+
+            // Push new items to the contour
+            'traverse: loop {
+                let node_key = {
+                    let contour_tip = contour.last_mut().unwrap();
+
+                    let next_height = contour_tip.key.len();
+                    let next_bit = db_key.get(next_height);
+                    let node_key = contour_tip.branch.child_slice(next_bit);
+
+                    if !db_key.matches_from(&node_key, next_height) {
+                        // Both children of `branch` do not fit; stop here
+                        builder = builder.add_missing(key);
+                        break 'traverse;
+                    } else {
+                        match next_bit {
+                            ChildKind::Left => contour_tip.visited_left = true,
+                            ChildKind::Right => {
+                                if !contour_tip.visited_left {
+                                    builder =
+                                        builder.add_proof_entry(
+                                            contour_tip.branch.child_slice(ChildKind::Left),
+                                            *contour_tip.branch.child_hash(ChildKind::Left),
+                                        );
+                                }
+                                contour_tip.visited_right = true;
+                            }
+                        }
+
+                        node_key
+                    }
+                };
+
+                let node = lookup(&node_key);
+                match node {
+                    Node::Branch(branch) => {
+                        contour.push(ContourNode::new(node_key, branch));
+                    }
+
+                    Node::Leaf(value) => {
+                        // We have reached the leaf node and haven't diverged!
+                        builder = builder.add_entry(key, value);
+                        break 'traverse;
+                    }
+                }
+            }
+
+            builder
+        }
+
         // // // // `get_multiproof()` main section // // // //
 
         match self.get_root_node() {
@@ -455,76 +530,16 @@ where
                         // `unwrap` is safe here because all keys start from the same position `0`
                         x.0.partial_cmp(&y.0).unwrap()
                     });
-
                     keys
                 };
 
                 let mut contour = Vec::with_capacity(CONTOUR_CAPACITY);
                 contour.push(ContourNode::new(root_key, root_branch));
 
-                for (searched_key, key) in searched_keys {
-                    // `unwrap()` is safe: there is at least 1 element in the contour by design
-                    let common_prefix = searched_key.common_prefix(&contour.last().unwrap().key);
-
-                    // Eject nodes from the contour while they will they can be "finalized"
-                    while let Some(node) = contour.pop() {
-                        if contour.is_empty() || node.key.len() <= common_prefix {
-                            contour.push(node);
-                            break;
-                        } else {
-                            builder = node.add_to_proof(builder);
-                        }
-                    }
-
-                    // Push new items to the contour
-                    'traverse: loop {
-                        let node_key = {
-                            let contour_tip = contour.last_mut().unwrap();
-
-                            let next_height = contour_tip.key.len();
-                            let next_bit = searched_key.get(next_height);
-                            let node_key = contour_tip.branch.child_slice(next_bit);
-
-                            if !searched_key.matches_from(&node_key, next_height) {
-                                // Both children of `branch` do not fit; stop here
-                                builder = builder.add_missing(key);
-                                break 'traverse;
-                            } else {
-                                match next_bit {
-                                    ChildKind::Left => contour_tip.visited_left = true,
-                                    ChildKind::Right => {
-                                        if !contour_tip.visited_left {
-                                            builder = builder.add_proof_entry(
-                                                contour_tip.branch.child_slice(
-                                                    ChildKind::Left,
-                                                ),
-                                                *contour_tip.branch.child_hash(
-                                                    ChildKind::Left,
-                                                ),
-                                            );
-                                        }
-
-                                        contour_tip.visited_right = true;
-                                    }
-                                }
-
-                                node_key
-                            }
-                        };
-
-                        let node = self.get_node_unchecked(&node_key);
-                        match node {
-                            Node::Branch(branch) => {
-                                contour.push(ContourNode::new(node_key, branch));
-                            }
-
-                            Node::Leaf(value) => {
-                                // We have reached the leaf node and haven't diverged!
-                                builder = builder.add_entry(key, value);
-                                break 'traverse;
-                            }
-                        }
-                    }
+                for (db_key, key) in searched_keys {
+                    builder = process_key(&mut contour, builder, db_key, key, |&key| {
+                        self.get_node_unchecked(&key)
+                    });
                 }
 
                 // Eject remaining entries from the contour
