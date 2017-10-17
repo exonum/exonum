@@ -347,9 +347,12 @@ where
     }
 
     /// Creates a proof for an empty map.
-    pub fn empty() -> Self {
+    pub fn for_empty_map<KI>(keys: KI) -> Self
+    where
+        KI: IntoIterator<Item = K>,
+    {
         MapProof {
-            entries: vec![],
+            entries: keys.into_iter().map(|key| OptionalEntry::missing(key)).collect(),
             proof: vec![],
         }
     }

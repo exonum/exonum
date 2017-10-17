@@ -372,7 +372,7 @@ where
                 }
             }
 
-            None => MapProof::empty(),
+            None => MapProof::for_empty_map(vec![key]),
         }
     }
 
@@ -551,7 +551,7 @@ where
                 builder.create()
             }
 
-            None => MapProof::empty(),
+            None => MapProof::for_empty_map(keys),
         }
     }
 
