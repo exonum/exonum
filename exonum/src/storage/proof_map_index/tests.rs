@@ -306,27 +306,39 @@ fn check_map_proof<K, V>(
     assert_eq!(proof.try_into().unwrap(), (entries, table.root_hash()));
 }
 
-fn check_map_proofs<K, V>(
+fn check_map_multiproof<K, V>(
     proof: MapProof<K, V>,
     keys: Vec<K>,
     table: &ProofMapIndex<&mut Fork, K, V>,
 ) where
-    K: ProofMapKey + PartialEq + Ord + ::std::fmt::Debug,
+    K: ProofMapKey + Clone + PartialEq + Ord + ::std::hash::Hash + ::std::fmt::Debug,
     V: StorageValue + PartialEq + ::std::fmt::Debug,
 {
-    let entries = {
+    use std::iter::FromIterator;
+
+    let (entries, missing_keys) = {
         let mut entries = BTreeMap::new();
+        let mut missing_keys: HashSet<K> = HashSet::new();
 
         for key in keys {
             if table.contains(&key) {
                 let value = table.get(&key).unwrap();
                 entries.insert(key, value);
+            } else {
+                missing_keys.insert(key);
             }
         }
 
-        entries
+        (entries, missing_keys)
     };
 
+    // XXX: is it possible to compare real and expected missing keys without cloning?
+    let real_missing_keys = HashSet::from_iter(
+        proof.missing_keys_unchecked()
+            .into_iter()
+            .map(|k| k.clone()),
+    );
+    assert_eq!(real_missing_keys, missing_keys);
     assert_eq!(proof.try_into().unwrap(), (entries, table.root_hash()));
 }
 
@@ -368,7 +380,7 @@ where
 
 fn check_multiproofs_for_data<K, V>(db: &Box<Database>, data: Vec<(K, V)>, nonexisting_keys: Vec<K>)
 where
-    K: ProofMapKey + Copy + Ord + PartialEq + ::std::fmt::Debug + Serialize,
+    K: ProofMapKey + Copy + Ord + PartialEq + ::std::hash::Hash + ::std::fmt::Debug + Serialize,
     V: StorageValue + Clone + PartialEq + ::std::fmt::Debug + Serialize,
 {
     let mut storage = db.fork();
@@ -384,15 +396,58 @@ where
         // Check the multiproof only for existing keys
         let keys = sample(&mut rng, data.iter().map(|&(k, _)| k), proof_size);
         let proof = table.get_multiproof(keys.clone());
-        check_map_proofs(proof, keys, &table);
+        check_map_multiproof(proof, keys, &table);
 
         // Check the multiproof for the equal number of existing and non-existing keys
         let mut keys = sample(&mut rng, data.iter().map(|&(k, _)| k), proof_size);
         let non_keys = sample(&mut rng, &nonexisting_keys, proof_size);
         keys.extend(non_keys);
         let proof = table.get_multiproof(keys.clone());
-        check_map_proofs(proof, keys, &table);
+        check_map_multiproof(proof, keys, &table);
     }
+}
+
+#[test]
+fn test_invalid_map_proofs() {
+    use ::std::error::Error;
+
+    let h = hash(&vec![1]);
+
+    let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::builder()
+        .add_proof_entry(DBKey::leaf(&[1; 32]).truncate(240), h)
+        .create();
+    assert_eq!(proof.try_into::<Vec<_>>().unwrap_err().description(), "Non-terminal node as a single key in a map proof");
+
+    let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::builder()
+        .add_proof_entry(DBKey::leaf(&[1; 32]).truncate(8), h)
+        .add_proof_entry(DBKey::leaf(&[0; 32]).truncate(10), h)
+        .create();
+    assert_eq!(proof.try_into::<Vec<_>>().unwrap_err().description(), "Invalid key ordering in a map proof");
+
+    let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::builder()
+        .add_proof_entry(DBKey::leaf(&[1; 32]).truncate(3), h)
+        .add_proof_entry(DBKey::leaf(&[1; 32]).truncate(77), h)
+        .create();
+    assert_eq!(proof.try_into::<Vec<_>>().unwrap_err().description(), "Embedded keys in a map proof");
+
+    let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::builder()
+        .add_proof_entry(DBKey::leaf(&[1; 32]).truncate(3), h)
+        .add_entry([1; 32], vec![1, 2, 3])
+        .create();
+    assert_eq!(proof.try_into::<Vec<_>>().unwrap_err().description(), "Embedded keys in a map proof");
+
+    let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::builder()
+        .add_proof_entry(DBKey::leaf(&[1; 32]).truncate(3), h)
+        .add_entry([1; 32], vec![1, 2, 3])
+        .create();
+    assert_eq!(proof.try_into::<Vec<_>>().unwrap_err().description(), "Embedded keys in a map proof");
+
+    let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::builder()
+        .add_proof_entry(DBKey::leaf(&[0; 32]).truncate(10), h)
+        .add_proof_entry(DBKey::leaf(&[1; 32]), h)
+        .add_entry([1; 32], vec![1, 2, 3])
+        .create();
+    assert_eq!(proof.try_into::<Vec<_>>().unwrap_err().description(), "Duplicate keys in a map proof");
 }
 
 fn build_proof_in_empty_tree(db: Box<Database>) {
@@ -419,7 +474,7 @@ fn build_multiproof_in_empty_tree(db: Box<Database>) {
     let keys = vec![[0; 32], [230; 32], [244; 32]];
     let proof = table.get_multiproof(keys.clone());
     assert_eq!(proof.proof(), vec![]);
-    check_map_proofs(proof, keys, &table);
+    check_map_multiproof(proof, keys, &table);
 }
 
 fn build_proof_in_single_node_tree(db: Box<Database>) {
@@ -448,7 +503,7 @@ fn build_multiproof_in_single_node_tree(db: Box<Database>) {
     let keys = vec![[230; 32], [1; 32], [129; 32]];
     let proof = table.get_multiproof(keys.clone());
     assert_eq!(proof.proof(), vec![]);
-    check_map_proofs(proof, keys, &table);
+    check_map_multiproof(proof, keys, &table);
 
     let keys = vec![[229; 32], [1; 32], [129; 32]];
     let proof = table.get_multiproof(keys.clone());
@@ -456,7 +511,7 @@ fn build_multiproof_in_single_node_tree(db: Box<Database>) {
         proof.proof(),
         vec![(DBKey::leaf(&[230; 32]), hash(&vec![1]))]
     );
-    check_map_proofs(proof, keys, &table);
+    check_map_multiproof(proof, keys, &table);
 }
 
 fn build_proof_in_multinode_tree(db: Box<Database>) {
@@ -643,17 +698,17 @@ fn build_multiproof_simple(db: Box<Database>) {
     let keys = vec![[0; 32], [1; 32]];
     let proof = table.get_multiproof(keys.clone());
     assert_eq!(proof.proof(), vec![(DBKey::leaf(&[4; 32]), hash(&vec![2]))]);
-    check_map_proofs(proof, keys, &table);
+    check_map_multiproof(proof, keys, &table);
 
     let keys = vec![[2; 32], [0; 32], [1; 32], [129; 32]];
     let proof = table.get_multiproof(keys.clone());
     assert_eq!(proof.proof(), vec![(DBKey::leaf(&[4; 32]), hash(&vec![2]))]);
-    check_map_proofs(proof, keys, &table);
+    check_map_multiproof(proof, keys, &table);
 
     let keys = vec![[2; 32], [0; 32], [1; 32], [129; 32], [4; 32]];
     let proof = table.get_multiproof(keys.clone());
     assert_eq!(proof.proof(), vec![]);
-    check_map_proofs(proof, keys, &table);
+    check_map_multiproof(proof, keys, &table);
 
     let keys = vec![[2; 32], [0; 32], [129; 32]];
     let proof = table.get_multiproof(keys.clone());
@@ -661,7 +716,7 @@ fn build_multiproof_simple(db: Box<Database>) {
         proof.proof(),
         vec![(DBKey::leaf(&[1; 32]), hash(&vec![1])), (DBKey::leaf(&[4; 32]), hash(&vec![2]))]
     );
-    check_map_proofs(proof, keys, &table);
+    check_map_multiproof(proof, keys, &table);
 
     let keys = vec![[2; 32], [129; 32]];
     let proof = table.get_multiproof(keys.clone());
@@ -669,7 +724,7 @@ fn build_multiproof_simple(db: Box<Database>) {
         proof.proof(),
         vec![(DBKey::leaf(&[1; 32]), hash(&vec![1])), (DBKey::leaf(&[4; 32]), hash(&vec![2]))]
     );
-    check_map_proofs(proof, keys, &table);
+    check_map_multiproof(proof, keys, &table);
 
     let keys = vec![[255; 32], [129; 32]];
     let proof = table.get_multiproof(keys.clone());
@@ -677,7 +732,7 @@ fn build_multiproof_simple(db: Box<Database>) {
         proof.proof(),
         vec![(DBKey::leaf(&[1; 32]), hash(&vec![1])), (DBKey::leaf(&[4; 32]), hash(&vec![2]))]
     );
-    check_map_proofs(proof, keys, &table);
+    check_map_multiproof(proof, keys, &table);
 
     // Insert key that splits 15-bit segment off the left key in the tree.
     // The key itself is to the left of the `[1; 32]` key.
@@ -700,7 +755,7 @@ fn build_multiproof_simple(db: Box<Database>) {
         proof.proof(),
         vec![(DBKey::leaf(&[1; 32]).truncate(15), left_hash), (DBKey::leaf(&[4; 32]), hash(&vec![2]))]
     );
-    check_map_proofs(proof, vec![[0; 32]], &table);
+    check_map_multiproof(proof, vec![[0; 32]], &table);
 
     let keys = {
         // `key > [1; 32]`, which is visible from the `left_key` / `[1; 32]` junction
@@ -713,7 +768,7 @@ fn build_multiproof_simple(db: Box<Database>) {
         proof.proof(),
         vec![(DBKey::leaf(&[1; 32]).truncate(15), left_hash), (DBKey::leaf(&[4; 32]), hash(&vec![2]))]
     );
-    check_map_proofs(proof, keys, &table);
+    check_map_multiproof(proof, keys, &table);
 
     let keys = vec![[0; 32], [1; 32], [2; 32]];
     let proof = table.get_multiproof(keys.clone());
@@ -721,7 +776,7 @@ fn build_multiproof_simple(db: Box<Database>) {
         proof.proof(),
         vec![(DBKey::leaf(&left_key), hash(&vec![3])), (DBKey::leaf(&[4; 32]), hash(&vec![2]))]
     );
-    check_map_proofs(proof, keys, &table);
+    check_map_multiproof(proof, keys, &table);
 
     let keys = vec![[0; 32], [1; 32], [4; 32], [2; 32], [129; 32]];
     let proof = table.get_multiproof(keys.clone());
@@ -729,7 +784,7 @@ fn build_multiproof_simple(db: Box<Database>) {
         proof.proof(),
         vec![(DBKey::leaf(&left_key), hash(&vec![3]))]
     );
-    check_map_proofs(proof, keys, &table);
+    check_map_multiproof(proof, keys, &table);
 
     let keys = vec![[0; 32], [4; 32], [255; 32]];
     let proof = table.get_multiproof(keys.clone());
@@ -737,7 +792,7 @@ fn build_multiproof_simple(db: Box<Database>) {
         proof.proof(),
         vec![(DBKey::leaf(&[1; 32]).truncate(15), left_hash)]
     );
-    check_map_proofs(proof, keys, &table);
+    check_map_multiproof(proof, keys, &table);
 
     let keys = {
         // `key` is between `left_key` and `[1; 32]`, so they both should be returned in the proof
@@ -752,7 +807,7 @@ fn build_multiproof_simple(db: Box<Database>) {
         proof.proof(),
         vec![(DBKey::leaf(&left_key), hash(&vec![3])), (DBKey::leaf(&[1; 32]), hash(&vec![1]))]
     );
-    check_map_proofs(proof, keys, &table);
+    check_map_multiproof(proof, keys, &table);
 }
 
 fn fuzz_insert_build_proofs_in_table_filled_with_hashes(db: Box<Database>) {
