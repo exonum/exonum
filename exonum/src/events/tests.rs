@@ -295,3 +295,25 @@ fn test_network_reconnect() {
 
     assert_eq!(t1.wait_for_disconnect(), second);
 }
+
+
+#[test]
+fn test_network_multiple_connect() {
+    let main = "127.0.0.1:19100".parse().unwrap();
+
+    let nodes = ["127.0.0.1:19101".parse().unwrap(),
+                "127.0.0.1:19102".parse().unwrap(),
+                "127.0.0.1:19103".parse().unwrap()];
+
+    let mut node = TestEvents::with_addr(main).spawn();
+
+    let connect_messages:Vec<_> = nodes.iter().cloned().map(connect_message).collect();
+    let connectors:Vec<_> = nodes.iter().map(|addr| TestEvents::with_addr(*addr).spawn()).collect();
+
+    connectors[0].connect_with(main);
+    assert_eq!(node.wait_for_connect(), connect_messages[0]);
+    connectors[1].connect_with(main);
+    assert_eq!(node.wait_for_connect(), connect_messages[1]);
+    connectors[2].connect_with(main);
+    assert_eq!(node.wait_for_connect(), connect_messages[2]);
+}
