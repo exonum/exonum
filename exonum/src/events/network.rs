@@ -112,113 +112,17 @@ impl ConnectionsPool {
     fn len(&self) -> usize {
         self.inner.borrow_mut().len()
     }
-}
-
-impl NetworkPart {
-    pub fn run(self, handle: Handle) -> Box<Future<Item = (), Error = io::Error>> {
-        let network_config = self.network_config;
-        // Cancelation token
-        let (cancel_sender, cancel_handler) = unsync::oneshot::channel();
-        let cancel_sender = Some(cancel_sender);
-
-        let requests_handle = RequestHandler::new(
-            network_config.clone(),
-            self.network_tx.clone(),
-            handle.clone(),
-            self.network_requests.1,
-            cancel_sender,
-        );
-        let server = Listener::new(
-            network_config.clone(),
-            self.listen_address,
-            handle.clone(),
-            self.network_tx.clone(),
-        );
-
-        let cancel_handler = cancel_handler.map_err(|_| other_error("can't cancel routine"));
-        let fut = server
-            .join(requests_handle)
-            .map(drop)
-            .select(cancel_handler)
-            .map_err(|(e, _)| e);
-        tobox(fut)
-    }
-}
-
-struct RequestHandler {
-    // TODO: Replace with concrete type
-    handler: Box<Future<Item = (), Error = io::Error>>,
-}
-
-impl RequestHandler {
-    fn new(
-        network_config: NetworkConfiguration,
-        network_tx: mpsc::Sender<NetworkEvent>,
-        handle: Handle,
-        receiver: mpsc::Receiver<NetworkRequest>,
-        mut cancel_sender: Option<unsync::oneshot::Sender<()>>,
-    ) -> RequestHandler {
-        let outgoing_connections = ConnectionsPool::new();
-        let requests_handler = receiver
-            .map_err(|_| other_error("no network requests"))
-            .for_each(move |request| {
-                match request {
-                    NetworkRequest::SendMessage(peer, msg) => {
-                        let conn_tx = outgoing_connections.get(peer).or_else(|| {
-                            Self::connect_to_peer(
-                                network_config.clone(),
-                                peer,
-                                outgoing_connections.clone(),
-                                network_tx.clone(),
-                                handle.clone(),
-                            )
-                        });
-                        if let Some(conn_tx) = conn_tx {
-                            let fut = conn_tx.send(msg).map_err(|_| {
-                                other_error("can't send message to a connection")
-                            });
-                            tobox(fut)
-                        } else {
-                            let event = NetworkEvent::CantConnectToPeer(peer);
-                            let fut = network_tx
-                                .clone()
-                                .send(event)
-                                .map_err(|_| other_error("can't send network event"))
-                                .into_future();
-                            tobox(fut)
-                        }
-                    }
-                    NetworkRequest::DisconnectWithPeer(peer) => {
-                        Self::disconnect_with_peer(peer, &outgoing_connections, network_tx.clone())
-                    }
-                    // Immediately stop the event loop.
-                    NetworkRequest::Shutdown => {
-                        let fut = cancel_sender
-                            .take()
-                            .ok_or_else(|| other_error("shutdown twice"))
-                            .and_then(|sender| {
-                                sender.send(()).map_err(
-                                    |_| other_error("can't send shutdown signal"),
-                                )
-                            })
-                            .into_future();
-                        tobox(fut)
-                    }
-                }
-            });
-        RequestHandler { handler: tobox(requests_handler) }
-    }
 
     fn connect_to_peer(
+        self,
         network_config: NetworkConfiguration,
         peer: SocketAddr,
-        pool: ConnectionsPool,
         network_tx: mpsc::Sender<NetworkEvent>,
         handle: Handle,
     ) -> Option<mpsc::Sender<RawMessage>> {
 
         let limit = network_config.max_outgoing_connections;
-        if pool.len() >= limit {
+        if self.len() >= limit {
             warn!(
                 "Rejected outgoing connection with peer={}, \
                                      connections limit reached.",
@@ -228,7 +132,7 @@ impl RequestHandler {
         }
         // Register outgoing channel.
         let (conn_tx, conn_rx) = mpsc::channel(OUTGOING_CHANNEL_SIZE);
-        pool.insert(peer, &conn_tx);
+        self.insert(peer, &conn_tx);
         // Enable retry feature for outgoing connection.
         let timeout = network_config.tcp_connect_retry_timeout;
         let max_tries = network_config.tcp_connect_max_retries as usize;
@@ -274,7 +178,7 @@ impl RequestHandler {
                     peer,
                     res
                 );
-                Self::disconnect_with_peer(peer, &pool, network_tx.clone())
+                self.disconnect_with_peer(peer, network_tx.clone())
             })
             .map_err(log_error);
         handle.spawn(connect_handle);
@@ -282,11 +186,11 @@ impl RequestHandler {
     }
 
     fn disconnect_with_peer(
+        &self,
         peer: SocketAddr,
-        pool: &ConnectionsPool,
         network_tx: mpsc::Sender<NetworkEvent>,
     ) -> Box<Future<Item = (), Error = io::Error>> {
-        let fut = pool.remove(&peer)
+        let fut = self.remove(&peer)
             .into_future()
             .map_err(other_error)
             .and_then(move |_| {
@@ -299,19 +203,112 @@ impl RequestHandler {
     }
 }
 
+impl NetworkPart {
+    pub fn run(self, handle: Handle) -> Box<Future<Item = (), Error = io::Error>> {
+        let network_config = self.network_config;
+        // Cancelation token
+        let (cancel_sender, cancel_handler) = unsync::oneshot::channel();
+        let cancel_sender = Some(cancel_sender);
+
+        let requests_handle = RequestHandler::new(
+            network_config.clone(),
+            self.network_tx.clone(),
+            handle.clone(),
+            self.network_requests.1,
+            cancel_sender,
+        );
+        let server = Listener::new(
+            network_config.clone(),
+            self.listen_address,
+            handle.clone(),
+            self.network_tx.clone(),
+        );
+
+        let cancel_handler = cancel_handler.map_err(|_| other_error("can't cancel routine"));
+        let fut = server
+            .join(requests_handle)
+            .map(drop)
+            .select(cancel_handler)
+            .map_err(|(e, _)| e);
+        tobox(fut)
+    }
+}
+
+struct RequestHandler(
+    // TODO: Replace with concrete type
+    Box<Future<Item = (), Error = io::Error>>
+);
+
+impl RequestHandler {
+    fn new(
+        network_config: NetworkConfiguration,
+        network_tx: mpsc::Sender<NetworkEvent>,
+        handle: Handle,
+        receiver: mpsc::Receiver<NetworkRequest>,
+        mut cancel_sender: Option<unsync::oneshot::Sender<()>>,
+    ) -> RequestHandler {
+        let outgoing_connections = ConnectionsPool::new();
+        let requests_handler = receiver
+            .map_err(|_| other_error("no network requests"))
+            .for_each(move |request| {
+                match request {
+                    NetworkRequest::SendMessage(peer, msg) => {
+                        let conn_tx = outgoing_connections.get(peer).or_else(|| {
+                            outgoing_connections.clone().connect_to_peer(
+                                network_config.clone(),
+                                peer,
+                                network_tx.clone(),
+                                handle.clone(),
+                            )
+                        });
+                        if let Some(conn_tx) = conn_tx {
+                            let fut = conn_tx.send(msg).map_err(|_| {
+                                other_error("can't send message to a connection")
+                            });
+                            tobox(fut)
+                        } else {
+                            let event = NetworkEvent::CantConnectToPeer(peer);
+                            let fut = network_tx
+                                .clone()
+                                .send(event)
+                                .map_err(|_| other_error("can't send network event"))
+                                .into_future();
+                            tobox(fut)
+                        }
+                    }
+                    NetworkRequest::DisconnectWithPeer(peer) => {
+                        outgoing_connections.disconnect_with_peer(peer, network_tx.clone())
+                    }
+                    // Immediately stop the event loop.
+                    NetworkRequest::Shutdown => {
+                        let fut = cancel_sender
+                            .take()
+                            .ok_or_else(|| other_error("shutdown twice"))
+                            .and_then(|sender| {
+                                sender.send(()).map_err(
+                                    |_| other_error("can't send shutdown signal"),
+                                )
+                            })
+                            .into_future();
+                        tobox(fut)
+                    }
+                }
+            });
+        RequestHandler(tobox(requests_handler))
+    }
+}
+
 impl Future for RequestHandler {
     type Item = ();
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        self.handler.poll()
+        self.0.poll()
     }
 }
 
 
-struct Listener {
-    server: Box<Future<Item = (), Error = io::Error>>,
-}
+struct Listener(Box<Future<Item = (), Error = io::Error>>);
 
 impl Listener {
     fn new(
@@ -322,7 +319,7 @@ impl Listener {
     ) -> Listener {
         // Incoming connections limiter
         let incoming_connections_limit = network_config.max_incoming_connections;
-        let incoming_connections_counter: Rc<()> = Rc::default();;
+        let incoming_connections_counter: Rc<()> = Rc::default();
         // Incoming connections handler
         // TODO Don't use unwrap here!
         let listener = TcpListener::bind(&listen_address, &handle).unwrap();
@@ -377,7 +374,7 @@ impl Listener {
             tobox(future::ok(()))
         });
 
-        Listener { server: tobox(server) }
+        Listener(tobox(server))
     }
 }
 
@@ -386,7 +383,6 @@ impl Future for Listener {
     type Error = io::Error;
 
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        self.server.poll()
+        self.0.poll()
     }
 }
-
