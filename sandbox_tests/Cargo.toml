@@ -16,12 +16,14 @@ exonum-configuration = {version="0.2.0", path="../"}
 [dependencies.exonum]
 git = "https://github.com/exonum/exonum.git"
 version = "0.2.0"
-tag = "v0.2"
+# tag = "v0.3"
+rev = "32842d72845bc8b436c78db4347bc127a9dfa16c"
 
 [dependencies.sandbox]
 git = "https://github.com/exonum/exonum.git"
 version = "0.2.0"
-tag = "v0.2"
+# tag = "v0.3"
+rev = "32842d72845bc8b436c78db4347bc127a9dfa16c"
 
 [replace]
-"exonum:0.2.0" = { git = "https://github.com/exonum/exonum.git", tag = "v0.2" }
+"exonum:0.2.0" = { git = "https://github.com/exonum/exonum.git", rev = "32842d72845bc8b436c78db4347bc127a9dfa16c" }

@@ -26,14 +26,13 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use std::path::Path;
 use std::fs::File;
-use std::io::Read;
+use std::io::{self, Read};
 use std::str;
 
 use exonum::storage::{Database, MemoryDB, ProofListIndex, StorageValue};
 use exonum::node::TransactionSend;
 use exonum::crypto::Hash;
 use exonum::blockchain::{Service, Transaction};
-use exonum::events::Error as EventsError;
 use exonum::messages::{Message, RawMessage};
 use exonum::api::Api;
 use exonum::helpers::{init_logger, ValidatorId, Height};
@@ -115,9 +114,12 @@ struct TestTxSender {
 }
 
 impl TransactionSend for TestTxSender {
-    fn send(&self, tx: Box<Transaction>) -> Result<(), EventsError> {
+    fn send(&self, tx: Box<Transaction>) -> Result<(), io::Error> {
         if !tx.verify() {
-            return Err(EventsError::new("Unable to verify transaction"));
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "Unable to verify transaction",
+            ));
         }
         let rm = tx.raw().clone();
         self.transactions.lock().unwrap().push_back(rm);
