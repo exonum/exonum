@@ -17,15 +17,19 @@ pub mod tests;
 pub mod codec;
 pub mod error;
 pub mod network;
+pub mod timeouts;
 
-use futures::{Async, Poll, Stream};
+use futures::{Future, Async, Poll, Stream};
+use futures::sync::mpsc;
 
 use std::time::SystemTime;
 use std::cmp::Ordering;
 
 use node::{ExternalMessage, NodeTimeout};
 
-pub use self::network::{NetworkEvent, NetworkRequest};
+pub use self::network::{NetworkEvent, NetworkRequest, NetworkPart, NetworkConfiguration};
+pub use self::timeouts::TimeoutsPart;
+
 
 #[derive(Debug)]
 pub enum Event {
@@ -40,6 +44,28 @@ pub trait EventHandler {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct TimeoutRequest(pub SystemTime, pub NodeTimeout);
+
+#[derive(Debug)]
+pub struct HandlerPart<H: EventHandler> {
+    pub handler: H,
+    pub timeout_rx: mpsc::Receiver<NodeTimeout>,
+    pub network_rx: mpsc::Receiver<NetworkEvent>,
+    pub api_rx: mpsc::Receiver<ExternalMessage>,
+}
+
+impl<H: EventHandler + 'static> HandlerPart<H> {
+    pub fn run(self) -> Box<Future<Item = (), Error = ()>> {
+        let mut handler = self.handler;
+
+        let fut = EventsAggregator::new(self.timeout_rx, self.network_rx, self.api_rx)
+            .for_each(move |event| {
+                handler.handle_event(event);
+                Ok(())
+            });
+
+        tobox(fut)
+    }
+}
 
 impl PartialOrd for TimeoutRequest {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -159,4 +185,9 @@ where
             Ok(Async::NotReady)
         }
     }
+}
+
+
+fn tobox<F: Future + 'static>(f: F) -> Box<Future<Item = (), Error = F::Error>> {
+    Box::new(f.map(drop))
 }

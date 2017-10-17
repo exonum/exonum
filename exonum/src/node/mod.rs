@@ -36,7 +36,7 @@ use blockchain::{ApiContext, Blockchain, GenesisConfig, Schema, SharedNodeState,
 use api::{private, public, Api};
 use messages::{Connect, Message, RawMessage};
 use events::{NetworkRequest, TimeoutRequest, NetworkEvent};
-use events::network::{HandlerPart, NetworkConfiguration, NetworkPart, TimeoutsPart};
+use events::{HandlerPart, NetworkConfiguration, NetworkPart, TimeoutsPart};
 use events::error::{into_other, other_error, LogError, log_error};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 
@@ -779,8 +779,7 @@ impl Node {
         Ok(())
     }
 
-    #[doc(hidden)]
-    pub fn into_reactor(self) -> (HandlerPart<NodeHandler>, NetworkPart, TimeoutsPart) {
+    fn into_reactor(self) -> (HandlerPart<NodeHandler>, NetworkPart, TimeoutsPart) {
         let (network_tx, network_rx) = self.channel.network_events;
         let timeout_requests_rx = self.channel.timeout_requests.1;
 
