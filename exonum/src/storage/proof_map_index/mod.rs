@@ -23,7 +23,7 @@ use self::key::{DBKey, ChildKind, LEAF_KEY_PREFIX};
 use self::node::{Node, BranchNode};
 
 pub use self::key::{ProofMapKey, KEY_SIZE as PROOF_MAP_KEY_SIZE, DBKey as ProofMapDBKey};
-pub use self::proof::MapProof;
+pub use self::proof::{MapProof, MapProofBuilder};
 
 #[cfg(test)]
 mod tests;
@@ -370,6 +370,183 @@ where
                 } else {
                     MapProof::for_absent_key(key, vec![(root_key, root_value.hash())])
                 }
+            }
+
+            None => MapProof::empty(),
+        }
+    }
+
+    /// Returns the combined proof of existence or non-existence for the multiple specified keys.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let prefix = vec![1, 2, 3];
+    /// let snapshot = db.snapshot();
+    /// let index: ProofMapIndex<_, [u8; 32], u8> = ProofMapIndex::new(prefix, &snapshot);
+    ///
+    /// let proof = index.get_multiproof(vec![[0; 32], [1; 32]]);
+    /// # drop(proof);
+    /// ```
+    pub fn get_multiproof<KI>(&self, keys: KI) -> MapProof<K, V>
+    where
+        KI: IntoIterator<Item = K>,
+    {
+        const CONTOUR_CAPACITY: usize = 8;
+
+        #[derive(Debug)]
+        struct ContourNode {
+            key: DBKey,
+            branch: BranchNode,
+            visited_left: bool,
+            visited_right: bool,
+        }
+
+        impl ContourNode {
+            fn new(key: DBKey, branch: BranchNode) -> Self {
+                ContourNode {
+                    key,
+                    branch,
+                    visited_left: false,
+                    visited_right: false,
+                }
+            }
+
+            // Adds this contour node into a proof builder.
+            fn add_to_proof<K, V>(self, builder: &mut MapProofBuilder<K, V>) {
+                if !self.visited_right {
+                    // This works due to the following observation: If neither of the child nodes
+                    // were visited when the node is being ejected from the contour,
+                    // this means that it is safe to add the left and right hashes (in this order)
+                    // to the proof. The observation is provable by induction.
+                    if !self.visited_left {
+                        builder.add_proof_entry(
+                            self.branch.child_slice(ChildKind::Left),
+                            *self.branch.child_hash(ChildKind::Left),
+                        );
+                    }
+
+                    builder.add_proof_entry(
+                        self.branch.child_slice(ChildKind::Right),
+                        *self.branch.child_hash(ChildKind::Right),
+                    );
+                }
+            }
+        }
+
+        // // // // `get_multiproof()` main section // // // //
+
+        match self.get_root_node() {
+            Some((root_key, Node::Branch(root_branch))) => {
+                let mut builder = MapProof::builder();
+
+                let searched_keys: Vec<_> = {
+                    let mut keys: Vec<_> = keys.into_iter().map(|k| (DBKey::leaf(&k), k)).collect();
+
+                    keys.sort_by(|x, y| {
+                        // `unwrap` is safe here because all keys start from the same position `0`
+                        x.0.partial_cmp(&y.0).unwrap()
+                    });
+
+                    keys
+                };
+
+                let mut contour = Vec::with_capacity(CONTOUR_CAPACITY);
+                contour.push(ContourNode::new(root_key, root_branch));
+
+                for (searched_key, key) in searched_keys {
+                    // `unwrap()` is safe: there is at least 1 element in the contour by design
+                    let common_prefix = searched_key.common_prefix(&contour.last().unwrap().key);
+
+                    // Eject nodes from the contour while they will they can be "finalized"
+                    while let Some(node) = contour.pop() {
+                        if contour.is_empty() || node.key.len() <= common_prefix {
+                            contour.push(node);
+                            break;
+                        } else {
+                            node.add_to_proof(&mut builder);
+                        }
+                    }
+
+                    // Push new items to the contour
+                    'traverse: loop {
+                        let node_key = {
+                            let contour_tip = contour.last_mut().unwrap();
+
+                            let next_height = contour_tip.key.len();
+                            let next_bit = searched_key.get(next_height);
+                            let node_key = contour_tip.branch.child_slice(next_bit);
+
+                            if !searched_key.matches_from(&node_key, next_height) {
+                                // Both children of `branch` do not fit; stop here
+                                builder.add_missing(key);
+                                break 'traverse;
+                            } else {
+                                match next_bit {
+                                    ChildKind::Left => contour_tip.visited_left = true,
+                                    ChildKind::Right => {
+                                        if !contour_tip.visited_left {
+                                            builder.add_proof_entry(
+                                                contour_tip.branch.child_slice(ChildKind::Left),
+                                                *contour_tip.branch.child_hash(ChildKind::Left),
+                                            );
+                                        }
+
+                                        contour_tip.visited_right = true;
+                                    }
+                                }
+
+                                node_key
+                            }
+                        };
+
+                        let node = self.get_node_unchecked(&node_key);
+                        match node {
+                            Node::Branch(branch) => {
+                                contour.push(ContourNode::new(node_key, branch));
+                            }
+
+                            Node::Leaf(value) => {
+                                // We have reached the leaf node and haven't diverged!
+                                builder.add_entry(key, value);
+                                break 'traverse;
+                            }
+                        }
+                    }
+                }
+
+                // Eject remaining entries from the contour
+                while let Some(node) = contour.pop() {
+                    node.add_to_proof(&mut builder);
+                }
+
+                builder.create()
+            }
+
+            Some((root_key, Node::Leaf(root_value))) => {
+                let mut builder = MapProof::builder();
+                // (One of) keys corresponding to the existing table entry.
+                let mut found_key: Option<K> = None;
+
+                for key in keys {
+                    let searched_key = DBKey::leaf(&key);
+                    if root_key == searched_key {
+                        found_key = Some(key);
+                    } else {
+                        builder.add_missing(key);
+                    }
+                }
+
+                if let Some(key) = found_key {
+                    builder.add_entry(key, root_value);
+                } else {
+                    builder.add_proof_entry(root_key, root_value.hash());
+                }
+
+                builder.create()
             }
 
             None => MapProof::empty(),
