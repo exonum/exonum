@@ -218,11 +218,65 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
     }
 }
 
+/// Builder for `MapProof`s.
+#[derive(Debug)]
+pub struct MapProofBuilder<K, V> {
+    entries: Vec<(K, V)>,
+    proof: Vec<(DBKey, Hash)>,
+}
+
+impl<K, V> MapProofBuilder<K, V> {
+    /// Creates a new builder.
+    fn new() -> Self {
+        MapProofBuilder {
+            entries: vec![],
+            proof: vec![],
+        }
+    }
+
+    /// Adds an existing entry into the builder.
+    pub fn add_entry(&mut self, key: K, value: V) -> &mut Self {
+        self.entries.push((key, value));
+        self
+    }
+
+    /// Adds a missing key into the builder.
+    pub fn add_missing(&mut self, _: K) -> &mut Self {
+        //self.entries.push((key, None));
+        self
+    }
+
+    /// Adds a proof entry into the builder.
+    pub fn add_proof_entry(&mut self, key: DBKey, hash: Hash) -> &mut Self {
+        debug_assert!(if let Some(&(last_key, _)) = self.proof.last() {
+            last_key < key
+        } else {
+            true
+        });
+
+        self.proof.push((key, hash));
+        self
+    }
+
+    /// Converts the builder into a `MapProof`.
+    pub fn create(self) -> MapProof<K, V> {
+        MapProof {
+            entries: self.entries,
+            proof: self.proof.into_iter().map(|e| e.into()).collect(),
+        }
+    }
+}
+
 impl<K, V> MapProof<K, V>
 where
     K: ProofMapKey,
     V: StorageValue,
 {
+    /// Creates a builder instance for the map proof.
+    pub fn builder() -> MapProofBuilder<K, V> {
+        MapProofBuilder::new()
+    }
+
     /// Creates a proof for a single entry.
     pub fn for_entry<I>(entry: (K, V), proof: I) -> Self
     where
