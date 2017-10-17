@@ -235,30 +235,30 @@ impl<K, V> MapProofBuilder<K, V> {
     }
 
     /// Adds an existing entry into the builder.
-    pub fn add_entry(&mut self, key: K, value: V) -> &mut Self {
-        self.entries.push((key, value));
+    pub fn add_entry(mut self, key: K, value: V) -> Self {
+        self.entries.push(OptionalEntry::value(key, value));
         self
     }
 
     /// Adds a missing key into the builder.
-    pub fn add_missing(&mut self, _: K) -> &mut Self {
-        //self.entries.push((key, None));
+    pub fn add_missing(mut self, key: K) -> Self {
+        self.entries.push(OptionalEntry::missing(key));
         self
     }
 
     /// Adds a proof entry into the builder.
-    pub fn add_proof_entry(&mut self, key: DBKey, hash: Hash) -> &mut Self {
         debug_assert!(if let Some(&(last_key, _)) = self.proof.last() {
             last_key < key
         } else {
             true
         });
 
+    pub fn add_proof_entry(mut self, key: DBKey, hash: Hash) -> Self {
         self.proof.push((key, hash));
         self
     }
 
-    /// Converts the builder into a `MapProof`.
+    /// Creates a `MapProof` from the builder.
     pub fn create(self) -> MapProof<K, V> {
         MapProof {
             entries: self.entries,

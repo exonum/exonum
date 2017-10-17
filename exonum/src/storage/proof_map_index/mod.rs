@@ -416,24 +416,26 @@ where
             }
 
             // Adds this contour node into a proof builder.
-            fn add_to_proof<K, V>(self, builder: &mut MapProofBuilder<K, V>) {
+            fn add_to_proof<K, V>(self, mut builder: MapProofBuilder<K, V>) -> MapProofBuilder<K, V> {
                 if !self.visited_right {
                     // This works due to the following observation: If neither of the child nodes
                     // were visited when the node is being ejected from the contour,
                     // this means that it is safe to add the left and right hashes (in this order)
                     // to the proof. The observation is provable by induction.
                     if !self.visited_left {
-                        builder.add_proof_entry(
+                        builder = builder.add_proof_entry(
                             self.branch.child_slice(ChildKind::Left),
                             *self.branch.child_hash(ChildKind::Left),
                         );
                     }
 
-                    builder.add_proof_entry(
+                    builder = builder.add_proof_entry(
                         self.branch.child_slice(ChildKind::Right),
                         *self.branch.child_hash(ChildKind::Right),
                     );
                 }
+
+                builder
             }
         }
 
@@ -467,7 +469,7 @@ where
                             contour.push(node);
                             break;
                         } else {
-                            node.add_to_proof(&mut builder);
+                            builder = node.add_to_proof(builder);
                         }
                     }
 
@@ -482,14 +484,14 @@ where
 
                             if !searched_key.matches_from(&node_key, next_height) {
                                 // Both children of `branch` do not fit; stop here
-                                builder.add_missing(key);
+                                builder = builder.add_missing(key);
                                 break 'traverse;
                             } else {
                                 match next_bit {
                                     ChildKind::Left => contour_tip.visited_left = true,
                                     ChildKind::Right => {
                                         if !contour_tip.visited_left {
-                                            builder.add_proof_entry(
+                                            builder = builder.add_proof_entry(
                                                 contour_tip.branch.child_slice(ChildKind::Left),
                                                 *contour_tip.branch.child_hash(ChildKind::Left),
                                             );
@@ -511,7 +513,7 @@ where
 
                             Node::Leaf(value) => {
                                 // We have reached the leaf node and haven't diverged!
-                                builder.add_entry(key, value);
+                                builder = builder.add_entry(key, value);
                                 break 'traverse;
                             }
                         }
@@ -520,7 +522,7 @@ where
 
                 // Eject remaining entries from the contour
                 while let Some(node) = contour.pop() {
-                    node.add_to_proof(&mut builder);
+                    builder = node.add_to_proof(builder);
                 }
 
                 builder.create()
@@ -536,15 +538,15 @@ where
                     if root_key == searched_key {
                         found_key = Some(key);
                     } else {
-                        builder.add_missing(key);
+                        builder = builder.add_missing(key);
                     }
                 }
 
-                if let Some(key) = found_key {
-                    builder.add_entry(key, root_value);
+                builder = if let Some(key) = found_key {
+                    builder.add_entry(key, root_value)
                 } else {
-                    builder.add_proof_entry(root_key, root_value.hash());
-                }
+                    builder.add_proof_entry(root_key, root_value.hash())
+                };
 
                 builder.create()
             }
