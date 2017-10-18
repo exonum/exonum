@@ -23,6 +23,7 @@ env:
   global:
   - CLIPPY_VERS=0.0.155
   - RUSTFMT_VERS=0.9.0
+  - DEADLINKS_VERS=0.2.1
 
 install:
 - |
@@ -42,6 +43,11 @@ install:
     cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
   fi
 - |
+  if [[ "$FEATURE" == "non-fatal-checks" ]]; then
+    cargo-deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
+    cargo update
+  fi
+- |
   if [[ "$FEATURE" == "fmt" ]]; then
     cargo-audit -V || cargo install cargo-audit --force
     rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
@@ -53,6 +59,11 @@ script: skip
 
 jobs:
   include:
+  - stage: lint
+    env:
+    - FEATURE=non-fatal-checks
+    script:
+    - cargo doc --no-deps && cargo deadlinks --dir target/doc || true
   - stage: lint
     env:
     - FEATURE=fmt
