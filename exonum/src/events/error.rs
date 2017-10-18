@@ -21,7 +21,6 @@ use std::io;
 // Common error helpers (TODO move to helpers)
 
 pub fn other_error<S: AsRef<str>>(s: S) -> io::Error {
-    error!("{}", s.as_ref());
     io::Error::new(io::ErrorKind::Other, s.as_ref())
 }
 

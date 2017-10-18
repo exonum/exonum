@@ -270,7 +270,7 @@ fn test_network_reconnect() {
     // First connect attempt.
     let mut t2 = TestEvents::with_addr(second).spawn();
 
-    // Handle first attempt
+    // Handle first attempt.
     t1.connect_with(second);
     assert_eq!(t2.wait_for_connect(), c1);
 
@@ -282,7 +282,7 @@ fn test_network_reconnect() {
 
     drop(t2);
 
-    // Handle second attempt
+    // Handle second attempt.
     let mut t2 = TestEvents::with_addr(second).spawn();
 
     t1.connect_with(second);
@@ -299,16 +299,21 @@ fn test_network_reconnect() {
 
 #[test]
 fn test_network_multiple_connect() {
-    let main = "127.0.0.1:19100".parse().unwrap();
+    let main = "127.0.0.1:19600".parse().unwrap();
 
-    let nodes = ["127.0.0.1:19101".parse().unwrap(),
-                "127.0.0.1:19102".parse().unwrap(),
-                "127.0.0.1:19103".parse().unwrap()];
+    let nodes = [
+        "127.0.0.1:19601".parse().unwrap(),
+        "127.0.0.1:19602".parse().unwrap(),
+        "127.0.0.1:19603".parse().unwrap(),
+    ];
 
     let mut node = TestEvents::with_addr(main).spawn();
 
-    let connect_messages:Vec<_> = nodes.iter().cloned().map(connect_message).collect();
-    let connectors:Vec<_> = nodes.iter().map(|addr| TestEvents::with_addr(*addr).spawn()).collect();
+    let connect_messages: Vec<_> = nodes.iter().cloned().map(connect_message).collect();
+    let connectors: Vec<_> = nodes
+        .iter()
+        .map(|addr| TestEvents::with_addr(*addr).spawn())
+        .collect();
 
     connectors[0].connect_with(main);
     assert_eq!(node.wait_for_connect(), connect_messages[0]);

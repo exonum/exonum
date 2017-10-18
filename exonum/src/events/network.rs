@@ -211,18 +211,19 @@ impl NetworkPart {
         let cancel_sender = Some(cancel_sender);
 
         let requests_handle = RequestHandler::new(
-            network_config.clone(),
+            network_config,
             self.network_tx.clone(),
             handle.clone(),
             self.network_requests.1,
             cancel_sender,
         );
-        let server = Listener::new(
-            network_config.clone(),
+        // TODO Don't use unwrap here!
+        let server = Listener::bind(
+            network_config,
             self.listen_address,
             handle.clone(),
             self.network_tx.clone(),
-        );
+        ).unwrap();
 
         let cancel_handler = cancel_handler.map_err(|_| other_error("can't cancel routine"));
         let fut = server
@@ -255,7 +256,7 @@ impl RequestHandler {
                     NetworkRequest::SendMessage(peer, msg) => {
                         let conn_tx = outgoing_connections.get(peer).or_else(|| {
                             outgoing_connections.clone().connect_to_peer(
-                                network_config.clone(),
+                                network_config,
                                 peer,
                                 network_tx.clone(),
                                 handle.clone(),
@@ -311,18 +312,18 @@ impl Future for RequestHandler {
 struct Listener(Box<Future<Item = (), Error = io::Error>>);
 
 impl Listener {
-    fn new(
+    fn bind(
         network_config: NetworkConfiguration,
         listen_address: SocketAddr,
         handle: Handle,
         network_tx: mpsc::Sender<NetworkEvent>,
-    ) -> Listener {
+    ) -> Result<Listener, io::Error> {
         // Incoming connections limiter
         let incoming_connections_limit = network_config.max_incoming_connections;
+        // The reference counter is used to automatically count the number of the open connections.
         let incoming_connections_counter: Rc<()> = Rc::default();
         // Incoming connections handler
-        // TODO Don't use unwrap here!
-        let listener = TcpListener::bind(&listen_address, &handle).unwrap();
+        let listener = TcpListener::bind(&listen_address, &handle)?;
         let network_tx = network_tx.clone();
         let server = listener.incoming().for_each(move |(sock, addr)| {
             let holder = Rc::downgrade(&incoming_connections_counter);
@@ -375,7 +376,7 @@ impl Listener {
             tobox(future::ok(()))
         });
 
-        Listener(tobox(server))
+        Ok(Listener(tobox(server)))
     }
 }
 

@@ -63,8 +63,8 @@ impl NodeHandler {
             self.connect(&addr);
         }
     }
-    /// Handles the `CantConnect` event. Node will try to connect to that address again if it was
-    /// in the validators list.
+    /// Handles the `UnableConnectToPeer` event. Node will try to connect to that address again
+    /// if it was in the validators list.
     pub fn handle_unable_to_connect(&mut self, addr: SocketAddr) {
         info!("Could not connect to: {}", addr);
         let need_reconnect = self.state.remove_peer_with_addr(&addr);
