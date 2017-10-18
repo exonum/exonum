@@ -25,10 +25,10 @@ use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
 
 #[derive(Debug, Default, Clone, Copy)]
 struct SparseListSize {
-    /// Total list length including spaces.
-    total_length: u64,
+    /// Total list's length including spaces.
+    capacity: u64,
     /// Number of non-empty elements.
-    items_count: u64,
+    length: u64,
 }
 
 impl SparseListSize {
@@ -38,8 +38,8 @@ impl SparseListSize {
 
     fn to_array(&self) -> [u8; 16] {
         let mut buf = [0; 16];
-        BigEndian::write_u64(&mut buf[0..8], self.total_length);
-        BigEndian::write_u64(&mut buf[8..16], self.items_count);
+        BigEndian::write_u64(&mut buf[0..8], self.capacity);
+        BigEndian::write_u64(&mut buf[8..16], self.length);
         buf
     }
 }
@@ -55,12 +55,9 @@ impl StorageValue for SparseListSize {
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
         let buf = value.as_ref();
-        let total_length = BigEndian::read_u64(&buf[0..8]);
-        let items_count = BigEndian::read_u64(&buf[8..16]);
-        SparseListSize {
-            total_length,
-            items_count,
-        }
+        let capacity = BigEndian::read_u64(&buf[0..8]);
+        let length = BigEndian::read_u64(&buf[8..16]);
+        SparseListSize { capacity, length }
     }
 }
 
@@ -199,7 +196,7 @@ where
     }
 
 
-    /// Returns the total number of elements (incudes null elements) in the list.
+    /// Returns the total number of elements (including null elements) in the list.
     ///
     /// # Examples
     ///
@@ -209,19 +206,19 @@ where
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
-    /// assert_eq!(0, index.len());
+    /// assert_eq!(0, index.capacity());
     ///
     /// index.push(10);
     /// index.push(12);
-    /// assert_eq!(2, index.len());
+    /// assert_eq!(2, index.capacity());
     ///
     /// index.remove(0);
     ///
     /// index.push(100);
-    /// assert_eq!(3, index.len());
+    /// assert_eq!(3, index.capacity());
     /// ```
-    pub fn len(&self) -> u64 {
-        self.size().total_length
+    pub fn capacity(&self) -> u64 {
+        self.size().capacity
     }
 
     /// Returns the total number of non-null elements in the list.
@@ -234,18 +231,18 @@ where
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
-    /// assert_eq!(0, index.count());
+    /// assert_eq!(0, index.len());
     ///
     /// index.push(10);
-    /// assert_eq!(1, index.count());
+    /// assert_eq!(1, index.len());
     ///
     /// index.remove(0);
     ///
     /// index.push(100);
-    /// assert_eq!(1, index.count());
+    /// assert_eq!(1, index.len());
     /// ```
-    pub fn count(&self) -> u64 {
-        self.size().items_count
+    pub fn len(&self) -> u64 {
+        self.size().length
     }
 
     /// Returns an iterator over the list. The iterator element type is V.
@@ -319,9 +316,9 @@ where
     /// ```
     pub fn push(&mut self, value: V) {
         let mut size = self.size();
-        self.base.put(&size.total_length, value);
-        size.total_length += 1;
-        size.items_count += 1;
+        self.base.put(&size.capacity, value);
+        size.capacity += 1;
+        size.length += 1;
         self.set_size(size);
     }
 
@@ -343,13 +340,13 @@ where
     pub fn pop(&mut self) -> Option<V> {
         // TODO: shoud we get and return dropped value?
         let mut size = self.size();
-        match size.total_length {
+        match size.capacity {
             0 => None,
             l => {
                 let v = self.base.get(&(l - 1));
                 self.base.remove(&(l - 1));
-                size.total_length -= 1;
-                size.items_count -= 1;
+                size.capacity -= 1;
+                size.length -= 1;
                 self.set_size(size);
                 v
             }
@@ -358,7 +355,7 @@ where
 
     /// Removes the element with the given index from the list and returns it,
     /// or None if it is empty. If elements count becomes zero after,
-    /// it also sets the `len` to zero.
+    /// it also sets the `capacity` to zero.
     ///
     /// # Panics
     ///
@@ -372,39 +369,39 @@ where
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
-    /// assert_eq!(0, index.len());
+    /// assert_eq!(0, index.capacity());
     ///
     /// index.push(10);
     /// index.push(12);
     ///
     /// assert_eq!(Some(10), index.remove(0));
     /// assert_eq!(None, index.remove(0));
-    /// assert_eq!(2, index.len());
-    /// assert_eq!(1, index.count());
+    /// assert_eq!(2, index.capacity());
+    /// assert_eq!(1, index.len());
 
     /// assert_eq!(Some(12), index.remove(1));
-    /// assert_eq!(0, index.len());
+    /// assert_eq!(0, index.capacity());
     /// ```
     pub fn remove(&mut self, index: u64) -> Option<V> {
         let mut size = self.size();
-        if index >= size.total_length {
+        if index >= size.capacity {
             panic!(
                 "index out of bounds: \
-                    the len is {} but the index is {}",
-                size.total_length,
+                    the capacity is {} but the index is {}",
+                size.capacity,
                 index
             );
         }
         let v = self.base.get(&index);
         if v.is_some() {
-            if size.items_count == 1 {
+            if size.length == 1 {
                 self.clear();
             } else {
                 self.base.remove(&index);
-                if index == size.total_length - 1 {
-                    size.total_length -= 1;
+                if index == size.capacity - 1 {
+                    size.capacity -= 1;
                 }
-                size.items_count -= 1;
+                size.length -= 1;
                 self.set_size(size);
             }
         }
@@ -424,7 +421,7 @@ where
     /// assert!(index.is_empty());
     ///
     /// index.extend([1, 2, 3].iter().cloned());
-    /// assert_eq!(3, index.len());
+    /// assert_eq!(3, index.capacity());
     /// ```
     pub fn extend<I>(&mut self, iter: I)
     where
@@ -432,9 +429,9 @@ where
     {
         let mut size = self.size();
         for value in iter {
-            self.base.put(&size.total_length, value);
-            size.total_length += 1;
-            size.items_count += 1;
+            self.base.put(&size.capacity, value);
+            size.capacity += 1;
+            size.length += 1;
         }
         self.set_size(size);
     }
@@ -453,14 +450,14 @@ where
     /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
-    /// assert_eq!(5, index.len());
+    /// assert_eq!(5, index.capacity());
     ///
     /// index.truncate(3);
-    /// assert_eq!(3, index.len());
+    /// assert_eq!(3, index.capacity());
     /// ```
     pub fn truncate(&mut self, len: u64) {
         // TODO: optimize this
-        while self.len() > len {
+        while self.capacity() > len {
             self.pop();
         }
     }
@@ -489,17 +486,17 @@ where
     /// ```
     pub fn set(&mut self, index: u64, value: V) {
         let mut size = self.size();
-        if index >= size.total_length {
+        if index >= size.capacity {
             panic!(
                 "index out of bounds: \
-                    the len is {} but the index is {}",
-                size.total_length,
+                    the capacity is {} but the index is {}",
+                size.capacity,
                 index
             );
         }
         // Increment items count
         if self.base.get::<u64, V>(&index).is_none() {
-            size.items_count += 1;
+            size.length += 1;
             self.set_size(size);
         }
         self.base.put(&index, value)
@@ -576,7 +573,7 @@ mod tests {
         let mut list_index = SparseListIndex::new(vec![255], &mut fork);
 
         assert!(list_index.is_empty());
-        assert_eq!(0, list_index.len());
+        assert_eq!(0, list_index.capacity());
         assert!(list_index.last().is_none());
 
         let extended_by = vec![45, 3422, 234];
@@ -585,14 +582,14 @@ mod tests {
         assert_eq!(Some(45), list_index.get(0));
         assert_eq!(Some(3422), list_index.get(1));
         assert_eq!(Some(234), list_index.get(2));
+        assert_eq!(3, list_index.capacity());
         assert_eq!(3, list_index.len());
-        assert_eq!(3, list_index.count());
 
         list_index.set(2, 777);
         assert_eq!(Some(777), list_index.get(2));
         assert_eq!(Some(777), list_index.last());
+        assert_eq!(3, list_index.capacity());
         assert_eq!(3, list_index.len());
-        assert_eq!(3, list_index.count());
 
         let mut extended_by_again = vec![666, 999];
         for el in &extended_by_again {
@@ -600,35 +597,35 @@ mod tests {
         }
         assert_eq!(Some(666), list_index.get(3));
         assert_eq!(Some(999), list_index.get(4));
+        assert_eq!(5, list_index.capacity());
         assert_eq!(5, list_index.len());
-        assert_eq!(5, list_index.count());
         extended_by_again[1] = 1001;
         list_index.extend(extended_by_again);
+        assert_eq!(7, list_index.capacity());
         assert_eq!(7, list_index.len());
-        assert_eq!(7, list_index.count());
         assert_eq!(Some(1001), list_index.last());
 
         assert_eq!(Some(1001), list_index.pop());
+        assert_eq!(6, list_index.capacity());
         assert_eq!(6, list_index.len());
-        assert_eq!(6, list_index.count());
 
         list_index.truncate(3);
 
-        assert_eq!(3, list_index.len());
+        assert_eq!(3, list_index.capacity());
         assert_eq!(Some(777), list_index.last());
 
         assert_eq!(Some(3422), list_index.remove(1));
         assert_eq!(None, list_index.remove(1));
-        assert_eq!(3, list_index.len());
-        assert_eq!(2, list_index.count());
+        assert_eq!(3, list_index.capacity());
+        assert_eq!(2, list_index.len());
 
         assert_eq!(Some(777), list_index.remove(2));
-        assert_eq!(2, list_index.len());
-        assert_eq!(1, list_index.count());
+        assert_eq!(2, list_index.capacity());
+        assert_eq!(1, list_index.len());
 
         assert_eq!(Some(45), list_index.remove(0));
+        assert_eq!(0, list_index.capacity());
         assert_eq!(0, list_index.len());
-        assert_eq!(0, list_index.count());
     }
 
     fn list_index_iter(db: Box<Database>) {
