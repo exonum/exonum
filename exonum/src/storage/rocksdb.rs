@@ -15,17 +15,17 @@
 //! An implementation of `RocksDB` database.
 use exonum_profiler::ProfilerSpan;
 use rocksdb::OptimisticTransactionDB as _RocksDB;
-use rocksdb::DBRawIterator;
+use rocksdb::{DBIterator, IteratorMode, Direction};
 use rocksdb::optimistic_txn_db::Snapshot as _Snapshot;
 use rocksdb::Transaction as _Transaction;
 use rocksdb::Error as _Error;
-use rocksdb::IteratorMode;
 use rocksdb::utils::get_cf_names;
 
 use std::sync::{Arc, RwLock};
 use std::path::Path;
 use std::fmt;
 use std::error;
+use std::iter::Peekable;
 
 pub use rocksdb::WriteBatch as Patch;
 pub use rocksdb::Options as RocksDBOptions;
@@ -61,9 +61,9 @@ pub struct RocksDBTransaction {
 
 /// An iterator over the entries of a `RocksDB`.
 struct RocksDBIterator {
-    iter: DBRawIterator,
-    key: Option<Vec<u8>>,
-    value: Option<Vec<u8>>,
+    iter: Peekable<DBIterator>,
+    key: Option<Box<[u8]>>,
+    value: Option<Box<[u8]>>,
 }
 
 impl RocksDB {
@@ -128,21 +128,16 @@ impl View for RocksDBSnapshot {
 
     fn iter(&self, cf_name: &str, from: Option<&[u8]>) -> Iter {
         let _p = ProfilerSpan::new("RocksDBSnapshot::iter");
+        let mode = match from {
+            Some(from) => IteratorMode::From(from, Direction::Forward),
+            None => IteratorMode::Start,
+        };
         let iter = match self._db.read().unwrap().cf_handle(cf_name) {
-            Some(column_family) => {
-                let mut iter: DBRawIterator = self.snapshot
-                    .iterator_cf(column_family, IteratorMode::Start)
-                    .unwrap()
-                    .into();
-                if let Some(f) = from {
-                    iter.seek(f);
-                }
-                iter
-            }
-            None => self.snapshot.raw_iterator(),
+            Some(column_family) => self.snapshot.iterator_cf(column_family, mode).unwrap(),
+            None => self.snapshot.iterator(IteratorMode::Start),
         };
         Box::new(RocksDBIterator {
-            iter,
+            iter: iter.peekable(),
             key: None,
             value: None,
         })
@@ -237,19 +232,16 @@ impl View for RocksDBTransaction {
 
     fn iter(&self, cf_name: &str, from: Option<&[u8]>) -> Iter {
         let _p = ProfilerSpan::new("RocksDBTransaction::iter");
+        let mode = match from {
+            Some(from) => IteratorMode::From(from, Direction::Forward),
+            None => IteratorMode::Start,
+        };
         let iter = match self.get_column_family(cf_name) {
-            Some(column_family) => {
-                let mut iter: DBRawIterator =
-                    self.transaction.iterator_cf(column_family).unwrap().into();
-                if let Some(f) = from {
-                    iter.seek(f);
-                }
-                iter
-            }
-            None => self.transaction.iterator().into(),
+            Some(column_family) => self.transaction.iterator_cf(column_family, mode).unwrap(),
+            None => self.transaction.iterator(IteratorMode::Start),
         };
         Box::new(RocksDBIterator {
-            iter,
+            iter: iter.peekable(),
             key: None,
             value: None,
         })
@@ -281,33 +273,19 @@ impl View for RocksDBTransaction {
 impl<'a> Iterator for RocksDBIterator {
     fn next(&mut self) -> Option<(&[u8], &[u8])> {
         let _p = ProfilerSpan::new("RocksDBIterator::next");
-        let result = if self.iter.valid() {
-            self.key = Some(unsafe { self.iter.key_inner().unwrap().to_vec() });
-            self.value = Some(unsafe { self.iter.value_inner().unwrap().to_vec() });
-            Some((
-                self.key.as_ref().unwrap().as_ref(),
-                self.value.as_ref().unwrap().as_ref(),
-            ))
+        if let Some((key, value)) = self.iter.next() {
+            self.key = Some(key);
+            self.value = Some(value);
+            Some((self.key.as_ref().unwrap(), self.value.as_ref().unwrap()))
         } else {
             None
-        };
-
-        if result.is_some() {
-            self.iter.next();
         }
-
-        result
     }
 
     fn peek(&mut self) -> Option<(&[u8], &[u8])> {
         let _p = ProfilerSpan::new("RocksDBIterator::peek");
-        if self.iter.valid() {
-            self.key = Some(unsafe { self.iter.key_inner().unwrap().to_vec() });
-            self.value = Some(unsafe { self.iter.value_inner().unwrap().to_vec() });
-            Some((
-                self.key.as_ref().unwrap().as_ref(),
-                self.value.as_ref().unwrap().as_ref(),
-            ))
+        if let Some(&(ref key, ref value)) = self.iter.peek() {
+            Some((key, value))
         } else {
             None
         }
