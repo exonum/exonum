@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// This is regression test for exonum node.
+// This is a regression test for exonum node.
 extern crate exonum;
 extern crate futures;
 extern crate tokio_timer;

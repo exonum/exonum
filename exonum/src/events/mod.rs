@@ -97,6 +97,8 @@ impl Into<Event> for ExternalMessage {
     }
 }
 
+/// Receives timeout, network and api events and invokes `handle_event` method of handler.
+/// If one of these streams closes, the aggregator stream completes immediately.
 #[derive(Debug)]
 pub struct EventsAggregator<S1, S2, S3>
 where
@@ -145,36 +147,30 @@ where
         if self.done {
             Ok(Async::Ready(None))
         } else {
-            // Check timeout events
             match self.timeout.poll()? {
                 Async::Ready(Some(item)) => {
                     return Ok(Async::Ready(Some(Event::Timeout(item))));
                 }
-                // Just finish stream
                 Async::Ready(None) => {
                     self.done = true;
                     return Ok(Async::Ready(None));
                 }
                 Async::NotReady => {}
             };
-            // Check network events
             match self.network.poll()? {
                 Async::Ready(Some(item)) => {
                     return Ok(Async::Ready(Some(Event::Network(item))));
                 }
-                // Just finish stream
                 Async::Ready(None) => {
                     self.done = true;
                     return Ok(Async::Ready(None));
                 }
                 Async::NotReady => {}
             };
-            // Check api events
             match self.api.poll()? {
                 Async::Ready(Some(item)) => {
                     return Ok(Async::Ready(Some(Event::Api(item))));
                 }
-                // Just finish stream
                 Async::Ready(None) => {
                     self.done = true;
                     return Ok(Async::Ready(None));
