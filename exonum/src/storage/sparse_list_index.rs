@@ -566,11 +566,13 @@ where
     /// assert_eq!(Some(1), index.pop_front());
     /// ```
     pub fn pop_front(&mut self) -> Option<V> {
-        let min_index = match self.indices().next() {
-            Some(index) => index,
-            None => 0,
+        let _opt = {
+            self.indices().next()
         };
-        self.remove(min_index)
+        if let Some(min_index) = _opt {
+            return self.remove(min_index);
+        }
+        None
     }
 }
 
