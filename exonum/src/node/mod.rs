@@ -684,6 +684,10 @@ impl Node {
 
         let network_thread = thread::spawn(move || {
             let mut core = Core::new()?;
+            let handle = core.handle();
+            core.handle().spawn(
+                timeouts_part.run(handle).map_err(log_error),
+            );
             let network_handler = network_part.run(core.handle());
             core.run(network_handler).map(drop).map_err(|e| {
                 other_error(&format!("An error in the `Network` thread occured: {}", e))
@@ -691,11 +695,6 @@ impl Node {
         });
 
         let mut core = Core::new()?;
-        let handle = core.handle();
-        core.handle().spawn(
-            timeouts_part.run(handle).map_err(log_error),
-        );
-
         core.run(handler_part.run()).map_err(|_| {
             other_error("An error in the `Handler` thread occured")
         })?;
