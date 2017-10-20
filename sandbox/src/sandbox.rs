@@ -151,7 +151,7 @@ impl Reactor<NodeHandler<SandboxChannel>> for SandboxReactor {
         self.inner.lock().unwrap().time
     }
     fn channel(&self) -> SandboxChannel {
-        SandboxChannel { inner: self.inner.clone() }
+        SandboxChannel { inner: Arc::clone(&self.inner) }
     }
 }
 
@@ -178,13 +178,13 @@ impl SandboxReactor {
 
     pub fn actual_config(&self) -> StoredConfiguration {
         let snapshot = self.handler.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = Schema::new(snapshot);
         schema.actual_configuration()
     }
 
     pub fn following_config(&self) -> Option<StoredConfiguration> {
         let snapshot = self.handler.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = Schema::new(snapshot);
         schema.following_configuration()
     }
 
@@ -257,7 +257,7 @@ impl Sandbox {
 
     fn check_unexpected_message(&self) {
         if let Some((addr, msg)) = self.inner.lock().unwrap().sent.pop_front() {
-            let any_msg = Any::from_raw(msg.clone()).expect("Send incorrect message");
+            let any_msg = Any::from_raw(Arc::clone(&msg)).expect("Send incorrect message");
             panic!("Send unexpected message {:?} to {}", any_msg, addr);
         }
     }
@@ -324,15 +324,16 @@ impl Sandbox {
     pub fn recv<T: Message>(&self, msg: T) {
         self.check_unexpected_message();
         let mut reactor = self.reactor.borrow_mut();
-        reactor.handle_message(msg.raw().clone());
+        reactor.handle_message(Arc::clone(msg.raw()));
         reactor.run_once(None).unwrap();
     }
 
     pub fn send<T: Message>(&self, addr: SocketAddr, msg: T) {
-        let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
+        let any_expected_msg = Any::from_raw(Arc::clone(msg.raw())).unwrap();
         let sended = self.inner.lock().unwrap().sent.pop_front();
         if let Some((real_addr, real_msg)) = sended {
-            let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
+            let any_real_msg =
+                Any::from_raw(Arc::clone(&real_msg)).expect("Send incorrect message");
             if real_addr != addr || any_real_msg != any_expected_msg {
                 panic!(
                     "Expected to send the message {:?} to {} instead sending {:?} to {}",
@@ -360,7 +361,7 @@ impl Sandbox {
     where
         I: IntoIterator<Item = &'a SocketAddr>,
     {
-        let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
+        let any_expected_msg = Any::from_raw(Arc::clone(msg.raw())).unwrap();
 
         // If node is excluded from validators, then it still will broadcast messages.
         // So in that case we should not skip addresses and validators count.
@@ -369,7 +370,8 @@ impl Sandbox {
         for _ in 0..expected_set.len() {
             let sended = self.inner.lock().unwrap().sent.pop_front();
             if let Some((real_addr, real_msg)) = sended {
-                let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
+                let any_real_msg =
+                    Any::from_raw(Arc::clone(&real_msg)).expect("Send incorrect message");
                 if any_real_msg != any_expected_msg {
                     panic!(
                         "Expected to broadcast the message {:?} instead sending {:?} to {}",
@@ -471,20 +473,11 @@ impl Sandbox {
     {
         let mut unique_set: HashSet<Hash> = HashSet::new();
         let snapshot = self.reactor.borrow().handler.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = Schema::new(snapshot);
         let schema_transactions = schema.transactions();
         txs.into_iter()
-            .filter(|elem| {
-                let hash_elem = elem.hash();
-                if unique_set.contains(&hash_elem) {
-                    return false;
-                }
-                unique_set.insert(hash_elem);
-                if schema_transactions.contains(&hash_elem) {
-                    return false;
-                }
-                true
-            })
+            .filter(|tx| !schema_transactions.contains(&tx.hash()))
+            .filter(|tx| unique_set.insert(tx.hash()))
             .cloned()
             .collect()
     }
@@ -499,7 +492,7 @@ impl Sandbox {
             let mut pool = BTreeMap::new();
             let mut hashes = Vec::new();
             for raw in txs {
-                let tx = blockchain.tx_from_raw(raw.clone()).unwrap();
+                let tx = blockchain.tx_from_raw(Arc::clone(raw)).unwrap();
                 let hash = tx.hash();
                 hashes.push(hash);
                 pool.insert(hash, tx);
@@ -507,25 +500,20 @@ impl Sandbox {
             (hashes, pool)
         };
 
-        let fork = {
-            let mut fork = blockchain.fork();
-            let (_, patch) =
-                blockchain.create_patch(ValidatorId(0), self.current_height(), &hashes, &tx_pool);
-            fork.merge(patch);
-            fork
-        };
-        *Schema::new(&fork).last_block().unwrap().state_hash()
+        let (_, fork) =
+            blockchain.create_block(ValidatorId(0), self.current_height(), &hashes, &tx_pool);
+        *Schema::new(fork).last_block().unwrap().state_hash()
     }
 
     pub fn get_proof_to_service_table(&self, service_id: u16, table_idx: usize) -> MapProof<Hash> {
         let snapshot = self.reactor.borrow().handler.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = Schema::new(snapshot);
         schema.get_proof_to_service_table(service_id, table_idx)
     }
 
     pub fn get_configs_root_hash(&self) -> Hash {
         let snapshot = self.reactor.borrow().handler.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = Schema::new(snapshot);
         schema.configs().root_hash()
     }
 
@@ -568,7 +556,7 @@ impl Sandbox {
 
     pub fn block_and_precommits(&self, height: Height) -> Option<BlockProof> {
         let snapshot = self.reactor.borrow().handler.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = Schema::new(snapshot);
         schema.block_and_precommits(height)
     }
 
@@ -584,7 +572,7 @@ impl Sandbox {
 
     pub fn assert_state(&self, expected_height: Height, expected_round: Round) {
         let reactor = self.reactor.borrow();
-        let state = &reactor.handler.state();
+        let state = reactor.handler.state();
 
         let achual_height = state.height();
         let actual_round = state.round();
@@ -661,6 +649,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
             }
         }),
     );
+
     blockchain.create_genesis_block(genesis).unwrap();
 
     let config = Configuration {
@@ -690,7 +679,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         timers: BinaryHeap::new(),
     }));
 
-    let channel = SandboxChannel { inner: inner.clone() };
+    let channel = SandboxChannel { inner: Arc::clone(&inner) };
     let node = NodeHandler::new(
         blockchain.clone(),
         addresses[0],
@@ -700,16 +689,16 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
     );
 
     let mut reactor = SandboxReactor {
-        inner: inner.clone(),
+        inner: Arc::clone(&inner),
         handler: node,
     };
     reactor.handler.initialize();
     let sandbox = Sandbox {
-        inner: inner.clone(),
+        inner: Arc::clone(&inner),
         reactor: RefCell::new(reactor),
         validators_map: HashMap::from_iter(validators.clone()),
         services_map: HashMap::from_iter(service_keys),
-        addresses: addresses,
+        addresses,
     };
 
     sandbox.initialize(sandbox.time(), 1, validators.len());

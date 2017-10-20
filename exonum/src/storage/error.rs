@@ -30,7 +30,7 @@ impl Error {
     /// ```
     /// use exonum::storage::Error;
     ///
-    /// let error = Error::new("Oh no!");
+    /// let _error = Error::new("Oh no!");
     /// ```
     pub fn new<T: Into<String>>(message: T) -> Error {
         Error { message: message.into() }

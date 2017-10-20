@@ -21,10 +21,8 @@
 //! which means that only the Exonum process can access it. You can interact with a `Database` from
 //! different threads by cloning its instance.
 //!
-//! Exonum provides three types of database: [`LevelDB`], [`RocksDB`] and [`MemoryDB`]. By default
-//! present all three types, but you can choose [`LevelDB`] or [`RocksDB`] with `--feature` param.
-//! [`MemoryDB`] presents always. Also, you can make your own implementations of [`Database`] trait.
-//! See its documentation for more.
+//! Exonum provides two types of database: [`RocksDB`] and [`MemoryDB`]. Also, you can make your own
+//! implementations of [`Database`] trait. See its documentation for more.
 //!
 //! # Snapshot and Fork
 //!
@@ -79,7 +77,6 @@
 //! to create a wrapper over [`BaseIndex`] structure. See their documentation for more.
 //!
 //! [`Database`]: trait.Database.html
-//! [`LevelDB`]: struct.LevelDB.html
 //! [`RocksDB`]: struct.RocksDB.html
 //! [`MemoryDB`]: struct.MemoryDB.html
 //! [`Snapshot`]: trait.Snapshot.html
@@ -107,11 +104,8 @@
 //! [`HashSet`]: https://doc.rust-lang.org/std/collections/struct.HashSet.html
 
 pub use self::error::Error;
-pub use self::db::{Database, Snapshot, Fork, Patch, Change, Iterator, Iter};
+pub use self::db::{Database, View, Iterator, Iter};
 
-#[cfg(feature = "leveldb")]
-pub use self::leveldb::{LevelDB, LevelDBOptions, LevelDBCache};
-#[cfg(feature = "rocksdb")]
 pub use self::rocksdb::{RocksDB, RocksDBOptions, RocksBlockOptions};
 pub use self::memorydb::MemoryDB;
 
@@ -121,8 +115,8 @@ pub use self::values::StorageValue;
 pub use self::entry::Entry;
 
 pub use self::base_index::{BaseIndex, BaseIndexIter};
-pub use self::map_index::MapIndex;
 pub use self::list_index::ListIndex;
+pub use self::map_index::MapIndex;
 pub use self::key_set_index::KeySetIndex;
 pub use self::value_set_index::ValueSetIndex;
 pub use self::proof_list_index::{ProofListIndex, ListProof};
@@ -133,9 +127,6 @@ pub type Result<T> = ::std::result::Result<T, Error>;
 
 mod error;
 mod db;
-#[cfg(feature = "leveldb")]
-mod leveldb;
-#[cfg(feature = "rocksdb")]
 mod rocksdb;
 mod memorydb;
 
@@ -145,9 +136,8 @@ mod values;
 mod entry;
 
 pub mod base_index;
-
-pub mod map_index;
 pub mod list_index;
+pub mod map_index;
 pub mod key_set_index;
 pub mod value_set_index;
 pub mod proof_list_index;

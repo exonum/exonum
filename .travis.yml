@@ -5,7 +5,6 @@ addons:
     packages:
     - gcc
     - g++
-    - libleveldb-dev
     - libssl-dev
     - libcurl4-openssl-dev
     - libelf-dev
@@ -18,11 +17,11 @@ rust:
   - stable
 matrix:
   include:
-    - rust: nightly-2017-09-03
+    - rust: nightly-2017-10-03
       env: FEATURE=benchmarks
-    - rust: nightly-2017-09-03
+    - rust: nightly-2017-10-03
       env: FEATURE=clippy-core
-    - rust: nightly-2017-09-03
+    - rust: nightly-2017-10-03
       env: FEATURE=clippy-sandbox
 
 cache:
@@ -36,7 +35,7 @@ sudo: required
 
 env:
   global:
-  - CLIPPY_VERS=0.0.156
+  - CLIPPY_VERS=0.0.165
   - RUSTFMT_VERS=0.9.0
   - DEADLINKS_VERS=0.2.0
   - SODIUM_VERS=1.0.13
@@ -65,9 +64,9 @@ install:
   fi
 - |
   if [ ! -f "$HOME/.local/lib/librocksdb.so" ]; then
-    wget -O rocksdb-$ROCKSDB_VERS.tar.gz https://github.com/facebook/rocksdb/archive/v$ROCKSDB_VERS.tar.gz
-    tar xvf rocksdb-$ROCKSDB_VERS.tar.gz
-    cd rocksdb-$ROCKSDB_VERS
+    git clone https://github.com/facebook/rocksdb
+    cd rocksdb
+    git checkout 382277d0fe79ece86b799e3925919cf44c3afb4c
     INSTALL_PATH=$HOME/.local make install-shared
     cd ..
   fi
@@ -98,13 +97,13 @@ script: |
       cargo fmt -p sandbox -- --write-mode=diff
   ;;
   "clippy-core" )
-      cd exonum && cargo clippy --features long_benchmarks,rocksdb -- -D warnings
+      cd exonum && cargo clippy -- -D warnings
   ;;
   "clippy-sandbox" )
       cd sandbox && cargo clippy -- -D warnings
   ;;
   "test-core" )
-      cargo test --manifest-path exonum/Cargo.toml --features rocksdb --tests --lib
+      RUST_LOG=off cargo test -p exonum --tests --lib
   ;;
   "test-sandbox" )
       cargo test -p sandbox
@@ -113,7 +112,7 @@ script: |
       cargo test -p exonum --doc -- --test-threads=2
   ;;
   "benchmarks" )
-        RUST_LOG=off cargo bench --manifest-path exonum/Cargo.toml --features rocksdb,long_benchmarks --no-run
+        RUST_LOG=off cargo bench --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
   ;;
 
   esac

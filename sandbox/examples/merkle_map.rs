@@ -17,6 +17,8 @@ extern crate rand;
 #[macro_use]
 extern crate clap;
 
+use std::sync::Arc;
+
 use rand::{SeedableRng, XorShiftRng, Rng};
 use exonum::storage::{Database, ProofMapIndex};
 
@@ -71,7 +73,7 @@ fn main() {
         .unwrap();
     let seed_part: u32 = matches.value_of("seed").unwrap_or("0").parse().unwrap();
     // TODO get them from command line
-    let prefix = vec![1];
+    let name = "abc";
     let seed = [seed_part, 168, 56, 1];
 
     let mut rng = XorShiftRng::from_seed(seed);
@@ -84,18 +86,15 @@ fn main() {
         (k, v)
     };
 
-    let mut db = create_database(path);
-
-    let patch;
+    let db = create_database(path);
     {
-        let mut fork = db.fork();
+        let fork = db.fork();
         {
-            let mut map = ProofMapIndex::new(prefix, &mut fork);
+            let mut map = ProofMapIndex::new(name, Arc::clone(&fork));
             for item in (0..count).map(kv_generator) {
                 map.put(&item.0, item.1.clone());
             }
         }
-        patch = fork.into_patch();
+        fork.commit();
     }
-    db.merge(patch).unwrap();
 }

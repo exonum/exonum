@@ -141,7 +141,7 @@ impl TestEvents {
 
             while let Some(e) = self.0.inner.handler.event() {
                 if let InternalEvent::Node(Event::Error(e)) = e {
-                    error!("An error during wait occured {:?}", e);
+                    error!("An error during wait occurred {:?}", e);
                 }
             }
 

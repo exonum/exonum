@@ -25,7 +25,7 @@ use std::time::{SystemTime, Duration};
 
 use messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect};
 use crypto::{PublicKey, SecretKey, Hash};
-use storage::{Patch, Snapshot};
+use storage::View;
 use events::Milliseconds;
 use blockchain::{ValidatorKeys, ConsensusConfig, StoredConfiguration, Transaction,
                  TimeoutAdjusterConfig};
@@ -141,7 +141,7 @@ pub struct ProposeState {
 pub struct BlockState {
     hash: Hash,
     // Changes that should be made for block committing.
-    patch: Patch,
+    fork: Arc<View>,
     txs: Vec<Hash>,
     proposer_id: ValidatorId,
 }
@@ -176,7 +176,7 @@ impl ValidatorState {
     /// Creates new `ValidatorState` with given validator id.
     pub fn new(id: ValidatorId) -> Self {
         ValidatorState {
-            id: id,
+            id,
             our_precommits: HashMap::new(),
             our_prevotes: HashMap::new(),
         }
@@ -317,10 +317,10 @@ impl ProposeState {
 
 impl BlockState {
     /// Creates a new `BlockState` instance with the given parameters.
-    pub fn new(hash: Hash, patch: Patch, txs: Vec<Hash>, proposer_id: ValidatorId) -> Self {
+    pub fn new(hash: Hash, fork: Arc<View>, txs: Vec<Hash>, proposer_id: ValidatorId) -> Self {
         BlockState {
             hash,
-            patch,
+            fork,
             txs,
             proposer_id,
         }
@@ -331,9 +331,9 @@ impl BlockState {
         self.hash
     }
 
-    /// Returns the changes that should be made for block committing.
-    pub fn patch(&self) -> &Patch {
-        &self.patch
+    /// Returns the fork that should be commiting for block committing.
+    pub fn fork(&self) -> Arc<View> {
+        Arc::clone(&self.fork)
     }
 
     /// Returns block's transactions.
@@ -370,8 +370,8 @@ impl State {
             consensus_secret_key,
             service_public_key,
             service_secret_key,
-            tx_pool_capacity: tx_pool_capacity,
-            whitelist: whitelist,
+            tx_pool_capacity,
+            whitelist,
             peers: HashMap::new(),
             connections: HashMap::new(),
             height: last_height,
@@ -500,7 +500,7 @@ impl State {
     }
 
     /// Adjusts propose timeout (see `TimeoutAdjuster` for the details).
-    pub fn adjust_timeout(&mut self, snapshot: &Snapshot) {
+    pub fn adjust_timeout(&mut self, snapshot: Arc<View>) {
         let timeout = self.timeout_adjuster.adjust_timeout(snapshot);
         self.propose_timeout = timeout;
     }
@@ -818,7 +818,7 @@ impl State {
                 }
                 Some(e.insert(ProposeState {
                     propose: msg.clone(),
-                    unknown_txs: unknown_txs,
+                    unknown_txs,
                     block_hash: None,
                 }))
             }
@@ -830,7 +830,7 @@ impl State {
     pub fn add_block(
         &mut self,
         block_hash: Hash,
-        patch: Patch,
+        fork: Arc<View>,
         txs: Vec<Hash>,
         proposer_id: ValidatorId,
     ) -> Option<&BlockState> {
@@ -839,7 +839,7 @@ impl State {
             Entry::Vacant(e) => {
                 Some(e.insert(BlockState {
                     hash: block_hash,
-                    patch,
+                    fork,
                     txs,
                     proposer_id,
                 }))

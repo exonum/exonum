@@ -48,20 +48,6 @@ impl Run {
     }
 
     /// Returns created database instance.
-    #[cfg(feature = "leveldb")]
-    pub fn db_helper(ctx: &Context) -> Box<Database> {
-        use storage::{LevelDB, LevelDBOptions};
-
-        let path = ctx.arg::<String>("LEVELDB_PATH").expect(
-            "LEVELDB_PATH not found.",
-        );
-        let mut options = LevelDBOptions::new();
-        options.create_if_missing = true;
-        Box::new(LevelDB::open(Path::new(&path), options).unwrap())
-    }
-
-    /// Returns created database instance.
-    #[cfg(all(feature = "rocksdb", not(feature = "leveldb")))]
     pub fn db_helper(ctx: &Context) -> Box<Database> {
         use storage::{RocksDB, RocksDBOptions};
 
@@ -74,7 +60,7 @@ impl Run {
     }
 
     /// Returns created database instance.
-    #[cfg(all(not(feature = "leveldb"), not(feature = "rocksdb")))]
+    #[cfg(feature = "memorydb")]
     pub fn db_helper(_: &Context) -> Box<Database> {
         use storage::MemoryDB;
         Box::new(MemoryDB::new())
@@ -107,16 +93,6 @@ impl Command for Run {
                 "node-config",
                 false
             ),
-            #[cfg(feature = "leveldb")]
-            Argument::new_named(
-                "LEVELDB_PATH",
-                true,
-                "Use leveldb database with the given path.",
-                "d",
-                "leveldb",
-                false
-            ),
-            #[cfg(all(feature = "rocksdb", not(feature = "leveldb")))]
             Argument::new_named(
                 "ROCKSDB_PATH",
                 true,

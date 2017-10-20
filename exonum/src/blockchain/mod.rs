@@ -41,11 +41,11 @@ use std::panic;
 use crypto::{self, Hash};
 use messages::{RawMessage, Precommit, CONSENSUS as CORE_SERVICE};
 use node::State;
-use storage::{Patch, Database, Snapshot, Fork, Error};
+use storage::{Database, View, Error};
 use helpers::{Height, ValidatorId};
 
 pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
-pub use self::schema::{Schema, TxLocation, gen_prefix};
+pub use self::schema::{Schema, TxLocation};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{ValidatorKeys, StoredConfiguration, ConsensusConfig, TimeoutAdjusterConfig};
 pub use self::service::{Service, Transaction, ServiceContext, ApiContext, SharedNodeState};
@@ -94,13 +94,13 @@ impl Blockchain {
     }
 
     /// Creates a readonly snapshot of the current storage state.
-    pub fn snapshot(&self) -> Box<Snapshot> {
+    pub fn snapshot(&self) -> Arc<View> {
         self.db.snapshot()
     }
 
     /// Creates snapshot of the current storage state that can be later committed into storage
     /// via `merge` method.
-    pub fn fork(&self) -> Fork {
+    pub fn fork(&self) -> Arc<View> {
         self.db.fork()
     }
 
@@ -117,19 +117,13 @@ impl Blockchain {
         })
     }
 
-    /// Commits changes from the patch to the blockchain storage.
-    /// See [`Fork`](../storage/struct.Fork.html) for details.
-    pub fn merge(&mut self, patch: Patch) -> Result<(), Error> {
-        self.db.merge(patch)
-    }
-
     /// Returns the hash of latest committed block.
     ///
     /// # Panics
     ///
     /// - If the genesis block was not committed.
     pub fn last_hash(&self) -> Hash {
-        Schema::new(&self.snapshot())
+        Schema::new(self.snapshot())
             .block_hashes_by_height()
             .last()
             .unwrap_or_else(Hash::default)
@@ -141,7 +135,7 @@ impl Blockchain {
     ///
     /// - If the genesis block was not committed.
     pub fn last_block(&self) -> Block {
-        Schema::new(&self.snapshot()).last_block().unwrap()
+        Schema::new(self.snapshot()).last_block().unwrap()
     }
 
     /// Creates and commits the genesis block for the given genesis configuration.
@@ -154,34 +148,32 @@ impl Blockchain {
             services: BTreeMap::new(),
         };
 
-        let patch = {
-            let mut fork = self.fork();
-            // Update service tables
-            for (_, service) in self.service_map.iter() {
-                let cfg = service.initialize(&mut fork);
-                let name = service.service_name();
-                if config_propose.services.contains_key(name) {
-                    panic!(
-                        "Services already contain service with '{}' name, please change it",
-                        name
-                    );
-                }
-                config_propose.services.insert(name.into(), cfg);
+        let fork = self.fork();
+        // Update service tables
+        for (_, service) in self.service_map.iter() {
+            let cfg = service.initialize(Arc::clone(&fork));
+            let name = service.service_name();
+            if config_propose.services.contains_key(name) {
+                panic!(
+                    "Services already contain service with '{}' name, please change it",
+                    name
+                );
             }
-            // Commit actual configuration
-            {
-                let mut schema = Schema::new(&mut fork);
-                if schema.block_hash_by_height(Height::zero()).is_some() {
-                    // TODO create genesis block for MemoryDB and compare in hash with zero block
-                    return Ok(());
-                }
-                schema.commit_configuration(config_propose);
-            };
-            self.merge(fork.into_patch())?;
-            self.create_patch(ValidatorId::zero(), Height::zero(), &[], &BTreeMap::new())
-                .1
+            config_propose.services.insert(name.into(), cfg);
+        }
+        // Commit actual configuration
+        {
+            let mut schema = Schema::new(Arc::clone(&fork));
+            if schema.block_hash_by_height(Height::zero()).is_some() {
+                // TODO create genesis block for MemoryDB and compare in hash with zero block
+                return Ok(());
+            }
+            schema.commit_configuration(config_propose);
+            fork.commit();
         };
-        self.merge(patch)?;
+        let (_, fork) =
+            self.create_block(ValidatorId::zero(), Height::zero(), &[], &BTreeMap::new());
+        fork.commit();
         Ok(())
     }
 
@@ -208,112 +200,103 @@ impl Blockchain {
     /// Executes the given transactions from pool.
     /// Then it collects the resulting changes from the current storage state and returns them
     /// with the hash of resulting block.
-    pub fn create_patch(
+    pub fn create_block(
         &self,
         proposer_id: ValidatorId,
         height: Height,
         tx_hashes: &[Hash],
         pool: &BTreeMap<Hash, Box<Transaction>>,
-    ) -> (Hash, Patch) {
+    ) -> (Hash, Arc<View>) {
         // Create fork
-        let mut fork = self.fork();
+        let fork = self.fork();
+        // Get last hash
+        let last_hash = self.last_hash();
+        // Save & execute transactions
+        for (index, hash) in tx_hashes.iter().enumerate() {
+            let tx = pool.get(hash).expect(
+                "BUG: Cannot find transaction in pool.",
+            );
 
-        let block_hash = {
-            // Get last hash
-            let last_hash = self.last_hash();
-            // Save & execute transactions
-            for (index, hash) in tx_hashes.iter().enumerate() {
-                let tx = pool.get(hash).expect(
-                    "BUG: Cannot find transaction in pool.",
-                );
+            fork.savepoint();
 
-                fork.checkpoint();
+            if let Err(err) = panic::catch_unwind(panic::AssertUnwindSafe(
+                || { tx.execute(Arc::clone(&fork)); },
+            ))
+            {
+                if err.is::<Error>() {
+                    // Continue panic unwind if the reason is StorageError
+                    panic::resume_unwind(err);
+                }
+                fork.rollback_to_savepoint();
+                error!("{:?} transaction execution failed: {:?}", tx, err);
+            }
 
-                let r = panic::catch_unwind(panic::AssertUnwindSafe(|| { tx.execute(&mut fork); }));
+            let mut schema = Schema::new(Arc::clone(&fork));
+            schema.transactions_mut().put(hash, Arc::clone(tx.raw()));
+            schema.block_txs_mut(height).push(*hash);
+            let location = TxLocation::new(height, index as u64);
+            schema.tx_location_by_tx_hash_mut().put(hash, location);
+        }
+        // Get tx & state hash
+        let (tx_hash, state_hash) = {
 
-                match r {
-                    Ok(..) => fork.commit(),
-                    Err(err) => {
-                        if err.is::<Error>() {
-                            // Continue panic unwind if the reason is StorageError
-                            panic::resume_unwind(err);
-                        }
-                        fork.rollback();
-                        error!("{:?} transaction execution failed: {:?}", tx, err);
+            let state_hashes = {
+                let snapshot = self.snapshot();
+                let schema = Schema::new(Arc::clone(&snapshot));
+                let vec_core_state = schema.core_state_hash();
+                let mut state_hashes = Vec::new();
+
+                for (idx, core_table_hash) in vec_core_state.into_iter().enumerate() {
+                    let key = Blockchain::service_table_unique_key(CORE_SERVICE, idx);
+                    state_hashes.push((key, core_table_hash));
+                }
+
+                for service in self.service_map.values() {
+                    let service_id = service.service_id();
+                    let vec_service_state = service.state_hash(Arc::clone(&snapshot));
+                    for (idx, service_table_hash) in vec_service_state.into_iter().enumerate() {
+                        let key = Blockchain::service_table_unique_key(service_id, idx);
+                        state_hashes.push((key, service_table_hash));
                     }
                 }
 
-                let mut schema = Schema::new(&mut fork);
-                schema.transactions_mut().put(hash, tx.raw().clone());
-                schema.block_txs_mut(height).push(*hash);
-                let location = TxLocation::new(height, index as u64);
-                schema.tx_location_by_tx_hash_mut().put(hash, location);
-            }
-
-            // Get tx & state hash
-            let (tx_hash, state_hash) = {
-
-                let state_hashes = {
-                    let schema = Schema::new(&fork);
-
-                    let vec_core_state = schema.core_state_hash();
-                    let mut state_hashes = Vec::new();
-
-                    for (idx, core_table_hash) in vec_core_state.into_iter().enumerate() {
-                        let key = Blockchain::service_table_unique_key(CORE_SERVICE, idx);
-                        state_hashes.push((key, core_table_hash));
-                    }
-
-                    for service in self.service_map.values() {
-                        let service_id = service.service_id();
-                        let vec_service_state = service.state_hash(&fork);
-                        for (idx, service_table_hash) in vec_service_state.into_iter().enumerate() {
-                            let key = Blockchain::service_table_unique_key(service_id, idx);
-                            state_hashes.push((key, service_table_hash));
-                        }
-                    }
-
-                    state_hashes
-                };
-
-                let mut schema = Schema::new(&mut fork);
-
-                let state_hash = {
-                    let mut sum_table = schema.state_hash_aggregator_mut();
-                    for (key, hash) in state_hashes {
-                        sum_table.put(&key, hash)
-                    }
-                    sum_table.root_hash()
-                };
-
-                let tx_hash = schema.block_txs(height).root_hash();
-
-                (tx_hash, state_hash)
+                state_hashes
             };
 
-            // Create block
-            let block = Block::new(
-                SCHEMA_MAJOR_VERSION,
-                proposer_id,
-                height,
-                tx_hashes.len() as u32,
-                &last_hash,
-                &tx_hash,
-                &state_hash,
-            );
-            trace!("execute block = {:?}", block);
-            // Eval block hash
-            let block_hash = block.hash();
-            // Update height
-            let mut schema = Schema::new(&mut fork);
-            schema.block_hashes_by_height_mut().push(block_hash);
-            // Save block
-            schema.blocks_mut().put(&block_hash, block);
+            let mut schema = Schema::new(Arc::clone(&fork));
 
-            block_hash
+            let state_hash = {
+                let mut sum_table = schema.state_hash_aggregator_mut();
+                for (key, hash) in state_hashes {
+                    sum_table.put(&key, hash)
+                }
+                sum_table.root_hash()
+            };
+
+
+            let tx_hash = schema.block_txs(height).root_hash();
+            (tx_hash, state_hash)
         };
+        // Create block
+        let block = Block::new(
+            SCHEMA_MAJOR_VERSION,
+            proposer_id,
+            height,
+            tx_hashes.len() as u32,
+            &last_hash,
+            &tx_hash,
+            &state_hash,
+        );
 
-        (block_hash, fork.into_patch())
+        trace!("execute block = {:?}", block);
+        // Eval block hash
+        let block_hash = block.hash();
+        // Update height
+        let mut schema = Schema::new(Arc::clone(&fork));
+        schema.block_hashes_by_height_mut().push(block_hash);
+        // Save block
+        schema.blocks_mut().put(&block_hash, block);
+        (block_hash, fork)
     }
 
     /// Commits to the storage block that proposes by node `State`.
@@ -329,35 +312,23 @@ impl Blockchain {
     where
         I: Iterator<Item = &'a Precommit>,
     {
-        let (patch, txs) = {
-            let mut fork = {
-                let patch = state.block(&block_hash).unwrap().patch();
-                let mut fork = self.db.fork();
-                fork.merge(patch.clone()); // FIXME: avoid cloning here
-                fork
-            };
+        let fork = state.block(&block_hash).unwrap().fork();
+        let mut schema = Schema::new(Arc::clone(&fork));
+        for precommit in precommits {
+            schema.precommits_mut(&block_hash).push(precommit.clone());
+        }
+        state.update_config(schema.actual_configuration());
 
-            {
-                let mut schema = Schema::new(&mut fork);
-                for precommit in precommits {
-                    schema.precommits_mut(&block_hash).push(precommit.clone());
-                }
-
-                state.update_config(schema.actual_configuration());
+        let transactions = {
+            let snapshot = self.snapshot();
+            let mut ctx = ServiceContext::new(state, snapshot);
+            for service in self.service_map.values() {
+                service.handle_commit(&mut ctx);
             }
-
-            let transactions = {
-                let mut ctx = ServiceContext::new(state, &fork);
-                for service in self.service_map.values() {
-                    service.handle_commit(&mut ctx);
-                }
-                ctx.transactions()
-            };
-
-            (fork.into_patch(), transactions)
+            ctx.transactions()
         };
-        self.merge(patch)?;
-        Ok(txs)
+        fork.commit();
+        Ok(transactions)
     }
 
     /// Returns `Mount` object that aggregates public api handlers.
@@ -393,7 +364,7 @@ impl Clone for Blockchain {
     fn clone(&self) -> Blockchain {
         Blockchain {
             db: self.db.clone(),
-            service_map: self.service_map.clone(),
+            service_map: Arc::clone(&self.service_map),
         }
     }
 }

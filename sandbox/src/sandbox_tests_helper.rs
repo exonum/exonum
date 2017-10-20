@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// purpose of this module is to keep functions with reusable code used for sandbox tests
+/// Purpose of this module is to keep functions with reusable code used for sandbox tests
 
-use bit_vec::BitVec;
-
+use std::sync::Arc;
 use std::time::Duration;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
+
+use bit_vec::BitVec;
 
 use exonum::messages::{RawTransaction, Message, Propose, Prevote, Precommit, ProposeRequest,
                        PrevotesRequest};
@@ -76,8 +77,7 @@ impl<'a> BlockBuilder<'a> {
             tx_hash: None,
             state_hash: None,
             tx_count: None,
-
-            sandbox: sandbox,
+            sandbox,
         }
     }
 
@@ -162,7 +162,7 @@ impl<'a> ProposeBuilder<'a> {
             duration_since_sandbox_time: None,
             prev_hash: None,
             tx_hashes: None,
-            sandbox: sandbox,
+            sandbox,
         }
     }
 
@@ -248,8 +248,9 @@ pub fn compute_txs_root_hash(txs: &[Hash]) -> Hash {
     // TODO use special function
     use exonum::storage::{MemoryDB, ProofListIndex};
 
-    let mut fork = MemoryDB::new().fork();
-    let mut hashes = ProofListIndex::new(vec![], &mut fork);
+    let db = MemoryDB::new();
+    let fork = db.fork();
+    let mut hashes = ProofListIndex::new("a", fork);
     hashes.extend(txs.iter().cloned());
     hashes.root_hash()
 }
@@ -302,7 +303,7 @@ pub fn gen_timestamping_tx() -> TimestampTx {
 pub fn add_one_height(sandbox: &TimestampingSandbox, sandbox_state: &SandboxState) {
     // gen some tx
     let tx = gen_timestamping_tx();
-    add_one_height_with_transactions(sandbox, sandbox_state, &[tx.raw().clone()]);
+    add_one_height_with_transactions(sandbox, sandbox_state, &[Arc::clone(tx.raw())]);
 }
 
 pub fn add_one_height_with_transactions<'a, I>(
@@ -316,7 +317,7 @@ where
     // sort transaction in order accordingly their hashes
     let txs = sandbox.filter_present_transactions(txs);
     let mut tx_pool = BTreeMap::new();
-    tx_pool.extend(txs.into_iter().map(|tx| (tx.hash(), tx.clone())));
+    tx_pool.extend(txs.into_iter().map(|tx| (tx.hash(), Arc::clone(&tx))));
     let raw_txs = tx_pool.values().cloned().collect::<Vec<_>>();
     let txs: &[RawTransaction] = raw_txs.as_ref();
 
@@ -325,22 +326,19 @@ where
     // assert 1st round
     sandbox.assert_state(initial_height, ROUND_ONE);
 
-    let hashes = {
-        let mut hashes = Vec::new();
-        for tx in txs.iter() {
-            sandbox.recv(tx.clone());
-            hashes.push(tx.hash());
-        }
-        hashes
-    };
+    let hashes = txs.iter()
+        .map(|tx| {
+            sandbox.recv(Arc::clone(tx));
+            tx.hash()
+        })
+        .collect::<Vec<_>>();
     {
         *sandbox_state.committed_transaction_hashes.borrow_mut() = hashes.clone();
     }
     let mut propose: Option<Propose>;
-
     let n_validators = sandbox.n_validators();
     for _ in 0..n_validators {
-        propose = add_round_with_transactions(sandbox, sandbox_state, hashes.as_ref());
+        propose = add_round_with_transactions(sandbox, sandbox_state, &hashes);
         let round = sandbox.current_round();
         if sandbox.is_leader() {
             // ok, we are leader
@@ -351,7 +349,6 @@ where
             {
                 *sandbox_state.accepted_propose_hash.borrow_mut() = propose.hash();
             }
-
 
             for val_idx in 1..sandbox.majority_count(n_validators) {
                 let val_idx = ValidatorId(val_idx as u16);
@@ -429,7 +426,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
 ) -> Vec<Hash> {
     // sort transaction in order accordingly their hashes
     let mut tx_pool = BTreeMap::new();
-    tx_pool.extend(txs.into_iter().map(|tx| (tx.hash(), tx.clone())));
+    tx_pool.extend(txs.into_iter().map(|tx| (tx.hash(), Arc::clone(tx))));
     let raw_txs = tx_pool.values().cloned().collect::<Vec<_>>();
     let txs: &[RawTransaction] = raw_txs.as_ref();
 
@@ -442,7 +439,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
     let hashes = {
         let mut hashes = Vec::new();
         for tx in txs.iter() {
-            sandbox.recv(tx.clone());
+            sandbox.recv(Arc::clone(tx));
             hashes.push(tx.hash());
         }
         hashes

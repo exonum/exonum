@@ -85,7 +85,7 @@ impl DBKey {
         let mut data = [0; KEY_SIZE];
         key.write(&mut data);
         DBKey {
-            data: data,
+            data,
             from: 0,
             to: (KEY_SIZE * 8) as u16,
         }
@@ -241,11 +241,7 @@ impl StorageKey for DBKey {
             BRANCH_KEY_PREFIX => u16::from(buffer[DB_KEY_SIZE - 1]),
             _ => unreachable!("wrong key prefix"),
         };
-        DBKey {
-            data: data,
-            from: 0,
-            to: to,
-        }
+        DBKey { data, from: 0, to }
     }
 }
 

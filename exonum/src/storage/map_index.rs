@@ -13,9 +13,10 @@
 // limitations under the License.
 
 //! An implementation of key-value map.
+use std::sync::Arc;
 use std::marker::PhantomData;
 
-use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageKey, StorageValue};
+use super::{BaseIndex, BaseIndexIter, View, StorageKey, StorageValue};
 
 /// A map of keys and values.
 ///
@@ -24,8 +25,8 @@ use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageKey, StorageValue};
 /// [`StorageKey`]: ../trait.StorageKey.html
 /// [`StorageValue`]: ../trait.StorageValue.html
 #[derive(Debug)]
-pub struct MapIndex<T, K, V> {
-    base: BaseIndex<T>,
+pub struct MapIndex<K, V> {
+    base: BaseIndex,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
 }
@@ -39,8 +40,8 @@ pub struct MapIndex<T, K, V> {
 /// [`iter_from`]: struct.MapIndex.html#method.iter_from
 /// [`MapIndex`]: struct.MapIndex.html
 #[derive(Debug)]
-pub struct MapIndexIter<'a, K, V> {
-    base_iter: BaseIndexIter<'a, K, V>,
+pub struct MapIndexIter<K, V> {
+    base_iter: BaseIndexIter<K, V>,
 }
 
 /// An iterator over the keys of a `MapIndex`.
@@ -52,8 +53,8 @@ pub struct MapIndexIter<'a, K, V> {
 /// [`keys_from`]: struct.MapIndex.html#method.keys_from
 /// [`MapIndex`]: struct.MapIndex.html
 #[derive(Debug)]
-pub struct MapIndexKeys<'a, K> {
-    base_iter: BaseIndexIter<'a, K, ()>,
+pub struct MapIndexKeys<K> {
+    base_iter: BaseIndexIter<K, ()>,
 }
 
 /// An iterator over the values of a `MapIndex`.
@@ -65,11 +66,11 @@ pub struct MapIndexKeys<'a, K> {
 /// [`values_from`]: struct.MapIndex.html#method.values_from
 /// [`MapIndex`]: struct.MapIndex.html
 #[derive(Debug)]
-pub struct MapIndexValues<'a, V> {
-    base_iter: BaseIndexIter<'a, (), V>,
+pub struct MapIndexValues<V> {
+    base_iter: BaseIndexIter<(), V>,
 }
 
-impl<T, K, V> MapIndex<T, K, V> {
+impl<K, V> MapIndex<K, V> {
     /// Creates a new index representation based on the common prefix of its keys and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
@@ -85,22 +86,20 @@ impl<T, K, V> MapIndex<T, K, V> {
     ///
     /// let db = MemoryDB::new();
     /// let snapshot = db.snapshot();
-    /// let prefix = vec![1, 2, 3];
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new(prefix, &snapshot);
+    /// let index: MapIndex<u8, u8> = MapIndex::new("abc", snapshot);
     /// # drop(index);
     /// ```
-    pub fn new(prefix: Vec<u8>, view: T) -> Self {
+    pub fn new(name: &str, view: Arc<View>) -> Self {
         MapIndex {
-            base: BaseIndex::new(prefix, view),
+            base: BaseIndex::new(name, view),
             _k: PhantomData,
             _v: PhantomData,
         }
     }
 }
 
-impl<T, K, V> MapIndex<T, K, V>
+impl<K, V> MapIndex<K, V>
 where
-    T: AsRef<Snapshot>,
     K: StorageKey,
     V: StorageValue,
 {
@@ -112,8 +111,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, MapIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = MapIndex::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = MapIndex::new("abc", fork);
     /// assert!(index.get(&1).is_none());
     ///
     /// index.put(&1, 2);
@@ -131,8 +130,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, MapIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = MapIndex::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = MapIndex::new("abc", fork);
     /// assert!(!index.contains(&1));
     ///
     /// index.put(&1, 2);
@@ -151,14 +150,14 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new(vec![1, 2, 3], &snapshot);
+    /// let index: MapIndex<u8, u8> = MapIndex::new("abc", snapshot);
     ///
     /// for v in index.iter() {
     ///     println!("{:?}", v);
     /// }
     /// ```
     pub fn iter(&self) -> MapIndexIter<K, V> {
-        MapIndexIter { base_iter: self.base.iter(&()) }
+        MapIndexIter { base_iter: self.base.iter() }
     }
 
     /// Returns an iterator over the keys of the map in ascending order. The iterator element
@@ -171,14 +170,14 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new(vec![1, 2, 3], &snapshot);
+    /// let index: MapIndex<u8, u8> = MapIndex::new("abc", snapshot);
     ///
     /// for key in index.keys() {
     ///     println!("{}", key);
     /// }
     /// ```
     pub fn keys(&self) -> MapIndexKeys<K> {
-        MapIndexKeys { base_iter: self.base.iter(&()) }
+        MapIndexKeys { base_iter: self.base.iter() }
     }
 
     /// Returns an iterator over the values of the map in ascending order of keys. The iterator
@@ -191,14 +190,14 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new(vec![1, 2, 3], &snapshot);
+    /// let index: MapIndex<u8, u8> = MapIndex::new("abc", snapshot);
     ///
     /// for val in index.values() {
     ///     println!("{}", val);
     /// }
     /// ```
     pub fn values(&self) -> MapIndexValues<V> {
-        MapIndexValues { base_iter: self.base.iter(&()) }
+        MapIndexValues { base_iter: self.base.iter() }
     }
 
     /// Returns an iterator over the entries of the map in ascending order starting from the
@@ -211,14 +210,14 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new(vec![1, 2, 3], &snapshot);
+    /// let index: MapIndex<u8, u8> = MapIndex::new("abc", snapshot);
     ///
     /// for v in index.iter_from(&2) {
     ///     println!("{:?}", v);
     /// }
     /// ```
     pub fn iter_from(&self, from: &K) -> MapIndexIter<K, V> {
-        MapIndexIter { base_iter: self.base.iter_from(&(), from) }
+        MapIndexIter { base_iter: self.base.iter_from(from) }
     }
 
     /// Returns an iterator over the keys of the map in ascending order starting from the
@@ -231,14 +230,14 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new(vec![1, 2, 3], &snapshot);
+    /// let index: MapIndex<u8, u8> = MapIndex::new("abc", snapshot);
     ///
     /// for key in index.keys_from(&2) {
     ///     println!("{}", key);
     /// }
     /// ```
     pub fn keys_from(&self, from: &K) -> MapIndexKeys<K> {
-        MapIndexKeys { base_iter: self.base.iter_from(&(), from) }
+        MapIndexKeys { base_iter: self.base.iter_from(from) }
     }
 
     /// Returns an iterator over the values of the map in ascending order of keys starting from the
@@ -251,22 +250,16 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new(vec![1, 2, 3], &snapshot);
+    /// let index: MapIndex<u8, u8> = MapIndex::new("abc", snapshot);
     //
     /// for val in index.values_from(&2) {
     ///     println!("{}", val);
     /// }
     /// ```
     pub fn values_from(&self, from: &K) -> MapIndexValues<V> {
-        MapIndexValues { base_iter: self.base.iter_from(&(), from) }
+        MapIndexValues { base_iter: self.base.iter_from(from) }
     }
-}
 
-impl<'a, K, V> MapIndex<&'a mut Fork, K, V>
-where
-    K: StorageKey,
-    V: StorageValue,
-{
     /// Inserts the key-value pair into the map.
     ///
     /// # Examples
@@ -275,8 +268,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, MapIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = MapIndex::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = MapIndex::new("abc", fork);
     ///
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
@@ -292,8 +285,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, MapIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = MapIndex::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = MapIndex::new("abc", fork);
     ///
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
@@ -317,8 +310,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, MapIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = MapIndex::new(vec![1, 2, 3], &mut fork);
+    /// let fork = db.fork();
+    /// let mut index = MapIndex::new("abc", fork);
     ///
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
@@ -330,21 +323,20 @@ where
     }
 }
 
-impl<'a, T, K, V> ::std::iter::IntoIterator for &'a MapIndex<T, K, V>
+impl<K, V> ::std::iter::IntoIterator for MapIndex<K, V>
 where
-    T: AsRef<Snapshot>,
     K: StorageKey,
     V: StorageValue,
 {
     type Item = (K, V);
-    type IntoIter = MapIndexIter<'a, K, V>;
+    type IntoIter = MapIndexIter<K, V>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
     }
 }
 
-impl<'a, K, V> Iterator for MapIndexIter<'a, K, V>
+impl<K, V> Iterator for MapIndexIter<K, V>
 where
     K: StorageKey,
     V: StorageValue,
@@ -356,7 +348,7 @@ where
     }
 }
 
-impl<'a, K> Iterator for MapIndexKeys<'a, K>
+impl<K> Iterator for MapIndexKeys<K>
 where
     K: StorageKey,
 {
@@ -367,7 +359,7 @@ where
     }
 }
 
-impl<'a, V> Iterator for MapIndexValues<'a, V>
+impl<V> Iterator for MapIndexValues<V>
 where
     V: StorageValue,
 {
@@ -385,8 +377,8 @@ mod tests {
     use rand::{thread_rng, Rng};
 
     fn iter(db: Box<Database>) {
-        let mut fork = db.fork();
-        let mut map_index = MapIndex::new(vec![255], &mut fork);
+        let fork = db.fork();
+        let mut map_index = MapIndex::new("a", fork.clone());
 
         map_index.put(&1u8, 1u8);
         map_index.put(&2u8, 2u8);
@@ -442,54 +434,27 @@ mod tests {
     }
 
     fn gen_tempdir_name() -> String {
-        thread_rng().gen_ascii_chars().take(10).collect()
+        thread_rng().gen_ascii_chars().take(20).collect()
     }
 
     mod memorydb_tests {
-        use std::path::Path;
         use storage::{Database, MemoryDB};
-        use tempdir::TempDir;
 
-        fn create_database(_: &Path) -> Box<Database> {
+        fn create_database() -> Box<Database> {
             Box::new(MemoryDB::new())
         }
 
         #[test]
         fn test_iter() {
-            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-            let path = dir.path();
-            let db = create_database(path);
-            super::iter(db);
-        }
-
-    }
-
-    #[cfg(feature = "leveldb")]
-    mod leveldb_tests {
-        use std::path::Path;
-        use storage::Database;
-        use tempdir::TempDir;
-
-        fn create_database(path: &Path) -> Box<Database> {
-            use storage::{LevelDB, LevelDBOptions};
-            let mut opts = LevelDBOptions::default();
-            opts.create_if_missing = true;
-            Box::new(LevelDB::open(path, opts).unwrap())
-        }
-
-        #[test]
-        fn test_iter() {
-            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-            let path = dir.path();
-            let db = create_database(path);
+            let db = create_database();
             super::iter(db);
         }
     }
 
-    #[cfg(feature = "rocksdb")]
     mod rocksdb_tests {
+        use std::sync::Arc;
         use std::path::Path;
-        use storage::Database;
+        use storage::{Database, MapIndex};
         use tempdir::TempDir;
 
         fn create_database(path: &Path) -> Box<Database> {
@@ -505,6 +470,29 @@ mod tests {
             let path = dir.path();
             let db = create_database(path);
             super::iter(db);
+        }
+
+        #[test]
+        fn test_fork_and_snapshot_isolation() {
+            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let path = dir.path();
+            let db = create_database(path);
+            let fork = db.fork();
+            {
+                let mut idx = MapIndex::new("a", Arc::clone(&fork));
+                idx.put(&1, 1);
+            }
+            {
+                let snapshot = db.snapshot();
+                let idx: MapIndex<i32, i32> = MapIndex::new("a", Arc::clone(&snapshot));
+                assert!(!idx.contains(&1));
+            }
+            fork.commit();
+            {
+                let snapshot = db.snapshot();
+                let idx: MapIndex<i32, i32> = MapIndex::new("a", Arc::clone(&snapshot));
+                assert!(idx.contains(&1));
+            }
         }
     }
 }

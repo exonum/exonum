@@ -14,7 +14,6 @@
 
 #![feature(test)]
 #![allow(dead_code)]
-
 extern crate test;
 extern crate tempdir;
 #[macro_use]
@@ -22,22 +21,21 @@ extern crate exonum;
 
 #[cfg(test)]
 mod tests {
-    use tempdir::TempDir;
-
-    use test::Bencher;
+    use std::sync::Arc;
     use std::collections::BTreeMap;
 
-    use exonum::storage::{ProofMapIndex, Database, Fork, LevelDB, LevelDBOptions, LevelDBCache,
-                          StorageValue, Patch};
-    #[cfg(feature = "rocksdb")]
-    use exonum::storage::{RocksDB, RocksDBOptions, RocksBlockOptions};
+    use tempdir::TempDir;
+    use test::Bencher;
+
+    use exonum::storage::{ProofMapIndex, Database, View, StorageValue, RocksDB, RocksDBOptions,
+                          RocksBlockOptions};
     use exonum::blockchain::{Blockchain, Transaction};
     use exonum::crypto::{gen_keypair, Hash, PublicKey, SecretKey};
     use exonum::messages::Message;
     use exonum::helpers::{Height, ValidatorId};
 
     fn execute_timestamping(db: Box<Database>, b: &mut Bencher) {
-        let mut blockchain = Blockchain::new(db, Vec::new());
+        let blockchain = Blockchain::new(db, Vec::new());
 
         message! {
             struct Tx {
@@ -55,7 +53,7 @@ mod tests {
                 self.verify_signature(self.from())
             }
 
-            fn execute(&self, _: &mut Fork) {}
+            fn execute(&self, _: Arc<View>) {}
         }
 
         fn prepare_txs(height: u64, count: u64) -> (Vec<Hash>, BTreeMap<Hash, Box<Transaction>>) {
@@ -76,25 +74,25 @@ mod tests {
             height: u64,
             txs: &[Hash],
             pool: &BTreeMap<Hash, Box<Transaction>>,
-        ) -> Patch {
+        ) -> Arc<View> {
             blockchain
-                .create_patch(ValidatorId::zero(), Height(height), txs, pool)
+                .create_block(ValidatorId::zero(), Height(height), txs, pool)
                 .1
         }
 
         for i in 0..100 {
             let (txs, pool) = prepare_txs(i, 1000);
-            let patch = execute_block(&blockchain, i, &txs, &pool);
-            blockchain.merge(patch).unwrap();
+            let _fork = execute_block(&blockchain, i, &txs, &pool);
+            //  fork.commit();
+            //  blockchain.merge(patch).unwrap();
         }
 
         let (txs, pool) = prepare_txs(100, 1000);
-
         b.iter(|| execute_block(&blockchain, 100, &txs, &pool));
     }
 
     fn execute_cryptocurrency(db: Box<Database>, b: &mut Bencher) {
-        let mut blockchain = Blockchain::new(db, Vec::new());
+        let blockchain = Blockchain::new(db, Vec::new());
 
         message! {
             struct Tx {
@@ -112,8 +110,8 @@ mod tests {
                 self.verify_signature(self.from())
             }
 
-            fn execute(&self, view: &mut Fork) {
-                let mut index = ProofMapIndex::new(vec![1], view);
+            fn execute(&self, view: Arc<View>) {
+                let mut index = ProofMapIndex::new("a", view);
                 let from_balance = index.get(self.from()).unwrap_or(0u64);
                 let to_balance = index.get(self.to()).unwrap_or(0u64);
                 index.put(self.from(), from_balance - 1);
@@ -121,11 +119,7 @@ mod tests {
             }
         }
 
-        let mut keys = Vec::new();
-
-        for _ in 0..10_000 {
-            keys.push(gen_keypair());
-        }
+        let keys = (0..10_000).map(|_| gen_keypair()).collect::<Vec<_>>();
 
         fn prepare_txs(
             height: u64,
@@ -134,6 +128,7 @@ mod tests {
         ) -> (Vec<Hash>, BTreeMap<Hash, Box<Transaction>>) {
             let mut txs = Vec::new();
             let mut pool = BTreeMap::new();
+            #[cfg_attr(feature = "cargo-clippy", allow(needless_range_loop))]
             for i in (height * count)..((height + 1) * count) {
                 let tx = Tx::new(
                     &keys[i as usize % 10_000].0,
@@ -152,24 +147,23 @@ mod tests {
             height: u64,
             txs: &[Hash],
             pool: &BTreeMap<Hash, Box<Transaction>>,
-        ) -> Patch {
+        ) -> Arc<View> {
             blockchain
-                .create_patch(ValidatorId::zero(), Height(height), txs, pool)
+                .create_block(ValidatorId::zero(), Height(height), txs, pool)
                 .1
         }
 
         for i in 0..100 {
             let (txs, pool) = prepare_txs(i, 1000, &keys);
-            let patch = execute_block(&blockchain, i, &txs, &pool);
-            blockchain.merge(patch).unwrap();
+            let _fork = execute_block(&blockchain, i, &txs, &pool);
+            //  fork.commit();
+            //  blockchain.merge(patch).unwrap();
         }
 
         let (txs, pool) = prepare_txs(100, 1000, &keys);
-
         b.iter(|| execute_block(&blockchain, 100, &txs, &pool));
     }
 
-    #[cfg(feature = "rocksdb")]
     fn create_rocksdb(tempdir: &TempDir) -> Box<Database> {
         let mut block_options = RocksBlockOptions::default();
         block_options.set_block_size(4 * 1024);
@@ -189,52 +183,12 @@ mod tests {
     }
 
     #[bench]
-    fn bench_execute_block_timestamping_leveldb(b: &mut Bencher) {
-        let mut options = LevelDBOptions::new();
-        options.create_if_missing = true;
-        let path = TempDir::new("exonum").unwrap();
-        let db = Box::new(LevelDB::open(path.path(), options).unwrap()) as Box<Database>;
-        execute_timestamping(db, b)
-    }
-
-    #[bench]
-    fn bench_execute_block_timestamping_leveldb_cache(b: &mut Bencher) {
-        let mut options = LevelDBOptions::new();
-        options.create_if_missing = true;
-        options.cache = Some(LevelDBCache::new(100_000_000));
-        let path = TempDir::new("exonum").unwrap();
-        let db = Box::new(LevelDB::open(path.path(), options).unwrap()) as Box<Database>;
-        execute_timestamping(db, b)
-    }
-
-    #[bench]
-    fn bench_execute_block_cryptocurrency_leveldb(b: &mut Bencher) {
-        let mut options = LevelDBOptions::new();
-        options.create_if_missing = true;
-        let path = TempDir::new("exonum").unwrap();
-        let db = Box::new(LevelDB::open(path.path(), options).unwrap()) as Box<Database>;
-        execute_cryptocurrency(db, b)
-    }
-
-    #[bench]
-    fn bench_execute_block_cryptocurrency_leveldb_cache(b: &mut Bencher) {
-        let mut options = LevelDBOptions::new();
-        options.create_if_missing = true;
-        options.cache = Some(LevelDBCache::new(100_000_000));
-        let path = TempDir::new("exonum").unwrap();
-        let db = Box::new(LevelDB::open(path.path(), options).unwrap()) as Box<Database>;
-        execute_cryptocurrency(db, b)
-    }
-
-    #[cfg(feature = "rocksdb")]
-    #[bench]
     fn bench_execute_block_timestamping_rocksdb(b: &mut Bencher) {
         let tempdir = TempDir::new("exonum").unwrap();
         let db = create_rocksdb(&tempdir);
         execute_timestamping(db, b)
     }
 
-    #[cfg(feature = "rocksdb")]
     #[bench]
     fn bench_execute_block_cryptocurrency_rocksdb(b: &mut Bencher) {
         let tempdir = TempDir::new("exonum").unwrap();

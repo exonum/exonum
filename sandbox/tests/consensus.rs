@@ -25,6 +25,7 @@ use bit_vec::BitVec;
 
 use std::time::Duration;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use exonum::messages::{RawMessage, Message, Propose, Prevote, Precommit, ProposeRequest,
                        TransactionsRequest, PrevotesRequest, CONSENSUS};
@@ -226,7 +227,7 @@ fn test_store_txs_positions() {
     let num_txs = rng.gen_range(3, 100);
     let committed_block1 = generator
         .take(num_txs)
-        .map(|tx| (tx.hash(), tx.raw().clone()))
+        .map(|tx| (tx.hash(), Arc::clone(tx.raw())))
         .collect::<BTreeMap<Hash, RawMessage>>();
 
     let hashes =
@@ -234,7 +235,7 @@ fn test_store_txs_positions() {
     sandbox.assert_state(committed_height.next(), ROUND_ONE);
 
     let snapshot = sandbox.blockchain_ref().snapshot();
-    let schema = Schema::new(&snapshot);
+    let schema = Schema::new(snapshot);
     let locations = schema.tx_location_by_tx_hash();
     for (expected_idx, hash) in hashes.iter().enumerate() {
         let location = locations.get(hash).unwrap();
@@ -310,7 +311,7 @@ fn test_queue_propose_message_from_next_height() {
 
     sandbox.recv(future_propose.clone());
 
-    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.raw().clone()]);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[Arc::clone(tx.raw())]);
 
     info!("last_block={:#?}, hash={:?}",
           sandbox.last_block(),
@@ -2176,7 +2177,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     sandbox.recv(precommit_1.clone()); //early precommit from future height
 
     sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
-    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.raw().clone()]);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[Arc::clone(tx.raw())]);
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
     assert_eq!(first_block.hash(), sandbox.last_hash());
 
@@ -2442,7 +2443,7 @@ fn handle_tx_ignore_existing_tx_in_blockchain() {
     // option: with transaction
     let tx = gen_timestamping_tx();
 
-    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.raw().clone()]);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[Arc::clone(tx.raw())]);
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
 
     // add rounds & become leader
@@ -2730,7 +2731,7 @@ fn test_exclude_validator_from_consensus() {
         )
     };
 
-    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.raw().clone()]);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[Arc::clone(tx_cfg.raw())]);
     add_one_height(&sandbox, &sandbox_state);
     // node loses validator status
     add_one_height_with_transactions_from_other_validator(&sandbox, &sandbox_state, &[]);
@@ -2761,36 +2762,41 @@ fn test_schema_config_changes() {
         );
         (tx, consensus_cfg)
     };
-    let prev_cfg = sandbox.cfg();
 
+    //  let   sandbox.blockchain_ref().fork().commit();
+
+    let prev_cfg = sandbox.cfg();
+    let snapshot = sandbox.blockchain_ref().snapshot();
     // Check configuration from genesis block
     assert_eq!(
-        Schema::new(&sandbox.blockchain_ref().snapshot()).actual_configuration(),
+        Schema::new(Arc::clone(&snapshot)).actual_configuration(),
         prev_cfg
     );
     // Try to get configuration from non exists height
     assert_eq!(
-        Schema::new(&sandbox.blockchain_ref().snapshot()).configuration_by_height(HEIGHT_FOUR),
+        Schema::new(Arc::clone(&snapshot)).configuration_by_height(HEIGHT_FOUR),
         prev_cfg
     );
     // Commit a new configuration
-    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.raw().clone()]);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[Arc::clone(tx_cfg.raw())]);
+    let snapshot = sandbox.blockchain_ref().snapshot();
     // Check that following configuration is visible
     assert_eq!(
-        Schema::new(&sandbox.blockchain_ref().snapshot()).following_configuration(),
+        Schema::new(Arc::clone(&snapshot)).following_configuration(),
         Some(following_cfg.clone())
     );
     // Make following configuration actual
     add_one_height(&sandbox, &sandbox_state);
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[]);
     // Check that following configuration becomes actual
+    let snapshot = sandbox.blockchain_ref().snapshot();
     assert_eq!(
-        Schema::new(&sandbox.blockchain_ref().snapshot()).actual_configuration(),
+        Schema::new(Arc::clone(&snapshot)).actual_configuration(),
         following_cfg
     );
     // Check previous configuration
     assert_eq!(
-        Schema::new(&sandbox.blockchain_ref().snapshot())
+        Schema::new(Arc::clone(&snapshot))
             .previous_configuration()
             .unwrap(),
         prev_cfg
@@ -2798,12 +2804,11 @@ fn test_schema_config_changes() {
 
     // Finally check configuration for some heights
     assert_eq!(
-        Schema::new(&sandbox.blockchain_ref().snapshot()).configuration_by_height(HEIGHT_ZERO),
+        Schema::new(Arc::clone(&snapshot)).configuration_by_height(HEIGHT_ZERO),
         prev_cfg
     );
     assert_eq!(
-        Schema::new(&sandbox.blockchain_ref().snapshot())
-            .configuration_by_height(sandbox.current_height()),
+        Schema::new(snapshot).configuration_by_height(sandbox.current_height()),
         following_cfg
     );
 }

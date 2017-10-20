@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #![allow(dead_code)]
+use std::sync::Arc;
 use std::collections::BTreeMap;
 
 use rand::{thread_rng, Rng};
@@ -20,7 +21,7 @@ use serde_json;
 
 use blockchain::{Blockchain, Schema, Transaction};
 use crypto::{gen_keypair, Hash};
-use storage::{Database, Fork, Error, ListIndex};
+use storage::{View, Error, ListIndex};
 use messages::Message;
 use helpers::{Height, ValidatorId};
 
@@ -144,7 +145,7 @@ fn gen_tempdir_name() -> String {
     thread_rng().gen_ascii_chars().take(10).collect()
 }
 
-fn handling_tx_panic(blockchain: &Blockchain, db: &mut Box<Database>) {
+fn handling_tx_panic(blockchain: &Blockchain) {
     message! {
         struct Tx {
             const TYPE = 1;
@@ -160,13 +161,14 @@ fn handling_tx_panic(blockchain: &Blockchain, db: &mut Box<Database>) {
             true
         }
 
-        fn execute(&self, view: &mut Fork) {
+        fn execute(&self, view: Arc<View>) {
             if self.value() == 42 {
                 panic!(Error::new("42"))
             }
-            let mut index = ListIndex::new(vec![01], view);
+            let mut index = ListIndex::new("a", view.clone());
             index.push(self.value());
             index.push(42 / self.value());
+            view.commit();
         }
     }
 
@@ -190,17 +192,24 @@ fn handling_tx_panic(blockchain: &Blockchain, db: &mut Box<Database>) {
         Box::new(tx_storage_error.clone()) as Box<Transaction>,
     );
 
-    let (_, patch) = blockchain.create_patch(
+    let (_, fork) = blockchain.create_block(
         ValidatorId::zero(),
         Height::zero(),
         &[tx_ok1.hash(), tx_failed.hash(), tx_ok2.hash()],
         &pool,
     );
 
-    db.merge(patch).unwrap();
-    let snapshot = db.snapshot();
+    fork.commit();
 
-    let schema = Schema::new(&snapshot);
+    let snapshot = blockchain.snapshot();
+    let schema = Schema::new(Arc::clone(&snapshot));
+    let index = ListIndex::new("a", snapshot);
+
+    assert_eq!(index.len(), 4);
+    assert_eq!(index.get(0), Some(3));
+    assert_eq!(index.get(1), Some(14));
+    assert_eq!(index.get(2), Some(4));
+    assert_eq!(index.get(3), Some(10));
 
     assert_eq!(
         schema.transactions().get(&tx_ok1.hash()),
@@ -214,14 +223,6 @@ fn handling_tx_panic(blockchain: &Blockchain, db: &mut Box<Database>) {
         schema.transactions().get(&tx_failed.hash()),
         Some(tx_failed.raw().clone())
     );
-
-    let index = ListIndex::new(vec![01], &snapshot);
-
-    assert_eq!(index.len(), 4);
-    assert_eq!(index.get(0), Some(3));
-    assert_eq!(index.get(1), Some(14));
-    assert_eq!(index.get(2), Some(4));
-    assert_eq!(index.get(3), Some(10));
 }
 
 fn handling_tx_panic_storage_error(blockchain: &Blockchain) {
@@ -240,11 +241,11 @@ fn handling_tx_panic_storage_error(blockchain: &Blockchain) {
             true
         }
 
-        fn execute(&self, view: &mut Fork) {
+        fn execute(&self, view: Arc<View>) {
             if self.value() == 42 {
                 panic!(Error::new("42"))
             }
-            let mut index = ListIndex::new(vec![01], view);
+            let mut index = ListIndex::new("a", view.clone());
             index.push(self.value());
             index.push(42 / self.value());
         }
@@ -270,7 +271,7 @@ fn handling_tx_panic_storage_error(blockchain: &Blockchain) {
         Box::new(tx_storage_error.clone()) as Box<Transaction>,
     );
 
-    blockchain.create_patch(
+    blockchain.create_block(
         ValidatorId::zero(),
         Height::zero(),
         &[tx_ok1.hash(), tx_storage_error.hash(), tx_ok2.hash()],
@@ -279,80 +280,27 @@ fn handling_tx_panic_storage_error(blockchain: &Blockchain) {
 }
 
 mod memorydb_tests {
-    use std::path::Path;
-    use tempdir::TempDir;
-    use storage::{Database, MemoryDB};
+    use storage::MemoryDB;
     use blockchain::Blockchain;
 
-    fn create_database(_: &Path) -> Box<Database> {
-        Box::new(MemoryDB::new())
-    }
-
-    fn create_blockchain(_: &Path) -> Blockchain {
+    fn create_blockchain() -> Blockchain {
         Blockchain::new(Box::new(MemoryDB::new()), Vec::new())
     }
 
     #[test]
     fn test_handling_tx_panic() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let blockchain = create_blockchain(path);
-        let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path1 = dir1.path();
-        let mut db = create_database(path1);
-        super::handling_tx_panic(&blockchain, &mut db);
+        let blockchain = create_blockchain();
+        super::handling_tx_panic(&blockchain);
     }
 
     #[test]
     #[should_panic]
     fn test_handling_tx_panic_storage_error() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let blockchain = create_blockchain(path);
+        let blockchain = create_blockchain();
         super::handling_tx_panic_storage_error(&blockchain);
     }
 }
 
-#[cfg(feature = "leveldb")]
-mod leveldb_tests {
-    use std::path::Path;
-    use tempdir::TempDir;
-    use storage::{Database, LevelDB, LevelDBOptions};
-    use blockchain::Blockchain;
-
-    fn create_database(path: &Path) -> Box<Database> {
-        let mut opts = LevelDBOptions::default();
-        opts.create_if_missing = true;
-        Box::new(LevelDB::open(path, opts).unwrap())
-    }
-
-    fn create_blockchain(path: &Path) -> Blockchain {
-        let db = create_database(path);
-        Blockchain::new(db, Vec::new())
-    }
-
-    #[test]
-    fn test_handling_tx_panic() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let blockchain = create_blockchain(path);
-        let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path1 = dir1.path();
-        let mut db = create_database(path1);
-        super::handling_tx_panic(&blockchain, &mut db);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_handling_tx_panic_storage_error() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let blockchain = create_blockchain(path);
-        super::handling_tx_panic_storage_error(&blockchain);
-    }
-}
-
-#[cfg(feature = "rocksdb")]
 mod rocksdb_tests {
     use std::path::Path;
     use tempdir::TempDir;
@@ -375,10 +323,7 @@ mod rocksdb_tests {
         let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
         let path = dir.path();
         let blockchain = create_blockchain(path);
-        let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path1 = dir1.path();
-        let mut db = create_database(path1);
-        super::handling_tx_panic(&blockchain, &mut db);
+        super::handling_tx_panic(&blockchain);
     }
 
     #[test]

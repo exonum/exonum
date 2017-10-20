@@ -27,6 +27,7 @@ use std::time::{SystemTime, Duration};
 use std::collections::BTreeMap;
 use std::thread;
 use std::fmt;
+use std::sync::Arc;
 
 use crypto::{self, PublicKey, SecretKey, Hash};
 use events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, Channel,
@@ -244,7 +245,7 @@ where
 
         let snapshot = blockchain.snapshot();
 
-        let stored = Schema::new(&snapshot).actual_configuration();
+        let stored = Schema::new(Arc::clone(&snapshot)).actual_configuration();
         info!("Creating a node with config: {:#?}", stored);
 
         let validator_id = stored
@@ -280,7 +281,7 @@ where
         );
 
         // Adjust propose timeout for the first time.
-        state.adjust_timeout(&*snapshot);
+        state.adjust_timeout(snapshot);
 
         NodeHandler {
             blockchain,
@@ -353,7 +354,7 @@ where
     pub fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
         if let Some(conn) = self.state.peers().get(&public_key) {
             trace!("Send to address: {}", conn.addr());
-            self.channel.send_to(&conn.addr(), message.clone());
+            self.channel.send_to(&conn.addr(), Arc::clone(message));
         } else {
             warn!("Hasn't connection with peer {:?}", public_key);
         }
@@ -362,7 +363,7 @@ where
     /// Sends `RawMessage` to the specified address.
     pub fn send_to_addr(&mut self, address: &SocketAddr, message: &RawMessage) {
         trace!("Send to address: {}", address);
-        self.channel.send_to(address, message.clone());
+        self.channel.send_to(address, Arc::clone(message));
     }
 
     /// Broadcasts given message to all peers.
@@ -370,7 +371,7 @@ where
     pub fn broadcast(&mut self, message: &RawMessage) {
         for conn in self.state.peers().values() {
             trace!("Send to address: {}", conn.addr());
-            self.channel.send_to(&conn.addr(), message.clone());
+            self.channel.send_to(&conn.addr(), Arc::clone(message));
         }
     }
 
@@ -680,7 +681,7 @@ impl Node {
                 mount.mount("api/services", api_context.mount_public_api());
 
                 let mut router = Router::new();
-                let pool = self.state().transactions().clone();
+                let pool = Arc::clone(self.state().transactions());
                 let system_api = public::SystemApi::new(pool, blockchain.clone());
                 system_api.wire(&mut router);
                 mount.mount("api/system", router);

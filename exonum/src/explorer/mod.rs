@@ -18,6 +18,7 @@
 use serde_json::Value;
 
 use std::cmp;
+use std::sync::Arc;
 
 use storage::ListProof;
 use crypto::Hash;
@@ -65,14 +66,16 @@ impl<'a> BlockchainExplorer<'a> {
     pub fn tx_info(&self, tx_hash: &Hash) -> Result<Option<TxInfo>, ApiError> {
         let b = self.blockchain.clone();
         let snapshot = b.snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = Schema::new(snapshot);
         let tx = schema.transactions().get(tx_hash);
         let res = match tx {
             None => None,
             Some(raw_tx) => {
-                let box_transaction = self.blockchain.tx_from_raw(raw_tx.clone()).ok_or_else(|| {
-                    ApiError::Service(format!("Service not found for tx: {:?}", raw_tx).into())
-                })?;
+                let box_transaction = self.blockchain
+                    .tx_from_raw(Arc::clone(&raw_tx))
+                    .ok_or_else(|| {
+                        ApiError::Service(format!("Service not found for tx: {:?}", raw_tx).into())
+                    })?;
                 let content = box_transaction.info();
 
                 let location = schema.tx_location_by_tx_hash().get(tx_hash).expect(
@@ -100,7 +103,7 @@ impl<'a> BlockchainExplorer<'a> {
     pub fn block_info(&self, height: Height) -> Option<BlockInfo> {
         let b = self.blockchain.clone();
         let snapshot = b.snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = Schema::new(snapshot);
         let txs_table = schema.block_txs(height);
         let block_proof = schema.block_and_precommits(height);
         match block_proof {
@@ -125,7 +128,7 @@ impl<'a> BlockchainExplorer<'a> {
     ) -> Vec<Block> {
         let b = self.blockchain.clone();
         let snapshot = b.snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = Schema::new(snapshot);
         let hashes = schema.block_hashes_by_height();
         let blocks = schema.blocks();
 

@@ -15,9 +15,10 @@
 //! `TimeoutAdjuster` is used to dynamically change propose timeout.
 
 use std::fmt::Debug;
+use std::sync::Arc;
 
 use events::Milliseconds;
-use storage::Snapshot;
+use storage::View;
 use blockchain::Schema;
 
 /// `TimeoutAdjuster` trait is used to dynamically change propose timeout.
@@ -27,9 +28,11 @@ use blockchain::Schema;
 /// Implementing `TimeoutAdjuster`:
 ///
 /// ```
+/// use std::sync::Arc;
+///
 /// use exonum::node::timeout_adjuster::TimeoutAdjuster;
 /// use exonum::events::Milliseconds;
-/// use exonum::storage::Snapshot;
+/// use exonum::storage::View;
 /// use exonum::blockchain::Schema;
 ///
 /// # #[allow(dead_code)]
@@ -37,7 +40,7 @@ use blockchain::Schema;
 /// struct CustomAdjuster {}
 ///
 /// impl TimeoutAdjuster for CustomAdjuster {
-///     fn adjust_timeout(&mut self, snapshot: &Snapshot) -> Milliseconds {
+///     fn adjust_timeout(&mut self, snapshot: Arc<View>) -> Milliseconds {
 ///         let schema = Schema::new(snapshot);
 ///         let transactions = schema.last_block().map_or(0, |block| block.tx_count());
 ///         // Simply increase propose time after empty blocks.
@@ -52,7 +55,7 @@ use blockchain::Schema;
 /// For more examples see `Constant`, `Dynamic` and `MovingAverage` implementations.
 pub trait TimeoutAdjuster: Send + Debug {
     /// Called during node initialization and after accepting a new height.
-    fn adjust_timeout(&mut self, view: &Snapshot) -> Milliseconds;
+    fn adjust_timeout(&mut self, view: Arc<View>) -> Milliseconds;
 }
 
 /// `Adjuster` implementation that always returns the same value.
@@ -79,7 +82,7 @@ impl Constant {
 }
 
 impl TimeoutAdjuster for Constant {
-    fn adjust_timeout(&mut self, _: &Snapshot) -> Milliseconds {
+    fn adjust_timeout(&mut self, _: Arc<View>) -> Milliseconds {
         self.timeout
     }
 }
@@ -123,7 +126,7 @@ impl Dynamic {
 }
 
 impl TimeoutAdjuster for Dynamic {
-    fn adjust_timeout(&mut self, snapshot: &Snapshot) -> Milliseconds {
+    fn adjust_timeout(&mut self, snapshot: Arc<View>) -> Milliseconds {
         let schema = Schema::new(snapshot);
         let threshold = self.threshold;
         self.adjust_timeout_impl(schema.last_block().map_or(
@@ -192,7 +195,7 @@ impl MovingAverage {
 }
 
 impl TimeoutAdjuster for MovingAverage {
-    fn adjust_timeout(&mut self, snapshot: &Snapshot) -> Milliseconds {
+    fn adjust_timeout(&mut self, snapshot: Arc<View>) -> Milliseconds {
         let schema = Schema::new(snapshot);
         self.adjust_timeout_impl(schema.last_block().map_or(
             0.,

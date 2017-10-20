@@ -33,9 +33,6 @@ extern crate log;
 extern crate byteorder;
 extern crate mio;
 extern crate exonum_sodiumoxide as sodiumoxide;
-#[cfg(feature = "leveldb")]
-extern crate exonum_leveldb as leveldb;
-#[cfg(feature = "rocksdb")]
 extern crate exonum_rocksdb as rocksdb;
 
 extern crate rand;
@@ -47,7 +44,6 @@ extern crate toml;
 extern crate hex;
 extern crate bit_vec;
 extern crate vec_map;
-#[cfg(test)]
 extern crate tempdir;
 #[cfg(all(feature = "nightly", test))]
 extern crate test;

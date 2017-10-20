@@ -11,15 +11,15 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
+use std::sync::Arc;
 use std::collections::HashSet;
 
 use crypto::{Hash, PublicKey, HexValue};
+use storage::View;
 use blockchain::{Schema, Transaction};
 use messages::{ConsensusMessage, Propose, Prevote, Precommit, Message, ProposeRequest,
                TransactionsRequest, PrevotesRequest, BlockRequest, BlockResponse, RawTransaction};
 use helpers::{Height, Round, ValidatorId};
-use storage::Patch;
 use events::Channel;
 use super::{NodeHandler, RequestData, ExternalMessage, NodeTimeout};
 
@@ -107,7 +107,10 @@ where
         let snapshot = self.blockchain.snapshot();
         // Check that transactions are not committed yet
         for hash in msg.transactions() {
-            if Schema::new(&snapshot).transactions().contains(hash) {
+            if Schema::new(Arc::clone(&snapshot)).transactions().contains(
+                hash,
+            )
+            {
                 error!(
                     "Received propose with already committed transaction, msg={:?}",
                     msg
@@ -198,7 +201,7 @@ where
 
         if self.state.block(&block_hash).is_none() {
             let snapshot = self.blockchain.snapshot();
-            let schema = Schema::new(&snapshot);
+            let schema = Schema::new(snapshot);
             // Verify transactions
             let mut tx_hashes = Vec::new();
             for raw in msg.transactions() {
@@ -225,8 +228,8 @@ where
                 }
             }
 
-            let (block_hash, patch) =
-                self.create_block(block.proposer_id(), block.height(), tx_hashes.as_slice());
+            let (block_hash, fork) =
+                self.create_block(block.proposer_id(), block.height(), &tx_hashes);
             // Verify block_hash
             if block_hash != block.hash() {
                 panic!(
@@ -239,7 +242,7 @@ where
             // Commit block
             self.state.add_block(
                 block_hash,
-                patch,
+                fork,
                 tx_hashes,
                 block.proposer_id(),
             );
@@ -482,7 +485,7 @@ where
         self.add_status_timeout();
 
         // Adjust propose timeout after accepting a new block.
-        self.state.adjust_timeout(&*self.blockchain.snapshot());
+        self.state.adjust_timeout(self.blockchain.snapshot());
 
         // Handle queued transactions from services
         for tx in new_txs {
@@ -533,7 +536,7 @@ where
             }
 
             let snapshot = self.blockchain.snapshot();
-            if Schema::new(&snapshot).transactions().contains(&hash) {
+            if Schema::new(snapshot).transactions().contains(&hash) {
                 return;
             }
         });
@@ -569,7 +572,7 @@ where
         }
 
         let snapshot = self.blockchain.snapshot();
-        if Schema::new(&snapshot).transactions().contains(&hash) {
+        if Schema::new(snapshot).transactions().contains(&hash) {
             return;
         }
 
@@ -690,14 +693,15 @@ where
 
             let message = match data {
                 RequestData::Propose(ref propose_hash) => {
-                    ProposeRequest::new(
-                        self.state.consensus_public_key(),
-                        &peer,
-                        self.state.height(),
-                        propose_hash,
-                        self.state.consensus_secret_key(),
-                    ).raw()
-                        .clone()
+                    Arc::clone(
+                        ProposeRequest::new(
+                            self.state.consensus_public_key(),
+                            &peer,
+                            self.state.height(),
+                            propose_hash,
+                            self.state.consensus_secret_key(),
+                        ).raw(),
+                    )
                 }
                 RequestData::Transactions(ref propose_hash) => {
                     let txs: Vec<_> = self.state
@@ -707,34 +711,37 @@ where
                         .iter()
                         .cloned()
                         .collect();
-                    TransactionsRequest::new(
-                        self.state.consensus_public_key(),
-                        &peer,
-                        &txs,
-                        self.state.consensus_secret_key(),
-                    ).raw()
-                        .clone()
+                    Arc::clone(
+                        TransactionsRequest::new(
+                            self.state.consensus_public_key(),
+                            &peer,
+                            &txs,
+                            self.state.consensus_secret_key(),
+                        ).raw(),
+                    )
                 }
                 RequestData::Prevotes(round, ref propose_hash) => {
-                    PrevotesRequest::new(
-                        self.state.consensus_public_key(),
-                        &peer,
-                        self.state.height(),
-                        round,
-                        propose_hash,
-                        self.state.known_prevotes(round, propose_hash),
-                        self.state.consensus_secret_key(),
-                    ).raw()
-                        .clone()
+                    Arc::clone(
+                        PrevotesRequest::new(
+                            self.state.consensus_public_key(),
+                            &peer,
+                            self.state.height(),
+                            round,
+                            propose_hash,
+                            self.state.known_prevotes(round, propose_hash),
+                            self.state.consensus_secret_key(),
+                        ).raw(),
+                    )
                 }
                 RequestData::Block(height) => {
-                    BlockRequest::new(
-                        self.state.consensus_public_key(),
-                        &peer,
-                        height,
-                        self.state.consensus_secret_key(),
-                    ).raw()
-                        .clone()
+                    Arc::clone(
+                        BlockRequest::new(
+                            self.state.consensus_public_key(),
+                            &peer,
+                            height,
+                            self.state.consensus_secret_key(),
+                        ).raw(),
+                    )
                 }
             };
             trace!("Send request {:?} to peer {:?}", data, peer);
@@ -748,8 +755,8 @@ where
         proposer_id: ValidatorId,
         height: Height,
         tx_hashes: &[Hash],
-    ) -> (Hash, Patch) {
-        self.blockchain.create_patch(
+    ) -> (Hash, Arc<View>) {
+        self.blockchain.create_block(
             proposer_id,
             height,
             tx_hashes,
@@ -772,12 +779,12 @@ where
 
         let tx_hashes = propose.transactions().to_vec();
 
-        let (block_hash, patch) =
+        let (block_hash, fork) =
             self.create_block(propose.validator(), propose.height(), tx_hashes.as_slice());
         // Save patch
         self.state.add_block(
             block_hash,
-            patch,
+            fork,
             tx_hashes,
             propose.validator(),
         );

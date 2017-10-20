@@ -11,13 +11,14 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use std::sync::Arc;
 
 use rand::{Rng, XorShiftRng, SeedableRng};
 
 use exonum::messages::{FromRaw, Message, RawTransaction};
 use exonum::encoding::Error as MessageError;
 use exonum::crypto::{PublicKey, SecretKey, Hash, gen_keypair};
-use exonum::storage::{Snapshot, Fork};
+use exonum::storage::View;
 use exonum::blockchain::{Service, Transaction};
 
 pub const TIMESTAMPING_SERVICE: u16 = 129;
@@ -57,8 +58,8 @@ impl TimestampingTxGenerator {
         let rand = XorShiftRng::from_seed([192, 168, 56, 1]);
 
         TimestampingTxGenerator {
-            rand: rand,
-            data_size: data_size,
+            rand,
+            data_size,
             public_key: keypair.0,
             secret_key: keypair.1,
         }
@@ -86,7 +87,7 @@ impl Transaction for TimestampTx {
         self.verify_signature(self.pub_key())
     }
 
-    fn execute(&self, _: &mut Fork) {}
+    fn execute(&self, _: Arc<View>) {}
 }
 
 impl Service for TimestampingService {
@@ -98,7 +99,7 @@ impl Service for TimestampingService {
         TIMESTAMPING_SERVICE
     }
 
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    fn state_hash(&self, _: Arc<View>) -> Vec<Hash> {
         vec![Hash::new([127; 32]), Hash::new([128; 32])]
     }
 
