@@ -13,9 +13,9 @@
 // limitations under the License.
 use std::sync::Arc;
 
-use crypto::{HexValue, Hash};
+use crypto::Hash;
 use messages::{RawMessage, Precommit};
-use storage::{View, StorageValue, ListIndex, MapIndex, ProofListIndex, ProofMapIndex, MapProof};
+use storage::{View, StorageKey, StorageValue, ListIndex, MapIndex, ProofListIndex, ProofMapIndex, MapProof};
 use helpers::Height;
 use super::{Block, BlockProof, Blockchain};
 use super::config::StoredConfiguration;
@@ -41,6 +41,13 @@ encoding_struct! (
         field position_in_block:    u64     [08 => 16]
     }
 );
+
+/// Generates prefix that combines service identifier, table identifier and given suffix.
+pub fn gen_prefix<P: StorageKey>(prefix: &P) -> Vec<u8> {
+    let mut res = vec![0; prefix.size()];
+    prefix.write(&mut res[..]);
+    res
+}
 
 /// Information schema for `exonum-core`.
 #[derive(Debug)]
@@ -77,14 +84,12 @@ impl Schema {
 
     /// Returns table that keeps a list of transactions for the each block.
     pub fn block_txs(&self, height: Height) -> ProofListIndex<Hash> {
-        let name = format!("block_txs_{}", height.0);
-        ProofListIndex::new(name.as_str(), Arc::clone(&self.view))
+        ProofListIndex::with_prefix("block_txs", gen_prefix(&height.0), Arc::clone(&self.view))
     }
 
     /// Returns table that saves a list of precommits for block with given hash.
     pub fn precommits(&self, hash: &Hash) -> ListIndex<Precommit> {
-        let name = format!("precommits_{}", hash.to_hex());
-        ListIndex::new(name.as_str(), Arc::clone(&self.view))
+        ListIndex::with_prefix("precommits", gen_prefix(hash), Arc::clone(&self.view))
     }
 
     /// Returns table that represents a map from configuration hash into contents.
@@ -309,16 +314,14 @@ impl Schema {
     ///
     /// [1]: struct.Schema.html#method.block_txs
     pub fn block_txs_mut(&mut self, height: Height) -> ProofListIndex<Hash> {
-        let name = format!("block_txs_{}", height.0);
-        ProofListIndex::new(name.as_str(), Arc::clone(&self.view))
+        ProofListIndex::with_prefix("block_txs", gen_prefix(&height.0), Arc::clone(&self.view))
     }
 
     /// Mutable reference to the [`precommits`][1] index.
     ///
     /// [1]: struct.Schema.html#method.precommits
     pub fn precommits_mut(&mut self, hash: &Hash) -> ListIndex<Precommit> {
-        let name = format!("precommits_{}", hash.to_hex());
-        ListIndex::new(name.as_str(), Arc::clone(&self.view))
+        ListIndex::with_prefix("precommits", gen_prefix(hash), Arc::clone(&self.view))
     }
 
     /// Mutable reference to the [`configs`][1] index.

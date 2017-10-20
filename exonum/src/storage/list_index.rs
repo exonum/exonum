@@ -71,6 +71,15 @@ impl<V> ListIndex<V> {
             _v: PhantomData,
         }
     }
+
+    /// With prefix
+    pub fn with_prefix(name: &str, prefix: Vec<u8>, view: Arc<View>) -> Self {
+        ListIndex {
+            base: BaseIndex::with_prefix(name, prefix, view),
+            length: Cell::new(None),
+            _v: PhantomData,
+        }
+    }
 }
 
 impl<V> ListIndex<V>

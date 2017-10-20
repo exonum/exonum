@@ -32,6 +32,7 @@ use super::{StorageKey, StorageValue, View, Iter};
 #[derive(Debug)]
 pub struct BaseIndex {
     name: String,
+    prefix: Option<Vec<u8>>,
     view: Arc<View>,
 }
 
@@ -45,6 +46,8 @@ pub struct BaseIndex {
 /// [`BaseIndex`]: struct.BaseIndex.html
 pub struct BaseIndexIter<K, V> {
     base_iter: Iter,
+    base_prefix_len: usize,
+    prefix: Option<Vec<u8>>,
     ended: bool,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
@@ -59,19 +62,40 @@ impl BaseIndex {
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     pub fn new(name: &str, view: Arc<View>) -> Self {
-
         BaseIndex {
             name: name.to_string(),
+            prefix: None,
             view,
+        }
+    }
+
+    /// With prefix
+    pub fn with_prefix(name: &str, prefix: Vec<u8>, view: Arc<View>) -> Self {
+        BaseIndex {
+            name: name.to_string(),
+            prefix: Some(prefix),
+            view,
+        }
+    }
+
+    /// Generate prefixed key if needed
+    pub fn prefixed_key<K: StorageKey>(&self, key: &K) -> Vec<u8> {
+        match self.prefix {
+            Some(ref prefix) => {
+                let mut v = vec![0; prefix.len() + key.size()];
+                v[..prefix.len()].copy_from_slice(&prefix);
+                key.write(&mut v[prefix.len()..]);
+                v
+            }
+            None => {
+                let mut v = vec![0; key.size()];
+                key.write(&mut v);
+                v
+            }
         }
     }
 }
 
-fn gen_key<K: StorageKey>(key: &K) -> Vec<u8> {
-    let mut v = vec![0; key.size()];
-    key.write(&mut v);
-    v
-}
 
 impl BaseIndex {
     /// Returns a value of *any* type corresponding to the key of *any* type.
@@ -80,7 +104,7 @@ impl BaseIndex {
         K: StorageKey,
         V: StorageValue,
     {
-        self.view.get(&self.name, &gen_key(key)).map(|v| {
+        self.view.get(&self.name, &self.prefixed_key(key)).map(|v| {
             StorageValue::from_bytes(Cow::Owned(v))
         })
     }
@@ -91,7 +115,7 @@ impl BaseIndex {
     where
         K: StorageKey,
     {
-        self.view.contains(&self.name, &gen_key(key))
+        self.view.contains(&self.name, &self.prefixed_key(key))
     }
 
     /// Returns an iterator over the entries of the index in ascending order. The iterator element
@@ -104,6 +128,8 @@ impl BaseIndex {
     {
         BaseIndexIter {
             base_iter: self.view.iter(&self.name, None),
+            base_prefix_len: self.prefix.as_ref().map_or(0, |p| p.len()),
+            prefix: self.prefix.clone(),
             ended: false,
             _k: PhantomData,
             _v: PhantomData,
@@ -120,7 +146,9 @@ impl BaseIndex {
         V: StorageValue,
     {
         BaseIndexIter {
-            base_iter: self.view.iter(&self.name, Some(&gen_key(from))),
+            base_iter: self.view.iter(&self.name, Some(&self.prefixed_key(from))),
+            base_prefix_len: self.prefix.as_ref().map_or(0, |p| p.len()),
+            prefix: self.prefix.clone(),
             ended: false,
             _k: PhantomData,
             _v: PhantomData,
@@ -137,7 +165,7 @@ impl BaseIndex {
     {
         self.view.put(
             &self.name,
-            &gen_key(key),
+            &self.prefixed_key(key),
             value.into_bytes().as_ref(),
         );
     }
@@ -147,7 +175,7 @@ impl BaseIndex {
     where
         K: StorageKey,
     {
-        self.view.delete(&self.name, &gen_key(key));
+        self.view.delete(&self.name, &self.prefixed_key(key));
     }
 
     /// Clears the index, removing all entries.
@@ -174,10 +202,21 @@ where
             return None;
         }
         if let Some((k, v)) = self.base_iter.next() {
-            Some((K::read(&k[..]), V::from_bytes(Cow::Borrowed(v))))
+            if let Some(ref prefix) = self.prefix {
+                if k.starts_with(prefix) {
+                    return Some((
+                        K::read(&k[self.base_prefix_len..]),
+                        V::from_bytes(Cow::Borrowed(v)),
+                    ));
+                } else {
+                    return None;
+                }
+            } else {
+                return Some((K::read(&k[..]), V::from_bytes(Cow::Borrowed(v))));
+            }
         } else {
             self.ended = true;
-            None
+            return None;
         }
     }
 }
