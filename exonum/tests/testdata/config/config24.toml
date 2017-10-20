@@ -44,7 +44,7 @@ timeout_requests_capacity = 128
 [network]
 max_incoming_connections = 128
 max_outgoing_connections = 128
-tcp_nodelay = false
+tcp_nodelay = true
 tcp_connect_retry_timeout = 15000
 tcp_connect_max_retries = 10
 
