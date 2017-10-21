@@ -66,6 +66,42 @@ function check-request {
     fi
 }
 
+# Checks a `TxCreateWallet` in blockchain explorer.
+#
+# Arguments:
+# - $1: expected user name
+# - $2: expected transaction JSON
+# - $3: response JSON
+function check-create-tx {
+    if [[ \
+      ( `echo $3 | jq .type` == \"Committed\" ) && \
+      ( `echo $3 | jq .content.body.name` == "\"$1\"" ) && \
+      ( `echo $3 | jq ".content == $2"` == "true" ) \
+    ]]; then
+        echo "OK, got expected TxCreateWallet for user $1"
+    else
+        echo "Unexpected response: $3"
+        STATUS=1
+    fi
+}
+
+# Checks a `TxCreateWallet` in blockchain explorer.
+#
+# Arguments:
+# - $1: expected transaction JSON
+# - $2: response JSON
+function check-transfer-tx {
+    if [[ \
+      ( `echo $2 | jq .type` == \"Committed\" ) && \
+      ( `echo $2 | jq ".content == $1"` == "true" ) \
+    ]]; then
+        echo "OK, got expected TxTransfer among wallets"
+    else
+        echo "Unexpected response: $2"
+        STATUS=1
+    fi
+}
+
 kill-server
 launch-server
 
@@ -95,6 +131,18 @@ check-request "Janie Roe" 110 "`echo $RESP | jq .[1]`"
 echo "Retrieving info on Johnny's wallet..."
 RESP=`curl http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallet/03e657ae71e51be60a45b4bd20bcf79ff52f0c037ae6da0540a0e0066132b472 2>/dev/null`
 check-request "Johnny Doe" 90 "$RESP"
+
+echo "Retrieving Johnny's transaction info..."
+TXID=44c6c2c58eaab71f8d627d75ca72f244289bc84586a7fb42186a676b2ec4626b
+RESP=`curl http://127.0.0.1:8000/api/system/v1/transactions/$TXID 2>/dev/null`
+EXP=`cat create-wallet-1.json`
+check-create-tx "Johnny Doe" "$EXP" "$RESP"
+
+echo "Retrieving transfer transaction info..."
+TXID=e63b28caa07adffb6e2453390a59509a1469e66698c75b4cfb2f0ae7a6887fdc
+RESP=`curl http://127.0.0.1:8000/api/system/v1/transactions/$TXID 2>/dev/null`
+EXP=`cat transfer-funds.json`
+check-transfer-tx "$EXP" "$RESP"
 
 kill-server
 exit $STATUS
