@@ -66,7 +66,7 @@ function check-request {
     fi
 }
 
-# Checks a `TxCreateWallet` in blockchain explorer.
+# Checks a `TxCreateWallet` transaction in the blockchain explorer.
 #
 # Arguments:
 # - $1: expected user name
@@ -85,7 +85,7 @@ function check-create-tx {
     fi
 }
 
-# Checks a `TxCreateWallet` in blockchain explorer.
+# Checks a `TxCreateWallet` transaction in the blockchain explorer.
 #
 # Arguments:
 # - $1: expected transaction JSON
@@ -95,7 +95,7 @@ function check-transfer-tx {
       ( `echo $2 | jq .type` == \"Committed\" ) && \
       ( `echo $2 | jq ".content == $1"` == "true" ) \
     ]]; then
-        echo "OK, got expected TxTransfer among wallets"
+        echo "OK, got expected TxTransfer between wallets"
     else
         echo "Unexpected response: $2"
         STATUS=1
