@@ -14,7 +14,7 @@
 
 use std::iter::FromIterator;
 
-use serde::{Serialize, Serializer};
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use crypto::{hash, Hash};
 
 use super::super::StorageValue;
@@ -42,7 +42,51 @@ impl Serialize for DBKey {
     }
 }
 
-/// An error returned when a list proof is invalid.
+impl<'de> Deserialize<'de> for DBKey {
+    fn deserialize<D>(deser: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use std::fmt;
+        use serde::de::{self, Visitor, Unexpected};
+        
+        struct DBKeyVisitor;
+        
+        impl<'de> Visitor<'de> for DBKeyVisitor {
+            type Value = DBKey;
+            
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                write!(formatter, "binary string with length between 1 and {}", KEY_SIZE * 8)
+            }
+            
+            fn visit_str<E>(self, value: &str) -> Result<DBKey, E>
+                where E: de::Error
+            {
+                let len = value.len();
+                if len == 0 || len > 8 * KEY_SIZE {
+                    return Err(de::Error::invalid_value(Unexpected::Str(value), &self));
+                }
+                
+                let mut bytes = [0u8; KEY_SIZE];
+                for (i, ch) in value.chars().enumerate() {
+                    match ch {
+                        '0' => {},
+                        '1' => bytes[i / 8] += 1 << (7 - i % 8),
+                        _ => {
+                            return Err(de::Error::invalid_value(Unexpected::Str(value), &self))
+                        }
+                    }
+                }
+                
+                Ok(DBKey::leaf(&bytes).truncate(len as u16))
+            }
+        }
+        
+        deser.deserialize_str(DBKeyVisitor)
+    }
+}
+
+/// An error returned when a map proof is invalid.
 #[derive(Debug)]
 pub enum MapProofError {
     /// Non-terminal node for a map consisting of a single node.
