@@ -31,17 +31,9 @@ impl Decoder for MessagesCodec {
     type Error = io::Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, io::Error> {
-        // Check end
-        if buf.is_empty() {
-            return Ok(None);
-        }
         // Read header
         if buf.len() < HEADER_LENGTH {
-            return Err(other_error(format!(
-                "Received message is shorter than header: {}, header length is {}",
-                buf.len(),
-                HEADER_LENGTH
-            )));
+            return Ok(None);
         }
         // Check payload len
         let total_len = LittleEndian::read_u32(&buf[6..10]) as usize;

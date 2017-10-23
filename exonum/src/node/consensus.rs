@@ -506,7 +506,7 @@ impl NodeHandler {
     /// added to the transactions pool.
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_tx(&mut self, msg: RawTransaction) {
-        trace!("Handle transaction");
+        //trace!("Handle transaction");
         let hash = msg.hash();
         let tx = {
             let service_id = msg.service_id();
