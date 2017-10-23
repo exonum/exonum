@@ -194,6 +194,18 @@ impl<K, V> OptionalEntry<K, V> {
     }
 }
 
+impl<K, V> From<(K, Option<V>)> for OptionalEntry<K, V> {
+    fn from(value: (K, Option<V>)) -> Self {
+        OptionalEntry(value)
+    }
+}
+
+impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
+    fn into(self) -> (K, Option<V>) {
+        self.0
+    }
+}
+
 /// View of a `ProofMapIndex`, i.e., a subset of its elements coupled with a *proof*,
 /// which jointly allow to restore the `root_hash()` of the index.
 #[derive(Debug, Serialize)]
@@ -314,11 +326,7 @@ impl<K, V> MapProofBuilder<K, V> {
     }
 }
 
-impl<K, V> MapProof<K, V>
-where
-    K: ProofMapKey,
-    V: StorageValue,
-{
+impl<K, V> MapProof<K, V> {
     /// Creates a builder instance for the map proof.
     pub fn builder() -> MapProofBuilder<K, V> {
         MapProofBuilder::new()
@@ -357,11 +365,42 @@ where
         }
     }
 
+    /// Maps this proof to other type of keys and/or values.
+    pub fn map<F, L, U>(self, map_fn: F) -> MapProof<L, U>
+    where
+        F: FnMut((K, Option<V>)) -> (L, Option<U>),
+    {
+        MapProof {
+            entries: self.entries
+                .into_iter()
+                .map(|e| e.into())
+                .map(map_fn)
+                .map(|e| e.into())
+                .collect(),
+            proof: self.proof,
+        }
+    }
+
     /// Provides access to the proof part of the view. Useful mainly for debug purposes.
     pub fn proof(&self) -> Vec<(DBKey, Hash)> {
         self.proof.iter().cloned().map(|e| e.into()).collect()
     }
 
+    /// Retrieves references to keys that the proof shows as missing from the map.
+    /// This method does not perform any integrity checks of the proof.
+    pub fn missing_keys_unchecked(&self) -> Vec<&K> {
+        self.entries
+            .iter()
+            .filter_map(|e| e.get_missing())
+            .collect()
+    }
+}
+
+impl<K, V> MapProof<K, V>
+where
+    K: ProofMapKey,
+    V: StorageValue,
+{
     fn validate(&self) -> Result<(), MapProofError> {
         use std::cmp::Ordering;
 
@@ -418,15 +457,6 @@ where
         }
 
         Ok(())
-    }
-
-    /// Retrieves references to keys that the proof shows as missing from the map.
-    /// This method does not perform any integrity checks of the proof.
-    pub fn missing_keys_unchecked(&self) -> Vec<&K> {
-        self.entries
-            .iter()
-            .filter_map(|e| e.get_missing())
-            .collect()
     }
 
     /// Retrieves references to keys that the proof shows as missing from the map.

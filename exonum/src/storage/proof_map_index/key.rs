@@ -16,7 +16,7 @@ use std::cmp::{min, Ordering};
 
 use crypto::{Hash, PublicKey, HASH_SIZE};
 
-use super::super::StorageKey;
+use super::super::{StorageKey, StorageValue};
 
 pub const BRANCH_KEY_PREFIX: u8 = 00;
 pub const LEAF_KEY_PREFIX: u8 = 01;
@@ -28,29 +28,83 @@ pub const DB_KEY_SIZE: usize = KEY_SIZE + 2;
 /// A trait that defines a subset of storage key types which are suitable for use with
 /// `ProofMapIndex`.
 ///
-/// The size of the keys must be exactly 32 bytes and the keys must have a uniform distribution.
-pub trait ProofMapKey: StorageKey {}
+/// The size of the keys must be exactly `KEY_SIZE` bytes and the keys must have
+/// a uniform distribution.
+pub trait ProofMapKey
+where
+    Self::Output: ProofMapKey,
+{
+    /// The type of keys as read from the database. `Output` is not necessarily
+    /// equal to `Self`, which provides flexibility for `HashedKey`s and similar cases
+    /// where the key cannot be uniquely restored from the database.
+    type Output;
 
-impl ProofMapKey for Hash {}
-impl ProofMapKey for PublicKey {}
-impl ProofMapKey for [u8; KEY_SIZE] {}
+    /// Writes this key into a byte buffer. The buffer is guaranteed to have size `KEY_SIZE`.
+    fn write_key(&self, &mut [u8]);
 
-impl StorageKey for [u8; KEY_SIZE] {
-    fn size(&self) -> usize {
-        KEY_SIZE
+    /// Reads this key from the buffer.
+    fn read_key(&[u8]) -> Self::Output;
+}
+
+/// A trait denoting that a certain storage value is suitable for use as a key for `ProofMapIndex`
+/// after hashing.
+///
+/// **Warning:** The implementation of the `write_key()` method of `ProofMapKey` provided
+/// by this trait is not efficient; it calculates the hash anew on each call.
+pub trait HashedKey: StorageValue {}
+
+impl<T: HashedKey> ProofMapKey for T {
+    type Output = Hash;
+
+    fn write_key(&self, buffer: &mut [u8]) {
+        self.hash().write(buffer);
     }
 
-    fn write(&self, buffer: &mut [u8]) {
-        buffer.copy_from_slice(self.as_ref())
-    }
-
-    fn read(buffer: &[u8]) -> Self {
-        let mut value = [0; KEY_SIZE];
-        value.copy_from_slice(buffer);
-        value
+    fn read_key(buffer: &[u8]) -> Hash {
+        <Hash as StorageKey>::read(buffer)
     }
 }
 
+// TODO: consider removing.
+impl ProofMapKey for PublicKey {
+    type Output = PublicKey;
+
+    fn write_key(&self, buffer: &mut [u8]) {
+        StorageKey::write(self, buffer);
+    }
+
+    fn read_key(raw: &[u8]) -> PublicKey {
+        <PublicKey as StorageKey>::read(raw)
+    }
+}
+
+impl ProofMapKey for Hash {
+    type Output = Hash;
+
+    fn write_key(&self, buffer: &mut [u8]) {
+        StorageKey::write(self, buffer);
+    }
+
+    fn read_key(raw: &[u8]) -> Hash {
+        <Hash as StorageKey>::read(raw)
+    }
+}
+
+// TODO: should probably be removed; `[u8; 32]` values are not guaranteed
+// to be uniformly distributed.
+impl ProofMapKey for [u8; 32] {
+    type Output = [u8; 32];
+
+    fn write_key(&self, buffer: &mut [u8]) {
+        buffer.copy_from_slice(self);
+    }
+
+    fn read_key(raw: &[u8]) -> [u8; 32] {
+        let mut value = [0; KEY_SIZE];
+        value.copy_from_slice(raw);
+        value
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ChildKind {
@@ -80,10 +134,8 @@ impl ::std::ops::Not for ChildKind {
 impl DBKey {
     /// Create a new bit slice from the given binary data.
     pub fn leaf<K: ProofMapKey>(key: &K) -> DBKey {
-        debug_assert_eq!(key.size(), KEY_SIZE);
-
         let mut data = [0; KEY_SIZE];
-        key.write(&mut data);
+        key.write_key(&mut data);
         DBKey {
             data: data,
             from: 0,

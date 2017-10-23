@@ -23,7 +23,7 @@ use encoding::serialize::reexport::{Serialize, Serializer};
 
 use super::{DBKey, ProofMapIndex, ProofMapKey};
 use super::proof::MapProof;
-use super::key::{ChildKind, KEY_SIZE, LEAF_KEY_PREFIX};
+use super::key::{ChildKind, HashedKey, KEY_SIZE, LEAF_KEY_PREFIX};
 use super::node::BranchNode;
 
 const IDX_NAME: &'static str = "idx_name";
@@ -1067,6 +1067,90 @@ fn iter(db: Box<Database>) {
     );
 }
 
+fn tree_with_hashed_key(db: Box<Database>) {
+    use std::iter::FromIterator;
+
+    encoding_struct! {
+        struct Point {
+            const SIZE = 4;
+
+            field x: u16 [0 => 2]
+            field y: u16 [2 => 4]
+        }
+    }
+
+    impl HashedKey for Point {};
+
+    fn hash_isolated_node(key: &DBKey, h: &Hash) -> Hash {
+        hash(&[&key.to_vec(), h.as_ref()].concat())
+    }
+
+    let mut storage = db.fork();
+    let mut table = ProofMapIndex::new(vec![255], &mut storage);
+
+    table.put(&Point::new(1, 2), vec![1, 2, 3]);
+    table.put(&Point::new(3, 4), vec![2, 3, 4]);
+
+    assert_eq!(table.get(&Point::new(1, 2)), Some(vec![1, 2, 3]));
+    assert_eq!(table.get(&Point::new(2, 2)), None);
+
+    let keys: HashSet<_> = table.keys().collect();
+    assert_eq!(
+        keys,
+        HashSet::from_iter(vec![Point::new(3, 4).hash(), Point::new(1, 2).hash()])
+    );
+
+    let kvs: HashSet<_> = table.iter().collect();
+    assert_eq!(
+        kvs,
+        HashSet::from_iter(vec![
+            (Point::new(3, 4).hash(), vec![2, 3, 4]),
+            (Point::new(1, 2).hash(), vec![1, 2, 3]),
+        ])
+    );
+
+    let proof = table.get_proof(Point::new(1, 2));
+    assert_eq!(
+        proof.proof(),
+        vec![(DBKey::leaf(&Point::new(3, 4)), hash(&vec![2, 3, 4]))]
+    );
+
+    assert_eq!(proof.try_into().unwrap(), (
+        vec![
+            (
+                Point::new(1, 2),
+                vec![1, 2, 3]
+            ),
+        ],
+        table.root_hash(),
+    ));
+
+    let proof = table.get_proof(Point::new(3, 4)).map(
+        |(k, v)| (k.hash(), v),
+    );
+    assert_eq!(proof.try_into().unwrap(), (
+        vec![
+            (
+                Point::new(3, 4).hash(),
+                vec![2, 3, 4]
+            ),
+        ],
+        table.root_hash(),
+    ));
+
+    let key = Point::new(3, 4);
+    let other_key = Point::new(1, 2);
+    table.remove(&key);
+    let keys: Vec<_> = table.keys().collect();
+    assert_eq!(keys, vec![other_key.hash()]);
+    assert_eq!(table.get(&key), None);
+    assert_eq!(table.get(&other_key), Some(vec![1, 2, 3]));
+    assert_eq!(
+        table.root_hash(),
+        hash_isolated_node(&DBKey::leaf(&other_key.hash()), &hash(&vec![1, 2, 3]))
+    );
+}
+
 mod memorydb_tests {
     use std::path::Path;
     use tempdir::TempDir;
@@ -1266,6 +1350,14 @@ mod memorydb_tests {
         let path = dir.path();
         let db = create_database(path);
         super::iter(db);
+    }
+
+    #[test]
+    fn test_tree_with_hashed_key() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::tree_with_hashed_key(db);
     }
 }
 
@@ -1471,5 +1563,13 @@ mod rocksdb_tests {
         let path = dir.path();
         let db = create_database(path);
         super::iter(db);
+    }
+
+    #[test]
+    fn test_tree_with_hashed_key() {
+        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let path = dir.path();
+        let db = create_database(path);
+        super::tree_with_hashed_key(db);
     }
 }

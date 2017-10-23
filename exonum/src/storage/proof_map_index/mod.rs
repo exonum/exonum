@@ -1004,13 +1004,14 @@ where
     }
 }
 
-impl<'a, T, K, V> ::std::iter::IntoIterator for &'a ProofMapIndex<T, K, V>
+impl<'a, T, K, OK, V> ::std::iter::IntoIterator for &'a ProofMapIndex<T, K, V>
 where
     T: AsRef<Snapshot>,
-    K: ProofMapKey,
+    K: ProofMapKey<Output = OK>,
+    OK: ProofMapKey,
     V: StorageValue,
 {
-    type Item = (K, V);
+    type Item = (OK, V);
     type IntoIter = ProofMapIndexIter<'a, K, V>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -1018,27 +1019,31 @@ where
     }
 }
 
-impl<'a, K, V> Iterator for ProofMapIndexIter<'a, K, V>
+impl<'a, K, OK, V> Iterator for ProofMapIndexIter<'a, K, V>
 where
-    K: ProofMapKey,
+    K: ProofMapKey<Output = OK>,
+    OK: ProofMapKey,
     V: StorageValue,
 {
-    type Item = (K, V);
+    type Item = (OK, V);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.base_iter.next().map(|(k, v)| (K::read(k.as_ref()), v))
+        self.base_iter.next().map(
+            |(k, v)| (K::read_key(k.as_ref()), v),
+        )
     }
 }
 
 
-impl<'a, K> Iterator for ProofMapIndexKeys<'a, K>
+impl<'a, K, OK> Iterator for ProofMapIndexKeys<'a, K>
 where
-    K: ProofMapKey,
+    K: ProofMapKey<Output = OK>,
+    OK: ProofMapKey,
 {
-    type Item = K;
+    type Item = OK;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.base_iter.next().map(|(k, _)| K::read(k.as_ref()))
+        self.base_iter.next().map(|(k, _)| K::read_key(k.as_ref()))
     }
 }
 
