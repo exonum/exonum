@@ -158,6 +158,11 @@ impl Transaction for TxCreateWallet {
             schema.wallets().put(self.pub_key(), wallet)
         }
     }
+
+    /// Provide information about the transaction to be used in the blockchain explorer.
+    fn info(&self) -> serde_json::Value {
+        serde_json::to_value(&self).expect("Cannot serialize transaction to JSON")
+    }
 }
 
 impl Transaction for TxTransfer {
@@ -184,6 +189,11 @@ impl Transaction for TxTransfer {
                 wallets.put(self.to(), receiver);
             }
         }
+    }
+
+    /// Provide information about the transaction to be used in the blockchain explorer.
+    fn info(&self) -> serde_json::Value {
+        serde_json::to_value(&self).expect("Cannot serialize transaction to JSON")
     }
 }
 
