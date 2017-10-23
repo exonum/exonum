@@ -1151,6 +1151,70 @@ fn tree_with_hashed_key(db: Box<Database>) {
     );
 }
 
+// // // // Macros // // // //
+
+macro_rules! test_on_db {
+    {$testname:ident, $fnname:ident} => {
+        #[test]
+        fn $testname() {
+            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let path = dir.path();
+            let db = create_database(path);
+            super::$fnname(db);
+        }
+    };
+}
+
+macro_rules! test_on_2dbs {
+    {$testname:ident, $fnname:ident} => {
+        #[test]
+        fn $testname() {
+            let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let path1 = dir1.path();
+            let dir2 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let path2 = dir2.path();
+            let db1 = create_database(path1);
+            let db2 = create_database(path2);
+            super::$fnname(db1, db2);
+        }
+    };
+}
+
+// // // // Testsuites // // // //
+
+macro_rules! common_tests {
+    {} => {
+        test_on_2dbs!{test_insert_trivial, insert_trivial}
+        test_on_db!{test_insert_same_key, insert_same_key}
+        test_on_2dbs!{test_insert_simple, insert_simple}
+        test_on_2dbs!{test_insert_reverse, insert_reverse}
+        test_on_2dbs!{test_remove_trivial, remove_trivial}
+        test_on_2dbs!{test_remove_simple, remove_simple}
+        test_on_2dbs!{test_remove_reverse, remove_reverse}
+        test_on_2dbs!{test_fuzz_insert, fuzz_insert}
+        test_on_db!{test_build_proof_in_empty_tree, build_proof_in_empty_tree}
+        test_on_db!{test_build_multiproof_in_empty_tree, build_multiproof_in_empty_tree}
+        test_on_db!{test_build_proof_in_single_node_tree, build_proof_in_single_node_tree}
+        test_on_db!{
+            test_build_multiproof_in_single_node_tree,
+            build_multiproof_in_single_node_tree
+        }
+        test_on_db!{test_build_proof_in_multinode_tree, build_proof_in_multinode_tree}
+        test_on_db!{test_build_multiproof_simple, build_multiproof_simple}
+        test_on_db!{
+            test_fuzz_insert_build_proofs_in_table_filled_with_hashes,
+            fuzz_insert_build_proofs_in_table_filled_with_hashes
+        }
+        test_on_db!{test_fuzz_insert_build_proofs, fuzz_insert_build_proofs}
+        test_on_db!{test_fuzz_insert_build_multiproofs, fuzz_insert_build_multiproofs}
+        test_on_db!{test_fuzz_delete_build_proofs, fuzz_delete_build_proofs}
+        test_on_2dbs!{test_fuzz_delete, fuzz_delete}
+        test_on_db!{test_fuzz_insert_after_delete, fuzz_insert_after_delete}
+        test_on_db!{test_iter, iter}
+        test_on_db!{test_tree_with_hashed_key, tree_with_hashed_key}
+    };
+}
+
 mod memorydb_tests {
     use std::path::Path;
     use tempdir::TempDir;
@@ -1160,205 +1224,7 @@ mod memorydb_tests {
         Box::new(MemoryDB::new())
     }
 
-    #[test]
-    fn test_insert_trivial() {
-        let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path1 = dir1.path();
-        let dir2 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path2 = dir2.path();
-        let db1 = create_database(path1);
-        let db2 = create_database(path2);
-        super::insert_trivial(db1, db2);
-    }
-
-    #[test]
-    fn test_insert_same_key() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::insert_same_key(db);
-    }
-
-    #[test]
-    fn test_insert_simple() {
-        let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path1 = dir1.path();
-        let dir2 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path2 = dir2.path();
-        let db1 = create_database(path1);
-        let db2 = create_database(path2);
-        super::insert_simple(db1, db2);
-    }
-
-    #[test]
-    fn test_insert_reverse() {
-        let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path1 = dir1.path();
-        let db1 = create_database(path1);
-        let dir2 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path2 = dir2.path();
-        let db2 = create_database(path2);
-        super::insert_reverse(db1, db2);
-    }
-
-    #[test]
-    fn test_remove_trivial() {
-        let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path1 = dir1.path();
-        let db1 = create_database(path1);
-        let dir2 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path2 = dir2.path();
-        let db2 = create_database(path2);
-        super::remove_trivial(db1, db2);
-    }
-
-    #[test]
-    fn remove_simple() {
-        let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path1 = dir1.path();
-        let db1 = create_database(path1);
-        let dir2 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path2 = dir2.path();
-        let db2 = create_database(path2);
-        super::remove_simple(db1, db2);
-    }
-
-    #[test]
-    fn remove_reverse() {
-        let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path1 = dir1.path();
-        let db1 = create_database(path1);
-        let dir2 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path2 = dir2.path();
-        let db2 = create_database(path2);
-        super::remove_reverse(db1, db2);
-    }
-
-    #[test]
-    fn test_fuzz_insert() {
-        let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path1 = dir1.path();
-        let db1 = create_database(path1);
-        let dir2 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path2 = dir2.path();
-        let db2 = create_database(path2);
-        super::fuzz_insert(db1, db2);
-    }
-
-    #[test]
-    fn test_build_proof_in_empty_tree() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::build_proof_in_empty_tree(db);
-    }
-
-    #[test]
-    fn test_build_multiproof_in_empty_tree() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::build_multiproof_in_empty_tree(db);
-    }
-
-    #[test]
-    fn test_build_proof_in_single_node_tree() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::build_proof_in_single_node_tree(db);
-    }
-
-    #[test]
-    fn test_build_multiproof_in_single_node_tree() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::build_multiproof_in_single_node_tree(db);
-    }
-
-    #[test]
-    fn test_build_proof_in_multinode_tree() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::build_proof_in_multinode_tree(db);
-    }
-
-    #[test]
-    fn test_build_multiproof_simple() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::build_multiproof_simple(db);
-    }
-
-    #[test]
-    fn test_fuzz_insert_build_proofs_in_table_filled_with_hashes() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::fuzz_insert_build_proofs_in_table_filled_with_hashes(db);
-    }
-
-    #[test]
-    fn test_fuzz_insert_build_proofs() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::fuzz_insert_build_proofs(db);
-    }
-
-    #[test]
-    fn test_fuzz_insert_build_multiproofs() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::fuzz_insert_build_multiproofs(db);
-    }
-
-    #[test]
-    fn test_fuzz_delete_build_proofs() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::fuzz_delete_build_proofs(db);
-    }
-
-    #[test]
-    fn test_fuzz_delete() {
-        let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path1 = dir1.path();
-        let db1 = create_database(path1);
-        let dir2 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path2 = dir2.path();
-        let db2 = create_database(path2);
-        super::fuzz_delete(db1, db2);
-    }
-
-    #[test]
-    fn test_fuzz_insert_after_delete() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::fuzz_insert_after_delete(db);
-    }
-
-    #[test]
-    fn test_iter() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::iter(db);
-    }
-
-    #[test]
-    fn test_tree_with_hashed_key() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::tree_with_hashed_key(db);
-    }
+    common_tests!{}
 }
 
 #[cfg(feature = "rocksdb")]
@@ -1373,203 +1239,5 @@ mod rocksdb_tests {
         Box::new(RocksDB::open(path, opts).unwrap())
     }
 
-    #[test]
-    fn test_insert_trivial() {
-        let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path1 = dir1.path();
-        let dir2 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path2 = dir2.path();
-        let db1 = create_database(path1);
-        let db2 = create_database(path2);
-        super::insert_trivial(db1, db2);
-    }
-
-    #[test]
-    fn test_insert_same_key() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::insert_same_key(db);
-    }
-
-    #[test]
-    fn test_insert_simple() {
-        let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path1 = dir1.path();
-        let dir2 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path2 = dir2.path();
-        let db1 = create_database(path1);
-        let db2 = create_database(path2);
-        super::insert_simple(db1, db2);
-    }
-
-    #[test]
-    fn test_insert_reverse() {
-        let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path1 = dir1.path();
-        let db1 = create_database(path1);
-        let dir2 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path2 = dir2.path();
-        let db2 = create_database(path2);
-        super::insert_reverse(db1, db2);
-    }
-
-    #[test]
-    fn test_remove_trivial() {
-        let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path1 = dir1.path();
-        let db1 = create_database(path1);
-        let dir2 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path2 = dir2.path();
-        let db2 = create_database(path2);
-        super::remove_trivial(db1, db2);
-    }
-
-    #[test]
-    fn remove_simple() {
-        let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path1 = dir1.path();
-        let db1 = create_database(path1);
-        let dir2 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path2 = dir2.path();
-        let db2 = create_database(path2);
-        super::remove_simple(db1, db2);
-    }
-
-    #[test]
-    fn remove_reverse() {
-        let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path1 = dir1.path();
-        let db1 = create_database(path1);
-        let dir2 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path2 = dir2.path();
-        let db2 = create_database(path2);
-        super::remove_reverse(db1, db2);
-    }
-
-    #[test]
-    fn test_fuzz_insert() {
-        let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path1 = dir1.path();
-        let db1 = create_database(path1);
-        let dir2 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path2 = dir2.path();
-        let db2 = create_database(path2);
-        super::fuzz_insert(db1, db2);
-    }
-
-    #[test]
-    fn test_build_proof_in_empty_tree() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::build_proof_in_empty_tree(db);
-    }
-
-    #[test]
-    fn test_build_multiproof_in_empty_tree() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::build_multiproof_in_empty_tree(db);
-    }
-
-    #[test]
-    fn test_build_proof_in_single_node_tree() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::build_proof_in_single_node_tree(db);
-    }
-
-    #[test]
-    fn test_build_multiproof_in_single_node_tree() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::build_multiproof_in_single_node_tree(db);
-    }
-
-    #[test]
-    fn test_build_proof_in_multinode_tree() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::build_proof_in_multinode_tree(db);
-    }
-
-    #[test]
-    fn test_build_multiproof_simple() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::build_multiproof_simple(db);
-    }
-
-    #[test]
-    fn test_fuzz_insert_build_proofs_in_table_filled_with_hashes() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::fuzz_insert_build_proofs_in_table_filled_with_hashes(db);
-    }
-
-    #[test]
-    fn test_fuzz_insert_build_proofs() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::fuzz_insert_build_proofs(db);
-    }
-
-    #[test]
-    fn test_fuzz_insert_build_multiproofs() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::fuzz_insert_build_multiproofs(db);
-    }
-
-    #[test]
-    fn test_fuzz_delete_build_proofs() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::fuzz_delete_build_proofs(db);
-    }
-
-    #[test]
-    fn test_fuzz_delete() {
-        let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path1 = dir1.path();
-        let db1 = create_database(path1);
-        let dir2 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path2 = dir2.path();
-        let db2 = create_database(path2);
-        super::fuzz_delete(db1, db2);
-    }
-
-    #[test]
-    fn test_fuzz_insert_after_delete() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::fuzz_insert_after_delete(db);
-    }
-
-    #[test]
-    fn test_iter() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::iter(db);
-    }
-
-    #[test]
-    fn test_tree_with_hashed_key() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::tree_with_hashed_key(db);
-    }
+    common_tests!{}
 }
