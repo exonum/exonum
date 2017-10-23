@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Fixed
 - Fix network failure due to incorrect processing of the incoming buffer (#322)
+- Clarify `Transaction.info()` usage (#345)
 
 ## 0.2 - 2017-09-13
 
