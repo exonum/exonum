@@ -126,27 +126,6 @@ impl ::std::error::Error for MapProofError {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
-struct MapProofEntry {
-    key: DBKey,
-    hash: Hash,
-}
-
-impl From<(DBKey, Hash)> for MapProofEntry {
-    fn from(val: (DBKey, Hash)) -> Self {
-        MapProofEntry {
-            key: val.0,
-            hash: val.1,
-        }
-    }
-}
-
-impl From<MapProofEntry> for (DBKey, Hash) {
-    fn from(val: MapProofEntry) -> Self {
-        (val.key, val.hash)
-    }
-}
-
 #[derive(Debug)]
 struct ContourNode {
     key: Option<DBKey>,
@@ -199,54 +178,89 @@ impl ContourNode {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
-struct OptionalEntry<K, V>((K, Option<V>));
+// Used only for the purpose of clearer serialization.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+struct MapProofEntry {
+    key: DBKey,
+    hash: Hash,
+}
+
+impl From<(DBKey, Hash)> for MapProofEntry {
+    fn from(val: (DBKey, Hash)) -> Self {
+        MapProofEntry {
+            key: val.0,
+            hash: val.1,
+        }
+    }
+}
+
+impl From<MapProofEntry> for (DBKey, Hash) {
+    fn from(val: MapProofEntry) -> Self {
+        (val.key, val.hash)
+    }
+}
+
+// Used only for the purpose of clearer serialization.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+enum OptionalEntry<K, V> {
+    Missing { missing: K },
+    KV { key: K, value: V },
+}
 
 impl<K, V> OptionalEntry<K, V> {
     fn missing(key: K) -> Self {
-        OptionalEntry((key, None))
+        OptionalEntry::Missing { missing: key }
     }
 
     fn value(key: K, value: V) -> Self {
-        OptionalEntry((key, Some(value)))
+        OptionalEntry::KV { key, value }
     }
 
     fn key(&self) -> &K {
-        &(self.0).0
-    }
-
-    fn get_missing(&self) -> Option<&K> {
-        if (self.0).1.is_none() {
-            Some(&(self.0).0)
-        } else {
-            None
+        match *self {
+            OptionalEntry::Missing { ref missing } => missing,
+            OptionalEntry::KV { ref key, .. } => key,
         }
     }
 
-    fn get_value(&self) -> Option<(&K, &V)> {
-        let (key, value) = (&(self.0).0, &(self.0).1);
-        if let Some(ref v) = *value {
-            Some((key, v))
-        } else {
-            None
+    fn as_missing(&self) -> Option<&K> {
+        match *self {
+            OptionalEntry::Missing { ref missing } => Some(missing),
+            _ => None,
+        }
+    }
+
+    fn as_kv(&self) -> Option<(&K, &V)> {
+        match *self {
+            OptionalEntry::KV { ref key, ref value } => Some((key, value)),
+            _ => None,
         }
     }
 
     fn into_value(self) -> Option<(K, V)> {
-        let key = (self.0).0;
-        (self.0).1.map(|value| (key, value))
+        match self {
+            OptionalEntry::KV { key, value } => Some((key, value)),
+            _ => None,
+        }
     }
 }
 
 impl<K, V> From<(K, Option<V>)> for OptionalEntry<K, V> {
     fn from(value: (K, Option<V>)) -> Self {
-        OptionalEntry(value)
+        match value {
+            (missing, None) => OptionalEntry::Missing { missing },
+            (key, Some(value)) => OptionalEntry::KV { key, value },
+        }
     }
 }
 
 impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
     fn into(self) -> (K, Option<V>) {
-        self.0
+        match self {
+            OptionalEntry::Missing { missing } => (missing, None),
+            OptionalEntry::KV { key, value } => (key, Some(value)),
+        }
     }
 }
 
@@ -435,7 +449,7 @@ impl<K, V> MapProof<K, V> {
     pub fn missing_keys_unchecked(&self) -> Vec<&K> {
         self.entries
             .iter()
-            .filter_map(|e| e.get_missing())
+            .filter_map(|e| e.as_missing())
             .collect()
     }
 }
@@ -523,7 +537,7 @@ where
         let (mut proof, entries) = (self.proof, self.entries);
 
         proof.extend(entries.iter().filter_map(|e| {
-            e.get_value().map(
+            e.as_kv().map(
                 |(k, v)| (DBKey::leaf(k), v.hash()).into(),
             )
         }));
