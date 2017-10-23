@@ -55,7 +55,45 @@ pub trait Transaction: Message + 'static {
     /// - If the execute method of a transaction raises a `panic`, the changes made by the
     /// transactions are discarded, but the transaction itself is still considered committed.
     fn execute(&self, fork: &mut Fork);
-    /// Returns the useful information about the transaction in the JSON format.
+    /// Returns the useful information about the transaction in the JSON format. The returned value
+    /// is used to fill the [`TxInfo.content`] field in [the blockchain explorer][explorer].
+    ///
+    /// # Notes
+    ///
+    /// The default implementation returns `null`. For transactions defined with
+    /// the [`message!`] macro, you may redefine `info()` as
+    ///
+    /// ```
+    /// # #[macro_use] extern crate exonum;
+    /// extern crate serde_json;
+    /// # use exonum::blockchain::Transaction;
+    /// # use exonum::storage::Fork;
+    ///
+    /// message! {
+    ///     struct MyTransaction {
+    ///         // Transaction definition...
+    /// #       const TYPE = 1;
+    /// #       const ID = 1;
+    /// #       const SIZE = 8;
+    /// #       field foo: u64 [0 => 8]
+    ///     }
+    /// }
+    ///
+    /// impl Transaction for MyTransaction {
+    ///     // Other methods...
+    /// #   fn verify(&self) -> bool { true }
+    /// #   fn execute(&self, _: &mut Fork) { }
+    ///
+    ///     fn info(&self) -> serde_json::Value {
+    ///         serde_json::to_value(self).expect("Cannot serialize transaction to JSON")
+    ///     }
+    /// }
+    /// # fn main() { }
+    /// ```
+    ///
+    /// [`TxInfo.content`]: ../explorer/struct.TxInfo.html#structfield.content
+    /// [explorer]: ../explorer/index.html
+    /// [`message!`]: ../macro.message.html
     fn info(&self) -> Value {
         Value::Null
     }
