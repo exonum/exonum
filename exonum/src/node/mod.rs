@@ -779,10 +779,12 @@ impl Node {
     }
 
     fn into_reactor(self) -> (HandlerPart<NodeHandler>, NetworkPart, TimeoutsPart) {
+        let connect_message = self.state().our_connect_message().clone();
         let (network_tx, network_rx) = self.channel.network_events;
         let timeout_requests_rx = self.channel.timeout_requests.1;
 
         let network_part = NetworkPart {
+            our_connect_message: connect_message,
             listen_address: self.handler.system_state.listen_address(),
             network_requests: self.channel.network_requests,
             network_tx: network_tx,

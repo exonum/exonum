@@ -158,6 +158,7 @@ impl TestEvents {
         let network_requests_tx = channel.network_requests.0.clone();
 
         let network_part = NetworkPart {
+            our_connect_message: connect_message(self.listen_address),
             listen_address: self.listen_address,
             network_config,
             network_requests: channel.network_requests,
@@ -321,4 +322,24 @@ fn test_network_multiple_connect() {
     assert_eq!(node.wait_for_connect(), connect_messages[1]);
     connectors[2].connect_with(main);
     assert_eq!(node.wait_for_connect(), connect_messages[2]);
+}
+
+
+
+#[test]
+fn test_send_first_not_connect() {
+    let main = "127.0.0.1:19600".parse().unwrap();
+
+    let other = "127.0.0.1:19601".parse().unwrap();
+
+    let mut node = TestEvents::with_addr(main).spawn();
+
+    let other_node = TestEvents::with_addr(other).spawn();
+
+    let message = raw_message(11, 1000);
+    other_node.send_to(main, message.clone()); // should connect before send message
+
+    assert_eq!(node.wait_for_connect(), connect_message(other));
+    assert_eq!(node.wait_for_message(), message);
+
 }

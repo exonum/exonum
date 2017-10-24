@@ -29,7 +29,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-use messages::{Any, Connect, RawMessage};
+use messages::{Any, Connect, RawMessage, Message};
 use helpers::Milliseconds;
 
 use super::tobox;
@@ -79,6 +79,7 @@ impl Default for NetworkConfiguration {
 
 #[derive(Debug)]
 pub struct NetworkPart {
+    pub our_connect_message: Connect,
     pub listen_address: SocketAddr,
     pub network_config: NetworkConfiguration,
     pub network_requests: (mpsc::Sender<NetworkRequest>, mpsc::Receiver<NetworkRequest>),
@@ -211,6 +212,7 @@ impl NetworkPart {
         let cancel_sender = Some(cancel_sender);
 
         let requests_handle = RequestHandler::new(
+            self.our_connect_message,
             network_config,
             self.network_tx.clone(),
             handle.clone(),
@@ -242,6 +244,7 @@ struct RequestHandler(
 
 impl RequestHandler {
     fn new(
+        connect_message: Connect,
         network_config: NetworkConfiguration,
         network_tx: mpsc::Sender<NetworkEvent>,
         handle: Handle,
@@ -254,17 +257,36 @@ impl RequestHandler {
             .for_each(move |request| {
                 match request {
                     NetworkRequest::SendMessage(peer, msg) => {
-                        let conn_tx = outgoing_connections.get(peer).or_else(|| {
-                            outgoing_connections.clone().connect_to_peer(
-                                network_config,
-                                peer,
-                                network_tx.clone(),
-                                handle.clone(),
-                            )
-                        });
+
+                        let conn_tx = outgoing_connections
+                            .get(peer)
+                            .map(|conn_tx| conn_future(Ok(conn_tx).into_future()))
+                            .or_else(|| {
+                                outgoing_connections
+                                    .clone()
+                                    .connect_to_peer(
+                                        network_config,
+                                        peer,
+                                        network_tx.clone(),
+                                        handle.clone(),
+                                    )
+                                    .map(|conn_tx|
+                                        // if we create new connect, we should send connect message
+                                        if &msg != connect_message.raw() {
+                                            conn_fut(conn_tx.send(connect_message.raw().clone())
+                                                           .map_err(|_| {
+                                                other_error("can't send message to a connection")
+                                            }))
+                                        }
+                                        else {
+                                            conn_fut(Ok(conn_tx).into_future())
+                                    })
+                            });
                         if let Some(conn_tx) = conn_tx {
-                            let fut = conn_tx.send(msg).map_err(|_| {
-                                other_error("can't send message to a connection")
+                            let fut = conn_tx.and_then(|conn_tx| {
+                                conn_tx.send(msg).map_err(|_| {
+                                    other_error("can't send message to a connection")
+                                })
                             });
                             tobox(fut)
                         } else {
@@ -387,4 +409,12 @@ impl Future for Listener {
     fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
         self.0.poll()
     }
+}
+
+
+fn conn_fut<F>(fut: F) -> Box<Future<Item = mpsc::Sender<RawMessage>, Error = io::Error>>
+where
+    F: Future<Item = mpsc::Sender<RawMessage>, Error = io::Error> + 'static,
+{
+    Box::new(fut)
 }
