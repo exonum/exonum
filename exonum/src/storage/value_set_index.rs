@@ -57,7 +57,7 @@ pub struct ValueSetIndexHashes<'a> {
 }
 
 impl<T, V> ValueSetIndex<T, V> {
-    /// Creates a new index representation based on the common prefix of its keys and storage view.
+    /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
@@ -71,14 +71,14 @@ impl<T, V> ValueSetIndex<T, V> {
     /// use exonum::storage::{MemoryDB, Database, ValueSetIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name  = "name";
     /// let snapshot = db.snapshot();
-    /// let prefix = vec![1, 2, 3];
-    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(prefix, &snapshot);
+    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(name, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn new(prefix: Vec<u8>, view: T) -> Self {
+    pub fn new(name: &str, view: T) -> Self {
         ValueSetIndex {
-            base: BaseIndex::new(prefix, view),
+            base: BaseIndex::new(name, view),
             _v: PhantomData,
         }
     }
@@ -97,8 +97,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ValueSetIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name  = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ValueSetIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = ValueSetIndex::new(name, &mut fork);
     /// assert!(!index.contains(&1));
     ///
     /// index.insert(1);
@@ -117,8 +118,9 @@ where
     /// use exonum::crypto;
     ///
     /// let db = MemoryDB::new();
+    /// let name  = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ValueSetIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = ValueSetIndex::new(name, &mut fork);
     ///
     /// let data = vec![1, 2, 3];
     /// let data_hash = crypto::hash(&data);
@@ -138,9 +140,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ValueSetIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name  = "name";
     /// let snapshot = db.snapshot();
-    /// let prefix = vec![1, 2, 3];
-    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(prefix, &snapshot);
+    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(name, &snapshot);
     ///
     /// for val in index.iter() {
     ///     println!("{:?}", val);
@@ -160,9 +162,9 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
+    /// let name  = "name";
     /// let snapshot = db.snapshot();
-    /// let prefix = vec![1, 2, 3];
-    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(prefix, &snapshot);
+    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(name, &snapshot);
     ///
     /// let hash = Hash::default();
     ///
@@ -183,9 +185,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ValueSetIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name  = "name";
     /// let snapshot = db.snapshot();
-    /// let prefix = vec![1, 2, 3];
-    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(prefix, &snapshot);
+    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(name, &snapshot);
     ///
     /// for val in index.hashes() {
     ///     println!("{:?}", val);
@@ -205,9 +207,9 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
+    /// let name  = "name";
     /// let snapshot = db.snapshot();
-    /// let prefix = vec![1, 2, 3];
-    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(prefix, &snapshot);
+    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(name, &snapshot);
     ///
     /// let hash = Hash::default();
     ///
@@ -232,8 +234,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ValueSetIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name  = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ValueSetIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = ValueSetIndex::new(name, &mut fork);
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -250,8 +253,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ValueSetIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name  = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ValueSetIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = ValueSetIndex::new(name, &mut fork);
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -272,8 +276,9 @@ where
     /// use exonum::crypto;
     ///
     /// let db = MemoryDB::new();
+    /// let name  = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ValueSetIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = ValueSetIndex::new(name, &mut fork);
     ///
     /// let data = vec![1, 2, 3];
     /// let data_hash = crypto::hash(&data);
@@ -299,8 +304,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ValueSetIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name  = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ValueSetIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = ValueSetIndex::new(name, &mut fork);
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));

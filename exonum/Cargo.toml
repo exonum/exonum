@@ -39,11 +39,11 @@ bodyparser = "0.7.0"
 params = "0.6.0"
 mount = "0.3.0"
 atty = "0.2.2"
+regex = "0.2.2"
 
-exonum_sodiumoxide = { version = "0.0.14" }
-exonum_rocksdb = { version = "0.6.1", optional = true }
-exonum_leveldb = { version = "0.9.1", optional = true }
-exonum_profiler = { version = "0.1.1" }
+exonum_sodiumoxide = "0.0.14"
+exonum_profiler = "0.1.1"
+exonum_rocksdb = { version = "0.7.0", git = "https://github.com/exonum/exonum_rocksdb.git" }
 exonum_flamer = { version = "0.1.5", optional = true }
 
 [dev-dependencies]
@@ -51,9 +51,7 @@ pretty_assertions = "0.2.1"
 tempdir = "0.3.5"
 
 [features]
-default = ["leveldb"]
-leveldb = ["exonum_leveldb"]
-rocksdb = ["exonum_rocksdb"]
+default = []
 long_benchmarks = []
 nightly = []
 flame_profile = ["exonum_profiler/nomock", "exonum_flamer"]

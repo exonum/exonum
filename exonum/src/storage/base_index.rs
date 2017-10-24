@@ -16,6 +16,8 @@
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
+use regex::Regex;
+
 use super::{StorageKey, StorageValue, Snapshot, Fork, Iter};
 
 /// Basic struct for all indices that implements common features.
@@ -30,7 +32,8 @@ use super::{StorageKey, StorageValue, Snapshot, Fork, Iter};
 /// [`StorageValue`]: ../trait.StorageValue.html
 #[derive(Debug)]
 pub struct BaseIndex<T> {
-    prefix: Vec<u8>,
+    name: String,
+    prefix: Option<Vec<u8>>,
     view: T,
 }
 
@@ -52,25 +55,59 @@ pub struct BaseIndexIter<'a, K, V> {
 }
 
 impl<T> BaseIndex<T> {
-    /// Creates a new index representation based on the common prefix of its keys and storage view.
+    /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
-    pub fn new(prefix: Vec<u8>, view: T) -> Self {
-        BaseIndex {
-            prefix: prefix,
-            view: view,
+    pub fn new(name: &str, view: T) -> Self {
+        if is_valid_name(name) {
+            BaseIndex {
+                name: name.to_string(),
+                prefix: None,
+                view,
+            }
+        } else {
+            panic!("Wrong characters using in name. Use: a-zA-Z0-9 and _");
+        }
+    }
+
+    /// Creates a new index representation based on the name, common prefix of its keys
+    /// and storage view.
+    ///
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
+    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// available.
+    /// [`&Snapshot`]: ../trait.Snapshot.html
+    /// [`&mut Fork`]: ../struct.Fork.html
+    pub fn with_prefix(name: &str, prefix: Vec<u8>, view: T) -> Self {
+        if is_valid_name(name) {
+            BaseIndex {
+                name: name.to_string(),
+                prefix: Some(prefix),
+                view,
+            }
+        } else {
+            panic!("Wrong characters using in name. Use: a-zA-Z0-9 and _");
         }
     }
 
     fn prefixed_key<K: StorageKey>(&self, key: &K) -> Vec<u8> {
-        let mut v = vec![0; self.prefix.len() + key.size()];
-        v[..self.prefix.len()].copy_from_slice(&self.prefix);
-        key.write(&mut v[self.prefix.len()..]);
-        v
+        match self.prefix {
+            Some(ref prefix) => {
+                let mut v = vec![0; prefix.len() + key.size()];
+                v[..prefix.len()].copy_from_slice(prefix);
+                key.write(&mut v[prefix.len()..]);
+                v
+            }
+            None => {
+                let mut v = vec![0; key.size()];
+                key.write(&mut v);
+                v
+            }
+        }
     }
 }
 
@@ -84,9 +121,10 @@ where
         K: StorageKey,
         V: StorageValue,
     {
-        self.view.as_ref().get(&self.prefixed_key(key)).map(|v| {
-            StorageValue::from_bytes(Cow::Owned(v))
-        })
+        self.view
+            .as_ref()
+            .get(&self.name, &self.prefixed_key(key))
+            .map(|v| StorageValue::from_bytes(Cow::Owned(v)))
     }
 
     /// Returns `true` if the index contains a value of *any* type for the specified key of
@@ -95,7 +133,10 @@ where
     where
         K: StorageKey,
     {
-        self.view.as_ref().contains(&self.prefixed_key(key))
+        self.view.as_ref().contains(
+            &self.name,
+            &self.prefixed_key(key),
+        )
     }
 
     /// Returns an iterator over the entries of the index in ascending order. The iterator element
@@ -109,8 +150,8 @@ where
     {
         let iter_prefix = self.prefixed_key(subprefix);
         BaseIndexIter {
-            base_iter: self.view.as_ref().iter(&iter_prefix),
-            base_prefix_len: self.prefix.len(),
+            base_iter: self.view.as_ref().iter(&self.name, &iter_prefix),
+            base_prefix_len: self.prefix.as_ref().map_or(0, |p| p.len()),
             prefix: iter_prefix,
             ended: false,
             _k: PhantomData,
@@ -131,8 +172,8 @@ where
         let iter_prefix = self.prefixed_key(subprefix);
         let iter_from = self.prefixed_key(from);
         BaseIndexIter {
-            base_iter: self.view.as_ref().iter(&iter_from),
-            base_prefix_len: self.prefix.len(),
+            base_iter: self.view.as_ref().iter(&self.name, &iter_from),
+            base_prefix_len: self.prefix.as_ref().map_or(0, |p| p.len()),
             prefix: iter_prefix,
             ended: false,
             _k: PhantomData,
@@ -149,7 +190,7 @@ impl<'a> BaseIndex<&'a mut Fork> {
         V: StorageValue,
     {
         let key = self.prefixed_key(key);
-        self.view.put(key, value.into_bytes());
+        self.view.put(&self.name, key, value.into_bytes());
     }
 
     /// Removes the key of *any* type from the index.
@@ -158,10 +199,10 @@ impl<'a> BaseIndex<&'a mut Fork> {
         K: StorageKey,
     {
         let key = self.prefixed_key(key);
-        self.view.remove(key);
+        self.view.remove(&self.name, key);
     }
 
-    /// Clears the index, removing all entries.
+    /// Clears the index, removing all entries or entries with keys that starts with a prefix.
     ///
     /// # Notes
     ///
@@ -169,7 +210,7 @@ impl<'a> BaseIndex<&'a mut Fork> {
     /// this method the amount of allocated memory is linearly dependent on the number of elements
     /// in the index.
     pub fn clear(&mut self) {
-        self.view.remove_by_prefix(&self.prefix)
+        self.view.remove_by_prefix(&self.name, self.prefix.as_ref());
     }
 }
 
@@ -200,5 +241,15 @@ where
 impl<'a, K, V> ::std::fmt::Debug for BaseIndexIter<'a, K, V> {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         write!(f, "BaseIndexIter(..)")
+    }
+}
+
+/// A function that validates an index name. Allowable characters in name: ASCII characters, digits
+/// and underscores.
+pub fn is_valid_name(name: &str) -> bool {
+    if let Ok(regex) = Regex::new("^[a-zA-Z0-9_]+$") {
+        regex.is_match(name)
+    } else {
+        false
     }
 }

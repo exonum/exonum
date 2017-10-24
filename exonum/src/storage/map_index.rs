@@ -70,7 +70,7 @@ pub struct MapIndexValues<'a, V> {
 }
 
 impl<T, K, V> MapIndex<T, K, V> {
-    /// Creates a new index representation based on the common prefix of its keys and storage view.
+    /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
@@ -84,14 +84,14 @@ impl<T, K, V> MapIndex<T, K, V> {
     /// use exonum::storage::{MemoryDB, Database, MapIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let snapshot = db.snapshot();
-    /// let prefix = vec![1, 2, 3];
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new(prefix, &snapshot);
+    /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn new(prefix: Vec<u8>, view: T) -> Self {
+    pub fn new(name: &str, view: T) -> Self {
         MapIndex {
-            base: BaseIndex::new(prefix, view),
+            base: BaseIndex::new(name, view),
             _k: PhantomData,
             _v: PhantomData,
         }
@@ -112,8 +112,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, MapIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = MapIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = MapIndex::new(name, &mut fork);
     /// assert!(index.get(&1).is_none());
     ///
     /// index.put(&1, 2);
@@ -131,8 +132,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, MapIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = MapIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = MapIndex::new(name, &mut fork);
     /// assert!(!index.contains(&1));
     ///
     /// index.put(&1, 2);
@@ -150,8 +152,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, MapIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new(vec![1, 2, 3], &snapshot);
+    /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
     ///
     /// for v in index.iter() {
     ///     println!("{:?}", v);
@@ -170,8 +173,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, MapIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new(vec![1, 2, 3], &snapshot);
+    /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
     ///
     /// for key in index.keys() {
     ///     println!("{}", key);
@@ -190,8 +194,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, MapIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new(vec![1, 2, 3], &snapshot);
+    /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
     ///
     /// for val in index.values() {
     ///     println!("{}", val);
@@ -210,8 +215,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, MapIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new(vec![1, 2, 3], &snapshot);
+    /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
     ///
     /// for v in index.iter_from(&2) {
     ///     println!("{:?}", v);
@@ -230,8 +236,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, MapIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new(vec![1, 2, 3], &snapshot);
+    /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
     ///
     /// for key in index.keys_from(&2) {
     ///     println!("{}", key);
@@ -250,9 +257,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, MapIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::new(vec![1, 2, 3], &snapshot);
-    //
+    /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
     /// for val in index.values_from(&2) {
     ///     println!("{}", val);
     /// }
@@ -275,8 +282,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, MapIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = MapIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = MapIndex::new(name, &mut fork);
     ///
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
@@ -292,8 +300,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, MapIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = MapIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = MapIndex::new(name, &mut fork);
     ///
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
@@ -317,8 +326,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, MapIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = MapIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = MapIndex::new(name, &mut fork);
     ///
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
@@ -384,9 +394,11 @@ mod tests {
     use super::MapIndex;
     use rand::{thread_rng, Rng};
 
+    const IDX_NAME: &'static str = "idx_name";
+
     fn iter(db: Box<Database>) {
         let mut fork = db.fork();
-        let mut map_index = MapIndex::new(vec![255], &mut fork);
+        let mut map_index = MapIndex::new(IDX_NAME, &mut fork);
 
         map_index.put(&1u8, 1u8);
         map_index.put(&2u8, 2u8);
@@ -464,29 +476,6 @@ mod tests {
 
     }
 
-    #[cfg(feature = "leveldb")]
-    mod leveldb_tests {
-        use std::path::Path;
-        use storage::Database;
-        use tempdir::TempDir;
-
-        fn create_database(path: &Path) -> Box<Database> {
-            use storage::{LevelDB, LevelDBOptions};
-            let mut opts = LevelDBOptions::default();
-            opts.create_if_missing = true;
-            Box::new(LevelDB::open(path, opts).unwrap())
-        }
-
-        #[test]
-        fn test_iter() {
-            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-            let path = dir.path();
-            let db = create_database(path);
-            super::iter(db);
-        }
-    }
-
-    #[cfg(feature = "rocksdb")]
     mod rocksdb_tests {
         use std::path::Path;
         use storage::Database;

@@ -44,7 +44,7 @@ pub struct ListIndexIter<'a, V> {
 }
 
 impl<T, V> ListIndex<T, V> {
-    /// Creates a new index representation based on the common prefix of its keys and storage view.
+    /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
@@ -58,14 +58,43 @@ impl<T, V> ListIndex<T, V> {
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let snapshot = db.snapshot();
-    /// let prefix = vec![1, 2, 3];
-    /// let index: ListIndex<_, u8> = ListIndex::new(prefix, &snapshot);
+    /// let index: ListIndex<_, u8> = ListIndex::new(name, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn new(prefix: Vec<u8>, view: T) -> Self {
+    pub fn new(name: &str, view: T) -> Self {
         ListIndex {
-            base: BaseIndex::new(prefix, view),
+            base: BaseIndex::new(name, view),
+            length: Cell::new(None),
+            _v: PhantomData,
+        }
+    }
+
+    /// Creates a new index representation based on the name, common prefix of its keys
+    /// and storage view.
+    ///
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
+    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// available.
+    /// [`&Snapshot`]: ../trait.Snapshot.html
+    /// [`&mut Fork`]: ../struct.Fork.html
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let name = "name";
+    /// let prefix = vec![01];
+    /// let snapshot = db.snapshot();
+    /// let index: ListIndex<_, u8> = ListIndex::with_prefix(name, prefix, &snapshot);
+    /// # drop(index);
+    /// ```
+    pub fn with_prefix(name: &str, prefix: Vec<u8>, view: T) -> Self {
+        ListIndex {
+            base: BaseIndex::with_prefix(name, prefix, view),
             length: Cell::new(None),
             _v: PhantomData,
         }
@@ -85,8 +114,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = ListIndex::new(name, &mut fork);
     /// assert_eq!(None, index.get(0));
     ///
     /// index.push(42);
@@ -104,8 +134,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = ListIndex::new(name, &mut fork);
     /// assert_eq!(None, index.last());
     ///
     /// index.push(42);
@@ -126,8 +157,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = ListIndex::new(name, &mut fork);
     /// assert!(index.is_empty());
     ///
     /// index.push(42);
@@ -145,8 +177,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = ListIndex::new(name, &mut fork);
     /// assert_eq!(0, index.len());
     ///
     /// index.push(10);
@@ -172,8 +205,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = ListIndex::new(name, &mut fork);
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     ///
@@ -194,8 +228,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = ListIndex::new(name, &mut fork);
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     ///
@@ -225,8 +260,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = ListIndex::new(name, &mut fork);
     ///
     /// index.push(1);
     /// assert!(!index.is_empty());
@@ -245,8 +281,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = ListIndex::new(name, &mut fork);
     /// assert_eq!(None, index.pop());
     ///
     /// index.push(1);
@@ -273,8 +310,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = ListIndex::new(name, &mut fork);
     /// assert!(index.is_empty());
     ///
     /// index.extend([1, 2, 3].iter().cloned());
@@ -303,8 +341,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = ListIndex::new(name, &mut fork);
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     /// assert_eq!(5, index.len());
@@ -331,8 +370,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = ListIndex::new(name, &mut fork);
     ///
     /// index.push(1);
     /// assert_eq!(Some(1), index.get(0));
@@ -366,8 +406,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ListIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = ListIndex::new(name, &mut fork);
     ///
     /// index.push(1);
     /// assert!(!index.is_empty());
@@ -408,16 +449,13 @@ where
 #[cfg(test)]
 mod tests {
     use rand::{thread_rng, Rng};
-    use super::ListIndex;
-    use storage::db::Database;
+    use super::{ListIndex, Fork};
 
     fn gen_tempdir_name() -> String {
         thread_rng().gen_ascii_chars().take(10).collect()
     }
 
-    fn list_index_methods(db: Box<Database>) {
-        let mut fork = db.fork();
-        let mut list_index = ListIndex::new(vec![255], &mut fork);
+    fn list_index_methods(list_index: &mut ListIndex<&mut Fork, i32>) {
 
         assert!(list_index.is_empty());
         assert_eq!(0, list_index.len());
@@ -457,10 +495,7 @@ mod tests {
         assert_eq!(Some(777), list_index.last());
     }
 
-    fn list_index_iter(db: Box<Database>) {
-        let mut fork = db.fork();
-        let mut list_index = ListIndex::new(vec![255], &mut fork);
-
+    fn list_index_iter(list_index: &mut ListIndex<&mut Fork, u8>) {
         list_index.extend(vec![1u8, 2, 3]);
 
         assert_eq!(list_index.iter().collect::<Vec<u8>>(), vec![1, 2, 3]);
@@ -476,7 +511,9 @@ mod tests {
     mod memorydb_tests {
         use std::path::Path;
         use tempdir::TempDir;
-        use storage::{Database, MemoryDB};
+        use storage::{Database, MemoryDB, ListIndex};
+
+        const TABLE_NAME: &'static str = "table";
 
         fn create_database(_: &Path) -> Box<Database> {
             Box::new(MemoryDB::new())
@@ -487,7 +524,19 @@ mod tests {
             let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
             let path = dir.path();
             let db = create_database(path);
-            super::list_index_methods(db);
+            let mut fork = db.fork();
+            let mut list_index = ListIndex::new(TABLE_NAME, &mut fork);
+            super::list_index_methods(&mut list_index);
+        }
+
+        #[test]
+        fn test_list_index_with_prefix_methods() {
+            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let path = dir.path();
+            let db = create_database(path);
+            let mut fork = db.fork();
+            let mut list_index = ListIndex::with_prefix(TABLE_NAME, vec![01], &mut fork);
+            super::list_index_methods(&mut list_index);
         }
 
         #[test]
@@ -495,44 +544,28 @@ mod tests {
             let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
             let path = dir.path();
             let db = create_database(path);
-            super::list_index_iter(db);
-        }
-    }
-
-    #[cfg(feature = "leveldb")]
-    mod leveldb_tests {
-        use std::path::Path;
-        use tempdir::TempDir;
-        use storage::{Database, LevelDB, LevelDBOptions};
-
-        fn create_database(path: &Path) -> Box<Database> {
-            let mut opts = LevelDBOptions::default();
-            opts.create_if_missing = true;
-            Box::new(LevelDB::open(path, opts).unwrap())
+            let mut fork = db.fork();
+            let mut list_index = ListIndex::new(TABLE_NAME, &mut fork);
+            super::list_index_iter(&mut list_index);
         }
 
         #[test]
-        fn test_list_index_methods() {
+        fn test_list_index_with_prefix_iter() {
             let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
             let path = dir.path();
             let db = create_database(path);
-            super::list_index_methods(db);
-        }
-
-        #[test]
-        fn test_list_index_iter() {
-            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-            let path = dir.path();
-            let db = create_database(path);
-            super::list_index_iter(db);
+            let mut fork = db.fork();
+            let mut list_index = ListIndex::with_prefix(TABLE_NAME, vec![01], &mut fork);
+            super::list_index_iter(&mut list_index);
         }
     }
 
-    #[cfg(feature = "rocksdb")]
     mod rocksdb_tests {
         use std::path::Path;
         use tempdir::TempDir;
-        use storage::{Database, RocksDB, RocksDBOptions};
+        use storage::{Database, ListIndex, RocksDB, RocksDBOptions};
+
+        const TABLE_NAME: &'static str = "table";
 
         fn create_database(path: &Path) -> Box<Database> {
             let mut opts = RocksDBOptions::default();
@@ -545,7 +578,19 @@ mod tests {
             let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
             let path = dir.path();
             let db = create_database(path);
-            super::list_index_methods(db);
+            let mut fork = db.fork();
+            let mut list_index = ListIndex::new(TABLE_NAME, &mut fork);
+            super::list_index_methods(&mut list_index);
+        }
+
+        #[test]
+        fn test_list_index_with_prefix_methods() {
+            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let path = dir.path();
+            let db = create_database(path);
+            let mut fork = db.fork();
+            let mut list_index = ListIndex::with_prefix(TABLE_NAME, vec![01], &mut fork);
+            super::list_index_methods(&mut list_index);
         }
 
         #[test]
@@ -553,7 +598,19 @@ mod tests {
             let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
             let path = dir.path();
             let db = create_database(path);
-            super::list_index_iter(db);
+            let mut fork = db.fork();
+            let mut list_index = ListIndex::new(TABLE_NAME, &mut fork);
+            super::list_index_iter(&mut list_index);
+        }
+
+        #[test]
+        fn test_list_index_with_prefix_iter() {
+            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+            let path = dir.path();
+            let db = create_database(path);
+            let mut fork = db.fork();
+            let mut list_index = ListIndex::with_prefix(TABLE_NAME, vec![01], &mut fork);
+            super::list_index_iter(&mut list_index);
         }
     }
 }

@@ -12,12 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use byteorder::{ByteOrder, BigEndian};
-
-use std::mem;
-
 use crypto::Hash;
-use messages::{RawMessage, Precommit, CONSENSUS};
+use messages::{RawMessage, Precommit};
 use storage::{Snapshot, Fork, StorageKey, StorageValue, ListIndex, MapIndex, ProofListIndex,
               ProofMapIndex, MapProof};
 use helpers::Height;
@@ -25,12 +21,9 @@ use super::{Block, BlockProof, Blockchain};
 use super::config::StoredConfiguration;
 
 /// Generates prefix that combines service identifier, table identifier and given suffix.
-pub fn gen_prefix<K: StorageKey>(service_id: u16, ord: u8, suffix: &K) -> Vec<u8> {
-    let pos = mem::size_of::<u16>();
-    let mut res = vec![0; pos + 1 + suffix.size()];
-    suffix.write(&mut res[pos + 1..]);
-    BigEndian::write_u16(&mut res[0..pos], service_id);
-    res[pos] = ord;
+pub fn gen_prefix<K: StorageKey>(prefix: &K) -> Vec<u8> {
+    let mut res = vec![0; prefix.size()];
+    prefix.write(&mut res[..]);
     res
 }
 
@@ -73,47 +66,47 @@ where
 
     /// Returns table that represents a map from transaction hash into raw transaction message.
     pub fn transactions(&self) -> MapIndex<&T, Hash, RawMessage> {
-        MapIndex::new(gen_prefix(CONSENSUS, 0, &()), &self.view)
+        MapIndex::new("transactions", &self.view)
     }
 
     /// Returns table that keeps the block height and tx position inside block for every
     /// transaction hash.
     pub fn tx_location_by_tx_hash(&self) -> MapIndex<&T, Hash, TxLocation> {
-        MapIndex::new(gen_prefix(CONSENSUS, 1, &()), &self.view)
+        MapIndex::new("tx_location_by_tx_hash", &self.view)
     }
 
     /// Returns table that stores block object for every block height.
     pub fn blocks(&self) -> MapIndex<&T, Hash, Block> {
-        MapIndex::new(gen_prefix(CONSENSUS, 2, &()), &self.view)
+        MapIndex::new("blocks", &self.view)
     }
 
     /// Returns table that keeps block hash for the corresponding height.
     pub fn block_hashes_by_height(&self) -> ListIndex<&T, Hash> {
-        ListIndex::new(gen_prefix(CONSENSUS, 3, &()), &self.view)
+        ListIndex::new("block_hashes_by_height", &self.view)
     }
 
     /// Returns table that keeps a list of transactions for the each block.
     pub fn block_txs(&self, height: Height) -> ProofListIndex<&T, Hash> {
         let height: u64 = height.into();
-        ProofListIndex::new(gen_prefix(CONSENSUS, 4, &height), &self.view)
+        ProofListIndex::with_prefix("block_txs", gen_prefix(&height), &self.view)
     }
 
     /// Returns table that saves a list of precommits for block with given hash.
     pub fn precommits(&self, hash: &Hash) -> ListIndex<&T, Precommit> {
-        ListIndex::new(gen_prefix(CONSENSUS, 5, hash), &self.view)
+        ListIndex::with_prefix("precommits", gen_prefix(hash), &self.view)
     }
 
     /// Returns table that represents a map from configuration hash into contents.
     pub fn configs(&self) -> ProofMapIndex<&T, Hash, StoredConfiguration> {
         // configs patricia merkletree <block height> json
-        ProofMapIndex::new(gen_prefix(CONSENSUS, 6, &()), &self.view)
+        ProofMapIndex::new("configs", &self.view)
     }
 
     /// Returns auxiliary table that keeps hash references to configurations in order
     /// of increasing their `actual_from` height.
     pub fn configs_actual_from(&self) -> ListIndex<&T, ConfigReference> {
         // TODO: consider List index to reduce storage volume
-        ListIndex::new(gen_prefix(CONSENSUS, 7, &()), &self.view)
+        ListIndex::new("configs_actual_from", &self.view)
     }
 
     /// Returns the accessory `ProofMapIndex` for calculating
@@ -132,7 +125,7 @@ where
     /// Core tables participate in resulting state_hash with `CORE_SERVICE`
     /// service_id. Their vector is returned by `core_state_hash` method.
     pub fn state_hash_aggregator(&self) -> ProofMapIndex<&T, Hash, Hash> {
-        ProofMapIndex::new(gen_prefix(CONSENSUS, 8, &()), &self.view)
+        ProofMapIndex::new("state_hash_aggregator", &self.view)
     }
 
     /// Returns block hash for the given height.
@@ -295,28 +288,28 @@ impl<'a> Schema<&'a mut Fork> {
     ///
     /// [1]: struct.Schema.html#method.transactions
     pub fn transactions_mut(&mut self) -> MapIndex<&mut Fork, Hash, RawMessage> {
-        MapIndex::new(gen_prefix(CONSENSUS, 0, &()), &mut self.view)
+        MapIndex::new("transactions", &mut self.view)
     }
 
     /// Mutable reference to the [`tx_location_by_tx_hash`][1] index.
     ///
     /// [1]: struct.Schema.html#method.tx_location_by_tx_hash
     pub fn tx_location_by_tx_hash_mut(&mut self) -> MapIndex<&mut Fork, Hash, TxLocation> {
-        MapIndex::new(gen_prefix(CONSENSUS, 1, &()), &mut self.view)
+        MapIndex::new("tx_location_by_tx_hash", &mut self.view)
     }
 
     /// Mutable reference to the [`blocks][1] index.
     ///
     /// [1]: struct.Schema.html#method.blocks
     pub fn blocks_mut(&mut self) -> MapIndex<&mut Fork, Hash, Block> {
-        MapIndex::new(gen_prefix(CONSENSUS, 2, &()), &mut self.view)
+        MapIndex::new("blocks", &mut self.view)
     }
 
     /// Mutable reference to the [`block_hashes_by_height_mut`][1] index.
     ///
     /// [1]: struct.Schema.html#method.block_hashes_by_height_mut
     pub fn block_hashes_by_height_mut(&mut self) -> ListIndex<&mut Fork, Hash> {
-        ListIndex::new(gen_prefix(CONSENSUS, 3, &()), &mut self.view)
+        ListIndex::new("block_hashes_by_height", &mut self.view)
     }
 
     /// Mutable reference to the [`block_hash_by_height`][1] index.
@@ -331,35 +324,35 @@ impl<'a> Schema<&'a mut Fork> {
     /// [1]: struct.Schema.html#method.block_txs
     pub fn block_txs_mut(&mut self, height: Height) -> ProofListIndex<&mut Fork, Hash> {
         let height: u64 = height.into();
-        ProofListIndex::new(gen_prefix(CONSENSUS, 4, &height), &mut self.view)
+        ProofListIndex::with_prefix("block_txs", gen_prefix(&height), &mut self.view)
     }
 
     /// Mutable reference to the [`precommits`][1] index.
     ///
     /// [1]: struct.Schema.html#method.precommits
     pub fn precommits_mut(&mut self, hash: &Hash) -> ListIndex<&mut Fork, Precommit> {
-        ListIndex::new(gen_prefix(CONSENSUS, 5, hash), &mut self.view)
+        ListIndex::with_prefix("precommits", gen_prefix(hash), &mut self.view)
     }
 
     /// Mutable reference to the [`configs`][1] index.
     ///
     /// [1]: struct.Schema.html#method.configs
     pub fn configs_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, StoredConfiguration> {
-        ProofMapIndex::new(gen_prefix(CONSENSUS, 6, &()), &mut self.view)
+        ProofMapIndex::new("configs", &mut self.view)
     }
 
     /// Mutable reference to the [`configs_actual_from`][1] index.
     ///
     /// [1]: struct.Schema.html#method.configs_actual_from
     pub fn configs_actual_from_mut(&mut self) -> ListIndex<&mut Fork, ConfigReference> {
-        ListIndex::new(gen_prefix(CONSENSUS, 7, &()), &mut self.view)
+        ListIndex::new("configs_actual_from", &mut self.view)
     }
 
     /// Mutable reference to the [`state_hash_aggregator`][1] index.
     ///
     /// [1]: struct.Schema.html#method.state_hash_aggregator
     pub fn state_hash_aggregator_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, Hash> {
-        ProofMapIndex::new(gen_prefix(CONSENSUS, 8, &()), &mut self.view)
+        ProofMapIndex::new("state_hash_aggregator", &mut self.view)
     }
 
     /// Adds a new configuration to the blockchain, which will become an actual at

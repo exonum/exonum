@@ -14,20 +14,21 @@
 
 //! An implementation of `RocksDB` database.
 use exonum_profiler::ProfilerSpan;
-use rocksdb::TransactionDB as _RocksDB;
-use rocksdb::DBRawIterator;
+use rocksdb::DB as _RocksDB;
+use rocksdb::{WriteBatch, DBIterator};
 use rocksdb::Snapshot as _Snapshot;
 use rocksdb::Error as _Error;
+use rocksdb::utils::get_cf_names;
 
 use std::mem;
 use std::sync::Arc;
 use std::path::Path;
 use std::fmt;
 use std::error;
+use std::iter::Peekable;
 
 pub use rocksdb::Options as RocksDBOptions;
 pub use rocksdb::BlockBasedOptions as RocksBlockOptions;
-pub use rocksdb::{TransactionDBOptions, TransactionOptions, WriteOptions};
 
 use super::{Database, Iterator, Iter, Snapshot, Error, Patch, Change, Result};
 
@@ -51,17 +52,23 @@ pub struct RocksDBSnapshot {
 
 /// An iterator over the entries of a `RocksDB`.
 struct RocksDBIterator {
-    iter: DBRawIterator,
-    key: Option<Vec<u8>>,
-    value: Option<Vec<u8>>,
+    iter: Peekable<DBIterator>,
+    key: Option<Box<[u8]>>,
+    value: Option<Box<[u8]>>,
 }
 
 impl RocksDB {
     /// Open a database stored in the specified path with the specified options.
     pub fn open(path: &Path, options: RocksDBOptions) -> Result<RocksDB> {
-        let txn_db_options = TransactionDBOptions::default();
-        let database = _RocksDB::open(&options, &txn_db_options, path)?;
-        Ok(RocksDB { db: Arc::new(database) })
+        let db = {
+            if let Ok(names) = get_cf_names(path) {
+                let cf_names = names.iter().map(|name| name.as_str()).collect::<Vec<_>>();
+                _RocksDB::open_cf(&options, path, cf_names.as_ref())?
+            } else {
+                _RocksDB::open(&options, path)?
+            }
+        };
+        Ok(RocksDB { db: Arc::new(db) })
     }
 }
 
@@ -74,40 +81,59 @@ impl Database for RocksDB {
         let _p = ProfilerSpan::new("RocksDB::snapshot");
         Box::new(RocksDBSnapshot {
             snapshot: unsafe { mem::transmute(self.db.snapshot()) },
-            _db: self.db.clone(),
+            _db: Arc::clone(&self.db),
         })
     }
 
     fn merge(&mut self, patch: Patch) -> Result<()> {
         let _p = ProfilerSpan::new("RocksDB::merge");
-        let w_opts = WriteOptions::default();
-        let txn_opts = TransactionOptions::default();
-        let txn = self.db.transaction_begin(&w_opts, &txn_opts);
-        for (key, change) in patch {
-            match change {
-                Change::Put(ref value) => txn.put(&key, value)?,
-                Change::Delete => txn.delete(&key)?,
+        let mut batch = WriteBatch::default();
+        for (cf_name, changes) in patch {
+            let cf = match self.db.cf_handle(&cf_name) {
+                Some(cf) => cf,
+                None => {
+                    self.db
+                        .create_cf(&cf_name, &RocksDBOptions::default())
+                        .unwrap()
+                }
+            };
+            for (key, change) in changes {
+                match change {
+                    Change::Put(ref value) => batch.put_cf(cf, key.as_ref(), value)?,
+                    Change::Delete => batch.delete_cf(cf, &key)?,
+                }
             }
         }
-        txn.commit().map_err(Into::into)
+        self.db.write(batch).map_err(Into::into)
     }
 }
 
 impl Snapshot for RocksDBSnapshot {
-    fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
+    fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>> {
         let _p = ProfilerSpan::new("RocksDBSnapshot::get");
-        match self.snapshot.get(key) {
-            Ok(value) => value.map(|v| v.to_vec()),
-            Err(e) => panic!(e),
+        if let Some(cf) = self._db.cf_handle(name) {
+            match self.snapshot.get_cf(cf, key) {
+                Ok(value) => value.map(|v| v.to_vec()),
+                Err(e) => panic!(e),
+            }
+        } else {
+            None
         }
     }
 
-    fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a> {
+    fn iter<'a>(&'a self, name: &str, from: &[u8]) -> Iter<'a> {
+        use rocksdb::{IteratorMode, Direction};
         let _p = ProfilerSpan::new("RocksDBSnapshot::iter");
-        let mut iter = self.snapshot.raw_iterator();
-        iter.seek(from);
+        let iter = match self._db.cf_handle(name) {
+            Some(cf) => {
+                self.snapshot
+                    .iterator_cf(cf, IteratorMode::From(from, Direction::Forward))
+                    .unwrap()
+            }
+            None => self.snapshot.iterator(IteratorMode::Start),
+        };
         Box::new(RocksDBIterator {
-            iter: iter,
+            iter: iter.peekable(),
             key: None,
             value: None,
         })
@@ -117,33 +143,19 @@ impl Snapshot for RocksDBSnapshot {
 impl<'a> Iterator for RocksDBIterator {
     fn next(&mut self) -> Option<(&[u8], &[u8])> {
         let _p = ProfilerSpan::new("RocksDBIterator::next");
-        let result = if self.iter.valid() {
-            self.key = Some(unsafe { self.iter.key_inner().unwrap().to_vec() });
-            self.value = Some(unsafe { self.iter.value_inner().unwrap().to_vec() });
-            Some((
-                self.key.as_ref().unwrap().as_ref(),
-                self.value.as_ref().unwrap().as_ref(),
-            ))
+        if let Some((key, value)) = self.iter.next() {
+            self.key = Some(key);
+            self.value = Some(value);
+            Some((self.key.as_ref().unwrap(), self.value.as_ref().unwrap()))
         } else {
             None
-        };
-
-        if result.is_some() {
-            self.iter.next();
         }
-
-        result
     }
 
     fn peek(&mut self) -> Option<(&[u8], &[u8])> {
         let _p = ProfilerSpan::new("RocksDBIterator::peek");
-        if self.iter.valid() {
-            self.key = Some(unsafe { self.iter.key_inner().unwrap().to_vec() });
-            self.value = Some(unsafe { self.iter.value_inner().unwrap().to_vec() });
-            Some((
-                self.key.as_ref().unwrap().as_ref(),
-                self.value.as_ref().unwrap().as_ref(),
-            ))
+        if let Some(&(ref key, ref value)) = self.iter.peek() {
+            Some((key, value))
         } else {
             None
         }

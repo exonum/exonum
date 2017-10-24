@@ -249,7 +249,7 @@ pub fn compute_txs_root_hash(txs: &[Hash]) -> Hash {
     use exonum::storage::{MemoryDB, ProofListIndex};
 
     let mut fork = MemoryDB::new().fork();
-    let mut hashes = ProofListIndex::new(vec![], &mut fork);
+    let mut hashes = ProofListIndex::new("name", &mut fork);
     hashes.extend(txs.iter().cloned());
     hashes.root_hash()
 }
