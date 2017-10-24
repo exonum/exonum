@@ -209,9 +209,12 @@ impl MessageWriter {
     }
 
     /// Signs the message with the given secret key.
-    pub fn sign(self, secret_key: &SecretKey) -> MessageBuffer {
+    pub fn sign(mut self, secret_key: &SecretKey) -> MessageBuffer {
+        let payload_length = self.raw.len() + SIGNATURE_LENGTH;
+        self.set_payload_length(payload_length);
         let signature = sign(&self.raw, secret_key);
-        self.append_signature(&signature)
+        self.raw.extend_from_slice(signature.as_ref());
+        MessageBuffer { raw: self.raw }
     }
 
     /// Appends the given signature to the message.
