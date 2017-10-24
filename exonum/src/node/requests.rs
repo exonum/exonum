@@ -20,6 +20,7 @@ use super::{NodeHandler, ExternalMessage, NodeTimeout};
 
 // TODO: height should be updated after any message, not only after status (if signature is correct)
 // TODO: Request propose makes sense only if we know that node is on our height.
+// (ECR-171)
 
 impl<S> NodeHandler<S>
 where

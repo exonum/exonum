@@ -72,7 +72,7 @@
 //! ### Primitive types
 //!
 //! Primitive types are all fixed sized, and located fully in header.
-// TODO explain how an signed integer is stored in memory (what codding)
+// TODO explain how an signed integer is stored in memory (what codding) (ECR-155)
 //!
 //! | Type name | Size in Header | Info |
 //! |:--------|:---------------------|:--------------------------------------------------|
@@ -129,7 +129,7 @@ pub type Offset = u32;
 /// Type alias that should be returned in `check` method of `Field`
 pub type Result = ::std::result::Result<CheckedOffset, Error>;
 
-// TODO replace by more generic type
+// TODO replace by more generic type (ECR-156).
 /// `CheckedOffset` is a type that take control over overflow,
 /// so you can't panic without `unwrap`,
 /// and work with this value without overflow checks.

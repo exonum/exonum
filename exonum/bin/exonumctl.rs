@@ -82,6 +82,7 @@ impl<'a, 'b> BlockchainCommand<'a, 'b>
             BlockchainAction::FindTx(tx_hash) => {
                 let hash = Hash::from_hex(tx_hash).unwrap();
                 // TODO add constants to common used prefixes in blockchain
+                // with RocksDb we should use column families instead of byte constants (ECR-59).
                 let txs = MapIndex::new(vec![00], &storage);
                 let tx: Vec<u8> = txs.get(&hash).unwrap().unwrap();
                 println!("{}", tx.to_hex());

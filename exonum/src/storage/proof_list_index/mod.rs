@@ -29,7 +29,7 @@ mod tests;
 mod key;
 mod proof;
 
-// TODO: implement pop and truncate methods for Merkle tree
+// TODO: implement pop and truncate methods for Merkle tree (ECR-173)
 
 /// A Merkalized version of an array list that provides proofs of existence for the list items.
 ///

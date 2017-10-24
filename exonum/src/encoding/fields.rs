@@ -24,8 +24,8 @@ use super::{Error, CheckedOffset, Offset, Result};
 
 /// Trait for all types that could be a field in `encoding`.
 pub trait Field<'a> {
-    // TODO: use Read and Cursor
-    // TODO: debug_assert_eq!(to-from == size of Self)
+    // TODO: use Read and Cursor (ECR-156)
+    // TODO: debug_assert_eq!(to-from == size of Self) (ECR-156)
 
     /// Read Field from buffer, with given position,
     /// beware of memory unsafety,
@@ -224,7 +224,7 @@ impl<'a> Field<'a> for u8 {
     }
 }
 
-// TODO expect some codding of signed ints?
+// TODO expect some codding of signed ints (ECR-156) ?
 impl<'a> Field<'a> for i8 {
     fn field_size() -> Offset {
         mem::size_of::<Self>() as Offset
@@ -264,7 +264,7 @@ implement_pod_as_ref_field! {Signature}
 implement_pod_as_ref_field! {PublicKey}
 implement_pod_as_ref_field! {Hash}
 
-// TODO should we check `SystemTime` validity in check?
+// TODO should we check `SystemTime` validity in check (ECR-157)?
 impl<'a> Field<'a> for SystemTime {
     fn field_size() -> Offset {
         (mem::size_of::<u64>() + mem::size_of::<u32>()) as Offset
@@ -302,10 +302,10 @@ impl<'a> Field<'a> for SystemTime {
 }
 
 // TODO add socketaddr check, for now with only ipv4
-// all possible (>6 bytes long) sequences is a valid addr.
+// all possible (>6 bytes long) sequences is a valid addr (ECR-156).
 impl<'a> Field<'a> for SocketAddr {
     fn field_size() -> Offset {
-        // FIXME: reserve space for future compatibility
+        // FIXME: reserve space for future compatibility (ECR-156)
         6
     }
 
@@ -323,7 +323,7 @@ impl<'a> Field<'a> for SocketAddr {
                 buffer[from as usize..to as usize - 2].copy_from_slice(&addr.ip().octets());
             }
             SocketAddr::V6(_) => {
-                // FIXME: Supporting Ipv6
+                // FIXME: Supporting Ipv6 (ECR-156, ECR-158)
                 panic!("Ipv6 are currently unsupported")
             }
         }

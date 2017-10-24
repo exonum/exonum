@@ -79,7 +79,6 @@ impl MessageReader {
 
     pub fn read(&mut self, socket: &mut TcpStream) -> io::Result<Option<usize>> {
         // FIXME: we shouldn't read more than HEADER_LENGTH or total_length()
-        // TODO: read into growable Vec, not into [u8]
         if self.position == HEADER_LENGTH && self.actual_len() == HEADER_LENGTH {
             self.allocate()?;
         }
@@ -106,7 +105,7 @@ impl MessageWriter {
     }
 
     pub fn write(&mut self, socket: &mut TcpStream) -> io::Result<()> {
-        // TODO: use try_write_buf
+        // TODO: use try_write_buf (ECR-162)
         while let Some(message) = self.queue.front().cloned() {
             let buf = message.as_ref().as_ref();
             if buf.len() > MAX_MESSAGE_LEN {
@@ -168,6 +167,7 @@ impl IncomingConnection {
     pub fn try_read(&mut self) -> io::Result<Option<MessageBuffer>> {
         // TODO: raw length == 0?
         // TODO: maximum raw length?
+        // ECR-162
         loop {
             match self.reader.read(&mut self.socket)? {
                 None | Some(0) => return Ok(None),
@@ -193,7 +193,7 @@ impl OutgoingConnection {
     }
 
     pub fn try_write(&mut self) -> io::Result<()> {
-        // TODO: reregister
+        // TODO: reregister (ECR-162)
         self.writer.write(&mut self.socket).or_else(
             |e| match e.kind() {
                 io::ErrorKind::WouldBlock |
@@ -215,6 +215,7 @@ impl OutgoingConnection {
         self.writer.queue.push_back(message);
         // TODO proper test that we can write immediately
         self.try_write()
+        // (ECR-162)
     }
 
     pub fn is_idle(&self) -> bool {

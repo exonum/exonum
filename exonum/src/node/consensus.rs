@@ -23,7 +23,7 @@ use storage::Patch;
 use events::Channel;
 use super::{NodeHandler, RequestData, ExternalMessage, NodeTimeout};
 
-// TODO reduce view invokations
+// TODO reduce view invokations (ECR-171)
 impl<S> NodeHandler<S>
 where
     S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>,
@@ -42,7 +42,7 @@ where
         }
 
         // Queued messages from next height or round
-        // TODO: shoud we ignore messages from far rounds?
+        // TODO: shoud we ignore messages from far rounds (ECR-171)?
         if msg.height() == self.state.height().next() || msg.round() > self.state.round() {
             trace!(
                 "Received consensus message from future round: msg.height={}, msg.round={}, \
@@ -143,7 +143,7 @@ where
     }
 
     /// Handles the `Block` message. For details see the message documentation.
-    // TODO write helper function which returns Result
+    // TODO write helper function which returns Result (ECR-123)
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_block(&mut self, msg: BlockResponse) {
         // Request are sended to us
@@ -174,7 +174,7 @@ where
         let block = msg.block();
         let block_hash = block.hash();
 
-        // TODO add block with greater height to queue
+        // TODO add block with greater height to queue (ECR-171)
         if self.state.height() != block.height() {
             return;
         }
@@ -255,12 +255,12 @@ where
             if self.state.is_validator() && !self.state.have_prevote(propose_round) {
                 self.broadcast_prevote(propose_round, &hash);
             } else {
-                // TODO: what if we HAVE prevote for the propose round?
+                // TODO: what if we HAVE prevote for the propose round (ECR-171)?
             }
         }
 
         // Lock to propose
-        // TODO: avoid loop here
+        // TODO: avoid loop here (ECR-171).
         let start_round = ::std::cmp::max(self.state.locked_round().next(), propose_round);
         for round in start_round.iter_to(self.state.round().next()) {
             if self.state.has_majority_prevotes(round, hash) {
@@ -421,7 +421,7 @@ where
 
         // Request prevotes
         // TODO: If Precommit sender in on a greater height, then it cannot have +2/3 prevotes.
-        // So can we get rid of useless sending RequestPrevotes message?
+        // So can we get rid of useless sending RequestPrevotes message (ECR-171)?
         if msg.round() > self.state.locked_round() {
             self.request(
                 RequestData::Prevotes(msg.round(), *msg.propose_hash()),
@@ -477,7 +477,7 @@ where
               block_hash.to_hex(),
               );
 
-        // TODO: reset status timeout.
+        // TODO: reset status timeout (ECR-171).
         self.broadcast_status();
         self.add_status_timeout();
 
@@ -588,7 +588,7 @@ where
     /// Handles round timeout. As result node sends `Propose` if it is a leader or `Prevote` if it
     /// is locked to some round.
     pub fn handle_round_timeout(&mut self, height: Height, round: Round) {
-        // TODO debug asserts?
+        // TODO debug asserts (ECR-171)?
         if height != self.state.height() {
             return;
         }
@@ -626,7 +626,7 @@ where
 
     /// Handles propose timeout. Node sends `Propose` and `Prevote` if it is a leader as result.
     pub fn handle_propose_timeout(&mut self, height: Height, round: Round) {
-        // TODO debug asserts?
+        // TODO debug asserts (ECR-171)?
         if height != self.state.height() {
             // It is too late
             return;
@@ -668,7 +668,7 @@ where
                 self.state.consensus_secret_key(),
             );
             trace!("Broadcast propose: {:?}", propose);
-            self.broadcast(propose.raw());
+            self.broadcast(&propose);
 
             // Save our propose into state
             let hash = self.state.add_self_propose(propose);
@@ -817,7 +817,7 @@ where
     /// Requests a block for the next height from all peers with a bigger height. Called when the
     /// node tries to catch up with other nodes' height.
     pub fn request_next_block(&mut self) {
-        // TODO randomize next peer
+        // TODO randomize next peer (ECR-171)
         let heights: Vec<_> = self.state
             .nodes_with_bigger_height()
             .into_iter()
@@ -836,7 +836,7 @@ where
 
     /// Removes the specified request from the pending request list.
     pub fn remove_request(&mut self, data: RequestData) -> HashSet<PublicKey> {
-        // TODO: clear timeout
+        // TODO: clear timeout (ECR-171)
         self.state.remove_request(&data)
     }
 
@@ -856,7 +856,7 @@ where
         );
         let has_majority_prevotes = self.state.add_prevote(&prevote);
         trace!("Broadcast prevote: {:?}", prevote);
-        self.broadcast(prevote.raw());
+        self.broadcast(&prevote);
         has_majority_prevotes
     }
 
@@ -876,7 +876,7 @@ where
         );
         self.state.add_precommit(&precommit);
         trace!("Broadcast precommit: {:?}", precommit);
-        self.broadcast(precommit.raw());
+        self.broadcast(&precommit);
     }
 
     /// Checks that pre-commits count is correct and calls `verify_precommit` for each of them.

@@ -38,7 +38,7 @@ const RECONNECT_GROW_FACTOR: f32 = 2.0;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub struct NetworkConfiguration {
-    // TODO: think more about config parameters
+    // TODO: think more about config parameters (ECR-162)
     pub max_incoming_connections: usize,
     pub max_outgoing_connections: usize,
     pub tcp_nodelay: bool,
@@ -60,8 +60,8 @@ impl Default for NetworkConfiguration {
     }
 }
 
-// TODO Implement generic ConnectionPool struct to avoid copy paste.
-// Write proper code to configure outgoing streams
+// TODO Implement generic ConnectionPool struct to avoid copy paste (ECR-162).
+// Write proper code to configure outgoing streams (ECR-162)
 pub struct Network {
     api_state: SharedNodeState,
     config: NetworkConfiguration,
@@ -70,7 +70,7 @@ pub struct Network {
 
     incoming: Slab<IncomingConnection>,
     outgoing: Slab<OutgoingConnection>,
-    // FIXME addresses only needs for outgoing connections
+    // FIXME addresses only needs for outgoing connections (ECR-162)
     addresses: HashMap<SocketAddr, PeerId>,
 
     reconnects: HashMap<SocketAddr, MioTimeout>,
@@ -113,7 +113,7 @@ impl Network {
         &self.listen_address
     }
 
-    // TODO use error trait
+    // TODO use error trait (ECR-162)
     pub fn bind<H: EventHandler>(&mut self, event_loop: &mut EventLoop<H>) -> io::Result<()> {
         if self.listener.is_some() {
             return Err(make_io_error("Already bind"));
@@ -130,7 +130,7 @@ impl Network {
     }
 
     // TODO: Use ticks for fast reregistering sockets
-    // TODO: Implement Connections collection with (re)registering
+    // TODO: Implement Connections collection with (re)registering (ECR-162)
     pub fn io<H: EventHandler>(
         &mut self,
         event_loop: &mut EventLoop<H>,

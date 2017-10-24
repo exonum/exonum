@@ -19,7 +19,7 @@ use crypto::{Hash, hash, HASH_SIZE};
 use super::super::{StorageKey, StorageValue};
 use super::key::{DBKey, ChildKind, DB_KEY_SIZE};
 
-// TODO: implement Field for DBKey and define BranchNode as StorageValue
+// TODO: implement Field for DBKey and define BranchNode as StorageValue (ECR-22)
 
 const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + DB_KEY_SIZE);
 

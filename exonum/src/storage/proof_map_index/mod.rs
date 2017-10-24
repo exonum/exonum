@@ -155,7 +155,7 @@ where
     }
 
     fn get_node_unchecked(&self, key: &DBKey) -> Node<V> {
-        // TODO: unwraps?
+        // TODO: unwraps (ECR-84)?
         if key.is_leaf() {
             Node::Leaf(self.base.get(key).unwrap())
         } else {

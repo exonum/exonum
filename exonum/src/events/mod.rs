@@ -175,7 +175,7 @@ impl<E: Send, T: Send> Channel for MioChannel<E, T> {
     }
 }
 
-// TODO think about more ergonomic design with ChannelFactory or other solution
+// TODO think about more ergonomic design with ChannelFactory or other solution (ECR-162)
 
 impl<H: EventHandler> Events<H> {
     pub fn new(network: Network, handler: H) -> io::Result<Events<H>> {
@@ -305,7 +305,7 @@ impl<H: EventHandler> mio::Handler for MioAdapter<H> {
         }
     }
 
-    // TODO think about interrupted handlers
+    // TODO think about interrupted handlers (ECR-162)
     // fn interrupted(&mut self, _: &mut EventLoop) {
     //     self.push(Event::Terminate);
     // }
