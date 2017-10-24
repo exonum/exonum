@@ -551,8 +551,7 @@ fn build_proof_in_multinode_tree(db: Box<Database>) {
 
     // Key left of all keys in the tree
     let proof = table.get_proof([0; 32]);
-    let exp_proof =
-        vec![(DBKey::leaf(&[1; 32]), hash(&vec![1])), (DBKey::leaf(&[4; 32]), hash(&vec![2]))];
+    let exp_proof = vec![(DBKey::leaf(&[1; 32]), hash(&vec![1])), (DBKey::leaf(&[4; 32]), hash(&vec![2]))];
     assert_eq!(proof.proof(), exp_proof);
     check_map_proof(proof, None, &table);
 
@@ -1084,7 +1083,7 @@ fn tree_with_hashed_key(db: Box<Database>) {
         }
     }
 
-    impl HashedKey for Point {};
+    impl HashedKey for Point {}
 
     fn hash_isolated_node(key: &DBKey, h: &Hash) -> Hash {
         hash(&[&key.to_vec(), h.as_ref()].concat())

@@ -49,39 +49,42 @@ impl<'de> Deserialize<'de> for DBKey {
     {
         use std::fmt;
         use serde::de::{self, Visitor, Unexpected};
-        
+
         struct DBKeyVisitor;
-        
+
         impl<'de> Visitor<'de> for DBKeyVisitor {
             type Value = DBKey;
-            
+
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                write!(formatter, "binary string with length between 1 and {}", KEY_SIZE * 8)
+                write!(
+                    formatter,
+                    "binary string with length between 1 and {}",
+                    KEY_SIZE * 8
+                )
             }
-            
+
             fn visit_str<E>(self, value: &str) -> Result<DBKey, E>
-                where E: de::Error
+            where
+                E: de::Error,
             {
                 let len = value.len();
                 if len == 0 || len > 8 * KEY_SIZE {
                     return Err(de::Error::invalid_value(Unexpected::Str(value), &self));
                 }
-                
+
                 let mut bytes = [0u8; KEY_SIZE];
                 for (i, ch) in value.chars().enumerate() {
                     match ch {
-                        '0' => {},
+                        '0' => {}
                         '1' => bytes[i / 8] += 1 << (7 - i % 8),
-                        _ => {
-                            return Err(de::Error::invalid_value(Unexpected::Str(value), &self))
-                        }
+                        _ => return Err(de::Error::invalid_value(Unexpected::Str(value), &self)),
                     }
                 }
-                
+
                 Ok(DBKey::leaf(&bytes).truncate(len as u16))
             }
         }
-        
+
         deser.deserialize_str(DBKeyVisitor)
     }
 }
@@ -238,7 +241,7 @@ impl<K, V> OptionalEntry<K, V> {
         }
     }
 
-    fn into_value(self) -> Option<(K, V)> {
+    fn into_kv(self) -> Option<(K, V)> {
         match self {
             OptionalEntry::KV { key, value } => Some((key, value)),
             _ => None,
@@ -296,7 +299,7 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 /// `MapProof` is serialized to JSON as an object with 2 array fields:
 ///
 /// - `proof` is an array of `{ "key": DBKey, "hash": Hash }` objects. The entries are sorted by
-///   increasing `DBKey`, but client implementor should not rely on this if security is a concern.
+///   increasing [`DBKey`], but client implementors should not rely on this if security is a concern.
 /// - `entries` is an array with 2 kinds of objects: `{ "missing": K }` for keys missing from
 ///   the underlying index, and `{ "key": K, "value": V }` for key-value pairs, existence of
 ///   which is asserted by the proof
@@ -331,6 +334,7 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 /// [`get_multiproof()`]: struct.ProofMapIndex.html#method.get_multiproof
 /// [`try_into()`]: #method.try_into
 /// [`missing_keys()`]: #method.missing_keys
+/// [`DBKey`]: struct.ProofMapDBKey.html
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MapProof<K, V> {
     entries: Vec<OptionalEntry<K, V>>,
@@ -523,7 +527,7 @@ impl<K, V> MapProof<K, V> {
         }
     }
 
-    /// Maps this proof to other type of keys and/or values.
+    /// Maps this proof to another type of keys and/or values.
     pub fn map<F, L, U>(self, map_fn: F) -> MapProof<L, U>
     where
         F: FnMut((K, Option<V>)) -> (L, Option<U>),
@@ -547,10 +551,7 @@ impl<K, V> MapProof<K, V> {
     /// Retrieves references to keys that the proof shows as missing from the map.
     /// This method does not perform any integrity checks of the proof.
     pub fn missing_keys_unchecked(&self) -> Vec<&K> {
-        self.entries
-            .iter()
-            .filter_map(|e| e.as_missing())
-            .collect()
+        self.entries.iter().filter_map(|e| e.as_missing()).collect()
     }
 }
 
@@ -636,7 +637,6 @@ where
     /// ```
     /// # use exonum::storage::{Database, MemoryDB, ProofMapIndex};
     /// # use exonum::crypto::hash;
-    /// # fn main() {
     /// let mut fork = { let db = MemoryDB::new(); db.fork() };
     /// let mut map = ProofMapIndex::new(vec![255], &mut fork);
     /// let (h1, h2) = (hash(&vec![1]), hash(&vec![2]));
@@ -659,9 +659,7 @@ where
         let (mut proof, entries) = (self.proof, self.entries);
 
         proof.extend(entries.iter().filter_map(|e| {
-            e.as_kv().map(
-                |(k, v)| (DBKey::leaf(k), v.hash()).into(),
-            )
+            e.as_kv().map(|(k, v)| (DBKey::leaf(k), v.hash()).into())
         }));
         // Rust docs state that in the case `self.proof` and `self.entries` are sorted
         // (which is the case for `MapProof`s returned by `ProofMapIndex.get_proof()`),
@@ -677,7 +675,7 @@ where
             (
                 entries
                     .into_iter()
-                    .filter_map(OptionalEntry::into_value)
+                    .filter_map(OptionalEntry::into_kv)
                     .collect(),
                 h,
             )

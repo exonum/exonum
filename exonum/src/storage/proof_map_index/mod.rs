@@ -578,7 +578,7 @@ where
     }
 
     /// Returns an iterator over the entries of the map in ascending order. The iterator element
-    /// type is (K, V).
+    /// type is `(K::Output, V)`.
     ///
     /// # Examples
     ///
@@ -603,7 +603,7 @@ where
     }
 
     /// Returns an iterator over the keys of the map in ascending order. The iterator element
-    /// type is K.
+    /// type is `K::Output`.
     ///
     /// # Examples
     ///
@@ -628,7 +628,7 @@ where
     }
 
     /// Returns an iterator over the values of the map in ascending order of keys. The iterator
-    /// element type is V.
+    /// element type is `V`.
     ///
     /// # Examples
     ///
@@ -650,7 +650,7 @@ where
     }
 
     /// Returns an iterator over the entries of the map in ascending order starting from the
-    /// specified key. The iterator element type is (K, V).
+    /// specified key. The iterator element type is `(K::Output, V)`.
     ///
     /// # Examples
     ///
@@ -676,7 +676,7 @@ where
     }
 
     /// Returns an iterator over the keys of the map in ascending order starting from the
-    /// specified key. The iterator element type is K.
+    /// specified key. The iterator element type is `K::Output`.
     ///
     /// # Examples
     ///
@@ -702,7 +702,7 @@ where
     }
 
     /// Returns an iterator over the values of the map in ascending order of keys starting from the
-    /// specified key. The iterator element type is V.
+    /// specified key. The iterator element type is `V`.
     ///
     /// # Examples
     ///
