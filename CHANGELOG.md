@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 - Implement `FromStr` and `ToString` traits for public sodium types (#318)
+- Sparse list index - a new data structure (#312)
 
 ### Fixed
 - Fix network failure due to incorrect processing of the incoming buffer (#322)
