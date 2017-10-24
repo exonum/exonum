@@ -13,6 +13,7 @@
 // limitations under the License.
 
 extern crate rand;
+extern crate serde_json;
 
 use std::collections::{HashSet, BTreeMap};
 use rand::{thread_rng, Rng, sample};
@@ -419,10 +420,14 @@ fn test_invalid_map_proofs() {
         "Non-terminal node as a single key in a map proof"
     );
 
-    let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::builder()
-        .add_proof_entry(DBKey::leaf(&[1; 32]).truncate(8), h)
-        .add_proof_entry(DBKey::leaf(&[0; 32]).truncate(10), h)
-        .create();
+    let json = json!({
+        "proof": [
+            { "key": "11", "hash": Hash::default() },
+            { "key": "0", "hash": Hash::default() },
+        ],
+        "entries": []
+    });
+    let proof: MapProof<[u8; 32], Vec<u8>> = serde_json::from_value(json).unwrap();
     assert_eq!(
         proof.try_into::<Vec<_>>().unwrap_err().description(),
         "Invalid key ordering in a map proof"

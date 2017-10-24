@@ -266,7 +266,7 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 
 /// View of a `ProofMapIndex`, i.e., a subset of its elements coupled with a *proof*,
 /// which jointly allow to restore the `root_hash()` of the index.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct MapProof<K, V> {
     entries: Vec<OptionalEntry<K, V>>,
     proof: Vec<MapProofEntry>,
@@ -371,6 +371,12 @@ impl<K, V> MapProofBuilder<K, V> {
 
     /// Adds a proof entry into the builder.
     pub fn add_proof_entry(mut self, key: DBKey, hash: Hash) -> Self {
+        debug_assert!(if let Some(&(last_key, _)) = self.proof.last() {
+            last_key < key
+        } else {
+            true
+        });
+
         self.proof.push((key, hash));
         self
     }
