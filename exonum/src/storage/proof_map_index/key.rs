@@ -26,31 +26,66 @@ pub const KEY_SIZE: usize = HASH_SIZE;
 pub const DB_KEY_SIZE: usize = KEY_SIZE + 2;
 
 /// A trait that defines a subset of storage key types which are suitable for use with
-/// `ProofMapIndex`.
+/// [`ProofMapIndex`].
 ///
-/// The size of the keys must be exactly `KEY_SIZE` bytes and the keys must have
+/// The size of the keys must be exactly [`PROOF_MAP_KEY_SIZE`] bytes and the keys must have
 /// a uniform distribution.
+///
+/// [`ProofMapIndex`]: struct.ProofMapIndex.html
+/// [`PROOF_MAP_KEY_SIZE`]: constant.PROOF_MAP_KEY_SIZE.html
 pub trait ProofMapKey
 where
     Self::Output: ProofMapKey,
 {
     /// The type of keys as read from the database. `Output` is not necessarily
-    /// equal to `Self`, which provides flexibility for `HashedKey`s and similar cases
+    /// equal to `Self`, which provides flexibility for [`HashedKey`]s and similar cases
     /// where the key cannot be uniquely restored from the database.
+    ///
+    /// [`HashedKey`]: trait.HashedKey.html
     type Output;
 
-    /// Writes this key into a byte buffer. The buffer is guaranteed to have size `KEY_SIZE`.
+    /// Writes this key into a byte buffer. The buffer is guaranteed to have size
+    /// [`PROOF_MAP_KEY_SIZE`].
+    ///
+    /// [`PROOF_MAP_KEY_SIZE`]: constant.PROOF_MAP_KEY_SIZE.html
     fn write_key(&self, &mut [u8]);
 
     /// Reads this key from the buffer.
     fn read_key(&[u8]) -> Self::Output;
 }
 
-/// A trait denoting that a certain storage value is suitable for use as a key for `ProofMapIndex`
-/// after hashing.
+/// A trait denoting that a certain storage value is suitable for use as a key for
+/// [`ProofMapIndex`] after hashing.
 ///
-/// **Warning:** The implementation of the `write_key()` method of `ProofMapKey` provided
+/// **Warning:** The implementation of the [`ProofMapKey.write_key()`] method provided
 /// by this trait is not efficient; it calculates the hash anew on each call.
+///
+/// # Example
+///
+/// ```
+/// # #[macro_use] extern crate exonum;
+/// # use exonum::storage::{MemoryDB, Database, ProofMapIndex, HashedKey};
+/// encoding_struct!{
+///     struct Point {
+///         const SIZE = 8;
+///         field x: i32 [0 => 4]
+///         field y: i32 [4 => 8]
+///     }
+/// }
+///
+/// impl HashedKey for Point {}
+///
+/// # fn main() {
+/// let mut fork = { let db = MemoryDB::new(); db.fork() };
+/// let mut map = ProofMapIndex::new(vec![255], &mut fork);
+/// map.put(&Point::new(3, -4), 5u32);
+/// assert_eq!(map.get(&Point::new(3, -4)), Some(5));
+/// assert_eq!(map.get(&Point::new(3, 4)), None);
+/// # }
+/// ```
+///
+/// [`ProofMapIndex`]: struct.ProofMapIndex.html
+/// [`ProofMapKey.write_key()`]: trait.ProofMapKey.html#tymethod.write_key
 pub trait HashedKey: StorageValue {}
 
 impl<T: HashedKey> ProofMapKey for T {
@@ -112,7 +147,31 @@ pub enum ChildKind {
     Right,
 }
 
-/// A struct that represents a bit slices of the proof map keys.
+/// Bit slice type used internally to serialize [`ProofMapKey`]s. A single slice can contain
+/// from 1 to [`PROOF_MAP_KEY_SIZE`]`* 8` bits.
+///
+/// # JSON serialization
+///
+/// Serialized as a string of `'0'` and `'1'` chars, corresponding exactly to bits in the slice.
+///
+/// ```
+/// # extern crate exonum;
+/// extern crate serde_json;
+/// use exonum::crypto::Hash;
+/// # use exonum::storage::proof_map_index::ProofMapDBKey;
+///
+/// # fn main() {
+/// let key = ProofMapDBKey::leaf(&Hash::default()).truncate(3);
+/// assert_eq!(serde_json::to_string(&key).unwrap(), "\"000\"");
+/// assert_eq!(
+///     serde_json::from_str::<ProofMapDBKey>("\"101010\"").unwrap(),
+///     ProofMapDBKey::leaf(&[0b10101000; 32]).truncate(6)
+/// );
+/// # }
+/// ```
+///
+/// [`ProofMapKey`]: trait.ProofMapKey.html
+/// [`PROOF_MAP_KEY_SIZE`]: constant.PROOF_MAP_KEY_SIZE.html
 #[derive(Clone, Copy)]
 pub struct DBKey {
     data: [u8; KEY_SIZE],

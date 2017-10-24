@@ -100,10 +100,10 @@ pub enum MapProofError {
         key: DBKey,
     },
 
-    /// One key is mentioned several times in the proof
+    /// One key is mentioned several times in the proof.
     DuplicateKey(DBKey),
 
-    /// Entries in the proof are not ordered by increasing key
+    /// Entries in the proof are not ordered by increasing key.
     InvalidOrdering(DBKey, DBKey),
 }
 
@@ -264,8 +264,73 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
     }
 }
 
-/// View of a `ProofMapIndex`, i.e., a subset of its elements coupled with a *proof*,
-/// which jointly allow to restore the `root_hash()` of the index.
+/// View of a [`ProofMapIndex`], i.e., a subset of its elements coupled with a *proof*,
+/// which jointly allow to restore the [`root_hash()`] of the index. Besides existing elements,
+/// `MapProof` can assert absence of certain keys from the underlying index.
+///
+/// # Workflow
+///
+/// You can create `MapProof`s with [`get_proof()`] and [`get_multiproof()`] methods of
+/// `ProofMapIndex`. Proofs can be verified on the server side with the help of
+/// [`try_into()`]. Prior to the `try_into` conversion, you may use [`missing_keys()`]
+/// to extract the keys missing from the underlying index.
+///
+/// ```
+/// # use exonum::storage::{Database, MemoryDB, StorageValue, MapProof, ProofMapIndex};
+/// # use exonum::crypto::hash;
+/// let mut fork = { let db = MemoryDB::new(); db.fork() };
+/// let mut map = ProofMapIndex::new(vec![255], &mut fork);
+/// let (h1, h2, h3) = (hash(&vec![1]), hash(&vec![2]), hash(&vec![3]));
+/// map.put(&h1, 100u32);
+/// map.put(&h2, 200u32);
+/// // Get the proof from the index
+/// let proof = map.get_multiproof(vec![h1, h3]);
+/// // Check the missing elements
+/// assert_eq!(proof.missing_keys().unwrap(), vec![&h3]);
+/// // Check the proof consistency
+/// assert_eq!(proof.try_into().unwrap(), (vec![(h1, 100u32)], map.root_hash()));
+/// ```
+///
+/// # JSON serialization
+///
+/// `MapProof` is serialized to JSON as an object with 2 array fields:
+///
+/// - `proof` is an array of `{ "key": DBKey, "hash": Hash }` objects. The entries are sorted by
+///   increasing `DBKey`, but client implementor should not rely on this if security is a concern.
+/// - `entries` is an array with 2 kinds of objects: `{ "missing": K }` for keys missing from
+///   the underlying index, and `{ "key": K, "value": V }` for key-value pairs, existence of
+///   which is asserted by the proof
+///
+/// ```
+/// # extern crate exonum;
+/// # #[macro_use] extern crate serde_json;
+/// # use exonum::storage::{Database, MemoryDB, StorageValue, MapProof, ProofMapIndex};
+/// # use exonum::storage::proof_map_index::ProofMapDBKey;
+/// # use exonum::crypto::hash;
+/// # fn main() {
+/// let mut fork = { let db = MemoryDB::new(); db.fork() };
+/// let mut map = ProofMapIndex::new(vec![255], &mut fork);
+/// let (h1, h2) = (hash(&vec![1]), hash(&vec![2]));
+/// map.put(&h1, 100u32);
+/// map.put(&h2, 200u32);
+///
+/// let proof = map.get_proof(h2);
+/// assert_eq!(
+///     serde_json::to_value(&proof).unwrap(),
+///     json!({
+///         "proof": [ { "key": ProofMapDBKey::leaf(&h1), "hash": 100u32.hash() } ],
+///         "entries": [ { "key": h2, "value": 200 } ]
+///     })
+/// );
+/// # }
+/// ```
+///
+/// [`ProofMapIndex`]: struct.ProofMapIndex.html
+/// [`root_hash()`]: struct.ProofMapIndex.html#method.root_hash
+/// [`get_proof()`]: struct.ProofMapIndex.html#method.get_proof
+/// [`get_multiproof()`]: struct.ProofMapIndex.html#method.get_multiproof
+/// [`try_into()`]: #method.try_into
+/// [`missing_keys()`]: #method.missing_keys
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MapProof<K, V> {
     entries: Vec<OptionalEntry<K, V>>,
@@ -341,7 +406,30 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
     }
 }
 
-/// Builder for `MapProof`s.
+/// Builder for [`MapProof`]s.
+///
+/// This struct is rarely needs to be used explicitly (except for testing purposes). Instead,
+/// `MapProof`s can be created using [`get_proof()`] and [`get_multiproof()`] methods, or
+/// deserialized using `serde`.
+///
+/// # Examples
+///
+/// ```
+/// # use exonum::storage::{MapProof, StorageValue};
+/// # use exonum::storage::proof_map_index::ProofMapDBKey;
+/// # use exonum::crypto::hash;
+/// let (k1, k2, k3) = ((-1i32).hash(), 0i32.hash(), 1i32.hash());
+/// let proof = MapProof::builder()
+///     .add_proof_entry(ProofMapDBKey::leaf(&k1), hash("FOO".as_ref()))
+///     .add_entry(k2, "BAR".to_string())
+///     .add_missing(k3)
+///     .create();
+/// # drop(proof);
+/// ```
+///
+/// [`MapProof`]: struct.MapProof.html
+/// [`get_proof()`]: struct.ProofMapIndex.html#method.get_proof
+/// [`get_multiproof()`]: struct.ProofMapIndex.html#method.get_multiproof
 #[derive(Debug)]
 pub struct MapProofBuilder<K, V> {
     entries: Vec<OptionalEntry<K, V>>,
@@ -369,7 +457,8 @@ impl<K, V> MapProofBuilder<K, V> {
         self
     }
 
-    /// Adds a proof entry into the builder.
+    /// Adds a proof entry into the builder. The `key` must be greater than keys of
+    /// all proof entries previously added to the proof.
     pub fn add_proof_entry(mut self, key: DBKey, hash: Hash) -> Self {
         debug_assert!(if let Some(&(last_key, _)) = self.proof.last() {
             last_key < key
@@ -381,7 +470,9 @@ impl<K, V> MapProofBuilder<K, V> {
         self
     }
 
-    /// Creates a `MapProof` from the builder.
+    /// Creates a [`MapProof`] from the builder.
+    ///
+    /// [`MapProof`]: struct.MapProof.html
     pub fn create(self) -> MapProof<K, V> {
         MapProof {
             entries: self.entries,
@@ -397,6 +488,7 @@ impl<K, V> MapProof<K, V> {
     }
 
     /// Creates a proof for a single entry.
+    #[doc(hidden)]
     pub fn for_entry<I>(entry: (K, V), proof: I) -> Self
     where
         I: IntoIterator<Item = (DBKey, Hash)>,
@@ -408,6 +500,7 @@ impl<K, V> MapProof<K, V> {
     }
 
     /// Creates a proof of absence of a key.
+    #[doc(hidden)]
     pub fn for_absent_key<I>(key: K, proof: I) -> Self
     where
         I: IntoIterator<Item = (DBKey, Hash)>,
@@ -419,6 +512,7 @@ impl<K, V> MapProof<K, V> {
     }
 
     /// Creates a proof for an empty map.
+    #[doc(hidden)]
     pub fn for_empty_map<KI>(keys: KI) -> Self
     where
         KI: IntoIterator<Item = K>,
@@ -530,11 +624,33 @@ where
         Ok(self.missing_keys_unchecked())
     }
 
-    /// Consumes this view producing a pair of:
-    /// - Collection from key-value pairs present in the view
-    /// - Hash of the `ProofMapIndex` that backs the view
+    /// Consumes this proof producing a pair of:
     ///
-    /// Fails if the view is malformed (e.g., invalid proof).
+    /// - Collection from key-value pairs present in the proof
+    /// - Hash of the [`ProofMapIndex`] that backs the proof
+    ///
+    /// Fails if the proof is malformed.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use exonum::storage::{Database, MemoryDB, ProofMapIndex};
+    /// # use exonum::crypto::hash;
+    /// # fn main() {
+    /// let mut fork = { let db = MemoryDB::new(); db.fork() };
+    /// let mut map = ProofMapIndex::new(vec![255], &mut fork);
+    /// let (h1, h2) = (hash(&vec![1]), hash(&vec![2]));
+    /// map.put(&h1, 100u32);
+    /// map.put(&h2, 200u32);
+    ///
+    /// let proof = map.get_proof(h2);
+    /// assert_eq!(
+    ///     proof.try_into().unwrap(),
+    ///     (vec![(h2, 200u32)], map.root_hash())
+    /// );
+    /// ```
+    ///
+    /// [`ProofMapIndex`]: struct.ProofMapIndex.html
     pub fn try_into<T>(self) -> Result<(T, Hash), MapProofError>
     where
         T: FromIterator<(K, V)>,

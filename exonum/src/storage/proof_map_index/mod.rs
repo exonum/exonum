@@ -31,7 +31,7 @@ mod key;
 mod node;
 mod proof;
 
-/// A Merkalized version of a map that provides proofs of existence or non-existence for the map
+/// A Merkelized version of a map that provides proofs of existence or non-existence for the map
 /// keys.
 ///
 /// `ProofMapIndex` implements a Merkle Patricia tree, storing the values as leaves.
