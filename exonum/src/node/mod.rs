@@ -19,6 +19,7 @@
 use router::Router;
 use mount::Mount;
 use iron::{Chain, Iron};
+use iron::headers::AccessControlAllowOrigin;
 use toml::Value;
 
 use std::io;
@@ -134,6 +135,8 @@ pub struct NodeApiConfig {
     pub public_api_address: Option<SocketAddr>,
     /// Listen address for private api endpoints.
     pub private_api_address: Option<SocketAddr>,
+    /// Set CORS part of response header
+    pub allow_origin: Option<String>,
 }
 
 impl Default for NodeApiConfig {
@@ -143,6 +146,18 @@ impl Default for NodeApiConfig {
             enable_blockchain_explorer: true,
             public_api_address: None,
             private_api_address: None,
+            allow_origin: None,
+        }
+    }
+}
+
+impl NodeApiConfig {
+    /// Creates header from origin value
+    pub fn allow_origin_to_header(&self) -> AccessControlAllowOrigin {
+        match self.allow_origin {
+            None => AccessControlAllowOrigin::Null,
+            Some(ref s) if s == "*"  => AccessControlAllowOrigin::Any,
+            Some(ref s) => AccessControlAllowOrigin::Value(s.to_owned()),
         }
     }
 }
