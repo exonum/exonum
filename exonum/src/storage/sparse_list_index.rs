@@ -197,10 +197,8 @@ where
     }
 
 
-    /// Returns the total amount of elements (including "empty" elements) in the list. In fact
-    /// capacity reflects total amount of elements that have ever been put to the index and never
-    /// gets reduced. It's also used to produce an index value for new elements being appended to
-    /// the list.
+    /// Returns the total amount of elements (including "empty" elements) in the list. The value of
+    /// capacity is determined by the maximum index of the element ever inserted into the index.
     ///
     /// # Examples
     ///
@@ -347,7 +345,7 @@ where
         self.size.set(Some(size));
     }
 
-    /// Appends an element to the back of the list.
+    /// Appends an element to the back of the 'SparceListIndex'.
     ///
     /// # Examples
     ///
@@ -367,35 +365,6 @@ where
         size.capacity += 1;
         size.length += 1;
         self.set_size(size);
-    }
-
-    /// Removes the last element from the list and returns it, or None if it is empty.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum::storage::{MemoryDB, Database, SparseListIndex};
-    ///
-    /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
-    /// assert_eq!(None, index.pop());
-    ///
-    /// index.push(1);
-    /// assert_eq!(Some(1), index.pop());
-    /// ```
-    pub fn pop(&mut self) -> Option<V> {
-        let mut size = self.size();
-        match size.length {
-            0 => None,
-            l => {
-                let v = self.base.get(&(l - 1));
-                self.base.remove(&(l - 1));
-                size.length -= 1;
-                self.set_size(size);
-                v
-            }
-        }
     }
 
     /// Removes the element with the given index from the list and returns it,
@@ -425,12 +394,6 @@ where
     pub fn remove(&mut self, index: u64) -> Option<V> {
         let mut size = self.size();
         if index >= size.capacity {
-            warn!(
-                "Index out of bounds: \
-                    the capacity is {} but the index is {}",
-                size.capacity,
-                index
-            );
             return None;
         }
         let v = self.base.get(&index);
@@ -475,6 +438,8 @@ where
     /// current capacity, the capacity of the list considered index + 1 and all further elements
     /// without specific index value will be appended after this index.
     ///
+    /// Returns the value of an old element at this position or `None` if it was empty.
+    ///
     /// # Examples
     ///
     /// ```
@@ -490,17 +455,19 @@ where
     /// index.set(0, 10);
     /// assert_eq!(Some(10), index.get(0));
     /// ```
-    pub fn set(&mut self, index: u64, value: V) {
+    pub fn set(&mut self, index: u64, value: V) -> Option<V> {
         let mut size = self.size();
         // Update items count
-        if self.base.get::<u64, V>(&index).is_none() {
+        let old_value = self.base.get::<u64, V>(&index);
+        if old_value.is_none() {
             size.length += 1;
             if index >= size.capacity {
                 size.capacity = index + 1;
             }
             self.set_size(size);
         }
-        self.base.put(&index, value)
+        self.base.put(&index, value);
+        old_value
     }
 
     /// Clears the list, removing all values.
@@ -532,24 +499,6 @@ where
         self.base.clear()
     }
 
-    /// Appends an element to the back of the 'SparceListIndex'.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum::storage::{MemoryDB, Database, SparseListIndex};
-    ///
-    /// let db = MemoryDB::new();
-    /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
-    ///
-    /// index.push_back(1);
-    /// assert!(!index.is_empty());
-    /// ```
-    pub fn push_back(&mut self, value: V) {
-        self.push(value);
-    }
-
     /// Removes the first element from the 'SparceListIndex' and returns it, or None if it is empty.
     ///
     /// # Examples
@@ -562,15 +511,21 @@ where
     /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
     /// assert_eq!(None, index.pop());
     ///
-    /// index.push_back(1);
-    /// assert_eq!(Some(1), index.pop_front());
+    /// index.push(1);
+    /// assert_eq!(Some(1), index.pop());
     /// ```
-    pub fn pop_front(&mut self) -> Option<V> {
-        let _opt = {
-            self.indices().next()
+    pub fn pop(&mut self) -> Option<V> {
+
+        let first_item = {
+            self.iter().next()
         };
-        if let Some(min_index) = _opt {
-            return self.remove(min_index);
+
+        if let Some((first_index, first_elem)) = first_item {
+            let mut size = self.size();
+            self.base.remove(&first_index);
+            size.length -= 1;
+            self.set_size(size);
+            return Some(first_elem);
         }
         None
     }
@@ -648,7 +603,7 @@ mod tests {
         assert_eq!(3, list_index.capacity());
         assert_eq!(3, list_index.len());
 
-        list_index.set(2, 777);
+        assert_eq!(Some(234), list_index.set(2, 777));
         assert_eq!(Some(777), list_index.get(2));
         assert_eq!(3, list_index.capacity());
         assert_eq!(3, list_index.len());
@@ -661,55 +616,38 @@ mod tests {
         assert_eq!(Some(999), list_index.get(4));
         assert_eq!(5, list_index.capacity());
         assert_eq!(5, list_index.len());
-        extended_by_again[1] = 1001;
-        list_index.extend(extended_by_again);
-        assert_eq!(7, list_index.capacity());
-        assert_eq!(7, list_index.len());
-
-        assert_eq!(Some(1001), list_index.pop());
-        assert_eq!(7, list_index.capacity());
-        assert_eq!(6, list_index.len());
-
-        list_index.pop();
-        list_index.pop();
-        list_index.pop();
-
-        assert_eq!(7, list_index.capacity());
-        assert_eq!(Some(777), list_index.get(2));
 
         assert_eq!(Some(3422), list_index.remove(1));
         assert_eq!(None, list_index.remove(1));
-        assert_eq!(7, list_index.capacity());
-        assert_eq!(2, list_index.len());
+        assert_eq!(5, list_index.capacity());
+        assert_eq!(4, list_index.len());
 
         assert_eq!(Some(777), list_index.remove(2));
-        assert_eq!(7, list_index.capacity());
-        assert_eq!(1, list_index.len());
-
-        assert_eq!(Some(45), list_index.remove(0));
-        assert_eq!(7, list_index.capacity());
-        assert_eq!(0, list_index.len());
-        assert!(list_index.is_empty());
-
-        // check "queue methods"
-        list_index.push_back(42);
-        list_index.push_back(142);
-        list_index.push_back(242);
-        assert_eq!(10, list_index.capacity());
+        assert_eq!(5, list_index.capacity());
         assert_eq!(3, list_index.len());
-        assert_eq!(Some(42), list_index.pop_front());
-        assert_eq!(10, list_index.capacity());
+
+        assert_eq!(Some(45), list_index.pop());
+        assert_eq!(5, list_index.capacity());
         assert_eq!(2, list_index.len());
-        assert_eq!(Some(142), list_index.pop_front());
-        assert_eq!(10, list_index.capacity());
+        assert_eq!(Some(666), list_index.pop());
+        assert_eq!(5, list_index.capacity());
         assert_eq!(1, list_index.len());
-        assert_eq!(Some(242), list_index.pop_front());
-        assert_eq!(10, list_index.capacity());
+
+        list_index.push(42);
+        assert_eq!(6, list_index.capacity());
+        assert_eq!(2, list_index.len());
+
+        assert_eq!(Some(999), list_index.pop());
+        assert_eq!(6, list_index.capacity());
+        assert_eq!(1, list_index.len());
+        assert_eq!(Some(42), list_index.pop());
+        assert_eq!(6, list_index.capacity());
         assert_eq!(0, list_index.len());
-        assert_eq!(None, list_index.pop_front());
+        assert_eq!(None, list_index.pop());
+
 
         // check that capacity gets overwritten by bigger index correctly
-        list_index.set(42, 1024);
+        assert_eq!(None, list_index.set(42, 1024));
         assert_eq!(43, list_index.capacity());
     }
 
