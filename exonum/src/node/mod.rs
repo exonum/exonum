@@ -18,7 +18,8 @@
 
 use router::Router;
 use mount::Mount;
-use iron::{Chain, Iron};
+use iron::{Chain, Iron, AfterMiddleware, Request, Response, IronResult};
+use iron::headers::AccessControlAllowOrigin;
 use toml::Value;
 
 use std::io;
@@ -134,6 +135,8 @@ pub struct NodeApiConfig {
     pub public_api_address: Option<SocketAddr>,
     /// Listen address for private api endpoints.
     pub private_api_address: Option<SocketAddr>,
+    /// Set CORS part of response header
+    pub allow_origin: Option<String>,
 }
 
 impl Default for NodeApiConfig {
@@ -143,7 +146,28 @@ impl Default for NodeApiConfig {
             enable_blockchain_explorer: true,
             public_api_address: None,
             private_api_address: None,
+            allow_origin: None,
         }
+    }
+}
+
+struct CorsAppender(AccessControlAllowOrigin);
+
+impl From<Option<String>> for CorsAppender {
+    fn from(from: Option<String>) -> Self {
+        let header = match from {
+            None => AccessControlAllowOrigin::Null,
+            Some(ref s) if s == "*" => AccessControlAllowOrigin::Any,
+            Some(s) => AccessControlAllowOrigin::Value(s),
+        };
+        CorsAppender(header)
+    }
+}
+
+impl AfterMiddleware for CorsAppender {
+    fn after(&self, _: &mut Request, mut res: Response) -> IronResult<Response> {
+        res.headers.set(self.0.clone());
+        Ok(res)
     }
 }
 
@@ -691,10 +715,11 @@ impl Node {
                     mount.mount("api/explorer", router);
                 }
 
+                let appender: CorsAppender = self.api_options.allow_origin.clone().into();
                 let thread = thread::spawn(move || {
                     info!("Public exonum api started on {}", listen_address);
-
-                    let chain = Chain::new(mount);
+                    let mut chain = Chain::new(mount);
+                    chain.link_after(appender);
                     Iron::new(chain).http(listen_address).unwrap();
                 });
                 Some(thread)
