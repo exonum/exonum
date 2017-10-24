@@ -22,7 +22,7 @@ use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
 use self::key::{DBKey, ChildKind, LEAF_KEY_PREFIX};
 use self::node::{Node, BranchNode};
 
-pub use self::key::{ProofMapKey, KEY_SIZE as PROOF_MAP_KEY_SIZE};
+pub use self::key::{ProofMapKey, KEY_SIZE as PROOF_MAP_KEY_SIZE, DBKey as ProofMapDBKey};
 pub use self::proof::{MapProof, ProofNode, BranchProofNode};
 
 #[cfg(test)]
@@ -72,7 +72,7 @@ pub struct ProofMapIndexIter<'a, K, V> {
 ///
 /// [`keys`]: struct.ProofMapIndex.html#method.keys
 /// [`keys_from`]: struct.ProofMapIndex.html#method.keys_from
-/// [`ProofMapIndex`]: struct.MapIndex.html
+/// [`ProofMapIndex`]: struct.ProofMapIndex.html
 #[derive(Debug)]
 pub struct ProofMapIndexKeys<'a, K> {
     base_iter: BaseIndexIter<'a, DBKey, ()>,

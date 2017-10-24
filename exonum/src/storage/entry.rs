@@ -22,7 +22,7 @@ use super::{BaseIndex, Snapshot, Fork, StorageValue};
 /// An index that may only contain one element.
 ///
 /// A value should implement [`StorageValue`] trait.
-/// [`StorageValue`]: ../trait.StorageValue.html
+/// [`StorageValue`]: trait.StorageValue.html
 #[derive(Debug)]
 pub struct Entry<T, V> {
     base: BaseIndex<T>,
@@ -35,8 +35,8 @@ impl<T, V> Entry<T, V> {
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
-    /// [`&Snapshot`]: ../trait.Snapshot.html
-    /// [`&mut Fork`]: ../struct.Fork.html
+    /// [`&Snapshot`]: trait.Snapshot.html
+    /// [`&mut Fork`]: struct.Fork.html
     ///
     /// # Examples
     ///
@@ -106,15 +106,16 @@ where
     ///
     /// ```
     /// use exonum::storage::{MemoryDB, Database, Entry};
-    /// use exonum::crypto::Hash;
+    /// use exonum::crypto::{self, Hash};
     ///
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
     /// let mut index = Entry::new(vec![1, 2, 3], &mut fork);
     /// assert_eq!(Hash::default(), index.hash());
     ///
-    /// index.set(10);
-    /// assert_ne!(Hash::default(), index.hash());
+    /// let value = 10;
+    /// index.set(value);
+    /// assert_eq!(crypto::hash(&[value]), index.hash());
     /// ```
     pub fn hash(&self) -> Hash {
         self.base

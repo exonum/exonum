@@ -167,7 +167,7 @@ impl MovingAverage {
             min: min as f64,
             max: max as f64,
             adjustment_speed,
-            txs_block_limit: txs_block_limit as f64,
+            txs_block_limit: f64::from(txs_block_limit),
             optimal_block_load,
             previous_timeout: min as f64,
         }
@@ -196,7 +196,7 @@ impl TimeoutAdjuster for MovingAverage {
         let schema = Schema::new(snapshot);
         self.adjust_timeout_impl(schema.last_block().map_or(
             0.,
-            |block| block.tx_count() as f64,
+            |block| f64::from(block.tx_count()),
         ))
     }
 }

@@ -45,7 +45,7 @@ impl ProofListKey {
     }
 
     pub fn as_db_key(&self) -> u64 {
-        ((self.height as u64) << HEIGHT_SHIFT) + self.index
+        (u64::from(self.height) << HEIGHT_SHIFT) + self.index
     }
 
     pub fn from_db_key(key: u64) -> Self {
