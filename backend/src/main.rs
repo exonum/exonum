@@ -1,11 +1,11 @@
 extern crate exonum;
-extern crate currency;
+extern crate cryptocurrency;
 extern crate exonum_configuration;
 
 use exonum::helpers;
 use exonum::helpers::fabric::NodeBuilder;
 use exonum_configuration::ConfigurationService;
-use currency::CurrencyService;
+use cryptocurrency::CurrencyService;
 
 fn main() {
     exonum::crypto::init();

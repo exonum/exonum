@@ -1,6 +1,31 @@
-[workspace]
+[package]
+name = "cryptocurrency"
+version = "0.1.0"
+authors = ["Exonum Team <exonum@bitfury.com>"]
 
-members = [
-    "cryptocurrency",
-    "cryptocurrency_api_tests",
-]
+[workspace]
+members = ["cryptocurrency_api_tests"]
+
+[dependencies]
+exonum = { version = "0.2", path = "../../exonum/exonum" }
+exonum-configuration = { version = "0.2", path = "../../exonum-configuration" }
+env_logger = "0.3"
+clap = {version="2.14", features=["unstable"]}
+time = "0.1"
+rand = "0.3"
+log = "0.3"
+byteorder = "0.5"
+serde = "1.0.0"
+serde_derive = "1.0.0"
+jsonway = "1.0"
+iron = "0.5.1"
+bodyparser = "0.7.0"
+router = "0.5.1"
+headers = "0.1.0"
+hyper = "0.10.4"
+cookie = "0.6.0"
+tempdir = "0.3.5"
+params = "0.6.0"
+
+[replace]
+"exonum:0.2.0" = { path = "../../../exonum/exonum" } #{ git = "https://github.com/exonum/exonum.git", tag="v0.1" }
