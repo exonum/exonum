@@ -16,9 +16,9 @@
 /// json format.
 ///
 
-// TODO refer to difference between json serialization and exonum_json ECR-156
-// TODO implement Field for float ECR-153
-// TODO remove WriteBufferWraper hack (after refactor storage), should be moved into storage ECR-156
+// TODO refer to difference between json serialization and exonum_json (ECR-156)
+// TODO implement Field for float (ECR-153)
+// TODO remove WriteBufferWraper hack (after refactor storage), should be moved into storage (ECR-156)
 
 use serde_json::value::Value;
 use bit_vec::BitVec;
@@ -32,7 +32,7 @@ use std::error::Error;
 use crypto::{Hash, PublicKey, Signature};
 use helpers::{Height, Round, ValidatorId};
 
-// TODO: should we implement serialize for: `SecretKey`, `Seed` (ECR-156) ?
+// TODO: should we implement serialize for: `SecretKey`, `Seed` (ECR-156)?
 
 use encoding::{Field, Offset};
 use super::HexValue;
@@ -345,7 +345,7 @@ where
 }
 
 // TODO remove `ExonumJsonDeserialize` needs
-// after it remove impl `ExonumJsonDeserialize` for all types expect struct ECR-156
+// after it remove impl `ExonumJsonDeserialize` for all types expect struct (ECR-156)
 impl<T> ExonumJson for Vec<T>
 where
     T: ExonumJsonDeserialize + ExonumJson,
