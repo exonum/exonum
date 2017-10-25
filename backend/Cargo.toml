@@ -2,5 +2,5 @@
 
 members = [
     "cryptocurrency",
-#    "cryptocurrency_api_tests",
+    "cryptocurrency_api_tests",
 ]

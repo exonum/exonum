@@ -15,7 +15,8 @@ use exonum::messages::Message;
 use exonum::crypto::{HexValue, PublicKey, Hash};
 use exonum::storage::{MapProof, ListProof};
 use exonum::blockchain::{self, Blockchain, BlockProof};
-use exonum::storage::proof_map_index::{BranchProofNode, ProofNode};
+use exonum::helpers::Height;
+//use exonum::storage::proof_map_index::{BranchProofNode, ProofNode};
 
 use super::tx_metarecord::TxMetaRecord;
 use super::wallet::Wallet;
@@ -63,7 +64,7 @@ where
         let mut currency_schema = CurrencySchema::new(&mut view);
 
         let max_height = general_schema.block_hashes_by_height().len() - 1;
-        let block_proof = general_schema.block_and_precommits(max_height).unwrap();
+        let block_proof = general_schema.block_and_precommits(Height(max_height)).unwrap();
         let state_hash = *block_proof.block.state_hash(); //debug code
 
         let wallet_path: MapProofTemplate<MapProof<Wallet>>;

@@ -29,9 +29,9 @@ use router::Router;
 use std::fmt;
 
 use exonum::messages::{RawMessage, RawTransaction, FromRaw, Message};
-use exonum::crypto::{PublicKey, Hash, PUBLIC_KEY_LENGTH};
+use exonum::crypto::{PublicKey, Hash};
 use exonum::storage::{Snapshot, Fork, ProofListIndex, ProofMapIndex};
-use exonum::blockchain::{Service, Transaction, ApiContext};
+use exonum::blockchain::{Service, Transaction, ApiContext, gen_prefix};
 use exonum::encoding::serialize::json::reexport as serde_json;
 use exonum::encoding::Error as StreamStructError;
 use exonum::helpers::fabric::{ServiceFactory, Context};
@@ -192,7 +192,7 @@ where
 
     /// Returns `MerklePatriciaTable` with wallets.
     pub fn wallets_proof(&self) -> ProofMapIndex<&T, PublicKey, Wallet> {
-        ProofMapIndex::new(vec![20], &self.view)
+        ProofMapIndex::new("wallets", &self.view)
     }
 
     /// Returns state hash.
@@ -204,7 +204,7 @@ where
 impl<'a> CurrencySchema<&'a mut Fork> {
     /// Returns `MerklePatriciaTable` with wallets.
     pub fn wallets(&mut self) -> ProofMapIndex<&mut Fork, PublicKey, Wallet> {
-        ProofMapIndex::new(vec![20], self.view)
+        ProofMapIndex::new("wallets", self.view)
     }
 
     /// Returns wallet for the given public key.
@@ -217,9 +217,7 @@ impl<'a> CurrencySchema<&'a mut Fork> {
         &mut self,
         public_key: &PublicKey,
     ) -> ProofListIndex<&mut Fork, TxMetaRecord> {
-        let mut prefix = vec![19; 1 + PUBLIC_KEY_LENGTH];
-        prefix[1..].copy_from_slice(public_key.as_ref());
-        ProofListIndex::new(prefix, self.view)
+        ProofListIndex::with_prefix("wallet_history", gen_prefix(public_key), self.view)
     }
 
     /// Adds transaction record to the walled by the given public key.
@@ -673,10 +671,10 @@ mod tests {
 
     #[cfg(not(feature = "memorydb"))]
     fn create_db() -> Box<Database> {
-        let mut options = storage::LevelDBOptions::new();
-        options.create_if_missing = true;
+        let mut options = storage::RocksDBOptions::default();
+        options.create_if_missing(true);
         let dir = TempDir::new("cryptocurrency").unwrap();
-        Box::new(storage::LevelDB::open(dir.path(), options).unwrap())
+        Box::new(storage::RocksDB::open(dir.path(), options).unwrap())
     }
 
     #[derive(Serialize)]
@@ -691,9 +689,9 @@ mod tests {
             let hash = transaction.hash();
             let raw = transaction.raw().as_ref().as_ref().to_vec();
             TransactionTestData {
-                transaction: transaction,
-                hash: hash,
-                raw: raw,
+                transaction,
+                hash,
+                raw,
             }
         }
     }
