@@ -114,10 +114,10 @@ type ProposeData = StorageValueConfigProposeData;
 /// `ConfigurationService`
 pub const CONFIG_SERVICE: u16 = 1;
 /// Value of [`message_type`][1] of `TxConfigPropose`.
-/// [1]: https://docs.rs/exonum/0.2.0/exonum/messages/struct.MessageBuffer.html#method.message_type
+/// [1]: <https://docs.rs/exonum/0.2.0/exonum/messages/struct.MessageBuffer.html#method.message_type>
 pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 0;
 /// Value of [`message_type`][1] of `TxConfigVote`.
-/// [1]: https://docs.rs/exonum/0.2.0/exonum/messages/struct.MessageBuffer.html#method.message_type
+/// [1]: <https://docs.rs/exonum/0.2.0/exonum/messages/struct.MessageBuffer.html#method.message_type>
 pub const CONFIG_VOTE_MESSAGE_ID: u16 = 1;
 
 lazy_static! {
