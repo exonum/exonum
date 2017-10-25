@@ -16,9 +16,10 @@
 /// json format.
 ///
 
-// TODO refer to difference between json serialization and exonum_json (ECR-156)
-// TODO implement Field for float (ECR-153)
-// TODO remove WriteBufferWraper hack (after refactor storage), should be moved into storage (ECR-156)
+// TODO refer to difference between json serialization and exonum_json (ECR-156).
+// TODO implement Field for float (ECR-153).
+// TODO remove WriteBufferWraper hack (after refactor storage),
+// should be moved into storage (ECR-156).
 
 use serde_json::value::Value;
 use bit_vec::BitVec;
