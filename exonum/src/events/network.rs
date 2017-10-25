@@ -260,7 +260,7 @@ impl RequestHandler {
 
                         let conn_tx = outgoing_connections
                             .get(peer)
-                            .map(|conn_tx| conn_future(Ok(conn_tx).into_future()))
+                            .map(|conn_tx| conn_fut(Ok(conn_tx).into_future()))
                             .or_else(|| {
                                 outgoing_connections
                                     .clone()
@@ -410,7 +410,6 @@ impl Future for Listener {
         self.0.poll()
     }
 }
-
 
 fn conn_fut<F>(fut: F) -> Box<Future<Item = mpsc::Sender<RawMessage>, Error = io::Error>>
 where

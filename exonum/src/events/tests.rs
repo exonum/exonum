@@ -297,7 +297,6 @@ fn test_network_reconnect() {
     assert_eq!(t1.wait_for_disconnect(), second);
 }
 
-
 #[test]
 fn test_network_multiple_connect() {
     let main = "127.0.0.1:19600".parse().unwrap();
@@ -324,16 +323,12 @@ fn test_network_multiple_connect() {
     assert_eq!(node.wait_for_connect(), connect_messages[2]);
 }
 
-
-
 #[test]
 fn test_send_first_not_connect() {
-    let main = "127.0.0.1:19600".parse().unwrap();
-
-    let other = "127.0.0.1:19601".parse().unwrap();
+    let main = "127.0.0.1:19500".parse().unwrap();
+    let other = "127.0.0.1:19501".parse().unwrap();
 
     let mut node = TestEvents::with_addr(main).spawn();
-
     let other_node = TestEvents::with_addr(other).spawn();
 
     let message = raw_message(11, 1000);
@@ -341,5 +336,4 @@ fn test_send_first_not_connect() {
 
     assert_eq!(node.wait_for_connect(), connect_message(other));
     assert_eq!(node.wait_for_message(), message);
-
 }
