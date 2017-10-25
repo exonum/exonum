@@ -310,7 +310,7 @@ impl Api for CryptocurrencyApi {
 // // // // // // // // // // SERVICE DECLARATION // // // // // // // // // //
 
 /// Define the service.
-struct CurrencyService;
+pub struct CurrencyService;
 
 /// Implement a `Service` trait for the service.
 impl Service for CurrencyService {
@@ -348,12 +348,7 @@ impl Service for CurrencyService {
     }
 }
 
-// // // // // // // // // // ENTRY POINT // // // // // // // // // //
-
-fn main() {
-    exonum::helpers::init_logger().unwrap();
-
-    println!("Creating in-memory database...");
+pub fn init_node() -> Node {
     let db = MemoryDB::new();
     let services: Vec<Box<Service>> = vec![Box::new(CurrencyService)];
     let blockchain = Blockchain::new(Box::new(db), services);
@@ -391,9 +386,15 @@ fn main() {
         services_configs: Default::default(),
     };
 
-    println!("Starting a single node...");
-    let mut node = Node::new(blockchain, node_cfg);
+    Node::new(blockchain, node_cfg)
+}
 
-    println!("Blockchain is ready for transactions!");
+fn main() {
+    exonum::helpers::init_logger().unwrap();
+
+    println!("Creating in-memory database...");
+    let mut node = init_node();
+    println!("Starting a single node...");
     node.run().unwrap();
+    println!("Blockchain is ready for transactions!");
 }
