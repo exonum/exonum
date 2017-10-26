@@ -21,7 +21,7 @@ sudo: false
 
 env:
   global:
-  - CLIPPY_VERS=0.0.155
+  - CLIPPY_VERS=0.0.166
   - RUSTFMT_VERS=0.9.0
   - DEADLINKS_VERS=0.2.1
 
@@ -72,13 +72,13 @@ jobs:
     - cargo fmt -p exonum-configuration -- --write-mode=diff
     - cd sandbox_tests && cargo fmt -p exonum-configuration-sandbox -- --write-mode=diff
   - stage: lint
-    rust: nightly-2017-08-31
+    rust: nightly-2017-10-19
     env:
     - FEATURE=clippy
     script:
     - cargo clippy -- -D warnings
   - stage: lint
-    rust: nightly-2017-08-31
+    rust: nightly-2017-10-19
     env:
     - FEATURE=clippy
     # Needed to distinguish among `clippy` jobs when creating caches;
