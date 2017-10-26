@@ -37,13 +37,13 @@
 //! votes for current config.
 //!
 //! See [`StoredConfiguration`][sc] in exonum.
-//! [sc]: https://docs.rs/exonum/0.2.0/exonum/blockchain/config/struct.StoredConfiguration.html
+//! [sc]: <https://docs.rs/exonum/0.2.0/exonum/blockchain/config/struct.StoredConfiguration.html>
 //!
 //! While using the service's transactions and/or api, it's important to understand, how [hash of a
 //! configuration][sc] is calculated. It's calculated as a hash of normalized `String` bytes,
 //! containing configuration json representation.
 //! When a new propose is put via `TxConfigPropose`:
-//! [sc]: https://docs.rs/exonum/0.2.0/exonum/blockchain/config/struct.StoredConfiguration.html
+//! [sc]: <https://docs.rs/exonum/0.2.0/exonum/blockchain/config/struct.StoredConfiguration.html>
 //!
 //! 1. [bytes](struct.TxConfigPropose.html#method.cfg) of a `String`, containing configuration
 //! json ->
@@ -55,7 +55,7 @@
 //!
 //! The same [hash of a configuration][1] is referenced in
 //! `TxConfigVote` in [`cfg_hash`](struct.TxConfigVote.html#method.cfg_hash).
-//! [1]: https://docs.rs/exonum/0.2.0/exonum/blockchain/config/struct.StoredConfiguration.html#method.hash
+//! [1]: <https://docs.rs/exonum/0.2.0/exonum/blockchain/config/struct.StoredConfiguration.html#method.hash>
 //!
 //! # Examples
 //!
@@ -190,7 +190,7 @@ message! {
 /// Most of the actual business logic of modifying `Exonum` blockchain configuration is inside of
 /// [`TxConfigPropose`](struct.TxConfigPropose.html#method.execute) and
 /// [`TxConfigVote`](struct.TxConfigVote.html#method.execute).
-/// [1]: https://docs.rs/exonum/0.2.0/exonum/blockchain/trait.Service.html
+/// [1]: <https://docs.rs/exonum/0.2.0/exonum/blockchain/trait.Service.html>
 #[derive(Default)]
 pub struct ConfigurationService {}
 
