@@ -63,7 +63,7 @@ impl<T, V> ListIndex<T, V> {
     /// let index: ListIndex<_, u8> = ListIndex::new(name, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn new(name: &str, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
         ListIndex {
             base: BaseIndex::new(name, view),
             length: Cell::new(None),
@@ -92,7 +92,7 @@ impl<T, V> ListIndex<T, V> {
     /// let index: ListIndex<_, u8> = ListIndex::with_prefix(name, prefix, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn with_prefix(name: &str, prefix: Vec<u8>, view: T) -> Self {
+    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
         ListIndex {
             base: BaseIndex::with_prefix(name, prefix, view),
             length: Cell::new(None),

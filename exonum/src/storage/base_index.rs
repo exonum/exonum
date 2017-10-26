@@ -16,8 +16,6 @@
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
-use regex::Regex;
-
 use super::{StorageKey, StorageValue, Snapshot, Fork, Iter};
 
 /// Basic struct for all indices that implements common features.
@@ -62,10 +60,10 @@ impl<T> BaseIndex<T> {
     /// available.
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
-    pub fn new(name: &str, view: T) -> Self {
-        if is_valid_name(name) {
+    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
+        if is_valid_name(&name) {
             BaseIndex {
-                name: name.to_string(),
+                name: name.as_ref().to_string(),
                 prefix: None,
                 view,
             }
@@ -82,10 +80,10 @@ impl<T> BaseIndex<T> {
     /// available.
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
-    pub fn with_prefix(name: &str, prefix: Vec<u8>, view: T) -> Self {
-        if is_valid_name(name) {
+    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
+        if is_valid_name(&name) {
             BaseIndex {
-                name: name.to_string(),
+                name: name.as_ref().to_string(),
                 prefix: Some(prefix),
                 view,
             }
@@ -202,7 +200,8 @@ impl<'a> BaseIndex<&'a mut Fork> {
         self.view.remove(&self.name, key);
     }
 
-    /// Clears the index, removing all entries or entries with keys that starts with a prefix.
+    /// Clears the index, removing entries with keys that starts with a prefix or all entries
+    /// if `prefix` is `None`.
     ///
     /// # Notes
     ///
@@ -246,10 +245,9 @@ impl<'a, K, V> ::std::fmt::Debug for BaseIndexIter<'a, K, V> {
 
 /// A function that validates an index name. Allowable characters in name: ASCII characters, digits
 /// and underscores.
-pub fn is_valid_name(name: &str) -> bool {
-    if let Ok(regex) = Regex::new("^[a-zA-Z0-9_]+$") {
-        regex.is_match(name)
-    } else {
-        false
-    }
+pub fn is_valid_name<S: AsRef<str>>(name: S) -> bool {
+    name.as_ref().as_bytes().iter().all(|c| match *c {
+        48...57 | 65...90 | 97...122 | 95 => true,
+        _ => false,
+    })
 }

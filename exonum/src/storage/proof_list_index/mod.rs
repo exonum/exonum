@@ -81,7 +81,7 @@ impl<T, V> ProofListIndex<T, V> {
     /// # drop(index);
     /// # drop(mut_index);
     /// ```
-    pub fn new(name: &str, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
         ProofListIndex {
             base: BaseIndex::new(name, view),
             length: Cell::new(None),
@@ -117,7 +117,7 @@ impl<T, V> ProofListIndex<T, V> {
     /// # drop(index);
     /// # drop(mut_index);
     /// ```
-    pub fn with_prefix(name: &str, prefix: Vec<u8>, view: T) -> Self {
+    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
         ProofListIndex {
             base: BaseIndex::with_prefix(name, prefix, view),
             length: Cell::new(None),

@@ -76,7 +76,7 @@ impl<T, V> ValueSetIndex<T, V> {
     /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(name, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn new(name: &str, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
         ValueSetIndex {
             base: BaseIndex::new(name, view),
             _v: PhantomData,

@@ -111,7 +111,7 @@ mod tests {
             }
 
             fn execute(&self, view: &mut Fork) {
-                let mut index = ProofMapIndex::new("name", view);
+                let mut index = ProofMapIndex::new("balances_txs", view);
                 let from_balance = index.get(self.from()).unwrap_or(0u64);
                 let to_balance = index.get(self.to()).unwrap_or(0u64);
                 index.put(self.from(), from_balance - 1);

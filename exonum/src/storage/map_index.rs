@@ -89,7 +89,7 @@ impl<T, K, V> MapIndex<T, K, V> {
     /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn new(name: &str, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
         MapIndex {
             base: BaseIndex::new(name, view),
             _k: PhantomData,

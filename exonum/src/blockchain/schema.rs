@@ -20,7 +20,7 @@ use helpers::Height;
 use super::{Block, BlockProof, Blockchain};
 use super::config::StoredConfiguration;
 
-/// Generates prefix that combines service identifier, table identifier and given suffix.
+/// Generates an array of bytes from the `prefix`.
 pub fn gen_prefix<K: StorageKey>(prefix: &K) -> Vec<u8> {
     let mut res = vec![0; prefix.size()];
     prefix.write(&mut res[..]);

@@ -223,15 +223,15 @@ fn test_index_name_validator() {
 
     assert!(is_valid_name("index_name"));
     assert!(is_valid_name("_index_name"));
-    assert!(is_valid_name("inDex_name_"));
-    assert!(is_valid_name("index_name1"));
+    assert!(is_valid_name("AinDex_name_"));
+    assert!(is_valid_name("index_name1Z"));
     assert!(is_valid_name("indeX_1namE"));
-    assert!(is_valid_name("1index_Name"));
+    assert!(is_valid_name("1index_Namez"));
 
     assert!(!is_valid_name("index-name"));
     assert!(!is_valid_name("_index-name"));
     assert!(!is_valid_name("индекс_name_"));
     assert!(!is_valid_name("index_имя3"));
     assert!(!is_valid_name("indeX_1namE-"));
-    assert!(!is_valid_name("1in!dex_Name"));
+    assert!(!is_valid_name("1in!dex_Namez"));
 }

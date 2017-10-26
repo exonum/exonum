@@ -49,7 +49,7 @@ impl<T, V> Entry<T, V> {
     /// let index: Entry<_, u8> = Entry::new(name, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn new(name: &str, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
         Entry {
             base: BaseIndex::new(name, view),
             _v: PhantomData,

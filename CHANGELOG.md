@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 - Implement `FromStr` and `ToString` traits for public sodium types (#318)
+- `RocksDB` is a default storage. Removed `LevelDB` as dependency. (#178) 
 
 ### Fixed
 - Fix network failure due to incorrect processing of the incoming buffer (#322)
