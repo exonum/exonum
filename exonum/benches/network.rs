@@ -4,44 +4,82 @@ extern crate exonum;
 extern crate test;
 
 #[cfg(all(test, feature = "long_benchmarks"))]
+#[cfg(test)]
 mod tests {
     use test::Bencher;
-    use std::thread;
-    use std::net::SocketAddr;
-    use std::time::Duration;
 
-    use exonum::events::Reactor;
-    use exonum::events::tests::{gen_message, TestEvents, BenchConfig};
+    use std::net::SocketAddr;
+    use std::thread;
+
+    use exonum::node::EventsPoolCapacity;
+    use exonum::events::network::NetworkConfiguration;
+    use exonum::events::tests::{connect_message, raw_message, TestEvents};
+
+    struct BenchConfig {
+        times: usize,
+        len: usize,
+        tcp_nodelay: bool,
+    }
+
+    fn test_events(cfg: &BenchConfig, listen_address: SocketAddr) -> TestEvents {
+        let network_config = NetworkConfiguration {
+            tcp_nodelay: cfg.tcp_nodelay,
+            ..Default::default()
+        };
+        TestEvents {
+            listen_address,
+            network_config,
+            events_config: EventsPoolCapacity::default(),
+        }
+    }
 
     fn bench_network(b: &mut Bencher, addrs: [SocketAddr; 2], cfg: &BenchConfig) {
         b.iter(|| {
-            let mut e1 = TestEvents::with_cfg(cfg, addrs[0]);
-            let mut e2 = TestEvents::with_cfg(cfg, addrs[1]);
-            e1.0.bind().unwrap();
-            e2.0.bind().unwrap();
-
-            let timeout = Duration::from_secs(30);
-            let len = cfg.len;
             let times = cfg.times;
+            let len = cfg.len;
+            let first = addrs[0];
+            let second = addrs[1];
+
+            let c1 = connect_message(first);
+            let c2 = connect_message(second);
+
+            let mut t1 = test_events(cfg, first).spawn();
+            let mut t2 = test_events(cfg, second).spawn();
+
+            t1.connect_with(second);
+            t2.connect_with(first);
+            assert_eq!(t1.wait_for_connect(), c2);
+            assert_eq!(t2.wait_for_connect(), c1);
+
             let t1 = thread::spawn(move || {
-                e1.wait_for_connect(&addrs[1]).unwrap();
                 for _ in 0..times {
-                    let msg = gen_message(0, len);
-                    e1.send_to(&addrs[1], msg);
-                    e1.wait_for_messages(1, timeout).unwrap();
+                    let msg = raw_message(0, len);
+                    t1.send_to(second, msg);
+                    t1.wait_for_message();
                 }
-                e1.wait_for_disconnect(Duration::from_millis(1000)).unwrap();
+                t1
             });
+
             let t2 = thread::spawn(move || {
-                e2.wait_for_connect(&addrs[0]).unwrap();
                 for _ in 0..times {
-                    let msg = gen_message(1, len);
-                    e2.send_to(&addrs[0], msg);
-                    e2.wait_for_messages(1, timeout).unwrap();
+                    let msg = raw_message(1, len);
+                    t2.send_to(first, msg);
+                    t2.wait_for_message();
                 }
+                t2
             });
-            t1.join().unwrap();
-            t2.join().unwrap();
+
+            let mut t1 = t1.join().unwrap();
+            let mut t2 = t2.join().unwrap();
+
+            t1.disconnect_with(second);
+            t2.disconnect_with(first);
+
+            assert_eq!(t1.wait_for_disconnect(), second);
+            assert_eq!(t2.wait_for_disconnect(), first);
+
+            drop(t1);
+            drop(t2);
         })
     }
 
@@ -60,7 +98,7 @@ mod tests {
     fn bench_msg_short_1000(b: &mut Bencher) {
         let cfg = BenchConfig {
             tcp_nodelay: false,
-            len: 100,
+            len: 1000,
             times: 1000,
         };
         let addrs = ["127.0.0.1:9792".parse().unwrap(), "127.0.0.1:9793".parse().unwrap()];
@@ -68,13 +106,13 @@ mod tests {
     }
 
     #[bench]
-    fn bench_msg_short_10000(b: &mut Bencher) {
+    fn bench_msg_short_10_000(b: &mut Bencher) {
         let cfg = BenchConfig {
             tcp_nodelay: false,
-            len: 100,
+            len: 1000,
             times: 10_000,
         };
-        let addrs = ["127.0.0.1:9982".parse().unwrap(), "127.0.0.1:9983".parse().unwrap()];
+        let addrs = ["127.0.0.1:9792".parse().unwrap(), "127.0.0.1:9793".parse().unwrap()];
         bench_network(b, addrs, &cfg);
     }
 
@@ -90,7 +128,18 @@ mod tests {
     }
 
     #[bench]
-    fn bench_msg_short_10000_nodelay(b: &mut Bencher) {
+    fn bench_msg_short_1000_nodelay(b: &mut Bencher) {
+        let cfg = BenchConfig {
+            tcp_nodelay: true,
+            len: 100,
+            times: 1000,
+        };
+        let addrs = ["127.0.0.1:5990".parse().unwrap(), "127.0.0.1:5991".parse().unwrap()];
+        bench_network(b, addrs, &cfg);
+    }
+
+    #[bench]
+    fn bench_msg_short_10_000_nodelay(b: &mut Bencher) {
         let cfg = BenchConfig {
             tcp_nodelay: true,
             len: 100,
@@ -119,6 +168,17 @@ mod tests {
             times: 100,
         };
         let addrs = ["127.0.0.1:9946".parse().unwrap(), "127.0.0.1:9947".parse().unwrap()];
+        bench_network(b, addrs, &cfg);
+    }
+
+    #[bench]
+    fn bench_msg_long_10_nodelay(b: &mut Bencher) {
+        let cfg = BenchConfig {
+            tcp_nodelay: true,
+            len: 100_000,
+            times: 10,
+        };
+        let addrs = ["127.0.0.1:9198".parse().unwrap(), "127.0.0.1:9199".parse().unwrap()];
         bench_network(b, addrs, &cfg);
     }
 

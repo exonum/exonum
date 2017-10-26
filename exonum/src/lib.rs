@@ -19,8 +19,6 @@
 #![deny(missing_debug_implementations)]
 #![deny(missing_docs)]
 
-#![cfg_attr(all(feature = "nightly", test), feature(test))]
-
 #![cfg_attr(feature="cargo-clippy", allow(zero_prefixed_literal))]
 
 #![cfg_attr(feature="flame_profile", feature(plugin, custom_attribute))]
@@ -31,7 +29,6 @@ extern crate exonum_profiler;
 #[macro_use]
 extern crate log;
 extern crate byteorder;
-extern crate mio;
 extern crate exonum_sodiumoxide as sodiumoxide;
 #[cfg(feature = "leveldb")]
 extern crate exonum_leveldb as leveldb;
@@ -49,8 +46,6 @@ extern crate bit_vec;
 extern crate vec_map;
 #[cfg(test)]
 extern crate tempdir;
-#[cfg(all(feature = "nightly", test))]
-extern crate test;
 extern crate env_logger;
 extern crate colored;
 extern crate term;
@@ -63,14 +58,21 @@ extern crate params;
 extern crate cookie;
 extern crate mount;
 extern crate atty;
+extern crate bytes;
+extern crate futures;
+#[cfg(any(test, feature = "long_benchmarks"))]
+extern crate tokio_timer;
+extern crate tokio_core;
+extern crate tokio_io;
+extern crate tokio_retry;
 
 #[macro_use]
 pub mod encoding;
 #[macro_use]
 pub mod messages;
+pub mod crypto;
 #[doc(hidden)]
 pub mod events;
-pub mod crypto;
 pub mod node;
 pub mod storage;
 pub mod blockchain;
