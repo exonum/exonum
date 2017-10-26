@@ -245,9 +245,26 @@ impl<'a, K, V> ::std::fmt::Debug for BaseIndexIter<'a, K, V> {
 
 /// A function that validates an index name. Allowable characters in name: ASCII characters, digits
 /// and underscores.
-pub fn is_valid_name<S: AsRef<str>>(name: S) -> bool {
+fn is_valid_name<S: AsRef<str>>(name: S) -> bool {
     name.as_ref().as_bytes().iter().all(|c| match *c {
-        48...57 | 65...90 | 97...122 | 95 => true,
+        48...57 | 65...90 | 97...122 | 95 | 46 => true,
         _ => false,
     })
+}
+
+#[test]
+fn test_index_name_validator() {
+    assert!(is_valid_name("index_name"));
+    assert!(is_valid_name("_index_name"));
+    assert!(is_valid_name("AinDex_name_"));
+    assert!(is_valid_name("core.index_name1Z"));
+    assert!(is_valid_name("configuration.indeX_1namE"));
+    assert!(is_valid_name("1index_Namez"));
+
+    assert!(!is_valid_name("index-name"));
+    assert!(!is_valid_name("_index-name"));
+    assert!(!is_valid_name("индекс_name_"));
+    assert!(!is_valid_name("core.index_имя3"));
+    assert!(!is_valid_name("indeX_1namE-"));
+    assert!(!is_valid_name("1in!dex_Namez"));
 }

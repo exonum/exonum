@@ -216,22 +216,3 @@ mod rocksdb_tests {
         super::changelog(rocksdb_database(path));
     }
 }
-
-#[test]
-fn test_index_name_validator() {
-    use super::base_index::is_valid_name;
-
-    assert!(is_valid_name("index_name"));
-    assert!(is_valid_name("_index_name"));
-    assert!(is_valid_name("AinDex_name_"));
-    assert!(is_valid_name("index_name1Z"));
-    assert!(is_valid_name("indeX_1namE"));
-    assert!(is_valid_name("1index_Namez"));
-
-    assert!(!is_valid_name("index-name"));
-    assert!(!is_valid_name("_index-name"));
-    assert!(!is_valid_name("индекс_name_"));
-    assert!(!is_valid_name("index_имя3"));
-    assert!(!is_valid_name("indeX_1namE-"));
-    assert!(!is_valid_name("1in!dex_Namez"));
-}

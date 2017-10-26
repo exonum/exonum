@@ -82,6 +82,34 @@ impl<T, V> ValueSetIndex<T, V> {
             _v: PhantomData,
         }
     }
+
+    /// Creates a new index representation based on the name, common prefix of its keys
+    /// and storage view.
+    ///
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
+    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// available.
+    /// [`&Snapshot`]: ../trait.Snapshot.html
+    /// [`&mut Fork`]: ../struct.Fork.html
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ValueSetIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let snapshot = db.snapshot();
+    /// let name = "name";
+    /// let prefix = vec![123];
+    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::with_prefix(name, prefix, &snapshot);
+    /// # drop(index);
+    /// ```
+    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
+        ValueSetIndex {
+            base: BaseIndex::with_prefix(name, prefix, view),
+            _v: PhantomData,
+        }
+    }
 }
 
 impl<T, V> ValueSetIndex<T, V>

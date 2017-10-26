@@ -131,6 +131,43 @@ impl<T, K, V> ProofMapIndex<T, K, V> {
             _v: PhantomData,
         }
     }
+
+    /// Creates a new index representation based on the name, common prefix of its keys
+    /// and storage view.
+    ///
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
+    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// available.
+    /// [`&Snapshot`]: ../trait.Snapshot.html
+    /// [`&mut Fork`]: ../struct.Fork.html
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum::crypto::Hash;
+    ///
+    /// let db = MemoryDB::new();
+    /// let name = "name";
+    /// let prefix = vec![01];
+    ///
+    /// let snapshot = db.snapshot();
+    /// let index: ProofMapIndex<_, Hash, u8> =
+    ///                             ProofMapIndex::with_prefix(name, prefix.clone(), &snapshot);
+    ///
+    /// let mut fork = db.fork();
+    /// let mut mut_index : ProofMapIndex<_, Hash, u8> =
+    ///                                     ProofMapIndex::with_prefix(name, prefix, &mut fork);
+    /// # drop(index);
+    /// # drop(mut_index);
+    /// ```
+    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
+        ProofMapIndex {
+            base: BaseIndex::with_prefix(name, prefix, view),
+            _k: PhantomData,
+            _v: PhantomData,
+        }
+    }
 }
 
 impl<T, K, V> ProofMapIndex<T, K, V>

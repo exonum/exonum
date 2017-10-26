@@ -271,7 +271,7 @@ impl Fork {
         self.logged = false;
     }
 
-    /// Inserts the key-value pair into the fork with name `name`.
+    /// Inserts the key-value pair into the fork with the given name `name`.
     pub fn put(&mut self, name: &str, key: Vec<u8>, value: Vec<u8>) {
         if !self.patch.contains_key(name) {
             self.patch.insert(name.to_string(), BTreeMap::new());
@@ -290,7 +290,7 @@ impl Fork {
         }
     }
 
-    /// Removes the key from the fork with name `name`.
+    /// Removes the key from the fork with the given name `name`.
     pub fn remove(&mut self, name: &str, key: Vec<u8>) {
         if !self.patch.contains_key(name) {
             self.patch.insert(name.to_string(), BTreeMap::new());

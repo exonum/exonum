@@ -46,7 +46,7 @@ tokio-timer = "0.1.2"
 
 exonum_sodiumoxide = "0.0.14"
 exonum_profiler = "0.1.1"
-exonum_rocksdb = { version = "0.7.0", git = "https://github.com/exonum/exonum_rocksdb.git" }
+exonum_rocksdb = "0.7"
 exonum_flamer = { version = "0.1.5", optional = true }
 
 [dev-dependencies]

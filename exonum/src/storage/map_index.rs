@@ -96,6 +96,36 @@ impl<T, K, V> MapIndex<T, K, V> {
             _v: PhantomData,
         }
     }
+
+    /// Creates a new index representation based on the name, common prefix of its keys
+    /// and storage view.
+    ///
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
+    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// available.
+    /// [`&Snapshot`]: ../trait.Snapshot.html
+    /// [`&mut Fork`]: ../struct.Fork.html
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, MapIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let name = "name";
+    /// let prefix = vec![01];
+    ///
+    /// let snapshot = db.snapshot();
+    /// let index: MapIndex<_, u8, u8> = MapIndex::with_prefix(name, prefix, &snapshot);
+    /// # drop(index);
+    /// ```
+    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
+        MapIndex {
+            base: BaseIndex::with_prefix(name, prefix, view),
+            _k: PhantomData,
+            _v: PhantomData,
+        }
+    }
 }
 
 impl<T, K, V> MapIndex<T, K, V>
