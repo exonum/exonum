@@ -20,9 +20,8 @@ use serde_json::{self, Error as JsonError};
 use std::collections::{BTreeMap, HashSet};
 
 use storage::StorageValue;
-use events::Milliseconds;
 use crypto::{hash, PublicKey, Hash};
-use helpers::Height;
+use helpers::{Height, Milliseconds};
 
 /// Public keys of a validator.
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]

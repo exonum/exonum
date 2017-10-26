@@ -17,7 +17,7 @@ use std::panic::{self, PanicInfo};
 use std::ffi::OsString;
 
 use blockchain::{Service, Blockchain};
-use node::{Node, NodeConfig};
+use node::{NodeConfig, Node};
 
 use super::internal::{CollectedCommand, Feedback};
 use super::clap_backend::ClapBackend;
@@ -110,7 +110,7 @@ impl NodeBuilder {
         let feedback = self.parse_cmd();
         panic::set_hook(old_hook);
 
-        if let Some(mut node) = feedback {
+        if let Some(node) = feedback {
             node.run().expect("Node return error")
         }
 

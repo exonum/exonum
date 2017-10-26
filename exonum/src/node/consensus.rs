@@ -20,14 +20,10 @@ use messages::{ConsensusMessage, Propose, Prevote, Precommit, Message, ProposeRe
                TransactionsRequest, PrevotesRequest, BlockRequest, BlockResponse, RawTransaction};
 use helpers::{Height, Round, ValidatorId};
 use storage::Patch;
-use events::Channel;
-use super::{NodeHandler, RequestData, ExternalMessage, NodeTimeout};
+use super::{NodeHandler, RequestData};
 
 // TODO reduce view invokations
-impl<S> NodeHandler<S>
-where
-    S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>,
-{
+impl NodeHandler {
     /// Validates consensus message, then redirects it to the corresponding `handle_...` function.
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_consensus(&mut self, msg: ConsensusMessage) {
@@ -469,7 +465,10 @@ where
         metric!("node.mempool", mempool_size);
 
         // Update state to new height
-        self.state.new_height(&block_hash, self.channel.get_time());
+        self.state.new_height(
+            &block_hash,
+            self.system_state.current_time(),
+        );
 
         info!("COMMIT ====== height={}, proposer={}, round={}, committed={}, pool={}, hash={}",
               height,
@@ -510,7 +509,7 @@ where
     /// added to the transactions pool.
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_tx(&mut self, msg: RawTransaction) {
-        trace!("Handle transaction");
+        //trace!("Handle transaction");
         let hash = msg.hash();
         let tx = {
             let service_id = msg.service_id();
@@ -874,7 +873,7 @@ where
             round,
             propose_hash,
             block_hash,
-            self.channel.get_time(),
+            self.system_state.current_time(),
             self.state.consensus_secret_key(),
         );
         self.state.add_precommit(&precommit);

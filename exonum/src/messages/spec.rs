@@ -345,7 +345,8 @@ macro_rules! message {
                 use $crate::encoding::serialize::reexport::{DeError, Deserialize};
                 let value = <Value as Deserialize>::deserialize(deserializer)?;
                 <Self as $crate::encoding::serialize::json::ExonumJsonDeserialize>::deserialize(
-                    &value).map_err(|_| D::Error::custom("Can not deserialize value."))
+                    &value).map_err(|e| D::Error::custom(
+                            format!("Can't deserialize a value: {}", e.description())))
             }
         }
 

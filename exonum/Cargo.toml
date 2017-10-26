@@ -16,7 +16,6 @@ travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
 log = "0.3.8"
-mio = "0.5.0"
 byteorder = "1.1.0"
 hex = "0.2.0"
 bit-vec = "0.4.4"
@@ -35,10 +34,15 @@ cookie = "0.9.1"
 router = "0.5.1"
 iron = "0.5.1"
 headers = "0.1.0"
-bodyparser = "0.7.0"
 params = "0.6.0"
 mount = "0.3.0"
 atty = "0.2.2"
+bytes = "0.4.0"
+futures = "0.1.14"
+tokio-core = "0.1.9"
+tokio-io = "0.1.2"
+tokio-retry = "0.1.0"
+tokio-timer = "0.1.2"
 
 exonum_sodiumoxide = { version = "0.0.14" }
 exonum_rocksdb = { version = "0.6.1", optional = true }
@@ -55,6 +59,5 @@ default = ["leveldb"]
 leveldb = ["exonum_leveldb"]
 rocksdb = ["exonum_rocksdb"]
 long_benchmarks = []
-nightly = []
 flame_profile = ["exonum_profiler/nomock", "exonum_flamer"]
 metrics-log = []

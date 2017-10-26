@@ -25,7 +25,7 @@ use blockchain::{GenesisConfig, ValidatorKeys};
 use node::NodeConfig;
 use crypto::gen_keypair;
 
-pub use self::types::{Height, Round, ValidatorId};
+pub use self::types::{Height, Round, ValidatorId, Milliseconds};
 
 mod types;
 
