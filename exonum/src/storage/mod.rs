@@ -83,7 +83,7 @@
 //! [`RocksDB`]: struct.RocksDB.html
 //! [`MemoryDB`]: struct.MemoryDB.html
 //! [`Snapshot`]: trait.Snapshot.html
-//! [`Fork`]: struct.fork.html
+//! [`Fork`]: struct.Fork.html
 //! [`Patch`]: type.Patch.html
 //! [1]: trait.Database.html#tymethod.snapshot
 //! [2]: trait.Database.html#method.fork
