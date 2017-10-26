@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// This is regression test for exonum configuration.
+// This is a regression test for exonum configuration.
 #[macro_use]
 extern crate pretty_assertions;
 extern crate toml;

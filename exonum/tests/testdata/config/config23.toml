@@ -30,15 +30,20 @@ type = "Constant"
 timeout = 500
 
 [mempool]
-events_pool_capacity = 400000
 tx_pool_capacity = 100000
+
+[mempool.events_pool_capacity]
+api_requests_capacity = 1024
+network_events_capacity = 512
+network_requests_capacity = 512
+timeout_requests_capacity = 128
 
 [network]
 max_incoming_connections = 128
 max_outgoing_connections = 128
-tcp_nodelay = false
-tcp_reconnect_timeout = 500
-tcp_reconnect_timeout_max = 600000
+tcp_nodelay = true
+tcp_connect_retry_timeout = 15000
+tcp_connect_max_retries = 10
 
 [services_configs]
 
