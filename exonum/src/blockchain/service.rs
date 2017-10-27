@@ -349,6 +349,21 @@ impl ApiContext {
         }
     }
 
+    /// Constructs context from raw parts.
+    pub fn from_parts(
+        blockchain: &Blockchain,
+        node_channel: ApiSender,
+        public_key: &PublicKey,
+        secret_key: &SecretKey,
+    ) -> ApiContext {
+        ApiContext {
+            blockchain: blockchain.clone(),
+            node_channel,
+            public_key: *public_key,
+            secret_key: secret_key.clone(),
+        }
+    }
+
     /// Returns reference to the node's blockchain.
     pub fn blockchain(&self) -> &Blockchain {
         &self.blockchain
