@@ -151,7 +151,7 @@ impl<'a> BlockchainExplorer<'a> {
         let max_len = hashes.len();
         let upper = upper.map(|x| cmp::min(x, max_len)).unwrap_or(max_len);
 
-        let mut height = upper-1;
+        let mut height = upper - 1;
         let mut v = Vec::new();
         let mut collected: u64 = 0;
 
@@ -174,7 +174,10 @@ impl<'a> BlockchainExplorer<'a> {
             collected += 1;
         }
         BlocksRange {
-            range: Range { from: height+1, to: upper-1 },
+            range: Range {
+                from: height + 1,
+                to: upper - 1
+            },
             blocks: v,
         }
     }

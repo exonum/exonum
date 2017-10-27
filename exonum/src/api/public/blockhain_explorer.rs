@@ -19,7 +19,7 @@ use params::{Params, Value};
 use router::Router;
 use iron::prelude::*;
 
-use blockchain::{Blockchain};
+use blockchain::Blockchain;
 use explorer::{BlockInfo, BlockchainExplorer, BlocksRange};
 use api::{Api, ApiError};
 use helpers::Height;
