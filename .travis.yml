@@ -1,0 +1,40 @@
+language: rust
+rust:
+  - stable
+cache: cargo
+sudo: false
+dist: trusty
+env:
+  global:
+    - CLIPPY_VERS=0.0.166
+    - RUSTFMT_VERS=0.9.0
+  matrix:
+    - FEATURE=test
+script:
+  - cargo test
+
+stages:
+  - lint
+  - test
+jobs:
+  include:
+    - stage: lint
+      env:
+        - FEATURE=fmt
+      before_install:
+        - >
+          rustfmt --version | grep $RUSTFMT_VERS ||
+          cargo install rustfmt --force --vers $RUSTFMT_VERS
+      script:
+        - cargo fmt -- --write-mode=diff
+    - stage: lint
+      rust: nightly-2017-10-19
+      env:
+        - FEATURE=clippy
+      before_install:
+        - >
+          cargo clippy --version | grep $CLIPPY_VERS ||
+          cargo install clippy --force --vers $CLIPPY_VERS
+      script:
+        - cargo clippy -- -D warnings
+    - stage: test
