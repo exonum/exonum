@@ -176,7 +176,7 @@ impl<'a> BlockchainExplorer<'a> {
         BlocksRange {
             range: Range {
                 from: height + 1,
-                to: upper - 1
+                to: upper - 1,
             },
             blocks: v,
         }
