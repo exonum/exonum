@@ -60,8 +60,9 @@ const INIT_BALANCE: u64 = 100;
 // declare a type for storing information about the wallet and its balance.
 
 /// Declare a [serializable][1]
-/// [1]: https://github.com/exonum/exonum-doc/blob/master/src/architecture/serialization.md
 /// struct and determine bounds of its fields with `encoding_struct!` macro.
+///
+/// [1]: https://exonum.com/doc/architecture/serialization
 encoding_struct! {
     struct Wallet {
         const SIZE = 48;
@@ -93,12 +94,13 @@ pub struct CurrencySchema<'a> {
     view: &'a mut Fork,
 }
 
-/// Declare layout of the data. Use an instance of [`MapIndex`][2]
-/// [2]: https://github.com/exonum/exonum-doc/blob/master/src/architecture/storage.md#mapindex
+/// Declare layout of the data. Use an instance of [`MapIndex`]
 /// to keep wallets in storage. Index values are serialized `Wallet` structs.
 ///
 /// Isolate the wallets map into a separate entity by adding a unique prefix,
 /// i.e. the first argument to the `MapIndex::new` call.
+///
+/// [`MapIndex`]: https://exonum.com/doc/architecture/storage#mapindex
 impl<'a> CurrencySchema<'a> {
     pub fn wallets(&mut self) -> MapIndex<&mut Fork, PublicKey, Wallet> {
         let prefix = blockchain::gen_prefix(SERVICE_ID, 0, &());
