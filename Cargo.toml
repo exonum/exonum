@@ -1,0 +1,28 @@
+[package]
+name = "exonum-harness"
+version = "0.0.0"
+license = "Apache-2.0"
+homepage = "https://exonum.com"
+description = """
+Test harness for Exonum blockchain framework, allowing to test service APIs
+synchronously.
+"""
+categories = ["test"]
+
+[dependencies]
+exonum = "0.2.0"
+futures = "0.1.14"
+serde = "1.0"
+serde_json = "1.0"
+mount = "0.3.0"
+iron = "0.5.1"
+iron-test = "0.5.0"
+
+[dev-dependencies]
+bodyparser = "0.7.0"
+router = "0.5.1"
+serde_derive = "1.0"
+
+[replace."exonum:0.2.0"]
+git = "https://github.com/slowli/exonum"
+branch = "improvements-for-harness"
