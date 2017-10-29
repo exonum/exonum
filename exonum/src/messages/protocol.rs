@@ -51,15 +51,15 @@ pub const PRECOMMIT_MESSAGE_ID: u16 = 4;
 /// `BlockResponse` message id.
 pub const BLOCK_RESPONSE_MESSAGE_ID: u16 = 5;
 
-/// `RequestPropose` message id.
+/// `ProposeRequest` message id.
 pub const PROPOSE_REQUEST_MESSAGE_ID: u16 = 6;
-/// `RequestTransactions` message id.
+/// `TransactionsRequest` message id.
 pub const TRANSACTIONS_REQUEST_MESSAGE_ID: u16 = 7;
-/// `RequestPrevotes` message id.
+/// `PrevotesRequest` message id.
 pub const PREVOTES_REQUEST_MESSAGE_ID: u16 = 8;
-/// `RequestPeers` message id.
+/// `PeersRequest` message id.
 pub const PEERS_REQUEST_MESSAGE_ID: u16 = 9;
-/// `RequestBlock` message id.
+/// `BlockRequest` message id.
 pub const BLOCK_REQUEST_MESSAGE_ID: u16 = 10;
 
 message! {
