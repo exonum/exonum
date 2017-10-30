@@ -55,7 +55,8 @@
 //!
 //! The same [hash of a configuration][1] is referenced in
 //! `TxConfigVote` in [`cfg_hash`](struct.TxConfigVote.html#method.cfg_hash).
-//! [1]: <https://docs.rs/exonum/0.2.0/exonum/blockchain/config/struct.StoredConfiguration.html#method.hash>
+//! [1]: <https://docs.rs/exonum/0.2.0/exonum/blockchain/config/
+//!struct.StoredConfiguration.html#method.hash>
 //!
 //! # Examples
 //!
@@ -114,10 +115,12 @@ type ProposeData = StorageValueConfigProposeData;
 /// `ConfigurationService`
 pub const CONFIG_SERVICE: u16 = 1;
 /// Value of [`message_type`][1] of `TxConfigPropose`.
-/// [1]: <https://docs.rs/exonum/0.2.0/exonum/messages/struct.MessageBuffer.html#method.message_type>
+/// [1]: <https://docs.rs/exonum/0.2.0/exonum/messages/
+///struct.MessageBuffer.html#method.message_type>
 pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 0;
 /// Value of [`message_type`][1] of `TxConfigVote`.
-/// [1]: <https://docs.rs/exonum/0.2.0/exonum/messages/struct.MessageBuffer.html#method.message_type>
+/// [1]: <https://docs.rs/exonum/0.2.0/exonum/messages/
+///struct.MessageBuffer.html#method.message_type>
 pub const CONFIG_VOTE_MESSAGE_ID: u16 = 1;
 
 lazy_static! {
@@ -212,8 +215,7 @@ where
     /// within
     /// `StorageValueConfigProposeData` along with votes' data.
     ///
-    /// - Table **key** is [hash of a configuration]
-    /// (https://docs.rs/exonum/0.2.0/exonum/blockchain/config/struct.StoredConfiguration.html#method.hash).
+    /// - Table **key** is [hash of a configuration][1].
     /// This hash is normalized when a new propose is put via `put_propose`:
     ///   1. [bytes](struct.TxConfigPropose.html#method.cfg) of a `String`,
     ///   containing configuration json ->
@@ -228,6 +230,8 @@ where
     /// which contains
     /// [bytes](struct.TxConfigPropose.html#method.cfg), corresponding to
     /// **key**.
+    /// [1]: <https://docs.rs/exonum/0.2.0/exonum/blockchain/config/
+    ///struct.StoredConfiguration.html#method.hash>
     pub fn propose_data_by_config_hash(&self) -> ProofMapIndex<&T, Hash, ProposeData> {
         let prefix = gen_prefix(CONFIG_SERVICE, 0, &());
         ProofMapIndex::new(prefix, &self.view)
@@ -236,12 +240,12 @@ where
     /// Returns a `ProofListIndex` table of hashes of proposed configurations in propose
     /// commit order.
     ///
-    /// - Table **index** is propose_id - position of a proposed [hash of a configuration]
-    /// (https://docs.rs/exonum/0.2.0/exonum/blockchain/config/struct.StoredConfiguration.html#method.hash)
-    /// in the corresponding `TxConfigPropose` commit order.
-    /// - Table **value** is [hash of a configuration]
-    /// (https://docs.rs/exonum/0.2.0/exonum/blockchain/config/struct.StoredConfiguration.html#method.hash)
-    /// - **key** of `propose_data_by_config_hash`
+    /// - Table **index** is propose_id - position of a proposed [hash of a configuration][1] in
+    /// the corresponding `TxConfigPropose` commit order.
+    /// - Table **value** is [hash of a configuration][1] - **key** of
+    /// `propose_data_by_config_hash`.
+    /// [1]: <https://docs.rs/exonum/0.2.0/exonum/blockchain/config/
+    ///struct.StoredConfiguration.html#method.hash>
     pub fn config_hash_by_ordinal(&self) -> ProofListIndex<&T, Hash> {
         let prefix = gen_prefix(CONFIG_SERVICE, 1, &());
         ProofListIndex::new(prefix, &self.view)
@@ -249,8 +253,9 @@ where
 
     /// Returns a `ProofListIndex` table of votes of validators for config, referenced by the
     /// queried
-    /// `config_hash` - [hash of a configuration]
-    /// (https://docs.rs/exonum/0.2.0/exonum/blockchain/config/struct.StoredConfiguration.html#method.hash).
+    /// `config_hash` - [hash of a configuration][1].
+    /// [1]: <https://docs.rs/exonum/0.2.0/exonum/blockchain/config/
+    ///struct.StoredConfiguration.html#method.hash>
     ///
     /// 1. The list of validators, who can vote for a config, is determined by
     /// `validators` of previous [StoredConfiguration]
@@ -332,10 +337,10 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
     /// - **votes_history_hash** - root_hash of corresponding `votes_by_config_hash` table in a
     /// state right after initialization (all indices contain [empty vote](struct.ZEROVOTE.html)).
     ///
-    /// If an entry with the same [hash of a configuration]
-    /// (https://docs.rs/exonum/0.2.0/exonum/blockchain/config/struct.StoredConfiguration.html#method.hash)
-    /// is present in `propose_data_by_config_hash`, as in config inside of `tx_propose`, nothing
-    /// is done.
+    /// If an entry with the same [hash of a configuration][1] is present in
+    /// `propose_data_by_config_hash`, as in config inside of `tx_propose`, nothing is done.
+    /// [1]: <https://docs.rs/exonum/0.2.0/exonum/blockchain/config/
+    ///struct.StoredConfiguration.html#method.hash>
     pub fn put_propose(&mut self, tx_propose: TxConfigPropose) -> bool {
         let cfg =
             <StoredConfiguration as StorageValue>::from_bytes(tx_propose.cfg().as_bytes().into());
@@ -645,7 +650,8 @@ impl Service for ConfigurationService {
     /// `ConfigurationService` returns a vector, containing the single [root_hash][1]
     /// of [all config proposes table]
     /// (struct.ConfigurationSchema.html#method.propose_data_by_config_hash).
-    /// [1]: https://docs.rs/exonum/0.2.0/exonum/storage/proof_list_index/struct.ProofListIndex.html#method.root_hash
+    /// [1]: <https://docs.rs/exonum/0.2.0/exonum/storage/proof_list_index/
+    ///struct.ProofListIndex.html#method.root_hash>
     ///
     /// Thus, `state_hash` is affected by any new valid propose and indirectly by
     /// any new vote for a propose.
@@ -656,7 +662,8 @@ impl Service for ConfigurationService {
     /// is modified. Such hash is stored in each entry of [all config proposes table]
     /// (struct.ConfigurationSchema.html#method.propose_data_by_config_hash)
     /// - `StorageValueConfigProposeData`.
-    /// [1]: https://docs.rs/exonum/0.2.0/exonum/storage/proof_map_index/struct.ProofMapIndex.html#method.root_hash
+    /// [1]: <https://docs.rs/exonum/0.2.0/exonum/storage/proof_map_index/
+    ///struct.ProofMapIndex.html#method.root_hash>
     fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash> {
         let schema = ConfigurationSchema::new(snapshot);
         schema.state_hash()
