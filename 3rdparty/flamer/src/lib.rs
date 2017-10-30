@@ -64,7 +64,7 @@ impl<'a, 'cx> Folder for Flamer<'a, 'cx> {
         block.map(|block| {
             let name = self.cx.expr_str(DUMMY_SP, self.ident.name);
             quote_block!(self.cx, {
-                let g = ::profiler::ProfilerSpan::new($name);
+                let g = ::exonum_profiler::ProfilerSpan::new($name);
                 let r = $block;
                 drop(g);
                 r

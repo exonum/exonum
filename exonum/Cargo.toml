@@ -47,8 +47,8 @@ tokio-timer = "0.1.2"
 exonum_sodiumoxide = { version = "0.0.14" }
 exonum_rocksdb = { version = "0.6.1", optional = true }
 exonum_leveldb = { version = "0.9.1", optional = true }
-exonum_profiler = { version = "0.1.1" }
-exonum_flamer = { version = "0.1.5", optional = true }
+exonum_profiler = { path="../3rdparty/profiler", version = "0.1.2" }
+exonum_flamer = {  path="../3rdparty/flamer", version = "0.1.6", optional = true }
 
 [dev-dependencies]
 pretty_assertions = "0.2.1"
