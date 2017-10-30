@@ -80,6 +80,8 @@
 //! ```
 
 #![cfg_attr(feature = "cargo-clippy", allow(block_in_if_condition_stmt))]
+// TODO: Remove when https://github.com/rust-lang-nursery/rust-clippy/issues/2190 is fixed.
+#![cfg_attr(feature="cargo-clippy", allow(doc_markdown))]
 
 #[macro_use]
 extern crate exonum;
