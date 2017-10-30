@@ -278,7 +278,7 @@ macro_rules! implement_public_sodium_wrapper {
             write!(f, stringify!($name))?;
             write!(f, "(")?;
             for i in &self[0..BYTES_IN_DEBUG] {
-                write!(f, "{:X}", i)?
+                write!(f, "{:02X}", i)?
             }
             write!(f, ")")
         }
@@ -316,7 +316,7 @@ macro_rules! implement_private_sodium_wrapper {
             write!(f, stringify!($name))?;
             write!(f, "(")?;
             for i in &self[0..BYTES_IN_DEBUG] {
-                write!(f, "{:X}", i)?
+                write!(f, "{:02X}", i)?
             }
             write!(f, "...)")
         }
@@ -565,6 +565,28 @@ mod tests {
         let json_h = serde_json::to_string(&h).unwrap();
         let h1 = serde_json::from_str(&json_h).unwrap();
         assert_eq!(h, h1);
+    }
+
+    #[test]
+    fn test_debug_format() {
+        // Check zero padding
+        let hash = Hash::new([1; 32]);
+        assert_eq!(format!("{:?}", &hash), "Hash(01010101)");
+
+        let pk = PublicKey::new([15; 32]);
+        assert_eq!(format!("{:?}", &pk), "PublicKey(0F0F0F0F)");
+        let sk = SecretKey::new([8; 64]);
+        assert_eq!(format!("{:?}", &sk), "SecretKey(08080808...)");
+        let signature = Signature::new([10; 64]);
+        assert_eq!(format!("{:?}", &signature), "Signature(0A0A0A0A)");
+        let seed = Seed::new([4; 32]);
+        assert_eq!(format!("{:?}", &seed), "Seed(04040404...)");
+
+        // Check no padding
+        let hash = Hash::new([128; 32]);
+        assert_eq!(format!("{:?}", &hash), "Hash(80808080)");
+        let sk = SecretKey::new([255; 64]);
+        assert_eq!(format!("{:?}", &sk), "SecretKey(FFFFFFFF...)");
     }
 
     #[test]
