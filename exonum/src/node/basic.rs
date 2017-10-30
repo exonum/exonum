@@ -133,7 +133,7 @@ impl NodeHandler {
         }
     }
 
-    /// Handles the `Status` message. Node sends `RequestBlock` as response if height in the
+    /// Handles the `Status` message. Node sends `BlockRequest` as response if height in the
     /// message is higher than node's height.
     pub fn handle_status(&mut self, msg: Status) {
         let height = self.state.height();
@@ -174,7 +174,7 @@ impl NodeHandler {
         }
     }
 
-    /// Handles the `RequestPeers` message. Node sends `Connect` messages of other peers as result.
+    /// Handles the `PeersRequest` message. Node sends `Connect` messages of other peers as result.
     pub fn handle_request_peers(&mut self, msg: PeersRequest) {
         let peers: Vec<Connect> = self.state.peers().iter().map(|(_, b)| b.clone()).collect();
         trace!(
@@ -196,7 +196,7 @@ impl NodeHandler {
             self.add_status_timeout();
         }
     }
-    /// Handles `NodeTimeout::PeerExchange`. Node sends the `RequestPeers` to a random peer.
+    /// Handles `NodeTimeout::PeerExchange`. Node sends the `PeersRequest` to a random peer.
     pub fn handle_peer_exchange_timeout(&mut self) {
         if !self.state.peers().is_empty() {
             let to = self.state.peers().len();

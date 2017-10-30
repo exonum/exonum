@@ -34,13 +34,13 @@ use node::timeout_adjuster::{TimeoutAdjuster, Constant, Dynamic, MovingAverage};
 
 // TODO: move request timeouts into node configuration
 
-/// Timeout value for the `RequestPropose` message.
+/// Timeout value for the `ProposeRequest` message.
 pub const PROPOSE_REQUEST_TIMEOUT: Milliseconds = 100;
-/// Timeout value for the `RequestTransactions` message.
+/// Timeout value for the `TransactionsRequest` message.
 pub const TRANSACTIONS_REQUEST_TIMEOUT: Milliseconds = 100;
-/// Timeout value for the `RequestPrevotes` message.
+/// Timeout value for the `PrevotesRequest` message.
 pub const PREVOTES_REQUEST_TIMEOUT: Milliseconds = 100;
-/// Timeout value for the `RequestBlock` message.
+/// Timeout value for the `BlockRequest` message.
 pub const BLOCK_REQUEST_TIMEOUT: Milliseconds = 100;
 
 /// Transactions pool.
@@ -108,13 +108,13 @@ pub struct ValidatorState {
 /// translated to the corresponding request-message.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum RequestData {
-    /// Represents `RequestPropose` message.
+    /// Represents `ProposeRequest` message.
     Propose(Hash),
-    /// Represents `RequestTransactions` message.
+    /// Represents `TransactionsRequest` message.
     Transactions(Hash),
-    /// Represents `RequestPrevotes` message.
+    /// Represents `PrevotesRequest` message.
     Prevotes(Round, Hash),
-    /// Represents `RequestBlock` message.
+    /// Represents `BlockRequest` message.
     Block(Height),
 }
 
