@@ -20,7 +20,7 @@ use exonum::crypto;
 use exonum::events::{Event as ExonumEvent, EventHandler};
 use exonum::node::{ApiSender, NodeChannel, NodeHandler, Configuration, ListenerConfig,
                    ServiceConfig, DefaultSystemState, State as NodeState};
-use exonum::storage::MemoryDB;
+use exonum::storage::{MemoryDB, Snapshot};
 use futures::Stream;
 use futures::executor;
 use iron::headers::{Headers, ContentType};
@@ -158,6 +158,11 @@ impl TestHarness {
         );
         let mut event_exec = executor::spawn(event_stream);
         event_exec.wait_stream()
+    }
+
+    /// Returns a snapshot of the current blockchain state.
+    pub fn snapshot(&self) -> Box<Snapshot> {
+        self.handler.blockchain.snapshot()
     }
 
     fn do_create_block(&mut self, tx_hashes: &[crypto::Hash]) {
