@@ -32,12 +32,12 @@ mod service {
 
     // // // // Schema // // // //
 
-    struct CounterSchema<T> {
+    pub struct CounterSchema<T> {
         view: T,
     }
 
     impl<T: AsRef<Snapshot>> CounterSchema<T> {
-        fn new(view: T) -> Self {
+        pub fn new(view: T) -> Self {
             CounterSchema { view }
         }
 
@@ -45,7 +45,7 @@ mod service {
             Entry::new(vec![1], self.view.as_ref())
         }
 
-        fn count(&self) -> Option<u64> {
+        pub fn count(&self) -> Option<u64> {
             self.entry().get()
         }
     }
@@ -244,7 +244,7 @@ use exonum::crypto::{self, HexValue, PublicKey};
 use exonum::helpers::Height;
 use exonum::messages::Message;
 use exonum_harness::{TestHarness, HarnessApi};
-use service::{ADMIN_KEY, CounterService, TxIncrement, TxReset, TransactionResponse};
+use service::{ADMIN_KEY, CounterService, TxIncrement, TxReset, TransactionResponse, CounterSchema};
 
 fn inc_count(api: &HarnessApi, by: u64) -> TxIncrement {
     let (pubkey, key) = crypto::gen_keypair();
@@ -336,4 +336,168 @@ fn test_private_api() {
     harness.create_block();
     let counter: u64 = api.get("counter", "count");
     assert_eq!(counter, 0);
+}
+
+#[test]
+fn test_probe() {
+    let services: Vec<Box<Service>> = vec![Box::new(CounterService)];
+    let mut harness = TestHarness::with_services(services);
+    let api = harness.api();
+
+    let tx = {
+        let (pubkey, key) = crypto::gen_keypair();
+        TxIncrement::new(&pubkey, 5, &key)
+    };
+
+    let snapshot = harness.probe(tx.clone());
+    let schema = CounterSchema::new(&snapshot);
+    assert_eq!(schema.count(), Some(5));
+    // Verify that the patch has not been applied to the blockchain
+    let counter: u64 = api.get("counter", "count");
+    assert_eq!(counter, 0);
+
+    let other_tx = {
+        let (pubkey, key) = crypto::gen_keypair();
+        TxIncrement::new(&pubkey, 3, &key)
+    };
+
+    let snapshot = harness.probe_all(vec![Box::new(tx.clone()), Box::new(other_tx.clone())]);
+    let schema = CounterSchema::new(&snapshot);
+    assert_eq!(schema.count(), Some(8));
+
+    // Posting a transaction is not enough to change the blockchain!
+    let _: TransactionResponse = api.post("counter", "count", &tx);
+    let snapshot = harness.probe(other_tx.clone());
+    let schema = CounterSchema::new(&snapshot);
+    assert_eq!(schema.count(), Some(3));
+
+    harness.create_block();
+    let snapshot = harness.probe(other_tx.clone());
+    let schema = CounterSchema::new(&snapshot);
+    assert_eq!(schema.count(), Some(8));
+}
+
+#[test]
+fn test_duplicate_tx() {
+    let services: Vec<Box<Service>> = vec![Box::new(CounterService)];
+    let mut harness = TestHarness::with_services(services);
+    let api = harness.api();
+
+    let tx = inc_count(&api, 5);
+    harness.create_block();
+    let _: TransactionResponse = api.post("counter", "count", &tx);
+    let _: TransactionResponse = api.post("counter", "count", &tx);
+    harness.create_block();
+    let counter: u64 = api.get("counter", "count");
+    assert_eq!(counter, 5);
+}
+
+#[test]
+#[should_panic(expected = "Duplicate transactions in probe")]
+fn test_probe_duplicate_tx_panic() {
+    let services: Vec<Box<Service>> = vec![Box::new(CounterService)];
+    let harness = TestHarness::with_services(services);
+
+    let tx = {
+        let (pubkey, key) = crypto::gen_keypair();
+        TxIncrement::new(&pubkey, 6, &key)
+    };
+    let snapshot = harness.probe_all(vec![Box::new(tx.clone()), Box::new(tx.clone())]);
+    drop(snapshot);
+}
+
+#[test]
+fn test_probe_advanced() {
+    let services: Vec<Box<Service>> = vec![Box::new(CounterService)];
+    let mut harness = TestHarness::with_services(services);
+    let api = harness.api();
+
+    let tx = {
+        let (pubkey, key) = crypto::gen_keypair();
+        TxIncrement::new(&pubkey, 6, &key)
+    };
+    let other_tx = {
+        let (pubkey, key) = crypto::gen_keypair();
+        TxIncrement::new(&pubkey, 10, &key)
+    };
+    let admin_tx = {
+        let (pubkey, key) = crypto::gen_keypair_from_seed(&crypto::Seed::from_slice(
+            &crypto::hash(b"correct horse battery staple")[..],
+        ).unwrap());
+        assert_eq!(pubkey, PublicKey::from_hex(ADMIN_KEY).unwrap());
+
+        TxReset::new(&pubkey, &key)
+    };
+
+    let snapshot = harness.probe(tx.clone());
+    let schema = CounterSchema::new(&snapshot);
+    assert_eq!(schema.count(), Some(6));
+    // Check that data is not persisted
+    let snapshot = harness.snapshot();
+    let schema = CounterSchema::new(&snapshot);
+    assert_eq!(schema.count(), None);
+
+    // Check dependency of the resulting snapshot on tx ordering
+    let snapshot = harness.probe_all(vec![Box::new(tx.clone()), Box::new(admin_tx.clone())]);
+    let schema = CounterSchema::new(&snapshot);
+    assert_eq!(schema.count(), Some(0));
+    let snapshot = harness.probe_all(vec![Box::new(admin_tx.clone()), Box::new(tx.clone())]);
+    let schema = CounterSchema::new(&snapshot);
+    assert_eq!(schema.count(), Some(6));
+    // Check that data is (still) not persisted
+    let snapshot = harness.snapshot();
+    let schema = CounterSchema::new(&snapshot);
+    assert_eq!(schema.count(), None);
+
+    api.send(other_tx);
+    harness.create_block();
+    let snapshot = harness.snapshot();
+    let schema = CounterSchema::new(&snapshot);
+    assert_eq!(schema.count(), Some(10));
+
+    let snapshot = harness.probe(tx.clone());
+    let schema = CounterSchema::new(&snapshot);
+    assert_eq!(schema.count(), Some(16));
+    // Check that data is not persisted
+    let snapshot = harness.snapshot();
+    let schema = CounterSchema::new(&snapshot);
+    assert_eq!(schema.count(), Some(10));
+
+    // Check dependency of the resulting snapshot on tx ordering
+    let snapshot = harness.probe_all(vec![Box::new(tx.clone()), Box::new(admin_tx.clone())]);
+    let schema = CounterSchema::new(&snapshot);
+    assert_eq!(schema.count(), Some(0));
+    let snapshot = harness.probe_all(vec![Box::new(admin_tx.clone()), Box::new(tx.clone())]);
+    let schema = CounterSchema::new(&snapshot);
+    assert_eq!(schema.count(), Some(6));
+    // Check that data is (still) not persisted
+    let snapshot = harness.snapshot();
+    let schema = CounterSchema::new(&snapshot);
+    assert_eq!(schema.count(), Some(10));
+}
+
+#[test]
+fn test_probe_duplicate_tx() {
+    //! Checks that committed transactions do not change the blockchain state when probed.
+
+    let services: Vec<Box<Service>> = vec![Box::new(CounterService)];
+    let mut harness = TestHarness::with_services(services);
+    let api = harness.api();
+    let tx = inc_count(&api, 5);
+
+    let snapshot = harness.probe(tx.clone());
+    let schema = CounterSchema::new(&snapshot);
+    assert_eq!(schema.count(), Some(5));
+
+    harness.create_block();
+
+    let snapshot = harness.probe(tx.clone());
+    let schema = CounterSchema::new(&snapshot);
+    assert_eq!(schema.count(), Some(5));
+
+    // Check the mixed case, when some probed transactions are committed and some are not
+    let other_tx = inc_count(&api, 7);
+    let snapshot = harness.probe_all(vec![Box::new(tx), Box::new(other_tx)]);
+    let schema = CounterSchema::new(&snapshot);
+    assert_eq!(schema.count(), Some(12));
 }
