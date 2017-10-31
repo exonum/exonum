@@ -40,7 +40,7 @@ env:
   global:
   - CLIPPY_VERS=0.0.156
   - RUSTFMT_VERS=0.9.0
-  - DEADLINKS_VERS=0.2.0
+  - DEADLINKS_VERS=0.2.1
   - SODIUM_VERS=1.0.13
   - CARGO_INCREMENTAL=1
   - RUSTFLAGS="-C link-dead-code"
@@ -52,6 +52,7 @@ env:
   - FEATURE=test-core
   - FEATURE=test-sandbox
   - FEATURE=test-doc
+  - FEATURE=non-fatal-checks
 
 install:
 - |
@@ -67,9 +68,12 @@ install:
 - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.local/lib
 - export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$HOME/.local/lib/pkgconfig
 - |
+  if [[ "$FEATURE" == "non-fatal-checks" ]]; then
+    cargo-deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
+    fi
+- |
   if [[ "$FEATURE" == "fmt" ]]; then
     cargo-audit -V || cargo install cargo-audit --force
-    cargo-deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
     rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
     cargo update
     fi
@@ -84,8 +88,6 @@ script: |
   case "$FEATURE" in
 
   "fmt" )
-      cargo doc --no-deps -p exonum &&
-      cargo deadlinks --dir target/doc &&
       cargo audit &&
       cargo fmt -p exonum -- --write-mode=diff &&
       cargo fmt -p sandbox -- --write-mode=diff
@@ -104,6 +106,11 @@ script: |
   ;;
   "test-doc" )
       cargo test -p exonum --doc -- --test-threads=2
+  ;;
+  "non-fatal-checks" )
+      cargo doc --no-deps -p exonum &&
+      cargo deadlinks --dir target/doc ||
+      true
   ;;
   "benchmarks" )
         RUST_LOG=off cargo bench --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
