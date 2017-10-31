@@ -14,12 +14,12 @@ extern crate serde_json;
 use std::collections::BTreeMap;
 
 use exonum::blockchain::{ApiContext, Blockchain, Service, Transaction, GenesisConfig,
-                         SharedNodeState};
+                         SharedNodeState, Schema as CoreSchema};
 use exonum::crypto;
 // A bit hacky, `exonum::events` is hidden from docs.
 use exonum::events::{Event as ExonumEvent, EventHandler};
 use exonum::node::{ApiSender, NodeChannel, NodeHandler, Configuration, ListenerConfig,
-                   ServiceConfig, DefaultSystemState, State as NodeState};
+                   ServiceConfig, DefaultSystemState, State as NodeState, TransactionSend};
 use exonum::storage::{MemoryDB, Snapshot};
 use futures::Stream;
 use futures::executor;
@@ -163,6 +163,66 @@ impl TestHarness {
     /// Returns a snapshot of the current blockchain state.
     pub fn snapshot(&self) -> Box<Snapshot> {
         self.handler.blockchain.snapshot()
+    }
+
+    /// Executes a list of transactions given the current state of the blockchain, but does not
+    /// commit execution results to the blockchain. The execution result is the same
+    /// as if transactions were included into a new block; for example,
+    /// transactions included into one of previous blocks do not lead to any state changes.
+    ///
+    /// # Panics
+    ///
+    /// If there are duplicate transactions.
+    pub fn probe_all(&self, transactions: Vec<Box<Transaction>>) -> Box<Snapshot> {
+        let validator_id = self.state().validator_id().expect(
+            "Tested node is not a validator",
+        );
+        let height = self.state().height();
+
+        let (transaction_map, hashes) = {
+            let mut transaction_map = BTreeMap::new();
+            let mut hashes = Vec::with_capacity(transactions.len());
+
+            let core_schema = CoreSchema::new(self.snapshot());
+            let committed_txs = core_schema.transactions();
+
+            for tx in transactions {
+                let hash = tx.hash();
+                if committed_txs.contains(&hash) {
+                    continue;
+                }
+
+                hashes.push(hash);
+                transaction_map.insert(hash, tx);
+            }
+
+            assert_eq!(
+                hashes.len(),
+                transaction_map.len(),
+                "Duplicate transactions in probe"
+            );
+
+            (transaction_map, hashes)
+        };
+
+        let (_, patch) = self.handler.blockchain.create_patch(
+            validator_id,
+            height,
+            &hashes,
+            &transaction_map,
+        );
+
+        let mut fork = self.handler.blockchain.fork();
+        fork.merge(patch);
+        Box::new(fork)
+    }
+
+    /// Executes a transaction given the current state of the blockchain but does not
+    /// commit execution results to the blockchain. The execution result is the same
+    /// as if a transaction was included into a new block; for example,
+    /// a transaction included into one of previous blocks does not lead to any state changes.
+    pub fn probe<T: Transaction>(&self, transaction: T) -> Box<Snapshot> {
+        self.probe_all(vec![Box::new(transaction)])
     }
 
     fn do_create_block(&mut self, tx_hashes: &[crypto::Hash]) {
