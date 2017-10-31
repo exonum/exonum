@@ -244,15 +244,24 @@ impl TestHarness {
 pub struct HarnessApi {
     public_mount: Mount,
     private_mount: Mount,
+    api_sender: ApiSender,
 }
 
 impl HarnessApi {
-    /// Creates new instance of Api.
+    /// Creates a new instance of Api.
     fn new(harness: &TestHarness) -> Self {
         HarnessApi {
             public_mount: harness.public_api_mount(),
             private_mount: harness.private_api_mount(),
+            api_sender: harness.api_context.node_channel().clone(),
         }
+    }
+
+    /// Sends a transaction to the node via `ApiSender`.
+    pub fn send<T: Transaction>(&self, transaction: T) {
+        self.api_sender.send(Box::new(transaction)).expect(
+            "Cannot send transaction",
+        );
     }
 
     fn do_get<D>(&self, service_name: &str, endpoint: &str, mount: &Mount) -> D
