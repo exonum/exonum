@@ -28,9 +28,12 @@ use iron_test::{request, response};
 use mount::Mount;
 use serde::{Serialize, Deserialize};
 
+pub mod compare;
 mod greedy_fold;
+
 #[doc(hidden)]
 pub use greedy_fold::GreedilyFoldable;
+pub use compare::ComparableSnapshot;
 
 const STATE_UPDATE_TIMEOUT: u64 = 10_000;
 
