@@ -10,7 +10,7 @@ use exonum::blockchain::Service;
 use exonum::crypto::{self, HexValue, PublicKey};
 use exonum::helpers::Height;
 use exonum::messages::Message;
-use exonum_harness::{TestHarness, HarnessApi};
+use exonum_harness::{TestHarness, HarnessApi, ComparableSnapshot};
 
 mod counter {
     //! Sample counter service.
@@ -503,4 +503,61 @@ fn test_probe_duplicate_tx() {
     let snapshot = harness.probe_all(vec![Box::new(tx), Box::new(other_tx)]);
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(12));
+}
+
+#[test]
+fn test_snapshot_comparison() {
+    let services: Vec<Box<Service>> = vec![Box::new(CounterService)];
+    let mut harness = TestHarness::with_services(services);
+
+    let tx = {
+        let (pubkey, key) = crypto::gen_keypair();
+        TxIncrement::new(&pubkey, 5, &key)
+    };
+    harness
+        .probe(tx.clone())
+        .compare(harness.snapshot())
+        .map(CounterSchema::new)
+        .map(CounterSchema::count)
+        .assert_before("Counter does not exist", Option::is_none)
+        .assert_after("Counter has been set", |&c| c == Some(5));
+
+    harness.api().send(tx);
+    harness.create_block();
+
+    let other_tx = {
+        let (pubkey, key) = crypto::gen_keypair();
+        TxIncrement::new(&pubkey, 3, &key)
+    };
+    harness
+        .probe(other_tx.clone())
+        .compare(harness.snapshot())
+        .map(CounterSchema::new)
+        .map(CounterSchema::count)
+        .map(|&c| c.unwrap())
+        .assert("Counter has increased", |&old, &new| new == old + 3);
+}
+
+#[test]
+#[should_panic(expected = "Counter has increased")]
+fn test_snapshot_comparison_panic() {
+    let services: Vec<Box<Service>> = vec![Box::new(CounterService)];
+    let mut harness = TestHarness::with_services(services);
+
+    let tx = {
+        let (pubkey, key) = crypto::gen_keypair();
+        TxIncrement::new(&pubkey, 5, &key)
+    };
+
+    harness.api().send(tx.clone());
+    harness.create_block();
+
+    // The assertion fails because the transaction is already committed by now
+    harness
+        .probe(tx.clone())
+        .compare(harness.snapshot())
+        .map(CounterSchema::new)
+        .map(CounterSchema::count)
+        .map(|&c| c.unwrap())
+        .assert("Counter has increased", |&old, &new| new == old + tx.by());
 }
