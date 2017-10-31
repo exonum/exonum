@@ -6,7 +6,15 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 
-mod service {
+use exonum::blockchain::Service;
+use exonum::crypto::{self, HexValue, PublicKey};
+use exonum::helpers::Height;
+use exonum::messages::Message;
+use exonum_harness::{TestHarness, HarnessApi};
+
+mod counter {
+    //! Sample counter service.
+
     extern crate bodyparser;
     extern crate iron;
     extern crate router;
@@ -239,12 +247,7 @@ mod service {
     }
 }
 
-use exonum::blockchain::Service;
-use exonum::crypto::{self, HexValue, PublicKey};
-use exonum::helpers::Height;
-use exonum::messages::Message;
-use exonum_harness::{TestHarness, HarnessApi};
-use service::{ADMIN_KEY, CounterService, TxIncrement, TxReset, TransactionResponse, CounterSchema};
+use counter::{ADMIN_KEY, CounterService, TxIncrement, TxReset, TransactionResponse, CounterSchema};
 
 fn inc_count(api: &HarnessApi, by: u64) -> TxIncrement {
     let (pubkey, key) = crypto::gen_keypair();
