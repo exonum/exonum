@@ -24,9 +24,8 @@ use exonum::messages::{RawTransaction, Message, Propose, Prevote, Precommit, Pro
                        PrevotesRequest};
 use exonum::blockchain::{Block, SCHEMA_MAJOR_VERSION};
 use exonum::crypto::{Hash, HASH_SIZE};
-use exonum::events::Milliseconds;
 use exonum::storage::Database;
-use exonum::helpers::{Height, Round, ValidatorId};
+use exonum::helpers::{Height, Round, ValidatorId, Milliseconds};
 
 use sandbox::Sandbox;
 use timestamping::{TimestampTx, TimestampingTxGenerator};

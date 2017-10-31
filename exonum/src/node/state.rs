@@ -26,10 +26,9 @@ use std::time::{SystemTime, Duration};
 use messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect};
 use crypto::{PublicKey, SecretKey, Hash};
 use storage::{Patch, Snapshot};
-use events::Milliseconds;
 use blockchain::{ValidatorKeys, ConsensusConfig, StoredConfiguration, Transaction,
                  TimeoutAdjusterConfig};
-use helpers::{Height, Round, ValidatorId};
+use helpers::{Height, Round, ValidatorId, Milliseconds};
 use node::whitelist::Whitelist;
 use node::timeout_adjuster::{TimeoutAdjuster, Constant, Dynamic, MovingAverage};
 

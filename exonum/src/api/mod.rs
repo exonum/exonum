@@ -31,7 +31,6 @@ use std::io;
 use std::collections::BTreeMap;
 use std::fmt;
 
-use events::Error as EventsError;
 use crypto::{PublicKey, SecretKey, HexValue, FromHexError, Hash};
 use encoding::serialize::ToHex;
 use storage::{Result as StorageResult, Error as StorageError};
@@ -48,8 +47,6 @@ pub enum ApiError {
     Service(Box<::std::error::Error + Send + Sync>),
     /// Storage error.
     Storage(StorageError),
-    /// Events error.
-    Events(EventsError),
     /// Converting from hex error.
     FromHex(FromHexError),
     /// Input/output error.
@@ -82,7 +79,6 @@ impl ::std::error::Error for ApiError {
             ApiError::Service(ref error) |
             ApiError::IncorrectRequest(ref error) => error.description(),
             ApiError::Storage(ref error) => error.description(),
-            ApiError::Events(ref error) => error.description(),
             ApiError::FromHex(ref error) => error.description(),
             ApiError::Io(ref error) => error.description(),
             ApiError::FileNotFound(_) => "File not found",
@@ -110,12 +106,6 @@ impl From<io::Error> for ApiError {
 impl From<StorageError> for ApiError {
     fn from(e: StorageError) -> ApiError {
         ApiError::Storage(e)
-    }
-}
-
-impl From<EventsError> for ApiError {
-    fn from(e: EventsError) -> ApiError {
-        ApiError::Events(e)
     }
 }
 
