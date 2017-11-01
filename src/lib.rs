@@ -8,6 +8,7 @@ extern crate futures;
 extern crate mount;
 extern crate iron;
 extern crate iron_test;
+extern crate router;
 extern crate serde;
 extern crate serde_json;
 
@@ -26,6 +27,7 @@ use futures::executor;
 use iron::headers::{Headers, ContentType};
 use iron_test::{request, response};
 use mount::Mount;
+use router::Router;
 use serde::{Serialize, Deserialize};
 
 pub mod compare;
@@ -307,6 +309,24 @@ impl TestHarness {
     }
 }
 
+#[doc(hidden)]
+#[derive(Debug)]
+pub enum ApiKind {
+    System,
+    Explorer,
+    Service(&'static str),
+}
+
+impl ApiKind {
+    fn into_prefix(self) -> String {
+         match self {
+             ApiKind::System => "api/system".to_string(),
+             ApiKind::Explorer => "api/explorer".to_string(),
+             ApiKind::Service(name) => format!("api/services/{}", name),
+         }
+    }
+}
+
 /// API encapsulation for the test harness. Allows to execute and synchronously retrieve results
 /// for REST-ful endpoints of services.
 pub struct HarnessApi {
@@ -318,9 +338,43 @@ pub struct HarnessApi {
 impl HarnessApi {
     /// Creates a new instance of Api.
     fn new(harness: &TestHarness) -> Self {
+        use exonum::api::{Api, public};
+
+        let blockchain = &harness.handler.blockchain;
+
         HarnessApi {
-            public_mount: harness.public_api_mount(),
-            private_mount: harness.private_api_mount(),
+            public_mount: {
+                let mut mount = Mount::new();
+
+                let service_mount = harness.public_api_mount();
+                mount.mount("api/services", service_mount);
+
+                let mut router = Router::new();
+                let pool = harness.state().transactions().clone();
+                let system_api = public::SystemApi::new(pool, blockchain.clone());
+                system_api.wire(&mut router);
+                mount.mount("api/system", router);
+
+                let mut router = Router::new();
+                let explorer_api = public::ExplorerApi::new(blockchain.clone());
+                explorer_api.wire(&mut router);
+                mount.mount("api/explorer", router);
+
+                mount
+            },
+
+            private_mount: {
+                let mut mount = Mount::new();
+
+                let service_mount = harness.private_api_mount();
+                mount.mount("api/services", service_mount);
+
+                //let harness_mount = harness.harness_mount();
+                //mount.mount("api/harness", harness_mount);
+
+                mount
+            },
+
             api_sender: harness.api_context.node_channel().clone(),
         }
     }
@@ -332,23 +386,34 @@ impl HarnessApi {
         );
     }
 
-    fn do_get<D>(&self, service_name: &str, endpoint: &str, mount: &Mount) -> D
+    fn get_internal<D>(mount: &Mount, url: &str) -> D
     where
         for<'de> D: Deserialize<'de>,
     {
-        let url = format!("http://localhost:3000/{}/{}", service_name, endpoint);
+        let url = format!("http://localhost:3000/{}", url);
         let resp = request::get(&url, Headers::new(), mount).unwrap();
         let resp = response::extract_body_to_string(resp);
         // TODO: check status
         serde_json::from_str(&resp).unwrap()
     }
 
-    fn do_post<T, D>(&self, service_name: &str, endpoint: &str, mount: &Mount, transaction: &T) -> D
+    #[doc(hidden)]
+    pub fn get<D>(&self, kind: ApiKind, endpoint: &str) -> D
+    where
+        for<'de> D: Deserialize<'de>,
+    {
+        HarnessApi::get_internal(
+            &self.public_mount,
+            &format!("{}/{}", kind.into_prefix(), endpoint),
+        )
+    }
+
+    fn post_internal<T, D>(mount: &Mount, endpoint: &str, transaction: &T) -> D
     where
         T: Transaction + Serialize,
         for<'de> D: Deserialize<'de>,
     {
-        let url = format!("http://localhost:3000/{}/{}", service_name, endpoint);
+        let url = format!("http://localhost:3000/{}", endpoint);
         let resp =
             request::post(
                 &url,
@@ -365,35 +430,35 @@ impl HarnessApi {
         serde_json::from_str(&resp).expect("Cannot parse result")
     }
 
-    /// Retrieves information from a service using a `GET` method of the public API.
-    pub fn get<D>(&self, service_name: &str, endpoint: &str) -> D
-    where
-        for<'de> D: Deserialize<'de>,
-    {
-        self.do_get(service_name, endpoint, &self.public_mount)
-    }
-
     /// Posts a transaction to the service using the public API. The returned value is the result
     /// of synchronous transaction processing, which includes running the API shim
     /// and `Transaction.verify()`. `Transaction.execute()` is not run until the transaction
     /// gets to a block via one of `create_block*()` methods.
-    pub fn post<T, D>(&self, service_name: &str, endpoint: &str, transaction: &T) -> D
+    pub fn post<T, D>(&self, kind: ApiKind, endpoint: &str, transaction: &T) -> D
     where
         T: Transaction + Serialize,
         for<'de> D: Deserialize<'de>,
     {
-        self.do_post(service_name, endpoint, &self.public_mount, transaction)
+        HarnessApi::post_internal(
+            &self.public_mount,
+            &format!("{}/{}", kind.into_prefix(), endpoint),
+            transaction,
+        )
     }
 
     /// Posts a transaction to the service using the private API. The returned value is the result
     /// of synchronous transaction processing, which includes running the API shim
     /// and `Transaction.verify()`. `Transaction.execute()` is not run until the transaction
     /// gets to a block via one of `create_block*()` methods.
-    pub fn post_private<T, D>(&self, service_name: &str, endpoint: &str, transaction: &T) -> D
+    pub fn post_private<T, D>(&self, kind: ApiKind, endpoint: &str, transaction: &T) -> D
     where
         T: Transaction + Serialize,
         for<'de> D: Deserialize<'de>,
     {
-        self.do_post(service_name, endpoint, &self.private_mount, transaction)
+        HarnessApi::post_internal(
+            &self.private_mount,
+            &format!("{}/{}", kind.into_prefix(), endpoint),
+            transaction,
+        )
     }
 }
