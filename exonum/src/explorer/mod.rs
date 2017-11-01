@@ -34,7 +34,7 @@ pub struct BlockchainExplorer<'a> {
 }
 
 /// Block information.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct BlockInfo {
     /// Block header from blockchain.
     pub block: Block,
@@ -45,7 +45,7 @@ pub struct BlockInfo {
 }
 
 /// Transaction information.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TxInfo {
     /// `JSON` serialized transaction
     pub content: Value,
