@@ -10,7 +10,7 @@ use exonum::blockchain::Service;
 use exonum::crypto::{self, HexValue, PublicKey};
 use exonum::helpers::Height;
 use exonum::messages::Message;
-use exonum_harness::{TestHarness, HarnessApi, ComparableSnapshot};
+use exonum_harness::{TestHarness, HarnessApi, ApiKind, ComparableSnapshot};
 
 mod counter {
     //! Sample counter service.
@@ -254,7 +254,7 @@ fn inc_count(api: &HarnessApi, by: u64) -> TxIncrement {
     // Create a presigned transaction
     let tx = TxIncrement::new(&pubkey, by, &key);
 
-    let tx_info: TransactionResponse = api.post("counter", "count", &tx);
+    let tx_info: TransactionResponse = api.post(ApiKind::Service("counter"), "count", &tx);
     assert_eq!(tx_info.tx_hash, tx.hash());
     tx
 }
@@ -269,7 +269,7 @@ fn test_inc_count() {
     harness.create_block();
 
     // Check that the user indeed is persisted by the service
-    let counter: u64 = api.get("counter", "count");
+    let counter: u64 = api.get(ApiKind::Service("counter"), "count");
     assert_eq!(counter, 5);
 }
 
@@ -289,7 +289,7 @@ fn test_inc_count_with_multiple_transactions() {
     }
 
     assert_eq!(harness.state().height(), Height(101));
-    let counter: u64 = api.get("counter", "count");
+    let counter: u64 = api.get(ApiKind::Service("counter"), "count");
     assert_eq!(counter, 1_000);
 }
 
@@ -303,15 +303,15 @@ fn test_inc_count_with_manual_tx_control() {
 
     // Empty block
     harness.create_block_with_transactions(&[]);
-    let counter: u64 = api.get("counter", "count");
+    let counter: u64 = api.get(ApiKind::Service("counter"), "count");
     assert_eq!(counter, 0);
 
     harness.create_block_with_transactions(&[tx_b.hash()]);
-    let counter: u64 = api.get("counter", "count");
+    let counter: u64 = api.get(ApiKind::Service("counter"), "count");
     assert_eq!(counter, 3);
 
     harness.create_block_with_transactions(&[tx_a.hash()]);
-    let counter: u64 = api.get("counter", "count");
+    let counter: u64 = api.get(ApiKind::Service("counter"), "count");
     assert_eq!(counter, 8);
 }
 
@@ -324,7 +324,7 @@ fn test_private_api() {
     inc_count(&api, 3);
 
     harness.create_block();
-    let counter: u64 = api.get("counter", "count");
+    let counter: u64 = api.get(ApiKind::Service("counter"), "count");
     assert_eq!(counter, 8);
 
     let (pubkey, key) = crypto::gen_keypair_from_seed(&crypto::Seed::from_slice(
@@ -333,11 +333,11 @@ fn test_private_api() {
     assert_eq!(pubkey, PublicKey::from_hex(ADMIN_KEY).unwrap());
 
     let tx = TxReset::new(&pubkey, &key);
-    let tx_info: TransactionResponse = api.post_private("counter", "reset", &tx);
+    let tx_info: TransactionResponse = api.post_private(ApiKind::Service("counter"), "reset", &tx);
     assert_eq!(tx_info.tx_hash, tx.hash());
 
     harness.create_block();
-    let counter: u64 = api.get("counter", "count");
+    let counter: u64 = api.get(ApiKind::Service("counter"), "count");
     assert_eq!(counter, 0);
 }
 
@@ -356,7 +356,7 @@ fn test_probe() {
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(5));
     // Verify that the patch has not been applied to the blockchain
-    let counter: u64 = api.get("counter", "count");
+    let counter: u64 = api.get(ApiKind::Service("counter"), "count");
     assert_eq!(counter, 0);
 
     let other_tx = {
@@ -369,7 +369,7 @@ fn test_probe() {
     assert_eq!(schema.count(), Some(8));
 
     // Posting a transaction is not enough to change the blockchain!
-    let _: TransactionResponse = api.post("counter", "count", &tx);
+    let _: TransactionResponse = api.post(ApiKind::Service("counter"), "count", &tx);
     let snapshot = harness.probe(other_tx.clone());
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(3));
@@ -388,10 +388,10 @@ fn test_duplicate_tx() {
 
     let tx = inc_count(&api, 5);
     harness.create_block();
-    let _: TransactionResponse = api.post("counter", "count", &tx);
-    let _: TransactionResponse = api.post("counter", "count", &tx);
+    let _: TransactionResponse = api.post(ApiKind::Service("counter"), "count", &tx);
+    let _: TransactionResponse = api.post(ApiKind::Service("counter"), "count", &tx);
     harness.create_block();
-    let counter: u64 = api.get("counter", "count");
+    let counter: u64 = api.get(ApiKind::Service("counter"), "count");
     assert_eq!(counter, 5);
 }
 

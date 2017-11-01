@@ -11,7 +11,7 @@ extern crate exonum_harness;
 
 use exonum::crypto::{self, PublicKey, SecretKey};
 use exonum::messages::Message;
-use exonum_harness::{TestHarness, HarnessApi, ComparableSnapshot};
+use exonum_harness::{TestHarness, HarnessApi, ApiKind, ComparableSnapshot};
 
 mod cryptocurrency {
     extern crate serde;
@@ -336,15 +336,28 @@ fn create_wallet(api: &HarnessApi, name: &str) -> (TxCreateWallet, SecretKey) {
     // Create a presigned transaction
     let tx = TxCreateWallet::new(&pubkey, name, &key);
 
-    let tx_info: TransactionResponse = api.post("cryptocurrency", "v1/wallets/transaction", &tx);
+    let tx_info: TransactionResponse = api.post(
+        ApiKind::Service("cryptocurrency"),
+        "v1/wallets/transaction",
+        &tx,
+    );
     assert_eq!(tx_info.tx_hash, tx.hash());
 
     (tx, key)
 }
 
+fn transfer(api: &HarnessApi, tx: &TxTransfer) {
+    let tx_info: TransactionResponse = api.post(
+        ApiKind::Service("cryptocurrency"),
+        "v1/wallets/transaction",
+        tx,
+    );
+    assert_eq!(tx_info.tx_hash, tx.hash());
+}
+
 fn get_wallet(api: &HarnessApi, pubkey: &PublicKey) -> Wallet {
     api.get(
-        "cryptocurrency",
+        ApiKind::Service("cryptocurrency"),
         &format!("v1/wallet/{}", pubkey.to_string()),
     )
 }
@@ -388,9 +401,7 @@ fn test_transfer() {
         0, // seed
         &key_alice,
     );
-    let tx_info: TransactionResponse = api.post("cryptocurrency", "v1/wallets/transaction", &tx);
-    assert_eq!(tx_info.tx_hash, tx.hash());
-
+    transfer(&api, &tx);
     harness.create_block();
 
     let wallet = get_wallet(&api, tx_alice.pub_key());
@@ -433,7 +444,6 @@ fn test_transfer_from_nonexisting_wallet() {
     let wallet = get_wallet(&api, tx_bob.pub_key());
     assert_eq!(wallet.balance(), 100);
 
-    // Transfer funds
     let tx = TxTransfer::new(
         tx_alice.pub_key(),
         tx_bob.pub_key(),
@@ -441,8 +451,6 @@ fn test_transfer_from_nonexisting_wallet() {
         0, // seed
         &key_alice,
     );
-    let tx_info: TransactionResponse = api.post("cryptocurrency", "v1/wallets/transaction", &tx);
-    assert_eq!(tx_info.tx_hash, tx.hash());
 
     let comp = harness.probe(tx).compare(harness.snapshot());
     let comp = comp.map(CurrencySchema::new);
@@ -478,7 +486,7 @@ fn test_transfer_to_nonexisting_wallet() {
         0, // seed
         &key_alice,
     );
-    let _: TransactionResponse = api.post("cryptocurrency", "v1/wallets/transaction", &tx);
+    transfer(&api, &tx);
 
     let old_snapshot = harness.snapshot();
     harness.create_block_with_transactions(&[tx.hash()]);
@@ -513,8 +521,7 @@ fn test_transfer_overcharge() {
         0, // seed
         &key_alice,
     );
-
-    let _: TransactionResponse = api.post("cryptocurrency", "v1/wallets/transaction", &tx);
+    transfer(&api, &tx);
     harness.create_block();
 
     let wallet = get_wallet(&api, tx_alice.pub_key());
@@ -567,8 +574,8 @@ fn test_transfers_in_single_block() {
             .assert("Bob's balance increases", |&old, &new| new == old + 90);
     }
 
-    let _: TransactionResponse = api.post("cryptocurrency", "v1/wallets/transaction", &tx_a_to_b);
-    let _: TransactionResponse = api.post("cryptocurrency", "v1/wallets/transaction", &tx_b_to_a);
+    transfer(&api, &tx_a_to_b);
+    transfer(&api, &tx_b_to_a);
     harness.create_block_with_transactions(&[tx_a_to_b.hash(), tx_b_to_a.hash()]);
 
     let wallet = get_wallet(&api, tx_alice.pub_key());
