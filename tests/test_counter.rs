@@ -548,3 +548,122 @@ fn test_snapshot_comparison_panic() {
         .map(|&c| c.unwrap())
         .assert("Counter has increased", |&old, &new| new == old + tx.by());
 }
+
+#[test]
+fn test_explorer_blocks() {
+    use exonum::blockchain::Block;
+    use exonum::helpers::Height;
+
+    let (mut harness, api) = init_harness();
+
+    let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+    assert_eq!(blocks.len(), 1);
+    assert_eq!(blocks[0].height(), Height(0));
+    assert_eq!(*blocks[0].prev_hash(), crypto::Hash::default());
+
+    // Check empty block creation
+    harness.create_block();
+
+    let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+    assert_eq!(blocks.len(), 2);
+    assert_eq!(blocks[0].height(), Height(1));
+    assert_eq!(*blocks[0].prev_hash(), blocks[1].hash());
+    assert_eq!(blocks[0].tx_count(), 0);
+    assert_eq!(blocks[1].height(), Height(0));
+    assert_eq!(*blocks[1].prev_hash(), crypto::Hash::default());
+
+    let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10&skip_empty_blocks=true");
+    assert_eq!(blocks.len(), 0);
+
+    let tx = {
+        let (pubkey, key) = crypto::gen_keypair();
+        TxIncrement::new(&pubkey, 5, &key)
+    };
+    harness.api().send(tx.clone());
+    harness.create_block(); // height == 2
+
+    let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+    assert_eq!(blocks.len(), 3);
+    assert_eq!(blocks[0].height(), Height(2));
+    assert_eq!(*blocks[0].prev_hash(), blocks[1].hash());
+    assert_eq!(blocks[0].tx_count(), 1);
+    assert_eq!(*blocks[0].tx_hash(), tx.hash());
+
+    let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10&skip_empty_blocks=true");
+    assert_eq!(blocks.len(), 1);
+    assert_eq!(blocks[0].height(), Height(2));
+
+    harness.create_block(); // height == 3
+    harness.create_block(); // height == 4
+
+    let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10&skip_empty_blocks=true");
+    assert_eq!(blocks.len(), 1);
+    assert_eq!(blocks[0].height(), Height(2));
+
+    let tx = {
+        let (pubkey, key) = crypto::gen_keypair();
+        TxIncrement::new(&pubkey, 5, &key)
+    };
+    harness.api().send(tx.clone());
+    harness.create_block(); // height == 5
+
+    // Check block filtering
+    let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=3&skip_empty_blocks=true");
+    assert_eq!(blocks.len(), 1);
+    assert_eq!(blocks[0].height(), Height(5));
+    let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=4&skip_empty_blocks=true");
+    assert_eq!(blocks.len(), 2);
+    assert_eq!(blocks[0].height(), Height(5));
+    assert_eq!(blocks[1].height(), Height(2));
+
+    // Check `latest` param
+    let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10&skip_empty_blocks=true&latest=4");
+    assert_eq!(blocks.len(), 1);
+    assert_eq!(blocks[0].height(), Height(2));
+}
+
+#[test]
+fn test_explorer_single_block() {
+    use std::collections::HashSet;
+    use exonum::explorer::BlockInfo;
+    use exonum::helpers::Height;
+
+    let services: Vec<Box<Service>> = vec![Box::new(CounterService)];
+    let mut harness = TestHarness::with_services(services)
+        .validators(4)
+        .create();
+    let api = harness.api();
+
+    assert_eq!(harness.state().majority_count(), 3);
+
+    let info: BlockInfo = api.get(ApiKind::Explorer, "v1/blocks/0");
+    assert_eq!(info.block.height(), Height(0));
+    assert_eq!(*info.block.prev_hash(), crypto::Hash::default());
+    assert_eq!(info.txs, vec![]);
+
+    let tx = {
+        let (pubkey, key) = crypto::gen_keypair();
+        TxIncrement::new(&pubkey, 5, &key)
+    };
+    harness.api().send(tx.clone());
+    harness.create_block(); // height == 1
+
+    let info: BlockInfo = api.get(ApiKind::Explorer, "v1/blocks/1");
+    assert_eq!(info.block.height(), Height(1));
+    assert_eq!(info.block.tx_count(), 1);
+    assert_eq!(*info.block.tx_hash(), tx.hash());
+    assert_eq!(info.txs, vec![tx.hash()]);
+
+    let mut validators = HashSet::new();
+    for precommit in &info.precommits {
+        assert_eq!(precommit.height(), Height(1));
+        assert_eq!(*precommit.block_hash(), info.block.hash());
+        let pk = harness.state()
+            .consensus_public_key_of(precommit.validator())
+            .expect("Cannot find validator id");
+        assert!(precommit.verify_signature(&pk));
+        validators.insert(precommit.validator());
+    }
+
+    assert!(validators.len() >= harness.state().majority_count());
+}
