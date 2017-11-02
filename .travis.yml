@@ -93,13 +93,13 @@ script: |
       cargo fmt -p sandbox -- --write-mode=diff
   ;;
   "clippy-core" )
-      cd exonum && cargo clippy --verbose --features long_benchmarks,rocksdb,flame_profile  -- -D warnings
+      cd exonum && cargo clippy --verbose --features long_benchmarks,flame_profile  -- -D warnings
   ;;
   "clippy-sandbox" )
       cd sandbox && cargo clippy --verbose -- -D warnings
   ;;
   "test-core" )
-      cargo test --manifest-path exonum/Cargo.toml --verbose --features rocksdb --tests --lib
+      cargo test --manifest-path exonum/Cargo.toml --verbose --tests --lib
   ;;
   "test-sandbox" )
       cargo test -p sandbox --verbose
@@ -113,7 +113,7 @@ script: |
       true
   ;;
   "benchmarks" )
-        RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features rocksdb,long_benchmarks --no-run
+        RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
   ;;
 
   esac
