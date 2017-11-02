@@ -31,7 +31,6 @@ mod types;
 
 pub mod fabric;
 pub mod config;
-pub mod user_agent;
 #[macro_use]
 pub mod metrics;
 
