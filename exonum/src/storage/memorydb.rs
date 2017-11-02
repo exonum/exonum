@@ -13,15 +13,12 @@
 // limitations under the License.
 
 //! An implementation of `MemoryDB` database.
-use std::sync::{Arc, RwLock, RwLockReadGuard};
+use std::sync::{Arc, RwLock};
 use std::clone::Clone;
-use std::collections::btree_map::{BTreeMap, Range};
+use std::collections::btree_map::BTreeMap;
 use std::collections::HashMap;
-use std::iter::Peekable;
 
 use super::{Database, Snapshot, Patch, Change, Iterator, Iter, Result};
-
-const DEFAULT_NAME: &'static str = "default";
 
 type DB = HashMap<String, BTreeMap<Vec<u8>, Vec<u8>>>;
 
@@ -34,20 +31,15 @@ pub struct MemoryDB {
 }
 
 /// An iterator over the entries of a `MemoryDB`.
-struct MemoryDBIter<'a> {
-    iter: Peekable<Range<'a, Vec<u8>, Vec<u8>>>,
-    _guard: RwLockReadGuard<'a, DB>,
+struct MemoryDBIter {
+    data: Vec<(Vec<u8>, Vec<u8>)>,
+    index: usize,
 }
 
 impl MemoryDB {
     /// Creates a new, empty database.
     pub fn new() -> MemoryDB {
-        let mut tables = HashMap::new();
-        debug_assert_eq!(
-            tables.insert(DEFAULT_NAME.to_string(), BTreeMap::new()),
-            None
-        );
-        MemoryDB { map: Arc::new(RwLock::new(tables)) }
+        MemoryDB { map: Arc::new(RwLock::new(HashMap::new())) }
     }
 }
 
@@ -97,70 +89,73 @@ impl Snapshot for MemoryDB {
         })
     }
 
-    fn iter<'a>(&'a self, name: &str, from: &[u8]) -> Iter<'a> {
-        use std::collections::Bound::{Included, Unbounded};
-        use std::mem::transmute;
+    fn iter(&self, name: &str, from: &[u8]) -> Iter {
         let map_guard = self.map.read().unwrap();
+        let data = match map_guard.get(name) {
+            Some(table) => {
+                table
+                    .iter()
+                    .skip_while(|&(k, _)| k.as_slice() < from)
+                    .map(|(k, v)| (k.to_vec(), v.to_vec()))
+                    .collect()
+            }
+            None => Vec::new(),
+        };
 
-        Box::new(MemoryDBIter {
-            iter: unsafe {
-                transmute(match map_guard.get(name) {
-                    Some(table) => {
-                        table
-                            .range::<[u8], _>((Included(from), Unbounded))
-                            .peekable()
-                    }
-                    None => {
-                        map_guard
-                            .get(DEFAULT_NAME)
-                            .unwrap()
-                            .range::<[u8], _>((Unbounded, Unbounded))
-                            .peekable()
-                    }
-                })
-            },
-            _guard: map_guard,
-        })
+        Box::new(MemoryDBIter { data, index: 0 })
     }
 }
 
-impl<'a> Iterator for MemoryDBIter<'a> {
+impl Iterator for MemoryDBIter {
     fn next(&mut self) -> Option<(&[u8], &[u8])> {
-        self.iter.next().map(|(k, v)| (k.as_slice(), v.as_slice()))
+        if self.index < self.data.len() {
+            self.index += 1;
+            self.data.get(self.index - 1).map(|&(ref k, ref v)| {
+                (k.as_slice(), v.as_slice())
+            })
+        } else {
+            None
+        }
     }
 
     fn peek(&mut self) -> Option<(&[u8], &[u8])> {
-        self.iter.peek().map(|&(k, v)| (k.as_slice(), v.as_slice()))
+        if self.index < self.data.len() {
+            self.data.get(self.index).map(|&(ref k, ref v)| {
+                (k.as_slice(), v.as_slice())
+            })
+        } else {
+            None
+        }
     }
 }
 
 #[test]
 fn test_memorydb_snapshot() {
     let mut db = MemoryDB::new();
-
+    let idx_name = "idx_name";
     {
         let mut fork = db.fork();
-        fork.put(DEFAULT_NAME, vec![1, 2, 3], vec![123]);
+        fork.put(idx_name, vec![1, 2, 3], vec![123]);
         let _ = db.merge(fork.into_patch());
     }
 
     let snapshot = db.snapshot();
-    assert!(snapshot.contains(DEFAULT_NAME, vec![1, 2, 3].as_slice()));
+    assert!(snapshot.contains(idx_name, vec![1, 2, 3].as_slice()));
 
     {
         let mut fork = db.fork();
-        fork.put(DEFAULT_NAME, vec![2, 3, 4], vec![234]);
+        fork.put(idx_name, vec![2, 3, 4], vec![234]);
         let _ = db.merge(fork.into_patch());
     }
 
-    assert!(!snapshot.contains(DEFAULT_NAME, vec![2, 3, 4].as_slice()));
+    assert!(!snapshot.contains(idx_name, vec![2, 3, 4].as_slice()));
 
     {
         let db_clone = Clone::clone(&db);
         let snap_clone = db_clone.snapshot();
-        assert!(snap_clone.contains(DEFAULT_NAME, vec![2, 3, 4].as_slice()));
+        assert!(snap_clone.contains(idx_name, vec![2, 3, 4].as_slice()));
     }
 
     let snapshot = db.snapshot();
-    assert!(snapshot.contains(DEFAULT_NAME, vec![2, 3, 4].as_slice()));
+    assert!(snapshot.contains(idx_name, vec![2, 3, 4].as_slice()));
 }
