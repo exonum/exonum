@@ -248,7 +248,7 @@ fn test_store_txs_positions() {
 /// - queue it
 /// - reach that first height
 /// - handle queued Prevote
-/// - and observe `RequestPropose` for queued `Prevote`
+/// - and observe `ProposeRequest` for queued `Prevote`
 // TODO: Remove `#[rustfmt_skip]` after https://github.com/rust-lang-nursery/rustfmt/issues/1777
 // is fixed.
 #[cfg_attr(rustfmt, rustfmt_skip)]
@@ -1093,7 +1093,7 @@ fn lock_to_past_round_broadcast_prevote() {
 /// idea of the scenario:
 ///   - obtain lock
 ///   - receive precommit in same round
-///   - verify that `RequestPrevotes` are absent
+///   - verify that `PrevotesRequest` are absent
 #[test]
 fn handle_precommit_remove_request_prevotes() {
     let sandbox = timestamping_sandbox();
@@ -1269,8 +1269,8 @@ fn lock_to_propose_and_send_prevote() {
 ///         - remove prevote request
 /// idea of the scenario:
 ///  - just obtain lock
-///  - wait `REQUEST_PREVOTES_TIMEOUT`
-///  - verify that `RequestPrevotes` request is absent (it would have been observed without
+///  - wait `PREVOTES_REQUEST_TIMEOUT`
+///  - verify that `PrevotesRequest` request is absent (it would have been observed without
 ///    last block with appropriate comment)
 #[test]
 fn lock_remove_request_prevotes() {
@@ -1491,7 +1491,7 @@ fn handle_precommit_positive_scenario_commit() {
 /// - if haven’t incompatible prevotes
 ///     - if has +2/3 precommits
 ///         - remove precommit request //todo this idea is unreachable because there are no
-///           any places in the code where `RequestPrecommit` is added
+///           any places in the code where `PrecommitRequest` is added
 ///         - COMMIT // covered in `test_reach_one_height`
 ///         -> not send prevotes after commit
 ///
