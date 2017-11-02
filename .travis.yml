@@ -1,12 +1,25 @@
 language: rust
 rust:
   - stable
+os:
+  - linux
+  - osx
+compiler:
+  - gcc
+  - clang
 cache: cargo
 sudo: required
 dist: trusty
 addons:
   apt:
+    sources:
+    - sourceline: 'ppa:chris-lea/libsodium'
     packages:
+    - gcc
+    - g++
+    - make
+    - libsodium-dev
+    - libssl-dev
     - jq
 env:
   global:
@@ -19,10 +32,8 @@ before_install:
 - rustup toolchain install $NIGHTLY_RUST
 - cargo +$NIGHTLY_RUST clippy --version | grep $CLIPPY_VERS || cargo +$NIGHTLY_RUST
   install clippy --force --vers $CLIPPY_VERS
-- sudo add-apt-repository -y ppa:chris-lea/libsodium
-- sudo apt-get -qq update
-install:
-- sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libssl-dev
+- if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew update          ; fi
+- if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install make openssl leveldb libsodium jq; fi
 script:
 - cargo fmt -- --write-mode=diff
 - cargo +$NIGHTLY_RUST clippy -- -D warnings
