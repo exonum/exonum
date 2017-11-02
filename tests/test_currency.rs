@@ -598,4 +598,35 @@ fn test_transfers_in_single_block() {
     assert_eq!(wallet.balance(), 130);
     let wallet = get_wallet(&api, tx_bob.pub_key());
     assert_eq!(wallet.balance(), 70);
+
+    let wallets = get_all_wallets(&api);
+    assert_eq!(wallets.len(), 2);
+    assert_eq!(wallets.iter().fold(0, |acc, w| acc + w.balance()), 200);
+    assert_eq!(
+        BTreeSet::from_iter(wallets.iter().map(|w| *w.pub_key())),
+        BTreeSet::from_iter(vec![*tx_alice.pub_key(), *tx_bob.pub_key()])
+    );
+}
+
+#[test]
+fn test_malformed_wallet_request() {
+    let harness = TestHarness::new(blockchain());
+    let api = harness.api();
+    let info: String = api.get_err(ApiKind::Service("cryptocurrency"), "v1/wallet/c0ffee");
+    assert!(info.starts_with("Invalid request param"));
+}
+
+#[test]
+fn test_unknown_wallet_request() {
+    let harness = TestHarness::new(blockchain());
+    let api = harness.api();
+
+    // transaction is sent by API, but isn't committed
+    let (tx_alice, _) = create_wallet(&api, "Alice");
+
+    let info: String = api.get_err(
+        ApiKind::Service("cryptocurrency"),
+        &format!("v1/wallet/{}", tx_alice.pub_key().to_string()),
+    );
+    assert_eq!(info, "Wallet not found".to_string());
 }
