@@ -15,10 +15,12 @@ extern crate serde_json;
 use std::collections::BTreeMap;
 
 use exonum::blockchain::{ApiContext, Blockchain, Service, Transaction, GenesisConfig,
-                         SharedNodeState, Schema as CoreSchema};
+                         SharedNodeState, Schema as CoreSchema, ValidatorKeys};
 use exonum::crypto;
 // A bit hacky, `exonum::events` is hidden from docs.
 use exonum::events::{Event as ExonumEvent, EventHandler};
+use exonum::helpers::{Height, Round, ValidatorId};
+use exonum::messages::{Message, Propose, Precommit};
 use exonum::node::{ApiSender, NodeChannel, NodeHandler, Configuration, ListenerConfig,
                    ServiceConfig, DefaultSystemState, State as NodeState, TransactionSend};
 use exonum::storage::{MemoryDB, Snapshot};
@@ -39,76 +41,215 @@ pub use compare::ComparableSnapshot;
 
 const STATE_UPDATE_TIMEOUT: u64 = 10_000;
 
-/// Harness for testing blockchain with a single-node, no-network setup.
-pub struct TestHarness {
-    handler: NodeHandler,
-    channel: NodeChannel,
-    api_context: ApiContext,
+/// Emulated test network.
+pub struct TestNetwork {
+    validators: Vec<Validator>,
 }
 
-impl TestHarness {
-    /// Initializes a harness with a blockchain and no service-specific configuration.
-    pub fn new(blockchain: Blockchain) -> Self {
-        TestHarness::with_config(blockchain, BTreeMap::new())
+impl TestNetwork {
+    /// Creates a new emulated network.
+    pub fn new(validator_count: u16) -> Self {
+        let mut validators = Vec::with_capacity(validator_count as usize);
+        for i in 0..validator_count {
+            validators.push(Validator::new(ValidatorId(i)));
+        }
+        TestNetwork { validators }
     }
 
-    /// Initializes a harness with a blockchain that hosts a given set of services.
-    /// The blockchain uses `MemoryDB` for storage.
-    pub fn with_services<I>(services: I) -> Self
+    /// Returns the node in the emulated network, from whose perspective the harness operates.
+    pub fn us(&self) -> &Validator {
+        &self.validators[0]
+    }
+
+    /// Returns a slice of all validators in the network.
+    pub fn validators(&self) -> &[Validator] {
+        &self.validators
+    }
+
+    /// Returns config encoding the network structure usable for creating the genesis block of
+    /// a blockchain.
+    pub fn config(&self) -> GenesisConfig {
+        GenesisConfig::new(self.validators
+            .iter()
+            .map(Validator::public_keys),
+        )
+    }
+}
+
+/// An emulated validator in the test network.
+pub struct Validator {
+    consensus_secret_key: crypto::SecretKey,
+    consensus_public_key: crypto::PublicKey,
+    service_secret_key: crypto::SecretKey,
+    service_public_key: crypto::PublicKey,
+    validator_id: ValidatorId,
+}
+
+impl Validator {
+    /// Creates a new validator.
+    pub fn new(validator_id: ValidatorId) -> Self {
+        let (consensus_public_key, consensus_secret_key) = crypto::gen_keypair();
+        let (service_public_key, service_secret_key) = crypto::gen_keypair();
+
+        Validator {
+            consensus_secret_key,
+            consensus_public_key,
+            service_secret_key,
+            service_public_key,
+            validator_id,
+        }
+    }
+
+    /// Creates a `Propose` message signed by this validator.
+    pub fn create_propose(
+        &self,
+        height: Height,
+        last_hash: &crypto::Hash,
+        tx_hashes: &[crypto::Hash],
+    ) -> Propose {
+        Propose::new(
+            self.validator_id,
+            height,
+            Round::first(),
+            last_hash,
+            tx_hashes,
+            &self.consensus_secret_key,
+        )
+    }
+
+    /// Creates a `Precommit` message signed by this validator.
+    pub fn create_precommit(&self, propose: &Propose, block_hash: &crypto::Hash) -> Precommit {
+        use std::time::SystemTime;
+
+        Precommit::new(
+            self.validator_id,
+            propose.height(),
+            propose.round(),
+            &propose.hash(),
+            block_hash,
+            SystemTime::now(),
+            &self.consensus_secret_key,
+        )
+    }
+
+    /// Returns public keys of the validator.
+    pub fn public_keys(&self) -> ValidatorKeys {
+        ValidatorKeys {
+            consensus_key: self.consensus_public_key,
+            service_key: self.service_public_key,
+        }
+    }
+}
+
+/// Builder for `TestHarness`.
+pub struct TestHarnessBuilder {
+    blockchain: Blockchain,
+    validator_count: u16,
+}
+
+impl TestHarnessBuilder {
+    fn with_blockchain(blockchain: Blockchain) -> Self {
+        TestHarnessBuilder {
+            blockchain,
+            validator_count: 1,
+        }
+    }
+
+    fn with_services<I>(services: I) -> Self
     where
         I: IntoIterator<Item = Box<Service>>,
     {
         let db = MemoryDB::new();
         let blockchain = Blockchain::new(Box::new(db), services.into_iter().collect());
-        TestHarness::new(blockchain)
+        TestHarnessBuilder::with_blockchain(blockchain)
     }
 
-    /// Initializes a harness with a blockchain and a service-specific configuration.
-    pub fn with_config(
-        mut blockchain: Blockchain,
-        _services_configs: BTreeMap<String, serde_json::Value>,
-    ) -> Self {
+    /// Sets the validator count to be used in the harness emulation.
+    pub fn validators(&mut self, validator_count: u16) -> &mut Self {
+        assert!(validator_count > 0, "Number of validators should be positive");
+        self.validator_count = validator_count;
+        self
+    }
+
+    /// Creates the harness.
+    pub fn create(&self) -> TestHarness {
         crypto::init();
+        TestHarness::assemble(
+            self.blockchain.clone(),
+            TestNetwork::new(self.validator_count),
+        )
+    }
+}
 
-        let (consensus_public_key, consensus_secret_key) = crypto::gen_keypair();
-        let (service_public_key, service_secret_key) = crypto::gen_keypair();
+/// Harness for testing blockchain services. It offers simple network configuration emulation
+/// (with no real network setup).
+pub struct TestHarness {
+    handler: NodeHandler,
+    channel: NodeChannel,
+    api_context: ApiContext,
+    network: TestNetwork,
+}
 
-        let validator_keys = exonum::blockchain::config::ValidatorKeys {
-            consensus_key: consensus_public_key,
-            service_key: service_public_key,
-        };
-        let genesis = GenesisConfig::new(vec![validator_keys].into_iter());
+impl TestHarness {
+    /// Initializes a harness with a blockchain and a single-node network.
+    pub fn new(blockchain: Blockchain) -> Self {
+        TestHarness::assemble(
+            blockchain,
+            TestNetwork::new(1),
+        )
+    }
 
+    /// Initializes a harness builder with a blockchain.
+    pub fn with_blockchain(blockchain: Blockchain) -> TestHarnessBuilder {
+        TestHarnessBuilder::with_blockchain(blockchain)
+    }
+
+    /// Initializes a harness with a blockchain that hosts a given set of services.
+    /// The blockchain uses `MemoryDB` for storage.
+    pub fn with_services<I>(services: I) -> TestHarnessBuilder
+    where
+        I: IntoIterator<Item = Box<Service>>,
+    {
+        TestHarnessBuilder::with_services(services)
+    }
+
+    fn assemble(
+        mut blockchain: Blockchain,
+        network: TestNetwork,
+    ) -> Self {
+        let genesis = network.config();
         blockchain.create_genesis_block(genesis.clone()).unwrap();
 
         let listen_address = "0.0.0.0:2000".parse().unwrap();
-        let config = Configuration {
-            listener: ListenerConfig {
-                consensus_public_key,
-                consensus_secret_key: consensus_secret_key.clone(),
-                whitelist: Default::default(),
-                address: listen_address,
-            },
-            service: ServiceConfig {
-                service_public_key,
-                service_secret_key: service_secret_key.clone(),
-            },
-            mempool: Default::default(),
-            network: Default::default(),
-            peer_discovery: vec![],
-        };
-
         let api_state = SharedNodeState::new(STATE_UPDATE_TIMEOUT);
         let system_state = Box::new(DefaultSystemState(listen_address));
         let channel = NodeChannel::new(Default::default());
         let api_sender = ApiSender::new(channel.api_requests.0.clone());
 
-        let api_context = ApiContext::from_parts(
-            &blockchain,
-            api_sender,
-            &service_public_key,
-            &service_secret_key,
-        );
+        let (config, api_context) = {
+            let our_node = network.us();
+
+            (Configuration {
+                listener: ListenerConfig {
+                    consensus_public_key: our_node.consensus_public_key,
+                    consensus_secret_key: our_node.consensus_secret_key.clone(),
+                    whitelist: Default::default(),
+                    address: listen_address,
+                },
+                service: ServiceConfig {
+                    service_public_key: our_node.service_public_key,
+                    service_secret_key: our_node.service_secret_key.clone(),
+                },
+                mempool: Default::default(),
+                network: Default::default(),
+                peer_discovery: vec![],
+            }, ApiContext::from_parts(
+                &blockchain,
+                api_sender,
+                &our_node.service_public_key,
+                &our_node.service_secret_key,
+            ))
+        };
 
         let handler = NodeHandler::new(
             blockchain,
@@ -123,6 +264,7 @@ impl TestHarness {
             handler,
             channel,
             api_context,
+            network,
         }
     }
 
@@ -132,13 +274,11 @@ impl TestHarness {
     }
 
     /// Creates a mounting point for public APIs used by the blockchain.
-    // TODO: consider making public
     fn public_api_mount(&self) -> Mount {
         self.api_context.mount_public_api()
     }
 
     /// Creates a mounting point for public APIs used by the blockchain.
-    // TODO: consider making public
     fn private_api_mount(&self) -> Mount {
         self.api_context.mount_private_api()
     }
@@ -231,20 +371,15 @@ impl TestHarness {
     }
 
     fn do_create_block(&mut self, tx_hashes: &[crypto::Hash]) {
-        use std::time::SystemTime;
-        use exonum::helpers::Round;
-        use exonum::messages::{Message, Propose, Precommit};
-
         let validator_id = self.state().validator_id().expect(
             "Tested node is not a validator",
         );
         let height = self.state().height();
         let last_hash = *self.state().last_hash();
-        let consensus_secret_key = self.state().consensus_secret_key().clone();
         let round = Round::first();
 
         let handler = &mut self.handler;
-        let (block_hash, patch) = handler.create_block(validator_id, height.next(), tx_hashes);
+        let (block_hash, patch) = handler.create_block(validator_id, height, tx_hashes);
         handler.state.add_block(
             block_hash,
             patch,
@@ -252,25 +387,17 @@ impl TestHarness {
             validator_id,
         );
 
-        let propose = Propose::new(
-            validator_id,
+        let propose = self.network.us().create_propose(
             height,
-            round,
             &last_hash,
             tx_hashes,
-            &consensus_secret_key,
         );
-        let precommit = Precommit::new(
-            validator_id,
-            height,
-            round,
-            &propose.hash(),
-            &block_hash,
-            SystemTime::now(),
-            &consensus_secret_key,
-        );
-
-        handler.commit(block_hash, vec![precommit].iter(), Some(round));
+        let precommits: Vec<_> = self.network
+            .validators()
+            .iter()
+            .map(|v| v.create_precommit(&propose, &block_hash))
+            .collect();
+        handler.commit(block_hash, precommits.iter(), Some(round));
     }
 
     /// Creates block with the specified transactions. The transactions must be previously
