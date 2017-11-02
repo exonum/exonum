@@ -29,8 +29,8 @@ clap = "2.25.0"
 term = "0.4.6"
 colored = "1.5.2"
 env_logger = "0.4.3"
-hyper = "0.10.12"
-cookie = "0.9.1"
+hyper = "0.10.13"
+cookie = "0.10.1"
 router = "0.5.1"
 iron = "0.5.1"
 headers = "0.1.0"
@@ -43,16 +43,16 @@ tokio-core = "0.1.9"
 tokio-io = "0.1.2"
 tokio-retry = "0.1.0"
 tokio-timer = "0.1.2"
-os_info="0.1.1"
+os_info = "0.3.0"
 
 exonum_sodiumoxide = { version = "0.0.14" }
 exonum_rocksdb = { version = "0.6.1", optional = true }
 exonum_leveldb = { version = "0.9.1", optional = true }
-exonum_profiler = { path="../3rdparty/profiler", version = "0.1.2" }
-exonum_flamer = {  path="../3rdparty/flamer", version = "0.1.6", optional = true }
+exonum_profiler = { path = "../3rdparty/profiler", version = "0.1.2" }
+exonum_flamer = { path = "../3rdparty/flamer", version = "0.1.6", optional = true }
 
 [dev-dependencies]
-pretty_assertions = "0.2.1"
+pretty_assertions = "0.4.0"
 tempdir = "0.3.5"
 
 [features]
