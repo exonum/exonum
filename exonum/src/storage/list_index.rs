@@ -512,7 +512,7 @@ mod tests {
         use tempdir::TempDir;
         use storage::{Database, MemoryDB, ListIndex};
 
-        const TABLE_NAME: &'static str = "table";
+        const IDX_NAME: &'static str = "idx_name";
 
         fn create_database(_: &Path) -> Box<Database> {
             Box::new(MemoryDB::new())
@@ -524,7 +524,7 @@ mod tests {
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
-            let mut list_index = ListIndex::new(TABLE_NAME, &mut fork);
+            let mut list_index = ListIndex::new(IDX_NAME, &mut fork);
             super::list_index_methods(&mut list_index);
         }
 
@@ -534,7 +534,7 @@ mod tests {
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
-            let mut list_index = ListIndex::with_prefix(TABLE_NAME, vec![01], &mut fork);
+            let mut list_index = ListIndex::with_prefix(IDX_NAME, vec![01], &mut fork);
             super::list_index_methods(&mut list_index);
         }
 
@@ -544,7 +544,7 @@ mod tests {
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
-            let mut list_index = ListIndex::new(TABLE_NAME, &mut fork);
+            let mut list_index = ListIndex::new(IDX_NAME, &mut fork);
             super::list_index_iter(&mut list_index);
         }
 
@@ -554,7 +554,7 @@ mod tests {
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
-            let mut list_index = ListIndex::with_prefix(TABLE_NAME, vec![01], &mut fork);
+            let mut list_index = ListIndex::with_prefix(IDX_NAME, vec![01], &mut fork);
             super::list_index_iter(&mut list_index);
         }
     }
@@ -564,7 +564,7 @@ mod tests {
         use tempdir::TempDir;
         use storage::{Database, ListIndex, RocksDB, RocksDBOptions};
 
-        const TABLE_NAME: &'static str = "table";
+        const IDX_NAME: &'static str = "idx_name";
 
         fn create_database(path: &Path) -> Box<Database> {
             let mut opts = RocksDBOptions::default();
@@ -578,7 +578,7 @@ mod tests {
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
-            let mut list_index = ListIndex::new(TABLE_NAME, &mut fork);
+            let mut list_index = ListIndex::new(IDX_NAME, &mut fork);
             super::list_index_methods(&mut list_index);
         }
 
@@ -588,7 +588,7 @@ mod tests {
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
-            let mut list_index = ListIndex::with_prefix(TABLE_NAME, vec![01], &mut fork);
+            let mut list_index = ListIndex::with_prefix(IDX_NAME, vec![01], &mut fork);
             super::list_index_methods(&mut list_index);
         }
 
@@ -598,7 +598,7 @@ mod tests {
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
-            let mut list_index = ListIndex::new(TABLE_NAME, &mut fork);
+            let mut list_index = ListIndex::new(IDX_NAME, &mut fork);
             super::list_index_iter(&mut list_index);
         }
 
@@ -608,7 +608,7 @@ mod tests {
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
-            let mut list_index = ListIndex::with_prefix(TABLE_NAME, vec![01], &mut fork);
+            let mut list_index = ListIndex::with_prefix(IDX_NAME, vec![01], &mut fork);
             super::list_index_iter(&mut list_index);
         }
     }
