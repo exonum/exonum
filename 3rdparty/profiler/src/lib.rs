@@ -2,8 +2,8 @@
 #![allow(unused_variables)]
 #[macro_use]
 extern crate lazy_static;
-
-mod html;
+extern crate ctrlc;
+pub mod html;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -16,7 +16,7 @@ use std::sync::{Mutex, Arc};
 
 
 pub type SpanPtr = RefCell<Span>;
-thread_local!(static THREAD_FRAME: RefCell<ThreadFrame> = RefCell::new(ThreadFrame::new()));
+thread_local!(pub static THREAD_FRAME: RefCell<ThreadFrame> = RefCell::new(ThreadFrame::new()));
 
 lazy_static!{
     static ref SETTED_NAME: Mutex<Option<String>> = Mutex::new(None);
@@ -228,7 +228,7 @@ pub fn init_handler(file: String) {
     *SETTED_NAME.lock().unwrap() = Some(file);
 
     let r = INTERRUPTED_TICKS.clone();
-    ctrlc::set_handler(move || {
+    ::ctrlc::set_handler(move || {
         let secs = SystemTime::now()
                             .duration_since(UNIX_EPOCH)
                             .unwrap().as_secs() as usize;
