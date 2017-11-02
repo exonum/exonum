@@ -96,6 +96,10 @@ mod counter {
             let mut schema = CounterSchema::new(fork);
             schema.inc_count(self.by());
         }
+
+        fn info(&self) -> serde_json::Value {
+            serde_json::to_value(self).expect("Cannot serialize transaction to JSON")
+        }
     }
 
     message! {
@@ -683,4 +687,78 @@ fn test_explorer_single_block() {
     }
 
     assert!(validators.len() >= harness.state().majority_count());
+}
+
+#[test]
+fn test_system_transaction() {
+    use exonum::blockchain::Transaction;
+    use exonum::explorer::{BlockInfo, TxInfo as CommittedTxInfo};
+    use exonum::helpers::Height;
+
+    // Analogs of structures defined by the system API handler.
+    #[derive(Deserialize)]
+    struct MemPoolTxInfo {
+        content: serde_json::Value,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(tag = "type")]
+    enum TxInfo {
+        Unknown,
+        MemPool(MemPoolTxInfo),
+        Committed(CommittedTxInfo),
+    }
+
+
+    let services: Vec<Box<Service>> = vec![Box::new(CounterService)];
+    let mut harness = TestHarness::with_services(services).validators(4).create();
+    let api = harness.api();
+
+    let tx = {
+        let (pubkey, key) = crypto::gen_keypair();
+        TxIncrement::new(&pubkey, 5, &key)
+    };
+
+    let info: TxInfo = api.get_err(
+        ApiKind::System,
+        &format!("v1/transactions/{}", &tx.hash().to_string()),
+    );
+    match info {
+        TxInfo::Unknown => {}
+        _ => panic!("Transaction should be unknown to the node"),
+    }
+
+    api.send(tx.clone());
+    harness.poll_events();
+
+    let info: TxInfo = api.get(
+        ApiKind::System,
+        &format!("v1/transactions/{}", &tx.hash().to_string()),
+    );
+    if let TxInfo::MemPool(info) = info {
+        assert_eq!(info.content, tx.info());
+    } else {
+        panic!("Transaction should be in the mempool");
+    }
+
+    harness.create_block();
+    let info: TxInfo = api.get(
+        ApiKind::System,
+        &format!("v1/transactions/{}", &tx.hash().to_string()),
+    );
+    if let TxInfo::Committed(info) = info {
+        assert_eq!(info.content, tx.info());
+        assert_eq!(info.location.block_height(), Height(1));
+        assert_eq!(info.location.position_in_block(), 0);
+
+        let block: BlockInfo = api.get(ApiKind::Explorer, "v1/blocks/1");
+        let block = block.block;
+        assert!(
+            info.proof_to_block_merkle_root
+                .validate(*block.tx_hash(), u64::from(block.tx_count()))
+                .is_ok()
+        );
+    } else {
+        panic!("Transaction should be committed");
+    }
 }
