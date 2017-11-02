@@ -51,7 +51,7 @@ impl NodeBuilder {
 
     /// Appends service to the `NodeBuilder` context.
     pub fn with_service<S: ServiceFactory>(mut self) -> NodeBuilder {
-        //TODO: take endpoints, etc...
+        //TODO: take endpoints, etc... (ECR-164)
 
         for command in &mut self.commands {
             let name = command.name();

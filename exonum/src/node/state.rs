@@ -32,7 +32,7 @@ use helpers::{Height, Round, ValidatorId, Milliseconds};
 use node::whitelist::Whitelist;
 use node::timeout_adjuster::{TimeoutAdjuster, Constant, Dynamic, MovingAverage};
 
-// TODO: move request timeouts into node configuration
+// TODO: move request timeouts into node configuration (ECR-171)
 
 /// Timeout value for the `RequestPropose` message.
 pub const PROPOSE_REQUEST_TIMEOUT: Milliseconds = 100;
@@ -44,9 +44,9 @@ pub const PREVOTES_REQUEST_TIMEOUT: Milliseconds = 100;
 pub const BLOCK_REQUEST_TIMEOUT: Milliseconds = 100;
 
 /// Transactions pool.
-// TODO replace by persistent TxPool
+// TODO replace by persistent TxPool (ECR-171)
 pub type TxPool = Arc<RwLock<BTreeMap<Hash, Box<Transaction>>>>;
-// TODO: reduce copying of Hash
+// TODO: reduce copying of Hash (ECR-171)
 
 /// State of the `NodeHandler`.
 #[derive(Debug)]
@@ -681,7 +681,7 @@ impl State {
                     .remove(&hash);
             }
         }
-        // TODO: destruct/construct structure HeightState instead of call clear
+        // TODO: destruct/construct structure HeightState instead of call clear (ECR-171)
         self.blocks.clear();
         self.proposes.clear();
         self.prevotes.clear();
@@ -689,7 +689,7 @@ impl State {
         if let Some(ref mut validator_state) = self.validator_state {
             validator_state.clear();
         }
-        self.requests.clear(); // FIXME: clear all timeouts
+        self.requests.clear(); // FIXME: clear all timeouts (ECR-171)
     }
 
     /// Returns a list of queued consensus messages.
@@ -976,7 +976,7 @@ impl State {
             match self.validator_state {
                 Some(ref validator_state) => {
                     if let Some(msg) = validator_state.our_prevotes.get(&round) {
-                        // TODO: unefficient
+                        // TODO: unefficient (ECR-171)
                         if Some(*msg.propose_hash()) != self.locked_propose {
                             return true;
                         }

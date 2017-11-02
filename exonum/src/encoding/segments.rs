@@ -215,7 +215,7 @@ where
     // TODO: implement different
     // for Vec<T> where T: Field,
     // for Vec<T> where T = u8
-    // but this is possible only after specialization land
+    // but this is possible only after specialization land (ECR-156)
     unsafe fn from_buffer(buffer: &'a [u8], from: Offset, count: Offset) -> Self {
         // read vector len
         let mut vec = Vec::with_capacity(count as usize);
@@ -259,7 +259,7 @@ impl<'a> SegmentField<'a> for BitVec {
         1
     }
 
-    // TODO: reduce memory allocation
+    // TODO: reduce memory allocation (ECR-156)
     fn count(&self) -> Offset {
         self.to_bytes().len() as Offset
     }
@@ -271,7 +271,7 @@ impl<'a> SegmentField<'a> for BitVec {
     }
 
     fn extend_buffer(&self, buffer: &mut Vec<u8>) {
-        // TODO: avoid reallocation here using normal implementation of bitvec
+        // TODO: avoid reallocation here using normal implementation of bitvec (ECR-156)
         let slice = &self.to_bytes();
         buffer.extend_from_slice(slice);
     }

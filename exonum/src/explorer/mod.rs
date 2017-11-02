@@ -23,7 +23,7 @@ use storage::ListProof;
 use crypto::Hash;
 use blockchain::{Schema, Blockchain, Block, TxLocation};
 use messages::Precommit;
-// TODO: if explorer is usable anywhere else, remove `ApiError` dependencies.
+// TODO: if explorer is usable anywhere else, remove `ApiError` dependencies (ECR-163).
 use api::ApiError;
 use helpers::Height;
 

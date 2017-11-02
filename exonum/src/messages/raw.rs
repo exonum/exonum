@@ -22,7 +22,7 @@ use encoding::{Field, Error, Result as StreamStructResult, Offset, CheckedOffset
 
 /// Length of the message header.
 pub const HEADER_LENGTH: usize = 10;
-// TODO: Better name.
+// TODO: Better name (ECR-166).
 #[doc(hidden)]
 pub const TEST_NETWORK_ID: u8 = 0;
 /// Version of the protocol. Different versions are incompatible.
@@ -34,6 +34,7 @@ pub type RawMessage = sync::Arc<MessageBuffer>;
 // TODO: reduce `to` argument from `write`, `read` and `check` methods
 // TODO: payload_length as a first value into message header
 // TODO: make sure that message length is enougth when using mem::transmute
+// (ECR-166)
 
 /// A raw message represented by the bytes buffer.
 #[derive(Debug, PartialEq)]
@@ -55,6 +56,7 @@ impl MessageBuffer {
     pub fn from_vec(raw: Vec<u8>) -> MessageBuffer {
         // TODO: check that size >= HEADER_LENGTH
         // TODO: check that payload_length == raw.len()
+        // ECR-166
         MessageBuffer { raw: raw }
     }
 
@@ -208,7 +210,6 @@ impl MessageWriter {
 
     /// Signs the message with the given secret key.
     pub fn sign(mut self, secret_key: &SecretKey) -> MessageBuffer {
-        // TODO: Reuse `append_signature`.
         let payload_length = self.raw.len() + SIGNATURE_LENGTH;
         self.set_payload_length(payload_length);
         let signature = sign(&self.raw, secret_key);

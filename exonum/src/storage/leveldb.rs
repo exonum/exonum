@@ -79,7 +79,6 @@ impl From<io::Error> for Error {
 impl LevelDB {
     /// Open a database stored in the specified path with the specified options.
     pub fn open<P: AsRef<Path>>(path: P, options: LevelDBOptions) -> Result<LevelDB> {
-        // TODO: configure LRU cache
         if options.create_if_missing {
             fs::create_dir_all(path.as_ref())?;
         }

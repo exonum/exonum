@@ -48,7 +48,7 @@ mod basic;
 mod consensus;
 mod requests;
 mod whitelist;
-pub mod state; // TODO: temporary solution to get access to WAIT consts
+pub mod state; // TODO: temporary solution to get access to WAIT consts (ECR-167)
 pub mod timeout_adjuster;
 
 /// External messages.
@@ -373,9 +373,12 @@ impl NodeHandler {
 
     /// Sends the given message to a peer by its id.
     pub fn send_to_validator(&self, id: u32, message: &RawMessage) {
-        // TODO: check validator id
-        let public_key = self.state.validators()[id as usize].consensus_key;
-        self.send_to_peer(public_key, message);
+        if id as usize >= self.state.validators().len() {
+            error!("Invalid validator id: {}", id);
+        } else {
+            let public_key = self.state.validators()[id as usize].consensus_key;
+            self.send_to_peer(public_key, message);
+        }
     }
 
     /// Sends the given message to a peer by its public key.
@@ -400,11 +403,10 @@ impl NodeHandler {
     }
 
     /// Broadcasts given message to all peers.
-    // TODO: use Into<RawMessage>
-    pub fn broadcast(&self, message: &RawMessage) {
+    pub fn broadcast(&mut self, message: &Message) {
         for conn in self.state.peers().values() {
             let addr = conn.addr();
-            self.send_to_addr(&addr, message);
+            self.send_to_addr(&addr, message.raw());
         }
     }
 

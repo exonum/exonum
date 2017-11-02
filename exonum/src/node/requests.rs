@@ -19,6 +19,7 @@ use super::NodeHandler;
 
 // TODO: height should be updated after any message, not only after status (if signature is correct)
 // TODO: Request propose makes sense only if we know that node is on our height.
+// (ECR-171)
 
 impl NodeHandler {
     /// Validates request, then redirects it to the corresponding `handle_...` function.

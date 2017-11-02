@@ -65,11 +65,11 @@ pub trait StorageKey {
     ///
     /// The caller must guarantee that the size of the buffer is equal to the precalculated size
     /// of the serialized key.
-    // TODO: should be unsafe?
+    // TODO: should be unsafe (ECR-174)?
     fn write(&self, buffer: &mut [u8]);
 
     /// Deserialize a key from the specified buffer of bytes.
-    // TODO: should be unsafe?
+    // TODO: should be unsafe (ECR-174)?
     fn read(buffer: &[u8]) -> Self;
 }
 
