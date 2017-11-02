@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Fixed
 - Fix the issue #197. Timeouts are ignored when the event pool is full. (#300)
 - Fix network failure due to incorrect processing of the incoming buffer (#322)
+- Clarify `Transaction.info()` usage (#345)
 
 ## 0.2 - 2017-09-13
 
