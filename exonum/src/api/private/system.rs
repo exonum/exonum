@@ -20,7 +20,7 @@ use router::Router;
 use iron::prelude::*;
 
 use params::{Params, Value as ParamsValue};
-use node::{NodeChannel, ApiSender};
+use node::ApiSender;
 use blockchain::{Service, Blockchain, SharedNodeState};
 use api::{Api, ApiError};
 use messages::{TEST_NETWORK_ID, PROTOCOL_MAJOR_VERSION};
@@ -98,7 +98,7 @@ pub struct SystemApi {
     blockchain: Blockchain,
     info: NodeInfo,
     shared_api_state: SharedNodeState,
-    node_channel: ApiSender<NodeChannel>,
+    node_channel: ApiSender,
 }
 
 impl SystemApi {
@@ -107,7 +107,7 @@ impl SystemApi {
         info: NodeInfo,
         blockchain: Blockchain,
         shared_api_state: SharedNodeState,
-        node_channel: ApiSender<NodeChannel>,
+        node_channel: ApiSender,
     ) -> SystemApi {
         SystemApi {
             info,

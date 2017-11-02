@@ -15,7 +15,7 @@
 //! An implementation of a Merklized version of a map (Merkle Patricia tree).
 use std::marker::PhantomData;
 
-use crypto::{hash, Hash};
+use crypto::{Hash, HashStream};
 
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
 
@@ -246,7 +246,12 @@ where
     /// ```
     pub fn root_hash(&self) -> Hash {
         match self.get_root_node() {
-            Some((k, Node::Leaf(v))) => hash(&[&k.to_vec(), v.hash().as_ref()].concat()),
+            Some((k, Node::Leaf(v))) => {
+                HashStream::new()
+                    .update(&k.as_bytes())
+                    .update(v.hash().as_ref())
+                    .hash()
+            }
             Some((_, Node::Branch(branch))) => branch.hash(),
             None => Hash::zero(),
         }
