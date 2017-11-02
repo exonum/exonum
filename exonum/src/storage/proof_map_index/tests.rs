@@ -16,7 +16,7 @@ extern crate rand;
 
 use std::collections::HashSet;
 use rand::{thread_rng, Rng};
-use crypto::{hash, Hash};
+use crypto::{hash, Hash, HashStream};
 use storage::db::Database;
 use encoding::serialize::json::reexport::to_string;
 use encoding::serialize::reexport::{Serialize, Serializer};
@@ -104,7 +104,10 @@ fn insert_same_key(db: Box<Database>) {
     let mut table = ProofMapIndex::new(vec![255], &mut storage);
     assert_eq!(table.root_hash(), Hash::zero());
     let root_prefix = &[&[LEAF_KEY_PREFIX], vec![255; 32].as_slice(), &[0u8]].concat();
-    let hash = hash(&[root_prefix, hash(&[2]).as_ref()].concat());
+    let hash = HashStream::new()
+        .update(root_prefix)
+        .update(hash(&[2]).as_ref())
+        .hash();
 
     table.put(&[255; 32], vec![1]);
     table.put(&[255; 32], vec![2]);

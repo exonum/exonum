@@ -195,10 +195,10 @@ impl DBKey {
     }
 
     // TODO: terrible hack, try to remove this (ECR-22)
-    /// Writes `DBKey` into the vector and returns it (see `write` method of the `StorageKey`).
-    pub fn to_vec(&self) -> Vec<u8> {
-        let mut buffer = vec![0u8; DB_KEY_SIZE as usize];
-        self.write(&mut buffer);
+    /// Represents `DBKey` as byte array and returns it
+    pub fn as_bytes(&self) -> Box<[u8]> {
+        let mut buffer = Box::new([0u8; DB_KEY_SIZE as usize]);
+        self.write(buffer.as_mut());
         buffer
     }
 }
