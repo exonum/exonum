@@ -501,6 +501,18 @@ impl HarnessApi {
         }
     }
 
+    /// Returns the mounting point for public APIs. Useful for intricate testing not covered
+    /// by `get*` and `post*` functions.
+    pub fn public_mount(&self) -> &Mount {
+        &self.public_mount
+    }
+
+    /// Returns the mounting point for private APIs. Useful for intricate testing not covered
+    /// by `get*` and `post*` functions.
+    pub fn private_mount(&self) -> &Mount {
+        &self.private_mount
+    }
+
     /// Sends a transaction to the node via `ApiSender`.
     pub fn send<T: Transaction>(&self, transaction: T) {
         self.api_sender.send(Box::new(transaction)).expect(
