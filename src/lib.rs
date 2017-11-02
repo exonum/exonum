@@ -74,7 +74,7 @@
 //! fn main() {
 //!     exonum::helpers::init_logger().unwrap();
 //!     NodeBuilder::new()
-//!         .with_service::<ConfigurationService>()
+//!         .with_service(Box::new(ConfigurationService::new()))
 //!         .run();
 //! }
 //! ```
@@ -235,8 +235,7 @@ where
     /// [1]: <https://docs.rs/exonum/0.2.0/exonum/blockchain/config/
     ///struct.StoredConfiguration.html#method.hash>
     pub fn propose_data_by_config_hash(&self) -> ProofMapIndex<&T, Hash, ProposeData> {
-        let prefix = gen_prefix(CONFIG_SERVICE, 0, &());
-        ProofMapIndex::new(prefix, &self.view)
+        ProofMapIndex::new("configuration.proposes", &self.view)
     }
 
     /// Returns a `ProofListIndex` table of hashes of proposed configurations in propose
@@ -249,8 +248,7 @@ where
     /// [1]: <https://docs.rs/exonum/0.2.0/exonum/blockchain/config/
     ///struct.StoredConfiguration.html#method.hash>
     pub fn config_hash_by_ordinal(&self) -> ProofListIndex<&T, Hash> {
-        let prefix = gen_prefix(CONFIG_SERVICE, 1, &());
-        ProofListIndex::new(prefix, &self.view)
+        ProofListIndex::new("configuration.propose_hashes", &self.view)
     }
 
     /// Returns a `ProofListIndex` table of votes of validators for config, referenced by the
@@ -271,8 +269,7 @@ where
     /// - Table **value** is `TxConfigVote`, cast by validator with
     /// [PublicKey](struct.TxConfigVote.html#method.from), corresponding to **index**.
     pub fn votes_by_config_hash(&self, config_hash: &Hash) -> ProofListIndex<&T, TxConfigVote> {
-        let prefix = gen_prefix(CONFIG_SERVICE, 2, config_hash);
-        ProofListIndex::new(prefix, &self.view)
+        ProofListIndex::with_prefix("configuration.votes", gen_prefix(config_hash), &self.view)
     }
 
     pub fn get_propose(&self, cfg_hash: &Hash) -> Option<TxConfigPropose> {
@@ -309,14 +306,12 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
     pub fn propose_data_by_config_hash_mut(
         &mut self,
     ) -> ProofMapIndex<&mut Fork, Hash, ProposeData> {
-        let prefix = gen_prefix(CONFIG_SERVICE, 0, &());
-        ProofMapIndex::new(prefix, &mut self.view)
+        ProofMapIndex::new("configuration.proposes", &mut self.view)
     }
 
     /// Mutable version of `config_hash_by_ordinal` index.
     pub fn config_hash_by_ordinal_mut(&mut self) -> ProofListIndex<&mut Fork, Hash> {
-        let prefix = gen_prefix(CONFIG_SERVICE, 1, &());
-        ProofListIndex::new(prefix, &mut self.view)
+        ProofListIndex::new("configuration.propose_hashes", &mut self.view)
     }
 
     /// Mutable version of `votes_by_config_hash` index.
@@ -324,8 +319,7 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
         &mut self,
         config_hash: &Hash,
     ) -> ProofListIndex<&mut Fork, TxConfigVote> {
-        let prefix = gen_prefix(CONFIG_SERVICE, 2, config_hash);
-        ProofListIndex::new(prefix, &mut self.view)
+        ProofListIndex::with_prefix("configuration.votes", gen_prefix(config_hash), &mut self.view)
     }
 
 
@@ -702,7 +696,7 @@ impl Service for ConfigurationService {
 }
 
 impl ServiceFactory for ConfigurationService {
-    fn make_service(_: &Context) -> Box<Service> {
+    fn make_service(&mut self, _: &Context) -> Box<Service> {
         Box::new(ConfigurationService::new())
     }
 }

@@ -26,14 +26,13 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use std::path::Path;
 use std::fs::File;
-use std::io::Read;
+use std::io::{self, Read};
 use std::str;
 
 use exonum::storage::{Database, MemoryDB, ProofListIndex, StorageValue};
 use exonum::node::TransactionSend;
 use exonum::crypto::Hash;
 use exonum::blockchain::{Service, Transaction};
-use exonum::events::Error as EventsError;
 use exonum::messages::{Message, RawMessage};
 use exonum::api::Api;
 use exonum::helpers::{init_logger, ValidatorId, Height};
@@ -47,6 +46,8 @@ use exonum_configuration::config_api::{PublicConfigApi, PrivateConfigApi, ApiRes
                                        ApiResponseConfigHashInfo, ApiResponseVotesInfo,
                                        ApiResponseProposePost, ApiResponseVotePost};
 use super::generate_config_with_message;
+
+const TEST_CF: &str = "configuration.test";
 
 fn response_body(response: Response) -> serde_json::Value {
     if let Some(mut body) = response.body {
@@ -115,9 +116,12 @@ struct TestTxSender {
 }
 
 impl TransactionSend for TestTxSender {
-    fn send(&self, tx: Box<Transaction>) -> Result<(), EventsError> {
+    fn send(&self, tx: Box<Transaction>) -> Result<(), io::Error> {
         if !tx.verify() {
-            return Err(EventsError::new("Unable to verify transaction"));
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "Unable to verify transaction",
+            ));
         }
         let rm = tx.raw().clone();
         self.transactions.lock().unwrap().push_back(rm);
@@ -362,7 +366,7 @@ fn test_get_config_by_hash2() {
     let expected_body = {
         let expected_hash = {
             let mut fork = MemoryDB::new().fork();
-            let mut hashes = ProofListIndex::new(Vec::new(), &mut fork);
+            let mut hashes = ProofListIndex::new(TEST_CF, &mut fork);
             for _ in 0..api_sandbox.sandbox.n_validators() {
                 hashes.push(ZEROVOTE.clone());
             }
@@ -447,7 +451,7 @@ fn test_get_config_by_hash3() {
     let expected_body = {
         let expected_hash = {
             let mut fork = MemoryDB::new().fork();
-            let mut hashes = ProofListIndex::new(Vec::new(), &mut fork);
+            let mut hashes = ProofListIndex::new(TEST_CF, &mut fork);
             hashes.extend(votes);
             hashes.root_hash()
         };
