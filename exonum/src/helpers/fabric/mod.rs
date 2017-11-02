@@ -211,6 +211,8 @@ pub trait CommandExtension {
 }
 
 /// Factory for service creation.
+///
+/// Services should provide implementation of this trait.
 pub trait ServiceFactory: 'static {
     //TODO: we could move
     // `service_name` and `service_id` from `Service` trait into this one
@@ -219,10 +221,10 @@ pub trait ServiceFactory: 'static {
 
     /// Returns `CommandExtension` for the specific `CommandName`.
     #[allow(unused_variables)]
-    fn command(command: CommandName) -> Option<Box<CommandExtension>> {
+    fn command(&mut self, command: CommandName) -> Option<Box<CommandExtension>> {
         None
     }
 
-    /// Create a new service instance from the context returned by the `Run` command.
-    fn make_service(run_context: &Context) -> Box<Service>;
+    /// Creates a new service instance from the context returned by the `Run` command.
+    fn make_service(&mut self, run_context: &Context) -> Box<Service>;
 }
