@@ -38,7 +38,7 @@ use messages::{Connect, Message, RawMessage};
 use events::{NetworkRequest, TimeoutRequest, NetworkEvent};
 use events::{HandlerPart, NetworkConfiguration, NetworkPart, TimeoutsPart};
 use events::error::{into_other, other_error, LogError, log_error};
-use helpers::{Height, Milliseconds, Round, ValidatorId, user_agent};
+use helpers::{Height, Milliseconds, Round, ValidatorId};
 
 pub use self::state::{RequestData, State, TxPool, ValidatorState};
 pub use self::whitelist::Whitelist;
@@ -285,7 +285,6 @@ impl NodeHandler {
             &config.listener.consensus_public_key,
             external_address,
             system_state.current_time(),
-            &user_agent::get(),
             &config.listener.consensus_secret_key,
         );
 
