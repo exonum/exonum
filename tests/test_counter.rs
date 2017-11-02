@@ -572,7 +572,10 @@ fn test_explorer_blocks() {
     assert_eq!(blocks[1].height(), Height(0));
     assert_eq!(*blocks[1].prev_hash(), crypto::Hash::default());
 
-    let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10&skip_empty_blocks=true");
+    let blocks: Vec<Block> = api.get(
+        ApiKind::Explorer,
+        "v1/blocks?count=10&skip_empty_blocks=true",
+    );
     assert_eq!(blocks.len(), 0);
 
     let tx = {
@@ -589,14 +592,20 @@ fn test_explorer_blocks() {
     assert_eq!(blocks[0].tx_count(), 1);
     assert_eq!(*blocks[0].tx_hash(), tx.hash());
 
-    let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10&skip_empty_blocks=true");
+    let blocks: Vec<Block> = api.get(
+        ApiKind::Explorer,
+        "v1/blocks?count=10&skip_empty_blocks=true",
+    );
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(2));
 
     harness.create_block(); // height == 3
     harness.create_block(); // height == 4
 
-    let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10&skip_empty_blocks=true");
+    let blocks: Vec<Block> = api.get(
+        ApiKind::Explorer,
+        "v1/blocks?count=10&skip_empty_blocks=true",
+    );
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(2));
 
@@ -608,16 +617,25 @@ fn test_explorer_blocks() {
     harness.create_block(); // height == 5
 
     // Check block filtering
-    let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=3&skip_empty_blocks=true");
+    let blocks: Vec<Block> = api.get(
+        ApiKind::Explorer,
+        "v1/blocks?count=3&skip_empty_blocks=true",
+    );
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(5));
-    let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=4&skip_empty_blocks=true");
+    let blocks: Vec<Block> = api.get(
+        ApiKind::Explorer,
+        "v1/blocks?count=4&skip_empty_blocks=true",
+    );
     assert_eq!(blocks.len(), 2);
     assert_eq!(blocks[0].height(), Height(5));
     assert_eq!(blocks[1].height(), Height(2));
 
     // Check `latest` param
-    let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10&skip_empty_blocks=true&latest=4");
+    let blocks: Vec<Block> = api.get(
+        ApiKind::Explorer,
+        "v1/blocks?count=10&skip_empty_blocks=true&latest=4",
+    );
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(2));
 }
@@ -629,9 +647,7 @@ fn test_explorer_single_block() {
     use exonum::helpers::Height;
 
     let services: Vec<Box<Service>> = vec![Box::new(CounterService)];
-    let mut harness = TestHarness::with_services(services)
-        .validators(4)
-        .create();
+    let mut harness = TestHarness::with_services(services).validators(4).create();
     let api = harness.api();
 
     assert_eq!(harness.state().majority_count(), 3);
@@ -658,7 +674,8 @@ fn test_explorer_single_block() {
     for precommit in &info.precommits {
         assert_eq!(precommit.height(), Height(1));
         assert_eq!(*precommit.block_hash(), info.block.hash());
-        let pk = harness.state()
+        let pk = harness
+            .state()
             .consensus_public_key_of(precommit.validator())
             .expect("Cannot find validator id");
         assert!(precommit.verify_signature(&pk));

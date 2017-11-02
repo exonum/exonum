@@ -453,10 +453,15 @@ fn test_transfer_from_nonexisting_wallet() {
 
     let comp = harness.probe(tx).compare(harness.snapshot());
     let comp = comp.map(CurrencySchema::new);
-    comp.map(|s| s.wallet(tx_alice.pub_key()))
-        .assert_inv("No Alice's wallet", Option::is_none);
-    comp.map(|s| s.wallet(tx_bob.pub_key()).expect("No Bob's wallet!").balance())
-        .assert_eq("Bob's balance hasn't changed");
+    comp.map(|s| s.wallet(tx_alice.pub_key())).assert_inv(
+        "No Alice's wallet",
+        Option::is_none,
+    );
+    comp.map(|s| {
+        s.wallet(tx_bob.pub_key())
+            .expect("No Bob's wallet!")
+            .balance()
+    }).assert_eq("Bob's balance hasn't changed");
 }
 
 #[test]
@@ -486,10 +491,15 @@ fn test_transfer_to_nonexisting_wallet() {
 
     let comp = harness.snapshot().compare(old_snapshot);
     let comp = comp.map(CurrencySchema::new);
-    comp.map(|s| s.wallet(tx_bob.pub_key()))
-        .assert_inv("No Bob's wallet", Option::is_none);
-    comp.map(|s| s.wallet(tx_alice.pub_key()).expect("No Alice's wallet!").balance())
-        .assert_eq("Alice's balance hasn't changed");
+    comp.map(|s| s.wallet(tx_bob.pub_key())).assert_inv(
+        "No Bob's wallet",
+        Option::is_none,
+    );
+    comp.map(|s| {
+        s.wallet(tx_alice.pub_key())
+            .expect("No Alice's wallet!")
+            .balance()
+    }).assert_eq("Alice's balance hasn't changed");
 }
 
 #[test]

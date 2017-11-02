@@ -69,10 +69,7 @@ impl TestNetwork {
     /// Returns config encoding the network structure usable for creating the genesis block of
     /// a blockchain.
     pub fn config(&self) -> GenesisConfig {
-        GenesisConfig::new(self.validators
-            .iter()
-            .map(Validator::public_keys),
-        )
+        GenesisConfig::new(self.validators.iter().map(Validator::public_keys))
     }
 }
 
@@ -166,7 +163,10 @@ impl TestHarnessBuilder {
 
     /// Sets the validator count to be used in the harness emulation.
     pub fn validators(&mut self, validator_count: u16) -> &mut Self {
-        assert!(validator_count > 0, "Number of validators should be positive");
+        assert!(
+            validator_count > 0,
+            "Number of validators should be positive"
+        );
         self.validator_count = validator_count;
         self
     }
@@ -193,10 +193,7 @@ pub struct TestHarness {
 impl TestHarness {
     /// Initializes a harness with a blockchain and a single-node network.
     pub fn new(blockchain: Blockchain) -> Self {
-        TestHarness::assemble(
-            blockchain,
-            TestNetwork::new(1),
-        )
+        TestHarness::assemble(blockchain, TestNetwork::new(1))
     }
 
     /// Initializes a harness builder with a blockchain.
@@ -213,10 +210,7 @@ impl TestHarness {
         TestHarnessBuilder::with_services(services)
     }
 
-    fn assemble(
-        mut blockchain: Blockchain,
-        network: TestNetwork,
-    ) -> Self {
+    fn assemble(mut blockchain: Blockchain, network: TestNetwork) -> Self {
         let genesis = network.config();
         blockchain.create_genesis_block(genesis.clone()).unwrap();
 
@@ -229,26 +223,29 @@ impl TestHarness {
         let (config, api_context) = {
             let our_node = network.us();
 
-            (Configuration {
-                listener: ListenerConfig {
-                    consensus_public_key: our_node.consensus_public_key,
-                    consensus_secret_key: our_node.consensus_secret_key.clone(),
-                    whitelist: Default::default(),
-                    address: listen_address,
+            (
+                Configuration {
+                    listener: ListenerConfig {
+                        consensus_public_key: our_node.consensus_public_key,
+                        consensus_secret_key: our_node.consensus_secret_key.clone(),
+                        whitelist: Default::default(),
+                        address: listen_address,
+                    },
+                    service: ServiceConfig {
+                        service_public_key: our_node.service_public_key,
+                        service_secret_key: our_node.service_secret_key.clone(),
+                    },
+                    mempool: Default::default(),
+                    network: Default::default(),
+                    peer_discovery: vec![],
                 },
-                service: ServiceConfig {
-                    service_public_key: our_node.service_public_key,
-                    service_secret_key: our_node.service_secret_key.clone(),
-                },
-                mempool: Default::default(),
-                network: Default::default(),
-                peer_discovery: vec![],
-            }, ApiContext::from_parts(
-                &blockchain,
-                api_sender,
-                &our_node.service_public_key,
-                &our_node.service_secret_key,
-            ))
+                ApiContext::from_parts(
+                    &blockchain,
+                    api_sender,
+                    &our_node.service_public_key,
+                    &our_node.service_secret_key,
+                ),
+            )
         };
 
         let handler = NodeHandler::new(
@@ -446,11 +443,11 @@ pub enum ApiKind {
 
 impl ApiKind {
     fn into_prefix(self) -> String {
-         match self {
-             ApiKind::System => "api/system".to_string(),
-             ApiKind::Explorer => "api/explorer".to_string(),
-             ApiKind::Service(name) => format!("api/services/{}", name),
-         }
+        match self {
+            ApiKind::System => "api/system".to_string(),
+            ApiKind::Explorer => "api/explorer".to_string(),
+            ApiKind::Service(name) => format!("api/services/{}", name),
+        }
     }
 }
 
@@ -465,6 +462,7 @@ pub struct HarnessApi {
 impl HarnessApi {
     /// Creates a new instance of Api.
     fn new(harness: &TestHarness) -> Self {
+        use std::sync::Arc;
         use exonum::api::{Api, public};
 
         let blockchain = &harness.handler.blockchain;
@@ -477,7 +475,7 @@ impl HarnessApi {
                 mount.mount("api/services", service_mount);
 
                 let mut router = Router::new();
-                let pool = harness.state().transactions().clone();
+                let pool = Arc::clone(harness.state().transactions());
                 let system_api = public::SystemApi::new(pool, blockchain.clone());
                 system_api.wire(&mut router);
                 mount.mount("api/system", router);
@@ -495,9 +493,6 @@ impl HarnessApi {
 
                 let service_mount = harness.private_api_mount();
                 mount.mount("api/services", service_mount);
-
-                //let harness_mount = harness.harness_mount();
-                //mount.mount("api/harness", harness_mount);
 
                 mount
             },
