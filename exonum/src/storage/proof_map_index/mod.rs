@@ -100,7 +100,7 @@ enum RemoveResult {
 }
 
 impl<T, K, V> ProofMapIndex<T, K, V> {
-    /// Creates a new index representation based on the common prefix of its keys and storage view.
+    /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
@@ -115,19 +115,55 @@ impl<T, K, V> ProofMapIndex<T, K, V> {
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
-    ///
+    /// let name = "name";
     /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix.clone(), &snapshot);
+    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &snapshot);
     ///
     /// let mut fork = db.fork();
-    /// let mut mut_index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &mut fork);
+    /// let mut mut_index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &mut fork);
     /// # drop(index);
     /// # drop(mut_index);
     /// ```
-    pub fn new(prefix: Vec<u8>, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
         ProofMapIndex {
-            base: BaseIndex::new(prefix, view),
+            base: BaseIndex::new(name, view),
+            _k: PhantomData,
+            _v: PhantomData,
+        }
+    }
+
+    /// Creates a new index representation based on the name, common prefix of its keys
+    /// and storage view.
+    ///
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
+    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// available.
+    /// [`&Snapshot`]: ../trait.Snapshot.html
+    /// [`&mut Fork`]: ../struct.Fork.html
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
+    /// use exonum::crypto::Hash;
+    ///
+    /// let db = MemoryDB::new();
+    /// let name = "name";
+    /// let prefix = vec![01];
+    ///
+    /// let snapshot = db.snapshot();
+    /// let index: ProofMapIndex<_, Hash, u8> =
+    ///                             ProofMapIndex::with_prefix(name, prefix.clone(), &snapshot);
+    ///
+    /// let mut fork = db.fork();
+    /// let mut mut_index : ProofMapIndex<_, Hash, u8> =
+    ///                                     ProofMapIndex::with_prefix(name, prefix, &mut fork);
+    /// # drop(index);
+    /// # drop(mut_index);
+    /// ```
+    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
+        ProofMapIndex {
+            base: BaseIndex::with_prefix(name, prefix, view),
             _k: PhantomData,
             _v: PhantomData,
         }
@@ -233,9 +269,9 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ProofMapIndex::new(prefix, &mut fork);
+    /// let mut index = ProofMapIndex::new(name, &mut fork);
     ///
     /// let default_hash = index.root_hash();
     /// assert_eq!(Hash::default(), default_hash);
@@ -266,9 +302,9 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ProofMapIndex::new(prefix, &mut fork);
+    /// let mut index = ProofMapIndex::new(name, &mut fork);
     ///
     /// let hash = Hash::default();
     /// assert_eq!(None, index.get(&hash));
@@ -289,9 +325,9 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ProofMapIndex::new(prefix, &mut fork);
+    /// let mut index = ProofMapIndex::new(name, &mut fork);
     ///
     /// let hash = Hash::default();
     /// assert!(!index.contains(&hash));
@@ -312,9 +348,9 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "name";
     /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &snapshot);
+    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &snapshot);
     ///
     /// let hash = Hash::default();
     /// let proof = index.get_proof(&hash);
@@ -402,9 +438,9 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "name";
     /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &snapshot);
+    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &snapshot);
     ///
     /// for val in index.iter() {
     ///     println!("{:?}", val);
@@ -427,9 +463,9 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "name";
     /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &snapshot);
+    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &snapshot);
     ///
     /// for key in index.keys() {
     ///     println!("{:?}", key);
@@ -452,9 +488,9 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "name";
     /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &snapshot);
+    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &snapshot);
     ///
     /// for val in index.values() {
     ///     println!("{}", val);
@@ -474,9 +510,9 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "name";
     /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &snapshot);
+    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &snapshot);
     ///
     /// let hash = Hash::default();
     /// for val in index.iter_from(&hash) {
@@ -500,9 +536,9 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "name";
     /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &snapshot);
+    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &snapshot);
     ///
     /// let hash = Hash::default();
     /// for key in index.keys_from(&hash) {
@@ -526,9 +562,9 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "name";
     /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(prefix, &snapshot);
+    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &snapshot);
     ///
     /// let hash = Hash::default();
     /// for val in index.values_from(&hash) {
@@ -623,9 +659,9 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ProofMapIndex::new(prefix, &mut fork);
+    /// let mut index = ProofMapIndex::new(name, &mut fork);
     ///
     /// let hash = Hash::default();
     /// index.put(&hash, 2);
@@ -742,9 +778,9 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ProofMapIndex::new(prefix, &mut fork);
+    /// let mut index = ProofMapIndex::new(name, &mut fork);
     ///
     /// let hash = Hash::default();
     /// index.put(&hash, 2);
@@ -803,9 +839,9 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ProofMapIndex::new(prefix, &mut fork);
+    /// let mut index = ProofMapIndex::new(name, &mut fork);
     ///
     /// let hash = Hash::default();
     /// index.put(&hash, 2);

@@ -42,7 +42,7 @@ pub struct KeySetIndexIter<'a, K> {
 }
 
 impl<T, K> KeySetIndex<T, K> {
-    /// Creates a new index representation based on the common prefix of its keys and storage view.
+    /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
@@ -57,13 +57,41 @@ impl<T, K> KeySetIndex<T, K> {
     ///
     /// let db = MemoryDB::new();
     /// let snapshot = db.snapshot();
-    /// let prefix = vec![1, 2, 3];
-    /// let index: KeySetIndex<_, u8> = KeySetIndex::new(prefix, &snapshot);
+    /// let name = "name";
+    /// let index: KeySetIndex<_, u8> = KeySetIndex::new(name, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn new(prefix: Vec<u8>, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
         KeySetIndex {
-            base: BaseIndex::new(prefix, view),
+            base: BaseIndex::new(name, view),
+            _k: PhantomData,
+        }
+    }
+
+    /// Creates a new index representation based on the name, common prefix of its keys
+    /// and storage view.
+    ///
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
+    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// available.
+    /// [`&Snapshot`]: ../trait.Snapshot.html
+    /// [`&mut Fork`]: ../struct.Fork.html
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let snapshot = db.snapshot();
+    /// let name = "name";
+    /// let prefix = vec![123];
+    /// let index: KeySetIndex<_, u8> = KeySetIndex::with_prefix(name, prefix, &snapshot);
+    /// # drop(index);
+    /// ```
+    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
+        KeySetIndex {
+            base: BaseIndex::with_prefix(name, prefix, view),
             _k: PhantomData,
         }
     }
@@ -82,8 +110,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = KeySetIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = KeySetIndex::new(name, &mut fork);
     /// assert!(!index.contains(&1));
     ///
     /// index.insert(1);
@@ -101,8 +130,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let snapshot = db.snapshot();
-    /// let index: KeySetIndex<_, u8> = KeySetIndex::new(vec![1, 2, 3], &snapshot);
+    /// let index: KeySetIndex<_, u8> = KeySetIndex::new(name, &snapshot);
     ///
     /// for val in index.iter() {
     ///     println!("{}", val);
@@ -121,8 +151,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let snapshot = db.snapshot();
-    /// let index: KeySetIndex<_, u8> = KeySetIndex::new(vec![1, 2, 3], &snapshot);
+    /// let index: KeySetIndex<_, u8> = KeySetIndex::new(name, &snapshot);
     ///
     /// for val in index.iter_from(&2) {
     ///     println!("{}", val);
@@ -145,8 +176,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = KeySetIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = KeySetIndex::new(name, &mut fork);
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -163,8 +195,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = KeySetIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = KeySetIndex::new(name, &mut fork);
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));
@@ -189,8 +222,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, KeySetIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = KeySetIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = KeySetIndex::new(name, &mut fork);
     ///
     /// index.insert(1);
     /// assert!(index.contains(&1));

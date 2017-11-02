@@ -112,7 +112,7 @@ pub struct SparceListIndexValues<'a, V> {
 }
 
 impl<T, V> SparseListIndex<T, V> {
-    /// Creates a new index representation based on the common prefix of its keys and storage view.
+    /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
@@ -127,13 +127,42 @@ impl<T, V> SparseListIndex<T, V> {
     ///
     /// let db = MemoryDB::new();
     /// let snapshot = db.snapshot();
-    /// let prefix = vec![1, 2, 3];
-    /// let index: SparseListIndex<_, u8> = SparseListIndex::new(prefix, &snapshot);
+    /// let name = "name";
+    /// let index: SparseListIndex<_, u8> = SparseListIndex::new(name, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn new(prefix: Vec<u8>, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
         SparseListIndex {
-            base: BaseIndex::new(prefix, view),
+            base: BaseIndex::new(name, view),
+            size: Cell::new(None),
+            _v: PhantomData,
+        }
+    }
+
+    /// Creates a new index representation based on the name, common prefix of its keys
+    /// and storage view.
+    ///
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
+    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// available.
+    /// [`&Snapshot`]: ../trait.Snapshot.html
+    /// [`&mut Fork`]: ../struct.Fork.html
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, SparseListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let snapshot = db.snapshot();
+    /// let name = "name";
+    /// let prefix = vec![123];
+    /// let index: SparseListIndex<_, u8> = SparseListIndex::with_prefix(name, prefix, &snapshot);
+    /// # drop(index);
+    /// ```
+    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
+        SparseListIndex {
+            base: BaseIndex::with_prefix(name, prefix, view),
             size: Cell::new(None),
             _v: PhantomData,
         }
@@ -163,7 +192,7 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = SparseListIndex::new("name", &mut fork);
     /// assert_eq!(None, index.get(0));
     ///
     /// index.push(42);
@@ -186,7 +215,7 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = SparseListIndex::new("name", &mut fork);
     /// assert!(index.is_empty());
     ///
     /// index.push(42);
@@ -207,7 +236,7 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = SparseListIndex::new("name", &mut fork);
     /// assert_eq!(0, index.capacity());
     ///
     /// index.push(10);
@@ -232,7 +261,7 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = SparseListIndex::new("name", &mut fork);
     /// assert_eq!(0, index.len());
     ///
     /// index.push(10);
@@ -256,7 +285,7 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = SparseListIndex::new("name", &mut fork);
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     ///
@@ -277,7 +306,7 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = SparseListIndex::new("name", &mut fork);
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     ///
@@ -299,7 +328,7 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = SparseListIndex::new("name", &mut fork);
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     ///
@@ -321,7 +350,7 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = SparseListIndex::new("name", &mut fork);
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     /// index.remove(3);
@@ -354,7 +383,7 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = SparseListIndex::new("name", &mut fork);
     ///
     /// index.push(1);
     /// assert!(!index.is_empty());
@@ -377,7 +406,7 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = SparseListIndex::new("name", &mut fork);
     /// assert_eq!(0, index.capacity());
     ///
     /// index.push(10);
@@ -414,7 +443,7 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = SparseListIndex::new("name", &mut fork);
     /// assert!(index.is_empty());
     ///
     /// index.extend([1, 2, 3].iter().cloned());
@@ -447,7 +476,7 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = SparseListIndex::new("name", &mut fork);
     ///
     /// index.push(1);
     /// assert_eq!(Some(1), index.get(0));
@@ -486,7 +515,7 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = SparseListIndex::new("name", &mut fork);
     ///
     /// index.push(1);
     /// assert!(!index.is_empty());
@@ -508,7 +537,7 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let mut fork = db.fork();
-    /// let mut index = SparseListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = SparseListIndex::new("name", &mut fork);
     /// assert_eq!(None, index.pop());
     ///
     /// index.push(1);
@@ -582,13 +611,15 @@ mod tests {
     use super::SparseListIndex;
     use storage::db::Database;
 
+    const IDX_NAME: &'static str = "idx_name";
+
     fn gen_tempdir_name() -> String {
         thread_rng().gen_ascii_chars().take(10).collect()
     }
 
     fn list_index_methods(db: Box<Database>) {
         let mut fork = db.fork();
-        let mut list_index = SparseListIndex::new(vec![255], &mut fork);
+        let mut list_index = SparseListIndex::new(IDX_NAME, &mut fork);
 
         assert!(list_index.is_empty());
         assert_eq!(0, list_index.capacity());
@@ -653,7 +684,7 @@ mod tests {
 
     fn list_index_iter(db: Box<Database>) {
         let mut fork = db.fork();
-        let mut list_index = SparseListIndex::new(vec![255], &mut fork);
+        let mut list_index = SparseListIndex::new(IDX_NAME, &mut fork);
 
         list_index.extend(vec![1u8, 15, 25, 2, 3]);
         assert_eq!(
@@ -716,36 +747,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "leveldb")]
-    mod leveldb_tests {
-        use std::path::Path;
-        use tempdir::TempDir;
-        use storage::{Database, LevelDB, LevelDBOptions};
-
-        fn create_database(path: &Path) -> Box<Database> {
-            let mut opts = LevelDBOptions::default();
-            opts.create_if_missing = true;
-            Box::new(LevelDB::open(path, opts).unwrap())
-        }
-
-        #[test]
-        fn test_list_index_methods() {
-            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-            let path = dir.path();
-            let db = create_database(path);
-            super::list_index_methods(db);
-        }
-
-        #[test]
-        fn test_list_index_iter() {
-            let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-            let path = dir.path();
-            let db = create_database(path);
-            super::list_index_iter(db);
-        }
-    }
-
-    #[cfg(feature = "rocksdb")]
     mod rocksdb_tests {
         use std::path::Path;
         use tempdir::TempDir;

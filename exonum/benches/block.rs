@@ -27,10 +27,8 @@ mod tests {
     use test::Bencher;
     use std::collections::BTreeMap;
 
-    use exonum::storage::{ProofMapIndex, Database, Fork, LevelDB, LevelDBOptions, LevelDBCache,
-                          StorageValue, Patch};
-    #[cfg(feature = "rocksdb")]
-    use exonum::storage::{RocksDB, RocksDBOptions, RocksBlockOptions};
+    use exonum::storage::{ProofMapIndex, Database, Fork, StorageValue, Patch};
+    use exonum::storage::{RocksDB, RocksDBOptions};
     use exonum::blockchain::{Blockchain, Transaction};
     use exonum::crypto::{gen_keypair, Hash, PublicKey, SecretKey};
     use exonum::messages::Message;
@@ -113,7 +111,7 @@ mod tests {
             }
 
             fn execute(&self, view: &mut Fork) {
-                let mut index = ProofMapIndex::new(vec![1], view);
+                let mut index = ProofMapIndex::new("balances_txs", view);
                 let from_balance = index.get(self.from()).unwrap_or(0u64);
                 let to_balance = index.get(self.to()).unwrap_or(0u64);
                 index.put(self.from(), from_balance - 1);
@@ -169,64 +167,13 @@ mod tests {
         b.iter(|| execute_block(&blockchain, 100, &txs, &pool));
     }
 
-    #[cfg(feature = "rocksdb")]
     fn create_rocksdb(tempdir: &TempDir) -> Box<Database> {
-        let mut block_options = RocksBlockOptions::default();
-        block_options.set_block_size(4 * 1024);
-        block_options.set_lru_cache(512 * 1024 * 1024);
-        block_options.set_bloom_filter(128, true);
-        block_options.set_cache_index_and_filter_blocks(true);
         let mut options = RocksDBOptions::default();
         options.create_if_missing(true);
-        options.increase_parallelism(4);
-        options.set_max_write_buffer_number(16);
-        options.set_write_buffer_size(536_870_912);
-        options.set_max_open_files(-1);
-        options.set_block_based_table_factory(&block_options);
-        options.set_max_bytes_for_level_base(512 * 1024 * 1024);
         let db = Box::new(RocksDB::open(tempdir.path(), options).unwrap());
         db as Box<Database>
     }
 
-    #[bench]
-    fn bench_execute_block_timestamping_leveldb(b: &mut Bencher) {
-        let mut options = LevelDBOptions::new();
-        options.create_if_missing = true;
-        let path = TempDir::new("exonum").unwrap();
-        let db = Box::new(LevelDB::open(path.path(), options).unwrap()) as Box<Database>;
-        execute_timestamping(db, b)
-    }
-
-    #[bench]
-    fn bench_execute_block_timestamping_leveldb_cache(b: &mut Bencher) {
-        let mut options = LevelDBOptions::new();
-        options.create_if_missing = true;
-        options.cache = Some(LevelDBCache::new(100_000_000));
-        let path = TempDir::new("exonum").unwrap();
-        let db = Box::new(LevelDB::open(path.path(), options).unwrap()) as Box<Database>;
-        execute_timestamping(db, b)
-    }
-
-    #[bench]
-    fn bench_execute_block_cryptocurrency_leveldb(b: &mut Bencher) {
-        let mut options = LevelDBOptions::new();
-        options.create_if_missing = true;
-        let path = TempDir::new("exonum").unwrap();
-        let db = Box::new(LevelDB::open(path.path(), options).unwrap()) as Box<Database>;
-        execute_cryptocurrency(db, b)
-    }
-
-    #[bench]
-    fn bench_execute_block_cryptocurrency_leveldb_cache(b: &mut Bencher) {
-        let mut options = LevelDBOptions::new();
-        options.create_if_missing = true;
-        options.cache = Some(LevelDBCache::new(100_000_000));
-        let path = TempDir::new("exonum").unwrap();
-        let db = Box::new(LevelDB::open(path.path(), options).unwrap()) as Box<Database>;
-        execute_cryptocurrency(db, b)
-    }
-
-    #[cfg(feature = "rocksdb")]
     #[bench]
     fn bench_execute_block_timestamping_rocksdb(b: &mut Bencher) {
         let tempdir = TempDir::new("exonum").unwrap();
@@ -234,7 +181,6 @@ mod tests {
         execute_timestamping(db, b)
     }
 
-    #[cfg(feature = "rocksdb")]
     #[bench]
     fn bench_execute_block_cryptocurrency_rocksdb(b: &mut Bencher) {
         let tempdir = TempDir::new("exonum").unwrap();

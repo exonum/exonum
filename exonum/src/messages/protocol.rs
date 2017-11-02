@@ -78,7 +78,7 @@ message! {
     struct Connect {
         const TYPE = CONSENSUS;
         const ID = CONNECT_MESSAGE_ID;
-        const SIZE = 58;
+        const SIZE = 50;
 
         /// The sender's public key.
         field pub_key:        &PublicKey  [00 => 32]
@@ -86,8 +86,6 @@ message! {
         field addr:           SocketAddr  [32 => 38]
         /// Time when the message was created.
         field time:           SystemTime  [38 => 50]
-        /// String containing information about this node including Exonum, Rust and OS versions.
-        field user_agent:     &str        [50 => 58]
     }
 }
 
