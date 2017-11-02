@@ -23,7 +23,7 @@ mod cryptocurrency {
     extern crate bodyparser;
     extern crate iron;
 
-    use exonum::blockchain::{self, Blockchain, Service, Transaction, ApiContext};
+    use exonum::blockchain::{Blockchain, Service, Transaction, ApiContext};
     use exonum::node::{TransactionSend, ApiSender};
     use exonum::messages::{RawTransaction, FromRaw, Message};
     use exonum::storage::{Snapshot, Fork, MemoryDB, MapIndex};
@@ -81,8 +81,7 @@ mod cryptocurrency {
         }
 
         pub fn wallets(&self) -> MapIndex<&Snapshot, PublicKey, Wallet> {
-            let prefix = blockchain::gen_prefix(SERVICE_ID, 0, &());
-            MapIndex::new(prefix, self.view.as_ref())
+            MapIndex::new("cryptocurrency.wallets", self.view.as_ref())
         }
 
         /// Get a separate wallet from the storage.
@@ -93,8 +92,7 @@ mod cryptocurrency {
 
     impl<'a> CurrencySchema<&'a mut Fork> {
         pub fn wallets_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Wallet> {
-            let prefix = blockchain::gen_prefix(SERVICE_ID, 0, &());
-            MapIndex::new(prefix, self.view)
+            MapIndex::new("cryptocurrency.wallets", self.view)
         }
     }
 

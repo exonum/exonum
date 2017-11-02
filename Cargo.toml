@@ -10,7 +10,7 @@ synchronously.
 categories = ["test"]
 
 [dependencies]
-exonum = "0.2.0"
+exonum = "0.3.0"
 futures = "0.1.14"
 serde = "1.0"
 serde_json = "1.0"
@@ -23,6 +23,6 @@ router = "0.5.1"
 bodyparser = "0.7.0"
 serde_derive = "1.0"
 
-[replace."exonum:0.2.0"]
+[replace."exonum:0.3.0"]
 git = "https://github.com/slowli/exonum"
-rev = "0b79f62b7d2251d9207bd765ae159b7e142a36de"
+rev = "0f356ce6b7036eddb1e6bc85cc871145a42776c2"

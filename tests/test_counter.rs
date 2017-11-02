@@ -50,7 +50,7 @@ mod counter {
         }
 
         fn entry(&self) -> Entry<&Snapshot, u64> {
-            Entry::new(vec![1], self.view.as_ref())
+            Entry::new("counter.count", self.view.as_ref())
         }
 
         pub fn count(&self) -> Option<u64> {
@@ -60,7 +60,7 @@ mod counter {
 
     impl<'a> CounterSchema<&'a mut Fork> {
         fn entry_mut(&mut self) -> Entry<&mut Fork, u64> {
-            Entry::new(vec![1], self.view)
+            Entry::new("counter.count", self.view)
         }
 
         fn inc_count(&mut self, inc: u64) -> u64 {
