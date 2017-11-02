@@ -71,6 +71,8 @@ extern crate os_info;
 pub mod encoding;
 #[macro_use]
 pub mod messages;
+#[macro_use]
+pub mod helpers;
 pub mod crypto;
 #[doc(hidden)]
 pub mod events;
@@ -78,5 +80,4 @@ pub mod node;
 pub mod storage;
 pub mod blockchain;
 pub mod explorer;
-pub mod helpers;
 pub mod api;

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Implement `FromStr` and `ToString` traits for public sodium types (#318)
 - Add new index `SparseListIndex`. It is a list of items stored in sequential order. Similar to `ListIndex` but it may contain indexes without elements (#312)
 - New events implementation based on tokio with the separated queues for network events and timeouts and different threads for the network and node code. (#300)
+- Add a new macro `metric!` for collecting statistical information.
 
 ### Changed
 - Field `events_pool_capacity` in `MemoryPoolConfig` replaced by the new `EventsPoolCapacity` configuration. (#300)
