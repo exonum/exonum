@@ -16,7 +16,6 @@
 use byteorder::{ByteOrder, LittleEndian};
 
 use std::mem;
-use std::sync::Arc;
 use std::borrow::Cow;
 
 use crypto::{Hash, hash, PublicKey};
@@ -267,7 +266,7 @@ impl StorageValue for RawMessage {
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
-        Arc::new(MessageBuffer::from_vec(value.into_owned()))
+        Self::new(MessageBuffer::from_vec(value.into_owned()))
     }
 
     fn hash(&self) -> Hash {

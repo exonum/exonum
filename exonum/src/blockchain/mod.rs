@@ -393,7 +393,7 @@ impl Clone for Blockchain {
     fn clone(&self) -> Blockchain {
         Blockchain {
             db: self.db.clone(),
-            service_map: self.service_map.clone(),
+            service_map: Arc::clone(&self.service_map),
         }
     }
 }

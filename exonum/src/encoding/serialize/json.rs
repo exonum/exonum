@@ -26,12 +26,12 @@ use bit_vec::BitVec;
 use hex::ToHex;
 
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
-use std::sync::Arc;
 use std::net::SocketAddr;
 use std::error::Error;
 
 use crypto::{Hash, PublicKey, Signature};
 use helpers::{Height, Round, ValidatorId};
+use messages::RawMessage;
 
 // TODO: should we implement serialize for: `SecretKey`, `Seed` (ECR-156)?
 
@@ -301,7 +301,7 @@ impl<'a> ExonumJson for &'a [u8] {
     }
 }
 
-impl ExonumJson for Vec<Arc<::messages::MessageBuffer>> {
+impl ExonumJson for Vec<RawMessage> {
     fn deserialize_field<B: WriteBufferWrapper>(
         value: &Value,
         buffer: &mut B,
@@ -314,7 +314,7 @@ impl ExonumJson for Vec<Arc<::messages::MessageBuffer>> {
         for el in bytes {
             let stri = el.as_str().ok_or("Can't cast json as string")?;
             let str_hex = <Vec<u8> as HexValue>::from_hex(stri)?;
-            vec.push(Arc::new(MessageBuffer::from_vec(str_hex)));
+            vec.push(RawMessage::new(MessageBuffer::from_vec(str_hex)));
         }
         buffer.write(from, to, vec);
         Ok(())

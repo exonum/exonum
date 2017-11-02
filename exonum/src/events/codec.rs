@@ -48,7 +48,7 @@ impl Decoder for MessagesCodec {
         // Read message
         if buf.len() >= total_len {
             let data = buf.split_to(total_len).to_vec();
-            let raw = RawMessage::from(MessageBuffer::from_vec(data));
+            let raw = RawMessage::new(MessageBuffer::from_vec(data));
             return Ok(Some(raw));
         }
         Ok(None)

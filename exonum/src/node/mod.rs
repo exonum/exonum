@@ -25,6 +25,7 @@ use futures::sync::mpsc;
 use tokio_core::reactor::Core;
 
 use std::io;
+use std::sync::Arc;
 use std::thread;
 use std::net::SocketAddr;
 use std::time::{Duration, SystemTime};
@@ -746,7 +747,7 @@ impl Node {
                 mount.mount("api/services", api_context.mount_public_api());
 
                 let mut router = Router::new();
-                let pool = self.state().transactions().clone();
+                let pool = Arc::clone(self.state().transactions());
                 let system_api = public::SystemApi::new(pool, blockchain.clone());
                 system_api.wire(&mut router);
                 mount.mount("api/system", router);

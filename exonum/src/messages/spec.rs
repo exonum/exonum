@@ -227,8 +227,8 @@ macro_rules! message {
 
             fn from_bytes(value: ::std::borrow::Cow<[u8]>) -> Self {
                 $name {
-                    raw: ::std::sync::Arc::new($crate::messages::MessageBuffer::from_vec(
-                        value.into_owned()))
+                    raw: $crate::messages::RawMessage::new(
+                        $crate::messages::MessageBuffer::from_vec(value.into_owned()))
                 }
             }
         }

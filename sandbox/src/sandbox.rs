@@ -591,7 +591,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         listen_address: addresses[0],
         shared_time: SharedTime::new(Mutex::new(UNIX_EPOCH + Duration::new(1_486_720_340, 0))),
     };
-    let shared_time = system_state.shared_time.clone();
+    let shared_time = Arc::clone(&system_state.shared_time);
 
     let network_channel = mpsc::channel(100);
     let timeout_channel = mpsc::channel(100);
