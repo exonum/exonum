@@ -69,7 +69,7 @@ pub enum Change {
 /// [`checkpoint`]: #method.checkpoint
 /// [`commit`]: #method.commit
 /// [`rollback`]: #method.rollback
-// FIXME: make &mut Fork "unwind safe"
+// FIXME: make &mut Fork "unwind safe" (ECR-176)
 pub struct Fork {
     snapshot: Box<Snapshot>,
     patch: Patch,
@@ -156,7 +156,6 @@ pub trait Database: Send + Sync + 'static {
 ///
 /// `Snapshot` provides all the necessary methods for reading data from the database, so `&Storage`
 /// is used as a storage view for creating read-only indices representation.
-// TODO: should Snapshot be Send or Sync?
 pub trait Snapshot: 'static {
     /// Returns a value as raw vector of bytes corresponding to the specified key
     /// or `None` if does not exist.

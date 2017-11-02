@@ -27,6 +27,7 @@ use events::{NetworkEvent, NetworkRequest};
 use events::network::{NetworkConfiguration, NetworkPart};
 use events::error::log_error;
 use node::{EventsPoolCapacity, NodeChannel};
+use helpers::user_agent;
 
 #[derive(Debug)]
 pub struct TestHandler {
@@ -172,7 +173,13 @@ impl TestEvents {
 
 pub fn connect_message(addr: SocketAddr) -> Connect {
     let time = time::UNIX_EPOCH;
-    Connect::new_with_signature(&PublicKey::zero(), addr, time, &Signature::zero())
+    Connect::new_with_signature(
+        &PublicKey::zero(),
+        addr,
+        time,
+        &user_agent::get(),
+        &Signature::zero(),
+    )
 }
 
 pub fn raw_message(id: u16, len: usize) -> RawMessage {
@@ -278,10 +285,8 @@ fn test_network_reconnect() {
     t1.send_to(second, msg.clone());
     assert_eq!(t2.wait_for_message(), msg);
 
-    t1.disconnect_with(second);
-    assert_eq!(t1.wait_for_disconnect(), second);
-
     drop(t2);
+    assert_eq!(t1.wait_for_disconnect(), second);
 
     // Handle second attempt.
     let mut t2 = TestEvents::with_addr(second).spawn();
@@ -292,8 +297,7 @@ fn test_network_reconnect() {
     t1.send_to(second, msg.clone());
     assert_eq!(t2.wait_for_message(), msg);
 
-    drop(t2);
-
+    t1.disconnect_with(second);
     assert_eq!(t1.wait_for_disconnect(), second);
 }
 

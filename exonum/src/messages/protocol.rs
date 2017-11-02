@@ -51,15 +51,15 @@ pub const PRECOMMIT_MESSAGE_ID: u16 = 4;
 /// `BlockResponse` message id.
 pub const BLOCK_RESPONSE_MESSAGE_ID: u16 = 5;
 
-/// `RequestPropose` message id.
+/// `ProposeRequest` message id.
 pub const PROPOSE_REQUEST_MESSAGE_ID: u16 = 6;
-/// `RequestTransactions` message id.
+/// `TransactionsRequest` message id.
 pub const TRANSACTIONS_REQUEST_MESSAGE_ID: u16 = 7;
-/// `RequestPrevotes` message id.
+/// `PrevotesRequest` message id.
 pub const PREVOTES_REQUEST_MESSAGE_ID: u16 = 8;
-/// `RequestPeers` message id.
+/// `PeersRequest` message id.
 pub const PEERS_REQUEST_MESSAGE_ID: u16 = 9;
-/// `RequestBlock` message id.
+/// `BlockRequest` message id.
 pub const BLOCK_REQUEST_MESSAGE_ID: u16 = 10;
 
 message! {
@@ -78,7 +78,7 @@ message! {
     struct Connect {
         const TYPE = CONSENSUS;
         const ID = CONNECT_MESSAGE_ID;
-        const SIZE = 50;
+        const SIZE = 58;
 
         /// The sender's public key.
         field pub_key:        &PublicKey  [00 => 32]
@@ -86,6 +86,8 @@ message! {
         field addr:           SocketAddr  [32 => 38]
         /// Time when the message was created.
         field time:           SystemTime  [38 => 50]
+        /// String containing information about this node including Exonum, Rust and OS versions.
+        field user_agent:     &str        [50 => 58]
     }
 }
 

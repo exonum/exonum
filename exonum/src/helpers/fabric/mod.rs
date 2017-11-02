@@ -215,6 +215,7 @@ pub trait ServiceFactory: 'static {
     //TODO: we could move
     // `service_name` and `service_id` from `Service` trait into this one
     //fn name() -> &'static str;
+    // ECR-76?
 
     /// Returns `CommandExtension` for the specific `CommandName`.
     #[allow(unused_variables)]

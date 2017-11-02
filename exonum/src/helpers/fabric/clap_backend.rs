@@ -22,7 +22,7 @@ use super::internal::{Feedback, CollectedCommand};
 pub struct ClapBackend;
 
 impl ClapBackend {
-    // TODO: remove code duplication
+    // TODO: remove code duplication (ECR-164)
     #[doc(hidden)]
     pub fn execute_cmd_string<I, T>(commands: &[CollectedCommand], line: I) -> Feedback
     where

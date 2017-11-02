@@ -19,6 +19,7 @@ use super::NodeHandler;
 
 // TODO: height should be updated after any message, not only after status (if signature is correct)
 // TODO: Request propose makes sense only if we know that node is on our height.
+// (ECR-171)
 
 impl NodeHandler {
     /// Validates request, then redirects it to the corresponding `handle_...` function.
@@ -50,7 +51,7 @@ impl NodeHandler {
         }
     }
 
-    /// Handles `RequstPropose` message. For details see the message documentation.
+    /// Handles `ProposeRequest` message. For details see the message documentation.
     pub fn handle_request_propose(&mut self, msg: ProposeRequest) {
         trace!("HANDLE PROPOSE REQUEST");
         if msg.height() != self.state.height() {
@@ -70,7 +71,7 @@ impl NodeHandler {
         }
     }
 
-    /// Handles `RequestTransactions` message. For details see the message documentation.
+    /// Handles `TransactionsRequest` message. For details see the message documentation.
     pub fn handle_request_txs(&mut self, msg: TransactionsRequest) {
         trace!("HANDLE TRANSACTIONS REQUEST");
         let snapshot = self.blockchain.snapshot();
@@ -91,7 +92,7 @@ impl NodeHandler {
         }
     }
 
-    /// Handles `RequestPrevotes` message. For details see the message documentation.
+    /// Handles `PrevotesRequest` message. For details see the message documentation.
     pub fn handle_request_prevotes(&mut self, msg: PrevotesRequest) {
         trace!("HANDLE PREVOTES REQUEST");
         if msg.height() != self.state.height() {
@@ -111,7 +112,7 @@ impl NodeHandler {
         }
     }
 
-    /// Handles `RequestBlock` message. For details see the message documentation.
+    /// Handles `BlockRequest` message. For details see the message documentation.
     pub fn handle_request_block(&mut self, msg: BlockRequest) {
         trace!(
             "Handle block request with height:{}, our height: {}",

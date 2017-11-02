@@ -43,6 +43,7 @@ tokio-core = "0.1.9"
 tokio-io = "0.1.2"
 tokio-retry = "0.1.0"
 tokio-timer = "0.1.2"
+os_info="0.1.1"
 
 exonum_sodiumoxide = "0.0.14"
 exonum_rocksdb = "0.7"
@@ -57,3 +58,4 @@ tempdir = "0.3.5"
 default = []
 long_benchmarks = []
 flame_profile = ["exonum_profiler/nomock", "exonum_flamer"]
+metrics-log = []

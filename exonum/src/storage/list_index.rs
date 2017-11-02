@@ -290,7 +290,6 @@ where
     /// assert_eq!(Some(1), index.pop());
     /// ```
     pub fn pop(&mut self) -> Option<V> {
-        // TODO: shoud we get and return dropped value?
         match self.len() {
             0 => None,
             l => {
@@ -352,7 +351,7 @@ where
     /// assert_eq!(3, index.len());
     /// ```
     pub fn truncate(&mut self, len: u64) {
-        // TODO: optimize this
+        // TODO: optimize this (ECR-175)
         while self.len() > len {
             self.pop();
         }

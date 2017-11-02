@@ -10,14 +10,17 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Implement `FromStr` and `ToString` traits for public sodium types (#318)
 - `RocksDB` is a default storage. Removed `LevelDB` as dependency. (#178) 
+- Add new index `SparseListIndex`. It is a list of items stored in sequential order. Similar to `ListIndex` but it may contain indexes without elements (#312)
 - New events implementation based on tokio with the separated queues for network events and timeouts and different threads for the network and node code. (#300)
+- Add a new macro `metric!` for collecting statistical information.
 
 ### Changed
 - Field `events_pool_capacity` in `MemoryPoolConfig` replaced by the new `EventsPoolCapacity` configuration. (#300)
 
 ### Fixed
-- Fix the issue GH-197. Timeouts are ignored when the event pool is full. (#300)
+- Fix the issue #197. Timeouts are ignored when the event pool is full. (#300)
 - Fix network failure due to incorrect processing of the incoming buffer (#322)
+- Clarify `Transaction.info()` usage (#345)
 
 ## 0.2 - 2017-09-13
 

@@ -481,6 +481,16 @@ mod tests {
             map_index.values_from(&4).collect::<Vec<u8>>(),
             Vec::<u8>::new()
         );
+
+        map_index.remove(&1u8);
+        assert_eq!(
+            map_index.iter_from(&0u8).collect::<Vec<(u8, u8)>>(),
+            vec![(2, 2), (3, 3)]
+        );
+        assert_eq!(
+            map_index.iter_from(&1u8).collect::<Vec<(u8, u8)>>(),
+            vec![(2, 2), (3, 3)]
+        );
     }
 
     fn gen_tempdir_name() -> String {

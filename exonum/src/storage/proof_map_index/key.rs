@@ -96,7 +96,7 @@ impl DBKey {
         self.from
     }
 
-    // TODO: terrible hack, try to remove this
+    // TODO: terrible hack, try to remove this (ECR-22)
     #[doc(hidden)]
     pub fn set_from(&mut self, from: u16) {
         self.from = from
@@ -194,11 +194,11 @@ impl DBKey {
         self.to == (KEY_SIZE * 8) as u16
     }
 
-    // TODO: terrible hack, try to remove this
-    /// Writes `DBKey` into the vector and returns it (see `write` method of the `StorageKey`).
-    pub fn to_vec(&self) -> Vec<u8> {
-        let mut buffer = vec![0u8; DB_KEY_SIZE as usize];
-        self.write(&mut buffer);
+    // TODO: terrible hack, try to remove this (ECR-22)
+    /// Represents `DBKey` as byte array and returns it
+    pub fn as_bytes(&self) -> Box<[u8]> {
+        let mut buffer = Box::new([0u8; DB_KEY_SIZE as usize]);
+        self.write(buffer.as_mut());
         buffer
     }
 }

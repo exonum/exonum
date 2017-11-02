@@ -66,6 +66,8 @@
 //! configuration. Similar to combination of [`Box`] and [`Option`] from standard library.
 //! - [`ListIndex`] is a list of items stored in sequential order. Similar to [`Vec`] collection
 //! from standard library.
+//! - [`SparseListIndex`] is a list of items stored in sequential order. Similar to `ListIndex`
+//! but it may contain indexes without elements.
 //! - [`MapIndex`] is a map of keys and values. Similar to [`BTreeMap`] collection from standard
 //! library.
 //! - [`ProofListIndex`] is a Merklized version of `ListIndex` which supports the cryptographic
@@ -92,6 +94,7 @@
 //! [`StorageValue`]: trait.StorageValue.html
 //! [`Entry`]: struct.Entry.html
 //! [`ListIndex`]: list_index/struct.ListIndex.html
+//! [`SparseListIndex`]: sparse_list_index/struct.SparseListIndex.html
 //! [`MapIndex`]: map_index/struct.MapIndex.html
 //! [`ProofListIndex`]: proof_list_index/struct.ProofListIndex.html
 //! [`ProofMapIndex`]: proof_map_index/struct.ProofMapIndex.html
@@ -120,6 +123,7 @@ pub use self::entry::Entry;
 pub use self::base_index::{BaseIndex, BaseIndexIter};
 pub use self::map_index::MapIndex;
 pub use self::list_index::ListIndex;
+pub use self::sparse_list_index::SparseListIndex;
 pub use self::key_set_index::KeySetIndex;
 pub use self::value_set_index::ValueSetIndex;
 pub use self::proof_list_index::{ProofListIndex, ListProof};
@@ -142,6 +146,7 @@ pub mod base_index;
 
 pub mod map_index;
 pub mod list_index;
+pub mod sparse_list_index;
 pub mod key_set_index;
 pub mod value_set_index;
 pub mod proof_list_index;

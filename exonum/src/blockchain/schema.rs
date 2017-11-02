@@ -105,7 +105,6 @@ where
     /// Returns auxiliary table that keeps hash references to configurations in order
     /// of increasing their `actual_from` height.
     pub fn configs_actual_from(&self) -> ListIndex<&T, ConfigReference> {
-        // TODO: consider List index to reduce storage volume
         ListIndex::new("core.configs_actual_from", &self.view)
     }
 
@@ -361,7 +360,7 @@ impl<'a> Schema<&'a mut Fork> {
         let actual_from = config_data.actual_from;
         if let Some(last_cfg) = self.configs_actual_from().last() {
             if last_cfg.cfg_hash() != &config_data.previous_cfg_hash {
-                // TODO: Replace panic with errors.
+                // TODO: Replace panic with errors (ECR-123).
                 panic!(
                     "Attempting to commit configuration with incorrect previous hash: {:?}, \
                     expected: {:?}",
