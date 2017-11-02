@@ -249,6 +249,13 @@ mod counter {
 
 use counter::{ADMIN_KEY, CounterService, TxIncrement, TxReset, TransactionResponse, CounterSchema};
 
+fn init_harness() -> (TestHarness, HarnessApi) {
+    let services: Vec<Box<Service>> = vec![Box::new(CounterService)];
+    let harness = TestHarness::with_services(services).create();
+    let api = harness.api();
+    (harness, api)
+}
+
 fn inc_count(api: &HarnessApi, by: u64) -> TxIncrement {
     let (pubkey, key) = crypto::gen_keypair();
     // Create a presigned transaction
@@ -261,11 +268,8 @@ fn inc_count(api: &HarnessApi, by: u64) -> TxIncrement {
 
 #[test]
 fn test_inc_count() {
-    let services: Vec<Box<Service>> = vec![Box::new(CounterService)];
-    let mut harness = TestHarness::with_services(services);
-    let api = harness.api();
+    let (mut harness, api) = init_harness();
     inc_count(&api, 5);
-
     harness.create_block();
 
     // Check that the user indeed is persisted by the service
@@ -275,9 +279,7 @@ fn test_inc_count() {
 
 #[test]
 fn test_inc_count_with_multiple_transactions() {
-    let services: Vec<Box<Service>> = vec![Box::new(CounterService)];
-    let mut harness = TestHarness::with_services(services);
-    let api = harness.api();
+    let (mut harness, api) = init_harness();
 
     for _ in 0..100 {
         inc_count(&api, 1);
@@ -295,9 +297,7 @@ fn test_inc_count_with_multiple_transactions() {
 
 #[test]
 fn test_inc_count_with_manual_tx_control() {
-    let services: Vec<Box<Service>> = vec![Box::new(CounterService)];
-    let mut harness = TestHarness::with_services(services);
-    let api = harness.api();
+    let (mut harness, api) = init_harness();
     let tx_a = inc_count(&api, 5);
     let tx_b = inc_count(&api, 3);
 
@@ -317,9 +317,7 @@ fn test_inc_count_with_manual_tx_control() {
 
 #[test]
 fn test_private_api() {
-    let services: Vec<Box<Service>> = vec![Box::new(CounterService)];
-    let mut harness = TestHarness::with_services(services);
-    let api = harness.api();
+    let (mut harness, api) = init_harness();
     inc_count(&api, 5);
     inc_count(&api, 3);
 
@@ -343,9 +341,7 @@ fn test_private_api() {
 
 #[test]
 fn test_probe() {
-    let services: Vec<Box<Service>> = vec![Box::new(CounterService)];
-    let mut harness = TestHarness::with_services(services);
-    let api = harness.api();
+    let (mut harness, api) = init_harness();
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -382,9 +378,7 @@ fn test_probe() {
 
 #[test]
 fn test_duplicate_tx() {
-    let services: Vec<Box<Service>> = vec![Box::new(CounterService)];
-    let mut harness = TestHarness::with_services(services);
-    let api = harness.api();
+    let (mut harness, api) = init_harness();
 
     let tx = inc_count(&api, 5);
     harness.create_block();
@@ -398,8 +392,7 @@ fn test_duplicate_tx() {
 #[test]
 #[should_panic(expected = "Duplicate transactions in probe")]
 fn test_probe_duplicate_tx_panic() {
-    let services: Vec<Box<Service>> = vec![Box::new(CounterService)];
-    let harness = TestHarness::with_services(services);
+    let (harness, _) = init_harness();
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -411,9 +404,7 @@ fn test_probe_duplicate_tx_panic() {
 
 #[test]
 fn test_probe_advanced() {
-    let services: Vec<Box<Service>> = vec![Box::new(CounterService)];
-    let mut harness = TestHarness::with_services(services);
-    let api = harness.api();
+    let (mut harness, api) = init_harness();
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -483,9 +474,7 @@ fn test_probe_advanced() {
 fn test_probe_duplicate_tx() {
     //! Checks that committed transactions do not change the blockchain state when probed.
 
-    let services: Vec<Box<Service>> = vec![Box::new(CounterService)];
-    let mut harness = TestHarness::with_services(services);
-    let api = harness.api();
+    let (mut harness, api) = init_harness();
     let tx = inc_count(&api, 5);
 
     let snapshot = harness.probe(tx.clone());
@@ -507,8 +496,7 @@ fn test_probe_duplicate_tx() {
 
 #[test]
 fn test_snapshot_comparison() {
-    let services: Vec<Box<Service>> = vec![Box::new(CounterService)];
-    let mut harness = TestHarness::with_services(services);
+    let (mut harness, api) = init_harness();
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -522,7 +510,7 @@ fn test_snapshot_comparison() {
         .assert_before("Counter does not exist", Option::is_none)
         .assert_after("Counter has been set", |&c| c == Some(5));
 
-    harness.api().send(tx);
+    api.send(tx);
     harness.create_block();
 
     let other_tx = {
@@ -541,15 +529,14 @@ fn test_snapshot_comparison() {
 #[test]
 #[should_panic(expected = "Counter has increased")]
 fn test_snapshot_comparison_panic() {
-    let services: Vec<Box<Service>> = vec![Box::new(CounterService)];
-    let mut harness = TestHarness::with_services(services);
+    let (mut harness, api) = init_harness();
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
         TxIncrement::new(&pubkey, 5, &key)
     };
 
-    harness.api().send(tx.clone());
+    api.send(tx.clone());
     harness.create_block();
 
     // The assertion fails because the transaction is already committed by now
