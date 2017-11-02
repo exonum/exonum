@@ -26,7 +26,9 @@ use exonum::node::{ApiSender, NodeChannel, NodeHandler, Configuration, ListenerC
 use exonum::storage::{MemoryDB, Snapshot};
 use futures::Stream;
 use futures::executor;
+use iron::IronError;
 use iron::headers::{Headers, ContentType};
+use iron::status::StatusClass;
 use iron_test::{request, response};
 use mount::Mount;
 use router::Router;
@@ -520,18 +522,42 @@ impl HarnessApi {
         );
     }
 
-    fn get_internal<D>(mount: &Mount, url: &str) -> D
+    fn get_internal<D>(mount: &Mount, url: &str, expect_error: bool) -> D
     where
         for<'de> D: Deserialize<'de>,
     {
+        let status_class = if expect_error {
+            StatusClass::ClientError
+        } else {
+            StatusClass::Success
+        };
+
         let url = format!("http://localhost:3000/{}", url);
-        let resp = request::get(&url, Headers::new(), mount).unwrap();
+        let resp = request::get(&url, Headers::new(), mount);
+        let resp = if expect_error {
+            // Support either "normal" or erroneous responses.
+            // For example, `Api.not_found_response()` returns the response as `Ok(..)`.
+            match resp {
+                Ok(resp) => resp,
+                Err(IronError { response, .. }) => response,
+            }
+        } else {
+            resp.expect("Got unexpected `Err(..)` response")
+        };
+
+        if let Some(ref status) = resp.status {
+            if status.class() != status_class {
+                panic!("Unexpected response status: {:?}", status);
+            }
+        } else {
+            panic!("Response status not set");
+        }
+
         let resp = response::extract_body_to_string(resp);
-        // TODO: check status
         serde_json::from_str(&resp).unwrap()
     }
 
-    #[doc(hidden)]
+    /// Gets information from a public endpoint of the node.
     pub fn get<D>(&self, kind: ApiKind, endpoint: &str) -> D
     where
         for<'de> D: Deserialize<'de>,
@@ -539,6 +565,19 @@ impl HarnessApi {
         HarnessApi::get_internal(
             &self.public_mount,
             &format!("{}/{}", kind.into_prefix(), endpoint),
+            false,
+        )
+    }
+
+    /// Gets an error from a public endpoint of the node.
+    pub fn get_err<D>(&self, kind: ApiKind, endpoint: &str) -> D
+    where
+        for<'de> D: Deserialize<'de>,
+    {
+        HarnessApi::get_internal(
+            &self.public_mount,
+            &format!("{}/{}", kind.into_prefix(), endpoint),
+            true,
         )
     }
 
