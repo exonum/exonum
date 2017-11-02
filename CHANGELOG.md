@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Field `events_pool_capacity` in `MemoryPoolConfig` replaced by the new `EventsPoolCapacity` configuration. (#300)
 - Changed a build method `new` and added a new build method `with_prefix` for indexes. (#178)
 - Changed a signature of `gen_prefix` function in a `schema` module. (#178)
+- `NodeBuilder` works with `ServiceFactory` as trait object instead.
 
 ### Fixed
 - Fix the issue #197. Timeouts are ignored when the event pool is full. (#300)

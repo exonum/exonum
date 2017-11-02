@@ -93,7 +93,7 @@ script: |
       cargo fmt -p sandbox -- --write-mode=diff
   ;;
   "clippy-core" )
-      cd exonum && cargo clippy --verbose --features long_benchmarks,flame_profile  -- -D warnings
+      cd exonum && cargo clippy --verbose --features long_benchmarks  -- -D warnings
   ;;
   "clippy-sandbox" )
       cd sandbox && cargo clippy --verbose -- -D warnings
