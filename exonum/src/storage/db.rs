@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::collections::HashMap;
 use std::collections::btree_map::{BTreeMap, Range};
 use std::collections::Bound::*;
 use std::cmp::Ordering::*;
@@ -22,7 +23,7 @@ use super::Result;
 use self::NextIterValue::*;
 
 /// A set of serial changes that should be applied to a storage atomically.
-pub type Patch = BTreeMap<Vec<u8>, Change>;
+pub type Patch = HashMap<String, BTreeMap<Vec<u8>, Change>>;
 
 /// A generalized iterator over the storage views.
 pub type Iter<'a> = Box<Iterator + 'a>;
@@ -71,14 +72,14 @@ pub enum Change {
 // FIXME: make &mut Fork "unwind safe" (ECR-176)
 pub struct Fork {
     snapshot: Box<Snapshot>,
-    changes: Patch,
-    changelog: Vec<(Vec<u8>, Option<Change>)>,
+    patch: Patch,
+    changelog: Vec<(String, Vec<u8>, Option<Change>)>,
     logged: bool,
 }
 
 struct ForkIter<'a> {
     snapshot: Iter<'a>,
-    changes: Peekable<Range<'a, Vec<u8>, Change>>,
+    changes: Option<Peekable<Range<'a, Vec<u8>, Change>>>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -132,7 +133,7 @@ pub trait Database: Send + Sync + 'static {
     fn fork(&self) -> Fork {
         Fork {
             snapshot: self.snapshot(),
-            changes: Patch::new(),
+            patch: Patch::new(),
             changelog: Vec::new(),
             logged: false,
         }
@@ -158,19 +159,19 @@ pub trait Database: Send + Sync + 'static {
 pub trait Snapshot: 'static {
     /// Returns a value as raw vector of bytes corresponding to the specified key
     /// or `None` if does not exist.
-    fn get(&self, key: &[u8]) -> Option<Vec<u8>>;
+    fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>>;
 
     /// Returns `true` if the snapshot contains a value for the specified key.
     ///
     /// Default implementation tries to read the value using method [`get`].
     /// [`get`]: #tymethod.get
-    fn contains(&self, key: &[u8]) -> bool {
-        self.get(key).is_some()
+    fn contains(&self, name: &str, key: &[u8]) -> bool {
+        self.get(name, key).is_some()
     }
 
     /// Returns an iterator over the entries of the snapshot in ascending order starting from
     /// the specified key. The iterator element type is `(&[u8], &[u8])`.
-    fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a>;
+    fn iter<'a>(&'a self, name: &str, from: &[u8]) -> Iter<'a>;
 }
 
 /// A trait that defines streaming iterator over storage view entries.
@@ -183,35 +184,40 @@ pub trait Iterator {
 }
 
 impl Snapshot for Fork {
-    fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
-        match self.changes.get(key) {
-            Some(change) => {
+    fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>> {
+        if let Some(changes) = self.patch.get(name) {
+            if let Some(change) = changes.get(key) {
                 match *change {
-                    Change::Put(ref v) => Some(v.clone()),
-                    Change::Delete => None,
+                    Change::Put(ref v) => return Some(v.clone()),
+                    Change::Delete => return None,
                 }
             }
-            None => self.snapshot.get(key),
         }
+        self.snapshot.get(name, key)
     }
 
-    fn contains(&self, key: &[u8]) -> bool {
-        match self.changes.get(key) {
-            Some(change) => {
+    fn contains(&self, name: &str, key: &[u8]) -> bool {
+        if let Some(changes) = self.patch.get(name) {
+            if let Some(change) = changes.get(key) {
                 match *change {
-                    Change::Put(..) => true,
-                    Change::Delete => false,
+                    Change::Put(..) => return true,
+                    Change::Delete => return false,
                 }
             }
-            None => self.snapshot.contains(key),
         }
+        self.snapshot.contains(name, key)
     }
 
-    fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a> {
+    fn iter<'a>(&'a self, name: &str, from: &[u8]) -> Iter<'a> {
         let range = (Included(from), Unbounded);
+        let changes = match self.patch.get(name) {
+            Some(changes) => Some(changes.range::<[u8], _>(range).peekable()),
+            None => None,
+        };
+
         Box::new(ForkIter {
-            snapshot: self.snapshot.iter(from),
-            changes: self.changes.range::<[u8], _>(range).peekable(),
+            snapshot: self.snapshot.iter(name, from),
+            changes,
         })
     }
 }
@@ -253,66 +259,90 @@ impl Fork {
         if !self.logged {
             panic!("call rollback before checkpoint");
         }
-        for (k, c) in self.changelog.drain(..).rev() {
-            match c {
-                Some(change) => self.changes.insert(k, change),
-                None => self.changes.remove(&k),
-            };
+        for (name, k, c) in self.changelog.drain(..).rev() {
+            if let Some(changes) = self.patch.get_mut(&name) {
+                match c {
+                    Some(change) => changes.insert(k, change),
+                    None => changes.remove(&k),
+                };
+            }
         }
         self.logged = false;
     }
 
-    /// Inserts the key-value pair into the fork.
-    pub fn put(&mut self, key: Vec<u8>, value: Vec<u8>) {
+    /// Inserts the key-value pair into the fork with the given name `name`.
+    pub fn put(&mut self, name: &str, key: Vec<u8>, value: Vec<u8>) {
+        if !self.patch.contains_key(name) {
+            self.patch.insert(name.to_string(), BTreeMap::new());
+        }
+
+        let changes = self.patch.get_mut(name).unwrap();
+
         if self.logged {
             self.changelog.push((
+                name.to_string(),
                 key.clone(),
-                self.changes.insert(key, Change::Put(value)),
+                changes.insert(key, Change::Put(value)),
             ));
         } else {
-            self.changes.insert(key, Change::Put(value));
+            changes.insert(key, Change::Put(value));
         }
     }
 
-    /// Removes the key from the fork.
-    pub fn remove(&mut self, key: Vec<u8>) {
+    /// Removes the key from the fork with the given name `name`.
+    pub fn remove(&mut self, name: &str, key: Vec<u8>) {
+        if !self.patch.contains_key(name) {
+            self.patch.insert(name.to_string(), BTreeMap::new());
+        }
+
+        let changes = self.patch.get_mut(name).unwrap();
         if self.logged {
             self.changelog.push((
+                name.to_string(),
                 key.clone(),
-                self.changes.insert(key, Change::Delete),
+                changes.insert(key, Change::Delete),
             ));
         } else {
-            self.changes.insert(key, Change::Delete);
+            changes.insert(key, Change::Delete);
         }
     }
 
-    /// Removes all keys starting with the specified prefix from the fork.
-    pub fn remove_by_prefix(&mut self, prefix: &[u8]) {
+    /// Removes all keys starting with the specified prefix from the fork with name `name`.
+    pub fn remove_by_prefix(&mut self, name: &str, prefix: Option<&Vec<u8>>) {
+        if !self.patch.contains_key(name) {
+            self.patch.insert(name.to_string(), BTreeMap::new());
+        }
+
+        let changes = self.patch.get_mut(name).unwrap();
         // Remove changes
-        let keys = self.changes
-            .range::<[u8], _>((Included(prefix), Unbounded))
-            .map(|(k, ..)| k.to_vec())
-            .take_while(|k| k.starts_with(prefix))
-            .collect::<Vec<_>>();
-        for k in keys {
-            self.changes.remove(&k);
+        if let Some(prefix) = prefix {
+            let keys = changes
+                .range::<Vec<u8>, _>((Included(prefix), Unbounded))
+                .map(|(k, _)| k.to_vec())
+                .take_while(|k| k.starts_with(prefix))
+                .collect::<Vec<_>>();
+            for k in keys {
+                changes.remove(&k);
+            }
+        } else {
+            changes.clear();
         }
         // Remove from storage
-        let mut iter = self.snapshot.iter(prefix);
+        let mut iter = self.snapshot.iter(
+            name,
+            prefix.map_or(&[], |k| k.as_slice()),
+        );
         while let Some((k, ..)) = iter.next() {
-            if !k.starts_with(prefix) {
-                return;
-            }
-            let change = self.changes.insert(k.to_vec(), Change::Delete);
+            let change = changes.insert(k.to_vec(), Change::Delete);
             if self.logged {
-                self.changelog.push((k.to_vec(), change));
+                self.changelog.push((name.to_string(), k.to_vec(), change));
             }
         }
     }
 
     /// Converts the fork into `Patch`.
     pub fn into_patch(self) -> Patch {
-        self.changes
+        self.patch
     }
 
     /// Merges patch from another fork to this fork.
@@ -327,7 +357,16 @@ impl Fork {
         if self.logged {
             panic!("call merge before commit or rollback");
         }
-        self.changes.extend(patch)
+
+        for (name, changes) in patch {
+            if let Some(in_changes) = self.patch.get_mut(&name) {
+                in_changes.extend(changes);
+                continue;
+            }
+            {
+                self.patch.insert(name, changes);
+            }
+        }
     }
 }
 
@@ -351,40 +390,47 @@ impl ::std::fmt::Debug for Fork {
 
 impl<'a> ForkIter<'a> {
     fn step(&mut self) -> NextIterValue {
-        match self.changes.peek() {
-            Some(&(k, change)) => {
-                match self.snapshot.peek() {
-                    Some((key, ..)) => {
-                        match *change {
-                            Change::Put(..) => {
-                                match k[..].cmp(key) {
-                                    Equal => Replaced,
-                                    Less => Inserted,
-                                    Greater => Stored,
+        if let Some(ref mut changes) = self.changes {
+            match changes.peek() {
+                Some(&(k, change)) => {
+                    match self.snapshot.peek() {
+                        Some((key, ..)) => {
+                            match *change {
+                                Change::Put(..) => {
+                                    match k[..].cmp(key) {
+                                        Equal => Replaced,
+                                        Less => Inserted,
+                                        Greater => Stored,
+                                    }
+                                }
+                                Change::Delete => {
+                                    match k[..].cmp(key) {
+                                        Equal => Deleted,
+                                        Less => MissDeleted,
+                                        Greater => Stored,
+                                    }
                                 }
                             }
-                            Change::Delete => {
-                                match k[..].cmp(key) {
-                                    Equal => Deleted,
-                                    Less => MissDeleted,
-                                    Greater => Stored,
-                                }
+                        }
+                        None => {
+                            match *change {
+                                Change::Put(..) => Inserted,
+                                Change::Delete => MissDeleted,
                             }
                         }
                     }
-                    None => {
-                        match *change {
-                            Change::Put(..) => Inserted,
-                            Change::Delete => MissDeleted,
-                        }
+                }
+                None => {
+                    match self.snapshot.peek() {
+                        Some(..) => Stored,
+                        None => Finished,
                     }
                 }
             }
-            None => {
-                match self.snapshot.peek() {
-                    Some(..) => Stored,
-                    None => Finished,
-                }
+        } else {
+            match self.snapshot.peek() {
+                Some(..) => Stored,
+                None => Finished,
             }
         }
     }
@@ -397,7 +443,7 @@ impl<'a> Iterator for ForkIter<'a> {
                 Stored => return self.snapshot.next(),
                 Replaced => {
                     self.snapshot.next();
-                    return self.changes.next().map(|(key, change)| {
+                    return self.changes.as_mut().unwrap().next().map(|(key, change)| {
                         (
                             key.as_slice(),
                             match *change {
@@ -408,7 +454,7 @@ impl<'a> Iterator for ForkIter<'a> {
                     });
                 }
                 Inserted => {
-                    return self.changes.next().map(|(key, change)| {
+                    return self.changes.as_mut().unwrap().next().map(|(key, change)| {
                         (
                             key.as_slice(),
                             match *change {
@@ -419,11 +465,11 @@ impl<'a> Iterator for ForkIter<'a> {
                     })
                 }
                 Deleted => {
-                    self.changes.next();
+                    self.changes.as_mut().unwrap().next();
                     self.snapshot.next();
                 }
                 MissDeleted => {
-                    self.changes.next();
+                    self.changes.as_mut().unwrap().next();
                 }
                 Finished => return None,
             }
@@ -435,7 +481,7 @@ impl<'a> Iterator for ForkIter<'a> {
             match self.step() {
                 Stored => return self.snapshot.peek(),
                 Replaced | Inserted => {
-                    return self.changes.peek().map(|&(key, change)| {
+                    return self.changes.as_mut().unwrap().peek().map(|&(key, change)| {
                         (
                             key.as_slice(),
                             match *change {
@@ -446,11 +492,11 @@ impl<'a> Iterator for ForkIter<'a> {
                     })
                 }
                 Deleted => {
-                    self.changes.next();
+                    self.changes.as_mut().unwrap().next();
                     self.snapshot.next();
                 }
                 MissDeleted => {
-                    self.changes.next();
+                    self.changes.as_mut().unwrap().next();
                 }
                 Finished => return None,
             }

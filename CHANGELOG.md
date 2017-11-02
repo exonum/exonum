@@ -9,12 +9,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 - Implement `FromStr` and `ToString` traits for public sodium types (#318)
+- `RocksDB` is a default storage. Removed `LevelDB` as dependency. (#178) 
 - Add new index `SparseListIndex`. It is a list of items stored in sequential order. Similar to `ListIndex` but it may contain indexes without elements (#312)
 - New events implementation based on tokio with the separated queues for network events and timeouts and different threads for the network and node code. (#300)
 - Add a new macro `metric!` for collecting statistical information.
 
 ### Changed
 - Field `events_pool_capacity` in `MemoryPoolConfig` replaced by the new `EventsPoolCapacity` configuration. (#300)
+- Changed a build method `new` and added a new build method `with_prefix` for indexes. (#178)
+- Changed a signature of `gen_prefix` function in a `schema` module. (#178)
 - `NodeBuilder` works with `ServiceFactory` as trait object instead.
 
 ### Fixed
