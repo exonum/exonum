@@ -16,6 +16,7 @@ use byteorder::{ByteOrder, LittleEndian};
 
 use std::{mem, convert, sync};
 use std::fmt::Debug;
+use std::ops::Deref;
 
 use crypto::{PublicKey, SecretKey, Signature, sign, verify, Hash, hash, SIGNATURE_LENGTH};
 use encoding::{Field, Error, Result as StreamStructResult, Offset, CheckedOffset};
@@ -28,8 +29,24 @@ pub const TEST_NETWORK_ID: u8 = 0;
 /// Version of the protocol. Different versions are incompatible.
 pub const PROTOCOL_MAJOR_VERSION: u8 = 0;
 
-/// thread-safe reference-counting pointer to the `MessageBuffer`.
-pub type RawMessage = sync::Arc<MessageBuffer>;
+/// Thread-safe reference-counting pointer to the `MessageBuffer`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RawMessage(sync::Arc<MessageBuffer>);
+
+impl RawMessage {
+    /// Creates a new `RawMessage` instance with the given `MessageBuffer`.
+    pub fn new(buffer: MessageBuffer) -> Self {
+        RawMessage(sync::Arc::new(buffer))
+    }
+}
+
+impl Deref for RawMessage {
+    type Target = MessageBuffer;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 // TODO: reduce `to` argument from `write`, `read` and `check` methods
 // TODO: payload_length as a first value into message header

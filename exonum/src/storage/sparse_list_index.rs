@@ -608,7 +608,7 @@ mod tests {
         assert_eq!(3, list_index.capacity());
         assert_eq!(3, list_index.len());
 
-        let mut extended_by_again = vec![666, 999];
+        let extended_by_again = vec![666, 999];
         for el in &extended_by_again {
             list_index.push(*el);
         }

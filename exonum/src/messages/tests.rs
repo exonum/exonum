@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use crypto::SecretKey;
-use std::sync::Arc;
 use messages::raw::{FromRaw, MessageBuffer};
+use messages::RawMessage;
 
 #[test]
 fn test_message_without_fields() {
@@ -42,6 +42,6 @@ fn test_message_with_small_size() {
     }
 
     let buff = vec![1; 1];
-    let raw = Arc::new(MessageBuffer::from_vec(buff));
+    let raw = RawMessage::new(MessageBuffer::from_vec(buff));
     let _message = <SmallField as FromRaw>::from_raw(raw).expect("Found error in from_raw");
 }
