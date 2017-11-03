@@ -37,13 +37,13 @@
 //! votes for current config.
 //!
 //! See [`StoredConfiguration`][sc] in exonum.
-//! [sc]: <https://docs.rs/exonum/0.2.0/exonum/blockchain/config/struct.StoredConfiguration.html>
+//! [sc]: <https://docs.rs/exonum/0.3.0/exonum/blockchain/config/struct.StoredConfiguration.html>
 //!
 //! While using the service's transactions and/or api, it's important to understand, how [hash of a
 //! configuration][sc] is calculated. It's calculated as a hash of normalized `String` bytes,
 //! containing configuration json representation.
 //! When a new propose is put via `TxConfigPropose`:
-//! [sc]: <https://docs.rs/exonum/0.2.0/exonum/blockchain/config/struct.StoredConfiguration.html>
+//! [sc]: <https://docs.rs/exonum/0.3.0/exonum/blockchain/config/struct.StoredConfiguration.html>
 //!
 //! 1. [bytes](struct.TxConfigPropose.html#method.cfg) of a `String`, containing configuration
 //! json ->
@@ -51,11 +51,11 @@
 //! 3. `StoredConfiguration` ->
 //! 4. unique normalized `String` for a unique configuration ->
 //! 5. bytes ->
-//! 6. [hash](https://docs.rs/exonum/0.2.0/exonum/crypto/fn.hash.html)(bytes)
+//! 6. [hash](https://docs.rs/exonum/0.3.0/exonum/crypto/fn.hash.html)(bytes)
 //!
 //! The same [hash of a configuration][1] is referenced in
 //! `TxConfigVote` in [`cfg_hash`](struct.TxConfigVote.html#method.cfg_hash).
-//! [1]: <https://docs.rs/exonum/0.2.0/exonum/blockchain/config/
+//! [1]: <https://docs.rs/exonum/0.3.0/exonum/blockchain/config/
 //!struct.StoredConfiguration.html#method.hash>
 //!
 //! # Examples
@@ -117,11 +117,11 @@ type ProposeData = StorageValueConfigProposeData;
 /// `ConfigurationService`
 pub const CONFIG_SERVICE: u16 = 1;
 /// Value of [`message_type`][1] of `TxConfigPropose`.
-/// [1]: <https://docs.rs/exonum/0.2.0/exonum/messages/
+/// [1]: <https://docs.rs/exonum/0.3.0/exonum/messages/
 ///struct.MessageBuffer.html#method.message_type>
 pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 0;
 /// Value of [`message_type`][1] of `TxConfigVote`.
-/// [1]: <https://docs.rs/exonum/0.2.0/exonum/messages/
+/// [1]: <https://docs.rs/exonum/0.3.0/exonum/messages/
 ///struct.MessageBuffer.html#method.message_type>
 pub const CONFIG_VOTE_MESSAGE_ID: u16 = 1;
 
@@ -195,7 +195,7 @@ message! {
 /// Most of the actual business logic of modifying `Exonum` blockchain configuration is inside of
 /// [`TxConfigPropose`](struct.TxConfigPropose.html#method.execute) and
 /// [`TxConfigVote`](struct.TxConfigVote.html#method.execute).
-/// [1]: <https://docs.rs/exonum/0.2.0/exonum/blockchain/trait.Service.html>
+/// [1]: <https://docs.rs/exonum/0.3.0/exonum/blockchain/trait.Service.html>
 #[derive(Default)]
 pub struct ConfigurationService {}
 
@@ -223,16 +223,16 @@ where
     ///   containing configuration json ->
     ///   2. `String` ->
     ///   3. [StoredConfiguration]
-    ///   (https://docs.rs/exonum/0.2.0/exonum/blockchain/config/struct.StoredConfiguration.html) ->
+    ///   (https://docs.rs/exonum/0.3.0/exonum/blockchain/config/struct.StoredConfiguration.html) ->
     ///   4. unique normalized `String` for a unique configuration ->
     ///   5. bytes ->
-    ///   6. [hash](https://docs.rs/exonum/0.2.0/exonum/crypto/fn.hash.html)(bytes)
+    ///   6. [hash](https://docs.rs/exonum/0.3.0/exonum/crypto/fn.hash.html)(bytes)
     /// - Table **value** is `StorageValueConfigProposeData`, containing
     /// `TxConfigPropose`,
     /// which contains
     /// [bytes](struct.TxConfigPropose.html#method.cfg), corresponding to
     /// **key**.
-    /// [1]: <https://docs.rs/exonum/0.2.0/exonum/blockchain/config/
+    /// [1]: <https://docs.rs/exonum/0.3.0/exonum/blockchain/config/
     ///struct.StoredConfiguration.html#method.hash>
     pub fn propose_data_by_config_hash(&self) -> ProofMapIndex<&T, Hash, ProposeData> {
         ProofMapIndex::new("configuration.proposes", &self.view)
@@ -245,7 +245,7 @@ where
     /// the corresponding `TxConfigPropose` commit order.
     /// - Table **value** is [hash of a configuration][1] - **key** of
     /// `propose_data_by_config_hash`.
-    /// [1]: <https://docs.rs/exonum/0.2.0/exonum/blockchain/config/
+    /// [1]: <https://docs.rs/exonum/0.3.0/exonum/blockchain/config/
     ///struct.StoredConfiguration.html#method.hash>
     pub fn config_hash_by_ordinal(&self) -> ProofListIndex<&T, Hash> {
         ProofListIndex::new("configuration.propose_hashes", &self.view)
@@ -254,12 +254,12 @@ where
     /// Returns a `ProofListIndex` table of votes of validators for config, referenced by the
     /// queried
     /// `config_hash` - [hash of a configuration][1].
-    /// [1]: <https://docs.rs/exonum/0.2.0/exonum/blockchain/config/
+    /// [1]: <https://docs.rs/exonum/0.3.0/exonum/blockchain/config/
     ///struct.StoredConfiguration.html#method.hash>
     ///
     /// 1. The list of validators, who can vote for a config, is determined by
     /// `validators` of previous [StoredConfiguration]
-    /// (https://docs.rs/exonum/0.2.0/exonum/blockchain/config/struct.StoredConfiguration.html).
+    /// (https://docs.rs/exonum/0.3.0/exonum/blockchain/config/struct.StoredConfiguration.html).
     /// 2. Config, previous to a `StoredConfiguration` is referenced by
     /// `previous_cfg_hash` in `StoredConfiguration`.
     ///
@@ -319,7 +319,11 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
         &mut self,
         config_hash: &Hash,
     ) -> ProofListIndex<&mut Fork, TxConfigVote> {
-        ProofListIndex::with_prefix("configuration.votes", gen_prefix(config_hash), &mut self.view)
+        ProofListIndex::with_prefix(
+            "configuration.votes",
+            gen_prefix(config_hash),
+            &mut self.view,
+        )
     }
 
 
@@ -328,14 +332,14 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
     ///
     /// - **tx_propose** - `tx_propose` argument
     /// - **num_votes** - `validators.len()` of [StoredConfiguration]
-    /// (https://docs.rs/exonum/0.2.0/exonum/blockchain/config/struct.StoredConfiguration.html),
+    /// (https://docs.rs/exonum/0.3.0/exonum/blockchain/config/struct.StoredConfiguration.html),
     /// referenced by `previous_cfg_hash` of config, stored in `tx_propose`.
     /// - **votes_history_hash** - root_hash of corresponding `votes_by_config_hash` table in a
     /// state right after initialization (all indices contain [empty vote](struct.ZEROVOTE.html)).
     ///
     /// If an entry with the same [hash of a configuration][1] is present in
     /// `propose_data_by_config_hash`, as in config inside of `tx_propose`, nothing is done.
-    /// [1]: <https://docs.rs/exonum/0.2.0/exonum/blockchain/config/
+    /// [1]: <https://docs.rs/exonum/0.3.0/exonum/blockchain/config/
     ///struct.StoredConfiguration.html#method.hash>
     pub fn put_propose(&mut self, tx_propose: TxConfigPropose) -> bool {
         let cfg =
@@ -646,7 +650,7 @@ impl Service for ConfigurationService {
     /// `ConfigurationService` returns a vector, containing the single [root_hash][1]
     /// of [all config proposes table]
     /// (struct.ConfigurationSchema.html#method.propose_data_by_config_hash).
-    /// [1]: <https://docs.rs/exonum/0.2.0/exonum/storage/proof_list_index/
+    /// [1]: <https://docs.rs/exonum/0.3.0/exonum/storage/proof_list_index/
     ///struct.ProofListIndex.html#method.root_hash>
     ///
     /// Thus, `state_hash` is affected by any new valid propose and indirectly by
@@ -658,7 +662,7 @@ impl Service for ConfigurationService {
     /// is modified. Such hash is stored in each entry of [all config proposes table]
     /// (struct.ConfigurationSchema.html#method.propose_data_by_config_hash)
     /// - `StorageValueConfigProposeData`.
-    /// [1]: <https://docs.rs/exonum/0.2.0/exonum/storage/proof_map_index/
+    /// [1]: <https://docs.rs/exonum/0.3.0/exonum/storage/proof_map_index/
     ///struct.ProofMapIndex.html#method.root_hash>
     fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash> {
         let schema = ConfigurationSchema::new(snapshot);
@@ -666,7 +670,7 @@ impl Service for ConfigurationService {
     }
 
     /// Returns box ([Transaction][1]).
-    /// [1]: https://docs.rs/exonum/0.2.0/exonum/blockchain/trait.Transaction.html
+    /// [1]: https://docs.rs/exonum/0.3.0/exonum/blockchain/trait.Transaction.html
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, StreamStructError> {
         match raw.message_type() {
             CONFIG_PROPOSE_MESSAGE_ID => Ok(Box::new(TxConfigPropose::from_raw(raw)?)),
