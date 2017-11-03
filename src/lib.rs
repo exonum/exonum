@@ -44,6 +44,26 @@ use checkpoint_db::{CheckpointDb, CheckpointDbHandler};
 
 const STATE_UPDATE_TIMEOUT: u64 = 10_000;
 
+/// Macro allowing to create `Vec<Box<Transaction>>` from transaction references. Can be used for
+/// `TestHarness.probe_all()`, among other things.
+///
+/// As the macro syntax implies, the transactions are not consumed; they are rather cloned before
+/// being put into `Box`es.
+///
+/// # Examples
+///
+/// ```ignore
+/// let tx = TxCreateWallet::new(..);
+/// let other_tx = TxTransfer::new(..);
+/// let txs = txvec![&tx, &other_tx];
+/// ```
+#[macro_export]
+macro_rules! txvec {
+    ($(&$tx:ident),+ $(,)*) => {
+        vec![$(Box::new($tx.clone()) as Box<exonum::blockchain::Transaction>,)+]
+    };
+}
+
 /// Emulated test network.
 pub struct TestNetwork {
     validators: Vec<Validator>,
