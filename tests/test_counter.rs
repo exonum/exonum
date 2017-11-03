@@ -1,5 +1,6 @@
 #[macro_use]
 extern crate exonum;
+#[macro_use]
 extern crate exonum_harness;
 extern crate serde;
 #[macro_use]
@@ -364,7 +365,7 @@ fn test_probe() {
         TxIncrement::new(&pubkey, 3, &key)
     };
 
-    let snapshot = harness.probe_all(vec![Box::new(tx.clone()), Box::new(other_tx.clone())]);
+    let snapshot = harness.probe_all(txvec![&tx, &other_tx]);
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(8));
 
@@ -396,13 +397,13 @@ fn test_duplicate_tx() {
 #[test]
 #[should_panic(expected = "Duplicate transactions in probe")]
 fn test_probe_duplicate_tx_panic() {
-    let (harness, _) = init_harness();
+    let (mut harness, _) = init_harness();
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
         TxIncrement::new(&pubkey, 6, &key)
     };
-    let snapshot = harness.probe_all(vec![Box::new(tx.clone()), Box::new(tx.clone())]);
+    let snapshot = harness.probe_all(txvec![&tx, &tx]);
     drop(snapshot);
 }
 
@@ -436,10 +437,10 @@ fn test_probe_advanced() {
     assert_eq!(schema.count(), None);
 
     // Check dependency of the resulting snapshot on tx ordering
-    let snapshot = harness.probe_all(vec![Box::new(tx.clone()), Box::new(admin_tx.clone())]);
+    let snapshot = harness.probe_all(txvec![&tx, &admin_tx]);
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(0));
-    let snapshot = harness.probe_all(vec![Box::new(admin_tx.clone()), Box::new(tx.clone())]);
+    let snapshot = harness.probe_all(txvec![&admin_tx, &tx]);
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(6));
     // Check that data is (still) not persisted
@@ -462,10 +463,10 @@ fn test_probe_advanced() {
     assert_eq!(schema.count(), Some(10));
 
     // Check dependency of the resulting snapshot on tx ordering
-    let snapshot = harness.probe_all(vec![Box::new(tx.clone()), Box::new(admin_tx.clone())]);
+    let snapshot = harness.probe_all(txvec![&tx, &admin_tx]);
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(0));
-    let snapshot = harness.probe_all(vec![Box::new(admin_tx.clone()), Box::new(tx.clone())]);
+    let snapshot = harness.probe_all(txvec![&admin_tx, &tx]);
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(6));
     // Check that data is (still) not persisted
@@ -493,7 +494,7 @@ fn test_probe_duplicate_tx() {
 
     // Check the mixed case, when some probed transactions are committed and some are not
     let other_tx = inc_count(&api, 7);
-    let snapshot = harness.probe_all(vec![Box::new(tx), Box::new(other_tx)]);
+    let snapshot = harness.probe_all(txvec![&tx, &other_tx]);
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(12));
 }

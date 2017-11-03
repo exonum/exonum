@@ -7,11 +7,13 @@
 extern crate serde_derive;
 #[macro_use]
 extern crate exonum;
+#[macro_use]
 extern crate exonum_harness;
 
 use std::collections::BTreeSet;
 use std::iter::FromIterator;
 
+use exonum::blockchain::Service;
 use exonum::crypto::{self, PublicKey, SecretKey};
 use exonum::messages::Message;
 use exonum_harness::{TestHarness, HarnessApi, ApiKind, ComparableSnapshot};
@@ -26,7 +28,7 @@ mod cryptocurrency {
     use exonum::blockchain::{Blockchain, Service, Transaction, ApiContext};
     use exonum::node::{TransactionSend, ApiSender};
     use exonum::messages::{RawTransaction, FromRaw, Message};
-    use exonum::storage::{Snapshot, Fork, MemoryDB, MapIndex};
+    use exonum::storage::{Snapshot, Fork, MapIndex};
     use exonum::crypto::{PublicKey, Hash, HexValue};
     use exonum::encoding;
     use exonum::api::{Api, ApiError};
@@ -334,16 +336,15 @@ mod cryptocurrency {
             Some(Box::new(router))
         }
     }
-
-    pub fn blockchain() -> Blockchain {
-        let db = MemoryDB::new();
-        let services: Vec<Box<Service>> = vec![Box::new(CurrencyService)];
-        Blockchain::new(Box::new(db), services)
-    }
 }
 
 use cryptocurrency::{CurrencySchema, TxCreateWallet, TxTransfer, TransactionResponse, Wallet,
-                     blockchain};
+                     CurrencyService};
+
+fn create_harness() -> TestHarness {
+    let services: Vec<Box<Service>> = vec![Box::new(CurrencyService)];
+    TestHarness::with_services(services).create()
+}
 
 fn create_wallet(api: &HarnessApi, name: &str) -> (TxCreateWallet, SecretKey) {
     let (pubkey, key) = crypto::gen_keypair();
@@ -382,7 +383,7 @@ fn get_all_wallets(api: &HarnessApi) -> Vec<Wallet> {
 
 #[test]
 fn test_create_wallet() {
-    let mut harness = TestHarness::new(blockchain());
+    let mut harness = create_harness();
     let api = harness.api();
     let (tx, _) = create_wallet(&api, "Alice");
 
@@ -397,7 +398,7 @@ fn test_create_wallet() {
 
 #[test]
 fn test_transfer() {
-    let mut harness = TestHarness::new(blockchain());
+    let mut harness = create_harness();
     let api = harness.api();
 
     let (tx_alice, key_alice) = create_wallet(&api, "Alice");
@@ -430,7 +431,7 @@ fn test_transfer() {
 
 #[test]
 fn test_snapshot_completeness() {
-    let mut harness = TestHarness::new(blockchain());
+    let mut harness = create_harness();
     let api = harness.api();
 
     let (tx_alice, _) = create_wallet(&api, "Alice");
@@ -450,7 +451,7 @@ fn test_snapshot_completeness() {
 
 #[test]
 fn test_transfer_from_nonexisting_wallet() {
-    let mut harness = TestHarness::new(blockchain());
+    let mut harness = create_harness();
     let api = harness.api();
 
     let (tx_alice, key_alice) = create_wallet(&api, "Alice");
@@ -484,7 +485,7 @@ fn test_transfer_from_nonexisting_wallet() {
 
 #[test]
 fn test_transfer_to_nonexisting_wallet() {
-    let mut harness = TestHarness::new(blockchain());
+    let mut harness = create_harness();
     let api = harness.api();
 
     let (tx_alice, key_alice) = create_wallet(&api, "Alice");
@@ -522,7 +523,7 @@ fn test_transfer_to_nonexisting_wallet() {
 
 #[test]
 fn test_transfer_overcharge() {
-    let mut harness = TestHarness::new(blockchain());
+    let mut harness = create_harness();
     let api = harness.api();
 
     let (tx_alice, key_alice) = create_wallet(&api, "Alice");
@@ -548,7 +549,7 @@ fn test_transfer_overcharge() {
 
 #[test]
 fn test_transfers_in_single_block() {
-    let mut harness = TestHarness::new(blockchain());
+    let mut harness = create_harness();
     let api = harness.api();
 
     let (tx_alice, key_alice) = create_wallet(&api, "Alice");
@@ -575,12 +576,9 @@ fn test_transfers_in_single_block() {
 
     {
         // See what happens if transactions are applied in an "incorrect" order.
-        let comp = harness
-            .probe_all(vec![
-                Box::new(tx_b_to_a.clone()),
-                Box::new(tx_a_to_b.clone()),
-            ])
-            .compare(harness.snapshot());
+        let comp = harness.probe_all(txvec![&tx_b_to_a, &tx_a_to_b]).compare(
+            harness.snapshot(),
+        );
         let comp = comp.map(CurrencySchema::new);
         comp.map(|s| s.wallet(tx_alice.pub_key()).unwrap().balance())
             .assert("Alice's balance decreases", |&old, &new| new == old - 90);
@@ -608,7 +606,7 @@ fn test_transfers_in_single_block() {
 
 #[test]
 fn test_malformed_wallet_request() {
-    let harness = TestHarness::new(blockchain());
+    let harness = create_harness();
     let api = harness.api();
     let info: String = api.get_err(ApiKind::Service("cryptocurrency"), "v1/wallet/c0ffee");
     assert!(info.starts_with("Invalid request param"));
@@ -616,7 +614,7 @@ fn test_malformed_wallet_request() {
 
 #[test]
 fn test_unknown_wallet_request() {
-    let harness = TestHarness::new(blockchain());
+    let harness = create_harness();
     let api = harness.api();
 
     // transaction is sent by API, but isn't committed
