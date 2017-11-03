@@ -47,6 +47,8 @@ use exonum_configuration::config_api::{PublicConfigApi, PrivateConfigApi, ApiRes
                                        ApiResponseProposePost, ApiResponseVotePost};
 use super::generate_config_with_message;
 
+const TEST_CF: &str = "configuration.test";
+
 fn response_body(response: Response) -> serde_json::Value {
     if let Some(mut body) = response.body {
         let mut buf = Vec::new();
@@ -364,7 +366,7 @@ fn test_get_config_by_hash2() {
     let expected_body = {
         let expected_hash = {
             let mut fork = MemoryDB::new().fork();
-            let mut hashes = ProofListIndex::new(Vec::new(), &mut fork);
+            let mut hashes = ProofListIndex::new(TEST_CF, &mut fork);
             for _ in 0..api_sandbox.sandbox.n_validators() {
                 hashes.push(ZEROVOTE.clone());
             }
@@ -449,7 +451,7 @@ fn test_get_config_by_hash3() {
     let expected_body = {
         let expected_hash = {
             let mut fork = MemoryDB::new().fork();
-            let mut hashes = ProofListIndex::new(Vec::new(), &mut fork);
+            let mut hashes = ProofListIndex::new(TEST_CF, &mut fork);
             hashes.extend(votes);
             hashes.root_hash()
         };

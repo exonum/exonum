@@ -1,29 +1,27 @@
 [package]
 name = "exonum-configuration-sandbox"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 
 [dependencies]
 iron = "0.5.1"
-serde = "1.0.0"
-serde_derive = "1.0.0"
-rand = "0.3.0"
+serde = "1.0.10"
+serde_derive = "1.0.10"
+rand = "0.3.15"
 router = "0.5.1"
-log = "0.3.0"
+log = "0.3.8"
 iron-test = { git = "https://github.com/reem/iron-test" }
-exonum-configuration = {version="0.2.0", path="../"}
+exonum-configuration = {version="0.3.0", path="../"}
 
 [dependencies.exonum]
 git = "https://github.com/exonum/exonum.git"
-version = "0.2.0"
-# tag = "v0.3"
-rev = "32842d72845bc8b436c78db4347bc127a9dfa16c"
+version = "0.3.0"
+tag = "v0.3"
 
 [dependencies.sandbox]
 git = "https://github.com/exonum/exonum.git"
-version = "0.2.0"
-# tag = "v0.3"
-rev = "32842d72845bc8b436c78db4347bc127a9dfa16c"
+version = "0.3.0"
+tag = "v0.3"
 
 [replace]
-"exonum:0.2.0" = { git = "https://github.com/exonum/exonum.git", rev = "32842d72845bc8b436c78db4347bc127a9dfa16c" }
+"exonum:0.3.0" = { git = "https://github.com/exonum/exonum.git", tag = "v0.3" }
