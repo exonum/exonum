@@ -1,4 +1,4 @@
-use futures::{Async, Stream, Poll};
+use futures::{Async, Poll, Stream};
 
 /// Implementor for greedy folding in streams.
 pub struct GreedyFold<S, F, A> {
@@ -16,9 +16,9 @@ pub struct GreedyFold<S, F, A> {
 ///
 /// ```
 /// # extern crate futures;
-/// # extern crate exonum_harness;
+/// # extern crate exonum_testkit;
 /// use futures::{stream, Stream};
-/// use exonum_harness::GreedilyFoldable;
+/// use exonum_testkit::GreedilyFoldable;
 /// # fn main() {
 /// let stream = stream::iter_ok::<_, ()>(vec![1, 2, 3, 4])
 ///     .greedy_fold(0, |acc, item| acc + item);
