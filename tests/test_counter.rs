@@ -1,6 +1,6 @@
 #[macro_use]
 extern crate exonum;
-extern crate exonum_harness;
+extern crate exonum_testkit;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
@@ -10,7 +10,7 @@ use exonum::blockchain::Service;
 use exonum::crypto::{self, HexValue, PublicKey};
 use exonum::helpers::Height;
 use exonum::messages::Message;
-use exonum_harness::{TestHarness, HarnessApi, ApiKind, ComparableSnapshot};
+use exonum_testkit::{TestHarness, HarnessApi, ApiKind, ComparableSnapshot};
 
 mod counter {
     //! Sample counter service.

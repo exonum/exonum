@@ -7,14 +7,14 @@
 extern crate serde_derive;
 #[macro_use]
 extern crate exonum;
-extern crate exonum_harness;
+extern crate exonum_testkit;
 
 use std::collections::BTreeSet;
 use std::iter::FromIterator;
 
 use exonum::crypto::{self, PublicKey, SecretKey};
 use exonum::messages::Message;
-use exonum_harness::{TestHarness, HarnessApi, ApiKind, ComparableSnapshot};
+use exonum_testkit::{TestHarness, HarnessApi, ApiKind, ComparableSnapshot};
 
 mod cryptocurrency {
     extern crate serde;

@@ -20,7 +20,7 @@ impl<T> Comparison<T> {
     /// # Examples
     ///
     /// ```
-    /// # use exonum_harness::compare::Comparison;
+    /// # use exonum_testkit::compare::Comparison;
     /// let comparison = Comparison::new(vec![1, 2, 3], vec![4, 5])
     ///     .map(Vec::len);
     /// // Now, this is a comparison between `3` and `2`
@@ -41,7 +41,7 @@ impl<T> Comparison<T> {
     /// # Examples
     ///
     /// ```
-    /// # use exonum_harness::compare::Comparison;
+    /// # use exonum_testkit::compare::Comparison;
     /// Comparison::new(vec![1, 2, 3], vec![4, 5])
     ///     .map(Vec::len)
     ///     .assert_before("Array length <= 5", |&len| len <= 5);
@@ -66,7 +66,7 @@ impl<T> Comparison<T> {
     /// # Examples
     ///
     /// ```
-    /// # use exonum_harness::compare::Comparison;
+    /// # use exonum_testkit::compare::Comparison;
     /// Comparison::new(vec![1, 2, 3], vec![4, 5])
     ///     .assert_after("The second element is greater than first", |v| {
     ///         v[1] > v[0]
@@ -92,7 +92,7 @@ impl<T> Comparison<T> {
     /// # Examples
     ///
     /// ```
-    /// # use exonum_harness::compare::Comparison;
+    /// # use exonum_testkit::compare::Comparison;
     /// Comparison::new(vec![1, 2, 3], vec![4, 5])
     ///     .map(Vec::len)
     ///     .assert("Less elements after", |&old, &new| old > new);
@@ -117,7 +117,7 @@ impl<T> Comparison<T> {
     /// # Examples
     ///
     /// ```
-    /// # use exonum_harness::compare::Comparison;
+    /// # use exonum_testkit::compare::Comparison;
     /// Comparison::new(vec![1, 2, 3], vec![4, 5])
     ///     .map(Vec::len)
     ///     .assert_inv("More than 1 element in array", |&len| len > 1);
@@ -148,7 +148,7 @@ impl<T: PartialEq + ::std::fmt::Debug> Comparison<T> {
     /// # Examples
     ///
     /// ```
-    /// # use exonum_harness::compare::Comparison;
+    /// # use exonum_testkit::compare::Comparison;
     /// Comparison::new(vec![1, 2, 3], vec![4, 5, 6])
     ///     .map(Vec::len)
     ///     .assert_eq("Array length doesn't change");
@@ -167,7 +167,7 @@ impl<T: PartialEq + ::std::fmt::Debug> Comparison<T> {
     /// # Examples
     ///
     /// ```
-    /// # use exonum_harness::compare::Comparison;
+    /// # use exonum_testkit::compare::Comparison;
     /// Comparison::new(vec![1, 2, 3], vec![4, 5])
     ///     .map(Vec::len)
     ///     .assert_ne("Array length should change");
