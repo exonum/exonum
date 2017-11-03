@@ -1,13 +1,13 @@
 [package]
 name = "cryptocurrency"
-version = "0.1.0"
+version = "0.3.0"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 repository = "https://github.com/exonum/cryptocurrency"
 readme = "README.md"
 license = "Apache-2.0"
 
 [dependencies]
-exonum = "0.2.0"
+exonum = "0.3.0"
 iron = "0.5.1"
 bodyparser = "0.7.0"
 router = "0.5.1"

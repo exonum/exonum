@@ -26,9 +26,9 @@ extern crate iron;
 
 // Import necessary types from crates.
 
-use exonum::blockchain::{self, Blockchain, Service, GenesisConfig, ValidatorKeys, Transaction,
+use exonum::blockchain::{Blockchain, Service, GenesisConfig, ValidatorKeys, Transaction,
                          ApiContext};
-use exonum::node::{Node, NodeConfig, NodeApiConfig, TransactionSend, ApiSender, NodeChannel};
+use exonum::node::{Node, NodeConfig, NodeApiConfig, TransactionSend, ApiSender};
 use exonum::messages::{RawTransaction, FromRaw, Message};
 use exonum::storage::{Fork, MemoryDB, MapIndex};
 use exonum::crypto::{PublicKey, Hash, HexValue};
@@ -101,8 +101,7 @@ pub struct CurrencySchema<'a> {
 /// i.e. the first argument to the `MapIndex::new` call.
 impl<'a> CurrencySchema<'a> {
     pub fn wallets(&mut self) -> MapIndex<&mut Fork, PublicKey, Wallet> {
-        let prefix = blockchain::gen_prefix(SERVICE_ID, 0, &());
-        MapIndex::new(prefix, self.view)
+        MapIndex::new("cryptocurrency.wallets", self.view)
     }
 
     /// Get a separate wallet from the storage.
@@ -202,7 +201,7 @@ impl Transaction for TxTransfer {
 /// Implement the node API.
 #[derive(Clone)]
 struct CryptocurrencyApi {
-    channel: ApiSender<NodeChannel>,
+    channel: ApiSender,
     blockchain: Blockchain,
 }
 
@@ -265,7 +264,7 @@ impl Api for CryptocurrencyApi {
                 Ok(Some(transaction)) => {
                     let transaction: Box<Transaction> = transaction.into();
                     let tx_hash = transaction.hash();
-                    self_.channel.send(transaction).map_err(ApiError::Events)?;
+                    self_.channel.send(transaction).map_err(ApiError::from)?;
                     let json = TransactionResponse { tx_hash };
                     self_.ok_response(&serde_json::to_value(&json).unwrap())
                 }
@@ -392,7 +391,7 @@ fn main() {
     };
 
     println!("Starting a single node...");
-    let mut node = Node::new(blockchain, node_cfg);
+    let node = Node::new(blockchain, node_cfg);
 
     println!("Blockchain is ready for transactions!");
     node.run().unwrap();
