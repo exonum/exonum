@@ -12,10 +12,8 @@ extern crate router;
 extern crate serde;
 extern crate serde_json;
 
-use std::collections::BTreeMap;
-
 use exonum::blockchain::{ApiContext, Blockchain, Service, Transaction, GenesisConfig,
-                         SharedNodeState, Schema as CoreSchema, ValidatorKeys};
+                         SharedNodeState, ValidatorKeys};
 use exonum::crypto;
 // A bit hacky, `exonum::events` is hidden from docs.
 use exonum::events::{Event as ExonumEvent, EventHandler};
@@ -34,12 +32,15 @@ use mount::Mount;
 use router::Router;
 use serde::{Serialize, Deserialize};
 
+mod checkpoint_db;
 pub mod compare;
 mod greedy_fold;
 
 #[doc(hidden)]
 pub use greedy_fold::GreedilyFoldable;
 pub use compare::ComparableSnapshot;
+
+use checkpoint_db::{CheckpointDb, CheckpointDbHandler};
 
 const STATE_UPDATE_TIMEOUT: u64 = 10_000;
 
@@ -143,24 +144,23 @@ impl Validator {
 /// Builder for `TestHarness`.
 pub struct TestHarnessBuilder {
     blockchain: Blockchain,
+    db_handler: CheckpointDbHandler<MemoryDB>,
     validator_count: u16,
 }
 
 impl TestHarnessBuilder {
-    fn with_blockchain(blockchain: Blockchain) -> Self {
-        TestHarnessBuilder {
-            blockchain,
-            validator_count: 1,
-        }
-    }
-
     fn with_services<I>(services: I) -> Self
     where
         I: IntoIterator<Item = Box<Service>>,
     {
-        let db = MemoryDB::new();
+        let db = CheckpointDb::new(MemoryDB::new());
+        let db_handler = db.handler();
         let blockchain = Blockchain::new(Box::new(db), services.into_iter().collect());
-        TestHarnessBuilder::with_blockchain(blockchain)
+        TestHarnessBuilder {
+            blockchain,
+            db_handler,
+            validator_count: 1,
+        }
     }
 
     /// Sets the validator count to be used in the harness emulation.
@@ -178,6 +178,7 @@ impl TestHarnessBuilder {
         crypto::init();
         TestHarness::assemble(
             self.blockchain.clone(),
+            self.db_handler.clone(),
             TestNetwork::new(self.validator_count),
         )
     }
@@ -187,22 +188,13 @@ impl TestHarnessBuilder {
 /// (with no real network setup).
 pub struct TestHarness {
     handler: NodeHandler,
+    db_handler: CheckpointDbHandler<MemoryDB>,
     channel: NodeChannel,
     api_context: ApiContext,
     network: TestNetwork,
 }
 
 impl TestHarness {
-    /// Initializes a harness with a blockchain and a single-node network.
-    pub fn new(blockchain: Blockchain) -> Self {
-        TestHarness::assemble(blockchain, TestNetwork::new(1))
-    }
-
-    /// Initializes a harness builder with a blockchain.
-    pub fn with_blockchain(blockchain: Blockchain) -> TestHarnessBuilder {
-        TestHarnessBuilder::with_blockchain(blockchain)
-    }
-
     /// Initializes a harness with a blockchain that hosts a given set of services.
     /// The blockchain uses `MemoryDB` for storage.
     pub fn with_services<I>(services: I) -> TestHarnessBuilder
@@ -212,7 +204,11 @@ impl TestHarness {
         TestHarnessBuilder::with_services(services)
     }
 
-    fn assemble(mut blockchain: Blockchain, network: TestNetwork) -> Self {
+    fn assemble(
+        mut blockchain: Blockchain,
+        db_handler: CheckpointDbHandler<MemoryDB>,
+        network: TestNetwork,
+    ) -> Self {
         let genesis = network.config();
         blockchain.create_genesis_block(genesis.clone()).unwrap();
 
@@ -261,6 +257,7 @@ impl TestHarness {
 
         TestHarness {
             handler,
+            db_handler,
             channel,
             api_context,
             network,
@@ -309,6 +306,15 @@ impl TestHarness {
         self.handler.blockchain.snapshot()
     }
 
+    /// Rolls the blockchain back for a certain number of blocks
+    pub fn rollback(&mut self, blocks: usize) {
+        assert!(
+            (blocks as u64) < self.state().height().0,
+            "Cannot rollback past genesis block"
+        );
+        self.db_handler.rollback(blocks);
+    }
+
     /// Executes a list of transactions given the current state of the blockchain, but does not
     /// commit execution results to the blockchain. The execution result is the same
     /// as if transactions were included into a new block; for example,
@@ -317,56 +323,52 @@ impl TestHarness {
     /// # Panics
     ///
     /// If there are duplicate transactions.
-    pub fn probe_all(&self, transactions: Vec<Box<Transaction>>) -> Box<Snapshot> {
-        let validator_id = self.state().validator_id().expect(
-            "Tested node is not a validator",
-        );
-        let height = self.state().height();
+    pub fn probe_all<I>(&mut self, transactions: I) -> Box<Snapshot>
+    where
+        I: IntoIterator<Item = Box<Transaction>>,
+    {
+        use std::collections::BTreeSet;
+        use std::iter::FromIterator;
 
-        let (transaction_map, hashes) = {
-            let mut transaction_map = BTreeMap::new();
-            let mut hashes = Vec::with_capacity(transactions.len());
+        let transactions = transactions.into_iter();
+        let mut tx_hashes = Vec::with_capacity(transactions.size_hint().0);
 
-            let core_schema = CoreSchema::new(self.snapshot());
-            let committed_txs = core_schema.transactions();
+        let api = self.api();
+        for tx in transactions {
+            tx_hashes.push(tx.hash());
+            api.send_boxed(tx);
+        }
+        self.poll_events();
 
-            for tx in transactions {
-                let hash = tx.hash();
-                if committed_txs.contains(&hash) {
-                    continue;
-                }
-
-                hashes.push(hash);
-                transaction_map.insert(hash, tx);
-            }
-
-            assert_eq!(
-                hashes.len(),
-                transaction_map.len(),
-                "Duplicate transactions in probe"
+        let tx_hashes: Vec<_> = {
+            let mempool = self.state().transactions().read().expect(
+                "Cannot acquire read lock on mempool",
             );
-
-            (transaction_map, hashes)
+            tx_hashes
+                .into_iter()
+                .filter(|h| mempool.contains_key(h))
+                .collect()
         };
-
-        let (_, patch) = self.handler.blockchain.create_patch(
-            validator_id,
-            height,
-            &hashes,
-            &transaction_map,
+        let tx_hash_set = BTreeSet::from_iter(tx_hashes.clone());
+        assert_eq!(
+            tx_hash_set.len(),
+            tx_hashes.len(),
+            "Duplicate transactions in probe"
         );
 
-        let mut fork = self.handler.blockchain.fork();
-        fork.merge(patch);
-        Box::new(fork)
+        self.do_create_block(&tx_hashes);
+
+        let snapshot = self.snapshot();
+        self.rollback(1);
+        snapshot
     }
 
     /// Executes a transaction given the current state of the blockchain but does not
     /// commit execution results to the blockchain. The execution result is the same
     /// as if a transaction was included into a new block; for example,
     /// a transaction included into one of previous blocks does not lead to any state changes.
-    pub fn probe<T: Transaction>(&self, transaction: T) -> Box<Snapshot> {
-        self.probe_all(vec![Box::new(transaction)])
+    pub fn probe<T: Transaction>(&mut self, transaction: T) -> Box<Snapshot> {
+        self.probe_all(vec![Box::new(transaction) as Box<Transaction>])
     }
 
     fn do_create_block(&mut self, tx_hashes: &[crypto::Hash]) {
@@ -517,7 +519,12 @@ impl HarnessApi {
 
     /// Sends a transaction to the node via `ApiSender`.
     pub fn send<T: Transaction>(&self, transaction: T) {
-        self.api_sender.send(Box::new(transaction)).expect(
+        self.send_boxed(Box::new(transaction));
+    }
+
+    /// Sends a transaction to the node via `ApiSender`.
+    pub fn send_boxed(&self, transaction: Box<Transaction>) {
+        self.api_sender.send(transaction).expect(
             "Cannot send transaction",
         );
     }
