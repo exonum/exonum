@@ -27,6 +27,7 @@ use events::{NetworkEvent, NetworkRequest};
 use events::network::{NetworkConfiguration, NetworkPart};
 use events::error::log_error;
 use node::{EventsPoolCapacity, NodeChannel};
+use helpers::user_agent;
 
 #[derive(Debug)]
 pub struct TestHandler {
@@ -172,7 +173,13 @@ impl TestEvents {
 
 pub fn connect_message(addr: SocketAddr) -> Connect {
     let time = time::UNIX_EPOCH;
-    Connect::new_with_signature(&PublicKey::zero(), addr, time, &Signature::zero())
+    Connect::new_with_signature(
+        &PublicKey::zero(),
+        addr,
+        time,
+        &user_agent::get(),
+        &Signature::zero(),
+    )
 }
 
 pub fn raw_message(id: u16, len: usize) -> RawMessage {
