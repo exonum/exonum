@@ -215,16 +215,12 @@ impl CryptocurrencyApi {
         schema.wallet(pub_key)
     }
 
-    fn get_wallets(&self) -> Option<Vec<Wallet>> {
+    fn get_wallets(&self) -> Vec<Wallet> {
         let mut view = self.blockchain.fork();
         let mut schema = CurrencySchema { view: &mut view };
         let idx = schema.wallets();
         let wallets: Vec<Wallet> = idx.values().collect();
-        if wallets.is_empty() {
-            None
-        } else {
-            Some(wallets)
-        }
+        wallets
     }
 }
 
@@ -278,14 +274,8 @@ impl Api for CryptocurrencyApi {
         // Gets status of all wallets.
         let self_ = self.clone();
         let wallets_info = move |_: &mut Request| -> IronResult<Response> {
-            if let Some(wallets) = self_.get_wallets() {
-                self_.ok_response(&serde_json::to_value(wallets).unwrap())
-            } else {
-                self_.not_found_response(
-                    &serde_json::to_value("Wallets database is empty")
-                        .unwrap(),
-                )
-            }
+            let wallets = self_.get_wallets();
+            self_.ok_response(&serde_json::to_value(&wallets).unwrap())
         };
 
         // Gets status of the wallet corresponding to the public key.
