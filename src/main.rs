@@ -208,6 +208,12 @@ struct CryptocurrencyApi {
     blockchain: Blockchain,
 }
 
+/// The structure returned by the REST API.
+#[derive(Serialize, Deserialize)]
+struct TransactionResponse {
+    tx_hash: Hash,
+}
+
 /// Shortcut to get data on wallets.
 impl CryptocurrencyApi {
     /// Endpoint for getting a single wallet.
@@ -258,31 +264,6 @@ impl CryptocurrencyApi {
     }
 }
 
-/// Add an enum which joins transactions of both types to simplify request
-/// processing.
-#[serde(untagged)]
-#[derive(Clone, Serialize, Deserialize)]
-enum TransactionRequest {
-    CreateWallet(TxCreateWallet),
-    Transfer(TxTransfer),
-}
-
-/// Implement a trait for the enum for deserialized `TransactionRequest`s
-/// to fit into the node channel.
-impl Into<Box<Transaction>> for TransactionRequest {
-    fn into(self) -> Box<Transaction> {
-        match self {
-            TransactionRequest::CreateWallet(trans) => Box::new(trans),
-            TransactionRequest::Transfer(trans) => Box::new(trans),
-        }
-    }
-}
-
-/// The structure returned by the REST API.
-#[derive(Serialize, Deserialize)]
-struct TransactionResponse {
-    tx_hash: Hash,
-}
 
 /// Implement the `Api` trait.
 /// `Api` facilitates conversion between transactions/read requests and REST
