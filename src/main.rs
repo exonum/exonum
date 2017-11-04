@@ -37,6 +37,7 @@ use exonum::api::{Api, ApiError};
 use iron::prelude::*;
 use iron::Handler;
 use router::Router;
+use serde::Deserialize;
 
 // // // // // // // // // // CONSTANTS // // // // // // // // // //
 
@@ -209,18 +210,51 @@ struct CryptocurrencyApi {
 
 /// Shortcut to get data on wallets.
 impl CryptocurrencyApi {
-    fn get_wallet(&self, pub_key: &PublicKey) -> Option<Wallet> {
-        let mut view = self.blockchain.fork();
-        let mut schema = CurrencySchema { view: &mut view };
-        schema.wallet(pub_key)
+    /// Endpoint for getting a single wallet.
+    fn get_wallet(&self, req: &mut Request) -> IronResult<Response> {
+        let path = req.url.path();
+        let wallet_key = path.last().unwrap();
+        let public_key = PublicKey::from_hex(wallet_key).map_err(ApiError::FromHex)?;
+
+        let wallet = {
+            let mut view = self.blockchain.fork();
+            let mut schema = CurrencySchema { view: &mut view };
+            schema.wallet(&public_key)
+        };
+
+        if let Some(wallet) = wallet {
+            self.ok_response(&serde_json::to_value(wallet).unwrap())
+        } else {
+            self.not_found_response(&serde_json::to_value("Wallet not found").unwrap())
+        }
     }
 
-    fn get_wallets(&self) -> Vec<Wallet> {
+    /// Endpoint for dumping all wallets from the storage.
+    fn get_wallets(&self, _: &mut Request) -> IronResult<Response> {
         let mut view = self.blockchain.fork();
         let mut schema = CurrencySchema { view: &mut view };
         let idx = schema.wallets();
         let wallets: Vec<Wallet> = idx.values().collect();
-        wallets
+
+        self.ok_response(&serde_json::to_value(&wallets).unwrap())
+    }
+
+    /// Common processing for transaction-accepting endpoints.
+    fn post_transaction<T>(&self, req: &mut Request) -> IronResult<Response>
+    where
+        T: Transaction + Clone + for<'de> Deserialize<'de>,
+    {
+        match req.get::<bodyparser::Struct<T>>() {
+            Ok(Some(transaction)) => {
+                let transaction: Box<Transaction> = Box::new(transaction);
+                let tx_hash = transaction.hash();
+                self.channel.send(transaction).map_err(ApiError::from)?;
+                let json = TransactionResponse { tx_hash };
+                self.ok_response(&serde_json::to_value(&json).unwrap())
+            }
+            Ok(None) => Err(ApiError::IncorrectRequest("Empty request body".into()))?,
+            Err(e) => Err(ApiError::IncorrectRequest(Box::new(e)))?,
+        }
     }
 }
 
@@ -257,44 +291,20 @@ struct TransactionResponse {
 impl Api for CryptocurrencyApi {
     fn wire(&self, router: &mut Router) {
         let self_ = self.clone();
-        let transaction = move |req: &mut Request| -> IronResult<Response> {
-            match req.get::<bodyparser::Struct<TransactionRequest>>() {
-                Ok(Some(transaction)) => {
-                    let transaction: Box<Transaction> = transaction.into();
-                    let tx_hash = transaction.hash();
-                    self_.channel.send(transaction).map_err(ApiError::from)?;
-                    let json = TransactionResponse { tx_hash };
-                    self_.ok_response(&serde_json::to_value(&json).unwrap())
-                }
-                Ok(None) => Err(ApiError::IncorrectRequest("Empty request body".into()))?,
-                Err(e) => Err(ApiError::IncorrectRequest(Box::new(e)))?,
-            }
-        };
-
-        // Gets status of all wallets.
+        let post_create_wallet =
+            move |req: &mut Request| self_.post_transaction::<TxCreateWallet>(req);
         let self_ = self.clone();
-        let wallets_info = move |_: &mut Request| -> IronResult<Response> {
-            let wallets = self_.get_wallets();
-            self_.ok_response(&serde_json::to_value(&wallets).unwrap())
-        };
-
-        // Gets status of the wallet corresponding to the public key.
+        let post_transfer = move |req: &mut Request| self_.post_transaction::<TxTransfer>(req);
         let self_ = self.clone();
-        let wallet_info = move |req: &mut Request| -> IronResult<Response> {
-            let path = req.url.path();
-            let wallet_key = path.last().unwrap();
-            let public_key = PublicKey::from_hex(wallet_key).map_err(ApiError::FromHex)?;
-            if let Some(wallet) = self_.get_wallet(&public_key) {
-                self_.ok_response(&serde_json::to_value(wallet).unwrap())
-            } else {
-                self_.not_found_response(&serde_json::to_value("Wallet not found").unwrap())
-            }
-        };
+        let get_wallets = move |req: &mut Request| self_.get_wallets(req);
+        let self_ = self.clone();
+        let get_wallet = move |req: &mut Request| self_.get_wallet(req);
 
-        // Bind the transaction handler to a specific route.
-        router.post("/v1/wallets/transaction", transaction, "transaction");
-        router.get("/v1/wallets", wallets_info, "wallets_info");
-        router.get("/v1/wallet/:pub_key", wallet_info, "wallet_info");
+        // Bind handlers to specific routes.
+        router.post("/v1/wallets", post_create_wallet, "post_create_wallet");
+        router.post("/v1/wallets/transfer", post_transfer, "post_transfer");
+        router.get("/v1/wallets", get_wallets, "get_wallets");
+        router.get("/v1/wallet/:pub_key", get_wallet, "get_wallet");
     }
 }
 

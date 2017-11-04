@@ -29,12 +29,20 @@ function kill-server {
     netstat -tlp 2>/dev/null | awk '{ if ($4 == "*:8000") { split($7, pid, /\//); print pid[1] } }' | xargs -r kill -KILL
 }
 
-# Sends a transaction to the cryptocurrency demo.
+# Creates a wallet in the cryptocurrency demo.
 #
 # Arguments:
 # - $1: filename with the transaction data
-function send-transaction {
-    RESP=`curl -H "Content-Type: application/json" -X POST -d @$1 http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets/transaction 2>/dev/null`
+function create-wallet {
+    RESP=`curl -H "Content-Type: application/json" -X POST -d @$1 http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets 2>/dev/null`
+}
+
+# Performs a transfer in the cryptocurrency demo.
+#
+# Arguments:
+# - $1: filename with the transaction data
+function transfer {
+    RESP=`curl -H "Content-Type: application/json" -X POST -d @$1 http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets/transfer 2>/dev/null`
 }
 
 # Checks a response to an Exonum transaction.
@@ -106,15 +114,15 @@ kill-server
 launch-server
 
 echo "Creating a wallet for Johnny..."
-send-transaction create-wallet-1.json
+create-wallet create-wallet-1.json
 check-transaction 44c6c2c5
 
 echo "Creating a wallet for Janie..."
-send-transaction create-wallet-2.json
+create-wallet create-wallet-2.json
 check-transaction 8714e906
 
 echo "Transferring funds from Johnny to Janie"
-send-transaction transfer-funds.json
+transfer transfer-funds.json
 check-transaction e63b28ca
 
 echo "Waiting until transactions are committed..."
