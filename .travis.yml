@@ -17,6 +17,7 @@ addons:
     - sourceline: 'ppa:giskou/librocksdb'
     packages:
     - libsodium-dev
+    - libsnappy-dev
     - librocksdb
     - jq
 env:
