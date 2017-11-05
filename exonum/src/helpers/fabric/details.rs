@@ -348,7 +348,7 @@ impl Finalize {
         (
             common,
             map.iter().map(|(_, c)| c.clone()).collect(),
-            map.get(&our_config.consensus_public_key).map(Clone::clone),
+            map.get(&our_config.consensus_public_key).cloned(),
         )
     }
 }
@@ -436,10 +436,10 @@ impl Command for Finalize {
                 service_secret_key: secret_config.service_secret_key,
                 genesis: genesis,
                 api: NodeApiConfig {
-                        public_api_address: public_addr,
-                        private_api_address: private_addr,
-                        ..Default::default()
-                    },
+                    public_api_address: public_addr,
+                    private_api_address: private_addr,
+                    ..Default::default()
+                },
                 mempool: Default::default(),
                 services_configs: Default::default(),
             }
