@@ -5,34 +5,37 @@
 
 extern crate exonum;
 extern crate futures;
-extern crate mount;
 extern crate iron;
 extern crate iron_test;
+extern crate mount;
 extern crate router;
 extern crate serde;
 extern crate serde_json;
 
 use std::collections::BTreeMap;
+use std::sync::{Arc, RwLock};
 
-use exonum::blockchain::{ApiContext, Blockchain, Service, Transaction, GenesisConfig,
-                         SharedNodeState, Schema as CoreSchema, ValidatorKeys};
+use exonum::blockchain::{ApiContext, Blockchain, GenesisConfig, Schema as CoreSchema, Service,
+                         ServiceContext, SharedNodeState, Transaction, ValidatorKeys};
 use exonum::crypto;
 // A bit hacky, `exonum::events` is hidden from docs.
 use exonum::events::{Event as ExonumEvent, EventHandler};
 use exonum::helpers::{Height, Round, ValidatorId};
-use exonum::messages::{Message, Propose, Precommit};
-use exonum::node::{ApiSender, NodeChannel, NodeHandler, Configuration, ListenerConfig,
-                   ServiceConfig, DefaultSystemState, State as NodeState, TransactionSend};
+use exonum::messages::{Message, Precommit, Propose};
+use exonum::node::{ApiSender, Configuration, DefaultSystemState, ExternalMessage, ListenerConfig,
+                   NodeChannel, NodeHandler, ServiceConfig, State as NodeState, TransactionSend,
+                   TxPool};
 use exonum::storage::{MemoryDB, Snapshot};
 use futures::Stream;
 use futures::executor;
+use futures::sync::mpsc;
 use iron::IronError;
-use iron::headers::{Headers, ContentType};
+use iron::headers::{ContentType, Headers};
 use iron::status::StatusClass;
 use iron_test::{request, response};
 use mount::Mount;
 use router::Router;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 pub mod compare;
 mod greedy_fold;
@@ -45,6 +48,7 @@ const STATE_UPDATE_TIMEOUT: u64 = 10_000;
 
 /// Emulated test network.
 pub struct TestNetwork {
+    validator_id: Option<ValidatorId>,
     validators: Vec<Validator>,
 }
 
@@ -55,12 +59,21 @@ impl TestNetwork {
         for i in 0..validator_count {
             validators.push(Validator::new(ValidatorId(i)));
         }
-        TestNetwork { validators }
+        let validator_id = Some(ValidatorId(0));
+        TestNetwork {
+            validators,
+            validator_id,
+        }
     }
 
     /// Returns the node in the emulated network, from whose perspective the harness operates.
     pub fn us(&self) -> &Validator {
         &self.validators[0]
+    }
+
+    /// TODO
+    pub fn validator_id(&self) -> Option<&ValidatorId> {
+        self.validator_id.as_ref()
     }
 
     /// Returns a slice of all validators in the network.
@@ -186,10 +199,12 @@ impl TestHarnessBuilder {
 /// Harness for testing blockchain services. It offers simple network configuration emulation
 /// (with no real network setup).
 pub struct TestHarness {
-    handler: NodeHandler,
+    blockchain: Blockchain,
     channel: NodeChannel,
     api_context: ApiContext,
+    // node_state: NodeState,
     network: TestNetwork,
+    mempool: TxPool,
 }
 
 impl TestHarness {
@@ -250,27 +265,19 @@ impl TestHarness {
             )
         };
 
-        let handler = NodeHandler::new(
-            blockchain,
-            listen_address,
-            channel.node_sender(),
-            system_state,
-            config,
-            api_state,
-        );
-
         TestHarness {
-            handler,
+            blockchain,
             channel,
             api_context,
             network,
+            mempool: Arc::new(RwLock::new(BTreeMap::new())),
         }
     }
 
     /// Returns the node state of the harness.
-    pub fn state(&self) -> &NodeState {
-        self.handler.state()
-    }
+    // pub fn state(&self) -> &NodeState {
+    //     &self.node_state
+    // }
 
     /// Creates a mounting point for public APIs used by the blockchain.
     fn public_api_mount(&self) -> Mount {
@@ -293,20 +300,34 @@ impl TestHarness {
         // XXX: Creating a new executor each time seems very inefficient, but sharing
         // a single executor seems to be impossible
         // because `handler` needs to be borrowed mutably into the closure. Use `RefCell`?
-        let handler = &mut self.handler;
-        let event_stream = self.channel.api_requests.1.by_ref().greedy_fold(
-            (),
-            |_, event| {
-                handler.handle_event(ExonumEvent::Api(event))
-            },
-        );
+        let mempool = Arc::clone(&self.mempool);
+        let snapshot = self.blockchain.snapshot();
+        let schema = CoreSchema::new(snapshot);
+        let event_stream = self.channel
+            .api_requests
+            .1
+            .by_ref()
+            .greedy_fold((), |_, event| {
+                match event {
+                    ExternalMessage::Transaction(tx) => {
+                        let hash = tx.hash();
+                        if !schema.transactions().contains(&hash) {
+                            mempool
+                                .write()
+                                .expect("Cannot write transactions to mempool")
+                                .insert(tx.hash(), tx);
+                        }
+                    }
+                    ExternalMessage::PeerAdd(_) => { /* Ignored */ }
+                }
+            });
         let mut event_exec = executor::spawn(event_stream);
         event_exec.wait_stream()
     }
 
     /// Returns a snapshot of the current blockchain state.
     pub fn snapshot(&self) -> Box<Snapshot> {
-        self.handler.blockchain.snapshot()
+        self.blockchain.snapshot()
     }
 
     /// Executes a list of transactions given the current state of the blockchain, but does not
@@ -318,10 +339,8 @@ impl TestHarness {
     ///
     /// If there are duplicate transactions.
     pub fn probe_all(&self, transactions: Vec<Box<Transaction>>) -> Box<Snapshot> {
-        let validator_id = self.state().validator_id().expect(
-            "Tested node is not a validator",
-        );
-        let height = self.state().height();
+        let validator_id = self.validator_id().expect("Tested node is not a validator");
+        let height = self.height();
 
         let (transaction_map, hashes) = {
             let mut transaction_map = BTreeMap::new();
@@ -349,14 +368,11 @@ impl TestHarness {
             (transaction_map, hashes)
         };
 
-        let (_, patch) = self.handler.blockchain.create_patch(
-            validator_id,
-            height,
-            &hashes,
-            &transaction_map,
-        );
+        let (_, patch) =
+            self.blockchain
+                .create_patch(*validator_id, height, &hashes, &transaction_map);
 
-        let mut fork = self.handler.blockchain.fork();
+        let mut fork = self.blockchain.fork();
         fork.merge(patch);
         Box::new(fork)
     }
@@ -370,33 +386,68 @@ impl TestHarness {
     }
 
     fn do_create_block(&mut self, tx_hashes: &[crypto::Hash]) {
-        let validator_id = self.state().validator_id().expect(
-            "Tested node is not a validator",
-        );
-        let height = self.state().height();
-        let last_hash = *self.state().last_hash();
-        let round = Round::first();
+        let height = self.height();
+        let last_hash = self.last_hash();
 
-        let handler = &mut self.handler;
-        let (block_hash, patch) = handler.create_block(validator_id, height, tx_hashes);
-        handler.state.add_block(
-            block_hash,
-            patch,
-            tx_hashes.to_vec(),
-            validator_id,
-        );
+        let (block_hash, patch) = {
+            let validator_id = self.validator_id().expect("Tested node is not a validator");
+            let transactions = self.mempool
+                .read()
+                .expect("Cannot read transactions from mempool");
+            self.blockchain
+                .create_patch(*validator_id, height, tx_hashes, &transactions)
+        };
 
-        let propose = self.network.us().create_propose(
-            height,
-            &last_hash,
-            tx_hashes,
-        );
+        // Remove txs from mempool
+        {
+        let mut transactions = self.mempool
+                .write()
+                .expect("Cannot modify transactions in mempool");
+            for hash in tx_hashes {
+                transactions.remove(hash);
+            }
+        }
+
+        let propose = self.network
+            .us()
+            .create_propose(height, &last_hash, tx_hashes);
         let precommits: Vec<_> = self.network
             .validators()
             .iter()
             .map(|v| v.create_precommit(&propose, &block_hash))
             .collect();
-        handler.commit(block_hash, precommits.iter(), Some(round));
+
+        let (patch, txs) = {
+            let mut fork = {
+                let mut fork = self.blockchain.fork();
+                fork.merge(patch.clone()); // FIXME: avoid cloning here
+                fork
+            };
+
+            {
+                let mut schema = CoreSchema::new(&mut fork);
+                for precommit in precommits {
+                    schema.precommits_mut(&block_hash).push(precommit.clone());
+                }
+
+                // self.node_state.update_config(schema.actual_configuration());
+            }
+
+            let transactions: Vec<Box<Transaction>> = {
+                // let mut ctx = ServiceContext::new(&mut self.node_state, &fork);
+                // for service in self.blockchain.service_map().values() {
+                //     service.handle_commit(&mut ctx);
+                // }
+                // ctx.transactions()
+                Vec::new()
+            };
+
+            (fork.into_patch(), transactions)
+        };
+        self.blockchain.merge(patch).unwrap();
+        for tx in txs {
+            self.insert_transaction(tx);
+        }
     }
 
     /// Creates block with the specified transactions. The transactions must be previously
@@ -409,9 +460,9 @@ impl TestHarness {
         self.poll_events();
 
         {
-            let txs = self.state().transactions().read().expect(
-                "Cannot read transactions from node",
-            );
+            let txs = self.mempool
+                .read()
+                .expect("Cannot read transactions from node");
             for hash in tx_hashes {
                 assert!(txs.contains_key(hash));
             }
@@ -425,13 +476,60 @@ impl TestHarness {
         self.poll_events();
 
         let tx_hashes: Vec<_> = {
-            let txs = self.state().transactions().read().expect(
-                "Cannot read transactions from node",
-            );
+            let txs = self.mempool
+                .read()
+                .expect("Cannot read transactions from node");
             txs.keys().cloned().collect()
         };
 
         self.do_create_block(&tx_hashes);
+    }
+
+    /// TODO
+    pub fn validator_id(&self) -> Option<&ValidatorId> {
+        self.network.validator_id()
+    }
+
+    /// TODO
+    pub fn majority_count(&self) -> usize {
+        NodeState::byzantine_majority_count(self.network.validators.len())
+    }
+
+    /// TODO
+    pub fn height(&self) -> Height {
+        Height(self.blockchain.last_block().height().0 + 1)
+    }
+
+    /// TODO
+    pub fn last_hash(&self) -> crypto::Hash {
+        self.blockchain.last_hash()
+    }
+
+    /// TODO
+    pub fn consensus_public_key_of(&self, id: ValidatorId) -> Option<&crypto::PublicKey> {
+        self.network
+            .validators
+            .get(id.0 as usize)
+            .map(|x| &x.consensus_public_key)
+    }
+    /// TODO
+    pub fn service_public_key_of(&self, id: ValidatorId) -> Option<&crypto::PublicKey> {
+        self.network
+            .validators
+            .get(id.0 as usize)
+            .map(|x| &x.service_public_key)
+    }
+
+    /// TODO
+    fn insert_transaction(&self, tx: Box<Transaction>) {
+        let hash = tx.hash();
+        let snapshot = self.blockchain.snapshot();
+        if !CoreSchema::new(&snapshot).transactions().contains(&hash) {
+            self.mempool
+                .write()
+                .expect("Cannot write transactions to mempool")
+                .insert(hash, tx);
+        }
     }
 }
 
@@ -465,9 +563,9 @@ impl HarnessApi {
     /// Creates a new instance of Api.
     fn new(harness: &TestHarness) -> Self {
         use std::sync::Arc;
-        use exonum::api::{Api, public};
+        use exonum::api::{public, Api};
 
-        let blockchain = &harness.handler.blockchain;
+        let blockchain = &harness.blockchain;
 
         HarnessApi {
             public_mount: {
@@ -477,7 +575,7 @@ impl HarnessApi {
                 mount.mount("api/services", service_mount);
 
                 let mut router = Router::new();
-                let pool = Arc::clone(harness.state().transactions());
+                let pool = Arc::clone(&harness.mempool);
                 let system_api = public::SystemApi::new(pool, blockchain.clone());
                 system_api.wire(&mut router);
                 mount.mount("api/system", router);
@@ -517,9 +615,9 @@ impl HarnessApi {
 
     /// Sends a transaction to the node via `ApiSender`.
     pub fn send<T: Transaction>(&self, transaction: T) {
-        self.api_sender.send(Box::new(transaction)).expect(
-            "Cannot send transaction",
-        );
+        self.api_sender
+            .send(Box::new(transaction))
+            .expect("Cannot send transaction");
     }
 
     fn get_internal<D>(mount: &Mount, url: &str, expect_error: bool) -> D
@@ -587,17 +685,16 @@ impl HarnessApi {
         for<'de> D: Deserialize<'de>,
     {
         let url = format!("http://localhost:3000/{}", endpoint);
-        let resp =
-            request::post(
-                &url,
-                {
-                    let mut headers = Headers::new();
-                    headers.set(ContentType::json());
-                    headers
-                },
-                &serde_json::to_string(&transaction).expect("Cannot serialize transaction to JSON"),
-                mount,
-            ).expect("Cannot send transaction");
+        let resp = request::post(
+            &url,
+            {
+                let mut headers = Headers::new();
+                headers.set(ContentType::json());
+                headers
+            },
+            &serde_json::to_string(&transaction).expect("Cannot serialize transaction to JSON"),
+            mount,
+        ).expect("Cannot send transaction");
 
         let resp = response::extract_body_to_string(resp);
         serde_json::from_str(&resp).expect("Cannot parse result")
@@ -633,5 +730,24 @@ impl HarnessApi {
             &format!("{}/{}", kind.into_prefix(), endpoint),
             transaction,
         )
+    }
+}
+
+mod refactor {
+    use exonum::crypto;
+    use exonum::helpers::ValidatorId;
+
+    /// Keys of the testnet node.
+    pub struct NodeKeys {
+        consensus_secret_key: crypto::SecretKey,
+        consensus_public_key: crypto::PublicKey,
+        service_secret_key: crypto::SecretKey,
+        service_public_key: crypto::PublicKey,
+        validator_id: Option<ValidatorId>,
+    }
+
+    pub struct TestNetwork {
+        validators: Vec<NodeKeys>,
+        us: NodeKeys,
     }
 }

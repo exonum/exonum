@@ -294,7 +294,7 @@ fn test_inc_count_with_multiple_transactions() {
         harness.create_block();
     }
 
-    assert_eq!(harness.state().height(), Height(101));
+    assert_eq!(harness.height(), Height(101));
     let counter: u64 = api.get(ApiKind::Service("counter"), "count");
     assert_eq!(counter, 1_000);
 }
@@ -654,7 +654,7 @@ fn test_explorer_single_block() {
     let mut harness = TestHarness::with_services(services).validators(4).create();
     let api = harness.api();
 
-    assert_eq!(harness.state().majority_count(), 3);
+    assert_eq!(harness.majority_count(), 3);
 
     let info: BlockInfo = api.get(ApiKind::Explorer, "v1/blocks/0");
     assert_eq!(info.block.height(), Height(0));
@@ -679,14 +679,13 @@ fn test_explorer_single_block() {
         assert_eq!(precommit.height(), Height(1));
         assert_eq!(*precommit.block_hash(), info.block.hash());
         let pk = harness
-            .state()
             .consensus_public_key_of(precommit.validator())
             .expect("Cannot find validator id");
         assert!(precommit.verify_signature(&pk));
         validators.insert(precommit.validator());
     }
 
-    assert!(validators.len() >= harness.state().majority_count());
+    assert!(validators.len() >= harness.majority_count());
 }
 
 #[test]
