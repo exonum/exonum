@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Changed
+- Separate type `ConfigurationServiceFactory` is used as `ServiceFactory` implementation (#66).
+
 ## 0.3 - 2017-11-03
 
 ### Changed
