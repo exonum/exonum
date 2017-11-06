@@ -69,12 +69,12 @@
 //!
 //! use exonum::helpers::fabric::NodeBuilder;
 //!
-//! use exonum_configuration::ConfigurationService;
+//! use exonum_configuration::ConfigurationServiceFactory;
 //!
 //! fn main() {
 //!     exonum::helpers::init_logger().unwrap();
 //!     NodeBuilder::new()
-//!         .with_service(Box::new(ConfigurationService::new()))
+//!         .with_service(Box::new(ConfigurationServiceFactory))
 //!         .run();
 //! }
 //! ```
@@ -699,7 +699,11 @@ impl Service for ConfigurationService {
     }
 }
 
-impl ServiceFactory for ConfigurationService {
+/// A configuration service creator for the `NodeBuilder`.
+#[derive(Debug)]
+pub struct ConfigurationServiceFactory;
+
+impl ServiceFactory for ConfigurationServiceFactory {
     fn make_service(&mut self, _: &Context) -> Box<Service> {
         Box::new(ConfigurationService::new())
     }
