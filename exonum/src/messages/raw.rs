@@ -272,7 +272,7 @@ impl Message for RawMessage {
     }
 
     fn hash(&self) -> Hash {
-        hash(self.as_ref().as_ref())
+        hash(self.as_ref())
     }
 
     fn verify_signature(&self, pub_key: &PublicKey) -> bool {
