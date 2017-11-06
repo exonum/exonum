@@ -40,7 +40,6 @@ use std::panic;
 
 use crypto::{self, Hash};
 use messages::{RawMessage, Precommit, CONSENSUS as CORE_SERVICE};
-use node::State;
 use storage::{Patch, Database, Snapshot, Fork, Error};
 use helpers::{Height, ValidatorId};
 
@@ -48,7 +47,7 @@ pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
 pub use self::schema::{Schema, TxLocation, gen_prefix};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{ValidatorKeys, StoredConfiguration, ConsensusConfig, TimeoutAdjusterConfig};
-pub use self::service::{Service, Transaction, ServiceContext, NodeHandlerContext, ApiContext, SharedNodeState};
+pub use self::service::{Service, Transaction, ServiceContext, ApiContext, SharedNodeState};
 
 mod block;
 mod schema;
@@ -322,16 +321,15 @@ impl Blockchain {
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn commit<'a, I>(
         &mut self,
-        state: &mut State,
+        patch: &Patch,
         block_hash: Hash,
         precommits: I,
-    ) -> Result<Vec<Box<Transaction>>, Error>
+    ) -> Result<(), Error>
     where
         I: Iterator<Item = &'a Precommit>,
     {
-        let (patch, txs) = {
+        let patch = {
             let mut fork = {
-                let patch = state.block(&block_hash).unwrap().patch();
                 let mut fork = self.db.fork();
                 fork.merge(patch.clone()); // FIXME: avoid cloning here
                 fork
@@ -342,22 +340,11 @@ impl Blockchain {
                 for precommit in precommits {
                     schema.precommits_mut(&block_hash).push(precommit.clone());
                 }
-
-                state.update_config(schema.actual_configuration());
             }
-
-            let transactions = {
-                let mut ctx = NodeHandlerContext::new(state, &fork);
-                for service in self.service_map.values() {
-                    service.handle_commit(&mut ctx);
-                }
-                ctx.transactions()
-            };
-
-            (fork.into_patch(), transactions)
+            fork.into_patch()
         };
         self.merge(patch)?;
-        Ok(txs)
+        Ok(())
     }
 
     /// Returns `Mount` object that aggregates public api handlers.

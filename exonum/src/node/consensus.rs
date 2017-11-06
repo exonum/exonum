@@ -13,14 +13,96 @@
 // limitations under the License.
 
 use std::collections::HashSet;
+use std::fmt;
 
-use crypto::{Hash, PublicKey, HexValue};
-use blockchain::{Schema, Transaction};
-use messages::{ConsensusMessage, Propose, Prevote, Precommit, Message, ProposeRequest,
-               TransactionsRequest, PrevotesRequest, BlockRequest, BlockResponse, RawTransaction};
+use serde_json::Value;
+
+use crypto::{Hash, HexValue, PublicKey, SecretKey};
+use blockchain::{ConsensusConfig, Schema, Service, ServiceContext, Transaction, ValidatorKeys};
+use messages::{BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote,
+               PrevotesRequest, Propose, ProposeRequest, RawTransaction, TransactionsRequest};
 use helpers::{Height, Round, ValidatorId};
-use storage::Patch;
-use super::{NodeHandler, RequestData};
+use storage::{Patch, Snapshot};
+use node::{NodeHandler, RequestData};
+use node::state::{State, ValidatorState};
+
+#[doc(hidden)]
+pub struct NodeHandlerContext<'a, 'b> {
+    state: &'a mut State,
+    snapshot: &'b Snapshot,
+    txs: Vec<Box<Transaction>>,
+}
+
+impl<'a, 'b> NodeHandlerContext<'a, 'b> {
+    #[doc(hidden)]
+    pub fn new(state: &'a mut State, snapshot: &'b Snapshot) -> NodeHandlerContext<'a, 'b> {
+        NodeHandlerContext {
+            state: state,
+            snapshot: snapshot,
+            txs: Vec::new(),
+        }
+    }
+
+    #[doc(hidden)]
+    pub fn transactions(self) -> Vec<Box<Transaction>> {
+        self.txs
+    }
+}
+
+impl<'a, 'b> ServiceContext for NodeHandlerContext<'a, 'b> {
+    fn validator_state(&self) -> &Option<ValidatorState> {
+        self.state.validator_state()
+    }
+
+    fn snapshot(&self) -> &Snapshot {
+        self.snapshot
+    }
+
+    fn height(&self) -> Height {
+        self.state.height()
+    }
+
+    fn round(&self) -> Round {
+        self.state.round()
+    }
+
+    fn validators(&self) -> &[ValidatorKeys] {
+        self.state.validators()
+    }
+
+    fn public_key(&self) -> &PublicKey {
+        self.state.service_public_key()
+    }
+
+    fn secret_key(&self) -> &SecretKey {
+        self.state.service_secret_key()
+    }
+
+    fn actual_consensus_config(&self) -> &ConsensusConfig {
+        self.state.consensus_config()
+    }
+
+    fn actual_service_config(&self, service: &Service) -> &Value {
+        let name = service.service_name();
+        self.state.services_config().get(name).unwrap()
+    }
+
+    fn add_transaction(&mut self, tx: Box<Transaction>) {
+        assert!(tx.verify());
+        self.txs.push(tx);
+    }
+}
+
+impl<'a, 'b> fmt::Debug for NodeHandlerContext<'a, 'b> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "ServiceContext(state: {:?}, txs: {:?})",
+            self.state,
+            self.txs
+        )
+    }
+}
 
 // TODO reduce view invokations (ECR-171)
 impl NodeHandler {
@@ -42,7 +124,7 @@ impl NodeHandler {
         if msg.height() == self.state.height().next() || msg.round() > self.state.round() {
             trace!(
                 "Received consensus message from future round: msg.height={}, msg.round={}, \
-                    self.height={}, self.round={}",
+                 self.height={}, self.round={}",
                 msg.height(),
                 msg.round(),
                 self.state.height(),
@@ -179,7 +261,7 @@ impl NodeHandler {
         if block.prev_hash() != &self.last_block_hash() {
             error!(
                 "Received block prev_hash is distinct from the one in db, \
-                    block={:?}, block.prev_hash={:?}, db.last_block_hash={:?}",
+                 block={:?}, block.prev_hash={:?}, db.last_block_hash={:?}",
                 msg,
                 *block.prev_hash(),
                 self.last_block_hash()
@@ -227,18 +309,14 @@ impl NodeHandler {
             if block_hash != block.hash() {
                 panic!(
                     "Block_hash incorrect in the received block={:?}. Either a node's \
-                implementation is incorrect or validators majority works incorrectly",
+                     implementation is incorrect or validators majority works incorrectly",
                     msg
                 );
             }
 
             // Commit block
-            self.state.add_block(
-                block_hash,
-                patch,
-                tx_hashes,
-                block.proposer_id(),
-            );
+            self.state
+                .add_block(block_hash, patch, tx_hashes, block.proposer_id());
         }
         self.commit(block_hash, msg.precommits().iter(), None);
         self.request_next_block();
@@ -272,7 +350,7 @@ impl NodeHandler {
             if our_block_hash != block_hash {
                 panic!(
                     "Full propose: wrong state hash. Either a node's implementation is \
-                incorrect or validators majority works incorrectly"
+                     incorrect or validators majority works incorrectly"
                 );
             }
 
@@ -330,11 +408,8 @@ impl NodeHandler {
     ) {
         // Check if propose is known.
         if self.state.propose(propose_hash).is_none() {
-            self.state.add_unknown_propose_with_precommits(
-                round,
-                *propose_hash,
-                *block_hash,
-            );
+            self.state
+                .add_unknown_propose_with_precommits(round, *propose_hash, *block_hash);
             return;
         }
 
@@ -445,12 +520,26 @@ impl NodeHandler {
         let (commited_txs, new_txs, proposer) = {
             let (txs_count, proposer) = {
                 let block_state = self.state.block(&block_hash).unwrap();
+                self.blockchain
+                    .commit(block_state.patch(), block_hash, precommits)
+                    .expect("Unable to commit block");
                 (block_state.txs().len(), block_state.proposer_id())
             };
 
-            let txs = self.blockchain
-                .commit(&mut self.state, block_hash, precommits)
-                .unwrap();
+            // Update node state configuration
+            let snapshot = self.blockchain.snapshot();
+            {
+                let schema = Schema::new(&snapshot);
+                self.state.update_config(schema.actual_configuration());
+            }
+            // Handle commit event.
+            let txs = {
+                let mut ctx = NodeHandlerContext::new(&mut self.state, snapshot.as_ref());
+                for service in self.blockchain.service_map().values() {
+                    service.handle_commit(&mut ctx);
+                }
+                ctx.transactions()
+            };
 
             (txs_count, txs, proposer)
         };
@@ -465,19 +554,20 @@ impl NodeHandler {
         metric!("node.mempool", mempool_size);
 
         // Update state to new height
-        self.state.new_height(
-            &block_hash,
-            self.system_state.current_time(),
-        );
+        self.state
+            .new_height(&block_hash, self.system_state.current_time());
 
-        info!("COMMIT ====== height={}, proposer={}, round={}, committed={}, pool={}, hash={}",
-              height,
-              proposer,
-              round.map(|x| format!("{}", x)).unwrap_or_else(|| "?".into()),
-              commited_txs,
-              mempool_size,
-              block_hash.to_hex(),
-              );
+        info!(
+            "COMMIT ====== height={}, proposer={}, round={}, committed={}, pool={}, hash={}",
+            height,
+            proposer,
+            round
+                .map(|x| format!("{}", x))
+                .unwrap_or_else(|| "?".into()),
+            commited_txs,
+            mempool_size,
+            block_hash.to_hex(),
+        );
 
         // TODO: reset status timeout (ECR-171).
         self.broadcast_status();
@@ -691,16 +781,14 @@ impl NodeHandler {
             self.add_request_timeout(data.clone(), Some(peer));
 
             let message = match data {
-                RequestData::Propose(ref propose_hash) => {
-                    ProposeRequest::new(
-                        self.state.consensus_public_key(),
-                        &peer,
-                        self.state.height(),
-                        propose_hash,
-                        self.state.consensus_secret_key(),
-                    ).raw()
-                        .clone()
-                }
+                RequestData::Propose(ref propose_hash) => ProposeRequest::new(
+                    self.state.consensus_public_key(),
+                    &peer,
+                    self.state.height(),
+                    propose_hash,
+                    self.state.consensus_secret_key(),
+                ).raw()
+                    .clone(),
                 RequestData::Transactions(ref propose_hash) => {
                     let txs: Vec<_> = self.state
                         .propose(propose_hash)
@@ -717,27 +805,23 @@ impl NodeHandler {
                     ).raw()
                         .clone()
                 }
-                RequestData::Prevotes(round, ref propose_hash) => {
-                    PrevotesRequest::new(
-                        self.state.consensus_public_key(),
-                        &peer,
-                        self.state.height(),
-                        round,
-                        propose_hash,
-                        self.state.known_prevotes(round, propose_hash),
-                        self.state.consensus_secret_key(),
-                    ).raw()
-                        .clone()
-                }
-                RequestData::Block(height) => {
-                    BlockRequest::new(
-                        self.state.consensus_public_key(),
-                        &peer,
-                        height,
-                        self.state.consensus_secret_key(),
-                    ).raw()
-                        .clone()
-                }
+                RequestData::Prevotes(round, ref propose_hash) => PrevotesRequest::new(
+                    self.state.consensus_public_key(),
+                    &peer,
+                    self.state.height(),
+                    round,
+                    propose_hash,
+                    self.state.known_prevotes(round, propose_hash),
+                    self.state.consensus_secret_key(),
+                ).raw()
+                    .clone(),
+                RequestData::Block(height) => BlockRequest::new(
+                    self.state.consensus_public_key(),
+                    &peer,
+                    height,
+                    self.state.consensus_secret_key(),
+                ).raw()
+                    .clone(),
             };
             trace!("Send request {:?} to peer {:?}", data, peer);
             self.send_to_peer(peer, &message);
@@ -755,9 +839,10 @@ impl NodeHandler {
             proposer_id,
             height,
             tx_hashes,
-            &self.state.transactions().read().expect(
-                "Expected read lock",
-            ),
+            &self.state
+                .transactions()
+                .read()
+                .expect("Expected read lock"),
         )
     }
 
@@ -777,12 +862,8 @@ impl NodeHandler {
         let (block_hash, patch) =
             self.create_block(propose.validator(), propose.height(), tx_hashes.as_slice());
         // Save patch
-        self.state.add_block(
-            block_hash,
-            patch,
-            tx_hashes,
-            propose.validator(),
-        );
+        self.state
+            .add_block(block_hash, patch, tx_hashes, propose.validator());
         self.state
             .propose_mut(propose_hash)
             .unwrap()
@@ -844,9 +925,9 @@ impl NodeHandler {
 
     /// Broadcasts the `Prevote` message to all peers.
     pub fn broadcast_prevote(&mut self, round: Round, propose_hash: &Hash) -> bool {
-        let validator_id = self.state.validator_id().expect(
-            "called broadcast_prevote in Auditor node.",
-        );
+        let validator_id = self.state
+            .validator_id()
+            .expect("called broadcast_prevote in Auditor node.");
         let locked_round = self.state.locked_round();
         let prevote = Prevote::new(
             validator_id,
@@ -864,9 +945,9 @@ impl NodeHandler {
 
     /// Broadcasts the `Precommit` message to all peers.
     pub fn broadcast_precommit(&mut self, round: Round, propose_hash: &Hash, block_hash: &Hash) {
-        let validator_id = self.state.validator_id().expect(
-            "called broadcast_precommit in Auditor node.",
-        );
+        let validator_id = self.state
+            .validator_id()
+            .expect("called broadcast_precommit in Auditor node.");
         let precommit = Precommit::new(
             validator_id,
             self.state.height(),
@@ -901,12 +982,7 @@ impl NodeHandler {
                 return Err("Several precommits from one validator in block".to_string());
             }
 
-            self.verify_precommit(
-                block_hash,
-                block_height,
-                round,
-                precommit,
-            )?;
+            self.verify_precommit(block_hash, block_height, round, precommit)?;
         }
 
         Ok(())
