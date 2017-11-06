@@ -19,6 +19,9 @@ addons:
 rust:
   - stable
 matrix:
+  allow_failures:
+    - env: FEATURE=non-fatal-checks
+  fast_finish: true
   include:
     - rust: nightly-2017-10-19
       env: FEATURE=benchmarks
@@ -109,8 +112,7 @@ script: |
   ;;
   "non-fatal-checks" )
       cargo doc --no-deps -p exonum &&
-      cargo deadlinks --dir target/doc ||
-      true
+      cargo deadlinks --dir target/doc
   ;;
   "benchmarks" )
         RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
