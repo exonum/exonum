@@ -316,8 +316,10 @@ impl Blockchain {
     }
 
     /// Commits to the storage block that proposes by node `State`.
-    /// After that invokes `handle_commit` for each service in order of their identifiers
-    /// and returns the list of transactions which which were created by the `handle_commit` event.
+    ///
+    /// # Notes
+    ///
+    /// You should invoke `handle_commit` after that for the correct services workflow.
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn commit<'a, I>(
         &mut self,
@@ -345,6 +347,14 @@ impl Blockchain {
         };
         self.merge(patch)?;
         Ok(())
+    }
+
+    /// Invokes `handle_commit` for each service in order of their identifiers
+    /// within the given context.
+    pub fn handle_commit(&mut self, ctx: &mut ServiceContext) {
+        for service in self.service_map.values() {
+            service.handle_commit(ctx);
+        }
     }
 
     /// Returns `Mount` object that aggregates public api handlers.

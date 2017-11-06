@@ -11,11 +11,10 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use serde_json::Value;
 
 use std::collections::HashSet;
 use std::fmt;
-
-use serde_json::Value;
 
 use crypto::{Hash, HexValue, PublicKey, SecretKey};
 use blockchain::{ConsensusConfig, Schema, Service, ServiceContext, Transaction, ValidatorKeys};
@@ -26,16 +25,14 @@ use storage::{Patch, Snapshot};
 use node::{NodeHandler, RequestData};
 use node::state::{State, ValidatorState};
 
-#[doc(hidden)]
-pub struct NodeHandlerContext<'a, 'b> {
+struct NodeHandlerContext<'a, 'b> {
     state: &'a mut State,
     snapshot: &'b Snapshot,
     txs: Vec<Box<Transaction>>,
 }
 
 impl<'a, 'b> NodeHandlerContext<'a, 'b> {
-    #[doc(hidden)]
-    pub fn new(state: &'a mut State, snapshot: &'b Snapshot) -> NodeHandlerContext<'a, 'b> {
+    fn new(state: &'a mut State, snapshot: &'b Snapshot) -> NodeHandlerContext<'a, 'b> {
         NodeHandlerContext {
             state: state,
             snapshot: snapshot,
@@ -43,8 +40,7 @@ impl<'a, 'b> NodeHandlerContext<'a, 'b> {
         }
     }
 
-    #[doc(hidden)]
-    pub fn transactions(self) -> Vec<Box<Transaction>> {
+    fn transactions(self) -> Vec<Box<Transaction>> {
         self.txs
     }
 }
@@ -542,9 +538,7 @@ impl NodeHandler {
             // Handle commit event.
             let txs = {
                 let mut ctx = NodeHandlerContext::new(&mut self.state, snapshot.as_ref());
-                for service in self.blockchain.service_map().values() {
-                    service.handle_commit(&mut ctx);
-                }
+                self.blockchain.handle_commit(&mut ctx);
                 ctx.transactions()
             };
 
