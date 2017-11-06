@@ -37,7 +37,7 @@ export SERVICE_ROOT=$(pwd)/currency_root
 ./service/bootstrap.sh start cryptocurrency
 ```
 
-Ready! Open the [wallet manager](http://127.0.0.1:3000) in your browser.
+Ready! Open the [wallet manager](http://127.0.0.1:8280) in your browser.
 
 ## Backend
 
@@ -120,7 +120,7 @@ To run the application:
 npm start
 ```
 
-Application is served on [http://127.0.0.1:3000](http://127.0.0.1:3000). Port can be changred in the [frontend/app.js](frontend/app.js).
+Application is served on [http://127.0.0.1:8280](http://127.0.0.1:8280). Port can be changred in the [frontend/app.js](frontend/app.js).
 
 ### License
 
