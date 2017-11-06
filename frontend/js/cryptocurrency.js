@@ -1,3 +1,6 @@
+/* eslint-env jquery */
+/* global Exonum, bigInt */
+
 /**
  * Business logic
  */
@@ -8,13 +11,10 @@ function CryptocurrencyService() {
         switch (id) {
             case 128:
                 return Exonum.newMessage(this.TransferTransactionParams);
-                break;
             case 129:
                 return Exonum.newMessage(this.AddFundsTransactionParams);
-                break;
             case 130:
                 return Exonum.newMessage(this.CreateWalletTransactionParams);
-                break;
         }
     };
 
@@ -53,10 +53,10 @@ function CryptocurrencyService() {
                 message_id: type.message_id,
                 signature: type.signature
             }),
-            success: function(response, textStatus, jqXHR) {
+            success: function() {
                 loop();
             },
-            error: function(jqXHR, textStatus, errorThrown) {
+            error: function(jqXHR, textStatus) {
                 console.error(textStatus);
             }
         });
@@ -67,13 +67,10 @@ function CryptocurrencyService() {
             switch (id) {
                 case 128:
                     return transaction.from;
-                    break;
                 case 129:
                     return transaction.wallet;
-                    break;
                 case 130:
                     return transaction.pub_key;
-                    break;
             }
         }
 
@@ -231,7 +228,7 @@ function CryptocurrencyService() {
                 }
             };
         },
-        error: function(jqXHR, textStatus, errorThrown) {
+        error: function(jqXHR, textStatus) {
             console.error(textStatus);
         }
     });
@@ -242,10 +239,10 @@ CryptocurrencyService.prototype.getWallet = function(publicKey, callback) {
     $.ajax({
         method: 'GET',
         url: 'api/services/cryptocurrency/v1/wallets/info?pubkey=' + publicKey,
-        success: function(response, textStatus, jqXHR) {
+        success: function(response) {
             callback.apply(this, self.validateWallet(publicKey, response));
         },
-        error: function(jqXHR, textStatus, errorThrown) {
+        error: function(jqXHR, textStatus) {
             console.error(textStatus);
         }
     });
@@ -307,19 +304,18 @@ CryptocurrencyService.prototype.getBlocks = function(height, callback) {
         method: 'GET',
         url: 'api/explorer/v1/blocks?count=10' + suffix,
         success: callback,
-        error: function(jqXHR, textStatus, errorThrown) {
+        error: function(jqXHR, textStatus) {
             console.error(textStatus);
         }
     });
 };
 
 CryptocurrencyService.prototype.getBlock = function(height, callback) {
-    var self = this;
     $.ajax({
         method: 'GET',
         url: 'api/explorer/v1/blocks/' + height,
         success: callback,
-        error: function(jqXHR, textStatus, errorThrown) {
+        error: function(jqXHR, textStatus) {
             console.error(textStatus);
         }
     });
@@ -330,7 +326,7 @@ CryptocurrencyService.prototype.getTransaction = function(hash, callback) {
         method: 'GET',
         url: 'api/system/v1/transactions/' + hash,
         success: callback,
-        error: function(jqXHR, textStatus, errorThrown) {
+        error: function(jqXHR, textStatus) {
             console.error(textStatus);
         }
     });
@@ -340,7 +336,7 @@ CryptocurrencyService.prototype.login = function(login, password, callback, erro
     $.ajax({
         method: 'GET',
         url: this.baseUrl + '/auth?login=' + login,
-        success: function(data, textStatus, jqXHR) {
+        success: function(data) {
             var secretKey = Exonum.decryptDigest(data.sec_key_enc, data.nonce, password);
             if (secretKey !== false) {
                 callback(data.pub_key, secretKey);
@@ -348,7 +344,7 @@ CryptocurrencyService.prototype.login = function(login, password, callback, erro
                 error();
             }
         },
-        error: function(jqXHR, textStatus, errorThrown) {
+        error: function(jqXHR, textStatus) {
             console.error(textStatus);
         }
     });

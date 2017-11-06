@@ -6,6 +6,7 @@
   "license": "Apache-2.0",
   "author": "BitFury Group Limited",
   "scripts": {
+    "lint": "eslint './js/cryptocurrency.js'",
     "start": "node app.js"
   },
   "dependencies": {
@@ -23,5 +24,8 @@
     "request": "^2.81.0",
     "riot": "^3.3.1",
     "riot-route": "^3.1.0"
+  },
+  "devDependencies": {
+    "eslint": "^4.1.1"
   }
 }

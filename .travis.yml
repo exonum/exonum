@@ -16,6 +16,11 @@ before_install:
 - cargo +$NIGHTLY_RUST clippy --version | grep $CLIPPY_VERS || cargo +$NIGHTLY_RUST install clippy --force --vers $CLIPPY_VERS
 - sudo add-apt-repository -y ppa:chris-lea/libsodium
 - sudo apt-get -qq update
+- nvm install 6.9.1
+- nvm use 6.9.1
+- cd frontend
+- npm install
+- cd ..
 install:
 - sudo apt-get -qq --yes install gcc g++ make libsodium-dev libleveldb-dev libssl-dev
 script:
@@ -29,6 +34,8 @@ script:
 - cargo build --release
 - RUST_LOG=off cargo test --release
 - RUST_LOG=off cargo test --release -p cryptocurrency_api_tests
+- cd ../frontend
+- npm run lint
 notifications:
   slack:
     rooms:
