@@ -301,7 +301,7 @@ CryptocurrencyService.prototype.transfer = function(amount, from, to, secretKey,
 CryptocurrencyService.prototype.getBlocks = function(height, callback) {
     var suffix = '';
     if (!isNaN(height)) {
-        suffix += '&from=' + height;
+        suffix += '&latest=' + height;
     }
     $.ajax({
         method: 'GET',
@@ -328,7 +328,7 @@ CryptocurrencyService.prototype.getBlock = function(height, callback) {
 CryptocurrencyService.prototype.getTransaction = function(hash, callback) {
     $.ajax({
         method: 'GET',
-        url: 'api/explorer/v1/transactions/' + hash,
+        url: 'api/system/v1/transactions/' + hash,
         success: callback,
         error: function(jqXHR, textStatus, errorThrown) {
             console.error(textStatus);
