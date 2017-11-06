@@ -48,7 +48,7 @@ pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
 pub use self::schema::{Schema, TxLocation, gen_prefix};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{ValidatorKeys, StoredConfiguration, ConsensusConfig, TimeoutAdjusterConfig};
-pub use self::service::{Service, Transaction, ServiceContext, ApiContext, SharedNodeState};
+pub use self::service::{Service, Transaction, ServiceContext, NodeHandlerContext, ApiContext, SharedNodeState};
 
 mod block;
 mod schema;
@@ -347,7 +347,7 @@ impl Blockchain {
             }
 
             let transactions = {
-                let mut ctx = ServiceContext::new(state, &fork);
+                let mut ctx = NodeHandlerContext::new(state, &fork);
                 for service in self.service_map.values() {
                     service.handle_commit(&mut ctx);
                 }

@@ -21,17 +21,17 @@ use mount::Mount;
 
 use std::fmt;
 use std::sync::{Arc, RwLock};
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
 
 use crypto::{Hash, PublicKey, SecretKey};
-use storage::{Snapshot, Fork};
+use storage::{Fork, Snapshot};
 use messages::{Message, RawTransaction};
 use encoding::Error as MessageError;
-use node::{Node, State, ApiSender};
+use node::{ApiSender, Node, State};
 use node::state::ValidatorState;
-use blockchain::{ConsensusConfig, Blockchain, ValidatorKeys};
-use helpers::{Height, Round, Milliseconds};
+use blockchain::{Blockchain, ConsensusConfig, ValidatorKeys};
+use helpers::{Height, Milliseconds, Round};
 
 /// A trait that describes transaction processing rules (a group of sequential operations
 /// with the Exonum storage) for the given `Message`.
@@ -148,75 +148,55 @@ pub trait Service: Send + Sync + 'static {
 
 /// The current node state on which the blockchain is running, or in other words
 /// execution context.
-pub struct ServiceContext<'a, 'b> {
+pub trait ServiceContext {
+    /// If the current node is validator returns its state.
+    /// For other nodes return `None`.
+    fn validator_state(&self) -> &Option<ValidatorState>;
+
+    /// Returns the current database snapshot.
+    fn snapshot(&self) -> &Snapshot;
+
+    /// Returns the current blockchain height. This height is 'height of last committed block` + 1.
+    fn height(&self) -> Height;
+
+    /// Returns the current node round.
+    fn round(&self) -> Round;
+
+    /// Returns the current list of validators.
+    fn validators(&self) -> &[ValidatorKeys];
+
+    /// Returns current node's public key.
+    fn public_key(&self) -> &PublicKey;
+
+    /// Returns current node's secret key.
+    fn secret_key(&self) -> &SecretKey;
+
+    /// Returns the actual blockchain global configuration.
+    fn actual_consensus_config(&self) -> &ConsensusConfig;
+
+    /// Returns service specific global variables as json value.
+    fn actual_service_config(&self, service: &Service) -> &Value;
+
+    /// Adds transaction to the queue.
+    /// After the services handle commit event these transactions will be broadcast by node.
+    fn add_transaction(&mut self, tx: Box<Transaction>);
+}
+
+#[doc(hidden)]
+pub struct NodeHandlerContext<'a, 'b> {
     state: &'a mut State,
     snapshot: &'b Snapshot,
     txs: Vec<Box<Transaction>>,
 }
 
-
-impl<'a, 'b> ServiceContext<'a, 'b> {
+impl<'a, 'b> NodeHandlerContext<'a, 'b> {
     #[doc(hidden)]
-    pub fn new(state: &'a mut State, snapshot: &'b Snapshot) -> ServiceContext<'a, 'b> {
-        ServiceContext {
+    pub fn new(state: &'a mut State, snapshot: &'b Snapshot) -> NodeHandlerContext<'a, 'b> {
+        NodeHandlerContext {
             state: state,
             snapshot: snapshot,
             txs: Vec::new(),
         }
-    }
-
-    /// If the current node is validator returns its state.
-    /// For other nodes return `None`.
-    pub fn validator_state(&self) -> &Option<ValidatorState> {
-        self.state.validator_state()
-    }
-
-    /// Returns the current database snapshot.
-    pub fn snapshot(&self) -> &'b Snapshot {
-        self.snapshot
-    }
-
-    /// Returns the current blockchain height. This height is 'height of last committed block` + 1.
-    pub fn height(&self) -> Height {
-        self.state.height()
-    }
-
-    /// Returns the current node round.
-    pub fn round(&self) -> Round {
-        self.state.round()
-    }
-
-    /// Returns the current list of validators.
-    pub fn validators(&self) -> &[ValidatorKeys] {
-        self.state.validators()
-    }
-
-    /// Returns current node's public key.
-    pub fn public_key(&self) -> &PublicKey {
-        self.state.service_public_key()
-    }
-
-    /// Returns current node's secret key.
-    pub fn secret_key(&self) -> &SecretKey {
-        self.state.service_secret_key()
-    }
-
-    /// Returns the actual blockchain global configuration.
-    pub fn actual_consensus_config(&self) -> &ConsensusConfig {
-        self.state.consensus_config()
-    }
-
-    /// Returns service specific global variables as json value.
-    pub fn actual_service_config(&self, service: &Service) -> &Value {
-        let name = service.service_name();
-        self.state.services_config().get(name).unwrap()
-    }
-
-    /// Adds transaction to the queue.
-    /// After the services handle commit event these transactions will be broadcast by node.
-    pub fn add_transaction(&mut self, tx: Box<Transaction>) {
-        assert!(tx.verify());
-        self.txs.push(tx);
     }
 
     #[doc(hidden)]
@@ -225,7 +205,51 @@ impl<'a, 'b> ServiceContext<'a, 'b> {
     }
 }
 
-impl<'a, 'b> fmt::Debug for ServiceContext<'a, 'b> {
+impl<'a, 'b> ServiceContext for NodeHandlerContext<'a, 'b> {
+    fn validator_state(&self) -> &Option<ValidatorState> {
+        self.state.validator_state()
+    }
+
+    fn snapshot(&self) -> &Snapshot {
+        self.snapshot
+    }
+
+    fn height(&self) -> Height {
+        self.state.height()
+    }
+
+    fn round(&self) -> Round {
+        self.state.round()
+    }
+
+    fn validators(&self) -> &[ValidatorKeys] {
+        self.state.validators()
+    }
+
+    fn public_key(&self) -> &PublicKey {
+        self.state.service_public_key()
+    }
+
+    fn secret_key(&self) -> &SecretKey {
+        self.state.service_secret_key()
+    }
+
+    fn actual_consensus_config(&self) -> &ConsensusConfig {
+        self.state.consensus_config()
+    }
+
+    fn actual_service_config(&self, service: &Service) -> &Value {
+        let name = service.service_name();
+        self.state.services_config().get(name).unwrap()
+    }
+
+    fn add_transaction(&mut self, tx: Box<Transaction>) {
+        assert!(tx.verify());
+        self.txs.push(tx);
+    }
+}
+
+impl<'a, 'b> fmt::Debug for NodeHandlerContext<'a, 'b> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -244,6 +268,7 @@ pub struct ApiNodeState {
     //TODO: update on event?
     peers_info: HashMap<SocketAddr, PublicKey>,
 }
+
 impl ApiNodeState {
     fn new() -> ApiNodeState {
         Self::default()
