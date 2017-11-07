@@ -14,7 +14,7 @@
 
 
 // Workaround: Clippy does not correctly handle borrowing checking rules for returned types.
-#![cfg_attr(feature="cargo-clippy", allow(let_and_return))]
+#![cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
 
 use futures::{self, Async, Future, Stream};
 use futures::sync::mpsc;
@@ -27,8 +27,8 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet, VecDeque};
 use std::iter::FromIterator;
 
-use exonum::node::{Configuration, ListenerConfig, NodeHandler, ServiceConfig, State,
-                   SystemStateProvider, NodeSender, ExternalMessage};
+use exonum::node::{Configuration, ExternalMessage, ListenerConfig, NodeHandler, NodeSender,
+                   ServiceConfig, State, SystemStateProvider};
 use exonum::blockchain::{Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema,
                          Service, SharedNodeState, StoredConfiguration, TimeoutAdjusterConfig,
                          Transaction, ValidatorKeys};
@@ -77,9 +77,9 @@ pub struct SandboxInner {
 
 impl SandboxInner {
     pub fn process_events(&mut self) {
+        self.process_api_requests();
         self.process_network_requests();
         self.process_timeout_requests();
-        self.process_api_requests();
     }
 
     pub fn handle_event<E: Into<Event>>(&mut self, e: E) {
@@ -656,9 +656,46 @@ pub fn timestamping_sandbox() -> Sandbox {
 
 #[cfg(test)]
 mod tests {
-    use sandbox_tests_helper::{VALIDATOR_1, VALIDATOR_2, VALIDATOR_3, HEIGHT_ONE, ROUND_ONE,
-                               ROUND_TWO};
+    use exonum::blockchain::ServiceContext;
+    use exonum::messages::RawTransaction;
+    use exonum::encoding;
+    use exonum::crypto::{gen_keypair_from_seed, Seed};
+    use exonum::node::TransactionSend;
+
+    use sandbox_tests_helper::{add_one_height, SandboxState, VALIDATOR_1, VALIDATOR_2,
+                               VALIDATOR_3, HEIGHT_ONE, ROUND_ONE, ROUND_TWO};
+    use timestamping::TimestampTx;
     use super::*;
+
+    struct HandleCommitService;
+
+    impl HandleCommitService {
+        fn transaction() -> TimestampTx {
+            let keypair = gen_keypair_from_seed(&Seed::new([22; 32]));
+            TimestampTx::new(&keypair.0, b"handle_commit", &keypair.1)
+        }
+    }
+
+    impl Service for HandleCommitService {
+        fn service_name(&self) -> &'static str {
+            "handle_commit"
+        }
+
+        fn service_id(&self) -> u16 {
+            0
+        }
+
+        fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
+            unreachable!();
+        }
+
+        fn handle_commit(&self, context: &ServiceContext) {
+            context
+                .api_sender()
+                .send(Box::new(Self::transaction()))
+                .unwrap();
+        }
+    }
 
     #[test]
     fn test_sandbox_init() {
@@ -750,5 +787,16 @@ mod tests {
         s.recv(Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
         s.add_time(Duration::from_millis(1000));
         panic!("Oops! We don't catch unexpected message");
+    }
+
+    #[test]
+    fn test_sandbox_service_handle_commit() {
+        let sandbox = sandbox_with_services(vec![
+            Box::new(TimestampingService::new()),
+            Box::new(HandleCommitService),
+        ]);
+        let state = SandboxState::new();
+        add_one_height(&sandbox, &state);
+        sandbox.broadcast(HandleCommitService::transaction());
     }
 }
