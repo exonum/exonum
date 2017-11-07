@@ -2,11 +2,15 @@ language: rust
 
 addons:
   apt:
+    sources:
+    - sourceline: 'ppa:giskou/librocksdb'
     packages:
     - gcc
     - g++
     - libleveldb-dev
     - libssl-dev
+    - librocksdb
+    - libsnappy-dev
 
 rust:
 - stable
@@ -17,6 +21,7 @@ cache:
   - $HOME/.local
   - $TRAVIS_BUILD_DIR/target
   - $TRAVIS_BUILD_DIR/sandbox_tests/target
+
 sudo: false
 
 env:
@@ -24,6 +29,8 @@ env:
   - CLIPPY_VERS=0.0.166
   - RUSTFMT_VERS=0.9.0
   - DEADLINKS_VERS=0.2.1
+  - ROCKSDB_LIB_DIR=/usr/lib/x86_64-linux-gnu
+  - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
 
 install:
 - |
