@@ -22,26 +22,26 @@ use messages::{BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit
                PrevotesRequest, Propose, ProposeRequest, RawTransaction, TransactionsRequest};
 use helpers::{Height, Round, ValidatorId};
 use storage::{Patch, Snapshot};
-use node::{NodeHandler, RequestData};
+use node::{ApiSender, NodeHandler, RequestData};
 use node::state::{State, ValidatorState};
 
 struct NodeHandlerContext<'a, 'b> {
-    state: &'a mut State,
+    state: &'a State,
     snapshot: &'b Snapshot,
-    txs: Vec<Box<Transaction>>,
+    api_sender: ApiSender,
 }
 
 impl<'a, 'b> NodeHandlerContext<'a, 'b> {
-    fn new(state: &'a mut State, snapshot: &'b Snapshot) -> NodeHandlerContext<'a, 'b> {
+    fn new(
+        state: &'a State,
+        snapshot: &'b Snapshot,
+        api_sender: ApiSender,
+    ) -> NodeHandlerContext<'a, 'b> {
         NodeHandlerContext {
-            state: state,
-            snapshot: snapshot,
-            txs: Vec::new(),
+            state,
+            snapshot,
+            api_sender,
         }
-    }
-
-    fn transactions(self) -> Vec<Box<Transaction>> {
-        self.txs
     }
 }
 
@@ -83,20 +83,14 @@ impl<'a, 'b> ServiceContext for NodeHandlerContext<'a, 'b> {
         self.state.services_config().get(name).unwrap()
     }
 
-    fn add_transaction(&mut self, tx: Box<Transaction>) {
-        assert!(tx.verify());
-        self.txs.push(tx);
+    fn api_sender(&self) -> &ApiSender {
+        &self.api_sender
     }
 }
 
 impl<'a, 'b> fmt::Debug for NodeHandlerContext<'a, 'b> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "ServiceContext(state: {:?}, txs: {:?})",
-            self.state,
-            self.txs
-        )
+        write!(f, "ServiceContext(state: {:?})", self.state,)
     }
 }
 
@@ -520,7 +514,7 @@ impl NodeHandler {
         trace!("COMMIT {:?}", block_hash);
 
         // Merge changes into storage
-        let (commited_txs, new_txs, proposer) = {
+        let (commited_txs, proposer) = {
             let (txs_count, proposer) = {
                 let block_state = self.state.block(&block_hash).unwrap();
                 self.blockchain
@@ -536,13 +530,14 @@ impl NodeHandler {
                 self.state.update_config(schema.actual_configuration());
             }
             // Handle commit event.
-            let txs = {
-                let mut ctx = NodeHandlerContext::new(&mut self.state, snapshot.as_ref());
-                self.blockchain.handle_commit(&mut ctx);
-                ctx.transactions()
-            };
+            let ctx = NodeHandlerContext::new(
+                &self.state,
+                snapshot.as_ref(),
+                ApiSender(self.channel.api_requests.clone()),
+            );
+            self.blockchain.handle_commit(&ctx);
 
-            (txs_count, txs, proposer)
+            (txs_count, proposer)
         };
 
         let height = self.state.height();
@@ -578,12 +573,6 @@ impl NodeHandler {
 
         // Adjust propose timeout after accepting a new block.
         self.state.adjust_timeout(&*self.blockchain.snapshot());
-
-        // Handle queued transactions from services
-        for tx in new_txs {
-            debug_assert!(tx.verify());
-            self.handle_incoming_tx(tx);
-        }
 
         // Add timeout for first round
         self.add_round_timeout();

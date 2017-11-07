@@ -244,13 +244,15 @@ pub struct Configuration {
     pub mempool: MemoryPoolConfig,
 }
 
-/// Channel for messages and timeouts requests.
+/// Channel for messages, timeouts and api requests.
 #[derive(Debug, Clone)]
 pub struct NodeSender {
     /// Timeout requests sender.
     pub timeout_requests: mpsc::Sender<TimeoutRequest>,
     /// Network requests sender.
     pub network_requests: mpsc::Sender<NetworkRequest>,
+    /// Api requests sender.
+    pub api_requests: mpsc::Sender<ExternalMessage>,
 }
 
 impl NodeHandler {
@@ -608,11 +610,12 @@ impl NodeChannel {
         }
     }
 
-    /// Returns the channel for sending timeouts and networks requests.
+    /// Returns the channel for sending timeouts, networks and api requests.
     pub fn node_sender(&self) -> NodeSender {
         NodeSender {
             timeout_requests: self.timeout_requests.0.clone(),
             network_requests: self.network_requests.0.clone(),
+            api_requests: self.api_requests.0.clone(),
         }
     }
 }

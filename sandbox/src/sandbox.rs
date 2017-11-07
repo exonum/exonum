@@ -28,7 +28,7 @@ use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet, VecDeque};
 use std::iter::FromIterator;
 
 use exonum::node::{Configuration, ListenerConfig, NodeHandler, ServiceConfig, State,
-                   SystemStateProvider, NodeSender};
+                   SystemStateProvider, NodeSender, ExternalMessage};
 use exonum::blockchain::{Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema,
                          Service, SharedNodeState, StoredConfiguration, TimeoutAdjusterConfig,
                          Transaction, ValidatorKeys};
@@ -72,12 +72,14 @@ pub struct SandboxInner {
     pub timers: BinaryHeap<TimeoutRequest>,
     pub network_requests_rx: mpsc::Receiver<NetworkRequest>,
     pub timeout_requests_rx: mpsc::Receiver<TimeoutRequest>,
+    pub api_requests_rx: mpsc::Receiver<ExternalMessage>,
 }
 
 impl SandboxInner {
     pub fn process_events(&mut self) {
         self.process_network_requests();
         self.process_timeout_requests();
+        self.process_api_requests();
     }
 
     pub fn handle_event<E: Into<Event>>(&mut self, e: E) {
@@ -107,6 +109,16 @@ impl SandboxInner {
             Ok(())
         });
         timeouts_getter.wait().unwrap();
+    }
+
+    fn process_api_requests(&mut self) {
+        let api_getter = futures::lazy(|| -> Result<(), ()> {
+            while let Async::Ready(Some(api)) = self.api_requests_rx.poll()? {
+                self.handler.handle_event(api.into());
+            }
+            Ok(())
+        });
+        api_getter.wait().unwrap();
     }
 }
 
@@ -595,9 +607,11 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
 
     let network_channel = mpsc::channel(100);
     let timeout_channel = mpsc::channel(100);
+    let api_channel = mpsc::channel(100);
     let node_sender = NodeSender {
         network_requests: network_channel.0.clone(),
         timeout_requests: timeout_channel.0.clone(),
+        api_requests: api_channel.0.clone(),
     };
 
     let mut handler = NodeHandler::new(
@@ -616,6 +630,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         timers: BinaryHeap::new(),
         timeout_requests_rx: timeout_channel.1,
         network_requests_rx: network_channel.1,
+        api_requests_rx: api_channel.1,
         handler,
         time: shared_time,
     };

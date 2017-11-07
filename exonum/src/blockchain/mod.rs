@@ -351,7 +351,7 @@ impl Blockchain {
 
     /// Invokes `handle_commit` for each service in order of their identifiers
     /// within the given context.
-    pub fn handle_commit(&mut self, ctx: &mut ServiceContext) {
+    pub fn handle_commit(&mut self, ctx: &ServiceContext) {
         for service in self.service_map.values() {
             service.handle_commit(ctx);
         }

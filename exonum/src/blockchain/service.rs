@@ -133,7 +133,7 @@ pub trait Service: Send + Sync + 'static {
     /// For example service can create some transaction if the specific condition occurred.
     ///
     /// *Try not to perform long operations here*.
-    fn handle_commit(&self, context: &mut ServiceContext) {}
+    fn handle_commit(&self, context: &ServiceContext) {}
 
     /// Returns api handler for public users.
     fn public_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
@@ -177,9 +177,8 @@ pub trait ServiceContext {
     /// Returns service specific global variables as json value.
     fn actual_service_config(&self, service: &Service) -> &Value;
 
-    /// Adds transaction to the queue.
-    /// After the services handle commit event these transactions will be broadcast by node.
-    fn add_transaction(&mut self, tx: Box<Transaction>);
+    /// Returns reference to the transaction sender.
+    fn api_sender(&self) -> &ApiSender;
 }
 
 #[derive(Debug, Default)]
