@@ -41,12 +41,19 @@
 
     <script>
         var self = this;
+        var blocksPerPage = 10;
 
         this.toggleLoading(true);
-        this.service.getBlocks(self.height + 1, function(blocks) {
+        this.service.getBlocks(self.height + 1, blocksPerPage, function(error, blocks) {
+            self.toggleLoading(false);
+
+            if (error) {
+                self.notify('error', error.name + ': ' + error.message);
+                return;
+            }
+
             self.blocks = blocks;
             self.update();
-            self.toggleLoading(false);
         });
 
         rowClick(height, e) {
@@ -57,10 +64,16 @@
         more(e) {
             e.preventDefault();
             self.toggleLoading(true);
-            this.service.getBlocks(self.blocks[self.blocks.length - 1].height, function(blocks) {
+            this.service.getBlocks(self.blocks[self.blocks.length - 1].height, blocksPerPage, function(error, blocks) {
+                self.toggleLoading(false);
+
+                if (error) {
+                    self.notify('error', error.message);
+                    return;
+                }
+
                 self.blocks = self.blocks.concat(blocks);
                 self.update();
-                self.toggleLoading(false);
             });
         }
 

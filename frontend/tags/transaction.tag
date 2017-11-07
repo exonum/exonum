@@ -76,24 +76,17 @@
         var self = this;
 
         this.toggleLoading(true);
-        this.service.getTransaction(this.opts.hash, function(response) {
-            if (response.content) {
-                switch(response.content.message_id) {
-                    case 128:
-                        self.title = 'Transfer';
-                        break;
-                    case 129:
-                        self.title = 'Add Funds';
-                        break;
-                    case 130:
-                        self.title = 'Create Wallet';
-                        break;
-                }
-                self.transaction = response;
-                self.update();
+        this.service.getTransaction(this.opts.hash, function(error, response) {
+            self.toggleLoading(false);
+
+            if (error) {
+                self.notify('error', error.message);
+                return;
             }
 
-            self.toggleLoading(false);
+            self.transaction = response;
+            self.title = self.service.getTransactionDescription(self.transaction.content.message_id);
+            self.update();
         });
 
         back(e) {
