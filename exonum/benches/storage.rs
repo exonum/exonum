@@ -30,7 +30,7 @@ mod tests {
     use exonum::storage::{ProofMapIndex, ProofListIndex};
     use exonum::storage::proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE;
 
-    const NAME: &'static str = "name";
+    const NAME: &str = "name";
 
     fn generate_random_kv(len: usize) -> Vec<([u8; KEY_SIZE], Vec<u8>)> {
         let mut rng = thread_rng();
