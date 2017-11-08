@@ -119,7 +119,7 @@ impl ConnectionsPool {
         network_config: NetworkConfiguration,
         peer: SocketAddr,
         network_tx: mpsc::Sender<NetworkEvent>,
-        handle: Handle,
+        handle: &Handle,
     ) -> Option<mpsc::Sender<RawMessage>> {
 
         let limit = network_config.max_outgoing_connections;
@@ -205,7 +205,7 @@ impl ConnectionsPool {
 }
 
 impl NetworkPart {
-    pub fn run(self, handle: Handle) -> Box<Future<Item = (), Error = io::Error>> {
+    pub fn run(self, handle: &Handle) -> Box<Future<Item = (), Error = io::Error>> {
         let network_config = self.network_config;
         // Cancelation token
         let (cancel_sender, cancel_handler) = unsync::oneshot::channel();
@@ -224,7 +224,7 @@ impl NetworkPart {
             network_config,
             self.listen_address,
             handle.clone(),
-            self.network_tx.clone(),
+            &self.network_tx.clone(),
         ).unwrap();
 
         let cancel_handler = cancel_handler.map_err(|_| other_error("can't cancel routine"));
@@ -268,7 +268,7 @@ impl RequestHandler {
                                         network_config,
                                         peer,
                                         network_tx.clone(),
-                                        handle.clone(),
+                                        &handle,
                                     )
                                     .map(|conn_tx|
                                         // if we create new connect, we should send connect message
@@ -338,7 +338,7 @@ impl Listener {
         network_config: NetworkConfiguration,
         listen_address: SocketAddr,
         handle: Handle,
-        network_tx: mpsc::Sender<NetworkEvent>,
+        network_tx: &mpsc::Sender<NetworkEvent>,
     ) -> Result<Listener, io::Error> {
         // Incoming connections limiter
         let incoming_connections_limit = network_config.max_incoming_connections;

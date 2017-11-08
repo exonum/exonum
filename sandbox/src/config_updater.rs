@@ -51,7 +51,8 @@ impl Transaction for TxConfig {
 
     fn execute(&self, fork: &mut Fork) {
         let mut schema = Schema::new(fork);
-        schema.commit_configuration(StoredConfiguration::try_deserialize(self.config()).unwrap())
+        schema.commit_configuration(&StoredConfiguration::try_deserialize(self.config())
+            .unwrap())
     }
 }
 

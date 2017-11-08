@@ -356,7 +356,7 @@ impl<'a> Schema<&'a mut Fork> {
 
     /// Adds a new configuration to the blockchain, which will become an actual at
     /// the `actual_from` height in `config_data`.
-    pub fn commit_configuration(&mut self, config_data: StoredConfiguration) {
+    pub fn commit_configuration(&mut self, config_data: &StoredConfiguration) {
         let actual_from = config_data.actual_from;
         if let Some(last_cfg) = self.configs_actual_from().last() {
             if last_cfg.cfg_hash() != &config_data.previous_cfg_hash {

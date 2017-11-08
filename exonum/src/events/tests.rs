@@ -144,7 +144,7 @@ impl TestEvents {
         let (mut handler_part, network_part) = self.into_reactor();
         let handle = thread::spawn(move || {
             let mut core = Core::new().unwrap();
-            let fut = network_part.run(core.handle());
+            let fut = network_part.run(&core.handle());
             core.run(fut).map_err(log_error).unwrap();
         });
         handler_part.handle = Some(handle);
@@ -152,7 +152,7 @@ impl TestEvents {
     }
 
     fn into_reactor(self) -> (TestHandler, NetworkPart) {
-        let channel = NodeChannel::new(self.events_config);
+        let channel = NodeChannel::new(&self.events_config);
         let network_config = self.network_config;
         let (network_tx, network_rx) = channel.network_events;
         let network_requests_tx = channel.network_requests.0.clone();

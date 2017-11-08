@@ -163,7 +163,7 @@ macro_rules! message {
                 let mut writer = MessageWriter::new($crate::messages::PROTOCOL_MAJOR_VERSION,
                                                     $crate::messages::TEST_NETWORK_ID,
                                                     $extension, $id, $body);
-                $(writer.write($field_name, $from, $to);)*
+                $(writer.write(&$field_name, $from, $to);)*
                 $name { raw: RawMessage::new(writer.sign(secret_key)) }
             }
 
@@ -177,7 +177,7 @@ macro_rules! message {
                 let mut writer = MessageWriter::new($crate::messages::PROTOCOL_MAJOR_VERSION,
                                                     $crate::messages::TEST_NETWORK_ID,
                                                     $extension, $id, $body);
-                $(writer.write($field_name, $from, $to);)*
+                $(writer.write(&$field_name, $from, $to);)*
                 $name { raw: RawMessage::new(writer.append_signature(signature)) }
 
             }

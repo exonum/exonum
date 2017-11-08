@@ -217,7 +217,7 @@ impl MessageWriter {
     }
 
     /// Writes given field to the given offset.
-    pub fn write<'a, F: Field<'a>>(&'a mut self, field: F, from: Offset, to: Offset) {
+    pub fn write<'a, F: Field<'a>>(&'a mut self, field: &F, from: Offset, to: Offset) {
         field.write(
             &mut self.raw,
             from + HEADER_LENGTH as Offset,
@@ -272,7 +272,7 @@ impl Message for RawMessage {
     }
 
     fn hash(&self) -> Hash {
-        hash(self.as_ref().as_ref())
+        hash(self.as_ref())
     }
 
     fn verify_signature(&self, pub_key: &PublicKey) -> bool {

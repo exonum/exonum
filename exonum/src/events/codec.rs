@@ -60,7 +60,7 @@ impl Encoder for MessagesCodec {
     type Error = io::Error;
 
     fn encode(&mut self, msg: Self::Item, buf: &mut BytesMut) -> io::Result<()> {
-        buf.extend_from_slice(msg.as_ref().as_ref());
+        buf.extend_from_slice(msg.as_ref());
         Ok(())
     }
 }

@@ -175,7 +175,7 @@ impl Blockchain {
                     // TODO create genesis block for MemoryDB and compare in hash with zero block
                     return Ok(());
                 }
-                schema.commit_configuration(config_propose);
+                schema.commit_configuration(&config_propose);
             };
             self.merge(fork.into_patch())?;
             self.create_patch(ValidatorId::zero(), Height::zero(), &[], &BTreeMap::new())

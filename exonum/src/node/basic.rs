@@ -36,10 +36,10 @@ impl NodeHandler {
 
         match Any::from_raw(raw) {
             Ok(Any::Connect(msg)) => self.handle_connect(msg),
-            Ok(Any::Status(msg)) => self.handle_status(msg),
+            Ok(Any::Status(msg)) => self.handle_status(&msg),
             Ok(Any::Consensus(msg)) => self.handle_consensus(msg),
             Ok(Any::Request(msg)) => self.handle_request(msg),
-            Ok(Any::Block(msg)) => self.handle_block(msg),
+            Ok(Any::Block(msg)) => self.handle_block(&msg),
             Ok(Any::Transaction(msg)) => self.handle_tx(msg),
             Err(err) => {
                 error!("Invalid message received: {:?}", err.description());
@@ -135,7 +135,7 @@ impl NodeHandler {
 
     /// Handles the `Status` message. Node sends `BlockRequest` as response if height in the
     /// message is higher than node's height.
-    pub fn handle_status(&mut self, msg: Status) {
+    pub fn handle_status(&mut self, msg: &Status) {
         let height = self.state.height();
         trace!(
             "HANDLE STATUS: current height = {}, msg height = {}",
@@ -175,7 +175,7 @@ impl NodeHandler {
     }
 
     /// Handles the `PeersRequest` message. Node sends `Connect` messages of other peers as result.
-    pub fn handle_request_peers(&mut self, msg: PeersRequest) {
+    pub fn handle_request_peers(&mut self, msg: &PeersRequest) {
         let peers: Vec<Connect> = self.state.peers().iter().map(|(_, b)| b.clone()).collect();
         trace!(
             "HANDLE REQUEST PEERS: Sending {:?} peers to {:?}",
