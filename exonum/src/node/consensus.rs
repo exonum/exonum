@@ -55,7 +55,8 @@ impl<'a, 'b> ServiceContext for NodeHandlerContext<'a, 'b> {
     }
 
     fn height(&self) -> Height {
-        self.state.height()
+        // A lot of code assumes that the height is height of latest block.
+        self.state.height().previous()
     }
 
     fn round(&self) -> Round {
@@ -556,7 +557,7 @@ impl NodeHandler {
             block_hash.to_hex(),
         );
 
-        // Handle commit event.
+        // Invoke after commit hook.
         {
             let snapshot = self.blockchain.snapshot();
             let ctx = NodeHandlerContext::new(

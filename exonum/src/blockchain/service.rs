@@ -156,7 +156,7 @@ pub trait ServiceContext {
     /// Returns the current database snapshot.
     fn snapshot(&self) -> &Snapshot;
 
-    /// Returns the current blockchain height. This height is 'height of last committed block` + 1.
+    /// Returns the current blockchain height. This height is 'height of the last committed block`.
     fn height(&self) -> Height;
 
     /// Returns the current node round.
