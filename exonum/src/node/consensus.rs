@@ -522,21 +522,10 @@ impl NodeHandler {
                     .expect("Unable to commit block");
                 (block_state.txs().len(), block_state.proposer_id())
             };
-
             // Update node state configuration
             let snapshot = self.blockchain.snapshot();
-            {
-                let schema = Schema::new(&snapshot);
-                self.state.update_config(schema.actual_configuration());
-            }
-            // Handle commit event.
-            let ctx = NodeHandlerContext::new(
-                &self.state,
-                snapshot.as_ref(),
-                ApiSender(self.channel.api_requests.clone()),
-            );
-            self.blockchain.handle_commit(&ctx);
-
+            let schema = Schema::new(&snapshot);
+            self.state.update_config(schema.actual_configuration());
             (txs_count, proposer)
         };
 
@@ -566,6 +555,17 @@ impl NodeHandler {
             mempool_size,
             block_hash.to_hex(),
         );
+
+        // Handle commit event.
+        {
+            let snapshot = self.blockchain.snapshot();
+            let ctx = NodeHandlerContext::new(
+                &self.state,
+                snapshot.as_ref(),
+                ApiSender(self.channel.api_requests.clone()),
+            );
+            self.blockchain.handle_commit(&ctx);
+        }
 
         // TODO: reset status timeout (ECR-171).
         self.broadcast_status();
