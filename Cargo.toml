@@ -23,6 +23,5 @@ router = "0.5.1"
 bodyparser = "0.7.0"
 serde_derive = "1.0.0"
 
-[replace."exonum:0.3.0"]
-git = "https://github.com/slowli/exonum"
-rev = "0f356ce6b7036eddb1e6bc85cc871145a42776c2"
+[patch.crates-io]
+exonum = { git = "https://github.com/alekseysidorov/exonum", branch = "improve-blockchain-api" }
