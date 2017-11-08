@@ -224,7 +224,7 @@ impl NetworkPart {
             network_config,
             self.listen_address,
             handle.clone(),
-            &self.network_tx.clone(),
+            &self.network_tx,
         ).unwrap();
 
         let cancel_handler = cancel_handler.map_err(|_| other_error("can't cancel routine"));
