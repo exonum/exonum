@@ -122,7 +122,7 @@ mod tests {
     fn create_rocksdb(tempdir: &TempDir) -> RocksDB {
         let mut options = RocksDBOptions::default();
         options.create_if_missing(true);
-        RocksDB::open(tempdir.path(), options).unwrap()
+        RocksDB::open(tempdir.path(), &options).unwrap()
     }
 
     #[bench]
