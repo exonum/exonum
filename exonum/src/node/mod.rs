@@ -585,7 +585,7 @@ pub struct NodeChannel {
     pub timeout_events: (mpsc::Sender<NodeTimeout>, mpsc::Receiver<NodeTimeout>),
 }
 
-const PROFILE_ENV_VARIABLE_NAME: &'static str = "EXONUM_PROFILE_FILENAME";
+const PROFILE_ENV_VARIABLE_NAME: &str = "EXONUM_PROFILE_FILENAME";
 
 /// Node that contains handler (`NodeHandler`) and `NodeApiConfig`.
 #[derive(Debug)]

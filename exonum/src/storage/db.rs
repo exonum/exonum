@@ -146,6 +146,14 @@ pub trait Database: Send + Sync + 'static {
     /// will be returned. In case of an error the method guarantees no changes were applied to
     /// the database.
     fn merge(&mut self, patch: Patch) -> Result<()>;
+
+    /// Atomically applies a sequence of patch changes to the database with fsync.
+    ///
+    /// # Errors
+    /// If this method encounters any form of I/O or other error during merging, an error variant
+    /// will be returned. In case of an error the method guarantees no changes were applied to
+    /// the database.
+    fn merge_sync(&mut self, patch: Patch) -> Result<()>;
 }
 
 /// A trait that defines a snapshot of storage backend.

@@ -27,7 +27,7 @@ use std::fmt;
 use std::error;
 use std::iter::Peekable;
 
-pub use rocksdb::Options as RocksDBOptions;
+pub use rocksdb::{Options as RocksDBOptions, WriteOptions as RocksDBWriteOptions};
 pub use rocksdb::BlockBasedOptions as RocksBlockOptions;
 
 use super::{Database, Iterator, Iter, Snapshot, Error, Patch, Change, Result};
@@ -70,22 +70,8 @@ impl RocksDB {
         };
         Ok(RocksDB { db: Arc::new(db) })
     }
-}
 
-impl Database for RocksDB {
-    fn clone(&self) -> Box<Database> {
-        Box::new(Clone::clone(self))
-    }
-
-    fn snapshot(&self) -> Box<Snapshot> {
-        let _p = ProfilerSpan::new("RocksDB::snapshot");
-        Box::new(RocksDBSnapshot {
-            snapshot: unsafe { mem::transmute(self.db.snapshot()) },
-            _db: Arc::clone(&self.db),
-        })
-    }
-
-    fn merge(&mut self, patch: Patch) -> Result<()> {
+    fn merge(&mut self, patch: Patch, w_opts: &RocksDBWriteOptions) -> Result<()> {
         let _p = ProfilerSpan::new("RocksDB::merge");
         let mut batch = WriteBatch::default();
         for (cf_name, changes) in patch {
@@ -104,7 +90,32 @@ impl Database for RocksDB {
                 }
             }
         }
-        self.db.write(batch).map_err(Into::into)
+        self.db.write_opt(batch, w_opts).map_err(Into::into)
+    }
+}
+
+impl Database for RocksDB {
+    fn clone(&self) -> Box<Database> {
+        Box::new(Clone::clone(self))
+    }
+
+    fn snapshot(&self) -> Box<Snapshot> {
+        let _p = ProfilerSpan::new("RocksDB::snapshot");
+        Box::new(RocksDBSnapshot {
+            snapshot: unsafe { mem::transmute(self.db.snapshot()) },
+            _db: Arc::clone(&self.db),
+        })
+    }
+
+    fn merge(&mut self, patch: Patch) -> Result<()> {
+        let w_opts = RocksDBWriteOptions::default();
+        self.merge(patch, &w_opts)
+    }
+
+    fn merge_sync(&mut self, patch: Patch) -> Result<()> {
+        let mut w_opts = RocksDBWriteOptions::default();
+        w_opts.set_sync(true);
+        self.merge(patch, &w_opts)
     }
 }
 
