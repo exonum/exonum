@@ -29,9 +29,8 @@ use storage::{Fork, Snapshot};
 use messages::{Message, RawTransaction};
 use encoding::Error as MessageError;
 use node::{ApiSender, Node, State};
-use node::state::ValidatorState;
 use blockchain::{Blockchain, ConsensusConfig, ValidatorKeys};
-use helpers::{Height, Milliseconds, Round};
+use helpers::{Height, Milliseconds, Round, ValidatorId};
 
 /// A trait that describes transaction processing rules (a group of sequential operations
 /// with the Exonum storage) for the given `Message`.
@@ -149,14 +148,14 @@ pub trait Service: Send + Sync + 'static {
 /// The current node state on which the blockchain is running, or in other words
 /// execution context.
 pub trait ServiceContext {
-    /// If the current node is validator returns its state.
+    /// If the current node is validator returns its identifier.
     /// For other nodes return `None`.
-    fn validator_state(&self) -> &Option<ValidatorState>;
+    fn validator_id(&self) -> Option<ValidatorId>;
 
     /// Returns the current database snapshot.
     fn snapshot(&self) -> &Snapshot;
 
-    /// Returns the current blockchain height. This height is 'height of the last committed block`.
+    /// Returns the current blockchain height. This height is "height of the last committed block".
     fn height(&self) -> Height;
 
     /// Returns the current node round.

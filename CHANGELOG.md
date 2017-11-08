@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Allow creating auditor node from command line. #364
 
+### Changed
+- `ServiceContext` becomed trait. This change may breaks the code that uses it. (#366)
+- `ValidatorState` in the `ServiceContext` replaced by the `ValidatorId`. (#366)
+- Now user code must invokes `handle_commit` manually after `commit`. (#366)
+
+### Fixed
+- Fixed mistake in description of the height getter in the `ServiceContext`. (#366)
+
 ## 0.3 - 2017-11-02
 
 ### Added

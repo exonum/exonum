@@ -23,7 +23,7 @@ use messages::{BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit
 use helpers::{Height, Round, ValidatorId};
 use storage::{Patch, Snapshot};
 use node::{ApiSender, NodeHandler, RequestData};
-use node::state::{State, ValidatorState};
+use node::state::State;
 
 struct NodeHandlerContext<'a, 'b> {
     state: &'a State,
@@ -46,8 +46,8 @@ impl<'a, 'b> NodeHandlerContext<'a, 'b> {
 }
 
 impl<'a, 'b> ServiceContext for NodeHandlerContext<'a, 'b> {
-    fn validator_state(&self) -> &Option<ValidatorState> {
-        self.state.validator_state()
+    fn validator_id(&self) -> Option<ValidatorId> {
+        self.state.validator_id()
     }
 
     fn snapshot(&self) -> &Snapshot {
@@ -55,7 +55,7 @@ impl<'a, 'b> ServiceContext for NodeHandlerContext<'a, 'b> {
     }
 
     fn height(&self) -> Height {
-        // A lot of code assumes that the height is height of latest block.
+        // A lot of code assumes that the height is height of the latest block.
         self.state.height().previous()
     }
 
