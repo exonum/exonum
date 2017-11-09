@@ -13,7 +13,7 @@ extern crate serde;
 extern crate serde_json;
 
 use std::collections::BTreeMap;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, RwLockReadGuard};
 
 use exonum::blockchain::{ApiContext, Blockchain, ConsensusConfig, GenesisConfig,
                          Schema as CoreSchema, Service, ServiceContext, StoredConfiguration,
@@ -496,9 +496,7 @@ impl TestHarness {
             let validator_id = self.state().validator_id().expect(
                 "Tested node is not a validator",
             );
-            let transactions = self.mempool.read().expect(
-                "Cannot read transactions from mempool",
-            );
+            let transactions = self.mempool();
             self.blockchain.create_patch(
                 validator_id,
                 height,
@@ -540,9 +538,6 @@ impl TestHarness {
                     schema.precommits_mut(&block_hash).push(precommit.clone());
                 }
             }
-            for service in self.blockchain.service_map().values() {
-                service.handle_commit(&self.service_context);
-            }
             fork.into_patch()
         };
         self.blockchain.merge(patch).unwrap();
@@ -551,10 +546,16 @@ impl TestHarness {
 
     // Update Harness state after commit block.
     fn do_update(&mut self) {
+        // Update context
         self.service_context.update(
             self.network.us.clone(),
             self.blockchain.snapshot(),
         );
+        // Invokes handle_commit event
+        for service in self.blockchain.service_map().values() {
+            service.handle_commit(&self.service_context);
+        }
+        self.poll_events();
     }
 
     /// Creates block with the specified transactions. The transactions must be previously
@@ -567,9 +568,7 @@ impl TestHarness {
         self.poll_events();
 
         {
-            let txs = self.mempool.read().expect(
-                "Cannot read transactions from node",
-            );
+            let txs = self.mempool();
             for hash in tx_hashes {
                 assert!(txs.contains_key(hash));
             }
@@ -595,6 +594,13 @@ impl TestHarness {
     /// Returns the current height of the blockchain.
     pub fn height(&self) -> Height {
         self.state().height().next()
+    }
+
+    /// Returns the test node memory pool handle.
+    pub fn mempool(&self) -> RwLockReadGuard<BTreeMap<crypto::Hash, Box<Transaction>>> {
+        self.mempool.read().expect(
+            "Can't read transactions from the mempool.",
+        )
     }
 }
 
