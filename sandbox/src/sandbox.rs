@@ -92,8 +92,7 @@ impl SandboxInner {
             while let Async::Ready(Some(network)) = self.network_requests_rx.poll()? {
                 match network {
                     NetworkRequest::SendMessage(peer, msg) => self.sent.push_back((peer, msg)),
-                    NetworkRequest::DisconnectWithPeer(_) |
-                    NetworkRequest::Shutdown => {}
+                    NetworkRequest::DisconnectWithPeer(_) | NetworkRequest::Shutdown => {}
                 }
             }
             Ok(())
@@ -253,7 +252,12 @@ impl Sandbox {
     pub fn recv<T: Message>(&self, msg: T) {
         self.check_unexpected_message();
         // TODO Think about addresses.
-        let dummy_addr = SocketAddr::from(([127, 0, 0, 1], 12_039));
+        let dummy_addr = SocketAddr::from((
+            [
+                127, 0, 0, 1
+            ],
+            12_039,
+        ));
         let event = NetworkEvent::MessageReceived(dummy_addr, msg.raw().clone());
         self.inner.borrow_mut().handle_event(event);
     }
@@ -481,9 +485,10 @@ impl Sandbox {
 
     pub fn transactions_hashes(&self) -> Vec<Hash> {
         let node_state = self.node_state();
-        let rlock = node_state.transactions().read().expect(
-            "Expected read lock",
-        );
+        let rlock = node_state
+            .transactions()
+            .read()
+            .expect("Expected read lock");
         rlock.keys().cloned().collect()
     }
 
@@ -547,16 +552,12 @@ fn gen_primitive_socket_addr(idx: u8) -> SocketAddr {
 
 pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
     let validators = vec![
-        gen_keypair_from_seed(&Seed::new([12; 32])),
-        gen_keypair_from_seed(&Seed::new([13; 32])),
-        gen_keypair_from_seed(&Seed::new([16; 32])),
-        gen_keypair_from_seed(&Seed::new([19; 32])),
+        gen_keypair_from_seed(&Seed::new([12; 32])), gen_keypair_from_seed(&Seed::new([13; 32])),
+        gen_keypair_from_seed(&Seed::new([16; 32])), gen_keypair_from_seed(&Seed::new([19; 32])),
     ];
     let service_keys = vec![
-        gen_keypair_from_seed(&Seed::new([20; 32])),
-        gen_keypair_from_seed(&Seed::new([21; 32])),
-        gen_keypair_from_seed(&Seed::new([22; 32])),
-        gen_keypair_from_seed(&Seed::new([23; 32])),
+        gen_keypair_from_seed(&Seed::new([20; 32])), gen_keypair_from_seed(&Seed::new([21; 32])),
+        gen_keypair_from_seed(&Seed::new([22; 32])), gen_keypair_from_seed(&Seed::new([23; 32])),
     ];
 
     let addresses: Vec<SocketAddr> = (1..5).map(gen_primitive_socket_addr).collect::<Vec<_>>();
@@ -649,32 +650,52 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
 
 pub fn timestamping_sandbox() -> Sandbox {
     sandbox_with_services(vec![
-        Box::new(TimestampingService::new()),
-        Box::new(ConfigUpdateService::new()),
+        Box::new(TimestampingService::new()), Box::new(ConfigUpdateService::new())
     ])
 }
 
 #[cfg(test)]
 mod tests {
     use exonum::blockchain::ServiceContext;
-    use exonum::messages::RawTransaction;
+    use exonum::messages::{FromRaw, RawTransaction};
     use exonum::encoding;
     use exonum::crypto::{gen_keypair_from_seed, Seed};
     use exonum::node::TransactionSend;
+    use exonum::storage::Fork;
 
     use sandbox_tests_helper::{add_one_height, SandboxState, VALIDATOR_1, VALIDATOR_2,
                                VALIDATOR_3, HEIGHT_ONE, ROUND_ONE, ROUND_TWO};
-    use timestamping::TimestampTx;
     use super::*;
 
-    struct HandleCommitService;
+    const SERVICE_ID: u16 = 1;
+    const TX_AFTER_COMMIT_ID: u16 = 1;
 
-    impl HandleCommitService {
-        fn transaction() -> TimestampTx {
-            let keypair = gen_keypair_from_seed(&Seed::new([22; 32]));
-            TimestampTx::new(&keypair.0, b"handle_commit", &keypair.1)
+    message! {
+        struct TxAfterCommit {
+            const TYPE = SERVICE_ID;
+            const ID = TX_AFTER_COMMIT_ID;
+            const SIZE = 8;
+
+            field height: Height [0 => 8]
         }
     }
+
+    impl TxAfterCommit {
+        pub fn new_with_height(height: Height) -> TxAfterCommit {
+            let keypair = gen_keypair_from_seed(&Seed::new([22; 32]));
+            TxAfterCommit::new(height, &keypair.1)
+        }
+    }
+
+    impl Transaction for TxAfterCommit {
+        fn verify(&self) -> bool {
+            true
+        }
+
+        fn execute(&self, _fork: &mut Fork) {}
+    }
+
+    struct HandleCommitService;
 
     impl Service for HandleCommitService {
         fn service_name(&self) -> &'static str {
@@ -682,18 +703,24 @@ mod tests {
         }
 
         fn service_id(&self) -> u16 {
-            0
+            SERVICE_ID
         }
 
-        fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
-            unreachable!();
+        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
+            let tx: Box<Transaction> = match raw.message_type() {
+                TX_AFTER_COMMIT_ID => Box::new(TxAfterCommit::from_raw(raw)?),
+                _ => {
+                    return Err(encoding::Error::IncorrectMessageType {
+                        message_type: raw.message_type(),
+                    });
+                }
+            };
+            Ok(tx)
         }
 
         fn handle_commit(&self, context: &ServiceContext) {
-            context
-                .api_sender()
-                .send(Box::new(Self::transaction()))
-                .unwrap();
+            let tx = TxAfterCommit::new_with_height(context.height());
+            context.api_sender().send(Box::new(tx)).unwrap();
         }
     }
 
@@ -792,11 +819,11 @@ mod tests {
     #[test]
     fn test_sandbox_service_handle_commit() {
         let sandbox = sandbox_with_services(vec![
-            Box::new(TimestampingService::new()),
-            Box::new(HandleCommitService),
+            Box::new(HandleCommitService), Box::new(TimestampingService::new())
         ]);
         let state = SandboxState::new();
         add_one_height(&sandbox, &state);
-        sandbox.broadcast(HandleCommitService::transaction());
+        let tx = TxAfterCommit::new_with_height(Height(1));
+        sandbox.broadcast(tx);
     }
 }
