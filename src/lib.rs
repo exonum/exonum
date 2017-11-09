@@ -518,7 +518,7 @@ impl TestKit {
             }
         }
 
-        let propose = self.network.us().create_propose(
+        let propose = self.leader().create_propose(
             height,
             &last_hash,
             tx_hashes,
