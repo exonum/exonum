@@ -17,30 +17,33 @@ use std::collections::HashSet;
 use std::fmt;
 
 use crypto::{Hash, HexValue, PublicKey, SecretKey};
-use blockchain::{ConsensusConfig, Schema, Service, ServiceContext, Transaction, ValidatorKeys};
+use blockchain::{Blockchain, ConsensusConfig, Schema, Service, ServiceContext, ServiceContextMut,
+                 Transaction, ValidatorKeys};
 use messages::{BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote,
                PrevotesRequest, Propose, ProposeRequest, RawTransaction, TransactionsRequest};
 use helpers::{Height, Round, ValidatorId};
 use storage::{Patch, Snapshot};
-use node::{ApiSender, NodeHandler, RequestData};
+use node::{ApiSender, NodeHandler, RequestData, SystemStateProvider};
 use node::state::State;
 
 struct NodeHandlerContext<'a, 'b> {
-    state: &'a State,
-    snapshot: &'b Snapshot,
+    state: &'a mut State,
+    snapshot: Option<Box<Snapshot>>,
+    system_state: &'b SystemStateProvider,
     api_sender: ApiSender,
 }
 
 impl<'a, 'b> NodeHandlerContext<'a, 'b> {
     fn new(
-        state: &'a State,
-        snapshot: &'b Snapshot,
+        state: &'a mut State,
+        system_state: &'b SystemStateProvider,
         api_sender: ApiSender,
     ) -> NodeHandlerContext<'a, 'b> {
         NodeHandlerContext {
             state,
-            snapshot,
+            system_state,
             api_sender,
+            snapshot: None,
         }
     }
 }
@@ -52,6 +55,9 @@ impl<'a, 'b> ServiceContext for NodeHandlerContext<'a, 'b> {
 
     fn snapshot(&self) -> &Snapshot {
         self.snapshot
+            .as_ref()
+            .expect("An attempt to context without blockchain snapshot")
+            .as_ref()
     }
 
     fn height(&self) -> Height {
@@ -86,6 +92,22 @@ impl<'a, 'b> ServiceContext for NodeHandlerContext<'a, 'b> {
 
     fn api_sender(&self) -> &ApiSender {
         &self.api_sender
+    }
+}
+
+impl<'a, 'b> ServiceContextMut for NodeHandlerContext<'a, 'b> {
+    fn update(&mut self, blockchain: &Blockchain) {
+        // Update configuration
+        let snapshot = blockchain.snapshot();
+        let schema = Schema::new(&snapshot);
+        self.state.update_config(schema.actual_configuration());
+        // Update state to new height
+        let block_hash = blockchain.last_hash();
+        self.state.new_height(
+            &block_hash,
+            self.system_state.current_time(),
+        );
+        self.snapshot = Some(blockchain.snapshot());
     }
 }
 
@@ -516,21 +538,18 @@ impl NodeHandler {
 
         // Merge changes into storage
         let (commited_txs, proposer) = {
-            let (txs_count, proposer) = {
-                let block_state = self.state.block(&block_hash).unwrap();
-                self.blockchain
-                    .commit(block_state.patch(), block_hash, precommits)
-                    .expect("Unable to commit block");
-                (block_state.txs().len(), block_state.proposer_id())
-            };
-            // Update node state configuration
-            let snapshot = self.blockchain.snapshot();
-            let schema = Schema::new(&snapshot);
-            self.state.update_config(schema.actual_configuration());
-            (txs_count, proposer)
+            // FIXME Avoid of clone here.
+            let block_state = self.state.block(&block_hash).unwrap().clone();
+            let mut context = NodeHandlerContext::new(
+                &mut self.state,
+                self.system_state.as_ref(),
+                ApiSender::new(self.channel.api_requests.clone()),
+            );
+            self.blockchain
+                .commit(&mut context, block_state.patch(), block_hash, precommits)
+                .unwrap();
+            (block_state.txs().len(), block_state.proposer_id())
         };
-
-        let height = self.state.height();
 
         let mempool_size = self.state
             .transactions()
@@ -539,12 +558,7 @@ impl NodeHandler {
             .len();
         metric!("node.mempool", mempool_size);
 
-        // Update state to new height
-        self.state.new_height(
-            &block_hash,
-            self.system_state.current_time(),
-        );
-
+        let height = self.state.height();
         info!(
             "COMMIT ====== height={}, proposer={}, round={}, committed={}, pool={}, hash={}",
             height,
@@ -556,17 +570,6 @@ impl NodeHandler {
             mempool_size,
             block_hash.to_hex(),
         );
-
-        // Invoke after commit hook.
-        {
-            let snapshot = self.blockchain.snapshot();
-            let ctx = NodeHandlerContext::new(
-                &self.state,
-                snapshot.as_ref(),
-                ApiSender(self.channel.api_requests.clone()),
-            );
-            self.blockchain.handle_commit(&ctx);
-        }
 
         // TODO: reset status timeout (ECR-171).
         self.broadcast_status();

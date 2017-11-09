@@ -180,6 +180,13 @@ pub trait ServiceContext {
     fn api_sender(&self) -> &ApiSender;
 }
 
+/// Mutable version of the `ServiceContext` for internal purpose only.
+#[doc(hidden)]
+pub trait ServiceContextMut: ServiceContext {
+    /// Modify the service context by the latest changes in blockchain.
+    fn update(&mut self, blockchain: &Blockchain);
+}
+
 #[derive(Debug, Default)]
 pub struct ApiNodeState {
     incoming_connections: HashSet<SocketAddr>,

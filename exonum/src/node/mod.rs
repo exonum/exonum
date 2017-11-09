@@ -80,7 +80,7 @@ pub enum NodeTimeout {
 
 /// A helper trait that provides the node with information about the state of the system such
 /// as current time or listen address.
-pub trait SystemStateProvider: 'static + ::std::fmt::Debug {
+pub trait SystemStateProvider: ::std::fmt::Debug {
     /// Returns the current address that the node listens on.
     fn listen_address(&self) -> SocketAddr;
     /// Return the current system time.

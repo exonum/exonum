@@ -47,7 +47,8 @@ pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
 pub use self::schema::{Schema, TxLocation, gen_prefix};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{ValidatorKeys, StoredConfiguration, ConsensusConfig, TimeoutAdjusterConfig};
-pub use self::service::{Service, Transaction, ServiceContext, ApiContext, SharedNodeState};
+pub use self::service::{Service, Transaction, ServiceContext, ServiceContextMut, ApiContext,
+                        SharedNodeState};
 
 mod block;
 mod schema;
@@ -316,19 +317,19 @@ impl Blockchain {
     }
 
     /// Commits to the storage block that proposes by node `State`.
-    ///
-    /// # Notes
-    ///
-    /// You should invoke `handle_commit` after that for the correct services workflow.
+    /// After that invokes `handle_commit` for each service in order of their identifiers
+    /// and returns the list of transactions which which were created by the `handle_commit` event.
     #[cfg_attr(feature = "flame_profile", flame)]
-    pub fn commit<'a, I>(
+    pub fn commit<'a, I, S>(
         &mut self,
+        context: &mut S,
         patch: &Patch,
         block_hash: Hash,
         precommits: I,
     ) -> Result<(), Error>
     where
         I: Iterator<Item = &'a Precommit>,
+        S: ServiceContextMut,
     {
         let patch = {
             let mut fork = {
@@ -346,15 +347,13 @@ impl Blockchain {
             fork.into_patch()
         };
         self.merge(patch)?;
-        Ok(())
-    }
-
-    /// Invokes `handle_commit` for each service in order of their identifiers
-    /// within the given context.
-    pub fn handle_commit(&mut self, ctx: &ServiceContext) {
+        // Updates the context after merge.
+        context.update(self);
+        // Invokes `handle_commit` for each service in order of their identifiers
         for service in self.service_map.values() {
-            service.handle_commit(ctx);
+            service.handle_commit(context);
         }
+        Ok(())
     }
 
     /// Returns `Mount` object that aggregates public api handlers.
