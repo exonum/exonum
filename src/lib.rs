@@ -254,7 +254,7 @@ impl<'a> ServiceContext for TestNodeState {
     }
 
     fn actual_service_config(&self, service: &Service) -> &Value {
-        &self.actual_configuration
+        self.actual_configuration
             .services
             .get(service.service_name())
             .expect("An attempt to get configuration from nonexistent service")
@@ -313,7 +313,7 @@ impl TestKitBuilder {
 
     /// Adds a service to the testkit.
     pub fn with_service(mut self, service: Box<Service>) -> Self {
-        self.services.push(service.into());
+        self.services.push(service);
         self
     }
 
@@ -518,11 +518,7 @@ impl TestKit {
             }
         }
 
-        let propose = self.leader().create_propose(
-            height,
-            &last_hash,
-            tx_hashes,
-        );
+        let propose = self.leader().create_propose(height, &last_hash, tx_hashes);
         let precommits: Vec<_> = self.network
             .validators()
             .iter()

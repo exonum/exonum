@@ -684,7 +684,7 @@ fn test_explorer_single_block() {
             .state()
             .consensus_public_key_of(precommit.validator())
             .expect("Cannot find validator id");
-        assert!(precommit.verify_signature(&pk));
+        assert!(precommit.verify_signature(pk));
         validators.insert(precommit.validator());
     }
 
