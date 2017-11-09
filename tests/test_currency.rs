@@ -4,30 +4,30 @@
 //! [`cryptocurrency`]: https://github.com/exonum/cryptocurrency/
 
 #[macro_use]
-extern crate serde_derive;
-#[macro_use]
 extern crate exonum;
 extern crate exonum_testkit;
+#[macro_use]
+extern crate serde_derive;
 
 use std::collections::BTreeSet;
 use std::iter::FromIterator;
 
 use exonum::crypto::{self, PublicKey, SecretKey};
 use exonum::messages::Message;
-use exonum_testkit::{TestKit, TestKitApi, ApiKind, ComparableSnapshot};
+use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};
 
 mod cryptocurrency {
-    extern crate serde;
-    extern crate serde_json;
-    extern crate router;
     extern crate bodyparser;
     extern crate iron;
+    extern crate router;
+    extern crate serde;
+    extern crate serde_json;
 
-    use exonum::blockchain::{Blockchain, Service, Transaction, ApiContext};
-    use exonum::node::{TransactionSend, ApiSender};
-    use exonum::messages::{RawTransaction, FromRaw, Message};
-    use exonum::storage::{Snapshot, Fork, MemoryDB, MapIndex};
-    use exonum::crypto::{PublicKey, Hash, HexValue};
+    use exonum::blockchain::{ApiContext, Blockchain, Service, Transaction};
+    use exonum::node::{ApiSender, TransactionSend};
+    use exonum::messages::{FromRaw, Message, RawTransaction};
+    use exonum::storage::{Fork, MapIndex, Snapshot};
+    use exonum::crypto::{Hash, HexValue, PublicKey};
     use exonum::encoding;
     use exonum::api::{Api, ApiError};
     use self::iron::prelude::*;
@@ -334,16 +334,17 @@ mod cryptocurrency {
             Some(Box::new(router))
         }
     }
-
-    pub fn blockchain() -> Blockchain {
-        let db = MemoryDB::new();
-        let services: Vec<Box<Service>> = vec![Box::new(CurrencyService)];
-        Blockchain::new(Box::new(db), services)
-    }
 }
 
-use cryptocurrency::{CurrencySchema, TxCreateWallet, TxTransfer, TransactionResponse, Wallet,
-                     blockchain};
+use cryptocurrency::{CurrencySchema, CurrencyService, TransactionResponse, TxCreateWallet,
+                     TxTransfer, Wallet};
+
+fn init_testkit() -> TestKit {
+    TestKitBuilder::validator()
+        .with_validators(4)
+        .with_service(Box::new(CurrencyService))
+        .create()
+}
 
 fn create_wallet(api: &TestKitApi, name: &str) -> (TxCreateWallet, SecretKey) {
     let (pubkey, key) = crypto::gen_keypair();
@@ -382,7 +383,7 @@ fn get_all_wallets(api: &TestKitApi) -> Vec<Wallet> {
 
 #[test]
 fn test_create_wallet() {
-    let mut testkit = TestKit::new(blockchain());
+    let mut testkit = init_testkit();
     let api = testkit.api();
     let (tx, _) = create_wallet(&api, "Alice");
 
@@ -397,7 +398,7 @@ fn test_create_wallet() {
 
 #[test]
 fn test_transfer() {
-    let mut testkit = TestKit::new(blockchain());
+    let mut testkit = init_testkit();
     let api = testkit.api();
 
     let (tx_alice, key_alice) = create_wallet(&api, "Alice");
@@ -430,7 +431,7 @@ fn test_transfer() {
 
 #[test]
 fn test_snapshot_completeness() {
-    let mut testkit = TestKit::new(blockchain());
+    let mut testkit = init_testkit();
     let api = testkit.api();
 
     let (tx_alice, _) = create_wallet(&api, "Alice");
@@ -450,7 +451,7 @@ fn test_snapshot_completeness() {
 
 #[test]
 fn test_transfer_from_nonexisting_wallet() {
-    let mut testkit = TestKit::new(blockchain());
+    let mut testkit = init_testkit();
     let api = testkit.api();
 
     let (tx_alice, key_alice) = create_wallet(&api, "Alice");
@@ -484,7 +485,7 @@ fn test_transfer_from_nonexisting_wallet() {
 
 #[test]
 fn test_transfer_to_nonexisting_wallet() {
-    let mut testkit = TestKit::new(blockchain());
+    let mut testkit = init_testkit();
     let api = testkit.api();
 
     let (tx_alice, key_alice) = create_wallet(&api, "Alice");
@@ -522,7 +523,7 @@ fn test_transfer_to_nonexisting_wallet() {
 
 #[test]
 fn test_transfer_overcharge() {
-    let mut testkit = TestKit::new(blockchain());
+    let mut testkit = init_testkit();
     let api = testkit.api();
 
     let (tx_alice, key_alice) = create_wallet(&api, "Alice");
@@ -548,7 +549,7 @@ fn test_transfer_overcharge() {
 
 #[test]
 fn test_transfers_in_single_block() {
-    let mut testkit = TestKit::new(blockchain());
+    let mut testkit = init_testkit();
     let api = testkit.api();
 
     let (tx_alice, key_alice) = create_wallet(&api, "Alice");
@@ -608,7 +609,10 @@ fn test_transfers_in_single_block() {
 
 #[test]
 fn test_malformed_wallet_request() {
-    let testkit = TestKit::new(blockchain());
+    let testkit = TestKitBuilder::validator()
+        .with_validators(4)
+        .with_service(Box::new(CurrencyService))
+        .create();
     let api = testkit.api();
     let info: String = api.get_err(ApiKind::Service("cryptocurrency"), "v1/wallet/c0ffee");
     assert!(info.starts_with("Invalid request param"));
@@ -616,7 +620,7 @@ fn test_malformed_wallet_request() {
 
 #[test]
 fn test_unknown_wallet_request() {
-    let testkit = TestKit::new(blockchain());
+    let testkit = init_testkit();
     let api = testkit.api();
 
     // transaction is sent by API, but isn't committed

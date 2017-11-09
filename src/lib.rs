@@ -90,7 +90,7 @@ pub struct TestNode {
 
 impl TestNode {
     /// Creates a new auditor.
-    pub fn new() -> Self {
+    pub fn new_auditor() -> Self {
         let (consensus_public_key, consensus_secret_key) = crypto::gen_keypair();
         let (service_public_key, service_secret_key) = crypto::gen_keypair();
 
@@ -275,43 +275,59 @@ impl<'a> ServiceContextMut for TestNodeState {
 
 /// Builder for `TestKit`.
 pub struct TestKitBuilder {
-    blockchain: Blockchain,
-    validator_count: u16,
+    us: TestNode,
+    validators: Vec<TestNode>,
+    services: Vec<Box<Service>>,
 }
 
 impl TestKitBuilder {
-    fn with_blockchain(blockchain: Blockchain) -> Self {
+    /// Creates testkit for the validator node.
+    pub fn validator() -> Self {
+        let us = TestNode::new_validator(ValidatorId(0));
         TestKitBuilder {
-            blockchain,
-            validator_count: 1,
+            validators: vec![us.clone()],
+            services: Vec::new(),
+            us,
         }
     }
 
-    fn with_services<I>(services: I) -> Self
-    where
-        I: IntoIterator<Item = Box<Service>>,
-    {
-        let db = MemoryDB::new();
-        let blockchain = Blockchain::new(Box::new(db), services.into_iter().collect());
-        TestKitBuilder::with_blockchain(blockchain)
+    /// Creates testkit for the auditor node.
+    pub fn auditor() -> Self {
+        let us = TestNode::new_auditor();
+        TestKitBuilder {
+            validators: vec![TestNode::new_validator(ValidatorId(0))],
+            services: Vec::new(),
+            us,
+        }
     }
 
-    /// Sets the validator count to be used in the testkit emulation.
-    pub fn validators(&mut self, validator_count: u16) -> &mut Self {
-        assert!(
-            validator_count > 0,
-            "Number of validators should be positive"
+    /// Adds an additional validators.
+    pub fn with_validators(mut self, validators_count: u16) -> Self {
+        assert!(validators_count > 1, "At least one validator must be.");
+        let additional_validators = (1..validators_count).map(ValidatorId).map(
+            TestNode::new_validator,
         );
-        self.validator_count = validator_count;
+        self.validators.extend(additional_validators);
+        self
+    }
+
+    /// Adds a service to the testkit.
+    pub fn with_service(mut self, service: Box<Service>) -> Self {
+        self.services.push(service.into());
         self
     }
 
     /// Creates the testkit.
-    pub fn create(&self) -> TestKit {
+    pub fn create(self) -> TestKit {
         crypto::init();
+        let db = MemoryDB::new();
+        let blockchain = Blockchain::new(Box::new(db), self.services);
         TestKit::assemble(
-            self.blockchain.clone(),
-            TestNetwork::new(self.validator_count),
+            blockchain,
+            TestNetwork {
+                us: self.us,
+                validators: self.validators,
+            },
         )
     }
 }
@@ -328,25 +344,6 @@ pub struct TestKit {
 }
 
 impl TestKit {
-    /// Initializes a testkit with a blockchain and a single-node network.
-    pub fn new(blockchain: Blockchain) -> Self {
-        TestKit::assemble(blockchain, TestNetwork::new(1))
-    }
-
-    /// Initializes a testkit builder with a blockchain.
-    pub fn with_blockchain(blockchain: Blockchain) -> TestKitBuilder {
-        TestKitBuilder::with_blockchain(blockchain)
-    }
-
-    /// Initializes a testkit with a blockchain that hosts a given set of services.
-    /// The blockchain uses `MemoryDB` for storage.
-    pub fn with_services<I>(services: I) -> TestKitBuilder
-    where
-        I: IntoIterator<Item = Box<Service>>,
-    {
-        TestKitBuilder::with_services(services)
-    }
-
     fn assemble(mut blockchain: Blockchain, network: TestNetwork) -> Self {
         let genesis = network.genesis_config();
         blockchain.create_genesis_block(genesis.clone()).unwrap();
@@ -499,7 +496,7 @@ impl TestKit {
         let last_hash = self.state().last_hash();
 
         let (block_hash, patch) = {
-            let validator_id = self.state().validator_id().expect(
+            let validator_id = self.leader().validator_id().expect(
                 "Tested node is not a validator",
             );
             let transactions = self.mempool();
@@ -593,6 +590,11 @@ impl TestKit {
         self.mempool.read().expect(
             "Can't read transactions from the mempool.",
         )
+    }
+
+    /// Returns the leader on the current height. At the moment first validator.
+    pub fn leader(&self) -> &TestNode {
+        &self.network.validators[0]
     }
 }
 

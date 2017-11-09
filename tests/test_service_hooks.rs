@@ -4,11 +4,10 @@ extern crate exonum_testkit;
 extern crate serde;
 extern crate serde_json;
 
-use exonum::blockchain::Service;
 use exonum::crypto::Signature;
 use exonum::messages::Message;
 use exonum::helpers::Height;
-use exonum_testkit::TestKit;
+use exonum_testkit::TestKitBuilder;
 
 mod hooks {
     //! A special service which generates transactions on `handle_commit` events.
@@ -83,8 +82,9 @@ pub use hooks::{HandleCommitService, TxAfterCommit};
 
 #[test]
 fn test_handle_commit() {
-    let services: Vec<Box<Service>> = vec![Box::new(HandleCommitService)];
-    let mut testkit = TestKit::with_services(services).create();
+    let mut testkit = TestKitBuilder::validator()
+        .with_service(Box::new(HandleCommitService))
+        .create();
     // Check that `handle_commit` invoked on the correct height.
     for i in 1..5 {
         testkit.create_block();

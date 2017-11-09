@@ -6,11 +6,10 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 
-use exonum::blockchain::Service;
 use exonum::crypto::{self, HexValue, PublicKey};
 use exonum::helpers::Height;
 use exonum::messages::Message;
-use exonum_testkit::{TestKit, TestKitApi, ApiKind, ComparableSnapshot};
+use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};
 
 mod counter {
     //! Sample counter service.
@@ -19,11 +18,11 @@ mod counter {
     extern crate iron;
     extern crate router;
 
-    use exonum::blockchain::{Blockchain, ApiContext, Service, Transaction};
-    use exonum::messages::{RawTransaction, FromRaw, Message};
+    use exonum::blockchain::{ApiContext, Blockchain, Service, Transaction};
+    use exonum::messages::{FromRaw, Message, RawTransaction};
     use exonum::node::{ApiSender, TransactionSend};
-    use exonum::storage::{Fork, Snapshot, Entry};
-    use exonum::crypto::{PublicKey, Hash};
+    use exonum::storage::{Entry, Fork, Snapshot};
+    use exonum::crypto::{Hash, PublicKey};
     use exonum::encoding;
     use exonum::api::{Api, ApiError};
     use self::iron::Handler;
@@ -251,11 +250,12 @@ mod counter {
     }
 }
 
-use counter::{ADMIN_KEY, CounterService, TxIncrement, TxReset, TransactionResponse, CounterSchema};
+use counter::{CounterSchema, CounterService, TransactionResponse, TxIncrement, TxReset, ADMIN_KEY};
 
 fn init_testkit() -> (TestKit, TestKitApi) {
-    let services: Vec<Box<Service>> = vec![Box::new(CounterService)];
-    let testkit = TestKit::with_services(services).create();
+    let testkit = TestKitBuilder::validator()
+        .with_service(Box::new(CounterService))
+        .create();
     let api = testkit.api();
     (testkit, api)
 }
@@ -650,8 +650,10 @@ fn test_explorer_single_block() {
     use exonum::explorer::BlockInfo;
     use exonum::helpers::Height;
 
-    let services: Vec<Box<Service>> = vec![Box::new(CounterService)];
-    let mut testkit = TestKit::with_services(services).validators(4).create();
+    let mut testkit = TestKitBuilder::validator()
+        .with_validators(4)
+        .with_service(Box::new(CounterService))
+        .create();
     let api = testkit.api();
 
     assert_eq!(testkit.state().majority_count(), 3);
@@ -710,8 +712,10 @@ fn test_system_transaction() {
     }
 
 
-    let services: Vec<Box<Service>> = vec![Box::new(CounterService)];
-    let mut testkit = TestKit::with_services(services).validators(4).create();
+    let mut testkit = TestKitBuilder::validator()
+        .with_validators(4)
+        .with_service(Box::new(CounterService))
+        .create();
     let api = testkit.api();
 
     let tx = {
