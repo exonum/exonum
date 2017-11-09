@@ -8,7 +8,7 @@ use exonum::blockchain::Service;
 use exonum::crypto::Signature;
 use exonum::messages::Message;
 use exonum::helpers::Height;
-use exonum_testkit::TestHarness;
+use exonum_testkit::TestKit;
 
 mod hooks {
     //! A special service which generates transactions on `handle_commit` events.
@@ -84,11 +84,11 @@ pub use hooks::{HandleCommitService, TxAfterCommit};
 #[test]
 fn test_handle_commit() {
     let services: Vec<Box<Service>> = vec![Box::new(HandleCommitService)];
-    let mut harness = TestHarness::with_services(services).create();
+    let mut testkit = TestKit::with_services(services).create();
     // Check that `handle_commit` invoked on the correct height.
     for i in 1..5 {
-        harness.create_block();
+        testkit.create_block();
         let tx = TxAfterCommit::new_with_signature(Height(i), &Signature::zero());
-        assert!(harness.mempool().contains_key(&tx.hash()));
+        assert!(testkit.mempool().contains_key(&tx.hash()));
     }
 }

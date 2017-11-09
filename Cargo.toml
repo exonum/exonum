@@ -4,7 +4,7 @@ version = "0.0.0"
 license = "Apache-2.0"
 homepage = "https://exonum.com"
 description = """
-Test harness for Exonum blockchain framework, allowing to test service APIs
+Testkit for Exonum blockchain framework, allowing to test service APIs
 synchronously.
 """
 categories = ["test"]

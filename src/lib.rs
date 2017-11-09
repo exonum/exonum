@@ -1,5 +1,5 @@
-//! Test harness for Exonum blockchain framework, allowing to test service APIs synchronously
-//! and in the same process as the harness.
+//! Testkit for Exonum blockchain framework, allowing to test service APIs synchronously
+//! and in the same process as the testkit.
 
 #![deny(missing_docs)]
 
@@ -61,7 +61,7 @@ impl TestNetwork {
         TestNetwork { validators, us }
     }
 
-    /// Returns the node in the emulated network, from whose perspective the harness operates.
+    /// Returns the node in the emulated network, from whose perspective the testkit operates.
     pub fn us(&self) -> &TestNode {
         &self.us
     }
@@ -273,15 +273,15 @@ impl<'a> ServiceContextMut for TestNodeState {
     }
 }
 
-/// Builder for `TestHarness`.
-pub struct TestHarnessBuilder {
+/// Builder for `TestKit`.
+pub struct TestKitBuilder {
     blockchain: Blockchain,
     validator_count: u16,
 }
 
-impl TestHarnessBuilder {
+impl TestKitBuilder {
     fn with_blockchain(blockchain: Blockchain) -> Self {
-        TestHarnessBuilder {
+        TestKitBuilder {
             blockchain,
             validator_count: 1,
         }
@@ -293,10 +293,10 @@ impl TestHarnessBuilder {
     {
         let db = MemoryDB::new();
         let blockchain = Blockchain::new(Box::new(db), services.into_iter().collect());
-        TestHarnessBuilder::with_blockchain(blockchain)
+        TestKitBuilder::with_blockchain(blockchain)
     }
 
-    /// Sets the validator count to be used in the harness emulation.
+    /// Sets the validator count to be used in the testkit emulation.
     pub fn validators(&mut self, validator_count: u16) -> &mut Self {
         assert!(
             validator_count > 0,
@@ -306,19 +306,19 @@ impl TestHarnessBuilder {
         self
     }
 
-    /// Creates the harness.
-    pub fn create(&self) -> TestHarness {
+    /// Creates the testkit.
+    pub fn create(&self) -> TestKit {
         crypto::init();
-        TestHarness::assemble(
+        TestKit::assemble(
             self.blockchain.clone(),
             TestNetwork::new(self.validator_count),
         )
     }
 }
 
-/// Harness for testing blockchain services. It offers simple network configuration emulation
+/// Testkit for testing blockchain services. It offers simple network configuration emulation
 /// (with no real network setup).
-pub struct TestHarness {
+pub struct TestKit {
     blockchain: Blockchain,
     channel: NodeChannel,
     service_context: TestNodeState,
@@ -327,24 +327,24 @@ pub struct TestHarness {
     mempool: TxPool,
 }
 
-impl TestHarness {
-    /// Initializes a harness with a blockchain and a single-node network.
+impl TestKit {
+    /// Initializes a testkit with a blockchain and a single-node network.
     pub fn new(blockchain: Blockchain) -> Self {
-        TestHarness::assemble(blockchain, TestNetwork::new(1))
+        TestKit::assemble(blockchain, TestNetwork::new(1))
     }
 
-    /// Initializes a harness builder with a blockchain.
-    pub fn with_blockchain(blockchain: Blockchain) -> TestHarnessBuilder {
-        TestHarnessBuilder::with_blockchain(blockchain)
+    /// Initializes a testkit builder with a blockchain.
+    pub fn with_blockchain(blockchain: Blockchain) -> TestKitBuilder {
+        TestKitBuilder::with_blockchain(blockchain)
     }
 
-    /// Initializes a harness with a blockchain that hosts a given set of services.
+    /// Initializes a testkit with a blockchain that hosts a given set of services.
     /// The blockchain uses `MemoryDB` for storage.
-    pub fn with_services<I>(services: I) -> TestHarnessBuilder
+    pub fn with_services<I>(services: I) -> TestKitBuilder
     where
         I: IntoIterator<Item = Box<Service>>,
     {
-        TestHarnessBuilder::with_services(services)
+        TestKitBuilder::with_services(services)
     }
 
     fn assemble(mut blockchain: Blockchain, network: TestNetwork) -> Self {
@@ -369,7 +369,7 @@ impl TestHarness {
             ApiSender::new(channel.api_requests.0.clone()),
         );
 
-        TestHarness {
+        TestKit {
             blockchain,
             channel,
             api_context,
@@ -379,7 +379,7 @@ impl TestHarness {
         }
     }
 
-    /// Returns the node state of the harness.
+    /// Returns the node state of the testkit.
     pub fn state(&self) -> &TestNodeState {
         &self.service_context
     }
@@ -394,9 +394,9 @@ impl TestHarness {
         self.api_context.mount_private_api()
     }
 
-    /// Creates an instance of `HarnessApi` to test the API provided by services.
-    pub fn api(&self) -> HarnessApi {
-        HarnessApi::new(self)
+    /// Creates an instance of `TestKitApi` to test the API provided by services.
+    pub fn api(&self) -> TestKitApi {
+        TestKitApi::new(self)
     }
 
     /// Polls the *existing* events from the event loop until exhaustion. Does not wait
@@ -543,7 +543,7 @@ impl TestHarness {
         self.do_update();
     }
 
-    // Update Harness state after commit block.
+    // Update TeskKit state after commit block.
     fn do_update(&mut self) {
         // Update context
         self.service_context.update_node(self.network.us.clone());
@@ -614,31 +614,31 @@ impl ApiKind {
     }
 }
 
-/// API encapsulation for the test harness. Allows to execute and synchronously retrieve results
+/// API encapsulation for the testkit. Allows to execute and synchronously retrieve results
 /// for REST-ful endpoints of services.
-pub struct HarnessApi {
+pub struct TestKitApi {
     public_mount: Mount,
     private_mount: Mount,
     api_sender: ApiSender,
 }
 
-impl HarnessApi {
+impl TestKitApi {
     /// Creates a new instance of Api.
-    fn new(harness: &TestHarness) -> Self {
+    fn new(testkit: &TestKit) -> Self {
         use std::sync::Arc;
         use exonum::api::{public, Api};
 
-        let blockchain = &harness.blockchain;
+        let blockchain = &testkit.blockchain;
 
-        HarnessApi {
+        TestKitApi {
             public_mount: {
                 let mut mount = Mount::new();
 
-                let service_mount = harness.public_api_mount();
+                let service_mount = testkit.public_api_mount();
                 mount.mount("api/services", service_mount);
 
                 let mut router = Router::new();
-                let pool = Arc::clone(&harness.mempool);
+                let pool = Arc::clone(&testkit.mempool);
                 let system_api = public::SystemApi::new(pool, blockchain.clone());
                 system_api.wire(&mut router);
                 mount.mount("api/system", router);
@@ -654,13 +654,13 @@ impl HarnessApi {
             private_mount: {
                 let mut mount = Mount::new();
 
-                let service_mount = harness.private_api_mount();
+                let service_mount = testkit.private_api_mount();
                 mount.mount("api/services", service_mount);
 
                 mount
             },
 
-            api_sender: harness.api_context.node_channel().clone(),
+            api_sender: testkit.api_context.node_channel().clone(),
         }
     }
 
@@ -723,7 +723,7 @@ impl HarnessApi {
     where
         for<'de> D: Deserialize<'de>,
     {
-        HarnessApi::get_internal(
+        TestKitApi::get_internal(
             &self.public_mount,
             &format!("{}/{}", kind.into_prefix(), endpoint),
             false,
@@ -735,7 +735,7 @@ impl HarnessApi {
     where
         for<'de> D: Deserialize<'de>,
     {
-        HarnessApi::get_internal(
+        TestKitApi::get_internal(
             &self.public_mount,
             &format!("{}/{}", kind.into_prefix(), endpoint),
             true,
@@ -773,7 +773,7 @@ impl HarnessApi {
         T: Transaction + Serialize,
         for<'de> D: Deserialize<'de>,
     {
-        HarnessApi::post_internal(
+        TestKitApi::post_internal(
             &self.public_mount,
             &format!("{}/{}", kind.into_prefix(), endpoint),
             transaction,
@@ -789,7 +789,7 @@ impl HarnessApi {
         T: Transaction + Serialize,
         for<'de> D: Deserialize<'de>,
     {
-        HarnessApi::post_internal(
+        TestKitApi::post_internal(
             &self.private_mount,
             &format!("{}/{}", kind.into_prefix(), endpoint),
             transaction,

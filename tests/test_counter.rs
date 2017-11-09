@@ -10,7 +10,7 @@ use exonum::blockchain::Service;
 use exonum::crypto::{self, HexValue, PublicKey};
 use exonum::helpers::Height;
 use exonum::messages::Message;
-use exonum_testkit::{TestHarness, HarnessApi, ApiKind, ComparableSnapshot};
+use exonum_testkit::{TestKit, TestKitApi, ApiKind, ComparableSnapshot};
 
 mod counter {
     //! Sample counter service.
@@ -253,14 +253,14 @@ mod counter {
 
 use counter::{ADMIN_KEY, CounterService, TxIncrement, TxReset, TransactionResponse, CounterSchema};
 
-fn init_harness() -> (TestHarness, HarnessApi) {
+fn init_testkit() -> (TestKit, TestKitApi) {
     let services: Vec<Box<Service>> = vec![Box::new(CounterService)];
-    let harness = TestHarness::with_services(services).create();
-    let api = harness.api();
-    (harness, api)
+    let testkit = TestKit::with_services(services).create();
+    let api = testkit.api();
+    (testkit, api)
 }
 
-fn inc_count(api: &HarnessApi, by: u64) -> TxIncrement {
+fn inc_count(api: &TestKitApi, by: u64) -> TxIncrement {
     let (pubkey, key) = crypto::gen_keypair();
     // Create a presigned transaction
     let tx = TxIncrement::new(&pubkey, by, &key);
@@ -272,9 +272,9 @@ fn inc_count(api: &HarnessApi, by: u64) -> TxIncrement {
 
 #[test]
 fn test_inc_count() {
-    let (mut harness, api) = init_harness();
+    let (mut testkit, api) = init_testkit();
     inc_count(&api, 5);
-    harness.create_block();
+    testkit.create_block();
 
     // Check that the user indeed is persisted by the service
     let counter: u64 = api.get(ApiKind::Service("counter"), "count");
@@ -283,7 +283,7 @@ fn test_inc_count() {
 
 #[test]
 fn test_inc_count_with_multiple_transactions() {
-    let (mut harness, api) = init_harness();
+    let (mut testkit, api) = init_testkit();
 
     for _ in 0..100 {
         inc_count(&api, 1);
@@ -291,41 +291,41 @@ fn test_inc_count_with_multiple_transactions() {
         inc_count(&api, 3);
         inc_count(&api, 4);
 
-        harness.create_block();
+        testkit.create_block();
     }
 
-    assert_eq!(harness.height(), Height(101));
+    assert_eq!(testkit.height(), Height(101));
     let counter: u64 = api.get(ApiKind::Service("counter"), "count");
     assert_eq!(counter, 1_000);
 }
 
 #[test]
 fn test_inc_count_with_manual_tx_control() {
-    let (mut harness, api) = init_harness();
+    let (mut testkit, api) = init_testkit();
     let tx_a = inc_count(&api, 5);
     let tx_b = inc_count(&api, 3);
 
     // Empty block
-    harness.create_block_with_transactions(&[]);
+    testkit.create_block_with_transactions(&[]);
     let counter: u64 = api.get(ApiKind::Service("counter"), "count");
     assert_eq!(counter, 0);
 
-    harness.create_block_with_transactions(&[tx_b.hash()]);
+    testkit.create_block_with_transactions(&[tx_b.hash()]);
     let counter: u64 = api.get(ApiKind::Service("counter"), "count");
     assert_eq!(counter, 3);
 
-    harness.create_block_with_transactions(&[tx_a.hash()]);
+    testkit.create_block_with_transactions(&[tx_a.hash()]);
     let counter: u64 = api.get(ApiKind::Service("counter"), "count");
     assert_eq!(counter, 8);
 }
 
 #[test]
 fn test_private_api() {
-    let (mut harness, api) = init_harness();
+    let (mut testkit, api) = init_testkit();
     inc_count(&api, 5);
     inc_count(&api, 3);
 
-    harness.create_block();
+    testkit.create_block();
     let counter: u64 = api.get(ApiKind::Service("counter"), "count");
     assert_eq!(counter, 8);
 
@@ -338,21 +338,21 @@ fn test_private_api() {
     let tx_info: TransactionResponse = api.post_private(ApiKind::Service("counter"), "reset", &tx);
     assert_eq!(tx_info.tx_hash, tx.hash());
 
-    harness.create_block();
+    testkit.create_block();
     let counter: u64 = api.get(ApiKind::Service("counter"), "count");
     assert_eq!(counter, 0);
 }
 
 #[test]
 fn test_probe() {
-    let (mut harness, api) = init_harness();
+    let (mut testkit, api) = init_testkit();
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
         TxIncrement::new(&pubkey, 5, &key)
     };
 
-    let snapshot = harness.probe(tx.clone());
+    let snapshot = testkit.probe(tx.clone());
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(5));
     // Verify that the patch has not been applied to the blockchain
@@ -364,31 +364,31 @@ fn test_probe() {
         TxIncrement::new(&pubkey, 3, &key)
     };
 
-    let snapshot = harness.probe_all(vec![Box::new(tx.clone()), Box::new(other_tx.clone())]);
+    let snapshot = testkit.probe_all(vec![Box::new(tx.clone()), Box::new(other_tx.clone())]);
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(8));
 
     // Posting a transaction is not enough to change the blockchain!
     let _: TransactionResponse = api.post(ApiKind::Service("counter"), "count", &tx);
-    let snapshot = harness.probe(other_tx.clone());
+    let snapshot = testkit.probe(other_tx.clone());
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(3));
 
-    harness.create_block();
-    let snapshot = harness.probe(other_tx.clone());
+    testkit.create_block();
+    let snapshot = testkit.probe(other_tx.clone());
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(8));
 }
 
 #[test]
 fn test_duplicate_tx() {
-    let (mut harness, api) = init_harness();
+    let (mut testkit, api) = init_testkit();
 
     let tx = inc_count(&api, 5);
-    harness.create_block();
+    testkit.create_block();
     let _: TransactionResponse = api.post(ApiKind::Service("counter"), "count", &tx);
     let _: TransactionResponse = api.post(ApiKind::Service("counter"), "count", &tx);
-    harness.create_block();
+    testkit.create_block();
     let counter: u64 = api.get(ApiKind::Service("counter"), "count");
     assert_eq!(counter, 5);
 }
@@ -396,19 +396,19 @@ fn test_duplicate_tx() {
 #[test]
 #[should_panic(expected = "Duplicate transactions in probe")]
 fn test_probe_duplicate_tx_panic() {
-    let (harness, _) = init_harness();
+    let (testkit, _) = init_testkit();
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
         TxIncrement::new(&pubkey, 6, &key)
     };
-    let snapshot = harness.probe_all(vec![Box::new(tx.clone()), Box::new(tx.clone())]);
+    let snapshot = testkit.probe_all(vec![Box::new(tx.clone()), Box::new(tx.clone())]);
     drop(snapshot);
 }
 
 #[test]
 fn test_probe_advanced() {
-    let (mut harness, api) = init_harness();
+    let (mut testkit, api) = init_testkit();
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -427,49 +427,49 @@ fn test_probe_advanced() {
         TxReset::new(&pubkey, &key)
     };
 
-    let snapshot = harness.probe(tx.clone());
+    let snapshot = testkit.probe(tx.clone());
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(6));
     // Check that data is not persisted
-    let snapshot = harness.snapshot();
+    let snapshot = testkit.snapshot();
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), None);
 
     // Check dependency of the resulting snapshot on tx ordering
-    let snapshot = harness.probe_all(vec![Box::new(tx.clone()), Box::new(admin_tx.clone())]);
+    let snapshot = testkit.probe_all(vec![Box::new(tx.clone()), Box::new(admin_tx.clone())]);
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(0));
-    let snapshot = harness.probe_all(vec![Box::new(admin_tx.clone()), Box::new(tx.clone())]);
+    let snapshot = testkit.probe_all(vec![Box::new(admin_tx.clone()), Box::new(tx.clone())]);
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(6));
     // Check that data is (still) not persisted
-    let snapshot = harness.snapshot();
+    let snapshot = testkit.snapshot();
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), None);
 
     api.send(other_tx);
-    harness.create_block();
-    let snapshot = harness.snapshot();
+    testkit.create_block();
+    let snapshot = testkit.snapshot();
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(10));
 
-    let snapshot = harness.probe(tx.clone());
+    let snapshot = testkit.probe(tx.clone());
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(16));
     // Check that data is not persisted
-    let snapshot = harness.snapshot();
+    let snapshot = testkit.snapshot();
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(10));
 
     // Check dependency of the resulting snapshot on tx ordering
-    let snapshot = harness.probe_all(vec![Box::new(tx.clone()), Box::new(admin_tx.clone())]);
+    let snapshot = testkit.probe_all(vec![Box::new(tx.clone()), Box::new(admin_tx.clone())]);
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(0));
-    let snapshot = harness.probe_all(vec![Box::new(admin_tx.clone()), Box::new(tx.clone())]);
+    let snapshot = testkit.probe_all(vec![Box::new(admin_tx.clone()), Box::new(tx.clone())]);
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(6));
     // Check that data is (still) not persisted
-    let snapshot = harness.snapshot();
+    let snapshot = testkit.snapshot();
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(10));
 }
@@ -478,52 +478,52 @@ fn test_probe_advanced() {
 fn test_probe_duplicate_tx() {
     //! Checks that committed transactions do not change the blockchain state when probed.
 
-    let (mut harness, api) = init_harness();
+    let (mut testkit, api) = init_testkit();
     let tx = inc_count(&api, 5);
 
-    let snapshot = harness.probe(tx.clone());
+    let snapshot = testkit.probe(tx.clone());
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(5));
 
-    harness.create_block();
+    testkit.create_block();
 
-    let snapshot = harness.probe(tx.clone());
+    let snapshot = testkit.probe(tx.clone());
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(5));
 
     // Check the mixed case, when some probed transactions are committed and some are not
     let other_tx = inc_count(&api, 7);
-    let snapshot = harness.probe_all(vec![Box::new(tx), Box::new(other_tx)]);
+    let snapshot = testkit.probe_all(vec![Box::new(tx), Box::new(other_tx)]);
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(12));
 }
 
 #[test]
 fn test_snapshot_comparison() {
-    let (mut harness, api) = init_harness();
+    let (mut testkit, api) = init_testkit();
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
         TxIncrement::new(&pubkey, 5, &key)
     };
-    harness
+    testkit
         .probe(tx.clone())
-        .compare(harness.snapshot())
+        .compare(testkit.snapshot())
         .map(CounterSchema::new)
         .map(CounterSchema::count)
         .assert_before("Counter does not exist", Option::is_none)
         .assert_after("Counter has been set", |&c| c == Some(5));
 
     api.send(tx);
-    harness.create_block();
+    testkit.create_block();
 
     let other_tx = {
         let (pubkey, key) = crypto::gen_keypair();
         TxIncrement::new(&pubkey, 3, &key)
     };
-    harness
+    testkit
         .probe(other_tx.clone())
-        .compare(harness.snapshot())
+        .compare(testkit.snapshot())
         .map(CounterSchema::new)
         .map(CounterSchema::count)
         .map(|&c| c.unwrap())
@@ -533,7 +533,7 @@ fn test_snapshot_comparison() {
 #[test]
 #[should_panic(expected = "Counter has increased")]
 fn test_snapshot_comparison_panic() {
-    let (mut harness, api) = init_harness();
+    let (mut testkit, api) = init_testkit();
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -541,12 +541,12 @@ fn test_snapshot_comparison_panic() {
     };
 
     api.send(tx.clone());
-    harness.create_block();
+    testkit.create_block();
 
     // The assertion fails because the transaction is already committed by now
-    harness
+    testkit
         .probe(tx.clone())
-        .compare(harness.snapshot())
+        .compare(testkit.snapshot())
         .map(CounterSchema::new)
         .map(CounterSchema::count)
         .map(|&c| c.unwrap())
@@ -558,7 +558,7 @@ fn test_explorer_blocks() {
     use exonum::blockchain::Block;
     use exonum::helpers::Height;
 
-    let (mut harness, api) = init_harness();
+    let (mut testkit, api) = init_testkit();
 
     let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10");
     assert_eq!(blocks.len(), 1);
@@ -566,7 +566,7 @@ fn test_explorer_blocks() {
     assert_eq!(*blocks[0].prev_hash(), crypto::Hash::default());
 
     // Check empty block creation
-    harness.create_block();
+    testkit.create_block();
 
     let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10");
     assert_eq!(blocks.len(), 2);
@@ -586,8 +586,8 @@ fn test_explorer_blocks() {
         let (pubkey, key) = crypto::gen_keypair();
         TxIncrement::new(&pubkey, 5, &key)
     };
-    harness.api().send(tx.clone());
-    harness.create_block(); // height == 2
+    testkit.api().send(tx.clone());
+    testkit.create_block(); // height == 2
 
     let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10");
     assert_eq!(blocks.len(), 3);
@@ -603,8 +603,8 @@ fn test_explorer_blocks() {
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(2));
 
-    harness.create_block(); // height == 3
-    harness.create_block(); // height == 4
+    testkit.create_block(); // height == 3
+    testkit.create_block(); // height == 4
 
     let blocks: Vec<Block> = api.get(
         ApiKind::Explorer,
@@ -617,8 +617,8 @@ fn test_explorer_blocks() {
         let (pubkey, key) = crypto::gen_keypair();
         TxIncrement::new(&pubkey, 5, &key)
     };
-    harness.api().send(tx.clone());
-    harness.create_block(); // height == 5
+    testkit.api().send(tx.clone());
+    testkit.create_block(); // height == 5
 
     // Check block filtering
     let blocks: Vec<Block> = api.get(
@@ -651,10 +651,10 @@ fn test_explorer_single_block() {
     use exonum::helpers::Height;
 
     let services: Vec<Box<Service>> = vec![Box::new(CounterService)];
-    let mut harness = TestHarness::with_services(services).validators(4).create();
-    let api = harness.api();
+    let mut testkit = TestKit::with_services(services).validators(4).create();
+    let api = testkit.api();
 
-    assert_eq!(harness.state().majority_count(), 3);
+    assert_eq!(testkit.state().majority_count(), 3);
 
     let info: BlockInfo = api.get(ApiKind::Explorer, "v1/blocks/0");
     assert_eq!(info.block.height(), Height(0));
@@ -665,8 +665,8 @@ fn test_explorer_single_block() {
         let (pubkey, key) = crypto::gen_keypair();
         TxIncrement::new(&pubkey, 5, &key)
     };
-    harness.api().send(tx.clone());
-    harness.create_block(); // height == 1
+    testkit.api().send(tx.clone());
+    testkit.create_block(); // height == 1
 
     let info: BlockInfo = api.get(ApiKind::Explorer, "v1/blocks/1");
     assert_eq!(info.block.height(), Height(1));
@@ -678,7 +678,7 @@ fn test_explorer_single_block() {
     for precommit in &info.precommits {
         assert_eq!(precommit.height(), Height(1));
         assert_eq!(*precommit.block_hash(), info.block.hash());
-        let pk = harness
+        let pk = testkit
             .state()
             .consensus_public_key_of(precommit.validator())
             .expect("Cannot find validator id");
@@ -686,7 +686,7 @@ fn test_explorer_single_block() {
         validators.insert(precommit.validator());
     }
 
-    assert!(validators.len() >= harness.state().majority_count());
+    assert!(validators.len() >= testkit.state().majority_count());
 }
 
 #[test]
@@ -711,8 +711,8 @@ fn test_system_transaction() {
 
 
     let services: Vec<Box<Service>> = vec![Box::new(CounterService)];
-    let mut harness = TestHarness::with_services(services).validators(4).create();
-    let api = harness.api();
+    let mut testkit = TestKit::with_services(services).validators(4).create();
+    let api = testkit.api();
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -729,7 +729,7 @@ fn test_system_transaction() {
     }
 
     api.send(tx.clone());
-    harness.poll_events();
+    testkit.poll_events();
 
     let info: TxInfo = api.get(
         ApiKind::System,
@@ -741,7 +741,7 @@ fn test_system_transaction() {
         panic!("Transaction should be in the mempool");
     }
 
-    harness.create_block();
+    testkit.create_block();
     let info: TxInfo = api.get(
         ApiKind::System,
         &format!("v1/transactions/{}", &tx.hash().to_string()),
