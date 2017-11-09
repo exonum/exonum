@@ -16,8 +16,8 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock, RwLockReadGuard};
 
 use exonum::blockchain::{ApiContext, Blockchain, ConsensusConfig, GenesisConfig,
-                         Schema as CoreSchema, Service, ServiceContext, StoredConfiguration,
-                         Transaction, ValidatorKeys};
+                         Schema as CoreSchema, Service, ServiceContext, ServiceContextMut,
+                         StoredConfiguration, Transaction, ValidatorKeys};
 use exonum::crypto;
 use exonum::helpers::{Height, Round, ValidatorId};
 use exonum::messages::{Message, Precommit, Propose};
@@ -193,10 +193,8 @@ impl TestNodeState {
     }
 
     /// Updates the snapshot of the storage.
-    fn update(&mut self, node: TestNode, snapshot: Box<Snapshot>) {
+    fn update_node(&mut self, node: TestNode) {
         self.node = node;
-        self.actual_configuration = CoreSchema::new(&snapshot).actual_configuration();
-        self.snapshot = snapshot;
     }
 
     /// Returns sufficient number of validators for the Byzantine Fault Toulerance consensus.
@@ -264,6 +262,14 @@ impl<'a> ServiceContext for TestNodeState {
 
     fn api_sender(&self) -> &ApiSender {
         &self.api_sender
+    }
+}
+
+impl<'a> ServiceContextMut for TestNodeState {
+    fn update(&mut self, blockchain: &Blockchain) {
+        let snapshot = blockchain.snapshot();
+        self.actual_configuration = CoreSchema::new(&snapshot).actual_configuration();
+        self.snapshot = snapshot;
     }
 }
 
@@ -526,35 +532,21 @@ impl TestHarness {
             .map(|v| v.create_precommit(&propose, &block_hash))
             .collect();
 
-        let patch = {
-            let mut fork = {
-                let mut fork = self.blockchain.fork();
-                fork.merge(patch.clone()); // FIXME: avoid cloning here
-                fork
-            };
-            {
-                let mut schema = CoreSchema::new(&mut fork);
-                for precommit in precommits {
-                    schema.precommits_mut(&block_hash).push(precommit.clone());
-                }
-            }
-            fork.into_patch()
-        };
-        self.blockchain.merge(patch).unwrap();
+        self.blockchain
+            .commit(
+                &mut self.service_context,
+                &patch,
+                block_hash,
+                precommits.iter(),
+            )
+            .unwrap();
         self.do_update();
     }
 
     // Update Harness state after commit block.
     fn do_update(&mut self) {
         // Update context
-        self.service_context.update(
-            self.network.us.clone(),
-            self.blockchain.snapshot(),
-        );
-        // Invokes handle_commit event
-        for service in self.blockchain.service_map().values() {
-            service.handle_commit(&self.service_context);
-        }
+        self.service_context.update_node(self.network.us.clone());
         self.poll_events();
     }
 
