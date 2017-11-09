@@ -141,10 +141,7 @@ where
         let block = self.blocks().get(&block_hash).unwrap();
         let precommits_table = self.precommits(&block_hash);
         let precommits = precommits_table.iter().collect();
-        let res = BlockProof {
-            block: block,
-            precommits: precommits,
-        };
+        let res = BlockProof { block, precommits };
         Some(res)
     }
 
@@ -356,7 +353,7 @@ impl<'a> Schema<&'a mut Fork> {
 
     /// Adds a new configuration to the blockchain, which will become an actual at
     /// the `actual_from` height in `config_data`.
-    pub fn commit_configuration(&mut self, config_data: &StoredConfiguration) {
+    pub fn commit_configuration(&mut self, config_data: StoredConfiguration) {
         let actual_from = config_data.actual_from;
         if let Some(last_cfg) = self.configs_actual_from().last() {
             if last_cfg.cfg_hash() != &config_data.previous_cfg_hash {
@@ -379,15 +376,16 @@ impl<'a> Schema<&'a mut Fork> {
             }
         }
 
+        info!(
+            "Scheduled the following configuration for acceptance: {:?}",
+            &config_data
+        );
+
         let cfg_hash = config_data.hash();
-        self.configs_mut().put(&cfg_hash, config_data.clone());
+        self.configs_mut().put(&cfg_hash, config_data);
 
         let cfg_ref = ConfigReference::new(actual_from, &cfg_hash);
         self.configs_actual_from_mut().push(cfg_ref);
-        info!(
-            "Scheduled the following configuration for acceptance: {:?}",
-            config_data
-        );
         // TODO: clear storages
     }
 }

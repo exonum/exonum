@@ -92,7 +92,7 @@ pub trait WriteBufferWrapper {
 
 impl WriteBufferWrapper for MessageWriter {
     fn write<'a, T: Field<'a>>(&'a mut self, from: Offset, to: Offset, val: T) {
-        self.write(&val, from, to)
+        self.write(val, from, to)
     }
 }
 

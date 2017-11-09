@@ -78,7 +78,7 @@ fn test_check_leader() {
 
     // option: with transaction
     let tx = gen_timestamping_tx();
-    sandbox.recv(&tx.clone());
+    sandbox.recv(&tx);
 
     // TODO would be nice to check also for RequestPeers message which will appear
     // after 10 time units (at 11th round)
@@ -562,7 +562,7 @@ fn response_to_request_txs() {
     let sandbox = timestamping_sandbox();
 
     let tx = gen_timestamping_tx();
-    sandbox.recv(&tx.clone());
+    sandbox.recv(&tx);
 
     sandbox.recv(&TransactionsRequest::new(
         &sandbox.p(VALIDATOR_1),
@@ -596,7 +596,7 @@ fn responde_to_request_tx_propose_prevotes_precommits() {
 
     // option: with transaction
     let tx = gen_timestamping_tx();
-    sandbox.recv(&tx.clone());
+    sandbox.recv(&tx);
 
     sandbox.add_time(Duration::from_millis(sandbox.propose_timeout()));
 
@@ -628,7 +628,7 @@ fn responde_to_request_tx_propose_prevotes_precommits() {
     // ok, we are leader
 
     sandbox.broadcast(&propose);
-    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose.clone()));
+    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
 
     {
         // respond to RequestPropose
@@ -744,7 +744,7 @@ fn responde_to_request_tx_propose_prevotes_precommits() {
         // here state.height() is 1 already, so RequestPrevotes with height zero is ignored
         //        sandbox.send(
         //            sandbox.a(VALIDATOR_3),
-        //            make_prevote_from_propose(&sandbox, &propose.clone())
+        //            make_prevote_from_propose(&sandbox, &propose)
         //        );
     }
 
@@ -762,7 +762,7 @@ fn not_request_txs_when_get_tx_and_propose() {
 
     // option: with transaction
     let tx = gen_timestamping_tx();
-    sandbox.recv(&tx.clone());
+    sandbox.recv(&tx);
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
@@ -770,7 +770,7 @@ fn not_request_txs_when_get_tx_and_propose() {
         .build();
 
     sandbox.recv(&propose);
-    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose.clone()));
+    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
 }
 
@@ -791,7 +791,7 @@ fn handle_tx_verify_signature() {
 
     let data = vec![0; 64]; //todo find way how to get rid of hardcoded value
     let tx = TimestampTx::new(&public_key1, &data, &secret_key2);
-    sandbox.recv(&tx.clone());
+    sandbox.recv(&tx);
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
@@ -1012,7 +1012,7 @@ fn lock_to_past_round_broadcast_prevote() {
     let block = BlockBuilder::new(&sandbox).build();
 
     sandbox.recv(&propose);
-    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose.clone()));
+    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
 
     sandbox.add_time(Duration::from_millis(
         sandbox.round_timeout() - sandbox.propose_timeout(),
@@ -1192,7 +1192,7 @@ fn lock_to_propose_and_send_prevote() {
     sandbox.broadcast(&make_prevote_from_propose(&sandbox, &empty_propose.clone()));
 
     let tx = gen_timestamping_tx();
-    sandbox.recv(&tx.clone());
+    sandbox.recv(&tx);
 
 
     let propose = ProposeBuilder::new(&sandbox)
@@ -1288,7 +1288,7 @@ fn lock_remove_request_prevotes() {
         .build();
 
     sandbox.recv(&propose);
-    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose.clone()));
+    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
 
     sandbox.recv(&Prevote::new(
         VALIDATOR_2,
@@ -1396,7 +1396,7 @@ fn handle_precommit_different_block_hash() {
         &make_request_prevote_from_precommit(&sandbox, &precommit_1),
     );
     sandbox.recv(&propose);
-    sandbox.recv(&tx.clone());
+    sandbox.recv(&tx);
     sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
 
     sandbox.recv(&precommit_2);
@@ -1474,8 +1474,8 @@ fn handle_precommit_positive_scenario_commit() {
         &make_request_prevote_from_precommit(&sandbox, &precommit_2),
     );
     sandbox.recv(&propose);
-    sandbox.recv(&tx.clone());
-    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose.clone()));
+    sandbox.recv(&tx);
+    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
 
     // Here covered negative scenario for requirement: commit only If has +2/3 precommit
     sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
@@ -1576,7 +1576,7 @@ fn lock_not_send_prevotes_after_commit() {
     {
         // this block will make lock, and, hence, one additional precommit
         sandbox.recv(&propose);
-        sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose.clone()));
+        sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
 
         sandbox.recv(&Prevote::new(
             VALIDATOR_2,
@@ -1784,7 +1784,7 @@ fn do_not_commit_if_tx_is_unknown() {
 
     sandbox.recv(&propose);
     // !! if this tx would be received, commit would occur and last assert will require height one
-    //    sandbox.recv(&tx.clone());
+    //    sandbox.recv(&tx);
 
     sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
     // Here consensus.rs->has_majority_precommits()->//Commit is achieved
@@ -1890,7 +1890,7 @@ fn commit_using_unknown_propose_with_precommits() {
     sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
 
     // !! if this tx would be received, commit would occur and last assert will require height one
-    sandbox.recv(&tx.clone());
+    sandbox.recv(&tx);
     sandbox.recv(&propose);
     sandbox.broadcast(&Prevote::new(
         VALIDATOR_0,
@@ -2007,7 +2007,7 @@ fn has_full_propose_wrong_state_hash() {
     //        .with_duration_since_sandbox_time(sandbox.propose_timeout())
     //        .build();
     // !! if this tx would be received, commit would occur and last assert will require height one
-    sandbox.recv(&tx.clone());
+    sandbox.recv(&tx);
     sandbox.recv(&propose);
     sandbox.broadcast(&Prevote::new(
         VALIDATOR_0,
@@ -2325,8 +2325,8 @@ fn commit_as_leader_send_propose_round_timeout() {
     {
         // get propose and appropriate transaction
         sandbox.recv(&propose);
-        sandbox.recv(&tx.clone());
-        sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose.clone()));
+        sandbox.recv(&tx);
+        sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
     }
     // verify that transaction is received
     assert_eq!(vec![tx.hash()], sandbox.transactions_hashes());
@@ -2347,7 +2347,7 @@ fn commit_as_leader_send_propose_round_timeout() {
 
     sandbox.add_time(Duration::from_millis(sandbox.propose_timeout()));
     sandbox.broadcast(&propose);
-    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose.clone()));
+    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
     sandbox.add_time(Duration::from_millis(
         sandbox.round_timeout() - sandbox.propose_timeout(),
     ));
@@ -2387,9 +2387,9 @@ fn handle_tx_has_full_propose() {
     );
 
     // !! here handle_tx()->has_full_propose() is called => broadcast(Prevote) is observed
-    sandbox.recv(&tx.clone());
+    sandbox.recv(&tx);
 
-    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose.clone()));
+    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
 
     sandbox.add_time(Duration::from_millis(0));
 }
@@ -2408,7 +2408,7 @@ fn broadcast_prevote_with_tx_positive() {
 
     // option: with transaction
     let tx = gen_timestamping_tx();
-    sandbox.recv(&tx.clone());
+    sandbox.recv(&tx);
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
@@ -2450,7 +2450,7 @@ fn handle_tx_ignore_existing_tx_in_blockchain() {
     assert!(sandbox.is_leader());
 
 
-    sandbox.recv(&tx.clone());
+    sandbox.recv(&tx);
 
     sandbox.add_time(Duration::from_millis(sandbox.propose_timeout()));
     let propose = ProposeBuilder::new(&sandbox)
@@ -2459,7 +2459,7 @@ fn handle_tx_ignore_existing_tx_in_blockchain() {
         .with_tx_hashes(&[])
         .build();
     sandbox.broadcast(&propose);
-    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose.clone()));
+    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
     sandbox.add_time(Duration::from_millis(0));
 }
 
@@ -2539,8 +2539,8 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
         &make_request_prevote_from_precommit(&sandbox, &precommit_2),
     );
     sandbox.recv(&propose);
-    sandbox.recv(&tx.clone());
-    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose.clone()));
+    sandbox.recv(&tx);
+    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
 
     sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
     // Here consensus.rs->has_majority_precommits()->//Commit is achieved
@@ -2596,7 +2596,7 @@ fn test_send_propose_and_prevote_when_we_are_leader() {
     let propose = ProposeBuilder::new(&sandbox).build();
 
     sandbox.broadcast(&propose);
-    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose.clone()));
+    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
     sandbox.add_time(Duration::from_millis(0));
 }
 

@@ -115,7 +115,7 @@ where
     /// let mut index = KeySetIndex::new(name, &mut fork);
     /// assert!(!index.contains(&1));
     ///
-    /// index.insert(&1);
+    /// index.insert(1);
     /// assert!(index.contains(&1));
     /// ```
     pub fn contains(&self, item: &K) -> bool {
@@ -180,11 +180,12 @@ where
     /// let mut fork = db.fork();
     /// let mut index = KeySetIndex::new(name, &mut fork);
     ///
-    /// index.insert(&1);
+    /// index.insert(1);
     /// assert!(index.contains(&1));
     /// ```
-    pub fn insert(&mut self, item: &K) {
-        self.base.put(item, ())
+    #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
+    pub fn insert(&mut self, item: K) {
+        self.base.put(&item, ())
     }
 
     /// Removes a value from the set.
@@ -199,7 +200,7 @@ where
     /// let mut fork = db.fork();
     /// let mut index = KeySetIndex::new(name, &mut fork);
     ///
-    /// index.insert(&1);
+    /// index.insert(1);
     /// assert!(index.contains(&1));
     ///
     /// index.remove(&1);
@@ -226,7 +227,7 @@ where
     /// let mut fork = db.fork();
     /// let mut index = KeySetIndex::new(name, &mut fork);
     ///
-    /// index.insert(&1);
+    /// index.insert(1);
     /// assert!(index.contains(&1));
     ///
     /// index.clear();

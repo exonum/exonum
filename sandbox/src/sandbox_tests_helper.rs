@@ -327,7 +327,7 @@ where
     let hashes = {
         let mut hashes = Vec::new();
         for tx in txs.iter() {
-            sandbox.recv(&tx.clone());
+            sandbox.recv(tx);
             hashes.push(tx.hash());
         }
         hashes
@@ -602,7 +602,7 @@ pub fn receive_valid_propose_with_transactions(
         transactions,
         sandbox.s(sandbox.current_leader()),
     );
-    sandbox.recv(&propose.clone());
+    sandbox.recv(&propose);
     propose.clone()
 }
 
