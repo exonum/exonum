@@ -28,7 +28,7 @@ use crypto::{Hash, PublicKey, SecretKey};
 use storage::{Fork, Snapshot};
 use messages::{Message, RawTransaction};
 use encoding::Error as MessageError;
-use node::{ApiSender, Node, State};
+use node::{ApiSender, Node, State, TransactionSend};
 use blockchain::{Blockchain, ConsensusConfig, ValidatorKeys};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 
@@ -177,7 +177,7 @@ pub trait ServiceContext {
     fn actual_service_config(&self, service: &Service) -> &Value;
 
     /// Returns reference to the transaction sender.
-    fn api_sender(&self) -> &ApiSender;
+    fn transaction_sender(&self) -> &TransactionSend;
 }
 
 /// Mutable version of the `ServiceContext` for internal purpose only.

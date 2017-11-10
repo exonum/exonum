@@ -23,7 +23,7 @@ use messages::{BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit
                PrevotesRequest, Propose, ProposeRequest, RawTransaction, TransactionsRequest};
 use helpers::{Height, Round, ValidatorId};
 use storage::{Patch, Snapshot};
-use node::{ApiSender, NodeHandler, RequestData, SystemStateProvider};
+use node::{ApiSender, NodeHandler, RequestData, SystemStateProvider, TransactionSend};
 use node::state::State;
 
 struct NodeHandlerContext<'a, 'b> {
@@ -90,7 +90,7 @@ impl<'a, 'b> ServiceContext for NodeHandlerContext<'a, 'b> {
         self.state.services_config().get(name).unwrap()
     }
 
-    fn api_sender(&self) -> &ApiSender {
+    fn transaction_sender(&self) -> &TransactionSend {
         &self.api_sender
     }
 }

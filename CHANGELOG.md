@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Changed
 - `ServiceContext` becomed trait. This change may breaks the code that uses it. (#366)
 - `ValidatorState` in the `ServiceContext` replaced by the `ValidatorId`. (#366)
-- `add_transaction` in the `ServiceContext` replaced by the `ApiSender`. (#366)
+- `add_transaction` in the `ServiceContext` replaced by the `transaction_sender` which implements the `TransactionSend` trait. (#366)
 
 ### Fixed
 - Fixed mistake in description of the height getter in the `ServiceContext`. (#366)
