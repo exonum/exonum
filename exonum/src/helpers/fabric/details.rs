@@ -25,7 +25,7 @@ use std::collections::BTreeMap;
 use blockchain::GenesisConfig;
 use helpers::generate_testnet_config;
 use helpers::config::ConfigFile;
-use node::NodeConfig;
+use node::{NodeConfig, NodeApiConfig};
 use storage::Database;
 use crypto;
 
@@ -132,12 +132,11 @@ impl Command for Run {
             "cant load node_config",
         );
         // Override api options
-        if let Some(addr) = public_addr {
-            config.api.public_api_address = Some(addr);
-        }
-        if let Some(addr) = private_addr {
-            config.api.private_api_address = Some(addr);
-        }
+
+        config.api.public_api_address = public_addr;
+
+        config.api.private_api_address = private_addr;
+
         new_context.set("node_config", config);
 
         Feedback::RunNode(new_context)
@@ -326,7 +325,7 @@ impl Finalize {
     fn reduce_configs(
         public_configs: Vec<SharedConfig>,
         our_config: &NodePrivateConfig,
-    ) -> (CommonConfigTemplate, Vec<NodePublicConfig>, NodePublicConfig) {
+    ) -> (CommonConfigTemplate, Vec<NodePublicConfig>, Option<NodePublicConfig>) {
         let mut map = BTreeMap::new();
         let mut config_iter = public_configs.into_iter();
         let first = config_iter.next().expect(
@@ -349,9 +348,7 @@ impl Finalize {
         (
             common,
             map.iter().map(|(_, c)| c.clone()).collect(),
-            map.get(&our_config.consensus_public_key)
-                .expect("our key not found in config")
-                .clone(),
+            map.get(&our_config.consensus_public_key).cloned(),
         )
     }
 }
@@ -366,6 +363,22 @@ impl Command for Finalize {
                 "p",
                 "public-configs",
                 true
+            ),
+            Argument::new_named(
+                "PUBLIC_API_ADDRESS",
+                false,
+                "Listen address for public api.",
+                None,
+                "public-api-address",
+                false
+            ),
+            Argument::new_named(
+                "PRIVATE_API_ADDRESS",
+                false,
+                "Listen address for private api.",
+                None,
+                "private-api-address",
+                false
             ),
             Argument::new_positional("SECRET_CONFIG", true, "Path to our secret config."),
             Argument::new_positional("OUTPUT_CONFIG_PATH", true, "Path to output node config."),
@@ -391,6 +404,9 @@ impl Command for Finalize {
             "config path not found",
         );
 
+        let public_addr = Run::public_api_address(&context);
+        let private_addr = Run::private_api_address(&context);
+
         let secret_config: NodePrivateConfig =
             ConfigFile::load(secret_config_path).expect("Failed to load key config.");
         let public_configs: Vec<SharedConfig> = public_configs_path
@@ -400,6 +416,9 @@ impl Command for Finalize {
             })
             .collect();
         let (common, list, our) = Self::reduce_configs(public_configs, &secret_config);
+
+        context.set("auditor_mode", our.is_none());
+
         let peers = list.iter().map(|c| c.addr).collect();
 
         let genesis = Self::genesis_from_template(common.clone(), list.clone());
@@ -407,7 +426,7 @@ impl Command for Finalize {
         let config = {
             NodeConfig {
                 listen_address: secret_config.listen_addr,
-                external_address: Some(our.addr),
+                external_address: our.map(|o| o.addr),
                 network: Default::default(),
                 whitelist: Default::default(),
                 peers: peers,
@@ -416,7 +435,11 @@ impl Command for Finalize {
                 service_public_key: secret_config.service_public_key,
                 service_secret_key: secret_config.service_secret_key,
                 genesis: genesis,
-                api: Default::default(),
+                api: NodeApiConfig {
+                    public_api_address: public_addr,
+                    private_api_address: private_addr,
+                    ..Default::default()
+                },
                 mempool: Default::default(),
                 services_configs: Default::default(),
             }

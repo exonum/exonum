@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 - Added a new function `merge_sync`. In this function a write will be flushed from the operating system buffer cache before the write is considered complete. (#368)
+- Allow creating auditor node from command line. (#364)
 
 ## 0.3 - 2017-11-02
 
