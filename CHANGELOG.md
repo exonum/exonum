@@ -8,7 +8,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 
 ### Added
-- Allow creating auditor node from command line. #364
+- Allow creating auditor node from command line. (#364)
+- Add conversion into boxed values for values which implements `Service` or `Transaction` traits. (#366)
 
 ### Changed
 - `ServiceContext` becomed trait. This change may breaks the code that uses it. (#366)

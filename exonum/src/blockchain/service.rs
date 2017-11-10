@@ -410,3 +410,15 @@ impl ::std::fmt::Debug for ApiContext {
         )
     }
 }
+
+impl<'a, S: Service> From<S> for Box<Service + 'a> {
+    fn from(s: S) -> Self {
+        Box::new(s) as Box<Service>
+    }
+}
+
+impl<'a, T: Transaction> From<T> for Box<Transaction + 'a> {
+    fn from(tx: T) -> Self {
+        Box::new(tx) as Box<Transaction>
+    }
+}
