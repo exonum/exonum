@@ -254,7 +254,7 @@ use counter::{CounterSchema, CounterService, TransactionResponse, TxIncrement, T
 
 fn init_testkit() -> (TestKit, TestKitApi) {
     let testkit = TestKitBuilder::validator()
-        .with_service(Box::new(CounterService))
+        .with_service(CounterService)
         .create();
     let api = testkit.api();
     (testkit, api)
@@ -652,7 +652,7 @@ fn test_explorer_single_block() {
 
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
-        .with_service(Box::new(CounterService))
+        .with_service(CounterService)
         .create();
     let api = testkit.api();
 
@@ -714,7 +714,7 @@ fn test_system_transaction() {
 
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
-        .with_service(Box::new(CounterService))
+        .with_service(CounterService)
         .create();
     let api = testkit.api();
 

@@ -318,8 +318,11 @@ impl TestKitBuilder {
     }
 
     /// Adds a service to the testkit.
-    pub fn with_service(mut self, service: Box<Service>) -> Self {
-        self.services.push(service);
+    pub fn with_service<S>(mut self, service: S) -> Self
+    where
+        S: Into<Box<Service>>,
+    {
+        self.services.push(service.into());
         self
     }
 

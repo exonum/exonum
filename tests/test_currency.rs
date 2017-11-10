@@ -342,7 +342,7 @@ use cryptocurrency::{CurrencySchema, CurrencyService, TransactionResponse, TxCre
 fn init_testkit() -> TestKit {
     TestKitBuilder::validator()
         .with_validators(4)
-        .with_service(Box::new(CurrencyService))
+        .with_service(CurrencyService)
         .create()
 }
 
@@ -611,7 +611,7 @@ fn test_transfers_in_single_block() {
 fn test_malformed_wallet_request() {
     let testkit = TestKitBuilder::validator()
         .with_validators(4)
-        .with_service(Box::new(CurrencyService))
+        .with_service(CurrencyService)
         .create();
     let api = testkit.api();
     let info: String = api.get_err(ApiKind::Service("cryptocurrency"), "v1/wallet/c0ffee");

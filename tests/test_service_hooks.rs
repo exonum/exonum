@@ -82,7 +82,7 @@ pub use hooks::{HandleCommitService, TxAfterCommit};
 #[test]
 fn test_handle_commit() {
     let mut testkit = TestKitBuilder::validator()
-        .with_service(Box::new(HandleCommitService))
+        .with_service(HandleCommitService)
         .create();
     // Check that `handle_commit` invoked on the correct height.
     for i in 1..5 {
