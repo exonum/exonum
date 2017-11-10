@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Added
+- Allow creating auditor node from command line. #364
+
 ## 0.3 - 2017-11-02
 
 ### Added
