@@ -16,7 +16,6 @@ mod hooks {
 
     use exonum::blockchain::{Service, ServiceContext, Transaction};
     use exonum::messages::{FromRaw, RawTransaction};
-    use exonum::node::TransactionSend;
     use exonum::storage::Fork;
     use exonum::crypto::Signature;
     use exonum::encoding;
@@ -72,7 +71,7 @@ mod hooks {
 
         fn handle_commit(&self, context: &ServiceContext) {
             let tx = TxAfterCommit::new_with_signature(context.height(), &Signature::zero());
-            context.api_sender().send(Box::new(tx)).unwrap();
+            context.transaction_sender().send(Box::new(tx)).unwrap();
         }
     }
 }

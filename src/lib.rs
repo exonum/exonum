@@ -172,6 +172,12 @@ impl TestNode {
     }
 }
 
+impl From<TestNode> for ValidatorKeys {
+    fn from(node: TestNode) -> Self {
+        node.public_keys()
+    }
+}
+
 /// Current state of the test node.
 pub struct TestNodeState {
     node: TestNode,
@@ -192,7 +198,7 @@ impl TestNodeState {
         }
     }
 
-    /// Updates the snapshot of the storage.
+    /// Updates the testkit node.
     fn update_node(&mut self, node: TestNode) {
         self.node = node;
     }
@@ -260,7 +266,7 @@ impl<'a> ServiceContext for TestNodeState {
             .expect("An attempt to get configuration from nonexistent service")
     }
 
-    fn api_sender(&self) -> &ApiSender {
+    fn transaction_sender(&self) -> &TransactionSend {
         &self.api_sender
     }
 }
@@ -303,7 +309,7 @@ impl TestKitBuilder {
 
     /// Adds an additional validators.
     pub fn with_validators(mut self, validators_count: u16) -> Self {
-        assert!(validators_count > 1, "At least one validator must be.");
+        assert!(validators_count > 0, "At least one validator must be.");
         let additional_validators = (1..validators_count).map(ValidatorId).map(
             TestNode::new_validator,
         );
@@ -341,6 +347,7 @@ pub struct TestKit {
     api_context: ApiContext,
     network: TestNetwork,
     mempool: TxPool,
+    cfg_proposal: Option<TestNetworkConfiguration>,
 }
 
 impl TestKit {
@@ -373,6 +380,7 @@ impl TestKit {
             service_context,
             network,
             mempool: Arc::new(RwLock::new(BTreeMap::new())),
+            cfg_proposal: None,
         }
     }
 
@@ -495,6 +503,35 @@ impl TestKit {
         let height = self.height();
         let last_hash = self.state().last_hash();
 
+        // Try to modify the test network configuration.
+        if let Some(cfg_proposal) = self.cfg_proposal.take() {
+            if cfg_proposal.actual_from() == height {
+                // Modify the self configuration
+                self.network.us = cfg_proposal.us;
+                self.network.validators = cfg_proposal.validators;
+                self.service_context.update_node(self.network.us.clone());
+            } else {
+                // Commit configuration proposal
+                let stored = cfg_proposal.stored_configuration().clone();
+                let is_stored_commited = {
+                    let snapshot = self.snapshot();
+                    let stored_hash = exonum::storage::StorageValue::hash(&stored);
+                    let core_schema = CoreSchema::new(&snapshot);
+                    let configs = core_schema.configs();
+                    configs.contains(&stored_hash)
+                };
+
+                if !is_stored_commited {
+                    let mut fork = self.blockchain.fork();
+                    CoreSchema::new(&mut fork).commit_configuration(stored);
+                    let changes = fork.into_patch();
+                    self.blockchain.merge(changes).unwrap();
+                }
+
+                self.cfg_proposal = Some(cfg_proposal);
+            }
+        }
+
         let (block_hash, patch) = {
             let validator_id = self.leader().validator_id().expect(
                 "Tested node is not a validator",
@@ -533,11 +570,7 @@ impl TestKit {
                 precommits.iter(),
             )
             .unwrap();
-        self.do_update();
-    }
 
-    // Update TeskKit state after commit block.
-    fn do_update(&mut self) {
         // Update context
         self.service_context.update_node(self.network.us.clone());
         self.poll_events();
@@ -566,12 +599,7 @@ impl TestKit {
     pub fn create_block(&mut self) {
         self.poll_events();
 
-        let tx_hashes: Vec<_> = {
-            let txs = self.mempool.read().expect(
-                "Cannot read transactions from node",
-            );
-            txs.keys().cloned().collect()
-        };
+        let tx_hashes: Vec<_> = self.mempool().keys().cloned().collect();
 
         self.do_create_block(&tx_hashes);
     }
@@ -591,6 +619,149 @@ impl TestKit {
     /// Returns the leader on the current height. At the moment first validator.
     pub fn leader(&self) -> &TestNode {
         &self.network.validators[0]
+    }
+
+    /// Returns the reference to test network.
+    pub fn network(&self) -> &TestNetwork {
+        &self.network
+    }
+
+    /// Returns the actual configuration of the testkit for modification.
+    pub fn actual_configuration(&self) -> TestNetworkConfiguration {
+        let stored_configuration = CoreSchema::new(&self.snapshot()).actual_configuration();
+        TestNetworkConfiguration::from_parts(
+            self.network.us.clone(),
+            self.network.validators.clone(),
+            stored_configuration,
+        )
+    }
+
+    /// Adds a new configuration proposal
+    ///
+    /// # Panics
+    ///
+    /// - If `actual_from` is less than current height or equals.
+    /// - If configuration change has been already proposed but not executed.
+    pub fn propose_configuration_change(&mut self, proposal: TestNetworkConfiguration) {
+        assert!(self.height() < proposal.actual_from());
+        assert!(self.cfg_proposal.is_none());
+        self.cfg_proposal = Some(proposal);
+    }
+}
+
+/// A configuration of the test network.
+#[derive(Debug)]
+pub struct TestNetworkConfiguration {
+    us: TestNode,
+    validators: Vec<TestNode>,
+    stored_configuration: StoredConfiguration,
+}
+
+impl TestNetworkConfiguration {
+    fn from_parts(
+        us: TestNode,
+        validators: Vec<TestNode>,
+        mut stored_configuration: StoredConfiguration,
+    ) -> Self {
+        let prev_hash = exonum::storage::StorageValue::hash(&stored_configuration);
+        stored_configuration.previous_cfg_hash = prev_hash;
+        TestNetworkConfiguration {
+            us,
+            validators,
+            stored_configuration,
+        }
+    }
+
+    /// Returns the testkit node.
+    pub fn us(&self) -> &TestNode {
+        &self.us
+    }
+
+    /// Modifies the testkit node.
+    pub fn set_us(&mut self, us: TestNode) {
+        self.us = us;
+        self.modify_us_role();
+    }
+
+    /// Returns the test network validators.
+    pub fn validators(&self) -> &[TestNode] {
+        self.validators.as_ref()
+    }
+
+    /// Returns the current consensus configuration.
+    pub fn consensus_configuration(&self) -> &ConsensusConfig {
+        &self.stored_configuration.consensus
+    }
+
+    /// Return the height, starting from which this configuration becomes actual.
+    pub fn actual_from(&self) -> Height {
+        self.stored_configuration.actual_from
+    }
+
+    /// Modifies the height, starting from which this configuration becomes actual.
+    pub fn set_actual_from(&mut self, actual_from: Height) {
+        self.stored_configuration.actual_from = actual_from;
+    }
+
+    /// Modifies the current consensus configuration.
+    pub fn set_consensus_configuration(&mut self, consensus: ConsensusConfig) {
+        self.stored_configuration.consensus = consensus;
+    }
+
+    /// Modifies the validators list.
+    pub fn set_validators<I>(&mut self, validators: I)
+    where
+        I: IntoIterator<Item = TestNode>,
+    {
+        self.validators = validators
+            .into_iter()
+            .enumerate()
+            .map(|(idx, mut node)| {
+                node.change_role(Some(ValidatorId(idx as u16)));
+                node
+            })
+            .collect();
+        self.stored_configuration.validator_keys = self.validators
+            .iter()
+            .cloned()
+            .map(ValidatorKeys::from)
+            .collect();
+        self.modify_us_role();
+    }
+
+    /// Returns the configuration for service with the given identifier.
+    pub fn service_config<D>(&self, id: &str) -> D
+    where
+        for<'de> D: Deserialize<'de>,
+    {
+        let value = self.stored_configuration.services.get(id).expect(
+            "Unable to find configuration for service",
+        );
+        serde_json::from_value(value.clone()).unwrap()
+    }
+
+    /// Modifies the configuration of the service with the given identifier.
+    pub fn set_service_config<D>(&mut self, id: &str, config: D)
+    where
+        D: Serialize,
+    {
+        let value = serde_json::to_value(config).unwrap();
+        self.stored_configuration.services.insert(id.into(), value);
+    }
+
+    /// Returns the resulting exonum blockchain configuration.
+    pub fn stored_configuration(&self) -> &StoredConfiguration {
+        &self.stored_configuration
+    }
+
+    fn modify_us_role(&mut self) {
+        let validator_id = self.validators
+            .iter()
+            .position(|x| {
+                x.public_keys().service_key == self.us.service_public_key
+            })
+            .map(|x| ValidatorId(x as u16));
+        self.us.validator_id = validator_id;
     }
 }
 
