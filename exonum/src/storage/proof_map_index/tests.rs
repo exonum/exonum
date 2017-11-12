@@ -18,9 +18,8 @@ extern crate serde_json;
 use std::collections::{HashSet, BTreeMap};
 use rand::{thread_rng, Rng, sample};
 use crypto::{hash, Hash, HashStream};
-use storage::db::Database;
-use encoding::serialize::json::reexport::to_string;
-use encoding::serialize::reexport::{Serialize, Serializer};
+use storage::{Database, Fork, StorageValue};
+use encoding::serialize::reexport::Serialize;
 
 use super::{DBKey, ProofMapIndex, ProofMapKey};
 use super::proof::MapProof;
@@ -383,7 +382,7 @@ where
     V: StorageValue + Clone + PartialEq + ::std::fmt::Debug + Serialize,
 {
     let mut storage = db.fork();
-    let mut table = ProofMapIndex::new(vec![255], &mut storage);
+    let mut table = ProofMapIndex::new(IDX_NAME, &mut storage);
     for &(ref key, ref value) in &data {
         table.put(key, value.clone());
     }
@@ -486,7 +485,7 @@ fn build_proof_in_empty_tree(db: Box<Database>) {
 
 fn build_multiproof_in_empty_tree(db: Box<Database>) {
     let mut storage = db.fork();
-    let mut table = ProofMapIndex::new(vec![255], &mut storage);
+    let mut table = ProofMapIndex::new(IDX_NAME, &mut storage);
 
     // Just to notify the compiler of the types used; same key is added and then removed from tree.
     table.put(&[230; 32], vec![1]);
@@ -500,7 +499,7 @@ fn build_multiproof_in_empty_tree(db: Box<Database>) {
 
 fn build_proof_in_single_node_tree(db: Box<Database>) {
     let mut storage = db.fork();
-    let mut table = ProofMapIndex::new(vec![255], &mut storage);
+    let mut table = ProofMapIndex::new(IDX_NAME, &mut storage);
 
     table.put(&[230; 32], vec![1]);
     let proof = table.get_proof([230; 32]);
@@ -517,7 +516,7 @@ fn build_proof_in_single_node_tree(db: Box<Database>) {
 
 fn build_multiproof_in_single_node_tree(db: Box<Database>) {
     let mut storage = db.fork();
-    let mut table = ProofMapIndex::new(vec![255], &mut storage);
+    let mut table = ProofMapIndex::new(IDX_NAME, &mut storage);
 
     table.put(&[230; 32], vec![1]);
 
@@ -710,7 +709,7 @@ fn build_proof_in_multinode_tree(db: Box<Database>) {
 
 fn build_multiproof_simple(db: Box<Database>) {
     let mut storage = db.fork();
-    let mut table = ProofMapIndex::new(vec![255], &mut storage);
+    let mut table = ProofMapIndex::new(IDX_NAME, &mut storage);
 
     table.put(&[1; 32], vec![1]);
     table.put(&[4; 32], vec![2]);
@@ -1086,11 +1085,14 @@ fn tree_with_hashed_key(db: Box<Database>) {
     impl HashedKey for Point {}
 
     fn hash_isolated_node(key: &DBKey, h: &Hash) -> Hash {
-        hash(&[&key.to_vec(), h.as_ref()].concat())
+        HashStream::new()
+            .update(&key.as_bytes())
+            .update(h.as_ref())
+            .hash()
     }
 
     let mut storage = db.fork();
-    let mut table = ProofMapIndex::new(vec![255], &mut storage);
+    let mut table = ProofMapIndex::new(IDX_NAME, &mut storage);
 
     table.put(&Point::new(1, 2), vec![1, 2, 3]);
     table.put(&Point::new(3, 4), vec![2, 3, 4]);
@@ -1231,7 +1233,6 @@ mod memorydb_tests {
     common_tests!{}
 }
 
-#[cfg(feature = "rocksdb")]
 mod rocksdb_tests {
     use std::path::Path;
     use tempdir::TempDir;

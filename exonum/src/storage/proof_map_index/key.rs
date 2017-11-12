@@ -77,7 +77,7 @@ where
 ///
 /// # fn main() {
 /// let mut fork = { let db = MemoryDB::new(); db.fork() };
-/// let mut map = ProofMapIndex::new(vec![255], &mut fork);
+/// let mut map = ProofMapIndex::new("index", &mut fork);
 /// map.put(&Point::new(3, -4), 5u32);
 /// assert_eq!(map.get(&Point::new(3, -4)), Some(5));
 /// assert_eq!(map.get(&Point::new(3, 4)), None);

@@ -384,9 +384,8 @@ where
     /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
     /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, [u8; 32], u8> = ProofMapIndex::new(prefix, &snapshot);
+    /// let index: ProofMapIndex<_, [u8; 32], u8> = ProofMapIndex::new("index", &snapshot);
     ///
     /// let proof = index.get_multiproof(vec![[0; 32], [1; 32]]);
     /// # drop(proof);

@@ -15,7 +15,7 @@
 use std::iter::FromIterator;
 
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
-use crypto::{hash, Hash};
+use crypto::{Hash, HashStream};
 
 use super::super::StorageValue;
 use super::key::{ProofMapKey, DBKey, ChildKind, KEY_SIZE};
@@ -282,7 +282,7 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 /// # use exonum::storage::{Database, MemoryDB, StorageValue, MapProof, ProofMapIndex};
 /// # use exonum::crypto::hash;
 /// let mut fork = { let db = MemoryDB::new(); db.fork() };
-/// let mut map = ProofMapIndex::new(vec![255], &mut fork);
+/// let mut map = ProofMapIndex::new("index", &mut fork);
 /// let (h1, h2, h3) = (hash(&vec![1]), hash(&vec![2]), hash(&vec![3]));
 /// map.put(&h1, 100u32);
 /// map.put(&h2, 200u32);
@@ -312,7 +312,7 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 /// # use exonum::crypto::hash;
 /// # fn main() {
 /// let mut fork = { let db = MemoryDB::new(); db.fork() };
-/// let mut map = ProofMapIndex::new(vec![255], &mut fork);
+/// let mut map = ProofMapIndex::new("index", &mut fork);
 /// let (h1, h2) = (hash(&vec![1]), hash(&vec![2]));
 /// map.put(&h1, 100u32);
 /// map.put(&h2, 200u32);
@@ -343,7 +343,10 @@ pub struct MapProof<K, V> {
 
 /// Calculates hash for an isolated node in the Merkle Patricia tree.
 fn hash_isolated_node(key: &DBKey, h: &Hash) -> Hash {
-    hash(&[&key.to_vec(), h.as_ref()].concat())
+    HashStream::new()
+        .update(&key.as_bytes())
+        .update(h.as_ref())
+        .hash()
 }
 
 /// Computes the root hash of the Merkle Patricia tree backing the specified entries
@@ -638,7 +641,7 @@ where
     /// # use exonum::storage::{Database, MemoryDB, ProofMapIndex};
     /// # use exonum::crypto::hash;
     /// let mut fork = { let db = MemoryDB::new(); db.fork() };
-    /// let mut map = ProofMapIndex::new(vec![255], &mut fork);
+    /// let mut map = ProofMapIndex::new("index", &mut fork);
     /// let (h1, h2) = (hash(&vec![1]), hash(&vec![2]));
     /// map.put(&h1, 100u32);
     /// map.put(&h2, 200u32);
