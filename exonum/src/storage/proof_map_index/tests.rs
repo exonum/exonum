@@ -550,7 +550,10 @@ fn build_proof_in_multinode_tree(db: Box<Database>) {
 
     // Key left of all keys in the tree
     let proof = table.get_proof([0; 32]);
-    let exp_proof = vec![(DBKey::leaf(&[1; 32]), hash(&vec![1])), (DBKey::leaf(&[4; 32]), hash(&vec![2]))];
+    let exp_proof = vec![
+        (DBKey::leaf(&[1; 32]), hash(&vec![1])),
+        (DBKey::leaf(&[4; 32]), hash(&vec![2])),
+    ];
     assert_eq!(proof.proof(), exp_proof);
     check_map_proof(proof, None, &table);
 
@@ -590,7 +593,10 @@ fn build_proof_in_multinode_tree(db: Box<Database>) {
     let proof = table.get_proof([2; 32]);
     assert_eq!(
         proof.proof(),
-        vec![(DBKey::leaf(&left_key).truncate(15), left_hash), (DBKey::leaf(&[4; 32]), hash(&vec![2]))]
+        vec![
+            (DBKey::leaf(&left_key).truncate(15), left_hash),
+            (DBKey::leaf(&[4; 32]), hash(&vec![2])),
+        ]
     );
     check_map_proof(proof, None, &table);
 
@@ -604,7 +610,10 @@ fn build_proof_in_multinode_tree(db: Box<Database>) {
     let proof = table.get_proof([128; 32]);
     assert_eq!(
         proof.proof(),
-        vec![(DBKey::leaf(&left_key).truncate(15), left_hash), (DBKey::leaf(&[4; 32]), hash(&vec![2]))]
+        vec![
+            (DBKey::leaf(&left_key).truncate(15), left_hash),
+            (DBKey::leaf(&[4; 32]), hash(&vec![2])),
+        ]
     );
     check_map_proof(proof, None, &table);
 
@@ -772,7 +781,10 @@ fn build_multiproof_simple(db: Box<Database>) {
     let proof = table.get_multiproof(vec![[0; 32]]);
     assert_eq!(
         proof.proof(),
-        vec![(DBKey::leaf(&[1; 32]).truncate(15), left_hash), (DBKey::leaf(&[4; 32]), hash(&vec![2]))]
+        vec![
+            (DBKey::leaf(&[1; 32]).truncate(15), left_hash),
+            (DBKey::leaf(&[4; 32]), hash(&vec![2])),
+        ]
     );
     check_map_multiproof(proof, vec![[0; 32]], &table);
 
@@ -785,7 +797,10 @@ fn build_multiproof_simple(db: Box<Database>) {
     let proof = table.get_multiproof(keys.clone());
     assert_eq!(
         proof.proof(),
-        vec![(DBKey::leaf(&[1; 32]).truncate(15), left_hash), (DBKey::leaf(&[4; 32]), hash(&vec![2]))]
+        vec![
+            (DBKey::leaf(&[1; 32]).truncate(15), left_hash),
+            (DBKey::leaf(&[4; 32]), hash(&vec![2])),
+        ]
     );
     check_map_multiproof(proof, keys, &table);
 

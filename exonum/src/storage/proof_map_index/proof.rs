@@ -299,7 +299,8 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 /// `MapProof` is serialized to JSON as an object with 2 array fields:
 ///
 /// - `proof` is an array of `{ "key": DBKey, "hash": Hash }` objects. The entries are sorted by
-///   increasing [`DBKey`], but client implementors should not rely on this if security is a concern.
+///   increasing [`DBKey`], but client implementors should not rely on this if security
+///   is a concern.
 /// - `entries` is an array with 2 kinds of objects: `{ "missing": K }` for keys missing from
 ///   the underlying index, and `{ "key": K, "value": V }` for key-value pairs, existence of
 ///   which is asserted by the proof
