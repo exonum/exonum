@@ -119,6 +119,24 @@ mod tests {
         });
     }
 
+    fn proof_map_index_build_and_validate_proofs<T: Database>(b: &mut Bencher, db: &T) {
+        let data = generate_random_kv(256);
+        let mut storage = db.fork();
+        let mut table = ProofMapIndex::new(NAME, &mut storage);
+
+        for item in &data {
+            table.put(&item.0, item.1.clone());
+        }
+        let table_root_hash = table.root_hash();
+
+        b.iter(|| for item in &data {
+            let proof = table.get_proof(item.0);
+            let (entries, hash): (Vec<_>, _) = proof.try_into().unwrap();
+            assert_eq!(entries, vec![item.clone()]);
+            assert_eq!(hash, table_root_hash);
+        });
+    }
+
     fn create_rocksdb(tempdir: &TempDir) -> RocksDB {
         let mut options = RocksDBOptions::default();
         options.create_if_missing(true);
@@ -175,5 +193,18 @@ mod tests {
         let tempdir = TempDir::new("exonum").unwrap();
         let db = create_rocksdb(&tempdir);
         merkle_patricia_table_insertion_large_map(b, &db);
+    }
+
+    #[bench]
+    fn long_bench_proof_map_index_build_and_validate_proofs_memorydb(b: &mut Bencher) {
+        let db = MemoryDB::new();
+        proof_map_index_build_and_validate_proofs(b, &db);
+    }
+
+    #[bench]
+    fn long_bench_proof_map_index_build_and_validate_proofs_rocksdb(b: &mut Bencher) {
+        let tempdir = TempDir::new("exonum").unwrap();
+        let db = create_rocksdb(&tempdir);
+        proof_map_index_build_and_validate_proofs(b, &db);
     }
 }
