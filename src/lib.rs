@@ -37,6 +37,8 @@ use router::Router;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+#[macro_use]
+mod macros;
 pub mod compare;
 mod greedy_fold;
 
