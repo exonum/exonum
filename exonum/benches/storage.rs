@@ -145,8 +145,8 @@ mod tests {
         });
     }
 
-    fn proof_map_index_build_and_validate_proofs<T: Database>(b: &mut Bencher, db: &T) {
-        let data = generate_random_kv(1_024);
+    fn proof_map_index_build_proofs<T: Database>(b: &mut Bencher, db: &T) {
+        let data = generate_random_kv(512);
         let mut storage = db.fork();
         let mut table = ProofMapIndex::new(NAME, &mut storage);
 
@@ -154,11 +154,34 @@ mod tests {
             table.put(&item.0, item.1.clone());
         }
         let table_root_hash = table.root_hash();
+        let mut proofs = Vec::with_capacity(data.len());
 
-        b.iter(|| for item in &data {
-            let proof = table.get_proof(item.0);
+        b.iter(|| {
+            proofs.clear();
+            proofs.extend(data.iter().map(|item| table.get_proof(item.0)));
+        });
+
+        for (i, proof) in proofs.into_iter().enumerate() {
             let (entries, hash): (Vec<_>, _) = proof.try_into().unwrap();
-            assert_eq!(entries[0].1, item.1);
+            assert_eq!(entries[0].1, data[i].1);
+            assert_eq!(hash, table_root_hash);
+        }
+    }
+
+    fn proof_map_index_verify_proofs<T: Database>(b: &mut Bencher, db: &T) {
+        let data = generate_random_kv(512);
+        let mut storage = db.fork();
+        let mut table = ProofMapIndex::new(NAME, &mut storage);
+
+        for item in &data {
+            table.put(&item.0, item.1.clone());
+        }
+        let table_root_hash = table.root_hash();
+        let proofs: Vec<_> = data.iter().map(|item| table.get_proof(item.0)).collect();
+
+        b.iter(|| for (i, proof) in proofs.iter().enumerate() {
+            let (entries, hash): (Vec<_>, _) = proof.clone().try_into().unwrap();
+            assert_eq!(entries[0].1, data[i].1);
             assert_eq!(hash, table_root_hash);
         });
     }
@@ -222,15 +245,21 @@ mod tests {
     }
 
     #[bench]
-    fn long_bench_proof_map_index_build_and_validate_proofs_memorydb(b: &mut Bencher) {
+    fn long_bench_proof_map_index_build_proofs_memorydb(b: &mut Bencher) {
         let db = MemoryDB::new();
-        proof_map_index_build_and_validate_proofs(b, &db);
+        proof_map_index_build_proofs(b, &db);
     }
 
     #[bench]
-    fn long_bench_proof_map_index_build_and_validate_proofs_rocksdb(b: &mut Bencher) {
+    fn long_bench_proof_map_index_build_proofs_rocksdb(b: &mut Bencher) {
         let tempdir = TempDir::new("exonum").unwrap();
         let db = create_rocksdb(&tempdir);
-        proof_map_index_build_and_validate_proofs(b, &db);
+        proof_map_index_build_proofs(b, &db);
+    }
+
+    #[bench]
+    fn long_bench_proof_map_index_validate_proofs_memorydb(b: &mut Bencher) {
+        let db = MemoryDB::new();
+        proof_map_index_verify_proofs(b, &db);
     }
 }

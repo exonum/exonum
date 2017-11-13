@@ -336,7 +336,7 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 /// [`try_into()`]: #method.try_into
 /// [`missing_keys()`]: #method.missing_keys
 /// [`DBKey`]: struct.ProofMapDBKey.html
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MapProof<K, V> {
     entries: Vec<OptionalEntry<K, V>>,
     proof: Vec<MapProofEntry>,
