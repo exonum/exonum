@@ -361,44 +361,24 @@ impl<'a> DBKeyPrefix<'a> {
         self.prefix_len = new_len;
     }
 
-    pub fn hash_to(&self, mut stream: HashStream) -> HashStream {
-        const ZEROS: [u8; KEY_SIZE] = [0; KEY_SIZE];
-
-        let leaf_marker = if self.prefix_len == (KEY_SIZE * 8) as u16 {
-            1
+    pub fn hash_to(&self, stream: HashStream) -> HashStream {
+        let mut buffer = [0u8; DB_KEY_SIZE];
+        
+        if self.prefix_len == (KEY_SIZE * 8) as u16 {
+            buffer[0] = LEAF_KEY_PREFIX;
+            buffer[1..KEY_SIZE + 1].copy_from_slice(&self.parent.data);
+            buffer[KEY_SIZE + 1] = 0;
         } else {
-            0
-        };
-        stream = stream.update(&[leaf_marker]);
-
-        let mut last_prefix_byte = (self.prefix_len >> 3) as usize;
-        let bits = self.prefix_len % 8;
-
-        if last_prefix_byte > 0 {
-            // Write full bytes
-            stream = stream.update(&self.parent.data[0..last_prefix_byte]);
+            buffer[0] = BRANCH_KEY_PREFIX;
+            let right = (self.prefix_len as usize + 7) / 8;
+            buffer[1..right + 1].copy_from_slice(&self.parent.data[0..right]);
+            if self.prefix_len % 8 != 0 {
+                buffer[right] &= !(255u8 >> (self.prefix_len % 8));
+            }
+            buffer[KEY_SIZE + 1] = self.prefix_len as u8;
         }
-
-        if bits > 0 {
-            // Write the remaining prefix bits
-            let mask: u8 = match bits {
-                1 => 0b_1000_0000,
-                2 => 0b_1100_0000,
-                3 => 0b_1110_0000,
-                4 => 0b_1111_0000,
-                5 => 0b_1111_1000,
-                6 => 0b_1111_1100,
-                7 => 0b_1111_1110,
-                _ => unreachable!("Unexpected number of trailing bits"),
-            };
-            stream = stream.update(&[self.parent.data[last_prefix_byte] & mask]);
-            last_prefix_byte += 1;
-        }
-
-        if last_prefix_byte < KEY_SIZE {
-            stream = stream.update(&ZEROS[last_prefix_byte..]);
-        }
-        stream.update(&[self.prefix_len as u8])
+        
+        stream.update(&buffer)
     }
 }
 
@@ -521,13 +501,7 @@ impl PartialOrd for DBKey {
             let bits = min(self.to - to * 8, other.to - to * 8);
             let mask: u8 = match bits {
                 0 => return Some(self.to.cmp(&other.to)),
-                1 => 0b_1000_0000,
-                2 => 0b_1100_0000,
-                3 => 0b_1110_0000,
-                4 => 0b_1111_0000,
-                5 => 0b_1111_1000,
-                6 => 0b_1111_1100,
-                7 => 0b_1111_1110,
+                i if i < 8 => !(255u8 >> i),
                 _ => unreachable!("Unexpected number of trailing bits in DBKey comparison"),
             };
 

@@ -152,10 +152,12 @@ impl<'a> ContourNode<'a> {
         }
     }
 
+    #[inline]
     fn key_len(&self) -> u16 {
         self.key_len
     }
 
+    #[inline]
     fn truncate_right_key(&mut self, to_bits: u16) {
         self.right_key_len = to_bits;
     }
