@@ -8,7 +8,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 
 ### Added
-- Allow creating auditor node from command line. #364
+- Allow creating auditor node from command line. (#364)
+
+### Fixed
+- Fixed `crate_authors!` macro usage, this macro can't return static string in new clap version. (#370)
 
 ## 0.3 - 2017-11-02
 
