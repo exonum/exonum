@@ -8,6 +8,7 @@ extern crate serde_json;
 use exonum::helpers::{Height, ValidatorId};
 use exonum_testkit::TestKitBuilder;
 use exonum::blockchain::Schema;
+use exonum::storage::StorageValue;
 
 #[test]
 fn test_add_to_validators() {
@@ -32,6 +33,13 @@ fn test_add_to_validators() {
         Schema::new(&testkit.snapshot()).actual_configuration(),
         stored
     );
+    assert_eq!(
+        Schema::new(&testkit.snapshot())
+            .previous_configuration()
+            .unwrap()
+            .hash(),
+        stored.previous_cfg_hash
+    );
 }
 
 #[test]
@@ -55,6 +63,13 @@ fn test_exclude_from_validators() {
     assert_eq!(
         Schema::new(&testkit.snapshot()).actual_configuration(),
         stored
+    );
+    assert_eq!(
+        Schema::new(&testkit.snapshot())
+            .previous_configuration()
+            .unwrap()
+            .hash(),
+        stored.previous_cfg_hash
     );
 }
 

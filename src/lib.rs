@@ -79,15 +79,19 @@ impl TestNetwork {
     }
 
     /// Updates the test network by the new set of nodes.
-    pub fn update<I: IntoIterator<Item=TestNode>>(&mut self, mut us: TestNode, validators: I) {
-        let validators = validators.into_iter().enumerate().map(|(id, mut validator)| {
-            let validator_id = ValidatorId(id as u16); 
-            validator.change_role(Some(validator_id));
-            if us.public_keys().consensus_key == validator.public_keys().consensus_key {
-                us.change_role(Some(validator_id));
-            }
-            validator
-        }).collect::<Vec<_>>();
+    pub fn update<I: IntoIterator<Item = TestNode>>(&mut self, mut us: TestNode, validators: I) {
+        let validators = validators
+            .into_iter()
+            .enumerate()
+            .map(|(id, mut validator)| {
+                let validator_id = ValidatorId(id as u16);
+                validator.change_role(Some(validator_id));
+                if us.public_keys().consensus_key == validator.public_keys().consensus_key {
+                    us.change_role(Some(validator_id));
+                }
+                validator
+            })
+            .collect::<Vec<_>>();
         self.validators = validators;
         self.us.borrow_mut().clone_from(&us);
     }
@@ -582,7 +586,10 @@ impl TestKit {
                 ConfigurationProposalState::Commited(ref cfg_proposal)
                     if cfg_proposal.actual_from() == height => {
                     // Modify the self configuration
-                    self.network_mut().update(cfg_proposal.us.clone(), cfg_proposal.validators.clone());
+                    self.network_mut().update(
+                        cfg_proposal.us.clone(),
+                        cfg_proposal.validators.clone(),
+                    );
                 }
                 ConfigurationProposalState::Commited(cfg_proposal) => {
                     self.cfg_proposal = Some(ConfigurationProposalState::Commited(cfg_proposal));
