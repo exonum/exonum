@@ -14,6 +14,7 @@ extern crate serde_json;
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock, RwLockReadGuard};
+use std::cell::RefCell;
 
 use exonum::blockchain::{ApiContext, Blockchain, ConsensusConfig, GenesisConfig,
                          Schema as CoreSchema, Service, ServiceContext, ServiceContextMut,
@@ -45,7 +46,7 @@ pub use compare::ComparableSnapshot;
 
 /// Emulated test network.
 pub struct TestNetwork {
-    us: TestNode,
+    us: RefCell<TestNode>,
     validators: Vec<TestNode>,
 }
 
@@ -57,13 +58,13 @@ impl TestNetwork {
             .map(TestNode::new_validator)
             .collect::<Vec<_>>();
 
-        let us = validators[0].clone();
+        let us = RefCell::from(validators[0].clone());
         TestNetwork { validators, us }
     }
 
     /// Returns the node in the emulated network, from whose perspective the testkit operates.
-    pub fn us(&self) -> &TestNode {
-        &self.us
+    pub fn us(&self) -> TestNode {
+        self.us.borrow().clone()
     }
 
     /// Returns a slice of all validators in the network.
@@ -198,11 +199,6 @@ impl TestNodeState {
         }
     }
 
-    /// Updates the testkit node.
-    fn update_node(&mut self, node: TestNode) {
-        self.node = node;
-    }
-
     /// Returns sufficient number of validators for the Byzantine Fault Toulerance consensus.
     pub fn majority_count(&self) -> usize {
         NodeState::byzantine_majority_count(self.validators().len())
@@ -334,7 +330,7 @@ impl TestKitBuilder {
         TestKit::assemble(
             blockchain,
             TestNetwork {
-                us: self.us,
+                us: RefCell::from(self.us),
                 validators: self.validators,
             },
         )
@@ -510,9 +506,8 @@ impl TestKit {
         if let Some(cfg_proposal) = self.cfg_proposal.take() {
             if cfg_proposal.actual_from() == height {
                 // Modify the self configuration
-                self.network.us = cfg_proposal.us;
+                self.network.us.borrow_mut().clone_from(&cfg_proposal.us);
                 self.network.validators = cfg_proposal.validators;
-                self.service_context.update_node(self.network.us.clone());
             } else {
                 // Commit configuration proposal
                 let stored = cfg_proposal.stored_configuration().clone();
@@ -574,8 +569,6 @@ impl TestKit {
             )
             .unwrap();
 
-        // Update context
-        self.service_context.update_node(self.network.us.clone());
         self.poll_events();
     }
 
@@ -633,7 +626,7 @@ impl TestKit {
     pub fn actual_configuration(&self) -> TestNetworkConfiguration {
         let stored_configuration = CoreSchema::new(&self.snapshot()).actual_configuration();
         TestNetworkConfiguration::from_parts(
-            self.network.us.clone(),
+            self.network.us().clone(),
             self.network.validators.clone(),
             stored_configuration,
         )
@@ -683,7 +676,7 @@ impl TestNetworkConfiguration {
     /// Modifies the testkit node.
     pub fn set_us(&mut self, us: TestNode) {
         self.us = us;
-        self.modify_us_role();
+        self.update_our_role();
     }
 
     /// Returns the test network validators.
@@ -729,7 +722,7 @@ impl TestNetworkConfiguration {
             .cloned()
             .map(ValidatorKeys::from)
             .collect();
-        self.modify_us_role();
+        self.update_our_role();
     }
 
     /// Returns the configuration for service with the given identifier.
@@ -757,7 +750,7 @@ impl TestNetworkConfiguration {
         &self.stored_configuration
     }
 
-    fn modify_us_role(&mut self) {
+    fn update_our_role(&mut self) {
         let validator_id = self.validators
             .iter()
             .position(|x| {

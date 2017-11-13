@@ -29,10 +29,7 @@ fn test_add_to_validators() {
     }
 
     assert_eq!(testkit.network().us().validator_id(), Some(ValidatorId(1)));
-    assert_eq!(
-        testkit.network().validators().get(1),
-        Some(testkit.network().us())
-    );
+    assert_eq!(testkit.network().validators()[1], testkit.network().us());
     assert_eq!(
         Schema::new(&testkit.snapshot()).actual_configuration(),
         stored
@@ -92,11 +89,9 @@ fn test_change_service_config() {
     }
 
     assert_eq!(
-        &serde_json::to_value(service_cfg).unwrap(),
+        serde_json::to_value(service_cfg).unwrap(),
         Schema::new(&testkit.snapshot())
             .actual_configuration()
-            .services
-            .get("my_service")
-            .unwrap()
+            .services["my_service"]
     );
 }
