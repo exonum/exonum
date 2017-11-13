@@ -346,7 +346,7 @@ pub struct TestKit {
     api_context: ApiContext,
     network: TestNetwork,
     mempool: TxPool,
-    cfg_proposal: Option<TestNetworkConfiguration>,
+    cfg_proposal: Option<ConfigurationProposalState>,
 }
 
 impl TestKit {
@@ -502,33 +502,7 @@ impl TestKit {
         let height = self.height();
         let last_hash = self.state().last_hash();
 
-        // Try to modify the test network configuration.
-        if let Some(cfg_proposal) = self.cfg_proposal.take() {
-            if cfg_proposal.actual_from() == height {
-                // Modify the self configuration
-                self.network.us.borrow_mut().clone_from(&cfg_proposal.us);
-                self.network.validators = cfg_proposal.validators;
-            } else {
-                // Commit configuration proposal
-                let stored = cfg_proposal.stored_configuration().clone();
-                let is_stored_commited = {
-                    let snapshot = self.snapshot();
-                    let stored_hash = exonum::storage::StorageValue::hash(&stored);
-                    let core_schema = CoreSchema::new(&snapshot);
-                    let configs = core_schema.configs();
-                    configs.contains(&stored_hash)
-                };
-
-                if !is_stored_commited {
-                    let mut fork = self.blockchain.fork();
-                    CoreSchema::new(&mut fork).commit_configuration(stored);
-                    let changes = fork.into_patch();
-                    self.blockchain.merge(changes).unwrap();
-                }
-
-                self.cfg_proposal = Some(cfg_proposal);
-            }
-        }
+        self.do_config_update();
 
         let (block_hash, patch) = {
             let validator_id = self.leader().validator_id().expect(
@@ -570,6 +544,33 @@ impl TestKit {
             .unwrap();
 
         self.poll_events();
+    }
+
+    // Try to modify the test network configuration.
+    fn do_config_update(&mut self) {
+        let height = self.height();
+        if let Some(cfg_proposal) = self.cfg_proposal.take() {
+            match cfg_proposal {
+                ConfigurationProposalState::Uncommited(cfg_proposal) => {
+                    // Commit configuration proposal
+                    let stored = cfg_proposal.stored_configuration().clone();
+                    let mut fork = self.blockchain.fork();
+                    CoreSchema::new(&mut fork).commit_configuration(stored);
+                    let changes = fork.into_patch();
+                    self.blockchain.merge(changes).unwrap();
+                    self.cfg_proposal = Some(ConfigurationProposalState::Commited(cfg_proposal));
+                }
+                ConfigurationProposalState::Commited(ref cfg_proposal)
+                    if cfg_proposal.actual_from() == height => {
+                    // Modify the self configuration
+                    self.network.us.borrow_mut().clone_from(&cfg_proposal.us);
+                    self.network.validators = cfg_proposal.validators.clone();
+                }
+                ConfigurationProposalState::Commited(cfg_proposal) => {
+                    self.cfg_proposal = Some(ConfigurationProposalState::Commited(cfg_proposal));
+                }
+            }
+        }
     }
 
     /// Creates block with the given transactions.
@@ -667,7 +668,7 @@ impl TestKit {
     pub fn propose_configuration_change(&mut self, proposal: TestNetworkConfiguration) {
         assert!(self.height() < proposal.actual_from());
         assert!(self.cfg_proposal.is_none());
-        self.cfg_proposal = Some(proposal);
+        self.cfg_proposal = Some(ConfigurationProposalState::Uncommited(proposal));
     }
 }
 
@@ -677,6 +678,13 @@ pub struct TestNetworkConfiguration {
     us: TestNode,
     validators: Vec<TestNode>,
     stored_configuration: StoredConfiguration,
+}
+
+// A new configuration proposal state
+#[derive(Debug)]
+enum ConfigurationProposalState {
+    Uncommited(TestNetworkConfiguration),
+    Commited(TestNetworkConfiguration),
 }
 
 impl TestNetworkConfiguration {
