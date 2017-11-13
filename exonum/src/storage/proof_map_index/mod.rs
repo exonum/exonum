@@ -446,7 +446,7 @@ where
         fn process_key<K, V, F>(
             contour: &mut Vec<ContourNode>,
             mut builder: MapProofBuilder<K, V>,
-            db_key: DBKey,
+            db_key: &DBKey,
             key: K,
             lookup: F,
         ) -> MapProofBuilder<K, V>
@@ -536,7 +536,7 @@ where
                 contour.push(ContourNode::new(root_key, root_branch));
 
                 for (db_key, key) in searched_keys {
-                    builder = process_key(&mut contour, builder, db_key, key, |ref key| {
+                    builder = process_key(&mut contour, builder, &db_key, key, |key| {
                         self.get_node_unchecked(key)
                     });
                 }

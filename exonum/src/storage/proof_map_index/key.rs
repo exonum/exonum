@@ -274,13 +274,6 @@ impl DBKey {
         }
     }
 
-    /// Shortens this `DBKey` to the specified length. Unlike `truncate()`, the transformation
-    /// is performed in place.
-    pub fn truncate_in_place(&mut self, size: u16) {
-        debug_assert!(self.from + size <= self.to);
-        self.to = self.from + size;
-    }
-
     /// Returns the number of matching bits with `other` starting from position `from`.
     fn match_len(&self, other: &Self, from: u16) -> u16 {
         let from = from / 8;
@@ -356,11 +349,6 @@ pub struct DBKeyPrefix<'a> {
 
 #[doc(hidden)]
 impl<'a> DBKeyPrefix<'a> {
-    pub fn truncate(&mut self, new_len: u16) {
-        debug_assert!(new_len <= self.prefix_len);
-        self.prefix_len = new_len;
-    }
-
     pub fn hash_to(&self, stream: HashStream) -> HashStream {
         let mut buffer = [0u8; DB_KEY_SIZE];
 

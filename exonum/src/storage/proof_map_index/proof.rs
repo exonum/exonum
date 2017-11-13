@@ -130,23 +130,17 @@ impl ::std::error::Error for MapProofError {
 
 #[derive(Debug)]
 struct ContourNode<'a> {
-    left_hash_and_key: Option<(Hash, DBKeyPrefix<'a>)>,
+    left_hash: Hash,
+    left_key: DBKeyPrefix<'a>,
     key_len: u16,
     right_key_len: u16,
 }
 
 impl<'a> ContourNode<'a> {
-    fn root(child_key_len: u16) -> Self {
-        ContourNode {
-            left_hash_and_key: None,
-            key_len: 0,
-            right_key_len: child_key_len,
-        }
-    }
-
     fn new(key_len: u16, left_key: DBKeyPrefix<'a>, left_hash: Hash, right_key_len: u16) -> Self {
         ContourNode {
-            left_hash_and_key: Some((left_hash, left_key)),
+            left_hash,
+            left_key,
             key_len,
             right_key_len,
         }
@@ -164,20 +158,15 @@ impl<'a> ContourNode<'a> {
 
     /// Outputs the hash and the key of the node based on the finalized `right_hash` value.
     fn finalize(self, contour_key: &DBKey, right_hash: Hash) -> Hash {
-        if let Some((left_hash, left_key)) = self.left_hash_and_key {
-            let stream = HashStream::new().update(left_hash.as_ref()).update(
-                right_hash
-                    .as_ref(),
-            );
-            let stream = left_key.hash_to(stream);
-            let stream = contour_key.hashable_prefix(self.right_key_len).hash_to(
-                stream,
-            );
+        let stream = HashStream::new().update(self.left_hash.as_ref()).update(
+            right_hash.as_ref(),
+        );
+        let stream = self.left_key.hash_to(stream);
+        let stream = contour_key.hashable_prefix(self.right_key_len).hash_to(
+            stream,
+        );
 
-            stream.hash()
-        } else {
-            right_hash
-        }
+        stream.hash()
     }
 }
 
@@ -375,8 +364,7 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
         }
 
         _ => {
-            let root = ContourNode::root(entries[0].key.len());
-            let mut right_contour = vec![root];
+            let mut right_contour: Vec<ContourNode> = Vec::with_capacity(8);
 
             for w in entries.windows(2) {
                 let (prev, entry) = (&w[0], &w[1]);
@@ -390,13 +378,12 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
                         node.truncate_right_key(common_prefix);
                         right_contour.push(node);
                         break;
-                    } else {
-                        if len > 0 {
-                            // `len == 0` is a special case; the node will be reinserted
-                            // to the contour, so the left child length should not be updated.
-                            fin_key_len = node.key_len();
-                        }
+                    } else if len > 0 {
+                        fin_key_len = node.key_len();
                         fin_hash = node.finalize(&prev.key, fin_hash);
+                    } else {
+                        // `len == 0` is a special case; the node will be reinserted
+                        // to the contour, so the left child length should not be updated.
                     }
                 }
 
