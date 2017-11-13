@@ -23,7 +23,7 @@ extern crate exonum;
 mod tests {
     use std::collections::HashSet;
     use test::Bencher;
-    use rand::{Rng, thread_rng, XorShiftRng, SeedableRng};
+    use rand::{Rng, XorShiftRng, SeedableRng};
     use tempdir::TempDir;
     use exonum::storage::{Database, MemoryDB};
     use exonum::storage::{RocksDB, RocksDBOptions};
@@ -33,7 +33,7 @@ mod tests {
     const NAME: &'static str = "name";
 
     fn generate_random_kv(len: usize) -> Vec<([u8; KEY_SIZE], Vec<u8>)> {
-        let mut rng = thread_rng();
+        let mut rng = XorShiftRng::from_seed([1, 56, 168, 192]);
         let mut exists_keys = HashSet::new();
         let mut base = [0; KEY_SIZE];
         rng.fill_bytes(&mut base);
@@ -120,7 +120,7 @@ mod tests {
     }
 
     fn proof_map_index_build_and_validate_proofs<T: Database>(b: &mut Bencher, db: &T) {
-        let data = generate_random_kv(256);
+        let data = generate_random_kv(1_024);
         let mut storage = db.fork();
         let mut table = ProofMapIndex::new(NAME, &mut storage);
 
@@ -132,7 +132,7 @@ mod tests {
         b.iter(|| for item in &data {
             let proof = table.get_proof(item.0);
             let (entries, hash): (Vec<_>, _) = proof.try_into().unwrap();
-            assert_eq!(entries, vec![item.clone()]);
+            assert_eq!(entries[0].1, item.1);
             assert_eq!(hash, table_root_hash);
         });
     }
