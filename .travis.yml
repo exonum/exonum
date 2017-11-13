@@ -7,7 +7,6 @@ addons:
     packages:
     - gcc
     - g++
-    - libleveldb-dev
     - libssl-dev
     - librocksdb
     - libsnappy-dev
