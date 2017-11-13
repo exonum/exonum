@@ -14,7 +14,7 @@
 
 use std::cmp::{min, Ordering};
 
-use crypto::{Hash, PublicKey, HASH_SIZE};
+use crypto::{Hash, HashStream, PublicKey, HASH_SIZE};
 
 use super::super::{StorageKey, StorageValue};
 
@@ -329,6 +329,125 @@ impl DBKey {
         let mut buffer = Box::new([0u8; DB_KEY_SIZE as usize]);
         self.write(buffer.as_mut());
         buffer
+    }
+
+    #[doc(hidden)]
+    pub fn hashable_prefix(&self, prefix_len: u16) -> DBKeyPrefix {
+        debug_assert_eq!(self.from, 0);
+        debug_assert!(
+            prefix_len <= self.len(),
+            "Attempted to extract prefix with length {} from key with length {}",
+            prefix_len,
+            self.len()
+        );
+        DBKeyPrefix {
+            parent: self,
+            prefix_len: prefix_len,
+        }
+    }
+}
+
+#[doc(hidden)]
+#[derive(Debug)]
+pub struct DBKeyPrefix<'a> {
+    parent: &'a DBKey,
+    prefix_len: u16,
+}
+
+#[doc(hidden)]
+impl<'a> DBKeyPrefix<'a> {
+    pub fn truncate(&mut self, new_len: u16) {
+        debug_assert!(new_len <= self.prefix_len);
+        self.prefix_len = new_len;
+    }
+
+    pub fn hash_to(&self, mut stream: HashStream) -> HashStream {
+        const ZEROS: [u8; KEY_SIZE] = [0; KEY_SIZE];
+
+        let leaf_marker = if self.prefix_len == (KEY_SIZE * 8) as u16 {
+            1
+        } else {
+            0
+        };
+        stream = stream.update(&[leaf_marker]);
+
+        let mut last_prefix_byte = (self.prefix_len >> 3) as usize;
+        let bits = self.prefix_len % 8;
+
+        if last_prefix_byte > 0 {
+            // Write full bytes
+            stream = stream.update(&self.parent.data[0..last_prefix_byte]);
+        }
+
+        if bits > 0 {
+            // Write the remaining prefix bits
+            let mask: u8 = match bits {
+                1 => 0b_1000_0000,
+                2 => 0b_1100_0000,
+                3 => 0b_1110_0000,
+                4 => 0b_1111_0000,
+                5 => 0b_1111_1000,
+                6 => 0b_1111_1100,
+                7 => 0b_1111_1110,
+                _ => unreachable!("Unexpected number of trailing bits"),
+            };
+            stream = stream.update(&[self.parent.data[last_prefix_byte] & mask]);
+            last_prefix_byte += 1;
+        }
+
+        if last_prefix_byte < KEY_SIZE {
+            stream = stream.update(&ZEROS[last_prefix_byte..]);
+        }
+        stream.update(&[self.prefix_len as u8])
+    }
+}
+
+#[cfg(test)]
+mod dbkeyprefix_tests {
+    extern crate rand;
+
+    use crypto::hash;
+    use rand::Rng;
+    use super::*;
+
+    #[test]
+    fn test_leaf_key() {
+        let key = DBKey::leaf(&[1; 32]);
+        let prefix = key.hashable_prefix(256);
+        assert_eq!(
+            hash(key.as_bytes().as_ref()),
+            prefix.hash_to(HashStream::new()).hash()
+        );
+    }
+
+    #[test]
+    fn test_nonleaf_prefixes() {
+        let key = DBKey::leaf(&[42; 32]);
+        for i in 0..256 {
+            let prefix = key.hashable_prefix(i);
+            assert_eq!(
+                hash(key.truncate(i).as_bytes().as_ref()),
+                prefix.hash_to(HashStream::new()).hash()
+            );
+        }
+    }
+
+    #[test]
+    fn test_fuzz_prefixes() {
+        let mut rng = rand::thread_rng();
+        for _ in 0..32 {
+            let mut bytes = [0u8; 32];
+            rng.fill_bytes(&mut bytes);
+
+            let key = DBKey::leaf(&bytes);
+            for i in 0..256 {
+                let prefix = key.hashable_prefix(i);
+                assert_eq!(
+                    hash(key.truncate(i).as_bytes().as_ref()),
+                    prefix.hash_to(HashStream::new()).hash()
+                );
+            }
+        }
     }
 }
 

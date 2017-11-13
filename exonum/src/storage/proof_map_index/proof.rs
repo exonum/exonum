@@ -18,8 +18,7 @@ use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use crypto::{Hash, HashStream};
 
 use super::super::StorageValue;
-use super::key::{ProofMapKey, DBKey, ChildKind, KEY_SIZE};
-use super::node::BranchNode;
+use super::key::{ProofMapKey, DBKey, DBKeyPrefix, ChildKind, KEY_SIZE};
 
 impl Serialize for DBKey {
     fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
@@ -130,53 +129,52 @@ impl ::std::error::Error for MapProofError {
 }
 
 #[derive(Debug)]
-struct ContourNode {
-    key: Option<DBKey>,
-    node: Option<BranchNode>,
-    right_key: DBKey,
+struct ContourNode<'a> {
+    left_hash_and_key: Option<(Hash, DBKeyPrefix<'a>)>,
+    key_len: u16,
+    right_key_len: u16,
 }
 
-impl ContourNode {
-    fn root(init_key: &DBKey) -> Self {
+impl<'a> ContourNode<'a> {
+    fn root(child_key_len: u16) -> Self {
         ContourNode {
-            key: None,
-            node: None,
-            right_key: *init_key,
+            left_hash_and_key: None,
+            key_len: 0,
+            right_key_len: child_key_len,
         }
     }
 
-    fn new(key: DBKey, left_key: DBKey, left_hash: Hash, right_key: DBKey) -> Self {
+    fn new(key_len: u16, left_key: DBKeyPrefix<'a>, left_hash: Hash, right_key_len: u16) -> Self {
         ContourNode {
-            key: Some(key),
-            right_key,
-            node: Some({
-                let mut node = BranchNode::empty();
-                node.set_child(ChildKind::Left, &left_key, &left_hash);
-                node
-            }),
+            left_hash_and_key: Some((left_hash, left_key)),
+            key_len,
+            right_key_len,
         }
     }
 
     fn key_len(&self) -> u16 {
-        match self.key {
-            Some(ref key) => key.len(),
-            None => 0,
-        }
+        self.key_len
     }
 
     fn truncate_right_key(&mut self, to_bits: u16) {
-        self.right_key.truncate_in_place(to_bits);
+        self.right_key_len = to_bits;
     }
 
     /// Outputs the hash and the key of the node based on the finalized `right_hash` value.
-    fn finalize(self, right_hash: Hash) -> (DBKey, Hash) {
-        if let (Some(key), Some(mut node)) = (self.key, self.node) {
-            (key, {
-                node.set_child(ChildKind::Right, &self.right_key, &right_hash);
-                node.hash()
-            })
+    fn finalize(self, contour_key: &DBKey, right_hash: Hash) -> Hash {
+        if let Some((left_hash, left_key)) = self.left_hash_and_key {
+            let stream = HashStream::new().update(left_hash.as_ref()).update(
+                right_hash
+                    .as_ref(),
+            );
+            let stream = left_key.hash_to(stream);
+            let stream = contour_key.hashable_prefix(self.right_key_len).hash_to(
+                stream,
+            );
+
+            stream.hash()
         } else {
-            (self.right_key, right_hash)
+            right_hash
         }
     }
 }
@@ -375,29 +373,36 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
         }
 
         _ => {
-            let root = ContourNode::root(&entries[0].key);
+            let root = ContourNode::root(entries[0].key.len());
             let mut right_contour = vec![root];
 
             for w in entries.windows(2) {
                 let (prev, entry) = (&w[0], &w[1]);
                 let common_prefix = entry.key.common_prefix(&prev.key);
 
-                let mut fin_key_and_hash = (prev.key, prev.hash);
+                let mut fin_hash = prev.hash;
+                let mut fin_key_len = prev.key.len();
                 while let Some(mut node) = right_contour.pop() {
-                    if node.key_len() < common_prefix {
+                    let len = node.key_len();
+                    if len < common_prefix {
                         node.truncate_right_key(common_prefix);
                         right_contour.push(node);
                         break;
                     } else {
-                        fin_key_and_hash = node.finalize(fin_key_and_hash.1);
+                        if len > 0 {
+                            // `len == 0` is a special case; the node will be reinserted
+                            // to the contour, so the left child length should not be updated.
+                            fin_key_len = node.key_len();
+                        }
+                        fin_hash = node.finalize(&prev.key, fin_hash);
                     }
                 }
 
                 let node = ContourNode::new(
-                    entry.key.truncate(common_prefix), // key
-                    fin_key_and_hash.0, // left key
-                    fin_key_and_hash.1, // left hash
-                    entry.key, // right key
+                    common_prefix, // key length
+                    prev.key.hashable_prefix(fin_key_len), // left key
+                    fin_hash, // left hash
+                    entry.key.len(), // right key length
                 );
                 right_contour.push(node);
             }
@@ -405,9 +410,12 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
             // Iteratively finalize all remaining nodes in the tree. This handles the special case
             // when all keys start with the same bit(s); see the special clause in
             // `ContourNode.finalize()`.
-            let mut fin_hash = entries.last().unwrap().hash;
+            let (mut fin_hash, fin_key) = {
+                let last_entry = entries.last().unwrap();
+                (last_entry.hash, &last_entry.key)
+            };
             while let Some(node) = right_contour.pop() {
-                fin_hash = node.finalize(fin_hash).1;
+                fin_hash = node.finalize(fin_key, fin_hash);
             }
             Ok(fin_hash)
         }
@@ -668,7 +676,7 @@ where
         // Rust docs state that in the case `self.proof` and `self.entries` are sorted
         // (which is the case for `MapProof`s returned by `ProofMapIndex.get_proof()`),
         // the sort is performed very quickly.
-        proof.sort_by(|x, y| {
+        proof.sort_unstable_by(|x, y| {
             x.key.partial_cmp(&y.key).expect(
                 "Incorrectly formed keys supplied to MapProof; \
                                               keys should have `from` field set to 0",
