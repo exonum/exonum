@@ -24,9 +24,7 @@ fn test_add_to_validators() {
     let stored = proposal.stored_configuration().clone();
     testkit.propose_configuration_change(proposal);
 
-    for _ in testkit.height().0..6 {
-        testkit.create_block();
-    }
+    testkit.create_blocks_until(Height(6));
 
     assert_eq!(testkit.network().us().validator_id(), Some(ValidatorId(1)));
     assert_eq!(testkit.network().validators()[1], testkit.network().us());
@@ -50,9 +48,7 @@ fn test_exclude_from_validators() {
     let stored = proposal.stored_configuration().clone();
     testkit.propose_configuration_change(proposal);
 
-    for _ in testkit.height().0..6 {
-        testkit.create_block();
-    }
+    testkit.create_blocks_until(Height(6));
 
     assert_eq!(testkit.network().us().validator_id(), None);
     assert_eq!(testkit.network().validators().len(), 1);
@@ -84,9 +80,7 @@ fn test_change_service_config() {
     };
     testkit.propose_configuration_change(proposal);
 
-    for _ in testkit.height().0..6 {
-        testkit.create_block();
-    }
+    testkit.create_blocks_until(Height(6));
 
     assert_eq!(
         serde_json::to_value(service_cfg).unwrap(),

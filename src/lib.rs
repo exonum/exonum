@@ -600,6 +600,13 @@ impl TestKit {
         self.do_create_block(&tx_hashes);
     }
 
+    /// Creates a chain of blocks until a given height.
+    pub fn create_blocks_until(&mut self, height: Height) {
+        while self.height() < height {
+            self.create_block();
+        }
+    }
+
     /// Returns the current height of the blockchain.
     pub fn height(&self) -> Height {
         self.state().height().next()
