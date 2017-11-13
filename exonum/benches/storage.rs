@@ -19,6 +19,32 @@ extern crate rand;
 extern crate tempdir;
 extern crate exonum;
 
+#[cfg(test)]
+mod short_tests {
+    use test::Bencher;
+    use exonum::crypto::{Hash, HashStream, hash};
+    use exonum::storage::proof_map_index::ProofMapDBKey as DBKey;
+
+    #[bench]
+    fn bench_dbkeyprefix_truncate_hashing(b: &mut Bencher) {
+        let key = DBKey::leaf(&[42; 32]);
+        b.iter(|| for i in 0..256 {
+            assert_ne!(Hash::default(), hash(key.truncate(i).as_bytes().as_ref()));
+        });
+    }
+
+    #[bench]
+    fn bench_dbkeyprefix_prefix_hashing(b: &mut Bencher) {
+        let key = DBKey::leaf(&[42; 32]);
+        b.iter(|| for i in 0..256 {
+            assert_ne!(
+                Hash::default(),
+                key.hashable_prefix(i).hash_to(HashStream::new()).hash()
+            );
+        });
+    }
+}
+
 #[cfg(all(test, feature = "long_benchmarks"))]
 mod tests {
     use std::collections::HashSet;
