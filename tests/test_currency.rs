@@ -457,7 +457,7 @@ fn test_transfer_from_nonexisting_wallet() {
     let (tx_alice, key_alice) = create_wallet(&api, "Alice");
     let (tx_bob, _) = create_wallet(&api, "Bob");
     // Do not commit Alice's transaction
-    testkit.create_block_with_transactions(&[tx_bob.hash()]);
+    testkit.create_block_with_tx_hashes(&[tx_bob.hash()]);
 
     let wallet = get_wallet(&api, tx_bob.pub_key());
     assert_eq!(wallet.balance(), 100);
@@ -491,7 +491,7 @@ fn test_transfer_to_nonexisting_wallet() {
     let (tx_alice, key_alice) = create_wallet(&api, "Alice");
     let (tx_bob, _) = create_wallet(&api, "Bob");
     // Do not commit Bob's transaction
-    testkit.create_block_with_transactions(&[tx_alice.hash()]);
+    testkit.create_block_with_tx_hashes(&[tx_alice.hash()]);
 
     let wallet = get_wallet(&api, tx_alice.pub_key());
     assert_eq!(wallet.balance(), 100);
@@ -506,7 +506,7 @@ fn test_transfer_to_nonexisting_wallet() {
     transfer(&api, &tx);
 
     let old_snapshot = testkit.snapshot();
-    testkit.create_block_with_transactions(&[tx.hash()]);
+    testkit.create_block_with_tx_hashes(&[tx.hash()]);
 
     let comp = testkit.snapshot().compare(old_snapshot);
     let comp = comp.map(CurrencySchema::new);
@@ -591,7 +591,7 @@ fn test_transfers_in_single_block() {
 
     transfer(&api, &tx_a_to_b);
     transfer(&api, &tx_b_to_a);
-    testkit.create_block_with_transactions(&[tx_a_to_b.hash(), tx_b_to_a.hash()]);
+    testkit.create_block_with_tx_hashes(&[tx_a_to_b.hash(), tx_b_to_a.hash()]);
 
     let wallet = get_wallet(&api, tx_alice.pub_key());
     assert_eq!(wallet.balance(), 130);

@@ -572,13 +572,32 @@ impl TestKit {
         self.poll_events();
     }
 
+    /// Creates block with the given transactions.
+    /// Transactions that are in mempool will be ignored.
+    pub fn create_block_with_transactions(&mut self, txs: Vec<Box<Transaction>>) {
+        let tx_hashes = {
+            let mut mempool = self.mempool.write().expect(
+                "Cannot write transactions to mempool",
+            );
+
+            let mut tx_hashes = Vec::new();
+            for tx in txs {
+                let txid = tx.hash();
+                tx_hashes.push(txid);
+                mempool.insert(txid, tx);
+            }
+            tx_hashes
+        };
+        self.create_block_with_tx_hashes(&tx_hashes);
+    }
+
     /// Creates block with the specified transactions. The transactions must be previously
     /// sent to the node via API or directly put into the `channel()`.
     ///
     /// # Panics
     ///
     /// In the case any of transaction hashes are not in the mempool.
-    pub fn create_block_with_transactions(&mut self, tx_hashes: &[crypto::Hash]) {
+    pub fn create_block_with_tx_hashes(&mut self, tx_hashes: &[crypto::Hash]) {
         self.poll_events();
 
         {

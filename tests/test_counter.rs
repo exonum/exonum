@@ -270,7 +270,21 @@ fn inc_count(api: &TestKitApi, by: u64) -> TxIncrement {
 }
 
 #[test]
-fn test_inc_count() {
+fn test_inc_count_create_block() {
+    let (mut testkit, api) = init_testkit();
+    let (pubkey, key) = crypto::gen_keypair();
+    // Create a presigned transaction
+    let tx = TxIncrement::new(&pubkey, 5, &key);
+    testkit.create_block_with_transactions(vec![Box::new(tx)]);
+
+    // Check that the user indeed is persisted by the service
+    let counter: u64 = api.get(ApiKind::Service("counter"), "count");
+    assert_eq!(counter, 5);
+}
+
+
+#[test]
+fn test_inc_count_api() {
     let (mut testkit, api) = init_testkit();
     inc_count(&api, 5);
     testkit.create_block();
@@ -305,15 +319,15 @@ fn test_inc_count_with_manual_tx_control() {
     let tx_b = inc_count(&api, 3);
 
     // Empty block
-    testkit.create_block_with_transactions(&[]);
+    testkit.create_block_with_tx_hashes(&[]);
     let counter: u64 = api.get(ApiKind::Service("counter"), "count");
     assert_eq!(counter, 0);
 
-    testkit.create_block_with_transactions(&[tx_b.hash()]);
+    testkit.create_block_with_tx_hashes(&[tx_b.hash()]);
     let counter: u64 = api.get(ApiKind::Service("counter"), "count");
     assert_eq!(counter, 3);
 
-    testkit.create_block_with_transactions(&[tx_a.hash()]);
+    testkit.create_block_with_tx_hashes(&[tx_a.hash()]);
     let counter: u64 = api.get(ApiKind::Service("counter"), "count");
     assert_eq!(counter, 8);
 }
