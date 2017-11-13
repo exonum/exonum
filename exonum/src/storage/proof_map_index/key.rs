@@ -172,7 +172,7 @@ pub enum ChildKind {
 ///
 /// [`ProofMapKey`]: trait.ProofMapKey.html
 /// [`PROOF_MAP_KEY_SIZE`]: constant.PROOF_MAP_KEY_SIZE.html
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct DBKey {
     data: [u8; KEY_SIZE],
     from: u16,
@@ -363,7 +363,7 @@ impl<'a> DBKeyPrefix<'a> {
 
     pub fn hash_to(&self, stream: HashStream) -> HashStream {
         let mut buffer = [0u8; DB_KEY_SIZE];
-        
+
         if self.prefix_len == (KEY_SIZE * 8) as u16 {
             buffer[0] = LEAF_KEY_PREFIX;
             buffer[1..KEY_SIZE + 1].copy_from_slice(&self.parent.data);
@@ -377,7 +377,7 @@ impl<'a> DBKeyPrefix<'a> {
             }
             buffer[KEY_SIZE + 1] = self.prefix_len as u8;
         }
-        
+
         stream.update(&buffer)
     }
 }

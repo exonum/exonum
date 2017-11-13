@@ -368,7 +368,7 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
 
         1 => {
             if !entries[0].key.is_leaf() {
-                Err(MapProofError::NonTerminalNode(entries[0].key))
+                Err(MapProofError::NonTerminalNode(entries[0].key.clone()))
             } else {
                 Ok(hash_isolated_node(&entries[0].key, &entries[0].hash))
             }
@@ -478,8 +478,8 @@ impl<K, V> MapProofBuilder<K, V> {
     /// Adds a proof entry into the builder. The `key` must be greater than keys of
     /// all proof entries previously added to the proof.
     pub fn add_proof_entry(mut self, key: DBKey, hash: Hash) -> Self {
-        debug_assert!(if let Some(&(last_key, _)) = self.proof.last() {
-            last_key < key
+        debug_assert!(if let Some(&(ref last_key, _)) = self.proof.last() {
+            *last_key < key
         } else {
             true
         });
@@ -584,16 +584,19 @@ where
                 Some(Ordering::Less) => {
                     if key.starts_with(prev_key) {
                         return Err(MapProofError::EmbeddedKeys {
-                            prefix: *prev_key,
-                            key: *key,
+                            prefix: prev_key.clone(),
+                            key: key.clone(),
                         });
                     }
                 }
                 Some(Ordering::Equal) => {
-                    return Err(MapProofError::DuplicateKey(*key));
+                    return Err(MapProofError::DuplicateKey(key.clone()));
                 }
                 Some(Ordering::Greater) => {
-                    return Err(MapProofError::InvalidOrdering(*prev_key, *key));
+                    return Err(MapProofError::InvalidOrdering(
+                        prev_key.clone(),
+                        key.clone(),
+                    ));
                 }
                 None => unreachable!("Incomparable keys in proof"),
             }
@@ -615,11 +618,10 @@ where
                 }
 
                 Err(index) if index > 0 => {
-                    let prev_key = self.proof[index - 1].key;
-
-                    if key.starts_with(&prev_key) {
+                    let prev_key = &self.proof[index - 1].key;
+                    if key.starts_with(prev_key) {
                         return Err(MapProofError::EmbeddedKeys {
-                            prefix: prev_key,
+                            prefix: prev_key.clone(),
                             key,
                         });
                     }

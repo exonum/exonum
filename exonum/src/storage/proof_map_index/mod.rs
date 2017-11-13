@@ -536,8 +536,8 @@ where
                 contour.push(ContourNode::new(root_key, root_branch));
 
                 for (db_key, key) in searched_keys {
-                    builder = process_key(&mut contour, builder, db_key, key, |&key| {
-                        self.get_node_unchecked(&key)
+                    builder = process_key(&mut contour, builder, db_key, key, |ref key| {
+                        self.get_node_unchecked(key)
                     });
                 }
 
