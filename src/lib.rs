@@ -171,6 +171,11 @@ impl TestNode {
     pub fn change_role(&mut self, role: Option<ValidatorId>) {
         self.validator_id = role;
     }
+
+    /// Returns the service keypar.
+    pub fn service_keypair(&self) -> (&crypto::PublicKey, &crypto::SecretKey) {
+        (&self.service_public_key, &self.service_secret_key)
+    }
 }
 
 impl From<TestNode> for ValidatorKeys {
@@ -659,7 +664,7 @@ impl TestKit {
         )
     }
 
-    /// Adds a new configuration proposal
+    /// Adds a new configuration proposal.
     ///
     /// # Panics
     ///
