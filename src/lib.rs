@@ -27,7 +27,7 @@ use exonum::node::{ApiSender, ExternalMessage, NodeChannel, State as NodeState, 
 use exonum::storage::{MemoryDB, Snapshot};
 
 use futures::Stream;
-use futures::executor;
+use futures::executor::{self, Spawn};
 use iron::IronError;
 use iron::headers::{ContentType, Headers};
 use iron::status::StatusClass;
@@ -366,7 +366,7 @@ impl TestKitBuilder {
 /// (with no real network setup).
 pub struct TestKit {
     blockchain: Blockchain,
-    channel: NodeChannel,
+    events_stream: Spawn<Box<Stream<Item = (), Error = ()>>>,
     service_context: TestNodeState,
     api_context: ApiContext,
     network: TestNetwork,
@@ -397,13 +397,36 @@ impl TestKit {
             ApiSender::new(channel.api_requests.0.clone()),
         );
 
+        let mempool = Arc::new(RwLock::new(BTreeMap::new()));
+        let event_stream: Box<Stream<Item = (), Error = ()>> = {
+            let blockchain = blockchain.clone();
+            let mempool = Arc::clone(&mempool);
+            Box::new(channel.api_requests.1.greedy_fold((), move |_, event| {
+                let snapshot = blockchain.snapshot();
+                let schema = CoreSchema::new(&snapshot);
+                match event {
+                    ExternalMessage::Transaction(tx) => {
+                        let hash = tx.hash();
+                        if !schema.transactions().contains(&hash) {
+                            mempool
+                                .write()
+                                .expect("Cannot write transactions to mempool")
+                                .insert(tx.hash(), tx);
+                        }
+                    }
+                    ExternalMessage::PeerAdd(_) => { /* Ignored */ }
+                }
+            }))
+        };
+        let events_stream = executor::spawn(event_stream);
+
         TestKit {
             blockchain,
-            channel,
             api_context,
+            events_stream,
             service_context,
             network,
-            mempool: Arc::new(RwLock::new(BTreeMap::new())),
+            mempool: Arc::clone(&mempool),
             cfg_proposal: None,
         }
     }
@@ -431,31 +454,7 @@ impl TestKit {
     /// Polls the *existing* events from the event loop until exhaustion. Does not wait
     /// until new events arrive.
     pub fn poll_events(&mut self) -> Option<Result<(), ()>> {
-        // XXX: Creating a new executor each time seems very inefficient, but sharing
-        // a single executor seems to be impossible
-        // because `handler` needs to be borrowed mutably into the closure. Use `RefCell`?
-        let mempool = Arc::clone(&self.mempool);
-        let snapshot = self.blockchain.snapshot();
-        let schema = CoreSchema::new(snapshot);
-        let event_stream = self.channel.api_requests.1.by_ref().greedy_fold(
-            (),
-            |_, event| {
-                match event {
-                    ExternalMessage::Transaction(tx) => {
-                        let hash = tx.hash();
-                        if !schema.transactions().contains(&hash) {
-                            mempool
-                                .write()
-                                .expect("Cannot write transactions to mempool")
-                                .insert(tx.hash(), tx);
-                        }
-                    }
-                    ExternalMessage::PeerAdd(_) => { /* Ignored */ }
-                }
-            },
-        );
-        let mut event_exec = executor::spawn(event_stream);
-        event_exec.wait_stream()
+        self.events_stream.wait_stream()
     }
 
     /// Returns a snapshot of the current blockchain state.
