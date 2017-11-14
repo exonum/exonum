@@ -29,7 +29,10 @@ fn test_add_to_validators() {
 
     assert_eq!(testkit.network().us().validator_id(), Some(ValidatorId(1)));
     assert_eq!(testkit.network().validators()[1], testkit.network().us());
-    assert_eq!(testkit.network().us().validator_id(), testkit.state().validator_id());
+    assert_eq!(
+        testkit.network().us().validator_id(),
+        testkit.state().validator_id()
+    );
     assert_eq!(
         Schema::new(&testkit.snapshot()).actual_configuration(),
         stored
@@ -61,7 +64,10 @@ fn test_exclude_from_validators() {
 
     assert_eq!(testkit.network().us().validator_id(), None);
     assert_eq!(testkit.network().validators().len(), 1);
-    assert_eq!(testkit.network().us().validator_id(), testkit.state().validator_id());
+    assert_eq!(
+        testkit.network().us().validator_id(),
+        testkit.state().validator_id()
+    );
     assert_eq!(
         Schema::new(&testkit.snapshot()).actual_configuration(),
         stored
