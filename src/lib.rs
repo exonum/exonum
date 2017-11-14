@@ -14,7 +14,6 @@ extern crate serde_json;
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock, RwLockReadGuard};
-use std::cell::RefCell;
 
 use exonum::blockchain::{ApiContext, Blockchain, ConsensusConfig, GenesisConfig,
                          Schema as CoreSchema, Service, ServiceContext, ServiceContextMut,
@@ -48,7 +47,7 @@ pub use compare::ComparableSnapshot;
 
 /// Emulated test network.
 pub struct TestNetwork {
-    us: RefCell<TestNode>,
+    us: TestNode,
     validators: Vec<TestNode>,
 }
 
@@ -60,13 +59,13 @@ impl TestNetwork {
             .map(TestNode::new_validator)
             .collect::<Vec<_>>();
 
-        let us = RefCell::from(validators[0].clone());
+        let us = validators[0].clone();
         TestNetwork { validators, us }
     }
 
     /// Returns the node in the emulated network, from whose perspective the testkit operates.
-    pub fn us(&self) -> TestNode {
-        self.us.borrow().clone()
+    pub fn us(&self) -> &TestNode {
+        &self.us
     }
 
     /// Returns a slice of all validators in the network.
@@ -95,7 +94,7 @@ impl TestNetwork {
             })
             .collect::<Vec<_>>();
         self.validators = validators;
-        self.us.borrow_mut().clone_from(&us);
+        self.us.clone_from(&us);
     }
 }
 
@@ -206,18 +205,18 @@ impl From<TestNode> for ValidatorKeys {
 
 /// Current state of the test node.
 pub struct TestNodeState {
-    node: TestNode,
+    network: TestNetwork,
     snapshot: Box<Snapshot>,
     actual_configuration: StoredConfiguration,
     api_sender: ApiSender,
 }
 
 impl TestNodeState {
-    /// Creates a new node state for the given node with the given snapshot of the storage.
-    pub fn new(node: TestNode, snapshot: Box<Snapshot>, api_sender: ApiSender) -> Self {
+    /// Creates a new node state for the given network with the given snapshot of the storage.
+    pub fn new(network: TestNetwork, snapshot: Box<Snapshot>, api_sender: ApiSender) -> Self {
         let actual_configuration = CoreSchema::new(&snapshot).actual_configuration();
         TestNodeState {
-            node,
+            network,
             snapshot,
             actual_configuration,
             api_sender,
@@ -249,7 +248,7 @@ impl TestNodeState {
 
 impl<'a> ServiceContext for TestNodeState {
     fn validator_id(&self) -> Option<ValidatorId> {
-        self.node.validator_id()
+        self.network.us().validator_id()
     }
 
     fn snapshot(&self) -> &Snapshot {
@@ -269,11 +268,11 @@ impl<'a> ServiceContext for TestNodeState {
     }
 
     fn public_key(&self) -> &crypto::PublicKey {
-        &self.node.service_public_key
+        &self.network.us.service_public_key
     }
 
     fn secret_key(&self) -> &crypto::SecretKey {
-        &self.node.service_secret_key
+        &self.network.us.service_secret_key
     }
 
     fn actual_consensus_config(&self) -> &ConsensusConfig {
@@ -355,7 +354,7 @@ impl TestKitBuilder {
         TestKit::assemble(
             blockchain,
             TestNetwork {
-                us: RefCell::from(self.us),
+                us: self.us,
                 validators: self.validators,
             },
         )
@@ -369,7 +368,6 @@ pub struct TestKit {
     events_stream: Spawn<Box<Stream<Item = (), Error = ()>>>,
     service_context: TestNodeState,
     api_context: ApiContext,
-    network: TestNetwork,
     mempool: TxPool,
     cfg_proposal: Option<ConfigurationProposalState>,
 }
@@ -392,7 +390,7 @@ impl TestKit {
         };
 
         let service_context = TestNodeState::new(
-            network.us().clone(),
+            network,
             blockchain.snapshot(),
             ApiSender::new(channel.api_requests.0.clone()),
         );
@@ -425,7 +423,6 @@ impl TestKit {
             api_context,
             events_stream,
             service_context,
-            network,
             mempool: Arc::clone(&mempool),
             cfg_proposal: None,
         }
@@ -552,7 +549,7 @@ impl TestKit {
         }
 
         let propose = self.leader().create_propose(height, &last_hash, tx_hashes);
-        let precommits: Vec<_> = self.network
+        let precommits: Vec<_> = self.network()
             .validators()
             .iter()
             .map(|v| v.create_precommit(&propose, &block_hash))
@@ -593,8 +590,6 @@ impl TestKit {
                         cfg_proposal.us.clone(),
                         cfg_proposal.validators.clone(),
                     );
-                    // TODO Share node between network and service_context.
-                    self.service_context.node = self.network().us();
                 }
                 Committed(cfg_proposal) => {
                     self.cfg_proposal = Some(ConfigurationProposalState::Committed(cfg_proposal));
@@ -671,25 +666,25 @@ impl TestKit {
 
     /// Returns the leader on the current height. At the moment first validator.
     pub fn leader(&self) -> &TestNode {
-        &self.network.validators[0]
+        &self.network().validators[0]
     }
 
     /// Returns the reference to test network.
     pub fn network(&self) -> &TestNetwork {
-        &self.network
+        &self.service_context.network
     }
 
     /// Returns the mutable reference to test network for manual modifications.
     pub fn network_mut(&mut self) -> &mut TestNetwork {
-        &mut self.network
+        &mut self.service_context.network
     }
 
     /// Returns the actual configuration of the testkit for modification.
     pub fn actual_configuration(&self) -> TestNetworkConfiguration {
         let stored_configuration = CoreSchema::new(&self.snapshot()).actual_configuration();
         TestNetworkConfiguration::from_parts(
-            self.network.us().clone(),
-            self.network.validators.clone(),
+            self.network().us().clone(),
+            self.network().validators().into(),
             stored_configuration,
         )
     }

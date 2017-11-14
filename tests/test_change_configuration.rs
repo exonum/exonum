@@ -28,7 +28,7 @@ fn test_add_to_validators() {
     testkit.create_blocks_until(Height(6));
 
     assert_eq!(testkit.network().us().validator_id(), Some(ValidatorId(1)));
-    assert_eq!(testkit.network().validators()[1], testkit.network().us());
+    assert_eq!(&testkit.network().validators()[1], testkit.network().us());
     assert_eq!(
         testkit.network().us().validator_id(),
         testkit.state().validator_id()
