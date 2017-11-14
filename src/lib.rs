@@ -527,7 +527,7 @@ impl TestKit {
         let height = self.height();
         let last_hash = self.state().last_hash();
 
-        self.do_config_update();
+        self.update_configuration();
 
         let (block_hash, patch) = {
             let validator_id = self.leader().validator_id().expect(
@@ -571,30 +571,32 @@ impl TestKit {
         self.poll_events();
     }
 
-    // Try to modify the test network configuration.
-    fn do_config_update(&mut self) {
+    /// Update test network configuration if such an update has been scheduled
+    /// with `propose_configuration_change`.
+    fn update_configuration(&mut self) {
+        use ConfigurationProposalState::*;
+
         let height = self.height();
         if let Some(cfg_proposal) = self.cfg_proposal.take() {
             match cfg_proposal {
-                ConfigurationProposalState::Uncommited(cfg_proposal) => {
+                Uncommitted(cfg_proposal) => {
                     // Commit configuration proposal
                     let stored = cfg_proposal.stored_configuration().clone();
                     let mut fork = self.blockchain.fork();
                     CoreSchema::new(&mut fork).commit_configuration(stored);
                     let changes = fork.into_patch();
                     self.blockchain.merge(changes).unwrap();
-                    self.cfg_proposal = Some(ConfigurationProposalState::Commited(cfg_proposal));
+                    self.cfg_proposal = Some(ConfigurationProposalState::Committed(cfg_proposal));
                 }
-                ConfigurationProposalState::Commited(ref cfg_proposal)
-                    if cfg_proposal.actual_from() == height => {
+                Committed(ref cfg_proposal) if cfg_proposal.actual_from() == height => {
                     // Modify the self configuration
                     self.network_mut().update(
                         cfg_proposal.us.clone(),
                         cfg_proposal.validators.clone(),
                     );
                 }
-                ConfigurationProposalState::Commited(cfg_proposal) => {
-                    self.cfg_proposal = Some(ConfigurationProposalState::Commited(cfg_proposal));
+                Committed(cfg_proposal) => {
+                    self.cfg_proposal = Some(ConfigurationProposalState::Committed(cfg_proposal));
                 }
             }
         }
@@ -608,7 +610,7 @@ impl TestKit {
                 "Cannot write transactions to mempool",
             );
 
-            let mut tx_hashes = Vec::new();
+            let mut tx_hashes = Vec::with_capacity(txs.len());
             for tx in txs {
                 let txid = tx.hash();
                 tx_hashes.push(txid);
@@ -700,7 +702,7 @@ impl TestKit {
     pub fn propose_configuration_change(&mut self, proposal: TestNetworkConfiguration) {
         assert!(self.height() < proposal.actual_from());
         assert!(self.cfg_proposal.is_none());
-        self.cfg_proposal = Some(ConfigurationProposalState::Uncommited(proposal));
+        self.cfg_proposal = Some(ConfigurationProposalState::Uncommitted(proposal));
     }
 }
 
@@ -715,8 +717,8 @@ pub struct TestNetworkConfiguration {
 // A new configuration proposal state
 #[derive(Debug)]
 enum ConfigurationProposalState {
-    Uncommited(TestNetworkConfiguration),
-    Commited(TestNetworkConfiguration),
+    Uncommitted(TestNetworkConfiguration),
+    Committed(TestNetworkConfiguration),
 }
 
 impl TestNetworkConfiguration {
