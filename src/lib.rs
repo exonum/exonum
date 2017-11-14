@@ -593,6 +593,8 @@ impl TestKit {
                         cfg_proposal.us.clone(),
                         cfg_proposal.validators.clone(),
                     );
+                    // TODO Share node between network and service_context.
+                    self.service_context.node = self.network().us();
                 }
                 Committed(cfg_proposal) => {
                     self.cfg_proposal = Some(ConfigurationProposalState::Committed(cfg_proposal));
