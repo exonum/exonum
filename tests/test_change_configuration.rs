@@ -15,7 +15,7 @@ fn test_add_to_validators() {
     let mut testkit = TestKitBuilder::auditor().with_validators(1).create();
 
     let proposal = {
-        let mut cfg = testkit.actual_configuration();
+        let mut cfg = testkit.configuration_change_proposal();
         let mut validators = cfg.validators().to_vec();
         validators.push(testkit.network().us().clone());
         cfg.set_actual_from(Height(5));
@@ -23,7 +23,7 @@ fn test_add_to_validators() {
         cfg
     };
     let stored = proposal.stored_configuration().clone();
-    testkit.propose_configuration_change(proposal);
+    testkit.commit_configuration_change(proposal);
 
     testkit.create_blocks_until(Height(6));
 
@@ -51,14 +51,14 @@ fn test_exclude_from_validators() {
     let mut testkit = TestKitBuilder::validator().with_validators(2).create();
 
     let proposal = {
-        let mut cfg = testkit.actual_configuration();
+        let mut cfg = testkit.configuration_change_proposal();
         let validator = cfg.validators()[1].clone();
         cfg.set_actual_from(Height(5));
         cfg.set_validators(vec![validator]);
         cfg
     };
     let stored = proposal.stored_configuration().clone();
-    testkit.propose_configuration_change(proposal);
+    testkit.commit_configuration_change(proposal);
 
     testkit.create_blocks_until(Height(6));
 
@@ -96,12 +96,12 @@ fn test_change_service_config() {
 
     let mut testkit = TestKitBuilder::validator().create();
     let proposal = {
-        let mut cfg = testkit.actual_configuration();
+        let mut cfg = testkit.configuration_change_proposal();
         cfg.set_service_config("my_service", service_cfg.clone());
         cfg.set_actual_from(Height(5));
         cfg
     };
-    testkit.propose_configuration_change(proposal);
+    testkit.commit_configuration_change(proposal);
 
     testkit.create_blocks_until(Height(6));
 

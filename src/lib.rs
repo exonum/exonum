@@ -16,8 +16,8 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock, RwLockReadGuard};
 
 use exonum::blockchain::{ApiContext, Blockchain, ConsensusConfig, GenesisConfig,
-                         Schema as CoreSchema, Service, ServiceContext, ServiceContextMut,
-                         StoredConfiguration, Transaction, ValidatorKeys};
+                         Schema as CoreSchema, Service, ServiceContext, StoredConfiguration,
+                         Transaction, ValidatorKeys};
 use exonum::crypto;
 use exonum::helpers::{Height, Round, ValidatorId};
 use exonum::messages::{Message, Precommit, Propose};
@@ -289,9 +289,7 @@ impl<'a> ServiceContext for TestNodeState {
     fn transaction_sender(&self) -> &TransactionSend {
         &self.api_sender
     }
-}
 
-impl<'a> ServiceContextMut for TestNodeState {
     fn update(&mut self, blockchain: &Blockchain) {
         let snapshot = blockchain.snapshot();
         self.actual_configuration = CoreSchema::new(&snapshot).actual_configuration();
@@ -568,7 +566,7 @@ impl TestKit {
     }
 
     /// Update test network configuration if such an update has been scheduled
-    /// with `propose_configuration_change`.
+    /// with `commit_configuration_change`.
     fn update_configuration(&mut self) {
         use ConfigurationProposalState::*;
 
@@ -582,7 +580,7 @@ impl TestKit {
                     CoreSchema::new(&mut fork).commit_configuration(stored);
                     let changes = fork.into_patch();
                     self.blockchain.merge(changes).unwrap();
-                    self.cfg_proposal = Some(ConfigurationProposalState::Committed(cfg_proposal));
+                    self.cfg_proposal = Some(Committed(cfg_proposal));
                 }
                 Committed(ref cfg_proposal) if cfg_proposal.actual_from() == height => {
                     // Modify the self configuration
@@ -592,7 +590,7 @@ impl TestKit {
                     );
                 }
                 Committed(cfg_proposal) => {
-                    self.cfg_proposal = Some(ConfigurationProposalState::Committed(cfg_proposal));
+                    self.cfg_proposal = Some(Committed(cfg_proposal));
                 }
             }
         }
@@ -679,8 +677,9 @@ impl TestKit {
         &mut self.service_context.network
     }
 
-    /// Returns the actual configuration of the testkit for modification.
-    pub fn actual_configuration(&self) -> TestNetworkConfiguration {
+    /// Returns a copy of the actual configuration of the testkit.
+    /// The returned configuration could be modified for use with `commit_configuration_change` method.
+    pub fn configuration_change_proposal(&self) -> TestNetworkConfiguration {
         let stored_configuration = CoreSchema::new(&self.snapshot()).actual_configuration();
         TestNetworkConfiguration::from_parts(
             self.network().us().clone(),
@@ -695,10 +694,11 @@ impl TestKit {
     ///
     /// - If `actual_from` is less than current height or equals.
     /// - If configuration change has been already proposed but not executed.
-    pub fn propose_configuration_change(&mut self, proposal: TestNetworkConfiguration) {
+    pub fn commit_configuration_change(&mut self, proposal: TestNetworkConfiguration) {
+        use self::ConfigurationProposalState::*;
         assert!(self.height() < proposal.actual_from());
         assert!(self.cfg_proposal.is_none());
-        self.cfg_proposal = Some(ConfigurationProposalState::Uncommitted(proposal));
+        self.cfg_proposal = Some(Uncommitted(proposal));
     }
 }
 
