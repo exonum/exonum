@@ -598,9 +598,9 @@ impl TestKit {
 
     /// Creates block with the given transactions.
     /// Transactions that are in mempool will be ignored.
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// If the one of transactions has been already committed to the blockchain.
     pub fn create_block_with_transactions(&mut self, txs: Vec<Box<Transaction>>) {
         let tx_hashes = {
@@ -613,7 +613,11 @@ impl TestKit {
             let schema = CoreSchema::new(&snapshot);
             for tx in txs {
                 let txid = tx.hash();
-                assert!(!schema.transactions().contains(&txid), "Given transaction is already committed: {:?}", tx);
+                assert!(
+                    !schema.transactions().contains(&txid),
+                    "Given transaction is already committed: {:?}",
+                    tx
+                );
                 tx_hashes.push(txid);
                 mempool.insert(txid, tx);
             }
@@ -685,7 +689,8 @@ impl TestKit {
     }
 
     /// Returns a copy of the actual configuration of the testkit.
-    /// The returned configuration could be modified for use with `commit_configuration_change` method.
+    /// The returned configuration could be modified for use with
+    /// `commit_configuration_change` method.
     pub fn configuration_change_proposal(&self) -> TestNetworkConfiguration {
         let stored_configuration = CoreSchema::new(&self.snapshot()).actual_configuration();
         TestNetworkConfiguration::from_parts(
