@@ -282,6 +282,16 @@ fn test_inc_count_create_block() {
     assert_eq!(counter, 5);
 }
 
+#[should_panic(expected = "Given transaction is already committed")]
+#[test]
+fn test_inc_count_create_block_with_committed_transaction() {
+    let (mut testkit, _) = init_testkit();
+    let (pubkey, key) = crypto::gen_keypair();
+    // Create a presigned transaction
+    testkit.create_block_with_transactions(txvec![TxIncrement::new(&pubkey, 5, &key)]);
+    // Create another block with the same transaction
+    testkit.create_block_with_transactions(txvec![TxIncrement::new(&pubkey, 5, &key)]);
+}
 
 #[test]
 fn test_inc_count_api() {

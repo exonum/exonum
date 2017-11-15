@@ -598,6 +598,10 @@ impl TestKit {
 
     /// Creates block with the given transactions.
     /// Transactions that are in mempool will be ignored.
+    /// 
+    /// # Panics
+    /// 
+    /// If the one of transactions has been already committed to the blockchain.
     pub fn create_block_with_transactions(&mut self, txs: Vec<Box<Transaction>>) {
         let tx_hashes = {
             let mut mempool = self.mempool.write().expect(
@@ -605,8 +609,11 @@ impl TestKit {
             );
 
             let mut tx_hashes = Vec::with_capacity(txs.len());
+            let snapshot = self.snapshot();
+            let schema = CoreSchema::new(&snapshot);
             for tx in txs {
                 let txid = tx.hash();
+                assert!(!schema.transactions().contains(&txid), "Given transaction is already committed: {:?}", tx);
                 tx_hashes.push(txid);
                 mempool.insert(txid, tx);
             }
