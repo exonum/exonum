@@ -178,12 +178,13 @@ pub trait ServiceContext {
 
     /// Returns reference to the transaction sender.
     fn transaction_sender(&self) -> &TransactionSend;
-}
 
-/// Mutable version of the `ServiceContext` for internal purpose only.
-#[doc(hidden)]
-pub trait ServiceContextMut: ServiceContext {
-    /// Modify the service context by the latest changes in blockchain.
+    /// Updates the context of the service by the latest changes in blockchain.
+    /// `Blockchain` instance invokes this function before the `handle_commit` call.
+    ///
+    /// This method is necessary if you want to implement an alternative exonum node.
+    /// For example, you can implement special node without consensus for regression
+    /// testing of services business logic.
     fn update(&mut self, blockchain: &Blockchain);
 }
 

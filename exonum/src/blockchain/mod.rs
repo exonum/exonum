@@ -47,8 +47,7 @@ pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
 pub use self::schema::{Schema, TxLocation, gen_prefix};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{ValidatorKeys, StoredConfiguration, ConsensusConfig, TimeoutAdjusterConfig};
-pub use self::service::{Service, Transaction, ServiceContext, ServiceContextMut, ApiContext,
-                        SharedNodeState};
+pub use self::service::{Service, Transaction, ServiceContext, ApiContext, SharedNodeState};
 
 mod block;
 mod schema;
@@ -320,16 +319,15 @@ impl Blockchain {
     /// After that invokes `handle_commit` for each service in order of their identifiers
     /// and returns the list of transactions which which were created by the `handle_commit` event.
     #[cfg_attr(feature = "flame_profile", flame)]
-    pub fn commit<'a, I, S>(
+    pub fn commit<'a, I>(
         &mut self,
-        context: &mut S,
+        context: &mut ServiceContext,
         patch: &Patch,
         block_hash: Hash,
         precommits: I,
     ) -> Result<(), Error>
     where
         I: Iterator<Item = &'a Precommit>,
-        S: ServiceContextMut,
     {
         let patch = {
             let mut fork = {

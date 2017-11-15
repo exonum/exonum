@@ -17,8 +17,8 @@ use std::collections::HashSet;
 use std::fmt;
 
 use crypto::{Hash, HexValue, PublicKey, SecretKey};
-use blockchain::{Blockchain, ConsensusConfig, Schema, Service, ServiceContext, ServiceContextMut,
-                 Transaction, ValidatorKeys};
+use blockchain::{Blockchain, ConsensusConfig, Schema, Service, ServiceContext, Transaction,
+                 ValidatorKeys};
 use messages::{BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote,
                PrevotesRequest, Propose, ProposeRequest, RawTransaction, TransactionsRequest};
 use helpers::{Height, Round, ValidatorId};
@@ -93,9 +93,7 @@ impl<'a, 'b> ServiceContext for NodeHandlerContext<'a, 'b> {
     fn transaction_sender(&self) -> &TransactionSend {
         &self.api_sender
     }
-}
 
-impl<'a, 'b> ServiceContextMut for NodeHandlerContext<'a, 'b> {
     fn update(&mut self, blockchain: &Blockchain) {
         // Update configuration
         let snapshot = blockchain.snapshot();
