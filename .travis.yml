@@ -1,13 +1,26 @@
 language: rust
+
 rust:
   - stable
+
+addons:
+  apt:
+    sources:
+    - sourceline: 'ppa:giskou/librocksdb'
+    packages:
+    - librocksdb-dev
+    - libsnappy-dev
+
 cache: cargo
 sudo: false
 dist: trusty
+
 env:
   global:
     - CLIPPY_VERS=0.0.170
     - RUSTFMT_VERS=0.9.0
+    - ROCKSDB_LIB_DIR=/usr/lib/x86_64-linux-gnu
+    - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
   matrix:
     - FEATURE=test
 script:
