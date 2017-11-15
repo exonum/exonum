@@ -59,13 +59,13 @@ struct RocksDBIterator {
 
 impl RocksDB {
     /// Open a database stored in the specified path with the specified options.
-    pub fn open<P: AsRef<Path>>(path: P, options: RocksDBOptions) -> Result<RocksDB> {
+    pub fn open<P: AsRef<Path>>(path: P, options: &RocksDBOptions) -> Result<RocksDB> {
         let db = {
             if let Ok(names) = get_cf_names(&path) {
                 let cf_names = names.iter().map(|name| name.as_str()).collect::<Vec<_>>();
-                _RocksDB::open_cf(&options, path, cf_names.as_ref())?
+                _RocksDB::open_cf(options, path, cf_names.as_ref())?
             } else {
-                _RocksDB::open(&options, path)?
+                _RocksDB::open(options, path)?
             }
         };
         Ok(RocksDB { db: Arc::new(db) })

@@ -262,7 +262,7 @@ impl StorageValue for PublicKey {
 
 impl StorageValue for RawMessage {
     fn into_bytes(self) -> Vec<u8> {
-        self.as_ref().as_ref().to_vec()
+        self.as_ref().to_vec()
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
