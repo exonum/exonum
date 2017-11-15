@@ -29,19 +29,17 @@ impl ClapBackend {
         I: IntoIterator<Item = T>,
         T: Into<OsString> + Clone,
     {
-        let app = clap::App::new("Exonum application based on fabric configuration.")
-            .version(crate_version!())
-            .author(crate_authors!("\n"))
-            .about(
-                "It contain basic set of command, to deploy network on exonum.",
-            );
-
         let subcommands: Vec<_> = commands
             .iter()
             .map(|command| ClapBackend::command_into_subcommand(command))
             .collect();
-
-        let matches = app.subcommands(subcommands.into_iter())
+        let matches = clap::App::new("Exonum application based on fabric configuration.")
+            .version(crate_version!())
+            .author(crate_authors!("\n"))
+            .about(
+                "It contain basic set of command, to deploy network on exonum.",
+            )
+            .subcommands(subcommands.into_iter())
             .get_matches_from_safe(line)
             .unwrap();
 
@@ -59,17 +57,17 @@ impl ClapBackend {
     }
 
     pub fn execute(commands: &[CollectedCommand]) -> Feedback {
-        let app = clap::App::new("Exonum application based on fabric configuration.")
-            .version(crate_version!())
-            .author(crate_authors!("\n"))
-            .about("Exonum application based on fabric configuration.");
-
         let subcommands: Vec<_> = commands
             .iter()
             .map(|command| ClapBackend::command_into_subcommand(command))
             .collect();
 
-        let matches = app.subcommands(subcommands.into_iter()).get_matches();
+        let matches = clap::App::new("Exonum application based on fabric configuration.")
+            .version(crate_version!())
+            .author(crate_authors!("\n"))
+            .about("Exonum application based on fabric configuration.")
+            .subcommands(subcommands.into_iter())
+            .get_matches();
 
         let subcommand = matches.subcommand();
         for command in commands {
