@@ -995,9 +995,9 @@ impl TestKitApi {
         )
     }
 
-    fn post_internal<T, D>(mount: &Mount, endpoint: &str, transaction: &T) -> D
+    fn post_internal<T, D>(mount: &Mount, endpoint: &str, data: &T) -> D
     where
-        T: Transaction + Serialize,
+        T: Serialize,
         for<'de> D: Deserialize<'de>,
     {
         let url = format!("http://localhost:3000/{}", endpoint);
@@ -1009,9 +1009,9 @@ impl TestKitApi {
                     headers.set(ContentType::json());
                     headers
                 },
-                &serde_json::to_string(&transaction).expect("Cannot serialize transaction to JSON"),
+                &serde_json::to_string(&data).expect("Cannot serialize data to JSON"),
                 mount,
-            ).expect("Cannot send transaction");
+            ).expect("Cannot send data");
 
         let resp = response::extract_body_to_string(resp);
         serde_json::from_str(&resp).expect("Cannot parse result")
@@ -1023,7 +1023,7 @@ impl TestKitApi {
     /// gets to a block via one of `create_block*()` methods.
     pub fn post<T, D>(&self, kind: ApiKind, endpoint: &str, transaction: &T) -> D
     where
-        T: Transaction + Serialize,
+        T: Serialize,
         for<'de> D: Deserialize<'de>,
     {
         TestKitApi::post_internal(
@@ -1039,7 +1039,7 @@ impl TestKitApi {
     /// gets to a block via one of `create_block*()` methods.
     pub fn post_private<T, D>(&self, kind: ApiKind, endpoint: &str, transaction: &T) -> D
     where
-        T: Transaction + Serialize,
+        T: Serialize,
         for<'de> D: Deserialize<'de>,
     {
         TestKitApi::post_internal(
