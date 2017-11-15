@@ -26,8 +26,14 @@
 
 #[macro_use]
 extern crate exonum_profiler;
+extern crate slog_term;
+extern crate slog_json;
 #[macro_use]
-extern crate log;
+extern crate slog_scope;
+#[macro_use(slog_info, slog_trace,
+slog_debug, slog_warn, slog_error, slog_log, slog_record, slog_b,
+slog_record_static, slog_kv, slog_o)]
+extern crate slog;
 extern crate byteorder;
 extern crate exonum_sodiumoxide as sodiumoxide;
 extern crate exonum_rocksdb as rocksdb;

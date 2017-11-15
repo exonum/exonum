@@ -14,7 +14,6 @@
 
 //! Different assorted utilities.
 
-use log::{LogRecord, LogLevel, SetLoggerError};
 use env_logger::LogBuilder;
 use colored::*;
 
@@ -24,6 +23,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use blockchain::{GenesisConfig, ValidatorKeys};
 use node::NodeConfig;
 use crypto::gen_keypair;
+
+use slog::Drain;
+use slog_term;
 
 pub use self::types::{Height, Round, ValidatorId, Milliseconds};
 
@@ -35,15 +37,17 @@ pub mod config;
 pub mod metrics;
 
 /// Performs the logger initialization.
-pub fn init_logger() -> Result<(), SetLoggerError> {
-    let mut builder = LogBuilder::new();
-    builder.format(format_log_record);
+pub fn init_logger() -> Result<(), ()> {
+    let plain = slog_term::PlainSyncDecorator::new(::std::io::stdout());
+    let log = ::slog::Logger::root(
+        slog_term::FullFormat::new(plain)
+            .build().fuse(), slog_o!()
+    );
 
-    if env::var("RUST_LOG").is_ok() {
-        builder.parse(&env::var("RUST_LOG").unwrap());
-    }
+    // Make sure to save the guard, see documentation for more information
+    let _guard = ::slog_scope::set_global_logger(log).cancel_reset();
 
-    builder.init()
+    Ok(())
 }
 
 /// Generates testnet configuration.
@@ -102,57 +106,3 @@ fn has_colors() -> bool {
     }
 }
 
-fn format_log_record(record: &LogRecord) -> String {
-    let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-    let secs = ts.as_secs().to_string();
-    let millis = (u64::from(ts.subsec_nanos()) / 1_000_000).to_string();
-
-    let module = record.location().module_path();
-    let file = record.location().file();
-    let line = record.location().line();
-
-    let source_path;
-    let verbose_src_path = match env::var("RUST_VERBOSE_PATH") {
-        Ok(val) => val.parse::<bool>().unwrap_or(false),
-        Err(_) => false,
-    };
-    if verbose_src_path {
-        source_path = format!("{}:{}:{}", module, file, line);
-    } else {
-        source_path = module.to_string();
-    }
-
-    if has_colors() {
-        let level = match record.level() {
-            LogLevel::Error => "ERROR".red(),
-            LogLevel::Warn => "WARN".yellow(),
-            LogLevel::Info => "INFO".green(),
-            LogLevel::Debug => "DEBUG".cyan(),
-            LogLevel::Trace => "TRACE".white(),
-        };
-        format!(
-            "[{} : {:03}] - [ {} ] - {} - {}",
-            secs.bold(),
-            millis.bold(),
-            level,
-            &source_path,
-            record.args()
-        )
-    } else {
-        let level = match record.level() {
-            LogLevel::Error => "ERROR",
-            LogLevel::Warn => "WARN",
-            LogLevel::Info => "INFO",
-            LogLevel::Debug => "DEBUG",
-            LogLevel::Trace => "TRACE",
-        };
-        format!(
-            "[{} : {:03}] - [ {} ] - {} - {}",
-            secs,
-            millis,
-            level,
-            &source_path,
-            record.args()
-        )
-    }
-}
