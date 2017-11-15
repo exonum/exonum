@@ -971,6 +971,18 @@ impl TestKitApi {
         )
     }
 
+    /// Gets information from a private endpoint of the node.
+    pub fn get_private<D>(&self, kind: ApiKind, endpoint: &str) -> D
+    where
+        for<'de> D: Deserialize<'de>,
+    {
+        TestKitApi::get_internal(
+            &self.public_mount,
+            &format!("{}/{}", kind.into_prefix(), endpoint),
+            false,
+        )
+    }
+
     /// Gets an error from a public endpoint of the node.
     pub fn get_err<D>(&self, kind: ApiKind, endpoint: &str) -> D
     where
