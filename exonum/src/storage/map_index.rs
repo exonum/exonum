@@ -525,7 +525,7 @@ mod tests {
             use storage::{RocksDB, RocksDBOptions};
             let mut opts = RocksDBOptions::default();
             opts.create_if_missing(true);
-            Box::new(RocksDB::open(path, opts).unwrap())
+            Box::new(RocksDB::open(path, &opts).unwrap())
         }
 
         #[test]

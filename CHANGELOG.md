@@ -11,11 +11,17 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Added a new function `merge_sync`. In this function a write will be flushed from the operating system buffer cache before the write is considered complete. (#368)
 - Allow creating auditor node from command line. (#364)
 
+### Changed
+- Changed a signature of `open` function in a `rocksdb` module. `RocksDBOptions` should pass by the reference. (#369)
+
+### Fixed
+- Fixed `crate_authors!` macro usage, this macro can't return static string in new clap version. (#370)
+
 ## 0.3 - 2017-11-02
 
 ### Added
-- New events implementation based on tokio with the separated queues for network events and timeouts and different threads for the network and node code (#300)
-- Add new index `SparseListIndex`. It is a list of items stored in sequential order. Similar to `ListIndex` but it may contain indexes without elements (#312)
+- New events implementation based on the `tokio` with the separated queues for network events and timeouts and different threads for the network and node code (#300)
+- Added a new index `SparseListIndex`. It is a list of items stored in sequential order. Similar to `ListIndex` but it may contain indexes without elements (#312)
 - Implement `FromStr` and `ToString` traits for public sodium types (#318)
 - Add a new macro `metric!` for collecting statistical information (#329)
 - Make type `DBKey` public because it is used in `MapProof` (#306)
@@ -27,8 +33,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Changed a signature of `gen_prefix` function in a `schema` module (#178)
 - `NodeBuilder` works with `ServiceFactory` as trait object instead (#357)
 - Debug formatting for crypto types are improved (#353)
-- Add description of deserialization error for message types (#337)
-- Clarify `Transaction.info()` usage (#345)
+- Added description of deserialization error for message types (#337)
+- Clarified `Transaction.info()` usage (#345)
 
 ### Removed
 - Support of `LevelDB` is removed (#178)

@@ -323,7 +323,7 @@ mod rocksdb_tests {
     fn create_database(path: &Path) -> Box<Database> {
         let mut opts = RocksDBOptions::default();
         opts.create_if_missing(true);
-        Box::new(RocksDB::open(path, opts).unwrap())
+        Box::new(RocksDB::open(path, &opts).unwrap())
     }
 
     fn create_blockchain(path: &Path) -> Blockchain {

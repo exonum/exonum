@@ -598,7 +598,7 @@ pub struct Node {
 
 impl NodeChannel {
     /// Creates `NodeChannel` with the given pool capacitites.
-    pub fn new(buffer_sizes: EventsPoolCapacity) -> NodeChannel {
+    pub fn new(buffer_sizes: &EventsPoolCapacity) -> NodeChannel {
         NodeChannel {
             network_requests: mpsc::channel(buffer_sizes.network_requests_capacity),
             timeout_requests: mpsc::channel(buffer_sizes.timeout_requests_capacity),
@@ -660,7 +660,7 @@ impl Node {
         };
         let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
         let system_state = Box::new(DefaultSystemState(node_cfg.listen_address));
-        let channel = NodeChannel::new(config.mempool.events_pool_capacity.clone());
+        let channel = NodeChannel::new(&config.mempool.events_pool_capacity);
         let network_config = config.network;
         let handler = NodeHandler::new(
             blockchain,
@@ -691,7 +691,7 @@ impl Node {
             core.handle().spawn(
                 timeouts_part.run(handle).map_err(log_error),
             );
-            let network_handler = network_part.run(core.handle());
+            let network_handler = network_part.run(&core.handle());
             core.run(network_handler).map(drop).map_err(|e| {
                 other_error(&format!("An error in the `Network` thread occured: {}", e))
             })
