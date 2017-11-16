@@ -20,6 +20,7 @@ use std::ops::Deref;
 
 use crypto::{PublicKey, SecretKey, Signature, sign, verify, Hash, hash, SIGNATURE_LENGTH};
 use encoding::{Field, Error, Result as StreamStructResult, Offset, CheckedOffset};
+use encoding::serialize::{HexValue, FromHexError, ToHex};
 
 /// Length of the message header.
 pub const HEADER_LENGTH: usize = 10;
@@ -278,5 +279,27 @@ impl Message for RawMessage {
 
     fn verify_signature(&self, pub_key: &PublicKey) -> bool {
         verify(self.signature(), self.body(), pub_key)
+    }
+}
+
+impl HexValue for RawMessage {
+    fn to_hex(&self) -> String {
+        self.as_ref().to_hex()
+    }
+
+    fn from_hex<T: AsRef<str>>(v: T) -> Result<Self, FromHexError> {
+        let vec = Vec::<u8>::from_hex(v.as_ref())?;
+        Ok(RawMessage::new(MessageBuffer::from_vec(vec)))
+    }
+}
+
+impl<M: FromRaw> HexValue for M {
+    fn to_hex(&self) -> String {
+        self.raw().to_hex()
+    }
+
+    fn from_hex<T: AsRef<str>>(v: T) -> Result<Self, FromHexError> {
+        let raw = RawMessage::from_hex(v)?;
+        M::from_raw(raw).map_err(|_| FromHexError::InvalidHexLength)
     }
 }

@@ -216,6 +216,12 @@ macro_rules! message {
             })*
         }
 
+        impl AsRef<$crate::messages::RawMessage> for $name {
+            fn as_ref(&self) -> &$crate::messages::RawMessage {
+                $crate::messages::Message::raw(self)
+            }
+        }
+
         impl $crate::storage::StorageValue for $name {
             fn hash(&self) -> $crate::crypto::Hash {
                 $crate::messages::Message::hash(self)
