@@ -799,7 +799,7 @@ impl State {
     }
 
     /// Adds propose from other node. Returns `ProposeState` if it is a new propose.
-    pub fn add_propose(&mut self, msg: Propose) -> Option<&ProposeState> {
+    pub fn add_propose(&mut self, msg: &Propose) -> Option<&ProposeState> {
         let propose_hash = msg.hash();
         let txs = &self.transactions.read().expect("Expected read lock");
         match self.proposes.entry(propose_hash) {

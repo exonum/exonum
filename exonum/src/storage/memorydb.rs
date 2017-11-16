@@ -74,6 +74,10 @@ impl Database for MemoryDB {
         }
         Ok(())
     }
+
+    fn merge_sync(&mut self, patch: Patch) -> Result<()> {
+        self.merge(patch)
+    }
 }
 
 impl Snapshot for MemoryDB {

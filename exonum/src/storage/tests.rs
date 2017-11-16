@@ -199,7 +199,7 @@ mod rocksdb_tests {
     fn rocksdb_database(path: &Path) -> RocksDB {
         let mut options = RocksDBOptions::default();
         options.create_if_missing(true);
-        RocksDB::open(path, options).unwrap()
+        RocksDB::open(path, &options).unwrap()
     }
 
     #[test]

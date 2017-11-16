@@ -70,14 +70,14 @@ impl NodeHandler {
 
         trace!("Handle message={:?}", msg);
         match msg {
-            ConsensusMessage::Propose(msg) => self.handle_propose(key, msg),
-            ConsensusMessage::Prevote(msg) => self.handle_prevote(key, msg),
-            ConsensusMessage::Precommit(msg) => self.handle_precommit(key, msg),
+            ConsensusMessage::Propose(msg) => self.handle_propose(key, &msg),
+            ConsensusMessage::Prevote(msg) => self.handle_prevote(key, &msg),
+            ConsensusMessage::Precommit(msg) => self.handle_precommit(key, &msg),
         }
     }
 
     /// Handles the `Propose` message. For details see the message documentation.
-    pub fn handle_propose(&mut self, from: PublicKey, msg: Propose) {
+    pub fn handle_propose(&mut self, from: PublicKey, msg: &Propose) {
         debug_assert_eq!(
             Some(from),
             self.state.consensus_public_key_of(msg.validator())
@@ -117,13 +117,13 @@ impl NodeHandler {
 
         trace!("Handle propose");
         // Add propose
-        let (hash, has_unknown_txs) = match self.state.add_propose(msg.clone()) {
+        let (hash, has_unknown_txs) = match self.state.add_propose(msg) {
             Some(state) => (state.hash(), state.has_unknown_txs()),
             None => return,
         };
 
         // Remove request info
-        let known_nodes = self.remove_request(RequestData::Propose(hash));
+        let known_nodes = self.remove_request(&RequestData::Propose(hash));
 
         if has_unknown_txs {
             trace!("REQUEST TRANSACTIONS");
@@ -140,7 +140,7 @@ impl NodeHandler {
     /// Handles the `Block` message. For details see the message documentation.
     // TODO write helper function which returns Result (ECR-123)
     #[cfg_attr(feature = "flame_profile", flame)]
-    pub fn handle_block(&mut self, msg: BlockResponse) {
+    pub fn handle_block(&mut self, msg: &BlockResponse) {
         // Request are sended to us
         if msg.to() != self.state.consensus_public_key() {
             error!(
@@ -281,7 +281,7 @@ impl NodeHandler {
     }
 
     /// Handles the `Prevote` message. For details see the message documentation.
-    pub fn handle_prevote(&mut self, from: PublicKey, msg: Prevote) {
+    pub fn handle_prevote(&mut self, from: PublicKey, msg: &Prevote) {
         trace!("Handle prevote");
 
         debug_assert_eq!(
@@ -290,7 +290,7 @@ impl NodeHandler {
         );
 
         // Add prevote
-        let has_consensus = self.state.add_prevote(&msg);
+        let has_consensus = self.state.add_prevote(msg);
 
         // Request propose or transactions
         let has_propose_with_txs = self.request_propose_or_txs(msg.propose_hash(), from);
@@ -313,7 +313,7 @@ impl NodeHandler {
     /// +2/3 pre-votes.
     pub fn has_majority_prevotes(&mut self, prevote_round: Round, propose_hash: &Hash) {
         // Remove request info
-        self.remove_request(RequestData::Prevotes(prevote_round, *propose_hash));
+        self.remove_request(&RequestData::Prevotes(prevote_round, *propose_hash));
         // Lock to propose
         if self.state.locked_round() < prevote_round && self.state.propose(propose_hash).is_some() {
             self.lock(prevote_round, *propose_hash);
@@ -392,13 +392,13 @@ impl NodeHandler {
                     }
                 }
                 // Remove request info
-                self.remove_request(RequestData::Prevotes(round, propose_hash));
+                self.remove_request(&RequestData::Prevotes(round, propose_hash));
             }
         }
     }
 
     /// Handles the `Precommit` message. For details see the message documentation.
-    pub fn handle_precommit(&mut self, from: PublicKey, msg: Precommit) {
+    pub fn handle_precommit(&mut self, from: PublicKey, msg: &Precommit) {
         trace!("Handle precommit");
 
         debug_assert_eq!(
@@ -407,7 +407,7 @@ impl NodeHandler {
         );
 
         // Add precommit
-        let has_consensus = self.state.add_precommit(&msg);
+        let has_consensus = self.state.add_precommit(msg);
 
         // Request propose
         if self.state.propose(msg.propose_hash()).is_none() {
@@ -550,7 +550,7 @@ impl NodeHandler {
         let full_proposes = self.state.add_transaction(hash, tx, false);
         // Go to has full propose if we get last transaction
         for (hash, round) in full_proposes {
-            self.remove_request(RequestData::Transactions(hash));
+            self.remove_request(&RequestData::Transactions(hash));
             self.has_full_propose(hash, round);
         }
     }
@@ -583,7 +583,7 @@ impl NodeHandler {
         let full_proposes = self.state.add_transaction(hash, msg, false);
         // Go to has full propose if we get last transaction
         for (hash, round) in full_proposes {
-            self.remove_request(RequestData::Transactions(hash));
+            self.remove_request(&RequestData::Transactions(hash));
             self.has_full_propose(hash, round);
         }
     }
@@ -685,13 +685,13 @@ impl NodeHandler {
     }
 
     /// Handles request timeout by sending the corresponding request message to a peer.
-    pub fn handle_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
+    pub fn handle_request_timeout(&mut self, data: &RequestData, peer: Option<PublicKey>) {
         trace!("HANDLE REQUEST TIMEOUT");
         // FIXME: check height?
-        if let Some(peer) = self.state.retry(&data, peer) {
+        if let Some(peer) = self.state.retry(data, peer) {
             self.add_request_timeout(data.clone(), Some(peer));
 
-            let message = match data {
+            let message = match *data {
                 RequestData::Propose(ref propose_hash) => {
                     ProposeRequest::new(
                         self.state.consensus_public_key(),
@@ -838,9 +838,9 @@ impl NodeHandler {
     }
 
     /// Removes the specified request from the pending request list.
-    pub fn remove_request(&mut self, data: RequestData) -> HashSet<PublicKey> {
+    pub fn remove_request(&mut self, data: &RequestData) -> HashSet<PublicKey> {
         // TODO: clear timeout (ECR-171)
-        self.state.remove_request(&data)
+        self.state.remove_request(data)
     }
 
     /// Broadcasts the `Prevote` message to all peers.

@@ -56,7 +56,7 @@ impl Run {
         );
         let mut options = RocksDBOptions::default();
         options.create_if_missing(true);
-        Box::new(RocksDB::open(Path::new(&path), options).unwrap())
+        Box::new(RocksDB::open(Path::new(&path), &options).unwrap())
     }
 
     fn node_config(ctx: &Context) -> NodeConfig {
@@ -314,7 +314,7 @@ impl Finalize {
     /// Returns `GenesisConfig` from the template.
     fn genesis_from_template(
         template: CommonConfigTemplate,
-        configs: Vec<NodePublicConfig>,
+        configs: &[NodePublicConfig],
     ) -> GenesisConfig {
         GenesisConfig::new_with_consensus(
             template.consensus_config,
@@ -421,7 +421,7 @@ impl Command for Finalize {
 
         let peers = list.iter().map(|c| c.addr).collect();
 
-        let genesis = Self::genesis_from_template(common.clone(), list.clone());
+        let genesis = Self::genesis_from_template(common.clone(), &list);
 
         let config = {
             NodeConfig {

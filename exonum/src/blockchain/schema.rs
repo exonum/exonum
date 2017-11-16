@@ -141,10 +141,7 @@ where
         let block = self.blocks().get(&block_hash).unwrap();
         let precommits_table = self.precommits(&block_hash);
         let precommits = precommits_table.iter().collect();
-        let res = BlockProof {
-            block: block,
-            precommits: precommits,
-        };
+        let res = BlockProof { block, precommits };
         Some(res)
     }
 
@@ -379,15 +376,16 @@ impl<'a> Schema<&'a mut Fork> {
             }
         }
 
+        info!(
+            "Scheduled the following configuration for acceptance: {:?}",
+            &config_data
+        );
+
         let cfg_hash = config_data.hash();
-        self.configs_mut().put(&cfg_hash, config_data.clone());
+        self.configs_mut().put(&cfg_hash, config_data);
 
         let cfg_ref = ConfigReference::new(actual_from, &cfg_hash);
         self.configs_actual_from_mut().push(cfg_ref);
-        info!(
-            "Scheduled the following configuration for acceptance: {:?}",
-            config_data
-        );
         // TODO: clear storages
     }
 }

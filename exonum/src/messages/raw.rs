@@ -217,6 +217,7 @@ impl MessageWriter {
     }
 
     /// Writes given field to the given offset.
+    #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
     pub fn write<'a, F: Field<'a>>(&'a mut self, field: F, from: Offset, to: Offset) {
         field.write(
             &mut self.raw,

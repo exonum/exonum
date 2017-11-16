@@ -145,13 +145,13 @@ impl Sandbox {
 
         for validator in start_index..end_index {
             let validator = ValidatorId(validator as u16);
-            self.recv(Connect::new(
+            self.recv(&Connect::new(
                 &self.p(validator),
                 self.a(validator),
                 self.time(),
                 self.s(validator),
             ));
-            self.send(self.a(validator), connect.clone());
+            self.send(self.a(validator), &connect);
         }
 
         self.check_unexpected_message()
@@ -250,7 +250,7 @@ impl Sandbox {
         )
     }
 
-    pub fn recv<T: Message>(&self, msg: T) {
+    pub fn recv<T: Message>(&self, msg: &T) {
         self.check_unexpected_message();
         // TODO Think about addresses.
         let dummy_addr = SocketAddr::from(([127, 0, 0, 1], 12_039));
@@ -258,7 +258,7 @@ impl Sandbox {
         self.inner.borrow_mut().handle_event(event);
     }
 
-    pub fn send<T: Message>(&self, addr: SocketAddr, msg: T) {
+    pub fn send<T: Message>(&self, addr: SocketAddr, msg: &T) {
         let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
         let sended = self.inner.borrow_mut().sent.pop_front();
         if let Some((real_addr, real_msg)) = sended {
@@ -281,12 +281,12 @@ impl Sandbox {
         }
     }
 
-    pub fn broadcast<T: Message>(&self, msg: T) {
+    pub fn broadcast<T: Message>(&self, msg: &T) {
         self.broadcast_to_addrs(msg, self.addresses.iter().skip(1));
     }
 
     // TODO: add self-test for broadcasting?
-    pub fn broadcast_to_addrs<'a, T: Message, I>(&self, msg: T, addresses: I)
+    pub fn broadcast_to_addrs<'a, T: Message, I>(&self, msg: &T, addresses: I)
     where
         I: IntoIterator<Item = &'a SocketAddr>,
     {
@@ -329,7 +329,7 @@ impl Sandbox {
     }
 
     pub fn check_broadcast_status(&self, height: Height, block_hash: &Hash) {
-        self.broadcast(Status::new(
+        self.broadcast(&Status::new(
             &self.node_public_key(),
             height,
             block_hash,
@@ -732,10 +732,10 @@ mod tests {
     fn test_sandbox_recv_and_send() {
         let s = timestamping_sandbox();
         let (public, secret) = gen_keypair();
-        s.recv(Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
+        s.recv(&Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
         s.send(
             s.a(VALIDATOR_2),
-            Connect::new(
+            &Connect::new(
                 &s.p(VALIDATOR_0),
                 s.a(VALIDATOR_0),
                 s.time(),
@@ -761,7 +761,7 @@ mod tests {
         let s = timestamping_sandbox();
         s.send(
             s.a(VALIDATOR_1),
-            Connect::new(
+            &Connect::new(
                 &s.p(VALIDATOR_0),
                 s.a(VALIDATOR_0),
                 s.time(),
@@ -775,10 +775,10 @@ mod tests {
     fn test_sandbox_expected_to_send_another_message() {
         let s = timestamping_sandbox();
         let (public, secret) = gen_keypair();
-        s.recv(Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
+        s.recv(&Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
         s.send(
             s.a(VALIDATOR_1),
-            Connect::new(
+            &Connect::new(
                 &s.p(VALIDATOR_0),
                 s.a(VALIDATOR_0),
                 s.time(),
@@ -792,7 +792,7 @@ mod tests {
     fn test_sandbox_unexpected_message_when_drop() {
         let s = timestamping_sandbox();
         let (public, secret) = gen_keypair();
-        s.recv(Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
+        s.recv(&Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
     }
 
     #[test]
@@ -800,8 +800,8 @@ mod tests {
     fn test_sandbox_unexpected_message_when_handle_another_message() {
         let s = timestamping_sandbox();
         let (public, secret) = gen_keypair();
-        s.recv(Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
-        s.recv(Connect::new(&public, s.a(VALIDATOR_3), s.time(), &secret));
+        s.recv(&Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
+        s.recv(&Connect::new(&public, s.a(VALIDATOR_3), s.time(), &secret));
         panic!("Oops! We don't catch unexpected message");
     }
 
@@ -810,7 +810,7 @@ mod tests {
     fn test_sandbox_unexpected_message_when_time_changed() {
         let s = timestamping_sandbox();
         let (public, secret) = gen_keypair();
-        s.recv(Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
+        s.recv(&Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
         s.add_time(Duration::from_millis(1000));
         panic!("Oops! We don't catch unexpected message");
     }
@@ -824,6 +824,6 @@ mod tests {
         let state = SandboxState::new();
         add_one_height(&sandbox, &state);
         let tx = TxAfterCommit::new_with_height(Height(1));
-        sandbox.broadcast(tx);
+        sandbox.broadcast(&tx);
     }
 }

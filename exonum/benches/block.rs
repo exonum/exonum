@@ -170,7 +170,7 @@ mod tests {
     fn create_rocksdb(tempdir: &TempDir) -> Box<Database> {
         let mut options = RocksDBOptions::default();
         options.create_if_missing(true);
-        let db = Box::new(RocksDB::open(tempdir.path(), options).unwrap());
+        let db = Box::new(RocksDB::open(tempdir.path(), &options).unwrap());
         db as Box<Database>
     }
 

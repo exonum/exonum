@@ -50,7 +50,7 @@ impl NodeHandler {
     fn handle_timeout(&mut self, timeout: NodeTimeout) {
         match timeout {
             NodeTimeout::Round(height, round) => self.handle_round_timeout(height, round),
-            NodeTimeout::Request(data, peer) => self.handle_request_timeout(data, peer),
+            NodeTimeout::Request(data, peer) => self.handle_request_timeout(&data, peer),
             NodeTimeout::Status(height) => self.handle_status_timeout(height),
             NodeTimeout::PeerExchange => self.handle_peer_exchange_timeout(),
             NodeTimeout::UpdateApiState => self.handle_update_api_state_timeout(),
