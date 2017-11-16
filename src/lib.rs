@@ -21,12 +21,12 @@ use exonum::blockchain::{ApiContext, Blockchain, ConsensusConfig, GenesisConfig,
 use exonum::crypto;
 use exonum::helpers::{Height, Round, ValidatorId};
 use exonum::messages::{Message, Precommit, Propose};
-use exonum::node::{ApiSender, ExternalMessage, NodeChannel, State as NodeState, TransactionSend,
-                   TxPool};
+use exonum::node::{ApiSender, ExternalMessage, State as NodeState, TransactionSend, TxPool};
 use exonum::storage::{MemoryDB, Snapshot};
 
 use futures::Stream;
 use futures::executor::{self, Spawn};
+use futures::sync::mpsc;
 use iron::IronError;
 use iron::headers::{ContentType, Headers};
 use iron::status::StatusClass;
@@ -34,7 +34,6 @@ use iron_test::{request, response};
 use mount::Mount;
 use router::Router;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 #[macro_use]
 mod macros;
@@ -95,6 +94,20 @@ impl TestNetwork {
             .collect::<Vec<_>>();
         self.validators = validators;
         self.us.clone_from(&us);
+    }
+
+    /// Returns service public key of the validator with given id.
+    pub fn service_public_key_of(&self, id: ValidatorId) -> Option<&crypto::PublicKey> {
+        self.validators().get(id.0 as usize).map(|x| {
+            &x.service_public_key
+        })
+    }
+
+    /// Returns consensus public key of the validator with given id.
+    pub fn consensus_public_key_of(&self, id: ValidatorId) -> Option<&crypto::PublicKey> {
+        self.validators().get(id.0 as usize).map(|x| {
+            &x.consensus_public_key
+        })
     }
 }
 
@@ -203,100 +216,6 @@ impl From<TestNode> for ValidatorKeys {
     }
 }
 
-/// Current state of the test node.
-pub struct TestNodeState {
-    network: TestNetwork,
-    snapshot: Box<Snapshot>,
-    actual_configuration: StoredConfiguration,
-    api_sender: ApiSender,
-}
-
-impl TestNodeState {
-    /// Creates a new node state for the given network with the given snapshot of the storage.
-    pub fn new(network: TestNetwork, snapshot: Box<Snapshot>, api_sender: ApiSender) -> Self {
-        let actual_configuration = CoreSchema::new(&snapshot).actual_configuration();
-        TestNodeState {
-            network,
-            snapshot,
-            actual_configuration,
-            api_sender,
-        }
-    }
-
-    /// Returns sufficient number of validators for the Byzantine Fault Toulerance consensus.
-    pub fn majority_count(&self) -> usize {
-        NodeState::byzantine_majority_count(self.validators().len())
-    }
-
-    /// Returns hash of the latest commited block.
-    pub fn last_hash(&self) -> crypto::Hash {
-        CoreSchema::new(&self.snapshot).last_block().unwrap().hash()
-    }
-
-    /// Returns consensus public key of the validator with given id.
-    pub fn consensus_public_key_of(&self, id: ValidatorId) -> Option<&crypto::PublicKey> {
-        self.validators().get(id.0 as usize).map(
-            |x| &x.consensus_key,
-        )
-    }
-
-    /// Returns service public key of the validator with given id.
-    pub fn service_public_key_of(&self, id: ValidatorId) -> Option<&crypto::PublicKey> {
-        self.validators().get(id.0 as usize).map(|x| &x.service_key)
-    }
-}
-
-impl<'a> ServiceContext for TestNodeState {
-    fn validator_id(&self) -> Option<ValidatorId> {
-        self.network.us().validator_id()
-    }
-
-    fn snapshot(&self) -> &Snapshot {
-        self.snapshot.as_ref()
-    }
-
-    fn height(&self) -> Height {
-        CoreSchema::new(&self.snapshot).last_height().unwrap()
-    }
-
-    fn round(&self) -> Round {
-        Round(1)
-    }
-
-    fn validators(&self) -> &[ValidatorKeys] {
-        &self.actual_configuration.validator_keys
-    }
-
-    fn public_key(&self) -> &crypto::PublicKey {
-        &self.network.us.service_public_key
-    }
-
-    fn secret_key(&self) -> &crypto::SecretKey {
-        &self.network.us.service_secret_key
-    }
-
-    fn actual_consensus_config(&self) -> &ConsensusConfig {
-        &self.actual_configuration.consensus
-    }
-
-    fn actual_service_config(&self, service: &Service) -> &Value {
-        self.actual_configuration
-            .services
-            .get(service.service_name())
-            .expect("An attempt to get configuration from nonexistent service")
-    }
-
-    fn transaction_sender(&self) -> &TransactionSend {
-        &self.api_sender
-    }
-
-    fn update(&mut self, blockchain: &Blockchain) {
-        let snapshot = blockchain.snapshot();
-        self.actual_configuration = CoreSchema::new(&snapshot).actual_configuration();
-        self.snapshot = snapshot;
-    }
-}
-
 /// Builder for `TestKit`.
 pub struct TestKitBuilder {
     us: TestNode,
@@ -364,7 +283,7 @@ impl TestKitBuilder {
 pub struct TestKit {
     blockchain: Blockchain,
     events_stream: Spawn<Box<Stream<Item = (), Error = ()>>>,
-    service_context: TestNodeState,
+    network: TestNetwork,
     api_context: ApiContext,
     mempool: TxPool,
     cfg_proposal: Option<ConfigurationProposalState>,
@@ -375,29 +294,24 @@ impl TestKit {
         let genesis = network.genesis_config();
         blockchain.create_genesis_block(genesis.clone()).unwrap();
 
-        let channel = NodeChannel::new(Default::default());
+        let api_channel = mpsc::channel(1_000);
+        let api_sender = ApiSender::new(api_channel.0.clone());
 
         let api_context = {
             let our_node = network.us();
             ApiContext::from_parts(
                 &blockchain,
-                ApiSender::new(channel.api_requests.0.clone()),
+                api_sender.clone(),
                 &our_node.service_public_key,
                 &our_node.service_secret_key,
             )
         };
 
-        let service_context = TestNodeState::new(
-            network,
-            blockchain.snapshot(),
-            ApiSender::new(channel.api_requests.0.clone()),
-        );
-
         let mempool = Arc::new(RwLock::new(BTreeMap::new()));
         let event_stream: Box<Stream<Item = (), Error = ()>> = {
             let blockchain = blockchain.clone();
             let mempool = Arc::clone(&mempool);
-            Box::new(channel.api_requests.1.greedy_fold((), move |_, event| {
+            Box::new(api_channel.1.greedy_fold((), move |_, event| {
                 let snapshot = blockchain.snapshot();
                 let schema = CoreSchema::new(&snapshot);
                 match event {
@@ -420,15 +334,10 @@ impl TestKit {
             blockchain,
             api_context,
             events_stream,
-            service_context,
+            network,
             mempool: Arc::clone(&mempool),
             cfg_proposal: None,
         }
-    }
-
-    /// Returns the node state of the testkit.
-    pub fn state(&self) -> &TestNodeState {
-        &self.service_context
     }
 
     /// Creates a mounting point for public APIs used by the blockchain.
@@ -466,10 +375,10 @@ impl TestKit {
     ///
     /// If there are duplicate transactions.
     pub fn probe_all(&self, transactions: Vec<Box<Transaction>>) -> Box<Snapshot> {
-        let validator_id = self.state().validator_id().expect(
+        let validator_id = self.network().us().validator_id().expect(
             "Tested node is not a validator",
         );
-        let height = self.height();
+        let height = self.current_height();
 
         let (transaction_map, hashes) = {
             let mut transaction_map = BTreeMap::new();
@@ -518,8 +427,8 @@ impl TestKit {
     }
 
     fn do_create_block(&mut self, tx_hashes: &[crypto::Hash]) {
-        let height = self.height();
-        let last_hash = self.state().last_hash();
+        let height = self.current_height();
+        let last_hash = self.last_hash();
 
         self.update_configuration();
 
@@ -553,13 +462,17 @@ impl TestKit {
             .map(|v| v.create_precommit(&propose, &block_hash))
             .collect();
 
-        self.blockchain
-            .commit(
-                &mut self.service_context,
-                &patch,
-                block_hash,
-                precommits.iter(),
+        let mut service_context = {
+            let keypair = self.network().us().service_keypair();
+            ServiceContext::new(
+                self.network.us().validator_id(),
+                *keypair.0,
+                keypair.1.clone(),
+                self.api_context.node_channel().clone(),
             )
+        };
+        self.blockchain
+            .commit(&mut service_context, &patch, block_hash, precommits.iter())
             .unwrap();
 
         self.poll_events();
@@ -570,7 +483,7 @@ impl TestKit {
     fn update_configuration(&mut self) {
         use ConfigurationProposalState::*;
 
-        let height = self.height();
+        let height = self.current_height();
         if let Some(cfg_proposal) = self.cfg_proposal.take() {
             match cfg_proposal {
                 Uncommitted(cfg_proposal) => {
@@ -656,14 +569,24 @@ impl TestKit {
 
     /// Creates a chain of blocks until a given height.
     pub fn create_blocks_until(&mut self, height: Height) {
-        while self.height() < height {
+        while self.current_height() <= height {
             self.create_block();
         }
     }
 
-    /// Returns the current height of the blockchain.
-    pub fn height(&self) -> Height {
-        self.state().height().next()
+    /// Returns the current height of the blockchain. Its value is equal to `last_height + 1`.
+    pub fn current_height(&self) -> Height {
+        CoreSchema::new(&self.snapshot()).current_height()
+    }
+
+    /// Returns the hash of latest committed block.
+    pub fn last_hash(&self) -> crypto::Hash {
+        self.blockchain.last_hash()
+    }
+
+    /// Returns sufficient number of validators for the Byzantine Fault Toulerance consensus.
+    pub fn majority_count(&self) -> usize {
+        NodeState::byzantine_majority_count(self.network().validators().len())
     }
 
     /// Returns the test node memory pool handle.
@@ -680,12 +603,12 @@ impl TestKit {
 
     /// Returns the reference to test network.
     pub fn network(&self) -> &TestNetwork {
-        &self.service_context.network
+        &self.network
     }
 
     /// Returns the mutable reference to test network for manual modifications.
     pub fn network_mut(&mut self) -> &mut TestNetwork {
-        &mut self.service_context.network
+        &mut self.network
     }
 
     /// Returns a copy of the actual configuration of the testkit.
@@ -708,7 +631,7 @@ impl TestKit {
     /// - If configuration change has been already proposed but not executed.
     pub fn commit_configuration_change(&mut self, proposal: TestNetworkConfiguration) {
         use self::ConfigurationProposalState::*;
-        assert!(self.height() < proposal.actual_from());
+        assert!(self.current_height() < proposal.actual_from());
         assert!(self.cfg_proposal.is_none());
         self.cfg_proposal = Some(Uncommitted(proposal));
     }
@@ -1001,17 +924,16 @@ impl TestKitApi {
         for<'de> D: Deserialize<'de>,
     {
         let url = format!("http://localhost:3000/{}", endpoint);
-        let resp =
-            request::post(
-                &url,
-                {
-                    let mut headers = Headers::new();
-                    headers.set(ContentType::json());
-                    headers
-                },
-                &serde_json::to_string(&data).expect("Cannot serialize data to JSON"),
-                mount,
-            ).expect("Cannot send data");
+        let resp = request::post(
+            &url,
+            {
+                let mut headers = Headers::new();
+                headers.set(ContentType::json());
+                headers
+            },
+            &serde_json::to_string(&data).expect("Cannot serialize data to JSON"),
+            mount,
+        ).expect("Cannot send data");
 
         let resp = response::extract_body_to_string(resp);
         serde_json::from_str(&resp).expect("Cannot parse result")
@@ -1048,4 +970,14 @@ impl TestKitApi {
             transaction,
         )
     }
+}
+
+#[test]
+fn test_create_block_heights() {
+    let mut testkit = TestKitBuilder::validator().create();
+    assert_eq!(Height(1), testkit.current_height());
+    testkit.create_block();
+    assert_eq!(Height(2), testkit.current_height());
+    testkit.create_blocks_until(Height(6));
+    assert_eq!(Height(6), testkit.current_height());
 }

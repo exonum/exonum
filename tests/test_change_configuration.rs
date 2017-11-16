@@ -7,7 +7,7 @@ extern crate serde_json;
 
 use exonum::helpers::{Height, ValidatorId};
 use exonum_testkit::TestKitBuilder;
-use exonum::blockchain::{Schema, ServiceContext};
+use exonum::blockchain::Schema;
 use exonum::storage::StorageValue;
 
 #[test]
@@ -29,10 +29,6 @@ fn test_add_to_validators() {
 
     assert_eq!(testkit.network().us().validator_id(), Some(ValidatorId(1)));
     assert_eq!(&testkit.network().validators()[1], testkit.network().us());
-    assert_eq!(
-        testkit.network().us().validator_id(),
-        testkit.state().validator_id()
-    );
     assert_eq!(
         Schema::new(&testkit.snapshot()).actual_configuration(),
         stored
@@ -64,10 +60,6 @@ fn test_exclude_from_validators() {
 
     assert_eq!(testkit.network().us().validator_id(), None);
     assert_eq!(testkit.network().validators().len(), 1);
-    assert_eq!(
-        testkit.network().us().validator_id(),
-        testkit.state().validator_id()
-    );
     assert_eq!(
         Schema::new(&testkit.snapshot()).actual_configuration(),
         stored
