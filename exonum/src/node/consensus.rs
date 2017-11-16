@@ -11,109 +11,15 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use serde_json::Value;
-
 use std::collections::HashSet;
-use std::fmt;
 
-use crypto::{Hash, HexValue, PublicKey, SecretKey};
-use blockchain::{Blockchain, ConsensusConfig, Schema, Service, ServiceContext, Transaction,
-                 ValidatorKeys};
+use crypto::{Hash, HexValue, PublicKey};
+use blockchain::{Schema, ServiceContext, Transaction};
 use messages::{BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote,
                PrevotesRequest, Propose, ProposeRequest, RawTransaction, TransactionsRequest};
 use helpers::{Height, Round, ValidatorId};
-use storage::{Patch, Snapshot};
-use node::{ApiSender, NodeHandler, RequestData, SystemStateProvider, TransactionSend};
-use node::state::State;
-
-struct NodeHandlerContext<'a, 'b> {
-    state: &'a mut State,
-    snapshot: Option<Box<Snapshot>>,
-    system_state: &'b SystemStateProvider,
-    api_sender: ApiSender,
-}
-
-impl<'a, 'b> NodeHandlerContext<'a, 'b> {
-    fn new(
-        state: &'a mut State,
-        system_state: &'b SystemStateProvider,
-        api_sender: ApiSender,
-    ) -> NodeHandlerContext<'a, 'b> {
-        NodeHandlerContext {
-            state,
-            system_state,
-            api_sender,
-            snapshot: None,
-        }
-    }
-}
-
-impl<'a, 'b> ServiceContext for NodeHandlerContext<'a, 'b> {
-    fn validator_id(&self) -> Option<ValidatorId> {
-        self.state.validator_id()
-    }
-
-    fn snapshot(&self) -> &Snapshot {
-        self.snapshot
-            .as_ref()
-            .expect("An attempt to context without blockchain snapshot")
-            .as_ref()
-    }
-
-    fn height(&self) -> Height {
-        // A lot of code assumes that the height is height of the latest block.
-        self.state.height().previous()
-    }
-
-    fn round(&self) -> Round {
-        self.state.round()
-    }
-
-    fn validators(&self) -> &[ValidatorKeys] {
-        self.state.validators()
-    }
-
-    fn public_key(&self) -> &PublicKey {
-        self.state.service_public_key()
-    }
-
-    fn secret_key(&self) -> &SecretKey {
-        self.state.service_secret_key()
-    }
-
-    fn actual_consensus_config(&self) -> &ConsensusConfig {
-        self.state.consensus_config()
-    }
-
-    fn actual_service_config(&self, service: &Service) -> &Value {
-        let name = service.service_name();
-        self.state.services_config().get(name).unwrap()
-    }
-
-    fn transaction_sender(&self) -> &TransactionSend {
-        &self.api_sender
-    }
-
-    fn update(&mut self, blockchain: &Blockchain) {
-        // Update configuration
-        let snapshot = blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
-        self.state.update_config(schema.actual_configuration());
-        // Update state to new height
-        let block_hash = blockchain.last_hash();
-        self.state.new_height(
-            &block_hash,
-            self.system_state.current_time(),
-        );
-        self.snapshot = Some(blockchain.snapshot());
-    }
-}
-
-impl<'a, 'b> fmt::Debug for NodeHandlerContext<'a, 'b> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "ServiceContext(state: {:?})", self.state,)
-    }
-}
+use storage::Patch;
+use node::{ApiSender, NodeHandler, RequestData};
 
 // TODO reduce view invokations (ECR-171)
 impl NodeHandler {
@@ -538,14 +444,25 @@ impl NodeHandler {
         let (commited_txs, proposer) = {
             // FIXME Avoid of clone here.
             let block_state = self.state.block(&block_hash).unwrap().clone();
-            let mut context = NodeHandlerContext::new(
-                &mut self.state,
-                self.system_state.as_ref(),
-                ApiSender::new(self.channel.api_requests.clone()),
+            let mut context = ServiceContext::new(
+                self.state.validator_id(),
+                *self.state.service_public_key(),
+                self.state.service_secret_key().clone(),
+                ApiSender(self.channel.api_requests.clone()),
             );
             self.blockchain
                 .commit(&mut context, block_state.patch(), block_hash, precommits)
                 .unwrap();
+            // Update node state
+            self.state.update_config(
+                context.stored_configuration().clone(),
+            );
+            // Update state to new height
+            let block_hash = self.blockchain.last_hash();
+            self.state.new_height(
+                &block_hash,
+                self.system_state.current_time(),
+            );
             (block_state.txs().len(), block_state.proposer_id())
         };
 

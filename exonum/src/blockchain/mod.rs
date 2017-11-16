@@ -345,8 +345,8 @@ impl Blockchain {
             fork.into_patch()
         };
         self.merge(patch)?;
-        // Updates the context after merge.
-        context.update(self);
+        // Initializes the context after merge.
+        context.initialize(self.fork());
         // Invokes `handle_commit` for each service in order of their identifiers
         for service in self.service_map.values() {
             service.handle_commit(context);

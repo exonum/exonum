@@ -10,9 +10,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Allow creating auditor node from command line. (#364)
 - Add conversion into boxed values for values which implements `Service` or `Transaction` traits. (#366)
+- Add constructor for the `ServiceContext` which can be useful for the alternative node implementations. (#366)
 
 ### Changed
-- `ServiceContext` becomed trait. This change may breaks the code that uses it. (#366)
+- Removed `round` method from the `ServiceContext`. (#366)
 - `ValidatorState` in the `ServiceContext` replaced by the `ValidatorId`. (#366)
 - `add_transaction` in the `ServiceContext` replaced by the `transaction_sender` which implements the `TransactionSend` trait. (#366)
 

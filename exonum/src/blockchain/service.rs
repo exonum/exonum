@@ -29,8 +29,8 @@ use storage::{Fork, Snapshot};
 use messages::{Message, RawTransaction};
 use encoding::Error as MessageError;
 use node::{ApiSender, Node, State, TransactionSend};
-use blockchain::{Blockchain, ConsensusConfig, ValidatorKeys};
-use helpers::{Height, Milliseconds, Round, ValidatorId};
+use blockchain::{Blockchain, ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
+use helpers::{Height, Milliseconds, ValidatorId};
 
 /// A trait that describes transaction processing rules (a group of sequential operations
 /// with the Exonum storage) for the given `Message`.
@@ -145,47 +145,118 @@ pub trait Service: Send + Sync + 'static {
     }
 }
 
+#[derive(Debug)]
+struct ServiceContextInner {
+    fork: Fork,
+    stored_configuration: StoredConfiguration,
+    height: Height,
+}
+
+impl ServiceContextInner {
+    fn new(fork: Fork) -> ServiceContextInner {
+        let (stored_configuration, height) = {
+            let schema = Schema::new(fork.as_ref());
+            let stored_configuration = schema.actual_configuration();
+            let height = schema.last_height().unwrap();
+            (stored_configuration, height)
+        };
+        ServiceContextInner {
+            fork,
+            stored_configuration,
+            height,
+        }
+    }
+}
+
 /// The current node state on which the blockchain is running, or in other words
 /// execution context.
-pub trait ServiceContext {
-    /// If the current node is validator returns its identifier.
-    /// For other nodes return `None`.
-    fn validator_id(&self) -> Option<ValidatorId>;
+#[derive(Debug)]
+pub struct ServiceContext {
+    validator_id: Option<ValidatorId>,
+    service_keypair: (PublicKey, SecretKey),
+    api_sender: ApiSender,
+    inner: Option<ServiceContextInner>,
+}
 
-    /// Returns the current database snapshot.
-    fn snapshot(&self) -> &Snapshot;
-
-    /// Returns the current blockchain height. This height is "height of the last committed block".
-    fn height(&self) -> Height;
-
-    /// Returns the current node round.
-    fn round(&self) -> Round;
-
-    /// Returns the current list of validators.
-    fn validators(&self) -> &[ValidatorKeys];
-
-    /// Returns current node's public key.
-    fn public_key(&self) -> &PublicKey;
-
-    /// Returns current node's secret key.
-    fn secret_key(&self) -> &SecretKey;
-
-    /// Returns the actual blockchain global configuration.
-    fn actual_consensus_config(&self) -> &ConsensusConfig;
-
-    /// Returns service specific global variables as json value.
-    fn actual_service_config(&self, service: &Service) -> &Value;
-
-    /// Returns reference to the transaction sender.
-    fn transaction_sender(&self) -> &TransactionSend;
-
-    /// Updates the context of the service by the latest changes in blockchain.
-    /// `Blockchain` instance invokes this function before the `handle_commit` call.
+impl ServiceContext {
+    /// Creates the service context for the given node.
     ///
     /// This method is necessary if you want to implement an alternative exonum node.
     /// For example, you can implement special node without consensus for regression
     /// testing of services business logic.
-    fn update(&mut self, blockchain: &Blockchain);
+    pub fn new(
+        validator_id: Option<ValidatorId>,
+        service_public_key: PublicKey,
+        service_secret_key: SecretKey,
+        api_sender: ApiSender,
+    ) -> ServiceContext {
+        ServiceContext {
+            validator_id,
+            service_keypair: (service_public_key, service_secret_key),
+            api_sender,
+            inner: None,
+        }
+    }
+
+    /// If the current node is validator returns its identifier.
+    /// For other nodes return `None`.
+    pub fn validator_id(&self) -> Option<ValidatorId> {
+        self.validator_id
+    }
+
+    /// Returns the current database snapshot.
+    pub fn snapshot(&self) -> &Snapshot {
+        self.inner().fork.as_ref()
+    }
+
+    /// Returns the current blockchain height. This height is "height of the last committed block".
+    pub fn height(&self) -> Height {
+        self.inner().height
+    }
+
+    /// Returns the current list of validators.
+    pub fn validators(&self) -> &[ValidatorKeys] {
+        self.inner().stored_configuration.validator_keys.as_slice()
+    }
+
+    /// Returns current node's public key.
+    pub fn public_key(&self) -> &PublicKey {
+        &self.service_keypair.0
+    }
+
+    /// Returns current node's secret key.
+    pub fn secret_key(&self) -> &SecretKey {
+        &self.service_keypair.1
+    }
+
+    /// Returns the actual blockchain global configuration.
+    pub fn actual_consensus_config(&self) -> &ConsensusConfig {
+        &self.inner().stored_configuration.consensus
+    }
+
+    /// Returns service specific global variables as json value.
+    pub fn actual_service_config(&self, service: &Service) -> &Value {
+        &self.inner().stored_configuration.services[service.service_name()]
+    }
+
+    /// Returns reference to the transaction sender.
+    pub fn transaction_sender(&self) -> &TransactionSend {
+        &self.api_sender
+    }
+
+    pub(crate) fn initialize(&mut self, fork: Fork) {
+        self.inner = Some(ServiceContextInner::new(fork));
+    }
+
+    pub(crate) fn stored_configuration(&self) -> &StoredConfiguration {
+        &self.inner().stored_configuration
+    }
+
+    fn inner(&self) -> &ServiceContextInner {
+        self.inner.as_ref().expect(
+            "An attempt to use unitialized `ServiceContext`.",
+        )
+    }
 }
 
 #[derive(Debug, Default)]
