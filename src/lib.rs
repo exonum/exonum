@@ -979,5 +979,5 @@ fn test_create_block_heights() {
     testkit.create_block();
     assert_eq!(Height(2), testkit.current_height());
     testkit.create_blocks_until(Height(6));
-    assert_eq!(Height(6), testkit.current_height());
+    assert_eq!(Height(7), testkit.current_height());
 }
