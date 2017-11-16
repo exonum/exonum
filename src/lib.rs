@@ -15,14 +15,14 @@ extern crate serde_json;
 use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock, RwLockReadGuard};
 
-use exonum::blockchain::{ApiContext, Blockchain, ConsensusConfig, GenesisConfig,
-                         Schema as CoreSchema, Service, ServiceContext, StoredConfiguration,
+use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig,
+                         Schema as CoreSchema, Service, StoredConfiguration,
                          Transaction, ValidatorKeys};
 use exonum::crypto;
 use exonum::helpers::{Height, Round, ValidatorId};
 use exonum::messages::{Message, Precommit, Propose};
 use exonum::node::{ApiSender, ExternalMessage, State as NodeState, TransactionSend, TxPool};
-use exonum::storage::{MemoryDB, Snapshot};
+use exonum::storage::{MemoryDB, Snapshot, Database};
 
 use futures::Stream;
 use futures::executor::{self, Spawn};
@@ -267,9 +267,9 @@ impl TestKitBuilder {
     pub fn create(self) -> TestKit {
         crypto::init();
         let db = MemoryDB::new();
-        let blockchain = Blockchain::new(Box::new(db), self.services);
         TestKit::assemble(
-            blockchain,
+            Box::new(db),
+            self.services,
             TestNetwork {
                 us: self.us,
                 validators: self.validators,
@@ -284,28 +284,21 @@ pub struct TestKit {
     blockchain: Blockchain,
     events_stream: Spawn<Box<Stream<Item = (), Error = ()>>>,
     network: TestNetwork,
-    api_context: ApiContext,
+    api_sender: ApiSender,
     mempool: TxPool,
     cfg_proposal: Option<ConfigurationProposalState>,
 }
 
 impl TestKit {
-    fn assemble(mut blockchain: Blockchain, network: TestNetwork) -> Self {
-        let genesis = network.genesis_config();
-        blockchain.create_genesis_block(genesis.clone()).unwrap();
-
+    fn assemble(db: Box<Database>, services: Vec<Box<Service>>, network: TestNetwork) -> Self {
         let api_channel = mpsc::channel(1_000);
         let api_sender = ApiSender::new(api_channel.0.clone());
 
-        let api_context = {
-            let our_node = network.us();
-            ApiContext::from_parts(
-                &blockchain,
-                api_sender.clone(),
-                &our_node.service_public_key,
-                &our_node.service_secret_key,
-            )
-        };
+        let mut blockchain = Blockchain::new(db, services, *network.us().service_keypair().0,
+        network.us().service_keypair().1.clone(), api_sender.clone());
+
+        let genesis = network.genesis_config();
+        blockchain.create_genesis_block(genesis.clone()).unwrap();
 
         let mempool = Arc::new(RwLock::new(BTreeMap::new()));
         let event_stream: Box<Stream<Item = (), Error = ()>> = {
@@ -332,7 +325,7 @@ impl TestKit {
 
         TestKit {
             blockchain,
-            api_context,
+            api_sender,
             events_stream,
             network,
             mempool: Arc::clone(&mempool),
@@ -342,12 +335,12 @@ impl TestKit {
 
     /// Creates a mounting point for public APIs used by the blockchain.
     fn public_api_mount(&self) -> Mount {
-        self.api_context.mount_public_api()
+        self.blockchain.mount_public_api()
     }
 
     /// Creates a mounting point for public APIs used by the blockchain.
     fn private_api_mount(&self) -> Mount {
-        self.api_context.mount_private_api()
+        self.blockchain.mount_private_api()
     }
 
     /// Creates an instance of `TestKitApi` to test the API provided by services.
@@ -462,17 +455,8 @@ impl TestKit {
             .map(|v| v.create_precommit(&propose, &block_hash))
             .collect();
 
-        let mut service_context = {
-            let keypair = self.network().us().service_keypair();
-            ServiceContext::new(
-                self.network.us().validator_id(),
-                *keypair.0,
-                keypair.1.clone(),
-                self.api_context.node_channel().clone(),
-            )
-        };
         self.blockchain
-            .commit(&mut service_context, &patch, block_hash, precommits.iter())
+            .commit(&patch, block_hash, precommits.iter())
             .unwrap();
 
         self.poll_events();
@@ -824,7 +808,7 @@ impl TestKitApi {
                 mount
             },
 
-            api_sender: testkit.api_context.node_channel().clone(),
+            api_sender: testkit.api_sender.clone(),
         }
     }
 
