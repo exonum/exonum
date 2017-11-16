@@ -216,6 +216,37 @@ impl From<TestNode> for ValidatorKeys {
 }
 
 /// Builder for `TestKit`.
+///
+/// # Example
+///
+/// ```
+/// # extern crate exonum;
+/// # extern crate exonum_testkit;
+/// # use exonum::blockchain::{Service, Transaction};
+/// # use exonum::messages::RawTransaction;
+/// # use exonum::encoding;
+/// # use exonum_testkit::TestKitBuilder;
+/// # pub struct MyService;
+/// # impl Service for MyService {
+/// #    fn service_name(&self) -> &'static str {
+/// #        "documentation"
+/// #    }
+/// #    fn service_id(&self) -> u16 {
+/// #        0
+/// #    }
+/// #    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
+/// #        unimplemented!();
+/// #    }
+/// # }
+/// # fn main() {
+/// let mut testkit = TestKitBuilder::validator()
+///     .with_service(MyService)
+///     .with_validators(4)
+///     .create();
+/// testkit.create_block();
+/// // Other test code
+/// # }
+/// ```
 pub struct TestKitBuilder {
     us: TestNode,
     validators: Vec<TestNode>,
@@ -655,12 +686,12 @@ impl TestNetworkConfiguration {
         }
     }
 
-    /// Returns the testkit node.
+    /// Returns the node from whose perspective the testkit operates.
     pub fn us(&self) -> &TestNode {
         &self.us
     }
 
-    /// Modifies the testkit node.
+    /// Modifies the node from whose perspective the testkit operates.
     pub fn set_us(&mut self, us: TestNode) {
         self.us = us;
         self.update_our_role();
