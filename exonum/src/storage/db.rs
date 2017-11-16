@@ -23,14 +23,29 @@ use super::Result;
 use self::NextIterValue::*;
 
 /// A set of serial changes that should be applied to a storage atomically.
-pub type Patch = HashMap<String, BTreeMap<Vec<u8>, Change>>;
+#[derive(Debug, Clone)]
+pub struct Patch {
+    pub(crate) changes: HashMap<String, BTreeMap<Vec<u8>, Change>>,
+}
+
+impl Patch {
+    /// Creates a new empty `Patch` instance.
+    fn new() -> Self {
+        Self { changes: HashMap::new() }
+    }
+
+    /// Returns amount of changes.
+    pub fn len(&self) -> usize {
+        self.changes.len()
+    }
+}
 
 /// A generalized iterator over the storage views.
 pub type Iter<'a> = Box<Iterator + 'a>;
 
 /// An enum that represents a kind of change to some key in storage.
 #[derive(Debug, Clone)]
-pub enum Change {
+pub(crate) enum Change {
     /// Put the specified value into storage for a corresponding key.
     Put(Vec<u8>),
     /// Delete a value from storage for a corresponding key.
@@ -193,7 +208,7 @@ pub trait Iterator {
 
 impl Snapshot for Fork {
     fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>> {
-        if let Some(changes) = self.patch.get(name) {
+        if let Some(changes) = self.patch.changes.get(name) {
             if let Some(change) = changes.get(key) {
                 match *change {
                     Change::Put(ref v) => return Some(v.clone()),
@@ -205,7 +220,7 @@ impl Snapshot for Fork {
     }
 
     fn contains(&self, name: &str, key: &[u8]) -> bool {
-        if let Some(changes) = self.patch.get(name) {
+        if let Some(changes) = self.patch.changes.get(name) {
             if let Some(change) = changes.get(key) {
                 match *change {
                     Change::Put(..) => return true,
@@ -218,7 +233,7 @@ impl Snapshot for Fork {
 
     fn iter<'a>(&'a self, name: &str, from: &[u8]) -> Iter<'a> {
         let range = (Included(from), Unbounded);
-        let changes = match self.patch.get(name) {
+        let changes = match self.patch.changes.get(name) {
             Some(changes) => Some(changes.range::<[u8], _>(range).peekable()),
             None => None,
         };
@@ -268,7 +283,7 @@ impl Fork {
             panic!("call rollback before checkpoint");
         }
         for (name, k, c) in self.changelog.drain(..).rev() {
-            if let Some(changes) = self.patch.get_mut(&name) {
+            if let Some(changes) = self.patch.changes.get_mut(&name) {
                 match c {
                     Some(change) => changes.insert(k, change),
                     None => changes.remove(&k),
@@ -280,11 +295,11 @@ impl Fork {
 
     /// Inserts the key-value pair into the fork with the given name `name`.
     pub fn put(&mut self, name: &str, key: Vec<u8>, value: Vec<u8>) {
-        if !self.patch.contains_key(name) {
-            self.patch.insert(name.to_string(), BTreeMap::new());
+        if !self.patch.changes.contains_key(name) {
+            self.patch.changes.insert(name.to_string(), BTreeMap::new());
         }
 
-        let changes = self.patch.get_mut(name).unwrap();
+        let changes = self.patch.changes.get_mut(name).unwrap();
 
         if self.logged {
             self.changelog.push((
@@ -299,11 +314,11 @@ impl Fork {
 
     /// Removes the key from the fork with the given name `name`.
     pub fn remove(&mut self, name: &str, key: Vec<u8>) {
-        if !self.patch.contains_key(name) {
-            self.patch.insert(name.to_string(), BTreeMap::new());
+        if !self.patch.changes.contains_key(name) {
+            self.patch.changes.insert(name.to_string(), BTreeMap::new());
         }
 
-        let changes = self.patch.get_mut(name).unwrap();
+        let changes = self.patch.changes.get_mut(name).unwrap();
         if self.logged {
             self.changelog.push((
                 name.to_string(),
@@ -317,11 +332,11 @@ impl Fork {
 
     /// Removes all keys starting with the specified prefix from the fork with name `name`.
     pub fn remove_by_prefix(&mut self, name: &str, prefix: Option<&Vec<u8>>) {
-        if !self.patch.contains_key(name) {
-            self.patch.insert(name.to_string(), BTreeMap::new());
+        if !self.patch.changes.contains_key(name) {
+            self.patch.changes.insert(name.to_string(), BTreeMap::new());
         }
 
-        let changes = self.patch.get_mut(name).unwrap();
+        let changes = self.patch.changes.get_mut(name).unwrap();
         // Remove changes
         if let Some(prefix) = prefix {
             let keys = changes
@@ -366,13 +381,13 @@ impl Fork {
             panic!("call merge before commit or rollback");
         }
 
-        for (name, changes) in patch {
-            if let Some(in_changes) = self.patch.get_mut(&name) {
+        for (name, changes) in patch.changes {
+            if let Some(in_changes) = self.patch.changes.get_mut(&name) {
                 in_changes.extend(changes);
                 continue;
             }
             {
-                self.patch.insert(name, changes);
+                self.patch.changes.insert(name, changes);
             }
         }
     }

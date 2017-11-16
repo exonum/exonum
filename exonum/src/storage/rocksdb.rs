@@ -30,7 +30,8 @@ use std::iter::Peekable;
 pub use rocksdb::{Options as RocksDBOptions, WriteOptions as RocksDBWriteOptions};
 pub use rocksdb::BlockBasedOptions as RocksBlockOptions;
 
-use super::{Database, Iterator, Iter, Snapshot, Error, Patch, Change, Result};
+use super::{Database, Iterator, Iter, Snapshot, Error, Patch, Result};
+use super::db::Change;
 
 impl From<_Error> for Error {
     fn from(err: _Error) -> Self {
@@ -74,7 +75,7 @@ impl RocksDB {
     fn merge(&mut self, patch: Patch, w_opts: &RocksDBWriteOptions) -> Result<()> {
         let _p = ProfilerSpan::new("RocksDB::merge");
         let mut batch = WriteBatch::default();
-        for (cf_name, changes) in patch {
+        for (cf_name, changes) in patch.changes {
             let cf = match self.db.cf_handle(&cf_name) {
                 Some(cf) => cf,
                 None => {

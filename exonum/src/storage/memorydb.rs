@@ -18,7 +18,8 @@ use std::clone::Clone;
 use std::collections::btree_map::BTreeMap;
 use std::collections::HashMap;
 
-use super::{Database, Snapshot, Patch, Change, Iterator, Iter, Result};
+use super::{Database, Snapshot, Patch, Iterator, Iter, Result};
+use super::db::Change;
 
 type DB = HashMap<String, BTreeMap<Vec<u8>, Vec<u8>>>;
 
@@ -55,7 +56,7 @@ impl Database for MemoryDB {
     }
 
     fn merge(&mut self, patch: Patch) -> Result<()> {
-        for (cf_name, changes) in patch {
+        for (cf_name, changes) in patch.changes {
             let mut guard = self.map.write().unwrap();
             if !guard.contains_key(&cf_name) {
                 guard.insert(cf_name.clone(), BTreeMap::new());
