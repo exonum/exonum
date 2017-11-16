@@ -17,7 +17,6 @@
 
 use serde_json::Value;
 use iron::Handler;
-use mount::Mount;
 
 use std::fmt;
 use std::sync::{Arc, RwLock};
@@ -145,29 +144,6 @@ pub trait Service: Send + Sync + 'static {
     }
 }
 
-#[derive(Debug)]
-struct ServiceContextInner {
-    fork: Fork,
-    stored_configuration: StoredConfiguration,
-    height: Height,
-}
-
-impl ServiceContextInner {
-    fn new(fork: Fork) -> ServiceContextInner {
-        let (stored_configuration, height) = {
-            let schema = Schema::new(fork.as_ref());
-            let stored_configuration = schema.actual_configuration();
-            let height = schema.last_height().unwrap();
-            (stored_configuration, height)
-        };
-        ServiceContextInner {
-            fork,
-            stored_configuration,
-            height,
-        }
-    }
-}
-
 /// The current node state on which the blockchain is running, or in other words
 /// execution context.
 #[derive(Debug)]
@@ -175,7 +151,9 @@ pub struct ServiceContext {
     validator_id: Option<ValidatorId>,
     service_keypair: (PublicKey, SecretKey),
     api_sender: ApiSender,
-    inner: Option<ServiceContextInner>,
+    fork: Fork,
+    stored_configuration: StoredConfiguration,
+    height: Height,
 }
 
 impl ServiceContext {
@@ -185,16 +163,30 @@ impl ServiceContext {
     /// For example, you can implement special node without consensus for regression
     /// testing of services business logic.
     pub fn new(
-        validator_id: Option<ValidatorId>,
         service_public_key: PublicKey,
         service_secret_key: SecretKey,
         api_sender: ApiSender,
+        fork: Fork,
     ) -> ServiceContext {
+        let (stored_configuration, height) = {
+            let schema = Schema::new(fork.as_ref());
+            let stored_configuration = schema.actual_configuration();
+            let height = schema.last_height().unwrap();
+            (stored_configuration, height)
+        };
+        let validator_id = stored_configuration
+            .validator_keys
+            .iter()
+            .position(|validator| service_public_key == validator.service_key)
+            .map(|id| ValidatorId(id as u16));
+
         ServiceContext {
             validator_id,
             service_keypair: (service_public_key, service_secret_key),
             api_sender,
-            inner: None,
+            fork,
+            stored_configuration,
+            height,
         }
     }
 
@@ -206,17 +198,17 @@ impl ServiceContext {
 
     /// Returns the current database snapshot.
     pub fn snapshot(&self) -> &Snapshot {
-        self.inner().fork.as_ref()
+        self.fork.as_ref()
     }
 
     /// Returns the current blockchain height. This height is "height of the last committed block".
     pub fn height(&self) -> Height {
-        self.inner().height
+        self.height
     }
 
     /// Returns the current list of validators.
     pub fn validators(&self) -> &[ValidatorKeys] {
-        self.inner().stored_configuration.validator_keys.as_slice()
+        self.stored_configuration.validator_keys.as_slice()
     }
 
     /// Returns current node's public key.
@@ -229,14 +221,14 @@ impl ServiceContext {
         &self.service_keypair.1
     }
 
-    /// Returns the actual blockchain global configuration.
+    /// Returns the actual consensus configuration.
     pub fn actual_consensus_config(&self) -> &ConsensusConfig {
-        &self.inner().stored_configuration.consensus
+        &self.stored_configuration.consensus
     }
 
     /// Returns service specific global variables as json value.
     pub fn actual_service_config(&self, service: &Service) -> &Value {
-        &self.inner().stored_configuration.services[service.service_name()]
+        &self.stored_configuration.services[service.service_name()]
     }
 
     /// Returns reference to the transaction sender.
@@ -244,18 +236,9 @@ impl ServiceContext {
         &self.api_sender
     }
 
-    pub(crate) fn initialize(&mut self, fork: Fork) {
-        self.inner = Some(ServiceContextInner::new(fork));
-    }
-
-    pub(crate) fn stored_configuration(&self) -> &StoredConfiguration {
-        &self.inner().stored_configuration
-    }
-
-    fn inner(&self) -> &ServiceContextInner {
-        self.inner.as_ref().expect(
-            "An attempt to use unitialized `ServiceContext`.",
-        )
+    /// Returns the actual blockchain global configuration.
+    pub fn stored_configuration(&self) -> &StoredConfiguration {
+        &self.stored_configuration
     }
 }
 
@@ -459,16 +442,6 @@ impl ApiContext {
     /// Returns the secret key of current node.
     pub fn secret_key(&self) -> &SecretKey {
         &self.secret_key
-    }
-
-    /// Returns `Mount` object that aggregates public api handlers.
-    pub fn mount_public_api(&self) -> Mount {
-        self.blockchain.mount_public_api(self)
-    }
-
-    /// Returns `Mount` object that aggregates private api handlers.
-    pub fn mount_private_api(&self) -> Mount {
-        self.blockchain.mount_private_api(self)
     }
 }
 

@@ -14,12 +14,12 @@
 use std::collections::HashSet;
 
 use crypto::{Hash, HexValue, PublicKey};
-use blockchain::{Schema, ServiceContext, Transaction};
+use blockchain::{Schema, Transaction};
 use messages::{BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote,
                PrevotesRequest, Propose, ProposeRequest, RawTransaction, TransactionsRequest};
 use helpers::{Height, Round, ValidatorId};
 use storage::Patch;
-use node::{ApiSender, NodeHandler, RequestData};
+use node::{NodeHandler, RequestData};
 
 // TODO reduce view invokations (ECR-171)
 impl NodeHandler {
@@ -444,18 +444,12 @@ impl NodeHandler {
         let (commited_txs, proposer) = {
             // FIXME Avoid of clone here.
             let block_state = self.state.block(&block_hash).unwrap().clone();
-            let mut context = ServiceContext::new(
-                self.state.validator_id(),
-                *self.state.service_public_key(),
-                self.state.service_secret_key().clone(),
-                ApiSender(self.channel.api_requests.clone()),
-            );
             self.blockchain
-                .commit(&mut context, block_state.patch(), block_hash, precommits)
+                .commit(block_state.patch(), block_hash, precommits)
                 .unwrap();
             // Update node state
             self.state.update_config(
-                context.stored_configuration().clone(),
+                Schema::new(&self.blockchain.snapshot()).actual_configuration(),
             );
             // Update state to new height
             let block_hash = self.blockchain.last_hash();

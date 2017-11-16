@@ -28,7 +28,7 @@ use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet, VecDeque};
 use std::iter::FromIterator;
 
 use exonum::node::{Configuration, ExternalMessage, ListenerConfig, NodeHandler, NodeSender,
-                   ServiceConfig, State, SystemStateProvider};
+                   ServiceConfig, State, SystemStateProvider, ApiSender};
 use exonum::blockchain::{Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema,
                          Service, SharedNodeState, StoredConfiguration, TimeoutAdjusterConfig,
                          Transaction, ValidatorKeys};
@@ -561,8 +561,15 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
 
     let addresses: Vec<SocketAddr> = (1..5).map(gen_primitive_socket_addr).collect::<Vec<_>>();
 
+    let api_channel = mpsc::channel(100);
     let db = Box::new(MemoryDB::new());
-    let mut blockchain = Blockchain::new(db, services);
+    let mut blockchain = Blockchain::new(
+        db,
+        services,
+        service_keys[0].0,
+        service_keys[0].1.clone(),
+        ApiSender::new(api_channel.0.clone()),
+    );
 
     let consensus = ConsensusConfig {
         round_timeout: 1000,
@@ -607,7 +614,6 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
 
     let network_channel = mpsc::channel(100);
     let timeout_channel = mpsc::channel(100);
-    let api_channel = mpsc::channel(100);
     let node_sender = NodeSender {
         network_requests: network_channel.0.clone(),
         timeout_requests: timeout_channel.0.clone(),
