@@ -15,9 +15,8 @@ extern crate serde_json;
 use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock, RwLockReadGuard};
 
-use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig,
-                         Schema as CoreSchema, Service, StoredConfiguration,
-                         Transaction, ValidatorKeys};
+use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Schema as CoreSchema,
+                         Service, StoredConfiguration, Transaction, ValidatorKeys};
 use exonum::crypto;
 use exonum::helpers::{Height, Round, ValidatorId};
 use exonum::messages::{Message, Precommit, Propose};
@@ -294,8 +293,13 @@ impl TestKit {
         let api_channel = mpsc::channel(1_000);
         let api_sender = ApiSender::new(api_channel.0.clone());
 
-        let mut blockchain = Blockchain::new(db, services, *network.us().service_keypair().0,
-        network.us().service_keypair().1.clone(), api_sender.clone());
+        let mut blockchain = Blockchain::new(
+            db,
+            services,
+            *network.us().service_keypair().0,
+            network.us().service_keypair().1.clone(),
+            api_sender.clone(),
+        );
 
         let genesis = network.genesis_config();
         blockchain.create_genesis_block(genesis.clone()).unwrap();
