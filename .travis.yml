@@ -8,7 +8,7 @@ addons:
     sources:
     - sourceline: 'ppa:giskou/librocksdb'
     packages:
-    - librocksdb-dev
+    - librocksdb
     - libsnappy-dev
 
 cache: cargo
