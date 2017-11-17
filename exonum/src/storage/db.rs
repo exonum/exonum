@@ -24,7 +24,6 @@ use super::Result;
 use self::NextIterValue::*;
 
 /// Map containing changes with corresponding key.
-/// Changes
 #[derive(Debug, Clone)]
 pub struct Changes {
     data: BTreeMap<Vec<u8>, Change>,
@@ -40,15 +39,18 @@ impl Changes {
     pub fn iter(&self) -> BTMIter<Vec<u8>, Change> {
         self.data.iter()
     }
+}
 
-    /// Consumes `Changes` and returns iterator.
-    pub fn into_iter(self) -> BTMIntoIter<Vec<u8>, Change> {
+impl IntoIterator for Changes {
+    type Item = (Vec<u8>, Change);
+    type IntoIter = BTMIntoIter<Vec<u8>, Change>;
+
+    fn into_iter(self) -> Self::IntoIter {
         self.data.into_iter()
     }
 }
 
 /// A set of serial changes that should be applied to a storage atomically.
-#[cfg_attr(feature="cargo-clippy", allow(len_without_is_empty))]
 #[derive(Debug, Clone)]
 pub struct Patch {
     changes: HashMap<String, Changes>,
@@ -85,14 +87,21 @@ impl Patch {
         self.changes.iter()
     }
 
-    /// Consumes `Patch` and returns iterator over changes.
-    pub fn into_iter(self) -> HMIntoIter<String, Changes> {
-        self.changes.into_iter()
-    }
-
     /// Returns the number of changes.
+    #[cfg_attr(feature = "cargo-clippy", allow(len_without_is_empty))]
     pub fn len(&self) -> usize {
-        self.changes.iter().fold(0, |acc, (_, changes)| acc + changes.data.len())
+        self.changes.iter().fold(0, |acc, (_, changes)| {
+            acc + changes.data.len()
+        })
+    }
+}
+
+impl IntoIterator for Patch {
+    type Item = (String, Changes);
+    type IntoIter = HMIntoIter<String, Changes>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.changes.into_iter()
     }
 }
 
@@ -351,7 +360,9 @@ impl Fork {
 
     /// Inserts the key-value pair into the fork with the given name `name`.
     pub fn put(&mut self, name: &str, key: Vec<u8>, value: Vec<u8>) {
-        let changes = self.patch.changes_entry(name.to_string()).or_insert_with(Changes::new);
+        let changes = self.patch.changes_entry(name.to_string()).or_insert_with(
+            Changes::new,
+        );
         if self.logged {
             self.changelog.push((
                 name.to_string(),
@@ -365,7 +376,9 @@ impl Fork {
 
     /// Removes the key from the fork with the given name `name`.
     pub fn remove(&mut self, name: &str, key: Vec<u8>) {
-        let changes = self.patch.changes_entry(name.to_string()).or_insert_with(Changes::new);
+        let changes = self.patch.changes_entry(name.to_string()).or_insert_with(
+            Changes::new,
+        );
         if self.logged {
             self.changelog.push((
                 name.to_string(),
@@ -379,7 +392,9 @@ impl Fork {
 
     /// Removes all keys starting with the specified prefix from the fork with name `name`.
     pub fn remove_by_prefix(&mut self, name: &str, prefix: Option<&Vec<u8>>) {
-        let changes = self.patch.changes_entry(name.to_string()).or_insert_with(Changes::new);
+        let changes = self.patch.changes_entry(name.to_string()).or_insert_with(
+            Changes::new,
+        );
         // Remove changes
         if let Some(prefix) = prefix {
             let keys = changes
