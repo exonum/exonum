@@ -88,11 +88,15 @@ impl Patch {
     }
 
     /// Returns the number of changes.
-    #[cfg_attr(feature = "cargo-clippy", allow(len_without_is_empty))]
     pub fn len(&self) -> usize {
         self.changes.iter().fold(0, |acc, (_, changes)| {
             acc + changes.data.len()
         })
+    }
+
+    /// Returns `true` if this patch contains no changes and `false` otherwise.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 
@@ -440,7 +444,7 @@ impl Fork {
             panic!("call merge before commit or rollback");
         }
 
-        for (name, changes) in patch.into_iter() {
+        for (name, changes) in patch {
             if let Some(in_changes) = self.patch.changes_mut(&name) {
                 in_changes.data.extend(changes.into_iter());
                 continue;
