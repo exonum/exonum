@@ -62,7 +62,7 @@ impl Database for MemoryDB {
                 guard.insert(cf_name.clone(), BTreeMap::new());
             }
             let table = guard.get_mut(&cf_name).unwrap();
-            for (key, change) in changes {
+            for (key, change) in changes.into_iter() {
                 match change {
                     Change::Put(ref value) => {
                         table.insert(key, value.to_vec());

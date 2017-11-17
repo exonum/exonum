@@ -84,7 +84,7 @@ impl RocksDB {
                         .unwrap()
                 }
             };
-            for (key, change) in changes {
+            for (key, change) in changes.into_iter() {
                 match change {
                     Change::Put(ref value) => batch.put_cf(cf, key.as_ref(), value)?,
                     Change::Delete => batch.delete_cf(cf, &key)?,
