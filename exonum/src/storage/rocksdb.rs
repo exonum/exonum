@@ -75,7 +75,7 @@ impl RocksDB {
     fn merge(&mut self, patch: Patch, w_opts: &RocksDBWriteOptions) -> Result<()> {
         let _p = ProfilerSpan::new("RocksDB::merge");
         let mut batch = WriteBatch::default();
-        for (cf_name, changes) in patch.changes {
+        for (cf_name, changes) in patch.into_iter() {
             let cf = match self.db.cf_handle(&cf_name) {
                 Some(cf) => cf,
                 None => {

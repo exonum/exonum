@@ -14,6 +14,7 @@
 
 use std::collections::HashMap;
 use std::collections::btree_map::{BTreeMap, Range};
+use std::collections::hash_map::{Iter as HashMapIter, IntoIter as HashMapIntoIter};
 use std::collections::Bound::*;
 use std::cmp::Ordering::*;
 use std::iter::Peekable;
@@ -22,10 +23,13 @@ use super::Result;
 
 use self::NextIterValue::*;
 
+/// Map containing changes with corresponding key.
+type Changes = BTreeMap<Vec<u8>, Change>;
+
 /// A set of serial changes that should be applied to a storage atomically.
 #[derive(Debug, Clone)]
 pub struct Patch {
-    pub(crate) changes: HashMap<String, BTreeMap<Vec<u8>, Change>>,
+    changes: HashMap<String, Changes>,
 }
 
 impl Patch {
@@ -34,9 +38,45 @@ impl Patch {
         Self { changes: HashMap::new() }
     }
 
-    /// Returns amount of changes.
+    /// Returns changes for the given name.
+    fn get_changes(&self, name: &str) -> Option<&Changes> {
+        self.changes.get(name)
+    }
+
+    /// Returns a mutable reference to the changes corresponding to the `name`.
+    fn get_changes_mut(&mut self, name: &str) -> Option<&mut Changes> {
+        self.changes.get_mut(name)
+    }
+
+    /// Creates a changes map for the given name if doesn't exist already.
+    fn create_changes_if_needed(&mut self, name: &str) {
+        if !self.changes.contains_key(name) {
+            self.changes.insert(name.to_string(), BTreeMap::new());
+        }
+    }
+
+    /// Inserts changes with the given name.
+    fn insert_changes(&mut self, name: String, changes: Changes) {
+        self.changes.insert(name, changes);
+    }
+
+    /// Consumes `Patch` and returns iterator over changes.
+    pub(crate) fn into_iter(self) -> HashMapIntoIter<String, Changes> {
+        self.changes.into_iter()
+    }
+
+    /// Returns iterator over changes.
+    fn iter(&self) -> HashMapIter<String, Changes> {
+        self.changes.iter()
+    }
+
+    /// Returns the number of changes.
     pub fn len(&self) -> usize {
-        self.changes.len()
+        let mut count = 0;
+        for cf in self.iter() {
+            count += cf.1.len();
+        }
+        count
     }
 }
 
@@ -45,7 +85,7 @@ pub type Iter<'a> = Box<Iterator + 'a>;
 
 /// An enum that represents a kind of change to some key in storage.
 #[derive(Debug, Clone)]
-pub(crate) enum Change {
+pub enum Change {
     /// Put the specified value into storage for a corresponding key.
     Put(Vec<u8>),
     /// Delete a value from storage for a corresponding key.
@@ -208,7 +248,7 @@ pub trait Iterator {
 
 impl Snapshot for Fork {
     fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>> {
-        if let Some(changes) = self.patch.changes.get(name) {
+        if let Some(changes) = self.patch.get_changes(name) {
             if let Some(change) = changes.get(key) {
                 match *change {
                     Change::Put(ref v) => return Some(v.clone()),
@@ -220,7 +260,7 @@ impl Snapshot for Fork {
     }
 
     fn contains(&self, name: &str, key: &[u8]) -> bool {
-        if let Some(changes) = self.patch.changes.get(name) {
+        if let Some(changes) = self.patch.get_changes(name) {
             if let Some(change) = changes.get(key) {
                 match *change {
                     Change::Put(..) => return true,
@@ -233,7 +273,7 @@ impl Snapshot for Fork {
 
     fn iter<'a>(&'a self, name: &str, from: &[u8]) -> Iter<'a> {
         let range = (Included(from), Unbounded);
-        let changes = match self.patch.changes.get(name) {
+        let changes = match self.patch.get_changes(name) {
             Some(changes) => Some(changes.range::<[u8], _>(range).peekable()),
             None => None,
         };
@@ -283,7 +323,7 @@ impl Fork {
             panic!("call rollback before checkpoint");
         }
         for (name, k, c) in self.changelog.drain(..).rev() {
-            if let Some(changes) = self.patch.changes.get_mut(&name) {
+            if let Some(changes) = self.patch.get_changes_mut(&name) {
                 match c {
                     Some(change) => changes.insert(k, change),
                     None => changes.remove(&k),
@@ -295,11 +335,9 @@ impl Fork {
 
     /// Inserts the key-value pair into the fork with the given name `name`.
     pub fn put(&mut self, name: &str, key: Vec<u8>, value: Vec<u8>) {
-        if !self.patch.changes.contains_key(name) {
-            self.patch.changes.insert(name.to_string(), BTreeMap::new());
-        }
+        self.patch.create_changes_if_needed(name);
 
-        let changes = self.patch.changes.get_mut(name).unwrap();
+        let changes = self.patch.get_changes_mut(name).unwrap();
 
         if self.logged {
             self.changelog.push((
@@ -314,11 +352,9 @@ impl Fork {
 
     /// Removes the key from the fork with the given name `name`.
     pub fn remove(&mut self, name: &str, key: Vec<u8>) {
-        if !self.patch.changes.contains_key(name) {
-            self.patch.changes.insert(name.to_string(), BTreeMap::new());
-        }
+        self.patch.create_changes_if_needed(name);
 
-        let changes = self.patch.changes.get_mut(name).unwrap();
+        let changes = self.patch.get_changes_mut(name).unwrap();
         if self.logged {
             self.changelog.push((
                 name.to_string(),
@@ -332,11 +368,9 @@ impl Fork {
 
     /// Removes all keys starting with the specified prefix from the fork with name `name`.
     pub fn remove_by_prefix(&mut self, name: &str, prefix: Option<&Vec<u8>>) {
-        if !self.patch.changes.contains_key(name) {
-            self.patch.changes.insert(name.to_string(), BTreeMap::new());
-        }
+        self.patch.create_changes_if_needed(name);
 
-        let changes = self.patch.changes.get_mut(name).unwrap();
+        let changes = self.patch.get_changes_mut(name).unwrap();
         // Remove changes
         if let Some(prefix) = prefix {
             let keys = changes
@@ -381,13 +415,13 @@ impl Fork {
             panic!("call merge before commit or rollback");
         }
 
-        for (name, changes) in patch.changes {
-            if let Some(in_changes) = self.patch.changes.get_mut(&name) {
+        for (name, changes) in patch.into_iter() {
+            if let Some(in_changes) = self.patch.get_changes_mut(&name) {
                 in_changes.extend(changes);
                 continue;
             }
             {
-                self.patch.changes.insert(name, changes);
+                self.patch.insert_changes(name.to_owned(), changes);
             }
         }
     }
