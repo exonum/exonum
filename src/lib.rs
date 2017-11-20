@@ -590,6 +590,20 @@ impl TestKit {
     }
 
     /// Creates a chain of blocks until a given height.
+    /// 
+    /// # Example
+    ///
+    /// ```
+    /// # extern crate exonum_testkit;
+    /// # extern crate exonum;
+    /// # use exonum::helpers::Height;
+    /// # use exonum_testkit::TestKitBuilder;
+    /// # fn main() {
+    /// let mut testkit = TestKitBuilder::validator().create();
+    /// testkit.create_blocks_until(Height(5));
+    /// assert_eq!(Height(5), testkit.last_block_height());
+    /// assert_eq!(Height(6), testkit.current_height());
+    /// # }
     pub fn create_blocks_until(&mut self, height: Height) {
         while self.current_height() <= height {
             self.create_block();
@@ -672,7 +686,7 @@ pub struct TestNetworkConfiguration {
     stored_configuration: StoredConfiguration,
 }
 
-// A new configuration proposal state
+// A new configuration proposal state.
 #[derive(Debug)]
 enum ConfigurationProposalState {
     Uncommitted(TestNetworkConfiguration),
