@@ -25,7 +25,7 @@ use node::NodeConfig;
 use crypto::gen_keypair;
 
 use slog::Drain;
-use slog_term;
+use slog_term::{PlainSyncDecorator, FullFormat};
 
 pub use self::types::{Height, Round, ValidatorId, Milliseconds};
 
@@ -36,18 +36,14 @@ pub mod config;
 #[macro_use]
 pub mod metrics;
 
+
+// TODO: replace before merge
+// Stub for future replacement
+pub type ExonumLogger = Box<Drain>;
 /// Performs the logger initialization.
-pub fn init_logger() -> Result<(), ()> {
-    let plain = slog_term::PlainSyncDecorator::new(::std::io::stdout());
-    let log = ::slog::Logger::root(
-        slog_term::FullFormat::new(plain)
-            .build().fuse(), slog_o!()
-    );
-
-    // Make sure to save the guard, see documentation for more information
-    let _guard = ::slog_scope::set_global_logger(log).cancel_reset();
-
-    Ok(())
+pub fn root_logger() -> ExonumLogger {
+    let plain = PlainSyncDecorator::new(::std::io::stdout());
+    Box::new(FullFormat::new(plain).build().fuse(), slog_o!())
 }
 
 /// Generates testnet configuration.

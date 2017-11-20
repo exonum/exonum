@@ -23,6 +23,7 @@ use iron::{Chain, Iron};
 use futures::{Future, Sink};
 use futures::sync::mpsc;
 use tokio_core::reactor::Core;
+use slog::Logger;
 
 use std::io;
 use std::sync::Arc;
@@ -39,7 +40,7 @@ use messages::{Connect, Message, RawMessage};
 use events::{NetworkRequest, TimeoutRequest, NetworkEvent};
 use events::{HandlerPart, NetworkConfiguration, NetworkPart, TimeoutsPart};
 use events::error::{into_other, other_error, LogError, log_error};
-use helpers::{Height, Milliseconds, Round, ValidatorId};
+use helpers::{Height, Milliseconds, Round, ValidatorId, ExonumLogger};
 use storage::Database;
 
 pub use self::state::{RequestData, State, TxPool, ValidatorState};
@@ -79,6 +80,19 @@ pub enum NodeTimeout {
     PeerExchange,
 }
 
+impl NodeTimeout {
+    fn tag(&self) -> &'static str {
+        match self {
+            NodeTimeout::Status(_) => "status",
+            NodeTimeout::Round(..) => "round",
+            NodeTimeout::Request(..) => "request"
+            NodeTimeout::Propose(..) => "propose",
+            NodeTimeout::UpdateApiState => "update_api_state",
+            NodeTimeout::PeerExchange => "peer_exchange",
+        }
+    }
+}
+
 /// A helper trait that provides the node with information about the state of the system such
 /// as current time or listen address.
 pub trait SystemStateProvider: ::std::fmt::Debug {
@@ -94,6 +108,12 @@ pub struct ApiSender(pub mpsc::Sender<ExternalMessage>);
 
 /// Handler that that performs consensus algorithm.
 pub struct NodeHandler {
+    /// Basic Logger state
+    pub basic_logger: Logger<ExonumLogger>,
+    /// Network Logger state
+    pub network_logger: Logger<ExonumLogger>,
+    /// Consensus Logger state
+    pub consensus_logger: Logger<ExonumLogger>,
     /// State of the `NodeHandler`.
     pub state: State,
     /// Shared api state
@@ -259,6 +279,7 @@ pub struct NodeSender {
 impl NodeHandler {
     /// Creates `NodeHandler` using specified `Configuration`.
     pub fn new(
+        logger: Logger<ExonumLogger>,
         blockchain: Blockchain,
         external_address: SocketAddr,
         sender: NodeSender,
@@ -267,6 +288,7 @@ impl NodeHandler {
         api_state: SharedNodeState,
     ) -> Self {
         // FIXME: remove unwraps here, use FATAL log level instead
+
         let (last_hash, last_height) = {
             let block = blockchain.last_block();
             (block.hash(), block.height().next())
@@ -275,7 +297,6 @@ impl NodeHandler {
         let snapshot = blockchain.snapshot();
 
         let stored = Schema::new(&snapshot).actual_configuration();
-        info!("Creating a node with config: {:#?}", stored);
 
         let validator_id = stored
             .validator_keys
@@ -284,7 +305,12 @@ impl NodeHandler {
                 pk.consensus_key == config.listener.consensus_public_key
             })
             .map(|id| ValidatorId(id as u16));
-        info!("Validator id = '{:?}'", validator_id);
+
+        info!(logger, "Creating a node.";
+            "config" => stored,
+            "validator" => validator_id
+        );
+
         let connect = Connect::new(
             &config.listener.consensus_public_key,
             external_address,
@@ -313,14 +339,27 @@ impl NodeHandler {
         state.adjust_timeout(&*snapshot);
 
         NodeHandler {
+            basic_logger: Logger::root(logger, o!("module" => "basic")),
+            consensus_logger: Logger::root(logger, o!("module" => "consensus",
+                                                        "height" => last_height,
+                                                        "round" => "?")),
+            network_logger: Logger::root(logger, o!("module" => "network",
+                                "listen_address" => system_state.listen_address().to_string(),
+                                "external_address" => external_address.to_string())),
             blockchain,
             api_state,
             system_state,
             state,
             channel: sender,
             peer_discovery: config.peer_discovery,
+
         }
     }
+
+    fn consensus_logger(&self) -> &Logger<ExonumLogger> { &self.consensus_logger}
+    fn timeout_logger(&self) -> &Logger<ExonumLogger> { &self.consensus_logger}
+    fn basic_logger(&self) -> &Logger<ExonumLogger> { &self.basic_logger}
+    fn network_logger(&self) -> &Logger<ExonumLogger> { &self.network_logger}
 
     /// Return internal `SharedNodeState`
     pub fn api_state(&self) -> &SharedNodeState {
@@ -355,18 +394,14 @@ impl NodeHandler {
     /// Performs node initialization, so it starts consensus process from the first round.
     pub fn initialize(&mut self) {
         let addr = self.system_state.listen_address();
-        info!("Start listening address={}", addr);
+        info!(self.basic_logger(), "Start listening address"; "listen_address" => addr.to_string());
         for address in &self.peer_discovery.clone() {
             if address == &self.system_state.listen_address() {
                 continue;
             }
             self.connect(address);
-            info!("Trying to connect with peer {}", address);
+            info!(self.network_logger(), "Trying to connect with peer"; "remote_address" => address.to_string());
         }
-
-        let round = Round::first();
-        self.state.jump_round(round);
-        info!("Jump to round {}", round);
 
         self.add_round_timeout();
         self.add_status_timeout();
@@ -377,7 +412,7 @@ impl NodeHandler {
     /// Sends the given message to a peer by its id.
     pub fn send_to_validator(&self, id: u32, message: &RawMessage) {
         if id as usize >= self.state.validators().len() {
-            error!("Invalid validator id: {}", id);
+            crit!(self.consensus_logger(), "Invalid validator"; "validator_id" => id);
         } else {
             let public_key = self.state.validators()[id as usize].consensus_key;
             self.send_to_peer(public_key, message);
@@ -389,13 +424,13 @@ impl NodeHandler {
         if let Some(conn) = self.state.peers().get(&public_key) {
             self.send_to_addr(&conn.addr(), message);
         } else {
-            warn!("Hasn't connection with peer {:?}", public_key);
+            error!(self.network_logger(), "Sending to peer failed, connection not found."; "peer" => public_key);
         }
     }
 
     /// Sends `RawMessage` to the specified address.
     pub fn send_to_addr(&self, address: &SocketAddr, message: &RawMessage) {
-        trace!("Send to address: {}", address);
+        trace!(self.network_logger(), "Send to addres"; "address" => address.to_string());
         let request = NetworkRequest::SendMessage(*address, message.clone());
         self.channel
             .network_requests
@@ -407,6 +442,8 @@ impl NodeHandler {
 
     /// Broadcasts given message to all peers.
     pub fn broadcast(&mut self, message: &Message) {
+        trace!(self.network_logger(), "Broadcast message";
+               "peers_count" => self.state.peers().len());
         for conn in self.state.peers().values() {
             let addr = conn.addr();
             self.send_to_addr(&addr, message.raw());
@@ -421,6 +458,12 @@ impl NodeHandler {
 
     /// Add timeout request.
     pub fn add_timeout(&self, timeout: NodeTimeout, time: SystemTime) {
+        let timeout_type = timeout.tag()
+        trace!(self.consensus_logger(),
+            "Add timeout";
+            "timeout_type" => timeout_type,
+            "end_time" => time,
+        );
         let request = TimeoutRequest(time, timeout);
         self.channel
             .timeout_requests
@@ -441,12 +484,6 @@ impl NodeHandler {
     /// Adds `NodeTimeout::Round` timeout to the channel.
     pub fn add_round_timeout(&self) {
         let time = self.round_start_time(self.state.round().next());
-        trace!(
-            "ADD ROUND TIMEOUT: time={:?}, height={}, round={}",
-            time,
-            self.state.height(),
-            self.state.round()
-        );
         let timeout = NodeTimeout::Round(self.state.height(), self.state.round());
         self.add_timeout(timeout, time);
     }
@@ -454,15 +491,10 @@ impl NodeHandler {
     /// Adds `NodeTimeout::Propose` timeout to the channel.
     pub fn add_propose_timeout(&self) {
         let adjusted_timeout = self.state.propose_timeout();
+        // FIXME: can propose_timeout be set on round != 1 ?
         let time = self.round_start_time(self.state.round()) +
             Duration::from_millis(adjusted_timeout);
 
-        trace!(
-            "ADD PROPOSE TIMEOUT: time={:?}, height={}, round={}",
-            time,
-            self.state.height(),
-            self.state.round()
-        );
         let timeout = NodeTimeout::Propose(self.state.height(), self.state.round());
         self.add_timeout(timeout, time);
     }
@@ -475,14 +507,12 @@ impl NodeHandler {
 
     /// Adds `NodeTimeout::Request` timeout with `RequestData` to the channel.
     pub fn add_request_timeout(&self, data: RequestData, peer: Option<PublicKey>) {
-        trace!("ADD REQUEST TIMEOUT");
         let time = self.system_state.current_time() + data.timeout();
         self.add_timeout(NodeTimeout::Request(data, peer), time);
     }
 
     /// Adds `NodeTimeout::PeerExchange` timeout to the channel.
     pub fn add_peer_exchange_timeout(&self) {
-        trace!("ADD PEER EXCHANGE TIMEOUT");
         let time = self.system_state.current_time() + Duration::from_millis(self.peers_timeout());
         self.add_timeout(NodeTimeout::PeerExchange, time);
     }
@@ -625,7 +655,7 @@ impl Node {
     /// Creates node for the given services and node configuration.
     pub fn new(db: Box<Database>, services: Vec<Box<Service>>, node_cfg: NodeConfig) -> Self {
         crypto::init();
-
+        let logger = root_logger();
         if cfg!(feature = "flame_profile") {
             ::exonum_profiler::init_handler(
                 ::std::env::var(PROFILE_ENV_VARIABLE_NAME).expect(&format!(
@@ -667,13 +697,14 @@ impl Node {
         let external_address = if let Some(v) = node_cfg.external_address {
             v
         } else {
-            warn!("Could not find 'external_address' in the config, using 'listen_address'");
+            warn!(logger, "Could not find 'external_address' in the config, using 'listen_address'");
             node_cfg.listen_address
         };
         let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
         let system_state = Box::new(DefaultSystemState(node_cfg.listen_address));
         let network_config = config.network;
         let handler = NodeHandler::new(
+            logger,
             blockchain,
             external_address,
             channel.node_sender(),
@@ -742,7 +773,10 @@ impl Node {
                 mount.mount("api/system", router);
 
                 let thread = thread::spawn(move || {
-                    info!("Private exonum api started on {}", listen_address);
+                    info!(self.handler.basic_logger(),
+                        "Private exonum api started";
+                        "listen_address" => listen_address
+                    );
                     let chain = Chain::new(mount);
                     Iron::new(chain).http(listen_address).unwrap();
                 });
@@ -768,8 +802,10 @@ impl Node {
                 }
 
                 let thread = thread::spawn(move || {
-                    info!("Public exonum api started on {}", listen_address);
-
+                    info!(self.handler.basic_logger(),
+                        "Public exonum api started";
+                        "listen_address" => listen_address
+                    );
                     let chain = Chain::new(mount);
                     Iron::new(chain).http(listen_address).unwrap();
                 });

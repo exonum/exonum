@@ -42,7 +42,7 @@ impl NodeHandler {
             Ok(Any::Block(msg)) => self.handle_block(&msg),
             Ok(Any::Transaction(msg)) => self.handle_tx(msg),
             Err(err) => {
-                error!("Invalid message received: {:?}", err.description());
+                error!(self.network_logger(), "Invalid message received: {:?}", err.description());
             }
         }
     }
@@ -50,14 +50,14 @@ impl NodeHandler {
     /// Handles the `Connected` event. Node's `Connect` message is sent as response
     /// if received `Connect` message is correct.
     pub fn handle_connected(&mut self, addr: SocketAddr, connect: Connect) {
-        info!("Received Connect message from peer: {}", addr);
+        info!(self.network_logger(), "Received Connect message";  "peer_address" => addr);
         self.handle_connect(connect);
     }
 
     /// Handles the `Disconnected` event. Node will try to connect to that address again if it was
     /// in the validators list.
     pub fn handle_disconnected(&mut self, addr: SocketAddr) {
-        info!("Disconnected from: {}", addr);
+        info!(self.network_logger(), "Disconnected message";  "peer_address" => addr);
         let need_reconnect = self.state.remove_peer_with_addr(&addr);
         if need_reconnect {
             self.connect(&addr);
@@ -66,7 +66,7 @@ impl NodeHandler {
     /// Handles the `UnableConnectToPeer` event. Node will try to connect to that address again
     /// if it was in the validators list.
     pub fn handle_unable_to_connect(&mut self, addr: SocketAddr) {
-        info!("Could not connect to: {}", addr);
+        info!(self.network_logger(), "Unable to connect with peer";  "peer_address" => addr);
         let need_reconnect = self.state.remove_peer_with_addr(&addr);
         if need_reconnect {
             self.connect(&addr);
@@ -77,30 +77,34 @@ impl NodeHandler {
     pub fn handle_connect(&mut self, message: Connect) {
         // TODO add spam protection (ECR-170)
         let address = message.addr();
+        let peer_logger = Logger::root(self.network_logger().to_erased(),
+                                       o!("peer_public_key" => message.pub_key(),
+                                       "peer_address" => address));
         if address == self.state.our_connect_message().addr() {
-            trace!("Received Connect with same address as our external_address.");
+            trace!(peer_logger,
+                   "Received Connect with same address as our external_address.");
             return;
         }
 
         let pub_key = *message.pub_key();
         if pub_key == *self.state.our_connect_message().pub_key() {
-            trace!("Received Connect with same pub_key as ours.");
+            trace!(peer_logger, "Received Connect with same pub_key as ours.");
             return;
         }
 
         if !self.state.whitelist().allow(message.pub_key()) {
-            error!(
-                "Received connect message from {:?} peer which not in whitelist.",
-                message.pub_key()
+            error!(peer_logger,
+                "Received unauthorised connect message";
+                "authorised" => false,
             );
             return;
         }
 
         let public_key = *message.pub_key();
         if !message.verify_signature(&public_key) {
-            error!(
-                "Received connect-message with incorrect signature, msg={:?}",
-                message
+            error!(peer_logger
+                "Received connect-message with incorrect signature";
+                "msg" => message,
             );
             return;
         }
@@ -109,64 +113,67 @@ impl NodeHandler {
         let mut need_connect = true;
         if let Some(saved_message) = self.state.peers().get(&public_key) {
             if saved_message.time() > message.time() {
-                error!("Received outdated Connect message from {}", address);
+                error!(peer_logger, "Received outdated Connect message.");
                 return;
             } else if saved_message.time() < message.time() {
                 need_connect = saved_message.addr() != message.addr();
             } else if saved_message.addr() != message.addr() {
-                error!("Received weird Connect message from {}", address);
+                error!(peer_logger, "Received weird Connect message.");
                 return;
             } else {
                 need_connect = false;
             }
         }
         self.state.add_peer(public_key, message);
-        info!(
-            "Received Connect message from {}, {}",
-            address,
-            need_connect,
+        info!(peer_logger,
+              "Received Connect message",
+                "need_connect", => need_connect,
+                "authorised" => true,
         );
         if need_connect {
             // TODO: reduce double sending of connect message
-            info!("Send Connect message to {}", address);
+            info!(peer_logger, "Sending Connect message to peer");
             self.connect(&address);
         }
     }
 
     /// Handles the `Status` message. Node sends `BlockRequest` as response if height in the
     /// message is higher than node's height.
-    pub fn handle_status(&mut self, msg: &Status) {
+    pub fn handle_status(&mut self, message: &Status) {
+
         let height = self.state.height();
-        trace!(
-            "HANDLE STATUS: current height = {}, msg height = {}",
-            height,
-            msg.height()
+
+        let peer_logger = Logger::root(self.consensus_logger().to_erased(),
+                                       o!("peer_public_key" => message.pub_key(),
+                                       "peer_height" => message));
+        trace!(peer_logger,
+            "Handle status."
         );
 
-        if !self.state.whitelist().allow(msg.from()) {
-            error!(
-                "Received status message from peer = {:?} which not in whitelist.",
-                msg.from()
+        if !self.state.whitelist().allow(message.from()) {
+            error!(peer_logger,
+                "Received unauthorised status message";
+                "authorised" => false,
             );
             return;
         }
 
         // Handle message from future height
-        if msg.height() > height {
+        if message.height() > height {
             let peer = msg.from();
 
-            if !msg.verify_signature(peer) {
-                error!(
-                    "Received status message with incorrect signature, msg={:?}",
-                    msg
+            if !message.verify_signature(peer) {
+                error!(peer_logger,
+                    "Received status message with incorrect signature";
+                    "message" => message
                 );
                 return;
             }
 
             // Check validator height info
-            if msg.height() > self.state.node_height(peer) {
+            if message.height() > self.state.node_height(peer) {
                 // Update validator height
-                self.state.set_node_height(*peer, msg.height());
+                self.state.set_node_height(*peer, message.height());
             }
 
             // Request block
@@ -175,16 +182,16 @@ impl NodeHandler {
     }
 
     /// Handles the `PeersRequest` message. Node sends `Connect` messages of other peers as result.
-    pub fn handle_request_peers(&mut self, msg: &PeersRequest) {
+    pub fn handle_request_peers(&mut self, message: &PeersRequest) {
         let peers: Vec<Connect> = self.state.peers().iter().map(|(_, b)| b.clone()).collect();
         trace!(
-            "HANDLE REQUEST PEERS: Sending {:?} peers to {:?}",
+            "Handle request peers: Sending {:?} peers to {:?}",
             peers,
-            msg.from()
+            message.from()
         );
 
         for peer in peers {
-            self.send_to_peer(*msg.from(), peer.raw());
+            self.send_to_peer(*message.from(), peer.raw());
         }
     }
 
