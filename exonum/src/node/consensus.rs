@@ -13,7 +13,8 @@
 // limitations under the License.
 use std::collections::HashSet;
 
-use crypto::{Hash, HexValue, PublicKey};
+use crypto::{Hash, PublicKey};
+use encoding::serialize::encode_hex;
 use blockchain::{Schema, Transaction};
 use messages::{BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote,
                PrevotesRequest, Propose, ProposeRequest, RawTransaction, TransactionsRequest};
@@ -145,8 +146,8 @@ impl NodeHandler {
         if msg.to() != self.state.consensus_public_key() {
             error!(
                 "Received block that intended for another peer, to={}, from={}",
-                msg.to().to_hex(),
-                msg.from().to_hex()
+                encode_hex(msg.to()),
+                encode_hex(msg.from())
             );
             return;
         }
@@ -477,7 +478,7 @@ impl NodeHandler {
                 .unwrap_or_else(|| "?".into()),
             commited_txs,
             mempool_size,
-            block_hash.to_hex(),
+            encode_hex(block_hash),
         );
 
         // TODO: reset status timeout (ECR-171).

@@ -17,28 +17,27 @@
 //! [Sodium library](https://github.com/jedisct1/libsodium) is used under the hood through
 //! [sodiumoxide rust bindings](https://github.com/dnaq/sodiumoxide).
 
-use sodiumoxide::crypto::sign::ed25519::{PublicKey as PublicKeySodium,
+use sodiumoxide::crypto::sign::ed25519::{gen_keypair as gen_keypair_sodium, keypair_from_seed,
+                                         sign_detached, verify_detached,
+                                         PublicKey as PublicKeySodium,
                                          SecretKey as SecretKeySodium, Seed as SeedSodium,
-                                         Signature as SignatureSodium, State as SignState,
-                                         sign_detached, verify_detached, keypair_from_seed,
-                                         gen_keypair as gen_keypair_sodium};
-use sodiumoxide::crypto::hash::sha256::{Digest, State as HashState, hash as hash_sodium};
+                                         Signature as SignatureSodium, State as SignState};
+use sodiumoxide::crypto::hash::sha256::{hash as hash_sodium, Digest, State as HashState};
 use sodiumoxide;
 use serde::{Serialize, Serializer};
-use serde::de::{self, Visitor, Deserialize, Deserializer};
-use hex::{ToHex, FromHex};
+use serde::de::{self, Deserialize, Deserializer, Visitor};
 
 use std::default::Default;
-use std::ops::{Index, Range, RangeFrom, RangeTo, RangeFull};
+use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
 use std::fmt;
 
 pub use sodiumoxide::crypto::sign::ed25519::{PUBLICKEYBYTES as PUBLIC_KEY_LENGTH,
                                              SECRETKEYBYTES as SECRET_KEY_LENGTH,
-                                             SIGNATUREBYTES as SIGNATURE_LENGTH,
-                                             SEEDBYTES as SEED_LENGTH};
+                                             SEEDBYTES as SEED_LENGTH,
+                                             SIGNATUREBYTES as SIGNATURE_LENGTH};
 pub use sodiumoxide::crypto::hash::sha256::DIGESTBYTES as HASH_SIZE;
 
-pub use encoding::serialize::{FromHexError, HexValue};
+use encoding::serialize::FromHex;
 
 /// The size to crop the string in debug messages.
 const BYTES_IN_DEBUG: usize = 4;
@@ -269,7 +268,9 @@ macro_rules! implement_public_sodium_wrapper {
 
     impl ToString for $name {
         fn to_string(&self) -> String {
-            ::crypto::HexValue::to_hex(self)
+            let mut hex_string = String::new();
+            ::encoding::serialize::ToHex::write_hex(self, &mut hex_string).unwrap();
+            hex_string
         }
     }
 
@@ -319,6 +320,16 @@ macro_rules! implement_private_sodium_wrapper {
                 write!(f, "{:02X}", i)?
             }
             write!(f, "...)")
+        }
+    }
+
+    impl ::encoding::serialize::ToHex for $name {
+        fn write_hex<W: ::std::fmt::Write>(&self, w: &mut W) -> ::std::fmt::Result {
+            (self.0).0.as_ref().write_hex(w)
+        }
+
+        fn write_hex_upper<W: ::std::fmt::Write>(&self, w: &mut W) -> ::std::fmt::Result {
+            (self.0).0.as_ref().write_hex_upper(w)
         }
     }
     )
@@ -407,18 +418,15 @@ implement_private_sodium_wrapper! {
 
 macro_rules! implement_serde {
 ($name:ident) => (
-    impl HexValue for $name {
-        fn to_hex(&self) -> String {
-            let inner = &self.0;
-            inner.0.as_ref().to_hex()
-        }
+    impl ::encoding::serialize::FromHex for $name {
+        type Error = ::encoding::serialize::FromHexError;
 
-        fn from_hex<T: AsRef<str>>(v: T) -> Result<Self, FromHexError> {
-            let bytes: Vec<u8> = FromHex::from_hex(v.as_ref())?;
+        fn from_hex<T: AsRef<[u8]>>(v: T) -> Result<Self, Self::Error> {
+            let bytes: Vec<u8> = FromHex::from_hex(v)?;
             if let Some(self_value) = Self::from_slice(bytes.as_ref()) {
                 Ok(self_value)
             } else {
-                Err(FromHexError::InvalidHexLength)
+                Err(::encoding::serialize::FromHexError::InvalidStringLength)
             }
         }
     }
@@ -428,7 +436,9 @@ macro_rules! implement_serde {
         fn serialize<S>(&self, ser:S) -> Result<S::Ok, S::Error>
         where S: Serializer
         {
-            ser.serialize_str(&HexValue::to_hex(self))
+            let mut hex_string = String::new();
+            ::encoding::serialize::ToHex::write_hex(self, &mut hex_string).unwrap();
+            ser.serialize_str(&hex_string)
         }
     }
 
@@ -463,14 +473,6 @@ implement_serde! {SecretKey}
 implement_serde! {Seed}
 implement_serde! {Signature}
 
-impl HexValue for Vec<u8> {
-    fn to_hex(&self) -> String {
-        ToHex::to_hex(self)
-    }
-    fn from_hex<T: AsRef<str>>(v: T) -> Result<Self, FromHexError> {
-        FromHex::from_hex(v.as_ref())
-    }
-}
 macro_rules! implement_index_traits {
     ($newtype:ident) => (
         impl Index<Range<usize>> for $newtype {
@@ -516,15 +518,15 @@ impl Default for Hash {
 
 #[cfg(test)]
 mod tests {
-    use super::{hash, gen_keypair, Hash, PublicKey, SecretKey, Seed, Signature, HashStream,
-                SignStream};
-    use super::HexValue;
     use serde_json;
+    use encoding::serialize::{encode_hex, FromHex};
+    use super::{gen_keypair, hash, Hash, HashStream, PublicKey, SecretKey, Seed, SignStream,
+                Signature};
 
     #[test]
     fn test_hash() {
         let h = hash(&[]);
-        let h1 = Hash::from_hex(h.to_hex()).unwrap();
+        let h1 = Hash::from_hex(encode_hex(h)).unwrap();
         assert_eq!(h1, h);
         let h = Hash::zero();
         assert_eq!(*h.as_ref(), [0; 32]);
@@ -533,8 +535,8 @@ mod tests {
     #[test]
     fn test_keys() {
         let (p, s) = gen_keypair();
-        let p1 = PublicKey::from_hex(p.to_hex()).unwrap();
-        let s1 = SecretKey::from_hex(s.to_hex()).unwrap();
+        let p1 = PublicKey::from_hex(encode_hex(p)).unwrap();
+        let s1 = SecretKey::from_hex(encode_hex((s.0).0.as_ref())).unwrap();
         assert_eq!(p1, p);
         assert_eq!(s1, s);
     }

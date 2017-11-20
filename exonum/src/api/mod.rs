@@ -31,8 +31,8 @@ use std::io;
 use std::collections::BTreeMap;
 use std::fmt;
 
-use crypto::{PublicKey, SecretKey, HexValue, FromHexError, Hash};
-use encoding::serialize::ToHex;
+use crypto::{PublicKey, SecretKey, Hash};
+use encoding::serialize::{FromHex, FromHexError, ToHex};
 use storage::{Result as StorageResult, Error as StorageError};
 
 pub mod public;
@@ -125,7 +125,9 @@ impl From<ApiError> for IronError {
         let code = match e {
             ApiError::FileExists(hash) |
             ApiError::FileNotFound(hash) => {
-                body.insert("hash", ToHex::to_hex(&hash));
+                let mut hex_string = String::with_capacity(128);
+                hash.write_hex(&mut hex_string).unwrap();
+                body.insert("hash", hex_string);
                 status::Conflict
             }
             _ => status::Conflict,
@@ -160,20 +162,22 @@ where
     where
         S: Serializer,
     {
-        ser.serialize_str(&self.0.as_ref().to_hex())
+        let mut hex_string = String::new();
+        self.0.as_ref().write_hex(&mut hex_string).unwrap();
+        ser.serialize_str(&hex_string)
     }
 }
 
 struct HexVisitor<T>
 where
-    T: AsRef<[u8]> + HexValue,
+    T: AsRef<[u8]> + Clone + FromHex<Error = FromHexError>,
 {
     _p: PhantomData<T>,
 }
 
 impl<'v, T> Visitor<'v> for HexVisitor<T>
 where
-    T: AsRef<[u8]> + HexValue + Clone,
+    T: AsRef<[u8]> + Clone + FromHex<Error = FromHexError>,
 {
     type Value = HexField<T>;
 
@@ -192,7 +196,10 @@ where
 
 impl<'de, T> Deserialize<'de> for HexField<T>
 where
-    T: AsRef<[u8]> + HexValue + Clone,
+    T: AsRef<[u8]>
+        + FromHex<Error = FromHexError>
+        + ToHex
+        + Clone,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -214,7 +221,7 @@ pub trait Api {
             for cookie in cookies.iter() {
                 if let Ok(c) = CookiePair::parse(cookie.as_str()) {
                     if c.name() == key {
-                        if let Ok(value) = HexValue::from_hex(c.value()) {
+                        if let Ok(value) = FromHex::from_hex(c.value()) {
                             return Ok(value);
                         }
                     }

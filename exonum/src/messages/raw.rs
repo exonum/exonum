@@ -14,13 +14,12 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 
-use std::{mem, convert, sync};
+use std::{convert, mem, sync};
 use std::fmt::Debug;
 use std::ops::Deref;
 
-use crypto::{PublicKey, SecretKey, Signature, sign, verify, Hash, hash, SIGNATURE_LENGTH};
-use encoding::{Field, Result as StreamStructResult, Offset, CheckedOffset};
-use encoding::serialize::{HexValue, FromHexError, ToHex};
+use crypto::{hash, sign, verify, Hash, PublicKey, SecretKey, Signature, SIGNATURE_LENGTH};
+use encoding::{CheckedOffset, Field, Offset, Result as StreamStructResult};
 
 /// Length of the message header.
 pub const HEADER_LENGTH: usize = 10;
@@ -46,6 +45,12 @@ impl Deref for RawMessage {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl AsRef<[u8]> for RawMessage {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_ref().as_ref()
     }
 }
 
@@ -273,16 +278,5 @@ impl Message for RawMessage {
 
     fn verify_signature(&self, pub_key: &PublicKey) -> bool {
         verify(self.signature(), self.body(), pub_key)
-    }
-}
-
-impl HexValue for RawMessage {
-    fn to_hex(&self) -> String {
-        self.as_ref().to_hex()
-    }
-
-    fn from_hex<T: AsRef<str>>(v: T) -> Result<Self, FromHexError> {
-        let vec = Vec::<u8>::from_hex(v.as_ref())?;
-        Ok(RawMessage::new(MessageBuffer::from_vec(vec)))
     }
 }
