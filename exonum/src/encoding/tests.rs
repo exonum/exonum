@@ -19,8 +19,8 @@ use std::time::SystemTime;
 
 use crypto::{hash, gen_keypair};
 use blockchain::{self, BlockProof, Block};
-use messages::{RawMessage, Message, FromRaw, Connect, Propose, Prevote, Precommit, Status,
-               BlockResponse, BlockRequest};
+use messages::{RawMessage, Message, Connect, Propose, Prevote, Precommit, Status, BlockResponse,
+               BlockRequest};
 use helpers::{Height, Round, ValidatorId};
 
 use super::{Field, Offset};

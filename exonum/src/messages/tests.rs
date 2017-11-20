@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crypto::SecretKey;
-use messages::raw::{FromRaw, MessageBuffer};
+use messages::raw::MessageBuffer;
 use messages::RawMessage;
 
 #[test]
@@ -43,5 +43,5 @@ fn test_message_with_small_size() {
 
     let buff = vec![1; 1];
     let raw = RawMessage::new(MessageBuffer::from_vec(buff));
-    let _message = <SmallField as FromRaw>::from_raw(raw).expect("Found error in from_raw");
+    let _message = SmallField::from_raw(raw).expect("Found error in from_raw");
 }

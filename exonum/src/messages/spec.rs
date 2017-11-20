@@ -105,7 +105,7 @@ macro_rules! message {
                                     $crate::encoding::SegmentField::from_buffer(buffer,
                                                                 from,
                                                                 count);
-                $crate::messages::FromRaw::from_raw(raw_message).unwrap()
+                $name::from_raw(raw_message).unwrap()
             }
 
             fn check_data(buffer: &'a [u8],
@@ -124,34 +124,11 @@ macro_rules! message {
                                     unsafe { $crate::encoding::SegmentField::from_buffer(buffer,
                                                                 from.unchecked_offset(),
                                                                 count.unchecked_offset())};
-                let _: $name = $crate::messages::FromRaw::from_raw(raw_message)?;
+                let _: $name = $name::from_raw(raw_message)?;
                 Ok(latest_segment_origin)
             }
         }
 
-        impl $crate::messages::FromRaw for $name {
-            fn from_raw(raw: $crate::messages::RawMessage)
-                -> Result<$name, $crate::encoding::Error> {
-                let min_message_size = $body as usize
-                            + $crate::messages::HEADER_LENGTH as usize
-                            + $crate::crypto::SIGNATURE_LENGTH as usize;
-                if raw.len() < min_message_size {
-                    return Err($crate::encoding::Error::UnexpectedlyShortPayload {
-                        actual_size: raw.len() as $crate::encoding::Offset,
-                        minimum_size: min_message_size as $crate::encoding::Offset,
-                    });
-                }
-
-                let body_len = <Self>::check_fields(&raw)?;
-
-                if body_len.unchecked_offset() as usize +
-                    $crate::crypto::SIGNATURE_LENGTH as usize != raw.len()  {
-                   return Err("Incorrect raw message length.".into())
-                }
-
-                Ok($name { raw: raw })
-            }
-        }
         impl $name {
             #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
             /// Creates messsage and sign it.
@@ -179,7 +156,29 @@ macro_rules! message {
                                                     $extension, $id, $body);
                 $(writer.write($field_name, $from, $to);)*
                 $name { raw: RawMessage::new(writer.append_signature(signature)) }
+            }
 
+            /// Converts the raw message into the specific one.
+            pub fn from_raw(raw: $crate::messages::RawMessage)
+                -> Result<$name, $crate::encoding::Error> {
+                let min_message_size = $body as usize
+                            + $crate::messages::HEADER_LENGTH as usize
+                            + $crate::crypto::SIGNATURE_LENGTH as usize;
+                if raw.len() < min_message_size {
+                    return Err($crate::encoding::Error::UnexpectedlyShortPayload {
+                        actual_size: raw.len() as $crate::encoding::Offset,
+                        minimum_size: min_message_size as $crate::encoding::Offset,
+                    });
+                }
+
+                let body_len = <Self>::check_fields(&raw)?;
+
+                if body_len.unchecked_offset() as usize +
+                    $crate::crypto::SIGNATURE_LENGTH as usize != raw.len()  {
+                   return Err("Incorrect raw message length.".into())
+                }
+
+                Ok($name { raw: raw })
             }
 
             #[allow(unused_variables)]
