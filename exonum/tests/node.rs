@@ -25,7 +25,7 @@ use futures::Future;
 use futures::sync::oneshot;
 use tokio_timer::Timer;
 
-use exonum::blockchain::{Blockchain, Service, ServiceContext, Transaction};
+use exonum::blockchain::{Service, ServiceContext, Transaction};
 use exonum::encoding::Error as EncodingError;
 use exonum::messages::RawTransaction;
 use exonum::node::Node;
@@ -47,7 +47,7 @@ impl Service for CommitWatcherService {
         unreachable!("An unknown transaction received");
     }
 
-    fn handle_commit(&self, _context: &mut ServiceContext) {
+    fn handle_commit(&self, _context: &ServiceContext) {
         if let Some(oneshot) = self.0.lock().unwrap().take() {
             oneshot.send(()).unwrap();
         }
@@ -59,10 +59,9 @@ fn run_nodes(count: u8) -> (Vec<JoinHandle<()>>, Vec<oneshot::Receiver<()>>) {
     let mut commit_rxs = Vec::new();
     for node_cfg in helpers::generate_testnet_config(count, 16_300) {
         let (commit_tx, commit_rx) = oneshot::channel();
-        let service = Box::new(CommitWatcherService(Mutex::new(Some(commit_tx))));
-        let blockchain = Blockchain::new(Box::new(MemoryDB::new()), vec![service]);
         let node_thread = thread::spawn(move || {
-            let node = Node::new(blockchain, node_cfg);
+            let service = Box::new(CommitWatcherService(Mutex::new(Some(commit_tx))));
+            let node = Node::new(Box::new(MemoryDB::new()), vec![service], node_cfg);
             node.run().unwrap();
         });
         node_threads.push(node_thread);

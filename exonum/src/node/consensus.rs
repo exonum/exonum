@@ -11,16 +11,15 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 use std::collections::HashSet;
 
-use crypto::{Hash, PublicKey, HexValue};
+use crypto::{Hash, HexValue, PublicKey};
 use blockchain::{Schema, Transaction};
-use messages::{ConsensusMessage, Propose, Prevote, Precommit, Message, ProposeRequest,
-               TransactionsRequest, PrevotesRequest, BlockRequest, BlockResponse, RawTransaction};
+use messages::{BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote,
+               PrevotesRequest, Propose, ProposeRequest, RawTransaction, TransactionsRequest};
 use helpers::{Height, Round, ValidatorId};
 use storage::Patch;
-use super::{NodeHandler, RequestData};
+use node::{NodeHandler, RequestData};
 
 // TODO reduce view invokations (ECR-171)
 impl NodeHandler {
@@ -42,7 +41,7 @@ impl NodeHandler {
         if msg.height() == self.state.height().next() || msg.round() > self.state.round() {
             trace!(
                 "Received consensus message from future round: msg.height={}, msg.round={}, \
-                    self.height={}, self.round={}",
+                 self.height={}, self.round={}",
                 msg.height(),
                 msg.round(),
                 self.state.height(),
@@ -179,7 +178,7 @@ impl NodeHandler {
         if block.prev_hash() != &self.last_block_hash() {
             error!(
                 "Received block prev_hash is distinct from the one in db, \
-                    block={:?}, block.prev_hash={:?}, db.last_block_hash={:?}",
+                 block={:?}, block.prev_hash={:?}, db.last_block_hash={:?}",
                 msg,
                 *block.prev_hash(),
                 self.last_block_hash()
@@ -227,7 +226,7 @@ impl NodeHandler {
             if block_hash != block.hash() {
                 panic!(
                     "Block_hash incorrect in the received block={:?}. Either a node's \
-                implementation is incorrect or validators majority works incorrectly",
+                     implementation is incorrect or validators majority works incorrectly",
                     msg
                 );
             }
@@ -272,7 +271,7 @@ impl NodeHandler {
             if our_block_hash != block_hash {
                 panic!(
                     "Full propose: wrong state hash. Either a node's implementation is \
-                incorrect or validators majority works incorrectly"
+                     incorrect or validators majority works incorrectly"
                 );
             }
 
@@ -442,20 +441,24 @@ impl NodeHandler {
         trace!("COMMIT {:?}", block_hash);
 
         // Merge changes into storage
-        let (commited_txs, new_txs, proposer) = {
-            let (txs_count, proposer) = {
-                let block_state = self.state.block(&block_hash).unwrap();
-                (block_state.txs().len(), block_state.proposer_id())
-            };
-
-            let txs = self.blockchain
-                .commit(&mut self.state, block_hash, precommits)
+        let (commited_txs, proposer) = {
+            // FIXME Avoid of clone here.
+            let block_state = self.state.block(&block_hash).unwrap().clone();
+            self.blockchain
+                .commit(block_state.patch(), block_hash, precommits)
                 .unwrap();
-
-            (txs_count, txs, proposer)
+            // Update node state
+            self.state.update_config(
+                Schema::new(&self.blockchain.snapshot()).actual_configuration(),
+            );
+            // Update state to new height
+            let block_hash = self.blockchain.last_hash();
+            self.state.new_height(
+                &block_hash,
+                self.system_state.current_time(),
+            );
+            (block_state.txs().len(), block_state.proposer_id())
         };
-
-        let height = self.state.height();
 
         let mempool_size = self.state
             .transactions()
@@ -464,20 +467,18 @@ impl NodeHandler {
             .len();
         metric!("node.mempool", mempool_size);
 
-        // Update state to new height
-        self.state.new_height(
-            &block_hash,
-            self.system_state.current_time(),
+        let height = self.state.height();
+        info!(
+            "COMMIT ====== height={}, proposer={}, round={}, committed={}, pool={}, hash={}",
+            height,
+            proposer,
+            round
+                .map(|x| format!("{}", x))
+                .unwrap_or_else(|| "?".into()),
+            commited_txs,
+            mempool_size,
+            block_hash.to_hex(),
         );
-
-        info!("COMMIT ====== height={}, proposer={}, round={}, committed={}, pool={}, hash={}",
-              height,
-              proposer,
-              round.map(|x| format!("{}", x)).unwrap_or_else(|| "?".into()),
-              commited_txs,
-              mempool_size,
-              block_hash.to_hex(),
-              );
 
         // TODO: reset status timeout (ECR-171).
         self.broadcast_status();
@@ -485,12 +486,6 @@ impl NodeHandler {
 
         // Adjust propose timeout after accepting a new block.
         self.state.adjust_timeout(&*self.blockchain.snapshot());
-
-        // Handle queued transactions from services
-        for tx in new_txs {
-            debug_assert!(tx.verify());
-            self.handle_incoming_tx(tx);
-        }
 
         // Add timeout for first round
         self.add_round_timeout();

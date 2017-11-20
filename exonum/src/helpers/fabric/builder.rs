@@ -16,7 +16,7 @@ use std::fmt;
 use std::panic::{self, PanicInfo};
 use std::ffi::OsString;
 
-use blockchain::{Service, Blockchain};
+use blockchain::Service;
 use node::{NodeConfig, Node};
 
 use super::internal::{CollectedCommand, Feedback};
@@ -79,8 +79,7 @@ impl NodeBuilder {
                     .into_iter()
                     .map(|mut factory| factory.make_service(ctx))
                     .collect();
-                let blockchain = Blockchain::new(db, services);
-                let node = Node::new(blockchain, config);
+                let node = Node::new(db, services, config);
                 Some(node)
             }
             _ => None,

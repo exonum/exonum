@@ -29,7 +29,7 @@ pub type Patch = HashMap<String, BTreeMap<Vec<u8>, Change>>;
 pub type Iter<'a> = Box<Iterator + 'a>;
 
 /// An enum that represents a kind of change to some key in storage.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Change {
     /// Put the specified value into storage for a corresponding key.
     Put(Vec<u8>),
