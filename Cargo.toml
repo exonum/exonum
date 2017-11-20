@@ -1,6 +1,6 @@
 [package]
 name = "exonum-testkit"
-version = "0.0.1"
+version = "0.1.0"
 license = "Apache-2.0"
 homepage = "https://exonum.com"
 description = """
@@ -24,4 +24,4 @@ bodyparser = "0.7.0"
 serde_derive = "1.0.0"
 
 [patch.crates-io]
-exonum = { git = "https://github.com/alekseysidorov/exonum", branch = "improve-blockchain-api" }
+exonum = { git = "https://github.com/exonum/exonum", rev = "adb1a9ab47a356b6efb3ef73755f981f6fd0af9a" }
