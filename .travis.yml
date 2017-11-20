@@ -27,7 +27,6 @@ script:
   - cargo test
 
 stages:
-  - lint
   - test
 jobs:
   include:
