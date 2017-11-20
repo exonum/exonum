@@ -23,57 +23,85 @@ use super::NodeHandler;
 
 impl NodeHandler {
     /// Validates request, then redirects it to the corresponding `handle_...` function.
-    pub fn handle_request(&mut self, msg: RequestMessage) {
+    pub fn handle_request(&mut self, message: RequestMessage) {
+        let peer_logger = Logger::root(self.consensus_logger().to_erased(),
+                                       o!("peer_public_key" => message.from());
         // Request are sended to us
-        if msg.to() != self.state.consensus_public_key() {
-            return;
-        }
-
-        if !self.state.whitelist().allow(msg.from()) {
-            error!(
-                "Received request message from peer = {:?} which not in whitelist.",
-                msg.from()
+        if message.to() != self.state.consensus_public_key() {
+            error!(peer_logger,
+                   "Received request message, that was addressed to other validator.";
+                   "message_to" => message.to()
             );
             return;
         }
 
-        if !msg.verify(msg.from()) {
-            error!("Received request with incorrect signature, msg={:?}", msg);
+        if !self.state.whitelist().allow(message.from()) {
+            error!(peer_logger,
+                "Received request message.";
+                "authorised" => false
+            );
             return;
         }
 
+        if !message.verify(message.from()) {
+            error!(peer_logger,
+                   "Received request with incorrect signature", "message" => message);
+            return;
+        }
+
+<<<<<<< HEAD
         match msg {
             RequestMessage::Propose(msg) => self.handle_request_propose(&msg),
             RequestMessage::Transactions(msg) => self.handle_request_txs(&msg),
             RequestMessage::Prevotes(msg) => self.handle_request_prevotes(&msg),
             RequestMessage::Peers(msg) => self.handle_request_peers(&msg),
             RequestMessage::Block(msg) => self.handle_request_block(&msg),
+=======
+        match message {
+            RequestMessage::Propose(message) => self.handle_request_propose(message),
+            RequestMessage::Transactions(message) => self.handle_request_txs(message),
+            RequestMessage::Prevotes(message) => self.handle_request_prevotes(message),
+            RequestMessage::Peers(message) => self.handle_request_peers(message),
+            RequestMessage::Block(message) => self.handle_request_block(message),
+>>>>>>> df14cc09... Rewrite requests node module to contextual logger.
         }
     }
 
     /// Handles `ProposeRequest` message. For details see the message documentation.
+<<<<<<< HEAD
     pub fn handle_request_propose(&mut self, msg: &ProposeRequest) {
         trace!("HANDLE PROPOSE REQUEST");
+=======
+    pub fn handle_request_propose(&mut self, msg: ProposeRequest) {
+        trace!(self.consensus_logger(), "Handle propose request");
+>>>>>>> df14cc09... Rewrite requests node module to contextual logger.
         if msg.height() != self.state.height() {
+            trace!(self.consensus_logger(), "Received propose request from other height";
+            "message_height" => msg.height());
             return;
         }
 
-        let propose = if msg.height() == self.state.height() {
-            self.state.propose(msg.propose_hash()).map(|p| {
-                p.message().raw().clone()
-            })
-        } else {
-            return;
-        };
+        let propose = self.state.propose(msg.propose_hash()).map(|p| {
+            p.message().raw().clone()
+        })
+
 
         if let Some(propose) = propose {
             self.send_to_peer(*msg.from(), &propose);
         }
+        else {
+            warn!(self.consensus_logger(), "Received propose request with unknown propose hash.");
+        }
     }
 
     /// Handles `TransactionsRequest` message. For details see the message documentation.
+<<<<<<< HEAD
     pub fn handle_request_txs(&mut self, msg: &TransactionsRequest) {
         trace!("HANDLE TRANSACTIONS REQUEST");
+=======
+    pub fn handle_request_txs(&mut self, msg: TransactionsRequest) {
+        trace!(self.consensus_logger(), "Handle transaction request");
+>>>>>>> df14cc09... Rewrite requests node module to contextual logger.
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
         for hash in msg.txs() {
@@ -89,12 +117,20 @@ impl NodeHandler {
             if let Some(tx) = tx {
                 self.send_to_peer(*msg.from(), &tx);
             }
+            else {
+                warn!(self.consensus_logger(), "Received transaction request with unknown tx hash.");
+            }
         }
     }
 
     /// Handles `PrevotesRequest` message. For details see the message documentation.
+<<<<<<< HEAD
     pub fn handle_request_prevotes(&mut self, msg: &PrevotesRequest) {
         trace!("HANDLE PREVOTES REQUEST");
+=======
+    pub fn handle_request_prevotes(&mut self, msg: PrevotesRequest) {
+        trace!("Handle prevotes request");
+>>>>>>> df14cc09... Rewrite requests node module to contextual logger.
         if msg.height() != self.state.height() {
             return;
         }
@@ -107,6 +143,10 @@ impl NodeHandler {
             .map(|p| p.raw().clone())
             .collect::<Vec<_>>();
 
+        if prevotes.empty() {
+            warn!(self.consensus_logger(), "Received prevotes request with unknown propose hash.");
+        }
+
         for prevote in &prevotes {
             self.send_to_peer(*msg.from(), prevote);
         }
@@ -114,10 +154,9 @@ impl NodeHandler {
 
     /// Handles `BlockRequest` message. For details see the message documentation.
     pub fn handle_request_block(&mut self, msg: &BlockRequest) {
-        trace!(
-            "Handle block request with height:{}, our height: {}",
+        trace!(self.consensus_logger(),
+            "Handle block request",
             msg.height(),
-            self.state.height()
         );
         if msg.height() >= self.state.height() {
             return;
