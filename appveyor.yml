@@ -22,7 +22,7 @@ install:
 
 cache:
    - './target'
-#  - '%USERPROFILE%\.cargo'
+   - '%USERPROFILE%\.cargo'
 
 build_script:
   - cargo build --release %cargoflags%
