@@ -323,7 +323,7 @@ macro_rules! implement_private_sodium_wrapper {
         }
     }
 
-    impl ::encoding::serialize::ToHex for $name {
+    impl $crate::encoding::serialize::ToHex for $name {
         fn write_hex<W: ::std::fmt::Write>(&self, w: &mut W) -> ::std::fmt::Result {
             (self.0).0.as_ref().write_hex(w)
         }

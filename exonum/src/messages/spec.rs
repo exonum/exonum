@@ -221,6 +221,21 @@ macro_rules! message {
             }
         }
 
+        impl $crate::encoding::serialize::FromHex for $name {
+            type Error = ::encoding::Error;
+
+            fn from_hex<T: AsRef<[u8]>>(hex: T) -> Result<Self, Self::Error> {
+                let vec = Vec::<u8>::from_hex(hex)
+                    .map_err(|e| ::encoding::Error::Other(Box::new(e)))?;
+                if vec.len() < ::messages::HEADER_LENGTH {
+                    return Err(::encoding::Error::Basic("Hex is too short.".into()));
+                }
+                let buf = $crate::messages::MessageBuffer::from_vec(vec);
+                let raw = $crate::messages::RawMessage::new(buf);
+                $name::from_raw(raw)
+            }
+        }
+
         impl $crate::storage::StorageValue for $name {
             fn hash(&self) -> $crate::crypto::Hash {
                 $crate::messages::Message::hash(self)
