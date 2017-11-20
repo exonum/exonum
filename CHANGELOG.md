@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Allow creating auditor node from command line. (#364)
 - Added a new function `merge_sync`. In this function a write will be flushed from the operating system buffer cache before the write is considered complete. (#368)
-- Added conversion into boxed values for values which implements `Service` or `Transaction` traits. (#366)
+- Added conversion into boxed values for values which implement `Service` or `Transaction` traits. (#366)
 - Added constructor for the `ServiceContext` which can be useful for the alternative node implementations. (#366)
 
 ### Changed
