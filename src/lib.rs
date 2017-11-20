@@ -590,7 +590,7 @@ impl TestKit {
     }
 
     /// Creates a chain of blocks until a given height.
-    /// 
+    ///
     /// # Example
     ///
     /// ```
