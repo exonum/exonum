@@ -21,7 +21,6 @@ install:
 ## Build Script ##
 
 cache:
-   - './target'
    - '%USERPROFILE%\.cargo'
 
 build_script:
