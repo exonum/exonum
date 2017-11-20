@@ -21,7 +21,7 @@ use exonum::crypto;
 use exonum::helpers::{Height, Round, ValidatorId};
 use exonum::messages::{Message, Precommit, Propose};
 use exonum::node::{ApiSender, ExternalMessage, State as NodeState, TransactionSend, TxPool};
-use exonum::storage::{MemoryDB, Snapshot, Database};
+use exonum::storage::{Database, MemoryDB, Snapshot};
 
 use futures::Stream;
 use futures::executor::{self, Spawn};
@@ -274,12 +274,15 @@ impl TestKitBuilder {
         }
     }
 
-    /// Adds an additional validators.
+    /// Sets the number of validator nodes in the test network.
     pub fn with_validators(mut self, validators_count: u16) -> Self {
-        assert!(validators_count > 0, "At least one validator must be.");
-        let additional_validators = (1..validators_count).map(ValidatorId).map(
-            TestNode::new_validator,
+        assert!(
+            validators_count > 0,
+            "At least one validator should be present in the network."
         );
+        let additional_validators = (self.validators.len() as u16..validators_count)
+            .map(ValidatorId)
+            .map(TestNode::new_validator);
         self.validators.extend(additional_validators);
         self
     }
@@ -456,7 +459,7 @@ impl TestKit {
 
     fn do_create_block(&mut self, tx_hashes: &[crypto::Hash]) {
         let height = self.current_height();
-        let last_hash = self.last_hash();
+        let last_hash = self.last_block_hash();
 
         self.update_configuration();
 
@@ -547,7 +550,7 @@ impl TestKit {
                 let txid = tx.hash();
                 assert!(
                     !schema.transactions().contains(&txid),
-                    "Given transaction is already committed: {:?}",
+                    "Transaction is already committed: {:?}",
                     tx
                 );
                 tx_hashes.push(txid);
@@ -593,14 +596,19 @@ impl TestKit {
         }
     }
 
-    /// Returns the current height of the blockchain. Its value is equal to `last_height + 1`.
+    /// Returns the current height of the blockchain. Its value is equal to `last_block_height + 1`.
     pub fn current_height(&self) -> Height {
         CoreSchema::new(&self.snapshot()).current_height()
     }
 
     /// Returns the hash of latest committed block.
-    pub fn last_hash(&self) -> crypto::Hash {
+    pub fn last_block_hash(&self) -> crypto::Hash {
         self.blockchain.last_hash()
+    }
+
+    /// Returns the height of latest committed block.
+    pub fn last_block_height(&self) -> Height {
+        self.blockchain.last_block().height()
     }
 
     /// Returns sufficient number of validators for the Byzantine Fault Toulerance consensus.
@@ -999,4 +1007,5 @@ fn test_create_block_heights() {
     assert_eq!(Height(2), testkit.current_height());
     testkit.create_blocks_until(Height(6));
     assert_eq!(Height(7), testkit.current_height());
+    assert_eq!(Height(6), testkit.last_block_height());
 }

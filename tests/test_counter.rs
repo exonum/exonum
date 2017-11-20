@@ -282,7 +282,7 @@ fn test_inc_count_create_block() {
     assert_eq!(counter, 5);
 }
 
-#[should_panic(expected = "Given transaction is already committed")]
+#[should_panic(expected = "Transaction is already committed")]
 #[test]
 fn test_inc_count_create_block_with_committed_transaction() {
     let (mut testkit, _) = init_testkit();

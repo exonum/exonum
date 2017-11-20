@@ -14,18 +14,19 @@ use exonum::storage::StorageValue;
 fn test_add_to_validators() {
     let mut testkit = TestKitBuilder::auditor().with_validators(1).create();
 
+    let cfg_change_height = Height(5);
     let proposal = {
         let mut cfg = testkit.configuration_change_proposal();
         let mut validators = cfg.validators().to_vec();
         validators.push(testkit.network().us().clone());
-        cfg.set_actual_from(Height(5));
+        cfg.set_actual_from(cfg_change_height);
         cfg.set_validators(validators);
         cfg
     };
     let stored = proposal.stored_configuration().clone();
     testkit.commit_configuration_change(proposal);
 
-    testkit.create_blocks_until(Height(6));
+    testkit.create_blocks_until(cfg_change_height);
 
     assert_eq!(testkit.network().us().validator_id(), Some(ValidatorId(1)));
     assert_eq!(&testkit.network().validators()[1], testkit.network().us());
@@ -46,17 +47,18 @@ fn test_add_to_validators() {
 fn test_exclude_from_validators() {
     let mut testkit = TestKitBuilder::validator().with_validators(2).create();
 
+    let cfg_change_height = Height(5);
     let proposal = {
         let mut cfg = testkit.configuration_change_proposal();
         let validator = cfg.validators()[1].clone();
-        cfg.set_actual_from(Height(5));
+        cfg.set_actual_from(cfg_change_height);
         cfg.set_validators(vec![validator]);
         cfg
     };
     let stored = proposal.stored_configuration().clone();
     testkit.commit_configuration_change(proposal);
 
-    testkit.create_blocks_until(Height(6));
+    testkit.create_blocks_until(cfg_change_height);
 
     assert_eq!(testkit.network().us().validator_id(), None);
     assert_eq!(testkit.network().validators().len(), 1);
@@ -87,15 +89,16 @@ fn test_change_service_config() {
     };
 
     let mut testkit = TestKitBuilder::validator().create();
+    let cfg_change_height = Height(5);
     let proposal = {
         let mut cfg = testkit.configuration_change_proposal();
         cfg.set_service_config("my_service", service_cfg.clone());
-        cfg.set_actual_from(Height(5));
+        cfg.set_actual_from(cfg_change_height);
         cfg
     };
     testkit.commit_configuration_change(proposal);
 
-    testkit.create_blocks_until(Height(6));
+    testkit.create_blocks_until(cfg_change_height);
 
     assert_eq!(
         serde_json::to_value(service_cfg).unwrap(),
