@@ -537,13 +537,16 @@ impl TestKit {
     /// # Panics
     ///
     /// If the one of transactions has been already committed to the blockchain.
-    pub fn create_block_with_transactions(&mut self, txs: Vec<Box<Transaction>>) {
+    pub fn create_block_with_transactions<I>(&mut self, txs: I)
+    where
+        I: IntoIterator<Item = Box<Transaction>>,
+    {
         let tx_hashes = {
             let mut mempool = self.mempool.write().expect(
                 "Cannot write transactions to mempool",
             );
 
-            let mut tx_hashes = Vec::with_capacity(txs.len());
+            let mut tx_hashes = Vec::new();
             let snapshot = self.snapshot();
             let schema = CoreSchema::new(&snapshot);
             for tx in txs {
