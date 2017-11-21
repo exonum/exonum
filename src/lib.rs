@@ -625,6 +625,19 @@ impl TestKit {
         self.blockchain.last_block().height()
     }
 
+    /// Returns the actual blockchain configuration.
+    pub fn actual_configuration(&self) -> StoredConfiguration {
+        CoreSchema::new(&self.snapshot()).actual_configuration()
+    }
+
+    /// Returns reference to validator with the given identifier.
+    ///
+    /// # Panics
+    /// - If validator with the given id is absent in test network.
+    pub fn validator(&self, id: ValidatorId) -> &TestNode {
+        &self.network.validators[id.0 as usize]
+    }
+
     /// Returns sufficient number of validators for the Byzantine Fault Toulerance consensus.
     pub fn majority_count(&self) -> usize {
         NodeState::byzantine_majority_count(self.network().validators().len())
