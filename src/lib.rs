@@ -397,6 +397,11 @@ impl TestKit {
         self.blockchain.snapshot()
     }
 
+    /// Returns a blockchain instance for low level manipulations with storage.
+    pub fn blockchain_mut(&mut self) -> &mut Blockchain {
+        &mut self.blockchain
+    }
+
     /// Executes a list of transactions given the current state of the blockchain, but does not
     /// commit execution results to the blockchain. The execution result is the same
     /// as if transactions were included into a new block; for example,
