@@ -26,12 +26,12 @@ impl NodeHandler {
     /// Validates consensus message, then redirects it to the corresponding `handle_...` function.
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_consensus(&mut self, msg: ConsensusMessage) {
+        let msg_logger = msg.logger(self.consensus_logger());
+        trace!(msg_logger, "Handle message"; "message" => ?msg);
         // Ignore messages from previous and future height
         if msg.height() < self.state.height() || msg.height() > self.state.height().next() {
-            warn!(
-                "Received consensus message from other height: msg.height={}, self.height={}",
-                msg.height(),
-                self.state.height()
+            warn!(msg_logger,
+                  "Received consensus message from other height"
             );
             return;
         }
@@ -39,13 +39,8 @@ impl NodeHandler {
         // Queued messages from next height or round
         // TODO: shoud we ignore messages from far rounds (ECR-171)?
         if msg.height() == self.state.height().next() || msg.round() > self.state.round() {
-            trace!(
-                "Received consensus message from future round: msg.height={}, msg.round={}, \
-                 self.height={}, self.round={}",
-                msg.height(),
-                msg.round(),
-                self.state.height(),
-                self.state.round()
+            trace!(msg_logger,
+                "Received consensus message from future round"
             );
             self.state.add_queued(msg);
             return;
@@ -54,21 +49,20 @@ impl NodeHandler {
         let key = match self.state.consensus_public_key_of(msg.validator()) {
             Some(public_key) => {
                 if !msg.verify(&public_key) {
-                    error!(
-                        "Received consensus message with incorrect signature, msg={:?}",
-                        msg
+                    error!(msg_logger,
+                        "Received consensus message with incorrect signature";
+                        "message" => ?msg
                     );
                     return;
                 }
                 public_key
             }
             None => {
-                error!("Received message from incorrect validator, msg={:?}", msg);
+                error!(msg_logger, "Received message from incorrect validator"; "message" => ?msg);
                 return;
             }
         };
 
-        trace!("Handle message={:?}", msg);
         match msg {
             ConsensusMessage::Propose(msg) => self.handle_propose(key, &msg),
             ConsensusMessage::Prevote(msg) => self.handle_prevote(key, &msg),
@@ -78,6 +72,8 @@ impl NodeHandler {
 
     /// Handles the `Propose` message. For details see the message documentation.
     pub fn handle_propose(&mut self, from: PublicKey, msg: &Propose) {
+        let msg_logger = msg.logger(self.consensus_logger());
+        trace!(msg_logger, "Handle propose");
         debug_assert_eq!(
             Some(from),
             self.state.consensus_public_key_of(msg.validator())
@@ -85,16 +81,16 @@ impl NodeHandler {
 
         // Check prev_hash
         if msg.prev_hash() != self.state.last_hash() {
-            error!("Received propose with wrong last_block_hash msg={:?}", msg);
+            error!(msg_logger, "Received propose with wrong last_block_hash", "msg" => ?msg);
             return;
         }
 
         // Check leader
         if msg.validator() != self.state.leader(msg.round()) {
-            error!(
-                "Wrong propose leader detected: actual={}, expected={}",
-                msg.validator(),
-                self.state.leader(msg.round())
+            error!(msg_logger,
+                "Wrong propose leader detected";
+                "actual_leader" => %msg.validator(),
+                "expected_leader" => %self.state.leader(msg.round())
             );
             return;
         }
@@ -103,9 +99,9 @@ impl NodeHandler {
         // Check that transactions are not committed yet
         for hash in msg.transactions() {
             if Schema::new(&snapshot).transactions().contains(hash) {
-                error!(
-                    "Received propose with already committed transaction, msg={:?}",
-                    msg
+                error!(msg_logger,
+                    "Received propose with already committed transaction.",
+                    "msg" => %msg
                 );
                 return;
             }
@@ -115,7 +111,7 @@ impl NodeHandler {
             return;
         }
 
-        trace!("Handle propose");
+
         // Add propose
         let (hash, has_unknown_txs) = match self.state.add_propose(msg) {
             Some(state) => (state.hash(), state.has_unknown_txs()),
@@ -126,7 +122,7 @@ impl NodeHandler {
         let known_nodes = self.remove_request(&RequestData::Propose(hash));
 
         if has_unknown_txs {
-            trace!("REQUEST TRANSACTIONS");
+            trace!("Request unknown transactions");
             self.request(RequestData::Transactions(hash), from);
 
             for node in known_nodes {
@@ -141,30 +137,31 @@ impl NodeHandler {
     // TODO write helper function which returns Result (ECR-123)
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_block(&mut self, msg: &BlockResponse) {
+        let msg_logger = msg.logger(self.consensus_logger());
+        trace!(msg_logger, "Handle block");
         // Request are sended to us
         if msg.to() != self.state.consensus_public_key() {
-            error!(
-                "Received block that intended for another peer, to={}, from={}",
-                msg.to().to_hex(),
-                msg.from().to_hex()
+            error!(msg_logger,
+                "Received block that intended for another peer";
             );
             return;
         }
 
         if !self.state.whitelist().allow(msg.from()) {
-            error!(
-                "Received request message from peer = {:?} which not in whitelist.",
-                msg.from()
+            error!(msg_logger,
+                "Received request message from unauthorised peer.";
+                "authorised" => false
             );
             return;
         }
 
         if !msg.verify_signature(msg.from()) {
-            error!("Received block with incorrect signature, msg={:?}", msg);
+            error!(msg_logger, "Received block with incorrect signature";
+            "message" => ?msg);
             return;
         }
 
-        trace!("Handle block");
+
 
         let block = msg.block();
         let block_hash = block.hash();
@@ -176,18 +173,19 @@ impl NodeHandler {
 
         // Check block content
         if block.prev_hash() != &self.last_block_hash() {
-            error!(
-                "Received block prev_hash is distinct from the one in db, \
-                 block={:?}, block.prev_hash={:?}, db.last_block_hash={:?}",
-                msg,
-                *block.prev_hash(),
-                self.last_block_hash()
+            error!(msg_logger,
+                "Received block prev_hash is distinct from the one in db";
+                "msg" => ?msg,
+                "block.prev_hash" => ?*block.prev_hash(),
+                "db.last_block_hash" => ?self.last_block_hash()
             );
             return;
         }
 
         if let Err(err) = self.verify_precommits(&msg.precommits(), &block_hash, block.height()) {
-            error!("{}, block={:?}", err, msg);
+            error!(msg_logger, "Error in verify precommits";
+            "error" => %err,
+            "msg" => msg);
             return;
         }
 
@@ -200,22 +198,26 @@ impl NodeHandler {
                 if let Some(tx) = self.blockchain.tx_from_raw(raw) {
                     let hash = tx.hash();
                     if schema.transactions().contains(&hash) {
-                        error!(
-                            "Received block with already committed transaction, block={:?}",
-                            msg
+                        error!(msg_logger,
+                            "Received block with already committed transaction";
+                            "msg" => ?msg
                         );
                         return;
                     }
                     profiler_span!("tx.verify()", {
                         if !tx.verify() {
-                            error!("Incorrect transaction in block detected, block={:?}", msg);
+                            error!(msg_logger,"Incorrect transaction in block detected";
+                            "msg" => ?msg
+                            );
                             return;
                         }
                     });
                     self.state.add_transaction(hash, tx, true);
                     tx_hashes.push(hash);
                 } else {
-                    error!("Unknown transaction in block detected, block={:?}", msg);
+                    error!(msg_logger, "Unknown transaction in block detected";
+                    "msg" => ?msg
+                    );
                     return;
                 }
             }
@@ -282,7 +284,8 @@ impl NodeHandler {
 
     /// Handles the `Prevote` message. For details see the message documentation.
     pub fn handle_prevote(&mut self, from: PublicKey, msg: &Prevote) {
-        trace!("Handle prevote");
+        let msg_logger = msg.logger(self.consensus_logger());
+        trace!(msg_logger, "Handle prevote");
 
         debug_assert_eq!(
             Some(from),
@@ -297,6 +300,8 @@ impl NodeHandler {
 
         // Request prevotes
         if msg.locked_round() > self.state.locked_round() {
+            trace!(msg_logger, "Request other prevotes";
+            "validator" => %msg.validator());
             self.request(
                 RequestData::Prevotes(msg.locked_round(), *msg.propose_hash()),
                 from,
@@ -315,9 +320,17 @@ impl NodeHandler {
         // Remove request info
         self.remove_request(&RequestData::Prevotes(prevote_round, *propose_hash));
         // Lock to propose
-        if self.state.locked_round() < prevote_round && self.state.propose(propose_hash).is_some() {
+        let locked = if self.state.locked_round() < prevote_round && self.state.propose(propose_hash).is_some() {
             self.lock(prevote_round, *propose_hash);
+            true
         }
+        else {
+            false
+        };
+
+        trace!(self.cosensus_logger(), "Trying to lock",
+               "round" => %prevote_round,
+                "locked" => true);
     }
 
     /// Executes and commits block. This function is called when the node has +2/3 pre-commits.
@@ -370,7 +383,9 @@ impl NodeHandler {
 
     /// Locks node to the specified round, so pre-votes for the lower round will be ignored.
     pub fn lock(&mut self, prevote_round: Round, propose_hash: Hash) {
-        trace!("MAKE LOCK {:?} {:?}", prevote_round, propose_hash);
+        trace!(self.consensus_logger(), "Changing lock";
+        "propose_round" => %prevote_round,
+        "propose_hash" => ?propose_hash);
         for round in prevote_round.iter_to(self.state.round().next()) {
             // Send prevotes
             if self.state.is_validator() && !self.state.have_prevote(round) {
@@ -400,6 +415,8 @@ impl NodeHandler {
     /// Handles the `Precommit` message. For details see the message documentation.
     pub fn handle_precommit(&mut self, from: PublicKey, msg: &Precommit) {
         trace!("Handle precommit");
+        let msg_logger = msg.logger(self.consensus_logger());
+        trace!(msg_logger, "Handle precommit");
 
         debug_assert_eq!(
             Some(from),
@@ -411,6 +428,7 @@ impl NodeHandler {
 
         // Request propose
         if self.state.propose(msg.propose_hash()).is_none() {
+            trace!(msg_logger, "Request propose from precommit sender.");
             self.request(RequestData::Propose(*msg.propose_hash()), from);
         }
 
@@ -418,6 +436,7 @@ impl NodeHandler {
         // TODO: If Precommit sender in on a greater height, then it cannot have +2/3 prevotes.
         // So can we get rid of useless sending RequestPrevotes message (ECR-171)?
         if msg.round() > self.state.locked_round() {
+            trace!(msg_logger, "Request prevotes from precommit sender.");
             self.request(
                 RequestData::Prevotes(msg.round(), *msg.propose_hash()),
                 from,
@@ -438,7 +457,8 @@ impl NodeHandler {
         precommits: I,
         round: Option<Round>,
     ) {
-        trace!("COMMIT {:?}", block_hash);
+        trace!(self.consensus_logger(), "Trying commit block";
+        "block_hash" => %block_hash);
 
         // Merge changes into storage
         let (commited_txs, proposer) = {
@@ -467,19 +487,14 @@ impl NodeHandler {
             .len();
         metric!("node.mempool", mempool_size);
 
-        let height = self.state.height();
-        info!(
-            "COMMIT ====== height={}, proposer={}, round={}, committed={}, pool={}, hash={}",
-            height,
-            proposer,
-            round
-                .map(|x| format!("{}", x))
-                .unwrap_or_else(|| "?".into()),
-            commited_txs,
-            mempool_size,
-            block_hash.to_hex(),
-        );
-
+        info!(self.consensus_logger(), "Commited block",
+              "height" => %height,
+              "proposer" => %proposer,
+              "round" => %round.map(|x| format!("{}", x)).unwrap_or_else(|| "?".into()),
+              "tx_committed" => %commited_txs,
+              "mempool_size" =>%mempool_size,
+              "hash" =>%block_hash.to_hex(),
+              );
         // TODO: reset status timeout (ECR-171).
         self.broadcast_status();
         self.add_status_timeout();
