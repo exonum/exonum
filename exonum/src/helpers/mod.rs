@@ -13,19 +13,17 @@
 // limitations under the License.
 
 //! Different assorted utilities.
-
-use env_logger::LogBuilder;
-use colored::*;
+use slog::{Drain, SendSyncRefUnwindSafeDrain, Never};
+use slog_term::{TermDecorator, CompactFormat, FullFormat };
+use slog_async::Async;
 
 use std::env;
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::Arc;
 
 use blockchain::{GenesisConfig, ValidatorKeys};
 use node::NodeConfig;
 use crypto::gen_keypair;
-
-use slog::Drain;
-use slog_term::{PlainSyncDecorator, FullFormat};
 
 pub use self::types::{Height, Round, ValidatorId, Milliseconds};
 
@@ -36,14 +34,15 @@ pub mod config;
 #[macro_use]
 pub mod metrics;
 
-
 // TODO: replace before merge
 // Stub for future replacement
-pub type ExonumLogger = Box<Drain>;
+pub(crate) type ExonumLogger = Arc<SendSyncRefUnwindSafeDrain<Ok = (), Err = Never>>;
 /// Performs the logger initialization.
 pub fn root_logger() -> ExonumLogger {
-    let plain = PlainSyncDecorator::new(::std::io::stdout());
-    Box::new(FullFormat::new(plain).build().fuse(), slog_o!())
+    let decorator = TermDecorator::new().build();
+    let drain = FullFormat::new(decorator).build().fuse();
+    let async_drain =  Async::new(drain).build().fuse();
+    Arc::new(async_drain)
 }
 
 /// Generates testnet configuration.
@@ -89,16 +88,4 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
         .collect::<Vec<_>>()
 }
 
-fn has_colors() -> bool {
-    use term::terminfo::TerminfoTerminal;
-    use term::Terminal;
-    use std::io;
-    use atty;
-
-    let out = io::stderr();
-    match TerminfoTerminal::new(out) {
-        Some(ref term) if atty::is(atty::Stream::Stderr) => term.supports_color(),
-        _ => false,
-    }
-}
 

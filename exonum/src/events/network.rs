@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use slog::Logger;
+
 use futures::{future, unsync, Future, IntoFuture, Sink, Stream, Poll};
 use futures::future::Either;
 use futures::sync::mpsc;
@@ -30,7 +32,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 
 use messages::{Any, Connect, RawMessage, Message};
-use helpers::Milliseconds;
+use helpers::{Milliseconds, ExonumLogger};
 
 use super::tobox;
 use super::error::{into_other, log_error, other_error, result_ok};
@@ -116,6 +118,7 @@ impl ConnectionsPool {
 
     fn connect_to_peer(
         self,
+        logger: Logger<ExonumLogger>,
         network_config: NetworkConfiguration,
         peer: SocketAddr,
         network_tx: mpsc::Sender<NetworkEvent>,
@@ -124,13 +127,15 @@ impl ConnectionsPool {
 
         let limit = network_config.max_outgoing_connections;
         if self.len() >= limit {
-            warn!(
-                "Rejected outgoing connection with peer={}, \
-                                     connections limit reached.",
-                peer
+            warn!(logger,
+                "Rejected outgoing connection with peer connections limit reached.";
+                "peer_address" => %peer
             );
             return None;
         }
+        //TODO: Reduce cloning Arc
+        let logger_cloned = logger.clone();
+        let logger_cloned2 = logger.clone();
         // Register outgoing channel.
         let (conn_tx, conn_rx) = mpsc::channel(OUTGOING_CHANNEL_SIZE);
         self.insert(peer, &conn_tx);
@@ -155,7 +160,7 @@ impl ConnectionsPool {
             })
             // Connect socket with the outgoing channel
             .and_then(move |sock| {
-                trace!("Established connection with peer={}", peer);
+                trace!(logger_cloned, "Established connection with peer={}", peer);
 
                 let stream = sock.framed(MessagesCodec);
                 let (sink, stream) = stream.split();
@@ -174,14 +179,14 @@ impl ConnectionsPool {
                     })
             })
             .then(move |res| {
-                trace!(
+                trace!(logger,
                     "Disconnection with peer={}, reason={:?}",
                     peer,
                     res
                 );
                 self.disconnect_with_peer(peer, network_tx.clone())
             })
-            .map_err(log_error);
+            .map_err(move |e| log_error(&logger_cloned2, e));
         handle.spawn(connect_handle);
         Some(conn_tx)
     }
@@ -205,13 +210,14 @@ impl ConnectionsPool {
 }
 
 impl NetworkPart {
-    pub fn run(self, handle: &Handle) -> Box<Future<Item = (), Error = io::Error>> {
+    pub fn run(self, handle: &Handle, logger: Logger<ExonumLogger>) -> Box<Future<Item = (), Error = io::Error>> {
         let network_config = self.network_config;
         // Cancelation token
         let (cancel_sender, cancel_handler) = unsync::oneshot::channel();
         let cancel_sender = Some(cancel_sender);
 
         let requests_handle = RequestHandler::new(
+            logger.clone(),
             self.our_connect_message,
             network_config,
             self.network_tx.clone(),
@@ -221,6 +227,7 @@ impl NetworkPart {
         );
         // TODO Don't use unwrap here!
         let server = Listener::bind(
+            logger,
             network_config,
             self.listen_address,
             handle.clone(),
@@ -244,6 +251,7 @@ struct RequestHandler(
 
 impl RequestHandler {
     fn new(
+        logger: Logger<ExonumLogger>,
         connect_message: Connect,
         network_config: NetworkConfiguration,
         network_tx: mpsc::Sender<NetworkEvent>,
@@ -265,6 +273,7 @@ impl RequestHandler {
                                 outgoing_connections
                                     .clone()
                                     .connect_to_peer(
+                                        logger.clone(),
                                         network_config,
                                         peer,
                                         network_tx.clone(),
@@ -335,6 +344,7 @@ struct Listener(Box<Future<Item = (), Error = io::Error>>);
 
 impl Listener {
     fn bind(
+        logger: Logger<ExonumLogger>,
         network_config: NetworkConfiguration,
         listen_address: SocketAddr,
         handle: Handle,
@@ -352,17 +362,21 @@ impl Listener {
             // Check incoming connections count
             let connections_count = Rc::weak_count(&incoming_connections_counter);
             if connections_count > incoming_connections_limit {
-                warn!(
-                    "Rejected incoming connection with peer={}, \
-                     connections limit reached.",
-                    addr
+                warn!(logger,
+                    "Rejected incoming connection, \
+                     connections limit reached.";
+                    "peer_addr" => %addr
                 );
                 return tobox(future::ok(()));
             }
-            trace!("Accepted incoming connection with peer={}", addr);
+            trace!(logger, "Accepted incoming connection with peer";
+                   "peer_addr" => %addr);
             let stream = sock.framed(MessagesCodec);
             let (_, stream) = stream.split();
             let network_tx = network_tx.clone();
+            // TODO: Reduce cloning state, rewrite connection
+            let logger = logger.clone();
+            let logger_clonned = logger.clone();
             let connection_handler = stream
                 .into_future()
                 .map_err(|e| e.0)
@@ -375,7 +389,7 @@ impl Listener {
                     None => Err(other_error("Incoming socket closed")),
                 })
                 .and_then(move |(connect, stream)| {
-                    trace!("Received handshake message={:?}", connect);
+                    trace!(logger, "Received handshake message={:?}", connect);
                     let event = NetworkEvent::PeerConnected(addr, connect);
                     let stream = network_tx
                         .clone()
@@ -393,7 +407,7 @@ impl Listener {
                     // Ensure that holder lives until the stream ends.
                     let _holder = holder;
                 })
-                .map_err(log_error);
+                .map_err(move |e| log_error(&logger_clonned, e));
             handle.spawn(tobox(connection_handler));
             tobox(future::ok(()))
         });

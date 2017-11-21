@@ -21,6 +21,7 @@ use std::error::Error;
 
 use messages::{Any, RawMessage, Connect, Status, Message, PeersRequest};
 use helpers::Height;
+use logger::ExtContextLogger;
 use super::{NodeHandler, RequestData};
 
 impl NodeHandler {
@@ -50,14 +51,14 @@ impl NodeHandler {
     /// Handles the `Connected` event. Node's `Connect` message is sent as response
     /// if received `Connect` message is correct.
     pub fn handle_connected(&mut self, addr: SocketAddr, connect: Connect) {
-        info!(self.network_logger(), "Received Connect message";  "peer_address" => addr);
+        info!(self.network_logger(), "Received Connect message";  "peer_address" => %addr);
         self.handle_connect(connect);
     }
 
     /// Handles the `Disconnected` event. Node will try to connect to that address again if it was
     /// in the validators list.
     pub fn handle_disconnected(&mut self, addr: SocketAddr) {
-        info!(self.network_logger(), "Disconnected message";  "peer_address" => addr);
+        info!(self.network_logger(), "Disconnected message";  "peer_address" => %addr);
         let need_reconnect = self.state.remove_peer_with_addr(&addr);
         if need_reconnect {
             self.connect(&addr);
@@ -66,7 +67,7 @@ impl NodeHandler {
     /// Handles the `UnableConnectToPeer` event. Node will try to connect to that address again
     /// if it was in the validators list.
     pub fn handle_unable_to_connect(&mut self, addr: SocketAddr) {
-        info!(self.network_logger(), "Unable to connect with peer";  "peer_address" => addr);
+        info!(self.network_logger(), "Unable to connect with peer";  "peer_address" => %addr);
         let need_reconnect = self.state.remove_peer_with_addr(&addr);
         if need_reconnect {
             self.connect(&addr);
@@ -77,9 +78,7 @@ impl NodeHandler {
     pub fn handle_connect(&mut self, message: Connect) {
         // TODO add spam protection (ECR-170)
         let address = message.addr();
-        let peer_logger = Logger::root(self.network_logger().to_erased(),
-                                       o!("peer_public_key" => message.pub_key(),
-                                       "peer_address" => address));
+        let peer_logger = message.logger(self.network_logger());
         if address == self.state.our_connect_message().addr() {
             trace!(peer_logger,
                    "Received Connect with same address as our external_address.");
@@ -102,9 +101,9 @@ impl NodeHandler {
 
         let public_key = *message.pub_key();
         if !message.verify_signature(&public_key) {
-            error!(peer_logger
+            error!(peer_logger,
                 "Received connect-message with incorrect signature";
-                "msg" => message,
+                "msg" => ?message,
             );
             return;
         }
@@ -126,8 +125,8 @@ impl NodeHandler {
         }
         self.state.add_peer(public_key, message);
         info!(peer_logger,
-              "Received Connect message",
-                "need_connect", => need_connect,
+              "Received Connect message";
+                "need_connect" => need_connect,
                 "authorised" => true,
         );
         if need_connect {
@@ -143,9 +142,7 @@ impl NodeHandler {
 
         let height = self.state.height();
 
-        let peer_logger = Logger::root(self.consensus_logger().to_erased(),
-                                       o!("peer_public_key" => message.pub_key(),
-                                       "peer_height" => message));
+        let peer_logger = message.logger(self.consensus_logger());
         trace!(peer_logger,
             "Handle status."
         );
@@ -160,12 +157,12 @@ impl NodeHandler {
 
         // Handle message from future height
         if message.height() > height {
-            let peer = msg.from();
+            let peer = message.from();
 
             if !message.verify_signature(peer) {
                 error!(peer_logger,
                     "Received status message with incorrect signature";
-                    "message" => message
+                    "message" => ?message
                 );
                 return;
             }
@@ -183,11 +180,11 @@ impl NodeHandler {
 
     /// Handles the `PeersRequest` message. Node sends `Connect` messages of other peers as result.
     pub fn handle_request_peers(&mut self, message: &PeersRequest) {
+        let peer_logger = message.logger(self.network_logger());
         let peers: Vec<Connect> = self.state.peers().iter().map(|(_, b)| b.clone()).collect();
-        trace!(
-            "Handle request peers: Sending {:?} peers to {:?}",
-            peers,
-            message.from()
+        trace!(peer_logger,
+            "Handle request peers";
+            "peers" => ?peers
         );
 
         for peer in peers {
@@ -224,7 +221,8 @@ impl NodeHandler {
                 peer.pub_key(),
                 self.state.consensus_secret_key(),
             );
-            trace!("Request peers from peer with addr {:?}", peer.addr());
+            trace!(self.network_logger(), "Request peers";
+                   "from_peer" => %peer.addr());
             self.send_to_peer(*peer.pub_key(), msg.raw());
         }
         self.add_peer_exchange_timeout();
@@ -245,7 +243,7 @@ impl NodeHandler {
             &hash,
             self.state.consensus_secret_key(),
         );
-        trace!("Broadcast status: {:?}", status);
+        trace!(self.consensus_logger(), "Broadcast status"; "status" => ?status);
         self.broadcast(&status);
     }
 }

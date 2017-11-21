@@ -16,19 +16,21 @@
 
 use serde_json::Value;
 use bit_vec::BitVec;
+use slog::Logger;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::collections::hash_map::Entry;
 use std::sync::{Arc, RwLock};
 use std::net::SocketAddr;
 use std::time::{SystemTime, Duration};
+use std::ops::Index;
 
 use messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect};
 use crypto::{PublicKey, SecretKey, Hash};
 use storage::{Patch, Snapshot};
 use blockchain::{ValidatorKeys, ConsensusConfig, StoredConfiguration, Transaction,
                  TimeoutAdjusterConfig};
-use helpers::{Height, Round, ValidatorId, Milliseconds};
+use helpers::{Height, Round, ValidatorId, Milliseconds, ExonumLogger};
 use node::whitelist::Whitelist;
 use node::timeout_adjuster::{TimeoutAdjuster, Constant, Dynamic, MovingAverage};
 
@@ -94,6 +96,10 @@ pub struct State {
 
     timeout_adjuster: Box<TimeoutAdjuster>,
     propose_timeout: Milliseconds,
+
+    // We should keep copy of root logger, to update consensus_logger in future
+    root_logger: Logger<ExonumLogger>,
+    consensus_logger: Logger<ExonumLogger>,
 }
 
 /// State of a validator-node.
@@ -169,6 +175,19 @@ pub struct Votes<T: VoteMessage> {
     messages: Vec<T>,
     validators: BitVec,
     count: usize,
+}
+
+impl<T: VoteMessage> ::std::fmt::Display for Votes<T> {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> Result<(), ::std::fmt::Error> {
+        for i in 0..self.count {
+            if *self.validators.index(i) {
+                write!(f, "X")?
+            } else {
+                write!(f, "_")?
+            }
+        }
+        Ok(())
+    }
 }
 
 impl ValidatorState {
@@ -350,6 +369,7 @@ impl State {
     /// Creates state with the given parameters.
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
     pub fn new(
+        logger: Logger<ExonumLogger>,
         validator_id: Option<ValidatorId>,
         consensus_public_key: PublicKey,
         consensus_secret_key: SecretKey,
@@ -375,7 +395,7 @@ impl State {
             connections: HashMap::new(),
             height: last_height,
             height_start_time,
-            round: Round::zero(),
+            round: Round::first(),
             locked_round: Round::zero(),
             locked_propose: None,
             last_hash,
@@ -401,7 +421,25 @@ impl State {
             timeout_adjuster: make_timeout_adjuster(&stored.consensus),
             propose_timeout: 0,
             config: stored,
+            root_logger: logger.clone(),
+            consensus_logger: Logger::root(logger, o!("module" => "consensus",
+                "height" => last_height.to_string(),
+                "round" => Round::first().to_string() )),
         }
+    }
+
+
+    pub(crate) fn consensus_logger(&self) -> &Logger<ExonumLogger> {
+        &self.consensus_logger
+    }
+
+    fn update_logger(&mut self) {
+        let height = self.height;
+        let round = self.round;
+        self.consensus_logger = self.root_logger.new(o!(
+        "module" => "consensus",
+        "height" => height.to_string(),
+        "round" => round.to_string()))
     }
 
     /// Returns `ValidatorState` if the node is validator.
@@ -480,7 +518,6 @@ impl State {
             return;
         }
 
-        trace!("Updating node config={:#?}", config);
         let validator_id = config
             .validator_keys
             .iter()
@@ -492,7 +529,10 @@ impl State {
             }),
         );
         self.renew_validator_id(validator_id);
-        trace!("Validator={:#?}", self.validator_state());
+
+        trace!(self.consensus_logger(), "Updating node config";
+            "config" => ?config,
+            "validator" => ?self.validator_state());
 
         self.timeout_adjuster = make_timeout_adjuster(&config.consensus);
         self.config = config;
@@ -655,11 +695,13 @@ impl State {
     /// Updates mode's round.
     pub fn jump_round(&mut self, round: Round) {
         self.round = round;
+        self.update_logger();
     }
 
     /// Increments node's round by one.
     pub fn new_round(&mut self) {
         self.round.increment();
+        self.update_logger();
     }
 
     /// Increments the node height by one and resets previous height data.
@@ -690,6 +732,7 @@ impl State {
             validator_state.clear();
         }
         self.requests.clear(); // FIXME: clear all timeouts (ECR-171)
+        self.update_logger();
     }
 
     /// Returns a list of queued consensus messages.
@@ -734,7 +777,7 @@ impl State {
         let tx_pool_len = self.transactions.read().expect("Expected read lock").len();
         if tx_pool_len >= self.tx_pool_capacity {
             // but make warn about pool exceeded, even if we should add tx
-            warn!(
+            warn!(self.consensus_logger,
                 "Too many transactions in pool, txs={}, high_priority={}",
                 tx_pool_len,
                 high_priority_tx
@@ -846,7 +889,7 @@ impl State {
         }
     }
 
-    /// Adds pre-vote. Returns `true` there are +2/3 pre-votes.
+    /// Adds pre-vote. Returns `true` if there are +2/3 pre-votes.
     ///
     /// # Panics
     ///

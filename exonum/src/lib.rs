@@ -28,8 +28,10 @@
 extern crate exonum_profiler;
 extern crate slog_term;
 extern crate slog_json;
+extern crate slog_async;
 #[macro_use]
 extern crate slog;
+extern crate slog_scope;
 extern crate byteorder;
 extern crate exonum_sodiumoxide as sodiumoxide;
 extern crate exonum_rocksdb as rocksdb;
@@ -45,9 +47,6 @@ extern crate bit_vec;
 extern crate vec_map;
 #[cfg(test)]
 extern crate tempdir;
-extern crate env_logger;
-extern crate colored;
-extern crate term;
 #[macro_use(crate_version, crate_authors)]
 extern crate clap;
 extern crate hyper;
@@ -79,3 +78,5 @@ pub mod storage;
 pub mod blockchain;
 pub mod explorer;
 pub mod api;
+
+mod logger;

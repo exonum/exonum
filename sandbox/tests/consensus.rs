@@ -469,7 +469,7 @@ fn handle_propose_with_incorrect_time() {
 }
 
 #[test]
-fn ignore_propose_with_commited_transaction() {
+fn ignore_propose_with_committed_transaction() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
 

@@ -41,7 +41,7 @@ impl NodeHandler {
                 self.handle_incoming_tx(tx);
             }
             ExternalMessage::PeerAdd(address) => {
-                info!("Send Connect message to {}", address);
+                info!(self.network_logger(), "Send Connect message"; "peer_address" => %address);
                 self.connect(&address);
             }
         }

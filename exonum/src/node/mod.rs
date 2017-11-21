@@ -82,10 +82,10 @@ pub enum NodeTimeout {
 
 impl NodeTimeout {
     fn tag(&self) -> &'static str {
-        match self {
+        match *self {
             NodeTimeout::Status(_) => "status",
             NodeTimeout::Round(..) => "round",
-            NodeTimeout::Request(..) => "request"
+            NodeTimeout::Request(..) => "request",
             NodeTimeout::Propose(..) => "propose",
             NodeTimeout::UpdateApiState => "update_api_state",
             NodeTimeout::PeerExchange => "peer_exchange",
@@ -112,8 +112,6 @@ pub struct NodeHandler {
     pub basic_logger: Logger<ExonumLogger>,
     /// Network Logger state
     pub network_logger: Logger<ExonumLogger>,
-    /// Consensus Logger state
-    pub consensus_logger: Logger<ExonumLogger>,
     /// State of the `NodeHandler`.
     pub state: State,
     /// Shared api state
@@ -203,7 +201,7 @@ impl Default for EventsPoolCapacity {
 /// Memory pool configuration parameters.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MemoryPoolConfig {
-    /// Maximum number of uncommited transactions.
+    /// Maximum number of uncommitted transactions.
     pub tx_pool_capacity: usize,
     /// Sets the maximum number of messages that can be buffered on the event loop's
     /// notification channel before a send will fail.
@@ -306,9 +304,9 @@ impl NodeHandler {
             })
             .map(|id| ValidatorId(id as u16));
 
-        info!(logger, "Creating a node.";
-            "config" => stored,
-            "validator" => validator_id
+        info!(logger, "Creating a node";
+            "config" => ?stored,
+            "validator" => ?validator_id,
         );
 
         let connect = Connect::new(
@@ -321,6 +319,7 @@ impl NodeHandler {
         let mut whitelist = config.listener.whitelist;
         whitelist.set_validators(stored.validator_keys.iter().map(|x| x.consensus_key));
         let mut state = State::new(
+            logger.clone(),
             validator_id,
             config.listener.consensus_public_key,
             config.listener.consensus_secret_key,
@@ -339,13 +338,10 @@ impl NodeHandler {
         state.adjust_timeout(&*snapshot);
 
         NodeHandler {
-            basic_logger: Logger::root(logger, o!("module" => "basic")),
-            consensus_logger: Logger::root(logger, o!("module" => "consensus",
-                                                        "height" => last_height,
-                                                        "round" => "?")),
-            network_logger: Logger::root(logger, o!("module" => "network",
+            network_logger: logger.new(o!("module" => "network",
                                 "listen_address" => system_state.listen_address().to_string(),
-                                "external_address" => external_address.to_string())),
+                                "external_address" => external_address.to_string() )),
+            basic_logger: logger,
             blockchain,
             api_state,
             system_state,
@@ -356,8 +352,7 @@ impl NodeHandler {
         }
     }
 
-    fn consensus_logger(&self) -> &Logger<ExonumLogger> { &self.consensus_logger}
-    fn timeout_logger(&self) -> &Logger<ExonumLogger> { &self.consensus_logger}
+    fn consensus_logger(&self) -> &Logger<ExonumLogger> { &self.state.consensus_logger()}
     fn basic_logger(&self) -> &Logger<ExonumLogger> { &self.basic_logger}
     fn network_logger(&self) -> &Logger<ExonumLogger> { &self.network_logger}
 
@@ -394,13 +389,13 @@ impl NodeHandler {
     /// Performs node initialization, so it starts consensus process from the first round.
     pub fn initialize(&mut self) {
         let addr = self.system_state.listen_address();
-        info!(self.basic_logger(), "Start listening address"; "listen_address" => addr.to_string());
+        info!(self.network_logger(), "Start listening address"; "listen_address" => %addr);
         for address in &self.peer_discovery.clone() {
             if address == &self.system_state.listen_address() {
                 continue;
             }
             self.connect(address);
-            info!(self.network_logger(), "Trying to connect with peer"; "remote_address" => address.to_string());
+            info!(self.network_logger(), "Trying to connect with peer"; "peer_address" => %address);
         }
 
         self.add_round_timeout();
@@ -424,20 +419,20 @@ impl NodeHandler {
         if let Some(conn) = self.state.peers().get(&public_key) {
             self.send_to_addr(&conn.addr(), message);
         } else {
-            error!(self.network_logger(), "Sending to peer failed, connection not found."; "peer" => public_key);
+            error!(self.network_logger(), "Sending to peer failed, connection not found."; "peer" => ?public_key);
         }
     }
 
     /// Sends `RawMessage` to the specified address.
     pub fn send_to_addr(&self, address: &SocketAddr, message: &RawMessage) {
-        trace!(self.network_logger(), "Send to addres"; "address" => address.to_string());
+        trace!(self.network_logger(), "Send to addres"; "address" => %address);
         let request = NetworkRequest::SendMessage(*address, message.clone());
         self.channel
             .network_requests
             .clone()
             .send(request)
             .wait()
-            .log_error();
+            .log_error(self.network_logger());
     }
 
     /// Broadcasts given message to all peers.
@@ -458,11 +453,11 @@ impl NodeHandler {
 
     /// Add timeout request.
     pub fn add_timeout(&self, timeout: NodeTimeout, time: SystemTime) {
-        let timeout_type = timeout.tag()
+        let timeout_type = timeout.tag();
         trace!(self.consensus_logger(),
             "Add timeout";
             "timeout_type" => timeout_type,
-            "end_time" => time,
+            "end_time" => ?time,
         );
         let request = TimeoutRequest(time, timeout);
         self.channel
@@ -470,7 +465,7 @@ impl NodeHandler {
             .clone()
             .send(request)
             .wait()
-            .log_error();
+            .log_error(self.network_logger());
     }
 
     /// Adds request timeout if it isn't already requested.
@@ -655,7 +650,7 @@ impl Node {
     /// Creates node for the given services and node configuration.
     pub fn new(db: Box<Database>, services: Vec<Box<Service>>, node_cfg: NodeConfig) -> Self {
         crypto::init();
-        let logger = root_logger();
+        let logger = Logger::root_typed(::helpers::root_logger(), o!());
         if cfg!(feature = "flame_profile") {
             ::exonum_profiler::init_handler(
                 ::std::env::var(PROFILE_ENV_VARIABLE_NAME).expect(&format!(
@@ -724,16 +719,18 @@ impl Node {
     /// This may be used if you want to customize api with the `ApiContext`.
     pub fn run_handler(mut self) -> io::Result<()> {
         self.handler.initialize();
+        let network_logger = self.handler.network_logger().clone();
 
         let (handler_part, network_part, timeouts_part) = self.into_reactor();
-
         let network_thread = thread::spawn(move || {
             let mut core = Core::new()?;
             let handle = core.handle();
+            let network_logger_clonned = network_logger.clone();
             core.handle().spawn(
-                timeouts_part.run(handle).map_err(log_error),
+                timeouts_part.run(handle).map_err(move |e| log_error(&network_logger_clonned, e)),
             );
-            let network_handler = network_part.run(&core.handle());
+            let network_handler = network_part.run(&core.handle(),
+                                                   network_logger);
             core.run(network_handler).map(drop).map_err(|e| {
                 other_error(&format!("An error in the `Network` thread occured: {}", e))
             })
@@ -771,11 +768,11 @@ impl Node {
                 );
                 system_api.wire(&mut router);
                 mount.mount("api/system", router);
-
+                let logger = self.handler.basic_logger().clone();
                 let thread = thread::spawn(move || {
-                    info!(self.handler.basic_logger(),
+                    info!(logger,
                         "Private exonum api started";
-                        "listen_address" => listen_address
+                        "listen_address" => %listen_address
                     );
                     let chain = Chain::new(mount);
                     Iron::new(chain).http(listen_address).unwrap();
@@ -800,11 +797,11 @@ impl Node {
                     explorer_api.wire(&mut router);
                     mount.mount("api/explorer", router);
                 }
-
+                let logger = self.handler.basic_logger().clone();
                 let thread = thread::spawn(move || {
-                    info!(self.handler.basic_logger(),
+                    info!(logger,
                         "Public exonum api started";
-                        "listen_address" => listen_address
+                        "listen_address" => %listen_address
                     );
                     let chain = Chain::new(mount);
                     Iron::new(chain).http(listen_address).unwrap();
