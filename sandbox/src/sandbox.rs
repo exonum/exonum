@@ -14,7 +14,7 @@
 
 
 // Workaround: Clippy does not correctly handle borrowing checking rules for returned types.
-#![cfg_attr(feature="cargo-clippy", allow(let_and_return))]
+#![cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
 
 use futures::{self, Async, Future, Stream};
 use futures::sync::mpsc;
@@ -27,8 +27,8 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet, VecDeque};
 use std::iter::FromIterator;
 
-use exonum::node::{Configuration, ListenerConfig, NodeHandler, ServiceConfig, State,
-                   SystemStateProvider, NodeSender};
+use exonum::node::{Configuration, ExternalMessage, ListenerConfig, NodeHandler, NodeSender,
+                   ServiceConfig, State, SystemStateProvider, ApiSender};
 use exonum::blockchain::{Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema,
                          Service, SharedNodeState, StoredConfiguration, TimeoutAdjusterConfig,
                          Transaction, ValidatorKeys};
@@ -72,10 +72,12 @@ pub struct SandboxInner {
     pub timers: BinaryHeap<TimeoutRequest>,
     pub network_requests_rx: mpsc::Receiver<NetworkRequest>,
     pub timeout_requests_rx: mpsc::Receiver<TimeoutRequest>,
+    pub api_requests_rx: mpsc::Receiver<ExternalMessage>,
 }
 
 impl SandboxInner {
     pub fn process_events(&mut self) {
+        self.process_api_requests();
         self.process_network_requests();
         self.process_timeout_requests();
     }
@@ -107,6 +109,16 @@ impl SandboxInner {
             Ok(())
         });
         timeouts_getter.wait().unwrap();
+    }
+
+    fn process_api_requests(&mut self) {
+        let api_getter = futures::lazy(|| -> Result<(), ()> {
+            while let Async::Ready(Some(api)) = self.api_requests_rx.poll()? {
+                self.handler.handle_event(api.into());
+            }
+            Ok(())
+        });
+        api_getter.wait().unwrap();
     }
 }
 
@@ -549,8 +561,15 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
 
     let addresses: Vec<SocketAddr> = (1..5).map(gen_primitive_socket_addr).collect::<Vec<_>>();
 
+    let api_channel = mpsc::channel(100);
     let db = Box::new(MemoryDB::new());
-    let mut blockchain = Blockchain::new(db, services);
+    let mut blockchain = Blockchain::new(
+        db,
+        services,
+        service_keys[0].0,
+        service_keys[0].1.clone(),
+        ApiSender::new(api_channel.0.clone()),
+    );
 
     let consensus = ConsensusConfig {
         round_timeout: 1000,
@@ -598,6 +617,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
     let node_sender = NodeSender {
         network_requests: network_channel.0.clone(),
         timeout_requests: timeout_channel.0.clone(),
+        api_requests: api_channel.0.clone(),
     };
 
     let mut handler = NodeHandler::new(
@@ -616,6 +636,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         timers: BinaryHeap::new(),
         timeout_requests_rx: timeout_channel.1,
         network_requests_rx: network_channel.1,
+        api_requests_rx: api_channel.1,
         handler,
         time: shared_time,
     };
@@ -641,9 +662,72 @@ pub fn timestamping_sandbox() -> Sandbox {
 
 #[cfg(test)]
 mod tests {
-    use sandbox_tests_helper::{VALIDATOR_1, VALIDATOR_2, VALIDATOR_3, HEIGHT_ONE, ROUND_ONE,
-                               ROUND_TWO};
+    use exonum::blockchain::ServiceContext;
+    use exonum::messages::{FromRaw, RawTransaction};
+    use exonum::encoding;
+    use exonum::crypto::{gen_keypair_from_seed, Seed};
+    use exonum::storage::Fork;
+
+    use sandbox_tests_helper::{add_one_height, SandboxState, VALIDATOR_1, VALIDATOR_2,
+                               VALIDATOR_3, HEIGHT_ONE, ROUND_ONE, ROUND_TWO};
     use super::*;
+
+    const SERVICE_ID: u16 = 1;
+    const TX_AFTER_COMMIT_ID: u16 = 1;
+
+    message! {
+        struct TxAfterCommit {
+            const TYPE = SERVICE_ID;
+            const ID = TX_AFTER_COMMIT_ID;
+            const SIZE = 8;
+
+            field height: Height [0 => 8]
+        }
+    }
+
+    impl TxAfterCommit {
+        pub fn new_with_height(height: Height) -> TxAfterCommit {
+            let keypair = gen_keypair_from_seed(&Seed::new([22; 32]));
+            TxAfterCommit::new(height, &keypair.1)
+        }
+    }
+
+    impl Transaction for TxAfterCommit {
+        fn verify(&self) -> bool {
+            true
+        }
+
+        fn execute(&self, _fork: &mut Fork) {}
+    }
+
+    struct HandleCommitService;
+
+    impl Service for HandleCommitService {
+        fn service_name(&self) -> &'static str {
+            "handle_commit"
+        }
+
+        fn service_id(&self) -> u16 {
+            SERVICE_ID
+        }
+
+        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
+            let tx: Box<Transaction> = match raw.message_type() {
+                TX_AFTER_COMMIT_ID => Box::new(TxAfterCommit::from_raw(raw)?),
+                _ => {
+                    return Err(encoding::Error::IncorrectMessageType {
+                        message_type: raw.message_type(),
+                    });
+                }
+            };
+            Ok(tx)
+        }
+
+        fn handle_commit(&self, context: &ServiceContext) {
+            let tx = TxAfterCommit::new_with_height(context.height());
+            context.transaction_sender().send(Box::new(tx)).unwrap();
+        }
+    }
 
     #[test]
     fn test_sandbox_init() {
@@ -735,5 +819,17 @@ mod tests {
         s.recv(&Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
         s.add_time(Duration::from_millis(1000));
         panic!("Oops! We don't catch unexpected message");
+    }
+
+    #[test]
+    fn test_sandbox_service_handle_commit() {
+        let sandbox = sandbox_with_services(vec![
+            Box::new(HandleCommitService),
+            Box::new(TimestampingService::new()),
+        ]);
+        let state = SandboxState::new();
+        add_one_height(&sandbox, &state);
+        let tx = TxAfterCommit::new_with_height(Height(1));
+        sandbox.broadcast(&tx);
     }
 }

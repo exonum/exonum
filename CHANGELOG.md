@@ -8,15 +8,24 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 
 ### Added
-- Added a new function `merge_sync`. In this function a write will be flushed from the operating system buffer cache before the write is considered complete. (#368)
 - Allow creating auditor node from command line. (#364)
+- Added a new function `merge_sync`. In this function a write will be flushed from the operating system buffer cache before the write is considered complete. (#368)
+- Added conversion into boxed values for values which implement `Service` or `Transaction` traits. (#366)
+- Added constructor for the `ServiceContext` which can be useful for the alternative node implementations. (#366)
 
 ### Changed
 - Changed a signature of `open` function in a `rocksdb` module. `RocksDBOptions` should pass by the reference. (#369)
+- Removed `round` method from the `ServiceContext`. (#366)
+- `ValidatorState` in the `ServiceContext` replaced by the `ValidatorId`. (#366)
+- `add_transaction` in the `ServiceContext` replaced by the `transaction_sender` which implements the `TransactionSend` trait. (#366)
+- The `Node` constructor now requires `db` and `services` variables instead of `blockchain` instance. (#366)
+- The `Blockchain` constructor now requires services keypair and an `ApiSender` instance. (#366)
+- `mount_*_api` methods in `Blockchain` instance now do not require `ApiContext`. (#366)
 - Changed `Patch` and `Changes` from typedefs into opaque structures.
 
 ### Fixed
 - Fixed `crate_authors!` macro usage, this macro can't return static string in new clap version. (#370)
+- Fixed mistake in description of the height getter in the `ServiceContext`. (#366)
 
 ## 0.3 - 2017-11-02
 

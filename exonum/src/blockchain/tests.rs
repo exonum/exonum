@@ -20,7 +20,7 @@ use serde_json;
 
 use blockchain::{Blockchain, Schema, Transaction};
 use crypto::{gen_keypair, Hash};
-use storage::{Database, Fork, Error, ListIndex};
+use storage::{Database, Error, Fork, ListIndex};
 use messages::Message;
 use helpers::{Height, ValidatorId};
 
@@ -280,17 +280,28 @@ fn handling_tx_panic_storage_error(blockchain: &Blockchain) {
 }
 
 mod memorydb_tests {
+    use futures::sync::mpsc;
     use std::path::Path;
     use tempdir::TempDir;
     use storage::{Database, MemoryDB};
     use blockchain::Blockchain;
+    use crypto::gen_keypair;
+    use node::ApiSender;
 
     fn create_database(_: &Path) -> Box<Database> {
         Box::new(MemoryDB::new())
     }
 
     fn create_blockchain(_: &Path) -> Blockchain {
-        Blockchain::new(Box::new(MemoryDB::new()), Vec::new())
+        let service_keypair = gen_keypair();
+        let api_channel = mpsc::channel(1);
+        Blockchain::new(
+            Box::new(MemoryDB::new()),
+            Vec::new(),
+            service_keypair.0,
+            service_keypair.1,
+            ApiSender::new(api_channel.0),
+        )
     }
 
     #[test]
@@ -315,10 +326,13 @@ mod memorydb_tests {
 }
 
 mod rocksdb_tests {
+    use futures::sync::mpsc;
     use std::path::Path;
     use tempdir::TempDir;
     use storage::{Database, RocksDB, RocksDBOptions};
     use blockchain::Blockchain;
+    use crypto::gen_keypair;
+    use node::ApiSender;
 
     fn create_database(path: &Path) -> Box<Database> {
         let mut opts = RocksDBOptions::default();
@@ -328,7 +342,15 @@ mod rocksdb_tests {
 
     fn create_blockchain(path: &Path) -> Blockchain {
         let db = create_database(path);
-        Blockchain::new(db, Vec::new())
+        let service_keypair = gen_keypair();
+        let api_channel = mpsc::channel(1);
+        Blockchain::new(
+            db,
+            Vec::new(),
+            service_keypair.0,
+            service_keypair.1,
+            ApiSender::new(api_channel.0),
+        )
     }
 
     #[test]

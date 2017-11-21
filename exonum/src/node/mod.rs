@@ -33,13 +33,14 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 use crypto::{self, Hash, PublicKey, SecretKey};
-use blockchain::{ApiContext, Blockchain, GenesisConfig, Schema, SharedNodeState, Transaction};
+use blockchain::{Blockchain, GenesisConfig, Schema, SharedNodeState, Transaction, Service};
 use api::{private, public, Api};
 use messages::{Connect, Message, RawMessage};
 use events::{NetworkRequest, TimeoutRequest, NetworkEvent};
 use events::{HandlerPart, NetworkConfiguration, NetworkPart, TimeoutsPart};
 use events::error::{into_other, other_error, LogError, log_error};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
+use storage::Database;
 
 pub use self::state::{RequestData, State, TxPool, ValidatorState};
 pub use self::whitelist::Whitelist;
@@ -80,7 +81,7 @@ pub enum NodeTimeout {
 
 /// A helper trait that provides the node with information about the state of the system such
 /// as current time or listen address.
-pub trait SystemStateProvider: 'static + ::std::fmt::Debug {
+pub trait SystemStateProvider: ::std::fmt::Debug {
     /// Returns the current address that the node listens on.
     fn listen_address(&self) -> SocketAddr;
     /// Return the current system time.
@@ -244,13 +245,15 @@ pub struct Configuration {
     pub mempool: MemoryPoolConfig,
 }
 
-/// Channel for messages and timeouts requests.
+/// Channel for messages, timeouts and api requests.
 #[derive(Debug, Clone)]
 pub struct NodeSender {
     /// Timeout requests sender.
     pub timeout_requests: mpsc::Sender<TimeoutRequest>,
     /// Network requests sender.
     pub network_requests: mpsc::Sender<NetworkRequest>,
+    /// Api requests sender.
+    pub api_requests: mpsc::Sender<ExternalMessage>,
 }
 
 impl NodeHandler {
@@ -608,18 +611,19 @@ impl NodeChannel {
         }
     }
 
-    /// Returns the channel for sending timeouts and networks requests.
+    /// Returns the channel for sending timeouts, networks and api requests.
     pub fn node_sender(&self) -> NodeSender {
         NodeSender {
             timeout_requests: self.timeout_requests.0.clone(),
             network_requests: self.network_requests.0.clone(),
+            api_requests: self.api_requests.0.clone(),
         }
     }
 }
 
 impl Node {
-    /// Creates node for the given blockchain and node configuration.
-    pub fn new(mut blockchain: Blockchain, node_cfg: NodeConfig) -> Self {
+    /// Creates node for the given services and node configuration.
+    pub fn new(db: Box<Database>, services: Vec<Box<Service>>, node_cfg: NodeConfig) -> Self {
         crypto::init();
 
         if cfg!(feature = "flame_profile") {
@@ -631,6 +635,14 @@ impl Node {
             )
         };
 
+        let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
+        let mut blockchain = Blockchain::new(
+            db,
+            services,
+            node_cfg.service_public_key,
+            node_cfg.service_secret_key.clone(),
+            ApiSender::new(channel.api_requests.0.clone()),
+        );
         blockchain
             .create_genesis_block(node_cfg.genesis.clone())
             .unwrap();
@@ -660,7 +672,6 @@ impl Node {
         };
         let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
         let system_state = Box::new(DefaultSystemState(node_cfg.listen_address));
-        let channel = NodeChannel::new(&config.mempool.events_pool_capacity);
         let network_config = config.network;
         let handler = NodeHandler::new(
             blockchain,
@@ -715,9 +726,8 @@ impl Node {
 
         let private_config_api_thread = match self.api_options.private_api_address {
             Some(listen_address) => {
-                let api_context = ApiContext::new(&self);
                 let mut mount = Mount::new();
-                mount.mount("api/services", api_context.mount_private_api());
+                mount.mount("api/services", blockchain.mount_private_api());
                 let shared_api_state = self.handler().api_state().clone();
                 let mut router = Router::new();
                 let node_info =
@@ -742,9 +752,8 @@ impl Node {
         };
         let public_config_api_thread = match self.api_options.public_api_address {
             Some(listen_address) => {
-                let api_context = ApiContext::new(&self);
                 let mut mount = Mount::new();
-                mount.mount("api/services", api_context.mount_public_api());
+                mount.mount("api/services", blockchain.mount_public_api());
 
                 let mut router = Router::new();
                 let pool = Arc::clone(self.state().transactions());
@@ -807,6 +816,11 @@ impl Node {
             timeout_requests_rx,
         };
         (handler_part, network_part, timeouts_part)
+    }
+
+    /// Returns `Blockchain` instance.
+    pub fn blockchain(&self) -> Blockchain {
+        self.handler.blockchain.clone()
     }
 
     /// Returns `State`.
