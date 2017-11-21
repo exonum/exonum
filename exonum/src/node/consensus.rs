@@ -14,7 +14,6 @@
 use std::collections::HashSet;
 
 use crypto::{Hash, PublicKey};
-use encoding::serialize::encode_hex;
 use blockchain::{Schema, Transaction};
 use messages::{BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote,
                PrevotesRequest, Propose, ProposeRequest, RawTransaction, TransactionsRequest};
@@ -146,16 +145,16 @@ impl NodeHandler {
         if msg.to() != self.state.consensus_public_key() {
             error!(
                 "Received block that intended for another peer, to={}, from={}",
-                encode_hex(msg.to()),
-                encode_hex(msg.from())
+                msg.to().to_hex(),
+                msg.from().to_hex()
             );
             return;
         }
 
         if !self.state.whitelist().allow(msg.from()) {
             error!(
-                "Received request message from peer = {:?} which not in whitelist.",
-                msg.from()
+                "Received request message from peer = {} which not in whitelist.",
+                msg.from().to_hex()
             );
             return;
         }
@@ -478,7 +477,7 @@ impl NodeHandler {
                 .unwrap_or_else(|| "?".into()),
             commited_txs,
             mempool_size,
-            encode_hex(block_hash),
+            block_hash.to_hex(),
         );
 
         // TODO: reset status timeout (ECR-171).

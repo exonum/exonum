@@ -222,13 +222,13 @@ macro_rules! message {
         }
 
         impl $crate::encoding::serialize::FromHex for $name {
-            type Error = ::encoding::Error;
+            type Error = $crate::encoding::Error;
 
             fn from_hex<T: AsRef<[u8]>>(hex: T) -> Result<Self, Self::Error> {
                 let vec = Vec::<u8>::from_hex(hex)
-                    .map_err(|e| ::encoding::Error::Other(Box::new(e)))?;
-                if vec.len() < ::messages::HEADER_LENGTH {
-                    return Err(::encoding::Error::Basic("Hex is too short.".into()));
+                    .map_err(|e| $crate::encoding::Error::Other(Box::new(e)))?;
+                if vec.len() < $crate::messages::HEADER_LENGTH {
+                    return Err($crate::encoding::Error::Basic("Hex is too short.".into()));
                 }
                 let buf = $crate::messages::MessageBuffer::from_vec(vec);
                 let raw = $crate::messages::RawMessage::new(buf);

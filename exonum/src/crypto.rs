@@ -251,6 +251,14 @@ macro_rules! implement_public_sodium_wrapper {
         pub fn from_slice(bs: &[u8]) -> Option<Self> {
             $name_from::from_slice(bs).map($name)
         }
+
+        /// Returns the hex representation of the binary data.
+        /// Lower case letters are used (e.g. f9b4ca).
+        pub fn to_hex(&self) -> String {
+            let mut str_buf = String::with_capacity(4 * $size);
+            $crate::encoding::serialize::ToHex::write_hex(self, &mut str_buf).unwrap();
+            str_buf
+        }
     }
 
     impl AsRef<[u8]> for $name {
@@ -268,9 +276,7 @@ macro_rules! implement_public_sodium_wrapper {
 
     impl ToString for $name {
         fn to_string(&self) -> String {
-            let mut hex_string = String::new();
-            ::encoding::serialize::ToHex::write_hex(self, &mut hex_string).unwrap();
-            hex_string
+            self.to_hex()
         }
     }
 
@@ -309,6 +315,14 @@ macro_rules! implement_private_sodium_wrapper {
         /// Creates a new instance from bytes slice.
         pub fn from_slice(bs: &[u8]) -> Option<Self> {
             $name_from::from_slice(bs).map($name)
+        }
+
+        /// Returns the hex representation of the binary data.
+        /// Lower case letters are used (e.g. f9b4ca).
+        pub fn to_hex(&self) -> String {
+            let mut str_buf = String::with_capacity(4 * $size);
+            $crate::encoding::serialize::ToHex::write_hex(self, &mut str_buf).unwrap();
+            str_buf
         }
     }
 
@@ -418,15 +432,15 @@ implement_private_sodium_wrapper! {
 
 macro_rules! implement_serde {
 ($name:ident) => (
-    impl ::encoding::serialize::FromHex for $name {
-        type Error = ::encoding::serialize::FromHexError;
+    impl $crate::encoding::serialize::FromHex for $name {
+        type Error = $crate::encoding::serialize::FromHexError;
 
         fn from_hex<T: AsRef<[u8]>>(v: T) -> Result<Self, Self::Error> {
-            let bytes: Vec<u8> = FromHex::from_hex(v)?;
+            let bytes = Vec::<u8>::from_hex(v)?;
             if let Some(self_value) = Self::from_slice(bytes.as_ref()) {
                 Ok(self_value)
             } else {
-                Err(::encoding::serialize::FromHexError::InvalidStringLength)
+                Err($crate::encoding::serialize::FromHexError::InvalidStringLength)
             }
         }
     }
@@ -519,14 +533,14 @@ impl Default for Hash {
 #[cfg(test)]
 mod tests {
     use serde_json;
-    use encoding::serialize::{encode_hex, FromHex};
+    use encoding::serialize::FromHex;
     use super::{gen_keypair, hash, Hash, HashStream, PublicKey, SecretKey, Seed, SignStream,
                 Signature};
 
     #[test]
     fn test_hash() {
         let h = hash(&[]);
-        let h1 = Hash::from_hex(encode_hex(h)).unwrap();
+        let h1 = Hash::from_hex(h.to_hex()).unwrap();
         assert_eq!(h1, h);
         let h = Hash::zero();
         assert_eq!(*h.as_ref(), [0; 32]);
@@ -535,8 +549,8 @@ mod tests {
     #[test]
     fn test_keys() {
         let (p, s) = gen_keypair();
-        let p1 = PublicKey::from_hex(encode_hex(p)).unwrap();
-        let s1 = SecretKey::from_hex(encode_hex((s.0).0.as_ref())).unwrap();
+        let p1 = PublicKey::from_hex(p.to_hex()).unwrap();
+        let s1 = SecretKey::from_hex(s.to_hex()).unwrap();
         assert_eq!(p1, p);
         assert_eq!(s1, s);
     }
