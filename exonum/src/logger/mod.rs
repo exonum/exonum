@@ -14,12 +14,68 @@
 
 
 //! Some logging related stuff
-
-use slog::{Drain, Logger, Value, SendSyncUnwindSafeDrain, Never};
+use slog::{OwnedKVList, Record, Drain, Logger,
+           SendSyncUnwindSafeDrain, SendSyncRefUnwindSafeDrain, Never};
+use slog_async::Async;
+use slog_scope::{GlobalLoggerGuard, set_global_logger};
+use std::iter::FromIterator;
+use std::cell::Cell;
+use std::sync::{Arc};
 
 use messages::{Connect, Propose, Prevote, Precommit, PrevotesRequest,
                BlockResponse, Status, ProposeRequest, TransactionsRequest,
                         PeersRequest, BlockRequest, ConsensusMessage};
+
+pub use self::config::LoggerConfig;
+
+thread_local!(static GLOBAL_LOGGER: Cell<Option<GlobalLoggerGuard>> = Cell::new(None););
+mod config;
+mod builder;
+// TODO: replace before merge
+// Stub for future replacement
+pub(crate) type ExonumLogger = Arc<SendSyncRefUnwindSafeDrain<Ok = (), Err = Never>>;
+/// Performs the logger initialization.
+pub(crate) fn init_logger(logger_config: LoggerConfig) -> ExonumLogger {
+    let async = Async::new(logger_config.into_multi_logger()).build().fuse();
+    let ret = Arc::new(async);
+    let logger_cloned = ret.clone();
+
+    GLOBAL_LOGGER.with(|v|
+        v.set(Some(set_global_logger(Logger::root_typed(logger_cloned, o!("module" => "global"))))
+        ));
+    ret
+}
+
+pub(crate) struct MultipleDrain {
+    drains: Vec<Box<Drain<Ok = (), Err = Never>+ Send >>
+}
+
+impl FromIterator<Box<Drain<Ok = (), Err = Never> + Send>> for MultipleDrain {
+    fn from_iter<T>(iter: T) -> Self
+    where
+    T: IntoIterator<Item = Box<Drain<Ok = (), Err = Never> + Send>>
+    {
+        MultipleDrain {
+            drains: iter.into_iter().collect(),
+        }
+    }
+}
+
+impl Drain for MultipleDrain {
+    type Ok = ();
+    type Err = Never;
+    fn log(
+        &self,
+        record: &Record,
+        logger_values: &OwnedKVList,
+    ) -> Result<Self::Ok, Self::Err> {
+        for drain in &self.drains {
+            drop(drain.log(record, logger_values));
+        }
+        Ok(())
+    }
+}
+
 
 /// `ExtContextLogger` is a trait, used to compatible extend root logging context.
 /// This trait is useful when you need to introduce some context

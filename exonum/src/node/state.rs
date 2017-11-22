@@ -30,7 +30,8 @@ use crypto::{PublicKey, SecretKey, Hash};
 use storage::{Patch, Snapshot};
 use blockchain::{ValidatorKeys, ConsensusConfig, StoredConfiguration, Transaction,
                  TimeoutAdjusterConfig};
-use helpers::{Height, Round, ValidatorId, Milliseconds, ExonumLogger};
+use helpers::{Height, Round, ValidatorId, Milliseconds};
+use logger::ExonumLogger;
 use node::whitelist::Whitelist;
 use node::timeout_adjuster::{TimeoutAdjuster, Constant, Dynamic, MovingAverage};
 

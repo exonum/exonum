@@ -440,6 +440,7 @@ impl Command for Finalize {
                     private_api_address: private_addr,
                     ..Default::default()
                 },
+                logger: Default::default(),
                 mempool: Default::default(),
                 services_configs: Default::default(),
             }

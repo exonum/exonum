@@ -463,22 +463,11 @@ impl NodeHandler {
         "block_hash" => ?block_hash);
 
         // Merge changes into storage
-<<<<<<< HEAD
         let (commited_txs, proposer) = {
             // FIXME Avoid of clone here.
             let block_state = self.state.block(&block_hash).unwrap().clone();
             self.blockchain
                 .commit(block_state.patch(), block_hash, precommits)
-=======
-        let (committed_txs, new_txs, proposer) = {
-            let (txs_count, proposer) = {
-                let block_state = self.state.block(&block_hash).unwrap();
-                (block_state.txs().len(), block_state.proposer_id())
-            };
-
-            let txs = self.blockchain
-                .commit(&mut self.state, block_hash, precommits)
->>>>>>> 82989e58... Add abstraction, fully move exonum to slog
                 .unwrap();
             // Update node state
             self.state.update_config(
@@ -500,24 +489,18 @@ impl NodeHandler {
             .len();
         metric!("node.mempool", mempool_size);
 
-<<<<<<< HEAD
-        info!(self.consensus_logger(), "Commited block",
-=======
+        info!(self.consensus_logger(), "Committed block";
+            "block_proposer" => %proposer,
+            "block_round" => %round.map(|x| format!("{}", x)).unwrap_or_else(|| "?".into()),
+            "tx_committed" => %committed_txs,
+            "mempool_size" =>%mempool_size,
+            "block_hash" =>%block_hash.to_hex(),
+        );
         // Update state to new height
         self.state.new_height(
             &block_hash,
             self.system_state.current_time(),
         );
-
-        info!(self.consensus_logger(), "Committed block";
->>>>>>> 82989e58... Add abstraction, fully move exonum to slog
-              "height" => %height,
-              "proposer" => %proposer,
-              "round" => %round.map(|x| format!("{}", x)).unwrap_or_else(|| "?".into()),
-              "tx_committed" => %committed_txs,
-              "mempool_size" =>%mempool_size,
-              "hash" =>%block_hash.to_hex(),
-              );
         // TODO: reset status timeout (ECR-171).
         self.broadcast_status();
         self.add_status_timeout();
@@ -723,13 +706,8 @@ impl NodeHandler {
     }
 
     /// Handles request timeout by sending the corresponding request message to a peer.
-<<<<<<< HEAD
     pub fn handle_request_timeout(&mut self, data: &RequestData, peer: Option<PublicKey>) {
-        trace!("HANDLE REQUEST TIMEOUT");
-=======
-    pub fn handle_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
         trace!(self.network_logger(), "Handle request timeout");
->>>>>>> 82989e58... Add abstraction, fully move exonum to slog
         // FIXME: check height?
         if let Some(peer) = self.state.retry(data, peer) {
             self.add_request_timeout(data.clone(), Some(peer));

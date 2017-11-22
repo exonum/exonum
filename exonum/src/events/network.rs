@@ -32,7 +32,8 @@ use std::rc::Rc;
 use std::cell::RefCell;
 
 use messages::{Any, Connect, RawMessage, Message};
-use helpers::{Milliseconds, ExonumLogger};
+use helpers::Milliseconds;
+use logger::ExonumLogger;
 
 use super::tobox;
 use super::error::{into_other, log_error, other_error, result_ok};

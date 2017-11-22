@@ -40,7 +40,8 @@ use messages::{Connect, Message, RawMessage};
 use events::{NetworkRequest, TimeoutRequest, NetworkEvent};
 use events::{HandlerPart, NetworkConfiguration, NetworkPart, TimeoutsPart};
 use events::error::{into_other, other_error, LogError, log_error};
-use helpers::{Height, Milliseconds, Round, ValidatorId, ExonumLogger};
+use helpers::{Height, Milliseconds, Round, ValidatorId};
+use logger::{ExonumLogger, LoggerConfig};
 use storage::Database;
 
 pub use self::state::{RequestData, State, TxPool, ValidatorState};
@@ -244,6 +245,8 @@ pub struct NodeConfig {
     pub api: NodeApiConfig,
     /// Memory pool configuration.
     pub mempool: MemoryPoolConfig,
+    /// Log outputs configuration.
+    pub logger: LoggerConfig,
     /// Additional config, usable for services.
     pub services_configs: BTreeMap<String, Value>,
 }
@@ -650,7 +653,7 @@ impl Node {
     /// Creates node for the given services and node configuration.
     pub fn new(db: Box<Database>, services: Vec<Box<Service>>, node_cfg: NodeConfig) -> Self {
         crypto::init();
-        let logger = Logger::root_typed(::helpers::root_logger(), o!());
+        let logger = Logger::root_typed(::logger::init_logger(node_cfg.logger), o!());
         if cfg!(feature = "flame_profile") {
             ::exonum_profiler::init_handler(
                 ::std::env::var(PROFILE_ENV_VARIABLE_NAME).expect(&format!(

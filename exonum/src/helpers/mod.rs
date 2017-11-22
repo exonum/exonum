@@ -13,13 +13,6 @@
 // limitations under the License.
 
 //! Different assorted utilities.
-use slog::{Drain, SendSyncRefUnwindSafeDrain, Never};
-use slog_term::{TermDecorator, CompactFormat, FullFormat };
-use slog_async::Async;
-
-use std::env;
-use std::time::{SystemTime, UNIX_EPOCH};
-use std::sync::Arc;
 
 use blockchain::{GenesisConfig, ValidatorKeys};
 use node::NodeConfig;
@@ -33,17 +26,6 @@ pub mod fabric;
 pub mod config;
 #[macro_use]
 pub mod metrics;
-
-// TODO: replace before merge
-// Stub for future replacement
-pub(crate) type ExonumLogger = Arc<SendSyncRefUnwindSafeDrain<Ok = (), Err = Never>>;
-/// Performs the logger initialization.
-pub fn root_logger() -> ExonumLogger {
-    let decorator = TermDecorator::new().build();
-    let drain = FullFormat::new(decorator).build().fuse();
-    let async_drain =  Async::new(drain).build().fuse();
-    Arc::new(async_drain)
-}
 
 /// Generates testnet configuration.
 pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
@@ -82,6 +64,7 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
                 whitelist: Default::default(),
                 api: Default::default(),
                 mempool: Default::default(),
+                logger: Default::default(),
                 services_configs: Default::default(),
             }
         })

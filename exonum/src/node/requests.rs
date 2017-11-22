@@ -14,7 +14,6 @@
 
 use slog::Logger;
 
-use helpers::ExonumLogger;
 use logger::ExtContextLogger;
 use messages::{RequestMessage, Message, ProposeRequest, TransactionsRequest, PrevotesRequest,
                BlockRequest, BlockResponse};

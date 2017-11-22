@@ -19,7 +19,7 @@ use slog::Logger;
 use std::error::Error as StdError;
 use std::io;
 
-use helpers::ExonumLogger;
+use logger::ExonumLogger;
 
 // Common error helpers (TODO move to helpers)
 

@@ -17,7 +17,7 @@
 //! For more information see the project readme.
 
 #![deny(missing_debug_implementations)]
-#![deny(missing_docs)]
+
 
 #![cfg_attr(feature="cargo-clippy", allow(zero_prefixed_literal))]
 
@@ -32,6 +32,8 @@ extern crate slog_async;
 #[macro_use]
 extern crate slog;
 extern crate slog_scope;
+#[macro_use]
+extern crate lazy_static;
 extern crate byteorder;
 extern crate exonum_sodiumoxide as sodiumoxide;
 extern crate exonum_rocksdb as rocksdb;
