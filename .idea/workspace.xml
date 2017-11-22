@@ -1,10 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="3d235f5b-18e1-4f71-9504-d265e7ad9d45" name="Default" comment="">
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/main.rs" afterPath="$PROJECT_DIR$/src/main.rs" />
-    </list>
+    <list default="true" id="3d235f5b-18e1-4f71-9504-d265e7ad9d45" name="Default" comment="" />
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -27,9 +24,10 @@
       <file leaf-file-name="main.rs" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/main.rs">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="714">
-              <caret line="42" column="33" lean-forward="true" selection-start-line="42" selection-start-column="33" selection-end-line="42" selection-end-column="33" />
+            <state relative-caret-position="527">
+              <caret line="31" column="24" lean-forward="true" selection-start-line="31" selection-start-column="24" selection-end-line="31" selection-end-column="24" />
               <folding>
+                <element signature="e#1113#1114#0" expanded="true" />
                 <element signature="e#1147#1148#0" expanded="true" />
                 <marker date="1511360936268" expanded="false" signature="5618:5629" ph=" { " />
                 <marker date="1511360936268" expanded="false" signature="5635:5641" ph=" }" />
@@ -305,6 +303,7 @@
         <state relative-caret-position="1445">
           <caret line="85" column="40" lean-forward="true" selection-start-line="85" selection-start-column="40" selection-end-line="85" selection-end-column="40" />
           <folding>
+            <element signature="e#1113#1114#0" expanded="true" />
             <element signature="e#1147#1148#0" expanded="true" />
             <marker date="1511360936268" expanded="false" signature="5618:5629" ph=" { " />
             <marker date="1511360936268" expanded="false" signature="5635:5641" ph=" }" />
@@ -340,9 +339,10 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/main.rs">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="714">
-          <caret line="42" column="33" lean-forward="true" selection-start-line="42" selection-start-column="33" selection-end-line="42" selection-end-column="33" />
+        <state relative-caret-position="527">
+          <caret line="31" column="24" lean-forward="true" selection-start-line="31" selection-start-column="24" selection-end-line="31" selection-end-column="24" />
           <folding>
+            <element signature="e#1113#1114#0" expanded="true" />
             <element signature="e#1147#1148#0" expanded="true" />
             <marker date="1511360936268" expanded="false" signature="5618:5629" ph=" { " />
             <marker date="1511360936268" expanded="false" signature="5635:5641" ph=" }" />
