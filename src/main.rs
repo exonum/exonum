@@ -8,12 +8,12 @@ extern crate router;
 extern crate bodyparser;
 extern crate iron;
 
-use exonum::blockchain::{self, Blockchain, ServiceContext, GenesisConfig, ValidatorKeys,
-                         Transaction, ApiContext, StoredConfiguration};
+use exonum::blockchain::{Blockchain, Service, ServiceContext, Schema, GenesisConfig,
+                         ValidatorKeys, Transaction, ApiContext, StoredConfiguration};
 use exonum::node::{Node, NodeConfig, NodeApiConfig, TransactionSend, ApiSender};
 use exonum::messages::{RawTransaction, FromRaw, Message};
 use exonum::encoding::serialize::json::reexport::Value;
-use exonum::storage::{Fork, MemoryDB, MapIndex, Entry};
+use exonum::storage::{Fork, Snapshot, MemoryDB, MapIndex, Entry};
 use exonum::crypto::{PublicKey, Hash, HexValue};
 use exonum::encoding;
 use exonum::api::{Api, ApiError};
@@ -21,7 +21,6 @@ use iron::prelude::*;
 use iron::Handler;
 use router::Router;
 use std::time::SystemTime;
-use std::cmp::PartialOrd;
 
 const SERVICE_ID: u16 = 1;
 const TX_TIME_ID: u16 = 1;
@@ -36,28 +35,34 @@ encoding_struct! {
     }
 }
 
-pub struct Schema<'a> {
-    view: &'a mut Fork,
+pub struct TimeSchema<T> {
+    view: T,
 }
 
-impl<'a> Schema<'a> {
-    pub fn validators_time(&mut self) -> MapIndex<&mut Fork, PublicKey, Time> {
+impl<T: AsRef<Snapshot>> TimeSchema<T> {
+    pub fn new(view: T) -> Self {
+        TimeSchema { view }
+    }
+
+    pub fn validators_time(&self) -> MapIndex<&Snapshot, PublicKey, Time> {
+        MapIndex::new("time.validators_time", self.view.as_ref())
+    }
+
+    pub fn time(&self) -> Entry<&Snapshot, Time> {
+        Entry::new("time.time", self.view.as_ref())
+    }
+}
+
+
+impl<'a> TimeSchema<&'a mut Fork> {
+    pub fn validators_time_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Time> {
         MapIndex::new("time.validators_time", self.view)
     }
 
-    pub fn validator_time(&mut self, pub_key: &PublicKey) -> Option<Time> {
-        self.validators_time().get(pub_key)
-    }
-
-    pub fn time(&mut self) -> Entry<&mut Fork, Time> {
+    pub fn time_mut(&mut self) -> Entry<&mut Fork, Time> {
         Entry::new("time.time", self.view)
     }
-
-    pub fn current_time(&mut self) -> Option<Time> {
-        self.time().get()
-    }
 }
-
 
 // TRANSACTION
 
@@ -78,164 +83,112 @@ impl Transaction for TxTime {
     }
 
     fn execute(&self, view: &mut Fork) {
-        let validator_keys = blockchain::Schema::new(view)
-            .actual_configuration()
-            .validator_keys;
-        if let Some(_) = validator_keys.iter().find(|&validator| validator.service_key == *self.pub_key()) {
+        let validator_keys = Schema::new(&view).actual_configuration().validator_keys;
+
+        if (validator_keys.iter().find(|&validator| {
+            validator.service_key == *self.pub_key()
+        })).is_some()
+        {
+
+            let mut schema = TimeSchema::new(view);
+            if let Some(storage_time) = schema.validators_time().get(self.pub_key()) {
+                if storage_time.time() < self.time() {
+                    schema.validators_time_mut().put(
+                        self.pub_key(),
+                        Time::new(self.time()),
+                    );
+
+                    let mut validators_time = Vec::new();
+                    {
+                        let idx = schema.validators_time();
+
+                        for pair in idx.iter() {
+                            let (pub_key, time) = (pair.0, pair.1.time());
+                            if (validator_keys.iter().find(|validator| {
+                                validator.service_key == pub_key
+                            })).is_some()
+                            {
+                                validators_time.push(time);
+                            }
+                        }
+                    }
+
+                    let f = validator_keys.len() / 3 + 1;
+                    if validators_time.len() > f {
+                        validators_time.sort();
+                        validators_time.reverse();
+                        if let Some(current_time) = schema.time().get() {
+                            if current_time.time() < validators_time[f] {
+                                schema.time_mut().set(Time::new(validators_time[f]));
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
-// REST API
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-enum TxRequest {
-    SendTime(TxTime),
-}
-
-impl Into<Box<Transaction>> for TxRequest {
-    fn into(self) -> Box<Transaction> {
-        match self {
-            TxRequest::SendTime(trans) => Box::new(trans),
-        }
-    }
-}
+// API
 
 #[derive(Serialize, Deserialize)]
-struct TxResponse {
-    tx_hash: Hash,
+pub struct TxResponse {
+    pub tx_hash: Hash,
 }
 
-pub mod public {
-    use serde_json;
-    use exonum::api::{self, ApiError};
-    use exonum::blockchain::{Blockchain, Transaction};
-    use exonum::node::{ApiSender, TransactionSend};
-    use exonum::crypto::PublicKey;
-    use iron::prelude::*;
-    use router::Router;
-    use bodyparser;
-    use super::{Schema, TxRequest, TxResponse};
+#[derive(Clone)]
+struct TimeApi {
+    channel: ApiSender,
+    blockchain: Blockchain,
+}
 
-    #[derive(Clone)]
-    pub struct Api {
-        blockchain: Blockchain,
-        channel: ApiSender,
+impl TimeApi {
+    fn get_current_time(&self, _: &mut Request) -> IronResult<Response> {
+        let view = self.blockchain.snapshot();
+        let schema = TimeSchema::new(&view);
+        let current_time = schema.time().get();
+        self.ok_response(&serde_json::to_value(current_time).unwrap())
     }
 
-    impl Api {
-        pub fn new(blockchain: Blockchain, channel: ApiSender) -> Self {
-            Api {
-                blockchain,
-                channel,
-            }
+    fn get_validators_time(&self, _: &mut Request) -> IronResult<Response> {
+        let view = self.blockchain.snapshot();
+        let schema = TimeSchema::new(&view);
+        let idx = schema.validators_time();
+        let validators_time: Vec<Time> = idx.values().collect();
+        if validators_time.is_empty() {
+            self.not_found_response(&serde_json::to_value("Validators time database if empty")
+                .unwrap())
+        } else {
+            self.ok_response(&serde_json::to_value(validators_time).unwrap())
         }
     }
 
-    impl api::Api for Api {
-        fn wire(&self, router: &mut Router) {
-
-            let self_ = self.clone();
-            let transaction = move |req: &mut Request| -> IronResult<Response> {
-                match req.get::<bodyparser::Struct<TxRequest>>() {
-                    Ok(Some(transaction)) => {
-                        let transaction: Box<Transaction> = transaction.into();
-                        let tx_hash = transaction.hash();
-                        self_.channel.send(transaction).map_err(ApiError::Io)?;
-                        let json = TxResponse { tx_hash };
-                        self_.ok_response(&serde_json::to_value(&json).unwrap())
-                    }
-                    Ok(None) => Err(ApiError::IncorrectRequest("Empty request body".into()))?,
-                    Err(e) => Err(ApiError::IncorrectRequest(Box::new(e)))?,
-                }
-            };
-            router.post(&"v1/transaction", transaction, "transaction");
-
-            let self_ = self.clone();
-            let get_current_time = move |_: &mut Request| -> IronResult<Response> {
-                let mut view = self_.blockchain.fork();
-                let mut schema = Schema { view: &mut view };
-                self_.ok_response(&serde_json::to_value(schema.current_time()).unwrap())
-            };
-            router.get("/v1/current_time", get_current_time, "current_time");
-        }
+    fn wire_private(&self, router: &mut Router) {
+        let self_ = self.clone();
+        let get_validators_time = move |req: &mut Request| self_.get_validators_time(req);
+        router.get(
+            "/validators_time",
+            get_validators_time,
+            "get_validators_time",
+        );
     }
 }
 
-pub mod private {
-    use serde_json;
-    use exonum::api::{self, ApiError};
-    use exonum::blockchain::{Blockchain, Transaction};
-    use exonum::node::{ApiSender, TransactionSend};
-    use exonum::crypto::PublicKey;
-    use iron::prelude::*;
-    use router::Router;
-    use bodyparser;
-    use super::{Schema, TxRequest, TxResponse};
-
-    #[derive(Clone)]
-    pub struct Api {
-        blockchain: Blockchain,
-        channel: ApiSender,
-    }
-
-    impl Api {
-        pub fn new(blockchain: Blockchain, channel: ApiSender) -> Self {
-            Api {
-                blockchain,
-                channel,
-            }
-        }
-    }
-
-    impl api::Api for Api {
-        fn wire(&self, router: &mut Router) {
-
-            let self_ = self.clone();
-            let transaction = move |req: &mut Request| -> IronResult<Response> {
-                match req.get::<bodyparser::Struct<TxRequest>>() {
-                    Ok(Some(transaction)) => {
-                        let transaction: Box<Transaction> = transaction.into();
-                        let tx_hash = transaction.hash();
-                        self_.channel.send(transaction).map_err(ApiError::Io)?;
-                        let json = TxResponse { tx_hash };
-                        self_.ok_response(&serde_json::to_value(&json).unwrap())
-                    }
-                    Ok(None) => Err(ApiError::IncorrectRequest("Empty request body".into()))?,
-                    Err(e) => Err(ApiError::IncorrectRequest(Box::new(e)))?,
-                }
-            };
-            router.post(&"v1/transaction", transaction, "transaction");
-
-            let self_ = self.clone();
-            let get_validators_time = move |_: &mut Request| -> IronResult<Response> {
-                let mut view = self_.blockchain.fork();
-                let mut schema = Schema { view: &mut view };
-                let idx = schema.validators_time();
-                let validators_time: Vec<super::Time> = idx.values().collect();
-                if validators_time.is_empty() {
-                    self_.not_found_response(
-                        &serde_json::to_value("Validators time database is empty").unwrap(),
-                    )
-                } else {
-                    self_.ok_response(&serde_json::to_value(validators_time).unwrap())
-                }
-            };
-            router.get(
-                "/v1/validators_time",
-                get_validators_time,
-                "validators_time",
-            );
-        }
+impl Api for TimeApi {
+    fn wire(&self, router: &mut Router) {
+        let self_ = self.clone();
+        let get_current_time = move |req: &mut Request| self_.get_current_time(req);
+        router.get("/current_time", get_current_time, "get_current_time");
     }
 }
+
+
 
 // SERVICE DECLARATION
 
-struct Service;
+struct TimeService;
 
-impl blockchain::Service for Service {
+impl Service for TimeService {
     fn service_name(&self) -> &'static str {
         "time"
     }
@@ -266,19 +219,21 @@ impl blockchain::Service for Service {
 
     fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
         let mut router = Router::new();
-        let blockchain = ctx.blockchain().clone();
-        let channel = ctx.node_channel().clone();
-        let api = private::Api::new(blockchain, channel);
+        let api = TimeApi {
+            channel: ctx.node_channel().clone(),
+            blockchain: ctx.blockchain().clone(),
+        };
         api.wire(&mut router);
         Some(Box::new(router))
     }
 
     fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
         let mut router = Router::new();
-        let blockchain = ctx.blockchain().clone();
-        let channel = ctx.node_channel().clone();
-        let api = public::Api::new(blockchain, channel);
-        api.wire(&mut router);
+        let api = TimeApi {
+            channel: ctx.node_channel().clone(),
+            blockchain: ctx.blockchain().clone(),
+        };
+        api.wire_private(&mut router);
         Some(Box::new(router))
     }
 }
@@ -290,7 +245,7 @@ fn main() {
 
     println!("Creating in-memory database...");
     let db = MemoryDB::new();
-    let services: Vec<Box<blockchain::Service>> = vec![Box::new(Service)];
+    let services: Vec<Box<Service>> = vec![Box::new(TimeService)];
     let blockchain = Blockchain::new(Box::new(db), services);
 
     let (consensus_public_key, consensus_secret_key) = exonum::crypto::gen_keypair();
