@@ -149,6 +149,21 @@ impl TestNode {
         }
     }
 
+    /// Constructs a new node from the given keypairs.
+    pub fn from_parts(
+        consensus: (crypto::PublicKey, crypto::SecretKey),
+        service: (crypto::PublicKey, crypto::SecretKey),
+        validator_id: Option<ValidatorId>,
+    ) -> TestNode {
+        TestNode {
+            consensus_secret_key: consensus.1,
+            consensus_public_key: consensus.0,
+            service_secret_key: service.1,
+            service_public_key: service.0,
+            validator_id,
+        }
+    }
+
     /// Creates a `Propose` message signed by this validator.
     pub fn create_propose(
         &self,
