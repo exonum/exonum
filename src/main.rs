@@ -9,14 +9,14 @@ extern crate bodyparser;
 extern crate iron;
 
 use exonum::blockchain::{Blockchain, Service, ServiceContext, Schema, GenesisConfig,
-                         ValidatorKeys, Transaction, ApiContext, StoredConfiguration};
-use exonum::node::{Node, NodeConfig, NodeApiConfig, TransactionSend, ApiSender};
+                         ValidatorKeys, Transaction, ApiContext};
+use exonum::node::{Node, NodeConfig, NodeApiConfig, ApiSender};
 use exonum::messages::{RawTransaction, FromRaw, Message};
 use exonum::encoding::serialize::json::reexport::Value;
 use exonum::storage::{Fork, Snapshot, MemoryDB, MapIndex, Entry};
-use exonum::crypto::{PublicKey, Hash, HexValue};
+use exonum::crypto::{PublicKey, Hash};
 use exonum::encoding;
-use exonum::api::{Api, ApiError};
+use exonum::api::Api;
 use iron::prelude::*;
 use iron::Handler;
 use router::Router;
@@ -85,11 +85,10 @@ impl Transaction for TxTime {
     fn execute(&self, view: &mut Fork) {
         let validator_keys = Schema::new(&view).actual_configuration().validator_keys;
 
-        if (validator_keys.iter().find(|&validator| {
+        if validator_keys.iter().any(|&validator| {
             validator.service_key == *self.pub_key()
-        })).is_some()
+        })
         {
-
             let mut schema = TimeSchema::new(view);
             if let Some(storage_time) = schema.validators_time().get(self.pub_key()) {
                 if storage_time.time() < self.time() {
@@ -104,9 +103,9 @@ impl Transaction for TxTime {
 
                         for pair in idx.iter() {
                             let (pub_key, time) = (pair.0, pair.1.time());
-                            if (validator_keys.iter().find(|validator| {
+                            if validator_keys.iter().any(|validator| {
                                 validator.service_key == pub_key
-                            })).is_some()
+                            })
                             {
                                 validators_time.push(time);
                             }
@@ -213,7 +212,7 @@ impl Service for TimeService {
     }
 
     fn handle_commit(&self, context: &mut ServiceContext) {
-        let (pub_key, sec_key) = (context.public_key().clone(), context.secret_key().clone());
+        let (pub_key, sec_key) = (*context.public_key(), context.secret_key().clone());
         context.add_transaction(Box::new(TxTime::new(SystemTime::now(), &pub_key, &sec_key)));
     }
 
@@ -237,8 +236,6 @@ impl Service for TimeService {
         Some(Box::new(router))
     }
 }
-
-
 
 fn main() {
     exonum::helpers::init_logger().unwrap();
