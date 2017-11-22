@@ -119,12 +119,7 @@ mod tests {
         sender.try_send(4).unwrap();
 
         let folded: Vec<_> = stream.take(4).wait().into_iter().collect();
-        assert_eq!(
-            folded,
-            vec![
-                Ok(10), Ok(0), Ok(0), Ok(0)
-            ]
-        );
+        assert_eq!(folded, vec![Ok(10), Ok(0), Ok(0), Ok(0)]);
     }
 
     #[test]
@@ -152,9 +147,7 @@ mod tests {
         let (mut sender, receiver) = mpsc::channel(1_024);
         let values = RefCell::new(Vec::new());
         let stream = {
-            let stream = GreedyFold::new(receiver, (), |_, i| {
-                values.borrow_mut().push(i);
-            });
+            let stream = GreedyFold::new(receiver, (), |_, i| { values.borrow_mut().push(i); });
             stream
         };
         let mut exec = executor::spawn(stream);
@@ -163,23 +156,13 @@ mod tests {
         sender.try_send(2).unwrap();
         let result = exec.wait_stream();
         assert_eq!(result, Some(Ok(())));
-        assert_eq!(
-            *values.borrow(),
-            vec![
-                1, 2
-            ]
-        );
+        assert_eq!(*values.borrow(), vec![1, 2]);
 
         sender.try_send(3).unwrap();
         sender.try_send(4).unwrap();
         sender.try_send(5).unwrap();
         let result = exec.wait_stream();
         assert_eq!(result, Some(Ok(())));
-        assert_eq!(
-            *values.borrow(),
-            vec![
-                1, 2, 3, 4, 5
-            ]
-        );
+        assert_eq!(*values.borrow(), vec![1, 2, 3, 4, 5]);
     }
 }
