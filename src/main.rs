@@ -112,7 +112,7 @@ impl Transaction for TxTime {
                         }
                     }
 
-                    let f = validator_keys.len() / 3 + 1;
+                    let f = validator_keys.len() / 3;
                     if validators_time.len() > f {
                         validators_time.sort();
                         validators_time.reverse();
