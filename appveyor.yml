@@ -14,8 +14,6 @@ install:
   - rustc -vV
   - cargo -vV
 
-## Build Script ##
-
 cache:
    - '%USERPROFILE%\.cargo'
 
