@@ -341,9 +341,11 @@ impl NodeHandler {
         state.adjust_timeout(&*snapshot);
 
         NodeHandler {
-            network_logger: logger.new(o!("module" => "network",
+            network_logger: logger.new(
+                o!("module" => "network",
                                 "listen_address" => system_state.listen_address().to_string(),
-                                "external_address" => external_address.to_string() )),
+                                "external_address" => external_address.to_string() ),
+            ),
             basic_logger: logger,
             blockchain,
             api_state,
@@ -351,13 +353,18 @@ impl NodeHandler {
             state,
             channel: sender,
             peer_discovery: config.peer_discovery,
-
         }
     }
 
-    fn consensus_logger(&self) -> &Logger<ExonumLogger> { &self.state.consensus_logger()}
-    fn basic_logger(&self) -> &Logger<ExonumLogger> { &self.basic_logger}
-    fn network_logger(&self) -> &Logger<ExonumLogger> { &self.network_logger}
+    fn consensus_logger(&self) -> &Logger<ExonumLogger> {
+        self.state.consensus_logger()
+    }
+    fn basic_logger(&self) -> &Logger<ExonumLogger> {
+        &self.basic_logger
+    }
+    fn network_logger(&self) -> &Logger<ExonumLogger> {
+        &self.network_logger
+    }
 
     /// Return internal `SharedNodeState`
     pub fn api_state(&self) -> &SharedNodeState {
@@ -422,7 +429,8 @@ impl NodeHandler {
         if let Some(conn) = self.state.peers().get(&public_key) {
             self.send_to_addr(&conn.addr(), message);
         } else {
-            error!(self.network_logger(), "Sending to peer failed, connection not found."; "peer" => ?public_key);
+            error!(self.network_logger(),
+                   "Sending to peer failed, connection not found."; "peer" => ?public_key);
         }
     }
 
@@ -695,7 +703,10 @@ impl Node {
         let external_address = if let Some(v) = node_cfg.external_address {
             v
         } else {
-            warn!(logger, "Could not find 'external_address' in the config, using 'listen_address'");
+            warn!(
+                logger,
+                "Could not find 'external_address' in the config, using 'listen_address'"
+            );
             node_cfg.listen_address
         };
         let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
@@ -730,7 +741,9 @@ impl Node {
             let handle = core.handle();
             let network_logger_clonned = network_logger.clone();
             core.handle().spawn(
-                timeouts_part.run(handle).map_err(move |e| log_error(&network_logger_clonned, e)),
+                timeouts_part.run(handle).map_err(move |e| {
+                    log_error(&network_logger_clonned, e)
+                }),
             );
             let network_handler = network_part.run(&core.handle(),
                                                    network_logger);

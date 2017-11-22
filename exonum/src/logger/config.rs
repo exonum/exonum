@@ -1,6 +1,6 @@
 use serde::{Serialize, Deserialize, Serializer, Deserializer};
 
-use std::fmt::{Display, self};
+use std::fmt::{self, Display};
 use std::str::FromStr;
 use std::collections::BTreeMap;
 
@@ -86,9 +86,10 @@ pub struct LoggerConfig {
 
 impl LoggerConfig {
     pub(crate) fn into_multi_logger(self) -> MultipleDrain {
-        self.loggers.into_iter().map(|v|
-            builder::build_drain(&v)
-        ).collect()
+        self.loggers
+            .into_iter()
+            .map(|v| builder::build_drain(&v))
+            .collect()
     }
 }
 
@@ -100,9 +101,7 @@ impl Default for LoggerConfig {
             timestamp: TimestampConfig::Local,
             level: ::slog::Level::Info,
         };
-        LoggerConfig {
-            loggers: vec![LoggerOption::Stderr(cfg)]
-        }
+        LoggerConfig { loggers: vec![LoggerOption::Stderr(cfg)] }
     }
 }
 
@@ -131,7 +130,7 @@ impl FromStr for ColorConfig {
             "always" => ColorConfig::Always,
             "auto" => ColorConfig::Auto,
             "none" => ColorConfig::None,
-            _ => return Err(())
+            _ => return Err(()),
         };
         Ok(val)
     }
@@ -148,10 +147,10 @@ pub(crate) enum TimestampConfig {
 impl Display for TimestampConfig {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let s = match *self {
-            TimestampConfig::Utc   => "utc",
+            TimestampConfig::Utc => "utc",
             TimestampConfig::Local => "local",
             TimestampConfig::Ticks => "ticks",
-            TimestampConfig::None  => "none",
+            TimestampConfig::None => "none",
         };
         write!(f, "{}", s)
     }
@@ -161,11 +160,11 @@ impl FromStr for TimestampConfig {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let val = match s {
-            "utc"   => TimestampConfig::Utc,
+            "utc" => TimestampConfig::Utc,
             "local" => TimestampConfig::Local,
             "ticks" => TimestampConfig::Ticks,
-            "none"  => TimestampConfig::None,
-            _ => return Err(())
+            "none" => TimestampConfig::None,
+            _ => return Err(()),
         };
         Ok(val)
     }
@@ -181,9 +180,9 @@ pub(crate) enum FormatConfig {
 impl Display for FormatConfig {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let s = match *self {
-            FormatConfig::Json    => "json",
+            FormatConfig::Json => "json",
             FormatConfig::Compact => "compact",
-            FormatConfig::Full    => "full",
+            FormatConfig::Full => "full",
         };
         write!(f, "{}", s)
     }
@@ -193,10 +192,10 @@ impl FromStr for FormatConfig {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let val = match s {
-            "json"    => FormatConfig::Json,
+            "json" => FormatConfig::Json,
             "compact" => FormatConfig::Compact,
-            "full"    => FormatConfig::Full,
-            _ => return Err(())
+            "full" => FormatConfig::Full,
+            _ => return Err(()),
         };
         Ok(val)
     }
@@ -223,35 +222,40 @@ impl OutputConfig {
     }
     fn from_map(map: BTreeMap<String, String>) -> OutputConfig {
         OutputConfig {
-            format: map.get("format").map(|s|s.parse())
-                                     .unwrap_or(Ok(FormatConfig::Compact))
-                                     .unwrap_or(FormatConfig::Compact),
-            color: map.get("color").map(|s|s.parse())
-                                    .unwrap_or(Ok(ColorConfig::Auto))
-                                    .unwrap_or(ColorConfig::Auto),
-            timestamp: map.get("timestamp").map(|s|s.parse())
-                                            .unwrap_or(Ok(TimestampConfig::Local))
-                                            .unwrap_or(TimestampConfig::Local),
-            level: map.get("level").map(|s|s.parse())
-                                    .unwrap_or(Ok(::slog::Level::Info))
-                                    .unwrap_or(::slog::Level::Info),
+            format: map.get("format")
+                .map(|s| s.parse())
+                .unwrap_or(Ok(FormatConfig::Compact))
+                .unwrap_or(FormatConfig::Compact),
+            color: map.get("color")
+                .map(|s| s.parse())
+                .unwrap_or(Ok(ColorConfig::Auto))
+                .unwrap_or(ColorConfig::Auto),
+            timestamp: map.get("timestamp")
+                .map(|s| s.parse())
+                .unwrap_or(Ok(TimestampConfig::Local))
+                .unwrap_or(TimestampConfig::Local),
+            level: map.get("level")
+                .map(|s| s.parse())
+                .unwrap_or(Ok(::slog::Level::Info))
+                .unwrap_or(::slog::Level::Info),
         }
     }
 }
 
 impl Serialize for OutputConfig {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
+    where
+        S: Serializer,
     {
         let map = self.to_map();
         map.serialize(serializer)
     }
 }
 
-impl<'de> Deserialize<'de> for OutputConfig
-{
+impl<'de> Deserialize<'de> for OutputConfig {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer<'de>
+    where
+        D: Deserializer<'de>,
     {
         let map: BTreeMap<String, String> = Deserialize::deserialize(deserializer)?;
         Ok(Self::from_map(map))
@@ -262,45 +266,44 @@ impl<'de> Deserialize<'de> for OutputConfig
 pub(crate) enum LoggerOption {
     Stdout(OutputConfig),
     Stderr(OutputConfig),
-    File(String, OutputConfig)
+    File(String, OutputConfig),
 }
 
 impl Serialize for LoggerConfig {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
+    where
+        S: Serializer,
     {
-        let map: BTreeMap<String, BTreeMap<&'static str, String>> =
-        self.loggers.iter().map(|i|
-        {
-            let (n, o) = match *i {
-                LoggerOption::Stdout(ref o) => ("stdout".to_string(), o),
-                LoggerOption::Stderr(ref o) => ("stderr".to_string(), o),
-                LoggerOption::File(ref name, ref o) => (name.to_string(), o),
-            };
-            (n, o.to_map())
-        }).collect();
+        let map: BTreeMap<String, BTreeMap<&'static str, String>> = self.loggers
+            .iter()
+            .map(|i| {
+                let (n, o) = match *i {
+                    LoggerOption::Stdout(ref o) => ("stdout".to_string(), o),
+                    LoggerOption::Stderr(ref o) => ("stderr".to_string(), o),
+                    LoggerOption::File(ref name, ref o) => (name.to_string(), o),
+                };
+                (n, o.to_map())
+            })
+            .collect();
         map.serialize(serializer)
     }
 }
 
 
-impl<'de> Deserialize<'de> for LoggerConfig
-{
+impl<'de> Deserialize<'de> for LoggerConfig {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer<'de>
+    where
+        D: Deserializer<'de>,
     {
-        let map: BTreeMap<String, BTreeMap<String, String>>
-            = Deserialize::deserialize(deserializer)?;
-        let loggers = map.into_iter().map(|(name, config)|{
-            match name.as_str() {
-                "stdout" => LoggerOption::Stdout(OutputConfig::from_map(config) ),
-                "stderr" => LoggerOption::Stderr(OutputConfig::from_map(config) ),
-                _ => LoggerOption::File( name, OutputConfig::from_map(config) )
-            }
-        }).collect();
-        Ok(LoggerConfig {
-            loggers
-        })
+        let map: BTreeMap<String, BTreeMap<String, String>> =
+            Deserialize::deserialize(deserializer)?;
+        let loggers = map.into_iter()
+            .map(|(name, config)| match name.as_str() {
+                "stdout" => LoggerOption::Stdout(OutputConfig::from_map(config)),
+                "stderr" => LoggerOption::Stderr(OutputConfig::from_map(config)),
+                _ => LoggerOption::File(name, OutputConfig::from_map(config)),
+            })
+            .collect();
+        Ok(LoggerConfig { loggers })
     }
 }
-

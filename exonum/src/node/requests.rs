@@ -27,8 +27,10 @@ use super::NodeHandler;
 impl NodeHandler {
     /// Validates request, then redirects it to the corresponding `handle_...` function.
     pub fn handle_request(&mut self, message: RequestMessage) {
-        let peer_logger = Logger::root_typed(self.consensus_logger().to_erased(),
-                                       o!("peer_public_key" => format!("{:?}", message.from())));
+        let peer_logger = Logger::root_typed(
+            self.consensus_logger().to_erased(),
+            o!("peer_public_key" => format!("{:?}", message.from())),
+        );
         // Request are sended to us
         if message.to() != self.state.consensus_public_key() {
             error!(peer_logger,
@@ -77,9 +79,11 @@ impl NodeHandler {
 
         if let Some(propose) = propose {
             self.send_to_peer(*msg.from(), &propose);
-        }
-        else {
-            warn!(self.consensus_logger(), "Received propose request with unknown propose hash.");
+        } else {
+            warn!(
+                self.consensus_logger(),
+                "Received propose request with unknown propose hash."
+            );
         }
     }
 
@@ -100,9 +104,11 @@ impl NodeHandler {
 
             if let Some(tx) = tx {
                 self.send_to_peer(*msg.from(), &tx);
-            }
-            else {
-                warn!(self.consensus_logger(), "Received transaction request with unknown tx hash.");
+            } else {
+                warn!(
+                    self.consensus_logger(),
+                    "Received transaction request with unknown tx hash."
+                );
             }
         }
     }
@@ -124,8 +130,11 @@ impl NodeHandler {
             .map(|p| p.raw().clone())
             .collect::<Vec<_>>();
 
-        if prevotes.len() == 0 {
-            warn!(msg_logger, "Received prevotes request with unknown propose hash.");
+        if prevotes.is_empty() {
+            warn!(
+                msg_logger,
+                "Received prevotes request with unknown propose hash."
+            );
         }
 
         for prevote in &prevotes {
@@ -136,9 +145,7 @@ impl NodeHandler {
     /// Handles `BlockRequest` message. For details see the message documentation.
     pub fn handle_request_block(&mut self, msg: &BlockRequest) {
         let msg_logger = msg.logger(self.consensus_logger());
-        trace!(msg_logger,
-            "Handle block request"
-        );
+        trace!(msg_logger, "Handle block request");
         if msg.height() >= self.state.height() {
             return;
         }

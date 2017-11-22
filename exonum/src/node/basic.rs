@@ -43,7 +43,11 @@ impl NodeHandler {
             Ok(Any::Block(msg)) => self.handle_block(&msg),
             Ok(Any::Transaction(msg)) => self.handle_tx(msg),
             Err(err) => {
-                error!(self.network_logger(), "Invalid message received: {:?}", err.description());
+                error!(
+                    self.network_logger(),
+                    "Invalid message received: {:?}",
+                    err.description()
+                );
             }
         }
     }
@@ -80,8 +84,10 @@ impl NodeHandler {
         let address = message.addr();
         let peer_logger = message.logger(self.network_logger());
         if address == self.state.our_connect_message().addr() {
-            trace!(peer_logger,
-                   "Received Connect with same address as our external_address.");
+            trace!(
+                peer_logger,
+                "Received Connect with same address as our external_address."
+            );
             return;
         }
 
@@ -143,9 +149,7 @@ impl NodeHandler {
         let height = self.state.height();
 
         let peer_logger = message.logger(self.consensus_logger());
-        trace!(peer_logger,
-            "Handle status."
-        );
+        trace!(peer_logger, "Handle status.");
 
         if !self.state.whitelist().allow(message.from()) {
             error!(peer_logger,

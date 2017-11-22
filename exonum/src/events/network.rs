@@ -211,7 +211,11 @@ impl ConnectionsPool {
 }
 
 impl NetworkPart {
-    pub fn run(self, handle: &Handle, logger: Logger<ExonumLogger>) -> Box<Future<Item = (), Error = io::Error>> {
+    pub fn run(
+        self,
+        handle: &Handle,
+        logger: Logger<ExonumLogger>,
+    ) -> Box<Future<Item = (), Error = io::Error>> {
         let network_config = self.network_config;
         // Cancelation token
         let (cancel_sender, cancel_handler) = unsync::oneshot::channel();

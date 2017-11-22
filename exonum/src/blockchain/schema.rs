@@ -172,8 +172,7 @@ where
     pub fn actual_configuration(&self) -> StoredConfiguration {
         let current_height = self.current_height();
         let res = self.configuration_by_height(current_height);
-        ::slog_scope::with_logger(|l|
-            trace!(l, "Retrieved actual_config: {:?}", res));
+        ::slog_scope::with_logger(|l| trace!(l, "Retrieved actual_config: {:?}", res));
         res
     }
 

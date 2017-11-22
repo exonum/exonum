@@ -423,9 +423,12 @@ impl State {
             propose_timeout: 0,
             config: stored,
             root_logger: logger.clone(),
-            consensus_logger: Logger::root(logger, o!("module" => "consensus",
+            consensus_logger: Logger::root(
+                logger,
+                o!("module" => "consensus",
                 "height" => last_height.to_string(),
-                "round" => Round::first().to_string() )),
+                "round" => Round::first().to_string() ),
+            ),
         }
     }
 
@@ -778,7 +781,8 @@ impl State {
         let tx_pool_len = self.transactions.read().expect("Expected read lock").len();
         if tx_pool_len >= self.tx_pool_capacity {
             // but make warn about pool exceeded, even if we should add tx
-            warn!(self.consensus_logger,
+            warn!(
+                self.consensus_logger,
                 "Too many transactions in pool, txs={}, high_priority={}",
                 tx_pool_len,
                 high_priority_tx

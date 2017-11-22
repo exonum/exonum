@@ -32,18 +32,14 @@ impl NodeHandler {
         trace!(msg_logger, "Handle message"; "message" => ?msg);
         // Ignore messages from previous and future height
         if msg.height() < self.state.height() || msg.height() > self.state.height().next() {
-            warn!(msg_logger,
-                  "Received consensus message from other height"
-            );
+            warn!(msg_logger, "Received consensus message from other height");
             return;
         }
 
         // Queued messages from next height or round
         // TODO: shoud we ignore messages from far rounds (ECR-171)?
         if msg.height() == self.state.height().next() || msg.round() > self.state.round() {
-            trace!(msg_logger,
-                "Received consensus message from future round"
-            );
+            trace!(msg_logger, "Received consensus message from future round");
             self.state.add_queued(msg);
             return;
         }
@@ -322,11 +318,12 @@ impl NodeHandler {
         // Remove request info
         self.remove_request(&RequestData::Prevotes(prevote_round, *propose_hash));
         // Lock to propose
-        let locked = if self.state.locked_round() < prevote_round && self.state.propose(propose_hash).is_some() {
+        let locked = if self.state.locked_round() < prevote_round &&
+            self.state.propose(propose_hash).is_some()
+        {
             self.lock(prevote_round, *propose_hash);
             true
-        }
-        else {
+        } else {
             false
         };
 
@@ -615,8 +612,7 @@ impl NodeHandler {
             return;
         }
 
-        warn!(self.consensus_logger(),
-              "Handle round timeout");
+        warn!(self.consensus_logger(), "Handle round timeout");
 
         // Update state to new round
         self.state.new_round();
@@ -658,8 +654,7 @@ impl NodeHandler {
         if self.state.locked_propose().is_some() {
             return;
         }
-        warn!(self.consensus_logger(),
-              "Handle propose timeout");
+        warn!(self.consensus_logger(), "Handle propose timeout");
         if let Some(validator_id) = self.state.validator_id() {
             if self.state.have_prevote(round) {
                 return;
@@ -902,7 +897,10 @@ impl NodeHandler {
             self.state.consensus_secret_key(),
         );
         self.state.add_precommit(&precommit);
-        trace!(precommit.logger(self.consensus_logger()), "Broadcast precommit");
+        trace!(
+            precommit.logger(self.consensus_logger()),
+            "Broadcast precommit"
+        );
         self.broadcast(&precommit);
     }
 

@@ -70,5 +70,3 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
         })
         .collect::<Vec<_>>()
 }
-
-

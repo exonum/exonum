@@ -250,7 +250,9 @@ impl Blockchain {
                         }
                         fork.rollback();
                         // TODO: Return error instead of logging.
-                        ::slog_scope::with_logger(|l| error!(l, "{:?} transaction execution failed: {:?}", tx, err));
+                        ::slog_scope::with_logger(|l| {
+                            error!(l, "{:?} transaction execution failed: {:?}", tx, err)
+                        });
                     }
                 }
 
@@ -311,8 +313,7 @@ impl Blockchain {
                 &tx_hash,
                 &state_hash,
             );
-            ::slog_scope::with_logger(|l|
-                trace!(l, "execute block = {:?}", block));
+            ::slog_scope::with_logger(|l| trace!(l, "execute block = {:?}", block));
             // Eval block hash
             let block_hash = block.hash();
             // Update height

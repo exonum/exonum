@@ -14,17 +14,16 @@
 
 
 //! Some logging related stuff
-use slog::{OwnedKVList, Record, Drain, Logger,
-           SendSyncUnwindSafeDrain, SendSyncRefUnwindSafeDrain, Never};
+use slog::{OwnedKVList, Record, Drain, Logger, SendSyncUnwindSafeDrain,
+           SendSyncRefUnwindSafeDrain, Never};
 use slog_async::Async;
 use slog_scope::{GlobalLoggerGuard, set_global_logger};
 use std::iter::FromIterator;
 use std::cell::Cell;
-use std::sync::{Arc};
+use std::sync::Arc;
 
-use messages::{Connect, Propose, Prevote, Precommit, PrevotesRequest,
-               BlockResponse, Status, ProposeRequest, TransactionsRequest,
-                        PeersRequest, BlockRequest, ConsensusMessage};
+use messages::{Connect, Propose, Prevote, Precommit, PrevotesRequest, BlockResponse, Status,
+               ProposeRequest, TransactionsRequest, PeersRequest, BlockRequest, ConsensusMessage};
 
 pub use self::config::LoggerConfig;
 
@@ -38,37 +37,33 @@ pub(crate) type ExonumLogger = Arc<SendSyncRefUnwindSafeDrain<Ok = (), Err = Nev
 pub(crate) fn init_logger(logger_config: LoggerConfig) -> ExonumLogger {
     let async = Async::new(logger_config.into_multi_logger()).build().fuse();
     let ret = Arc::new(async);
-    let logger_cloned = ret.clone();
+    let logger_cloned = Arc::clone(&ret);
 
-    GLOBAL_LOGGER.with(|v|
-        v.set(Some(set_global_logger(Logger::root_typed(logger_cloned, o!("module" => "global"))))
-        ));
+    GLOBAL_LOGGER.with(|v| {
+        v.set(Some(set_global_logger(
+            Logger::root_typed(logger_cloned, o!("module" => "global")),
+        )))
+    });
     ret
 }
 
 pub(crate) struct MultipleDrain {
-    drains: Vec<Box<Drain<Ok = (), Err = Never>+ Send >>
+    drains: Vec<Box<Drain<Ok = (), Err = Never> + Send>>,
 }
 
 impl FromIterator<Box<Drain<Ok = (), Err = Never> + Send>> for MultipleDrain {
     fn from_iter<T>(iter: T) -> Self
     where
-    T: IntoIterator<Item = Box<Drain<Ok = (), Err = Never> + Send>>
+        T: IntoIterator<Item = Box<Drain<Ok = (), Err = Never> + Send>>,
     {
-        MultipleDrain {
-            drains: iter.into_iter().collect(),
-        }
+        MultipleDrain { drains: iter.into_iter().collect() }
     }
 }
 
 impl Drain for MultipleDrain {
     type Ok = ();
     type Err = Never;
-    fn log(
-        &self,
-        record: &Record,
-        logger_values: &OwnedKVList,
-    ) -> Result<Self::Ok, Self::Err> {
+    fn log(&self, record: &Record, logger_values: &OwnedKVList) -> Result<Self::Ok, Self::Err> {
         for drain in &self.drains {
             drop(drain.log(record, logger_values));
         }
@@ -90,160 +85,239 @@ where L: SendSyncUnwindSafeDrain<Ok = (), Err = Never> + Clone + 'static
 use slog::SingleKV;
 
 impl<L> ExtContextLogger<L> for Connect
-where L: SendSyncUnwindSafeDrain<Ok = (), Err = Never> + Clone + 'static
+where
+    L: SendSyncUnwindSafeDrain<Ok = (), Err = Never>
+        + Clone
+        + 'static,
 {
     type Logger = Logger<L>;
     fn logger(&self, root_logger: &L) -> Self::Logger {
-        Logger::root_typed(root_logger.clone(),
-                     o!(SingleKV("msg_type", "connect"),
-                        SingleKV("msg_public_key", format!("{:?}", self.pub_key())),
-                        SingleKV("msg_address", format!("{}", self.addr()))
-                        ))
+        Logger::root_typed(
+            root_logger.clone(),
+            o!(
+                SingleKV("msg_type", "connect"),
+                SingleKV("msg_public_key", format!("{:?}", self.pub_key())),
+                SingleKV("msg_address", format!("{}", self.addr()))
+            ),
+        )
     }
 }
 
 impl<L> ExtContextLogger<L> for Propose
-    where L: SendSyncUnwindSafeDrain<Ok = (), Err = Never> + Clone + 'static
+where
+    L: SendSyncUnwindSafeDrain<Ok = (), Err = Never>
+        + Clone
+        + 'static,
 {
     type Logger = Logger<L>;
     fn logger(&self, root_logger: &L) -> Self::Logger {
-        Logger::root_typed(root_logger.clone(),
-                     o!(SingleKV("msg_type", "propose"),
-                        SingleKV("msg_validator", format!("{}", self.validator())),
-                        SingleKV("msg_height", format!("{}", self.height())),
-                        SingleKV("msg_round", format!("{}", self.round()))
-                        ))
+        Logger::root_typed(
+            root_logger.clone(),
+            o!(
+                SingleKV("msg_type", "propose"),
+                SingleKV("msg_validator", format!("{}", self.validator())),
+                SingleKV("msg_height", format!("{}", self.height())),
+                SingleKV("msg_round", format!("{}", self.round()))
+            ),
+        )
     }
 }
 
 impl<L> ExtContextLogger<L> for Prevote
-    where L: SendSyncUnwindSafeDrain<Ok = (), Err = Never> + Clone + 'static
+where
+    L: SendSyncUnwindSafeDrain<Ok = (), Err = Never>
+        + Clone
+        + 'static,
 {
     type Logger = Logger<L>;
     fn logger(&self, root_logger: &L) -> Self::Logger {
-        Logger::root_typed(root_logger.clone(),
-                     o!(SingleKV("msg_type", "prevote"),
-                        SingleKV("msg_validator", format!("{}", self.validator())),
-                        SingleKV("msg_height", format!("{}", self.height())),
-                        SingleKV("msg_round", format!("{}", self.round())),
-                        SingleKV("msg_locked_round", format!("{}", self.locked_round()))
-        ))
+        Logger::root_typed(
+            root_logger.clone(),
+            o!(
+                SingleKV("msg_type", "prevote"),
+                SingleKV("msg_validator", format!("{}", self.validator())),
+                SingleKV("msg_height", format!("{}", self.height())),
+                SingleKV("msg_round", format!("{}", self.round())),
+                SingleKV("msg_locked_round", format!("{}", self.locked_round()))
+            ),
+        )
     }
 }
 
 impl<L> ExtContextLogger<L> for Precommit
-    where L: SendSyncUnwindSafeDrain<Ok = (), Err = Never> + Clone + 'static
+where
+    L: SendSyncUnwindSafeDrain<Ok = (), Err = Never>
+        + Clone
+        + 'static,
 {
     type Logger = Logger<L>;
     fn logger(&self, root_logger: &L) -> Self::Logger {
-        Logger::root_typed(root_logger.clone(),
-                     o!(SingleKV("msg_type","precommit"),
-                        SingleKV("msg_validator_id", format!("{}", self.validator())),
-                        SingleKV("msg_height", format!("{}", self.height())),
-                        SingleKV("msg_round", format!("{}", self.round()))))
+        Logger::root_typed(
+            root_logger.clone(),
+            o!(
+                SingleKV("msg_type", "precommit"),
+                SingleKV("msg_validator_id", format!("{}", self.validator())),
+                SingleKV("msg_height", format!("{}", self.height())),
+                SingleKV("msg_round", format!("{}", self.round()))
+            ),
+        )
     }
 }
 
 impl<L> ExtContextLogger<L> for Status
-    where L: SendSyncUnwindSafeDrain<Ok = (), Err = Never> + Clone + 'static
+where
+    L: SendSyncUnwindSafeDrain<Ok = (), Err = Never>
+        + Clone
+        + 'static,
 {
     type Logger = Logger<L>;
     fn logger(&self, root_logger: &L) -> Self::Logger {
-        Logger::root_typed(root_logger.clone(),
-                     o!(SingleKV("msg_type", "status"),
-                        SingleKV("msg_public_key", format!("{:?}", self.from())),
-                        SingleKV("msg_height", format!("{}", self.height()))))
+        Logger::root_typed(
+            root_logger.clone(),
+            o!(
+                SingleKV("msg_type", "status"),
+                SingleKV("msg_public_key", format!("{:?}", self.from())),
+                SingleKV("msg_height", format!("{}", self.height()))
+            ),
+        )
     }
 }
 
 impl<L> ExtContextLogger<L> for ProposeRequest
-    where L: SendSyncUnwindSafeDrain<Ok = (), Err = Never> + Clone + 'static
+where
+    L: SendSyncUnwindSafeDrain<Ok = (), Err = Never>
+        + Clone
+        + 'static,
 {
     type Logger = Logger<L>;
     fn logger(&self, root_logger: &L) -> Self::Logger {
-        Logger::root_typed(root_logger.clone(),
-                     o!(SingleKV("msg_type", "propose_request"),
-                        SingleKV("msg_public_key", format!("{:?}", self.from())),
-                        SingleKV("msg_height", format!("{}", self.height()))))
+        Logger::root_typed(
+            root_logger.clone(),
+            o!(
+                SingleKV("msg_type", "propose_request"),
+                SingleKV("msg_public_key", format!("{:?}", self.from())),
+                SingleKV("msg_height", format!("{}", self.height()))
+            ),
+        )
     }
 }
 
 impl<L> ExtContextLogger<L> for TransactionsRequest
-    where L: SendSyncUnwindSafeDrain<Ok = (), Err = Never> + Clone + 'static
+where
+    L: SendSyncUnwindSafeDrain<Ok = (), Err = Never>
+        + Clone
+        + 'static,
 {
     type Logger = Logger<L>;
     fn logger(&self, root_logger: &L) -> Self::Logger {
-        Logger::root_typed(root_logger.clone(),
-                     o!(SingleKV("msg_type", "transaction_request"),
-                        SingleKV("msg_public_key", format!("{:?}", self.from())),
-                        SingleKV("msg_to", format!("{:?}", self.to()))))
+        Logger::root_typed(
+            root_logger.clone(),
+            o!(
+                SingleKV("msg_type", "transaction_request"),
+                SingleKV("msg_public_key", format!("{:?}", self.from())),
+                SingleKV("msg_to", format!("{:?}", self.to()))
+            ),
+        )
     }
 }
 
 impl<L> ExtContextLogger<L> for PrevotesRequest
-    where L: SendSyncUnwindSafeDrain<Ok = (), Err = Never> + Clone + 'static
+where
+    L: SendSyncUnwindSafeDrain<Ok = (), Err = Never>
+        + Clone
+        + 'static,
 {
     type Logger = Logger<L>;
     fn logger(&self, root_logger: &L) -> Self::Logger {
-        Logger::root_typed(root_logger.clone(),
-                     o!(SingleKV("msg_type",  "transaction_request"),
-                        SingleKV("msg_public_key", format!("{:?}", self.from())),
-                        SingleKV("msg_to", format!("{:?}", self.to())),
-                        SingleKV("msg_height", format!("{}", self.height())),
-                        SingleKV("msg_round", format!("{}", self.round()))))
+        Logger::root_typed(
+            root_logger.clone(),
+            o!(
+                SingleKV("msg_type", "transaction_request"),
+                SingleKV("msg_public_key", format!("{:?}", self.from())),
+                SingleKV("msg_to", format!("{:?}", self.to())),
+                SingleKV("msg_height", format!("{}", self.height())),
+                SingleKV("msg_round", format!("{}", self.round()))
+            ),
+        )
     }
 }
 
 impl<L> ExtContextLogger<L> for PeersRequest
-    where L: SendSyncUnwindSafeDrain<Ok = (), Err = Never> + Clone + 'static
+where
+    L: SendSyncUnwindSafeDrain<Ok = (), Err = Never>
+        + Clone
+        + 'static,
 {
     type Logger = Logger<L>;
     fn logger(&self, root_logger: &L) -> Self::Logger {
 
-        Logger::root_typed(root_logger.clone(),
-                     o!(SingleKV("msg_type", format!("{:?}", "peers_request")),
-                        SingleKV("msg_public_key", format!("{:?}", self.from())),
-                        SingleKV("msg_to", format!("{:?}", self.to()))))
+        Logger::root_typed(
+            root_logger.clone(),
+            o!(
+                SingleKV("msg_type", format!("{:?}", "peers_request")),
+                SingleKV("msg_public_key", format!("{:?}", self.from())),
+                SingleKV("msg_to", format!("{:?}", self.to()))
+            ),
+        )
     }
 }
 
 impl<L> ExtContextLogger<L> for BlockRequest
-    where L: SendSyncUnwindSafeDrain<Ok = (), Err = Never> + Clone + 'static
+where
+    L: SendSyncUnwindSafeDrain<Ok = (), Err = Never>
+        + Clone
+        + 'static,
 {
     type Logger = Logger<L>;
     fn logger(&self, root_logger: &L) -> Self::Logger {
-        Logger::root_typed(root_logger.clone(),
-                           o!(SingleKV("msg_type", "block_request"),
-                            SingleKV("msg_public_key", format!("{:?}", self.from())),
-                            SingleKV("msg_to", format!("{:?}", self.to())),
-                            SingleKV("msg_height", format!("{}", self.height()))))
-        }
+        Logger::root_typed(
+            root_logger.clone(),
+            o!(
+                SingleKV("msg_type", "block_request"),
+                SingleKV("msg_public_key", format!("{:?}", self.from())),
+                SingleKV("msg_to", format!("{:?}", self.to())),
+                SingleKV("msg_height", format!("{}", self.height()))
+            ),
+        )
+    }
 }
 
 impl<L> ExtContextLogger<L> for BlockResponse
-    where L: SendSyncUnwindSafeDrain<Ok = (), Err = Never> + Clone + 'static
+where
+    L: SendSyncUnwindSafeDrain<Ok = (), Err = Never>
+        + Clone
+        + 'static,
 {
     type Logger = Logger<L>;
     fn logger(&self, root_logger: &L) -> Self::Logger {
-        Logger::root_typed(root_logger.clone(),
-                           o!(SingleKV("msg_type",  "block_response"),
-                            SingleKV("msg_public_key", format!("{:?}",self.from())),
-                            SingleKV("msg_to", format!("{:?}", self.to())),
-                            SingleKV("msg_height", format!("{}", self.block().height()))))
+        Logger::root_typed(
+            root_logger.clone(),
+            o!(
+                SingleKV("msg_type", "block_response"),
+                SingleKV("msg_public_key", format!("{:?}", self.from())),
+                SingleKV("msg_to", format!("{:?}", self.to())),
+                SingleKV("msg_height", format!("{}", self.block().height()))
+            ),
+        )
     }
 }
 
 impl<L> ExtContextLogger<L> for ConsensusMessage
-    where L: SendSyncUnwindSafeDrain<Ok = (), Err = Never> + Clone + 'static
+where
+    L: SendSyncUnwindSafeDrain<Ok = (), Err = Never>
+        + Clone
+        + 'static,
 {
     type Logger = Logger<L>;
     fn logger(&self, root_logger: &L) -> Self::Logger {
-        Logger::root_typed(root_logger.clone(),
-                           o!(SingleKV("msg_type", "consensus_message"),
-                            SingleKV("msg_validator", format!("{}", self.validator())),
-                            SingleKV("msg_round", format!("{}", self.round())),
-                            SingleKV("msg_height", format!("{}", self.height()))))
+        Logger::root_typed(
+            root_logger.clone(),
+            o!(
+                SingleKV("msg_type", "consensus_message"),
+                SingleKV("msg_validator", format!("{}", self.validator())),
+                SingleKV("msg_round", format!("{}", self.round())),
+                SingleKV("msg_height", format!("{}", self.height()))
+            ),
+        )
     }
 }
-
-
