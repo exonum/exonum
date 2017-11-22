@@ -40,6 +40,7 @@ use exonum::crypto::gen_keypair;
 use exonum::helpers::{Height, Milliseconds, Round, ValidatorId};
 use exonum::events::{Event, EventHandler, NetworkEvent, NetworkRequest, TimeoutRequest};
 use exonum::events::network::NetworkConfiguration;
+use exonum::logger::StubLogger;
 
 use timestamping::TimestampingService;
 use config_updater::ConfigUpdateService;
@@ -621,6 +622,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
     };
 
     let mut handler = NodeHandler::new(
+        StubLogger::new(),
         blockchain.clone(),
         addresses[0],
         node_sender,

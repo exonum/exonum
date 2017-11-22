@@ -274,11 +274,6 @@ mod tests {
         let mut previous_timeout = adjuster.adjust_timeout_impl(TXS_BLOCK_LIMIT);
         for transactions in TXS_TEST_DATA.iter().rev() {
             let timeout = adjuster.adjust_timeout_impl(*transactions);
-            info!(
-                "Timeout: current = {}, previous = {}",
-                timeout,
-                previous_timeout
-            );
             assert!(timeout >= previous_timeout);
             previous_timeout = timeout;
         }
@@ -292,11 +287,6 @@ mod tests {
         let mut previous_timeout = adjuster.adjust_timeout_impl(0.);
         for transactions in TXS_TEST_DATA {
             let timeout = adjuster.adjust_timeout_impl(*transactions);
-            info!(
-                "Timeout: current = {}, previous = {}",
-                timeout,
-                previous_timeout
-            );
             assert!(timeout <= previous_timeout);
             previous_timeout = timeout;
         }

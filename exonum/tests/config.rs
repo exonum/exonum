@@ -164,7 +164,7 @@ fn test_generate_full_config_run() {
     let command = "finalize";
     let result = panic::catch_unwind(|| {
         for i in 0..PUB_CONFIG.len() {
-            for n in 0..PUB_CONFIG.len() + 1 {
+            for n in 1..PUB_CONFIG.len() + 1 {
                 println!("{} {}", i, n);
                 let config = format!("config{}{}.toml", i, n);
                 let result = panic::catch_unwind(|| {
@@ -173,15 +173,8 @@ fn test_generate_full_config_run() {
                     run_node(&config, command);
                 });
 
-                // if we trying to create config,
-                // without our config, this is a problem
-                if n <= i || n == 0 {
-                    assert!(result.is_err());
-                } else {
-                    assert!(result.is_ok());
-                }
+                assert!(result.is_ok());
             }
-
         }
     });
 

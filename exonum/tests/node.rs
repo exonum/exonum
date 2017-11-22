@@ -31,6 +31,7 @@ use exonum::messages::RawTransaction;
 use exonum::node::Node;
 use exonum::storage::MemoryDB;
 use exonum::helpers;
+use exonum::logger::StubLogger;
 
 struct CommitWatcherService(pub Mutex<Option<oneshot::Sender<()>>>);
 
@@ -61,7 +62,10 @@ fn run_nodes(count: u8) -> (Vec<JoinHandle<()>>, Vec<oneshot::Receiver<()>>) {
         let (commit_tx, commit_rx) = oneshot::channel();
         let node_thread = thread::spawn(move || {
             let service = Box::new(CommitWatcherService(Mutex::new(Some(commit_tx))));
-            let node = Node::new(Box::new(MemoryDB::new()), vec![service], node_cfg);
+            let node = Node::with_logger(Box::new(MemoryDB::new()),
+                                         vec![service],
+                                         node_cfg,
+                                         StubLogger::new());
             node.run().unwrap();
         });
         node_threads.push(node_thread);

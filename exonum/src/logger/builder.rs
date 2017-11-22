@@ -5,7 +5,9 @@ use std::time::SystemTime;
 use std::fs::File;
 use std::io::{self, Write};
 
-use super::config::{LoggerOption, OutputConfig, ColorConfig, TimestampConfig, FormatConfig};
+use super::config::{LoggerOption, OutputConfig, ColorConfig,
+                    LoggingLevel, TimestampConfig, FormatConfig};
+use super::StubLogger;
 
 lazy_static! {
     static ref INIT_TIMER: SystemTime = SystemTime::now();
@@ -52,7 +54,12 @@ fn full_terminal(
         TimestampConfig::Local => format.use_local_timestamp(),
         TimestampConfig::Ticks => format.use_custom_timestamp(tick_timestamp),
     };
-    Box::new(format.build().filter_level(opts.level).fuse())
+    let logger = format.build();
+    match opts.level {
+        LoggingLevel::Env => Box::new(::slog_envlogger::new(logger).fuse()),
+        LoggingLevel::Off => Box::new(StubLogger::new().fuse()),
+        v => Box::new(logger.filter_level(v.into_slog_level().unwrap()).fuse()),
+    }
 }
 
 fn compact_terminal(
@@ -66,7 +73,12 @@ fn compact_terminal(
         TimestampConfig::Local => format.use_local_timestamp(),
         TimestampConfig::Ticks => format.use_custom_timestamp(tick_timestamp),
     };
-    Box::new(format.build().filter_level(opts.level).fuse())
+    let logger = format.build();
+    match opts.level {
+        LoggingLevel::Env => Box::new(::slog_envlogger::new(logger).fuse()),
+        LoggingLevel::Off => Box::new(StubLogger::new().fuse()),
+        v => Box::new(logger.filter_level(v.into_slog_level().unwrap()).fuse()),
+    }
 }
 
 fn make_json<W: io::Write + Send + 'static>(
@@ -100,8 +112,13 @@ fn make_json<W: io::Write + Send + 'static>(
             "level" => FnValue(move |rinfo : &Record| {
                 rinfo.level().as_str()
             }),
-            )).set_newlines(true);
-    Box::new(json.build().filter_level(opts.level).fuse())
+            )).set_newlines(true).build();
+
+    match opts.level {
+        LoggingLevel::Env => Box::new(::slog_envlogger::new(json).fuse()),
+        LoggingLevel::Off => Box::new(StubLogger::new().fuse()),
+        v => Box::new(json.filter_level(v.into_slog_level().unwrap()).fuse()),
+    }
 }
 
 // compatibility layer, for printing time in same format as terminal prints

@@ -20,8 +20,13 @@ status_timeout = 5000
 txs_block_limit = 1000
 
 [genesis.consensus.timeout_adjuster]
-type = "Constant"
 timeout = 500
+type = "Constant"
+[logger.stderr]
+color = "auto"
+format = "full"
+level = "info"
+timestamp = "local"
 
 [mempool]
 tx_pool_capacity = 100000
@@ -35,9 +40,9 @@ timeout_requests_capacity = 128
 [network]
 max_incoming_connections = 128
 max_outgoing_connections = 128
-tcp_nodelay = true
-tcp_connect_retry_timeout = 15000
 tcp_connect_max_retries = 10
+tcp_connect_retry_timeout = 15000
+tcp_nodelay = true
 
 [services_configs]
 

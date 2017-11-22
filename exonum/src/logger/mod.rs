@@ -27,14 +27,19 @@ use messages::{Connect, Propose, Prevote, Precommit, PrevotesRequest, BlockRespo
 
 pub use self::config::LoggerConfig;
 
-thread_local!(static GLOBAL_LOGGER: Cell<Option<GlobalLoggerGuard>> = Cell::new(None););
 mod config;
 mod builder;
-// TODO: replace before merge
-// Stub for future replacement
-pub(crate) type ExonumLogger = Arc<SendSyncRefUnwindSafeDrain<Ok = (), Err = Never>>;
+
+pub type ExonumLogger = Arc<SendSyncRefUnwindSafeDrain<Ok = (), Err = Never>>;
+
+/// Stub logger for tests
+#[derive(Debug)]
+pub struct StubLogger;
+
+thread_local!(static GLOBAL_LOGGER: Cell<Option<GlobalLoggerGuard>> = Cell::new(None););
+
 /// Performs the logger initialization.
-pub(crate) fn init_logger(logger_config: LoggerConfig) -> ExonumLogger {
+pub fn init_logger(logger_config: &LoggerConfig) -> ExonumLogger {
     let async = Async::new(logger_config.into_multi_logger()).build().fuse();
     let ret = Arc::new(async);
     let logger_cloned = Arc::clone(&ret);
@@ -45,6 +50,24 @@ pub(crate) fn init_logger(logger_config: LoggerConfig) -> ExonumLogger {
         )))
     });
     ret
+}
+
+impl StubLogger {
+    pub fn new() -> Logger {
+        Logger::root(StubLogger, o!("module" => "test"))
+    }
+}
+
+impl Drain for StubLogger {
+    type Ok = ();
+    type Err = Never;
+    fn log(
+        &self,
+        _: &Record,
+        _: &OwnedKVList
+    ) -> Result<Self::Ok, Self::Err> {
+    Ok(())
+    }
 }
 
 pub(crate) struct MultipleDrain {

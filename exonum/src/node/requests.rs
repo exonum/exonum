@@ -54,12 +54,12 @@ impl NodeHandler {
             return;
         }
 
-        match msg {
-            RequestMessage::Propose(msg) => self.handle_request_propose(&msg),
-            RequestMessage::Transactions(msg) => self.handle_request_txs(&msg),
-            RequestMessage::Prevotes(msg) => self.handle_request_prevotes(&msg),
-            RequestMessage::Peers(msg) => self.handle_request_peers(&msg),
-            RequestMessage::Block(msg) => self.handle_request_block(&msg),
+        match message {
+            RequestMessage::Propose(message) => self.handle_request_propose(&message),
+            RequestMessage::Transactions(message) => self.handle_request_txs(&message),
+            RequestMessage::Prevotes(message) => self.handle_request_prevotes(&message),
+            RequestMessage::Peers(message) => self.handle_request_peers(&message),
+            RequestMessage::Block(message) => self.handle_request_block(&message),
         }
     }
 

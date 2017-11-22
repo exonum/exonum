@@ -12,9 +12,11 @@ state_update_timeout = 10000
 [[genesis.validator_keys]]
 consensus_key = "16ef83ca4b231404daec6d07b24beb84d89c25944285d2e32a2dcf8f0f3eda72"
 service_key = "523ead8ea8457de570e165a512dd5d1b6688cb5757c3d744e03d1173f3e3e237"
+
 [[genesis.validator_keys]]
 consensus_key = "648e98a2405a40325d946bf8de6937795fe5c22ab095bca765a8b218e49ff5a3"
 service_key = "ed0c18a99cf373b0436376449da688e8150a93083d7b7ecdda3372e7bf70b80a"
+
 [[genesis.validator_keys]]
 consensus_key = "924625eb77b9ad21e76713e7ada715945fbf0a926698832e121484c797fcc58e"
 service_key = "7413a596e4fa0953cf22b120bd1ee0ba233bd1c619f10b21e6854b6b3cc9a6e9"
@@ -26,8 +28,13 @@ status_timeout = 5000
 txs_block_limit = 1000
 
 [genesis.consensus.timeout_adjuster]
-type = "Constant"
 timeout = 500
+type = "Constant"
+[logger.stderr]
+color = "auto"
+format = "full"
+level = "info"
+timestamp = "local"
 
 [mempool]
 tx_pool_capacity = 100000
@@ -41,9 +48,9 @@ timeout_requests_capacity = 128
 [network]
 max_incoming_connections = 128
 max_outgoing_connections = 128
-tcp_nodelay = true
-tcp_connect_retry_timeout = 15000
 tcp_connect_max_retries = 10
+tcp_connect_retry_timeout = 15000
+tcp_nodelay = true
 
 [services_configs]
 

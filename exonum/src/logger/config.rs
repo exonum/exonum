@@ -85,9 +85,9 @@ pub struct LoggerConfig {
 }
 
 impl LoggerConfig {
-    pub(crate) fn into_multi_logger(self) -> MultipleDrain {
+    pub(crate) fn into_multi_logger(&self) -> MultipleDrain {
         self.loggers
-            .into_iter()
+            .iter()
             .map(|v| builder::build_drain(&v))
             .collect()
     }
@@ -99,11 +99,76 @@ impl Default for LoggerConfig {
             format: FormatConfig::Full,
             color: ColorConfig::Auto,
             timestamp: TimestampConfig::Local,
-            level: ::slog::Level::Info,
+            level: LoggingLevel::Info,
         };
         LoggerConfig { loggers: vec![LoggerOption::Stderr(cfg)] }
     }
 }
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub(crate) enum LoggingLevel {
+    Crit,
+    Error,
+    Warn,
+    Info,
+    Debug,
+    Trace,
+    Env,
+    Off,
+}
+
+impl LoggingLevel {
+    pub fn into_slog_level(self) -> Option<::slog::Level> {
+        let v = match self {
+            LoggingLevel::Crit  => ::slog::Level::Critical,
+            LoggingLevel::Error => ::slog::Level::Error,
+            LoggingLevel::Warn  => ::slog::Level::Warning,
+            LoggingLevel::Info  => ::slog::Level::Info,
+            LoggingLevel::Debug => ::slog::Level::Debug,
+            LoggingLevel::Trace => ::slog::Level::Trace,
+            LoggingLevel::Env   => return None,
+            LoggingLevel::Off   => return None,
+        };
+        Some(v)
+    }
+}
+
+impl Display for LoggingLevel {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let s = match *self {
+            LoggingLevel::Crit  => "crit",
+            LoggingLevel::Error => "error",
+            LoggingLevel::Warn  => "warn",
+            LoggingLevel::Info  => "info",
+            LoggingLevel::Debug => "debug",
+            LoggingLevel::Trace => "trace",
+            LoggingLevel::Env   => "env",
+            LoggingLevel::Off   => "off",
+
+        };
+        write!(f, "{}", s)
+    }
+}
+
+impl FromStr for LoggingLevel {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let val = match s {
+            "crit"  => LoggingLevel::Crit,
+            "error" => LoggingLevel::Error,
+            "warn"  => LoggingLevel::Warn,
+            "info"  => LoggingLevel::Info,
+            "debug" => LoggingLevel::Debug,
+            "trace" => LoggingLevel::Trace,
+            "env"   => LoggingLevel::Env,
+            "off"   => LoggingLevel::Off,
+            _ => return Err(()),
+        };
+        Ok(val)
+    }
+}
+
+
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub(crate) enum ColorConfig {
@@ -206,7 +271,7 @@ pub(crate) struct OutputConfig {
     pub format: FormatConfig,
     pub color: ColorConfig,
     pub timestamp: TimestampConfig,
-    pub level: ::slog::Level,
+    pub level: LoggingLevel,
 }
 
 impl OutputConfig {
@@ -236,8 +301,8 @@ impl OutputConfig {
                 .unwrap_or(TimestampConfig::Local),
             level: map.get("level")
                 .map(|s| s.parse())
-                .unwrap_or(Ok(::slog::Level::Info))
-                .unwrap_or(::slog::Level::Info),
+                .unwrap_or(Ok(LoggingLevel::Info))
+                .unwrap_or(LoggingLevel::Info),
         }
     }
 }

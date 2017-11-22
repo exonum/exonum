@@ -413,7 +413,6 @@ impl NodeHandler {
 
     /// Handles the `Precommit` message. For details see the message documentation.
     pub fn handle_precommit(&mut self, from: PublicKey, msg: &Precommit) {
-        trace!("Handle precommit");
         let msg_logger = msg.logger(self.consensus_logger());
         trace!(msg_logger, "Handle precommit");
 
@@ -460,7 +459,7 @@ impl NodeHandler {
         "block_hash" => ?block_hash);
 
         // Merge changes into storage
-        let (commited_txs, proposer) = {
+        let (committed_txs, proposer) = {
             // FIXME Avoid of clone here.
             let block_state = self.state.block(&block_hash).unwrap().clone();
             self.blockchain
@@ -490,8 +489,8 @@ impl NodeHandler {
             "block_proposer" => %proposer,
             "block_round" => %round.map(|x| format!("{}", x)).unwrap_or_else(|| "?".into()),
             "tx_committed" => %committed_txs,
-            "mempool_size" =>%mempool_size,
-            "block_hash" =>%block_hash.to_hex(),
+            "mempool_size" => %mempool_size,
+            "block_hash" => %block_hash.to_hex(),
         );
         // Update state to new height
         self.state.new_height(

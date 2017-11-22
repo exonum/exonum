@@ -658,10 +658,12 @@ impl NodeChannel {
 }
 
 impl Node {
-    /// Creates node for the given services and node configuration.
-    pub fn new(db: Box<Database>, services: Vec<Box<Service>>, node_cfg: NodeConfig) -> Self {
+    /// Creates node with specific `logger`.
+    pub fn with_logger(db: Box<Database>, services: Vec<Box<Service>>,
+                       node_cfg: NodeConfig,
+                       logger: Logger<ExonumLogger>) -> Self
+    {
         crypto::init();
-        let logger = Logger::root_typed(::logger::init_logger(node_cfg.logger), o!());
         if cfg!(feature = "flame_profile") {
             ::exonum_profiler::init_handler(
                 ::std::env::var(PROFILE_ENV_VARIABLE_NAME).expect(&format!(
@@ -727,6 +729,11 @@ impl Node {
             channel,
             network_config,
         }
+    }
+    /// Creates node for the given blockchain and node configuration.
+    pub fn new(db: Box<Database>, services: Vec<Box<Service>>, node_cfg: NodeConfig) -> Self {
+        let logger = Logger::root_typed(::logger::init_logger(&node_cfg.logger), o!());
+        Self::with_logger(db, services, node_cfg, logger)
     }
 
     /// Launches only consensus messages handler.

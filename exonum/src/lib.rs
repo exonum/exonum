@@ -29,6 +29,7 @@ extern crate exonum_profiler;
 extern crate slog_term;
 extern crate slog_json;
 extern crate slog_async;
+extern crate slog_envlogger;
 #[macro_use]
 extern crate slog;
 extern crate slog_scope;
@@ -81,4 +82,4 @@ pub mod blockchain;
 pub mod explorer;
 pub mod api;
 
-mod logger;
+pub mod logger;

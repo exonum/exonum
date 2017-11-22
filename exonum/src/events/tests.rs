@@ -27,6 +27,7 @@ use events::{NetworkEvent, NetworkRequest};
 use events::network::{NetworkConfiguration, NetworkPart};
 use events::error::log_error;
 use node::{EventsPoolCapacity, NodeChannel};
+use logger::StubLogger;
 
 #[derive(Debug)]
 pub struct TestHandler {
@@ -144,8 +145,9 @@ impl TestEvents {
         let (mut handler_part, network_part) = self.into_reactor();
         let handle = thread::spawn(move || {
             let mut core = Core::new().unwrap();
-            let fut = network_part.run(&core.handle());
-            core.run(fut).map_err(log_error).unwrap();
+            let logger = StubLogger::new();
+            let fut = network_part.run(&core.handle(), logger.clone());
+            core.run(fut).map_err(|c|log_error(&logger, c)).unwrap();
         });
         handler_part.handle = Some(handle);
         handler_part
