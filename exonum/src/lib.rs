@@ -62,6 +62,7 @@ extern crate tokio_timer;
 extern crate tokio_core;
 extern crate tokio_io;
 extern crate tokio_retry;
+extern crate semver;
 
 #[macro_use]
 pub mod encoding;

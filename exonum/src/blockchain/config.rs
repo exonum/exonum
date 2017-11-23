@@ -16,12 +16,13 @@
 
 use serde::de::Error;
 use serde_json::{self, Error as JsonError};
+use semver::Version;
 
 use std::collections::{BTreeMap, HashSet};
 
 use storage::StorageValue;
 use crypto::{hash, PublicKey, Hash};
-use helpers::{Height, Milliseconds};
+use helpers::{Height, Milliseconds, ServiceId};
 
 /// Public keys of a validator.
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -46,9 +47,8 @@ pub struct StoredConfiguration {
     pub validator_keys: Vec<ValidatorKeys>,
     /// Consensus algorithm parameters.
     pub consensus: ConsensusConfig,
-    /// Services specific variables.
-    /// Keys are `service_name` from `Service` trait and values are the serialized json.
-    pub services: BTreeMap<String, serde_json::Value>,
+    /// Services configuration. See [`ConsensusConfig`](struct.ServiceConfig) for details.
+    pub services: Vec<ServiceConfig>,
 }
 
 /// Consensus algorithm parameters.
@@ -64,6 +64,24 @@ pub struct ConsensusConfig {
     pub txs_block_limit: u32,
     /// `TimeoutAdjuster` configuration.
     pub timeout_adjuster: TimeoutAdjusterConfig,
+}
+
+/// Service configuration.
+pub struct ServiceConfig {
+    /// Service identifier.
+    ///
+    /// Should be unique for the Exonum blockchain instance. Service transactions are identified
+    /// by this `id`, so it should persist even if services are added or removed.
+    pub id: ServiceId,
+    /// Service name.
+    ///
+    /// It is possible to have several services with the same name (and hence with the same type),
+    /// but they should have different `id`.
+    pub name: String,
+    /// Service semantic (see http://semver.org/) version.
+    pub version: Version,
+    /// Service specific data.
+    pub data: serde_json::Value,
 }
 
 impl Default for ConsensusConfig {
