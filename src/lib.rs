@@ -429,7 +429,7 @@ impl TestKit {
         let validator_id = self.network().us().validator_id().expect(
             "Tested node is not a validator",
         );
-        let height = self.current_height();
+        let height = self.height().next();
 
         let (transaction_map, hashes) = {
             let mut transaction_map = BTreeMap::new();
@@ -478,7 +478,7 @@ impl TestKit {
     }
 
     fn do_create_block(&mut self, tx_hashes: &[crypto::Hash]) {
-        let height = self.current_height();
+        let height = self.height().next();
         let last_hash = self.last_block_hash();
 
         self.update_configuration();
@@ -525,7 +525,7 @@ impl TestKit {
     fn update_configuration(&mut self) {
         use ConfigurationProposalState::*;
 
-        let height = self.current_height();
+        let height = self.height().next();
         if let Some(cfg_proposal) = self.cfg_proposal.take() {
             match cfg_proposal {
                 Uncommitted(cfg_proposal) => {
@@ -624,18 +624,12 @@ impl TestKit {
     /// # fn main() {
     /// let mut testkit = TestKitBuilder::validator().create();
     /// testkit.create_blocks_until(Height(5));
-    /// assert_eq!(Height(5), testkit.last_block_height());
-    /// assert_eq!(Height(6), testkit.current_height());
+    /// assert_eq!(Height(5), testkit.height());
     /// # }
     pub fn create_blocks_until(&mut self, height: Height) {
-        while self.current_height() <= height {
+        while self.height() < height {
             self.create_block();
         }
-    }
-
-    /// Returns the current height of the blockchain. Its value is equal to `last_block_height + 1`.
-    pub fn current_height(&self) -> Height {
-        CoreSchema::new(&self.snapshot()).current_height()
     }
 
     /// Returns the hash of latest committed block.
@@ -644,7 +638,7 @@ impl TestKit {
     }
 
     /// Returns the height of latest committed block.
-    pub fn last_block_height(&self) -> Height {
+    pub fn height(&self) -> Height {
         self.blockchain.last_block().height()
     }
 
@@ -708,7 +702,7 @@ impl TestKit {
     /// - If configuration change has been already proposed but not executed.
     pub fn commit_configuration_change(&mut self, proposal: TestNetworkConfiguration) {
         use self::ConfigurationProposalState::*;
-        assert!(self.current_height() < proposal.actual_from());
+        assert!(self.height() < proposal.actual_from());
         assert!(self.cfg_proposal.is_none());
         self.cfg_proposal = Some(Uncommitted(proposal));
     }
@@ -1052,10 +1046,9 @@ impl TestKitApi {
 #[test]
 fn test_create_block_heights() {
     let mut testkit = TestKitBuilder::validator().create();
-    assert_eq!(Height(1), testkit.current_height());
+    assert_eq!(Height(0), testkit.height());
     testkit.create_block();
-    assert_eq!(Height(2), testkit.current_height());
+    assert_eq!(Height(1), testkit.height());
     testkit.create_blocks_until(Height(6));
-    assert_eq!(Height(7), testkit.current_height());
-    assert_eq!(Height(6), testkit.last_block_height());
+    assert_eq!(Height(6), testkit.height());
 }

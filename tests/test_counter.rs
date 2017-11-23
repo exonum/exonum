@@ -317,7 +317,7 @@ fn test_inc_count_with_multiple_transactions() {
         testkit.create_block();
     }
 
-    assert_eq!(testkit.current_height(), Height(101));
+    assert_eq!(testkit.height(), Height(100));
     let counter: u64 = api.get(ApiKind::Service("counter"), "count");
     assert_eq!(counter, 1_000);
 }
