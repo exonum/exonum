@@ -10,12 +10,11 @@ pub struct GreedyFold<S, F, A> {
     exhausted: bool,
 }
 
-impl<S, F, A> fmt::Debug for GreedyFold<S, F, A> 
-{
+impl<S, F, A> fmt::Debug for GreedyFold<S, F, A> {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         f.debug_struct("GreedyFold")
-        .field("exhausted", &self.exhausted)
-        .finish()
+            .field("exhausted", &self.exhausted)
+            .finish()
     }
 }
 

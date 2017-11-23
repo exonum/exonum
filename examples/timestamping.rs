@@ -75,9 +75,7 @@ fn main() {
     let tx2 = TxTimestamp::new(&keypair.0, "Cry Over Spilt Milk", &keypair.1);
     let tx3 = TxTimestamp::new(&keypair.0, "Dropping Like Flies", &keypair.1);
     // Commit them into blockchain.
-    testkit.create_block_with_transactions(txvec![
-        tx1.clone(), tx2.clone(), tx3.clone()
-    ]);
+    testkit.create_block_with_transactions(txvec![tx1.clone(), tx2.clone(), tx3.clone()]);
     // Check results with schema.
     let snapshot = testkit.snapshot();
     let schema = Schema::new(&snapshot);

@@ -1,6 +1,6 @@
 //! Testkit for Exonum blockchain framework, allowing to test service APIs synchronously
 //! and in the same process as the testkit.
-//! 
+//!
 //! # Example
 //! ```
 //! #[macro_use]
