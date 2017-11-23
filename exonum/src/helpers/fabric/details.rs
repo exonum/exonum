@@ -93,7 +93,7 @@ impl Command for Run {
                 true,
                 "Use database with the given path.",
                 "d",
-                "database",
+                "database_path",
                 false
             ),
             Argument::new_named(

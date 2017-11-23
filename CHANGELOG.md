@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - The `Node` constructor now requires `db` and `services` variables instead of `blockchain` instance. (#366)
 - The `Blockchain` constructor now requires services keypair and an `ApiSender` instance. (#366)
 - `mount_*_api` methods in `Blockchain` instance now do not require `ApiContext`. (#366)
+- Replaced `rocksdb` commandline parameter to more generic `database`. (#376)
 
 ### Fixed
 - Fixed `crate_authors!` macro usage, this macro can't return static string in new clap version. (#370)
