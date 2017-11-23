@@ -28,6 +28,7 @@
 //!
 //! [1]: https://github.com/exonum/exonum-doc/blob/master/src/get-started/create-service.md
 
+use slog::Logger;
 use vec_map::VecMap;
 use byteorder::{ByteOrder, LittleEndian};
 use mount::Mount;
@@ -43,6 +44,7 @@ use messages::{CONSENSUS as CORE_SERVICE, Precommit, RawMessage};
 use storage::{Database, Error, Fork, Patch, Snapshot};
 use helpers::{Height, ValidatorId};
 use node::ApiSender;
+use logger::ExonumLogger;
 
 pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
 pub use self::schema::{gen_prefix, Schema, TxLocation};
@@ -67,6 +69,7 @@ pub struct Blockchain {
     service_map: Arc<VecMap<Box<Service>>>,
     service_keypair: (PublicKey, SecretKey),
     api_sender: ApiSender,
+    logger: Logger<ExonumLogger>,
 }
 
 impl Blockchain {
@@ -77,6 +80,7 @@ impl Blockchain {
         service_public_key: PublicKey,
         service_secret_key: SecretKey,
         api_sender: ApiSender,
+        logger: Logger<ExonumLogger>,
     ) -> Blockchain {
         let mut service_map = VecMap::new();
         for service in services {
@@ -95,6 +99,7 @@ impl Blockchain {
             service_map: Arc::new(service_map),
             service_keypair: (service_public_key, service_secret_key),
             api_sender,
+            logger,
         }
     }
 
@@ -250,9 +255,12 @@ impl Blockchain {
                         }
                         fork.rollback();
                         // TODO: Return error instead of logging.
-                        ::slog_scope::with_logger(|l| {
-                            error!(l, "{:?} transaction execution failed: {:?}", tx, err)
-                        });
+                        error!(
+                            self.logger,
+                            "{:?} transaction execution failed: {:?}",
+                            tx,
+                            err
+                        )
                     }
                 }
 
@@ -313,7 +321,7 @@ impl Blockchain {
                 &tx_hash,
                 &state_hash,
             );
-            ::slog_scope::with_logger(|l| trace!(l, "execute block = {:?}", block));
+            trace!(self.logger, "execute block = {:?}", block);
             // Eval block hash
             let block_hash = block.hash();
             // Update height
@@ -363,6 +371,7 @@ impl Blockchain {
             self.service_keypair.1.clone(),
             self.api_sender.clone(),
             self.fork(),
+            self.logger.new(o!()), // TODO: create context for each service?
         );
         // Invokes `handle_commit` for each service in order of their identifiers
         for service in self.service_map.values() {
@@ -418,6 +427,7 @@ impl Clone for Blockchain {
             service_map: Arc::clone(&self.service_map),
             api_sender: self.api_sender.clone(),
             service_keypair: self.service_keypair.clone(),
+            logger: self.logger.clone(),
         }
     }
 }

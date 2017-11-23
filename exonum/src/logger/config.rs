@@ -120,14 +120,14 @@ pub(crate) enum LoggingLevel {
 impl LoggingLevel {
     pub fn into_slog_level(self) -> Option<::slog::Level> {
         let v = match self {
-            LoggingLevel::Crit  => ::slog::Level::Critical,
+            LoggingLevel::Crit => ::slog::Level::Critical,
             LoggingLevel::Error => ::slog::Level::Error,
-            LoggingLevel::Warn  => ::slog::Level::Warning,
-            LoggingLevel::Info  => ::slog::Level::Info,
+            LoggingLevel::Warn => ::slog::Level::Warning,
+            LoggingLevel::Info => ::slog::Level::Info,
             LoggingLevel::Debug => ::slog::Level::Debug,
             LoggingLevel::Trace => ::slog::Level::Trace,
-            LoggingLevel::Env   => return None,
-            LoggingLevel::Off   => return None,
+            LoggingLevel::Env => return None,
+            LoggingLevel::Off => return None,
         };
         Some(v)
     }
@@ -136,14 +136,14 @@ impl LoggingLevel {
 impl Display for LoggingLevel {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let s = match *self {
-            LoggingLevel::Crit  => "crit",
+            LoggingLevel::Crit => "crit",
             LoggingLevel::Error => "error",
-            LoggingLevel::Warn  => "warn",
-            LoggingLevel::Info  => "info",
+            LoggingLevel::Warn => "warn",
+            LoggingLevel::Info => "info",
             LoggingLevel::Debug => "debug",
             LoggingLevel::Trace => "trace",
-            LoggingLevel::Env   => "env",
-            LoggingLevel::Off   => "off",
+            LoggingLevel::Env => "env",
+            LoggingLevel::Off => "off",
 
         };
         write!(f, "{}", s)
@@ -154,14 +154,14 @@ impl FromStr for LoggingLevel {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let val = match s {
-            "crit"  => LoggingLevel::Crit,
+            "crit" => LoggingLevel::Crit,
             "error" => LoggingLevel::Error,
-            "warn"  => LoggingLevel::Warn,
-            "info"  => LoggingLevel::Info,
+            "warn" => LoggingLevel::Warn,
+            "info" => LoggingLevel::Info,
             "debug" => LoggingLevel::Debug,
             "trace" => LoggingLevel::Trace,
-            "env"   => LoggingLevel::Env,
-            "off"   => LoggingLevel::Off,
+            "env" => LoggingLevel::Env,
+            "off" => LoggingLevel::Off,
             _ => return Err(()),
         };
         Ok(val)

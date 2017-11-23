@@ -62,10 +62,12 @@ fn run_nodes(count: u8) -> (Vec<JoinHandle<()>>, Vec<oneshot::Receiver<()>>) {
         let (commit_tx, commit_rx) = oneshot::channel();
         let node_thread = thread::spawn(move || {
             let service = Box::new(CommitWatcherService(Mutex::new(Some(commit_tx))));
-            let node = Node::with_logger(Box::new(MemoryDB::new()),
-                                         vec![service],
-                                         node_cfg,
-                                         StubLogger::new());
+            let node = Node::with_logger(
+                Box::new(MemoryDB::new()),
+                vec![service],
+                node_cfg,
+                StubLogger::new(),
+            );
             node.run().unwrap();
         });
         node_threads.push(node_thread);

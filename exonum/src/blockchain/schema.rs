@@ -376,11 +376,12 @@ impl<'a> Schema<&'a mut Fork> {
             }
         }
 
-        ::slog_scope::with_logger(|l|
-          info!(l,
+        ::slog_scope::with_logger(|l| {
+            info!(l,
                 "Scheduled configuration for acceptance";
             "configuration" => ?config_data
-        ));
+        )
+        });
 
         let cfg_hash = config_data.hash();
         self.configs_mut().put(&cfg_hash, config_data);

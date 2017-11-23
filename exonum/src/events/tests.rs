@@ -147,7 +147,7 @@ impl TestEvents {
             let mut core = Core::new().unwrap();
             let logger = StubLogger::new();
             let fut = network_part.run(&core.handle(), logger.clone());
-            core.run(fut).map_err(|c|log_error(&logger, c)).unwrap();
+            core.run(fut).map_err(|c| log_error(&logger, c)).unwrap();
         });
         handler_part.handle = Some(handle);
         handler_part

@@ -570,6 +570,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         service_keys[0].0,
         service_keys[0].1.clone(),
         ApiSender::new(api_channel.0.clone()),
+        StubLogger::new(),
     );
 
     let consensus = ConsensusConfig {

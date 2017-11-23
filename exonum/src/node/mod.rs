@@ -659,10 +659,12 @@ impl NodeChannel {
 
 impl Node {
     /// Creates node with specific `logger`.
-    pub fn with_logger(db: Box<Database>, services: Vec<Box<Service>>,
-                       node_cfg: NodeConfig,
-                       logger: Logger<ExonumLogger>) -> Self
-    {
+    pub fn with_logger(
+        db: Box<Database>,
+        services: Vec<Box<Service>>,
+        node_cfg: NodeConfig,
+        logger: Logger<ExonumLogger>,
+    ) -> Self {
         crypto::init();
         if cfg!(feature = "flame_profile") {
             ::exonum_profiler::init_handler(
@@ -680,6 +682,7 @@ impl Node {
             node_cfg.service_public_key,
             node_cfg.service_secret_key.clone(),
             ApiSender::new(channel.api_requests.0.clone()),
+            logger.clone(),
         );
         blockchain
             .create_genesis_block(node_cfg.genesis.clone())
@@ -752,8 +755,7 @@ impl Node {
                     log_error(&network_logger_clonned, e)
                 }),
             );
-            let network_handler = network_part.run(&core.handle(),
-                                                   network_logger);
+            let network_handler = network_part.run(&core.handle(), network_logger);
             core.run(network_handler).map(drop).map_err(|e| {
                 other_error(&format!("An error in the `Network` thread occured: {}", e))
             })

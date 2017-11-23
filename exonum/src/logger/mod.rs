@@ -61,12 +61,8 @@ impl StubLogger {
 impl Drain for StubLogger {
     type Ok = ();
     type Err = Never;
-    fn log(
-        &self,
-        _: &Record,
-        _: &OwnedKVList
-    ) -> Result<Self::Ok, Self::Err> {
-    Ok(())
+    fn log(&self, _: &Record, _: &OwnedKVList) -> Result<Self::Ok, Self::Err> {
+        Ok(())
     }
 }
 

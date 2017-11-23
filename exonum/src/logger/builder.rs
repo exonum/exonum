@@ -5,8 +5,8 @@ use std::time::SystemTime;
 use std::fs::File;
 use std::io::{self, Write};
 
-use super::config::{LoggerOption, OutputConfig, ColorConfig,
-                    LoggingLevel, TimestampConfig, FormatConfig};
+use super::config::{LoggerOption, OutputConfig, ColorConfig, LoggingLevel, TimestampConfig,
+                    FormatConfig};
 use super::StubLogger;
 
 lazy_static! {
@@ -112,7 +112,8 @@ fn make_json<W: io::Write + Send + 'static>(
             "level" => FnValue(move |rinfo : &Record| {
                 rinfo.level().as_str()
             }),
-            )).set_newlines(true).build();
+            )).set_newlines(true)
+        .build();
 
     match opts.level {
         LoggingLevel::Env => Box::new(::slog_envlogger::new(json).fuse()),

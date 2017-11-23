@@ -459,44 +459,43 @@ impl NodeHandler {
         "block_hash" => ?block_hash);
 
         // Merge changes into storage
-        let (committed_txs, proposer) = {
-            // FIXME Avoid of clone here.
-            let block_state = self.state.block(&block_hash).unwrap().clone();
+        let (tx_committed, block_proposer) = {
+            let block_state = self.state.block(&block_hash).unwrap();
+
             self.blockchain
                 .commit(block_state.patch(), block_hash, precommits)
                 .unwrap();
-            // Update node state
-            self.state.update_config(
-                Schema::new(&self.blockchain.snapshot()).actual_configuration(),
-            );
-            // Update state to new height
-            let block_hash = self.blockchain.last_hash();
-            self.state.new_height(
-                &block_hash,
-                self.system_state.current_time(),
-            );
+
             (block_state.txs().len(), block_state.proposer_id())
         };
+        // Update node state
+        self.state.update_config(
+            Schema::new(&self.blockchain.snapshot()).actual_configuration(),
+        );
 
         let mempool_size = self.state
             .transactions()
             .read()
             .expect("Expected read lock")
             .len();
+
         metric!("node.mempool", mempool_size);
 
+        // Update state to new height
+        let block_hash = self.blockchain.last_hash();
         info!(self.consensus_logger(), "Committed block";
-            "block_proposer" => %proposer,
+            "block_proposer" => %block_proposer,
             "block_round" => %round.map(|x| format!("{}", x)).unwrap_or_else(|| "?".into()),
-            "tx_committed" => %committed_txs,
+            "tx_committed" => %tx_committed,
             "mempool_size" => %mempool_size,
             "block_hash" => %block_hash.to_hex(),
         );
-        // Update state to new height
+
         self.state.new_height(
             &block_hash,
             self.system_state.current_time(),
         );
+
         // TODO: reset status timeout (ECR-171).
         self.broadcast_status();
         self.add_status_timeout();
