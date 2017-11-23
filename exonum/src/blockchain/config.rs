@@ -18,7 +18,7 @@ use serde::de::Error;
 use serde_json::{self, Error as JsonError};
 use semver::Version;
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 
 use storage::StorageValue;
 use crypto::{hash, PublicKey, Hash};
@@ -106,62 +106,8 @@ impl StoredConfiguration {
     pub fn try_deserialize(serialized: &[u8]) -> Result<StoredConfiguration, JsonError> {
         let config: StoredConfiguration = serde_json::from_slice(serialized)?;
 
-        // Check that there are no duplicated keys.
-        {
-            let mut keys = HashSet::with_capacity(config.validator_keys.len() * 2);
-            for k in &config.validator_keys {
-                keys.insert(k.consensus_key);
-                keys.insert(k.service_key);
-            }
-            if keys.len() != config.validator_keys.len() * 2 {
-                return Err(JsonError::custom(
-                    "Duplicated keys are found: each consensus and service key must be unique",
-                ));
-            }
-        }
-
-        // Check timeout adjuster.
-        match config.consensus.timeout_adjuster {
-            // There is no need to validate `Constant` timeout adjuster.
-            TimeoutAdjusterConfig::Constant { .. } => (),
-            TimeoutAdjusterConfig::Dynamic { min, max, .. } => {
-                if min >= max {
-                    return Err(JsonError::custom(format!(
-                        "Dynamic adjuster: minimal timeout should be less then maximal: \
-                        min = {}, max = {}",
-                        min,
-                        max
-                    )));
-                }
-            }
-            TimeoutAdjusterConfig::MovingAverage {
-                min,
-                max,
-                adjustment_speed,
-                optimal_block_load,
-            } => {
-                if min >= max {
-                    return Err(JsonError::custom(format!(
-                        "Moving average adjuster: minimal timeout must be less then maximal: \
-                        min = {}, max = {}",
-                        min,
-                        max
-                    )));
-                }
-                if adjustment_speed <= 0. || adjustment_speed > 1. {
-                    return Err(JsonError::custom(format!(
-                        "Moving average adjuster: adjustment speed must be in the (0..1] range: {}",
-                        adjustment_speed,
-                    )));
-                }
-                if optimal_block_load <= 0. || optimal_block_load > 1. {
-                    return Err(JsonError::custom(format!(
-                        "Moving average adjuster: block load must be in the (0..1] range: {}",
-                        adjustment_speed,
-                    )));
-                }
-            }
-        }
+        verify_keys(config.validator_keys)?;
+        verify_timeout_adjuster(config.consensus.timeout_adjuster)?;
 
         Ok(config)
     }
@@ -211,6 +157,66 @@ pub enum TimeoutAdjusterConfig {
         /// Optimal block load depending on the `txs_block_limit` from the `ConsensusConfig`.
         optimal_block_load: f64,
     },
+}
+
+/// Check that there are no duplicated keys.
+fn verify_keys(validator_keys: &[ValidatorKeys]) -> Result<(), JsonError> {
+    let mut keys = HashSet::with_capacity(validator_keys.len() * 2);
+    for k in &validator_keys {
+        keys.insert(k.consensus_key);
+        keys.insert(k.service_key);
+    }
+    if keys.len() != validator_keys.len() * 2 {
+        Err(JsonError::custom(
+            "Duplicated keys are found: each consensus and service key must be unique",
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+fn verify_timeout_adjuster(timeout_adjuster: TimeoutAdjusterConfig) -> Result<(), JsonError> {
+    match timeout_adjuster {
+        TimeoutAdjusterConfig::Constant { .. } => (),
+        TimeoutAdjusterConfig::Dynamic { min, max, .. } => {
+            if min >= max {
+                return Err(JsonError::custom(format!(
+                    "Dynamic adjuster: minimal timeout should be less then maximal: \
+                        min = {}, max = {}",
+                    min,
+                    max
+                )));
+            }
+        }
+        TimeoutAdjusterConfig::MovingAverage {
+            min,
+            max,
+            adjustment_speed,
+            optimal_block_load,
+        } => {
+            if min >= max {
+                return Err(JsonError::custom(format!(
+                    "Moving average adjuster: minimal timeout must be less then maximal: \
+                        min = {}, max = {}",
+                    min,
+                    max
+                )));
+            }
+            if adjustment_speed <= 0. || adjustment_speed > 1. {
+                return Err(JsonError::custom(format!(
+                    "Moving average adjuster: adjustment speed must be in the (0..1] range: {}",
+                    adjustment_speed,
+                )));
+            }
+            if optimal_block_load <= 0. || optimal_block_load > 1. {
+                return Err(JsonError::custom(format!(
+                    "Moving average adjuster: block load must be in the (0..1] range: {}",
+                    adjustment_speed,
+                )));
+            }
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
