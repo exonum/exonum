@@ -3,14 +3,14 @@ use serde::{Serialize, Deserialize, Serializer, Deserializer};
 use std::fmt::{self, Display};
 use std::str::FromStr;
 use std::collections::BTreeMap;
+use super::{MultipleDrain, builder};
 
-/// `LoggerConfig` structure that collect array of possible logger outputs.
-/// With this config, one can initialize logger with multiple output targets.
+/// `LoggerConfig` structure collects array of possible logger outputs.
+/// With this config, ones can initialize logger with multiple output targets.
 ///
-/// Full template of possible configuration
+/// ### Full template of possible configuration:
 ///
 /// ```toml
-///
 /// [logger.stdout]
 /// format = "json" | "compact" | "full"
 /// color = "always" | "auto" | "none"
@@ -32,11 +32,13 @@ use std::collections::BTreeMap;
 /// level = "crit" | "error" | "warn" | "info" | "debug" | "trace" | "off" | "env"
 /// ```
 ///
-/// Where `logger` is a root section in config,
-/// `stdout` / `stderr` - terminal standard out, and standard error outputs;
-/// `"/path/to/file.log"` - file output section.
+/// Where `logger` is a root logging section in config:
 ///
-/// In each section, one can set some of variables
+/// * `stdout` / `stderr` - terminal standard out, and standard error outputs subsections;
+///
+/// * `"/path/to/file.log"` - files output subsections.
+///
+/// In each section, ones can set some of variables:
 ///
 /// * `format` - is possible output format, could be one of
 ///
@@ -76,19 +78,16 @@ use std::collections::BTreeMap;
 ///
 /// Note: file output currently support only json.
 ///
-
-use super::{MultipleDrain, builder};
-
 #[derive(Debug, Clone)]
 pub struct LoggerConfig {
     loggers: Vec<LoggerOption>,
 }
 
 impl LoggerConfig {
-    pub(crate) fn into_multi_logger(&self) -> MultipleDrain {
+    pub(crate) fn to_multi_logger(&self) -> MultipleDrain {
         self.loggers
             .iter()
-            .map(|v| builder::build_drain(&v))
+            .map(|v| builder::build_drain(v))
             .collect()
     }
 }
@@ -126,8 +125,7 @@ impl LoggingLevel {
             LoggingLevel::Info => ::slog::Level::Info,
             LoggingLevel::Debug => ::slog::Level::Debug,
             LoggingLevel::Trace => ::slog::Level::Trace,
-            LoggingLevel::Env => return None,
-            LoggingLevel::Off => return None,
+            _ => return None,
         };
         Some(v)
     }
@@ -285,7 +283,7 @@ impl OutputConfig {
         map.insert("level", self.level.to_string());
         map
     }
-    fn from_map(map: BTreeMap<String, String>) -> OutputConfig {
+    fn from_map(map: &BTreeMap<String, String>) -> OutputConfig {
         OutputConfig {
             format: map.get("format")
                 .map(|s| s.parse())
@@ -323,7 +321,7 @@ impl<'de> Deserialize<'de> for OutputConfig {
         D: Deserializer<'de>,
     {
         let map: BTreeMap<String, String> = Deserialize::deserialize(deserializer)?;
-        Ok(Self::from_map(map))
+        Ok(Self::from_map(&map))
     }
 }
 
@@ -364,9 +362,9 @@ impl<'de> Deserialize<'de> for LoggerConfig {
             Deserialize::deserialize(deserializer)?;
         let loggers = map.into_iter()
             .map(|(name, config)| match name.as_str() {
-                "stdout" => LoggerOption::Stdout(OutputConfig::from_map(config)),
-                "stderr" => LoggerOption::Stderr(OutputConfig::from_map(config)),
-                _ => LoggerOption::File(name, OutputConfig::from_map(config)),
+                "stdout" => LoggerOption::Stdout(OutputConfig::from_map(&config)),
+                "stderr" => LoggerOption::Stderr(OutputConfig::from_map(&config)),
+                _ => LoggerOption::File(name, OutputConfig::from_map(&config)),
             })
             .collect();
         Ok(LoggerConfig { loggers })

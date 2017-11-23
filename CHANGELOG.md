@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Added a new function `merge_sync`. In this function a write will be flushed from the operating system buffer cache before the write is considered complete. (#368)
 - Added conversion into boxed values for values which implement `Service` or `Transaction` traits. (#366)
 - Added constructor for the `ServiceContext` which can be useful for the alternative node implementations. (#366)
+- Added new specialised constructor for `Node` `with_logger` which creates `Node`, with user context. (#375)
+- Added new logging methods to `ServiceContext` (`logger`, `warn`, `error`, `info`). (#375)
+- Added new module `logger`, for logging initialisation. (#375)
+- Added `StubLogger` structure in `logger` module - empty logger for testing purposes. (#375)
+- Added `init_logger` method in `logger` module, which perform global logger initialisation, and returns new logger instance. (#375)
+- Added new type alias `ExonumLogger`, `::slog::Logger` type param which is used as `::slog::Drain`. (#375)
+- Added new section in config `logger` more detains in rustdoc `./logger/struct.LoggerConfig.html`. (#375)
+
 
 ### Changed
 - Changed a signature of `open` function in a `rocksdb` module. `RocksDBOptions` should pass by the reference. (#369)
@@ -22,10 +30,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - The `Blockchain` constructor now requires services keypair and an `ApiSender` instance. (#366)
 - `mount_*_api` methods in `Blockchain` instance now do not require `ApiContext`. (#366)
 - Move exonum to slog ecosystem. (#375)
+- The `Blockchain` constructor now requires logger context. (#375)
+- The `Node` constructor now requires logger context. (#375)
+- The `ServiceContext` now requires logger context. (#375)
 
 ### Fixed
 - Fixed `crate_authors!` macro usage, this macro can't return static string in new clap version. (#370)
 - Fixed mistake in description of the height getter in the `ServiceContext`. (#366)
+
+### Removed
+- Removed old `init_logger` method from helpers. (#375)
 
 ## 0.3 - 2017-11-02
 

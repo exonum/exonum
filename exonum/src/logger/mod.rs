@@ -30,6 +30,7 @@ pub use self::config::LoggerConfig;
 mod config;
 mod builder;
 
+/// Exonum logger drain
 pub type ExonumLogger = Arc<SendSyncRefUnwindSafeDrain<Ok = (), Err = Never>>;
 
 /// Stub logger for tests
@@ -40,7 +41,7 @@ thread_local!(static GLOBAL_LOGGER: Cell<Option<GlobalLoggerGuard>> = Cell::new(
 
 /// Performs the logger initialization.
 pub fn init_logger(logger_config: &LoggerConfig) -> ExonumLogger {
-    let async = Async::new(logger_config.into_multi_logger()).build().fuse();
+    let async = Async::new(logger_config.to_multi_logger()).build().fuse();
     let ret = Arc::new(async);
     let logger_cloned = Arc::clone(&ret);
 
@@ -53,6 +54,7 @@ pub fn init_logger(logger_config: &LoggerConfig) -> ExonumLogger {
 }
 
 impl StubLogger {
+    /// Creates new instance of testing logger.
     pub fn new() -> Logger {
         Logger::root(StubLogger, o!("module" => "test"))
     }

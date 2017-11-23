@@ -212,17 +212,17 @@ impl ServiceContext {
     }
 
     /// Print message into log with error level.
-    pub fn error(&self, message: String) {
+    pub fn error(&self, message: &str) {
         error!(self.logger(), "{}", message)
     }
 
     /// Print message into log with warn level
-    pub fn warn(&self, message: String) {
+    pub fn warn(&self, message: &str) {
         warn!(self.logger(), "{}", message)
     }
 
     /// Print message into log with info level
-    pub fn info(&self, message: String) {
+    pub fn info(&self, message: &str) {
         info!(self.logger(), "{}", message)
     }
 

@@ -36,6 +36,7 @@ mod tests {
     use exonum::messages::Message;
     use exonum::helpers::{Height, ValidatorId};
     use exonum::node::ApiSender;
+    use exonum::logger::StubLogger;
 
     fn create_blockchain(db: Box<Database>) -> Blockchain {
         let dummy_channel = mpsc::channel(1);
@@ -46,6 +47,7 @@ mod tests {
             dummy_keypair.0,
             dummy_keypair.1,
             ApiSender::new(dummy_channel.0),
+            StubLogger::new(),
         )
     }
 
