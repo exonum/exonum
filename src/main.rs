@@ -96,32 +96,44 @@ impl Transaction for TxTime {
                         self.pub_key(),
                         Time::new(self.time()),
                     );
+                }
+                else {
+                    return;
+                }
+            }
+            else {
+                schema.validators_time_mut().put(
+                    self.pub_key(),
+                    Time::new(self.time()),
+                );
+            }
 
-                    let mut validators_time = Vec::new();
-                    {
-                        let idx = schema.validators_time();
+            let mut validators_time = Vec::new();
+            {
+                let idx = schema.validators_time();
 
-                        for pair in idx.iter() {
-                            let (pub_key, time) = (pair.0, pair.1.time());
-                            if validator_keys.iter().any(|validator| {
-                                validator.service_key == pub_key
-                            })
-                            {
-                                validators_time.push(time);
-                            }
+                for pair in idx.iter() {
+                    let (pub_key, time) = (pair.0, pair.1.time());
+                    if validator_keys.iter().any(|validator| {
+                        validator.service_key == pub_key
+                    })
+                        {
+                            validators_time.push(time);
                         }
-                    }
+                }
+            }
 
-                    let f = validator_keys.len() / 3;
-                    if validators_time.len() > f {
-                        validators_time.sort();
-                        validators_time.reverse();
-                        if let Some(current_time) = schema.time().get() {
-                            if current_time.time() < validators_time[f] {
-                                schema.time_mut().set(Time::new(validators_time[f]));
-                            }
-                        }
+            let f = validator_keys.len() / 3;
+            if validators_time.len() > f {
+                validators_time.sort();
+                validators_time.reverse();
+                if let Some(current_time) = schema.time().get() {
+                    if current_time.time() < validators_time[f] {
+                        schema.time_mut().set(Time::new(validators_time[f]));
                     }
+                }
+                else {
+                    schema.time_mut().set(Time::new(validators_time[f]));
                 }
             }
         }
