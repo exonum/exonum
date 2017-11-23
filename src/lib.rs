@@ -1,7 +1,7 @@
 //! Testkit for Exonum blockchain framework, allowing to test service APIs synchronously
 //! and in the same process as the testkit.
 
-#![deny(missing_docs)]
+#![deny(missing_debug_implementations, missing_docs)]
 
 extern crate exonum;
 extern crate futures;
@@ -11,17 +11,6 @@ extern crate mount;
 extern crate router;
 extern crate serde;
 extern crate serde_json;
-
-use std::collections::BTreeMap;
-use std::sync::{Arc, RwLock, RwLockReadGuard};
-
-use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Schema as CoreSchema,
-                         Service, StoredConfiguration, Transaction, ValidatorKeys};
-use exonum::crypto;
-use exonum::helpers::{Height, Round, ValidatorId};
-use exonum::messages::{Message, Precommit, Propose};
-use exonum::node::{ApiSender, ExternalMessage, State as NodeState, TransactionSend, TxPool};
-use exonum::storage::{Database, MemoryDB, Snapshot};
 
 use futures::Stream;
 use futures::executor::{self, Spawn};
@@ -34,6 +23,18 @@ use mount::Mount;
 use router::Router;
 use serde::{Deserialize, Serialize};
 
+use std::collections::BTreeMap;
+use std::sync::{Arc, RwLock, RwLockReadGuard};
+use std::fmt;
+
+use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Schema as CoreSchema,
+                         Service, StoredConfiguration, Transaction, ValidatorKeys};
+use exonum::crypto;
+use exonum::helpers::{Height, Round, ValidatorId};
+use exonum::messages::{Message, Precommit, Propose};
+use exonum::node::{ApiSender, ExternalMessage, State as NodeState, TransactionSend, TxPool};
+use exonum::storage::{Database, MemoryDB, Snapshot};
+
 #[macro_use]
 mod macros;
 pub mod compare;
@@ -44,6 +45,7 @@ pub use greedy_fold::GreedilyFoldable;
 pub use compare::ComparableSnapshot;
 
 /// Emulated test network.
+#[derive(Debug)]
 pub struct TestNetwork {
     us: TestNode,
     validators: Vec<TestNode>,
@@ -268,6 +270,22 @@ pub struct TestKitBuilder {
     services: Vec<Box<Service>>,
 }
 
+impl fmt::Debug for TestKitBuilder {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        f.debug_struct("TestKitBuilder")
+            .field("us", &self.us)
+            .field("validators", &self.validators)
+            .field(
+                "services",
+                &self.services
+                    .iter()
+                    .map(|x| x.service_name())
+                    .collect::<Vec<_>>(),
+            )
+            .finish()
+    }
+}
+
 impl TestKitBuilder {
     /// Creates testkit for the validator node.
     pub fn validator() -> Self {
@@ -335,6 +353,17 @@ pub struct TestKit {
     api_sender: ApiSender,
     mempool: TxPool,
     cfg_proposal: Option<ConfigurationProposalState>,
+}
+
+impl fmt::Debug for TestKit {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        f.debug_struct("TestKit")
+            .field("blockchain", &self.blockchain)
+            .field("network", &self.network)
+            .field("mempool", &self.mempool)
+            .field("cfg_change_proposal", &self.cfg_proposal)
+            .finish()
+    }
 }
 
 impl TestKit {
@@ -855,6 +884,12 @@ pub struct TestKitApi {
     public_mount: Mount,
     private_mount: Mount,
     api_sender: ApiSender,
+}
+
+impl fmt::Debug for TestKitApi {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        f.debug_struct("TestKitApi").finish()
+    }
 }
 
 impl TestKitApi {
