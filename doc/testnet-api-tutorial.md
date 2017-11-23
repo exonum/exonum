@@ -42,9 +42,9 @@ cargo install --example configuration
 - manually for the each node's process:
 
     ```bash
-    configuration run --node-config configuration_service/validators/0.toml --leveldb configuration_service/db/0 --public-api-address 127.0.0.1:8000 --private-api-address 127.0.0.1:8010
+    configuration run --node-config configuration_service/validators/0.toml --rocksdb configuration_service/db/0 --public-api-address 127.0.0.1:8000 --private-api-address 127.0.0.1:8010
     ...
-    configuration run --node-config configuration_service/validators/3.toml --leveldb configuration_service/db/3 --public-api-address 127.0.0.1:8003 --private-api-address 127.0.0.1:8013
+    configuration run --node-config configuration_service/validators/3.toml --rocksdb configuration_service/db/3 --public-api-address 127.0.0.1:8003 --private-api-address 127.0.0.1:8013
     ```
 
       - parameters
@@ -52,7 +52,7 @@ cargo install --example configuration
           - `--public-api-address` is for exonum's [public http api endpoints](#public-endpoints)
           - `--private-api-address` is for exonum's [private http api endpoints](#private-endpoints)
           - `--node-config` path to the node's config
-          - `--leveldb` path to the database
+          - `--rocksdb` path to the database
           
 - automatically via the [supervisord](http://supervisord.org/) utility.
 
