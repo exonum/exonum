@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use std::collections::HashMap;
-use std::collections::btree_map::{BTreeMap, Range, Iter as BTMIter, IntoIter as BTMIntoIter};
-use std::collections::hash_map::{Iter as HMIter, IntoIter as HMIntoIter, Entry as HMEntry};
+use std::collections::btree_map::{BTreeMap, Range, Iter as BtmIter, IntoIter as BtmIntoIter};
+use std::collections::hash_map::{Iter as HmIter, IntoIter as HmIntoIter, Entry as HmEntry};
 use std::collections::Bound::*;
 use std::cmp::Ordering::*;
 use std::iter::Peekable;
@@ -36,14 +36,14 @@ impl Changes {
     }
 
     /// Returns iterator over changes.
-    pub fn iter(&self) -> BTMIter<Vec<u8>, Change> {
+    pub fn iter(&self) -> BtmIter<Vec<u8>, Change> {
         self.data.iter()
     }
 }
 
 impl IntoIterator for Changes {
     type Item = (Vec<u8>, Change);
-    type IntoIter = BTMIntoIter<Vec<u8>, Change>;
+    type IntoIter = BtmIntoIter<Vec<u8>, Change>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.data.into_iter()
@@ -73,7 +73,7 @@ impl Patch {
     }
 
     /// Gets the given names's corresponding entry in the map for in-place manipulation.
-    fn changes_entry(&mut self, name: String) -> HMEntry<String, Changes> {
+    fn changes_entry(&mut self, name: String) -> HmEntry<String, Changes> {
         self.changes.entry(name)
     }
 
@@ -83,7 +83,7 @@ impl Patch {
     }
 
     /// Returns iterator over changes.
-    pub fn iter(&self) -> HMIter<String, Changes> {
+    pub fn iter(&self) -> HmIter<String, Changes> {
         self.changes.iter()
     }
 
@@ -102,7 +102,7 @@ impl Patch {
 
 impl IntoIterator for Patch {
     type Item = (String, Changes);
-    type IntoIter = HMIntoIter<String, Changes>;
+    type IntoIter = HmIntoIter<String, Changes>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.changes.into_iter()
