@@ -1,7 +1,15 @@
 [package]
 name = "exonum-time"
 version = "0.1.0"
-authors = ["Serhii Oryshych <serhii.oryshych@xdev.re>"]
+authors = ["The Exonum Team <exonum@bitfury.com>"]
+homepage = "https://github.com/exonum/exonum-time"
+repository = "https://github.com/exonum/exonum-time"
+documentation = "https://docs.rs/exonum-time"
+readme = "README.md"
+license = "Apache-2.0"
+keywords = ["exonum", "time"]
+categories = ["cryptography", "date-and-time"]
+description = "The time oracle service for Exonum."
 
 [dependencies]
 exonum = "0.3.0"
