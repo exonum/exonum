@@ -12,7 +12,7 @@ function launch-server {
     cargo run &
     CTR=0
     MAXCTR=60
-    while [[ ( -z `netstat -tlp 2>/dev/null | awk '{ if ($4 == "*:8000") { split($7, pid, /\//); print pid[1] } }'` ) && ( $CTR -lt $MAXCTR ) ]]; do
+    while [[ ( -z `lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null |  awk '{ if ($9 == "*:8000") { print $2 } }'` ) && ( $CTR -lt $MAXCTR ) ]]; do
       sleep 1
       CTR=$(( $CTR + 1 ))
     done
@@ -26,7 +26,10 @@ function launch-server {
 # Kills whatever program is listening on the TCP port 8000, on which the cryptocurrency
 # demo needs to bind to.
 function kill-server {
-    netstat -tlp 2>/dev/null | awk '{ if ($4 == "*:8000") { split($7, pid, /\//); print pid[1] } }' | xargs -r kill -KILL
+    SERVER_PID=`lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null |  awk '{ if ($9 == "*:8000") { print $2 } }'`
+    if [[ -n $SERVER_PID ]]; then
+        kill -9 $SERVER_PID
+    fi
 }
 
 # Sends a transaction to the cryptocurrency demo.
