@@ -25,6 +25,7 @@ env:
     - FEATURE=test
 script:
   - cargo test
+  - cargo run --example timestamping
 
 stages:
   - test
