@@ -86,7 +86,7 @@ impl<'a> TimeSchema<&'a mut Fork> {
     }
 
     pub fn time_mut(&mut self) -> Entry<&mut Fork, Time> {
-        Entry::new(SERVICE_NAME.to_string() + "exonum_time.time", self.view)
+        Entry::new(SERVICE_NAME.to_string() + ".time", self.view)
     }
 }
 
