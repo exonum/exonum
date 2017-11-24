@@ -255,7 +255,7 @@ macro_rules! implement_public_sodium_wrapper {
         /// Returns the hex representation of the binary data.
         /// Lower case letters are used (e.g. f9b4ca).
         pub fn to_hex(&self) -> String {
-            let mut str_buf = String::with_capacity(4 * $size);
+            let mut str_buf = String::with_capacity(2 * $size);
             $crate::encoding::serialize::ToHex::write_hex(self, &mut str_buf).unwrap();
             str_buf
         }
