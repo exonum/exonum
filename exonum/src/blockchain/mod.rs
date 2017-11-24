@@ -28,18 +28,21 @@
 //!
 //! [1]: https://github.com/exonum/exonum-doc/blob/master/src/get-started/create-service.md
 
+
 use std::sync::Arc;
 use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::mem;
 use std::fmt;
 use std::panic;
+use std::net::SocketAddr;
 
 use vec_map::VecMap;
 use byteorder::{ByteOrder, LittleEndian};
 use mount::Mount;
 
 use crypto::{self, Hash, PublicKey, SecretKey};
-use messages::{CONSENSUS as CORE_SERVICE, Precommit, RawMessage};
+use messages::{CONSENSUS as CORE_SERVICE, Precommit, RawMessage, Connect};
 use storage::{Database, Error, Fork, Patch, Snapshot};
 use helpers::{Height, ValidatorId};
 use node::ApiSender;
@@ -399,6 +402,53 @@ impl Blockchain {
             &self.service_keypair.0,
             &self.service_keypair.1,
         )
+    }
+
+    /// Saves peer to the peers cache
+    pub fn save_peer(&mut self, pubkey: &PublicKey, peer: Connect) {
+        let mut fork = self.fork();
+
+        {
+            let mut schema = Schema::new(&mut fork);
+            schema.peers_cache_mut().put(pubkey, peer);
+        }
+
+        self.merge(fork.into_patch()).expect(
+            "Unable to save peer to the peers cache",
+        );
+    }
+
+    /// Removes peer from the peers cache
+    pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) {
+        let mut fork = self.fork();
+
+        {
+            let mut schema = Schema::new(&mut fork);
+            let mut peers = schema.peers_cache_mut();
+            let pubkey = peers.iter()
+                .filter_map(|(k, v)| match v.addr() == *addr {
+                    true => Some(k),
+                    false => None,
+                })
+                .next();
+            if let Some(pubkey) = pubkey {
+                peers.remove(&pubkey);
+            }
+        }
+
+        self.merge(fork.into_patch()).expect(
+            "Unable to remove peer from the peers cache",
+        );
+    }
+
+    /// Recover cached peers if any.
+    pub fn get_saved_peers(&self) -> HashMap<PublicKey, Connect> {
+        let schema = Schema::new(self.snapshot());
+        let peers_cache = schema.peers_cache();
+        let peers = peers_cache.iter()
+            .map(|(k, v)| (k, v.clone()))
+            .collect();
+        peers
     }
 }
 
