@@ -372,7 +372,7 @@ impl<'a> Schema<&'a mut Fork> {
 
     /// Mutable reference to the [`peers_cache`][1] index.
     ///
-    /// [1]: struct.Schema.html#method.peers
+    /// [1]: struct.Schema.html#method.peers_cache
     pub fn peers_cache_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Connect> {
         MapIndex::new("core.peers_cache", &mut self.view)
     }

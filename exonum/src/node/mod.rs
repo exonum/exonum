@@ -292,8 +292,6 @@ impl NodeHandler {
             &config.listener.consensus_secret_key,
         );
 
-        let peers = blockchain.get_saved_peers();
-
         let mut whitelist = config.listener.whitelist;
         whitelist.set_validators(stored.validator_keys.iter().map(|x| x.consensus_key));
         let mut state = State::new(
@@ -306,7 +304,7 @@ impl NodeHandler {
             whitelist,
             stored,
             connect,
-            peers,
+            blockchain.get_saved_peers(),
             last_hash,
             last_height,
             system_state.current_time(),
