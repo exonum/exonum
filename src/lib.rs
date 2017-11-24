@@ -46,6 +46,7 @@ use exonum::api::Api;
 
 const SERVICE_ID: u16 = 4;
 const TX_TIME_ID: u16 = 1;
+const SERVICE_NAME: &str = "exonum_time";
 
 // SCHEMA
 
@@ -67,22 +68,25 @@ impl<T: AsRef<Snapshot>> TimeSchema<T> {
     }
 
     pub fn validators_time(&self) -> MapIndex<&Snapshot, PublicKey, Time> {
-        MapIndex::new("exonum_time.validators_time", self.view.as_ref())
+        MapIndex::new(
+            SERVICE_NAME.to_string() + ".validators_time",
+            self.view.as_ref(),
+        )
     }
 
     pub fn time(&self) -> Entry<&Snapshot, Time> {
-        Entry::new("exonum_time.time", self.view.as_ref())
+        Entry::new(SERVICE_NAME.to_string() + ".time", self.view.as_ref())
     }
 }
 
 
 impl<'a> TimeSchema<&'a mut Fork> {
     pub fn validators_time_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Time> {
-        MapIndex::new("exonum_time.validators_time", self.view)
+        MapIndex::new(SERVICE_NAME.to_string() + ".validators_time", self.view)
     }
 
     pub fn time_mut(&mut self) -> Entry<&mut Fork, Time> {
-        Entry::new("exonum_time.time", self.view)
+        Entry::new(SERVICE_NAME.to_string() + "exonum_time.time", self.view)
     }
 }
 
@@ -128,17 +132,14 @@ impl Transaction for TxTime {
         }
 
         let mut validators_time: Vec<SystemTime>;
-
         {
             let idx = schema.validators_time();
             validators_time = idx.iter()
-                .filter_map(|pair| if validator_keys.iter().any(|validator| {
-                    validator.service_key == pair.0
-                })
-                {
-                    Some(pair.1.time())
-                } else {
-                    None
+                .filter_map(|pair| {
+                    validator_keys
+                        .iter()
+                        .find(|validator| validator.service_key == pair.0)
+                        .map(|_| pair.1.time())
                 })
                 .collect();
         }
@@ -231,7 +232,7 @@ impl TimeService {
 
 impl Service for TimeService {
     fn service_name(&self) -> &'static str {
-        "exonum_time"
+        SERVICE_NAME
     }
 
     fn service_id(&self) -> u16 {
