@@ -171,7 +171,7 @@ impl ServiceContext {
         let (stored_configuration, height) = {
             let schema = Schema::new(fork.as_ref());
             let stored_configuration = schema.actual_configuration();
-            let height = schema.last_height().unwrap();
+            let height = schema.height();
             (stored_configuration, height)
         };
         let validator_id = stored_configuration
