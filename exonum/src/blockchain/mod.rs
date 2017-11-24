@@ -440,10 +440,8 @@ impl Blockchain {
     pub fn get_saved_peers(&self) -> HashMap<PublicKey, Connect> {
         let schema = Schema::new(self.snapshot());
         let peers_cache = schema.peers_cache();
-        let peers = peers_cache.iter()
-            .map(|(k, v)| (k, v.clone()))
-            .collect();
-        peers
+        let it = peers_cache.iter().map(|(k, v)| (k, v.clone()));
+        it.collect()
     }
 }
 
