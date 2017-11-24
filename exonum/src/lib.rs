@@ -19,6 +19,7 @@
 #![deny(missing_debug_implementations)]
 #![deny(missing_docs)]
 
+
 #![cfg_attr(feature="cargo-clippy", allow(zero_prefixed_literal))]
 
 #![cfg_attr(feature="flame_profile", feature(plugin, custom_attribute))]
@@ -26,8 +27,15 @@
 
 #[macro_use]
 extern crate exonum_profiler;
+extern crate slog_term;
+extern crate slog_json;
+extern crate slog_async;
+extern crate slog_envlogger;
 #[macro_use]
-extern crate log;
+extern crate slog;
+extern crate slog_scope;
+#[macro_use]
+extern crate lazy_static;
 extern crate byteorder;
 extern crate exonum_sodiumoxide as sodiumoxide;
 extern crate exonum_rocksdb as rocksdb;
@@ -43,9 +51,6 @@ extern crate bit_vec;
 extern crate vec_map;
 #[cfg(test)]
 extern crate tempdir;
-extern crate env_logger;
-extern crate colored;
-extern crate term;
 #[macro_use(crate_version, crate_authors)]
 extern crate clap;
 extern crate hyper;
@@ -77,3 +82,5 @@ pub mod storage;
 pub mod blockchain;
 pub mod explorer;
 pub mod api;
+
+pub mod logger;

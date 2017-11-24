@@ -14,9 +14,12 @@
 
 // These functions transform source error types into other.
 #![cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
+use slog::Logger;
 
 use std::error::Error as StdError;
 use std::io;
+
+use logger::ExonumLogger;
 
 // Common error helpers (TODO move to helpers)
 
@@ -28,8 +31,8 @@ pub fn result_ok<T, E: StdError>(_: T) -> Result<(), E> {
     Ok(())
 }
 
-pub fn log_error<E: StdError>(err: E) {
-    error!("An error occured: {}", err)
+pub fn log_error<E: StdError>(logger: &Logger<ExonumLogger>, err: E) {
+    error!(logger, "An error occured: {}", err)
 }
 
 pub fn into_other<E: StdError>(err: E) -> io::Error {
@@ -37,16 +40,16 @@ pub fn into_other<E: StdError>(err: E) -> io::Error {
 }
 
 pub trait LogError {
-    fn log_error(self);
+    fn log_error(self, logger: &Logger<ExonumLogger>);
 }
 
 impl<T, E> LogError for Result<T, E>
 where
     E: ::std::fmt::Display,
 {
-    fn log_error(self) {
+    fn log_error(self, logger: &Logger<ExonumLogger>) {
         if let Err(error) = self {
-            error!("An error occurred: {}", error);
+            error!(logger, "An error occurred: {}", error);
         }
     }
 }

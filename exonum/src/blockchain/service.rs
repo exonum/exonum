@@ -17,6 +17,7 @@
 
 use serde_json::Value;
 use iron::Handler;
+use slog::Logger;
 
 use std::fmt;
 use std::sync::{Arc, RwLock};
@@ -30,6 +31,7 @@ use encoding::Error as MessageError;
 use node::{ApiSender, Node, State, TransactionSend};
 use blockchain::{Blockchain, ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use helpers::{Height, Milliseconds, ValidatorId};
+use logger::ExonumLogger;
 
 /// A trait that describes transaction processing rules (a group of sequential operations
 /// with the Exonum storage) for the given `Message`.
@@ -154,6 +156,7 @@ pub struct ServiceContext {
     fork: Fork,
     stored_configuration: StoredConfiguration,
     height: Height,
+    logger: Logger<ExonumLogger>,
 }
 
 impl ServiceContext {
@@ -167,6 +170,7 @@ impl ServiceContext {
         service_secret_key: SecretKey,
         api_sender: ApiSender,
         fork: Fork,
+        logger: Logger<ExonumLogger>,
     ) -> ServiceContext {
         let (stored_configuration, height) = {
             let schema = Schema::new(fork.as_ref());
@@ -187,7 +191,39 @@ impl ServiceContext {
             fork,
             stored_configuration,
             height,
+            logger,
         }
+    }
+
+    /// Returns current logger context, usable when important extended logging system.
+    /// If one needs more logging feature, one can use `slog` ecosystem to print log message.
+    ///
+    /// Example:
+    /// ```rust, no_build
+    /// #[macro_use] extern crate slog;
+    ///
+    /// // context: ServiceContext
+    ///
+    /// debug!(context.logger(), "My debug message");
+    /// trace!(context.logger(), "My trace message with context"; "context" => "my_value");
+    /// ```
+    pub fn logger(&self) -> &Logger<ExonumLogger> {
+        &self.logger
+    }
+
+    /// Print message into log with error level.
+    pub fn error(&self, message: &str) {
+        error!(self.logger(), "{}", message)
+    }
+
+    /// Print message into log with warn level
+    pub fn warn(&self, message: &str) {
+        warn!(self.logger(), "{}", message)
+    }
+
+    /// Print message into log with info level
+    pub fn info(&self, message: &str) {
+        info!(self.logger(), "{}", message)
     }
 
     /// If the current node is validator returns its identifier.

@@ -14,13 +14,6 @@
 
 //! Different assorted utilities.
 
-use log::{LogRecord, LogLevel, SetLoggerError};
-use env_logger::LogBuilder;
-use colored::*;
-
-use std::env;
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use blockchain::{GenesisConfig, ValidatorKeys};
 use node::NodeConfig;
 use crypto::gen_keypair;
@@ -33,18 +26,6 @@ pub mod fabric;
 pub mod config;
 #[macro_use]
 pub mod metrics;
-
-/// Performs the logger initialization.
-pub fn init_logger() -> Result<(), SetLoggerError> {
-    let mut builder = LogBuilder::new();
-    builder.format(format_log_record);
-
-    if env::var("RUST_LOG").is_ok() {
-        builder.parse(&env::var("RUST_LOG").unwrap());
-    }
-
-    builder.init()
-}
 
 /// Generates testnet configuration.
 pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
@@ -83,76 +64,9 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
                 whitelist: Default::default(),
                 api: Default::default(),
                 mempool: Default::default(),
+                logger: Default::default(),
                 services_configs: Default::default(),
             }
         })
         .collect::<Vec<_>>()
-}
-
-fn has_colors() -> bool {
-    use term::terminfo::TerminfoTerminal;
-    use term::Terminal;
-    use std::io;
-    use atty;
-
-    let out = io::stderr();
-    match TerminfoTerminal::new(out) {
-        Some(ref term) if atty::is(atty::Stream::Stderr) => term.supports_color(),
-        _ => false,
-    }
-}
-
-fn format_log_record(record: &LogRecord) -> String {
-    let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-    let secs = ts.as_secs().to_string();
-    let millis = (u64::from(ts.subsec_nanos()) / 1_000_000).to_string();
-
-    let module = record.location().module_path();
-    let file = record.location().file();
-    let line = record.location().line();
-
-    let source_path;
-    let verbose_src_path = match env::var("RUST_VERBOSE_PATH") {
-        Ok(val) => val.parse::<bool>().unwrap_or(false),
-        Err(_) => false,
-    };
-    if verbose_src_path {
-        source_path = format!("{}:{}:{}", module, file, line);
-    } else {
-        source_path = module.to_string();
-    }
-
-    if has_colors() {
-        let level = match record.level() {
-            LogLevel::Error => "ERROR".red(),
-            LogLevel::Warn => "WARN".yellow(),
-            LogLevel::Info => "INFO".green(),
-            LogLevel::Debug => "DEBUG".cyan(),
-            LogLevel::Trace => "TRACE".white(),
-        };
-        format!(
-            "[{} : {:03}] - [ {} ] - {} - {}",
-            secs.bold(),
-            millis.bold(),
-            level,
-            &source_path,
-            record.args()
-        )
-    } else {
-        let level = match record.level() {
-            LogLevel::Error => "ERROR",
-            LogLevel::Warn => "WARN",
-            LogLevel::Info => "INFO",
-            LogLevel::Debug => "DEBUG",
-            LogLevel::Trace => "TRACE",
-        };
-        format!(
-            "[{} : {:03}] - [ {} ] - {} - {}",
-            secs,
-            millis,
-            level,
-            &source_path,
-            record.args()
-        )
-    }
 }

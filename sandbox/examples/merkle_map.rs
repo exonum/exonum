@@ -50,7 +50,6 @@ fn create_database(_: &str) -> Box<Database> {
 }
 
 fn main() {
-    exonum::helpers::init_logger().unwrap();
 
     let matches = clap_app!(merkle_map =>
         (version: "0.1")

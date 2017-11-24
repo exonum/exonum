@@ -287,6 +287,7 @@ mod memorydb_tests {
     use blockchain::Blockchain;
     use crypto::gen_keypair;
     use node::ApiSender;
+    use logger::StubLogger;
 
     fn create_database(_: &Path) -> Box<Database> {
         Box::new(MemoryDB::new())
@@ -301,6 +302,7 @@ mod memorydb_tests {
             service_keypair.0,
             service_keypair.1,
             ApiSender::new(api_channel.0),
+            StubLogger::new(),
         )
     }
 
@@ -333,6 +335,7 @@ mod rocksdb_tests {
     use blockchain::Blockchain;
     use crypto::gen_keypair;
     use node::ApiSender;
+    use logger::StubLogger;
 
     fn create_database(path: &Path) -> Box<Database> {
         let mut opts = RocksDBOptions::default();
@@ -350,6 +353,7 @@ mod rocksdb_tests {
             service_keypair.0,
             service_keypair.1,
             ApiSender::new(api_channel.0),
+            StubLogger::new(),
         )
     }
 

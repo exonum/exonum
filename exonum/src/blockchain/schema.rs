@@ -172,7 +172,7 @@ where
     pub fn actual_configuration(&self) -> StoredConfiguration {
         let current_height = self.current_height();
         let res = self.configuration_by_height(current_height);
-        trace!("Retrieved actual_config: {:?}", res);
+        ::slog_scope::with_logger(|l| trace!(l, "Retrieved actual_config: {:?}", res));
         res
     }
 
@@ -376,16 +376,19 @@ impl<'a> Schema<&'a mut Fork> {
             }
         }
 
-        info!(
-            "Scheduled the following configuration for acceptance: {:?}",
-            &config_data
-        );
+        ::slog_scope::with_logger(|l| {
+            info!(l,
+                "Scheduled configuration for acceptance";
+            "configuration" => ?config_data
+        )
+        });
 
         let cfg_hash = config_data.hash();
         self.configs_mut().put(&cfg_hash, config_data);
 
         let cfg_ref = ConfigReference::new(actual_from, &cfg_hash);
         self.configs_actual_from_mut().push(cfg_ref);
+
         // TODO: clear storages
     }
 }
