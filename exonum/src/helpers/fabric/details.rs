@@ -53,9 +53,10 @@ impl Run {
     pub fn db_helper(ctx: &Context) -> Box<Database> {
         use storage::{RocksDB, RocksDBOptions};
 
-        let path = ctx.arg::<String>(DATABASE_PATH).expect(
-            format!("{} not found.", DATABASE_PATH),
-        );
+        let path = ctx.arg::<String>(DATABASE_PATH).expect(&format!(
+            "{} not found.",
+            DATABASE_PATH
+        ));
         let mut options = RocksDBOptions::default();
         options.create_if_missing(true);
         Box::new(RocksDB::open(Path::new(&path), &options).unwrap())
@@ -93,7 +94,7 @@ impl Command for Run {
                 true,
                 "Use database with the given path.",
                 "d",
-                "database_path",
+                "db-path",
                 false
             ),
             Argument::new_named(
