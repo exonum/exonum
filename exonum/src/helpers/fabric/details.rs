@@ -132,10 +132,13 @@ impl Command for Run {
             "cant load node_config",
         );
         // Override api options
+        if let Some(public_addr) = public_addr {
+            config.api.public_api_address = Some(public_addr);
+        }
 
-        config.api.public_api_address = public_addr;
-
-        config.api.private_api_address = private_addr;
+        if let Some(private_api_address) = private_addr {
+            config.api.private_api_address = Some(private_api_address);
+        }
 
         new_context.set("node_config", config);
 
