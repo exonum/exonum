@@ -25,3 +25,4 @@ build_script:
 test_script:
   - cargo test %cargoflags%
   - cargo run --example timestamping %cargoflags%
+  - cargo run --example configuration_change %cargoflags%

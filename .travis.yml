@@ -26,6 +26,7 @@ env:
 script:
   - cargo test
   - cargo run --example timestamping
+  - cargo run --example configuration_change
 
 stages:
   - test

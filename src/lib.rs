@@ -653,7 +653,7 @@ impl TestKit {
     fn update_configuration(&mut self) {
         use ConfigurationProposalState::*;
 
-        let height = self.height().next();
+        let height = self.height().next().next();
         if let Some(cfg_proposal) = self.cfg_proposal.take() {
             match cfg_proposal {
                 Uncommitted(cfg_proposal) => {

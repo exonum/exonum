@@ -26,14 +26,11 @@ fn test_add_to_validators() {
     let stored = proposal.stored_configuration().clone();
     testkit.commit_configuration_change(proposal);
 
-    testkit.create_blocks_until(cfg_change_height);
+    testkit.create_blocks_until(cfg_change_height.previous());
 
     assert_eq!(testkit.network().us().validator_id(), Some(ValidatorId(1)));
     assert_eq!(&testkit.network().validators()[1], testkit.network().us());
-    assert_eq!(
-        Schema::new(&testkit.snapshot()).actual_configuration(),
-        stored
-    );
+    assert_eq!(testkit.actual_configuration(), stored);
     assert_eq!(
         Schema::new(&testkit.snapshot())
             .previous_configuration()
@@ -58,14 +55,11 @@ fn test_exclude_from_validators() {
     let stored = proposal.stored_configuration().clone();
     testkit.commit_configuration_change(proposal);
 
-    testkit.create_blocks_until(cfg_change_height);
+    testkit.create_blocks_until(cfg_change_height.previous());
 
     assert_eq!(testkit.network().us().validator_id(), None);
     assert_eq!(testkit.network().validators().len(), 1);
-    assert_eq!(
-        Schema::new(&testkit.snapshot()).actual_configuration(),
-        stored
-    );
+    assert_eq!(testkit.actual_configuration(), stored);
     assert_eq!(
         Schema::new(&testkit.snapshot())
             .previous_configuration()
@@ -98,12 +92,10 @@ fn test_change_service_config() {
     };
     testkit.commit_configuration_change(proposal);
 
-    testkit.create_blocks_until(cfg_change_height);
+    testkit.create_blocks_until(cfg_change_height.previous());
 
     assert_eq!(
         serde_json::to_value(service_cfg).unwrap(),
-        Schema::new(&testkit.snapshot())
-            .actual_configuration()
-            .services["my_service"]
+        testkit.actual_configuration().services["my_service"]
     );
 }
