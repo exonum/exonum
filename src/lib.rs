@@ -828,23 +828,23 @@ impl TestKit {
     ///
     /// - If `actual_from` is less than current height or equals.
     /// - If configuration change has been already proposed but not executed.
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```
     /// extern crate exonum;
     /// extern crate exonum_testkit;
     /// extern crate serde;
     /// extern crate serde_json;
-    /// 
+    ///
     /// use exonum::helpers::{Height, ValidatorId};
     /// use exonum_testkit::TestKitBuilder;
     /// use exonum::blockchain::Schema;
     /// use exonum::storage::StorageValue;
-    /// 
+    ///
     /// fn main() {
     ///    let mut testkit = TestKitBuilder::auditor().with_validators(3).create();
-    /// 
+    ///
     ///    let cfg_change_height = Height(5);
     ///    let proposal = {
     ///         let mut cfg = testkit.configuration_change_proposal();
