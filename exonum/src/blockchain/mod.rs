@@ -425,8 +425,8 @@ impl Blockchain {
         {
             let mut schema = Schema::new(&mut fork);
             let mut peers = schema.peers_cache_mut();
-            let pubkey = peers.iter().find(|&(_, ref v)| v.addr() == *addr).map(|(k, _)| k);
-            if let Some(pubkey) = pubkey {
+            let peer = peers.iter().find(|&(_, ref v)| v.addr() == *addr);
+            if let Some(pubkey) = peer.map(|(k, _)| k) {
                 peers.remove(&pubkey);
             }
         }
