@@ -252,15 +252,15 @@ impl TestNode {
 
     /// Constructs a new node from the given keypairs.
     pub fn from_parts(
-        consensus: (crypto::PublicKey, crypto::SecretKey),
-        service: (crypto::PublicKey, crypto::SecretKey),
+        consensus_keypair: (crypto::PublicKey, crypto::SecretKey),
+        service_keypair: (crypto::PublicKey, crypto::SecretKey),
         validator_id: Option<ValidatorId>,
     ) -> TestNode {
         TestNode {
-            consensus_secret_key: consensus.1,
-            consensus_public_key: consensus.0,
-            service_secret_key: service.1,
-            service_public_key: service.0,
+            consensus_public_key: consensus_keypair.0,
+            consensus_secret_key: consensus_keypair.1,
+            service_public_key: service_keypair.0,
+            service_secret_key: service_keypair.1,
             validator_id,
         }
     }
@@ -552,7 +552,7 @@ impl TestKit {
     ///
     /// # Panics
     ///
-    /// If there are duplicate transactions.
+    /// - If there are duplicate transactions.
     pub fn probe_all(&self, transactions: Vec<Box<Transaction>>) -> Box<Snapshot> {
         let validator_id = self.network().us().validator_id().expect(
             "Tested node is not a validator",
@@ -684,7 +684,7 @@ impl TestKit {
     ///
     /// # Panics
     ///
-    /// If the one of transactions has been already committed to the blockchain.
+    /// - If the one of transactions has been already committed to the blockchain.
     pub fn create_block_with_transactions<I>(&mut self, txs: I)
     where
         I: IntoIterator<Item = Box<Transaction>>,
@@ -717,7 +717,7 @@ impl TestKit {
     ///
     /// # Panics
     ///
-    /// In the case any of transaction hashes are not in the mempool.
+    /// - In the case any of transaction hashes are not in the mempool.
     pub fn create_block_with_tx_hashes(&mut self, tx_hashes: &[crypto::Hash]) {
         self.poll_events();
 
@@ -828,6 +828,55 @@ impl TestKit {
     ///
     /// - If `actual_from` is less than current height or equals.
     /// - If configuration change has been already proposed but not executed.
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// extern crate exonum;
+    /// extern crate exonum_testkit;
+    /// extern crate serde;
+    /// extern crate serde_json;
+    /// 
+    /// use exonum::helpers::{Height, ValidatorId};
+    /// use exonum_testkit::TestKitBuilder;
+    /// use exonum::blockchain::Schema;
+    /// use exonum::storage::StorageValue;
+    /// 
+    /// fn main() {
+    ///    let mut testkit = TestKitBuilder::auditor().with_validators(3).create();
+    /// 
+    ///    let cfg_change_height = Height(5);
+    ///    let proposal = {
+    ///         let mut cfg = testkit.configuration_change_proposal();
+    ///         // Add us to validators.
+    ///         let mut validators = cfg.validators().to_vec();
+    ///         validators.push(testkit.network().us().clone());
+    ///         cfg.set_validators(validators);
+    ///         // Change configuration of our service.
+    ///         cfg.set_service_config("my_service", "My config");
+    ///         // Set the height with which the configuration takes effect.
+    ///         cfg.set_actual_from(cfg_change_height);
+    ///         cfg
+    ///     };
+    ///     // Save proposed configuration.
+    ///     let stored = proposal.stored_configuration().clone();
+    ///     // Commit configuration change proposal to the testkit.
+    ///     testkit.commit_configuration_change(proposal);
+    ///     // Create blocks up to the height preceding the `actual_from` height.
+    ///     testkit.create_blocks_until(cfg_change_height.previous());
+    ///     // Check that the proposal has become actual.
+    ///     assert_eq!(testkit.network().us().validator_id(), Some(ValidatorId(3)));
+    ///     assert_eq!(testkit.validator(ValidatorId(3)), testkit.network().us());
+    ///     assert_eq!(testkit.actual_configuration(), stored);
+    ///     assert_eq!(
+    ///         Schema::new(&testkit.snapshot())
+    ///             .previous_configuration()
+    ///             .unwrap()
+    ///             .hash(),
+    ///         stored.previous_cfg_hash
+    ///     );
+    /// }
+    /// ```
     pub fn commit_configuration_change(&mut self, proposal: TestNetworkConfiguration) {
         use self::ConfigurationProposalState::*;
         assert!(self.height() < proposal.actual_from());
