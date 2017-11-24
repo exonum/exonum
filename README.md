@@ -3,7 +3,6 @@
 [![Build status][travis-image]][travis-url]
 [![Build status][appveyor-image]][appveyor-url]
 
-
 [travis-image]: https://travis-ci.org/exonum/exonum-testkit.svg?branch=master
 [travis-url]: https://travis-ci.org/exonum/exonum-testkit
 [appveyor-image]: https://ci.appveyor.com/api/projects/status/lhu2aykh9nyti78p/branch/master?svg=true
@@ -14,7 +13,7 @@ synchronously and in the same process as the testkit.
 
 ## Examples
 
-See the [**tests**](tests) folder for examples of building a
+See the [**tests**](tests) and [**examples**](examples) folders for examples of building a
 service and then testing it with the testkit.
 
 ## License
