@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! The time oracle service for Exonum
+
 /*
 #![deny(missing_debug_implementations)]
 #![deny(missing_docs)]
@@ -42,7 +44,7 @@ use exonum::encoding;
 use exonum::helpers::fabric::{ServiceFactory, Context};
 use exonum::api::Api;
 
-const SERVICE_ID: u16 = 3;
+const SERVICE_ID: u16 = 4;
 const TX_TIME_ID: u16 = 1;
 
 // SCHEMA
