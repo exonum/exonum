@@ -12,6 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! This crate defines the oracle for Exonum.
+
+/*
+#![deny(missing_debug_implementations)]
+#![deny(missing_docs)]
+*/
+
 extern crate serde;
 extern crate serde_json;
 #[macro_use]
@@ -22,19 +29,20 @@ extern crate router;
 extern crate bodyparser;
 extern crate iron;
 
-use exonum::blockchain::{Blockchain, Service, ServiceContext, Schema, GenesisConfig,
-                         ValidatorKeys, Transaction, ApiContext};
-use exonum::node::{Node, NodeConfig, NodeApiConfig, ApiSender};
-use exonum::messages::{RawTransaction, FromRaw, Message};
-use exonum::encoding::serialize::json::reexport::Value;
-use exonum::storage::{Fork, Snapshot, MemoryDB, MapIndex, Entry};
-use exonum::crypto::{PublicKey, Hash};
-use exonum::encoding;
-use exonum::api::Api;
 use iron::prelude::*;
 use iron::Handler;
 use router::Router;
+
 use std::time::SystemTime;
+
+use exonum::blockchain::{Blockchain, Service, ServiceContext, Schema, Transaction, ApiContext};
+use exonum::messages::{RawTransaction, FromRaw, Message};
+use exonum::encoding::serialize::json::reexport::Value;
+use exonum::storage::{Fork, Snapshot, MapIndex, Entry};
+use exonum::crypto::{PublicKey, Hash};
+use exonum::encoding;
+use exonum::helpers::fabric::{ServiceFactory, Context};
+use exonum::api::Api;
 
 const SERVICE_ID: u16 = 3;
 const TX_TIME_ID: u16 = 1;
@@ -59,22 +67,22 @@ impl<T: AsRef<Snapshot>> TimeSchema<T> {
     }
 
     pub fn validators_time(&self) -> MapIndex<&Snapshot, PublicKey, Time> {
-        MapIndex::new("time.validators_time", self.view.as_ref())
+        MapIndex::new("exonum_time.validators_time", self.view.as_ref())
     }
 
     pub fn time(&self) -> Entry<&Snapshot, Time> {
-        Entry::new("time.time", self.view.as_ref())
+        Entry::new("exonum_time.time", self.view.as_ref())
     }
 }
 
 
 impl<'a> TimeSchema<&'a mut Fork> {
     pub fn validators_time_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Time> {
-        MapIndex::new("time.validators_time", self.view)
+        MapIndex::new("exonum_time.validators_time", self.view)
     }
 
     pub fn time_mut(&mut self) -> Entry<&mut Fork, Time> {
-        Entry::new("time.time", self.view)
+        Entry::new("exonum_time.time", self.view)
     }
 }
 
@@ -99,56 +107,59 @@ impl Transaction for TxTime {
     fn execute(&self, view: &mut Fork) {
         let validator_keys = Schema::new(&view).actual_configuration().validator_keys;
 
-        if validator_keys.iter().any(|&validator| {
+        if !validator_keys.iter().any(|&validator| {
             validator.service_key == *self.pub_key()
         })
         {
-            let mut schema = TimeSchema::new(view);
-            if let Some(storage_time) = schema.validators_time().get(self.pub_key()) {
-                if storage_time.time() < self.time() {
-                    schema.validators_time_mut().put(
-                        self.pub_key(),
-                        Time::new(self.time()),
-                    );
-                }
-                else {
-                    return;
-                }
+            return;
+        }
+
+        let mut schema = TimeSchema::new(view);
+        match schema.validators_time().get(self.pub_key()) {
+            Some(ref storage_time) if storage_time.time() >= self.time() => {
+                return;
             }
-            else {
+            _ => {
                 schema.validators_time_mut().put(
                     self.pub_key(),
                     Time::new(self.time()),
-                );
+                )
             }
+        }
 
-            let mut validators_time = Vec::new();
-            {
-                let idx = schema.validators_time();
+        let mut validators_time: Vec<SystemTime>;
 
-                for pair in idx.iter() {
-                    let (pub_key, time) = (pair.0, pair.1.time());
-                    if validator_keys.iter().any(|validator| {
-                        validator.service_key == pub_key
-                    })
-                        {
-                            validators_time.push(time);
-                        }
-                }
+        {
+            let idx = schema.validators_time();
+            validators_time = idx.iter()
+                .filter_map(|pair| if validator_keys.iter().any(|validator| {
+                    validator.service_key == pair.0
+                })
+                {
+                    Some(pair.1.time())
+                } else {
+                    None
+                })
+                .collect();
+        }
+
+
+        let max_byzantine_nodes = validator_keys.len() / 3;
+        if validators_time.len() <= max_byzantine_nodes {
+            return;
+        }
+
+        validators_time.sort_by(|a, b| b.cmp(a));
+
+        match schema.time().get() {
+            Some(ref current_time)
+                if current_time.time() >= validators_time[max_byzantine_nodes] => {
+                return;
             }
-
-            let f = validator_keys.len() / 3;
-            if validators_time.len() > f {
-                validators_time.sort();
-                validators_time.reverse();
-                if let Some(current_time) = schema.time().get() {
-                    if current_time.time() < validators_time[f] {
-                        schema.time_mut().set(Time::new(validators_time[f]));
-                    }
-                }
-                else {
-                    schema.time_mut().set(Time::new(validators_time[f]));
-                }
+            _ => {
+                schema.time_mut().set(Time::new(
+                    validators_time[max_byzantine_nodes],
+                ));
             }
         }
     }
@@ -163,7 +174,6 @@ pub struct TxResponse {
 
 #[derive(Clone)]
 struct TimeApi {
-    channel: ApiSender,
     blockchain: Blockchain,
 }
 
@@ -211,11 +221,17 @@ impl Api for TimeApi {
 
 // SERVICE DECLARATION
 
-struct TimeService;
+pub struct TimeService;
+
+impl TimeService {
+    pub fn new() -> TimeService {
+        TimeService {}
+    }
+}
 
 impl Service for TimeService {
     fn service_name(&self) -> &'static str {
-        "time"
+        "exonum_time"
     }
 
     fn service_id(&self) -> u16 {
@@ -244,69 +260,23 @@ impl Service for TimeService {
 
     fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
         let mut router = Router::new();
-        let api = TimeApi {
-            channel: ctx.node_channel().clone(),
-            blockchain: ctx.blockchain().clone(),
-        };
-        api.wire(&mut router);
+        let api = TimeApi { blockchain: ctx.blockchain().clone() };
+        api.wire_private(&mut router);
         Some(Box::new(router))
     }
 
     fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
         let mut router = Router::new();
-        let api = TimeApi {
-            channel: ctx.node_channel().clone(),
-            blockchain: ctx.blockchain().clone(),
-        };
-        api.wire_private(&mut router);
+        let api = TimeApi { blockchain: ctx.blockchain().clone() };
+        api.wire(&mut router);
         Some(Box::new(router))
     }
 }
 
-fn main() {
-    exonum::helpers::init_logger().unwrap();
+pub struct TimeServiceFactory;
 
-    println!("Creating in-memory database...");
-    let db = MemoryDB::new();
-    let services: Vec<Box<Service>> = vec![Box::new(TimeService)];
-    let blockchain = Blockchain::new(Box::new(db), services);
-
-    let (consensus_public_key, consensus_secret_key) = exonum::crypto::gen_keypair();
-    let (service_public_key, service_secret_key) = exonum::crypto::gen_keypair();
-
-    let validator_keys = ValidatorKeys {
-        consensus_key: consensus_public_key,
-        service_key: service_public_key,
-    };
-    let genesis = GenesisConfig::new(vec![validator_keys].into_iter());
-
-    let api_address = "0.0.0.0:8000".parse().unwrap();
-    let api_cfg = NodeApiConfig {
-        public_api_address: Some(api_address),
-        ..Default::default()
-    };
-
-    let peer_address = "0.0.0.0:2000".parse().unwrap();
-
-    let node_cfg = NodeConfig {
-        listen_address: peer_address,
-        peers: vec![],
-        service_public_key,
-        service_secret_key,
-        consensus_public_key,
-        consensus_secret_key,
-        genesis,
-        external_address: None,
-        network: Default::default(),
-        whitelist: Default::default(),
-        api: api_cfg,
-        mempool: Default::default(),
-        services_configs: Default::default(),
-    };
-
-    println!("Starting a single node...");
-    let node = Node::new(blockchain, node_cfg);
-
-    println!("Blockchain is ready for transactions!");
-    node.run().unwrap();
+impl ServiceFactory for TimeServiceFactory {
+    fn make_service(&mut self, _: &Context) -> Box<Service> {
+        Box::new(TimeService::new())
+    }
 }
