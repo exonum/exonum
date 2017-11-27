@@ -612,9 +612,7 @@ impl TestKit {
         self.update_configuration();
 
         let (block_hash, patch) = {
-            let validator_id = self.leader().validator_id().expect(
-                "Tested node is not a validator",
-            );
+            let validator_id = self.leader().validator_id().unwrap();
             let transactions = self.mempool();
             self.blockchain.create_patch(
                 validator_id,
@@ -665,15 +663,16 @@ impl TestKit {
                     self.blockchain.merge(changes).unwrap();
                     self.cfg_proposal = Some(Committed(cfg_proposal));
                 }
-                Committed(ref cfg_proposal) if cfg_proposal.actual_from() == height => {
-                    // Modify the self configuration
-                    self.network_mut().update(
-                        cfg_proposal.us.clone(),
-                        cfg_proposal.validators.clone(),
-                    );
-                }
                 Committed(cfg_proposal) => {
-                    self.cfg_proposal = Some(Committed(cfg_proposal));
+                    if cfg_proposal.actual_from() == height {
+                        // Modify the self configuration
+                        self.network_mut().update(
+                            cfg_proposal.us,
+                            cfg_proposal.validators,
+                        );
+                    } else {
+                        self.cfg_proposal = Some(Committed(cfg_proposal));
+                    }
                 }
             }
         }
@@ -879,8 +878,8 @@ impl TestKit {
     /// ```
     pub fn commit_configuration_change(&mut self, proposal: TestNetworkConfiguration) {
         use self::ConfigurationProposalState::*;
-        assert!(self.height() < proposal.actual_from());
-        assert!(self.cfg_proposal.is_none());
+        assert!(self.height() < proposal.actual_from(), "The `actual_from` height should be greater than the current.");
+        assert!(self.cfg_proposal.is_none(), "There is an active configuration change proposal.");
         self.cfg_proposal = Some(Uncommitted(proposal));
     }
 }

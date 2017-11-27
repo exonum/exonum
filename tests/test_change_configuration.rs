@@ -99,3 +99,34 @@ fn test_change_service_config() {
         testkit.actual_configuration().services["my_service"]
     );
 }
+
+#[test]
+#[should_panic(expected = "The `actual_from` height should be greater than the current")]
+fn test_incorrect_actual_from_field() {
+    let mut testkit = TestKitBuilder::auditor().with_validators(1).create();
+    testkit.create_blocks_until(Height(2));
+    let proposal = {
+        let mut cfg = testkit.configuration_change_proposal();
+        cfg.set_actual_from(Height(2));
+        cfg
+    };
+    testkit.commit_configuration_change(proposal);
+}
+
+#[test]
+#[should_panic(expected = "There is an active configuration change proposal")]
+fn test_another_configuration_change_proposal() {
+    let mut testkit = TestKitBuilder::auditor().with_validators(1).create();
+    let first_proposal = {
+        let mut cfg = testkit.configuration_change_proposal();
+        cfg.set_actual_from(Height(10));
+        cfg
+    };
+    testkit.commit_configuration_change(first_proposal);
+    let second_proposal = {
+        let mut cfg = testkit.configuration_change_proposal();
+        cfg.set_actual_from(Height(11));
+        cfg
+    };
+    testkit.commit_configuration_change(second_proposal);
+}
