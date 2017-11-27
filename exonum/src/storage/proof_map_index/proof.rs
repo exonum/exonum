@@ -156,7 +156,8 @@ impl<'a> ContourNode<'a> {
         self.right_key_len = to_bits;
     }
 
-    /// Outputs the hash and the key of the node based on the finalized `right_hash` value.
+    /// Outputs the hash of the node based on the finalized `right_hash` value and `contour_key`,
+    /// which is an extension of the right child key.
     fn finalize(self, contour_key: &DBKey, right_hash: Hash) -> Hash {
         let stream = HashStream::new().update(self.left_hash.as_ref()).update(
             right_hash.as_ref(),
@@ -170,7 +171,7 @@ impl<'a> ContourNode<'a> {
     }
 }
 
-// Used only for the purpose of clearer serialization.
+// Used instead of `(DBKey, Hash)` only for the purpose of clearer (de)serialization.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct MapProofEntry {
     key: DBKey,
@@ -192,7 +193,7 @@ impl From<MapProofEntry> for (DBKey, Hash) {
     }
 }
 
-// Used only for the purpose of clearer serialization.
+// Used instead of `(K, Option<V>)` only for the purpose of clearer (de)serialization.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 enum OptionalEntry<K, V> {
@@ -397,8 +398,7 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
             }
 
             // Iteratively finalize all remaining nodes in the tree. This handles the special case
-            // when all keys start with the same bit(s); see the special clause in
-            // `ContourNode.finalize()`.
+            // when all keys start with the same bit(s).
             let (mut fin_hash, fin_key) = {
                 let last_entry = entries.last().unwrap();
                 (last_entry.hash, &last_entry.key)
