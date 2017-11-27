@@ -21,7 +21,7 @@ mod hooks {
     use exonum::encoding;
     use exonum::helpers::Height;
 
-    const SERVICE_ID: u16 = 1;
+    const SERVICE_ID: u16 = 512;
     const TX_AFTER_COMMIT_ID: u16 = 1;
 
     message! {

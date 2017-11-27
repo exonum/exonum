@@ -13,8 +13,8 @@ use exonum_testkit::{ApiKind, TestKitBuilder};
 
 // Simple service implementation.
 
-const SERVICE_ID: u16 = 1;
-const TX_TIMESTAMP_ID: u16 = 1;
+const SERVICE_ID: u16 = 512;
+const TX_TIMESTAMP_ID: u16 = 0;
 
 message! {
     struct TxTimestamp {

@@ -878,8 +878,14 @@ impl TestKit {
     /// ```
     pub fn commit_configuration_change(&mut self, proposal: TestNetworkConfiguration) {
         use self::ConfigurationProposalState::*;
-        assert!(self.height() < proposal.actual_from(), "The `actual_from` height should be greater than the current.");
-        assert!(self.cfg_proposal.is_none(), "There is an active configuration change proposal.");
+        assert!(
+            self.height() < proposal.actual_from(),
+            "The `actual_from` height should be greater than the current."
+        );
+        assert!(
+            self.cfg_proposal.is_none(),
+            "There is an active configuration change proposal."
+        );
         self.cfg_proposal = Some(Uncommitted(proposal));
     }
 }
