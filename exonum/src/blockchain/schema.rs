@@ -146,31 +146,21 @@ where
     }
 
     /// Returns latest committed block.
-    pub fn last_block(&self) -> Option<Block> {
-        match self.block_hashes_by_height().last() {
-            Some(hash) => Some(self.blocks().get(&hash).unwrap()),
-            None => None,
-        }
+    pub fn last_block(&self) -> Block {
+        let hash = self.block_hashes_by_height().last().expect(
+            "Genesis block was not created.",
+        );
+        self.blocks().get(&hash).unwrap()
     }
 
     /// Returns height of the latest committed block.
-    pub fn last_height(&self) -> Option<Height> {
-        let block_opt = self.last_block();
-        block_opt.map(|block| block.height())
-    }
-
-    /// Returns the current height of the blockchain. Its value is equal to `last_height + 1`.
-    pub fn current_height(&self) -> Height {
-        let last_height = self.last_height();
-        match last_height {
-            Some(last_height) => last_height.next(),
-            None => Height::zero(),
-        }
+    pub fn height(&self) -> Height {
+        self.last_block().height()
     }
 
     /// Returns configuration for the latest height of blockchain.
     pub fn actual_configuration(&self) -> StoredConfiguration {
-        let current_height = self.current_height();
+        let current_height = self.height().next();
         let res = self.configuration_by_height(current_height);
         trace!("Retrieved actual_config: {:?}", res);
         res
@@ -178,7 +168,7 @@ where
 
     /// Returns the nearest following configuration if it exists.
     pub fn following_configuration(&self) -> Option<StoredConfiguration> {
-        let current_height = self.current_height();
+        let current_height = self.height().next();
         let idx = self.find_configurations_index_by_height(current_height);
         match self.configs_actual_from().get(idx + 1) {
             Some(cfg_ref) => {
@@ -195,7 +185,7 @@ where
 
     /// Returns the previous configuration if it exists.
     pub fn previous_configuration(&self) -> Option<StoredConfiguration> {
-        let current_height = self.current_height();
+        let current_height = self.height().next();
         let idx = self.find_configurations_index_by_height(current_height);
         if idx > 0 {
             let cfg_ref = self.configs_actual_from().get(idx - 1).expect(&format!(
