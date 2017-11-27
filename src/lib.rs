@@ -609,8 +609,6 @@ impl TestKit {
         let height = self.height().next();
         let last_hash = self.last_block_hash();
 
-        self.update_configuration();
-
         let (block_hash, patch) = {
             let validator_id = self.leader().validator_id().unwrap();
             let transactions = self.mempool();
@@ -643,6 +641,7 @@ impl TestKit {
             .commit(&patch, block_hash, precommits.iter())
             .unwrap();
 
+        self.update_configuration();
         self.poll_events();
     }
 
@@ -651,7 +650,7 @@ impl TestKit {
     fn update_configuration(&mut self) {
         use ConfigurationProposalState::*;
 
-        let height = self.height().next().next();
+        let height = self.height().next();
         if let Some(cfg_proposal) = self.cfg_proposal.take() {
             match cfg_proposal {
                 Uncommitted(cfg_proposal) => {
