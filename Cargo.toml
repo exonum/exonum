@@ -27,3 +27,6 @@ router = "0.5.1"
 iron = "0.5.1"
 bodyparser = "0.7.0"
 params = "0.6.0"
+
+[patch.crates-io]
+exonum = { git = "https://github.com/exonum/exonum", rev = "f81c4b1429a225ca7605ba5ae11122f4fcd78859" }

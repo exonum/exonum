@@ -511,7 +511,7 @@ impl Transaction for TxConfigPropose {
             return;
         }
 
-        let current_height = Schema::new(&fork).current_height();
+        let current_height = Schema::new(&fork).height().next();
         let actual_from = config_candidate_body.actual_from;
         if actual_from <= current_height {
             error!(
@@ -591,7 +591,7 @@ impl Transaction for TxConfigVote {
             return;
         }
 
-        let current_height = Schema::new(&fork).current_height();
+        let current_height = Schema::new(&fork).height().next();
         let actual_from = parsed_config.actual_from;
         if actual_from <= current_height {
             error!(
