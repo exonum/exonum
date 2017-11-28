@@ -146,30 +146,44 @@ where
     }
 
     /// Returns latest committed block.
+    ///
+    /// # Panics
+    /// - If the "genesis block" was not created.
     pub fn last_block(&self) -> Block {
         let hash = self.block_hashes_by_height().last().expect(
-            "Genesis block was not created.",
+            "An attempt to get the `last_block` during creating the genesis block.",
         );
         self.blocks().get(&hash).unwrap()
     }
 
     /// Returns height of the latest committed block.
+    ///
+    /// # Panics
+    /// - If the "genesis block" was not created.
     pub fn height(&self) -> Height {
-        self.last_block().height()
+        let len = self.block_hashes_by_height().len();
+        assert!(
+            len > 0,
+            "An attempt to get the actual `height` during creating the genesis block."
+        );
+        Height(len - 1)
     }
 
     /// Returns configuration for the latest height of blockchain.
+    ///
+    /// # Panics
+    /// - If the "genesis block" was not created.
     pub fn actual_configuration(&self) -> StoredConfiguration {
-        let current_height = self.current_height();
-        let res = self.configuration_by_height(current_height);
+        let next_height = self.next_height();
+        let res = self.configuration_by_height(next_height);
         trace!("Retrieved actual_config: {:?}", res);
         res
     }
 
     /// Returns the nearest following configuration if it exists.
     pub fn following_configuration(&self) -> Option<StoredConfiguration> {
-        let current_height = self.current_height();
-        let idx = self.find_configurations_index_by_height(current_height);
+        let next_height = self.next_height();
+        let idx = self.find_configurations_index_by_height(next_height);
         match self.configs_actual_from().get(idx + 1) {
             Some(cfg_ref) => {
                 let cfg_hash = cfg_ref.cfg_hash();
@@ -185,8 +199,8 @@ where
 
     /// Returns the previous configuration if it exists.
     pub fn previous_configuration(&self) -> Option<StoredConfiguration> {
-        let current_height = self.current_height();
-        let idx = self.find_configurations_index_by_height(current_height);
+        let next_height = self.next_height();
+        let idx = self.find_configurations_index_by_height(next_height);
         if idx > 0 {
             let cfg_ref = self.configs_actual_from().get(idx - 1).expect(&format!(
                 "Configuration at index {} not found",
@@ -268,11 +282,8 @@ where
         )
     }
 
-    fn current_height(&self) -> Height {
-        self.block_hashes_by_height()
-            .last()
-            .map(|hash| self.blocks().get(&hash).unwrap().height().next())
-            .unwrap_or_else(Height::zero)
+    fn next_height(&self) -> Height {
+        Height(self.block_hashes_by_height().len())
     }
 }
 
