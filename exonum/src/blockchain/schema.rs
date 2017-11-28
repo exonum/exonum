@@ -159,7 +159,8 @@ where
     /// Returns height of the latest committed block.
     ///
     /// # Panics
-    /// - If the "genesis block" was not created.
+    /// 
+    /// Panics if the "genesis block" was not created.
     pub fn height(&self) -> Height {
         let len = self.block_hashes_by_height().len();
         assert!(
@@ -172,7 +173,8 @@ where
     /// Returns configuration for the latest height of blockchain.
     ///
     /// # Panics
-    /// - If the "genesis block" was not created.
+    /// 
+    /// Panics if the "genesis block" was not created.
     pub fn actual_configuration(&self) -> StoredConfiguration {
         let next_height = self.next_height();
         let res = self.configuration_by_height(next_height);
