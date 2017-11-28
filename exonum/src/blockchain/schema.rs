@@ -148,7 +148,8 @@ where
     /// Returns latest committed block.
     ///
     /// # Panics
-    /// - If the "genesis block" was not created.
+    ///
+    /// Panics if the "genesis block" was not created.
     pub fn last_block(&self) -> Block {
         let hash = self.block_hashes_by_height().last().expect(
             "An attempt to get the `last_block` during creating the genesis block.",
@@ -284,7 +285,7 @@ where
         )
     }
 
-    /// Returns the nexte height of the blockchain.
+    /// Returns the next height of the blockchain.
     /// Its value is equal to "height of the latest committed block" + 1.
     fn next_height(&self) -> Height {
         Height(self.block_hashes_by_height().len())
