@@ -32,7 +32,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 use crypto::{PublicKey, SecretKey, Hash};
-use encoding::serialize::{FromHex, FromHexError, ToHex};
+use encoding::serialize::{FromHex, FromHexError, ToHex, encode_hex};
 use storage::{Result as StorageResult, Error as StorageError};
 
 pub mod public;
@@ -125,9 +125,7 @@ impl From<ApiError> for IronError {
         let code = match e {
             ApiError::FileExists(hash) |
             ApiError::FileNotFound(hash) => {
-                let mut hex_string = String::with_capacity(128);
-                hash.write_hex(&mut hex_string).unwrap();
-                body.insert("hash", hex_string);
+                body.insert("hash", encode_hex(&hash));
                 status::Conflict
             }
             _ => status::Conflict,
@@ -162,9 +160,7 @@ where
     where
         S: Serializer,
     {
-        let mut hex_string = String::new();
-        self.0.as_ref().write_hex(&mut hex_string).unwrap();
-        ser.serialize_str(&hex_string)
+        ser.serialize_str(&encode_hex(&self.0))
     }
 }
 
