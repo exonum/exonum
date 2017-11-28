@@ -116,7 +116,7 @@ script: |
   ;;
   "non-fatal-checks" )
       cd exonum &&
-      cargo doc --no-deps -p exonum &&
+      cargo doc --no-deps &&
       cargo deadlinks --dir target/doc
   ;;
   "benchmarks" )
