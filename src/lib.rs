@@ -151,10 +151,6 @@ impl Transaction for TxTime {
 
         validators_time.sort_by(|a, b| b.cmp(a));
 
-        println!("---------------");
-        println!("{:?}", validators_time);
-        println!("---------------");
-
         match schema.time().get() {
             Some(ref current_time)
                 if current_time.time() >= validators_time[max_byzantine_nodes] => {
