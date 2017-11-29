@@ -318,9 +318,7 @@ macro_rules! implement_private_sodium_wrapper {
         /// Returns the hex representation of the binary data.
         /// Lower case letters are used (e.g. f9b4ca).
         pub fn to_hex(&self) -> String {
-            let mut str_buf = String::with_capacity(4 * $size);
-            $crate::encoding::serialize::ToHex::write_hex(self, &mut str_buf).unwrap();
-            str_buf
+            $crate::encoding::serialize::encode_hex(&self[..])
         }
     }
 
@@ -448,8 +446,7 @@ macro_rules! implement_serde {
         fn serialize<S>(&self, ser:S) -> Result<S::Ok, S::Error>
         where S: Serializer
         {
-            let mut hex_string = String::new();
-            ::encoding::serialize::ToHex::write_hex(self, &mut hex_string).unwrap();
+            let hex_string = $crate::encoding::serialize::encode_hex(&self[..]);
             ser.serialize_str(&hex_string)
         }
     }

@@ -42,7 +42,7 @@ macro_rules! impl_default_deserialize_owned {
     (@impl $name:ty) => {
         impl $crate::encoding::serialize::json::ExonumJsonDeserialize for $name {
             fn deserialize(value: &$crate::encoding::serialize::json::reexport::Value)
-                                                        -> Result<Self, Box<::std::error::Error>> {
+                -> Result<Self, Box<::std::error::Error>> {
                 use $crate::encoding::serialize::json::reexport::from_value;
                 Ok(from_value(value.clone())?)
             }
@@ -89,7 +89,7 @@ macro_rules! impl_deserialize_int {
             fn deserialize_field<B: WriteBufferWrapper>(value: &Value,
                                                          buffer: &mut B,
                                                          from: Offset,
-                                                         to: Offset )
+                                                         to: Offset)
                 -> Result<(), Box<Error>>
             {
                 let number = value.as_i64().ok_or("Can't cast json as integer")?;
@@ -111,7 +111,7 @@ macro_rules! impl_deserialize_bigint {
             fn deserialize_field<B: WriteBufferWrapper>(value: &Value,
                                                         buffer: & mut B,
                                                         from: Offset,
-                                                        to: Offset )
+                                                        to: Offset)
             -> Result<(), Box<Error>>
             {
                 let stri = value.as_str().ok_or("Can't cast json as string")?;
@@ -156,7 +156,7 @@ macro_rules! impl_deserialize_hex_segment {
             fn deserialize_field<B: WriteBufferWrapper>(value: &Value,
                                                         buffer: & mut B,
                                                         from: Offset,
-                                                        to: Offset )
+                                                        to: Offset)
                 -> Result<(), Box<Error>>
             {
                 let stri = value.as_str().ok_or("Can't cast json as string")?;
@@ -166,8 +166,7 @@ macro_rules! impl_deserialize_hex_segment {
             }
 
             fn serialize_field(&self) -> Result<Value, Box<Error>> {
-                let mut hex_str = String::new();
-                ::encoding::serialize::ToHex::write_hex(self, &mut hex_str)?;
+                let hex_str = $crate::encoding::serialize::encode_hex(&self[..]);
                 Ok(Value::String(hex_str))
             }
         }
