@@ -17,6 +17,7 @@
 use clap;
 use toml::Value;
 use serde::{Serialize, Deserialize};
+use semver::Version;
 
 use std::str::FromStr;
 use std::error::Error;
@@ -214,17 +215,18 @@ pub trait CommandExtension {
 ///
 /// Services should provide implementation of this trait.
 pub trait ServiceFactory: 'static {
-    //TODO: we could move
-    // `service_name` and `service_id` from `Service` trait into this one
-    //fn name() -> &'static str;
-    // ECR-76?
-
     /// Returns `CommandExtension` for the specific `CommandName`.
     #[allow(unused_variables)]
     fn command(&mut self, command: CommandName) -> Option<Box<CommandExtension>> {
         None
     }
 
-    /// Creates a new service instance from the context returned by the `Run` command.
-    fn make_service(&mut self, run_context: &Context) -> Box<Service>;
+    /// Creates a new service instance with given version and name from the context returned by the
+    /// `Run` command.
+    fn make_service(
+        &mut self,
+        run_context: &Context,
+        version: &Version,
+        name: &str,
+    ) -> Box<Service>;
 }

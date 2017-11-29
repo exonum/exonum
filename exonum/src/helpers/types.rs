@@ -256,7 +256,7 @@ impl ValidatorId {
 }
 
 /// Service unique identifier.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ServiceId(pub u16);
 
 impl fmt::Display for Height {
@@ -336,20 +336,20 @@ impl<'de> Deserialize<'de> for Height {
 
 impl Serialize for ServiceId {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
+    where
+        S: Serializer,
     {
         self.0.serialize(serializer)
     }
 }
 
 impl<'de> Deserialize<'de> for ServiceId {
-    fn deserialize<D>(deserializer: D) -> Result<Height, D::Error>
-        where
-            D: Deserializer<'de>,
+    fn deserialize<D>(deserializer: D) -> Result<ServiceId, D::Error>
+    where
+        D: Deserializer<'de>,
     {
 
-        Ok(Height(u16::deserialize(deserializer)?))
+        Ok(ServiceId(u16::deserialize(deserializer)?))
     }
 }
 
