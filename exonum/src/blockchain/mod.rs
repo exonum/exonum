@@ -101,6 +101,14 @@ impl Blockchain {
         }
     }
 
+    /// Recreates the blockchain to reuse with a sandbox.
+    pub fn clone_with_api_sender(&self, api_sender: ApiSender) -> Blockchain {
+        Blockchain {
+            api_sender,
+            ..self.clone()
+        }
+    }
+
     /// Returns service `VecMap` for all our services.
     pub fn service_map(&self) -> &Arc<VecMap<Box<Service>>> {
         &self.service_map

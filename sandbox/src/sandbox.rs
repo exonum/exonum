@@ -265,7 +265,12 @@ impl Sandbox {
         self.inner.borrow_mut().handle_event(event);
     }
 
+    fn process_events(&self) {
+        self.inner.borrow_mut().process_events();
+    }
+
     pub fn send<T: Message>(&self, addr: SocketAddr, msg: &T) {
+        self.process_events();
         let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
         let sended = self.inner.borrow_mut().sent.pop_front();
         if let Some((real_addr, real_msg)) = sended {
@@ -552,7 +557,15 @@ fn gen_primitive_socket_addr(idx: u8) -> SocketAddr {
     SocketAddr::new(IpAddr::V4(addr), u16::from(idx))
 }
 
+/// Constructs an instance of a `Sandbox` and initializes connections.
 pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
+    let sandbox = sandbox_with_services_uninitialized(services);
+    sandbox.initialize(sandbox.time(), 1, sandbox.validators_map.len());
+    sandbox
+}
+
+/// Constructs an uninitialized instance of a `Sandbox`.
+pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandbox {
     let validators = vec![
         gen_keypair_from_seed(&Seed::new([12; 32])),
         gen_keypair_from_seed(&Seed::new([13; 32])),
@@ -651,13 +664,91 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         inner: RefCell::new(inner),
         validators_map: HashMap::from_iter(validators.clone()),
         services_map: HashMap::from_iter(service_keys),
-        addresses: addresses,
+        addresses,
     };
 
-    sandbox.initialize(sandbox.time(), 1, validators.len());
     // General assumption; necessary for correct work of consensus algorithm
     assert!(sandbox.propose_timeout() < sandbox.round_timeout());
     sandbox
+}
+
+/// Constructs a new instance of a `Sandbox` preserving database and configuration and initializes
+/// connections.
+pub fn sandbox_restarted(sandbox: Sandbox) -> Sandbox {
+    let sandbox = sandbox_restarted_uninitialized(sandbox);
+    sandbox.initialize(sandbox.time(), 1, sandbox.validators_map.len());
+    sandbox
+}
+
+/// Constructs a new uninitialized instance of a `Sandbox` preserving database and configuration.
+#[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
+pub fn sandbox_restarted_uninitialized(sandbox: Sandbox) -> Sandbox {
+    let network_channel = mpsc::channel(100);
+    let timeout_channel = mpsc::channel(100);
+    let api_channel = mpsc::channel(100);
+
+    let address = sandbox.a(VALIDATOR_0);
+    let inner = sandbox.inner.borrow();
+
+    let blockchain = inner.handler.blockchain.clone_with_api_sender(
+        ApiSender::new(
+            api_channel.0.clone(),
+        ),
+    );
+
+    let node_sender = NodeSender {
+        network_requests: network_channel.0.clone(),
+        timeout_requests: timeout_channel.0.clone(),
+        api_requests: api_channel.0.clone(),
+    };
+
+    let config = Configuration {
+        listener: ListenerConfig {
+            address,
+            consensus_public_key: *inner.handler.state.consensus_public_key(),
+            consensus_secret_key: inner.handler.state.consensus_secret_key().clone(),
+            whitelist: Default::default(),
+        },
+        service: ServiceConfig {
+            service_public_key: *inner.handler.state.service_public_key(),
+            service_secret_key: inner.handler.state.service_secret_key().clone(),
+        },
+        network: NetworkConfiguration::default(),
+        peer_discovery: Vec::new(),
+        mempool: Default::default(),
+    };
+
+    let system_state = SandboxSystemStateProvider {
+        listen_address: address,
+        shared_time: SharedTime::new(Mutex::new(UNIX_EPOCH + Duration::new(1_486_720_340, 0))),
+    };
+
+    let mut handler = NodeHandler::new(
+        blockchain,
+        address,
+        node_sender,
+        Box::new(system_state),
+        config,
+        inner.handler.api_state.clone(),
+    );
+    handler.initialize();
+
+    let inner = SandboxInner {
+        sent: VecDeque::new(),
+        events: VecDeque::new(),
+        timers: BinaryHeap::new(),
+        timeout_requests_rx: timeout_channel.1,
+        network_requests_rx: network_channel.1,
+        api_requests_rx: api_channel.1,
+        handler,
+        time: Arc::clone(&inner.time),
+    };
+    Sandbox {
+        inner: RefCell::new(inner),
+        validators_map: sandbox.validators_map.clone(),
+        services_map: sandbox.services_map.clone(),
+        addresses: sandbox.addresses.clone(),
+    }
 }
 
 pub fn timestamping_sandbox() -> Sandbox {

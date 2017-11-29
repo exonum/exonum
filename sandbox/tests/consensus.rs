@@ -26,7 +26,7 @@ use std::collections::BTreeMap;
 use rand::{thread_rng, Rng};
 use bit_vec::BitVec;
 use exonum::messages::{RawMessage, Message, Propose, Prevote, Precommit, ProposeRequest,
-                       TransactionsRequest, PrevotesRequest, CONSENSUS};
+                       TransactionsRequest, PrevotesRequest, CONSENSUS, Connect, PeersRequest};
 use exonum::crypto::{Hash, Seed, gen_keypair, gen_keypair_from_seed};
 use exonum::blockchain::{Blockchain, Schema};
 use exonum::node::state::{PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT,
@@ -35,6 +35,8 @@ use exonum::helpers::{Height, Round};
 
 use sandbox::timestamping::{TimestampTx, TimestampingTxGenerator, TIMESTAMPING_SERVICE};
 use sandbox::timestamping_sandbox;
+use sandbox::sandbox::sandbox_with_services_uninitialized;
+use sandbox::sandbox::sandbox_restarted_uninitialized;
 use sandbox::sandbox_tests_helper::*;
 use sandbox::config_updater::TxConfig;
 
@@ -241,6 +243,45 @@ fn test_retrieve_block_and_precommits() {
     }
     let bl_proof_option = sandbox.block_and_precommits(target_height);
     assert!(bl_proof_option.is_none());
+}
+
+/// Scenario:
+/// - Node 0 is not aware of Node 1
+/// - Node 0 receives `PeersRequest` from Node 1 and responds nothing
+/// - Node 0 receives `Connect` from Node 1, saves it and trying to connect
+/// - Node 0 restarts
+/// - Node 0 should connect to Node 1
+/// - Node 0 should be aware of Node 1 and send received `Connect` in response to `PeersRequest`
+#[test]
+fn should_restore_peers_after_restart() {
+    // create sandbox with nodes not aware about each other
+    let sandbox = sandbox_with_services_uninitialized(vec![]);
+
+    let (v0, v1) = (VALIDATOR_0, VALIDATOR_1);
+    let (p0, s0, a0) = (sandbox.p(v0), sandbox.s(v0).clone(), sandbox.a(v0));
+    let (p1, s1, a1) = (sandbox.p(v1), sandbox.s(v1).clone(), sandbox.a(v1));
+
+    let time = sandbox.time();
+    let connect_from_0 = Connect::new(&p0, a0, time, &s0);
+    let connect_from_1 = Connect::new(&p1, a1, time, &s1);
+    let peers_request = PeersRequest::new(&p1, &p0, &s1);
+
+    // check that peers are absent
+    sandbox.recv(&peers_request);
+
+    // receive a `Connect` message and the respond on it
+    sandbox.recv(&connect_from_1);
+    sandbox.send(a1, &connect_from_0);
+
+    // restart the node
+    let sandbox_restarted = sandbox_restarted_uninitialized(sandbox);
+
+    // check that the node is connecting with the peer
+    sandbox_restarted.send(a1, &connect_from_0);
+
+    // check that the peer is restored
+    sandbox_restarted.recv(&peers_request);
+    sandbox_restarted.send(a1, &connect_from_1);
 }
 
 #[test]
