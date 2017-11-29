@@ -42,6 +42,7 @@ pub trait Transaction: Message + 'static {
     ///
     /// *This method should not use external data, that is, it must be a pure function.*
     fn verify(&self) -> bool;
+
     /// Takes the current blockchain state via `fork` and can modify it if certain conditions
     /// are met.
     ///
@@ -51,7 +52,9 @@ pub trait Transaction: Message + 'static {
     /// to the state and return early if these checks fail.
     /// - If the execute method of a transaction raises a `panic`, the changes made by the
     /// transactions are discarded, but the transaction itself is still considered committed.
-    fn execute(&self, fork: &mut Fork);
+    /// - Return value is also stored in the blockchain and can be accessed through api.
+    fn execute(&self, fork: &mut Fork) -> bool;
+
     /// Returns the useful information about the transaction in the JSON format. The returned value
     /// is used to fill the [`TxInfo.content`] field in [the blockchain explorer][explorer].
     ///
@@ -79,7 +82,7 @@ pub trait Transaction: Message + 'static {
     /// impl Transaction for MyTransaction {
     ///     // Other methods...
     /// #   fn verify(&self) -> bool { true }
-    /// #   fn execute(&self, _: &mut Fork) { }
+    /// #   fn execute(&self, _: &mut Fork) -> bool { true }
     ///
     ///     fn info(&self) -> serde_json::Value {
     ///         serde_json::to_value(self).expect("Cannot serialize transaction to JSON")

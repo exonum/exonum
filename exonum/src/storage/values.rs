@@ -232,6 +232,27 @@ impl StorageValue for i64 {
     }
 }
 
+impl StorageValue for bool {
+    fn into_bytes(self) -> Vec<u8> {
+        vec![self as u8]
+    }
+
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        debug_assert_eq!(value.len(), 1);
+        debug_assert!(value[0] == 0 || value[0] == 1);
+
+        match value[0] {
+            0 => true,
+            1 => false,
+            _ => unreachable!(),
+        }
+    }
+
+    fn hash(&self) -> Hash {
+        hash(&[*self as u8])
+    }
+}
+
 impl StorageValue for Hash {
     fn into_bytes(self) -> Vec<u8> {
         self.as_ref().to_vec()
