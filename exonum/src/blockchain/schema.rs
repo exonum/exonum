@@ -13,9 +13,9 @@
 // limitations under the License.
 
 use crypto::Hash;
-use messages::{RawMessage, Precommit};
-use storage::{Snapshot, Fork, StorageKey, StorageValue, ListIndex, MapIndex, ProofListIndex,
-              ProofMapIndex, MapProof};
+use messages::{Precommit, RawMessage};
+use storage::{Fork, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex, Snapshot,
+              StorageKey, StorageValue};
 use helpers::Height;
 use super::{Block, BlockProof, Blockchain};
 use super::config::StoredConfiguration;
@@ -146,40 +146,47 @@ where
     }
 
     /// Returns latest committed block.
-    pub fn last_block(&self) -> Option<Block> {
-        match self.block_hashes_by_height().last() {
-            Some(hash) => Some(self.blocks().get(&hash).unwrap()),
-            None => None,
-        }
+    ///
+    /// # Panics
+    ///
+    /// Panics if the "genesis block" was not created.
+    pub fn last_block(&self) -> Block {
+        let hash = self.block_hashes_by_height().last().expect(
+            "An attempt to get the `last_block` during creating the genesis block.",
+        );
+        self.blocks().get(&hash).unwrap()
     }
 
     /// Returns height of the latest committed block.
-    pub fn last_height(&self) -> Option<Height> {
-        let block_opt = self.last_block();
-        block_opt.map(|block| block.height())
-    }
-
-    /// Returns the current height of the blockchain. Its value is equal to `last_height + 1`.
-    pub fn current_height(&self) -> Height {
-        let last_height = self.last_height();
-        match last_height {
-            Some(last_height) => last_height.next(),
-            None => Height::zero(),
-        }
+    ///
+    /// # Panics
+    ///
+    /// Panics if the "genesis block" was not created.
+    pub fn height(&self) -> Height {
+        let len = self.block_hashes_by_height().len();
+        assert!(
+            len > 0,
+            "An attempt to get the actual `height` during creating the genesis block."
+        );
+        Height(len - 1)
     }
 
     /// Returns configuration for the latest height of blockchain.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the "genesis block" was not created.
     pub fn actual_configuration(&self) -> StoredConfiguration {
-        let current_height = self.current_height();
-        let res = self.configuration_by_height(current_height);
+        let next_height = self.next_height();
+        let res = self.configuration_by_height(next_height);
         trace!("Retrieved actual_config: {:?}", res);
         res
     }
 
     /// Returns the nearest following configuration if it exists.
     pub fn following_configuration(&self) -> Option<StoredConfiguration> {
-        let current_height = self.current_height();
-        let idx = self.find_configurations_index_by_height(current_height);
+        let next_height = self.next_height();
+        let idx = self.find_configurations_index_by_height(next_height);
         match self.configs_actual_from().get(idx + 1) {
             Some(cfg_ref) => {
                 let cfg_hash = cfg_ref.cfg_hash();
@@ -195,8 +202,8 @@ where
 
     /// Returns the previous configuration if it exists.
     pub fn previous_configuration(&self) -> Option<StoredConfiguration> {
-        let current_height = self.current_height();
-        let idx = self.find_configurations_index_by_height(current_height);
+        let next_height = self.next_height();
+        let idx = self.find_configurations_index_by_height(next_height);
         if idx > 0 {
             let cfg_ref = self.configs_actual_from().get(idx - 1).expect(&format!(
                 "Configuration at index {} not found",
@@ -273,9 +280,15 @@ where
         }
         panic!(
             "Couldn't not find any config for height {}, \
-                that means that genesis block was created incorrectly.",
+             that means that genesis block was created incorrectly.",
             height
         )
+    }
+
+    /// Returns the next height of the blockchain.
+    /// Its value is equal to "height of the latest committed block" + 1.
+    fn next_height(&self) -> Height {
+        Height(self.block_hashes_by_height().len())
     }
 }
 
@@ -360,7 +373,7 @@ impl<'a> Schema<&'a mut Fork> {
                 // TODO: Replace panic with errors (ECR-123).
                 panic!(
                     "Attempting to commit configuration with incorrect previous hash: {:?}, \
-                    expected: {:?}",
+                     expected: {:?}",
                     config_data.previous_cfg_hash,
                     last_cfg.cfg_hash()
                 );
@@ -369,7 +382,7 @@ impl<'a> Schema<&'a mut Fork> {
             if actual_from <= last_cfg.actual_from() {
                 panic!(
                     "Attempting to commit configuration with actual_from {} less than the last \
-                    committed the last committed actual_from {}",
+                     committed the last committed actual_from {}",
                     actual_from,
                     last_cfg.actual_from()
                 );

@@ -22,7 +22,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - The `Node` constructor now requires `db` and `services` variables instead of `blockchain` instance. (#366)
 - The `Blockchain` constructor now requires services keypair and an `ApiSender` instance. (#366)
 - `mount_*_api` methods in `Blockchain` instance now do not require `ApiContext`. (#366)
+- Renamed `last_height` to `height`. (#379)
+- `last_block` now returns `Block` instead of `Option<Block>`. (#379)
 - Service identifier replaced from `u16` by separate `ServiceId` type.
+
+### Removed
+- Removed redundant `current_height` method in `Schema`. (#379)
 
 ### Fixed
 - Fixed `crate_authors!` macro usage, this macro can't return static string in new clap version. (#370)

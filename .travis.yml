@@ -35,6 +35,7 @@ cache:
   - $HOME/.cargo
   - $HOME/.local
   - $TRAVIS_BUILD_DIR/target
+  - $TRAVIS_BUILD_DIR/sandbox/target
 
 dist: trusty
 sudo: required
@@ -78,7 +79,8 @@ install:
   if [[ "$FEATURE" == "fmt" ]]; then
     cargo-audit -V || cargo install cargo-audit --force
     rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
-    cargo update
+    cd exonum && cargo update && cd ..
+    cd sandbox && cargo update && cd ..
     fi
 - |
   case "$FEATURE" in
@@ -92,8 +94,8 @@ script: |
 
   "fmt" )
       cargo audit &&
-      cargo fmt -p exonum -- --write-mode=diff &&
-      cargo fmt -p sandbox -- --write-mode=diff
+      cd exonum && cargo fmt -- --write-mode=diff && cd .. &&
+      cd sandbox && cargo fmt -- --write-mode=diff && cd ..
   ;;
   "clippy-core" )
       cd exonum && cargo clippy --verbose --features long_benchmarks  -- -D warnings
@@ -105,10 +107,10 @@ script: |
       cargo test --manifest-path exonum/Cargo.toml --verbose --tests --lib
   ;;
   "test-sandbox" )
-      cargo test -p sandbox --verbose
+      cargo test --manifest-path sandbox/Cargo.toml  --verbose
   ;;
   "test-doc" )
-      cargo test -p exonum --verbose --doc  -- --test-threads=2
+      cargo test --manifest-path sandbox/Cargo.toml  --verbose --doc  -- --test-threads=2
   ;;
   "non-fatal-checks" )
       cargo doc --no-deps -p exonum &&
