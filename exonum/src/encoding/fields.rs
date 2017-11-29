@@ -172,7 +172,7 @@ impl<'a> Field<'a> for bool {
         1
     }
 
-    unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> bool {
+    unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> Self {
         buffer[from as usize] == 1
     }
 
@@ -205,7 +205,7 @@ impl<'a> Field<'a> for u8 {
         mem::size_of::<Self>() as Offset
     }
 
-    unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> u8 {
+    unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> Self {
         buffer[from as usize]
     }
 
@@ -230,7 +230,7 @@ impl<'a> Field<'a> for i8 {
         mem::size_of::<Self>() as Offset
     }
 
-    unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> i8 {
+    unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> Self {
         buffer[from as usize] as i8
     }
 
@@ -246,6 +246,75 @@ impl<'a> Field<'a> for i8 {
     ) -> Result {
         debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
         Ok(latest_segment)
+    }
+}
+
+impl<'a> Field<'a> for f32 {
+    fn field_size() -> Offset {
+        mem::size_of::<Self>() as Offset
+    }
+
+    unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
+        LittleEndian::read_f32(&buffer[from as usize..to as usize])
+    }
+
+    fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
+        LittleEndian::write_f32(&mut buffer[from as usize..to as usize], *self);
+    }
+
+    fn check(
+        buffer: &'a [u8],
+        from: CheckedOffset,
+        to: CheckedOffset,
+        latest_segment: CheckedOffset,
+    ) -> Result {
+        debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
+
+        let from = from.unchecked_offset();
+        let to = to.unchecked_offset();
+
+        let value = unsafe { Self::read(buffer, from, to) };
+        check_float_value(f64::from(value), from, latest_segment)
+    }
+}
+
+impl<'a> Field<'a> for f64 {
+    fn field_size() -> Offset {
+        mem::size_of::<Self>() as Offset
+    }
+
+    unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
+        LittleEndian::read_f64(&buffer[from as usize..to as usize])
+    }
+
+    fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
+        LittleEndian::write_f64(&mut buffer[from as usize..to as usize], *self);
+    }
+
+    fn check(
+        buffer: &'a [u8],
+        from: CheckedOffset,
+        to: CheckedOffset,
+        latest_segment: CheckedOffset,
+    ) -> Result {
+        debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
+
+        let from = from.unchecked_offset();
+        let to = to.unchecked_offset();
+
+        let value = unsafe { Self::read(buffer, from, to) };
+        check_float_value(value, from, latest_segment)
+    }
+}
+
+fn check_float_value(value: f64, position: Offset, segment: CheckedOffset) -> Result {
+    if value.is_finite() {
+        Ok(segment)
+    } else {
+        Err(Error::UnsupportedFloat {
+            position,
+            value,
+        })
     }
 }
 

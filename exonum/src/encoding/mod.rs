@@ -84,9 +84,15 @@
 //! `i32`    | 4    | 32-bit signed number stored in little endian  |
 //! `u64`    | 8    | long unsigned number stored in little endian  |
 //! `i64`    | 8    | long signed number stored in little endian  |
-//! `bool`   | 1    | stored as single byte, where `0x01` - true `0x00` - false [\[1\]](#1)|
+//! `f32`    | 4    | 32-bit floating point type stored in little endian [\[1\]](#1)|
+//! `f64`    | 8    | 64-bit floating point type stored in little endian [\[1\]](#1)|
+//! `bool`   | 1    | stored as single byte, where `0x01` - true `0x00` - false [\[1\]](#2)|
 //!
 //! ######\[1]
+//! Special floating point values that cannot be represented as sequences of digits (such as
+//! Infinity, NaN and signaling NaN) are not permitted.
+//!
+//! ######\[2]
 //! **Trying to represent other values as bool leads to undefined behavior**.
 //!
 //! ### Segment fields

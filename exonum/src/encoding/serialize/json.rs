@@ -21,7 +21,7 @@
 // TODO remove WriteBufferWraper hack (after refactor storage),
 // should be moved into storage (ECR-156).
 
-use serde_json::value::Value;
+use serde_json::value::{Value, Number};
 use bit_vec::BitVec;
 use hex::ToHex;
 
@@ -129,27 +129,29 @@ macro_rules! impl_deserialize_bigint {
     ($($name:ty);*) => ($(impl_deserialize_bigint!{@impl $name})*);
 }
 
-/*
 macro_rules! impl_deserialize_float {
-    (@impl $traitname:ident $typename:ty) => {
-        impl<'a> ExonumJson for $typename {
-            fn deserialize(value: &Value, buffer: &'a mut Vec<u8>,
-                            from: usize, to: usize ) -> bool {
-                    value.as_f64()
-                         .map(|v| v as $typename)
-                         .map(|val| val.write(buffer, from, to))
-                         .is_some()
+    (@impl $typename:ty) => {
+        impl ExonumJson for $typename {
+            fn deserialize_field<B: WriteBufferWrapper>(value: &Value,
+                                                         buffer: &mut B,
+                                                         from: Offset,
+                                                         to: Offset )
+                -> Result<(), Box<Error>>
+            {
+                let number = value.as_f64().ok_or("Can't cast json as float")?;
+                buffer.write(from, to, number as $typename);
+                Ok(())
             }
 
             fn serialize_field(&self) -> Result<Value, Box<Error>> {
-                Value::Number(self.into())
+                Ok(Value::Number(
+                    Number::from_f64((*self).into()).ok_or("Can't cast float as json")?,
+                ))
             }
         }
     };
-    ( $($name:ty);*) => ($(impl_deserialize_float!{@impl  $name})*);
+    ($($name:ty);*) => ($(impl_deserialize_float!{@impl $name})*);
 }
-impl_deserialize_int!{ f32; f64 }
-*/
 
 macro_rules! impl_deserialize_hex_segment {
     (@impl $typename:ty) => {
@@ -176,6 +178,7 @@ macro_rules! impl_deserialize_hex_segment {
 
 impl_deserialize_int!{u8; u16; u32; i8; i16; i32}
 impl_deserialize_bigint!{u64; i64}
+impl_deserialize_float!{f32; f64}
 
 impl_deserialize_hex_segment!{Hash; PublicKey; Signature}
 
