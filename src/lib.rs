@@ -17,8 +17,6 @@
 #![deny(missing_docs)]
 */
 
-//! The time oracle service for Exonum
-
 extern crate serde;
 extern crate serde_json;
 #[macro_use]
