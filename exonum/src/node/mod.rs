@@ -355,10 +355,18 @@ impl NodeHandler {
 
     /// Performs node initialization, so it starts consensus process from the first round.
     pub fn initialize(&mut self) {
-        let addr = self.system_state.listen_address();
-        info!("Start listening address={}", addr);
+        let listen_address = self.system_state.listen_address();
+        info!("Start listening address={}", listen_address);
+        let peers: Vec<_> = self.state.peers().values().map(Connect::addr).collect();
+        for address in &peers {
+            if address == &listen_address {
+                continue;
+            }
+            self.connect(address);
+            info!("Trying to connect with peer {}", address);
+        }
         for address in &self.peer_discovery.clone() {
-            if address == &self.system_state.listen_address() {
+            if address == &listen_address || peers.contains(address) {
                 continue;
             }
             self.connect(address);
