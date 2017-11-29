@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! The time oracle service for Exonum
-
 /*
 #![deny(missing_debug_implementations)]
 #![deny(missing_docs)]
 */
+
+//! The time oracle service for Exonum
 
 extern crate serde;
 extern crate serde_json;
@@ -44,11 +44,13 @@ use exonum::encoding;
 use exonum::helpers::fabric::{ServiceFactory, Context};
 use exonum::api::Api;
 
+// // // // // // // // // // CONSTANTS // // // // // // // // // //
+
 const SERVICE_ID: u16 = 4;
 const TX_TIME_ID: u16 = 1;
 const SERVICE_NAME: &str = "exonum_time";
 
-// SCHEMA
+// // // // // // // // // // PERSISTENT DATA // // // // // // // // // //
 
 encoding_struct! {
     struct Time {
@@ -57,6 +59,8 @@ encoding_struct! {
         field time:     SystemTime  [00 => 12]
     }
 }
+
+// // // // // // // // // // DATA LAYOUT // // // // // // // // // //
 
 pub struct TimeSchema<T> {
     view: T,
@@ -90,7 +94,7 @@ impl<'a> TimeSchema<&'a mut Fork> {
     }
 }
 
-// TRANSACTION
+// // // // // // // // // // TRANSACTION // // // // // // // // // //
 
 message! {
     struct TxTime {
@@ -166,7 +170,7 @@ impl Transaction for TxTime {
     }
 }
 
-// API
+// // // // // // // // // // REST API // // // // // // // // // //
 
 #[derive(Serialize, Deserialize)]
 pub struct TxResponse {
@@ -220,7 +224,7 @@ impl Api for TimeApi {
 
 
 
-// SERVICE DECLARATION
+// // // // // // // // // // SERVICE DECLARATION // // // // // // // // // //
 
 pub struct TimeService;
 
@@ -254,9 +258,16 @@ impl Service for TimeService {
         Value::Null
     }
 
-    fn handle_commit(&self, context: &mut ServiceContext) {
+    fn handle_commit(&self, context: &ServiceContext) {
+        if context.validator_id().is_none() {
+            return;
+        }
         let (pub_key, sec_key) = (*context.public_key(), context.secret_key().clone());
-        context.add_transaction(Box::new(TxTime::new(SystemTime::now(), &pub_key, &sec_key)));
+        context.transaction_sender().send(Box::new(TxTime::new(
+            SystemTime::now(),
+            &pub_key,
+            &sec_key,
+        )));
     }
 
     fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
