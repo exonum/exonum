@@ -71,24 +71,24 @@ impl<T: AsRef<Snapshot>> TimeSchema<T> {
 
     pub fn validators_time(&self) -> MapIndex<&Snapshot, PublicKey, Time> {
         MapIndex::new(
-            SERVICE_NAME.to_string() + ".validators_time",
+            format!("{}.validators_time", SERVICE_NAME),
             self.view.as_ref(),
         )
     }
 
     pub fn time(&self) -> Entry<&Snapshot, Time> {
-        Entry::new(SERVICE_NAME.to_string() + ".time", self.view.as_ref())
+        Entry::new(format!("{}.time", SERVICE_NAME), self.view.as_ref())
     }
 }
 
 
 impl<'a> TimeSchema<&'a mut Fork> {
     pub fn validators_time_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Time> {
-        MapIndex::new(SERVICE_NAME.to_string() + ".validators_time", self.view)
+        MapIndex::new(format!("{}.validators_time", SERVICE_NAME), self.view)
     }
 
     pub fn time_mut(&mut self) -> Entry<&mut Fork, Time> {
-        Entry::new(SERVICE_NAME.to_string() + ".time", self.view)
+        Entry::new(format!("{}.time", SERVICE_NAME) , self.view)
     }
 }
 
