@@ -30,19 +30,19 @@ use exonum::helpers::Height;
 
 use super::{StorageValueConfigProposeData, TxConfigPropose, TxConfigVote, ConfigurationSchema};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ApiResponseConfigHashInfo {
     pub hash: Hash,
     pub config: StoredConfiguration,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ApiResponseProposeHashInfo {
     pub hash: Hash,
     pub propose_data: StorageValueConfigProposeData,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ApiResponseConfigInfo {
     pub committed_config: Option<StoredConfiguration>,
     pub propose: Option<StorageValueConfigProposeData>,
@@ -50,13 +50,13 @@ pub struct ApiResponseConfigInfo {
 
 pub type ApiResponseVotesInfo = Option<Vec<Option<TxConfigVote>>>;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ApiResponseProposePost {
     pub tx_hash: Hash,
     pub cfg_hash: Hash,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ApiResponseVotePost {
     pub tx_hash: Hash,
 }

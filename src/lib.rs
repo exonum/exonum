@@ -85,6 +85,12 @@
 
 #[macro_use]
 extern crate exonum;
+#[cfg(test)]
+#[macro_use]
+extern crate exonum_testkit;
+#[cfg(test)]
+#[macro_use]
+extern crate pretty_assertions;
 #[macro_use]
 extern crate log;
 #[macro_use]
@@ -111,6 +117,8 @@ use exonum::encoding::serialize::json::reexport as serde_json;
 
 /// Configuration service http api.
 pub mod config_api;
+#[cfg(test)]
+mod tests;
 
 type ProposeData = StorageValueConfigProposeData;
 /// Value of [`service_id`](struct.ConfigurationService.html#method.service_id) of

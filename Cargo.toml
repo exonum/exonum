@@ -28,5 +28,12 @@ iron = "0.5.1"
 bodyparser = "0.7.0"
 params = "0.6.0"
 
+[dev-dependencies]
+pretty_assertions = "0.4.0"
+
+[dev-dependencies.exonum-testkit]
+git = "https://github.com/alekseysidorov/exonum-testkit"
+rev = "78b22b42cab7f9451ef63056de2623281e9c0bf9"
+
 [patch.crates-io]
-exonum = { git = "https://github.com/exonum/exonum", rev = "f81c4b1429a225ca7605ba5ae11122f4fcd78859" }
+exonum = { git = "https://github.com/exonum/exonum", rev = "3ffaf6c7f2bf93e42cb70b10a8a0d02077691fe2" }
