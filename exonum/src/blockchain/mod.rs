@@ -102,6 +102,7 @@ impl Blockchain {
     }
 
     /// Recreates the blockchain to reuse with a sandbox.
+    #[doc(hidden)]
     pub fn clone_with_api_sender(&self, api_sender: ApiSender) -> Blockchain {
         Blockchain {
             api_sender,
