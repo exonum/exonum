@@ -359,10 +359,12 @@ impl NodeHandler {
         let listen_address = self.system_state.listen_address();
         info!("Start listening address={}", listen_address);
 
-        let peers: HashSet<_> = self.state.peers().values().map(Connect::addr)
-            .chain(self.peer_discovery.iter().cloned())
-            .filter(|&address| address != listen_address)
-            .collect();
+        let peers: HashSet<_> = {
+            let it = self.state.peers().values().map(Connect::addr);
+            let it = it.chain(self.peer_discovery.iter().cloned());
+            let it = it.filter(|&address| address != listen_address);
+            it.collect()
+        };
 
         for address in &peers {
             self.connect(address);
