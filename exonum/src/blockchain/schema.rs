@@ -20,19 +20,19 @@ use helpers::Height;
 use super::{Block, BlockProof, Blockchain};
 use super::config::StoredConfiguration;
 
-// TODO: Replace by `const` when/if `contact!` accepts it.
-macro_rules! core_prefix { () => ( "core." ) }
+/// Appends "core." prefix to the given name.
+macro_rules! define_name { ($name:expr) => ( concat!("core.", $name) ) }
 
-const TRANSACTIONS: &str = concat!(core_prefix!(), "transactions");
-const TRANSACTIONS_STATUS: &str = concat!(core_prefix!(), "transactions_status");
-const TX_LOCATION_BY_TX_HASH: &str = concat!(core_prefix!(), "tx_location_by_tx_hash");
-const BLOCKS: &str = concat!(core_prefix!(), "blocks");
-const BLOCK_HASHES_BY_HEIGHT: &str = concat!(core_prefix!(), "block_hashes_by_height");
-const BLOCK_TXS: &str = concat!(core_prefix!(), "block_txs");
-const PRECOMMITS: &str = concat!(core_prefix!(), "precommits");
-const CONFIGS: &str = concat!(core_prefix!(), "configs");
-const CONFIGS_ACTUAL_FROM: &str = concat!(core_prefix!(), "configs_actual_from");
-const STATE_HASH_AGGREGATOR: &str = concat!(core_prefix!(), "state_hash_aggregator");
+const TRANSACTIONS: &str = define_name!("transactions");
+const TRANSACTIONS_STATUS: &str = define_name!("transactions_status");
+const TX_LOCATION_BY_TX_HASH: &str = define_name!("tx_location_by_tx_hash");
+const BLOCKS: &str = define_name!("blocks");
+const BLOCK_HASHES_BY_HEIGHT: &str = define_name!("block_hashes_by_height");
+const BLOCK_TXS: &str = define_name!("block_txs");
+const PRECOMMITS: &str = define_name!("precommits");
+const CONFIGS: &str = define_name!("configs");
+const CONFIGS_ACTUAL_FROM: &str = define_name!("configs_actual_from");
+const STATE_HASH_AGGREGATOR: &str = define_name!("state_hash_aggregator");
 
 /// Generates an array of bytes from the `prefix`.
 pub fn gen_prefix<K: StorageKey>(prefix: &K) -> Vec<u8> {
