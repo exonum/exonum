@@ -247,13 +247,13 @@ impl Blockchain {
 
                 fork.checkpoint();
 
-                let r = panic::catch_unwind(panic::AssertUnwindSafe(|| { tx.execute(&mut fork) }));
+                let r = panic::catch_unwind(panic::AssertUnwindSafe(|| tx.execute(&mut fork)));
 
                 let transaction_status = match r {
                     Ok(status) => {
                         fork.commit();
                         status
-                    },
+                    }
                     Err(err) => {
                         if err.is::<Error>() {
                             // Continue panic unwind if the reason is StorageError
@@ -267,7 +267,10 @@ impl Blockchain {
 
                 let mut schema = Schema::new(&mut fork);
                 schema.transactions_mut().put(hash, tx.raw().clone());
-                schema.transactions_status_mut().put(hash, transaction_status);
+                schema.transactions_status_mut().put(
+                    hash,
+                    transaction_status,
+                );
                 schema.block_txs_mut(height).push(*hash);
                 let location = TxLocation::new(height, index as u64);
                 schema.tx_location_by_tx_hash_mut().put(hash, location);

@@ -420,7 +420,10 @@ mod tests {
 
     #[test]
     fn string_round_trip() {
-        let values: Vec<_> = ["", "e", "2", "hello"].iter().map(|v| v.to_string()).collect();
+        let values: Vec<_> = ["", "e", "2", "hello"]
+            .iter()
+            .map(|v| v.to_string())
+            .collect();
         for value in values.iter() {
             let bytes = value.clone().into_bytes();
             assert_eq!(*value, String::from_bytes(Cow::Borrowed(&bytes)));
