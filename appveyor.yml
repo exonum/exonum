@@ -13,12 +13,16 @@ install:
   - rustup update
   - rustc -vV
   - cargo -vV
+  - cmd: set RUST_BACKTRACE=1
+  - cmd: set RUSTFLAGS=-C target-feature=+crt-static
 
 cache:
    - '%USERPROFILE%\.cargo'
 
 build_script:
-  - cargo build --release %cargoflags%
+  - cargo build %cargoflags%
 
 test_script:
-  - cargo test --release %cargoflags%
+  - cargo test %cargoflags%
+  - cargo run --example timestamping %cargoflags%
+  - cargo run --example configuration_change %cargoflags%

@@ -4,30 +4,30 @@
 //! [`cryptocurrency`]: https://github.com/exonum/cryptocurrency/
 
 #[macro_use]
-extern crate serde_derive;
-#[macro_use]
 extern crate exonum;
 extern crate exonum_testkit;
+#[macro_use]
+extern crate serde_derive;
 
 use std::collections::BTreeSet;
 use std::iter::FromIterator;
 
 use exonum::crypto::{self, PublicKey, SecretKey};
 use exonum::messages::Message;
-use exonum_testkit::{TestHarness, HarnessApi, ApiKind, ComparableSnapshot};
+use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};
 
 mod cryptocurrency {
-    extern crate serde;
-    extern crate serde_json;
-    extern crate router;
     extern crate bodyparser;
     extern crate iron;
+    extern crate router;
+    extern crate serde;
+    extern crate serde_json;
 
-    use exonum::blockchain::{Blockchain, Service, Transaction, ApiContext};
-    use exonum::node::{TransactionSend, ApiSender};
-    use exonum::messages::{RawTransaction, FromRaw, Message};
-    use exonum::storage::{Snapshot, Fork, MemoryDB, MapIndex};
-    use exonum::crypto::{PublicKey, Hash, HexValue};
+    use exonum::blockchain::{ApiContext, Blockchain, Service, Transaction};
+    use exonum::node::{ApiSender, TransactionSend};
+    use exonum::messages::{FromRaw, Message, RawTransaction};
+    use exonum::storage::{Fork, MapIndex, Snapshot};
+    use exonum::crypto::{Hash, HexValue, PublicKey};
     use exonum::encoding;
     use exonum::api::{Api, ApiError};
     use self::iron::prelude::*;
@@ -334,18 +334,19 @@ mod cryptocurrency {
             Some(Box::new(router))
         }
     }
-
-    pub fn blockchain() -> Blockchain {
-        let db = MemoryDB::new();
-        let services: Vec<Box<Service>> = vec![Box::new(CurrencyService)];
-        Blockchain::new(Box::new(db), services)
-    }
 }
 
-use cryptocurrency::{CurrencySchema, TxCreateWallet, TxTransfer, TransactionResponse, Wallet,
-                     blockchain};
+use cryptocurrency::{CurrencySchema, CurrencyService, TransactionResponse, TxCreateWallet,
+                     TxTransfer, Wallet};
 
-fn create_wallet(api: &HarnessApi, name: &str) -> (TxCreateWallet, SecretKey) {
+fn init_testkit() -> TestKit {
+    TestKitBuilder::validator()
+        .with_validators(4)
+        .with_service(CurrencyService)
+        .create()
+}
+
+fn create_wallet(api: &TestKitApi, name: &str) -> (TxCreateWallet, SecretKey) {
     let (pubkey, key) = crypto::gen_keypair();
     // Create a presigned transaction
     let tx = TxCreateWallet::new(&pubkey, name, &key);
@@ -360,7 +361,7 @@ fn create_wallet(api: &HarnessApi, name: &str) -> (TxCreateWallet, SecretKey) {
     (tx, key)
 }
 
-fn transfer(api: &HarnessApi, tx: &TxTransfer) {
+fn transfer(api: &TestKitApi, tx: &TxTransfer) {
     let tx_info: TransactionResponse = api.post(
         ApiKind::Service("cryptocurrency"),
         "v1/wallets/transaction",
@@ -369,24 +370,24 @@ fn transfer(api: &HarnessApi, tx: &TxTransfer) {
     assert_eq!(tx_info.tx_hash, tx.hash());
 }
 
-fn get_wallet(api: &HarnessApi, pubkey: &PublicKey) -> Wallet {
+fn get_wallet(api: &TestKitApi, pubkey: &PublicKey) -> Wallet {
     api.get(
         ApiKind::Service("cryptocurrency"),
         &format!("v1/wallet/{}", pubkey.to_string()),
     )
 }
 
-fn get_all_wallets(api: &HarnessApi) -> Vec<Wallet> {
+fn get_all_wallets(api: &TestKitApi) -> Vec<Wallet> {
     api.get(ApiKind::Service("cryptocurrency"), "v1/wallets")
 }
 
 #[test]
 fn test_create_wallet() {
-    let mut harness = TestHarness::new(blockchain());
-    let api = harness.api();
+    let mut testkit = init_testkit();
+    let api = testkit.api();
     let (tx, _) = create_wallet(&api, "Alice");
 
-    harness.create_block();
+    testkit.create_block();
 
     // Check that the user indeed is persisted by the service
     let wallet = get_wallet(&api, tx.pub_key());
@@ -397,13 +398,13 @@ fn test_create_wallet() {
 
 #[test]
 fn test_transfer() {
-    let mut harness = TestHarness::new(blockchain());
-    let api = harness.api();
+    let mut testkit = init_testkit();
+    let api = testkit.api();
 
     let (tx_alice, key_alice) = create_wallet(&api, "Alice");
     let (tx_bob, _) = create_wallet(&api, "Bob");
     // Commit creation transactions
-    harness.create_block();
+    testkit.create_block();
 
     // Check that the initial Alice's and Bob's balances are persisted by the service
     let wallet = get_wallet(&api, tx_alice.pub_key());
@@ -420,7 +421,7 @@ fn test_transfer() {
         &key_alice,
     );
     transfer(&api, &tx);
-    harness.create_block();
+    testkit.create_block();
 
     let wallet = get_wallet(&api, tx_alice.pub_key());
     assert_eq!(wallet.balance(), 90);
@@ -430,17 +431,17 @@ fn test_transfer() {
 
 #[test]
 fn test_snapshot_completeness() {
-    let mut harness = TestHarness::new(blockchain());
-    let api = harness.api();
+    let mut testkit = init_testkit();
+    let api = testkit.api();
 
     let (tx_alice, _) = create_wallet(&api, "Alice");
-    harness.create_block();
+    testkit.create_block();
 
     let (tx_bob, _) = create_wallet(&api, "Bob");
     // Check that Alice's wallet is in the snapshot
-    harness
+    testkit
         .probe(tx_bob)
-        .compare(harness.snapshot())
+        .compare(testkit.snapshot())
         .map(CurrencySchema::new)
         .map(|schema| schema.wallet(tx_alice.pub_key()))
         .assert_inv("Alice's wallet is there", Option::is_some)
@@ -450,13 +451,13 @@ fn test_snapshot_completeness() {
 
 #[test]
 fn test_transfer_from_nonexisting_wallet() {
-    let mut harness = TestHarness::new(blockchain());
-    let api = harness.api();
+    let mut testkit = init_testkit();
+    let api = testkit.api();
 
     let (tx_alice, key_alice) = create_wallet(&api, "Alice");
     let (tx_bob, _) = create_wallet(&api, "Bob");
     // Do not commit Alice's transaction
-    harness.create_block_with_transactions(&[tx_bob.hash()]);
+    testkit.create_block_with_tx_hashes(&[tx_bob.hash()]);
 
     let wallet = get_wallet(&api, tx_bob.pub_key());
     assert_eq!(wallet.balance(), 100);
@@ -469,7 +470,7 @@ fn test_transfer_from_nonexisting_wallet() {
         &key_alice,
     );
 
-    let comp = harness.probe(tx).compare(harness.snapshot());
+    let comp = testkit.probe(tx).compare(testkit.snapshot());
     let comp = comp.map(CurrencySchema::new);
     comp.map(|s| s.wallet(tx_alice.pub_key())).assert_inv(
         "No Alice's wallet",
@@ -484,13 +485,13 @@ fn test_transfer_from_nonexisting_wallet() {
 
 #[test]
 fn test_transfer_to_nonexisting_wallet() {
-    let mut harness = TestHarness::new(blockchain());
-    let api = harness.api();
+    let mut testkit = init_testkit();
+    let api = testkit.api();
 
     let (tx_alice, key_alice) = create_wallet(&api, "Alice");
     let (tx_bob, _) = create_wallet(&api, "Bob");
     // Do not commit Bob's transaction
-    harness.create_block_with_transactions(&[tx_alice.hash()]);
+    testkit.create_block_with_tx_hashes(&[tx_alice.hash()]);
 
     let wallet = get_wallet(&api, tx_alice.pub_key());
     assert_eq!(wallet.balance(), 100);
@@ -504,10 +505,10 @@ fn test_transfer_to_nonexisting_wallet() {
     );
     transfer(&api, &tx);
 
-    let old_snapshot = harness.snapshot();
-    harness.create_block_with_transactions(&[tx.hash()]);
+    let old_snapshot = testkit.snapshot();
+    testkit.create_block_with_tx_hashes(&[tx.hash()]);
 
-    let comp = harness.snapshot().compare(old_snapshot);
+    let comp = testkit.snapshot().compare(old_snapshot);
     let comp = comp.map(CurrencySchema::new);
     comp.map(|s| s.wallet(tx_bob.pub_key())).assert_inv(
         "No Bob's wallet",
@@ -522,12 +523,12 @@ fn test_transfer_to_nonexisting_wallet() {
 
 #[test]
 fn test_transfer_overcharge() {
-    let mut harness = TestHarness::new(blockchain());
-    let api = harness.api();
+    let mut testkit = init_testkit();
+    let api = testkit.api();
 
     let (tx_alice, key_alice) = create_wallet(&api, "Alice");
     let (tx_bob, _) = create_wallet(&api, "Bob");
-    harness.create_block();
+    testkit.create_block();
 
     // Transfer funds
     let tx = TxTransfer::new(
@@ -538,7 +539,7 @@ fn test_transfer_overcharge() {
         &key_alice,
     );
     transfer(&api, &tx);
-    harness.create_block();
+    testkit.create_block();
 
     let wallet = get_wallet(&api, tx_alice.pub_key());
     assert_eq!(wallet.balance(), 100);
@@ -548,12 +549,12 @@ fn test_transfer_overcharge() {
 
 #[test]
 fn test_transfers_in_single_block() {
-    let mut harness = TestHarness::new(blockchain());
-    let api = harness.api();
+    let mut testkit = init_testkit();
+    let api = testkit.api();
 
     let (tx_alice, key_alice) = create_wallet(&api, "Alice");
     let (tx_bob, key_bob) = create_wallet(&api, "Bob");
-    harness.create_block();
+    testkit.create_block();
 
     // Transfer funds from Alice to Bob.
     let tx_a_to_b = TxTransfer::new(
@@ -575,12 +576,12 @@ fn test_transfers_in_single_block() {
 
     {
         // See what happens if transactions are applied in an "incorrect" order.
-        let comp = harness
+        let comp = testkit
             .probe_all(vec![
                 Box::new(tx_b_to_a.clone()),
                 Box::new(tx_a_to_b.clone()),
             ])
-            .compare(harness.snapshot());
+            .compare(testkit.snapshot());
         let comp = comp.map(CurrencySchema::new);
         comp.map(|s| s.wallet(tx_alice.pub_key()).unwrap().balance())
             .assert("Alice's balance decreases", |&old, &new| new == old - 90);
@@ -590,7 +591,7 @@ fn test_transfers_in_single_block() {
 
     transfer(&api, &tx_a_to_b);
     transfer(&api, &tx_b_to_a);
-    harness.create_block_with_transactions(&[tx_a_to_b.hash(), tx_b_to_a.hash()]);
+    testkit.create_block_with_tx_hashes(&[tx_a_to_b.hash(), tx_b_to_a.hash()]);
 
     let wallet = get_wallet(&api, tx_alice.pub_key());
     assert_eq!(wallet.balance(), 130);
@@ -608,16 +609,19 @@ fn test_transfers_in_single_block() {
 
 #[test]
 fn test_malformed_wallet_request() {
-    let harness = TestHarness::new(blockchain());
-    let api = harness.api();
+    let testkit = TestKitBuilder::validator()
+        .with_validators(4)
+        .with_service(CurrencyService)
+        .create();
+    let api = testkit.api();
     let info: String = api.get_err(ApiKind::Service("cryptocurrency"), "v1/wallet/c0ffee");
     assert!(info.starts_with("Invalid request param"));
 }
 
 #[test]
 fn test_unknown_wallet_request() {
-    let harness = TestHarness::new(blockchain());
-    let api = harness.api();
+    let testkit = init_testkit();
+    let api = testkit.api();
 
     // transaction is sent by API, but isn't committed
     let (tx_alice, _) = create_wallet(&api, "Alice");

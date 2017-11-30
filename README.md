@@ -1,17 +1,20 @@
-# exonum-harness
+# exonum-testkit
 
 [![Build status][travis-image]][travis-url]
+[![Build status][appveyor-image]][appveyor-url]
 
-[travis-image]: https://img.shields.io/travis/slowli/exonum-harness.svg?style=flat-square
-[travis-url]: https://travis-ci.org/slowli/exonum-harness 
+[travis-image]: https://travis-ci.org/exonum/exonum-testkit.svg?branch=master
+[travis-url]: https://travis-ci.org/exonum/exonum-testkit
+[appveyor-image]: https://ci.appveyor.com/api/projects/status/lhu2aykh9nyti78p/branch/master?svg=true
+[appveyor-url]: https://ci.appveyor.com/project/alekseysidorov/exonum-testkit/branch/master
 
-Test harness for Exonum blockchain framework, allowing to test service APIs
-synchronously and in the same process as the harness.
+Testkit for Exonum blockchain framework, allowing to test service APIs
+synchronously and in the same process as the testkit.
 
 ## Examples
 
-See the [**tests**](tests) folder for examples of building a
-service and then testing it with the harness.
+See the [**tests**](tests) and [**examples**](examples) folders for examples of building a
+service and then testing it with the testkit.
 
 ## License
 

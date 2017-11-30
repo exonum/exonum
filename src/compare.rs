@@ -185,11 +185,11 @@ impl<T: PartialEq + ::std::fmt::Debug> Comparison<T> {
 /// Typical usage involves `map`ping the resulting comparison through the schema:
 ///
 /// ```ignore
-/// let mut harness = ...;
-/// let old_snapshot = harness.snapshot();
-/// // Mutate the harness state somehow...
+/// let mut testkit = ...;
+/// let old_snapshot = testkit.snapshot();
+/// // Mutate the testkit state somehow...
 ///
-/// harness.snapshot()
+/// testkit.snapshot()
 ///     .compare(old_snapshot)
 ///     .map(ServiceSchema::new)
 ///     .assert("Something about the schema", |old, schema| {

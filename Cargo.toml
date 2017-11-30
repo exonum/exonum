@@ -1,10 +1,10 @@
 [package]
 name = "exonum-testkit"
-version = "0.0.0"
+version = "0.1.0"
 license = "Apache-2.0"
 homepage = "https://exonum.com"
 description = """
-Test harness for Exonum blockchain framework, allowing to test service APIs
+Testkit for Exonum blockchain framework, allowing to test service APIs
 synchronously.
 """
 categories = ["test"]
@@ -23,6 +23,5 @@ router = "0.5.1"
 bodyparser = "0.7.0"
 serde_derive = "1.0.0"
 
-[replace."exonum:0.3.0"]
-git = "https://github.com/slowli/exonum"
-rev = "0f356ce6b7036eddb1e6bc85cc871145a42776c2"
+[patch.crates-io]
+exonum = { git = "https://github.com/exonum/exonum", rev = "adb1a9ab47a356b6efb3ef73755f981f6fd0af9a" }
