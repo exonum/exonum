@@ -65,7 +65,7 @@ impl StorageValue for SparseListSize {
 /// as an index.
 /// `SparseListIndex` requires that the elements implement the [`StorageValue`] trait.
 /// [`StorageValue`]: ../trait.StorageValue.html
-/// [`ListIndex`]: ../struct.ListIndex.html
+/// [`ListIndex`]: <../list_index/struct.ListIndex.html>
 #[derive(Debug)]
 pub struct SparseListIndex<T, V> {
     base: BaseIndex<T>,
@@ -78,7 +78,7 @@ pub struct SparseListIndex<T, V> {
 /// This struct is created by the [`iter`] method on [`SparseListIndex`].
 /// See its documentation for more.
 ///
-/// [`iter`]: struct.ListIndex.html#method.iter
+/// [`iter`]: struct.SparseListIndex.html#method.iter
 /// [`SparseListIndex`]: struct.SparseListIndex.html
 #[derive(Debug)]
 pub struct SparseListIndexIter<'a, V> {
@@ -91,7 +91,7 @@ pub struct SparseListIndexIter<'a, V> {
 /// This struct is created by the [`indices`] method on [`SparseListIndex`].
 /// See its documentation for more.
 ///
-/// [`indices`]: struct.ListIndex.html#method.indices
+/// [`indices`]: struct.SparseListIndex.html#method.indices
 /// [`SparseListIndex`]: struct.SparseListIndex.html
 #[derive(Debug)]
 pub struct SparceListIndexKeys<'a> {
@@ -104,7 +104,7 @@ pub struct SparceListIndexKeys<'a> {
 /// This struct is created by the [`values`] method on [`SparseListIndex`].
 /// See its documentation for more.
 ///
-/// [`values`]: struct.ListIndex.html#method.values
+/// [`values`]: struct.SparseListIndex.html#method.values
 /// [`SparseListIndex`]: struct.SparseListIndex.html
 #[derive(Debug)]
 pub struct SparceListIndexValues<'a, V> {
