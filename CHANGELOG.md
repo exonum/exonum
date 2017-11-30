@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - `mount_*_api` methods in `Blockchain` instance now do not require `ApiContext`. (#366)
 - Removed redundant `current_height` method in `Schema` and rename `last_height` to `height`. (#379)
 - `last_block` now returns `Block` instead of `Option<Block>`. (#379)
+- The list of peer connections is now restored to the last state after the process is restarted. (#378)
 
 ### Fixed
 - Fixed `crate_authors!` macro usage, this macro can't return static string in new clap version. (#370)
