@@ -669,6 +669,7 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandb
 
     // General assumption; necessary for correct work of consensus algorithm
     assert!(sandbox.propose_timeout() < sandbox.round_timeout());
+    sandbox.process_events();
     sandbox
 }
 
@@ -743,12 +744,14 @@ pub fn sandbox_restarted_uninitialized(sandbox: Sandbox) -> Sandbox {
         handler,
         time: Arc::clone(&inner.time),
     };
-    Sandbox {
+    let sandbox = Sandbox {
         inner: RefCell::new(inner),
         validators_map: sandbox.validators_map.clone(),
         services_map: sandbox.services_map.clone(),
         addresses: sandbox.addresses.clone(),
-    }
+    };
+    sandbox.process_events();
+    sandbox
 }
 
 pub fn timestamping_sandbox() -> Sandbox {
