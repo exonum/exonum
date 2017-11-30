@@ -14,6 +14,9 @@
 
 //! An implementation of array list of items with spaces.
 
+// TODO: Remove when https://github.com/rust-lang-nursery/rust-clippy/issues/2190 is fixed.
+#![cfg_attr(feature="cargo-clippy", allow(doc_markdown))]
+
 use byteorder::{BigEndian, ByteOrder};
 
 use std::borrow::Cow;
