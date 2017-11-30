@@ -162,7 +162,7 @@ impl Blockchain {
     ///
     /// - If the genesis block was not committed.
     pub fn last_block(&self) -> Block {
-        Schema::new(&self.snapshot()).last_block().unwrap()
+        Schema::new(&self.snapshot()).last_block()
     }
 
     /// Creates and commits the genesis block for the given genesis configuration.

@@ -442,7 +442,7 @@ impl Sandbox {
             fork.merge(patch);
             fork
         };
-        *Schema::new(&fork).last_block().unwrap().state_hash()
+        *Schema::new(&fork).last_block().state_hash()
     }
 
     pub fn get_proof_to_service_table(&self, service_id: u16, table_idx: usize) -> MapProof<Hash> {
