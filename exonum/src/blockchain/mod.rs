@@ -59,6 +59,14 @@ mod tests;
 
 pub mod config;
 
+/// Transaction executed successfully.
+pub const TRANSACTION_STATUS_OK: u8 = 0;
+/// Panic was occurred during transaction execution. This status shouldn't be returned from the
+/// `Transaction`'s `execute` method directly, Exonum will catch panic and write this value instead.
+pub const TRANSACTION_STATUS_PANIC: u8 = 1;
+/// Transaction execution failure.
+pub const TRANSACTION_STATUS_FAILURE: u8 = 2;
+
 /// Exonum blockchain instance with the concrete services set and data storage.
 /// Only blockchains with the identical set of services and genesis block can be combined
 /// into the single network.
@@ -253,7 +261,7 @@ impl Blockchain {
                         }
                         fork.rollback();
                         error!("{:?} transaction execution failed: {:?}", tx, err);
-                        false
+                        TRANSACTION_STATUS_PANIC
                     }
                 };
 

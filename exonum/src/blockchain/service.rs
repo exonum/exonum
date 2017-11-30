@@ -53,7 +53,15 @@ pub trait Transaction: Message + 'static {
     /// - If the execute method of a transaction raises a `panic`, the changes made by the
     /// transactions are discarded, but the transaction itself is still considered committed.
     /// - Return value is also stored in the blockchain and can be accessed through api.
-    fn execute(&self, fork: &mut Fork) -> bool;
+    ///
+    /// # Return values:
+    ///
+    /// `0` - successful transaction execution (`TRANSACTION_STATUS_OK`).
+    /// `1` - panic during transaction execution (`TRANSACTION_STATUS_PANIC`).
+    /// `2` - general failure (`TRANSACTION_STATUS_FAILURE`).
+    /// `3..100` - reserved values.
+    /// `101 - 255` - values that can be used in service for some special meaning.
+    fn execute(&self, fork: &mut Fork) -> u8;
 
     /// Returns the useful information about the transaction in the JSON format. The returned value
     /// is used to fill the [`TxInfo.content`] field in [the blockchain explorer][explorer].
@@ -82,7 +90,7 @@ pub trait Transaction: Message + 'static {
     /// impl Transaction for MyTransaction {
     ///     // Other methods...
     /// #   fn verify(&self) -> bool { true }
-    /// #   fn execute(&self, _: &mut Fork) -> bool { true }
+    /// #   fn execute(&self, _: &mut Fork) -> u8 { 0 }
     ///
     ///     fn info(&self) -> serde_json::Value {
     ///         serde_json::to_value(self).expect("Cannot serialize transaction to JSON")
