@@ -1,22 +1,15 @@
 extern crate exonum;
 extern crate exonum_time;
+#[macro_use]
 extern crate exonum_testkit;
+#[macro_use]
+extern crate pretty_assertions;
 
 use std::time::{SystemTime, Duration};
 
 use exonum_time::TimeSchema;
 use exonum_time::{TimeService, TxTime, Time};
 use exonum_testkit::{TestKitBuilder};
-
-#[macro_export]
-macro_rules! txvec {
-    ($($x:expr),*) => (
-        vec![$($x.into()),*]
-    );
-    ($($x:expr,)*) => (
-        vec![$($x.into()),*]
-    )
-}
 
 #[test]
 fn test_exonum_time_service() {
