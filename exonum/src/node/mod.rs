@@ -22,6 +22,7 @@ use std::thread;
 use std::net::SocketAddr;
 use std::time::{Duration, SystemTime};
 use std::collections::BTreeMap;
+use std::collections::HashSet;
 use std::fmt;
 
 use toml::Value;
@@ -357,18 +358,13 @@ impl NodeHandler {
     pub fn initialize(&mut self) {
         let listen_address = self.system_state.listen_address();
         info!("Start listening address={}", listen_address);
-        let peers: Vec<_> = self.state.peers().values().map(Connect::addr).collect();
+
+        let peers: HashSet<_> = self.state.peers().values().map(Connect::addr)
+            .chain(self.peer_discovery.iter().cloned())
+            .filter(|&address| address != listen_address)
+            .collect();
+
         for address in &peers {
-            if address == &listen_address {
-                continue;
-            }
-            self.connect(address);
-            info!("Trying to connect with peer {}", address);
-        }
-        for address in &self.peer_discovery.clone() {
-            if address == &listen_address || peers.contains(address) {
-                continue;
-            }
             self.connect(address);
             info!("Trying to connect with peer {}", address);
         }
