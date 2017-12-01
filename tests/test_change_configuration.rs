@@ -11,6 +11,31 @@ use exonum::blockchain::Schema;
 use exonum::storage::StorageValue;
 
 #[test]
+fn test_following_config() {
+    let mut testkit = TestKitBuilder::validator().create();
+    let cfg_change_height = Height(10);
+    let proposal = {
+        let mut cfg = testkit.configuration_change_proposal();
+        cfg.set_actual_from(cfg_change_height);
+        cfg.set_service_config("service", "config");
+        cfg
+    };
+    let stored = proposal.stored_configuration().clone();
+    testkit.commit_configuration_change(proposal);
+    // Check that following configuration is none.
+    assert_eq!(
+        Schema::new(&testkit.snapshot()).following_configuration(),
+        None
+    );
+    testkit.create_block();
+    // Check that following configuration is appears.
+    assert_eq!(
+        Schema::new(&testkit.snapshot()).following_configuration(),
+        Some(stored)
+    );
+}
+
+#[test]
 fn test_add_to_validators() {
     let mut testkit = TestKitBuilder::auditor().with_validators(1).create();
 
