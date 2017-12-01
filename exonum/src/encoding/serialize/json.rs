@@ -133,9 +133,9 @@ macro_rules! impl_deserialize_float {
     (@impl $typename:ty) => {
         impl ExonumJson for $typename {
             fn deserialize_field<B: WriteBufferWrapper>(value: &Value,
-                                                         buffer: &mut B,
-                                                         from: Offset,
-                                                         to: Offset )
+                                                        buffer: &mut B,
+                                                        from: Offset,
+                                                        to: Offset )
                 -> Result<(), Box<Error>>
             {
                 let number = value.as_f64().ok_or("Can't cast json as float")?;
