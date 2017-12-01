@@ -662,7 +662,7 @@ pub fn timestamping_sandbox() -> Sandbox {
 
 #[cfg(test)]
 mod tests {
-    use exonum::blockchain::ServiceContext;
+    use exonum::blockchain::{ServiceContext, TRANSACTION_STATUS_OK};
     use exonum::messages::{FromRaw, RawTransaction};
     use exonum::encoding;
     use exonum::crypto::{gen_keypair_from_seed, Seed};
@@ -697,7 +697,9 @@ mod tests {
             true
         }
 
-        fn execute(&self, _fork: &mut Fork) {}
+        fn execute(&self, _fork: &mut Fork) -> u8 {
+            TRANSACTION_STATUS_OK
+        }
     }
 
     struct HandleCommitService;
