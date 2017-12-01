@@ -552,7 +552,7 @@ impl TestKit {
     ///
     /// # Panics
     ///
-    /// - If there are duplicate transactions.
+    /// - Panics if there are duplicate transactions.
     pub fn probe_all(&self, transactions: Vec<Box<Transaction>>) -> Box<Snapshot> {
         let validator_id = self.network().us().validator_id().expect(
             "Tested node is not a validator",
@@ -606,15 +606,16 @@ impl TestKit {
     }
 
     fn do_create_block(&mut self, tx_hashes: &[crypto::Hash]) {
-        let height = self.height().next();
+        let new_block_height = self.height().next();
         let last_hash = self.last_block_hash();
 
+        self.update_configuration(new_block_height);
         let (block_hash, patch) = {
             let validator_id = self.leader().validator_id().unwrap();
             let transactions = self.mempool();
             self.blockchain.create_patch(
                 validator_id,
-                height,
+                new_block_height,
                 tx_hashes,
                 &transactions,
             )
@@ -630,7 +631,11 @@ impl TestKit {
             }
         }
 
-        let propose = self.leader().create_propose(height, &last_hash, tx_hashes);
+        let propose = self.leader().create_propose(
+            new_block_height,
+            &last_hash,
+            tx_hashes,
+        );
         let precommits: Vec<_> = self.network()
             .validators()
             .iter()
@@ -641,16 +646,15 @@ impl TestKit {
             .commit(&patch, block_hash, precommits.iter())
             .unwrap();
 
-        self.update_configuration();
         self.poll_events();
     }
 
     /// Update test network configuration if such an update has been scheduled
     /// with `commit_configuration_change`.
-    fn update_configuration(&mut self) {
+    fn update_configuration(&mut self, new_block_height: Height) {
         use ConfigurationProposalState::*;
 
-        let height = self.height().next();
+        let actual_from = new_block_height.next();
         if let Some(cfg_proposal) = self.cfg_proposal.take() {
             match cfg_proposal {
                 Uncommitted(cfg_proposal) => {
@@ -663,7 +667,7 @@ impl TestKit {
                     self.cfg_proposal = Some(Committed(cfg_proposal));
                 }
                 Committed(cfg_proposal) => {
-                    if cfg_proposal.actual_from() == height {
+                    if cfg_proposal.actual_from() == actual_from {
                         // Modify the self configuration
                         self.network_mut().update(
                             cfg_proposal.us,
@@ -682,7 +686,7 @@ impl TestKit {
     ///
     /// # Panics
     ///
-    /// - If the one of transactions has been already committed to the blockchain.
+    /// - Panics if the one of transactions has been already committed to the blockchain.
     pub fn create_block_with_transactions<I>(&mut self, txs: I)
     where
         I: IntoIterator<Item = Box<Transaction>>,
@@ -715,7 +719,7 @@ impl TestKit {
     ///
     /// # Panics
     ///
-    /// - In the case any of transaction hashes are not in the mempool.
+    /// - Panics in the case any of transaction hashes are not in the mempool.
     pub fn create_block_with_tx_hashes(&mut self, tx_hashes: &[crypto::Hash]) {
         self.poll_events();
 
@@ -776,7 +780,7 @@ impl TestKit {
     /// Returns reference to validator with the given identifier.
     ///
     /// # Panics
-    /// - If validator with the given id is absent in test network.
+    /// - Panics if validator with the given id is absent in test network.
     pub fn validator(&self, id: ValidatorId) -> &TestNode {
         &self.network.validators[id.0 as usize]
     }
@@ -820,12 +824,13 @@ impl TestKit {
         )
     }
 
-    /// Adds a new configuration proposal.
+    /// Adds a new configuration proposal. Remember, to add this proposal to the blockchain,
+    /// you should create at least one block.
     ///
     /// # Panics
     ///
-    /// - If `actual_from` is less than current height or equals.
-    /// - If configuration change has been already proposed but not executed.
+    /// - Panics if `actual_from` is less than current height or equals.
+    /// - Panics if configuration change has been already proposed but not executed.
     ///
     /// # Example
     ///
