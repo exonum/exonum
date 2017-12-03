@@ -71,24 +71,24 @@ impl<T: AsRef<Snapshot>> TimeSchema<T> {
 
     pub fn validators_time(&self) -> MapIndex<&Snapshot, PublicKey, Time> {
         MapIndex::new(
-            SERVICE_NAME.to_string() + ".validators_time",
+            format!("{}.validators_time", SERVICE_NAME),
             self.view.as_ref(),
         )
     }
 
     pub fn time(&self) -> Entry<&Snapshot, Time> {
-        Entry::new(SERVICE_NAME.to_string() + ".time", self.view.as_ref())
+        Entry::new(format!("{}.time", SERVICE_NAME), self.view.as_ref())
     }
 }
 
 
 impl<'a> TimeSchema<&'a mut Fork> {
     pub fn validators_time_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Time> {
-        MapIndex::new(SERVICE_NAME.to_string() + ".validators_time", self.view)
+        MapIndex::new(format!("{}.validators_time", SERVICE_NAME), self.view)
     }
 
     pub fn time_mut(&mut self) -> Entry<&mut Fork, Time> {
-        Entry::new(SERVICE_NAME.to_string() + ".time", self.view)
+        Entry::new(format!("{}.time", SERVICE_NAME), self.view)
     }
 }
 
@@ -119,7 +119,6 @@ impl Transaction for TxTime {
         {
             return;
         }
-
         let mut schema = TimeSchema::new(view);
         match schema.validators_time().get(self.pub_key()) {
             Some(ref storage_time) if storage_time.time() >= self.time() => {
@@ -132,7 +131,6 @@ impl Transaction for TxTime {
                 )
             }
         }
-
         let mut validators_time: Vec<SystemTime>;
         {
             let idx = schema.validators_time();
@@ -145,7 +143,6 @@ impl Transaction for TxTime {
                 })
                 .collect();
         }
-
 
         let max_byzantine_nodes = validator_keys.len() / 3;
         if validators_time.len() <= max_byzantine_nodes {
@@ -219,8 +216,6 @@ impl Api for TimeApi {
         router.get("/current_time", get_current_time, "get_current_time");
     }
 }
-
-
 
 // // // // // // // // // // SERVICE DECLARATION // // // // // // // // // //
 
