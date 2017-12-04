@@ -7,9 +7,12 @@ extern crate pretty_assertions;
 
 use std::time::{SystemTime, Duration};
 
+use exonum::helpers::{Height, ValidatorId};
+use exonum::crypto::gen_keypair;
+
 use exonum_time::TimeSchema;
 use exonum_time::{TimeService, TxTime, Time};
-use exonum_testkit::{TestKitBuilder};
+use exonum_testkit::{TestKitBuilder, TestNode};
 
 #[test]
 fn test_exonum_time_service() {
@@ -133,4 +136,108 @@ fn test_exonum_time_service() {
         );
     }
     assert_eq!(schema.time().get(), Some(Time::new(time1)));
+}
+
+#[test]
+fn test_selected_time_less_than_time_in_storage() {
+    let mut testkit = TestKitBuilder::validator()
+        .with_validators(1)
+        .with_service(TimeService::new())
+        .create();
+
+    let validators = testkit.network().validators().to_vec();
+
+    let (pub_key_0, _) = validators[0].service_keypair();
+
+    let cfg_change_height = Height(5);
+    let new_cfg = {
+        let mut cfg = testkit.configuration_change_proposal();
+        cfg.set_validators(vec![TestNode::new_validator(ValidatorId(0))]);
+        cfg.set_actual_from(cfg_change_height);
+        cfg
+    };
+    testkit.commit_configuration_change(new_cfg);
+    testkit.create_blocks_until(cfg_change_height.previous());
+
+    let validators = testkit.network().validators().to_vec();
+    let (pub_key_1, sec_key_1) = validators[0].service_keypair();
+
+    let snapshot = testkit.snapshot();
+    let schema = TimeSchema::new(snapshot);
+
+    assert!(schema.time().get().is_some());
+    assert!(schema.validators_time().get(pub_key_0).is_some());
+    assert!(schema.validators_time().get(pub_key_1).is_none());
+    assert_eq!(schema.time().get(), schema.validators_time().get(pub_key_0));
+
+    if let Some(time_in_storage) = schema.time().get() {
+        let time_tx = time_in_storage.time() - Duration::new(10, 0);
+        let tx = {
+            TxTime::new(time_tx, pub_key_1, sec_key_1)
+        };
+        testkit.create_block_with_transactions(txvec![tx.clone()]);
+    }
+
+    let snapshot = testkit.snapshot();
+    let schema = TimeSchema::new(snapshot);
+    assert!(schema.time().get().is_some());
+    assert!(schema.validators_time().get(pub_key_0).is_some());
+    assert!(schema.validators_time().get(pub_key_1).is_some());
+    assert_eq!(schema.time().get(), schema.validators_time().get(pub_key_0));
+}
+
+#[test]
+fn test_creating_transaction_is_not_validator() {
+    let mut testkit = TestKitBuilder::validator()
+        .with_validators(1)
+        .with_service(TimeService::new())
+        .create();
+
+    let (pub_key, sec_key) = gen_keypair();
+    let tx = TxTime::new(SystemTime::now(), &pub_key, &sec_key);
+    testkit.create_block_with_transactions(txvec![tx.clone()]);
+
+    let snapshot = testkit.snapshot();
+    let schema = TimeSchema::new(snapshot);
+    assert!(schema.time().get().is_none());
+    assert!(schema.validators_time().get(&pub_key).is_none());
+}
+
+#[test]
+fn test_transaction_time_less_than_validator_time_in_storage() {
+    let mut testkit = TestKitBuilder::validator()
+        .with_validators(1)
+        .with_service(TimeService::new())
+        .create();
+
+    let validator = &testkit.network().validators().to_vec()[0];
+    let (pub_key, sec_key) = validator.service_keypair();
+
+    let time0 = SystemTime::now();
+    let tx0 = TxTime::new(time0, pub_key, sec_key);
+
+    testkit.create_block_with_transactions(txvec![tx0.clone()]);
+
+    let snapshot = testkit.snapshot();
+    let schema = TimeSchema::new(snapshot);
+
+    assert_eq!(schema.time().get(), Some(Time::new(time0)));
+    assert_eq!(
+        schema.validators_time().get(pub_key),
+        Some(Time::new(time0))
+    );
+
+    let time1 = time0 - Duration::new(10, 0);
+    let tx1 = TxTime::new(time1, pub_key, sec_key);
+
+    testkit.create_block_with_transactions(txvec![tx1.clone()]);
+
+    let snapshot = testkit.snapshot();
+    let schema = TimeSchema::new(snapshot);
+
+    assert_eq!(schema.time().get(), Some(Time::new(time0)));
+    assert_eq!(
+        schema.validators_time().get(pub_key),
+        Some(Time::new(time0))
+    );
 }
