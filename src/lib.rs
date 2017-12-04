@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/*
+//! The time oracle service for Exonum.
+
 #![deny(missing_debug_implementations)]
 #![deny(missing_docs)]
-*/
 
 extern crate serde;
 extern crate serde_json;
@@ -37,38 +37,46 @@ use exonum::blockchain::{Blockchain, Service, ServiceContext, Schema, Transactio
 use exonum::messages::{RawTransaction, FromRaw, Message};
 use exonum::encoding::serialize::json::reexport::Value;
 use exonum::storage::{Fork, Snapshot, MapIndex, Entry};
-use exonum::crypto::{PublicKey, Hash};
+use exonum::crypto::{PublicKey};
 use exonum::encoding;
 use exonum::helpers::fabric::{ServiceFactory, Context};
 use exonum::api::Api;
 
 // // // // // // // // // // CONSTANTS // // // // // // // // // //
 
+/// Time service id.
 const SERVICE_ID: u16 = 4;
+/// Transaction id.
 const TX_TIME_ID: u16 = 1;
+/// Time service name.
 const SERVICE_NAME: &str = "exonum_time";
 
 // // // // // // // // // // PERSISTENT DATA // // // // // // // // // //
 
 encoding_struct! {
+    /// Time index.
     struct Time {
         const SIZE = 12;
-
+        /// Field that stores 'SystemTime'.
         field time:     SystemTime  [00 => 12]
     }
 }
 
 // // // // // // // // // // DATA LAYOUT // // // // // // // // // //
 
+#[derive(Debug)]
+/// 'Exonum-time' service database schema.
 pub struct TimeSchema<T> {
     view: T,
 }
 
 impl<T: AsRef<Snapshot>> TimeSchema<T> {
+    /// Constructs schema for the given `snapshot`.
     pub fn new(view: T) -> Self {
         TimeSchema { view }
     }
 
+    /// Returns table that stores 'Time' struct for every validator.
     pub fn validators_time(&self) -> MapIndex<&Snapshot, PublicKey, Time> {
         MapIndex::new(
             format!("{}.validators_time", SERVICE_NAME),
@@ -76,6 +84,7 @@ impl<T: AsRef<Snapshot>> TimeSchema<T> {
         )
     }
 
+    /// Returns one element - 'Time' struct. Time that stores in storage.
     pub fn time(&self) -> Entry<&Snapshot, Time> {
         Entry::new(format!("{}.time", SERVICE_NAME), self.view.as_ref())
     }
@@ -83,10 +92,16 @@ impl<T: AsRef<Snapshot>> TimeSchema<T> {
 
 
 impl<'a> TimeSchema<&'a mut Fork> {
+    /// Mutable reference to the ['validators_time'][1] index.
+    ///
+    /// [1]: struct.TimeSchema.html#method.validators_time
     pub fn validators_time_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Time> {
         MapIndex::new(format!("{}.validators_time", SERVICE_NAME), self.view)
     }
 
+    /// Mutable reference to the ['time'][1] index.
+    ///
+    /// [1]: struct.TimeSchema.html#method.time
     pub fn time_mut(&mut self) -> Entry<&mut Fork, Time> {
         Entry::new(format!("{}.time", SERVICE_NAME), self.view)
     }
@@ -95,12 +110,14 @@ impl<'a> TimeSchema<&'a mut Fork> {
 // // // // // // // // // // TRANSACTION // // // // // // // // // //
 
 message! {
+    /// Transaction that is sent by the validator after the commit of the block.
     struct TxTime {
         const TYPE = SERVICE_ID;
         const ID = TX_TIME_ID;
         const SIZE = 44;
-
+        /// Field that stores validator time.
         field time:     SystemTime  [00 => 12]
+        /// Field that stores validator public key.
         field pub_key:  &PublicKey  [12 => 44]
     }
 }
@@ -112,18 +129,21 @@ impl Transaction for TxTime {
 
     fn execute(&self, view: &mut Fork) {
         let validator_keys = Schema::new(&view).actual_configuration().validator_keys;
-
+        // The transaction must be signed by the valid validator.
         if !validator_keys.iter().any(|&validator| {
             validator.service_key == *self.pub_key()
         })
         {
             return;
         }
+
         let mut schema = TimeSchema::new(view);
         match schema.validators_time().get(self.pub_key()) {
+            // The validator time in the storage should be less than in the transaction.
             Some(ref storage_time) if storage_time.time() >= self.time() => {
                 return;
             }
+            // Write the time for the validator.
             _ => {
                 schema.validators_time_mut().put(
                     self.pub_key(),
@@ -131,6 +151,8 @@ impl Transaction for TxTime {
                 )
             }
         }
+
+        // Find all known times for validators.
         let mut validators_time: Vec<SystemTime>;
         {
             let idx = schema.validators_time();
@@ -144,19 +166,22 @@ impl Transaction for TxTime {
                 .collect();
         }
 
+        // The largest number of Byzantine nodes.
         let max_byzantine_nodes = validator_keys.len() / 3;
         if validators_time.len() <= max_byzantine_nodes {
             return;
         }
-
+        // Ordering time from highest to lowest.
         validators_time.sort_by(|a, b| b.cmp(a));
 
         match schema.time().get() {
+            // Selected time should be longer than the time in the storage.
             Some(ref current_time)
                 if current_time.time() >= validators_time[max_byzantine_nodes] => {
                 return;
             }
             _ => {
+                // Change the time in storage.
                 schema.time_mut().set(Time::new(
                     validators_time[max_byzantine_nodes],
                 ));
@@ -167,17 +192,15 @@ impl Transaction for TxTime {
 
 // // // // // // // // // // REST API // // // // // // // // // //
 
-#[derive(Serialize, Deserialize)]
-pub struct TxResponse {
-    pub tx_hash: Hash,
-}
-
+/// Implement the node API.
 #[derive(Clone)]
 struct TimeApi {
     blockchain: Blockchain,
 }
 
+/// Shortcut to get data from storage.
 impl TimeApi {
+    /// Endpoint for getting value of the time that is saved in storage.
     fn get_current_time(&self, _: &mut Request) -> IronResult<Response> {
         let view = self.blockchain.snapshot();
         let schema = TimeSchema::new(&view);
@@ -185,6 +208,7 @@ impl TimeApi {
         self.ok_response(&serde_json::to_value(current_time).unwrap())
     }
 
+    /// Endpoint for getting time values for all validators.
     fn get_validators_time(&self, _: &mut Request) -> IronResult<Response> {
         let view = self.blockchain.snapshot();
         let schema = TimeSchema::new(&view);
@@ -219,9 +243,12 @@ impl Api for TimeApi {
 
 // // // // // // // // // // SERVICE DECLARATION // // // // // // // // // //
 
+/// Define the service.
+#[derive(Debug)]
 pub struct TimeService;
 
 impl TimeService {
+    /// Create new 'TimeService'.
     pub fn new() -> TimeService {
         TimeService {}
     }
@@ -251,7 +278,9 @@ impl Service for TimeService {
         Value::Null
     }
 
+    /// Creating transaction after commit of the block.
     fn handle_commit(&self, context: &ServiceContext) {
+        // The transaction must be created by the validator.
         if context.validator_id().is_none() {
             return;
         }
@@ -260,7 +289,7 @@ impl Service for TimeService {
             SystemTime::now(),
             &pub_key,
             &sec_key,
-        )));
+        ))).unwrap();
     }
 
     fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
@@ -278,6 +307,8 @@ impl Service for TimeService {
     }
 }
 
+/// A time service creator for the `NodeBuilder`.
+#[derive(Debug)]
 pub struct TimeServiceFactory;
 
 impl ServiceFactory for TimeServiceFactory {
