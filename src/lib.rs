@@ -20,8 +20,6 @@
 extern crate serde;
 extern crate serde_json;
 #[macro_use]
-extern crate serde_derive;
-#[macro_use]
 extern crate exonum;
 extern crate router;
 extern crate bodyparser;
@@ -244,7 +242,7 @@ impl Api for TimeApi {
 // // // // // // // // // // SERVICE DECLARATION // // // // // // // // // //
 
 /// Define the service.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct TimeService;
 
 impl TimeService {
