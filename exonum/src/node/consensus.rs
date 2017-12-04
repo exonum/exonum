@@ -48,7 +48,15 @@ impl NodeHandler {
                 self.state.height(),
                 self.state.round()
             );
+            let validator = msg.validator();
+            let round = msg.round();
             self.state.add_queued(msg);
+            trace!("Trying reach actual round.");
+            if let Some(r) = self.state.reach_actual_round(validator, round) {
+                info!("Jump to new round = {}", round);
+                self.state.jump_round(r);
+                self.handle_new_round();
+            }
             return;
         }
 
@@ -582,7 +590,26 @@ impl NodeHandler {
             self.has_full_propose(hash, round);
         }
     }
+    /// Handles round update
+    fn handle_new_round(&mut self) {
+        if self.state.is_validator() {
+            // Send prevote if we are locked or propose if we are leader
+            if let Some(hash) = self.state.locked_propose() {
+                let round = self.state.round();
+                let has_majority_prevotes = self.broadcast_prevote(round, &hash);
+                if has_majority_prevotes {
+                    self.has_majority_prevotes(round, &hash);
+                }
+            } else if self.state.is_leader() {
+                self.add_propose_timeout();
+            }
+        }
 
+        // Handle queued messages
+        for msg in self.state.queued() {
+            self.handle_consensus(msg);
+        }
+    }
     /// Handles round timeout. As result node sends `Propose` if it is a leader or `Prevote` if it
     /// is locked to some round.
     pub fn handle_round_timeout(&mut self, height: Height, round: Round) {
@@ -601,25 +628,7 @@ impl NodeHandler {
         // Add timeout for this round
         self.add_round_timeout();
 
-        if !self.state.is_validator() {
-            return;
-        }
-
-        // Send prevote if we are locked or propose if we are leader
-        if let Some(hash) = self.state.locked_propose() {
-            let round = self.state.round();
-            let has_majority_prevotes = self.broadcast_prevote(round, &hash);
-            if has_majority_prevotes {
-                self.has_majority_prevotes(round, &hash);
-            }
-        } else if self.state.is_leader() {
-            self.add_propose_timeout();
-        }
-
-        // Handle queued messages
-        for msg in self.state.queued() {
-            self.handle_consensus(msg);
-        }
+        self.handle_new_round();
     }
 
     /// Handles propose timeout. Node sends `Propose` and `Prevote` if it is a leader as result.
