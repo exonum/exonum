@@ -567,9 +567,10 @@ impl State {
         ValidatorId(((height + round) % (self.validators().len() as u64)) as u16)
     }
 
-    /// Update known round for a validator, try reach actual round
-    /// returns new actual round
-    pub fn reach_actual_round(&mut self, id: ValidatorId, round: Round) -> Option<Round> {
+    /// Updates known round for a validator and returns
+    /// a new actual round if at least one non byzantine validators are on a higher round.
+    /// Otherwise returns None.
+    pub fn get_actual_round(&mut self, id: ValidatorId, round: Round) -> Option<Round> {
         {
             let known_round = self.validators_rounds.entry(id).or_insert_with(Round::zero);
             if round <= *known_round {

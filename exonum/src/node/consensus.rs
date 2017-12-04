@@ -51,9 +51,9 @@ impl NodeHandler {
             let validator = msg.validator();
             let round = msg.round();
             self.state.add_queued(msg);
-            trace!("Trying reach actual round.");
-            if let Some(r) = self.state.reach_actual_round(validator, round) {
-                info!("Jump to new round = {}", round);
+            trace!("Trying to reach actual round.");
+            if let Some(r) = self.state.get_actual_round(validator, round) {
+                info!("Jump to a new round = {}", round);
                 self.state.jump_round(r);
                 self.handle_new_round();
             }
@@ -590,6 +590,7 @@ impl NodeHandler {
             self.has_full_propose(hash, round);
         }
     }
+
     /// Handles round update
     fn handle_new_round(&mut self) {
         if self.state.is_validator() {
