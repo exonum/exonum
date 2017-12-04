@@ -1,6 +1,6 @@
 # exonum-time
 
-[![Build Status](https://travis-ci.org/SerhiiOryshych/exonum-time.svg?branch=documentation)](https://travis-ci.org/SerhiiOryshych/exonum-time)
+[![Build Status](https://travis-ci.org/exonum/exonum-time.svg?branch=documentation)](https://travis-ci.org/exonum/exonum-time)
 
 The time oracle service for [Exonum](https://exonum.com/).
 
