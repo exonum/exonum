@@ -83,7 +83,7 @@ script: |
   case "$FEATURE" in
   "fmt" )
       cd backend && cargo audit && cargo fmt -- --write-mode=diff &&
-      cd cryptocurrency_api_tests && cargo audit && cargo fmt -- --write-mode=diff
+      cd cryptocurrency_api_tests && cargo fmt -- --write-mode=diff
   ;;
   "clippy" )
       cd backend && cargo clippy --verbose -- -D warnings
