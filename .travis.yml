@@ -73,8 +73,10 @@ install:
     cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
   fi
 - cargo install --list
+
 script: |
   case "$FEATURE" in
+  
   "fmt" )
       cargo audit &&
       cargo fmt -- --write-mode=diff &&
@@ -92,5 +94,5 @@ script: |
   "benchmarks" )
         RUST_LOG=off cargo bench --verbose --manifest-path Cargo.toml --features long_benchmarks --no-run
   ;;
-  
+
   esac
