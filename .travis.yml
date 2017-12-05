@@ -66,7 +66,7 @@ install:
   if [[ "$FEATURE" == "fmt" ]]; then
     cargo-audit -V || cargo install cargo-audit --force
     rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
-    cd exonum && cargo update && cd ..
+    cargo update
     fi
 - |
   case "$FEATURE" in
@@ -86,13 +86,13 @@ script: |
       cargo clippy --verbose --features long_benchmarks  -- -D warnings
   ;;
   "test" )
-      cargo test --manifest-path exonum/Cargo.toml --verbose --tests --lib
+      cargo test --manifest-path Cargo.toml --verbose --tests --lib
   ;;
   "non-fatal-checks" )
       cargo doc --no-deps -p exonum &&
       cargo deadlinks --dir target/doc
   ;;
   "benchmarks" )
-        RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
+        RUST_LOG=off cargo bench --verbose --manifest-path Cargo.toml --features long_benchmarks --no-run
   ;;
   esac
