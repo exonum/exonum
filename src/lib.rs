@@ -40,30 +40,25 @@ use exonum::encoding;
 use exonum::helpers::fabric::{ServiceFactory, Context};
 use exonum::api::Api;
 
-// // // // // // // // // // CONSTANTS // // // // // // // // // //
-
 /// Time service id.
 const SERVICE_ID: u16 = 4;
-/// Transaction id.
+/// `TxTime` transaction id.
 const TX_TIME_ID: u16 = 1;
 /// Time service name.
 const SERVICE_NAME: &str = "exonum_time";
 
-// // // // // // // // // // PERSISTENT DATA // // // // // // // // // //
-
 encoding_struct! {
-    /// Time index.
+    /// Time information.
     struct Time {
         const SIZE = 12;
-        /// Field that stores 'SystemTime'.
+
+        /// Field that stores `SystemTime`.
         field time:     SystemTime  [00 => 12]
     }
 }
 
-// // // // // // // // // // DATA LAYOUT // // // // // // // // // //
-
+/// `Exonum-time` service database schema.
 #[derive(Debug)]
-/// 'Exonum-time' service database schema.
 pub struct TimeSchema<T> {
     view: T,
 }
@@ -74,7 +69,7 @@ impl<T: AsRef<Snapshot>> TimeSchema<T> {
         TimeSchema { view }
     }
 
-    /// Returns table that stores 'Time' struct for every validator.
+    /// Returns the table that stores `Time` struct for every validator.
     pub fn validators_time(&self) -> MapIndex<&Snapshot, PublicKey, Time> {
         MapIndex::new(
             format!("{}.validators_time", SERVICE_NAME),
@@ -82,7 +77,7 @@ impl<T: AsRef<Snapshot>> TimeSchema<T> {
         )
     }
 
-    /// Returns one element - 'Time' struct. Time that stores in storage.
+    /// Returns stored `Time`.
     pub fn time(&self) -> Entry<&Snapshot, Time> {
         Entry::new(format!("{}.time", SERVICE_NAME), self.view.as_ref())
     }
@@ -105,17 +100,15 @@ impl<'a> TimeSchema<&'a mut Fork> {
     }
 }
 
-// // // // // // // // // // TRANSACTION // // // // // // // // // //
-
 message! {
     /// Transaction that is sent by the validator after the commit of the block.
     struct TxTime {
         const TYPE = SERVICE_ID;
         const ID = TX_TIME_ID;
         const SIZE = 44;
-        /// Field that stores validator time.
+        /// Validator's time.
         field time:     SystemTime  [00 => 12]
-        /// Field that stores validator public key.
+        /// Validator's public key.
         field pub_key:  &PublicKey  [12 => 44]
     }
 }
@@ -127,7 +120,7 @@ impl Transaction for TxTime {
 
     fn execute(&self, view: &mut Fork) {
         let validator_keys = Schema::new(&view).actual_configuration().validator_keys;
-        // The transaction must be signed by the valid validator.
+        // The transaction must be signed by the validator.
         if !validator_keys.iter().any(|&validator| {
             validator.service_key == *self.pub_key()
         })
@@ -150,7 +143,7 @@ impl Transaction for TxTime {
             }
         }
 
-        // Find all known times for validators.
+        // Find all known times for the validators.
         let mut validators_time: Vec<SystemTime>;
         {
             let idx = schema.validators_time();
@@ -179,7 +172,7 @@ impl Transaction for TxTime {
                 return;
             }
             _ => {
-                // Change the time in storage.
+                // Change the time in the storage.
                 schema.time_mut().set(Time::new(
                     validators_time[max_byzantine_nodes],
                 ));
@@ -188,9 +181,7 @@ impl Transaction for TxTime {
     }
 }
 
-// // // // // // // // // // REST API // // // // // // // // // //
-
-/// Implement the node API.
+/// Implements the node API.
 #[derive(Clone)]
 struct TimeApi {
     blockchain: Blockchain,
@@ -239,14 +230,12 @@ impl Api for TimeApi {
     }
 }
 
-// // // // // // // // // // SERVICE DECLARATION // // // // // // // // // //
-
 /// Define the service.
 #[derive(Debug, Default)]
 pub struct TimeService;
 
 impl TimeService {
-    /// Create new 'TimeService'.
+    /// Create a new 'TimeService'.
     pub fn new() -> TimeService {
         TimeService {}
     }
@@ -276,7 +265,7 @@ impl Service for TimeService {
         Value::Null
     }
 
-    /// Creating transaction after commit of the block.
+    /// Creates transaction after commit of the block.
     fn handle_commit(&self, context: &ServiceContext) {
         // The transaction must be created by the validator.
         if context.validator_id().is_none() {
