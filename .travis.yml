@@ -78,18 +78,17 @@ install:
 script: |
   case "$FEATURE" in
   "fmt" )
-      cd exonum && cargo update && cd .. &&
-      cd exonum && cargo audit && cd .. &&
-      cd exonum && cargo fmt -- --write-mode=diff && cd .. &&
+      cargo &&
+      cargo audit &&
+      cargo fmt -- --write-mode=diff &&
   ;;
   "clippy" )
-      cd exonum && cargo clippy --verbose --features long_benchmarks  -- -D warnings
+      cargo clippy --verbose --features long_benchmarks  -- -D warnings
   ;;
   "test" )
       cargo test --manifest-path exonum/Cargo.toml --verbose --tests --lib
   ;;
   "non-fatal-checks" )
-      cd exonum &&
       cargo doc --no-deps -p exonum &&
       cargo deadlinks --dir target/doc
   ;;
