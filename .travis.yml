@@ -70,7 +70,7 @@ install:
     cargo-audit -V || cargo install cargo-audit --force
     rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
     cd backend && cargo update
-    cd cryptocurrency_api_tests && cargo update && cd ..
+    cd cryptocurrency_api_tests && cargo update && cd ../..
     fi
 - |
   case "$FEATURE" in
