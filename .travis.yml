@@ -61,17 +61,17 @@ install:
 - |
   if [[ "$FEATURE" == "non-fatal-checks" ]]; then
     cargo-deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
-    fi
+  fi
 - |
   if [[ "$FEATURE" == "fmt" ]]; then
     cargo-audit -V || cargo install cargo-audit --force
     rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
     cargo update
-    fi
+  fi
 - |
-  if [[ "$FEATURE" == "clippy"]]; then
+  if [[ "$FEATURE" == "clippy" ]]; then
     cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
-    fi
+  fi
 - cargo install --list
 script: |
   case "$FEATURE" in
