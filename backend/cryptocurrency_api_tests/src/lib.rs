@@ -3,7 +3,7 @@
 extern crate log;
 extern crate exonum;
 extern crate sandbox;
-extern crate currency as cryptocurrency;
+extern crate cryptocurrency;
 extern crate iron;
 extern crate router;
 extern crate serde;
