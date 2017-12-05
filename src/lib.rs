@@ -35,7 +35,7 @@ use exonum::blockchain::{Blockchain, Service, ServiceContext, Schema, Transactio
 use exonum::messages::{RawTransaction, FromRaw, Message};
 use exonum::encoding::serialize::json::reexport::Value;
 use exonum::storage::{Fork, Snapshot, MapIndex, Entry};
-use exonum::crypto::{PublicKey};
+use exonum::crypto::PublicKey;
 use exonum::encoding;
 use exonum::helpers::fabric::{ServiceFactory, Context};
 use exonum::api::Api;
@@ -230,14 +230,43 @@ impl Api for TimeApi {
     }
 }
 
+/// A helper trait that provides the node with a current time.
+pub trait TimeProvider: Send + Sync + ::std::fmt::Debug {
+    /// Returns the current time.
+    fn current_time(&self) -> SystemTime;
+}
+
+#[derive(Debug)]
+struct SystemTimeProvider;
+
+impl TimeProvider for SystemTimeProvider {
+    fn current_time(&self) -> SystemTime {
+        SystemTime::now()
+    }
+}
+
 /// Define the service.
-#[derive(Debug, Default)]
-pub struct TimeService;
+#[derive(Debug)]
+pub struct TimeService {
+    /// Current time.
+    time: Box<TimeProvider>,
+}
+
+impl Default for TimeService {
+    fn default() -> TimeService {
+        TimeService { time: Box::new(SystemTimeProvider) as Box<TimeProvider> }
+    }
+}
 
 impl TimeService {
-    /// Create a new 'TimeService'.
+    /// Create a new `TimeService`.
     pub fn new() -> TimeService {
-        TimeService {}
+        TimeService::default()
+    }
+
+    /// Create a new `TimeService` with time provider `T`.
+    pub fn with_provider<T: Into<Box<TimeProvider>>>(time_provider: T) -> TimeService {
+        TimeService { time: time_provider.into() }
     }
 }
 
@@ -272,11 +301,12 @@ impl Service for TimeService {
             return;
         }
         let (pub_key, sec_key) = (*context.public_key(), context.secret_key().clone());
-        context.transaction_sender().send(Box::new(TxTime::new(
-            SystemTime::now(),
-            &pub_key,
-            &sec_key,
-        ))).unwrap();
+        context
+            .transaction_sender()
+            .send(Box::new(
+                TxTime::new(self.time.current_time(), &pub_key, &sec_key),
+            ))
+            .unwrap();
     }
 
     fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
