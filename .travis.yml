@@ -76,10 +76,10 @@ install:
 
 script: |
   case "$FEATURE" in
-  
+
   "fmt" )
       cargo audit &&
-      cargo fmt -- --write-mode=diff &&
+      cargo fmt -- --write-mode=diff
   ;;
   "clippy" )
       cargo clippy --verbose --features long_benchmarks  -- -D warnings
