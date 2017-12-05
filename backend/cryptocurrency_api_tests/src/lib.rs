@@ -28,13 +28,13 @@ mod tests {
     use std::sync::{Arc, Mutex};
     use std::path::Path;
     use std::fs::File;
-    use std::io::Read;
+    use std::io::{Read, Error};
 
     use exonum::encoding::serialize::json::reexport as serde_json;
     use exonum::node::TransactionSend;
     use exonum::crypto::{Seed, Hash, PublicKey, gen_keypair, gen_keypair_from_seed};
     use exonum::blockchain::{Service, Transaction};
-    use exonum::events::Error as EventsError;
+    use exonum::events::error;
     use exonum::messages::{FromRaw, Message, RawMessage};
     use exonum::api::Api;
     use exonum::helpers::init_logger;
@@ -517,13 +517,14 @@ mod tests {
     }
 
     impl TransactionSend for TestTxSender {
-        fn send(&self, tx: Box<Transaction>) -> Result<(), EventsError> {
-            if !tx.verify() {
-                return Err(EventsError::new("Unable to verify transaction"));
+        fn send(&self, tx: Box<Transaction>) -> Result<(), Error> {
+            if tx.verify() {
+                let rm = tx.raw().clone();
+                self.transactions.lock().unwrap().push_back(rm);
+                Ok(())
+            } else {
+                Err(error::other_error("Unable to verify transaction"))
             }
-            let rm = tx.raw().clone();
-            self.transactions.lock().unwrap().push_back(rm);
-            Ok(())
         }
     }
 
@@ -544,8 +545,8 @@ mod tests {
             );
             let state = SandboxState::new();
             CurrencySandbox {
-                sandbox: sandbox,
-                state: state,
+                sandbox,
+                state,
                 transactions: Arc::new(Mutex::new(VecDeque::new())),
             }
         }
@@ -554,8 +555,8 @@ mod tests {
             let channel = TestTxSender { transactions: self.transactions.clone() };
             let blockchain = self.sandbox.blockchain_ref().clone();
             let api = CryptocurrencyApi {
-                channel: channel,
-                blockchain: blockchain,
+                channel,
+                blockchain,
             };
             let mut router = Router::new();
             api.wire(&mut router);

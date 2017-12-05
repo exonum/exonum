@@ -1,27 +1,25 @@
 [package]
 name = "cryptocurrency_api_tests"
-version = "0.1.0"
+version = "0.3.0"
 authors = ["Exonum Team <exonum@bitfury.com>"]
 
 [dependencies]
-iron = "0.5.1"
 serde = "1.0.0"
 serde_derive = "1.0.0"
 rand = "0.3"
-router = "0.5.1"
 log = "0.3"
-iron-test = { git = "https://github.com/reem/iron-test" }
-cryptocurrency = {version="0.1.0", path="../"}
+router = "0.5.1"
+iron = "0.5.1"
+iron-test = "0.5.0"
+cryptocurrency = { version="0.3.0", path="../" }
 
 [dependencies.exonum]
-#git = "https://github.com/exonum/exonum.git"
-version = "0.2.0"
-path = "../../../exonum/exonum"
+git = "https://github.com/exonum/exonum.git"
+tag = "v0.3"
 
 [dependencies.sandbox]
-#git = "https://github.com/exonum/exonum.git"
-version = "0.2.0"
-path = "../../../exonum/sandbox"
+git = "https://github.com/exonum/exonum.git"
+tag = "v0.3"
 
 [replace]
-"exonum:0.2.0" = { path = "../../../exonum/exonum" } #{ git = "https://github.com/exonum/exonum.git", tag="v0.1" }
+"exonum:0.3.0" = { git = "https://github.com/exonum/exonum.git", tag="v0.3" }

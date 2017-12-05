@@ -64,7 +64,9 @@ where
         let mut currency_schema = CurrencySchema::new(&mut view);
 
         let max_height = general_schema.block_hashes_by_height().len() - 1;
-        let block_proof = general_schema.block_and_precommits(Height(max_height)).unwrap();
+        let block_proof = general_schema
+            .block_and_precommits(Height(max_height))
+            .unwrap();
         let state_hash = *block_proof.block.state_hash(); //debug code
 
         let wallet_path: MapProofTemplate<MapProof<Wallet>>;
@@ -86,7 +88,7 @@ where
         let /*mut*/ to_specific_wallet: MapProof<Wallet> =
             currency_schema.wallets_proof().get_proof(pub_key);
 
-//        change_wallet_proof(&mut to_specific_wallet);         // Byzantine behavior
+        //        change_wallet_proof(&mut to_specific_wallet);         // Byzantine behavior
 
         wallet_path = MapProofTemplate {
             mpt_proof: to_wallets_table,
@@ -128,7 +130,7 @@ where
         let tx_hash = tx.hash();
         match self.channel.send(Box::new(tx)) {
             Ok(_) => Ok(tx_hash),
-            Err(e) => Err(ApiError::Events(e)),
+            Err(e) => Err(ApiError::Io(e)),
         }
     }
 }
