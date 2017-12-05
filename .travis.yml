@@ -92,4 +92,5 @@ script: |
   "benchmarks" )
         RUST_LOG=off cargo bench --verbose --manifest-path Cargo.toml --features long_benchmarks --no-run
   ;;
+  
   esac
