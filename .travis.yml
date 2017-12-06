@@ -82,7 +82,7 @@ script: |
       cargo fmt -- --write-mode=diff
   ;;
   "clippy" )
-      cargo clippy --verbose --features long_benchmarks  -- -D warnings
+      cargo clippy -- -D warnings
   ;;
   "test" )
       cargo test --manifest-path Cargo.toml --verbose --tests --lib
