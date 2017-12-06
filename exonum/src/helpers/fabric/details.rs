@@ -38,6 +38,8 @@ use super::shared::{AbstractConfig, NodePublicConfig, SharedConfig, NodePrivateC
                     CommonConfigTemplate};
 use super::DEFAULT_EXONUM_LISTEN_PORT;
 
+const DATABASE_PATH: &str = "DATABASE_PATH";
+
 /// Run command.
 pub struct Run;
 
@@ -51,9 +53,10 @@ impl Run {
     pub fn db_helper(ctx: &Context) -> Box<Database> {
         use storage::{RocksDB, RocksDBOptions};
 
-        let path = ctx.arg::<String>("ROCKSDB_PATH").expect(
-            "ROCKSDB_PATH not found.",
-        );
+        let path = ctx.arg::<String>(DATABASE_PATH).expect(&format!(
+            "{} not found.",
+            DATABASE_PATH
+        ));
         let mut options = RocksDBOptions::default();
         options.create_if_missing(true);
         Box::new(RocksDB::open(Path::new(&path), &options).unwrap())
@@ -87,11 +90,11 @@ impl Command for Run {
                 false
             ),
             Argument::new_named(
-                "ROCKSDB_PATH",
+                DATABASE_PATH,
                 true,
-                "Use rocksdb database with the given path.",
+                "Use database with the given path.",
                 "d",
-                "rocksdb",
+                "db-path",
                 false
             ),
             Argument::new_named(

@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - `mount_*_api` methods in `Blockchain` instance now do not require `ApiContext`. (#366)
 - Removed redundant `current_height` method in `Schema` and rename `last_height` to `height`. (#379)
 - `last_block` now returns `Block` instead of `Option<Block>`. (#379)
+- Replaced `rocksdb` commandline parameter to more generic `db-path`. (#376)
 - Changed `Patch` and `Changes` from typedefs into opaque structures.
 
 ### Fixed
