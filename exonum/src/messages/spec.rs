@@ -178,6 +178,28 @@ macro_rules! message {
                    return Err("Incorrect raw message length.".into())
                 }
 
+                // Check identifiers
+                if raw.version() != $crate::messages::PROTOCOL_MAJOR_VERSION {
+                    return Err($crate::encoding::Error::UnsupportedProtocolVersion {
+                        version: $crate::messages::PROTOCOL_MAJOR_VERSION
+                    });
+                }
+                if raw.network_id() != $crate::messages::TEST_NETWORK_ID {
+                    return Err($crate::encoding::Error::IncorrectNetworkId {
+                        network_id: $crate::messages::TEST_NETWORK_ID
+                    });
+                }
+                if raw.message_type() != $id {
+                    return Err($crate::encoding::Error::IncorrectMessageType {
+                        message_type: $id
+                    });
+                }
+                if raw.service_id() != $extension {
+                    return Err($crate::encoding::Error::IncorrectServiceId {
+                        service_id: $extension
+                    });
+                }
+
                 Ok($name { raw: raw })
             }
 
@@ -206,6 +228,13 @@ macro_rules! message {
             #[allow(dead_code)]
             pub fn service_id() -> u16 {
                 $extension
+            }
+
+            /// Returns the hex representation of the binary data.
+            /// Lower case letters are used (e.g. f9b4ca).
+            #[allow(dead_code)]
+            pub fn to_hex(&self) -> String {
+                $crate::encoding::serialize::encode_hex(self.as_ref())
             }
 
             $(

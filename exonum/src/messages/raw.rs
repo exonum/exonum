@@ -38,6 +38,11 @@ impl RawMessage {
     pub fn new(buffer: MessageBuffer) -> Self {
         RawMessage(sync::Arc::new(buffer))
     }
+
+    /// Creates a new `RawMessage` instance from the given `Vec<u8>`.
+    pub fn from_vec(vec: Vec<u8>) -> Self {
+        RawMessage(sync::Arc::new(MessageBuffer::from_vec(vec)))
+    }
 }
 
 impl Deref for RawMessage {
