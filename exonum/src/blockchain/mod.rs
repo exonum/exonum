@@ -38,17 +38,17 @@ use std::mem;
 use std::fmt;
 use std::panic;
 
-use crypto::{self, Hash};
-use messages::{RawMessage, Precommit, CONSENSUS as CORE_SERVICE};
-use node::State;
-use storage::{Patch, Database, Snapshot, Fork, Error};
+use crypto::{self, Hash, PublicKey, SecretKey};
+use messages::{CONSENSUS as CORE_SERVICE, Precommit, RawMessage};
+use storage::{Database, Error, Fork, Patch, Snapshot};
 use helpers::{Height, ValidatorId};
+use node::ApiSender;
 
 pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
-pub use self::schema::{Schema, TxLocation, gen_prefix};
+pub use self::schema::{gen_prefix, Schema, TxLocation};
 pub use self::genesis::GenesisConfig;
-pub use self::config::{ValidatorKeys, StoredConfiguration, ConsensusConfig, TimeoutAdjusterConfig};
-pub use self::service::{Service, Transaction, ServiceContext, ApiContext, SharedNodeState};
+pub use self::config::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
+pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState, Transaction};
 
 mod block;
 mod schema;
@@ -65,11 +65,19 @@ pub mod config;
 pub struct Blockchain {
     db: Box<Database>,
     service_map: Arc<VecMap<Box<Service>>>,
+    service_keypair: (PublicKey, SecretKey),
+    api_sender: ApiSender,
 }
 
 impl Blockchain {
     /// Constructs a blockchain for the given `storage` and list of `services`.
-    pub fn new(storage: Box<Database>, services: Vec<Box<Service>>) -> Blockchain {
+    pub fn new(
+        storage: Box<Database>,
+        services: Vec<Box<Service>>,
+        service_public_key: PublicKey,
+        service_secret_key: SecretKey,
+        api_sender: ApiSender,
+    ) -> Blockchain {
         let mut service_map = VecMap::new();
         for service in services {
             let id = service.service_id() as usize;
@@ -85,6 +93,8 @@ impl Blockchain {
         Blockchain {
             db: storage,
             service_map: Arc::new(service_map),
+            service_keypair: (service_public_key, service_secret_key),
+            api_sender,
         }
     }
 
@@ -141,7 +151,7 @@ impl Blockchain {
     ///
     /// - If the genesis block was not committed.
     pub fn last_block(&self) -> Block {
-        Schema::new(&self.snapshot()).last_block().unwrap()
+        Schema::new(&self.snapshot()).last_block()
     }
 
     /// Creates and commits the genesis block for the given genesis configuration.
@@ -252,7 +262,6 @@ impl Blockchain {
 
             // Get tx & state hash
             let (tx_hash, state_hash) = {
-
                 let state_hashes = {
                     let schema = Schema::new(&fork);
 
@@ -322,16 +331,15 @@ impl Blockchain {
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn commit<'a, I>(
         &mut self,
-        state: &mut State,
+        patch: &Patch,
         block_hash: Hash,
         precommits: I,
-    ) -> Result<Vec<Box<Transaction>>, Error>
+    ) -> Result<(), Error>
     where
         I: Iterator<Item = &'a Precommit>,
     {
-        let (patch, txs) = {
+        let patch = {
             let mut fork = {
-                let patch = state.block(&block_hash).unwrap().patch();
                 let mut fork = self.db.fork();
                 fork.merge(patch.clone()); // FIXME: avoid cloning here
                 fork
@@ -342,29 +350,30 @@ impl Blockchain {
                 for precommit in precommits {
                     schema.precommits_mut(&block_hash).push(precommit.clone());
                 }
-
-                state.update_config(schema.actual_configuration());
             }
-
-            let transactions = {
-                let mut ctx = ServiceContext::new(state, &fork);
-                for service in self.service_map.values() {
-                    service.handle_commit(&mut ctx);
-                }
-                ctx.transactions()
-            };
-
-            (fork.into_patch(), transactions)
+            fork.into_patch()
         };
         self.merge(patch)?;
-        Ok(txs)
+        // Initializes the context after merge.
+        let context = ServiceContext::new(
+            self.service_keypair.0,
+            self.service_keypair.1.clone(),
+            self.api_sender.clone(),
+            self.fork(),
+        );
+        // Invokes `handle_commit` for each service in order of their identifiers
+        for service in self.service_map.values() {
+            service.handle_commit(&context);
+        }
+        Ok(())
     }
 
     /// Returns `Mount` object that aggregates public api handlers.
-    pub fn mount_public_api(&self, context: &ApiContext) -> Mount {
+    pub fn mount_public_api(&self) -> Mount {
+        let context = self.api_context();
         let mut mount = Mount::new();
         for service in self.service_map.values() {
-            if let Some(handler) = service.public_api_handler(context) {
+            if let Some(handler) = service.public_api_handler(&context) {
                 mount.mount(service.service_name(), handler);
             }
         }
@@ -372,14 +381,24 @@ impl Blockchain {
     }
 
     /// Returns `Mount` object that aggregates private api handlers.
-    pub fn mount_private_api(&self, context: &ApiContext) -> Mount {
+    pub fn mount_private_api(&self) -> Mount {
+        let context = self.api_context();
         let mut mount = Mount::new();
         for service in self.service_map.values() {
-            if let Some(handler) = service.private_api_handler(context) {
+            if let Some(handler) = service.private_api_handler(&context) {
                 mount.mount(service.service_name(), handler);
             }
         }
         mount
+    }
+
+    fn api_context(&self) -> ApiContext {
+        ApiContext::from_parts(
+            self,
+            self.api_sender.clone(),
+            &self.service_keypair.0,
+            &self.service_keypair.1,
+        )
     }
 }
 
@@ -394,6 +413,8 @@ impl Clone for Blockchain {
         Blockchain {
             db: self.db.clone(),
             service_map: Arc::clone(&self.service_map),
+            api_sender: self.api_sender.clone(),
+            service_keypair: self.service_keypair.clone(),
         }
     }
 }

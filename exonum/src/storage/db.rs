@@ -29,7 +29,7 @@ pub type Patch = HashMap<String, BTreeMap<Vec<u8>, Change>>;
 pub type Iter<'a> = Box<Iterator + 'a>;
 
 /// An enum that represents a kind of change to some key in storage.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Change {
     /// Put the specified value into storage for a corresponding key.
     Put(Vec<u8>),
@@ -146,6 +146,14 @@ pub trait Database: Send + Sync + 'static {
     /// will be returned. In case of an error the method guarantees no changes were applied to
     /// the database.
     fn merge(&mut self, patch: Patch) -> Result<()>;
+
+    /// Atomically applies a sequence of patch changes to the database with fsync.
+    ///
+    /// # Errors
+    /// If this method encounters any form of I/O or other error during merging, an error variant
+    /// will be returned. In case of an error the method guarantees no changes were applied to
+    /// the database.
+    fn merge_sync(&mut self, patch: Patch) -> Result<()>;
 }
 
 /// A trait that defines a snapshot of storage backend.

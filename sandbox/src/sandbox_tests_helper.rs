@@ -327,7 +327,7 @@ where
     let hashes = {
         let mut hashes = Vec::new();
         for tx in txs.iter() {
-            sandbox.recv(tx.clone());
+            sandbox.recv(tx);
             hashes.push(tx.hash());
         }
         hashes
@@ -354,7 +354,7 @@ where
 
             for val_idx in 1..sandbox.majority_count(n_validators) {
                 let val_idx = ValidatorId(val_idx as u16);
-                sandbox.recv(Prevote::new(
+                sandbox.recv(&Prevote::new(
                     val_idx,
                     initial_height,
                     round,
@@ -379,7 +379,7 @@ where
                 *sandbox_state.accepted_block_hash.borrow_mut() = block.hash();
             }
 
-            sandbox.broadcast(Precommit::new(
+            sandbox.broadcast(&Precommit::new(
                 VALIDATOR_0,
                 initial_height,
                 round,
@@ -392,7 +392,7 @@ where
 
             for val_idx in 1..sandbox.majority_count(n_validators) {
                 let val_idx = ValidatorId(val_idx as u16);
-                sandbox.recv(Precommit::new(
+                sandbox.recv(&Precommit::new(
                     val_idx,
                     initial_height,
                     round,
@@ -441,7 +441,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
     let hashes = {
         let mut hashes = Vec::new();
         for tx in txs.iter() {
-            sandbox.recv(tx.clone());
+            sandbox.recv(tx);
             hashes.push(tx.hash());
         }
         hashes
@@ -463,10 +463,10 @@ pub fn add_one_height_with_transactions_from_other_validator(
                 get_propose_with_transactions_for_validator(sandbox, hashes.as_ref(), VALIDATOR_1);
             trace!("propose.hash: {:?}", propose.hash());
             trace!("sandbox.last_hash(): {:?}", sandbox.last_hash());
-            sandbox.recv(propose.clone());
+            sandbox.recv(&propose);
             for val_idx in 0..sandbox.majority_count(n_validators) {
                 let val_idx = ValidatorId(val_idx as u16);
-                sandbox.recv(Prevote::new(
+                sandbox.recv(&Prevote::new(
                     val_idx,
                     initial_height,
                     round,
@@ -491,7 +491,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
 
             for val_idx in 0..sandbox.majority_count(n_validators) {
                 let val_idx = ValidatorId(val_idx as u16);
-                sandbox.recv(Precommit::new(
+                sandbox.recv(&Precommit::new(
                     val_idx,
                     initial_height,
                     round,
@@ -575,9 +575,9 @@ fn check_and_broadcast_propose_and_prevote(
     trace!("broadcasting propose with hash: {:?}", propose.hash());
     trace!("broadcasting propose with round: {:?}", propose.round());
     trace!("sandbox.current_round: {:?}", sandbox.current_round());
-    sandbox.broadcast(propose.clone());
+    sandbox.broadcast(&propose);
 
-    sandbox.broadcast(Prevote::new(
+    sandbox.broadcast(&Prevote::new(
         VALIDATOR_0,
         sandbox.current_height(),
         sandbox.current_round(),
@@ -602,7 +602,7 @@ pub fn receive_valid_propose_with_transactions(
         transactions,
         sandbox.s(sandbox.current_leader()),
     );
-    sandbox.recv(propose.clone());
+    sandbox.recv(&propose);
     propose.clone()
 }
 

@@ -15,27 +15,42 @@
 #![feature(test)]
 #![allow(dead_code)]
 
-extern crate test;
-extern crate tempdir;
 #[macro_use]
 extern crate exonum;
+extern crate futures;
+extern crate tempdir;
+extern crate test;
 
 #[cfg(test)]
 mod tests {
     use tempdir::TempDir;
+    use futures::sync::mpsc;
 
     use test::Bencher;
     use std::collections::BTreeMap;
 
-    use exonum::storage::{ProofMapIndex, Database, Fork, StorageValue, Patch};
+    use exonum::storage::{Database, Fork, Patch, ProofMapIndex, StorageValue};
     use exonum::storage::{RocksDB, RocksDBOptions};
     use exonum::blockchain::{Blockchain, Transaction};
     use exonum::crypto::{gen_keypair, Hash, PublicKey, SecretKey};
     use exonum::messages::Message;
     use exonum::helpers::{Height, ValidatorId};
+    use exonum::node::ApiSender;
+
+    fn create_blockchain(db: Box<Database>) -> Blockchain {
+        let dummy_channel = mpsc::channel(1);
+        let dummy_keypair = (PublicKey::zero(), SecretKey::zero());
+        Blockchain::new(
+            db,
+            Vec::new(),
+            dummy_keypair.0,
+            dummy_keypair.1,
+            ApiSender::new(dummy_channel.0),
+        )
+    }
 
     fn execute_timestamping(db: Box<Database>, b: &mut Bencher) {
-        let mut blockchain = Blockchain::new(db, Vec::new());
+        let mut blockchain = create_blockchain(db);
 
         message! {
             struct Tx {
@@ -92,7 +107,7 @@ mod tests {
     }
 
     fn execute_cryptocurrency(db: Box<Database>, b: &mut Bencher) {
-        let mut blockchain = Blockchain::new(db, Vec::new());
+        let mut blockchain = create_blockchain(db);
 
         message! {
             struct Tx {
@@ -170,7 +185,7 @@ mod tests {
     fn create_rocksdb(tempdir: &TempDir) -> Box<Database> {
         let mut options = RocksDBOptions::default();
         options.create_if_missing(true);
-        let db = Box::new(RocksDB::open(tempdir.path(), options).unwrap());
+        let db = Box::new(RocksDB::open(tempdir.path(), &options).unwrap());
         db as Box<Database>
     }
 

@@ -26,16 +26,15 @@ use std::io::Read;
 
 use exonum::helpers::fabric::NodeBuilder;
 
-const CONFIG_TMP_FOLDER: &'static str = "/tmp/";
-const CONFIG_TESTDATA_FOLDER: &'static str =
-    concat!(env!("CARGO_MANIFEST_DIR"), "/tests/testdata/config/");
+const CONFIG_TMP_FOLDER: &str = "/tmp/";
+const CONFIG_TESTDATA_FOLDER: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/testdata/config/");
 
-const GENERATED_TEMPLATE: &'static str = "template.toml";
+const GENERATED_TEMPLATE: &str = "template.toml";
 
-const SEC_CONFIG: [&'static str; 4] =
+const SEC_CONFIG: [&str; 4] =
     ["config0_sec.toml", "config1_sec.toml", "config2_sec.toml", "config3_sec.toml"];
 
-const PUB_CONFIG: [&'static str; 4] =
+const PUB_CONFIG: [&str; 4] =
     ["config0_pub.toml", "config1_pub.toml", "config2_pub.toml", "config3_pub.toml"];
 
 fn full_tmp_folder(folder: &str) -> String {

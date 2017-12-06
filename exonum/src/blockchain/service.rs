@@ -17,21 +17,19 @@
 
 use serde_json::Value;
 use iron::Handler;
-use mount::Mount;
 
 use std::fmt;
 use std::sync::{Arc, RwLock};
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
 
 use crypto::{Hash, PublicKey, SecretKey};
-use storage::{Snapshot, Fork};
+use storage::{Fork, Snapshot};
 use messages::{Message, RawTransaction};
 use encoding::Error as MessageError;
-use node::{Node, State, ApiSender};
-use node::state::ValidatorState;
-use blockchain::{ConsensusConfig, Blockchain, ValidatorKeys};
-use helpers::{Height, Round, Milliseconds};
+use node::{ApiSender, Node, State, TransactionSend};
+use blockchain::{Blockchain, ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
+use helpers::{Height, Milliseconds, ValidatorId};
 
 /// A trait that describes transaction processing rules (a group of sequential operations
 /// with the Exonum storage) for the given `Message`.
@@ -133,7 +131,7 @@ pub trait Service: Send + Sync + 'static {
     /// For example service can create some transaction if the specific condition occurred.
     ///
     /// *Try not to perform long operations here*.
-    fn handle_commit(&self, context: &mut ServiceContext) {}
+    fn handle_commit(&self, context: &ServiceContext) {}
 
     /// Returns api handler for public users.
     fn public_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
@@ -148,91 +146,99 @@ pub trait Service: Send + Sync + 'static {
 
 /// The current node state on which the blockchain is running, or in other words
 /// execution context.
-pub struct ServiceContext<'a, 'b> {
-    state: &'a mut State,
-    snapshot: &'b Snapshot,
-    txs: Vec<Box<Transaction>>,
+#[derive(Debug)]
+pub struct ServiceContext {
+    validator_id: Option<ValidatorId>,
+    service_keypair: (PublicKey, SecretKey),
+    api_sender: ApiSender,
+    fork: Fork,
+    stored_configuration: StoredConfiguration,
+    height: Height,
 }
 
+impl ServiceContext {
+    /// Creates the service context for the given node.
+    ///
+    /// This method is necessary if you want to implement an alternative exonum node.
+    /// For example, you can implement special node without consensus for regression
+    /// testing of services business logic.
+    pub fn new(
+        service_public_key: PublicKey,
+        service_secret_key: SecretKey,
+        api_sender: ApiSender,
+        fork: Fork,
+    ) -> ServiceContext {
+        let (stored_configuration, height) = {
+            let schema = Schema::new(fork.as_ref());
+            let stored_configuration = schema.actual_configuration();
+            let height = schema.height();
+            (stored_configuration, height)
+        };
+        let validator_id = stored_configuration
+            .validator_keys
+            .iter()
+            .position(|validator| service_public_key == validator.service_key)
+            .map(|id| ValidatorId(id as u16));
 
-impl<'a, 'b> ServiceContext<'a, 'b> {
-    #[doc(hidden)]
-    pub fn new(state: &'a mut State, snapshot: &'b Snapshot) -> ServiceContext<'a, 'b> {
         ServiceContext {
-            state: state,
-            snapshot: snapshot,
-            txs: Vec::new(),
+            validator_id,
+            service_keypair: (service_public_key, service_secret_key),
+            api_sender,
+            fork,
+            stored_configuration,
+            height,
         }
     }
 
-    /// If the current node is validator returns its state.
+    /// If the current node is validator returns its identifier.
     /// For other nodes return `None`.
-    pub fn validator_state(&self) -> &Option<ValidatorState> {
-        self.state.validator_state()
+    pub fn validator_id(&self) -> Option<ValidatorId> {
+        self.validator_id
     }
 
     /// Returns the current database snapshot.
-    pub fn snapshot(&self) -> &'b Snapshot {
-        self.snapshot
+    pub fn snapshot(&self) -> &Snapshot {
+        self.fork.as_ref()
     }
 
-    /// Returns the current blockchain height. This height is 'height of last committed block` + 1.
+    /// Returns the current blockchain height. This height is "height of the last committed block".
     pub fn height(&self) -> Height {
-        self.state.height()
-    }
-
-    /// Returns the current node round.
-    pub fn round(&self) -> Round {
-        self.state.round()
+        self.height
     }
 
     /// Returns the current list of validators.
     pub fn validators(&self) -> &[ValidatorKeys] {
-        self.state.validators()
+        self.stored_configuration.validator_keys.as_slice()
     }
 
     /// Returns current node's public key.
     pub fn public_key(&self) -> &PublicKey {
-        self.state.service_public_key()
+        &self.service_keypair.0
     }
 
     /// Returns current node's secret key.
     pub fn secret_key(&self) -> &SecretKey {
-        self.state.service_secret_key()
+        &self.service_keypair.1
     }
 
-    /// Returns the actual blockchain global configuration.
+    /// Returns the actual consensus configuration.
     pub fn actual_consensus_config(&self) -> &ConsensusConfig {
-        self.state.consensus_config()
+        &self.stored_configuration.consensus
     }
 
     /// Returns service specific global variables as json value.
     pub fn actual_service_config(&self, service: &Service) -> &Value {
-        let name = service.service_name();
-        self.state.services_config().get(name).unwrap()
+        &self.stored_configuration.services[service.service_name()]
     }
 
-    /// Adds transaction to the queue.
-    /// After the services handle commit event these transactions will be broadcast by node.
-    pub fn add_transaction(&mut self, tx: Box<Transaction>) {
-        assert!(tx.verify());
-        self.txs.push(tx);
+    /// Returns reference to the transaction sender.
+    pub fn transaction_sender(&self) -> &TransactionSend {
+        &self.api_sender
     }
 
-    #[doc(hidden)]
-    pub fn transactions(self) -> Vec<Box<Transaction>> {
-        self.txs
-    }
-}
-
-impl<'a, 'b> fmt::Debug for ServiceContext<'a, 'b> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "ServiceContext(state: {:?}, txs: {:?})",
-            self.state,
-            self.txs
-        )
+    /// Returns the actual blockchain global configuration.
+    pub fn stored_configuration(&self) -> &StoredConfiguration {
+        &self.stored_configuration
     }
 }
 
@@ -244,6 +250,7 @@ pub struct ApiNodeState {
     //TODO: update on event?
     peers_info: HashMap<SocketAddr, PublicKey>,
 }
+
 impl ApiNodeState {
     fn new() -> ApiNodeState {
         Self::default()
@@ -402,6 +409,21 @@ impl ApiContext {
         }
     }
 
+    /// Constructs context from raw parts.
+    pub fn from_parts(
+        blockchain: &Blockchain,
+        node_channel: ApiSender,
+        public_key: &PublicKey,
+        secret_key: &SecretKey,
+    ) -> ApiContext {
+        ApiContext {
+            blockchain: blockchain.clone(),
+            node_channel,
+            public_key: *public_key,
+            secret_key: secret_key.clone(),
+        }
+    }
+
     /// Returns reference to the node's blockchain.
     pub fn blockchain(&self) -> &Blockchain {
         &self.blockchain
@@ -421,16 +443,6 @@ impl ApiContext {
     pub fn secret_key(&self) -> &SecretKey {
         &self.secret_key
     }
-
-    /// Returns `Mount` object that aggregates public api handlers.
-    pub fn mount_public_api(&self) -> Mount {
-        self.blockchain.mount_public_api(self)
-    }
-
-    /// Returns `Mount` object that aggregates private api handlers.
-    pub fn mount_private_api(&self) -> Mount {
-        self.blockchain.mount_private_api(self)
-    }
 }
 
 impl ::std::fmt::Debug for ApiContext {
@@ -441,5 +453,17 @@ impl ::std::fmt::Debug for ApiContext {
             self.blockchain,
             self.public_key
         )
+    }
+}
+
+impl<'a, S: Service> From<S> for Box<Service + 'a> {
+    fn from(s: S) -> Self {
+        Box::new(s) as Box<Service>
+    }
+}
+
+impl<'a, T: Transaction> From<T> for Box<Transaction + 'a> {
+    fn from(tx: T) -> Self {
+        Box::new(tx) as Box<Transaction>
     }
 }
