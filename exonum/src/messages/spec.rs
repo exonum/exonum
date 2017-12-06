@@ -171,13 +171,6 @@ macro_rules! message {
                     });
                 }
 
-                let body_len = <Self>::check_fields(&raw)?;
-
-                if body_len.unchecked_offset() as usize +
-                    $crate::crypto::SIGNATURE_LENGTH as usize != raw.len()  {
-                   return Err("Incorrect raw message length.".into())
-                }
-
                 // Check identifiers
                 if raw.version() != $crate::messages::PROTOCOL_MAJOR_VERSION {
                     return Err($crate::encoding::Error::UnsupportedProtocolVersion {
@@ -198,6 +191,13 @@ macro_rules! message {
                     return Err($crate::encoding::Error::IncorrectServiceId {
                         service_id: $extension
                     });
+                }
+
+                // Check body
+                let body_len = <Self>::check_fields(&raw)?;
+                if body_len.unchecked_offset() as usize +
+                    $crate::crypto::SIGNATURE_LENGTH as usize != raw.len()  {
+                   return Err("Incorrect raw message length.".into())
                 }
 
                 Ok($name { raw: raw })

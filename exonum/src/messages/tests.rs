@@ -91,7 +91,7 @@ fn test_hex_wrong_length_into_message() {
     message! {
         struct TxOtherSize {
             const TYPE = 0;
-            const ID = 1;
+            const ID = 0;
             const SIZE = 32;
             field public_key: &PublicKey [0 => 32]
         }
@@ -109,7 +109,7 @@ fn test_hex_wrong_body_into_message() {
     message! {
         struct TxOtherBody {
             const TYPE = 0;
-            const ID = 2;
+            const ID = 0;
             const SIZE = 40;
             field a: u64 [0 => 8]
             field b: u64 [8 => 16]
