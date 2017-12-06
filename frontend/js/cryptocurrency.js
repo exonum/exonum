@@ -269,7 +269,13 @@
                 return;
             }
 
-            var wallet = parseWalletProof.call(self, publicKey, response);
+            try {
+                var wallet = parseWalletProof.call(self, publicKey, response);
+            } catch (e) {
+                callback(e);
+                return;
+            }
+
             callback.apply(undefined, [null].concat(wallet));
         });
     }

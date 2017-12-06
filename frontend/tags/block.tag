@@ -80,8 +80,11 @@
                         <div class="col-xs-12 custom-table-header-column">Hash</div>
                     </div>
                     <div class="row" each={ hash in txs } onclick={ rowClick.bind(this, hash) }>
-                        <div class="col-xs-12 custom-table-column">
+                        <div class="col-xs-8 custom-table-column">
                             <truncate class="truncate" val={ hash }></truncate>
+                        </div>
+                        <div class="col-xs-4 custom-table-column">
+                            <button class="btn btn-default btn-xs">Get Details</button>
                         </div>
                     </div>
                 </div>
