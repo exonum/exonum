@@ -21,10 +21,8 @@
 //! which means that only the Exonum process can access it. You can interact with a `Database` from
 //! different threads by cloning its instance.
 //!
-//! Exonum provides three types of database: [`LevelDB`], [`RocksDB`] and [`MemoryDB`]. By default
-//! present all three types, but you can choose [`LevelDB`] or [`RocksDB`] with `--feature` param.
-//! [`MemoryDB`] presents always. Also, you can make your own implementations of [`Database`] trait.
-//! See its documentation for more.
+//! Exonum provides two types of database: [`RocksDB`] and [`MemoryDB`]. Also, you can make your
+//! own implementations of [`Database`] trait. See its documentation for more.
 //!
 //! # Snapshot and Fork
 //!
@@ -81,7 +79,6 @@
 //! to create a wrapper over [`BaseIndex`] structure. See their documentation for more.
 //!
 //! [`Database`]: trait.Database.html
-//! [`LevelDB`]: struct.LevelDB.html
 //! [`RocksDB`]: struct.RocksDB.html
 //! [`MemoryDB`]: struct.MemoryDB.html
 //! [`Snapshot`]: trait.Snapshot.html
