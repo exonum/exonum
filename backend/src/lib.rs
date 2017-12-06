@@ -48,17 +48,8 @@ mod tx_metarecord;
 pub mod api;
 pub mod wallet;
 
+#[derive(Clone)]
 pub struct KeyBox(pub [u8; 128]);
-
-impl Clone for KeyBox {
-    fn clone(&self) -> Self {
-        let mut result: [u8; 128] = [0; 128];
-        for (element, value) in result.iter_mut().zip(self.0.iter()) {
-            *element = *value;
-        }
-        KeyBox(result)
-    }
-}
 
 impl fmt::Debug for KeyBox {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
