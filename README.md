@@ -1,5 +1,7 @@
 # exonum-time
 
+[![Build Status](https://travis-ci.com/exonum/exonum-time.svg?branch=master)](https://travis-ci.com/exonum/exonum-time)
+
 The time oracle service for [Exonum](https://exonum.com/).
 
 ## License
