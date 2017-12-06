@@ -26,6 +26,7 @@ hyper = "0.10.4"
 cookie = "0.6.0"
 tempdir = "0.3.5"
 params = "0.6.0"
+percent-encoding = "1.0.0"
 
 [replace]
 "exonum:0.3.0" = { git = "https://github.com/exonum/exonum.git", tag="v0.3" }
