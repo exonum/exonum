@@ -6,6 +6,7 @@ use router::Router;
 use iron::prelude::*;
 use bodyparser;
 use params::{Params, Value};
+use percent_encoding::percent_decode;
 
 use std::fmt;
 
@@ -19,7 +20,7 @@ use exonum::helpers::Height;
 //use exonum::storage::proof_map_index::{BranchProofNode, ProofNode};
 
 use super::tx_metarecord::TxMetaRecord;
-use super::wallet::Wallet;
+use super::wallet::{Wallet, WalletAccess};
 use super::{CRYPTOCURRENCY_SERVICE_ID, CurrencySchema, CurrencyTx};
 
 /// TODO: Add documentation.
@@ -85,10 +86,10 @@ where
             debug_assert_eq!(wallets_root_hash, *check_result.unwrap().unwrap());
         }
 
-        let /*mut*/ to_specific_wallet: MapProof<Wallet> =
+        let to_specific_wallet: MapProof<Wallet> =
             currency_schema.wallets_proof().get_proof(pub_key);
 
-        //        change_wallet_proof(&mut to_specific_wallet);         // Byzantine behavior
+        //change_wallet_proof(&mut to_specific_wallet);         // Byzantine behavior
 
         wallet_path = MapProofTemplate {
             mpt_proof: to_wallets_table,
@@ -124,6 +125,15 @@ where
             wallet_history,
         };
         Ok(res)
+    }
+
+    fn find_keybox(&self, login: &str) -> Result<WalletAccess, ApiError> {
+        let mut view = self.blockchain.fork();
+        let mut currency_schema = CurrencySchema::new(&mut view);
+        match currency_schema.key_boxes().get(&login.to_owned()) {
+            Some(keybox) => Ok(keybox.clone()),
+            None => Err(ApiError::NotFound),
+        }
     }
 
     fn transaction(&self, tx: CurrencyTx) -> Result<Hash, ApiError> {
@@ -216,12 +226,35 @@ where
                 Err(e) => Err(ApiError::IncorrectRequest(Box::new(e)))?,
             }
         };
+
+        let self_ = self.clone();
+        let wallet_find = move |req: &mut Request| -> IronResult<Response> {
+            let map = req.extensions.get::<Router>().unwrap();
+            match map.find("login") {
+                Some(login) => {
+                    let login = percent_decode(login.as_bytes()).decode_utf8_lossy();
+                    let access = self_.find_keybox(&login)?;
+                    self_.ok_response(&to_value(&access).unwrap())
+                }
+                _ => {
+                    Err(ApiError::IncorrectRequest(
+                        "Required parameter of \
+                                                     wallet 'login' is missing"
+                            .into(),
+                    ))?
+                }
+            }
+        };
+
         let route_post = "/v1/wallets/transaction";
         let route_get = "/v1/wallets/info";
+        let route_find = "/v1/wallets/find/:login";
         router.post(&route_post, transaction, "transaction");
-        info!("Created post route: {}", route_post);
+        info!("Created POST route: {}", route_post);
         router.get(&route_get, wallet_info, "wallet_info");
-        info!("Created get route: {}", route_get);
+        info!("Created GET route: {}", route_get);
+        router.get(&route_find, wallet_find, "wallet_find");
+        info!("Created GET route: {}", route_find);
     }
 }
 

@@ -49,7 +49,7 @@ It consists of nodes which interact with each other. Distributed nodes ensure th
 To build the backend, use cargo:
 
 ```
-cargo build --manifest-path=backend/Cargo.toml
+cd backend && cargo install
 ```
 
 ### Run
@@ -66,10 +66,10 @@ In the example above we created configs for 4 nodes and put them into `example/`
 The next step you should start all nodes:
 
 ```
-cryptocurrency run --leveldb-path=example/0 --node-config=example/validators/0.toml --public-api-address=127.0.0.1:8000
-cryptocurrency run --leveldb-path=example/1 --node-config=example/validators/1.toml
-cryptocurrency run --leveldb-path=example/2 --node-config=example/validators/2.toml
-cryptocurrency run --leveldb-path=example/3 --node-config=example/validators/3.toml
+cryptocurrency run --rocksdb=example/0 --node-config=example/validators/0.toml --public-api-address=127.0.0.1:8000
+cryptocurrency run --rocksdb=example/1 --node-config=example/validators/1.toml
+cryptocurrency run --rocksdb=example/2 --node-config=example/validators/2.toml
+cryptocurrency run --rocksdb=example/3 --node-config=example/validators/3.toml
 ```
 
 ## Frontend
