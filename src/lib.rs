@@ -119,9 +119,12 @@ impl Transaction for TxTime {
 
     fn execute(&self, view: &mut Fork) {
         let validator_keys = Schema::new(&view).actual_configuration().validator_keys;
+
         // The transaction must be signed by the validator.
-        if !validator_keys.iter().any(|&validator| validator.service_key == *self.pub_key())
-        {
+        let signed = validator_keys.iter().any(|&validator| {
+            validator.service_key == *self.pub_key()
+        });
+        if !signed {
             return;
         }
 
