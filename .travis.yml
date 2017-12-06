@@ -91,8 +91,5 @@ script: |
       cargo doc --no-deps &&
       cargo deadlinks --dir target/doc
   ;;
-  "benchmarks" )
-        RUST_LOG=off cargo bench --verbose --manifest-path Cargo.toml --features long_benchmarks --no-run
-  ;;
 
   esac
