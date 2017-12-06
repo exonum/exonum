@@ -14,8 +14,7 @@
 
 //! The time oracle service for Exonum.
 
-#![deny(missing_debug_implementations)]
-#![deny(missing_docs)]
+#![deny(missing_debug_implementations, missing_docs)]
 
 extern crate serde;
 extern crate serde_json;
@@ -121,9 +120,7 @@ impl Transaction for TxTime {
     fn execute(&self, view: &mut Fork) {
         let validator_keys = Schema::new(&view).actual_configuration().validator_keys;
         // The transaction must be signed by the validator.
-        if !validator_keys.iter().any(|&validator| {
-            validator.service_key == *self.pub_key()
-        })
+        if !validator_keys.iter().any(|&validator| validator.service_key == *self.pub_key())
         {
             return;
         }
