@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Added a new function `merge_sync`. In this function a write will be flushed from the operating system buffer cache before the write is considered complete. (#368)
 - Added conversion into boxed values for values which implement `Service` or `Transaction` traits. (#366)
 - Added constructor for the `ServiceContext` which can be useful for the alternative node implementations. (#366)
+- Implemented `AsRef<RawMessage>` for any Exonum messages that were created using the `message!` macro. (#372)
+- Implemented additional checks for conversion from raw message. (#372)
 
 ### Changed
 - Changed a signature of `open` function in a `rocksdb` module. `RocksDBOptions` should pass by the reference. (#369)
@@ -24,6 +26,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Removed redundant `current_height` method in `Schema` and rename `last_height` to `height`. (#379)
 - `last_block` now returns `Block` instead of `Option<Block>`. (#379)
 - Replaced `rocksdb` commandline parameter to more generic `db-path`. (#376)
+- Removed redundant `FromRaw` trait. (#372)
+- Obsolete trait `HexValue` replaced by the `FromHex` and `ToHex` traits. (#372)
 
 ### Fixed
 - Fixed `crate_authors!` macro usage, this macro can't return static string in new clap version. (#370)
