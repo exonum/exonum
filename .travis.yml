@@ -1,4 +1,5 @@
 language: rust
+node_js: "8.9.2"
 
 addons:
   apt:
@@ -15,6 +16,7 @@ addons:
     - libiberty-dev
     - libsnappy-dev
     - librocksdb
+    - npm
 
 rust:
   - stable
@@ -32,6 +34,7 @@ cache:
   - $HOME/.local
   - $TRAVIS_BUILD_DIR/target
   - $TRAVIS_BUILD_DIR/cryptocurrency_api_tests/target
+  - $TRAVIS_BUILD_DIR/frontend/node_modules
 
 dist: trusty
 sudo: required
@@ -50,6 +53,9 @@ env:
   - FEATURE=fmt
   - FEATURE=test
   - FEATURE=test-sandbox
+
+before_install:
+- nvm install 7.2.1
 
 install:
 - |
@@ -78,7 +84,13 @@ install:
   ;;
   esac
 - cargo install --list
-script: |
+- cd $TRAVIS_BUILD_DIR/frontend
+- npm install
+- npm install -g karma-cli
+- cd ..
+
+script:
+- |
   case "$FEATURE" in
   "fmt" )
       cd backend && cargo audit && cargo fmt -- --write-mode=diff &&
@@ -97,6 +109,10 @@ script: |
       cd backend/cryptocurrency_api_tests && cargo test --verbose
   ;;
   esac
+- cd $TRAVIS_BUILD_DIR/frontend
+- npm run lint
+- karma start
+- cd ..
 
 notifications:
   slack:

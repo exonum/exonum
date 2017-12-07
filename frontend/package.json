@@ -27,6 +27,19 @@
     "riot-route": "^3.1.0"
   },
   "devDependencies": {
-    "eslint": "^4.1.1"
+    "chai": "^4.0.2",
+    "chai-jquery": "^2.0.0",
+    "eslint": "^4.1.1",
+    "karma": "^1.7.0",
+    "karma-chai": "^0.1.0",
+    "karma-mocha": "^1.3.0",
+    "karma-mocha-reporter": "^2.2.3",
+    "karma-phantomjs-launcher": "^1.0.4",
+    "karma-sinon": "^1.0.5",
+    "mocha": "^3.4.2",
+    "phantomjs-polyfill-array-from": "^1.0.1",
+    "phantomjs-polyfill-object-assign": "0.0.2",
+    "sinon": "^2.3.5",
+    "sinon-chai": "^2.11.0"
   }
 }
