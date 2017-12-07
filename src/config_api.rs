@@ -21,10 +21,11 @@ use std::str;
 use std::num::ParseIntError;
 
 use exonum::api::{Api, ApiError};
-use exonum::crypto::{PublicKey, SecretKey, Hash, HexValue};
+use exonum::crypto::{PublicKey, SecretKey, Hash};
 use exonum::blockchain::{Blockchain, StoredConfiguration, Schema};
 use exonum::storage::StorageValue;
 use exonum::node::TransactionSend;
+use exonum::encoding::serialize::FromHex;
 use exonum::encoding::serialize::json::reexport as serde_json;
 use exonum::helpers::Height;
 

@@ -110,7 +110,7 @@ use exonum::blockchain::{StoredConfiguration, Service, Transaction, Schema, ApiC
 use exonum::node::State;
 use exonum::helpers::fabric::{ServiceFactory, Context};
 use exonum::crypto::{Signature, PublicKey, Hash};
-use exonum::messages::{Message, FromRaw, RawTransaction};
+use exonum::messages::{Message, RawTransaction};
 use exonum::storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot, StorageValue};
 use exonum::encoding::{Field, Error as StreamStructError};
 use exonum::encoding::serialize::json::reexport as serde_json;

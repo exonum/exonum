@@ -22,18 +22,18 @@ env_logger = "0.4.3"
 log = "0.3.8"
 serde = "1.0.10"
 serde_derive = "1.0.10"
-lazy_static = "0.2.9"
-router = "0.5.1"
-iron = "0.5.1"
-bodyparser = "0.7.0"
-params = "0.6.0"
+lazy_static = "1.0.0"
+router = "0.6.0"
+iron = "0.6.0"
+bodyparser = "0.8.0"
+params = "0.8.0"
 
 [dev-dependencies]
 pretty_assertions = "0.4.0"
 
 [dev-dependencies.exonum-testkit]
-git = "https://github.com/alekseysidorov/exonum-testkit"
-rev = "78b22b42cab7f9451ef63056de2623281e9c0bf9"
+git = "https://github.com/exonum/exonum-testkit"
+rev = "0aa5213c3575af707ca95b5df705e753850555b8"
 
 [patch.crates-io]
-exonum = { git = "https://github.com/exonum/exonum", rev = "3ffaf6c7f2bf93e42cb70b10a8a0d02077691fe2" }
+exonum = { git = "https://github.com/exonum/exonum", rev = "f0f690731b8871533dfd6e2368f03ef3ba182e47" }
