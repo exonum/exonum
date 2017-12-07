@@ -13,7 +13,7 @@
 // limitations under the License.
 use std::collections::HashSet;
 
-use crypto::{Hash, HexValue, PublicKey};
+use crypto::{Hash, PublicKey};
 use blockchain::{Schema, Transaction};
 use messages::{BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote,
                PrevotesRequest, Propose, ProposeRequest, RawTransaction, TransactionsRequest};
@@ -153,8 +153,8 @@ impl NodeHandler {
 
         if !self.state.whitelist().allow(msg.from()) {
             error!(
-                "Received request message from peer = {:?} which not in whitelist.",
-                msg.from()
+                "Received request message from peer = {} which not in whitelist.",
+                msg.from().to_hex()
             );
             return;
         }
