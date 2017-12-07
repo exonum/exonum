@@ -85,7 +85,9 @@ install:
   esac
 - cargo install --list
 - cd $TRAVIS_BUILD_DIR/frontend
-- npm install && cd ..
+- npm install
+- npm install -g karma-cli
+- cd ..
 
 script:
 - |
@@ -108,7 +110,9 @@ script:
   ;;
   esac
 - cd $TRAVIS_BUILD_DIR/frontend
-- npm run lint && cd ..
+- npm run lint
+- karma start
+- cd ..
 
 notifications:
   slack:
