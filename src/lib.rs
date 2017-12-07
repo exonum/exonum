@@ -29,6 +29,7 @@ use iron::Handler;
 use router::Router;
 
 use std::time::SystemTime;
+use std::collections::HashMap;
 
 use exonum::blockchain::{Blockchain, Service, ServiceContext, Schema, Transaction, ApiContext};
 use exonum::messages::{RawTransaction, FromRaw, Message};
@@ -202,9 +203,11 @@ impl TimeApi {
         let view = self.blockchain.snapshot();
         let schema = TimeSchema::new(&view);
         let idx = schema.validators_time();
-        let validators_time: Vec<Time> = idx.values().collect();
+
+        let validators_time: HashMap<_, _> = idx.iter().collect();
+
         if validators_time.is_empty() {
-            self.not_found_response(&serde_json::to_value("Validators time database if empty")
+            self.not_found_response(&serde_json::to_value("Validators time database is empty")
                 .unwrap())
         } else {
             self.ok_response(&serde_json::to_value(validators_time).unwrap())
