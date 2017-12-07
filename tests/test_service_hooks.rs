@@ -15,7 +15,7 @@ mod hooks {
     use serde_json::{to_value, Value};
 
     use exonum::blockchain::{Service, ServiceContext, Transaction};
-    use exonum::messages::{FromRaw, RawTransaction};
+    use exonum::messages::RawTransaction;
     use exonum::storage::Fork;
     use exonum::crypto::Signature;
     use exonum::encoding;

@@ -6,7 +6,7 @@ extern crate serde_json;
 
 use exonum::crypto::{gen_keypair, PublicKey};
 use exonum::blockchain::{Block, Schema, Service, Transaction};
-use exonum::messages::{FromRaw, Message, RawTransaction};
+use exonum::messages::{Message, RawTransaction};
 use exonum::storage::Fork;
 use exonum::encoding;
 use exonum_testkit::{ApiKind, TestKitBuilder};
