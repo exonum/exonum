@@ -23,6 +23,7 @@ right now. Be sure you installed necessary packages:
 * node (with npm)
 * bower
 * Rust compiler
+* `gnu-sed` on MacOS platform
 
 ### Run
 
