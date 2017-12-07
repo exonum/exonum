@@ -1,13 +1,19 @@
 #!/bin/bash
 
 if [ -z "$SERVICE_ROOT" ]; then
-    echo "Need to set SERVICE_ROOT"
+    echo "Need to set environment variable SERVICE_ROOT"
     exit 1
 fi
 
 destdir=$SERVICE_ROOT
 scriptdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 supervisor_conf=${destdir}/etc/supervisord.conf
+platform=`uname`
+sed_program=sed
+
+if [[ "$platform" == 'Darwin' ]]; then
+   sed_program=gsed
+fi
 
 install() {
     echo "Installing to: ${destdir}"
@@ -23,7 +29,7 @@ install() {
 
     echo "Build backend..."
     cd ${scriptdir}/../backend
-    cargo build -p cryptocurrency
+    cargo build
     cd -
 
     echo "Create supervisor environment..."
@@ -35,10 +41,10 @@ install() {
     ln -s ${scriptdir}/../backend ${destdir}/backend
 
     echo "Generate new configuration for nodes..."
-    ${destdir}/backend/target/debug/cryptocurrency generate -o ${destdir}/etc 6 -p 2000
-    validators=$(cat ${destdir}/etc/validators/0.toml | sed -n -e 's/consensus_key = //p' | sed -e 's/$/,/' | sed -e '1s/^/[/' | sed -e '$ s/,/]/g' | tr -d '\n')
+    ${destdir}/backend/target/debug/cryptocurrency generate-testnet -p 9000 6 --output_dir ${destdir}/etc
+    validators=$(cat ${destdir}/etc/validators/0.toml | ${sed_program} -n -e 's/consensus_key = //p' | ${sed_program} -e 's/$/,/' | ${sed_program} -e '1s/^/[/' | ${sed_program} -e '$ s/,/]/g' | tr -d '\n')
     echo "Use validators: $validators"
-    cat ${destdir}/frontend/config-example.json | sed -r "s/(\"validators\": )(\[\])/\1${validators}/" > ${destdir}/etc/frontend.json
+    cat ${destdir}/frontend/config-example.json | ${sed_program} -r "s/(\"validators\": )(\[\])/\1${validators}/" > ${destdir}/etc/frontend.json
 }
 
 enable() {
@@ -73,7 +79,6 @@ clear() {
 
 start() {
     test -e /tmp/supervisord.sock || exit 1
-
     svcgroup=$1
     cd ${destdir}
     supervisorctl update ${svcgroup}
