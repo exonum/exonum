@@ -7,9 +7,10 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 
-use exonum::crypto::{self, HexValue, PublicKey};
+use exonum::crypto::{self, PublicKey};
 use exonum::helpers::Height;
 use exonum::messages::Message;
+use exonum::encoding::serialize::FromHex;
 use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};
 
 mod counter {
@@ -20,7 +21,7 @@ mod counter {
     extern crate router;
 
     use exonum::blockchain::{ApiContext, Blockchain, Service, Transaction};
-    use exonum::messages::{FromRaw, Message, RawTransaction};
+    use exonum::messages::{Message, RawTransaction};
     use exonum::node::{ApiSender, TransactionSend};
     use exonum::storage::{Entry, Fork, Snapshot};
     use exonum::crypto::{Hash, PublicKey};
@@ -113,7 +114,7 @@ mod counter {
 
     impl TxReset {
         pub fn verify_author(&self) -> bool {
-            use exonum::crypto::HexValue;
+            use exonum::encoding::serialize::FromHex;
             *self.author() == PublicKey::from_hex(ADMIN_KEY).unwrap()
         }
     }

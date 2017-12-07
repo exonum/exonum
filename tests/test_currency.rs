@@ -25,10 +25,11 @@ mod cryptocurrency {
 
     use exonum::blockchain::{ApiContext, Blockchain, Service, Transaction};
     use exonum::node::{ApiSender, TransactionSend};
-    use exonum::messages::{FromRaw, Message, RawTransaction};
+    use exonum::messages::{Message, RawTransaction};
     use exonum::storage::{Fork, MapIndex, Snapshot};
-    use exonum::crypto::{Hash, HexValue, PublicKey};
+    use exonum::crypto::{Hash, PublicKey};
     use exonum::encoding;
+    use exonum::encoding::serialize::FromHex;
     use exonum::api::{Api, ApiError};
     use self::iron::prelude::*;
     use self::iron::headers::ContentType;
