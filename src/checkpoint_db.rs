@@ -1,7 +1,6 @@
-use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
 
-use exonum::storage::{Database, Patch, Change, Result as StorageResult, Snapshot};
+use exonum::storage::{Database, Patch, Result as StorageResult, Snapshot};
 
 /// Implementation of a `Database`, which allows to rollback commits introduced by the `merge()`
 /// function.
@@ -71,30 +70,29 @@ impl<T: Database + Clone> Database for CheckpointDb<T> {
 
     fn merge(&mut self, patch: Patch) -> StorageResult<()> {
         let snapshot = self.inner.snapshot();
-        let mut rev_patch = Patch::new();
+        self.inner.merge(patch.clone())?;
+        let mut rev_fork = self.fork();
 
-        for (name, kv_map) in &patch {
-            let mut rev_kv_map = BTreeMap::new();
-            for key in kv_map.keys() {
-                match snapshot.get(name, key) {
+        for (name, changes) in patch {
+            for (key, _) in changes {
+                match snapshot.get(&name, &key) {
                     Some(value) => {
-                        rev_kv_map.insert(key.clone(), Change::Put(value));
+                        rev_fork.put(&name, key, value);
                     }
                     None => {
-                        rev_kv_map.insert(key.clone(), Change::Delete);
+                        rev_fork.remove(&name, key);
                     }
                 }
             }
-            rev_patch.insert(name.to_string(), rev_kv_map);
         }
 
         {
             let mut journal = self.journal.write().expect(
                 "Cannot acquire write lock on journal",
             );
-            journal.push(rev_patch);
+            journal.push(rev_fork.into_patch());
         }
-        self.inner.merge(patch)
+        Ok(())
     }
 
     fn merge_sync(&mut self, patch: Patch) -> StorageResult<()> {
@@ -115,24 +113,52 @@ impl<T: Database + Clone> CheckpointDbHandler<T> {
 
 #[cfg(test)]
 mod tests {
-    use exonum::storage::MemoryDB;
+    use exonum::storage::{Change, MemoryDB};
     use super::*;
 
-    fn create_patch<'a, I>(from: I) -> Patch
+    // Same as `Change`, but with trait implementation required for `Patch` comparison.
+    #[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
+    enum OrdChange {
+        Put(Vec<u8>),
+        Delete,
+    }
+
+    impl From<Change> for OrdChange {
+        fn from(change: Change) -> Self {
+            match change {
+                Change::Put(value) => OrdChange::Put(value),
+                Change::Delete => OrdChange::Delete,
+            }
+        }
+    }
+
+    impl<'a> From<&'a Change> for OrdChange {
+        fn from(change: &'a Change) -> Self {
+            match *change {
+                Change::Put(ref value) => OrdChange::Put(value.clone()),
+                Change::Delete => OrdChange::Delete,
+            }
+        }
+    }
+
+    /// Asserts that a patch contains only the specified changes.
+    fn check_patch<'a, I>(patch: &Patch, changes: I)
     where
         I: IntoIterator<Item = (&'a str, Vec<u8>, Change)>,
     {
-        let mut patch = Patch::new();
+        use std::collections::BTreeSet;
+        use std::iter::FromIterator;
 
-        for (name, key, value) in from.into_iter() {
-            let name = name.to_string();
-            let kv_map = patch.entry(name).or_insert_with(BTreeMap::new);
-            if kv_map.insert(key, value).is_some() {
-                panic!("Attempt to re-insert a key into patch");
+        let mut patch_set: BTreeSet<(&str, _, _)> = BTreeSet::new();
+        for (name, changes) in patch.iter() {
+            for (key, value) in changes.iter() {
+                patch_set.insert((name, key.clone(), OrdChange::from(value)));
             }
         }
-
-        patch
+        let expected_set = BTreeSet::from_iter(changes.into_iter().map(|(name, key, value)| {
+            (name, key, OrdChange::from(value))
+        }));
+        assert_eq!(patch_set, expected_set);
     }
 
     #[test]
@@ -146,10 +172,7 @@ mod tests {
                 "Cannot acquire read lock on journal",
             );
             assert_eq!(journal.len(), 1);
-            assert_eq!(
-                journal[0],
-                create_patch(vec![("foo", vec![], Change::Delete)])
-            );
+            check_patch(&journal[0], vec![("foo", vec![], Change::Delete)]);
         }
 
         let snapshot = db.snapshot();
@@ -164,16 +187,10 @@ mod tests {
                 "Cannot acquire read lock on journal",
             );
             assert_eq!(journal.len(), 2);
-            assert_eq!(
-                journal[0],
-                create_patch(vec![("foo", vec![], Change::Delete)])
-            );
-            assert_eq!(
-                journal[1],
-                create_patch(vec![
-                    ("foo", vec![], Change::Put(vec![2])),
-                    ("bar", vec![1], Change::Delete),
-                ])
+            check_patch(&journal[0], vec![("foo", vec![], Change::Delete)]);
+            check_patch(
+                &journal[1],
+                vec![("foo", vec![], Change::Put(vec![2])), ("bar", vec![1], Change::Delete)],
             );
         }
 
