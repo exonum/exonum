@@ -1,37 +1,141 @@
-//! Test harness for Exonum blockchain framework, allowing to test service APIs synchronously
-//! and in the same process as the harness.
+//! Testkit for Exonum blockchain framework, allowing to test service APIs synchronously
+//! and in the same process as the testkit.
+//!
+//! # Example
+//! ```
+//! #[macro_use]
+//! extern crate exonum;
+//! #[macro_use]
+//! extern crate exonum_testkit;
+//! extern crate serde_json;
+//!
+//! use exonum::crypto::{gen_keypair, PublicKey};
+//! use exonum::blockchain::{Block, Schema, Service, Transaction};
+//! use exonum::messages::{Message, RawTransaction};
+//! use exonum::storage::Fork;
+//! use exonum::encoding;
+//! use exonum_testkit::{ApiKind, TestKitBuilder};
+//!
+//! // Simple service implementation.
+//!
+//! const SERVICE_ID: u16 = 1;
+//! const TX_TIMESTAMP_ID: u16 = 1;
+//!
+//! message! {
+//!     struct TxTimestamp {
+//!         const TYPE = SERVICE_ID;
+//!         const ID = TX_TIMESTAMP_ID;
+//!         const SIZE = 40;
+//!
+//!         field from: &PublicKey [0 => 32]
+//!         field msg: &str [32 => 40]
+//!     }
+//! }
+//!
+//! struct TimestampingService;
+//!
+//! impl Transaction for TxTimestamp {
+//!     fn verify(&self) -> bool {
+//!         self.verify_signature(self.from())
+//!     }
+//!
+//!     fn execute(&self, _fork: &mut Fork) {}
+//!
+//!     fn info(&self) -> serde_json::Value {
+//!         serde_json::to_value(self).unwrap()
+//!     }
+//! }
+//!
+//! impl Service for TimestampingService {
+//!     fn service_name(&self) -> &'static str {
+//!         "timestamping"
+//!     }
+//!
+//!     fn service_id(&self) -> u16 {
+//!         SERVICE_ID
+//!     }
+//!
+//!     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
+//!         let trans: Box<Transaction> = match raw.message_type() {
+//!             TX_TIMESTAMP_ID => Box::new(TxTimestamp::from_raw(raw)?),
+//!             _ => {
+//!                 return Err(encoding::Error::IncorrectMessageType {
+//!                     message_type: raw.message_type(),
+//!                 });
+//!             }
+//!         };
+//!         Ok(trans)
+//!     }
+//! }
+//!
+//! fn main() {
+//!     // Create testkit for network with four validators.
+//!     let mut testkit = TestKitBuilder::validator()
+//!         .with_validators(4)
+//!         .with_service(TimestampingService)
+//!         .create();
+//!     // Create few transactions.
+//!     let keypair = gen_keypair();
+//!     let tx1 = TxTimestamp::new(&keypair.0, "Down To Earth", &keypair.1);
+//!     let tx2 = TxTimestamp::new(&keypair.0, "Cry Over Spilt Milk", &keypair.1);
+//!     let tx3 = TxTimestamp::new(&keypair.0, "Dropping Like Flies", &keypair.1);
+//!     // Commit them into blockchain.
+//!     testkit.create_block_with_transactions(txvec![
+//!         tx1.clone(), tx2.clone(), tx3.clone()
+//!     ]);
+//!     // Check results with schema.
+//!     let snapshot = testkit.snapshot();
+//!     let schema = Schema::new(&snapshot);
+//!     assert!(schema.transactions().contains(&tx1.hash()));
+//!     assert!(schema.transactions().contains(&tx2.hash()));
+//!     assert!(schema.transactions().contains(&tx3.hash()));
+//!     // Check results with api.
+//!     let api = testkit.api();
+//!     let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+//!     assert_eq!(blocks.len(), 2);
+//!     api.get::<serde_json::Value>(
+//!         ApiKind::System,
+//!         &format!("v1/transactions/{}", tx1.hash().to_string()),
+//!     );
+//! }
+//! ```
 
-#![deny(missing_docs)]
+#![deny(missing_debug_implementations, missing_docs)]
 
 extern crate exonum;
 extern crate futures;
-extern crate mount;
 extern crate iron;
 extern crate iron_test;
+extern crate mount;
 extern crate router;
 extern crate serde;
 extern crate serde_json;
 
-use exonum::blockchain::{ApiContext, Blockchain, Service, Transaction, GenesisConfig,
-                         SharedNodeState, ValidatorKeys};
-use exonum::crypto;
-// A bit hacky, `exonum::events` is hidden from docs.
-use exonum::events::{Event as ExonumEvent, EventHandler};
-use exonum::helpers::{Height, Round, ValidatorId};
-use exonum::messages::{Message, Propose, Precommit};
-use exonum::node::{ApiSender, NodeChannel, NodeHandler, Configuration, ListenerConfig,
-                   ServiceConfig, DefaultSystemState, State as NodeState, TransactionSend};
-use exonum::storage::{MemoryDB, Snapshot};
 use futures::Stream;
-use futures::executor;
+use futures::executor::{self, Spawn};
+use futures::sync::mpsc;
 use iron::IronError;
-use iron::headers::{Headers, ContentType};
+use iron::headers::{ContentType, Headers};
 use iron::status::StatusClass;
 use iron_test::{request, response};
 use mount::Mount;
 use router::Router;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
+use std::collections::BTreeMap;
+use std::sync::{Arc, RwLock, RwLockReadGuard};
+use std::fmt;
+
+use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Schema as CoreSchema,
+                         Service, StoredConfiguration, Transaction, ValidatorKeys};
+use exonum::crypto;
+use exonum::helpers::{Height, Round, ValidatorId};
+use exonum::messages::{Message, Precommit, Propose};
+use exonum::node::{ApiSender, ExternalMessage, State as NodeState, TransactionSend, TxPool};
+use exonum::storage::{MemoryDB, Snapshot};
+
+#[macro_use]
+mod macros;
 mod checkpoint_db;
 pub mod compare;
 mod greedy_fold;
@@ -42,80 +146,124 @@ pub use compare::ComparableSnapshot;
 
 use checkpoint_db::{CheckpointDb, CheckpointDbHandler};
 
-const STATE_UPDATE_TIMEOUT: u64 = 10_000;
-
-/// Macro allowing to create `Vec<Box<Transaction>>` from transaction references. Can be used for
-/// `TestHarness.probe_all()`, among other things.
-///
-/// As the macro syntax implies, the transactions are not consumed; they are rather cloned before
-/// being put into `Box`es.
-///
-/// # Examples
-///
-/// ```ignore
-/// let tx = TxCreateWallet::new(..);
-/// let other_tx = TxTransfer::new(..);
-/// let txs = txvec![&tx, &other_tx];
-/// ```
-#[macro_export]
-macro_rules! txvec {
-    ($(&$tx:ident),+ $(,)*) => {
-        vec![$(Box::new($tx.clone()) as Box<exonum::blockchain::Transaction>,)+]
-    };
-}
-
 /// Emulated test network.
+#[derive(Debug)]
 pub struct TestNetwork {
-    validators: Vec<Validator>,
+    us: TestNode,
+    validators: Vec<TestNode>,
 }
 
 impl TestNetwork {
     /// Creates a new emulated network.
     pub fn new(validator_count: u16) -> Self {
-        let mut validators = Vec::with_capacity(validator_count as usize);
-        for i in 0..validator_count {
-            validators.push(Validator::new(ValidatorId(i)));
-        }
-        TestNetwork { validators }
+        let validators = (0..validator_count)
+            .map(ValidatorId)
+            .map(TestNode::new_validator)
+            .collect::<Vec<_>>();
+
+        let us = validators[0].clone();
+        TestNetwork { validators, us }
     }
 
-    /// Returns the node in the emulated network, from whose perspective the harness operates.
-    pub fn us(&self) -> &Validator {
-        &self.validators[0]
+    /// Returns the node in the emulated network, from whose perspective the testkit operates.
+    pub fn us(&self) -> &TestNode {
+        &self.us
     }
 
     /// Returns a slice of all validators in the network.
-    pub fn validators(&self) -> &[Validator] {
+    pub fn validators(&self) -> &[TestNode] {
         &self.validators
     }
 
     /// Returns config encoding the network structure usable for creating the genesis block of
     /// a blockchain.
-    pub fn config(&self) -> GenesisConfig {
-        GenesisConfig::new(self.validators.iter().map(Validator::public_keys))
+    pub fn genesis_config(&self) -> GenesisConfig {
+        GenesisConfig::new(self.validators.iter().map(TestNode::public_keys))
+    }
+
+    /// Updates the test network by the new set of nodes.
+    pub fn update<I: IntoIterator<Item = TestNode>>(&mut self, mut us: TestNode, validators: I) {
+        let validators = validators
+            .into_iter()
+            .enumerate()
+            .map(|(id, mut validator)| {
+                let validator_id = ValidatorId(id as u16);
+                validator.change_role(Some(validator_id));
+                if us.public_keys().consensus_key == validator.public_keys().consensus_key {
+                    us.change_role(Some(validator_id));
+                }
+                validator
+            })
+            .collect::<Vec<_>>();
+        self.validators = validators;
+        self.us.clone_from(&us);
+    }
+
+    /// Returns service public key of the validator with given id.
+    pub fn service_public_key_of(&self, id: ValidatorId) -> Option<&crypto::PublicKey> {
+        self.validators().get(id.0 as usize).map(|x| {
+            &x.service_public_key
+        })
+    }
+
+    /// Returns consensus public key of the validator with given id.
+    pub fn consensus_public_key_of(&self, id: ValidatorId) -> Option<&crypto::PublicKey> {
+        self.validators().get(id.0 as usize).map(|x| {
+            &x.consensus_public_key
+        })
     }
 }
 
-/// An emulated validator in the test network.
-pub struct Validator {
+/// An emulated node in the test network.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TestNode {
     consensus_secret_key: crypto::SecretKey,
     consensus_public_key: crypto::PublicKey,
     service_secret_key: crypto::SecretKey,
     service_public_key: crypto::PublicKey,
-    validator_id: ValidatorId,
+    validator_id: Option<ValidatorId>,
 }
 
-impl Validator {
-    /// Creates a new validator.
-    pub fn new(validator_id: ValidatorId) -> Self {
+impl TestNode {
+    /// Creates a new auditor.
+    pub fn new_auditor() -> Self {
         let (consensus_public_key, consensus_secret_key) = crypto::gen_keypair();
         let (service_public_key, service_secret_key) = crypto::gen_keypair();
 
-        Validator {
+        TestNode {
             consensus_secret_key,
             consensus_public_key,
             service_secret_key,
             service_public_key,
+            validator_id: None,
+        }
+    }
+
+    /// Creates a new validator with the given id.
+    pub fn new_validator(validator_id: ValidatorId) -> Self {
+        let (consensus_public_key, consensus_secret_key) = crypto::gen_keypair();
+        let (service_public_key, service_secret_key) = crypto::gen_keypair();
+
+        TestNode {
+            consensus_secret_key,
+            consensus_public_key,
+            service_secret_key,
+            service_public_key,
+            validator_id: Some(validator_id),
+        }
+    }
+
+    /// Constructs a new node from the given keypairs.
+    pub fn from_parts(
+        consensus_keypair: (crypto::PublicKey, crypto::SecretKey),
+        service_keypair: (crypto::PublicKey, crypto::SecretKey),
+        validator_id: Option<ValidatorId>,
+    ) -> TestNode {
+        TestNode {
+            consensus_public_key: consensus_keypair.0,
+            consensus_secret_key: consensus_keypair.1,
+            service_public_key: service_keypair.0,
+            service_secret_key: service_keypair.1,
             validator_id,
         }
     }
@@ -128,7 +276,9 @@ impl Validator {
         tx_hashes: &[crypto::Hash],
     ) -> Propose {
         Propose::new(
-            self.validator_id,
+            self.validator_id.expect(
+                "An attempt to create propose from a non-validator node.",
+            ),
             height,
             Round::first(),
             last_hash,
@@ -142,7 +292,9 @@ impl Validator {
         use std::time::SystemTime;
 
         Precommit::new(
-            self.validator_id,
+            self.validator_id.expect(
+                "An attempt to create propose from a non-validator node.",
+            ),
             propose.height(),
             propose.round(),
             &propose.hash(),
@@ -152,184 +304,257 @@ impl Validator {
         )
     }
 
-    /// Returns public keys of the validator.
+    /// Returns public keys of the node.
     pub fn public_keys(&self) -> ValidatorKeys {
         ValidatorKeys {
             consensus_key: self.consensus_public_key,
             service_key: self.service_public_key,
         }
     }
+
+    /// Returns the current validator id of node if it is validator of the test network.
+    pub fn validator_id(&self) -> Option<ValidatorId> {
+        self.validator_id
+    }
+
+    /// Change node role.
+    pub fn change_role(&mut self, role: Option<ValidatorId>) {
+        self.validator_id = role;
+    }
+
+    /// Returns the service keypar.
+    pub fn service_keypair(&self) -> (&crypto::PublicKey, &crypto::SecretKey) {
+        (&self.service_public_key, &self.service_secret_key)
+    }
 }
 
-/// Builder for `TestHarness`.
-pub struct TestHarnessBuilder {
-    blockchain: Blockchain,
-    db_handler: CheckpointDbHandler<MemoryDB>,
-    validator_count: u16,
+impl From<TestNode> for ValidatorKeys {
+    fn from(node: TestNode) -> Self {
+        node.public_keys()
+    }
 }
 
-impl TestHarnessBuilder {
-    fn with_services<I>(services: I) -> Self
-    where
-        I: IntoIterator<Item = Box<Service>>,
-    {
-        let db = CheckpointDb::new(MemoryDB::new());
-        let db_handler = db.handler();
-        let blockchain = Blockchain::new(Box::new(db), services.into_iter().collect());
-        TestHarnessBuilder {
-            blockchain,
-            db_handler,
-            validator_count: 1,
+/// Builder for `TestKit`.
+///
+/// # Example
+///
+/// ```
+/// # extern crate exonum;
+/// # extern crate exonum_testkit;
+/// # use exonum::blockchain::{Service, Transaction};
+/// # use exonum::messages::RawTransaction;
+/// # use exonum::encoding;
+/// # use exonum_testkit::TestKitBuilder;
+/// # pub struct MyService;
+/// # impl Service for MyService {
+/// #    fn service_name(&self) -> &'static str {
+/// #        "documentation"
+/// #    }
+/// #    fn service_id(&self) -> u16 {
+/// #        0
+/// #    }
+/// #    fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
+/// #        unimplemented!();
+/// #    }
+/// # }
+/// # fn main() {
+/// let mut testkit = TestKitBuilder::validator()
+///     .with_service(MyService)
+///     .with_validators(4)
+///     .create();
+/// testkit.create_block();
+/// // Other test code
+/// # }
+/// ```
+pub struct TestKitBuilder {
+    us: TestNode,
+    validators: Vec<TestNode>,
+    services: Vec<Box<Service>>,
+}
+
+impl fmt::Debug for TestKitBuilder {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        f.debug_struct("TestKitBuilder")
+            .field("us", &self.us)
+            .field("validators", &self.validators)
+            .field(
+                "services",
+                &self.services
+                    .iter()
+                    .map(|x| x.service_name())
+                    .collect::<Vec<_>>(),
+            )
+            .finish()
+    }
+}
+
+impl TestKitBuilder {
+    /// Creates testkit for the validator node.
+    pub fn validator() -> Self {
+        let us = TestNode::new_validator(ValidatorId(0));
+        TestKitBuilder {
+            validators: vec![us.clone()],
+            services: Vec::new(),
+            us,
         }
     }
 
-    /// Sets the validator count to be used in the harness emulation.
-    pub fn validators(&mut self, validator_count: u16) -> &mut Self {
+    /// Creates testkit for the auditor node.
+    pub fn auditor() -> Self {
+        let us = TestNode::new_auditor();
+        TestKitBuilder {
+            validators: vec![TestNode::new_validator(ValidatorId(0))],
+            services: Vec::new(),
+            us,
+        }
+    }
+
+    /// Sets the number of validator nodes in the test network.
+    pub fn with_validators(mut self, validators_count: u16) -> Self {
         assert!(
-            validator_count > 0,
-            "Number of validators should be positive"
+            validators_count > 0,
+            "At least one validator should be present in the network."
         );
-        self.validator_count = validator_count;
+        let additional_validators = (self.validators.len() as u16..validators_count)
+            .map(ValidatorId)
+            .map(TestNode::new_validator);
+        self.validators.extend(additional_validators);
         self
     }
 
-    /// Creates the harness.
-    pub fn create(&self) -> TestHarness {
+    /// Adds a service to the testkit.
+    pub fn with_service<S>(mut self, service: S) -> Self
+    where
+        S: Into<Box<Service>>,
+    {
+        self.services.push(service.into());
+        self
+    }
+
+    /// Creates the testkit.
+    pub fn create(self) -> TestKit {
         crypto::init();
-        TestHarness::assemble(
-            self.blockchain.clone(),
-            self.db_handler.clone(),
-            TestNetwork::new(self.validator_count),
+        TestKit::assemble(
+            self.services,
+            TestNetwork {
+                us: self.us,
+                validators: self.validators,
+            },
         )
     }
 }
 
-/// Harness for testing blockchain services. It offers simple network configuration emulation
+/// Testkit for testing blockchain services. It offers simple network configuration emulation
 /// (with no real network setup).
-pub struct TestHarness {
-    handler: NodeHandler,
+pub struct TestKit {
+    blockchain: Blockchain,
     db_handler: CheckpointDbHandler<MemoryDB>,
-    channel: NodeChannel,
-    api_context: ApiContext,
+    events_stream: Spawn<Box<Stream<Item = (), Error = ()>>>,
     network: TestNetwork,
+    api_sender: ApiSender,
+    mempool: TxPool,
+    cfg_proposal: Option<ConfigurationProposalState>,
 }
 
-impl TestHarness {
-    /// Initializes a harness with a blockchain that hosts a given set of services.
-    /// The blockchain uses `MemoryDB` for storage.
-    pub fn with_services<I>(services: I) -> TestHarnessBuilder
-    where
-        I: IntoIterator<Item = Box<Service>>,
-    {
-        TestHarnessBuilder::with_services(services)
+impl fmt::Debug for TestKit {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        f.debug_struct("TestKit")
+            .field("blockchain", &self.blockchain)
+            .field("network", &self.network)
+            .field("mempool", &self.mempool)
+            .field("cfg_change_proposal", &self.cfg_proposal)
+            .finish()
     }
+}
 
-    fn assemble(
-        mut blockchain: Blockchain,
-        db_handler: CheckpointDbHandler<MemoryDB>,
-        network: TestNetwork,
-    ) -> Self {
-        let genesis = network.config();
-        blockchain.create_genesis_block(genesis.clone()).unwrap();
+impl TestKit {
+    fn assemble(services: Vec<Box<Service>>, network: TestNetwork) -> Self {
+        let api_channel = mpsc::channel(1_000);
+        let api_sender = ApiSender::new(api_channel.0.clone());
 
-        let listen_address = "0.0.0.0:2000".parse().unwrap();
-        let api_state = SharedNodeState::new(STATE_UPDATE_TIMEOUT);
-        let system_state = Box::new(DefaultSystemState(listen_address));
-        let channel = NodeChannel::new(Default::default());
-        let api_sender = ApiSender::new(channel.api_requests.0.clone());
+        let db = CheckpointDb::new(MemoryDB::new());
+        let db_handler = db.handler();
 
-        let (config, api_context) = {
-            let our_node = network.us();
-
-            (
-                Configuration {
-                    listener: ListenerConfig {
-                        consensus_public_key: our_node.consensus_public_key,
-                        consensus_secret_key: our_node.consensus_secret_key.clone(),
-                        whitelist: Default::default(),
-                        address: listen_address,
-                    },
-                    service: ServiceConfig {
-                        service_public_key: our_node.service_public_key,
-                        service_secret_key: our_node.service_secret_key.clone(),
-                    },
-                    mempool: Default::default(),
-                    network: Default::default(),
-                    peer_discovery: vec![],
-                },
-                ApiContext::from_parts(
-                    &blockchain,
-                    api_sender,
-                    &our_node.service_public_key,
-                    &our_node.service_secret_key,
-                ),
-            )
-        };
-
-        let handler = NodeHandler::new(
-            blockchain,
-            listen_address,
-            channel.node_sender(),
-            system_state,
-            config,
-            api_state,
+        let mut blockchain = Blockchain::new(
+            Box::new(db),
+            services,
+            *network.us().service_keypair().0,
+            network.us().service_keypair().1.clone(),
+            api_sender.clone(),
         );
 
-        TestHarness {
-            handler,
-            db_handler,
-            channel,
-            api_context,
-            network,
-        }
-    }
+        let genesis = network.genesis_config();
+        blockchain.create_genesis_block(genesis.clone()).unwrap();
 
-    /// Returns the node state of the harness.
-    pub fn state(&self) -> &NodeState {
-        self.handler.state()
+        let mempool = Arc::new(RwLock::new(BTreeMap::new()));
+        let event_stream: Box<Stream<Item = (), Error = ()>> = {
+            let blockchain = blockchain.clone();
+            let mempool = Arc::clone(&mempool);
+            Box::new(api_channel.1.greedy_fold((), move |_, event| {
+                let snapshot = blockchain.snapshot();
+                let schema = CoreSchema::new(&snapshot);
+                match event {
+                    ExternalMessage::Transaction(tx) => {
+                        let hash = tx.hash();
+                        if !schema.transactions().contains(&hash) {
+                            mempool
+                                .write()
+                                .expect("Cannot write transactions to mempool")
+                                .insert(tx.hash(), tx);
+                        }
+                    }
+                    ExternalMessage::PeerAdd(_) => { /* Ignored */ }
+                }
+            }))
+        };
+        let events_stream = executor::spawn(event_stream);
+
+        TestKit {
+            blockchain,
+            db_handler,
+            api_sender,
+            events_stream,
+            network,
+            mempool: Arc::clone(&mempool),
+            cfg_proposal: None,
+        }
     }
 
     /// Creates a mounting point for public APIs used by the blockchain.
     fn public_api_mount(&self) -> Mount {
-        self.api_context.mount_public_api()
+        self.blockchain.mount_public_api()
     }
 
     /// Creates a mounting point for public APIs used by the blockchain.
     fn private_api_mount(&self) -> Mount {
-        self.api_context.mount_private_api()
+        self.blockchain.mount_private_api()
     }
 
-    /// Creates an instance of `HarnessApi` to test the API provided by services.
-    pub fn api(&self) -> HarnessApi {
-        HarnessApi::new(self)
+    /// Creates an instance of `TestKitApi` to test the API provided by services.
+    pub fn api(&self) -> TestKitApi {
+        TestKitApi::new(self)
     }
 
     /// Polls the *existing* events from the event loop until exhaustion. Does not wait
     /// until new events arrive.
     pub fn poll_events(&mut self) -> Option<Result<(), ()>> {
-        // XXX: Creating a new executor each time seems very inefficient, but sharing
-        // a single executor seems to be impossible
-        // because `handler` needs to be borrowed mutably into the closure. Use `RefCell`?
-        let handler = &mut self.handler;
-        let event_stream = self.channel.api_requests.1.by_ref().greedy_fold(
-            (),
-            |_, event| {
-                handler.handle_event(ExonumEvent::Api(event))
-            },
-        );
-        let mut event_exec = executor::spawn(event_stream);
-        event_exec.wait_stream()
+        self.events_stream.wait_stream()
     }
 
     /// Returns a snapshot of the current blockchain state.
     pub fn snapshot(&self) -> Box<Snapshot> {
-        self.handler.blockchain.snapshot()
+        self.blockchain.snapshot()
+    }
+
+    /// Returns a blockchain instance for low level manipulations with storage.
+    pub fn blockchain_mut(&mut self) -> &mut Blockchain {
+        &mut self.blockchain
     }
 
     /// Rolls the blockchain back for a certain number of blocks
     pub fn rollback(&mut self, blocks: usize) {
         assert!(
-            (blocks as u64) < self.state().height().0,
+            (blocks as u64) <= self.height().0,
             "Cannot rollback past genesis block"
         );
         self.db_handler.rollback(blocks);
@@ -342,42 +567,17 @@ impl TestHarness {
     ///
     /// # Panics
     ///
-    /// If there are duplicate transactions.
-    pub fn probe_all<I>(&mut self, transactions: I) -> Box<Snapshot>
-    where
-        I: IntoIterator<Item = Box<Transaction>>,
-    {
-        use std::collections::BTreeSet;
-        use std::iter::FromIterator;
+    /// - Panics if there are duplicate transactions.
+    pub fn probe_all(&mut self, transactions: Vec<Box<Transaction>>) -> Box<Snapshot> {
+        // Filter out already committed transactions; otherwise,
+        // `create_block_with_transactions()` will panic.
+        let schema = CoreSchema::new(self.snapshot());
+        let uncommitted_txs: Vec<_> = transactions
+            .into_iter()
+            .filter(|tx| !schema.transactions().contains(&tx.hash()))
+            .collect();
 
-        let transactions = transactions.into_iter();
-        let mut tx_hashes = Vec::with_capacity(transactions.size_hint().0);
-
-        let api = self.api();
-        for tx in transactions {
-            tx_hashes.push(tx.hash());
-            api.send_boxed(tx);
-        }
-        self.poll_events();
-
-        let tx_hashes: Vec<_> = {
-            let mempool = self.state().transactions().read().expect(
-                "Cannot acquire read lock on mempool",
-            );
-            tx_hashes
-                .into_iter()
-                .filter(|h| mempool.contains_key(h))
-                .collect()
-        };
-        let tx_hash_set = BTreeSet::from_iter(tx_hashes.clone());
-        assert_eq!(
-            tx_hash_set.len(),
-            tx_hashes.len(),
-            "Duplicate transactions in probe"
-        );
-
-        self.do_create_block(&tx_hashes);
-
+        self.create_block_with_transactions(uncommitted_txs);
         let snapshot = self.snapshot();
         self.rollback(1);
         snapshot
@@ -392,33 +592,112 @@ impl TestHarness {
     }
 
     fn do_create_block(&mut self, tx_hashes: &[crypto::Hash]) {
-        let validator_id = self.state().validator_id().expect(
-            "Tested node is not a validator",
-        );
-        let height = self.state().height();
-        let last_hash = *self.state().last_hash();
-        let round = Round::first();
+        let new_block_height = self.height().next();
+        let last_hash = self.last_block_hash();
 
-        let handler = &mut self.handler;
-        let (block_hash, patch) = handler.create_block(validator_id, height, tx_hashes);
-        handler.state.add_block(
-            block_hash,
-            patch,
-            tx_hashes.to_vec(),
-            validator_id,
-        );
+        self.update_configuration(new_block_height);
+        let (block_hash, patch) = {
+            let validator_id = self.leader().validator_id().unwrap();
+            let transactions = self.mempool();
+            self.blockchain.create_patch(
+                validator_id,
+                new_block_height,
+                tx_hashes,
+                &transactions,
+            )
+        };
 
-        let propose = self.network.us().create_propose(
-            height,
+        // Remove txs from mempool
+        {
+            let mut transactions = self.mempool.write().expect(
+                "Cannot modify transactions in mempool",
+            );
+            for hash in tx_hashes {
+                transactions.remove(hash);
+            }
+        }
+
+        let propose = self.leader().create_propose(
+            new_block_height,
             &last_hash,
             tx_hashes,
         );
-        let precommits: Vec<_> = self.network
+        let precommits: Vec<_> = self.network()
             .validators()
             .iter()
             .map(|v| v.create_precommit(&propose, &block_hash))
             .collect();
-        handler.commit(block_hash, precommits.iter(), Some(round));
+
+        self.blockchain
+            .commit(&patch, block_hash, precommits.iter())
+            .unwrap();
+
+        self.poll_events();
+    }
+
+    /// Update test network configuration if such an update has been scheduled
+    /// with `commit_configuration_change`.
+    fn update_configuration(&mut self, new_block_height: Height) {
+        use ConfigurationProposalState::*;
+
+        let actual_from = new_block_height.next();
+        if let Some(cfg_proposal) = self.cfg_proposal.take() {
+            match cfg_proposal {
+                Uncommitted(cfg_proposal) => {
+                    // Commit configuration proposal
+                    let stored = cfg_proposal.stored_configuration().clone();
+                    let mut fork = self.blockchain.fork();
+                    CoreSchema::new(&mut fork).commit_configuration(stored);
+                    let changes = fork.into_patch();
+                    self.blockchain.merge(changes).unwrap();
+                    self.cfg_proposal = Some(Committed(cfg_proposal));
+                }
+                Committed(cfg_proposal) => {
+                    if cfg_proposal.actual_from() == actual_from {
+                        // Modify the self configuration
+                        self.network_mut().update(
+                            cfg_proposal.us,
+                            cfg_proposal.validators,
+                        );
+                    } else {
+                        self.cfg_proposal = Some(Committed(cfg_proposal));
+                    }
+                }
+            }
+        }
+    }
+
+    /// Creates block with the given transactions.
+    /// Transactions that are in mempool will be ignored.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if the one of transactions has been already committed to the blockchain.
+    pub fn create_block_with_transactions<I>(&mut self, txs: I)
+    where
+        I: IntoIterator<Item = Box<Transaction>>,
+    {
+        let tx_hashes = {
+            let mut mempool = self.mempool.write().expect(
+                "Cannot write transactions to mempool",
+            );
+
+            let mut tx_hashes = Vec::new();
+            let snapshot = self.snapshot();
+            let schema = CoreSchema::new(&snapshot);
+            for tx in txs {
+                let txid = tx.hash();
+                assert!(
+                    !schema.transactions().contains(&txid),
+                    "Transaction is already committed: {:?}",
+                    tx
+                );
+                tx_hashes.push(txid);
+                mempool.insert(txid, tx);
+            }
+            tx_hashes
+        };
+        self.create_block_with_tx_hashes(&tx_hashes);
     }
 
     /// Creates block with the specified transactions. The transactions must be previously
@@ -426,14 +705,12 @@ impl TestHarness {
     ///
     /// # Panics
     ///
-    /// In the case any of transaction hashes are not in the mempool.
-    pub fn create_block_with_transactions(&mut self, tx_hashes: &[crypto::Hash]) {
+    /// - Panics in the case any of transaction hashes are not in the mempool.
+    pub fn create_block_with_tx_hashes(&mut self, tx_hashes: &[crypto::Hash]) {
         self.poll_events();
 
         {
-            let txs = self.state().transactions().read().expect(
-                "Cannot read transactions from node",
-            );
+            let txs = self.mempool();
             for hash in tx_hashes {
                 assert!(txs.contains_key(hash));
             }
@@ -446,14 +723,283 @@ impl TestHarness {
     pub fn create_block(&mut self) {
         self.poll_events();
 
-        let tx_hashes: Vec<_> = {
-            let txs = self.state().transactions().read().expect(
-                "Cannot read transactions from node",
-            );
-            txs.keys().cloned().collect()
-        };
+        let tx_hashes: Vec<_> = self.mempool().keys().cloned().collect();
 
         self.do_create_block(&tx_hashes);
+    }
+
+    /// Creates a chain of blocks until a given height.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # extern crate exonum_testkit;
+    /// # extern crate exonum;
+    /// # use exonum::helpers::Height;
+    /// # use exonum_testkit::TestKitBuilder;
+    /// # fn main() {
+    /// let mut testkit = TestKitBuilder::validator().create();
+    /// testkit.create_blocks_until(Height(5));
+    /// assert_eq!(Height(5), testkit.height());
+    /// # }
+    pub fn create_blocks_until(&mut self, height: Height) {
+        while self.height() < height {
+            self.create_block();
+        }
+    }
+
+    /// Returns the hash of latest committed block.
+    pub fn last_block_hash(&self) -> crypto::Hash {
+        self.blockchain.last_hash()
+    }
+
+    /// Returns the height of latest committed block.
+    pub fn height(&self) -> Height {
+        self.blockchain.last_block().height()
+    }
+
+    /// Returns the actual blockchain configuration.
+    pub fn actual_configuration(&self) -> StoredConfiguration {
+        CoreSchema::new(&self.snapshot()).actual_configuration()
+    }
+
+    /// Returns reference to validator with the given identifier.
+    ///
+    /// # Panics
+    /// - Panics if validator with the given id is absent in test network.
+    pub fn validator(&self, id: ValidatorId) -> &TestNode {
+        &self.network.validators[id.0 as usize]
+    }
+
+    /// Returns sufficient number of validators for the Byzantine Fault Toulerance consensus.
+    pub fn majority_count(&self) -> usize {
+        NodeState::byzantine_majority_count(self.network().validators().len())
+    }
+
+    /// Returns the test node memory pool handle.
+    pub fn mempool(&self) -> RwLockReadGuard<BTreeMap<crypto::Hash, Box<Transaction>>> {
+        self.mempool.read().expect(
+            "Can't read transactions from the mempool.",
+        )
+    }
+
+    /// Returns the leader on the current height. At the moment first validator.
+    pub fn leader(&self) -> &TestNode {
+        &self.network().validators[0]
+    }
+
+    /// Returns the reference to test network.
+    pub fn network(&self) -> &TestNetwork {
+        &self.network
+    }
+
+    /// Returns the mutable reference to test network for manual modifications.
+    pub fn network_mut(&mut self) -> &mut TestNetwork {
+        &mut self.network
+    }
+
+    /// Returns a copy of the actual configuration of the testkit.
+    /// The returned configuration could be modified for use with
+    /// `commit_configuration_change` method.
+    pub fn configuration_change_proposal(&self) -> TestNetworkConfiguration {
+        let stored_configuration = CoreSchema::new(&self.snapshot()).actual_configuration();
+        TestNetworkConfiguration::from_parts(
+            self.network().us().clone(),
+            self.network().validators().into(),
+            stored_configuration,
+        )
+    }
+
+    /// Adds a new configuration proposal. Remember, to add this proposal to the blockchain,
+    /// you should create at least one block.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if `actual_from` is less than current height or equals.
+    /// - Panics if configuration change has been already proposed but not executed.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// extern crate exonum;
+    /// extern crate exonum_testkit;
+    /// extern crate serde;
+    /// extern crate serde_json;
+    ///
+    /// use exonum::helpers::{Height, ValidatorId};
+    /// use exonum_testkit::TestKitBuilder;
+    /// use exonum::blockchain::Schema;
+    /// use exonum::storage::StorageValue;
+    ///
+    /// fn main() {
+    ///    let mut testkit = TestKitBuilder::auditor().with_validators(3).create();
+    ///
+    ///    let cfg_change_height = Height(5);
+    ///    let proposal = {
+    ///         let mut cfg = testkit.configuration_change_proposal();
+    ///         // Add us to validators.
+    ///         let mut validators = cfg.validators().to_vec();
+    ///         validators.push(testkit.network().us().clone());
+    ///         cfg.set_validators(validators);
+    ///         // Change configuration of our service.
+    ///         cfg.set_service_config("my_service", "My config");
+    ///         // Set the height with which the configuration takes effect.
+    ///         cfg.set_actual_from(cfg_change_height);
+    ///         cfg
+    ///     };
+    ///     // Save proposed configuration.
+    ///     let stored = proposal.stored_configuration().clone();
+    ///     // Commit configuration change proposal to the testkit.
+    ///     testkit.commit_configuration_change(proposal);
+    ///     // Create blocks up to the height preceding the `actual_from` height.
+    ///     testkit.create_blocks_until(cfg_change_height.previous());
+    ///     // Check that the proposal has become actual.
+    ///     assert_eq!(testkit.network().us().validator_id(), Some(ValidatorId(3)));
+    ///     assert_eq!(testkit.validator(ValidatorId(3)), testkit.network().us());
+    ///     assert_eq!(testkit.actual_configuration(), stored);
+    ///     assert_eq!(
+    ///         Schema::new(&testkit.snapshot())
+    ///             .previous_configuration()
+    ///             .unwrap()
+    ///             .hash(),
+    ///         stored.previous_cfg_hash
+    ///     );
+    /// }
+    /// ```
+    pub fn commit_configuration_change(&mut self, proposal: TestNetworkConfiguration) {
+        use self::ConfigurationProposalState::*;
+        assert!(
+            self.height() < proposal.actual_from(),
+            "The `actual_from` height should be greater than the current."
+        );
+        assert!(
+            self.cfg_proposal.is_none(),
+            "There is an active configuration change proposal."
+        );
+        self.cfg_proposal = Some(Uncommitted(proposal));
+    }
+}
+
+/// A configuration of the test network.
+#[derive(Debug)]
+pub struct TestNetworkConfiguration {
+    us: TestNode,
+    validators: Vec<TestNode>,
+    stored_configuration: StoredConfiguration,
+}
+
+// A new configuration proposal state.
+#[derive(Debug)]
+enum ConfigurationProposalState {
+    Uncommitted(TestNetworkConfiguration),
+    Committed(TestNetworkConfiguration),
+}
+
+impl TestNetworkConfiguration {
+    fn from_parts(
+        us: TestNode,
+        validators: Vec<TestNode>,
+        mut stored_configuration: StoredConfiguration,
+    ) -> Self {
+        let prev_hash = exonum::storage::StorageValue::hash(&stored_configuration);
+        stored_configuration.previous_cfg_hash = prev_hash;
+        TestNetworkConfiguration {
+            us,
+            validators,
+            stored_configuration,
+        }
+    }
+
+    /// Returns the node from whose perspective the testkit operates.
+    pub fn us(&self) -> &TestNode {
+        &self.us
+    }
+
+    /// Modifies the node from whose perspective the testkit operates.
+    pub fn set_us(&mut self, us: TestNode) {
+        self.us = us;
+        self.update_our_role();
+    }
+
+    /// Returns the test network validators.
+    pub fn validators(&self) -> &[TestNode] {
+        self.validators.as_ref()
+    }
+
+    /// Returns the current consensus configuration.
+    pub fn consensus_configuration(&self) -> &ConsensusConfig {
+        &self.stored_configuration.consensus
+    }
+
+    /// Return the height, starting from which this configuration becomes actual.
+    pub fn actual_from(&self) -> Height {
+        self.stored_configuration.actual_from
+    }
+
+    /// Modifies the height, starting from which this configuration becomes actual.
+    pub fn set_actual_from(&mut self, actual_from: Height) {
+        self.stored_configuration.actual_from = actual_from;
+    }
+
+    /// Modifies the current consensus configuration.
+    pub fn set_consensus_configuration(&mut self, consensus: ConsensusConfig) {
+        self.stored_configuration.consensus = consensus;
+    }
+
+    /// Modifies the validators list.
+    pub fn set_validators<I>(&mut self, validators: I)
+    where
+        I: IntoIterator<Item = TestNode>,
+    {
+        self.validators = validators
+            .into_iter()
+            .enumerate()
+            .map(|(idx, mut node)| {
+                node.change_role(Some(ValidatorId(idx as u16)));
+                node
+            })
+            .collect();
+        self.stored_configuration.validator_keys = self.validators
+            .iter()
+            .cloned()
+            .map(ValidatorKeys::from)
+            .collect();
+        self.update_our_role();
+    }
+
+    /// Returns the configuration for service with the given identifier.
+    pub fn service_config<D>(&self, id: &str) -> D
+    where
+        for<'de> D: Deserialize<'de>,
+    {
+        let value = self.stored_configuration.services.get(id).expect(
+            "Unable to find configuration for service",
+        );
+        serde_json::from_value(value.clone()).unwrap()
+    }
+
+    /// Modifies the configuration of the service with the given identifier.
+    pub fn set_service_config<D>(&mut self, id: &str, config: D)
+    where
+        D: Serialize,
+    {
+        let value = serde_json::to_value(config).unwrap();
+        self.stored_configuration.services.insert(id.into(), value);
+    }
+
+    /// Returns the resulting exonum blockchain configuration.
+    pub fn stored_configuration(&self) -> &StoredConfiguration {
+        &self.stored_configuration
+    }
+
+    fn update_our_role(&mut self) {
+        let validator_id = self.validators
+            .iter()
+            .position(|x| {
+                x.public_keys().service_key == self.us.service_public_key
+            })
+            .map(|x| ValidatorId(x as u16));
+        self.us.validator_id = validator_id;
     }
 }
 
@@ -475,31 +1021,37 @@ impl ApiKind {
     }
 }
 
-/// API encapsulation for the test harness. Allows to execute and synchronously retrieve results
+/// API encapsulation for the testkit. Allows to execute and synchronously retrieve results
 /// for REST-ful endpoints of services.
-pub struct HarnessApi {
+pub struct TestKitApi {
     public_mount: Mount,
     private_mount: Mount,
     api_sender: ApiSender,
 }
 
-impl HarnessApi {
+impl fmt::Debug for TestKitApi {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        f.debug_struct("TestKitApi").finish()
+    }
+}
+
+impl TestKitApi {
     /// Creates a new instance of Api.
-    fn new(harness: &TestHarness) -> Self {
+    fn new(testkit: &TestKit) -> Self {
         use std::sync::Arc;
-        use exonum::api::{Api, public};
+        use exonum::api::{public, Api};
 
-        let blockchain = &harness.handler.blockchain;
+        let blockchain = &testkit.blockchain;
 
-        HarnessApi {
+        TestKitApi {
             public_mount: {
                 let mut mount = Mount::new();
 
-                let service_mount = harness.public_api_mount();
+                let service_mount = testkit.public_api_mount();
                 mount.mount("api/services", service_mount);
 
                 let mut router = Router::new();
-                let pool = Arc::clone(harness.state().transactions());
+                let pool = Arc::clone(&testkit.mempool);
                 let system_api = public::SystemApi::new(pool, blockchain.clone());
                 system_api.wire(&mut router);
                 mount.mount("api/system", router);
@@ -515,13 +1067,13 @@ impl HarnessApi {
             private_mount: {
                 let mut mount = Mount::new();
 
-                let service_mount = harness.private_api_mount();
+                let service_mount = testkit.private_api_mount();
                 mount.mount("api/services", service_mount);
 
                 mount
             },
 
-            api_sender: harness.api_context.node_channel().clone(),
+            api_sender: testkit.api_sender.clone(),
         }
     }
 
@@ -589,7 +1141,19 @@ impl HarnessApi {
     where
         for<'de> D: Deserialize<'de>,
     {
-        HarnessApi::get_internal(
+        TestKitApi::get_internal(
+            &self.public_mount,
+            &format!("{}/{}", kind.into_prefix(), endpoint),
+            false,
+        )
+    }
+
+    /// Gets information from a private endpoint of the node.
+    pub fn get_private<D>(&self, kind: ApiKind, endpoint: &str) -> D
+    where
+        for<'de> D: Deserialize<'de>,
+    {
+        TestKitApi::get_internal(
             &self.public_mount,
             &format!("{}/{}", kind.into_prefix(), endpoint),
             false,
@@ -601,30 +1165,29 @@ impl HarnessApi {
     where
         for<'de> D: Deserialize<'de>,
     {
-        HarnessApi::get_internal(
+        TestKitApi::get_internal(
             &self.public_mount,
             &format!("{}/{}", kind.into_prefix(), endpoint),
             true,
         )
     }
 
-    fn post_internal<T, D>(mount: &Mount, endpoint: &str, transaction: &T) -> D
+    fn post_internal<T, D>(mount: &Mount, endpoint: &str, data: &T) -> D
     where
-        T: Transaction + Serialize,
+        T: Serialize,
         for<'de> D: Deserialize<'de>,
     {
         let url = format!("http://localhost:3000/{}", endpoint);
-        let resp =
-            request::post(
-                &url,
-                {
-                    let mut headers = Headers::new();
-                    headers.set(ContentType::json());
-                    headers
-                },
-                &serde_json::to_string(&transaction).expect("Cannot serialize transaction to JSON"),
-                mount,
-            ).expect("Cannot send transaction");
+        let resp = request::post(
+            &url,
+            {
+                let mut headers = Headers::new();
+                headers.set(ContentType::json());
+                headers
+            },
+            &serde_json::to_string(&data).expect("Cannot serialize data to JSON"),
+            mount,
+        ).expect("Cannot send data");
 
         let resp = response::extract_body_to_string(resp);
         serde_json::from_str(&resp).expect("Cannot parse result")
@@ -636,10 +1199,10 @@ impl HarnessApi {
     /// gets to a block via one of `create_block*()` methods.
     pub fn post<T, D>(&self, kind: ApiKind, endpoint: &str, transaction: &T) -> D
     where
-        T: Transaction + Serialize,
+        T: Serialize,
         for<'de> D: Deserialize<'de>,
     {
-        HarnessApi::post_internal(
+        TestKitApi::post_internal(
             &self.public_mount,
             &format!("{}/{}", kind.into_prefix(), endpoint),
             transaction,
@@ -652,13 +1215,23 @@ impl HarnessApi {
     /// gets to a block via one of `create_block*()` methods.
     pub fn post_private<T, D>(&self, kind: ApiKind, endpoint: &str, transaction: &T) -> D
     where
-        T: Transaction + Serialize,
+        T: Serialize,
         for<'de> D: Deserialize<'de>,
     {
-        HarnessApi::post_internal(
+        TestKitApi::post_internal(
             &self.private_mount,
             &format!("{}/{}", kind.into_prefix(), endpoint),
             transaction,
         )
     }
+}
+
+#[test]
+fn test_create_block_heights() {
+    let mut testkit = TestKitBuilder::validator().create();
+    assert_eq!(Height(0), testkit.height());
+    testkit.create_block();
+    assert_eq!(Height(1), testkit.height());
+    testkit.create_blocks_until(Height(6));
+    assert_eq!(Height(6), testkit.height());
 }

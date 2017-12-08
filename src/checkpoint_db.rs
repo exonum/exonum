@@ -96,6 +96,10 @@ impl<T: Database + Clone> Database for CheckpointDb<T> {
         }
         self.inner.merge(patch)
     }
+
+    fn merge_sync(&mut self, patch: Patch) -> StorageResult<()> {
+        self.merge(patch)
+    }
 }
 
 /// Handler to a checkpointed database.

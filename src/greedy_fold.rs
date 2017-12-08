@@ -1,11 +1,21 @@
 use futures::{Async, Poll, Stream};
 
+use std::fmt;
+
 /// Implementor for greedy folding in streams.
 pub struct GreedyFold<S, F, A> {
     stream: S,
     fold_fn: F,
     acc: A,
     exhausted: bool,
+}
+
+impl<S, F, A> fmt::Debug for GreedyFold<S, F, A> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        f.debug_struct("GreedyFold")
+            .field("exhausted", &self.exhausted)
+            .finish()
+    }
 }
 
 /// Stream that folds all immediately available items from the underlying stream, yielding a single
