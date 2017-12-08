@@ -1,6 +1,6 @@
 [package]
 name = "exonum"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 homepage = "https://exonum.com/"
 repository = "https://github.com/exonum/exonum"
@@ -29,7 +29,7 @@ clap = "2.25.0"
 term = "0.4.6"
 colored = "1.5.2"
 env_logger = "0.4.3"
-hyper = "0.10.13"
+hyper = "0.10.9"
 cookie = "0.10.1"
 router = "0.6.0"
 iron = "0.6.0"
