@@ -5,6 +5,7 @@
 
 #[macro_use]
 extern crate exonum;
+#[macro_use]
 extern crate exonum_testkit;
 #[macro_use]
 extern crate serde_derive;
@@ -578,10 +579,7 @@ fn test_transfers_in_single_block() {
     {
         // See what happens if transactions are applied in an "incorrect" order.
         let comp = testkit
-            .probe_all(vec![
-                Box::new(tx_b_to_a.clone()),
-                Box::new(tx_a_to_b.clone()),
-            ])
+            .probe_all(txvec![tx_b_to_a.clone(), tx_a_to_b.clone()])
             .compare(testkit.snapshot());
         let comp = comp.map(CurrencySchema::new);
         comp.map(|s| s.wallet(tx_alice.pub_key()).unwrap().balance())

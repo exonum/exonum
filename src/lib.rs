@@ -564,7 +564,10 @@ impl TestKit {
     /// commit execution results to the blockchain. The execution result is the same
     /// as if transactions were included into a new block; for example,
     /// transactions included into one of previous blocks do not lead to any state changes.
-    pub fn probe_all(&mut self, transactions: Vec<Box<Transaction>>) -> Box<Snapshot> {
+    pub fn probe_all<I>(&mut self, transactions: I) -> Box<Snapshot>
+    where
+        I: IntoIterator<Item = Box<Transaction>>,
+    {
         // Filter out already committed transactions; otherwise,
         // `create_block_with_transactions()` will panic.
         let schema = CoreSchema::new(self.snapshot());
