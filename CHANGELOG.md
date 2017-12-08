@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - `last_block` now returns `Block` instead of `Option<Block>`. (#379)
 - Replaced `rocksdb` commandline parameter to more generic `db-path`. (#376)
 - Obsolete trait `HexValue` replaced by the `FromHex` and `ToHex` traits. (#372)
+- Changed `Patch` and `Changes` from typedefs into opaque structures. (#371)
 - Help text is displayed if required argument is not specified. (#390)
 
 ### Removed
