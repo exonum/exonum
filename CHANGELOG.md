@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Replaced `rocksdb` commandline parameter to more generic `db-path`. (#376)
 - Removed redundant `FromRaw` trait. (#372)
 - Obsolete trait `HexValue` replaced by the `FromHex` and `ToHex` traits. (#372)
+- Changed `Patch` and `Changes` from typedefs into opaque structures.
 
 ### Fixed
 - Fixed `crate_authors!` macro usage, this macro can't return static string in new clap version. (#370)
