@@ -575,6 +575,13 @@ impl State {
             let known_round = self.validators_rounds.entry(id).or_insert_with(Round::zero);
             if round <= *known_round {
                 // keep only maximum round
+                trace!(
+                    "Received message with round older that we know,\
+                message_round = {},\
+                known_round = {}.",
+                    round,
+                    known_round
+                );
                 return None;
             }
             *known_round = round;

@@ -21,6 +21,7 @@ use messages::{BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit
 use helpers::{Height, Round, ValidatorId};
 use storage::Patch;
 use node::{NodeHandler, RequestData};
+use events::InternalEvent;
 
 // TODO reduce view invokations (ECR-171)
 impl NodeHandler {
@@ -53,9 +54,9 @@ impl NodeHandler {
             self.state.add_queued(msg);
             trace!("Trying to reach actual round.");
             if let Some(r) = self.state.get_actual_round(validator, round) {
-                info!("Jump to a new round = {}", round);
-                self.state.jump_round(r);
-                self.handle_new_round();
+                trace!("Scheduling jump to round.");
+                let height = self.state.height();
+                self.execute_later(InternalEvent::JumpToRound(height, r));
             }
             return;
         }
@@ -591,8 +592,24 @@ impl NodeHandler {
         }
     }
 
-    /// Handles round update
-    fn handle_new_round(&mut self) {
+    /// Handle new round, after jump.
+    pub fn handle_new_round(&mut self, height: Height, round: Round) {
+        trace!("Handle new round");
+        if height != self.state.height() {
+            return;
+        }
+
+        if round <= self.state.round() {
+            return;
+        }
+
+        info!("Jump to a new round = {}", round);
+        self.state.jump_round(round);
+        self.process_new_round();
+    }
+
+    // Try to process consensus messages from future round.
+    fn process_new_round(&mut self) {
         if self.state.is_validator() {
             // Send prevote if we are locked or propose if we are leader
             if let Some(hash) = self.state.locked_propose() {
@@ -629,7 +646,7 @@ impl NodeHandler {
         // Add timeout for this round
         self.add_round_timeout();
 
-        self.handle_new_round();
+        self.process_new_round();
     }
 
     /// Handles propose timeout. Node sends `Propose` and `Prevote` if it is a leader as result.

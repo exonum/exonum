@@ -36,7 +36,8 @@ use exonum::crypto::{gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed};
 #[cfg(test)]
 use exonum::crypto::gen_keypair;
 use exonum::helpers::{Height, Milliseconds, Round, ValidatorId};
-use exonum::events::{Event, EventHandler, NetworkEvent, NetworkRequest, TimeoutRequest};
+use exonum::events::{Event, InternalEvent, EventHandler, NetworkEvent, NetworkRequest,
+                     TimeoutRequest};
 use exonum::events::network::NetworkConfiguration;
 
 use timestamping::TimestampingService;
@@ -71,10 +72,12 @@ pub struct SandboxInner {
     pub network_requests_rx: mpsc::Receiver<NetworkRequest>,
     pub timeout_requests_rx: mpsc::Receiver<TimeoutRequest>,
     pub api_requests_rx: mpsc::Receiver<ExternalMessage>,
+    pub internal_requests_rx: mpsc::Receiver<InternalEvent>,
 }
 
 impl SandboxInner {
     pub fn process_events(&mut self) {
+        self.process_internal_requests();
         self.process_api_requests();
         self.process_network_requests();
         self.process_timeout_requests();
@@ -108,7 +111,6 @@ impl SandboxInner {
         });
         timeouts_getter.wait().unwrap();
     }
-
     fn process_api_requests(&mut self) {
         let api_getter = futures::lazy(|| -> Result<(), ()> {
             while let Async::Ready(Some(api)) = self.api_requests_rx.poll()? {
@@ -117,6 +119,16 @@ impl SandboxInner {
             Ok(())
         });
         api_getter.wait().unwrap();
+    }
+
+    fn process_internal_requests(&mut self) {
+        let internal_getter = futures::lazy(|| -> Result<(), ()> {
+            while let Async::Ready(Some(internal)) = self.internal_requests_rx.poll()? {
+                self.handler.handle_event(internal.into());
+            }
+            Ok(())
+        });
+        internal_getter.wait().unwrap();
     }
 }
 
@@ -560,6 +572,8 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
     let addresses: Vec<SocketAddr> = (1..5).map(gen_primitive_socket_addr).collect::<Vec<_>>();
 
     let api_channel = mpsc::channel(100);
+    let internal_channel = mpsc::channel(100);
+
     let db = Box::new(MemoryDB::new());
     let mut blockchain = Blockchain::new(
         db,
@@ -616,6 +630,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         network_requests: network_channel.0.clone(),
         timeout_requests: timeout_channel.0.clone(),
         api_requests: api_channel.0.clone(),
+        internal_requests: internal_channel.0.clone(),
     };
 
     let mut handler = NodeHandler::new(
@@ -635,6 +650,7 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         timeout_requests_rx: timeout_channel.1,
         network_requests_rx: network_channel.1,
         api_requests_rx: api_channel.1,
+        internal_requests_rx: internal_channel.1,
         handler,
         time: shared_time,
     };

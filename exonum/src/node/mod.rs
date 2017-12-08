@@ -36,7 +36,7 @@ use crypto::{self, Hash, PublicKey, SecretKey};
 use blockchain::{Blockchain, GenesisConfig, Schema, SharedNodeState, Transaction, Service};
 use api::{private, public, Api};
 use messages::{Connect, Message, RawMessage};
-use events::{NetworkRequest, TimeoutRequest, NetworkEvent};
+use events::{NetworkRequest, TimeoutRequest, NetworkEvent, InternalEvent};
 use events::{HandlerPart, NetworkConfiguration, NetworkPart, TimeoutsPart};
 use events::error::{into_other, other_error, LogError, log_error};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
@@ -166,6 +166,8 @@ pub struct EventsPoolCapacity {
     pub timeout_requests_capacity: usize,
     /// Maximum number of queued requests from api.
     pub api_requests_capacity: usize,
+    /// Maximum number of queued internal events.
+    pub internal_events_capacity: usize,
 }
 
 impl Default for EventsPoolCapacity {
@@ -175,6 +177,7 @@ impl Default for EventsPoolCapacity {
             network_events_capacity: 512,
             timeout_requests_capacity: 128,
             api_requests_capacity: 1024,
+            internal_events_capacity: 128,
         }
     }
 }
@@ -254,6 +257,8 @@ pub struct NodeSender {
     pub network_requests: mpsc::Sender<NetworkRequest>,
     /// Api requests sender.
     pub api_requests: mpsc::Sender<ExternalMessage>,
+    /// Internal requests sender.
+    pub internal_requests: mpsc::Sender<InternalEvent>,
 }
 
 impl NodeHandler {
@@ -586,6 +591,8 @@ pub struct NodeChannel {
     pub network_events: (mpsc::Sender<NetworkEvent>, mpsc::Receiver<NetworkEvent>),
     /// Channel for timeout events.
     pub timeout_events: (mpsc::Sender<NodeTimeout>, mpsc::Receiver<NodeTimeout>),
+    /// Channel for internal events.
+    pub internal_events: (mpsc::Sender<InternalEvent>, mpsc::Receiver<InternalEvent>),
 }
 
 const PROFILE_ENV_VARIABLE_NAME: &str = "EXONUM_PROFILE_FILENAME";
@@ -608,6 +615,7 @@ impl NodeChannel {
             timeout_events: mpsc::channel(buffer_sizes.timeout_requests_capacity),
             api_requests: mpsc::channel(buffer_sizes.api_requests_capacity),
             network_events: mpsc::channel(buffer_sizes.network_events_capacity),
+            internal_events: mpsc::channel(buffer_sizes.network_events_capacity),
         }
     }
 
@@ -617,6 +625,7 @@ impl NodeChannel {
             timeout_requests: self.timeout_requests.0.clone(),
             network_requests: self.network_requests.0.clone(),
             api_requests: self.api_requests.0.clone(),
+            internal_requests: self.internal_events.0.clone(),
         }
     }
 }
@@ -794,7 +803,7 @@ impl Node {
         let connect_message = self.state().our_connect_message().clone();
         let (network_tx, network_rx) = self.channel.network_events;
         let timeout_requests_rx = self.channel.timeout_requests.1;
-
+        let internal_rx = self.channel.internal_events.1;
         let network_part = NetworkPart {
             our_connect_message: connect_message,
             listen_address: self.handler.system_state.listen_address(),
@@ -807,7 +816,8 @@ impl Node {
         let handler_part = HandlerPart {
             handler: self.handler,
             timeout_rx,
-            network_rx: network_rx,
+            network_rx,
+            internal_rx,
             api_rx: self.channel.api_requests.1,
         };
 
