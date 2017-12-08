@@ -22,7 +22,7 @@ impl<T: Database + Clone> CheckpointDb<T> {
         }
     }
 
-    /// Rolls this database by udoing the latest `count` `merge()` operations.
+    /// Rolls back this database by udoing the latest `count` `merge()` operations.
     pub fn rollback(&mut self, count: usize) -> bool {
         let journal_len = self.journal
             .read()
@@ -105,7 +105,7 @@ impl<T: Database + Clone> Database for CheckpointDb<T> {
 pub struct CheckpointDbHandler<T>(CheckpointDb<T>);
 
 impl<T: Database + Clone> CheckpointDbHandler<T> {
-    /// Rolls this database by udoing the latest `count` `merge()` operations.
+    /// Rolls back this database by udoing the latest `count` `merge()` operations.
     pub fn rollback(&mut self, count: usize) -> bool {
         self.0.rollback(count)
     }
@@ -116,7 +116,7 @@ mod tests {
     use exonum::storage::{Change, MemoryDB};
     use super::*;
 
-    // Same as `Change`, but with trait implementation required for `Patch` comparison.
+    // Same as `Change`, but with trait implementations required for `Patch` comparison.
     #[derive(Debug, PartialOrd, Ord, PartialEq, Eq)]
     enum OrdChange {
         Put(Vec<u8>),

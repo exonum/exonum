@@ -564,18 +564,13 @@ impl TestKit {
     /// commit execution results to the blockchain. The execution result is the same
     /// as if transactions were included into a new block; for example,
     /// transactions included into one of previous blocks do not lead to any state changes.
-    ///
-    /// # Panics
-    ///
-    /// - Panics if there are duplicate transactions.
     pub fn probe_all(&mut self, transactions: Vec<Box<Transaction>>) -> Box<Snapshot> {
         // Filter out already committed transactions; otherwise,
         // `create_block_with_transactions()` will panic.
         let schema = CoreSchema::new(self.snapshot());
-        let uncommitted_txs: Vec<_> = transactions
-            .into_iter()
-            .filter(|tx| !schema.transactions().contains(&tx.hash()))
-            .collect();
+        let uncommitted_txs = transactions.into_iter().filter(|tx| {
+            !schema.transactions().contains(&tx.hash())
+        });
 
         self.create_block_with_transactions(uncommitted_txs);
         let snapshot = self.snapshot();
@@ -1091,12 +1086,7 @@ impl TestKitApi {
 
     /// Sends a transaction to the node via `ApiSender`.
     pub fn send<T: Transaction>(&self, transaction: T) {
-        self.send_boxed(Box::new(transaction));
-    }
-
-    /// Sends a transaction to the node via `ApiSender`.
-    pub fn send_boxed(&self, transaction: Box<Transaction>) {
-        self.api_sender.send(transaction).expect(
+        self.api_sender.send(Box::new(transaction)).expect(
             "Cannot send transaction",
         );
     }
