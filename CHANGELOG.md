@@ -7,8 +7,17 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## 0.4 - 2017-12-08
+
+### Added
+- Added tests written on `exonum-testkit` (#69).
+
 ### Changed
 - Separate type `ConfigurationServiceFactory` is used as `ServiceFactory` implementation (#66).
+- Update to the [Exonum 0.4.0](https://github.com/exonum/exonum/releases/tag/v0.4) release (#77).
+
+### Removed
+- Sandbox tests are removed (#69).
 
 ## 0.3 - 2017-11-03
 

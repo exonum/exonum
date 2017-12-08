@@ -1,6 +1,6 @@
 [package]
 name = "exonum-configuration"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 homepage = "https://exonum.com/doc/advanced/configuration-updater/"
 repository = "https://github.com/exonum/exonum-configuration"
@@ -15,7 +15,7 @@ description = "An Exonum service that provides functionality of modifying the gl
 travis-ci = { repository = "exonum/exonum-configuration" }
 
 [dependencies]
-exonum = "0.3.0"
+exonum = "0.4.0"
 clap = "2.25.0"
 tempdir = "0.3.5"
 env_logger = "0.4.3"
@@ -30,10 +30,4 @@ params = "0.8.0"
 
 [dev-dependencies]
 pretty_assertions = "0.4.0"
-
-[dev-dependencies.exonum-testkit]
-git = "https://github.com/exonum/exonum-testkit"
-rev = "0aa5213c3575af707ca95b5df705e753850555b8"
-
-[patch.crates-io]
-exonum = { git = "https://github.com/exonum/exonum", rev = "f0f690731b8871533dfd6e2368f03ef3ba182e47" }
+exonum-testkit = "0.1.0"
