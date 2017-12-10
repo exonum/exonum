@@ -44,6 +44,7 @@
         var blocksPerPage = 10;
 
         this.toggleLoading(true);
+
         this.service.getBlocks(self.height + 1, blocksPerPage, function(error, blocks) {
             self.toggleLoading(false);
 

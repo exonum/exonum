@@ -1,5 +1,5 @@
 /* eslint-env jquery */
-/* global Exonum, bigInt */
+/* global Exonum, bigInt, pwbox */
 
 /**
  * Business logic
@@ -30,18 +30,19 @@
         }
     };
     var CreateWalletTransaction = {
-        size: 40,
+        size: 168,
         message_id: TX_CREATE_WALLET_ID,
         fields: {
             pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-            name: {type: Exonum.String, size: 8, from: 32, to: 40}
+            login: {type: Exonum.String, size: 8, from: 32, to: 40},
+            key_box: {type: Exonum.FixedBuffer, size: 128, from: 40, to: 168}
         }
     };
     var Wallet = Exonum.newType({
         size: 88,
         fields: {
             pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-            name: {type: Exonum.String, size: 8, from: 32, to: 40},
+            login: {type: Exonum.String, size: 8, from: 32, to: 40},
             balance: {type: Exonum.Uint64, size: 8, from: 40, to: 48},
             history_len: {type: Exonum.Uint64, size: 8, from: 48, to: 56},
             history_hash: {type: Exonum.Hash, size: 32, from: 56, to: 88}
@@ -288,13 +289,46 @@
         loadWallet.call(this, publicKey, callback);
     };
 
-    CryptocurrencyService.prototype.createWallet = function(publicKey, name, secretKey, callback) {
-        var data = {
-            pub_key: publicKey,
-            name: name
-        };
+    CryptocurrencyService.prototype.createWallet = function(login, password, callback) {
+        var self = this;
+        var pair = Exonum.keyPair();
+        var message = Exonum.hexadecimalToUint8Array(pair.secretKey);
 
-        submitTransaction.call(this, TX_CREATE_WALLET_ID, data, publicKey, secretKey, callback);
+        pwbox(message, password, function(err, box) {
+            if (err) {
+                console.error(err);
+                return;
+            }
+
+            var data = {
+                login: login,
+                pub_key: pair.publicKey,
+                key_box: Exonum.uint8ArrayToHexadecimal(box)
+            };
+
+            submitTransaction.call(self, TX_CREATE_WALLET_ID, data, pair.publicKey, pair.secretKey, callback);
+        });
+    };
+
+    CryptocurrencyService.prototype.login = function(login, password, callback) {
+        var url = 'api/services/cryptocurrency/v1/wallets/find/' + encodeURIComponent(login);
+
+        getData(url, function(err, response) {
+            if (err) {
+                callback(err);
+                return;
+            }
+
+            pwbox.open(Exonum.hexadecimalToUint8Array(response.key_box), password, function(err, message) {
+                if (err) {
+                    console.error(err);
+                    callback(err);
+                    return;
+                }
+
+                callback(null, response.pub_key, Exonum.uint8ArrayToHexadecimal(message));
+            });
+        });
     };
 
     CryptocurrencyService.prototype.addFunds = function(amount, publicKey, secretKey, callback) {
@@ -355,24 +389,6 @@
         var url = 'api/system/v1/transactions/' + hash;
 
         getData(url, callback);
-    };
-
-    CryptocurrencyService.prototype.login = function(login, password, callback) {
-        var url = this.baseUrl + '/auth?login=' + login;
-
-        getData(url, function(error, response) {
-            if (error) {
-                callback(error);
-                return;
-            }
-
-            var secretKey = Exonum.decryptDigest(response.sec_key_enc, response.nonce, password);
-            if (secretKey !== false) {
-                callback(null, response.pub_key, secretKey);
-            } else {
-                callback(new Error('Wrong login or password has been passed'));
-            }
-        });
     };
 
     window.CryptocurrencyService = CryptocurrencyService;

@@ -11,6 +11,11 @@ target
 # frontend
 frontend/config.json
 
+# bootstrap and temporary directories
+currency_root
+etc
+example
+
 # IDE files
 .idea
 .vscode

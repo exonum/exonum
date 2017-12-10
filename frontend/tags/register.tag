@@ -9,13 +9,17 @@
         </div>
     </div>
     <div class="panel-body">
-        <form onsubmit={ register }>
+        <form onsubmit={ submit }>
             <div class="form-group">
-                <label class="control-label">Your name:</label>
-                <input type="text" class="form-control" onkeyup="{ editName }">
+                <label class="control-label">Login:</label>
+                <input type="text" class="form-control" onkeyup="{ editLogin }">
             </div>
             <div class="form-group">
-                <button type="submit" class="btn btn-lg btn-block btn-primary" disabled={ !name }>Register a new wallet</button>
+                <label class="control-label">Password:</label>
+                <input type="password" class="form-control" onkeyup="{ editPassword }">
+            </div>
+            <div class="form-group">
+                <button type="submit" class="btn btn-lg btn-block btn-primary" disabled={ !login || !password }>Register a new wallet</button>
             </div>
         </form>
     </div>
@@ -23,30 +27,28 @@
     <script>
         var self = this;
 
-        editName(e) {
-            this.name = e.target.value;
+        editLogin(e) {
+            this.login = e.target.value;
         }
 
-        register(e) {
+        editPassword(e) {
+            this.password = e.target.value;
+        }
+
+        submit(e) {
             e.preventDefault();
-            var pair = self.core.keyPair();
 
             self.toggleLoading(true);
-            self.service.createWallet(pair.publicKey, self.name, pair.secretKey, function(error) {
+            self.service.createWallet(self.login, self.password, function(error) {
                 self.toggleLoading(false);
 
                 if (error) {
-//                    self.notify('error', error.message);
                     self.notify('error', error.message +  ' An error occurred while trying to parse the wallet.', false);
                     return;
                 }
 
-                self.storage.addUser({
-                    name: self.name,
-                    publicKey: pair.publicKey,
-                    secretKey: pair.secretKey
-                });
                 self.notify('success', 'Wallet has been created. Login and manage the wallet.');
+
                 route('/dashboard');
             });
         }

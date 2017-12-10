@@ -9,14 +9,14 @@
         </div>
     </div>
     <div class="panel-body">
-        <form onsubmit={ login }>
+        <form onsubmit={ submit }>
             <div class="form-group">
                 <label class="control-label">Login:</label>
                 <input type="text" class="form-control" onkeyup="{ editLogin }">
             </div>
             <div class="form-group">
                 <label class="control-label">Password:</label>
-                <input type="text" class="form-control" onkeyup="{ editPassword }">
+                <input type="password" class="form-control" onkeyup="{ editPassword }">
             </div>
             <div class="form-group">
                 <button type="submit" class="btn btn-lg btn-block btn-primary" disabled={ !login || !password }>Login</button>
@@ -35,7 +35,7 @@
             this.password = e.target.value;
         }
 
-        login(e) {
+        submit(e) {
             e.preventDefault();
 
             self.toggleLoading(true);
@@ -47,12 +47,15 @@
                     return;
                 }
 
-                self.addUser({
+                self.auth.setUser({
                     publicKey: publicKey,
                     secretKey: secretKey
                 });
-                self.notify('success', 'Wallet has been created. Login and manage the wallet.');
-                route('/user/' + publicKey);
+
+                route('/user');
+            }, function() {
+                self.toggleLoading(false);
+                self.notify('error', 'Wrong login or password has been passed.');
             });
         }
     </script>

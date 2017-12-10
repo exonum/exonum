@@ -1,6 +1,6 @@
 <transfer>
     <div class="panel-heading">
-        <a class="btn btn-default pull-left page-nav" href="#user/{ opts.publicKey }">
+        <a class="btn btn-default pull-left page-nav" href="#user">
             <i class="glyphicon glyphicon-arrow-left"></i>
             <span class="hidden-xs">Back</span>
         </a>
@@ -30,14 +30,14 @@
 
     <script>
         var self = this;
-        var user = this.storage.getUser(this.opts.publicKey);
+        var user = this.auth.getUser();
 
         this.toggleLoading(true);
+
         this.service.getWallet(user.publicKey, function(error, block, wallet, transactions) {
             self.toggleLoading(false);
 
             if (error) {
-//                self.notify('error', error.message);
                 self.notify('error', error.message +  ' An error occurred while trying to parse the wallet.', false);
                 return;
             }
@@ -64,7 +64,7 @@
             var amount = self.amount.toString();
 
             self.toggleLoading(true);
-            self.service.transfer(amount, self.opts.publicKey, self.receiver, user.secretKey, function(error) {
+            self.service.transfer(amount, user.publicKey, self.receiver, user.secretKey, function(error) {
                 self.toggleLoading(false);
 
                 if (error) {
@@ -72,8 +72,9 @@
                     return;
                 }
 
-                self.notify('success', 'Funds has been transferred.');
-                route('/user/' + self.opts.publicKey);
+                self.notify('success', 'Funds has been transferred into account.');
+
+                route('/user');
             });
         }
     </script>

@@ -25,7 +25,7 @@
 
             <div class="form-group">
                 <p class="text-center">Add more funds to your account:</p>
-                <a href="#user/{ opts.publicKey }/add-funds" class="btn btn-lg btn-block btn-success">Add Funds</a>
+                <a href="#user/add-funds" class="btn btn-lg btn-block btn-success">Add Funds</a>
             </div>
         </virtual>
 
@@ -70,13 +70,14 @@
 
     <script>
         var self = this;
+        var user = self.auth.getUser();
 
         this.toggleLoading(true);
-        this.service.getWallet(self.opts.publicKey, function(error, block, wallet, transactions) {
+
+        this.service.getWallet(user.publicKey, function(error, block, wallet, transactions) {
             self.toggleLoading(false);
 
             if (error) {
-//                self.notify('error', error.message);
                 self.notify('error', error.message +  ' An error occurred while trying to parse the wallet.', false);
                 return;
             }
@@ -93,7 +94,7 @@
 
         transfer(e) {
             e.preventDefault();
-            route('/user/' + self.opts.publicKey + '/transfer');
+            route('/user/transfer');
         }
 
         refresh(e) {
@@ -103,6 +104,7 @@
 
         logout(e) {
             e.preventDefault();
+            self.auth.removeUser();
             route('/dashboard');
         }
     </script>

@@ -103,6 +103,7 @@
         var height = parseInt(this.opts.height);
 
         this.toggleLoading(true);
+
         this.service.getBlock(height, function(error, response) {
             self.toggleLoading(false);
 
