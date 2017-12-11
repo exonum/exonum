@@ -25,8 +25,9 @@ exonum-testkit = "0.1.0"
 
 The primary goal of the kind of tests is to check the business logic of your service.
 
-For writting your first test create `tests` directory in according of cargo integration testing [manual][integration-tests].
-After that create file `transactions.rs` like the following content.
+For writing your first test create `tests` directory in according to the cargo
+integration testing [manual][integration-tests].
+After that creates file `transactions.rs` like the following content.
 
 ```rust
 extern crate exonum;
@@ -54,7 +55,8 @@ fn test_my_tx() {
 ```
 
 Make sure that you have full coverage of the business logic in the `execute` method of your transactions.
-But if you just want to check the `verify` logic in transaction, you can do it without testkit in simple way like this:
+But if you just want to check the `verify` logic in the transaction, you can do it without testkit in
+a simple way like this:
 
 ```rust
 let tx = MyTransaction::new(...);
@@ -63,10 +65,10 @@ assert!(tx.verify());
 
 ### Api testing
 
-The following steps may helps you.
+The following steps may help you.
 
 * Define the `MyServiceApi` trait for the `TestKitApi` structure that covers the whole api of your service.
-* Implement functions that uses transactions to fill your storage with the test data.
+* Implement functions that use transactions to fill your storage with the test data.
 * Create the tests that check all of your endpoints.
 
 ```rust
@@ -120,7 +122,7 @@ Here are examples of more complex and less common cases.
 
 The oracle in this case is service which can produce transaction with external data after the commit of block,
 [`exonum-time`][exonum-time] and [`exonum-btc-anchoring`][exonum-btc-anchoring] are examples of these kind of oracles.
-In this way, transactions, which were created during the `handle_commit` execution, will store in `TestKit` memory pool.
+In this way, transactions which were created during the `handle_commit` execution will be stored in `TestKit` memory pool.
 
 ```rust
 let mut testkit = TestKitBuilder::validator()
@@ -134,7 +136,8 @@ for i in 1..5 {
 }
 ```
 
-In order to invoke a `handle_commit` event, you must create a block. If the oracle have to fetch any data from external world, you must create a mock object.
+In order to invoke a `handle_commit` event, you must create a block.
+If the oracle has to fetch any data from external world, you must create a mock object.
 
 ```rust
 // Provide a mock api for the service.
