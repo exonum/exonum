@@ -576,7 +576,7 @@ impl State {
             if round <= *known_round {
                 // keep only maximum round
                 trace!(
-                    "Received message with round older that we know,\
+                    "Received a message from a lower round than we know already,\
                 message_round = {},\
                 known_round = {}.",
                     round,

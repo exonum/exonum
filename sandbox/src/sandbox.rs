@@ -37,7 +37,7 @@ use exonum::crypto::{gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed};
 use exonum::crypto::gen_keypair;
 use exonum::helpers::{Height, Milliseconds, Round, ValidatorId};
 use exonum::events::{Event, InternalEvent, EventHandler, NetworkEvent, NetworkRequest,
-                     TimeoutRequest};
+                     TimeoutRequest, InternalRequest};
 use exonum::events::network::NetworkConfiguration;
 
 use timestamping::TimestampingService;
@@ -70,9 +70,8 @@ pub struct SandboxInner {
     pub events: VecDeque<Event>,
     pub timers: BinaryHeap<TimeoutRequest>,
     pub network_requests_rx: mpsc::Receiver<NetworkRequest>,
-    pub timeout_requests_rx: mpsc::Receiver<TimeoutRequest>,
+    pub internal_requests_rx: mpsc::Receiver<InternalRequest>,
     pub api_requests_rx: mpsc::Receiver<ExternalMessage>,
-    pub internal_requests_rx: mpsc::Receiver<InternalEvent>,
 }
 
 impl SandboxInner {
@@ -80,7 +79,7 @@ impl SandboxInner {
         self.process_internal_requests();
         self.process_api_requests();
         self.process_network_requests();
-        self.process_timeout_requests();
+        self.process_internal_requests();
     }
 
     pub fn handle_event<E: Into<Event>>(&mut self, e: E) {
@@ -101,15 +100,22 @@ impl SandboxInner {
         });
         network_getter.wait().unwrap();
     }
+    fn process_internal_requests(&mut self) {
+        let internal_getter = futures::lazy(|| -> Result<(), ()> {
+            while let Async::Ready(Some(internal)) = self.internal_requests_rx.poll()? {
+                match internal {
+                    InternalRequest::Timeout(t) => self.timers.push(t),
+                    InternalRequest::JumpToRound(height, round) => {
+                        self.handler.handle_event(
+                            InternalEvent::JumpToRound(height, round).into(),
+                        )
+                    }
+                }
 
-    fn process_timeout_requests(&mut self) {
-        let timeouts_getter = futures::lazy(|| -> Result<(), ()> {
-            while let Async::Ready(Some(timeout)) = self.timeout_requests_rx.poll()? {
-                self.timers.push(timeout);
             }
             Ok(())
         });
-        timeouts_getter.wait().unwrap();
+        internal_getter.wait().unwrap();
     }
     fn process_api_requests(&mut self) {
         let api_getter = futures::lazy(|| -> Result<(), ()> {
@@ -119,16 +125,6 @@ impl SandboxInner {
             Ok(())
         });
         api_getter.wait().unwrap();
-    }
-
-    fn process_internal_requests(&mut self) {
-        let internal_getter = futures::lazy(|| -> Result<(), ()> {
-            while let Async::Ready(Some(internal)) = self.internal_requests_rx.poll()? {
-                self.handler.handle_event(internal.into());
-            }
-            Ok(())
-        });
-        internal_getter.wait().unwrap();
     }
 }
 
@@ -572,8 +568,6 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
     let addresses: Vec<SocketAddr> = (1..5).map(gen_primitive_socket_addr).collect::<Vec<_>>();
 
     let api_channel = mpsc::channel(100);
-    let internal_channel = mpsc::channel(100);
-
     let db = Box::new(MemoryDB::new());
     let mut blockchain = Blockchain::new(
         db,
@@ -625,12 +619,11 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
     let shared_time = Arc::clone(&system_state.shared_time);
 
     let network_channel = mpsc::channel(100);
-    let timeout_channel = mpsc::channel(100);
+    let internal_channel = mpsc::channel(100);
     let node_sender = NodeSender {
         network_requests: network_channel.0.clone(),
-        timeout_requests: timeout_channel.0.clone(),
-        api_requests: api_channel.0.clone(),
         internal_requests: internal_channel.0.clone(),
+        api_requests: api_channel.0.clone(),
     };
 
     let mut handler = NodeHandler::new(
@@ -647,7 +640,6 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         sent: VecDeque::new(),
         events: VecDeque::new(),
         timers: BinaryHeap::new(),
-        timeout_requests_rx: timeout_channel.1,
         network_requests_rx: network_channel.1,
         api_requests_rx: api_channel.1,
         internal_requests_rx: internal_channel.1,

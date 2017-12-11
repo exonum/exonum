@@ -9,10 +9,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 - Added `patch` method to the `Fork` structure. (#393)
+- Replaced config param `timeout_events_capacity` with `internal_events_capacity`. (#388)
 
 ### Changed
 - Changed iterators over `Patch` and `Changes` data into custom types instead of standard collection iterators. (#393)
-- Fixed typo in `SparceListIndexKeys` and `SparceListIndexValues`. (#398)
+- Fixed typo in `SparceListIndexKeys` and `SparceListIndexValues` (#398)
+- Fixed #15 consensus on the threshold of 1/3 sleeping validators. (#388)
 
 ### Removed
 - Removed default `state_hash` implementation in the `Service` trait. (#399)

@@ -401,7 +401,6 @@ fn test_ignore_message_from_prev_height() {
 /// - send prevote when lock=0 for known propose
 #[test]
 fn positive_get_propose_send_prevote() {
-    let _ = env_logger::init();
 
     let sandbox = timestamping_sandbox();
 

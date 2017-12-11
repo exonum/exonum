@@ -21,7 +21,7 @@ use messages::{BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit
 use helpers::{Height, Round, ValidatorId};
 use storage::Patch;
 use node::{NodeHandler, RequestData};
-use events::InternalEvent;
+use events::InternalRequest;
 
 // TODO reduce view invokations (ECR-171)
 impl NodeHandler {
@@ -56,7 +56,7 @@ impl NodeHandler {
             if let Some(r) = self.state.get_actual_round(validator, round) {
                 trace!("Scheduling jump to round.");
                 let height = self.state.height();
-                self.execute_later(InternalEvent::JumpToRound(height, r));
+                self.execute_later(InternalRequest::JumpToRound(height, r));
             }
             return;
         }
@@ -608,7 +608,7 @@ impl NodeHandler {
         self.process_new_round();
     }
 
-    // Try to process consensus messages from future round.
+    // Try to process consensus messages from the future round.
     fn process_new_round(&mut self) {
         if self.state.is_validator() {
             // Send prevote if we are locked or propose if we are leader

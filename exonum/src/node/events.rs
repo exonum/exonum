@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use events::{Event, EventHandler, NetworkEvent, InternalEvent};
+use events::{Event, EventHandler, NetworkEvent, InternalEvent, InternalRequest};
 use super::{NodeHandler, ExternalMessage, NodeTimeout};
 use futures::{Sink, Future};
 use events::error::LogError;
@@ -21,7 +21,6 @@ impl EventHandler for NodeHandler {
     fn handle_event(&mut self, event: Event) {
         match event {
             Event::Network(network) => self.handle_network_event(network),
-            Event::Timeout(timeout) => self.handle_timeout(timeout),
             Event::Api(api) => self.handle_api_event(api),
             Event::Internal(internal) => self.handle_internal_event(internal),
         }
@@ -34,6 +33,7 @@ impl NodeHandler {
     #![cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
     fn handle_internal_event(&mut self, event: InternalEvent) {
         match event {
+            InternalEvent::Timeout(timeout) => self.handle_timeout(timeout),
             InternalEvent::JumpToRound(height, round) => self.handle_new_round(height, round),
         }
     }
@@ -71,7 +71,7 @@ impl NodeHandler {
     }
 
     /// Schedule execution for later time
-    pub(crate) fn execute_later(&mut self, event: InternalEvent) {
+    pub(crate) fn execute_later(&mut self, event: InternalRequest) {
         self.channel
             .internal_requests
             .clone()

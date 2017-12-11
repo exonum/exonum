@@ -17,7 +17,7 @@ pub mod tests;
 pub mod codec;
 pub mod error;
 pub mod network;
-pub mod timeouts;
+pub mod intrenal;
 
 use std::time::SystemTime;
 use std::cmp::Ordering;
@@ -27,7 +27,7 @@ use futures::sync::mpsc;
 
 use node::{ExternalMessage, NodeTimeout};
 pub use self::network::{NetworkEvent, NetworkRequest, NetworkPart, NetworkConfiguration};
-pub use self::timeouts::TimeoutsPart;
+pub use self::intrenal::InternalPart;
 use helpers::{Height, Round};
 
 /// This kind of events is used to schedule execution in next event-loop ticks
@@ -36,12 +36,21 @@ use helpers::{Height, Round};
 pub enum InternalEvent {
     /// Round update event.
     JumpToRound(Height, Round),
+    Timeout(NodeTimeout),
 }
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum InternalRequest {
+    Timeout(TimeoutRequest),
+    JumpToRound(Height, Round),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct TimeoutRequest(pub SystemTime, pub NodeTimeout);
 
 #[derive(Debug)]
 pub enum Event {
     Network(NetworkEvent),
-    Timeout(NodeTimeout),
     Api(ExternalMessage),
     Internal(InternalEvent),
 }
@@ -50,14 +59,11 @@ pub trait EventHandler {
     fn handle_event(&mut self, event: Event);
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct TimeoutRequest(pub SystemTime, pub NodeTimeout);
 
 #[derive(Debug)]
 pub struct HandlerPart<H: EventHandler> {
     pub handler: H,
     pub internal_rx: mpsc::Receiver<InternalEvent>,
-    pub timeout_rx: mpsc::Receiver<NodeTimeout>,
     pub network_rx: mpsc::Receiver<NetworkEvent>,
     pub api_rx: mpsc::Receiver<ExternalMessage>,
 }
@@ -66,17 +72,19 @@ impl<H: EventHandler + 'static> HandlerPart<H> {
     pub fn run(self) -> Box<Future<Item = (), Error = ()>> {
         let mut handler = self.handler;
 
-        let fut = EventsAggregator::new(
-            self.timeout_rx,
-            self.network_rx,
-            self.api_rx,
-            self.internal_rx,
-        ).for_each(move |event| {
-            handler.handle_event(event);
-            Ok(())
-        });
+        let fut = EventsAggregator::new(self.internal_rx, self.network_rx, self.api_rx)
+            .for_each(move |event| {
+                handler.handle_event(event);
+                Ok(())
+            });
 
         tobox(fut)
+    }
+}
+
+impl Into<InternalRequest> for TimeoutRequest {
+    fn into(self) -> InternalRequest {
+        InternalRequest::Timeout(self)
     }
 }
 
@@ -100,7 +108,7 @@ impl Into<Event> for NetworkEvent {
 
 impl Into<Event> for NodeTimeout {
     fn into(self) -> Event {
-        Event::Timeout(self)
+        Event::Internal(InternalEvent::Timeout(self))
     }
 }
 
@@ -118,56 +126,43 @@ impl Into<Event> for InternalEvent {
 /// Receives timeout, network and api events and invokes `handle_event` method of handler.
 /// If one of these streams closes, the aggregator stream completes immediately.
 #[derive(Debug)]
-pub struct EventsAggregator<S1, S2, S3, S4>
+pub struct EventsAggregator<S1, S2, S3>
 where
     S1: Stream,
     S2: Stream,
     S3: Stream,
-    S4: Stream,
 {
     done: bool,
-    timeout: S1,
+    internal: S1,
     network: S2,
     api: S3,
-    internal: S4,
 }
 
-impl<S1, S2, S3, S4> EventsAggregator<S1, S2, S3, S4>
+impl<S1, S2, S3> EventsAggregator<S1, S2, S3>
 where
     S1: Stream,
     S2: Stream,
     S3: Stream,
-    S4: Stream,
 {
-    pub fn new(
-        timeout: S1,
-        network: S2,
-        api: S3,
-        internal: S4,
-    ) -> EventsAggregator<S1, S2, S3, S4> {
+    pub fn new(internal: S1, network: S2, api: S3) -> EventsAggregator<S1, S2, S3> {
         EventsAggregator {
             done: false,
             network,
-            timeout,
-            api,
             internal,
+            api,
         }
     }
 }
 
-impl<S1, S2, S3, S4> Stream for EventsAggregator<S1, S2, S3, S4>
+impl<S1, S2, S3> Stream for EventsAggregator<S1, S2, S3>
 where
-    S1: Stream<Item = NodeTimeout>,
+    S1: Stream<Item = InternalEvent>,
     S2: Stream<
         Item = NetworkEvent,
         Error = S1::Error,
     >,
     S3: Stream<
         Item = ExternalMessage,
-        Error = S1::Error,
-    >,
-    S4: Stream<
-        Item = InternalEvent,
         Error = S1::Error,
     >,
 {
@@ -181,16 +176,6 @@ where
             match self.internal.poll()? {
                 Async::Ready(Some(item)) => {
                     return Ok(Async::Ready(Some(Event::Internal(item))));
-                }
-                Async::Ready(None) => {
-                    self.done = true;
-                    return Ok(Async::Ready(None));
-                }
-                Async::NotReady => {}
-            };
-            match self.timeout.poll()? {
-                Async::Ready(Some(item)) => {
-                    return Ok(Async::Ready(Some(Event::Timeout(item))));
                 }
                 Async::Ready(None) => {
                     self.done = true;
