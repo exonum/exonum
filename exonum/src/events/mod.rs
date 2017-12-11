@@ -17,7 +17,7 @@ pub mod tests;
 pub mod codec;
 pub mod error;
 pub mod network;
-pub mod intrenal;
+pub mod internal;
 
 use std::time::SystemTime;
 use std::cmp::Ordering;
@@ -27,7 +27,7 @@ use futures::sync::mpsc;
 
 use node::{ExternalMessage, NodeTimeout};
 pub use self::network::{NetworkEvent, NetworkRequest, NetworkPart, NetworkConfiguration};
-pub use self::intrenal::InternalPart;
+pub use self::internal::InternalPart;
 use helpers::{Height, Round};
 
 /// This kind of events is used to schedule execution in next event-loop ticks
