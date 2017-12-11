@@ -177,7 +177,7 @@ where
     V: StorageValue,
 {
     fn get_root_key(&self) -> Option<DBKey> {
-        self.base.iter(&()).next().map(|(k, _): (DBKey, ())| k)
+        self.base.iter::<_, DBKey, _>(&()).next().map(|(k, _): (DBKey, ())| k)
     }
 
     fn get_root_node(&self) -> Option<(DBKey, Node<V>)> {
@@ -861,7 +861,7 @@ where
     K: ProofMapKey,
     V: StorageValue,
 {
-    type Item = (K, V);
+    type Item = (K::Owned, V);
     type IntoIter = ProofMapIndexIter<'a, K, V>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -874,7 +874,7 @@ where
     K: ProofMapKey,
     V: StorageValue,
 {
-    type Item = (K, V);
+    type Item = (K::Owned, V);
 
     fn next(&mut self) -> Option<Self::Item> {
         self.base_iter.next().map(|(k, v)| (K::read(k.as_ref()), v))
@@ -886,7 +886,7 @@ impl<'a, K> Iterator for ProofMapIndexKeys<'a, K>
 where
     K: ProofMapKey,
 {
-    type Item = K;
+    type Item = K::Owned;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.base_iter.next().map(|(k, _)| K::read(k.as_ref()))

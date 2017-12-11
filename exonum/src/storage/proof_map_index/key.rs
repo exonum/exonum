@@ -233,7 +233,7 @@ impl StorageKey for DBKey {
         }
     }
 
-    fn read(buffer: &[u8]) -> Self {
+    fn read(buffer: &[u8]) -> Self::Owned {
         let mut data = [0; KEY_SIZE];
         data[..].copy_from_slice(&buffer[1..KEY_SIZE + 1]);
         let to = match buffer[0] {

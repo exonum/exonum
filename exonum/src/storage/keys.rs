@@ -13,9 +13,12 @@
 // limitations under the License.
 
 //! A definition of `StorageKey` trait and implementations for common types.
-use byteorder::{ByteOrder, BigEndian};
-use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 
+use byteorder::{ByteOrder, BigEndian};
+
+use std::mem;
+
+use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 
 /// A trait that defines serialization of corresponding types as storage keys.
 ///
@@ -34,6 +37,7 @@ use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 /// use exonum::storage::StorageKey;
 /// use byteorder::{LittleEndian, ByteOrder};
 ///
+/// #[Derive(Clone)]
 /// struct Key {
 ///     a: i16,
 ///     b: u32,
@@ -57,7 +61,7 @@ use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 /// }
 /// # fn main() {}
 /// ```
-pub trait StorageKey {
+pub trait StorageKey: ToOwned {
     /// Returns the size of the serialized key in bytes.
     fn size(&self) -> usize;
 
@@ -70,131 +74,131 @@ pub trait StorageKey {
 
     /// Deserialize a key from the specified buffer of bytes.
     // TODO: should be unsafe (ECR-174)?
-    fn read(buffer: &[u8]) -> Self;
+    fn read(buffer: &[u8]) -> Self::Owned;
 }
 
 impl StorageKey for () {
     fn size(&self) -> usize {
-        0
+        mem::size_of::<Self>()
     }
 
     fn write(&self, _buffer: &mut [u8]) {
         // no-op
     }
 
-    fn read(_buffer: &[u8]) -> Self {
+    fn read(_buffer: &[u8]) -> Self::Owned {
         ()
     }
 }
 
 impl StorageKey for u8 {
     fn size(&self) -> usize {
-        1
+        mem::size_of::<Self>()
     }
 
     fn write(&self, buffer: &mut [u8]) {
         buffer[0] = *self
     }
 
-    fn read(buffer: &[u8]) -> Self {
+    fn read(buffer: &[u8]) -> Self::Owned {
         buffer[0]
     }
 }
 
 impl StorageKey for u16 {
     fn size(&self) -> usize {
-        2
+        mem::size_of::<Self>()
     }
 
     fn write(&self, buffer: &mut [u8]) {
         BigEndian::write_u16(buffer, *self)
     }
 
-    fn read(buffer: &[u8]) -> Self {
+    fn read(buffer: &[u8]) -> Self::Owned {
         BigEndian::read_u16(buffer)
     }
 }
 
 impl StorageKey for u32 {
     fn size(&self) -> usize {
-        4
+        mem::size_of::<Self>()
     }
 
     fn write(&self, buffer: &mut [u8]) {
         BigEndian::write_u32(buffer, *self)
     }
 
-    fn read(buffer: &[u8]) -> Self {
+    fn read(buffer: &[u8]) -> Self::Owned {
         BigEndian::read_u32(buffer)
     }
 }
 
 impl StorageKey for u64 {
     fn size(&self) -> usize {
-        8
+        mem::size_of::<Self>()
     }
 
     fn write(&self, buffer: &mut [u8]) {
         BigEndian::write_u64(buffer, *self)
     }
 
-    fn read(buffer: &[u8]) -> Self {
+    fn read(buffer: &[u8]) -> Self::Owned {
         BigEndian::read_u64(buffer)
     }
 }
 
 impl StorageKey for i8 {
     fn size(&self) -> usize {
-        1
+        mem::size_of::<Self>()
     }
 
     fn write(&self, buffer: &mut [u8]) {
         buffer[0] = *self as u8
     }
 
-    fn read(buffer: &[u8]) -> Self {
+    fn read(buffer: &[u8]) -> Self::Owned {
         buffer[0] as i8
     }
 }
 
 impl StorageKey for i16 {
     fn size(&self) -> usize {
-        2
+        mem::size_of::<Self>()
     }
 
     fn write(&self, buffer: &mut [u8]) {
         BigEndian::write_i16(buffer, *self)
     }
 
-    fn read(buffer: &[u8]) -> Self {
+    fn read(buffer: &[u8]) -> Self::Owned {
         BigEndian::read_i16(buffer)
     }
 }
 
 impl StorageKey for i32 {
     fn size(&self) -> usize {
-        4
+        mem::size_of::<Self>()
     }
 
     fn write(&self, buffer: &mut [u8]) {
         BigEndian::write_i32(buffer, *self)
     }
 
-    fn read(buffer: &[u8]) -> Self {
+    fn read(buffer: &[u8]) -> Self::Owned {
         BigEndian::read_i32(buffer)
     }
 }
 
 impl StorageKey for i64 {
     fn size(&self) -> usize {
-        8
+        mem::size_of::<Self>()
     }
 
     fn write(&self, buffer: &mut [u8]) {
         BigEndian::write_i64(buffer, *self)
     }
 
-    fn read(buffer: &[u8]) -> Self {
+    fn read(buffer: &[u8]) -> Self::Owned {
         BigEndian::read_i64(buffer)
     }
 }
@@ -208,7 +212,7 @@ impl StorageKey for Hash {
         buffer.copy_from_slice(self.as_ref())
     }
 
-    fn read(buffer: &[u8]) -> Self {
+    fn read(buffer: &[u8]) -> Self::Owned {
         Hash::from_slice(buffer).unwrap()
     }
 }
@@ -222,7 +226,7 @@ impl StorageKey for PublicKey {
         buffer.copy_from_slice(self.as_ref())
     }
 
-    fn read(buffer: &[u8]) -> Self {
+    fn read(buffer: &[u8]) -> Self::Owned {
         PublicKey::from_slice(buffer).unwrap()
     }
 }
@@ -236,7 +240,21 @@ impl StorageKey for Vec<u8> {
         buffer.copy_from_slice(self)
     }
 
-    fn read(buffer: &[u8]) -> Self {
+    fn read(buffer: &[u8]) -> Self::Owned {
+        buffer.to_vec()
+    }
+}
+
+impl StorageKey for [u8] {
+    fn size(&self) -> usize {
+        self.len()
+    }
+
+    fn write(&self, buffer: &mut [u8]) {
+        buffer.copy_from_slice(self)
+    }
+
+    fn read(buffer: &[u8]) -> Self::Owned {
         buffer.to_vec()
     }
 }
@@ -250,7 +268,52 @@ impl StorageKey for String {
         buffer.copy_from_slice(self.as_bytes())
     }
 
-    fn read(buffer: &[u8]) -> Self {
+    fn read(buffer: &[u8]) -> Self::Owned {
         unsafe { ::std::str::from_utf8_unchecked(buffer).to_string() }
+    }
+}
+
+impl StorageKey for str {
+    fn size(&self) -> usize {
+        self.len()
+    }
+
+    fn write(&self, buffer: &mut [u8]) {
+        buffer.copy_from_slice(self.as_bytes())
+    }
+
+    fn read(buffer: &[u8]) -> Self::Owned {
+        unsafe { ::std::str::from_utf8_unchecked(buffer).to_string() }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn str_key() {
+        let values = ["eee", "hello world", ""];
+        for val in values.iter() {
+            let mut buffer = get_buffer(*val);
+            val.write(&mut buffer);
+            let new_val = str::read(&buffer);
+            assert_eq!(new_val, *val);
+        }
+    }
+
+    #[test]
+    fn u8_slice_key() {
+        let values: &[&[u8]] = &[&[1, 2, 3], &[255], &[]];
+        for val in values.iter() {
+            let mut buffer = get_buffer(*val);
+            val.write(&mut buffer);
+            let new_val = <[u8] as StorageKey>::read(&buffer);
+            assert_eq!(new_val, *val);
+        }
+    }
+
+    fn get_buffer<T: StorageKey + ?Sized>(key: &T) -> Vec<u8> {
+        vec![0; key.size()]
     }
 }

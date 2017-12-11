@@ -13,7 +13,9 @@
 // limitations under the License.
 
 //! An implementation of set for items that implement `StorageKey` trait.
+
 use std::marker::PhantomData;
+use std::borrow::Borrow;
 
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageKey};
 
@@ -118,7 +120,11 @@ where
     /// index.insert(1);
     /// assert!(index.contains(&1));
     /// ```
-    pub fn contains(&self, item: &K) -> bool {
+    pub fn contains<Q>(&self, item: &Q) -> bool
+        where
+            K: Borrow<Q>,
+            Q: StorageKey + ToOwned<Owned = K> + ?Sized,
+    {
         self.base.contains(item)
     }
 
@@ -206,7 +212,11 @@ where
     /// index.remove(&1);
     /// assert!(!index.contains(&1));
     /// ```
-    pub fn remove(&mut self, item: &K) {
+    pub fn remove<Q>(&mut self, item: &Q)
+        where
+            K: Borrow<Q>,
+            Q: StorageKey + ToOwned<Owned = K> + ?Sized,
+    {
         self.base.remove(item)
     }
 
@@ -243,7 +253,7 @@ where
     T: AsRef<Snapshot>,
     K: StorageKey,
 {
-    type Item = K;
+    type Item = K::Owned;
     type IntoIter = KeySetIndexIter<'a, K>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -255,9 +265,49 @@ impl<'a, K> Iterator for KeySetIndexIter<'a, K>
 where
     K: StorageKey,
 {
-    type Item = K;
+    type Item = K::Owned;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.base_iter.next().map(|(k, ..)| k)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use super::super::{MemoryDB, Database};
+
+    #[test]
+    fn str_key() {
+        let db = MemoryDB::new();
+        let mut fork = db.fork();
+
+        const KEY: &str = "key_1";
+
+        let mut index: KeySetIndex<_, String> = KeySetIndex::new("str_key", &mut fork);
+        assert_eq!(false, index.contains(KEY));
+
+        index.insert(KEY.to_owned());
+        assert_eq!(true, index.contains(KEY));
+
+        index.remove(KEY);
+        assert_eq!(false, index.contains(KEY));
+    }
+
+    #[test]
+    fn u8_slice_key() {
+        let db = MemoryDB::new();
+        let mut fork = db.fork();
+
+        const KEY: &[u8] = &[1, 2, 3];
+
+        let mut index: KeySetIndex<_, Vec<u8>> = KeySetIndex::new("str_key", &mut fork);
+        assert_eq!(false, index.contains(KEY));
+
+        index.insert(KEY.to_owned());
+        assert_eq!(true, index.contains(KEY));
+
+        index.remove(KEY);
+        assert_eq!(false, index.contains(KEY));
     }
 }
