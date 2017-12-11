@@ -3,10 +3,10 @@
     <div class="custom-dd">
         <div class="row">
             <div class="col-xs-6 custom-dd-column">
-                <strong>Name</strong>
+                <strong>Login</strong>
             </div>
             <div class="col-xs-6 custom-dd-column">
-                { opts.wallet.name }
+                { opts.wallet.login }
             </div>
         </div>
         <div class="row">
@@ -27,7 +27,7 @@
         </div>
         <div class="row">
             <div class="col-xs-6 custom-dd-column">
-                <strong>Time</strong>
+                <strong>Updated</strong>
             </div>
             <div class="col-xs-6 custom-dd-column">
                 { moment(opts.block.time / 1000000).fromNow() }

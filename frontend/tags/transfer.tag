@@ -19,8 +19,11 @@
                 <input type="text" class="form-control" onkeyup={ editReceiver }>
             </div>
             <div class="form-group">
-                <label class="control-label">Amount, $:</label>
-                <input type="number" class="form-control" onkeyup={ editAmount }>
+                <label class="control-label">Amount:</label>
+                <div class="input-group">
+                    <span class="input-group-addon">$</span>
+                    <input type="number" class="form-control" onkeyup={ editAmount }>
+                </div>
             </div>
             <div class="form-group">
                 <button type="submit" class="btn btn-lg btn-block btn-primary" disabled="{ !amount }">Make a Transfer</button>
