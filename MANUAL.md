@@ -114,8 +114,46 @@ fn my_api_test() {
 
 ## Advanced usage
 
+Here are examples of more complex and less common cases.
+
 ### Oracles testing
+
+The oracle in this case is service which can produce transaction with external data after the commit of block,
+[`exonum-time`][exonum-time] and [`exonum-btc-anchoring`][exonum-btc-anchoring] are examples of these kind of oracles.
+In this way, transactions, which were created during the `handle_commit` execution, will store in `TestKit` memory pool.
+
+```rust
+let mut testkit = TestKitBuilder::validator()
+    .with_service(HandleCommitService)
+    .create();
+// Check that `handle_commit` invoked on the correct height.
+for i in 1..5 {
+    testkit.create_block();
+    let tx = TxAfterCommit::new_with_signature(Height(i), &Signature::zero());
+    assert!(testkit.mempool().contains_key(&tx.hash()));
+}
+```
+
+In order to invoke a `handle_commit` event, you must create a block. If the oracle have to fetch any data from external world, you must create a mock object.
+
+```rust
+// Provide a mock api for the service.
+let mut cruel_world = ExternalApiMock::new();
+let mut testkit = TestKitBuilder::validator()
+    .with_service(MyOracleService::with_client(cruel_world.client()))
+    .create();
+// Expect the request from the service.
+cruel_world.expect_api_call(ApiCallInfo { ... })
+    .with_response_ok(ApiResponse { ... });
+// Call the `handle_commit` event.
+testkit.create_block();
+let expected_tx = MyOracleTx::new(...);
+// Check that the expected transaction there is in memory pool.
+assert!(testkit.mempool().contains_key(&expected_tx.hash()));
+```
 
 ### Configuration changes testing
 
 [integration-tests]: https://doc.rust-lang.org/book/second-edition/ch11-03-test-organization.html#integration-tests
+[exonum-btc-anchoring]: https://github.com/exonum/exonum-btc-anchoring
+[exonum-time]: https://github.com/exonum/exonum-time
