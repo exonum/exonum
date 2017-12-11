@@ -48,10 +48,10 @@
                     <div class="col-xs-5 custom-table-column" if={ message_id === 129 }>
                         Add <strong>{ numeral(body.amount).format('$0,0.00') }</strong> to your wallet
                     </div>
-                    <div class="col-xs-5 custom-table-column" if={ message_id === 128 && body.from === parent.opts.publicKey }>
+                    <div class="col-xs-5 custom-table-column" if={ message_id === 128 && body.from === wallet.pub_key }>
                         Send <strong>{ numeral(body.amount).format('$0,0.00') }</strong> to <truncate val={ body.to }></truncate>
                     </div>
-                    <div class="col-xs-5 custom-table-column" if={ message_id === 128 && body.to === parent.opts.publicKey }>
+                    <div class="col-xs-5 custom-table-column" if={ message_id === 128 && body.to === wallet.pub_key }>
                         Receive <strong>{ numeral(body.amount).format('$0,0.00') }</strong> from <truncate val={ body.from }></truncate>
                     </div>
                     <div class="col-xs-3 custom-table-column text-center">
