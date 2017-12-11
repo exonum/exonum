@@ -157,6 +157,38 @@ assert!(testkit.mempool().contains_key(&expected_tx.hash()));
 
 ### Configuration changes testing
 
+If your service has its own configuration, you may need to test the response to a configuration change.
+With the testkit you can create the configuration change proposal and commit them.
+
+```rust
+// Provide a mock api for the service.
+let mut testkit = TestKitBuilder::validator()
+    .with_service(MyOracleService::new())
+    .create();
+// Create configuration change proposal.
+let proposal = {
+    let mut cfg = testkit.configuration_change_proposal();
+    cfg.set_actual_from(cfg_change_height);
+    cfg.set_service_config("my_service", MyServiceCfg { ... });
+    cfg
+};
+let stored = proposal.stored_configuration().clone();
+testkit.commit_configuration_change(proposal);
+// Check that following configuration is none.
+assert_eq!(
+    Schema::new(&testkit.snapshot()).following_configuration(),
+    None
+);
+testkit.create_block();
+// Check that following configuration is appears.
+assert_eq!(
+    Schema::new(&testkit.snapshot()).following_configuration(),
+    Some(stored)
+);
+```
+
+If your service has some business logic in `handle_commit` event handler, you can check its by analogy with the previous paragraph.
+
 [integration-tests]: https://doc.rust-lang.org/book/second-edition/ch11-03-test-organization.html#integration-tests
 [exonum-btc-anchoring]: https://github.com/exonum/exonum-btc-anchoring
 [exonum-time]: https://github.com/exonum/exonum-time
