@@ -431,6 +431,11 @@ impl Fork {
         self.patch
     }
 
+    /// Returns reference to the inner `Patch`.
+    pub fn path(&self) -> &Patch {
+        &self.patch
+    }
+
     /// Merges patch from another fork to this fork.
     ///
     /// If both forks have changed the same data, this can lead to a non-consistent state. So this
