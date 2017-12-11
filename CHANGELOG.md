@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Changed
+- Changes key-indexes interface allowing to use borrowed types for the search operations. (#392)
+
 ## 0.4 - 2017-12-08
 
 ### Added
