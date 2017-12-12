@@ -13,6 +13,7 @@
 // limitations under the License.
 
 //! An implementation of `RocksDB` database.
+
 use exonum_profiler::ProfilerSpan;
 use rocksdb::DB as _RocksDB;
 use rocksdb::{WriteBatch, DBIterator};
@@ -27,11 +28,11 @@ use std::fmt;
 use std::error;
 use std::iter::Peekable;
 
-pub use rocksdb::{Options as RocksDBOptions, WriteOptions as RocksDBWriteOptions};
-pub use rocksdb::BlockBasedOptions as RocksBlockOptions;
-
 use super::{Database, Iterator, Iter, Snapshot, Error, Patch, Result};
 use super::db::Change;
+
+pub use rocksdb::{Options as RocksDBOptions, WriteOptions as RocksDBWriteOptions};
+pub use rocksdb::BlockBasedOptions as RocksBlockOptions;
 
 impl From<_Error> for Error {
     fn from(err: _Error) -> Self {

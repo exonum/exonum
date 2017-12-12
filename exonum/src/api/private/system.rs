@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use router::Router;
+use iron::prelude::*;
+use params::{Params, Value as ParamsValue};
+
 use std::net::SocketAddr;
 use std::collections::HashMap;
 
 use crypto::PublicKey;
-use router::Router;
-use iron::prelude::*;
-
-use params::{Params, Value as ParamsValue};
 use node::ApiSender;
 use blockchain::{Service, Blockchain, SharedNodeState};
 use api::{Api, ApiError};

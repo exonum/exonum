@@ -15,7 +15,6 @@
 use futures::{future, unsync, Future, IntoFuture, Sink, Stream, Poll};
 use futures::future::Either;
 use futures::sync::mpsc;
-
 use tokio_core::net::{TcpListener, TcpStream};
 use tokio_core::reactor::Handle;
 use tokio_io::AsyncRead;
@@ -31,7 +30,6 @@ use std::cell::RefCell;
 
 use messages::{Any, Connect, RawMessage, Message};
 use helpers::Milliseconds;
-
 use super::tobox;
 use super::error::{into_other, log_error, other_error, result_ok};
 use super::codec::MessagesCodec;

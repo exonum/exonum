@@ -22,7 +22,6 @@ use blockchain::{self, BlockProof, Block};
 use messages::{RawMessage, Message, Connect, Propose, Prevote, Precommit, Status, BlockResponse,
                BlockRequest};
 use helpers::{Height, Round, ValidatorId};
-
 use super::{Field, Offset};
 
 static VALIDATOR: ValidatorId = ValidatorId(65_123);

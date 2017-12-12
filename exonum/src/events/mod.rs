@@ -26,10 +26,8 @@ use std::time::SystemTime;
 use std::cmp::Ordering;
 
 use node::{ExternalMessage, NodeTimeout};
-
 pub use self::network::{NetworkEvent, NetworkRequest, NetworkPart, NetworkConfiguration};
 pub use self::timeouts::TimeoutsPart;
-
 
 #[derive(Debug)]
 pub enum Event {

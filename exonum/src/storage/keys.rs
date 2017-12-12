@@ -13,9 +13,9 @@
 // limitations under the License.
 
 //! A definition of `StorageKey` trait and implementations for common types.
+
 use byteorder::{ByteOrder, BigEndian};
 use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
-
 
 /// A trait that defines serialization of corresponding types as storage keys.
 ///

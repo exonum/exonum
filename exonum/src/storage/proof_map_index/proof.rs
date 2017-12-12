@@ -12,13 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::fmt;
-
 use serde::{Serialize, Serializer};
 use serde::ser::SerializeMap;
 
-use crypto::{Hash, HashStream};
+use std::fmt;
 
+use crypto::{Hash, HashStream};
 use super::super::{StorageValue, Error};
 use super::key::{ProofMapKey, DBKey, ChildKind, KEY_SIZE};
 

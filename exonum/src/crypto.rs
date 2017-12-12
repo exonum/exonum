@@ -31,13 +31,13 @@ use std::default::Default;
 use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
 use std::fmt;
 
+use encoding::serialize::FromHex;
+
 pub use sodiumoxide::crypto::sign::ed25519::{PUBLICKEYBYTES as PUBLIC_KEY_LENGTH,
                                              SECRETKEYBYTES as SECRET_KEY_LENGTH,
                                              SEEDBYTES as SEED_LENGTH,
                                              SIGNATUREBYTES as SIGNATURE_LENGTH};
 pub use sodiumoxide::crypto::hash::sha256::DIGESTBYTES as HASH_SIZE;
-
-use encoding::serialize::FromHex;
 
 /// The size to crop the string in debug messages.
 const BYTES_IN_DEBUG: usize = 4;

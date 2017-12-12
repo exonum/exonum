@@ -20,7 +20,6 @@ use std::cmp::Ordering::*;
 use std::iter::Peekable;
 
 use super::Result;
-
 use self::NextIterValue::*;
 
 /// Map containing changes with corresponding key.

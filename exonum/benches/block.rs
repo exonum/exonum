@@ -25,17 +25,16 @@ extern crate test;
 mod tests {
     use tempdir::TempDir;
     use futures::sync::mpsc;
-
     use test::Bencher;
-    use std::collections::BTreeMap;
-
-    use exonum::storage::{Database, Fork, Patch, ProofMapIndex, StorageValue};
-    use exonum::storage::{RocksDB, RocksDBOptions};
+    use exonum::storage::{Database, Fork, Patch, ProofMapIndex, StorageValue, RocksDB,
+                          RocksDBOptions};
     use exonum::blockchain::{Blockchain, Transaction};
     use exonum::crypto::{gen_keypair, Hash, PublicKey, SecretKey};
     use exonum::messages::Message;
     use exonum::helpers::{Height, ValidatorId};
     use exonum::node::ApiSender;
+
+    use std::collections::BTreeMap;
 
     fn create_blockchain(db: Box<Database>) -> Blockchain {
         let dummy_channel = mpsc::channel(1);

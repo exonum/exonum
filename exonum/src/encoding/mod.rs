@@ -119,7 +119,6 @@ mod segments;
 #[macro_use]
 mod spec;
 
-
 #[cfg(test)]
 mod tests;
 

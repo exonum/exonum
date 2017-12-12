@@ -13,6 +13,7 @@
 // limitations under the License.
 
 //! A definition of `StorageValue` trait and implementations for common types.
+
 use byteorder::{ByteOrder, LittleEndian};
 
 use std::mem;

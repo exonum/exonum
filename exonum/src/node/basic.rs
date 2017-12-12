@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate rand;
-
-use rand::Rng;
+use rand::{self, Rng};
 
 use std::net::SocketAddr;
 use std::error::Error;

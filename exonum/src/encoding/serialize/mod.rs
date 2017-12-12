@@ -17,6 +17,7 @@
 //! This module is a pack of superstructures over serde `Serializer's`\\`Deserializer's`
 
 pub use hex::{FromHexError, ToHex, FromHex, encode as encode_hex, decode as decode_hex};
+
 use encoding::Field;
 use messages::MessageWriter;
 use super::Offset;
