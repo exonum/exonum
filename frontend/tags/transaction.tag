@@ -18,49 +18,53 @@
             <virtual if={ transaction.content.message_id === 128 }>
                 <div class="custom-table text-center">
                     <div class="row">
-                        <div class="col-xs-6 custom-table-header-column">From</div>
-                        <div class="col-xs-6 custom-table-header-column">To</div>
+                        <div class="col-xs-4 custom-table-header-column">Sum</div>
+                        <div class="col-xs-4 custom-table-header-column">From</div>
+                        <div class="col-xs-4 custom-table-header-column">To</div>
                     </div>
                     <div class="row">
-                        <div class="col-xs-6 custom-table-column">
+                        <div class="col-xs-4 custom-table-column">
+                            { numeral(transaction.content.body.amount).format('$0,0.00') }
+                        </div>
+                        <div class="col-xs-4 custom-table-column">
                             <truncate class="truncate" val={ transaction.content.body.from }></truncate>
                         </div>
-                        <div class="col-xs-6 custom-table-column">
+                        <div class="col-xs-4 custom-table-column">
                             <truncate class="truncate" val={ transaction.content.body.to }></truncate>
                         </div>
                     </div>
-                </div>
-
-                <div class="text-center">
-                    <h2>{ numeral(transaction.content.body.amount).format('$0,0.00') }</h2>
                 </div>
             </virtual>
 
             <virtual if={ transaction.content.message_id === 129 }>
                 <div class="custom-table text-center">
                     <div class="row">
-                        <div class="col-sm-12 custom-table-header-column">To</div>
+                        <div class="col-sm-6 custom-table-header-column">Sum</div>
+                        <div class="col-sm-6 custom-table-header-column">To</div>
                     </div>
                     <div class="row">
-                        <div class="col-sm-12 custom-table-column">
+                        <div class="col-sm-6 custom-table-column">
+                            { numeral(transaction.content.body.amount).format('$0,0.00') }
+                        </div>
+                        <div class="col-sm-6 custom-table-column">
                             <truncate class="truncate" val={ transaction.content.body.wallet }></truncate>
                         </div>
                     </div>
-                </div>
-
-                <div class="text-center">
-                    <h2>{ numeral(transaction.content.body.amount).format('$0,0.00') }</h2>
                 </div>
             </virtual>
 
             <virtual if={ transaction.content.message_id === 130 }>
                 <div class="custom-table text-center">
                     <div class="row">
-                        <div class="col-sm-12 custom-table-header-column">Name</div>
+                        <div class="col-sm-6 custom-table-header-column">Login</div>
+                        <div class="col-sm-6 custom-table-header-column">Public key</div>
                     </div>
                     <div class="row">
-                        <div class="col-sm-12 custom-table-column">
-                            { transaction.content.body.name }
+                        <div class="col-sm-6 custom-table-column">
+                            { transaction.content.body.login }
+                        </div>
+                        <div class="col-sm-6 custom-table-column">
+                            <truncate class="truncate" val={ transaction.content.body.pub_key }></truncate>
                         </div>
                     </div>
                 </div>
