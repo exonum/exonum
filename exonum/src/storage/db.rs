@@ -42,6 +42,7 @@ impl Changes {
 }
 
 /// Iterator over the `Changes` data.
+#[derive(Debug)]
 pub struct ChangesIterator {
     inner: BtmIntoIter<Vec<u8>, Change>,
 }
@@ -114,6 +115,7 @@ impl Patch {
 }
 
 /// Iterator over the `Patch` data.
+#[derive(Debug)]
 pub struct PatchIterator {
     inner: HmIntoIter<String, Changes>,
 }
