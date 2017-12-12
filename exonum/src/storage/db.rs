@@ -432,7 +432,7 @@ impl Fork {
     }
 
     /// Returns reference to the inner `Patch`.
-    pub fn path(&self) -> &Patch {
+    pub fn patch(&self) -> &Patch {
         &self.patch
     }
 
