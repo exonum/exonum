@@ -72,6 +72,21 @@ pub enum Error {
         /// expected `message_id`
         message_type: u16,
     },
+    /// Incorrect `service_id` found in buffer.
+    IncorrectServiceId {
+        /// expected `service_id`
+        service_id: u16,
+    },
+    /// Incorrect `network_id` found in buffer.
+    IncorrectNetworkId {
+        /// expected `network_id`
+        network_id: u8,
+    },
+    /// Unsupported message version.
+    UnsupportedProtocolVersion {
+        /// Actual message version.
+        version: u8,
+    },
     /// Different segments overlaps
     OverlappingSegment {
         /// last segment ended position
@@ -117,6 +132,9 @@ impl StdError for Error {
             Error::UnexpectedlyShortRawMessage { .. } => "Unexpectedly short RawMessage",
             Error::IncorrectSizeOfRawMessage { .. } => "Incorrect size of RawMessage",
             Error::IncorrectMessageType { .. } => "Incorrect message type",
+            Error::IncorrectServiceId { .. } => "Incorrect service id",
+            Error::IncorrectNetworkId { .. } => "Incorrect network id",
+            Error::UnsupportedProtocolVersion { .. } => "Unsupported protocol version",
             Error::OverlappingSegment { .. } => "Overlapping segments",
             Error::SpaceBetweenSegments { .. } => "Space between segments",
             Error::Utf8 { .. } => "Utf8 error in parsing string",
