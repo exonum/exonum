@@ -17,7 +17,7 @@ use std::collections::btree_map::{BTreeMap, Range, Iter as BtmIter, IntoIter as 
 use std::collections::hash_map::{Iter as HmIter, IntoIter as HmIntoIter, Entry as HmEntry};
 use std::collections::Bound::*;
 use std::cmp::Ordering::*;
-use std::iter::Peekable;
+use std::iter::{Peekable, Iterator as StdIterator};
 
 use super::Result;
 
@@ -41,12 +41,25 @@ impl Changes {
     }
 }
 
+/// Iterator over the `Changes` data.
+pub struct ChangesIterator {
+    inner: BtmIntoIter<Vec<u8>, Change>,
+}
+
+impl StdIterator for ChangesIterator {
+    type Item = (Vec<u8>, Change);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+
 impl IntoIterator for Changes {
     type Item = (Vec<u8>, Change);
-    type IntoIter = BtmIntoIter<Vec<u8>, Change>;
+    type IntoIter = ChangesIterator;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.data.into_iter()
+        Self::IntoIter { inner: self.data.into_iter() }
     }
 }
 
@@ -100,12 +113,25 @@ impl Patch {
     }
 }
 
+/// Iterator over the `Patch` data.
+pub struct PatchIterator {
+    inner: HmIntoIter<String, Changes>,
+}
+
+impl StdIterator for PatchIterator {
+    type Item = (String, Changes);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+
 impl IntoIterator for Patch {
     type Item = (String, Changes);
-    type IntoIter = HmIntoIter<String, Changes>;
+    type IntoIter = PatchIterator;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.changes.into_iter()
+        Self::IntoIter { inner: self.changes.into_iter() }
     }
 }
 

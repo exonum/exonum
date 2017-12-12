@@ -107,7 +107,8 @@
 //! [`HashSet`]: https://doc.rust-lang.org/std/collections/struct.HashSet.html
 
 pub use self::error::Error;
-pub use self::db::{Database, Snapshot, Fork, Patch, Change, Changes, Iterator, Iter};
+pub use self::db::{Database, Snapshot, Fork, Patch, PatchIterator, Change, Changes,
+                   ChangesIterator, Iterator, Iter};
 
 pub use self::rocksdb::{RocksDB, RocksDBOptions};
 pub use self::memorydb::MemoryDB;
