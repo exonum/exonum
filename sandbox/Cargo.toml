@@ -1,10 +1,10 @@
 [package]
 name = "sandbox"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 
 [dependencies]
-exonum = {version="0.3", path="../exonum"}
+exonum = {version="0.4", path="../exonum"}
 
 log = "0.3.8"
 env_logger = "0.4.3"

@@ -17,9 +17,10 @@ use iron::prelude::*;
 
 use node::state::TxPool;
 use blockchain::Blockchain;
-use crypto::{Hash, HexValue};
-use explorer::{TxInfo, BlockchainExplorer};
+use crypto::Hash;
+use explorer::{BlockchainExplorer, TxInfo};
 use api::{Api, ApiError};
+use encoding::serialize::FromHex;
 
 #[derive(Serialize)]
 struct MemPoolTxInfo {
