@@ -458,9 +458,11 @@ impl ExonumJson for F32 {
     }
 
     fn serialize_field(&self) -> Result<Value, Box<Error>> {
-        Ok(Value::Number(Number::from_f64(self.get().into()).ok_or(
-            "Can't cast float as json",
-        )?))
+        Ok(Value::Number(
+            Number::from_f64(f64::from(self.get())).ok_or(
+                "Can't cast float as json",
+            )?,
+        ))
     }
 }
 
@@ -477,7 +479,7 @@ impl ExonumJson for F64 {
     }
 
     fn serialize_field(&self) -> Result<Value, Box<Error>> {
-        Ok(Value::Number(Number::from_f64(self.get().into()).ok_or(
+        Ok(Value::Number(Number::from_f64(self.get()).ok_or(
             "Can't cast float as json",
         )?))
     }
