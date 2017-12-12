@@ -18,7 +18,8 @@ use std::clone::Clone;
 use std::collections::btree_map::BTreeMap;
 use std::collections::HashMap;
 
-use super::{Database, Snapshot, Patch, Change, Iterator, Iter, Result};
+use super::{Database, Snapshot, Patch, Iterator, Iter, Result};
+use super::db::Change;
 
 type DB = HashMap<String, BTreeMap<Vec<u8>, Vec<u8>>>;
 

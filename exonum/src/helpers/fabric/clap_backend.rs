@@ -34,6 +34,7 @@ impl ClapBackend {
             .map(|command| ClapBackend::command_into_subcommand(command))
             .collect();
         let matches = clap::App::new("Exonum application based on fabric configuration.")
+            .setting(clap::AppSettings::ArgRequiredElseHelp)
             .version(crate_version!())
             .author(crate_authors!("\n"))
             .about(
@@ -63,6 +64,7 @@ impl ClapBackend {
             .collect();
 
         let matches = clap::App::new("Exonum application based on fabric configuration.")
+            .setting(clap::AppSettings::ArgRequiredElseHelp)
             .version(crate_version!())
             .author(crate_authors!("\n"))
             .about("Exonum application based on fabric configuration.")
