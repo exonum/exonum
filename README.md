@@ -32,7 +32,7 @@ export SERVICE_ROOT=$(pwd)/currency_root
 ./service/bootstrap.sh start cryptocurrency
 ```
 
-Ready! Open the wallet manager at [http://127.0.0.1:8200](http://127.0.0.1:8200) in your browser.
+Ready! Open the wallet manager at [http://127.0.0.1:8280](http://127.0.0.1:8280) in your browser.
 
 To stop the project execute:
 ```sh
@@ -117,7 +117,7 @@ Run the application:
 npm start
 ```
 
-Ready! Open the wallet manager at [http://127.0.0.1:8200](http://127.0.0.1:8200) in your browser.
+Ready! Open the wallet manager at [http://127.0.0.1:8280](http://127.0.0.1:8280) in your browser.
 
 ### Tests
 
