@@ -6,7 +6,7 @@ Below is a simple user guide.
 
 * [Installation](#installation)
 * [Transactions testing](#transactions-testing)
-* [Api testing](#api-testing)
+* [API testing](#api-testing)
 * [Oracles testing](#oracles-testing)
 * [Configuration changes testing](#configuration-changes-testing)
 
@@ -82,7 +82,7 @@ testkit.create_block_with_transactions(txvec![tx1, tx2]);
 
 The following steps may help you.
 
-* Define the `MyServiceApi` trait for the `TestKitApi` structure that covers the whole api of your service.
+* Define the `MyServiceApi` trait for the `TestKitApi` structure that covers the whole API of your service.
 * Implement functions that use transactions to fill your storage with the test data.
 * Create the tests that check all of your endpoints.
 
@@ -122,7 +122,7 @@ fn my_api_test() {
         .with_service(MyService::new())
         .create();
     fill_storage_with_data(&mut testkit);
-    // Check api responses
+    // Check API responses
     let api = testkit.api();
     assert_eq!(api.get_public_data(), ApiResponsePublicData::new(...));
     ...
@@ -155,7 +155,7 @@ In order to invoke a `handle_commit` event, you must create a block.
 If the oracle has to fetch any data from external world, you must create a mock object.
 
 ```rust
-// Provide a mock api for the service.
+// Provide a mock API for the service.
 let mut cruel_world = ExternalApiMock::new();
 let mut testkit = TestKitBuilder::validator()
     .with_service(MyOracleService::with_client(cruel_world.client()))
@@ -176,7 +176,6 @@ If your service has its own configuration, you may need to test the response to 
 With the testkit you can create the configuration change proposal and commit it.
 
 ```rust
-// Provide a mock api for the service.
 let mut testkit = TestKitBuilder::validator()
     .with_service(MyOracleService::new())
     .create();
