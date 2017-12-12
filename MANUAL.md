@@ -140,22 +140,23 @@ The oracle in this case is a service which can produce transactions with externa
 In this way, transactions created during the `handle_commit` execution will be stored in `TestKit` memory pool.
 
 ```rust
+// Create testkit with the service which creates transaction with the height
+// of latest committed block after commit.
 let mut testkit = TestKitBuilder::validator()
     .with_service(HandleCommitService)
     .create();
+// Call the `handle_commit` event.
+testkit.create_block();
 // Check that `handle_commit` has been invoked at the correct height.
-for i in 1..5 {
-    testkit.create_block();
-    let tx = TxAfterCommit::new_with_signature(Height(i), &Signature::zero());
-    assert!(testkit.mempool().contains_key(&tx.hash()));
-}
+let tx = TxAfterCommit::new_with_signature(Height(1), &Signature::zero());
+assert!(testkit.mempool().contains_key(&tx.hash()));
 ```
 
 In order to invoke a `handle_commit` event, you must create a block.
 If the oracle has to fetch any data from external world, you must create a mock object.
 
 ```rust
-// Provide a mock API for the service.
+// Provide a mock object for the service.
 let mut cruel_world = ExternalApiMock::new();
 let mut testkit = TestKitBuilder::validator()
     .with_service(MyOracleService::with_client(cruel_world.client()))
@@ -188,7 +189,7 @@ let proposal = {
 };
 let stored = proposal.stored_configuration().clone();
 testkit.commit_configuration_change(proposal);
-// Check that the following configuration is none.
+// Check that the following configuration before block creation is none.
 use exonum::blockchain::Schema;
 assert_eq!(
     Schema::new(&testkit.snapshot()).following_configuration(),
