@@ -45,6 +45,7 @@ env:
   - CLIPPY_VERS=0.0.169
   - RUSTFMT_VERS=0.9.0
   - DEADLINKS_VERS=0.3.0
+  - OUTDATED_VERS=0.7.0
   - SODIUM_VERS=1.0.13
   - CARGO_INCREMENTAL=1
   - RUSTFLAGS="-C link-dead-code"
@@ -73,6 +74,7 @@ install:
 - export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$HOME/.local/lib/pkgconfig
 - |
   if [[ "$FEATURE" == "non-fatal-checks" ]]; then
+    cargo-outdated -V | grep $OUTDATED_VERS || cargo install cargo-outdated --vers $OUTDATED_VERS --force
     cargo-deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
     fi
 - |
@@ -115,7 +117,8 @@ script: |
   "non-fatal-checks" )
       cd exonum &&
       cargo doc --no-deps &&
-      cargo deadlinks --dir target/doc
+      cargo deadlinks --dir target/doc &&
+      cargo outdated --exit-code 1
   ;;
   "benchmarks" )
         RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
