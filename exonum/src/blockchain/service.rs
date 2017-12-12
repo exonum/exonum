@@ -52,16 +52,11 @@ pub trait Transaction: Message + 'static {
     /// to the state and return early if these checks fail.
     /// - If the execute method of a transaction raises a `panic`, the changes made by the
     /// transactions are discarded, but the transaction itself is still considered committed.
-    /// - Return value is also stored in the blockchain and can be accessed through api.
-    ///
-    /// # Return values:
-    ///
-    /// `0` - successful transaction execution (`TRANSACTION_STATUS_OK`).
-    /// `1` - panic during transaction execution (`TRANSACTION_STATUS_PANIC`).
-    /// `2` - general failure (`TRANSACTION_STATUS_FAILURE`).
-    /// `3..100` - reserved values.
-    /// `101 - 255` - values that can be used in service for some special meaning.
-    fn execute(&self, fork: &mut Fork) -> u8;
+    /// - A transaction execution status (see `TransactionExecutionStatus` for the details) is
+    /// stored in the blockchain and can be accessed through api.
+    /// - A transaction is considered failed if it made no changes to the storage, but its execution
+    /// status can be set explicitly (see `ExecutionContext` for the details).
+    fn execute(&self, context: &mut ExecutionContext);
 
     /// Returns the useful information about the transaction in the JSON format. The returned value
     /// is used to fill the [`TxInfo.content`] field in [the blockchain explorer][explorer].
@@ -104,6 +99,36 @@ pub trait Transaction: Message + 'static {
     /// [`message!`]: ../macro.message.html
     fn info(&self) -> Value {
         Value::Null
+    }
+}
+
+/// Execution status of the transaction.
+pub enum TransactionExecutionStatus {
+    /// Successful transaction execution.
+    Succeeded,
+    /// Panic occurred during transaction execution,
+    Panic,
+    /// General failure (unspecified reason).
+    Failed,
+    /// User defined execution status. Can have different meanings for different transactions and
+    /// services.
+    Custom(u8),
+}
+
+/// `Transaction`'s execution context.
+#[derive(Debug)]
+pub struct ExecutionContext<'a> {
+    fork: &'a mut Fork,
+    status: Option<TransactionExecutionStatus>
+}
+
+impl ExecutionContext {
+    pub fn fork(&mut self) -> &mut Fork {
+        self.fork
+    }
+
+    pub fn set_execution_status(&mut self, status: TransactionExecutionStatus) {
+        self.status = Some(status);
     }
 }
 
