@@ -23,11 +23,11 @@ exonum-testkit = "0.1.0"
 
 ### Transactions testing
 
-The primary goal of the kind of tests is to check the business logic of your service.
+The primary goal of this kind of tests is to check the business logic of your service.
 
-For writing your first test create `tests` directory in according to the cargo
+For writing your first test create `tests` directory according to the cargo
 integration testing [manual][integration-tests].
-After that creates file `transactions.rs` like the following content.
+After that, create file `tests/transactions.rs` with the content similar to written below.
 
 ```rust
 extern crate exonum;
@@ -46,8 +46,8 @@ fn test_my_tx() {
     // Create transaction.
     let tx = MyTransaction::new(...);
     // Commit it into blockchain.
-    testkit.create_block_with_transactions(txvec![tx.clone()]);
-    // Check the expected result
+    testkit.create_block_with_transactions(txvec![tx]);
+    // Check the expected result.
     let snapshot = testkit.snapshot();
     let schema = MySchema::new(&snapshot);
     assert!(schema.is_my_data_checked());
@@ -63,7 +63,22 @@ let tx = MyTransaction::new(...);
 assert!(tx.verify());
 ```
 
-### Api testing
+Testkit also allows to check different orderings of transactions, including transactions for multiple services. This could allow to more efficiently test margin cases, which would be difficult to reproduce otherwise.
+
+```rust
+let mut testkit = TestKitBuilder::validator()
+    .with_service(MyService::new())
+    .with_service(OtherService::new())
+    .create();
+// Create transactions.
+let tx1 = MyTransaction::new(...);
+let tx2 = OtherTransaction::new(...);
+// Commit its into blockchain.
+testkit.create_block_with_transactions(txvec![tx1, tx2]);
+// Check the expected result.
+```
+
+### API testing
 
 The following steps may help you.
 
@@ -73,7 +88,7 @@ The following steps may help you.
 
 ```rust
 
-// Api trait definition.
+// API trait definition.
 
 trait MyServiceApi {
     fn get_public_data(&self) -> ApiResponsePublicData;
@@ -99,7 +114,7 @@ impl MyServiceApi for TestKitApi {
     }
 }
 
-// Api test skeleton
+// API test skeleton
 
 #[test]
 fn my_api_test() {
@@ -120,15 +135,15 @@ Here are examples of more complex and less common cases.
 
 ### Oracles testing
 
-The oracle in this case is service which can produce transaction with external data after the commit of block,
+The oracle in this case is a service which can produce transactions with external data after the commit of the block,
 [`exonum-time`][exonum-time] and [`exonum-btc-anchoring`][exonum-btc-anchoring] are examples of these kind of oracles.
-In this way, transactions which were created during the `handle_commit` execution will be stored in `TestKit` memory pool.
+In this way, transactions created during the `handle_commit` execution will be stored in `TestKit` memory pool.
 
 ```rust
 let mut testkit = TestKitBuilder::validator()
     .with_service(HandleCommitService)
     .create();
-// Check that `handle_commit` invoked on the correct height.
+// Check that `handle_commit` has been invoked at the correct height.
 for i in 1..5 {
     testkit.create_block();
     let tx = TxAfterCommit::new_with_signature(Height(i), &Signature::zero());
@@ -145,27 +160,27 @@ let mut cruel_world = ExternalApiMock::new();
 let mut testkit = TestKitBuilder::validator()
     .with_service(MyOracleService::with_client(cruel_world.client()))
     .create();
-// Expect the request from the service.
+// Expect a request from the service.
 cruel_world.expect_api_call(ApiCallInfo { ... })
     .with_response_ok(ApiResponse { ... });
 // Call the `handle_commit` event.
 testkit.create_block();
 let expected_tx = MyOracleTx::new(...);
-// Check that the expected transaction there is in memory pool.
+// Check that the expected transaction is in the memory pool.
 assert!(testkit.mempool().contains_key(&expected_tx.hash()));
 ```
 
 ### Configuration changes testing
 
 If your service has its own configuration, you may need to test the response to a configuration change.
-With the testkit you can create the configuration change proposal and commit them.
+With the testkit you can create the configuration change proposal and commit it.
 
 ```rust
 // Provide a mock api for the service.
 let mut testkit = TestKitBuilder::validator()
     .with_service(MyOracleService::new())
     .create();
-// Create configuration change proposal.
+// Create a configuration change proposal.
 let proposal = {
     let mut cfg = testkit.configuration_change_proposal();
     cfg.set_actual_from(cfg_change_height);
@@ -174,20 +189,22 @@ let proposal = {
 };
 let stored = proposal.stored_configuration().clone();
 testkit.commit_configuration_change(proposal);
-// Check that following configuration is none.
+// Check that the following configuration is none.
+use exonum::blockchain::Schema;
 assert_eq!(
     Schema::new(&testkit.snapshot()).following_configuration(),
     None
 );
 testkit.create_block();
-// Check that following configuration is appears.
+// Check that the following configuration is now scheduled.
 assert_eq!(
     Schema::new(&testkit.snapshot()).following_configuration(),
     Some(stored)
 );
 ```
 
-If your service has some business logic in `handle_commit` event handler, you can check its by analogy with the previous paragraph.
+If your service has some business logic in the `handle_commit` event handler, you can check it
+in the same way as provided in the previous paragraph.
 
 [integration-tests]: https://doc.rust-lang.org/book/second-edition/ch11-03-test-organization.html#integration-tests
 [exonum-btc-anchoring]: https://github.com/exonum/exonum-btc-anchoring
