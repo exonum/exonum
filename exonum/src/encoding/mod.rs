@@ -84,8 +84,8 @@
 //! `i32`    | 4    | 32-bit signed number stored in little endian  |
 //! `u64`    | 8    | long unsigned number stored in little endian  |
 //! `i64`    | 8    | long signed number stored in little endian  |
-//! `f32`    | 4    | 32-bit floating point type stored in little endian [\[1\]](#1)|
-//! `f64`    | 8    | 64-bit floating point type stored in little endian [\[1\]](#1)|
+//! `F32`    | 4    | 32-bit floating point type stored in little endian [\[1\]](#1)|
+//! `F64`    | 8    | 64-bit floating point type stored in little endian [\[1\]](#1)|
 //! `bool`   | 1    | stored as single byte, where `0x01` - true `0x00` - false [\[1\]](#2)|
 //!
 //! ######\[1]
@@ -114,6 +114,7 @@ use std::ops::{Add, Sub, Mul, Div};
 pub use self::fields::Field;
 pub use self::segments::SegmentField;
 pub use self::error::Error;
+pub use self::float::{F32, F64};
 
 #[macro_use]
 pub mod serialize;
@@ -124,7 +125,7 @@ mod fields;
 mod segments;
 #[macro_use]
 mod spec;
-
+mod float;
 
 #[cfg(test)]
 mod tests;

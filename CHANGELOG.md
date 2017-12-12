@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 
 ### Added
-- Added serialization support floating point types (`f32` and `f64`). Note: special values (Infinity and NaN) aren't supported. (#384)
+- Added serialization support floating point types through special wrapper(`F32` and `F64`). Note: special values (Infinity and NaN) aren't supported. (#384)
 
 ## 0.4 - 2017-12-08
 
