@@ -21,6 +21,7 @@ use std::time::{SystemTime, Duration, UNIX_EPOCH};
 use crypto::{Hash, PublicKey, Signature};
 use helpers::{Height, Round, ValidatorId};
 use super::{Error, CheckedOffset, Offset, Result};
+use super::float::{F32, F64};
 
 /// Trait for all types that could be a field in `encoding`.
 pub trait Field<'a> {
@@ -249,17 +250,17 @@ impl<'a> Field<'a> for i8 {
     }
 }
 
-impl<'a> Field<'a> for f32 {
+impl<'a> Field<'a> for F32 {
     fn field_size() -> Offset {
         mem::size_of::<Self>() as Offset
     }
 
     unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
-        LittleEndian::read_f32(&buffer[from as usize..to as usize])
+        Self::new(LittleEndian::read_f32(&buffer[from as usize..to as usize]))
     }
 
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
-        LittleEndian::write_f32(&mut buffer[from as usize..to as usize], *self);
+        LittleEndian::write_f32(&mut buffer[from as usize..to as usize], self.get());
     }
 
     fn check(
@@ -273,22 +274,28 @@ impl<'a> Field<'a> for f32 {
         let from = from.unchecked_offset();
         let to = to.unchecked_offset();
 
-        let value = unsafe { Self::read(buffer, from, to) };
-        check_float_value(f64::from(value), from, latest_segment)
+        let value = LittleEndian::read_f32(&buffer[from as usize..to as usize]);
+        match Self::try_from(value) {
+            Some(_) => Ok(latest_segment),
+            None => Err(Error::UnsupportedFloat {
+                position: from,
+                value: f64::from(value),
+            }),
+        }
     }
 }
 
-impl<'a> Field<'a> for f64 {
+impl<'a> Field<'a> for F64 {
     fn field_size() -> Offset {
         mem::size_of::<Self>() as Offset
     }
 
     unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
-        LittleEndian::read_f64(&buffer[from as usize..to as usize])
+        Self::new(LittleEndian::read_f64(&buffer[from as usize..to as usize]))
     }
 
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
-        LittleEndian::write_f64(&mut buffer[from as usize..to as usize], *self);
+        LittleEndian::write_f64(&mut buffer[from as usize..to as usize], self.get());
     }
 
     fn check(
@@ -302,19 +309,14 @@ impl<'a> Field<'a> for f64 {
         let from = from.unchecked_offset();
         let to = to.unchecked_offset();
 
-        let value = unsafe { Self::read(buffer, from, to) };
-        check_float_value(value, from, latest_segment)
-    }
-}
-
-fn check_float_value(value: f64, position: Offset, segment: CheckedOffset) -> Result {
-    if value.is_finite() {
-        Ok(segment)
-    } else {
-        Err(Error::UnsupportedFloat {
-            position,
-            value,
-        })
+        let value = LittleEndian::read_f64(&buffer[from as usize..to as usize]);
+        match Self::try_from(value) {
+            Some(_) => Ok(latest_segment),
+            None => Err(Error::UnsupportedFloat {
+                position: from,
+                value,
+            }),
+        }
     }
 }
 

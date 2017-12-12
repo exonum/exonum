@@ -32,11 +32,10 @@ use std::error::Error;
 use crypto::{Hash, PublicKey, Signature};
 use helpers::{Height, Round, ValidatorId};
 use messages::RawMessage;
+use encoding::{Field, Offset, F32, F64};
+use super::WriteBufferWrapper;
 
 // TODO: should we implement serialize for: `SecretKey`, `Seed` (ECR-156)?
-
-use encoding::{Field, Offset};
-use super::WriteBufferWrapper;
 
 macro_rules! impl_default_deserialize_owned {
     (@impl $name:ty) => {
@@ -128,30 +127,6 @@ macro_rules! impl_deserialize_bigint {
     ($($name:ty);*) => ($(impl_deserialize_bigint!{@impl $name})*);
 }
 
-macro_rules! impl_deserialize_float {
-    (@impl $typename:ty) => {
-        impl ExonumJson for $typename {
-            fn deserialize_field<B: WriteBufferWrapper>(value: &Value,
-                                                        buffer: &mut B,
-                                                        from: Offset,
-                                                        to: Offset )
-                -> Result<(), Box<Error>>
-            {
-                let number = value.as_f64().ok_or("Can't cast json as float")?;
-                buffer.write(from, to, number as $typename);
-                Ok(())
-            }
-
-            fn serialize_field(&self) -> Result<Value, Box<Error>> {
-                Ok(Value::Number(
-                    Number::from_f64((*self).into()).ok_or("Can't cast float as json")?,
-                ))
-            }
-        }
-    };
-    ($($name:ty);*) => ($(impl_deserialize_float!{@impl $name})*);
-}
-
 macro_rules! impl_deserialize_hex_segment {
     (@impl $typename:ty) => {
         impl<'a> ExonumJson for &'a $typename {
@@ -178,12 +153,9 @@ macro_rules! impl_deserialize_hex_segment {
 
 impl_deserialize_int!{u8; u16; u32; i8; i16; i32}
 impl_deserialize_bigint!{u64; i64}
-impl_deserialize_float!{f32; f64}
-
 impl_deserialize_hex_segment!{Hash; PublicKey; Signature}
-
 impl_default_deserialize_owned!{u8; u16; u32; i8; i16; i32; u64; i64;
-Hash; PublicKey; Signature; bool}
+                                Hash; PublicKey; Signature; bool}
 
 impl ExonumJson for bool {
     fn deserialize_field<B: WriteBufferWrapper>(
@@ -470,6 +442,44 @@ impl ExonumJson for ValidatorId {
     fn serialize_field(&self) -> Result<Value, Box<Error>> {
         let val: u16 = self.to_owned().into();
         Ok(Value::Number(val.into()))
+    }
+}
+
+impl ExonumJson for F32 {
+    fn deserialize_field<B: WriteBufferWrapper>(
+        value: &Value,
+        buffer: &mut B,
+        from: Offset,
+        to: Offset,
+    ) -> Result<(), Box<Error>> {
+        let number = value.as_f64().ok_or("Can't cast json as float")?;
+        buffer.write(from, to, Self::new(number as f32));
+        Ok(())
+    }
+
+    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+        Ok(Value::Number(Number::from_f64(self.get().into()).ok_or(
+            "Can't cast float as json",
+        )?))
+    }
+}
+
+impl ExonumJson for F64 {
+    fn deserialize_field<B: WriteBufferWrapper>(
+        value: &Value,
+        buffer: &mut B,
+        from: Offset,
+        to: Offset,
+    ) -> Result<(), Box<Error>> {
+        let number = value.as_f64().ok_or("Can't cast json as float")?;
+        buffer.write(from, to, Self::new(number));
+        Ok(())
+    }
+
+    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+        Ok(Value::Number(Number::from_f64(self.get().into()).ok_or(
+            "Can't cast float as json",
+        )?))
     }
 }
 

@@ -20,8 +20,29 @@ impl F32 {
     /// assert_eq!(val.get(), 1.0);
     /// ```
     pub fn new(value: f32) -> Self {
-        assert!(value.is_finite());
-        Self { value }
+        Self::try_from(value).expect("Unexpected non-finite value")
+    }
+
+    /// Creates a new `F32` instance with the given `value`. Returns `None` if the given value
+    /// isn't finite.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::encoding::F32;
+    ///
+    /// let val = F32::try_from(1.0);
+    /// assert!(val.is_some());
+    ///
+    /// let val = F32::try_from(f32::NaN);
+    /// assert!(val.is_none());
+    /// ```
+    pub fn try_from(value: f32) -> Option<Self> {
+        if value.is_finite() {
+            Some(Self { value })
+        } else {
+            None
+        }
     }
 
     /// Returns value contained in this wrapper.
@@ -61,8 +82,29 @@ impl F64 {
     /// assert_eq!(val.get(), 1.0);
     /// ```
     pub fn new(value: f64) -> Self {
-        assert!(value.is_finite());
-        Self { value }
+        Self::try_from(value).expect("Unexpected non-finite value")
+    }
+
+    /// Creates a new `F64` instance with the given `value`. Returns `None` if the given value
+    /// isn't finite.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::encoding::F64;
+    ///
+    /// let val = F64::try_from(1.0);
+    /// assert!(val.is_some());
+    ///
+    /// let val = F64::try_from(f64::NaN);
+    /// assert!(val.is_none());
+    /// ```
+    pub fn try_from(value: f64) -> Option<Self> {
+        if value.is_finite() {
+            Some(Self { value })
+        } else {
+            None
+        }
     }
 
     /// Returns value contained in this wrapper.
