@@ -168,7 +168,7 @@ assert!(testkit.mempool().contains_key(&expected_tx.hash()));
 ### Configuration changes testing
 
 If your service has its own configuration, you may need to test the response to a configuration change.
-With the testkit you can create a configuration change proposal change proposal and commit it.
+With the testkit you can create a configuration change proposal and commit it.
 
 ```rust
 let mut testkit = TestKitBuilder::validator()
