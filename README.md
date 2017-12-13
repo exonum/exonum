@@ -11,7 +11,7 @@ Specifically, it allows to test transaction execution and APIs in the synchronou
 
 ## Usage
 
-Just add a following line to the `Cargo.toml`:
+Just add the following line to the `Cargo.toml`:
 
 ```toml
 [dev-dependencies]

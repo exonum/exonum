@@ -66,7 +66,7 @@ let mut testkit = TestKitBuilder::validator()
 // Create transactions.
 let tx1 = MyTransaction::new(...);
 let tx2 = OtherTransaction::new(...);
-// Commit its into blockchain.
+// Commit it into blockchain.
 testkit.create_block_with_transactions(txvec![tx1, tx2]);
 // Check the expected result.
 ```
@@ -129,7 +129,7 @@ Here are examples of more complex and less common cases.
 ### Oracles testing
 
 The oracle in this case is a service which can produce transactions with external data after the commit of the block,
-[`exonum-time`][exonum-time] and [`exonum-btc-anchoring`][exonum-btc-anchoring] are examples of these kind of oracles.
+[`exonum-time`][exonum-time] and [`exonum-btc-anchoring`][exonum-btc-anchoring] are examples of these kinds of oracles.
 In this way, transactions created during the `handle_commit` execution will be stored in `TestKit` memory pool.
 
 ```rust
@@ -147,7 +147,7 @@ assert!(testkit.mempool().contains_key(&tx.hash()));
 
 In order to invoke a `handle_commit` event, you must create a block.
 If the oracle has to fetch any data from external world, you must create a mock object that
-would generate said external data to accomplish testing
+would generate said external data to accomplish testing.
 
 ```rust
 // Provide a mock object for the service.
@@ -168,7 +168,7 @@ assert!(testkit.mempool().contains_key(&expected_tx.hash()));
 ### Configuration changes testing
 
 If your service has its own configuration, you may need to test the response to a configuration change.
-With the testkit you can create the configuration change proposal and commit it.
+With the testkit you can create a configuration change proposal change proposal and commit it.
 
 ```rust
 let mut testkit = TestKitBuilder::validator()
