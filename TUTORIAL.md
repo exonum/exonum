@@ -16,7 +16,7 @@ Below is a simple user guide.
 ### Transactions testing
 
 The primary goal of this kind of tests is to check the business logic of your service,
-encapsulated in the execute() method of transactions.
+encapsulated in the `execute` method of transactions.
 
 For writing your first test create `tests` directory according to the cargo
 integration testing [manual][integration-tests].
