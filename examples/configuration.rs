@@ -16,7 +16,6 @@ extern crate exonum;
 extern crate exonum_configuration;
 
 use exonum::helpers::fabric::NodeBuilder;
-
 use exonum_configuration::ConfigurationServiceFactory;
 
 fn main() {

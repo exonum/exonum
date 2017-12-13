@@ -104,7 +104,6 @@ extern crate lazy_static;
 
 use router::Router;
 use iron::Handler;
-
 use exonum::api::Api;
 use exonum::blockchain::{StoredConfiguration, Service, Transaction, Schema, ApiContext, gen_prefix};
 use exonum::node::State;

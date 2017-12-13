@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::str;
+use std::num::ParseIntError;
+
 use params::{Map as ParamsMap, Params, Value};
 use router::Router;
 use iron::prelude::*;
 use bodyparser;
-
-use std::str;
-use std::num::ParseIntError;
-
 use exonum::api::{Api, ApiError};
 use exonum::crypto::{PublicKey, SecretKey, Hash};
 use exonum::blockchain::{Blockchain, StoredConfiguration, Schema};
