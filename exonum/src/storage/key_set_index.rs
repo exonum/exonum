@@ -13,6 +13,7 @@
 // limitations under the License.
 
 //! An implementation of set for items that implement `StorageKey` trait.
+
 use std::marker::PhantomData;
 
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageKey};

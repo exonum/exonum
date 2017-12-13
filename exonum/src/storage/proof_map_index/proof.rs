@@ -18,7 +18,6 @@ use serde::{Serialize, Serializer};
 use serde::ser::SerializeMap;
 
 use crypto::{Hash, HashStream};
-
 use super::super::{StorageValue, Error};
 use super::key::{ProofMapKey, DBKey, ChildKind, KEY_SIZE};
 

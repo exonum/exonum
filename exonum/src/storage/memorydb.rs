@@ -13,6 +13,7 @@
 // limitations under the License.
 
 //! An implementation of `MemoryDB` database.
+
 use std::sync::{Arc, RwLock};
 use std::clone::Clone;
 use std::collections::btree_map::BTreeMap;

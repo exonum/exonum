@@ -18,11 +18,9 @@ use serde::de::Error;
 use serde_json::{Error as SerdeJsonError, Value, from_value};
 
 use crypto::{Hash, hash};
-
 use super::pair_hash;
 use super::super::StorageValue;
 use super::key::ProofListKey;
-
 use self::ListProof::*;
 
 /// An enum that represents a proof of existence for a proof list elements.

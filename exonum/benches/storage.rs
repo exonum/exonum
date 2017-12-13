@@ -22,6 +22,7 @@ extern crate exonum;
 #[cfg(all(test, feature = "long_benchmarks"))]
 mod tests {
     use std::collections::HashSet;
+
     use test::Bencher;
     use rand::{Rng, thread_rng, XorShiftRng, SeedableRng};
     use tempdir::TempDir;

@@ -12,12 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 // Workaround: Clippy does not correctly handle borrowing checking rules for returned types.
 #![cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
-
-use futures::{self, Async, Future, Stream};
-use futures::sync::mpsc;
 
 use std::ops::{AddAssign, Deref};
 use std::sync::{Arc, Mutex};
@@ -27,6 +23,8 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet, VecDeque};
 use std::iter::FromIterator;
 
+use futures::{self, Async, Future, Stream};
+use futures::sync::mpsc;
 use exonum::node::{Configuration, ExternalMessage, ListenerConfig, NodeHandler, NodeSender,
                    ServiceConfig, State, SystemStateProvider, ApiSender};
 use exonum::blockchain::{Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema,
