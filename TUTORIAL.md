@@ -1,29 +1,22 @@
 # Testkit manual
 
-Testkit for Exonum blockchain framework, allowing to test service APIs synchronously and in the same process as the testkit.
+Testkit for Exonum blockchain is a framework that allows to test operation of the whole service.
+Specifically, it allows to test transaction execution and APIs in the synchronous environment
+(without consensus algorithm) and in the same system process.
 
 Below is a simple user guide.
 
-* [Installation](#installation)
 * [Transactions testing](#transactions-testing)
 * [API testing](#api-testing)
 * [Oracles testing](#oracles-testing)
 * [Configuration changes testing](#configuration-changes-testing)
 
-## Installation
-
-Just add a following line to the `Cargo.toml`:
-
-```toml
-[dev-dependencies]
-exonum-testkit = "0.1.0"
-```
-
 ## Simple usage
 
 ### Transactions testing
 
-The primary goal of this kind of tests is to check the business logic of your service.
+The primary goal of this kind of tests is to check the business logic of your service,
+encapsulated in the execute() method of transactions.
 
 For writing your first test create `tests` directory according to the cargo
 integration testing [manual][integration-tests].
@@ -55,7 +48,7 @@ fn test_my_tx() {
 ```
 
 Make sure that you have full coverage of the business logic in the `execute` method of your transactions.
-But if you just want to check the `verify` logic in the transaction, you can do it without testkit in
+If you just want to check the `verify` logic in the transaction, you can do it without testkit in
 a simple way like this:
 
 ```rust
@@ -153,7 +146,8 @@ assert!(testkit.mempool().contains_key(&tx.hash()));
 ```
 
 In order to invoke a `handle_commit` event, you must create a block.
-If the oracle has to fetch any data from external world, you must create a mock object.
+If the oracle has to fetch any data from external world, you must create a mock object that
+would generate said external data to accomplish testing
 
 ```rust
 // Provide a mock object for the service.
