@@ -13,10 +13,10 @@
 // limitations under the License.
 
 //! An implementation of set for items that implement `StorageValue` trait.
+
 use std::marker::PhantomData;
 
 use crypto::Hash;
-
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
 
 /// A set of items that implement `StorageValue` trait.

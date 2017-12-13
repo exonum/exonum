@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::io;
+
 use bytes::BytesMut;
 use byteorder::{LittleEndian, ByteOrder};
 use tokio_io::codec::{Decoder, Encoder};
-
-use std::io;
 
 use messages::{HEADER_LENGTH, MessageBuffer, RawMessage};
 use super::error::other_error;

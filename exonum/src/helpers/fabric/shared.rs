@@ -14,9 +14,10 @@
 
 //! This module is used to collect structures that is shared into `CommandExtension` from `Command`.
 
-use toml::Value;
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
+
+use toml::Value;
 
 use crypto::{PublicKey, SecretKey};
 use blockchain::config::ConsensusConfig;

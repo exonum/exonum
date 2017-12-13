@@ -13,10 +13,10 @@
 // limitations under the License.
 
 //! An implementation of index that may only contain one element.
+
 use std::marker::PhantomData;
 
 use crypto::Hash;
-
 use super::{BaseIndex, Snapshot, Fork, StorageValue};
 
 /// An index that may only contain one element.

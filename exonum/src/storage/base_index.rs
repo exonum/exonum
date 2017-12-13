@@ -13,6 +13,7 @@
 // limitations under the License.
 
 //! An implementation of base index with most common features.
+
 use std::borrow::Cow;
 use std::marker::PhantomData;
 

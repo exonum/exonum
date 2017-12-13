@@ -24,7 +24,6 @@ use std::sync::Mutex;
 use futures::Future;
 use futures::sync::oneshot;
 use tokio_timer::Timer;
-
 use exonum::blockchain::{Service, ServiceContext, Transaction};
 use exonum::encoding::Error as EncodingError;
 use exonum::messages::RawTransaction;
