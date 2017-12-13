@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::num::ParseIntError;
+use std::str::ParseBoolError;
+
 use params::{Params, Value};
 use router::Router;
 use iron::prelude::*;
-
-use std::num::ParseIntError;
-use std::str::ParseBoolError;
 
 use blockchain::{Blockchain, Block};
 use explorer::{BlockInfo, BlockchainExplorer};

@@ -14,6 +14,12 @@
 
 //! `RESTful` API and corresponding utilities.
 
+use std::ops::Deref;
+use std::marker::PhantomData;
+use std::io;
+use std::collections::BTreeMap;
+use std::fmt;
+
 use iron::IronError;
 use iron::prelude::*;
 use iron::status;
@@ -24,12 +30,6 @@ use router::Router;
 use serde_json;
 use serde::{Serialize, Serializer};
 use serde::de::{self, Visitor, Deserialize, Deserializer};
-
-use std::ops::Deref;
-use std::marker::PhantomData;
-use std::io;
-use std::collections::BTreeMap;
-use std::fmt;
 
 use crypto::{PublicKey, SecretKey, Hash};
 use encoding::serialize::{FromHex, FromHexError, ToHex, encode_hex};

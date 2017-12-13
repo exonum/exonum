@@ -14,13 +14,13 @@
 
 //! Loading and saving TOML-encoded configurations.
 
-use serde::{Serialize, Deserialize};
-use toml;
-
 use std::path::Path;
 use std::io::{self, Read, Write};
 use std::fs::{self, File};
 use std::error::Error;
+
+use serde::{Serialize, Deserialize};
+use toml;
 
 /// Implements loading and saving TOML-encoded configurations.
 #[derive(Debug)]

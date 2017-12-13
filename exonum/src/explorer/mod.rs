@@ -15,9 +15,9 @@
 //! Blockchain explorer module provides api for getting information about blocks and transactions
 //! from the blockchain.
 
-use serde_json::Value;
-
 use std::cmp;
+
+use serde_json::Value;
 
 use storage::ListProof;
 use crypto::Hash;

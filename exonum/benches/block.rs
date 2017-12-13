@@ -23,6 +23,8 @@ extern crate test;
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use tempdir::TempDir;
     use futures::sync::mpsc;
     use test::Bencher;
@@ -33,8 +35,6 @@ mod tests {
     use exonum::messages::Message;
     use exonum::helpers::{Height, ValidatorId};
     use exonum::node::ApiSender;
-
-    use std::collections::BTreeMap;
 
     fn create_blockchain(db: Box<Database>) -> Blockchain {
         let dummy_channel = mpsc::channel(1);

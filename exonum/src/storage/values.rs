@@ -14,10 +14,10 @@
 
 //! A definition of `StorageValue` trait and implementations for common types.
 
-use byteorder::{ByteOrder, LittleEndian};
-
 use std::mem;
 use std::borrow::Cow;
+
+use byteorder::{ByteOrder, LittleEndian};
 
 use crypto::{Hash, hash, PublicKey};
 use messages::{RawMessage, MessageBuffer, Message};

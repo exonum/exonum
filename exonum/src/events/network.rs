@@ -12,6 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::io;
+use std::net::SocketAddr;
+use std::time::Duration;
+use std::collections::HashMap;
+use std::rc::Rc;
+use std::cell::RefCell;
+
 use futures::{future, unsync, Future, IntoFuture, Sink, Stream, Poll};
 use futures::future::Either;
 use futures::sync::mpsc;
@@ -20,13 +27,6 @@ use tokio_core::reactor::Handle;
 use tokio_io::AsyncRead;
 use tokio_retry::Retry;
 use tokio_retry::strategy::{jitter, FixedInterval};
-
-use std::io;
-use std::net::SocketAddr;
-use std::time::Duration;
-use std::collections::HashMap;
-use std::rc::Rc;
-use std::cell::RefCell;
 
 use messages::{Any, Connect, RawMessage, Message};
 use helpers::Milliseconds;

@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::io;
+use std::time::{Duration, SystemTime};
+
 use futures::{Future, Sink, Stream};
 use futures::sync::mpsc;
 use tokio_core::reactor::Handle;
 use tokio_core::reactor::Timeout;
-
-use std::io;
-use std::time::{Duration, SystemTime};
 
 use node::NodeTimeout;
 use super::error::{into_other, other_error};

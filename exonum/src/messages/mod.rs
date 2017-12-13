@@ -14,9 +14,9 @@
 
 //! Consensus and other messages and related utilities.
 
-use bit_vec::BitVec;
-
 use std::fmt;
+
+use bit_vec::BitVec;
 
 use crypto::PublicKey;
 use encoding::Error;

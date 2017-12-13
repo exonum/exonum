@@ -15,25 +15,23 @@
 #![allow(missing_debug_implementations)]
 
 //! This module implement all core commands.
-use toml::Value;
 
 use std::fs;
 use std::path::Path;
 use std::net::SocketAddr;
 use std::collections::BTreeMap;
 
+use toml::Value;
+
 use blockchain::GenesisConfig;
+use blockchain::config::ValidatorKeys;
 use helpers::generate_testnet_config;
 use helpers::config::ConfigFile;
 use node::{NodeConfig, NodeApiConfig};
 use storage::Database;
 use crypto;
-
-use blockchain::config::ValidatorKeys;
-
 use super::internal::{Command, Feedback};
 use super::{Argument, Context, CommandName};
-
 use super::shared::{AbstractConfig, NodePublicConfig, SharedConfig, NodePrivateConfig,
                     CommonConfigTemplate};
 use super::DEFAULT_EXONUM_LISTEN_PORT;

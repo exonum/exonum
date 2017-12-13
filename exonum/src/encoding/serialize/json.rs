@@ -21,13 +21,13 @@
 // TODO remove WriteBufferWraper hack (after refactor storage),
 // should be moved into storage (ECR-156).
 
-use serde_json::value::Value;
-use bit_vec::BitVec;
-use hex::FromHex;
-
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::net::SocketAddr;
 use std::error::Error;
+
+use serde_json::value::Value;
+use bit_vec::BitVec;
+use hex::FromHex;
 
 use crypto::{Hash, PublicKey, Signature};
 use helpers::{Height, Round, ValidatorId};

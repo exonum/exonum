@@ -21,6 +21,8 @@ extern crate exonum;
 
 #[cfg(all(test, feature = "long_benchmarks"))]
 mod tests {
+    use std::collections::HashSet;
+
     use test::Bencher;
     use rand::{Rng, thread_rng, XorShiftRng, SeedableRng};
     use tempdir::TempDir;
@@ -28,8 +30,6 @@ mod tests {
     use exonum::storage::{RocksDB, RocksDBOptions};
     use exonum::storage::{ProofMapIndex, ProofListIndex};
     use exonum::storage::proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE;
-
-    use std::collections::HashSet;
 
     const NAME: &str = "name";
 

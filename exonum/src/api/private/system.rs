@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::net::SocketAddr;
+use std::collections::HashMap;
+
 use router::Router;
 use iron::prelude::*;
 use params::{Params, Value as ParamsValue};
-
-use std::net::SocketAddr;
-use std::collections::HashMap;
 
 use crypto::PublicKey;
 use node::ApiSender;

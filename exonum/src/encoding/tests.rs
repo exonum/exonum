@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use bit_vec::BitVec;
-
 use std::net::SocketAddr;
 use std::time::SystemTime;
+
+use bit_vec::BitVec;
 
 use crypto::{hash, gen_keypair};
 use blockchain::{self, BlockProof, Block};

@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use rand::{self, Rng};
-
 use std::net::SocketAddr;
 use std::error::Error;
+
+use rand::{self, Rng};
 
 use messages::{Any, RawMessage, Connect, Status, Message, PeersRequest};
 use helpers::Height;

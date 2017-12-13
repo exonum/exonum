@@ -6,13 +6,13 @@ extern crate test;
 #[cfg(all(test, feature = "long_benchmarks"))]
 #[cfg(test)]
 mod tests {
+    use std::net::SocketAddr;
+    use std::thread;
+
     use test::Bencher;
     use exonum::node::EventsPoolCapacity;
     use exonum::events::network::NetworkConfiguration;
     use exonum::events::tests::{connect_message, raw_message, TestEvents};
-
-    use std::net::SocketAddr;
-    use std::thread;
 
     struct BenchConfig {
         times: usize,
