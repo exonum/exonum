@@ -13,6 +13,7 @@
 // limitations under the License.
 
 //! An implementation of array list of items.
+
 use std::cell::Cell;
 use std::marker::PhantomData;
 

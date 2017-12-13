@@ -14,14 +14,14 @@
 
 //! State of the `NodeHandler`.
 
-use serde_json::Value;
-use bit_vec::BitVec;
-
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::collections::hash_map::Entry;
 use std::sync::{Arc, RwLock};
 use std::net::SocketAddr;
 use std::time::{SystemTime, Duration};
+
+use serde_json::Value;
+use bit_vec::BitVec;
 
 use messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect};
 use crypto::{PublicKey, SecretKey, Hash};

@@ -15,11 +15,11 @@
 use std::net::SocketAddr;
 use std::collections::HashMap;
 
-use crypto::PublicKey;
 use router::Router;
 use iron::prelude::*;
-
 use params::{Params, Value as ParamsValue};
+
+use crypto::PublicKey;
 use node::ApiSender;
 use blockchain::{Service, Blockchain, SharedNodeState};
 use api::{Api, ApiError};

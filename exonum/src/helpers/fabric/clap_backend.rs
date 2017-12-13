@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use clap;
-
 use std::ffi::OsString;
+
+use clap;
 
 use super::{Context, ArgumentType};
 use super::internal::{Feedback, CollectedCommand};

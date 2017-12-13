@@ -14,14 +14,14 @@
 
 //! Command line commands utilities.
 
+use std::str::FromStr;
+use std::error::Error;
+use std::collections::BTreeMap;
+
 use clap;
 use toml::Value;
 use serde::{Serialize, Deserialize};
 use semver::Version;
-
-use std::str::FromStr;
-use std::error::Error;
-use std::collections::BTreeMap;
 
 use blockchain::Service;
 use self::internal::NotFoundInMap;

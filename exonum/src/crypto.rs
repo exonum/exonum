@@ -17,6 +17,10 @@
 //! [Sodium library](https://github.com/jedisct1/libsodium) is used under the hood through
 //! [sodiumoxide rust bindings](https://github.com/dnaq/sodiumoxide).
 
+use std::default::Default;
+use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
+use std::fmt;
+
 use sodiumoxide::crypto::sign::ed25519::{gen_keypair as gen_keypair_sodium, keypair_from_seed,
                                          sign_detached, verify_detached,
                                          PublicKey as PublicKeySodium,
@@ -27,17 +31,13 @@ use sodiumoxide;
 use serde::{Serialize, Serializer};
 use serde::de::{self, Deserialize, Deserializer, Visitor};
 
-use std::default::Default;
-use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
-use std::fmt;
+use encoding::serialize::FromHex;
 
 pub use sodiumoxide::crypto::sign::ed25519::{PUBLICKEYBYTES as PUBLIC_KEY_LENGTH,
                                              SECRETKEYBYTES as SECRET_KEY_LENGTH,
                                              SEEDBYTES as SEED_LENGTH,
                                              SIGNATUREBYTES as SIGNATURE_LENGTH};
 pub use sodiumoxide::crypto::hash::sha256::DIGESTBYTES as HASH_SIZE;
-
-use encoding::serialize::FromHex;
 
 /// The size to crop the string in debug messages.
 const BYTES_IN_DEBUG: usize = 4;

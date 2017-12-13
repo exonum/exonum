@@ -14,11 +14,11 @@
 
 //! Exonum global variables which stored in blockchain as utf8 encoded json.
 
+use std::collections::{BTreeMap, HashSet};
+
 use serde::de::Error;
 use serde_json::{self, Error as JsonError};
 use semver::Version;
-
-use std::collections::{BTreeMap, HashSet};
 
 use storage::StorageValue;
 use crypto::{hash, PublicKey, Hash};
