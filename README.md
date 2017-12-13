@@ -31,4 +31,4 @@ Licensed under the Apache License (Version 2.0). See [LICENSE](LICENSE) for deta
 [travis-url]: https://travis-ci.org/exonum/exonum-testkit
 [appveyor-image]: https://ci.appveyor.com/api/projects/status/lhu2aykh9nyti78p/branch/master?svg=true
 [appveyor-url]: https://ci.appveyor.com/project/alekseysidorov/exonum-testkit/branch/master
-[manual]: https://github.com/exonum/exonum-testkit/TUTORIAL.md
+[tutorial]: https://github.com/exonum/exonum-testkit/TUTORIAL.md

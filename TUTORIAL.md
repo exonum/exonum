@@ -76,7 +76,7 @@ testkit.create_block_with_transactions(txvec![tx1, tx2]);
 The following steps may help you.
 
 * Define the `MyServiceApi` trait for the `TestKitApi` structure that covers the whole API of your service.
-* Implement functions that use transactions to fill your storage with the test data.
+* Implement functions that use some transactions as test data to fill the storage.
 * Create the tests that check all of your endpoints.
 
 ```rust
