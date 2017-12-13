@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 - `Transaction` `execute` method now takes `ExecutionContext`.
-- `Transaction` `execute` method now can have several logical execution statuses representing by `TransactionExecutionStatus`. (#385)
+- `Transaction` `execute` method now can have several logical execution statuses representing by `ExecutionStatus`. (#385)
 
 ## 0.4 - 2017-12-08
 

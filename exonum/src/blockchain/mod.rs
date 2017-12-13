@@ -48,7 +48,8 @@ pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
 pub use self::schema::{gen_prefix, Schema, TxLocation};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
-pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState, Transaction};
+pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState};
+pub use self::transaction::{Transaction, ExecutionContext, ExecutionStatus};
 
 mod block;
 mod schema;
@@ -58,6 +59,7 @@ mod service;
 mod tests;
 
 pub mod config;
+pub mod transaction;
 
 /// Transaction executed successfully.
 pub const TRANSACTION_STATUS_OK: u8 = 0;
@@ -247,12 +249,17 @@ impl Blockchain {
 
                 fork.checkpoint();
 
-                let r = panic::catch_unwind(panic::AssertUnwindSafe(|| tx.execute(&mut fork)));
+                let (r, transaction_status) = {
+                    let mut context = ExecutionContext::new(&mut fork);
+                    let r =
+                        panic::catch_unwind(panic::AssertUnwindSafe(|| tx.execute(&mut context)));
+                    (r, context.into_status())
+                };
 
                 let transaction_status = match r {
-                    Ok(status) => {
+                    Ok(()) => {
                         fork.commit();
-                        status
+                        transaction_status
                     }
                     Err(err) => {
                         if err.is::<Error>() {
@@ -261,7 +268,7 @@ impl Blockchain {
                         }
                         fork.rollback();
                         error!("{:?} transaction execution failed: {:?}", tx, err);
-                        TRANSACTION_STATUS_PANIC
+                        ExecutionStatus::Panic
                     }
                 };
 

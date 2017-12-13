@@ -25,112 +25,12 @@ use std::net::SocketAddr;
 
 use crypto::{Hash, PublicKey, SecretKey};
 use storage::{Fork, Snapshot};
-use messages::{Message, RawTransaction};
+use messages::RawTransaction;
 use encoding::Error as MessageError;
 use node::{ApiSender, Node, State, TransactionSend};
 use blockchain::{Blockchain, ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use helpers::{Height, Milliseconds, ValidatorId};
-
-/// A trait that describes transaction processing rules (a group of sequential operations
-/// with the Exonum storage) for the given `Message`.
-pub trait Transaction: Message + 'static {
-    /// Verifies the transaction, which includes the message signature verification and other
-    /// specific internal constraints. verify is intended to check the internal consistency of
-    /// a transaction; it has no access to the blockchain state.
-    /// If a transaction fails verify, it is considered incorrect and cannot be included into
-    /// any correct block proposal. Incorrect transactions are never included into the blockchain.
-    ///
-    /// *This method should not use external data, that is, it must be a pure function.*
-    fn verify(&self) -> bool;
-
-    /// Takes the current blockchain state via `fork` and can modify it if certain conditions
-    /// are met.
-    ///
-    /// # Notes
-    ///
-    /// - When programming `execute`, you should perform state-related checks before any changes
-    /// to the state and return early if these checks fail.
-    /// - If the execute method of a transaction raises a `panic`, the changes made by the
-    /// transactions are discarded, but the transaction itself is still considered committed.
-    /// - A transaction execution status (see `TransactionExecutionStatus` for the details) is
-    /// stored in the blockchain and can be accessed through api.
-    /// - A transaction is considered failed if it made no changes to the storage, but its execution
-    /// status can be set explicitly (see `ExecutionContext` for the details).
-    fn execute(&self, context: &mut ExecutionContext);
-
-    /// Returns the useful information about the transaction in the JSON format. The returned value
-    /// is used to fill the [`TxInfo.content`] field in [the blockchain explorer][explorer].
-    ///
-    /// # Notes
-    ///
-    /// The default implementation returns `null`. For transactions defined with
-    /// the [`message!`] macro, you may redefine `info()` as
-    ///
-    /// ```
-    /// # #[macro_use] extern crate exonum;
-    /// extern crate serde_json;
-    /// # use exonum::blockchain::Transaction;
-    /// # use exonum::storage::Fork;
-    ///
-    /// message! {
-    ///     struct MyTransaction {
-    ///         // Transaction definition...
-    /// #       const TYPE = 1;
-    /// #       const ID = 1;
-    /// #       const SIZE = 8;
-    /// #       field foo: u64 [0 => 8]
-    ///     }
-    /// }
-    ///
-    /// impl Transaction for MyTransaction {
-    ///     // Other methods...
-    /// #   fn verify(&self) -> bool { true }
-    /// #   fn execute(&self, _: &mut Fork) -> u8 { 0 }
-    ///
-    ///     fn info(&self) -> serde_json::Value {
-    ///         serde_json::to_value(self).expect("Cannot serialize transaction to JSON")
-    ///     }
-    /// }
-    /// # fn main() { }
-    /// ```
-    ///
-    /// [`TxInfo.content`]: ../explorer/struct.TxInfo.html#structfield.content
-    /// [explorer]: ../explorer/index.html
-    /// [`message!`]: ../macro.message.html
-    fn info(&self) -> Value {
-        Value::Null
-    }
-}
-
-/// Execution status of the transaction.
-pub enum TransactionExecutionStatus {
-    /// Successful transaction execution.
-    Succeeded,
-    /// Panic occurred during transaction execution,
-    Panic,
-    /// General failure (unspecified reason).
-    Failed,
-    /// User defined execution status. Can have different meanings for different transactions and
-    /// services.
-    Custom(u8),
-}
-
-/// `Transaction`'s execution context.
-#[derive(Debug)]
-pub struct ExecutionContext<'a> {
-    fork: &'a mut Fork,
-    status: Option<TransactionExecutionStatus>
-}
-
-impl ExecutionContext {
-    pub fn fork(&mut self) -> &mut Fork {
-        self.fork
-    }
-
-    pub fn set_execution_status(&mut self, status: TransactionExecutionStatus) {
-        self.status = Some(status);
-    }
-}
+use super::transaction::Transaction;
 
 /// A trait that describes a business-logic of the concrete service.
 #[allow(unused_variables, unused_mut)]
@@ -495,11 +395,5 @@ impl ::std::fmt::Debug for ApiContext {
 impl<'a, S: Service> From<S> for Box<Service + 'a> {
     fn from(s: S) -> Self {
         Box::new(s) as Box<Service>
-    }
-}
-
-impl<'a, T: Transaction> From<T> for Box<Transaction + 'a> {
-    fn from(tx: T) -> Self {
-        Box::new(tx) as Box<Transaction>
     }
 }
