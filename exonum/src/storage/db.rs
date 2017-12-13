@@ -147,7 +147,7 @@ pub enum Change {
 /// [`put`]: #method.put
 /// [`remove`]: #method.remove
 /// [`remove_by_prefix`]: #method.remove_by_prefix
-/// [`Patch`]: type.Patch.html
+/// [`Patch`]: struct.Patch.html
 /// [`into_patch`]: #method.into_patch
 /// [`merge`]: trait.Database.html#tymethod.merge
 /// [`checkpoint`]: #method.checkpoint
@@ -198,7 +198,7 @@ enum NextIterValue {
 /// [1]: #tymethod.snapshot
 /// [`Fork`]: struct.Fork.html
 /// [2]: #method.fork
-/// [`Patch`]: type.Patch.html
+/// [`Patch`]: struct.Patch.html
 /// [`merge`]: #tymethod.merge
 pub trait Database: Send + Sync + 'static {
     /// Creates a new reference to the database as `Box<Database>`.
