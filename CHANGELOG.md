@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Added
+- Added `patch` method to the `Fork` structure. (#393)
+
+### Changed
+- Changed iterators over `Patch` and `Changes` data into custom types instead of standard collection iterators. (#393)
+
 ## 0.4 - 2017-12-08
 
 ### Added
