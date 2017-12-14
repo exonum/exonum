@@ -183,7 +183,9 @@ let proposal = {
 };
 let stored = proposal.stored_configuration().clone();
 testkit.commit_configuration_change(proposal);
-// Check that the following configuration before block creation is none.
+
+// Check that that there is no following configuration scheduled before a block is created,
+// and the proposal is committed.
 use exonum::blockchain::Schema;
 assert_eq!(
     Schema::new(&testkit.snapshot()).following_configuration(),

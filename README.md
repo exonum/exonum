@@ -33,7 +33,7 @@ Licensed under the Apache License (Version 2.0). See [LICENSE](LICENSE) for deta
 [travis-url]: https://travis-ci.org/exonum/exonum-testkit
 [appveyor-image]: https://ci.appveyor.com/api/projects/status/lhu2aykh9nyti78p/branch/master?svg=true
 [appveyor-url]: https://ci.appveyor.com/project/alekseysidorov/exonum-testkit/branch/master
-[gitter-image]: https://img.shields.io/gitter/room/exonum/exonum.svg?style=flat-square
+[gitter-image]: https://img.shields.io/gitter/room/exonum/exonum.svg
 [gitter-url]: https://gitter.im/exonum/exonum
 [crates-io-image]: https://img.shields.io/crates/v/exonum-testkit.svg
 [crates-io-url]: https://crates.io/crates/exonum-testkit
