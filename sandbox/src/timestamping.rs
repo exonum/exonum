@@ -17,8 +17,9 @@ use rand::{Rng, XorShiftRng, SeedableRng};
 use exonum::messages::{Message, RawTransaction};
 use exonum::encoding::Error as MessageError;
 use exonum::crypto::{PublicKey, SecretKey, Hash, gen_keypair};
-use exonum::storage::{Snapshot, Fork};
-use exonum::blockchain::{Service, Transaction, TRANSACTION_STATUS_OK};
+use exonum::storage::Snapshot;
+use exonum::blockchain::{Service, Transaction};
+use exonum::blockchain::transaction::ExecutionContext;
 
 pub const TIMESTAMPING_SERVICE: u16 = 129;
 pub const TIMESTAMPING_TRANSACTION_MESSAGE_ID: u16 = 128;
@@ -86,8 +87,7 @@ impl Transaction for TimestampTx {
         self.verify_signature(self.pub_key())
     }
 
-    fn execute(&self, _: &mut Fork) -> u8 {
-        TRANSACTION_STATUS_OK
+    fn execute(&self, _: &mut ExecutionContext) {
     }
 }
 

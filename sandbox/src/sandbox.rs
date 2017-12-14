@@ -660,11 +660,11 @@ pub fn timestamping_sandbox() -> Sandbox {
 
 #[cfg(test)]
 mod tests {
-    use exonum::blockchain::{ServiceContext, TRANSACTION_STATUS_OK};
+    use exonum::blockchain::ServiceContext;
+    use exonum::blockchain::transaction::ExecutionContext;
     use exonum::messages::RawTransaction;
     use exonum::encoding;
     use exonum::crypto::{gen_keypair_from_seed, Seed};
-    use exonum::storage::Fork;
 
     use sandbox_tests_helper::{add_one_height, SandboxState, VALIDATOR_1, VALIDATOR_2,
                                VALIDATOR_3, HEIGHT_ONE, ROUND_ONE, ROUND_TWO};
@@ -695,8 +695,7 @@ mod tests {
             true
         }
 
-        fn execute(&self, _fork: &mut Fork) -> u8 {
-            TRANSACTION_STATUS_OK
+        fn execute(&self, _: &mut ExecutionContext) {
         }
     }
 
