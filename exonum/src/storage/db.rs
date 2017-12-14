@@ -17,10 +17,9 @@ use std::collections::btree_map::{BTreeMap, Range, Iter as BtmIter, IntoIter as 
 use std::collections::hash_map::{Iter as HmIter, IntoIter as HmIntoIter, Entry as HmEntry};
 use std::collections::Bound::*;
 use std::cmp::Ordering::*;
-use std::iter::Peekable;
+use std::iter::{Peekable, Iterator as StdIterator};
 
 use super::Result;
-
 use self::NextIterValue::*;
 
 /// Map containing changes with corresponding key.
@@ -41,12 +40,26 @@ impl Changes {
     }
 }
 
+/// Iterator over the `Changes` data.
+#[derive(Debug)]
+pub struct ChangesIterator {
+    inner: BtmIntoIter<Vec<u8>, Change>,
+}
+
+impl StdIterator for ChangesIterator {
+    type Item = (Vec<u8>, Change);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+
 impl IntoIterator for Changes {
     type Item = (Vec<u8>, Change);
-    type IntoIter = BtmIntoIter<Vec<u8>, Change>;
+    type IntoIter = ChangesIterator;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.data.into_iter()
+        Self::IntoIter { inner: self.data.into_iter() }
     }
 }
 
@@ -100,12 +113,26 @@ impl Patch {
     }
 }
 
+/// Iterator over the `Patch` data.
+#[derive(Debug)]
+pub struct PatchIterator {
+    inner: HmIntoIter<String, Changes>,
+}
+
+impl StdIterator for PatchIterator {
+    type Item = (String, Changes);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+
 impl IntoIterator for Patch {
     type Item = (String, Changes);
-    type IntoIter = HmIntoIter<String, Changes>;
+    type IntoIter = PatchIterator;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.changes.into_iter()
+        Self::IntoIter { inner: self.changes.into_iter() }
     }
 }
 
@@ -147,7 +174,7 @@ pub enum Change {
 /// [`put`]: #method.put
 /// [`remove`]: #method.remove
 /// [`remove_by_prefix`]: #method.remove_by_prefix
-/// [`Patch`]: type.Patch.html
+/// [`Patch`]: struct.Patch.html
 /// [`into_patch`]: #method.into_patch
 /// [`merge`]: trait.Database.html#tymethod.merge
 /// [`checkpoint`]: #method.checkpoint
@@ -198,7 +225,7 @@ enum NextIterValue {
 /// [1]: #tymethod.snapshot
 /// [`Fork`]: struct.Fork.html
 /// [2]: #method.fork
-/// [`Patch`]: type.Patch.html
+/// [`Patch`]: struct.Patch.html
 /// [`merge`]: #tymethod.merge
 pub trait Database: Send + Sync + 'static {
     /// Creates a new reference to the database as `Box<Database>`.
@@ -429,6 +456,11 @@ impl Fork {
     /// Converts the fork into `Patch`.
     pub fn into_patch(self) -> Patch {
         self.patch
+    }
+
+    /// Returns reference to the inner `Patch`.
+    pub fn patch(&self) -> &Patch {
+        &self.patch
     }
 
     /// Merges patch from another fork to this fork.

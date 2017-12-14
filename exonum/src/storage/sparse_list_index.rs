@@ -17,11 +17,11 @@
 // TODO: Remove when https://github.com/rust-lang-nursery/rust-clippy/issues/2190 is fixed.
 #![cfg_attr(feature="cargo-clippy", allow(doc_markdown))]
 
-use byteorder::{BigEndian, ByteOrder};
-
 use std::borrow::Cow;
 use std::cell::Cell;
 use std::marker::PhantomData;
+
+use byteorder::{BigEndian, ByteOrder};
 
 use crypto::{hash, Hash};
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
@@ -97,7 +97,7 @@ pub struct SparseListIndexIter<'a, V> {
 /// [`indices`]: struct.SparseListIndex.html#method.indices
 /// [`SparseListIndex`]: struct.SparseListIndex.html
 #[derive(Debug)]
-pub struct SparceListIndexKeys<'a> {
+pub struct SparseListIndexKeys<'a> {
     base_iter: BaseIndexIter<'a, u64, ()>,
 }
 
@@ -110,7 +110,7 @@ pub struct SparceListIndexKeys<'a> {
 /// [`values`]: struct.SparseListIndex.html#method.values
 /// [`SparseListIndex`]: struct.SparseListIndex.html
 #[derive(Debug)]
-pub struct SparceListIndexValues<'a, V> {
+pub struct SparseListIndexValues<'a, V> {
     base_iter: BaseIndexIter<'a, (), V>,
 }
 
@@ -317,8 +317,8 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn indices(&self) -> SparceListIndexKeys {
-        SparceListIndexKeys { base_iter: self.base.iter_from(&(), &0u64) }
+    pub fn indices(&self) -> SparseListIndexKeys {
+        SparseListIndexKeys { base_iter: self.base.iter_from(&(), &0u64) }
     }
 
     /// Returns an iterator over the values of the 'SparceListIndex'. The iterator element type is
@@ -339,8 +339,8 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn values(&self) -> SparceListIndexValues<V> {
-        SparceListIndexValues { base_iter: self.base.iter_from(&(), &0u64) }
+    pub fn values(&self) -> SparseListIndexValues<V> {
+        SparseListIndexValues { base_iter: self.base.iter_from(&(), &0u64) }
     }
 
     /// Returns an iterator over the list starting from the specified position. The iterator
@@ -588,7 +588,7 @@ where
     }
 }
 
-impl<'a> Iterator for SparceListIndexKeys<'a> {
+impl<'a> Iterator for SparseListIndexKeys<'a> {
     type Item = u64;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -596,7 +596,7 @@ impl<'a> Iterator for SparceListIndexKeys<'a> {
     }
 }
 
-impl<'a, V> Iterator for SparceListIndexValues<'a, V>
+impl<'a, V> Iterator for SparseListIndexValues<'a, V>
 where
     V: StorageValue,
 {

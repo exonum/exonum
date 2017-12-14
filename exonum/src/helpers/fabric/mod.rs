@@ -14,13 +14,13 @@
 
 //! Command line commands utilities.
 
-use clap;
-use toml::Value;
-use serde::{Serialize, Deserialize};
-
 use std::str::FromStr;
 use std::error::Error;
 use std::collections::BTreeMap;
+
+use clap;
+use toml::Value;
+use serde::{Serialize, Deserialize};
 
 use blockchain::Service;
 use self::internal::NotFoundInMap;

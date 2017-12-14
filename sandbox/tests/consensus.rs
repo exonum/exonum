@@ -20,12 +20,11 @@ extern crate log;
 extern crate env_logger;
 extern crate bit_vec;
 
-use rand::{thread_rng, Rng};
-use bit_vec::BitVec;
-
 use std::time::Duration;
 use std::collections::BTreeMap;
 
+use rand::{thread_rng, Rng};
+use bit_vec::BitVec;
 use exonum::messages::{RawMessage, Message, Propose, Prevote, Precommit, ProposeRequest,
                        TransactionsRequest, PrevotesRequest, CONSENSUS};
 use exonum::crypto::{Hash, Seed, gen_keypair, gen_keypair_from_seed};

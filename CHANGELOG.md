@@ -8,9 +8,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 
 ### Added
+- Added `patch` method to the `Fork` structure. (#393)
+- Added `StorageValue` implementation for `bool`. (#385)
 - Added `StorageValue` implementation for `bool`. (#385)
 
 ### Changed
+- Changed iterators over `Patch` and `Changes` data into custom types instead of standard collection iterators. (#393)
+- Fixed typo in `SparceListIndexKeys` and `SparceListIndexValues` (#398)
 - `Transaction` `execute` method now takes `ExecutionContext`.
 - `Transaction` `execute` method now can have several logical execution statuses representing by `ExecutionStatus`. (#385)
 

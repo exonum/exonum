@@ -19,17 +19,15 @@ pub mod error;
 pub mod network;
 pub mod timeouts;
 
-use futures::{Future, Async, Poll, Stream};
-use futures::sync::mpsc;
-
 use std::time::SystemTime;
 use std::cmp::Ordering;
 
-use node::{ExternalMessage, NodeTimeout};
+use futures::{Future, Async, Poll, Stream};
+use futures::sync::mpsc;
 
+use node::{ExternalMessage, NodeTimeout};
 pub use self::network::{NetworkEvent, NetworkRequest, NetworkPart, NetworkConfiguration};
 pub use self::timeouts::TimeoutsPart;
-
 
 #[derive(Debug)]
 pub enum Event {

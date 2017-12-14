@@ -23,14 +23,13 @@ extern crate test;
 
 #[cfg(test)]
 mod tests {
-    use tempdir::TempDir;
-    use futures::sync::mpsc;
-
-    use test::Bencher;
     use std::collections::BTreeMap;
 
-    use exonum::storage::{Database, Fork, Patch, ProofMapIndex, StorageValue};
-    use exonum::storage::{RocksDB, RocksDBOptions};
+    use tempdir::TempDir;
+    use futures::sync::mpsc;
+    use test::Bencher;
+    use exonum::storage::{Database, Fork, Patch, ProofMapIndex, StorageValue, RocksDB,
+                          RocksDBOptions};
     use exonum::blockchain::{Blockchain, Transaction};
     use exonum::crypto::{gen_keypair, Hash, PublicKey, SecretKey};
     use exonum::messages::Message;
