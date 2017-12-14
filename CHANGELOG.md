@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 
-- Fixed typo in SparceListIndexKeys and SparceListIndexValues (#398)
+- Fixed typo in `SparceListIndexKeys` and `SparceListIndexValues` (#398)
 
 ## 0.4 - 2017-12-08
 
