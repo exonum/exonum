@@ -114,12 +114,13 @@ pub enum ExecutionStatus {
 pub struct ExecutionContext<'a> {
     fork: &'a mut Fork,
     status: Option<ExecutionStatus>,
+    changes_number: usize,
 }
 
 impl<'a> ExecutionContext<'a> {
     /// Creates a new `ExecutionContext` instance.
     pub fn new(fork: &'a mut Fork) -> Self {
-        Self { fork, status: None }
+        Self { changes_number: fork.patch().len(), fork, status: None, }
     }
 
     /// Returns execution status consuming `ExecutionContext`.
@@ -127,8 +128,11 @@ impl<'a> ExecutionContext<'a> {
         match self.status {
             Some(val) => val,
             None => {
-                // TODO: FIXME.
-                ExecutionStatus::Succeeded
+                if self.fork.patch().len() > self.changes_number {
+                    ExecutionStatus::Succeeded
+                } else {
+                    ExecutionStatus::Failed
+                }
             }
         }
     }
