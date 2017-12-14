@@ -22,6 +22,8 @@ use messages::Message;
 use storage::{Fork, StorageValue};
 use crypto::Hash;
 
+// TODO: Remove attribute when `const fn` becomes stable.
+#[cfg_attr(feature="cargo-clippy", allow(cast_lossless))]
 static MAX_RESERVED_VALUE: u16 = ::std::u8::MAX as u16;
 
 /// A trait that describes transaction processing rules (a group of sequential operations
@@ -121,7 +123,11 @@ pub struct ExecutionContext<'a> {
 impl<'a> ExecutionContext<'a> {
     /// Creates a new `ExecutionContext` instance.
     pub fn new(fork: &'a mut Fork) -> Self {
-        Self { changes_number: fork.patch().len(), fork, status: None, }
+        Self {
+            changes_number: fork.patch().len(),
+            fork,
+            status: None,
+        }
     }
 
     /// Returns execution status consuming `ExecutionContext`.
