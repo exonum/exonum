@@ -20,7 +20,7 @@ encapsulated in the `execute` method of transactions.
 
 For writing your first test create `tests` directory according to the cargo
 integration testing [manual][integration-tests].
-After that, create file `tests/transactions.rs` with the content similar to written below.
+After that, create file `tests/transactions.rs` with the content similar to the one written below.
 
 ```rust
 extern crate exonum;
@@ -134,7 +134,7 @@ In this way, transactions created during the `handle_commit` execution will be s
 
 ```rust
 // Create testkit with the service which creates transaction with the height
-// of latest committed block after commit.
+// of the latest committed block after commit.
 let mut testkit = TestKitBuilder::validator()
     .with_service(HandleCommitService)
     .create();
@@ -184,7 +184,7 @@ let proposal = {
 let stored = proposal.stored_configuration().clone();
 testkit.commit_configuration_change(proposal);
 
-// Check that that there is no following configuration scheduled before a block is created,
+// Check that there is no following configuration scheduled before a block is created,
 // and the proposal is committed.
 use exonum::blockchain::Schema;
 assert_eq!(
