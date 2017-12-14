@@ -43,13 +43,14 @@ use messages::{CONSENSUS as CORE_SERVICE, Precommit, RawMessage};
 use storage::{Database, Error, Fork, Patch, Snapshot};
 use helpers::{Height, ValidatorId};
 use node::ApiSender;
+use self::transaction::{ExecutionStatus, ExecutionContext};
 
 pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
 pub use self::schema::{gen_prefix, Schema, TxLocation};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
 pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState};
-pub use self::transaction::{Transaction, ExecutionContext, ExecutionStatus};
+pub use self::transaction::Transaction;
 
 mod block;
 mod schema;
@@ -60,14 +61,6 @@ mod tests;
 
 pub mod config;
 pub mod transaction;
-
-/// Transaction executed successfully.
-pub const TRANSACTION_STATUS_OK: u8 = 0;
-/// Panic was occurred during transaction execution. This status shouldn't be returned from the
-/// `Transaction`'s `execute` method directly, Exonum will catch panic and write this value instead.
-pub const TRANSACTION_STATUS_PANIC: u8 = 1;
-/// Transaction execution failure.
-pub const TRANSACTION_STATUS_FAILURE: u8 = 2;
 
 /// Exonum blockchain instance with the concrete services set and data storage.
 /// Only blockchains with the identical set of services and genesis block can be combined

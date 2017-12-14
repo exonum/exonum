@@ -63,6 +63,7 @@ pub trait Transaction: Message + 'static {
     /// # #[macro_use] extern crate exonum;
     /// extern crate serde_json;
     /// # use exonum::blockchain::Transaction;
+    /// # use exonum::blockchain::transaction::ExecutionContext;
     /// # use exonum::storage::Fork;
     ///
     /// message! {
@@ -78,7 +79,7 @@ pub trait Transaction: Message + 'static {
     /// impl Transaction for MyTransaction {
     ///     // Other methods...
     /// #   fn verify(&self) -> bool { true }
-    /// #   fn execute(&self, _: &mut Fork) -> u8 { 0 }
+    /// #   fn execute(&self, _: &mut ExecutionContext) {}
     ///
     ///     fn info(&self) -> serde_json::Value {
     ///         serde_json::to_value(self).expect("Cannot serialize transaction to JSON")
@@ -173,7 +174,7 @@ fn from_status(status: ExecutionStatus) -> u16 {
         ExecutionStatus::Succeeded => 0,
         ExecutionStatus::Panic => 1,
         ExecutionStatus::Failed => 2,
-        ExecutionStatus::Custom(value) => u16::from(value) + MAX_RESERVED_VALUE,
+        ExecutionStatus::Custom(value) => u16::from(value) + MAX_RESERVED_VALUE + 1,
     }
 }
 
@@ -188,7 +189,7 @@ fn to_status(value: u16) -> ExecutionStatus {
                 "Invalid ExecutionStatus value: {}",
                 val
             );
-            ExecutionStatus::Custom((val - MAX_RESERVED_VALUE) as u8)
+            ExecutionStatus::Custom((val - MAX_RESERVED_VALUE - 1) as u8)
         }
     }
 }
@@ -212,9 +213,9 @@ mod tests {
 
         for status in &statuses {
             let bytes = status.clone().into_bytes();
-            let new_status = ExecutionStatus::from_bytes(&bytes);
+            let new_status = ExecutionStatus::from_bytes(Cow::Borrowed(&bytes));
 
-            assert_eq!(status, new_status);
+            assert_eq!(*status, new_status);
         }
     }
 
@@ -223,12 +224,16 @@ mod tests {
         let db = MemoryDB::new();
         let mut fork = db.fork();
 
-        let mut context = ExecutionContext::new(&mut fork);
-        assert_eq!(ExecutionStatus::Failed, context.into_status());
+        {
+            let context = ExecutionContext::new(&mut fork);
+            assert_eq!(ExecutionStatus::Failed, context.into_status());
+        }
 
         let mut context = ExecutionContext::new(&mut fork);
-        let mut index = ListIndex("test", context.fork());
-        index.push(1u8);
+        {
+            let mut index = ListIndex::new("test", context.fork());
+            index.push(1u8);
+        }
         assert_eq!(ExecutionStatus::Succeeded, context.into_status());
     }
 }

@@ -19,9 +19,10 @@ use std::collections::BTreeMap;
 use rand::{thread_rng, Rng};
 use serde_json;
 
-use blockchain::{Blockchain, Schema, Transaction, TRANSACTION_STATUS_OK};
+use blockchain::{Blockchain, Schema};
+use blockchain::transaction::{Transaction, ExecutionContext};
 use crypto::{gen_keypair, Hash};
-use storage::{Database, Error, Fork, ListIndex};
+use storage::{Database, Error, ListIndex};
 use messages::Message;
 use helpers::{Height, ValidatorId};
 
@@ -161,15 +162,14 @@ impl Transaction for TxPanic {
         true
     }
 
-    fn execute(&self, view: &mut Fork) -> u8 {
+    fn execute(&self, context: &mut ExecutionContext) {
         if self.value() == 42 {
             panic!(Error::new("42"))
         }
 
-        let mut index = ListIndex::new(IDX_NAME, view);
+        let mut index = ListIndex::new(IDX_NAME, context.fork());
         index.push(self.value());
         index.push(42 / self.value());
-        TRANSACTION_STATUS_OK
     }
 }
 
