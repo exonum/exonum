@@ -17,7 +17,8 @@ Be sure you installed necessary packages:
 * [supervisord](http://supervisord.org/installing.html)
 * [node](https://nodejs.org/en/download/) *(with npm)*
 * [Rust compiler](https://rustup.rs/)
-* `gnu-sed` on MacOS platform
+* [gnu-sed](https://stackoverflow.com/questions/30003570/how-to-use-gnu-sed-on-mac-os-x) on Mac OS X
+* [build-essential](https://askubuntu.com/questions/398489/how-to-install-build-essential) on Ubuntu
 
 ### Quick installation on local machine
 
