@@ -8,22 +8,41 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 
 ### Added
+- Added `patch` method to the `Fork` structure. (#393)
+
+### Changed
+- Changed iterators over `Patch` and `Changes` data into custom types instead of standard collection iterators. (#393)
+- Fixed typo in `SparceListIndexKeys` and `SparceListIndexValues` (#398)
+- The list of peer connections is now restored to the last state after the process is restarted. (#378)
+
+## 0.4 - 2017-12-08
+
+### Added
 - Allow creating auditor node from command line. (#364)
 - Added a new function `merge_sync`. In this function a write will be flushed from the operating system buffer cache before the write is considered complete. (#368)
 - Added conversion into boxed values for values which implement `Service` or `Transaction` traits. (#366)
 - Added constructor for the `ServiceContext` which can be useful for the alternative node implementations. (#366)
+- Implemented `AsRef<RawMessage>` for any Exonum messages that were created using the `message!` macro. (#372)
+- Implemented additional checks for conversion from raw message. (#372)
 
 ### Changed
 - Changed a signature of `open` function in a `rocksdb` module. `RocksDBOptions` should pass by the reference. (#369)
-- Removed `round` method from the `ServiceContext`. (#366)
 - `ValidatorState` in the `ServiceContext` replaced by the `ValidatorId`. (#366)
 - `add_transaction` in the `ServiceContext` replaced by the `transaction_sender` which implements the `TransactionSend` trait. (#366)
 - The `Node` constructor now requires `db` and `services` variables instead of `blockchain` instance. (#366)
 - The `Blockchain` constructor now requires services keypair and an `ApiSender` instance. (#366)
 - `mount_*_api` methods in `Blockchain` instance now do not require `ApiContext`. (#366)
-- Removed redundant `current_height` method in `Schema` and rename `last_height` to `height`. (#379)
+- Rename method `last_height` to `height` in `Schema`. (#379)
 - `last_block` now returns `Block` instead of `Option<Block>`. (#379)
-- The list of peer connections is now restored to the last state after the process is restarted. (#378)
+- Replaced `rocksdb` commandline parameter to more generic `db-path`. (#376)
+- Obsolete trait `HexValue` replaced by the `FromHex` and `ToHex` traits. (#372)
+- Changed `Patch` and `Changes` from typedefs into opaque structures. (#371)
+- Help text is displayed if required argument is not specified. (#390)
+
+### Removed
+- Removed `round` method from the `ServiceContext`. (#366)
+- Removed redundant `FromRaw` trait. (#372)
+- Removed redundant `current_height` method in `Schema`. (#379)
 
 ### Fixed
 - Fixed `crate_authors!` macro usage, this macro can't return static string in new clap version. (#370)

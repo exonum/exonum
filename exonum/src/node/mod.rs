@@ -16,14 +16,6 @@
 //!
 //! For details about consensus message handling see messages module documentation.
 
-use toml::Value;
-use router::Router;
-use mount::Mount;
-use iron::{Chain, Iron};
-use futures::{Future, Sink};
-use futures::sync::mpsc;
-use tokio_core::reactor::Core;
-
 use std::io;
 use std::sync::Arc;
 use std::thread;
@@ -32,6 +24,14 @@ use std::time::{Duration, SystemTime};
 use std::collections::BTreeMap;
 use std::collections::HashSet;
 use std::fmt;
+
+use toml::Value;
+use router::Router;
+use mount::Mount;
+use iron::{Chain, Iron};
+use futures::{Future, Sink};
+use futures::sync::mpsc;
+use tokio_core::reactor::Core;
 
 use crypto::{self, Hash, PublicKey, SecretKey};
 use blockchain::{Blockchain, GenesisConfig, Schema, SharedNodeState, Transaction, Service};

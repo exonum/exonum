@@ -3,7 +3,7 @@ First of all, you need to install system dependencies.
 
 # Installing system dependencies
 The crate uses these system libraries:
-* [leveldb](https://github.com/google/leveldb)
+* [rocksdb](https://github.com/facebook/rocksdb)
 * [libsodium](https://download.libsodium.org/doc/)
 * [openssl](https://www.openssl.org)
 
@@ -12,19 +12,32 @@ Below you can find instructions on how to obtain them for the different operatin
 ## macOS 
 If you use `homebrew` you can simply install needed libraries with the command:
 ```shell
-brew install libsodium leveldb openssl
+brew install libsodium rocksdb openssl
 ```
 
 ## Linux
 For deb based systems like Debian or Ubuntu you need the following packages:
 ```shell
-apt install build-essential libsodium-dev libleveldb-dev libssl-dev pkg-config
+apt install build-essential libsodium-dev librocksdb-dev libsnappy-dev libssl-dev pkg-config
 ```
 Other linux users may find the packages with similar names in their package managers.
 
 ## Windows
 Building and workability is not guaranteed yet.
 
+
+#Adding environment variables:
+This variables needed for linking with the `rocksdb` and `snappy` libraries.
+## macOS
+```shell
+export ROCKSDB_LIB_DIR=/usr/local/lib
+export SNAPPY_LIB_DIR=/usr/local/lib
+```
+## Linux
+```shell
+export ROCKSDB_LIB_DIR=/usr/lib/x86_64-linux-gnu
+export SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
+```
 # Installing Rust
 The project uses a stable Rust version that can be installed by using the [rustup](https://www.rustup.rs) utility.
 

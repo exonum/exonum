@@ -12,17 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use bit_vec::BitVec;
-
 use std::net::SocketAddr;
 use std::time::SystemTime;
 
+use bit_vec::BitVec;
+
 use crypto::{hash, gen_keypair};
 use blockchain::{self, BlockProof, Block};
-use messages::{RawMessage, Message, FromRaw, Connect, Propose, Prevote, Precommit, Status,
-               BlockResponse, BlockRequest};
+use messages::{RawMessage, Message, Connect, Propose, Prevote, Precommit, Status, BlockResponse,
+               BlockRequest};
 use helpers::{Height, Round, ValidatorId};
-
 use super::{Field, Offset};
 
 static VALIDATOR: ValidatorId = ValidatorId(65_123);

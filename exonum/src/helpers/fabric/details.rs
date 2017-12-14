@@ -15,28 +15,28 @@
 #![allow(missing_debug_implementations)]
 
 //! This module implement all core commands.
-use toml::Value;
 
 use std::fs;
 use std::path::Path;
 use std::net::SocketAddr;
 use std::collections::BTreeMap;
 
+use toml::Value;
+
 use blockchain::GenesisConfig;
+use blockchain::config::ValidatorKeys;
 use helpers::generate_testnet_config;
 use helpers::config::ConfigFile;
 use node::{NodeConfig, NodeApiConfig};
 use storage::Database;
 use crypto;
-
-use blockchain::config::ValidatorKeys;
-
 use super::internal::{Command, Feedback};
 use super::{Argument, Context, CommandName};
-
 use super::shared::{AbstractConfig, NodePublicConfig, SharedConfig, NodePrivateConfig,
                     CommonConfigTemplate};
 use super::DEFAULT_EXONUM_LISTEN_PORT;
+
+const DATABASE_PATH: &str = "DATABASE_PATH";
 
 /// Run command.
 pub struct Run;
@@ -51,9 +51,10 @@ impl Run {
     pub fn db_helper(ctx: &Context) -> Box<Database> {
         use storage::{RocksDB, RocksDBOptions};
 
-        let path = ctx.arg::<String>("ROCKSDB_PATH").expect(
-            "ROCKSDB_PATH not found.",
-        );
+        let path = ctx.arg::<String>(DATABASE_PATH).expect(&format!(
+            "{} not found.",
+            DATABASE_PATH
+        ));
         let mut options = RocksDBOptions::default();
         options.create_if_missing(true);
         Box::new(RocksDB::open(Path::new(&path), &options).unwrap())
@@ -87,11 +88,11 @@ impl Command for Run {
                 false
             ),
             Argument::new_named(
-                "ROCKSDB_PATH",
+                DATABASE_PATH,
                 true,
-                "Use rocksdb database with the given path.",
+                "Use database with the given path.",
                 "d",
-                "rocksdb",
+                "db-path",
                 false
             ),
             Argument::new_named(

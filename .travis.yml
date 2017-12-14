@@ -23,11 +23,11 @@ matrix:
     - env: FEATURE=non-fatal-checks
   fast_finish: true
   include:
-    - rust: nightly-2017-11-05
+    - rust: nightly-2017-12-11
       env: FEATURE=benchmarks
-    - rust: nightly-2017-11-05
+    - rust: nightly-2017-12-11
       env: FEATURE=clippy-core
-    - rust: nightly-2017-11-05
+    - rust: nightly-2017-12-11
       env: FEATURE=clippy-sandbox
 
 cache:
@@ -42,9 +42,10 @@ sudo: required
 
 env:
   global:
-  - CLIPPY_VERS=0.0.169
+  - CLIPPY_VERS=0.0.175
   - RUSTFMT_VERS=0.9.0
   - DEADLINKS_VERS=0.3.0
+  - OUTDATED_VERS=0.7.0
   - SODIUM_VERS=1.0.13
   - CARGO_INCREMENTAL=1
   - RUSTFLAGS="-C link-dead-code"
@@ -73,14 +74,13 @@ install:
 - export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$HOME/.local/lib/pkgconfig
 - |
   if [[ "$FEATURE" == "non-fatal-checks" ]]; then
+    cargo-outdated -V | grep $OUTDATED_VERS || cargo install cargo-outdated --vers $OUTDATED_VERS --force
     cargo-deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
     fi
 - |
   if [[ "$FEATURE" == "fmt" ]]; then
     cargo-audit -V || cargo install cargo-audit --force
     rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
-    cd exonum && cargo update && cd ..
-    cd sandbox && cargo update && cd ..
     fi
 - |
   case "$FEATURE" in
@@ -116,8 +116,9 @@ script: |
   ;;
   "non-fatal-checks" )
       cd exonum &&
-      cargo doc --no-deps -p exonum &&
-      cargo deadlinks --dir target/doc
+      cargo doc --no-deps &&
+      cargo deadlinks --dir target/doc &&
+      cargo outdated --exit-code 1
   ;;
   "benchmarks" )
         RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
