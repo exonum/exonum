@@ -18,10 +18,11 @@ use std::collections::{BTreeMap, HashSet};
 
 use serde::de::Error;
 use serde_json::{self, Error as JsonError};
+use semver::Version;
 
 use storage::StorageValue;
 use crypto::{hash, PublicKey, Hash};
-use helpers::{Height, Milliseconds};
+use helpers::{Height, Milliseconds, ServiceId};
 
 /// Public keys of a validator.
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -46,13 +47,15 @@ pub struct StoredConfiguration {
     pub validator_keys: Vec<ValidatorKeys>,
     /// Consensus algorithm parameters.
     pub consensus: ConsensusConfig,
-    /// Services specific variables.
-    /// Keys are `service_name` from `Service` trait and values are the serialized json.
-    pub services: BTreeMap<String, serde_json::Value>,
+    /// Services configuration. See [`ConsensusConfig`](struct.ServiceConfig) for details.
+    ///
+    /// Service identifier should be unique for the Exonum blockchain instance. Service transactions
+    /// are identified by this `id`, so it should persist even if services are added or removed.
+    pub services: BTreeMap<ServiceId, ServiceConfig>,
 }
 
 /// Consensus algorithm parameters.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ConsensusConfig {
     /// Interval between rounds.
     pub round_timeout: Milliseconds,
@@ -64,6 +67,27 @@ pub struct ConsensusConfig {
     pub txs_block_limit: u32,
     /// `TimeoutAdjuster` configuration.
     pub timeout_adjuster: TimeoutAdjusterConfig,
+}
+
+/// Service configuration.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ServiceConfig {
+    /// Service instance name.
+    ///
+    /// It is possible to have several services with the same name (and hence with the same type),
+    /// but they should have different `id`.
+    pub instance_name: String,
+    /// Globally unique service name (type).
+    ///
+    /// Must be unique for each service. Currently uniqueness can be guaranteed by third-party tools
+    /// such as crates.io.
+    pub service_type: String,
+    /// Service version.
+    ///
+    /// Follow the rules of semantic versioning (see http://semver.org/ for details).
+    pub version: Version,
+    /// Service specific data.
+    pub data: serde_json::Value,
 }
 
 impl Default for ConsensusConfig {
@@ -88,62 +112,9 @@ impl StoredConfiguration {
     pub fn try_deserialize(serialized: &[u8]) -> Result<StoredConfiguration, JsonError> {
         let config: StoredConfiguration = serde_json::from_slice(serialized)?;
 
-        // Check that there are no duplicated keys.
-        {
-            let mut keys = HashSet::with_capacity(config.validator_keys.len() * 2);
-            for k in &config.validator_keys {
-                keys.insert(k.consensus_key);
-                keys.insert(k.service_key);
-            }
-            if keys.len() != config.validator_keys.len() * 2 {
-                return Err(JsonError::custom(
-                    "Duplicated keys are found: each consensus and service key must be unique",
-                ));
-            }
-        }
-
-        // Check timeout adjuster.
-        match config.consensus.timeout_adjuster {
-            // There is no need to validate `Constant` timeout adjuster.
-            TimeoutAdjusterConfig::Constant { .. } => (),
-            TimeoutAdjusterConfig::Dynamic { min, max, .. } => {
-                if min >= max {
-                    return Err(JsonError::custom(format!(
-                        "Dynamic adjuster: minimal timeout should be less then maximal: \
-                        min = {}, max = {}",
-                        min,
-                        max
-                    )));
-                }
-            }
-            TimeoutAdjusterConfig::MovingAverage {
-                min,
-                max,
-                adjustment_speed,
-                optimal_block_load,
-            } => {
-                if min >= max {
-                    return Err(JsonError::custom(format!(
-                        "Moving average adjuster: minimal timeout must be less then maximal: \
-                        min = {}, max = {}",
-                        min,
-                        max
-                    )));
-                }
-                if adjustment_speed <= 0. || adjustment_speed > 1. {
-                    return Err(JsonError::custom(format!(
-                        "Moving average adjuster: adjustment speed must be in the (0..1] range: {}",
-                        adjustment_speed,
-                    )));
-                }
-                if optimal_block_load <= 0. || optimal_block_load > 1. {
-                    return Err(JsonError::custom(format!(
-                        "Moving average adjuster: block load must be in the (0..1] range: {}",
-                        adjustment_speed,
-                    )));
-                }
-            }
-        }
+        verify_keys(&config.validator_keys)?;
+        verify_timeout_adjuster(config.consensus.timeout_adjuster)?;
+        verify_service_configs(config.services.iter())?;
 
         Ok(config)
     }
@@ -193,6 +164,75 @@ pub enum TimeoutAdjusterConfig {
         /// Optimal block load depending on the `txs_block_limit` from the `ConsensusConfig`.
         optimal_block_load: f64,
     },
+}
+
+/// Checks that there are no duplicated keys.
+fn verify_keys(validator_keys: &[ValidatorKeys]) -> Result<(), JsonError> {
+    let mut keys = HashSet::with_capacity(validator_keys.len() * 2);
+    for k in validator_keys.iter() {
+        keys.insert(k.consensus_key);
+        keys.insert(k.service_key);
+    }
+    if keys.len() != validator_keys.len() * 2 {
+        Err(JsonError::custom(
+            "Duplicated keys are found: each consensus and service key must be unique",
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+/// Checks timeout adjuster configuration for consistency.
+fn verify_timeout_adjuster(timeout_adjuster: TimeoutAdjusterConfig) -> Result<(), JsonError> {
+    match timeout_adjuster {
+        TimeoutAdjusterConfig::Constant { .. } => (),
+        TimeoutAdjusterConfig::Dynamic { min, max, .. } => {
+            if min >= max {
+                return Err(JsonError::custom(format!(
+                    "Dynamic adjuster: minimal timeout should be less then maximal: \
+                        min = {}, max = {}",
+                    min,
+                    max
+                )));
+            }
+        }
+        TimeoutAdjusterConfig::MovingAverage {
+            min,
+            max,
+            adjustment_speed,
+            optimal_block_load,
+        } => {
+            if min >= max {
+                return Err(JsonError::custom(format!(
+                    "Moving average adjuster: minimal timeout must be less then maximal: \
+                        min = {}, max = {}",
+                    min,
+                    max
+                )));
+            }
+            if adjustment_speed <= 0. || adjustment_speed > 1. {
+                return Err(JsonError::custom(format!(
+                    "Moving average adjuster: adjustment speed must be in the (0..1] range: {}",
+                    adjustment_speed,
+                )));
+            }
+            if optimal_block_load <= 0. || optimal_block_load > 1. {
+                return Err(JsonError::custom(format!(
+                    "Moving average adjuster: block load must be in the (0..1] range: {}",
+                    adjustment_speed,
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Checks service configurations.
+fn verify_service_configs<'a, I>(configs: I) -> Result<(), JsonError>
+    where I: Iterator<Item = (&'a ServiceId, &'a ServiceConfig)> + ExactSizeIterator
+{
+    // TODO: FIXME.
+    Ok(())
 }
 
 #[cfg(test)]

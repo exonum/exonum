@@ -21,6 +21,7 @@ use std::collections::BTreeMap;
 use clap;
 use toml::Value;
 use serde::{Serialize, Deserialize};
+use semver::Version;
 
 use blockchain::Service;
 use self::internal::NotFoundInMap;
@@ -214,10 +215,8 @@ pub trait CommandExtension {
 ///
 /// Services should provide implementation of this trait.
 pub trait ServiceFactory: 'static {
-    //TODO: we could move
-    // `service_name` and `service_id` from `Service` trait into this one
-    //fn name() -> &'static str;
-    // ECR-76?
+    /// Returns service unique name (type).
+    fn name(&self) -> String;
 
     /// Returns `CommandExtension` for the specific `CommandName`.
     #[allow(unused_variables)]
@@ -225,6 +224,12 @@ pub trait ServiceFactory: 'static {
         None
     }
 
-    /// Creates a new service instance from the context returned by the `Run` command.
-    fn make_service(&mut self, run_context: &Context) -> Box<Service>;
+    /// Creates a new service instance with given version and name from the context returned by the
+    /// `Run` command.
+    fn make_service(
+        &mut self,
+        run_context: &Context,
+        version: &Version,
+        name: &str,
+    ) -> Box<Service>;
 }

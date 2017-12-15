@@ -9,10 +9,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 - Added `patch` method to the `Fork` structure. (#393)
+- Added service configuration (`ServiceConfig`) that allows to specify services version, type and identifier.
 
 ### Changed
 - Changed iterators over `Patch` and `Changes` data into custom types instead of standard collection iterators. (#393)
 - Fixed typo in `SparceListIndexKeys` and `SparceListIndexValues` (#398)
+- Service identifier replaced from `u16` by separate `ServiceId` type.
 
 ## 0.4 - 2017-12-08
 

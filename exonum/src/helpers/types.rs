@@ -255,6 +255,10 @@ impl ValidatorId {
     }
 }
 
+/// Service unique identifier.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ServiceId(pub u16);
+
 impl fmt::Display for Height {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
@@ -303,6 +307,12 @@ impl From<ValidatorId> for usize {
     }
 }
 
+impl fmt::Display for ServiceId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 // Serialization/deserialization is implemented manually because TOML round-trip for the tuple
 // structs is broken currently. See https://github.com/alexcrichton/toml-rs/issues/194 for details.
 impl Serialize for Height {
@@ -321,6 +331,25 @@ impl<'de> Deserialize<'de> for Height {
     {
 
         Ok(Height(u64::deserialize(deserializer)?))
+    }
+}
+
+impl Serialize for ServiceId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.0.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for ServiceId {
+    fn deserialize<D>(deserializer: D) -> Result<ServiceId, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+
+        Ok(ServiceId(u16::deserialize(deserializer)?))
     }
 }
 
