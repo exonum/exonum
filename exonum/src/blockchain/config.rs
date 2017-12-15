@@ -72,12 +72,12 @@ pub struct ConsensusConfig {
 /// Service configuration.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ServiceConfig {
-    /// Service name.
+    /// Service instance name.
     ///
     /// It is possible to have several services with the same name (and hence with the same type),
     /// but they should have different `id`.
-    pub name: String,
-    /// Service type.
+    pub instance_name: String,
+    /// Globally unique service name (type).
     ///
     /// Must be unique for each service. Currently uniqueness can be guaranteed by third-party tools
     /// such as crates.io.
@@ -112,8 +112,9 @@ impl StoredConfiguration {
     pub fn try_deserialize(serialized: &[u8]) -> Result<StoredConfiguration, JsonError> {
         let config: StoredConfiguration = serde_json::from_slice(serialized)?;
 
-        verify_keys(config.validator_keys)?;
+        verify_keys(&config.validator_keys)?;
         verify_timeout_adjuster(config.consensus.timeout_adjuster)?;
+        verify_service_configs(config.services.iter())?;
 
         Ok(config)
     }
@@ -165,10 +166,10 @@ pub enum TimeoutAdjusterConfig {
     },
 }
 
-/// Check that there are no duplicated keys.
+/// Checks that there are no duplicated keys.
 fn verify_keys(validator_keys: &[ValidatorKeys]) -> Result<(), JsonError> {
     let mut keys = HashSet::with_capacity(validator_keys.len() * 2);
-    for k in &validator_keys {
+    for k in validator_keys.iter() {
         keys.insert(k.consensus_key);
         keys.insert(k.service_key);
     }
@@ -181,6 +182,7 @@ fn verify_keys(validator_keys: &[ValidatorKeys]) -> Result<(), JsonError> {
     }
 }
 
+/// Checks timeout adjuster configuration for consistency.
 fn verify_timeout_adjuster(timeout_adjuster: TimeoutAdjusterConfig) -> Result<(), JsonError> {
     match timeout_adjuster {
         TimeoutAdjusterConfig::Constant { .. } => (),
@@ -222,6 +224,14 @@ fn verify_timeout_adjuster(timeout_adjuster: TimeoutAdjusterConfig) -> Result<()
             }
         }
     }
+    Ok(())
+}
+
+/// Checks service configurations.
+fn verify_service_configs<'a, I>(configs: I) -> Result<(), JsonError>
+    where I: Iterator<Item = (&'a ServiceId, &'a ServiceConfig)> + ExactSizeIterator
+{
+    // TODO: FIXME.
     Ok(())
 }
 

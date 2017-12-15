@@ -215,6 +215,9 @@ pub trait CommandExtension {
 ///
 /// Services should provide implementation of this trait.
 pub trait ServiceFactory: 'static {
+    /// Returns service unique name (type).
+    fn name(&self) -> String;
+
     /// Returns `CommandExtension` for the specific `CommandName`.
     #[allow(unused_variables)]
     fn command(&mut self, command: CommandName) -> Option<Box<CommandExtension>> {
