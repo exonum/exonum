@@ -109,13 +109,13 @@ pub trait Service: Send + Sync + 'static {
     /// of the service database. These hashes are collected from all services in a common
     ///  `MerklePatriciaTable` that named [`state_hash_aggregator`][1].
     ///
+    /// Empty `Vec` can be returned if service don't want to change blockchain state.
+    ///
     /// See also [`service_table_unique_key`][2].
     ///
     /// [1]: struct.Schema.html#method.state_hash_aggregator
     /// [2]: struct.Blockchain.html#method.service_table_unique_key
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
-        Vec::new()
-    }
+    fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash>;
 
     /// Tries to create `Transaction` object from the given raw message.
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError>;
