@@ -5,6 +5,7 @@
 
 #[macro_use]
 extern crate exonum;
+#[macro_use]
 extern crate exonum_testkit;
 #[macro_use]
 extern crate serde_derive;
@@ -632,4 +633,21 @@ fn test_unknown_wallet_request() {
         &format!("v1/wallet/{}", tx_alice.pub_key().to_string()),
     );
     assert_eq!(info, "Wallet not found".to_string());
+}
+
+#[test]
+fn test_nonverified_transaction_in_create_block() {
+    let mut testkit = init_testkit();
+    let api = testkit.api();
+
+    let (create_tx, key) = create_wallet(&api, "Alice");
+    testkit.create_block();
+
+    // Send transaction to self. As this transaction fails `verify()`, it should not
+    // be executed and increase sender's balance.
+    let transfer_tx = TxTransfer::new(create_tx.pub_key(), create_tx.pub_key(), 10, 0, &key);
+    testkit.create_block_with_transactions(txvec![transfer_tx]);
+
+    let wallet = get_wallet(&api, create_tx.pub_key());
+    assert_eq!(wallet.balance(), 100);
 }
