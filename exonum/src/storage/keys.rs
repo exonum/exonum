@@ -14,9 +14,9 @@
 
 //! A definition of `StorageKey` trait and implementations for common types.
 
-use byteorder::{ByteOrder, BigEndian};
-
 use std::mem;
+
+use byteorder::{ByteOrder, BigEndian};
 
 use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 

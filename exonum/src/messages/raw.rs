@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use byteorder::{ByteOrder, LittleEndian};
-
 use std::{convert, mem, sync};
 use std::fmt::Debug;
 use std::ops::Deref;
+
+use byteorder::{ByteOrder, LittleEndian};
 
 use crypto::{hash, sign, verify, Hash, PublicKey, SecretKey, Signature, SIGNATURE_LENGTH};
 use encoding::{CheckedOffset, Field, Offset, Result as StreamStructResult};

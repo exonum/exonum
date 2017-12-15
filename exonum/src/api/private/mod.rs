@@ -15,4 +15,5 @@
 //! Private part of the Exonum rest api.
 
 pub use self::system::{SystemApi, NodeInfo};
+
 mod system;

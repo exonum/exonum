@@ -15,7 +15,6 @@
 use std::cmp::min;
 
 use crypto::{Hash, PublicKey, HASH_SIZE};
-
 use super::super::StorageKey;
 
 pub const BRANCH_KEY_PREFIX: u8 = 00;
