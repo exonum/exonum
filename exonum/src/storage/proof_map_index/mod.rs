@@ -176,7 +176,9 @@ where
     V: StorageValue,
 {
     fn get_root_key(&self) -> Option<DBKey> {
-        self.base.iter::<_, DBKey, _>(&()).next().map(|(k, _): (DBKey, ())| k)
+        self.base.iter::<_, DBKey, _>(&()).next().map(
+            |(k, _): (DBKey, ())| k,
+        )
     }
 
     fn get_root_node(&self) -> Option<(DBKey, Node<V>)> {
