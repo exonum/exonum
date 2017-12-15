@@ -651,3 +651,30 @@ fn test_nonverified_transaction_in_create_block() {
     let wallet = get_wallet(&api, create_tx.pub_key());
     assert_eq!(wallet.balance(), 100);
 }
+
+#[test]
+fn test_nonsigned_transaction_in_create_block() {
+    let mut testkit = init_testkit();
+    let api = testkit.api();
+
+    let (tx_alice, key) = create_wallet(&api, "Alice");
+    let (tx_bob, _) = create_wallet(&api, "Bob");
+    testkit.create_block();
+
+    let transfer_tx = TxTransfer::new(tx_alice.pub_key(), tx_bob.pub_key(), 10, 0, &key);
+    // Transaction with an incorrect signature (all zeros)
+    let bogus_transfer_tx = TxTransfer::new_with_signature(
+        tx_alice.pub_key(),
+        tx_bob.pub_key(),
+        20,
+        0,
+        &crypto::Signature::new([0; 64]),
+    );
+    // Check execution of a mix of correct and incorrect transactions
+    testkit.create_block_with_transactions(txvec![bogus_transfer_tx, transfer_tx]);
+
+    let wallet = get_wallet(&api, tx_alice.pub_key());
+    assert_eq!(wallet.balance(), 90);
+    let wallet = get_wallet(&api, tx_bob.pub_key());
+    assert_eq!(wallet.balance(), 110);
+}
