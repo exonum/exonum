@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - Added the usage manual. (#9)
 
+### Fixed
+
+- Fixed incorrect behavior of `TestKit::create_block_with_transactions()`,
+  in which it would execute incorrect transactions. (#11)
+
 ## 0.1 - 2017-12-08
 
 The first release of Exonum testkit.
