@@ -10,6 +10,6 @@ fn main() {
     println!("Creating in-memory database...");
     let node = Node::new(blockchain(), node_config());
     println!("Starting a single node...");
-    node.run().unwrap();
     println!("Blockchain is ready for transactions!");
+    node.run().unwrap();
 }
