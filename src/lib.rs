@@ -551,7 +551,26 @@ impl TestKit {
         &mut self.blockchain
     }
 
-    /// Rolls the blockchain back for a certain number of blocks
+    /// Rolls the blockchain back for a certain number of blocks.
+    ///
+    /// # Examples
+    ///
+    /// Rollbacks are useful in testing alternative scenarios (e.g., transactions executed
+    /// in different order and/or in different blocks) that require an expensive setup:
+    ///
+    /// ```ignore
+    /// let mut testkit = ...;
+    /// expensive_setup(&mut testkit);
+    /// let (tx_a, tx_b) = ...;
+    /// testkit.create_block_with_transactions(txvec![tx_a.clone(), tx_b.clone()]);
+    /// assert_something_about(&testkit);
+    /// testkit.rollback(1);
+    /// testkit.create_block_with_transactions(txvec![tx_a.clone()]);
+    /// testkit.create_block_with_transactions(txvec![tx_b.clone()]);
+    /// assert_something_about(&testkit);
+    /// testkit.rollback(2);
+    /// ...
+    /// ```
     pub fn rollback(&mut self, blocks: usize) {
         assert!(
             (blocks as u64) <= self.height().0,
