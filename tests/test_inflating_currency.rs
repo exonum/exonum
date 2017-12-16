@@ -454,8 +454,7 @@ fn test_transfer_scenarios() {
     testkit.rollback(1);
 }
 
-#[test]
-fn test_fuzz_transfers() {
+fn fuzz_transfers_and_maybe_rollbacks(use_rollbacks: bool) {
     const USERS: usize = 10;
 
     let mut rng = rand::thread_rng();
@@ -463,41 +462,63 @@ fn test_fuzz_transfers() {
     let api = testkit.api();
 
     // First, create users
-    let keys_and_txs: Vec<_> = (0..USERS).map(|i| {
-        let (pubkey, key) = crypto::gen_keypair();
-        let tx = TxCreateWallet::new(
-            &pubkey,
-            &format!("User #{}", i),
-            &key,
-        );
-        (key, tx)
-    }).collect();
-    let pubkeys: Vec<&_> = keys_and_txs.iter().map(|&(_, ref tx)| tx.pub_key()).collect();
+    let keys_and_txs: Vec<_> = (0..USERS)
+        .map(|i| {
+            let (pubkey, key) = crypto::gen_keypair();
+            let tx = TxCreateWallet::new(&pubkey, &format!("User #{}", i), &key);
+            (key, tx)
+        })
+        .collect();
+    let pubkeys: Vec<&_> = keys_and_txs
+        .iter()
+        .map(|&(_, ref tx)| tx.pub_key())
+        .collect();
 
-    testkit.create_block_with_transactions(
-        keys_and_txs.iter().map(|&(_, ref tx)| Box::new(tx.clone()) as Box<Transaction>),
-    );
+    testkit.create_block_with_transactions(keys_and_txs.iter().map(|&(_, ref tx)| {
+        Box::new(tx.clone()) as Box<Transaction>
+    }));
 
-    for height in 1..100 {
+    for _ in 0..64 {
         let total_balance: u64 = pubkeys.iter().map(|key| get_balance(&api, key)).sum();
-        assert_eq!(total_balance, (USERS as u64) * height);
+        assert_eq!(total_balance, (USERS as u64) * testkit.height().0);
+
+        if use_rollbacks {
+            let rollback_blocks = rng.choose(&[0usize, 0, 0, 1, 2, 3]);
+            match rollback_blocks {
+                Some(&blocks) if testkit.height() > Height(blocks as u64) => {
+                    testkit.rollback(blocks)
+                }
+                _ => {}
+            }
+        }
 
         let tx_count = rng.next_u32() & 15;
-        let txs = (0..tx_count).map(|_| {
-            let sender_idx = rng.gen_range(0, USERS);
-            let sender = pubkeys[sender_idx];
-            let sender_key = &keys_and_txs[sender_idx].0;
-            let receiver = pubkeys[rng.gen_range(0, USERS)];
-            let amount = rng.gen_range(1, 2 * height);
+        let height = testkit.height().0;
+        let txs = (0..tx_count)
+            .map(|_| {
+                let sender_idx = rng.gen_range(0, USERS);
+                let sender = pubkeys[sender_idx];
+                let sender_key = &keys_and_txs[sender_idx].0;
+                let receiver = pubkeys[rng.gen_range(0, USERS)];
+                let amount = rng.gen_range(1, 2 * height);
 
-            TxTransfer::new(
-                sender,
-                receiver,
-                amount,
-                rng.next_u64(),
-                sender_key,
-            )
-        }).map(Box::<Transaction>::from);
+                TxTransfer::new(sender, receiver, amount, rng.next_u64(), sender_key)
+            })
+            .map(Box::<Transaction>::from);
         testkit.create_block_with_transactions(txs);
     }
+}
+
+/// Test randomly generated transfers among users without blockchain rollbacks.
+#[test]
+fn test_fuzz_transfers() {
+    fuzz_transfers_and_maybe_rollbacks(false);
+}
+
+/// Test randomly generated transfers among users with blockchain rollbacks.
+/// This mostly tests `TestKit::rollback()` method rather than the service,
+/// because in practice rollbacks are impossible.
+#[test]
+fn test_fuzz_transfers_and_rollbacks() {
+    fuzz_transfers_and_maybe_rollbacks(true);
 }
