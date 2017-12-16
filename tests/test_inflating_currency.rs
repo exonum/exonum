@@ -13,8 +13,8 @@
 // limitations under the License.
 
 //! Tests for sample currency service with inflation. Similar to the `test_currency`
-//! integration test, with the difference that balance on each created wallets increases by 1 on
-//! each block. Correspondingly, the initial wallet balance is set to 0.
+//! integration test, with the difference that the balance of each created wallet increases by 1
+//! on each block. Correspondingly, the initial wallet balance is set to 0.
 
 #[macro_use]
 extern crate exonum;
@@ -276,7 +276,8 @@ mod inflating_cryptocurrency {
             })?;
             if let Some(wallet) = self.wallet(&public_key) {
                 let height = CoreSchema::new(self.blockchain.snapshot()).height();
-                self.ok_response(&serde_json::to_value(wallet.actual_balance(height)).unwrap())
+                self.ok_response(&serde_json::to_value(wallet.actual_balance(height))
+                    .unwrap())
             } else {
                 Err(IronError::new(ApiError::NotFound, (
                     Status::NotFound,
@@ -346,8 +347,7 @@ mod inflating_cryptocurrency {
     }
 }
 
-use inflating_cryptocurrency::{CurrencyService, TransactionResponse, TxCreateWallet,
-                     TxTransfer};
+use inflating_cryptocurrency::{CurrencyService, TransactionResponse, TxCreateWallet, TxTransfer};
 
 fn init_testkit() -> TestKit {
     TestKitBuilder::validator()
@@ -423,34 +423,34 @@ fn test_transfer_scenarios() {
     testkit.create_block_with_transactions(txvec![tx_a_to_b.clone()]); // A: 4 + 1, B: 14 + 1
     testkit.create_block_with_transactions(txvec![]); // A: 4 + 2, B: 14 + 2
     testkit.create_block_with_transactions(txvec![next_tx_a_to_b.clone()]); // A: 0 + 1, B: 20 + 3
-    assert_eq!(get_balance(&api, tx_alice.pub_key()), 0 + 1);
-    assert_eq!(get_balance(&api, tx_bob.pub_key()), 20 + 3);
+    assert_eq!(get_balance(&api, tx_alice.pub_key()), 1); // 0 + 1
+    assert_eq!(get_balance(&api, tx_bob.pub_key()), 23); // 20 + 3
     testkit.rollback(3);
 
     // If there is no block separating transactions, Alice's balance is insufficent
     // to complete the second transaction.
     testkit.create_block_with_transactions(txvec![tx_a_to_b.clone()]); // A: 4 + 1, B: 14 + 1
     testkit.create_block_with_transactions(txvec![next_tx_a_to_b.clone()]); // fails
-    assert_eq!(get_balance(&api, tx_alice.pub_key()), 4 + 2);
-    assert_eq!(get_balance(&api, tx_bob.pub_key()), 14 + 2);
+    assert_eq!(get_balance(&api, tx_alice.pub_key()), 6); // 4 + 2
+    assert_eq!(get_balance(&api, tx_bob.pub_key()), 16); // 14 + 2
     testkit.rollback(2);
 
     testkit.create_block_with_transactions(txvec![next_tx_a_to_b.clone()]); // A: 3 + 1, B: 15 + 1
     testkit.create_block_with_transactions(txvec![tx_a_to_b.clone()]); // fails
-    assert_eq!(get_balance(&api, tx_alice.pub_key()), 3 + 2);
-    assert_eq!(get_balance(&api, tx_bob.pub_key()), 15 + 2);
+    assert_eq!(get_balance(&api, tx_alice.pub_key()), 5); // 3 + 2
+    assert_eq!(get_balance(&api, tx_bob.pub_key()), 17); // 15 + 2
     testkit.rollback(2);
 
     // If the transactions are put in the same block, only the first transaction should succeed
     testkit.create_block_with_transactions(txvec![tx_a_to_b.clone(), next_tx_a_to_b.clone()]);
-    assert_eq!(get_balance(&api, tx_alice.pub_key()), 4 + 1);
-    assert_eq!(get_balance(&api, tx_bob.pub_key()), 14 + 1);
+    assert_eq!(get_balance(&api, tx_alice.pub_key()), 5); // 4 + 1
+    assert_eq!(get_balance(&api, tx_bob.pub_key()), 15); // 14 + 1
     testkit.rollback(1);
 
     // Same here
     testkit.create_block_with_transactions(txvec![next_tx_a_to_b.clone(), tx_a_to_b.clone()]);
-    assert_eq!(get_balance(&api, tx_alice.pub_key()), 3 + 1);
-    assert_eq!(get_balance(&api, tx_bob.pub_key()), 15 + 1);
+    assert_eq!(get_balance(&api, tx_alice.pub_key()), 4); // 3 + 1
+    assert_eq!(get_balance(&api, tx_bob.pub_key()), 16); // 15 + 1
     testkit.rollback(1);
 }
 
