@@ -28,10 +28,11 @@ extern crate iron;
 
 use exonum::blockchain::{Blockchain, Service, GenesisConfig, ValidatorKeys, Transaction,
                          ApiContext};
+use exonum::encoding::serialize::FromHex;
 use exonum::node::{NodeConfig, NodeApiConfig, TransactionSend, ApiSender};
-use exonum::messages::{RawTransaction, FromRaw, Message};
-use exonum::storage::{Fork, MemoryDB, MapIndex};
-use exonum::crypto::{PublicKey, Hash, HexValue};
+use exonum::messages::{RawTransaction, Message};
+use exonum::storage::{Fork, MapIndex};
+use exonum::crypto::{PublicKey, Hash};
 use exonum::encoding;
 use exonum::api::{Api, ApiError};
 use iron::prelude::*;
@@ -210,8 +211,8 @@ struct CryptocurrencyApi {
 
 /// The structure returned by the REST API.
 #[derive(Serialize, Deserialize)]
-struct TransactionResponse {
-    tx_hash: Hash,
+pub struct TransactionResponse {
+    pub tx_hash: Hash,
 }
 
 /// Shortcut to get data on wallets.
@@ -292,7 +293,7 @@ impl Api for CryptocurrencyApi {
 // // // // // // // // // // SERVICE DECLARATION // // // // // // // // // //
 
 /// Define the service.
-struct CurrencyService;
+pub struct CurrencyService;
 
 /// Implement a `Service` trait for the service.
 impl Service for CurrencyService {
@@ -328,12 +329,6 @@ impl Service for CurrencyService {
         api.wire(&mut router);
         Some(Box::new(router))
     }
-}
-
-pub fn blockchain() -> Blockchain {
-    let db = MemoryDB::new();
-    let services: Vec<Box<Service>> = vec![Box::new(CurrencyService)];
-    Blockchain::new(Box::new(db), services)
 }
 
 pub fn node_config() -> NodeConfig {
