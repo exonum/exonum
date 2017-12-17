@@ -1,42 +1,57 @@
 extern crate cryptocurrency;
 extern crate exonum;
-extern crate exonum_harness;
-extern crate iron;
+#[macro_use]
+extern crate exonum_testkit;
 
 use exonum::crypto::{self, PublicKey, SecretKey};
 use exonum::messages::Message;
-use exonum_harness::{TestHarness, HarnessApi};
+use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
-use cryptocurrency::{TxCreateWallet, TxTransfer, TransactionResponse, Wallet, blockchain};
+use cryptocurrency::{TxCreateWallet, TxTransfer, TransactionResponse, Wallet, CurrencyService};
 
-fn create_wallet(api: &HarnessApi, name: &str) -> (TxCreateWallet, SecretKey) {
-    let (pubkey, key) = crypto::gen_keypair();
-    // Create a presigned transaction
-    let tx = TxCreateWallet::new(&pubkey, name, &key);
-
-    let tx_info: TransactionResponse = api.post("cryptocurrency", "v1/wallets/transaction", &tx);
-    assert_eq!(tx_info.tx_hash, tx.hash());
-
-    (tx, key)
+struct CryptocurrencyApi {
+    inner: TestKitApi,
 }
 
-fn get_wallet(api: &HarnessApi, pubkey: &PublicKey) -> Wallet {
-    api.get(
-        "cryptocurrency",
-        &format!("v1/wallet/{}", pubkey.to_string()),
-    )
+impl CryptocurrencyApi {
+    fn create_wallet(&self, name: &str) -> (TxCreateWallet, SecretKey) {
+        let (pubkey, key) = crypto::gen_keypair();
+        // Create a presigned transaction
+        let tx = TxCreateWallet::new(&pubkey, name, &key);
+
+        let tx_info: TransactionResponse = self.inner.post(
+            ApiKind::Service("cryptocurrency"),
+            "v1/wallets",
+            &tx,
+        );
+        assert_eq!(tx_info.tx_hash, tx.hash());
+        (tx, key)
+    }
+
+    fn get_wallet(&self, pubkey: &PublicKey) -> Wallet {
+        self.inner.get(
+            ApiKind::Service("cryptocurrency"),
+            &format!("v1/wallet/{}", pubkey.to_string()),
+        )
+    }
+}
+
+fn create_testkit() -> (TestKit, CryptocurrencyApi) {
+    let testkit = TestKitBuilder::validator()
+        .with_service(CurrencyService)
+        .create();
+    let api = CryptocurrencyApi { inner: testkit.api() };
+    (testkit, api)
 }
 
 #[test]
 fn test_create_wallet() {
-    let mut harness = TestHarness::new(blockchain());
-    let api = harness.api();
-    let (tx, _) = create_wallet(&api, "Alice");
-
-    harness.create_block();
+    let (mut testkit, api) = create_testkit();
+    let (tx, _) = api.create_wallet("Alice");
+    testkit.create_block();
 
     // Check that the user indeed is persisted by the service
-    let wallet = get_wallet(&api, tx.pub_key());
+    let wallet = api.get_wallet(tx.pub_key());
     assert_eq!(wallet.pub_key(), tx.pub_key());
     assert_eq!(wallet.name(), tx.name());
     assert_eq!(wallet.balance(), 100);
@@ -44,17 +59,15 @@ fn test_create_wallet() {
 
 #[test]
 fn test_transfer() {
-    let mut harness = TestHarness::new(blockchain());
-    let api = harness.api();
-    let (tx_alice, key_alice) = create_wallet(&api, "Alice");
-    let (tx_bob, _) = create_wallet(&api, "Bob");
-
-    harness.create_block();
+    let (mut testkit, api) = create_testkit();
+    let (tx_alice, key_alice) = api.create_wallet("Alice");
+    let (tx_bob, _) = api.create_wallet("Bob");
+    testkit.create_block();
 
     // Check that the initial Alice's and Bob's balances persisted by the service
-    let wallet = get_wallet(&api, tx_alice.pub_key());
+    let wallet = api.get_wallet(tx_alice.pub_key());
     assert_eq!(wallet.balance(), 100);
-    let wallet = get_wallet(&api, tx_bob.pub_key());
+    let wallet = api.get_wallet(tx_bob.pub_key());
     assert_eq!(wallet.balance(), 100);
 
     // Transfer funds
@@ -65,13 +78,10 @@ fn test_transfer() {
         0, // seed
         &key_alice,
     );
-    let tx_info: TransactionResponse = api.post("cryptocurrency", "v1/wallets/transaction", &tx);
-    assert_eq!(tx_info.tx_hash, tx.hash());
+    testkit.create_block_with_transactions(txvec![tx]);
 
-    harness.create_block();
-
-    let wallet = get_wallet(&api, tx_alice.pub_key());
+    let wallet = api.get_wallet(tx_alice.pub_key());
     assert_eq!(wallet.balance(), 90);
-    let wallet = get_wallet(&api, tx_bob.pub_key());
+    let wallet = api.get_wallet(tx_bob.pub_key());
     assert_eq!(wallet.balance(), 110);
 }
