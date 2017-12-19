@@ -331,12 +331,12 @@ impl TestNode {
         self.validator_id
     }
 
-    /// Change node role.
+    /// Changes node role.
     pub fn change_role(&mut self, role: Option<ValidatorId>) {
         self.validator_id = role;
     }
 
-    /// Returns the service keypar.
+    /// Returns the service keypair.
     pub fn service_keypair(&self) -> (&crypto::PublicKey, &crypto::SecretKey) {
         (&self.service_public_key, &self.service_secret_key)
     }
@@ -1118,7 +1118,7 @@ impl fmt::Debug for TestKitApi {
 }
 
 impl TestKitApi {
-    /// Creates a new instance of Api.
+    /// Creates a new instance of API.
     fn new(testkit: &TestKit) -> Self {
         use std::sync::Arc;
         use exonum::api::{public, Api};
