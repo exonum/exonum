@@ -37,6 +37,11 @@ impl<T: Database + Clone> CheckpointDb<T> {
     }
 
     /// Rolls back this database by udoing the latest `count` `merge()` operations.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if more operations are attempted to be reverted than the number of operations
+    ///   in the DB journal.
     pub fn rollback(&mut self, count: usize) -> bool {
         let journal_len = self.journal
             .read()

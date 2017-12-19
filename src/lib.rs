@@ -1214,6 +1214,11 @@ impl TestKitApi {
     }
 
     /// Gets information from a public endpoint of the node.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if an error occurs during request processing (e.g., the requested endpoint is
+    ///  unknown), or if the response has a non-20x response status.
     pub fn get<D>(&self, kind: ApiKind, endpoint: &str) -> D
     where
         for<'de> D: Deserialize<'de>,
@@ -1226,6 +1231,11 @@ impl TestKitApi {
     }
 
     /// Gets information from a private endpoint of the node.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if an error occurs during request processing (e.g., the requested endpoint is
+    ///  unknown), or if the response has a non-20x response status.
     pub fn get_private<D>(&self, kind: ApiKind, endpoint: &str) -> D
     where
         for<'de> D: Deserialize<'de>,
@@ -1238,6 +1248,10 @@ impl TestKitApi {
     }
 
     /// Gets an error from a public endpoint of the node.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if the response has a non-40x response status.
     pub fn get_err<D>(&self, kind: ApiKind, endpoint: &str) -> D
     where
         for<'de> D: Deserialize<'de>,
@@ -1274,6 +1288,11 @@ impl TestKitApi {
     /// of synchronous transaction processing, which includes running the API shim
     /// and `Transaction.verify()`. `Transaction.execute()` is not run until the transaction
     /// gets to a block via one of `create_block*()` methods.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if an error occurs during request processing (e.g., the requested endpoint is
+    ///  unknown).
     pub fn post<T, D>(&self, kind: ApiKind, endpoint: &str, transaction: &T) -> D
     where
         T: Serialize,
@@ -1290,6 +1309,11 @@ impl TestKitApi {
     /// of synchronous transaction processing, which includes running the API shim
     /// and `Transaction.verify()`. `Transaction.execute()` is not run until the transaction
     /// gets to a block via one of `create_block*()` methods.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if an error occurs during request processing (e.g., the requested endpoint is
+    ///  unknown).
     pub fn post_private<T, D>(&self, kind: ApiKind, endpoint: &str, transaction: &T) -> D
     where
         T: Serialize,
