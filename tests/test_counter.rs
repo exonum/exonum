@@ -289,12 +289,18 @@ fn inc_count(api: &TestKitApi, by: u64) -> TxIncrement {
 fn test_inc_count_create_block() {
     let (mut testkit, api) = init_testkit();
     let (pubkey, key) = crypto::gen_keypair();
+
     // Create a presigned transaction
     testkit.create_block_with_transactions(txvec![TxIncrement::new(&pubkey, 5, &key)]);
 
     // Check that the user indeed is persisted by the service
     let counter: u64 = api.get(ApiKind::Service("counter"), "count");
     assert_eq!(counter, 5);
+
+    testkit.create_block_with_transaction(TxIncrement::new(&pubkey, 4, &key));
+
+    let counter: u64 = api.get(ApiKind::Service("counter"), "count");
+    assert_eq!(counter, 9);
 }
 
 #[should_panic(expected = "Transaction is already committed")]
