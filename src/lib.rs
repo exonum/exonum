@@ -480,6 +480,21 @@ impl fmt::Debug for TestKit {
 }
 
 impl TestKit {
+    /// Creates a new `TestKit` with a single validator. Returns `TestKit` along with public and
+    /// private keys of the validator.
+    pub fn single_validator<S>(service: S) -> (Self, crypto::PublicKey, crypto::SecretKey)
+    where
+        S: Into<Box<Service>>,
+    {
+        let testkit = TestKitBuilder::validator().with_service(service).create();
+        let (public_key, secret_key) = {
+            let (public_key, secret_key) =
+                testkit.network().validators()[0].service_keypair().clone();
+            (public_key.clone(), secret_key.clone())
+        };
+        (testkit, public_key, secret_key)
+    }
+
     fn assemble(db: Box<Database>, services: Vec<Box<Service>>, network: TestNetwork) -> Self {
         let api_channel = mpsc::channel(1_000);
         let api_sender = ApiSender::new(api_channel.0.clone());
