@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Added
+
+- Added `TestKit::create_block_with_transaction()` method`. (#13)
+
 ## 0.1.1 - 2017-12-14
 
 ### Added
