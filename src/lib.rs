@@ -1078,11 +1078,18 @@ impl TestNetworkConfiguration {
     }
 }
 
-#[doc(hidden)]
+/// Kind of public or private REST API of an Exonum node.
+///
+/// `ApiKind` allows to use `get*` and `post*` methods of [`TestKitApi`] more safely.
+///
+/// [`TestKitApi`]: struct.TestKitApi.html
 #[derive(Debug)]
 pub enum ApiKind {
+    /// `api/system` endpoints of the built-in Exonum REST API.
     System,
+    /// `api/explorer` endpoints of the built-in Exonum REST API.
     Explorer,
+    /// Endpoints corresponding to a service with the specified string identifier.
     Service(&'static str),
 }
 
