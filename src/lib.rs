@@ -695,8 +695,8 @@ impl TestKit {
         }
     }
 
-    /// Creates block with the given transactions.
-    /// Transactions that are in mempool will be ignored.
+    /// Creates a block with the given transactions.
+    /// Transactions that are in the mempool will be ignored.
     ///
     /// # Panics
     ///
@@ -729,28 +729,14 @@ impl TestKit {
         self.create_block_with_tx_hashes(&tx_hashes);
     }
 
-    /// Creates block with the given transaction.
-    /// Transactions that are in mempool will be ignored.
+    /// Creates a block with the given transaction.
+    /// Transactions that are in the mempool will be ignored.
     ///
     /// # Panics
     ///
     /// - Panics if given transaction has been already committed to the blockchain.
     pub fn create_block_with_transaction<T: Transaction>(&mut self, tx: T) {
-        if !tx.verify() {
-            return;
-        }
-
-        let tx_hash = tx.hash();
-
-        assert!(!CoreSchema::new(self.snapshot()).transactions().contains(&tx_hash),
-            "Transaction is already committed: {:?}",
-            tx);
-
-        self.mempool.write().expect(
-            "Cannot write transaction to mempool",
-        ).insert(tx_hash, Box::new(tx));
-
-        self.create_block_with_tx_hashes(&[tx_hash]);
+        self.create_block_with_transactions(txvec![tx]);
     }
 
     /// Creates block with the specified transactions. The transactions must be previously
