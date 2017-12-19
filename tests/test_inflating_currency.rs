@@ -12,33 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Tests for sample currency service almost identical to one implemented in
-//! the [`cryptocurrency`] tutorial.
-//!
-//! [`cryptocurrency`]: https://github.com/exonum/cryptocurrency/
+//! Tests for sample currency service with inflation. Similar to the `test_currency`
+//! integration test, with the difference that the balance of each created wallet increases by 1
+//! on each block. Correspondingly, the initial wallet balance is set to 0.
 
 #[macro_use]
 extern crate exonum;
 #[macro_use]
 extern crate exonum_testkit;
+extern crate rand;
 #[macro_use]
 extern crate serde_derive;
 
-use std::collections::BTreeSet;
-use std::iter::FromIterator;
-
+use exonum::blockchain::Transaction;
 use exonum::crypto::{self, PublicKey, SecretKey};
+use exonum::helpers::Height;
 use exonum::messages::Message;
-use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};
+use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
+use rand::Rng;
 
-mod cryptocurrency {
+mod inflating_cryptocurrency {
     extern crate bodyparser;
     extern crate iron;
     extern crate router;
     extern crate serde;
     extern crate serde_json;
 
-    use exonum::blockchain::{ApiContext, Blockchain, Service, Transaction};
+    use exonum::blockchain::{ApiContext, Blockchain, Schema as CoreSchema, Service, Transaction};
     use exonum::node::{ApiSender, TransactionSend};
     use exonum::messages::{Message, RawTransaction};
     use exonum::storage::{Fork, MapIndex, Snapshot};
@@ -46,6 +46,7 @@ mod cryptocurrency {
     use exonum::encoding;
     use exonum::encoding::serialize::FromHex;
     use exonum::api::{Api, ApiError};
+    use exonum::helpers::Height;
     use self::iron::prelude::*;
     use self::iron::headers::ContentType;
     use self::iron::{Handler, IronError};
@@ -59,29 +60,35 @@ mod cryptocurrency {
     const TX_TRANSFER_ID: u16 = 2;
 
     /// Initial balance of newly created wallet.
-    pub const INIT_BALANCE: u64 = 100;
+    pub const INIT_BALANCE: u64 = 0;
 
     // // // // // // // // // // PERSISTENT DATA // // // // // // // // // //
 
     encoding_struct! {
         struct Wallet {
-            const SIZE = 48;
+            const SIZE = 56;
 
             field pub_key:            &PublicKey  [00 => 32]
             field name:               &str        [32 => 40]
             field balance:            u64         [40 => 48]
+            field last_update_height: u64         [48 => 56]
         }
     }
 
     impl Wallet {
-        pub fn increase(self, amount: u64) -> Self {
-            let balance = self.balance() + amount;
-            Self::new(self.pub_key(), self.name(), balance)
+        pub fn actual_balance(&self, height: Height) -> u64 {
+            assert!(height.0 >= self.last_update_height());
+            self.balance() + height.0 - self.last_update_height()
         }
 
-        pub fn decrease(self, amount: u64) -> Self {
-            let balance = self.balance() - amount;
-            Self::new(self.pub_key(), self.name(), balance)
+        pub fn increase(self, amount: u64, height: Height) -> Self {
+            let balance = self.actual_balance(height) + amount;
+            Self::new(self.pub_key(), self.name(), balance, height.0)
+        }
+
+        pub fn decrease(self, amount: u64, height: Height) -> Self {
+            let balance = self.actual_balance(height) - amount;
+            Self::new(self.pub_key(), self.name(), balance, height.0)
         }
     }
 
@@ -151,9 +158,10 @@ mod cryptocurrency {
 
         /// Apply logic to the storage when executing the transaction.
         fn execute(&self, view: &mut Fork) {
+            let height = CoreSchema::new(&view).height();
             let mut schema = CurrencySchema { view };
             if schema.wallet(self.pub_key()).is_none() {
-                let wallet = Wallet::new(self.pub_key(), self.name(), INIT_BALANCE);
+                let wallet = Wallet::new(self.pub_key(), self.name(), INIT_BALANCE, height.0);
                 schema.wallets_mut().put(self.pub_key(), wallet)
             }
         }
@@ -174,14 +182,15 @@ mod cryptocurrency {
         /// Retrieve two wallets to apply the transfer. Check the sender's
         /// balance and apply changes to the balances of the wallets.
         fn execute(&self, view: &mut Fork) {
+            let height = CoreSchema::new(&view).height();
             let mut schema = CurrencySchema { view };
             let sender = schema.wallet(self.from());
             let receiver = schema.wallet(self.to());
             if let (Some(sender), Some(receiver)) = (sender, receiver) {
                 let amount = self.amount();
-                if sender.balance() >= amount {
-                    let sender = sender.decrease(amount);
-                    let receiver = receiver.increase(amount);
+                if sender.actual_balance(height) >= amount {
+                    let sender = sender.decrease(amount, height);
+                    let receiver = receiver.increase(amount, height);
                     let mut wallets = schema.wallets_mut();
                     wallets.put(self.from(), sender);
                     wallets.put(self.to(), receiver);
@@ -215,14 +224,6 @@ mod cryptocurrency {
             let view = self.blockchain.snapshot();
             let schema = CurrencySchema::new(view);
             schema.wallet(pub_key)
-        }
-
-        fn wallets(&self) -> Vec<Wallet> {
-            let view = self.blockchain.snapshot();
-            let schema = CurrencySchema::new(view);
-            let wallets = schema.wallets();
-            let wallets = wallets.values();
-            wallets.collect()
         }
 
         /// Endpoint for transactions.
@@ -261,7 +262,7 @@ mod cryptocurrency {
         }
 
         /// Endpoint for retrieving a single wallet.
-        fn get_wallet(&self, req: &mut Request) -> IronResult<Response> {
+        fn balance(&self, req: &mut Request) -> IronResult<Response> {
             use self::iron::modifiers::Header;
 
             let path = req.url.path();
@@ -274,7 +275,9 @@ mod cryptocurrency {
                 ))
             })?;
             if let Some(wallet) = self.wallet(&public_key) {
-                self.ok_response(&serde_json::to_value(wallet).unwrap())
+                let height = CoreSchema::new(self.blockchain.snapshot()).height();
+                self.ok_response(&serde_json::to_value(wallet.actual_balance(height))
+                    .unwrap())
             } else {
                 Err(IronError::new(ApiError::NotFound, (
                     Status::NotFound,
@@ -283,11 +286,6 @@ mod cryptocurrency {
                 )))
             }
         }
-
-        /// Endpoint for retrieving all wallets in the blockchain.
-        fn get_wallets(&self, _: &mut Request) -> IronResult<Response> {
-            self.ok_response(&serde_json::to_value(&self.wallets()).unwrap())
-        }
     }
 
     impl Api for CryptocurrencyApi {
@@ -295,9 +293,7 @@ mod cryptocurrency {
             let self_ = self.clone();
             let post_transaction = move |req: &mut Request| self_.post_transaction(req);
             let self_ = self.clone();
-            let get_wallets = move |req: &mut Request| self_.get_wallets(req);
-            let self_ = self.clone();
-            let get_wallet = move |req: &mut Request| self_.get_wallet(req);
+            let balance = move |req: &mut Request| self_.balance(req);
 
             // Bind the transaction handler to a specific route.
             router.post(
@@ -305,8 +301,7 @@ mod cryptocurrency {
                 post_transaction,
                 "post_transaction",
             );
-            router.get("/v1/wallets", get_wallets, "get_wallets");
-            router.get("/v1/wallet/:pub_key", get_wallet, "get_wallet");
+            router.get("/v1/balance/:pub_key", balance, "balance");
         }
     }
 
@@ -352,8 +347,7 @@ mod cryptocurrency {
     }
 }
 
-use cryptocurrency::{CurrencySchema, CurrencyService, TransactionResponse, TxCreateWallet,
-                     TxTransfer, Wallet};
+use inflating_cryptocurrency::{CurrencyService, TransactionResponse, TxCreateWallet, TxTransfer};
 
 fn init_testkit() -> TestKit {
     TestKitBuilder::validator()
@@ -377,315 +371,154 @@ fn create_wallet(api: &TestKitApi, name: &str) -> (TxCreateWallet, SecretKey) {
     (tx, key)
 }
 
-fn transfer(api: &TestKitApi, tx: &TxTransfer) {
-    let tx_info: TransactionResponse = api.post(
-        ApiKind::Service("cryptocurrency"),
-        "v1/wallets/transaction",
-        tx,
-    );
-    assert_eq!(tx_info.tx_hash, tx.hash());
-}
-
-fn get_wallet(api: &TestKitApi, pubkey: &PublicKey) -> Wallet {
+fn get_balance(api: &TestKitApi, pubkey: &PublicKey) -> u64 {
     api.get(
         ApiKind::Service("cryptocurrency"),
-        &format!("v1/wallet/{}", pubkey.to_string()),
+        &format!("v1/balance/{}", pubkey.to_string()),
     )
 }
 
-fn get_all_wallets(api: &TestKitApi) -> Vec<Wallet> {
-    api.get(ApiKind::Service("cryptocurrency"), "v1/wallets")
-}
-
 #[test]
-fn test_create_wallet() {
+fn test_inflation() {
     let mut testkit = init_testkit();
     let api = testkit.api();
     let (tx, _) = create_wallet(&api, "Alice");
 
     testkit.create_block();
-
-    // Check that the user indeed is persisted by the service
-    let wallet = get_wallet(&api, tx.pub_key());
-    assert_eq!(wallet.pub_key(), tx.pub_key());
-    assert_eq!(wallet.name(), tx.name());
-    assert_eq!(wallet.balance(), 100);
+    assert_eq!(get_balance(&api, tx.pub_key()), 1);
+    testkit.create_blocks_until(Height(10));
+    assert_eq!(get_balance(&api, tx.pub_key()), 10);
 }
 
 #[test]
-fn test_transfer() {
+fn test_transfer_scenarios() {
     let mut testkit = init_testkit();
     let api = testkit.api();
 
+    // Create 2 wallets
     let (tx_alice, key_alice) = create_wallet(&api, "Alice");
     let (tx_bob, _) = create_wallet(&api, "Bob");
-    // Commit creation transactions
-    testkit.create_block();
+    testkit.create_blocks_until(Height(9));
 
     // Check that the initial Alice's and Bob's balances are persisted by the service
-    let wallet = get_wallet(&api, tx_alice.pub_key());
-    assert_eq!(wallet.balance(), 100);
-    let wallet = get_wallet(&api, tx_bob.pub_key());
-    assert_eq!(wallet.balance(), 100);
+    assert_eq!(get_balance(&api, tx_alice.pub_key()), 9);
+    assert_eq!(get_balance(&api, tx_bob.pub_key()), 9);
 
     // Transfer funds
-    let tx = TxTransfer::new(
-        tx_alice.pub_key(),
-        tx_bob.pub_key(),
-        10, // amount
-        0, // seed
-        &key_alice,
-    );
-    transfer(&api, &tx);
-    testkit.create_block();
-
-    let wallet = get_wallet(&api, tx_alice.pub_key());
-    assert_eq!(wallet.balance(), 90);
-    let wallet = get_wallet(&api, tx_bob.pub_key());
-    assert_eq!(wallet.balance(), 110);
-}
-
-#[test]
-fn test_snapshot_completeness() {
-    let mut testkit = init_testkit();
-    let api = testkit.api();
-
-    let (tx_alice, _) = create_wallet(&api, "Alice");
-    testkit.create_block();
-
-    let (tx_bob, _) = create_wallet(&api, "Bob");
-    // Check that Alice's wallet is in the snapshot
-    testkit
-        .probe(tx_bob)
-        .compare(testkit.snapshot())
-        .map(CurrencySchema::new)
-        .map(|schema| schema.wallet(tx_alice.pub_key()))
-        .assert_inv("Alice's wallet is there", Option::is_some)
-        .map(|w| w.as_ref().unwrap().balance())
-        .assert_eq("Alice's balance hasn't changed");
-}
-
-#[test]
-fn test_transfer_from_nonexisting_wallet() {
-    let mut testkit = init_testkit();
-    let api = testkit.api();
-
-    let (tx_alice, key_alice) = create_wallet(&api, "Alice");
-    let (tx_bob, _) = create_wallet(&api, "Bob");
-    // Do not commit Alice's transaction
-    testkit.create_block_with_tx_hashes(&[tx_bob.hash()]);
-
-    let wallet = get_wallet(&api, tx_bob.pub_key());
-    assert_eq!(wallet.balance(), 100);
-
-    let tx = TxTransfer::new(
-        tx_alice.pub_key(),
-        tx_bob.pub_key(),
-        10, // amount
-        0, // seed
-        &key_alice,
-    );
-
-    let comp = testkit.probe(tx).compare(testkit.snapshot());
-    let comp = comp.map(CurrencySchema::new);
-    comp.map(|s| s.wallet(tx_alice.pub_key())).assert_inv(
-        "No Alice's wallet",
-        Option::is_none,
-    );
-    comp.map(|s| {
-        s.wallet(tx_bob.pub_key())
-            .expect("No Bob's wallet!")
-            .balance()
-    }).assert_eq("Bob's balance hasn't changed");
-}
-
-#[test]
-fn test_transfer_to_nonexisting_wallet() {
-    let mut testkit = init_testkit();
-    let api = testkit.api();
-
-    let (tx_alice, key_alice) = create_wallet(&api, "Alice");
-    let (tx_bob, _) = create_wallet(&api, "Bob");
-    // Do not commit Bob's transaction
-    testkit.create_block_with_tx_hashes(&[tx_alice.hash()]);
-
-    let wallet = get_wallet(&api, tx_alice.pub_key());
-    assert_eq!(wallet.balance(), 100);
-
-    let tx = TxTransfer::new(
-        tx_alice.pub_key(),
-        tx_bob.pub_key(),
-        10, // amount
-        0, // seed
-        &key_alice,
-    );
-    transfer(&api, &tx);
-
-    let old_snapshot = testkit.snapshot();
-    testkit.create_block_with_tx_hashes(&[tx.hash()]);
-
-    let comp = testkit.snapshot().compare(old_snapshot);
-    let comp = comp.map(CurrencySchema::new);
-    comp.map(|s| s.wallet(tx_bob.pub_key())).assert_inv(
-        "No Bob's wallet",
-        Option::is_none,
-    );
-    comp.map(|s| {
-        s.wallet(tx_alice.pub_key())
-            .expect("No Alice's wallet!")
-            .balance()
-    }).assert_eq("Alice's balance hasn't changed");
-}
-
-#[test]
-fn test_transfer_overcharge() {
-    let mut testkit = init_testkit();
-    let api = testkit.api();
-
-    let (tx_alice, key_alice) = create_wallet(&api, "Alice");
-    let (tx_bob, _) = create_wallet(&api, "Bob");
-    testkit.create_block();
-
-    // Transfer funds
-    let tx = TxTransfer::new(
-        tx_alice.pub_key(),
-        tx_bob.pub_key(),
-        110, // amount
-        0, // seed
-        &key_alice,
-    );
-    transfer(&api, &tx);
-    testkit.create_block();
-
-    let wallet = get_wallet(&api, tx_alice.pub_key());
-    assert_eq!(wallet.balance(), 100);
-    let wallet = get_wallet(&api, tx_bob.pub_key());
-    assert_eq!(wallet.balance(), 100);
-}
-
-#[test]
-fn test_transfers_in_single_block() {
-    let mut testkit = init_testkit();
-    let api = testkit.api();
-
-    let (tx_alice, key_alice) = create_wallet(&api, "Alice");
-    let (tx_bob, key_bob) = create_wallet(&api, "Bob");
-    testkit.create_block();
-
-    // Transfer funds from Alice to Bob.
     let tx_a_to_b = TxTransfer::new(
         tx_alice.pub_key(),
         tx_bob.pub_key(),
-        90, // amount
+        5, // amount
         0, // seed
         &key_alice,
     );
-
-    // Transfer funds back from Bob to Alice.
-    let tx_b_to_a = TxTransfer::new(
-        tx_bob.pub_key(),
+    let next_tx_a_to_b = TxTransfer::new(
         tx_alice.pub_key(),
-        120, // amount
-        0, // seed
-        &key_bob,
+        tx_bob.pub_key(),
+        6, // amount
+        1, // seed
+        &key_alice,
     );
+    // Put transactions from A to B in separate blocks, allowing them both to succeed.
+    testkit.create_block_with_transactions(txvec![tx_a_to_b.clone()]); // A: 4 + 1, B: 14 + 1
+    testkit.create_block_with_transactions(txvec![]); // A: 4 + 2, B: 14 + 2
+    testkit.create_block_with_transactions(txvec![next_tx_a_to_b.clone()]); // A: 0 + 1, B: 20 + 3
+    assert_eq!(get_balance(&api, tx_alice.pub_key()), 1); // 0 + 1
+    assert_eq!(get_balance(&api, tx_bob.pub_key()), 23); // 20 + 3
+    testkit.rollback(3);
 
-    {
-        // See what happens if transactions are applied in an "incorrect" order.
-        let comp = testkit
-            .probe_all(txvec![tx_b_to_a.clone(), tx_a_to_b.clone()])
-            .compare(testkit.snapshot());
-        let comp = comp.map(CurrencySchema::new);
-        comp.map(|s| s.wallet(tx_alice.pub_key()).unwrap().balance())
-            .assert("Alice's balance decreases", |&old, &new| new == old - 90);
-        comp.map(|s| s.wallet(tx_bob.pub_key()).unwrap().balance())
-            .assert("Bob's balance increases", |&old, &new| new == old + 90);
+    // If there is no block separating transactions, Alice's balance is insufficent
+    // to complete the second transaction.
+    testkit.create_block_with_transactions(txvec![tx_a_to_b.clone()]); // A: 4 + 1, B: 14 + 1
+    testkit.create_block_with_transactions(txvec![next_tx_a_to_b.clone()]); // fails
+    assert_eq!(get_balance(&api, tx_alice.pub_key()), 6); // 4 + 2
+    assert_eq!(get_balance(&api, tx_bob.pub_key()), 16); // 14 + 2
+    testkit.rollback(2);
+
+    testkit.create_block_with_transactions(txvec![next_tx_a_to_b.clone()]); // A: 3 + 1, B: 15 + 1
+    testkit.create_block_with_transactions(txvec![tx_a_to_b.clone()]); // fails
+    assert_eq!(get_balance(&api, tx_alice.pub_key()), 5); // 3 + 2
+    assert_eq!(get_balance(&api, tx_bob.pub_key()), 17); // 15 + 2
+    testkit.rollback(2);
+
+    // If the transactions are put in the same block, only the first transaction should succeed
+    testkit.create_block_with_transactions(txvec![tx_a_to_b.clone(), next_tx_a_to_b.clone()]);
+    assert_eq!(get_balance(&api, tx_alice.pub_key()), 5); // 4 + 1
+    assert_eq!(get_balance(&api, tx_bob.pub_key()), 15); // 14 + 1
+    testkit.rollback(1);
+
+    // Same here
+    testkit.create_block_with_transactions(txvec![next_tx_a_to_b.clone(), tx_a_to_b.clone()]);
+    assert_eq!(get_balance(&api, tx_alice.pub_key()), 4); // 3 + 1
+    assert_eq!(get_balance(&api, tx_bob.pub_key()), 16); // 15 + 1
+    testkit.rollback(1);
+}
+
+fn fuzz_transfers_and_maybe_rollbacks(use_rollbacks: bool) {
+    const USERS: usize = 10;
+
+    let mut rng = rand::thread_rng();
+    let mut testkit = init_testkit();
+    let api = testkit.api();
+
+    // First, create users
+    let keys_and_txs: Vec<_> = (0..USERS)
+        .map(|i| {
+            let (pubkey, key) = crypto::gen_keypair();
+            let tx = TxCreateWallet::new(&pubkey, &format!("User #{}", i), &key);
+            (key, tx)
+        })
+        .collect();
+    let pubkeys: Vec<&_> = keys_and_txs
+        .iter()
+        .map(|&(_, ref tx)| tx.pub_key())
+        .collect();
+
+    testkit.create_block_with_transactions(keys_and_txs.iter().map(|&(_, ref tx)| {
+        Box::new(tx.clone()) as Box<Transaction>
+    }));
+
+    for _ in 0..64 {
+        let total_balance: u64 = pubkeys.iter().map(|key| get_balance(&api, key)).sum();
+        assert_eq!(total_balance, (USERS as u64) * testkit.height().0);
+
+        if use_rollbacks {
+            let rollback_blocks = rng.choose(&[0usize, 0, 0, 1, 2, 3]);
+            match rollback_blocks {
+                Some(&blocks) if testkit.height() > Height(blocks as u64) => {
+                    testkit.rollback(blocks)
+                }
+                _ => {}
+            }
+        }
+
+        let tx_count = rng.next_u32() & 15;
+        let height = testkit.height().0;
+        let txs = (0..tx_count)
+            .map(|_| {
+                let sender_idx = rng.gen_range(0, USERS);
+                let sender = pubkeys[sender_idx];
+                let sender_key = &keys_and_txs[sender_idx].0;
+                let receiver = pubkeys[rng.gen_range(0, USERS)];
+                let amount = rng.gen_range(1, 2 * height);
+
+                TxTransfer::new(sender, receiver, amount, rng.next_u64(), sender_key)
+            })
+            .map(Box::<Transaction>::from);
+        testkit.create_block_with_transactions(txs);
     }
-
-    transfer(&api, &tx_a_to_b);
-    transfer(&api, &tx_b_to_a);
-    testkit.create_block_with_tx_hashes(&[tx_a_to_b.hash(), tx_b_to_a.hash()]);
-
-    let wallet = get_wallet(&api, tx_alice.pub_key());
-    assert_eq!(wallet.balance(), 130);
-    let wallet = get_wallet(&api, tx_bob.pub_key());
-    assert_eq!(wallet.balance(), 70);
-
-    let wallets = get_all_wallets(&api);
-    assert_eq!(wallets.len(), 2);
-    assert_eq!(wallets.iter().fold(0, |acc, w| acc + w.balance()), 200);
-    assert_eq!(
-        BTreeSet::from_iter(wallets.iter().map(|w| *w.pub_key())),
-        BTreeSet::from_iter(vec![*tx_alice.pub_key(), *tx_bob.pub_key()])
-    );
 }
 
+/// Test randomly generated transfers among users without blockchain rollbacks.
 #[test]
-fn test_malformed_wallet_request() {
-    let testkit = TestKitBuilder::validator()
-        .with_validators(4)
-        .with_service(CurrencyService)
-        .create();
-    let api = testkit.api();
-    let info: String = api.get_err(ApiKind::Service("cryptocurrency"), "v1/wallet/c0ffee");
-    assert!(info.starts_with("Invalid request param"));
+fn test_fuzz_transfers() {
+    fuzz_transfers_and_maybe_rollbacks(false);
 }
 
+/// Test randomly generated transfers among users with blockchain rollbacks.
+/// This mostly tests `TestKit::rollback()` method rather than the service,
+/// because in practice rollbacks are impossible.
 #[test]
-fn test_unknown_wallet_request() {
-    let testkit = init_testkit();
-    let api = testkit.api();
-
-    // transaction is sent by API, but isn't committed
-    let (tx_alice, _) = create_wallet(&api, "Alice");
-
-    let info: String = api.get_err(
-        ApiKind::Service("cryptocurrency"),
-        &format!("v1/wallet/{}", tx_alice.pub_key().to_string()),
-    );
-    assert_eq!(info, "Wallet not found".to_string());
-}
-
-#[test]
-fn test_nonverified_transaction_in_create_block() {
-    let mut testkit = init_testkit();
-    let api = testkit.api();
-
-    let (create_tx, key) = create_wallet(&api, "Alice");
-    testkit.create_block();
-
-    // Send transaction to self. As this transaction fails `verify()`, it should not
-    // be executed and increase sender's balance.
-    let transfer_tx = TxTransfer::new(create_tx.pub_key(), create_tx.pub_key(), 10, 0, &key);
-    testkit.create_block_with_transactions(txvec![transfer_tx]);
-
-    let wallet = get_wallet(&api, create_tx.pub_key());
-    assert_eq!(wallet.balance(), 100);
-}
-
-#[test]
-fn test_nonsigned_transaction_in_create_block() {
-    let mut testkit = init_testkit();
-    let api = testkit.api();
-
-    let (tx_alice, key) = create_wallet(&api, "Alice");
-    let (tx_bob, _) = create_wallet(&api, "Bob");
-    testkit.create_block();
-
-    let transfer_tx = TxTransfer::new(tx_alice.pub_key(), tx_bob.pub_key(), 10, 0, &key);
-    // Transaction with an incorrect signature (all zeros)
-    let bogus_transfer_tx = TxTransfer::new_with_signature(
-        tx_alice.pub_key(),
-        tx_bob.pub_key(),
-        20,
-        0,
-        &crypto::Signature::new([0; 64]),
-    );
-    // Check execution of a mix of correct and incorrect transactions
-    testkit.create_block_with_transactions(txvec![bogus_transfer_tx, transfer_tx]);
-
-    let wallet = get_wallet(&api, tx_alice.pub_key());
-    assert_eq!(wallet.balance(), 90);
-    let wallet = get_wallet(&api, tx_bob.pub_key());
-    assert_eq!(wallet.balance(), 110);
+fn test_fuzz_transfers_and_rollbacks() {
+    fuzz_transfers_and_maybe_rollbacks(true);
 }

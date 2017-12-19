@@ -154,16 +154,19 @@ use exonum::crypto;
 use exonum::helpers::{Height, Round, ValidatorId};
 use exonum::messages::{Message, Precommit, Propose};
 use exonum::node::{ApiSender, ExternalMessage, State as NodeState, TransactionSend, TxPool};
-use exonum::storage::{Database, MemoryDB, Snapshot};
+use exonum::storage::{MemoryDB, Snapshot};
 
 #[macro_use]
 mod macros;
+mod checkpoint_db;
 pub mod compare;
 mod greedy_fold;
 
 #[doc(hidden)]
 pub use greedy_fold::GreedilyFoldable;
 pub use compare::ComparableSnapshot;
+
+use checkpoint_db::{CheckpointDb, CheckpointDbHandler};
 
 /// Emulated test network.
 #[derive(Debug)]
@@ -453,9 +456,7 @@ impl TestKitBuilder {
     /// Creates the testkit.
     pub fn create(self) -> TestKit {
         crypto::init();
-        let db = MemoryDB::new();
         TestKit::assemble(
-            Box::new(db),
             self.services,
             TestNetwork {
                 us: self.us,
@@ -469,6 +470,7 @@ impl TestKitBuilder {
 /// (with no real network setup).
 pub struct TestKit {
     blockchain: Blockchain,
+    db_handler: CheckpointDbHandler<MemoryDB>,
     events_stream: Spawn<Box<Stream<Item = (), Error = ()>>>,
     network: TestNetwork,
     api_sender: ApiSender,
@@ -488,12 +490,15 @@ impl fmt::Debug for TestKit {
 }
 
 impl TestKit {
-    fn assemble(db: Box<Database>, services: Vec<Box<Service>>, network: TestNetwork) -> Self {
+    fn assemble(services: Vec<Box<Service>>, network: TestNetwork) -> Self {
         let api_channel = mpsc::channel(1_000);
         let api_sender = ApiSender::new(api_channel.0.clone());
 
+        let db = CheckpointDb::new(MemoryDB::new());
+        let db_handler = db.handler();
+
         let mut blockchain = Blockchain::new(
-            db,
+            Box::new(db),
             services,
             *network.us().service_keypair().0,
             network.us().service_keypair().1.clone(),
@@ -528,6 +533,7 @@ impl TestKit {
 
         TestKit {
             blockchain,
+            db_handler,
             api_sender,
             events_stream,
             network,
@@ -567,64 +573,104 @@ impl TestKit {
         &mut self.blockchain
     }
 
+    /// Rolls the blockchain back for a certain number of blocks.
+    ///
+    /// # Examples
+    ///
+    /// Rollbacks are useful in testing alternative scenarios (e.g., transactions executed
+    /// in different order and/or in different blocks) that require an expensive setup:
+    ///
+    /// ```
+    /// # #[macro_use] extern crate exonum;
+    /// # #[macro_use] extern crate exonum_testkit;
+    /// # use exonum::blockchain::{Service, Transaction};
+    /// # use exonum::messages::RawTransaction;
+    /// # use exonum::encoding;
+    /// # use exonum_testkit::{TestKit, TestKitBuilder};
+    /// #
+    /// # type FromRawResult = Result<Box<Transaction>, encoding::Error>;
+    /// # pub struct MyService;
+    /// # impl Service for MyService {
+    /// #    fn service_name(&self) -> &'static str {
+    /// #        "documentation"
+    /// #    }
+    /// #    fn service_id(&self) -> u16 {
+    /// #        0
+    /// #    }
+    /// #    fn tx_from_raw(&self, _raw: RawTransaction) -> FromRawResult {
+    /// #        unimplemented!();
+    /// #    }
+    /// # }
+    /// #
+    /// # message! {
+    /// #     struct MyTransaction {
+    /// #         const TYPE = 0;
+    /// #         const ID = 0;
+    /// #         const SIZE = 40;
+    /// #         field from: &exonum::crypto::PublicKey [0 => 32]
+    /// #         field msg: &str [32 => 40]
+    /// #     }
+    /// # }
+    /// # impl Transaction for MyTransaction {
+    /// #     fn verify(&self) -> bool { true }
+    /// #     fn execute(&self, _: &mut exonum::storage::Fork) {}
+    /// # }
+    /// #
+    /// # fn expensive_setup(_: &mut TestKit) {}
+    /// # fn assert_something_about(_: &TestKit) {}
+    /// #
+    /// # fn main() {
+    /// let mut testkit = TestKitBuilder::validator()
+    ///     .with_service(MyService)
+    ///     .create();
+    /// expensive_setup(&mut testkit);
+    /// let (pubkey, key) = exonum::crypto::gen_keypair();
+    /// let tx_a = MyTransaction::new(&pubkey, "foo", &key);
+    /// let tx_b = MyTransaction::new(&pubkey, "bar", &key);
+    /// testkit.create_block_with_transactions(txvec![tx_a.clone(), tx_b.clone()]);
+    /// assert_something_about(&testkit);
+    /// testkit.rollback(1);
+    /// testkit.create_block_with_transactions(txvec![tx_a.clone()]);
+    /// testkit.create_block_with_transactions(txvec![tx_b.clone()]);
+    /// assert_something_about(&testkit);
+    /// testkit.rollback(2);
+    /// # }
+    /// ```
+    pub fn rollback(&mut self, blocks: usize) {
+        assert!(
+            (blocks as u64) <= self.height().0,
+            "Cannot rollback past genesis block"
+        );
+        self.db_handler.rollback(blocks);
+    }
+
     /// Executes a list of transactions given the current state of the blockchain, but does not
     /// commit execution results to the blockchain. The execution result is the same
     /// as if transactions were included into a new block; for example,
     /// transactions included into one of previous blocks do not lead to any state changes.
-    ///
-    /// # Panics
-    ///
-    /// - Panics if there are duplicate transactions.
-    pub fn probe_all(&self, transactions: Vec<Box<Transaction>>) -> Box<Snapshot> {
-        let validator_id = self.network().us().validator_id().expect(
-            "Tested node is not a validator",
-        );
-        let height = self.height().next();
+    pub fn probe_all<I>(&mut self, transactions: I) -> Box<Snapshot>
+    where
+        I: IntoIterator<Item = Box<Transaction>>,
+    {
+        // Filter out already committed transactions; otherwise,
+        // `create_block_with_transactions()` will panic.
+        let schema = CoreSchema::new(self.snapshot());
+        let uncommitted_txs = transactions.into_iter().filter(|tx| {
+            !schema.transactions().contains(&tx.hash())
+        });
 
-        let (transaction_map, hashes) = {
-            let mut transaction_map = BTreeMap::new();
-            let mut hashes = Vec::with_capacity(transactions.len());
-
-            let core_schema = CoreSchema::new(self.snapshot());
-            let committed_txs = core_schema.transactions();
-
-            for tx in transactions {
-                let hash = tx.hash();
-                if committed_txs.contains(&hash) {
-                    continue;
-                }
-
-                hashes.push(hash);
-                transaction_map.insert(hash, tx);
-            }
-
-            assert_eq!(
-                hashes.len(),
-                transaction_map.len(),
-                "Duplicate transactions in probe"
-            );
-
-            (transaction_map, hashes)
-        };
-
-        let (_, patch) = self.blockchain.create_patch(
-            validator_id,
-            height,
-            &hashes,
-            &transaction_map,
-        );
-
-        let mut fork = self.blockchain.fork();
-        fork.merge(patch);
-        Box::new(fork)
+        self.create_block_with_transactions(uncommitted_txs);
+        let snapshot = self.snapshot();
+        self.rollback(1);
+        snapshot
     }
 
     /// Executes a transaction given the current state of the blockchain but does not
     /// commit execution results to the blockchain. The execution result is the same
     /// as if a transaction was included into a new block; for example,
     /// a transaction included into one of previous blocks does not lead to any state changes.
-    pub fn probe<T: Transaction>(&self, transaction: T) -> Box<Snapshot> {
-        self.probe_all(vec![Box::new(transaction)])
+    pub fn probe<T: Transaction>(&mut self, transaction: T) -> Box<Snapshot> {
+        self.probe_all(vec![Box::new(transaction) as Box<Transaction>])
     }
 
     fn do_create_block(&mut self, tx_hashes: &[crypto::Hash]) {
