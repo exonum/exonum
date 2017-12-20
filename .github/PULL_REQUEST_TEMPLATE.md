@@ -1,5 +1,5 @@
-**Closes:**  *(Link to an open issue. **Remeber:** any functional-related 
-changes should be discussed in issue before proceeding)*
+**Closes:**  *(Link to an open issue. **Remember:** any functional-related 
+changes should be discussed in an issue before proceeding)*
 
 ### Description
 
@@ -15,7 +15,7 @@ changes should be discussed in issue before proceeding)*
 
 - [ ] Breaking change (fix or feature that would cause existing functionality to change)
 
-- [ ] Other (CI-improvments, docs fixes, version bumps, clippy, rustfmt)
+- [ ] Other (CI-improvements, docs fixes, version bumps, clippy, rustfmt)
 
 ### Checklist:
 - [ ] All commits are named based on our guideline (read CONTRIBUTING.md)
@@ -28,5 +28,5 @@ changes should be discussed in issue before proceeding)*
 
 
 
-### How can we test this changes?
+### How can we test these changes?
 

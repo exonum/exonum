@@ -19,10 +19,10 @@
 
 Provide as much information as possible:
 
-- Code snippets that cause problem.
+- Code snippets that cause the problem.
 
-- Full backtrace of bug (run with enviroment variable RUST_BACKTRACE=full).
+- Full backtrace of the bug (run with enviroment variable RUST_BACKTRACE=full).
 
 - Log (run with enviroment variable RUST_LOG=trace).
 
-- Other info that could help us to find a problem.
+- Other info that could help us to find the problem.

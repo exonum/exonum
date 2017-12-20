@@ -99,11 +99,11 @@ From: [[http://git-scm.com/book/ch5-2.html]]
 * Don't end the summary line with a period - it's a title and titles don't end with a period.
 
 ### Tips
-* If it seems difficult to summarize what your commit does, it may be because it includes several logical changes or bug fixes, and are better split up into several commits using `git add -p`.
+* If it seems difficult to summarize what your commit does, it may be because it includes several logical changes or bug fixes, and it would be better to split it up into several commits using `git add -p`.
 
 ### References
 
-The following blog post has a good story how changes in naming of commit messages, helps maintain the project:
+The following blog post has a good story how changes in naming of commit messages, help maintain the project:
 
 "How to Write a Git Commit Message": https://chris.beams.io/posts/git-commit/
 
