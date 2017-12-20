@@ -664,7 +664,7 @@ mod tests {
     use exonum::messages::RawTransaction;
     use exonum::encoding;
     use exonum::crypto::{gen_keypair_from_seed, Seed};
-    use exonum::storage::Fork;
+    use exonum::storage::{Fork, Snapshot};
 
     use sandbox_tests_helper::{add_one_height, SandboxState, VALIDATOR_1, VALIDATOR_2,
                                VALIDATOR_3, HEIGHT_ONE, ROUND_ONE, ROUND_TWO};
@@ -707,6 +707,10 @@ mod tests {
 
         fn service_id(&self) -> u16 {
             SERVICE_ID
+        }
+
+        fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+            Vec::new()
         }
 
         fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
