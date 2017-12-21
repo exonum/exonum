@@ -114,8 +114,7 @@ impl SystemApi {
 
         let height = schema.height();
         let service_key = *self.blockchain.api_context().public_key();
-        let consensus_key = conf
-            .validator_keys
+        let consensus_key = conf.validator_keys
             .iter()
             .find(|key| service_key == key.service_key)
             .map(|key| key.consensus_key);
