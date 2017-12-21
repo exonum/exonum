@@ -1,3 +1,15 @@
+use std::mem;
+use std::error::Error;
+
+use byteorder::{ByteOrder, LittleEndian};
+use serde_json::value::{Value, Number};
+
+use super::Result as EncodingResult;
+use super::Error as EncodingError;
+use encoding::{CheckedOffset, Field, Offset};
+use encoding::serialize::WriteBufferWrapper;
+use encoding::serialize::json::ExonumJson;
+
 /// Wrapper for the `f32` type that restricts non-finite (NaN and Infinity) values.
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub struct F32 {
@@ -119,5 +131,116 @@ impl F64 {
     /// ```
     pub fn get(&self) -> f64 {
         self.value
+    }
+}
+
+impl<'a> Field<'a> for F32 {
+    fn field_size() -> Offset {
+        mem::size_of::<Self>() as Offset
+    }
+
+    unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
+        Self::new(LittleEndian::read_f32(&buffer[from as usize..to as usize]))
+    }
+
+    fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
+        LittleEndian::write_f32(&mut buffer[from as usize..to as usize], self.get());
+    }
+
+    fn check(
+        buffer: &'a [u8],
+        from: CheckedOffset,
+        to: CheckedOffset,
+        latest_segment: CheckedOffset,
+    ) -> EncodingResult {
+        debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
+
+        let from = from.unchecked_offset();
+        let to = to.unchecked_offset();
+
+        let value = LittleEndian::read_f32(&buffer[from as usize..to as usize]);
+        match Self::try_from(value) {
+            Some(_) => Ok(latest_segment),
+            None => Err(EncodingError::UnsupportedFloat {
+                position: from,
+                value: f64::from(value),
+            }),
+        }
+    }
+}
+
+impl<'a> Field<'a> for F64 {
+    fn field_size() -> Offset {
+        mem::size_of::<Self>() as Offset
+    }
+
+    unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
+        Self::new(LittleEndian::read_f64(&buffer[from as usize..to as usize]))
+    }
+
+    fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
+        LittleEndian::write_f64(&mut buffer[from as usize..to as usize], self.get());
+    }
+
+    fn check(
+        buffer: &'a [u8],
+        from: CheckedOffset,
+        to: CheckedOffset,
+        latest_segment: CheckedOffset,
+    ) -> EncodingResult {
+        debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
+
+        let from = from.unchecked_offset();
+        let to = to.unchecked_offset();
+
+        let value = LittleEndian::read_f64(&buffer[from as usize..to as usize]);
+        match Self::try_from(value) {
+            Some(_) => Ok(latest_segment),
+            None => Err(EncodingError::UnsupportedFloat {
+                position: from,
+                value,
+            }),
+        }
+    }
+}
+
+impl ExonumJson for F32 {
+    fn deserialize_field<B: WriteBufferWrapper>(
+        value: &Value,
+        buffer: &mut B,
+        from: Offset,
+        to: Offset,
+    ) -> Result<(), Box<Error>> {
+        let number = value.as_f64().ok_or("Can't cast json as float")?;
+        buffer.write(from, to, Self::new(number as f32));
+        Ok(())
+    }
+
+    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+        Ok(Value::Number(
+            Number::from_f64(f64::from(self.get())).ok_or(
+                "Can't cast float as json",
+            )?,
+        ))
+    }
+}
+
+#[cfg(feature="float_serialize")]
+impl ExonumJson for F64 {
+    fn deserialize_field<B: WriteBufferWrapper>(
+        value: &Value,
+        buffer: &mut B,
+        from: Offset,
+        to: Offset,
+    ) -> Result<(), Box<Error>> {
+        let number = value.as_f64().ok_or("Can't cast json as float")?;
+        buffer.write(from, to, Self::new(number));
+        Ok(())
+    }
+
+    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+        Ok(Value::Number(Number::from_f64(self.get()).ok_or(
+            "Can't cast float as json",
+        )?))
     }
 }

@@ -34,11 +34,6 @@ use helpers::{Height, Round, ValidatorId};
 use messages::RawMessage;
 use encoding::{Field, Offset};
 use super::WriteBufferWrapper;
-#[cfg(feature="float_serialize")]
-use encoding::{F32, F64};
-#[cfg(feature="float_serialize")]
-use serde_json::value::Number;
-
 // TODO: should we implement serialize for: `SecretKey`, `Seed` (ECR-156)?
 
 macro_rules! impl_default_deserialize_owned {
@@ -446,48 +441,6 @@ impl ExonumJson for ValidatorId {
     fn serialize_field(&self) -> Result<Value, Box<Error>> {
         let val: u16 = self.to_owned().into();
         Ok(Value::Number(val.into()))
-    }
-}
-
-#[cfg(feature="float_serialize")]
-impl ExonumJson for F32 {
-    fn deserialize_field<B: WriteBufferWrapper>(
-        value: &Value,
-        buffer: &mut B,
-        from: Offset,
-        to: Offset,
-    ) -> Result<(), Box<Error>> {
-        let number = value.as_f64().ok_or("Can't cast json as float")?;
-        buffer.write(from, to, Self::new(number as f32));
-        Ok(())
-    }
-
-    fn serialize_field(&self) -> Result<Value, Box<Error>> {
-        Ok(Value::Number(
-            Number::from_f64(f64::from(self.get())).ok_or(
-                "Can't cast float as json",
-            )?,
-        ))
-    }
-}
-
-#[cfg(feature="float_serialize")]
-impl ExonumJson for F64 {
-    fn deserialize_field<B: WriteBufferWrapper>(
-        value: &Value,
-        buffer: &mut B,
-        from: Offset,
-        to: Offset,
-    ) -> Result<(), Box<Error>> {
-        let number = value.as_f64().ok_or("Can't cast json as float")?;
-        buffer.write(from, to, Self::new(number));
-        Ok(())
-    }
-
-    fn serialize_field(&self) -> Result<Value, Box<Error>> {
-        Ok(Value::Number(Number::from_f64(self.get()).ok_or(
-            "Can't cast float as json",
-        )?))
     }
 }
 
