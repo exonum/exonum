@@ -8,8 +8,7 @@ STATUS=0
 # Launches the cryptocurrency demo and waits until it starts listening
 # on the TCP port 8000.
 function launch-server {
-    cd ..
-    cargo run &
+    cargo run --example demo &
     CTR=0
     MAXCTR=60
     while [[ ( -z `lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null |  awk '{ if ($9 == "*:8000") { print $2 } }'` ) && ( $CTR -lt $MAXCTR ) ]]; do
@@ -20,7 +19,6 @@ function launch-server {
         echo "Failed to launch the server; aborting"
         exit 1
     fi
-    cd examples
 }
 
 # Kills whatever program is listening on the TCP port 8000, on which the cryptocurrency
