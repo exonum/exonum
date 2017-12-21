@@ -392,7 +392,7 @@ impl Blockchain {
         mount
     }
 
-    fn api_context(&self) -> ApiContext {
+    pub(crate) fn api_context(&self) -> ApiContext {
         ApiContext::from_parts(
             self,
             self.api_sender.clone(),

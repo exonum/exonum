@@ -131,11 +131,11 @@ impl SystemApi {
                 .state = IncommingConnectionState::Reconnect(ReconnectInfo { delay });
         }
 
-        for (s, p) in self.shared_api_state.peers_info() {
+        for (s, info) in self.shared_api_state.peers_info() {
             outgoing_connections
                 .entry(s)
                 .or_insert_with(Default::default)
-                .public_key = Some(p);
+                .public_key = Some(info.public_key);
         }
 
         PeersInfo {
