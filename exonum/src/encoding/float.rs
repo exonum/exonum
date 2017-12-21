@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use std::mem;
+use std::num::FpCategory;
 use std::error::Error;
 
 use byteorder::{ByteOrder, LittleEndian};
@@ -35,7 +36,7 @@ impl F32 {
     ///
     /// # Panics
     ///
-    /// Panics if `is_finite()` returns `false` for the given `value`.
+    /// Panics if given value isn't normal (either `NaN`, `Infinity` or `SubNormal`).
     ///
     /// # Examples
     ///
@@ -50,7 +51,7 @@ impl F32 {
     }
 
     /// Creates a new `F32` instance with the given `value`. Returns `None` if the given value
-    /// isn't finite.
+    /// isn't normal.
     ///
     /// # Examples
     ///
@@ -65,10 +66,9 @@ impl F32 {
     /// assert!(val.is_none());
     /// ```
     pub fn try_from(value: f32) -> Option<Self> {
-        if value.is_finite() {
-            Some(Self { value })
-        } else {
-            None
+        match value.classify() {
+            FpCategory::Normal | FpCategory::Zero => Some(Self { value }),
+            _ => None,
         }
     }
 
@@ -98,7 +98,7 @@ impl F64 {
     ///
     /// # Panics
     ///
-    /// Panics if `is_finite()` returns `false` for the given `value`.
+    /// Panics if given value isn't normal (either `NaN`, `Infinity` or `SubNormal`).
     ///
     /// # Examples
     ///
@@ -113,7 +113,7 @@ impl F64 {
     }
 
     /// Creates a new `F64` instance with the given `value`. Returns `None` if the given value
-    /// isn't finite.
+    /// isn't normal.
     ///
     /// # Examples
     ///
@@ -128,10 +128,9 @@ impl F64 {
     /// assert!(val.is_none());
     /// ```
     pub fn try_from(value: f64) -> Option<Self> {
-        if value.is_finite() {
-            Some(Self { value })
-        } else {
-            None
+        match value.classify() {
+            FpCategory::Normal | FpCategory::Zero => Some(Self { value }),
+            _ => None,
         }
     }
 
@@ -241,7 +240,6 @@ impl ExonumJson for F32 {
     }
 }
 
-#[cfg(feature="float_serialize")]
 impl ExonumJson for F64 {
     fn deserialize_field<B: WriteBufferWrapper>(
         value: &Value,
@@ -258,5 +256,70 @@ impl ExonumJson for F64 {
         Ok(Value::Number(Number::from_f64(self.get()).ok_or(
             "Can't cast float as json",
         )?))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{F32, F64};
+    use std::num::FpCategory;
+    use std::{f32, f64};
+    use std::panic;
+    use encoding::fields::Field;
+    use byteorder::{LittleEndian, ByteOrder};
+    use encoding::Offset;
+
+    fn validate_constructor<T, V, C: Fn(V) -> T>(constructor: C, value: V, buffer: &[u8], header_size: Offset) -> bool
+    where
+        C: panic::RefUnwindSafe,
+        V: panic::UnwindSafe,
+        T: for<'r> Field<'r> + PartialEq + ::std::fmt::Debug,
+    {
+        let constructor_result = panic::catch_unwind(|| constructor(value));
+        let check_result = <T as Field>::check(&buffer, 0.into(), header_size.into(), header_size.into());
+        if constructor_result.is_err() && check_result.is_err() {
+            return false;
+        } else if constructor_result.is_ok() && check_result.is_ok() {
+            let constructed = constructor_result.unwrap();
+            let readed = unsafe { <T as Field>::read(&buffer, 0, header_size) };
+            assert_eq!(constructed, readed);
+            return true;
+        } else {
+            panic!("{:?} != {:?}", constructor_result, check_result);
+        }
+    }
+
+    #[test]
+    fn test_f32_encoding() {
+        let sub: f32 = 1.1754942e-38;
+        assert_eq!(sub.classify(), FpCategory::Subnormal);
+        let valid_data = vec![0f32, 3.14, -1.0, 1.0, f32::MAX, f32::MIN];
+        let invalid_data = vec![f32::INFINITY, f32::NEG_INFINITY, f32::NAN, sub];
+        let mut buf = vec![0; 4];
+        for value in valid_data {
+            LittleEndian::write_f32(&mut buf, value);
+            assert!(validate_constructor(|v| F32::new(v), value, &buf, 4));
+        }
+        for value in invalid_data {
+            LittleEndian::write_f32(&mut buf, value);
+            assert!(!validate_constructor(|v| F32::new(v), value, &buf, 4));
+        }
+    }
+
+    #[test]
+    fn test_f64_encoding() {
+        let sub: f64 = 1.1754942e-315;
+        assert_eq!(sub.classify(), FpCategory::Subnormal);
+        let valid_data = vec![0f64, 3.14, -1.0, 1.0, f64::MAX, f64::MIN];
+        let invalid_data = vec![f64::INFINITY, f64::NEG_INFINITY, f64::NAN, sub];
+        let mut buf = vec![0; 8];
+        for value in valid_data {
+            LittleEndian::write_f64(&mut buf, value);
+            assert!(validate_constructor(|v| F64::new(v), value, &buf, 8));
+        }
+        for value in invalid_data {
+            LittleEndian::write_f64(&mut buf, value);
+            assert!(!validate_constructor(|v| F64::new(v), value, &buf, 8));
+        }
     }
 }
