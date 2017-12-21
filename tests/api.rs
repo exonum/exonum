@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate cryptocurrency;
 extern crate exonum;
+extern crate exonum_cryptocurrency as cryptocurrency;
 extern crate exonum_testkit;
 
 use exonum::crypto::{self, PublicKey, SecretKey};
