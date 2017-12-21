@@ -15,13 +15,12 @@
 use std::time::SystemTime;
 use std::collections::HashMap;
 
-use crypto::PublicKey;
 use router::Router;
 use iron::prelude::*;
 
 use node::state::TxPool;
 use blockchain::{Blockchain, Schema, SharedNodeState};
-use crypto::Hash;
+use crypto::{PublicKey, Hash};
 use explorer::{BlockchainExplorer, TxInfo};
 use api::{Api, ApiError};
 use encoding::serialize::FromHex;
