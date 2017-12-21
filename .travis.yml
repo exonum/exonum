@@ -22,8 +22,8 @@ addons:
     - jq
 env:
   global:
-  - NIGHTLY_RUST=nightly-2017-08-15
-  - CLIPPY_VERS=0.0.152
+  - NIGHTLY_RUST=nightly-2017-10-19
+  - CLIPPY_VERS=0.0.166
   - RUSTFMT_VERS=0.9.0
   - ROCKSDB_LIB_DIR=/usr/lib/x86_64-linux-gnu
   - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
