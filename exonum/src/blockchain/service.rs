@@ -332,10 +332,10 @@ impl SharedNodeState {
                 Some(height)
             };
             let mut lock = self.state.write().expect("Expected write lock.");
-            lock.peers_info.insert(c.addr(), PeerInfo {
-                height,
-                public_key,
-            });
+            lock.peers_info.insert(
+                c.addr(),
+                PeerInfo { height, public_key },
+            );
         }
     }
 
