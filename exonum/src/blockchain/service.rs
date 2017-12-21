@@ -245,7 +245,7 @@ impl ServiceContext {
 #[derive(Debug, Clone, Copy)]
 pub struct PeerInfo {
     pub public_key: PublicKey,
-    pub height: Option<Height>,
+    pub height: Height,
 }
 
 #[derive(Debug, Default)]
@@ -326,11 +326,6 @@ impl SharedNodeState {
     pub fn update_node_state(&self, state: &State) {
         for (&public_key, c) in state.peers().iter() {
             let height = state.node_height(&public_key);
-            let height = if height == Height::zero() {
-                None
-            } else {
-                Some(height)
-            };
             let mut lock = self.state.write().expect("Expected write lock.");
             lock.peers_info.insert(
                 c.addr(),

@@ -52,10 +52,10 @@ struct PrecommitInfo {
 
 #[derive(Serialize, Clone, Debug)]
 pub struct HealthCheckInfo {
-    height: Height, // TODO: Should I remove this?
+    height: Height,
 
-    /// This node's pub key
-    public_key: PublicKey,
+    service_key: PublicKey,
+    consensus_key: Option<PublicKey>,
 
     precommits: Vec<PrecommitInfo>,
 
@@ -110,11 +110,15 @@ impl SystemApi {
     fn get_healthcheck_info(&self) -> HealthCheckInfo {
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(snapshot);
+        let conf = schema.actual_configuration();
 
         let height = schema.height();
-
-        let context = self.blockchain.api_context();
-        let public_key = *context.public_key();
+        let service_key = *self.blockchain.api_context().public_key();
+        let consensus_key = conf
+            .validator_keys
+            .iter()
+            .find(|key| service_key == key.service_key)
+            .map(|key| key.consensus_key);
 
         let last_hash = self.blockchain.last_hash();
         let schema_precommits = schema.precommits(&last_hash);
@@ -128,16 +132,15 @@ impl SystemApi {
 
         let mut chain = HashMap::new();
         for (_, info) in self.shared_api_state.peers_info() {
-            if let Some(height) = info.height {
-                chain.insert(info.public_key, height);
-            }
+            chain.insert(info.public_key, info.height);
         }
 
         HealthCheckInfo {
             height,
             precommits,
             chain,
-            public_key,
+            service_key,
+            consensus_key,
         }
     }
 }
