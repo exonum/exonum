@@ -12,15 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::time::SystemTime;
+use std::collections::HashMap;
+
+use crypto::PublicKey;
 use router::Router;
 use iron::prelude::*;
 
 use node::state::TxPool;
-use blockchain::Blockchain;
+use blockchain::{Blockchain, Schema, SharedNodeState};
 use crypto::Hash;
 use explorer::{BlockchainExplorer, TxInfo};
 use api::{Api, ApiError};
 use encoding::serialize::FromHex;
+use helpers::Height;
 
 #[derive(Serialize)]
 struct MemPoolTxInfo {
@@ -40,17 +45,45 @@ struct MemPoolInfo {
     size: usize,
 }
 
+#[derive(Serialize, Clone, Debug)]
+struct PrecommitInfo {
+    height: Height,
+    timestamp: SystemTime,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct HealthCheckInfo {
+    height: Height, // TODO: Should I remove this?
+
+    /// This node's pub key
+    public_key: PublicKey,
+
+    precommits: Vec<PrecommitInfo>,
+
+    /// All validators incl. current
+    chain: HashMap<PublicKey, Height>,
+}
+
 /// Public system API.
 #[derive(Clone, Debug)]
 pub struct SystemApi {
     pool: TxPool,
     blockchain: Blockchain,
+    shared_api_state: SharedNodeState,
 }
 
 impl SystemApi {
     /// Creates a new `private::SystemApi` instance.
-    pub fn new(pool: TxPool, blockchain: Blockchain) -> SystemApi {
-        SystemApi { pool, blockchain }
+    pub fn new(
+        pool: TxPool,
+        blockchain: Blockchain,
+        shared_api_state: SharedNodeState,
+    ) -> SystemApi {
+        SystemApi {
+            pool,
+            blockchain,
+            shared_api_state,
+        }
     }
 
     fn get_mempool_info(&self) -> MemPoolInfo {
@@ -73,6 +106,40 @@ impl SystemApi {
                 },
                 |o| Ok(MemPoolResult::MemPool(MemPoolTxInfo { content: o.info() })),
             )
+    }
+
+    fn get_healthcheck_info(&self) -> HealthCheckInfo {
+        let snapshot = self.blockchain.snapshot();
+        let schema = Schema::new(snapshot);
+
+        let height = schema.height();
+
+        let context = self.blockchain.api_context();
+        let public_key = *context.public_key();
+
+        let last_hash = self.blockchain.last_hash();
+        let schema_precommits = schema.precommits(&last_hash);
+        let mut precommits = Vec::new();
+        for precommit in &schema_precommits {
+            precommits.push(PrecommitInfo {
+                timestamp: precommit.time(),
+                height: precommit.height(),
+            });
+        }
+
+        let mut chain = HashMap::new();
+        for (_, info) in self.shared_api_state.peers_info() {
+            if let Some(height) = info.height {
+                chain.insert(info.public_key, height);
+            }
+        }
+
+        HealthCheckInfo {
+            height,
+            precommits,
+            chain,
+            public_key,
+        }
     }
 }
 
@@ -104,7 +171,14 @@ impl Api for SystemApi {
             }
         };
 
+        let _self = self.clone();
+        let healthcheck = move |_: &mut Request| {
+            let info = _self.get_healthcheck_info();
+            _self.ok_response(&::serde_json::to_value(info).unwrap())
+        };
+
         router.get("/v1/mempool", mempool_info, "mempool");
         router.get("/v1/transactions/:hash", transaction, "hash");
+        router.get("/v1/healthcheck", healthcheck, "healthcheck_info");
     }
 }

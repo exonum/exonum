@@ -242,13 +242,19 @@ impl ServiceContext {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct PeerInfo {
+    pub public_key: PublicKey,
+    pub height: Option<Height>,
+}
+
 #[derive(Debug, Default)]
 pub struct ApiNodeState {
     incoming_connections: HashSet<SocketAddr>,
     outgoing_connections: HashSet<SocketAddr>,
     reconnects_timeout: HashMap<SocketAddr, Milliseconds>,
     //TODO: update on event?
-    peers_info: HashMap<SocketAddr, PublicKey>,
+    peers_info: HashMap<SocketAddr, PeerInfo>,
 }
 
 impl ApiNodeState {
@@ -304,24 +310,32 @@ impl SharedNodeState {
             .map(|(c, e)| (*c, *e))
             .collect()
     }
+
     /// Return peers info list
-    pub fn peers_info(&self) -> Vec<(SocketAddr, PublicKey)> {
+    pub fn peers_info(&self) -> Vec<(SocketAddr, PeerInfo)> {
         self.state
             .read()
             .expect("Expected read lock.")
             .peers_info
             .iter()
-            .map(|(c, e)| (*c, *e))
+            .map(|(&c, &info)| (c, info))
             .collect()
     }
+
     /// Update internal state, from `Node` State`
     pub fn update_node_state(&self, state: &State) {
-        for (p, c) in state.peers().iter() {
-            self.state
-                .write()
-                .expect("Expected write lock.")
-                .peers_info
-                .insert(c.addr(), *p);
+        for (&public_key, c) in state.peers().iter() {
+            let height = state.node_height(&public_key);
+            let height = if height == Height::zero() {
+                None
+            } else {
+                Some(height)
+            };
+            let mut lock = self.state.write().expect("Expected write lock.");
+            lock.peers_info.insert(c.addr(), PeerInfo {
+                height,
+                public_key,
+            });
         }
     }
 

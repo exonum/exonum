@@ -392,7 +392,9 @@ impl Blockchain {
         mount
     }
 
-    fn api_context(&self) -> ApiContext {
+    // TODO: I need the public key - how can i get it?
+    // is it ok to make this public?
+    pub(crate) fn api_context(&self) -> ApiContext {
         ApiContext::from_parts(
             self,
             self.api_sender.clone(),
