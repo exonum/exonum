@@ -21,7 +21,6 @@ use byteorder::{ByteOrder, LittleEndian};
 use crypto::{Hash, PublicKey, Signature};
 use helpers::{Height, Round, ValidatorId};
 use super::{Error, CheckedOffset, Offset, Result};
-use super::float::{F32, F64};
 
 /// Trait for all types that could be a field in `encoding`.
 pub trait Field<'a> {
@@ -247,76 +246,6 @@ impl<'a> Field<'a> for i8 {
     ) -> Result {
         debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
         Ok(latest_segment)
-    }
-}
-
-impl<'a> Field<'a> for F32 {
-    fn field_size() -> Offset {
-        mem::size_of::<Self>() as Offset
-    }
-
-    unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
-        Self::new(LittleEndian::read_f32(&buffer[from as usize..to as usize]))
-    }
-
-    fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
-        LittleEndian::write_f32(&mut buffer[from as usize..to as usize], self.get());
-    }
-
-    fn check(
-        buffer: &'a [u8],
-        from: CheckedOffset,
-        to: CheckedOffset,
-        latest_segment: CheckedOffset,
-    ) -> Result {
-        debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
-
-        let from = from.unchecked_offset();
-        let to = to.unchecked_offset();
-
-        let value = LittleEndian::read_f32(&buffer[from as usize..to as usize]);
-        match Self::try_from(value) {
-            Some(_) => Ok(latest_segment),
-            None => Err(Error::UnsupportedFloat {
-                position: from,
-                value: f64::from(value),
-            }),
-        }
-    }
-}
-
-impl<'a> Field<'a> for F64 {
-    fn field_size() -> Offset {
-        mem::size_of::<Self>() as Offset
-    }
-
-    unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
-        Self::new(LittleEndian::read_f64(&buffer[from as usize..to as usize]))
-    }
-
-    fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
-        LittleEndian::write_f64(&mut buffer[from as usize..to as usize], self.get());
-    }
-
-    fn check(
-        buffer: &'a [u8],
-        from: CheckedOffset,
-        to: CheckedOffset,
-        latest_segment: CheckedOffset,
-    ) -> Result {
-        debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
-
-        let from = from.unchecked_offset();
-        let to = to.unchecked_offset();
-
-        let value = LittleEndian::read_f64(&buffer[from as usize..to as usize]);
-        match Self::try_from(value) {
-            Some(_) => Ok(latest_segment),
-            None => Err(Error::UnsupportedFloat {
-                position: from,
-                value,
-            }),
-        }
     }
 }
 

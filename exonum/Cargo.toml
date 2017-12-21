@@ -55,6 +55,7 @@ tempdir = "0.3.5"
 
 [features]
 default = []
+float_serialize = []
 long_benchmarks = []
 flame_profile = ["exonum_profiler/nomock", "exonum_flamer"]
 metrics-log = []
