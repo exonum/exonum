@@ -21,6 +21,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use crypto::{Hash, PublicKey, Signature};
 use helpers::{Height, Round, ValidatorId};
 use super::{Error, CheckedOffset, Offset, Result};
+#[cfg(feature="float_serialize")]
 use super::float::{F32, F64};
 
 /// Trait for all types that could be a field in `encoding`.
@@ -250,6 +251,7 @@ impl<'a> Field<'a> for i8 {
     }
 }
 
+#[cfg(feature="float_serialize")]
 impl<'a> Field<'a> for F32 {
     fn field_size() -> Offset {
         mem::size_of::<Self>() as Offset
@@ -285,6 +287,7 @@ impl<'a> Field<'a> for F32 {
     }
 }
 
+#[cfg(feature="float_serialize")]
 impl<'a> Field<'a> for F64 {
     fn field_size() -> Offset {
         mem::size_of::<Self>() as Offset

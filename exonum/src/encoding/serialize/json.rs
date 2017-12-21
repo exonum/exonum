@@ -25,15 +25,19 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::net::SocketAddr;
 use std::error::Error;
 
-use serde_json::value::{Value, Number};
+use serde_json::value::Value;
 use bit_vec::BitVec;
 use hex::FromHex;
 
 use crypto::{Hash, PublicKey, Signature};
 use helpers::{Height, Round, ValidatorId};
 use messages::RawMessage;
-use encoding::{Field, Offset, F32, F64};
+use encoding::{Field, Offset};
 use super::WriteBufferWrapper;
+#[cfg(feature="float_serialize")]
+use encoding::{F32, F64};
+#[cfg(feature="float_serialize")]
+use serde_json::value::Number;
 
 // TODO: should we implement serialize for: `SecretKey`, `Seed` (ECR-156)?
 
@@ -445,6 +449,7 @@ impl ExonumJson for ValidatorId {
     }
 }
 
+#[cfg(feature="float_serialize")]
 impl ExonumJson for F32 {
     fn deserialize_field<B: WriteBufferWrapper>(
         value: &Value,
@@ -466,6 +471,7 @@ impl ExonumJson for F32 {
     }
 }
 
+#[cfg(feature="float_serialize")]
 impl ExonumJson for F64 {
     fn deserialize_field<B: WriteBufferWrapper>(
         value: &Value,

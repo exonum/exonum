@@ -37,6 +37,7 @@ pub enum Error {
         /// value that was parsed as bool
         value: u8,
     },
+    #[cfg(feature="float_serialize")]
     /// Unsupported floating point value (Infinity, NaN or signaling NaN).
     UnsupportedFloat {
         /// Position in buffer where error appears.
@@ -134,6 +135,7 @@ impl StdError for Error {
         match *self {
             Error::UnexpectedlyShortPayload { .. } => "Unexpectedly short payload",
             Error::IncorrectBoolean { .. } => "Incorrect boolean value",
+            #[cfg(feature="float_serialize")]
             Error::UnsupportedFloat { .. } => "Unsupported float value",
             Error::IncorrectSegmentReference { .. } => "Incorrect segment reference",
             Error::IncorrectSegmentSize { .. } => "Incorrect segment size",
