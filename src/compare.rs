@@ -50,7 +50,7 @@ impl<T> Comparison<T> {
     ///
     /// # Panics
     ///
-    /// If the statement does not hold.
+    /// - Panics if the statement does not hold.
     ///
     /// # Examples
     ///
@@ -75,7 +75,7 @@ impl<T> Comparison<T> {
     ///
     /// # Panics
     ///
-    /// If the statement does not hold.
+    /// - Panics if the statement does not hold.
     ///
     /// # Examples
     ///
@@ -101,7 +101,7 @@ impl<T> Comparison<T> {
     ///
     /// # Panics
     ///
-    /// If the statement does not hold.
+    /// - Panics if the statement does not hold.
     ///
     /// # Examples
     ///
@@ -126,7 +126,7 @@ impl<T> Comparison<T> {
     ///
     /// # Panics
     ///
-    /// If the statement does not hold for either of states.
+    /// - Panics if the statement does not hold for either of states.
     ///
     /// # Examples
     ///
@@ -157,7 +157,7 @@ impl<T: PartialEq + ::std::fmt::Debug> Comparison<T> {
     ///
     /// # Panics
     ///
-    /// If the states are not equal.
+    /// - Panics if the states are not equal.
     ///
     /// # Examples
     ///
@@ -176,7 +176,7 @@ impl<T: PartialEq + ::std::fmt::Debug> Comparison<T> {
     ///
     /// # Panics
     ///
-    /// If the states are equal.
+    /// - Panics if the states are equal.
     ///
     /// # Examples
     ///

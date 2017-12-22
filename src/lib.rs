@@ -339,12 +339,12 @@ impl TestNode {
         self.validator_id
     }
 
-    /// Change node role.
+    /// Changes node role.
     pub fn change_role(&mut self, role: Option<ValidatorId>) {
         self.validator_id = role;
     }
 
-    /// Returns the service keypar.
+    /// Returns the service keypair.
     pub fn service_keypair(&self) -> (&crypto::PublicKey, &crypto::SecretKey) {
         (&self.service_public_key, &self.service_secret_key)
     }
@@ -1096,11 +1096,18 @@ impl TestNetworkConfiguration {
     }
 }
 
-#[doc(hidden)]
+/// Kind of public or private REST API of an Exonum node.
+///
+/// `ApiKind` allows to use `get*` and `post*` methods of [`TestKitApi`] more safely.
+///
+/// [`TestKitApi`]: struct.TestKitApi.html
 #[derive(Debug)]
 pub enum ApiKind {
+    /// `api/system` endpoints of the built-in Exonum REST API.
     System,
+    /// `api/explorer` endpoints of the built-in Exonum REST API.
     Explorer,
+    /// Endpoints corresponding to a service with the specified string identifier.
     Service(&'static str),
 }
 
@@ -1129,7 +1136,7 @@ impl fmt::Debug for TestKitApi {
 }
 
 impl TestKitApi {
-    /// Creates a new instance of Api.
+    /// Creates a new instance of API.
     fn new(testkit: &TestKit) -> Self {
         use std::sync::Arc;
         use exonum::api::{public, Api};
@@ -1225,6 +1232,11 @@ impl TestKitApi {
     }
 
     /// Gets information from a public endpoint of the node.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if an error occurs during request processing (e.g., the requested endpoint is
+    ///  unknown), or if the response has a non-20x response status.
     pub fn get<D>(&self, kind: ApiKind, endpoint: &str) -> D
     where
         for<'de> D: Deserialize<'de>,
@@ -1237,6 +1249,11 @@ impl TestKitApi {
     }
 
     /// Gets information from a private endpoint of the node.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if an error occurs during request processing (e.g., the requested endpoint is
+    ///  unknown), or if the response has a non-20x response status.
     pub fn get_private<D>(&self, kind: ApiKind, endpoint: &str) -> D
     where
         for<'de> D: Deserialize<'de>,
@@ -1249,6 +1266,10 @@ impl TestKitApi {
     }
 
     /// Gets an error from a public endpoint of the node.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if the response has a non-40x response status.
     pub fn get_err<D>(&self, kind: ApiKind, endpoint: &str) -> D
     where
         for<'de> D: Deserialize<'de>,
@@ -1285,6 +1306,11 @@ impl TestKitApi {
     /// of synchronous transaction processing, which includes running the API shim
     /// and `Transaction.verify()`. `Transaction.execute()` is not run until the transaction
     /// gets to a block via one of `create_block*()` methods.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if an error occurs during request processing (e.g., the requested endpoint is
+    ///  unknown).
     pub fn post<T, D>(&self, kind: ApiKind, endpoint: &str, transaction: &T) -> D
     where
         T: Serialize,
@@ -1301,6 +1327,11 @@ impl TestKitApi {
     /// of synchronous transaction processing, which includes running the API shim
     /// and `Transaction.verify()`. `Transaction.execute()` is not run until the transaction
     /// gets to a block via one of `create_block*()` methods.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if an error occurs during request processing (e.g., the requested endpoint is
+    ///  unknown).
     pub fn post_private<T, D>(&self, kind: ApiKind, endpoint: &str, transaction: &T) -> D
     where
         T: Serialize,
