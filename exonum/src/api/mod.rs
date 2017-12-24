@@ -65,6 +65,8 @@ pub enum ApiError {
     Unauthorized,
     /// Address parse error.
     AddressParseError(::std::net::AddrParseError),
+    /// Serialize error,
+    Serialize(Box<::std::error::Error + Send + Sync>),
 }
 
 impl fmt::Display for ApiError {
@@ -87,6 +89,7 @@ impl ::std::error::Error for ApiError {
             ApiError::FileExists(_) => "File exists",
             ApiError::Unauthorized => "Unauthorized",
             ApiError::AddressParseError(_) => "AddressParseError",
+            ApiError::Serialize(_) => "Serialization error",
         }
     }
 }
