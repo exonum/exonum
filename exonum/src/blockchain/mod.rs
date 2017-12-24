@@ -45,7 +45,8 @@ use helpers::{Height, ValidatorId};
 use node::ApiSender;
 
 pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
-pub use self::schema::{gen_prefix, Schema, TxLocation};
+pub use self::schema::{gen_prefix, Schema, TxLocation, TxStatus,
+                       TX_STATUS_COMMITTED, TX_STATUS_MEM_POOL, TX_STATUS_VALIDATION};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
 pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState, Transaction};

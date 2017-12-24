@@ -26,10 +26,11 @@ use futures::{Future, Async, Poll, Stream};
 use futures::sink::Wait;
 use futures::sync::mpsc::{self, Sender};
 
+use blockchain::Transaction;
 use node::{ExternalMessage, NodeTimeout};
+use helpers::{Height, Round};
 pub use self::network::{NetworkEvent, NetworkRequest, NetworkPart, NetworkConfiguration};
 pub use self::internal::InternalPart;
-use helpers::{Height, Round};
 
 pub type SyncSender<T> = Wait<Sender<T>>;
 
@@ -37,15 +38,17 @@ pub type SyncSender<T> = Wait<Sender<T>>;
 /// Usable to make flat logic and remove recursions.
 #[derive(Debug)]
 pub enum InternalEvent {
+    Timeout(NodeTimeout),
     /// Round update event.
     JumpToRound(Height, Round),
-    Timeout(NodeTimeout),
+    TransactionValidated(Box<Transaction>, bool),
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub enum InternalRequest {
     Timeout(TimeoutRequest),
     JumpToRound(Height, Round),
+    ValidateTransaction(Box<Transaction>),
 }
 
 #[derive(Debug, PartialEq, Eq)]

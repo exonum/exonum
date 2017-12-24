@@ -61,7 +61,6 @@ pub struct State {
 
     config: StoredConfiguration,
     whitelist: Whitelist,
-    tx_pool_capacity: usize,
 
     peers: HashMap<PublicKey, Connect>,
     connections: HashMap<SocketAddr, PublicKey>,
@@ -78,8 +77,6 @@ pub struct State {
     blocks: HashMap<Hash, BlockState>,
     prevotes: HashMap<(Round, Hash), Votes<Prevote>>,
     precommits: HashMap<(Round, Hash), Votes<Precommit>>,
-
-    transactions: TxPool,
 
     queued: Vec<ConsensusMessage>,
 
@@ -744,51 +741,21 @@ impl State {
         self.queued.push(msg);
     }
 
-    /// Returns non-committed transactions.
-    pub fn transactions(&self) -> &TxPool {
-        &self.transactions
-    }
-
-    /// Adds a transaction to the pool and returns list of proposes that don't contain unknown
-    /// transactions now.
+    /// Handles a transaction validated event and returns list of proposes
+    /// that don't contain unknown transactions now.
     ///
     /// Transaction is ignored if the following criteria are fulfilled:
     /// - transactions pool size is exceeded
     /// - transaction isn't contained in unknown transaction list of any propose
     /// - transaction isn't a part of block
-    pub fn add_transaction(
-        &mut self,
-        tx_hash: Hash,
-        msg: Box<Transaction>,
-        // if tx is in some of propose or in a block,
-        // we should add it, or we could become stuck in some state
-        mut high_priority_tx: bool,
-    ) -> Vec<(Hash, Round)> {
+    pub fn transaction_validated(&mut self, tx_hash: Hash) -> Vec<(Hash, Round)> {
         let mut full_proposes = Vec::new();
         for (propose_hash, propose_state) in &mut self.proposes {
-            high_priority_tx |= propose_state.unknown_txs.remove(&tx_hash);
+            propose_state.unknown_txs.remove(&tx_hash);
             if propose_state.unknown_txs.is_empty() {
                 full_proposes.push((*propose_hash, propose_state.message().round()));
             }
         }
-        let tx_pool_len = self.transactions.read().expect("Expected read lock").len();
-        if tx_pool_len >= self.tx_pool_capacity {
-            // but make warn about pool exceeded, even if we should add tx
-            warn!(
-                "Too many transactions in pool, txs={}, high_priority={}",
-                tx_pool_len,
-                high_priority_tx
-            );
-            if !high_priority_tx {
-                return full_proposes;
-            }
-        }
-
-        self.transactions
-            .write()
-            .expect("Expected read lock")
-            .insert(tx_hash, msg);
-
         full_proposes
     }
 

@@ -19,12 +19,14 @@ use futures::sync::mpsc;
 use tokio_core::reactor::Handle;
 use tokio_core::reactor::Timeout;
 
+use threadpool;
+
 use std::io;
 use std::time::{Duration, SystemTime};
 
-
-use super::error::{into_other, other_error};
+use super::error::{into_other, other_error, log_error};
 use super::{InternalRequest, TimeoutRequest, InternalEvent, tobox};
+use blockchain::Transaction;
 
 #[derive(Debug)]
 pub struct InternalPart {
@@ -34,6 +36,7 @@ pub struct InternalPart {
 
 impl InternalPart {
     pub fn run(self, handle: Handle) -> Box<Future<Item = (), Error = io::Error>> {
+        let pool = threadpool::Builder::new().build();
         let internal_tx = self.internal_tx.clone();
         let fut = self.internal_requests_rx
             .for_each(move |request| {
@@ -67,6 +70,18 @@ impl InternalPart {
                             })
                             .map_err(|_| panic!("Can't execute jump to round"));
                         tobox(fut)
+                    }
+                    InternalRequest::ValidateTransaction(tx) => {
+                        let internal_tx = internal_tx.clone();
+                        pool.execute(move || {
+                            let valid = tx.verify();
+                            internal_tx
+                                .send(InternalEvent::TransactionValidated(tx, valid))
+                                .map(drop)
+                                .map_err(log_error)
+                                .wait();
+                        });
+                        tobox(Ok(()).into_future())
                     }
                 };
 

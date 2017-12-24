@@ -49,6 +49,19 @@ encoding_struct! (
     }
 );
 
+pub const TX_STATUS_VALIDATION: u64 = 1;
+pub const TX_STATUS_MEM_POOL: u64 = 2;
+pub const TX_STATUS_COMMITTED: u64 = 3;
+
+encoding_struct! (
+    /// Transaction Status in block.
+    struct TxStatus {
+        const SIZE = 16;
+        field tag:                     u64     [00 => 08]
+        field transaction:         RawMessage  [08 => 16]
+    }
+);
+
 /// Information schema for `exonum-core`.
 #[derive(Debug)]
 pub struct Schema<T> {
@@ -65,7 +78,7 @@ where
     }
 
     /// Returns table that represents a map from transaction hash into raw transaction message.
-    pub fn transactions(&self) -> MapIndex<&T, Hash, RawMessage> {
+    pub fn transactions(&self) -> MapIndex<&T, Hash, TxStatus> {
         MapIndex::new("core.transactions", &self.view)
     }
 
@@ -296,7 +309,7 @@ impl<'a> Schema<&'a mut Fork> {
     /// Mutable reference to the [`transactions`][1] index.
     ///
     /// [1]: struct.Schema.html#method.transactions
-    pub fn transactions_mut(&mut self) -> MapIndex<&mut Fork, Hash, RawMessage> {
+    pub fn transactions_mut(&mut self) -> MapIndex<&mut Fork, Hash, TxStatus> {
         MapIndex::new("core.transactions", &mut self.view)
     }
 

@@ -56,6 +56,7 @@ extern crate cookie;
 extern crate mount;
 extern crate atty;
 extern crate bytes;
+extern crate threadpool;
 extern crate futures;
 #[cfg(any(test, feature = "long_benchmarks"))]
 extern crate tokio_timer;

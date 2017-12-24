@@ -34,6 +34,7 @@ impl NodeHandler {
         match event {
             InternalEvent::Timeout(timeout) => self.handle_timeout(timeout),
             InternalEvent::JumpToRound(height, round) => self.handle_new_round(height, round),
+            InternalEvent::TransactionValidated(tx, valid) => self.handle_tx_valid(tx, valid),
         }
     }
 
@@ -49,7 +50,7 @@ impl NodeHandler {
     fn handle_api_event(&mut self, event: ExternalMessage) {
         match event {
             ExternalMessage::Transaction(tx) => {
-                self.handle_incoming_tx(tx);
+                self.handle_tx_valid(tx, true);
             }
             ExternalMessage::PeerAdd(address) => {
                 info!("Send Connect message to {}", address);
