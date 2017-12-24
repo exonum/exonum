@@ -14,7 +14,6 @@
 
 use events::{Event, EventHandler, NetworkEvent, InternalEvent, InternalRequest};
 use super::{NodeHandler, ExternalMessage, NodeTimeout};
-use futures::{Sink, Future};
 use events::error::LogError;
 
 impl EventHandler for NodeHandler {
@@ -72,11 +71,6 @@ impl NodeHandler {
 
     /// Schedule execution for later time
     pub(crate) fn execute_later(&mut self, event: InternalRequest) {
-        self.channel
-            .internal_requests
-            .clone()
-            .send(event)
-            .wait()
-            .log_error();
+        self.channel.internal_requests.send(event).log_error();
     }
 }
