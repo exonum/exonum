@@ -77,7 +77,7 @@ fn test_exonum_time_service() {
     // time   | 'time0' | 'time1' | None |
     //
     // In sorted order: 'time1' >= 'time0'
-    // Time, that is saved in storage, will have the value 'time0'.
+    // Time, that is saved in storage, does not change.
 
     let time1 = time0 + Duration::new(10, 0);
     let tx1 = {
@@ -100,7 +100,7 @@ fn test_exonum_time_service() {
             validators_time_storage.get(pub_key)
         );
     }
-    assert_eq!(schema.time().get(), Some(Time::new(time0)));
+    assert_eq!(schema.time().get(), None);
 
     // Add third transaction 'tx2' from third validator with time 'time2' = 'time1' + 10 sec.
     // After that validators time look like this:
