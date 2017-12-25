@@ -5,13 +5,12 @@ extern crate exonum_testkit;
 #[macro_use]
 extern crate pretty_assertions;
 
-use std::time::{SystemTime, Duration};
+use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
 use exonum::helpers::{Height, ValidatorId};
 use exonum::crypto::gen_keypair;
 
-use exonum_time::TimeSchema;
-use exonum_time::{TimeService, TxTime, Time};
+use exonum_time::{TimeService, TimeSchema, TxTime, Time, TimeProvider};
 use exonum_testkit::{TestKitBuilder, TestNode};
 
 #[test]
@@ -136,6 +135,51 @@ fn test_exonum_time_service() {
         );
     }
     assert_eq!(schema.time().get(), Some(Time::new(time1)));
+}
+
+// A struct that provides the node with the current time.
+#[derive(Debug)]
+struct MyTimeProvider;
+impl TimeProvider for MyTimeProvider {
+    fn current_time(&self) -> SystemTime {
+        UNIX_EPOCH
+    }
+}
+
+#[test]
+fn test_mock_provider() {
+    // Create a simple testkit network.
+    let mut testkit = TestKitBuilder::validator()
+        .with_service(TimeService::with_provider(
+            Box::new(MyTimeProvider) as Box<TimeProvider>,
+        ))
+        .create();
+
+    // Get the validator public key.
+    let validator_public_key = &testkit.network().validators().to_vec()[0]
+        .public_keys()
+        .service_key;
+
+    let snapshot = testkit.snapshot();
+    let schema = TimeSchema::new(snapshot);
+
+    // Check that the blockchain does not contain time.
+    assert_eq!(schema.time().get(), None);
+    // Check that the time for the validator is unknown.
+    assert_eq!(schema.validators_time().get(validator_public_key), None);
+
+    // Create two blocks.
+    testkit.create_blocks_until(Height(2));
+
+    let snapshot = testkit.snapshot();
+    let schema = TimeSchema::new(snapshot);
+
+    // Check that the time in the blockchain and for the validator has been updated.
+    assert_eq!(schema.time().get(), Some(Time::new(UNIX_EPOCH)));
+    assert_eq!(
+        schema.validators_time().get(validator_public_key),
+        Some(Time::new(UNIX_EPOCH))
+    );
 }
 
 #[test]
