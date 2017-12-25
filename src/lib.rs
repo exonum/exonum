@@ -88,6 +88,7 @@
 //!         .with_validators(4)
 //!         .with_service(TimestampingService)
 //!         .create();
+//!
 //!     // Create few transactions.
 //!     let keypair = gen_keypair();
 //!     let tx1 = TxTimestamp::new(&keypair.0, "Down To Earth", &keypair.1);
@@ -97,16 +98,23 @@
 //!     testkit.create_block_with_transactions(txvec![
 //!         tx1.clone(), tx2.clone(), tx3.clone()
 //!     ]);
+//!
+//!     // Add a single transaction.
+//!     let tx4 = TxTimestamp::new(&keypair.0, "Barking up the wrong tree", &keypair.1);
+//!     testkit.create_block_with_transaction(tx4.clone());
+//!
 //!     // Check results with schema.
 //!     let snapshot = testkit.snapshot();
 //!     let schema = Schema::new(&snapshot);
 //!     assert!(schema.transactions().contains(&tx1.hash()));
 //!     assert!(schema.transactions().contains(&tx2.hash()));
 //!     assert!(schema.transactions().contains(&tx3.hash()));
+//!     assert!(schema.transactions().contains(&tx4.hash()));
+//!
 //!     // Check results with api.
 //!     let api = testkit.api();
 //!     let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10");
-//!     assert_eq!(blocks.len(), 2);
+//!     assert_eq!(blocks.len(), 3);
 //!     api.get::<serde_json::Value>(
 //!         ApiKind::System,
 //!         &format!("v1/transactions/{}", tx1.hash().to_string()),
@@ -741,8 +749,8 @@ impl TestKit {
         }
     }
 
-    /// Creates block with the given transactions.
-    /// Transactions that are in mempool will be ignored.
+    /// Creates a block with the given transactions.
+    /// Transactions that are in the mempool will be ignored.
     ///
     /// # Panics
     ///
@@ -773,6 +781,16 @@ impl TestKit {
                 .collect()
         };
         self.create_block_with_tx_hashes(&tx_hashes);
+    }
+
+    /// Creates a block with the given transaction.
+    /// Transactions that are in the mempool will be ignored.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if given transaction has been already committed to the blockchain.
+    pub fn create_block_with_transaction<T: Transaction>(&mut self, tx: T) {
+        self.create_block_with_transactions(txvec![tx]);
     }
 
     /// Creates block with the specified transactions. The transactions must be previously
