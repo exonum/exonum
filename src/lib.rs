@@ -124,6 +124,7 @@
 
 #![deny(missing_debug_implementations, missing_docs)]
 
+extern crate bodyparser;
 extern crate exonum;
 extern crate futures;
 extern crate iron;
@@ -131,6 +132,8 @@ extern crate iron_test;
 extern crate mount;
 extern crate router;
 extern crate serde;
+#[macro_use]
+extern crate serde_derive;
 extern crate serde_json;
 
 use futures::Stream;
