@@ -36,8 +36,8 @@ use crypto::{self, Hash, PublicKey, SecretKey};
 use blockchain::{Blockchain, GenesisConfig, Schema, SharedNodeState, Transaction, Service};
 use api::{private, public, Api};
 use messages::{Connect, Message, RawMessage};
-use events::{NetworkRequest, TimeoutRequest, NetworkEvent, InternalRequest, InternalEvent};
-use events::{HandlerPart, NetworkConfiguration, NetworkPart, InternalPart};
+use events::{NetworkRequest, TimeoutRequest, NetworkEvent, InternalRequest, InternalEvent,
+             SyncSender, HandlerPart, NetworkConfiguration, NetworkPart, InternalPart};
 use events::error::{into_other, other_error, LogError, log_error};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 use storage::Database;
@@ -246,14 +246,14 @@ pub struct Configuration {
 }
 
 /// Channel for messages, timeouts and api requests.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct NodeSender {
     /// Internal requests sender.
-    pub internal_requests: mpsc::Sender<InternalRequest>,
+    pub internal_requests: SyncSender<InternalRequest>,
     /// Network requests sender.
-    pub network_requests: mpsc::Sender<NetworkRequest>,
+    pub network_requests: SyncSender<NetworkRequest>,
     /// Api requests sender.
-    pub api_requests: mpsc::Sender<ExternalMessage>,
+    pub api_requests: SyncSender<ExternalMessage>,
 }
 
 impl NodeHandler {
@@ -375,7 +375,7 @@ impl NodeHandler {
     }
 
     /// Sends the given message to a peer by its id.
-    pub fn send_to_validator(&self, id: u32, message: &RawMessage) {
+    pub fn send_to_validator(&mut self, id: u32, message: &RawMessage) {
         if id as usize >= self.state.validators().len() {
             error!("Invalid validator id: {}", id);
         } else {
@@ -385,48 +385,46 @@ impl NodeHandler {
     }
 
     /// Sends the given message to a peer by its public key.
-    pub fn send_to_peer(&self, public_key: PublicKey, message: &RawMessage) {
+    pub fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
         if let Some(conn) = self.state.peers().get(&public_key) {
-            self.send_to_addr(&conn.addr(), message);
+            let address = conn.addr();
+            trace!("Send to address: {}", address);
+            let request = NetworkRequest::SendMessage(address, message.raw().clone());
+            self.channel.network_requests.send(request).log_error();
         } else {
             warn!("Hasn't connection with peer {:?}", public_key);
         }
     }
 
     /// Sends `RawMessage` to the specified address.
-    pub fn send_to_addr(&self, address: &SocketAddr, message: &RawMessage) {
+    pub fn send_to_addr(&mut self, address: &SocketAddr, message: &RawMessage) {
         trace!("Send to address: {}", address);
         let request = NetworkRequest::SendMessage(*address, message.clone());
-        self.channel
-            .network_requests
-            .clone()
-            .send(request)
-            .wait()
-            .log_error();
+        self.channel.network_requests.send(request).log_error();
     }
 
     /// Broadcasts given message to all peers.
     pub fn broadcast(&mut self, message: &Message) {
         for conn in self.state.peers().values() {
-            let addr = conn.addr();
-            self.send_to_addr(&addr, message.raw());
+            let address = conn.addr();
+            trace!("Send to address: {}", address);
+            let request = NetworkRequest::SendMessage(address, message.raw().clone());
+            self.channel.network_requests.send(request).log_error();
         }
     }
 
     /// Performs connection to the specified network address.
-    pub fn connect(&self, address: &SocketAddr) {
+    pub fn connect(&mut self, address: &SocketAddr) {
         let connect = self.state.our_connect_message().clone();
         self.send_to_addr(address, connect.raw());
     }
 
     /// Add timeout request.
-    pub fn add_timeout(&self, timeout: NodeTimeout, time: SystemTime) {
+    pub fn add_timeout(&mut self, timeout: NodeTimeout, time: SystemTime) {
         let request = TimeoutRequest(time, timeout);
         self.channel
             .internal_requests
-            .clone()
             .send(request.into())
-            .wait()
             .log_error();
     }
 
@@ -439,7 +437,7 @@ impl NodeHandler {
     }
 
     /// Adds `NodeTimeout::Round` timeout to the channel.
-    pub fn add_round_timeout(&self) {
+    pub fn add_round_timeout(&mut self) {
         let time = self.round_start_time(self.state.round().next());
         trace!(
             "ADD ROUND TIMEOUT: time={:?}, height={}, round={}",
@@ -452,7 +450,7 @@ impl NodeHandler {
     }
 
     /// Adds `NodeTimeout::Propose` timeout to the channel.
-    pub fn add_propose_timeout(&self) {
+    pub fn add_propose_timeout(&mut self) {
         let adjusted_timeout = self.state.propose_timeout();
         let time = self.round_start_time(self.state.round()) +
             Duration::from_millis(adjusted_timeout);
@@ -468,27 +466,28 @@ impl NodeHandler {
     }
 
     /// Adds `NodeTimeout::Status` timeout to the channel.
-    pub fn add_status_timeout(&self) {
+    pub fn add_status_timeout(&mut self) {
         let time = self.system_state.current_time() + Duration::from_millis(self.status_timeout());
-        self.add_timeout(NodeTimeout::Status(self.state.height()), time);
+        let height = self.state.height();
+        self.add_timeout(NodeTimeout::Status(height), time);
     }
 
     /// Adds `NodeTimeout::Request` timeout with `RequestData` to the channel.
-    pub fn add_request_timeout(&self, data: RequestData, peer: Option<PublicKey>) {
+    pub fn add_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
         trace!("ADD REQUEST TIMEOUT");
         let time = self.system_state.current_time() + data.timeout();
         self.add_timeout(NodeTimeout::Request(data, peer), time);
     }
 
     /// Adds `NodeTimeout::PeerExchange` timeout to the channel.
-    pub fn add_peer_exchange_timeout(&self) {
+    pub fn add_peer_exchange_timeout(&mut self) {
         trace!("ADD PEER EXCHANGE TIMEOUT");
         let time = self.system_state.current_time() + Duration::from_millis(self.peers_timeout());
         self.add_timeout(NodeTimeout::PeerExchange, time);
     }
 
     /// Adds `NodeTimeout::UpdateApiState` timeout to the channel.
-    pub fn add_update_api_state_timeout(&self) {
+    pub fn add_update_api_state_timeout(&mut self) {
         let time = self.system_state.current_time() +
             Duration::from_millis(self.api_state().state_update_timeout());
         self.add_timeout(NodeTimeout::UpdateApiState, time);
@@ -614,9 +613,9 @@ impl NodeChannel {
     /// Returns the channel for sending timeouts, networks and api requests.
     pub fn node_sender(&self) -> NodeSender {
         NodeSender {
-            internal_requests: self.internal_requests.0.clone(),
-            network_requests: self.network_requests.0.clone(),
-            api_requests: self.api_requests.0.clone(),
+            internal_requests: self.internal_requests.0.clone().wait(),
+            network_requests: self.network_requests.0.clone().wait(),
+            api_requests: self.api_requests.0.clone().wait(),
         }
     }
 }

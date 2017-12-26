@@ -24,6 +24,7 @@ use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet, VecDeque};
 use std::iter::FromIterator;
 
 use futures::{self, Async, Future, Stream};
+use futures::Sink;
 use futures::sync::mpsc;
 use exonum::node::{Configuration, ExternalMessage, ListenerConfig, NodeHandler, NodeSender,
                    ServiceConfig, State, SystemStateProvider, ApiSender};
@@ -621,9 +622,9 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
     let network_channel = mpsc::channel(100);
     let internal_channel = mpsc::channel(100);
     let node_sender = NodeSender {
-        network_requests: network_channel.0.clone(),
-        internal_requests: internal_channel.0.clone(),
-        api_requests: api_channel.0.clone(),
+        network_requests: network_channel.0.clone().wait(),
+        internal_requests: internal_channel.0.clone().wait(),
+        api_requests: api_channel.0.clone().wait(),
     };
 
     let mut handler = NodeHandler::new(

@@ -23,12 +23,15 @@ use std::time::SystemTime;
 use std::cmp::Ordering;
 
 use futures::{Future, Async, Poll, Stream};
-use futures::sync::mpsc;
+use futures::sink::Wait;
+use futures::sync::mpsc::{self, Sender};
 
 use node::{ExternalMessage, NodeTimeout};
 pub use self::network::{NetworkEvent, NetworkRequest, NetworkPart, NetworkConfiguration};
 pub use self::internal::InternalPart;
 use helpers::{Height, Round};
+
+pub type SyncSender<T> = Wait<Sender<T>>;
 
 /// This kind of events is used to schedule execution in next event-loop ticks
 /// Usable to make flat logic and remove recursions.
