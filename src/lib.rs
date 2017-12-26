@@ -135,21 +135,25 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
+extern crate tokio_core;
 
-use futures::Stream;
-use futures::executor::{self, Spawn};
+use futures::{executor, Future, Stream};
+use futures::future::ok as future_ok;
 use futures::sync::mpsc;
-use iron::IronError;
+use iron::{Chain, Iron, IronError};
 use iron::headers::{ContentType, Headers};
 use iron::status::StatusClass;
 use iron_test::{request, response};
 use mount::Mount;
 use router::Router;
 use serde::{Deserialize, Serialize};
+use tokio_core::reactor::Core;
 
 use std::collections::BTreeMap;
-use std::sync::{Arc, RwLock, RwLockReadGuard};
 use std::fmt;
+use std::net::SocketAddr;
+use std::sync::{Arc, RwLock, RwLockReadGuard};
+use std::thread;
 
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Schema as CoreSchema,
                          Service, StoredConfiguration, Transaction, ValidatorKeys};
@@ -164,12 +168,14 @@ mod macros;
 mod checkpoint_db;
 pub mod compare;
 mod greedy_fold;
+mod handler;
 
 #[doc(hidden)]
 pub use greedy_fold::GreedilyFoldable;
 pub use compare::ComparableSnapshot;
 
 use checkpoint_db::{CheckpointDb, CheckpointDbHandler};
+use handler::create_testkit_handler;
 
 /// Emulated test network.
 #[derive(Debug)]
@@ -985,6 +991,38 @@ impl TestKit {
             "There is an active configuration change proposal."
         );
         self.cfg_proposal = Some(Uncommitted(proposal));
+    }
+
+    /// Starts a testkit web server, which listens to public and private APIs exposed by
+    /// the testkit, on the respective addresses. The private address also exposes the testkit
+    /// APIs with the `/api/testkit` URL prefix (hereinafter denoted as `{baseURL}`).
+    ///
+    /// Unlike real Exonum nodes, the testkit web server does not create peer-to-peer connections
+    /// with other nodes, and does not create blocks automatically. The only way to commit
+    /// transactions is thus to use the [testkit API](#testkit-apis).
+    pub fn run(mut self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
+        let api = self.api();
+        let events_stream = self.remove_events_stream();
+        let (public_mount, mut private_mount) = (api.public_mount, api.private_mount);
+        private_mount.mount("api/testkit", create_testkit_handler(self));
+
+        let public_api_thread = thread::spawn(move || {
+            let chain = Chain::new(public_mount);
+            Iron::new(chain).http(public_api_address).unwrap();
+        });
+        let private_api_thread = thread::spawn(move || {
+            let chain = Chain::new(private_mount);
+            Iron::new(chain).http(private_api_address).unwrap();
+        });
+
+        // Run the event stream in a separate thread in order to put transactions to mempool
+        // when they are received. Otherwise, a client would need to call a `poll_events` analogue
+        // each time after a transaction is posted.
+        let mut core = Core::new().unwrap();
+        core.run(events_stream).unwrap();
+
+        public_api_thread.join().unwrap();
+        private_api_thread.join().unwrap();
     }
 
     /// Extracts the event stream from this testkit, replacing it with `futures::stream::empty()`.
