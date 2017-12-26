@@ -985,16 +985,6 @@ impl TestKit {
     pub fn us(&self) -> &TestNode {
         self.network().us()
     }
-
-    /// Returns public key of the validator.
-    pub fn service_public_key(&self) -> crypto::PublicKey {
-        *self.network().validators()[0].service_keypair().0
-    }
-
-    /// Returns secret key of the validator.
-    pub fn service_secret_key(&self) -> crypto::SecretKey {
-        self.network().validators()[0].service_keypair().1.clone()
-    }
 }
 
 /// A configuration of the test network.
