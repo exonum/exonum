@@ -23,5 +23,8 @@
     "exonum-client": "^0.3.0",
     "mocha": "^4.0.1",
     "node-fetch": "^1.7.3"
+  },
+  "devDependencies": {
+    "standard": "^10.0.3"
   }
 }
