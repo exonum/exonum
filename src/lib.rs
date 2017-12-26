@@ -490,19 +490,12 @@ impl fmt::Debug for TestKit {
 }
 
 impl TestKit {
-    /// Creates a new `TestKit` with a single validator. Returns `TestKit` along with public and
-    /// private keys of the validator.
-    pub fn single_validator<S>(service: S) -> (Self, crypto::PublicKey, crypto::SecretKey)
+    /// Creates a new `TestKit` with a single validator with the given service.
+    pub fn for_service<S>(service: S) -> Self
     where
         S: Into<Box<Service>>,
     {
-        let testkit = TestKitBuilder::validator().with_service(service).create();
-        let (public_key, secret_key) = {
-            let (public_key, secret_key) =
-                testkit.network().validators()[0].service_keypair().clone();
-            (public_key.clone(), secret_key.clone())
-        };
-        (testkit, public_key, secret_key)
+        TestKitBuilder::validator().with_service(service).create()
     }
 
     fn assemble(services: Vec<Box<Service>>, network: TestNetwork) -> Self {
@@ -874,6 +867,7 @@ impl TestKit {
     /// Returns reference to validator with the given identifier.
     ///
     /// # Panics
+    ///
     /// - Panics if validator with the given id is absent in test network.
     pub fn validator(&self, id: ValidatorId) -> &TestNode {
         &self.network.validators[id.0 as usize]
@@ -985,6 +979,21 @@ impl TestKit {
             "There is an active configuration change proposal."
         );
         self.cfg_proposal = Some(Uncommitted(proposal));
+    }
+
+    /// Returns the node in the emulated network, from whose perspective the testkit operates.
+    pub fn us(&self) -> &TestNode {
+        self.network().us()
+    }
+
+    /// Returns public key of the validator.
+    pub fn service_public_key(&self) -> crypto::PublicKey {
+        *self.network().validators()[0].service_keypair().0
+    }
+
+    /// Returns secret key of the validator.
+    pub fn service_secret_key(&self) -> crypto::SecretKey {
+        self.network().validators()[0].service_keypair().1.clone()
     }
 }
 
