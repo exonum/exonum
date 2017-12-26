@@ -321,6 +321,10 @@ mod cryptocurrency {
             "cryptocurrency"
         }
 
+        fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+            Vec::new()
+        }
+
         fn service_id(&self) -> u16 {
             SERVICE_ID
         }

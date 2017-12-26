@@ -18,10 +18,10 @@ extern crate exonum;
 extern crate exonum_testkit;
 extern crate serde_json;
 
-use exonum::crypto::{gen_keypair, PublicKey};
+use exonum::crypto::{gen_keypair, Hash, PublicKey};
 use exonum::blockchain::{Block, Schema, Service, Transaction};
 use exonum::messages::{Message, RawTransaction};
-use exonum::storage::Fork;
+use exonum::storage::{Fork, Snapshot};
 use exonum::encoding;
 use exonum_testkit::{ApiKind, TestKitBuilder};
 
@@ -58,6 +58,10 @@ impl Transaction for TxTimestamp {
 impl Service for TimestampingService {
     fn service_name(&self) -> &'static str {
         "timestamping"
+    }
+
+    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+        Vec::new()
     }
 
     fn service_id(&self) -> u16 {

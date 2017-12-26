@@ -30,8 +30,8 @@ mod hooks {
 
     use exonum::blockchain::{Service, ServiceContext, Transaction};
     use exonum::messages::RawTransaction;
-    use exonum::storage::Fork;
-    use exonum::crypto::Signature;
+    use exonum::storage::{Fork, Snapshot};
+    use exonum::crypto::{Hash, Signature};
     use exonum::encoding;
     use exonum::helpers::Height;
 
@@ -65,6 +65,10 @@ mod hooks {
     impl Service for HandleCommitService {
         fn service_name(&self) -> &'static str {
             "handle_commit"
+        }
+
+        fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+            Vec::new()
         }
 
         fn service_id(&self) -> u16 {
