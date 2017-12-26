@@ -240,7 +240,7 @@ impl TestNetwork {
 }
 
 /// An emulated node in the test network.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TestNode {
     consensus_secret_key: crypto::SecretKey,
     consensus_public_key: crypto::PublicKey,
@@ -991,7 +991,7 @@ impl TestKit {
 }
 
 /// A configuration of the test network.
-#[derive(Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TestNetworkConfiguration {
     us: TestNode,
     validators: Vec<TestNode>,
