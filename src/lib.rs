@@ -753,6 +753,17 @@ impl TestKit {
         }
     }
 
+    /// Returns a reference to the scheduled configutation proposal, or `None` if
+    /// there is no such proposal.
+    pub fn next_configuration(&self) -> Option<&TestNetworkConfiguration> {
+        use ConfigurationProposalState::*;
+
+        self.cfg_proposal.as_ref().map(|p| match *p {
+            Committed(ref proposal) |
+            Uncommitted(ref proposal) => proposal,
+        })
+    }
+
     /// Creates a block with the given transactions.
     /// Transactions that are in the mempool will be ignored.
     ///
