@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// Creates a `Vec<Box<Transaction>>` from the given transactions.
-///
-/// Each transaction must have an `Into<Box<Transaction>>` implementation.
+/// Creates a `Vec<Box<Transaction>>` from the given transactions, or other objects
+/// implementing the `Into<Box<Transaction>>` trait.
 #[macro_export]
 macro_rules! txvec {
     ($($x:expr),*) => (

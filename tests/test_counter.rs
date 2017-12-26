@@ -289,12 +289,21 @@ fn inc_count(api: &TestKitApi, by: u64) -> TxIncrement {
 fn test_inc_count_create_block() {
     let (mut testkit, api) = init_testkit();
     let (pubkey, key) = crypto::gen_keypair();
+
     // Create a presigned transaction
-    testkit.create_block_with_transactions(txvec![TxIncrement::new(&pubkey, 5, &key)]);
+    testkit.create_block_with_transaction(TxIncrement::new(&pubkey, 5, &key));
 
     // Check that the user indeed is persisted by the service
     let counter: u64 = api.get(ApiKind::Service("counter"), "count");
     assert_eq!(counter, 5);
+
+    testkit.create_block_with_transactions(txvec![
+        TxIncrement::new(&pubkey, 4, &key),
+        TxIncrement::new(&pubkey, 1, &key),
+    ]);
+
+    let counter: u64 = api.get(ApiKind::Service("counter"), "count");
+    assert_eq!(counter, 10);
 }
 
 #[should_panic(expected = "Transaction is already committed")]
@@ -303,9 +312,9 @@ fn test_inc_count_create_block_with_committed_transaction() {
     let (mut testkit, _) = init_testkit();
     let (pubkey, key) = crypto::gen_keypair();
     // Create a presigned transaction
-    testkit.create_block_with_transactions(txvec![TxIncrement::new(&pubkey, 5, &key)]);
+    testkit.create_block_with_transaction(TxIncrement::new(&pubkey, 5, &key));
     // Create another block with the same transaction
-    testkit.create_block_with_transactions(txvec![TxIncrement::new(&pubkey, 5, &key)]);
+    testkit.create_block_with_transaction(TxIncrement::new(&pubkey, 5, &key));
 }
 
 #[test]
@@ -402,7 +411,7 @@ fn test_probe() {
         TxIncrement::new(&pubkey, 3, &key)
     };
 
-    let snapshot = testkit.probe_all(vec![Box::new(tx.clone()), Box::new(other_tx.clone())]);
+    let snapshot = testkit.probe_all(txvec![tx.clone(), other_tx.clone()]);
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(8));
 
@@ -429,19 +438,6 @@ fn test_duplicate_tx() {
     testkit.create_block();
     let counter: u64 = api.get(ApiKind::Service("counter"), "count");
     assert_eq!(counter, 5);
-}
-
-#[test]
-#[should_panic(expected = "Duplicate transactions in probe")]
-fn test_probe_duplicate_tx_panic() {
-    let (testkit, _) = init_testkit();
-
-    let tx = {
-        let (pubkey, key) = crypto::gen_keypair();
-        TxIncrement::new(&pubkey, 6, &key)
-    };
-    let snapshot = testkit.probe_all(vec![Box::new(tx.clone()), Box::new(tx.clone())]);
-    drop(snapshot);
 }
 
 #[test]
@@ -474,10 +470,10 @@ fn test_probe_advanced() {
     assert_eq!(schema.count(), None);
 
     // Check dependency of the resulting snapshot on tx ordering
-    let snapshot = testkit.probe_all(vec![Box::new(tx.clone()), Box::new(admin_tx.clone())]);
+    let snapshot = testkit.probe_all(txvec![tx.clone(), admin_tx.clone()]);
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(0));
-    let snapshot = testkit.probe_all(vec![Box::new(admin_tx.clone()), Box::new(tx.clone())]);
+    let snapshot = testkit.probe_all(txvec![admin_tx.clone(), tx.clone()]);
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(6));
     // Check that data is (still) not persisted
@@ -500,10 +496,10 @@ fn test_probe_advanced() {
     assert_eq!(schema.count(), Some(10));
 
     // Check dependency of the resulting snapshot on tx ordering
-    let snapshot = testkit.probe_all(vec![Box::new(tx.clone()), Box::new(admin_tx.clone())]);
+    let snapshot = testkit.probe_all(txvec![tx.clone(), admin_tx.clone()]);
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(0));
-    let snapshot = testkit.probe_all(vec![Box::new(admin_tx.clone()), Box::new(tx.clone())]);
+    let snapshot = testkit.probe_all(txvec![admin_tx.clone(), tx.clone()]);
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(6));
     // Check that data is (still) not persisted
@@ -531,7 +527,7 @@ fn test_probe_duplicate_tx() {
 
     // Check the mixed case, when some probed transactions are committed and some are not
     let other_tx = inc_count(&api, 7);
-    let snapshot = testkit.probe_all(vec![Box::new(tx), Box::new(other_tx)]);
+    let snapshot = testkit.probe_all(txvec![tx, other_tx]);
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(12));
 }

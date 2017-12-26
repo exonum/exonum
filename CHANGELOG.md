@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+### Added
+- Added `rollback()` method for `TestKit` allowing to rollback blocks added to
+  the testkit blockchain. (#8)
+- Added `TestKit::create_block_with_transaction()` method. (#13)
+
+### Changed
+
+- Reimplemented `probe()` / `probe_all()` methods of the testkit with
+  a revertible database. (#8)
+
+### Fixed
+
+- Added missing documentation for `ApiKind` and improved documentation quality. (#15)
+
 ## 0.1.1 - 2017-12-14
 
 ### Added
