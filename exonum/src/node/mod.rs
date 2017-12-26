@@ -36,8 +36,8 @@ use crypto::{self, Hash, PublicKey, SecretKey};
 use blockchain::{Blockchain, GenesisConfig, Schema, SharedNodeState, Transaction, Service};
 use api::{private, public, Api};
 use messages::{Connect, Message, RawMessage};
-use events::{NetworkRequest, TimeoutRequest, NetworkEvent};
-use events::{HandlerPart, NetworkConfiguration, NetworkPart, TimeoutsPart};
+use events::{NetworkRequest, TimeoutRequest, NetworkEvent, InternalRequest, InternalEvent,
+             SyncSender, HandlerPart, NetworkConfiguration, NetworkPart, InternalPart};
 use events::error::{into_other, other_error, LogError, log_error};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 use storage::Database;
@@ -162,8 +162,8 @@ pub struct EventsPoolCapacity {
     pub network_requests_capacity: usize,
     /// Maximum number of queued incoming network messages.
     pub network_events_capacity: usize,
-    /// Maximum number of queued timeout requests.
-    pub timeout_requests_capacity: usize,
+    /// Maximum number of queued internal events.
+    pub internal_events_capacity: usize,
     /// Maximum number of queued requests from api.
     pub api_requests_capacity: usize,
 }
@@ -173,7 +173,7 @@ impl Default for EventsPoolCapacity {
         EventsPoolCapacity {
             network_requests_capacity: 512,
             network_events_capacity: 512,
-            timeout_requests_capacity: 128,
+            internal_events_capacity: 128,
             api_requests_capacity: 1024,
         }
     }
@@ -246,14 +246,14 @@ pub struct Configuration {
 }
 
 /// Channel for messages, timeouts and api requests.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct NodeSender {
-    /// Timeout requests sender.
-    pub timeout_requests: mpsc::Sender<TimeoutRequest>,
+    /// Internal requests sender.
+    pub internal_requests: SyncSender<InternalRequest>,
     /// Network requests sender.
-    pub network_requests: mpsc::Sender<NetworkRequest>,
+    pub network_requests: SyncSender<NetworkRequest>,
     /// Api requests sender.
-    pub api_requests: mpsc::Sender<ExternalMessage>,
+    pub api_requests: SyncSender<ExternalMessage>,
 }
 
 impl NodeHandler {
@@ -375,7 +375,7 @@ impl NodeHandler {
     }
 
     /// Sends the given message to a peer by its id.
-    pub fn send_to_validator(&self, id: u32, message: &RawMessage) {
+    pub fn send_to_validator(&mut self, id: u32, message: &RawMessage) {
         if id as usize >= self.state.validators().len() {
             error!("Invalid validator id: {}", id);
         } else {
@@ -385,48 +385,46 @@ impl NodeHandler {
     }
 
     /// Sends the given message to a peer by its public key.
-    pub fn send_to_peer(&self, public_key: PublicKey, message: &RawMessage) {
+    pub fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
         if let Some(conn) = self.state.peers().get(&public_key) {
-            self.send_to_addr(&conn.addr(), message);
+            let address = conn.addr();
+            trace!("Send to address: {}", address);
+            let request = NetworkRequest::SendMessage(address, message.raw().clone());
+            self.channel.network_requests.send(request).log_error();
         } else {
             warn!("Hasn't connection with peer {:?}", public_key);
         }
     }
 
     /// Sends `RawMessage` to the specified address.
-    pub fn send_to_addr(&self, address: &SocketAddr, message: &RawMessage) {
+    pub fn send_to_addr(&mut self, address: &SocketAddr, message: &RawMessage) {
         trace!("Send to address: {}", address);
         let request = NetworkRequest::SendMessage(*address, message.clone());
-        self.channel
-            .network_requests
-            .clone()
-            .send(request)
-            .wait()
-            .log_error();
+        self.channel.network_requests.send(request).log_error();
     }
 
     /// Broadcasts given message to all peers.
     pub fn broadcast(&mut self, message: &Message) {
         for conn in self.state.peers().values() {
-            let addr = conn.addr();
-            self.send_to_addr(&addr, message.raw());
+            let address = conn.addr();
+            trace!("Send to address: {}", address);
+            let request = NetworkRequest::SendMessage(address, message.raw().clone());
+            self.channel.network_requests.send(request).log_error();
         }
     }
 
     /// Performs connection to the specified network address.
-    pub fn connect(&self, address: &SocketAddr) {
+    pub fn connect(&mut self, address: &SocketAddr) {
         let connect = self.state.our_connect_message().clone();
         self.send_to_addr(address, connect.raw());
     }
 
     /// Add timeout request.
-    pub fn add_timeout(&self, timeout: NodeTimeout, time: SystemTime) {
+    pub fn add_timeout(&mut self, timeout: NodeTimeout, time: SystemTime) {
         let request = TimeoutRequest(time, timeout);
         self.channel
-            .timeout_requests
-            .clone()
-            .send(request)
-            .wait()
+            .internal_requests
+            .send(request.into())
             .log_error();
     }
 
@@ -439,7 +437,7 @@ impl NodeHandler {
     }
 
     /// Adds `NodeTimeout::Round` timeout to the channel.
-    pub fn add_round_timeout(&self) {
+    pub fn add_round_timeout(&mut self) {
         let time = self.round_start_time(self.state.round().next());
         trace!(
             "ADD ROUND TIMEOUT: time={:?}, height={}, round={}",
@@ -452,7 +450,7 @@ impl NodeHandler {
     }
 
     /// Adds `NodeTimeout::Propose` timeout to the channel.
-    pub fn add_propose_timeout(&self) {
+    pub fn add_propose_timeout(&mut self) {
         let adjusted_timeout = self.state.propose_timeout();
         let time = self.round_start_time(self.state.round()) +
             Duration::from_millis(adjusted_timeout);
@@ -468,27 +466,28 @@ impl NodeHandler {
     }
 
     /// Adds `NodeTimeout::Status` timeout to the channel.
-    pub fn add_status_timeout(&self) {
+    pub fn add_status_timeout(&mut self) {
         let time = self.system_state.current_time() + Duration::from_millis(self.status_timeout());
-        self.add_timeout(NodeTimeout::Status(self.state.height()), time);
+        let height = self.state.height();
+        self.add_timeout(NodeTimeout::Status(height), time);
     }
 
     /// Adds `NodeTimeout::Request` timeout with `RequestData` to the channel.
-    pub fn add_request_timeout(&self, data: RequestData, peer: Option<PublicKey>) {
+    pub fn add_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
         trace!("ADD REQUEST TIMEOUT");
         let time = self.system_state.current_time() + data.timeout();
         self.add_timeout(NodeTimeout::Request(data, peer), time);
     }
 
     /// Adds `NodeTimeout::PeerExchange` timeout to the channel.
-    pub fn add_peer_exchange_timeout(&self) {
+    pub fn add_peer_exchange_timeout(&mut self) {
         trace!("ADD PEER EXCHANGE TIMEOUT");
         let time = self.system_state.current_time() + Duration::from_millis(self.peers_timeout());
         self.add_timeout(NodeTimeout::PeerExchange, time);
     }
 
     /// Adds `NodeTimeout::UpdateApiState` timeout to the channel.
-    pub fn add_update_api_state_timeout(&self) {
+    pub fn add_update_api_state_timeout(&mut self) {
         let time = self.system_state.current_time() +
             Duration::from_millis(self.api_state().state_update_timeout());
         self.add_timeout(NodeTimeout::UpdateApiState, time);
@@ -579,13 +578,13 @@ pub struct NodeChannel {
     /// Channel for network requests.
     pub network_requests: (mpsc::Sender<NetworkRequest>, mpsc::Receiver<NetworkRequest>),
     /// Channel for timeout requests.
-    pub timeout_requests: (mpsc::Sender<TimeoutRequest>, mpsc::Receiver<TimeoutRequest>),
+    pub internal_requests: (mpsc::Sender<InternalRequest>, mpsc::Receiver<InternalRequest>),
     /// Channel for api requests.
     pub api_requests: (mpsc::Sender<ExternalMessage>, mpsc::Receiver<ExternalMessage>),
     /// Channel for network events.
     pub network_events: (mpsc::Sender<NetworkEvent>, mpsc::Receiver<NetworkEvent>),
-    /// Channel for timeout events.
-    pub timeout_events: (mpsc::Sender<NodeTimeout>, mpsc::Receiver<NodeTimeout>),
+    /// Channel for internal events.
+    pub internal_events: (mpsc::Sender<InternalEvent>, mpsc::Receiver<InternalEvent>),
 }
 
 const PROFILE_ENV_VARIABLE_NAME: &str = "EXONUM_PROFILE_FILENAME";
@@ -604,19 +603,19 @@ impl NodeChannel {
     pub fn new(buffer_sizes: &EventsPoolCapacity) -> NodeChannel {
         NodeChannel {
             network_requests: mpsc::channel(buffer_sizes.network_requests_capacity),
-            timeout_requests: mpsc::channel(buffer_sizes.timeout_requests_capacity),
-            timeout_events: mpsc::channel(buffer_sizes.timeout_requests_capacity),
+            internal_requests: mpsc::channel(buffer_sizes.internal_events_capacity),
             api_requests: mpsc::channel(buffer_sizes.api_requests_capacity),
             network_events: mpsc::channel(buffer_sizes.network_events_capacity),
+            internal_events: mpsc::channel(buffer_sizes.internal_events_capacity),
         }
     }
 
     /// Returns the channel for sending timeouts, networks and api requests.
     pub fn node_sender(&self) -> NodeSender {
         NodeSender {
-            timeout_requests: self.timeout_requests.0.clone(),
-            network_requests: self.network_requests.0.clone(),
-            api_requests: self.api_requests.0.clone(),
+            internal_requests: self.internal_requests.0.clone().wait(),
+            network_requests: self.network_requests.0.clone().wait(),
+            api_requests: self.api_requests.0.clone().wait(),
         }
     }
 }
@@ -790,11 +789,10 @@ impl Node {
         Ok(())
     }
 
-    fn into_reactor(self) -> (HandlerPart<NodeHandler>, NetworkPart, TimeoutsPart) {
+    fn into_reactor(self) -> (HandlerPart<NodeHandler>, NetworkPart, InternalPart) {
         let connect_message = self.state().our_connect_message().clone();
         let (network_tx, network_rx) = self.channel.network_events;
-        let timeout_requests_rx = self.channel.timeout_requests.1;
-
+        let internal_requests_rx = self.channel.internal_requests.1;
         let network_part = NetworkPart {
             our_connect_message: connect_message,
             listen_address: self.handler.system_state.listen_address(),
@@ -803,17 +801,17 @@ impl Node {
             network_config: self.network_config,
         };
 
-        let (timeout_tx, timeout_rx) = self.channel.timeout_events;
+        let (internal_tx, internal_rx) = self.channel.internal_events;
         let handler_part = HandlerPart {
             handler: self.handler,
-            timeout_rx,
-            network_rx: network_rx,
+            internal_rx,
+            network_rx,
             api_rx: self.channel.api_requests.1,
         };
 
-        let timeouts_part = TimeoutsPart {
-            timeout_tx,
-            timeout_requests_rx,
+        let timeouts_part = InternalPart {
+            internal_tx,
+            internal_requests_rx,
         };
         (handler_part, network_part, timeouts_part)
     }

@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Changed
 - Changed iterators over `Patch` and `Changes` data into custom types instead of standard collection iterators. (#393)
 - Fixed typo in `SparceListIndexKeys` and `SparceListIndexValues` (#398)
+- Fixed #15 consensus on the threshold of 1/3 sleeping validators. (#388)
+- Replaced config param `timeout_events_capacity` with `internal_events_capacity`. (#388)
+- The `Transaction` trait now inherit `ExonumJson`. (#402)
+
+### Removed
+- Removed default `state_hash` implementation in the `Service` trait. (#399)
+- Removed `info` method from the `Transaction`. (#402)
 
 ## 0.4 - 2017-12-08
 
@@ -47,6 +54,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Fixed
 - Fixed `crate_authors!` macro usage, this macro can't return static string in new clap version. (#370)
 - Fixed mistake in description of the height getter in the `ServiceContext`. (#366)
+- Fixed #15 consensus on the threshold of 1/3 sleeping validators. (#388)
 
 ## 0.3 - 2017-11-02
 

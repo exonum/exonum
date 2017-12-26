@@ -71,7 +71,11 @@ impl SystemApi {
                         MemPoolResult::Committed,
                     ))
                 },
-                |o| Ok(MemPoolResult::MemPool(MemPoolTxInfo { content: o.info() })),
+                |o| {
+                    Ok(MemPoolResult::MemPool(MemPoolTxInfo {
+                        content: o.serialize_field().map_err(ApiError::Serialize)?,
+                    }))
+                },
             )
     }
 }
