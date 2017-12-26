@@ -23,10 +23,10 @@
 //! extern crate exonum_testkit;
 //! extern crate serde_json;
 //!
-//! use exonum::crypto::{gen_keypair, PublicKey};
+//! use exonum::crypto::{gen_keypair, Hash, PublicKey};
 //! use exonum::blockchain::{Block, Schema, Service, Transaction};
 //! use exonum::messages::{Message, RawTransaction};
-//! use exonum::storage::Fork;
+//! use exonum::storage::{Snapshot, Fork};
 //! use exonum::encoding;
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
@@ -63,6 +63,10 @@
 //! impl Service for TimestampingService {
 //!     fn service_name(&self) -> &'static str {
 //!         "timestamping"
+//!     }
+//!
+//!     fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+//!         Vec::new()
 //!     }
 //!
 //!     fn service_id(&self) -> u16 {
@@ -372,6 +376,9 @@ impl From<TestNode> for ValidatorKeys {
 /// #    fn service_name(&self) -> &'static str {
 /// #        "documentation"
 /// #    }
+/// #    fn state_hash(&self, _: &exonum::storage::Snapshot) -> Vec<exonum::crypto::Hash> {
+/// #        Vec::new()
+/// #    }
 /// #    fn service_id(&self) -> u16 {
 /// #        0
 /// #    }
@@ -593,6 +600,9 @@ impl TestKit {
     /// # impl Service for MyService {
     /// #    fn service_name(&self) -> &'static str {
     /// #        "documentation"
+    /// #    }
+    /// #    fn state_hash(&self, _: &exonum::storage::Snapshot) -> Vec<exonum::crypto::Hash> {
+    /// #        Vec::new()
     /// #    }
     /// #    fn service_id(&self) -> u16 {
     /// #        0
