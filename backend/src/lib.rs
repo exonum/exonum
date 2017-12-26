@@ -21,6 +21,9 @@ extern crate iron_test;
 extern crate mime;
 #[cfg(test)]
 extern crate sandbox;
+#[cfg(test)]
+#[macro_use]
+extern crate exonum_testkit;
 
 pub mod api;
 pub mod blockchain;

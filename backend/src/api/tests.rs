@@ -1,6 +1,7 @@
 use std::ops::{Deref, DerefMut};
 use std::cell::{Ref, RefCell};
 use std::sync::{Arc, Mutex};
+use std::io::{ErrorKind, Error as EventsError};
 
 use iron::Headers;
 use iron::prelude::Response;
@@ -13,10 +14,8 @@ use serde_json;
 
 use exonum::api::Api;
 use exonum::blockchain::Transaction;
-use exonum::encoding::serialize::HexValue;
 use exonum::crypto::{gen_keypair, hash, Hash, PublicKey, SecretKey};
-use exonum::events::Error as EventsError;
-use exonum::messages::{Message, RawMessage, FromRaw};
+use exonum::messages::{Message, RawMessage};
 use exonum::node::TransactionSend;
 use exonum::helpers;
 
@@ -93,7 +92,7 @@ pub struct TestTxSender {
 impl TransactionSend for TestTxSender {
     fn send(&self, tx: Box<Transaction>) -> Result<(), EventsError> {
         if !tx.verify() {
-            return Err(EventsError::new("Unable to verify transaction"));
+            return Err(EventsError::new(ErrorKind::Other, "Unable to verify transaction"));
         }
         let rm = tx.raw().clone();
         self.transactions.lock().unwrap().push(rm);
