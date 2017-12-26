@@ -471,7 +471,7 @@ impl TestKitBuilder {
 pub struct TestKit {
     blockchain: Blockchain,
     db_handler: CheckpointDbHandler<MemoryDB>,
-    events_stream: Spawn<Box<Stream<Item = (), Error = ()>>>,
+    events_stream: Box<Stream<Item = (), Error = ()> + Send + Sync>,
     network: TestNetwork,
     api_sender: ApiSender,
     mempool: TxPool,
@@ -509,10 +509,10 @@ impl TestKit {
         blockchain.create_genesis_block(genesis.clone()).unwrap();
 
         let mempool = Arc::new(RwLock::new(BTreeMap::new()));
-        let event_stream: Box<Stream<Item = (), Error = ()>> = {
+        let events_stream: Box<Stream<Item = (), Error = ()> + Send + Sync> = {
             let blockchain = blockchain.clone();
             let mempool = Arc::clone(&mempool);
-            Box::new(api_channel.1.greedy_fold((), move |_, event| {
+            Box::new(api_channel.1.and_then(move |event| {
                 let snapshot = blockchain.snapshot();
                 let schema = CoreSchema::new(&snapshot);
                 match event {
@@ -527,9 +527,9 @@ impl TestKit {
                     }
                     ExternalMessage::PeerAdd(_) => { /* Ignored */ }
                 }
+                future_ok(())
             }))
         };
-        let events_stream = executor::spawn(event_stream);
 
         TestKit {
             blockchain,
@@ -560,7 +560,8 @@ impl TestKit {
     /// Polls the *existing* events from the event loop until exhaustion. Does not wait
     /// until new events arrive.
     pub fn poll_events(&mut self) -> Option<Result<(), ()>> {
-        self.events_stream.wait_stream()
+        let mut spawn = executor::spawn(self.events_stream.by_ref().greedy_fold((), |_, _| {}));
+        spawn.wait_stream()
     }
 
     /// Returns a snapshot of the current blockchain state.
@@ -970,6 +971,19 @@ impl TestKit {
             "There is an active configuration change proposal."
         );
         self.cfg_proposal = Some(Uncommitted(proposal));
+    }
+
+    /// Extracts the event stream from this testkit, replacing it with `futures::stream::empty()`.
+    /// This makes the testkit after the replacement pretty much unusable unless
+    /// the old event stream (which is still capable of processing current and future events)
+    /// is employed to run to completion.
+    ///
+    /// # Returned value
+    ///
+    /// Future that runs the event stream of this testkit to completion.
+    fn remove_events_stream(&mut self) -> Box<Future<Item = (), Error = ()>> {
+        let stream = std::mem::replace(&mut self.events_stream, Box::new(futures::stream::empty()));
+        Box::new(stream.for_each(|_| future_ok(())))
     }
 }
 
