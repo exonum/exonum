@@ -477,6 +477,51 @@ impl TestKitBuilder {
 
 /// Testkit for testing blockchain services. It offers simple network configuration emulation
 /// (with no real network setup).
+///
+/// # Testkit APIs
+///
+/// By calling the [`run`] method, you can transform testkit into a web server useful for
+/// client-side testing. The testkit-specific APIs are exposed on the private address
+/// with the `/api/testkit` prefix (hereinafter denoted as `{baseURL}`).
+/// In all APIs, the request body (if applicable) and response are JSON-encoded.
+///
+/// ## Testkit status
+///
+/// GET `{baseURL}/v1/status`
+///
+/// Outputs the status of the testkit, which includes:
+///
+/// - Current blockchain height
+/// - Current [test network configuration][cfg]
+/// - Next network configuration if it is scheduled with [`commit_configuration_change`].
+///
+/// ## Create block
+///
+/// POST `{baseURL}/v1/blocks`
+///
+/// Creates a new block in the testkit blockchain. If the
+/// JSON body of the request is an empty object, the call is functionally equivalent
+/// to [`create_block`]. Otherwise, if the body has the `tx_hashes` field specifying an array
+/// of transaction hashes, the call is equivalent to [`create_block_with_tx_hashes`] supplied
+/// with these hashes.
+///
+/// Returns the latest block from the blockchain on success.
+///
+/// ## Roll back
+///
+/// DELETE `{baseURL}/v1/blocks`
+///
+/// Acts as a [`rollback`] equivalent. The number of blocks to roll back should be specified
+/// in the `blocks` parameter of the body.
+///
+/// Returns the latest block from the blockchain on success.
+///
+/// [`run`]: #method.run
+/// [cfg]: struct.TestNetworkConfiguration.html
+/// [`create_block`]: #method.create_block
+/// [`create_block_with_tx_hashes`]: #method.create_block_with_tx_hashes
+/// [`commit_configuration_change`]: #method.commit_configuration_change
+/// [`rollback`]: #method.rollback
 pub struct TestKit {
     blockchain: Blockchain,
     db_handler: CheckpointDbHandler<MemoryDB>,
@@ -995,7 +1040,7 @@ impl TestKit {
 
     /// Starts a testkit web server, which listens to public and private APIs exposed by
     /// the testkit, on the respective addresses. The private address also exposes the testkit
-    /// APIs with the `/api/testkit` URL prefix (hereinafter denoted as `{baseURL}`).
+    /// APIs with the `/api/testkit` URL prefix.
     ///
     /// Unlike real Exonum nodes, the testkit web server does not create peer-to-peer connections
     /// with other nodes, and does not create blocks automatically. The only way to commit
