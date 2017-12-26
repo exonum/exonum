@@ -19,7 +19,7 @@ use exonum::blockchain::{Blockchain, Service, Transaction, ApiContext};
 use exonum::encoding::serialize::FromHex;
 use exonum::node::{TransactionSend, ApiSender};
 use exonum::messages::{RawTransaction, Message};
-use exonum::storage::{Fork, MapIndex};
+use exonum::storage::{Fork, MapIndex, Snapshot};
 use exonum::crypto::{PublicKey, Hash};
 use exonum::encoding;
 use exonum::api::{Api, ApiError};
@@ -292,6 +292,10 @@ impl Service for CurrencyService {
 
     fn service_id(&self) -> u16 {
         SERVICE_ID
+    }
+
+    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+        Vec::new()
     }
 
     /// Implement a method to deserialize transactions coming to the node.
