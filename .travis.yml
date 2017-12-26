@@ -52,6 +52,26 @@ jobs:
       script:
         - cargo clippy -- -D warnings
     - stage: test
+    - stage: test
+      cache:
+        cargo: true
+        directories:
+          - examples/server/node_modules
+      env:
+        - FEATURE=client-tests
+      before_install:
+        - nvm install 8 && nvm use 8
+        - node --version
+        - npm --version
+      install:
+        - cd examples/server && npm install
+      script:
+        - cargo build --example server
+        - npm run lint
+        - npm run test:unix
+      # Kill the server from example if it's still running
+      after_script:
+        - npm run posttest:unix
 notifications:
   slack:
     rooms:
