@@ -50,6 +50,7 @@ extern crate term;
 extern crate clap;
 extern crate hyper;
 extern crate iron;
+extern crate iron_cors;
 extern crate router;
 extern crate params;
 extern crate cookie;
