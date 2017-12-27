@@ -84,9 +84,18 @@
 //! `i32`    | 4    | 32-bit signed number stored in little endian  |
 //! `u64`    | 8    | long unsigned number stored in little endian  |
 //! `i64`    | 8    | long signed number stored in little endian  |
-//! `bool`   | 1    | stored as single byte, where `0x01` - true `0x00` - false [\[1\]](#1)|
+//! `F32`    | 4    | 32-bit floating point type stored in little endian [\[1\]](#1)[\[2\]](#2)|
+//! `F64`    | 8    | 64-bit floating point type stored in little endian [\[1\]](#1)[\[2\]](#2)|
+//! `bool`   | 1    | stored as single byte, where `0x01` - true `0x00` - false [\[3\]](#3)|
 //!
 //! ######\[1]
+//! Special floating point values that cannot be represented as sequences of digits (such as
+//! Infinity, NaN and signaling NaN) are not permitted.
+//!
+//! ######\[2]
+//! Floating point values serialization is hidden behind the feature gate `float_serialize`.
+//!
+//! ######\[3]
 //! **Trying to represent other values as bool leads to undefined behavior**.
 //!
 //! ### Segment fields
@@ -108,6 +117,8 @@ use std::ops::{Add, Sub, Mul, Div};
 pub use self::fields::Field;
 pub use self::segments::SegmentField;
 pub use self::error::Error;
+#[cfg(feature = "float_serialize")]
+pub use self::float::{F32, F64};
 
 #[macro_use]
 pub mod serialize;
@@ -118,6 +129,8 @@ mod fields;
 mod segments;
 #[macro_use]
 mod spec;
+#[cfg(feature = "float_serialize")]
+mod float;
 
 #[cfg(test)]
 mod tests;

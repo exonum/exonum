@@ -756,7 +756,8 @@ impl Node {
 
                 let mut router = Router::new();
                 let pool = Arc::clone(self.state().transactions());
-                let system_api = public::SystemApi::new(pool, blockchain.clone());
+                let shared_api_state = self.handler().api_state().clone();
+                let system_api = public::SystemApi::new(pool, blockchain.clone(), shared_api_state);
                 system_api.wire(&mut router);
                 mount.mount("api/system", router);
                 if self.api_options.enable_blockchain_explorer {

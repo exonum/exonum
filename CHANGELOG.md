@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Added
 - Added `patch` method to the `Fork` structure. (#393)
+- Added a public `helthcheck` endpoint. (#405)
+- Added serialization support floating point types through special wrapper(`F32` and `F64`). This feature is hidden behind `float_serialize` gate. Note: special values (Infinity and NaN) aren't supported. (#384)
 - Added `StorageValue` implementation for `bool`. (#385)
 - Added `TransactionStatus` representing transaction execution status.
 
