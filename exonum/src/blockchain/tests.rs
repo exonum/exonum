@@ -161,7 +161,7 @@ impl Transaction for TxPanic {
         true
     }
 
-    fn execute(&self, fork: &mut Fork) {
+    fn execute(&self, fork: &mut Fork) -> TransactionStatus {
         if self.value() == 42 {
             panic!(Error::new("42"))
         }
