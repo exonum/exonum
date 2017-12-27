@@ -32,11 +32,9 @@ use hex::FromHex;
 use crypto::{Hash, PublicKey, Signature};
 use helpers::{Height, Round, ValidatorId};
 use messages::RawMessage;
-
-// TODO: should we implement serialize for: `SecretKey`, `Seed` (ECR-156)?
-
 use encoding::{Field, Offset};
 use super::WriteBufferWrapper;
+// TODO: should we implement serialize for: `SecretKey`, `Seed` (ECR-156)?
 
 macro_rules! impl_default_deserialize_owned {
     (@impl $name:ty) => {
@@ -130,28 +128,6 @@ macro_rules! impl_deserialize_bigint {
     ($($name:ty);*) => ($(impl_deserialize_bigint!{@impl $name})*);
 }
 
-/*
-macro_rules! impl_deserialize_float {
-    (@impl $traitname:ident $typename:ty) => {
-        impl<'a> ExonumJson for $typename {
-            fn deserialize(value: &Value, buffer: &'a mut Vec<u8>,
-                            from: usize, to: usize ) -> bool {
-                    value.as_f64()
-                         .map(|v| v as $typename)
-                         .map(|val| val.write(buffer, from, to))
-                         .is_some()
-            }
-
-            fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
-                Value::Number(self.into())
-            }
-        }
-    };
-    ( $($name:ty);*) => ($(impl_deserialize_float!{@impl  $name})*);
-}
-impl_deserialize_int!{ f32; f64 }
-*/
-
 macro_rules! impl_deserialize_hex_segment {
     (@impl $typename:ty) => {
         impl<'a> ExonumJson for &'a $typename {
@@ -178,11 +154,9 @@ macro_rules! impl_deserialize_hex_segment {
 
 impl_deserialize_int!{u8; u16; u32; i8; i16; i32}
 impl_deserialize_bigint!{u64; i64}
-
 impl_deserialize_hex_segment!{Hash; PublicKey; Signature}
-
 impl_default_deserialize_owned!{u8; u16; u32; i8; i16; i32; u64; i64;
-Hash; PublicKey; Signature; bool}
+                                Hash; PublicKey; Signature; bool}
 
 impl ExonumJson for bool {
     fn deserialize_field<B: WriteBufferWrapper>(

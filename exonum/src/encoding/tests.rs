@@ -80,7 +80,6 @@ fn test_read_overflow_arithmetic() {
 
 #[test]
 fn test_bitvec() {
-
     let mut b = BitVec::from_elem(14, false);
     b.set(11, true);
     b.set(4, true);
@@ -116,8 +115,32 @@ fn test_u16_segment() {
 }
 
 #[test]
+fn test_i16_segment() {
+    let dat = vec![1i16, 3, 10, 15, 23, 4, 45];
+    assert_write_check_read(dat, 8);
+}
+
+#[test]
 fn test_u32_segment() {
     let dat = vec![1u32, 3, 10, 15, 23, 4, 45];
+    assert_write_check_read(dat, 8);
+}
+
+#[test]
+fn test_i32_segment() {
+    let dat = vec![1i32, 3, 10, 15, 23, 4, 45];
+    assert_write_check_read(dat, 8);
+}
+
+#[test]
+fn test_u64_segment() {
+    let dat = vec![1u64, 3, 10, 15, 23, 4, 45];
+    assert_write_check_read(dat, 8);
+}
+
+#[test]
+fn test_i64_segment() {
+    let dat = vec![1i64, 3, 10, 15, 23, 4, 45];
     assert_write_check_read(dat, 8);
 }
 
@@ -157,7 +180,6 @@ fn test_segments_of_arrays() {
     assert_eq!(buf.len(), 64 + v1.len() + v2.len() + v3.len() + 3 * 8);
 }
 
-
 fn assert_write_check_read<T>(input: T, header_size: Offset)
 where
     T: for<'r> Field<'r> + PartialEq + ::std::fmt::Debug,
@@ -180,7 +202,6 @@ where
     ).unwrap();
     let output = unsafe { Field::read(&new_buffer, 0, header_size) };
     assert_eq!(input, output);
-
 }
 
 #[test]
