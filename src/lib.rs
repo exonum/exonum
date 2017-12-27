@@ -54,10 +54,6 @@
 //!     }
 //!
 //!     fn execute(&self, _fork: &mut Fork) {}
-//!
-//!     fn info(&self) -> serde_json::Value {
-//!         serde_json::to_value(self).unwrap()
-//!     }
 //! }
 //!
 //! impl Service for TimestampingService {
