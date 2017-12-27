@@ -669,7 +669,7 @@ pub fn timestamping_sandbox() -> Sandbox {
 
 #[cfg(test)]
 mod tests {
-    use exonum::blockchain::{ ServiceContext, TransactionStatus};
+    use exonum::blockchain::{ServiceContext, TransactionStatus};
     use exonum::messages::RawTransaction;
     use exonum::encoding;
     use exonum::crypto::{gen_keypair_from_seed, Seed};
