@@ -101,23 +101,23 @@ impl SystemApi {
 
 impl Api for SystemApi {
     fn wire(&self, router: &mut Router) {
-        let _self = self.clone();
+        let self_ = self.clone();
         let mempool_info = move |_: &mut Request| -> IronResult<Response> {
-            let info = _self.get_mempool_info();
-            _self.ok_response(&::serde_json::to_value(info).unwrap())
+            let info = self_.get_mempool_info();
+            self_.ok_response(&::serde_json::to_value(info).unwrap())
         };
 
-        let _self = self.clone();
+        let self_ = self.clone();
         let transaction = move |req: &mut Request| -> IronResult<Response> {
             let params = req.extensions.get::<Router>().unwrap();
             match params.find("hash") {
                 Some(hash_str) => {
-                    let info = _self.get_transaction(hash_str)?;
+                    let info = self_.get_transaction(hash_str)?;
                     let result = match info {
                         MemPoolResult::Unknown => Self::not_found_response,
                         _ => Self::ok_response,
                     };
-                    result(&_self, &::serde_json::to_value(info).unwrap())
+                    result(&self_, &::serde_json::to_value(info).unwrap())
                 }
                 None => {
                     Err(ApiError::IncorrectRequest(
@@ -127,10 +127,10 @@ impl Api for SystemApi {
             }
         };
 
-        let _self = self.clone();
+        let self_ = self.clone();
         let healthcheck = move |_: &mut Request| {
-            let info = _self.get_healthcheck_info();
-            _self.ok_response(&::serde_json::to_value(info).unwrap())
+            let info = self_.get_healthcheck_info();
+            self_.ok_response(&::serde_json::to_value(info).unwrap())
         };
 
         router.get("/v1/mempool", mempool_info, "mempool");
