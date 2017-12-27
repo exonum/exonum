@@ -73,7 +73,9 @@ impl<'a> BlockchainExplorer<'a> {
                 let box_transaction = self.blockchain.tx_from_raw(raw_tx.clone()).ok_or_else(|| {
                     ApiError::Service(format!("Service not found for tx: {:?}", raw_tx).into())
                 })?;
-                let content = box_transaction.info();
+                let content = box_transaction.serialize_field().map_err(
+                    ApiError::Serialize,
+                )?;
 
                 let location = schema.tx_location_by_tx_hash().get(tx_hash).expect(
                     &format!(
