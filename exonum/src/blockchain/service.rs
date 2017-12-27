@@ -27,34 +27,10 @@ use crypto::{Hash, PublicKey, SecretKey};
 use storage::{Fork, Snapshot};
 use messages::RawTransaction;
 use encoding::Error as MessageError;
-use encoding::serialize::json::ExonumJson;
 use node::{ApiSender, Node, State, TransactionSend};
 use blockchain::{Blockchain, ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use helpers::{Height, Milliseconds, ValidatorId};
 use super::transaction::Transaction;
-
-/// A trait that describes transaction processing rules (a group of sequential operations
-/// with the Exonum storage) for the given `Message`.
-pub trait Transaction: Message + ExonumJson + 'static {
-    /// Verifies the transaction, which includes the message signature verification and other
-    /// specific internal constraints. verify is intended to check the internal consistency of
-    /// a transaction; it has no access to the blockchain state.
-    /// If a transaction fails verify, it is considered incorrect and cannot be included into
-    /// any correct block proposal. Incorrect transactions are never included into the blockchain.
-    ///
-    /// *This method should not use external data, that is, it must be a pure function.*
-    fn verify(&self) -> bool;
-    /// Takes the current blockchain state via `fork` and can modify it if certain conditions
-    /// are met.
-    ///
-    /// # Notes
-    ///
-    /// - When programming `execute`, you should perform state-related checks before any changes
-    /// to the state and return early if these checks fail.
-    /// - If the execute method of a transaction raises a `panic`, the changes made by the
-    /// transactions are discarded, but the transaction itself is still considered committed.
-    fn execute(&self, fork: &mut Fork);
-}
 
 /// A trait that describes a business-logic of the concrete service.
 #[allow(unused_variables, unused_mut)]

@@ -17,9 +17,8 @@ use messages::{Precommit, RawMessage};
 use storage::{Fork, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex, Snapshot,
               StorageKey, StorageValue};
 use helpers::Height;
-use super::{Block, BlockProof, Blockchain};
+use super::{Block, BlockProof, Blockchain, TransactionStatus};
 use super::config::StoredConfiguration;
-use super::transaction::ExecutionStatus;
 
 /// Defines `&str` constants with given name and value.
 macro_rules! define_names {
@@ -95,7 +94,7 @@ where
     }
 
     /// Returns table that represents a map from transaction hash into execution status.
-    pub fn transactions_status(&self) -> MapIndex<&T, Hash, ExecutionStatus> {
+    pub fn transactions_status(&self) -> MapIndex<&T, Hash, TransactionStatus> {
         MapIndex::new(TRANSACTIONS_STATUS, &self.view)
     }
 
@@ -333,7 +332,7 @@ impl<'a> Schema<&'a mut Fork> {
     /// Mutable reference to the [`transactions_status`][1] index.
     ///
     /// [1]: struct.Schema.html#method.transactions_status
-    pub fn transactions_status_mut(&mut self) -> MapIndex<&mut Fork, Hash, ExecutionStatus> {
+    pub fn transactions_status_mut(&mut self) -> MapIndex<&mut Fork, Hash, TransactionStatus> {
         MapIndex::new(TRANSACTIONS_STATUS, &mut self.view)
     }
 

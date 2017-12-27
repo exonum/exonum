@@ -43,24 +43,23 @@ use messages::{CONSENSUS as CORE_SERVICE, Precommit, RawMessage};
 use storage::{Database, Error, Fork, Patch, Snapshot};
 use helpers::{Height, ValidatorId};
 use node::ApiSender;
-use self::transaction::{ExecutionStatus, ExecutionContext};
 
 pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
 pub use self::schema::{gen_prefix, Schema, TxLocation};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
 pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState};
-pub use self::transaction::Transaction;
+pub use self::transaction::{Transaction, TransactionStatus};
 
 mod block;
 mod schema;
 mod genesis;
 mod service;
+mod transaction;
 #[cfg(test)]
 mod tests;
 
 pub mod config;
-pub mod transaction;
 
 /// Exonum blockchain instance with the concrete services set and data storage.
 /// Only blockchains with the identical set of services and genesis block can be combined
@@ -242,17 +241,12 @@ impl Blockchain {
 
                 fork.checkpoint();
 
-                let (r, transaction_status) = {
-                    let mut context = ExecutionContext::new(&mut fork);
-                    let r =
-                        panic::catch_unwind(panic::AssertUnwindSafe(|| tx.execute(&mut context)));
-                    (r, context.into_status())
-                };
+                let r = panic::catch_unwind(panic::AssertUnwindSafe(|| tx.execute(&mut fork)));
 
                 let transaction_status = match r {
-                    Ok(()) => {
+                    Ok(status) => {
                         fork.commit();
-                        transaction_status
+                        status
                     }
                     Err(err) => {
                         if err.is::<Error>() {
@@ -261,7 +255,7 @@ impl Blockchain {
                         }
                         fork.rollback();
                         error!("{:?} transaction execution failed: {:?}", tx, err);
-                        ExecutionStatus::Panic
+                        TransactionStatus::Panic
                     }
                 };
 

@@ -16,11 +16,10 @@
 
 use std::borrow::Cow;
 
-use serde_json::Value;
-
 use messages::Message;
 use storage::{Fork, StorageValue};
 use crypto::Hash;
+use encoding::serialize::json::ExonumJson;
 
 // TODO: Remove attribute when `const fn` becomes stable.
 #[cfg_attr(feature="cargo-clippy", allow(cast_lossless))]
@@ -28,7 +27,7 @@ static MAX_RESERVED_VALUE: u16 = ::std::u8::MAX as u16;
 
 /// A trait that describes transaction processing rules (a group of sequential operations
 /// with the Exonum storage) for the given `Message`.
-pub trait Transaction: Message + 'static {
+pub trait Transaction: Message + ExonumJson + 'static {
     /// Verifies the transaction, which includes the message signature verification and other
     /// specific internal constraints. verify is intended to check the internal consistency of
     /// a transaction; it has no access to the blockchain state.
@@ -36,6 +35,34 @@ pub trait Transaction: Message + 'static {
     /// any correct block proposal. Incorrect transactions are never included into the blockchain.
     ///
     /// *This method should not use external data, that is, it must be a pure function.*
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::blockchain::Transaction;
+    /// use exonum::crypto::PublicKey;
+    /// # use exonum::blockchain::TransactionStatus;
+    /// # use exonum::storage::Fork;
+    ///
+    /// message! {
+    ///     struct MyTransaction {
+    ///         // Transaction definition...
+    /// #       const TYPE = 1;
+    /// #       const ID = 1;
+    /// #       const SIZE = 32;
+    ///         field public_key:    &PublicKey    [0 => 32]
+    ///     }
+    /// }
+    ///
+    /// impl Transaction for MyTransaction {
+    ///     fn verify(&self) -> bool {
+    ///         self.verify_signature(self.public_key())
+    ///     }
+    ///
+    ///     // Other methods...
+    ///     // ...
+    /// #   fn execute(&self, _: &mut Fork) -> TransactionStatus { TransactionStatus::Succeeded }
+    /// }
     fn verify(&self) -> bool;
 
     /// Takes the current blockchain state via `fork` and can modify it if certain conditions
@@ -49,61 +76,47 @@ pub trait Transaction: Message + 'static {
     /// transactions are discarded, but the transaction itself is still considered committed.
     /// - A transaction execution status (see `ExecutionStatus` for the details) is stored in the
     /// blockchain and can be accessed through api.
-    /// - A transaction is considered failed if it made no changes to the storage, but its execution
-    /// status can be set explicitly (see `ExecutionContext` for the details).
-    fn execute(&self, context: &mut ExecutionContext);
-
-    /// Returns the useful information about the transaction in the JSON format. The returned value
-    /// is used to fill the [`TxInfo.content`] field in [the blockchain explorer][explorer].
     ///
-    /// # Notes
     ///
-    /// The default implementation returns `null`. For transactions defined with
-    /// the [`message!`] macro, you may redefine `info()` as
+    /// # Examples
     ///
     /// ```
-    /// # #[macro_use] extern crate exonum;
-    /// extern crate serde_json;
-    /// # use exonum::blockchain::Transaction;
-    /// # use exonum::blockchain::transaction::ExecutionContext;
-    /// # use exonum::storage::Fork;
+    /// use exonum::blockchain::Transaction;
+    /// use exonum::crypto::PublicKey;
+    /// use exonum::storage::Fork;
     ///
     /// message! {
     ///     struct MyTransaction {
     ///         // Transaction definition...
     /// #       const TYPE = 1;
     /// #       const ID = 1;
-    /// #       const SIZE = 8;
-    /// #       field foo: u64 [0 => 8]
+    /// #       const SIZE = 32;
+    /// #       field public_key:    &PublicKey    [0 => 32]
     ///     }
     /// }
     ///
     /// impl Transaction for MyTransaction {
-    ///     // Other methods...
-    /// #   fn verify(&self) -> bool { true }
-    /// #   fn execute(&self, _: &mut ExecutionContext) {}
+    ///     fn execute(&self, fork: &mut Fork) {
+    ///         // Read and/or write into storage.
+    ///         // ...
     ///
-    ///     fn info(&self) -> serde_json::Value {
-    ///         serde_json::to_value(self).expect("Cannot serialize transaction to JSON")
+    ///         // Returns execution status.
+    ///         TransactionStatus::Succeeded
     ///     }
-    /// }
-    /// # fn main() { }
-    /// ```
     ///
-    /// [`TxInfo.content`]: ../explorer/struct.TxInfo.html#structfield.content
-    /// [explorer]: ../explorer/index.html
-    /// [`message!`]: ../macro.message.html
-    fn info(&self) -> Value {
-        Value::Null
-    }
+    ///     // Other methods...
+    ///     // ...
+    /// #   fn verify(&self) -> bool { true }
+    /// }
+    fn execute(&self, fork: &mut Fork) -> TransactionStatus;
 }
 
 /// Execution status of the transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum ExecutionStatus {
+pub enum TransactionStatus {
     /// Successful transaction execution.
     Succeeded,
-    /// Panic occurred during transaction execution.
+    /// Panic occurred during transaction execution. This status should not be used explicitly.
     Panic,
     /// General failure (unspecified reason).
     Failed,
@@ -112,56 +125,13 @@ pub enum ExecutionStatus {
     Custom(u8),
 }
 
-/// `Transaction`'s execution context.
-#[derive(Debug)]
-pub struct ExecutionContext<'a> {
-    fork: &'a mut Fork,
-    status: Option<ExecutionStatus>,
-    changes_number: usize,
-}
-
-impl<'a> ExecutionContext<'a> {
-    /// Creates a new `ExecutionContext` instance.
-    pub fn new(fork: &'a mut Fork) -> Self {
-        Self {
-            changes_number: fork.patch().len(),
-            fork,
-            status: None,
-        }
-    }
-
-    /// Returns execution status consuming `ExecutionContext`.
-    pub fn into_status(self) -> ExecutionStatus {
-        match self.status {
-            Some(val) => val,
-            None => {
-                if self.fork.patch().len() > self.changes_number {
-                    ExecutionStatus::Succeeded
-                } else {
-                    ExecutionStatus::Failed
-                }
-            }
-        }
-    }
-
-    /// Returns reference to the `Fork`.
-    pub fn fork(&mut self) -> &mut Fork {
-        self.fork
-    }
-
-    /// Sets `Transaction`'s execution status. See `ExecutionStatus` for the details.
-    pub fn set_execution_status(&mut self, status: ExecutionStatus) {
-        self.status = Some(status);
-    }
-}
-
 impl<'a, T: Transaction> From<T> for Box<Transaction + 'a> {
     fn from(tx: T) -> Self {
         Box::new(tx) as Box<Transaction>
     }
 }
 
-impl StorageValue for ExecutionStatus {
+impl StorageValue for TransactionStatus {
     fn hash(&self) -> Hash {
         u16::hash(&from_status(*self))
     }
@@ -175,27 +145,27 @@ impl StorageValue for ExecutionStatus {
     }
 }
 
-fn from_status(status: ExecutionStatus) -> u16 {
+fn from_status(status: TransactionStatus) -> u16 {
     match status {
-        ExecutionStatus::Succeeded => 0,
-        ExecutionStatus::Panic => 1,
-        ExecutionStatus::Failed => 2,
-        ExecutionStatus::Custom(value) => u16::from(value) + MAX_RESERVED_VALUE + 1,
+        TransactionStatus::Succeeded => 0,
+        TransactionStatus::Panic => 1,
+        TransactionStatus::Failed => 2,
+        TransactionStatus::Custom(value) => u16::from(value) + MAX_RESERVED_VALUE + 1,
     }
 }
 
-fn to_status(value: u16) -> ExecutionStatus {
+fn to_status(value: u16) -> TransactionStatus {
     match value {
-        0 => ExecutionStatus::Succeeded,
-        1 => ExecutionStatus::Panic,
-        2 => ExecutionStatus::Failed,
+        0 => TransactionStatus::Succeeded,
+        1 => TransactionStatus::Panic,
+        2 => TransactionStatus::Failed,
         val => {
             assert!(
                 val > MAX_RESERVED_VALUE,
                 "Invalid ExecutionStatus value: {}",
                 val
             );
-            ExecutionStatus::Custom((val - MAX_RESERVED_VALUE - 1) as u8)
+            TransactionStatus::Custom((val - MAX_RESERVED_VALUE - 1) as u8)
         }
     }
 }
@@ -203,43 +173,24 @@ fn to_status(value: u16) -> ExecutionStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use storage::{Database, MemoryDB, ListIndex};
 
     #[test]
     fn execution_status_round_trip() {
         let statuses = [
-            ExecutionStatus::Succeeded,
-            ExecutionStatus::Panic,
-            ExecutionStatus::Failed,
-            ExecutionStatus::Custom(0),
-            ExecutionStatus::Custom(1),
-            ExecutionStatus::Custom(100),
-            ExecutionStatus::Custom(255),
+            TransactionStatus::Succeeded,
+            TransactionStatus::Panic,
+            TransactionStatus::Failed,
+            TransactionStatus::Custom(0),
+            TransactionStatus::Custom(1),
+            TransactionStatus::Custom(100),
+            TransactionStatus::Custom(255),
         ];
 
         for status in &statuses {
             let bytes = status.clone().into_bytes();
-            let new_status = ExecutionStatus::from_bytes(Cow::Borrowed(&bytes));
+            let new_status = TransactionStatus::from_bytes(Cow::Borrowed(&bytes));
 
             assert_eq!(*status, new_status);
         }
-    }
-
-    #[test]
-    fn implicit_execution_status() {
-        let db = MemoryDB::new();
-        let mut fork = db.fork();
-
-        {
-            let context = ExecutionContext::new(&mut fork);
-            assert_eq!(ExecutionStatus::Failed, context.into_status());
-        }
-
-        let mut context = ExecutionContext::new(&mut fork);
-        {
-            let mut index = ListIndex::new("test", context.fork());
-            index.push(1u8);
-        }
-        assert_eq!(ExecutionStatus::Succeeded, context.into_status());
     }
 }

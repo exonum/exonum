@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Added
 - Added `patch` method to the `Fork` structure. (#393)
 - Added `StorageValue` implementation for `bool`. (#385)
-- Added `StorageValue` implementation for `bool`. (#385)
+- Added `TransactionStatus` representing transaction execution status.
 
 ### Changed
 - Changed iterators over `Patch` and `Changes` data into custom types instead of standard collection iterators. (#393)
@@ -18,8 +18,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Fixed #15 consensus on the threshold of 1/3 sleeping validators. (#388)
 - Replaced config param `timeout_events_capacity` with `internal_events_capacity`. (#388)
 - The `Transaction` trait now inherit `ExonumJson`. (#402)
-- `Transaction` `execute` method now takes `ExecutionContext`.
-- `Transaction` `execute` method now can have several logical execution statuses representing by `ExecutionStatus`. (#385)
+- `Transaction` `execute` method now returns  `TransactionStatus`. (#385)
 
 ### Removed
 - Removed default `state_hash` implementation in the `Service` trait. (#399)
