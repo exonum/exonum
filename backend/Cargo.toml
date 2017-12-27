@@ -29,15 +29,6 @@ iron-test = "0.6"
 exonum-testkit = "0.1"
 mime = "0.2"
 
-[dev-dependencies.sandbox]
-git = "https://github.com/exonum/exonum.git"
-version = "0.4.0"
-tag = "v0.4"
-
-[replace."exonum:0.4.0"]
-git = "https://github.com/exonum/exonum.git"
-tag = "v0.4"
-
 [features]
 default = []
 anchoring = ["exonum-btc-anchoring"]

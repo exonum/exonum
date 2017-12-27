@@ -20,8 +20,6 @@ extern crate iron_test;
 #[cfg(test)]
 extern crate mime;
 #[cfg(test)]
-extern crate sandbox;
-#[cfg(test)]
 #[macro_use]
 extern crate exonum_testkit;
 
