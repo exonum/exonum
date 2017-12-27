@@ -22,7 +22,7 @@ use crypto::Hash;
 use encoding::serialize::json::ExonumJson;
 
 // TODO: Remove attribute when `const fn` becomes stable.
-#[cfg_attr(feature="cargo-clippy", allow(cast_lossless))]
+#[cfg_attr(feature = "cargo-clippy", allow(cast_lossless))]
 static MAX_RESERVED_VALUE: u16 = ::std::u8::MAX as u16;
 
 /// A trait that describes transaction processing rules (a group of sequential operations
