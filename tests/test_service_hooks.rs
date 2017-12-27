@@ -26,8 +26,6 @@ use exonum_testkit::TestKitBuilder;
 mod hooks {
     //! A special service which generates transactions on `handle_commit` events.
 
-    use serde_json::{to_value, Value};
-
     use exonum::blockchain::{Service, ServiceContext, Transaction};
     use exonum::messages::RawTransaction;
     use exonum::storage::{Fork, Snapshot};
@@ -54,10 +52,6 @@ mod hooks {
         }
 
         fn execute(&self, _fork: &mut Fork) {}
-
-        fn info(&self) -> Value {
-            to_value(self).unwrap()
-        }
     }
 
     pub struct HandleCommitService;

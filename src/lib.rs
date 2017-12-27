@@ -54,10 +54,6 @@
 //!     }
 //!
 //!     fn execute(&self, _fork: &mut Fork) {}
-//!
-//!     fn info(&self) -> serde_json::Value {
-//!         serde_json::to_value(self).unwrap()
-//!     }
 //! }
 //!
 //! impl Service for TimestampingService {
@@ -153,7 +149,7 @@ use std::sync::{Arc, RwLock, RwLockReadGuard};
 use std::fmt;
 
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Schema as CoreSchema,
-                         Service, StoredConfiguration, Transaction, ValidatorKeys};
+                         Service, SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys};
 use exonum::crypto;
 use exonum::helpers::{Height, Round, ValidatorId};
 use exonum::messages::{Message, Precommit, Propose};
@@ -1162,7 +1158,8 @@ impl TestKitApi {
 
                 let mut router = Router::new();
                 let pool = Arc::clone(&testkit.mempool);
-                let system_api = public::SystemApi::new(pool, blockchain.clone());
+                let api_state = SharedNodeState::new(10_000);
+                let system_api = public::SystemApi::new(pool, blockchain.clone(), api_state);
                 system_api.wire(&mut router);
                 mount.mount("api/system", router);
 

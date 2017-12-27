@@ -25,6 +25,7 @@ use exonum::crypto::{self, PublicKey};
 use exonum::helpers::Height;
 use exonum::messages::Message;
 use exonum::encoding::serialize::FromHex;
+use exonum::encoding::serialize::json::ExonumJson;
 use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};
 
 mod counter {
@@ -109,10 +110,6 @@ mod counter {
         fn execute(&self, fork: &mut Fork) {
             let mut schema = CounterSchema::new(fork);
             schema.inc_count(self.by());
-        }
-
-        fn info(&self) -> serde_json::Value {
-            serde_json::to_value(self).expect("Cannot serialize transaction to JSON")
         }
     }
 
@@ -731,7 +728,6 @@ fn test_explorer_single_block() {
 
 #[test]
 fn test_system_transaction() {
-    use exonum::blockchain::Transaction;
     use exonum::explorer::{BlockInfo, TxInfo as CommittedTxInfo};
     use exonum::helpers::Height;
 
@@ -778,7 +774,7 @@ fn test_system_transaction() {
         &format!("v1/transactions/{}", &tx.hash().to_string()),
     );
     if let TxInfo::MemPool(info) = info {
-        assert_eq!(info.content, tx.info());
+        assert_eq!(info.content, tx.serialize_field().unwrap());
     } else {
         panic!("Transaction should be in the mempool");
     }
@@ -789,7 +785,7 @@ fn test_system_transaction() {
         &format!("v1/transactions/{}", &tx.hash().to_string()),
     );
     if let TxInfo::Committed(info) = info {
-        assert_eq!(info.content, tx.info());
+        assert_eq!(info.content, tx.serialize_field().unwrap());
         assert_eq!(info.location.block_height(), Height(1));
         assert_eq!(info.location.position_in_block(), 0);
 
