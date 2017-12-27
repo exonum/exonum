@@ -105,7 +105,7 @@ macro_rules! message {
                                     $crate::encoding::SegmentField::from_buffer(buffer,
                                                                 from,
                                                                 count);
-                $crate::messages::FromRaw::from_raw(raw_message).unwrap()
+                $name::from_raw(raw_message).unwrap()
             }
 
             fn check_data(buffer: &'a [u8],
@@ -124,34 +124,11 @@ macro_rules! message {
                                     unsafe { $crate::encoding::SegmentField::from_buffer(buffer,
                                                                 from.unchecked_offset(),
                                                                 count.unchecked_offset())};
-                let _: $name = $crate::messages::FromRaw::from_raw(raw_message)?;
+                let _: $name = $name::from_raw(raw_message)?;
                 Ok(latest_segment_origin)
             }
         }
 
-        impl $crate::messages::FromRaw for $name {
-            fn from_raw(raw: $crate::messages::RawMessage)
-                -> Result<$name, $crate::encoding::Error> {
-                let min_message_size = $body as usize
-                            + $crate::messages::HEADER_LENGTH as usize
-                            + $crate::crypto::SIGNATURE_LENGTH as usize;
-                if raw.len() < min_message_size {
-                    return Err($crate::encoding::Error::UnexpectedlyShortPayload {
-                        actual_size: raw.len() as $crate::encoding::Offset,
-                        minimum_size: min_message_size as $crate::encoding::Offset,
-                    });
-                }
-
-                let body_len = <Self>::check_fields(&raw)?;
-
-                if body_len.unchecked_offset() as usize +
-                    $crate::crypto::SIGNATURE_LENGTH as usize != raw.len()  {
-                   return Err("Incorrect raw message length.".into())
-                }
-
-                Ok($name { raw: raw })
-            }
-        }
         impl $name {
             #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
             /// Creates messsage and sign it.
@@ -179,7 +156,51 @@ macro_rules! message {
                                                     $extension, $id, $body);
                 $(writer.write($field_name, $from, $to);)*
                 $name { raw: RawMessage::new(writer.append_signature(signature)) }
+            }
 
+            /// Converts the raw message into the specific one.
+            pub fn from_raw(raw: $crate::messages::RawMessage)
+                -> Result<$name, $crate::encoding::Error> {
+                let min_message_size = $body as usize
+                            + $crate::messages::HEADER_LENGTH as usize
+                            + $crate::crypto::SIGNATURE_LENGTH as usize;
+                if raw.len() < min_message_size {
+                    return Err($crate::encoding::Error::UnexpectedlyShortPayload {
+                        actual_size: raw.len() as $crate::encoding::Offset,
+                        minimum_size: min_message_size as $crate::encoding::Offset,
+                    });
+                }
+
+                // Check identifiers
+                if raw.version() != $crate::messages::PROTOCOL_MAJOR_VERSION {
+                    return Err($crate::encoding::Error::UnsupportedProtocolVersion {
+                        version: $crate::messages::PROTOCOL_MAJOR_VERSION
+                    });
+                }
+                if raw.network_id() != $crate::messages::TEST_NETWORK_ID {
+                    return Err($crate::encoding::Error::IncorrectNetworkId {
+                        network_id: $crate::messages::TEST_NETWORK_ID
+                    });
+                }
+                if raw.message_type() != $id {
+                    return Err($crate::encoding::Error::IncorrectMessageType {
+                        message_type: $id
+                    });
+                }
+                if raw.service_id() != $extension {
+                    return Err($crate::encoding::Error::IncorrectServiceId {
+                        service_id: $extension
+                    });
+                }
+
+                // Check body
+                let body_len = <Self>::check_fields(&raw)?;
+                if body_len.unchecked_offset() as usize +
+                    $crate::crypto::SIGNATURE_LENGTH as usize != raw.len()  {
+                   return Err("Incorrect raw message length.".into())
+                }
+
+                Ok($name { raw: raw })
             }
 
             #[allow(unused_variables)]
@@ -209,11 +230,39 @@ macro_rules! message {
                 $extension
             }
 
+            /// Returns the hex representation of the binary data.
+            /// Lower case letters are used (e.g. f9b4ca).
+            #[allow(dead_code)]
+            pub fn to_hex(&self) -> String {
+                $crate::encoding::serialize::encode_hex(self.as_ref())
+            }
+
             $(
             $(#[$field_attr])*
             pub fn $field_name(&self) -> $field_type {
                 unsafe{ self.raw.read::<$field_type>($from, $to)}
             })*
+        }
+
+        impl AsRef<$crate::messages::RawMessage> for $name {
+            fn as_ref(&self) -> &$crate::messages::RawMessage {
+                $crate::messages::Message::raw(self)
+            }
+        }
+
+        impl $crate::encoding::serialize::FromHex for $name {
+            type Error = $crate::encoding::Error;
+
+            fn from_hex<T: AsRef<[u8]>>(hex: T) -> Result<Self, Self::Error> {
+                let vec = Vec::<u8>::from_hex(hex)
+                    .map_err(|e| $crate::encoding::Error::Other(Box::new(e)))?;
+                if vec.len() < $crate::messages::HEADER_LENGTH {
+                    return Err($crate::encoding::Error::Basic("Hex is too short.".into()));
+                }
+                let buf = $crate::messages::MessageBuffer::from_vec(vec);
+                let raw = $crate::messages::RawMessage::new(buf);
+                $name::from_raw(raw)
+            }
         }
 
         impl $crate::storage::StorageValue for $name {
@@ -262,7 +311,7 @@ macro_rules! message {
             #[allow(unused_mut)]
             fn serialize_field(&self)
                 -> Result<$crate::encoding::serialize::json::reexport::Value,
-                            Box<::std::error::Error>>
+                            Box<::std::error::Error + Send + Sync>>
             {
                 use $crate::encoding::serialize::json::reexport::Value;
                 use $crate::encoding::serialize::json::reexport::Map;

@@ -83,7 +83,7 @@
 //! [`MemoryDB`]: struct.MemoryDB.html
 //! [`Snapshot`]: trait.Snapshot.html
 //! [`Fork`]: struct.Fork.html
-//! [`Patch`]: type.Patch.html
+//! [`Patch`]: struct.Patch.html
 //! [1]: trait.Database.html#tymethod.snapshot
 //! [2]: trait.Database.html#method.fork
 //! [`merge`]: trait.Database.html#tymethod.merge
@@ -107,7 +107,8 @@
 //! [`HashSet`]: https://doc.rust-lang.org/std/collections/struct.HashSet.html
 
 pub use self::error::Error;
-pub use self::db::{Database, Snapshot, Fork, Patch, Change, Iterator, Iter};
+pub use self::db::{Database, Snapshot, Fork, Patch, PatchIterator, Change, Changes,
+                   ChangesIterator, Iterator, Iter};
 
 pub use self::rocksdb::{RocksDB, RocksDBOptions};
 pub use self::memorydb::MemoryDB;

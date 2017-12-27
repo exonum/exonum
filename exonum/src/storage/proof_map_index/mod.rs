@@ -13,12 +13,11 @@
 // limitations under the License.
 
 //! An implementation of a Merklized version of a map (Merkle Patricia tree).
+
 use std::marker::PhantomData;
 
 use crypto::{Hash, HashStream};
-
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
-
 use self::key::{DBKey, ChildKind, LEAF_KEY_PREFIX};
 use self::node::{Node, BranchNode};
 

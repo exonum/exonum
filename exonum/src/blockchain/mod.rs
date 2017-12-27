@@ -28,15 +28,15 @@
 //!
 //! [1]: https://github.com/exonum/exonum-doc/blob/master/src/get-started/create-service.md
 
-use vec_map::VecMap;
-use byteorder::{ByteOrder, LittleEndian};
-use mount::Mount;
-
 use std::sync::Arc;
 use std::collections::BTreeMap;
 use std::mem;
 use std::fmt;
 use std::panic;
+
+use vec_map::VecMap;
+use byteorder::{ByteOrder, LittleEndian};
+use mount::Mount;
 
 use crypto::{self, Hash, PublicKey, SecretKey};
 use messages::{CONSENSUS as CORE_SERVICE, Precommit, RawMessage};

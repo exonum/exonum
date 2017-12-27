@@ -13,13 +13,12 @@
 // limitations under the License.
 
 //! An implementation of a Merklized version of an array list (Merkle tree).
+
 use std::cell::Cell;
 use std::marker::PhantomData;
 
 use crypto::{Hash, hash, HashStream};
-
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
-
 use self::key::ProofListKey;
 
 pub use self::proof::{ListProof, ListProofError};

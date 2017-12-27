@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::{Context, CommandName, Argument, CommandExtension};
-
 use std::fmt;
 use std::error::Error;
+
+use super::{Context, CommandName, Argument, CommandExtension};
 
 /// Used to take some additional information from executed command
 #[derive(Debug, PartialEq, Clone)]

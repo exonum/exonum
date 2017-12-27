@@ -24,13 +24,13 @@ use std::sync::Mutex;
 use futures::Future;
 use futures::sync::oneshot;
 use tokio_timer::Timer;
-
 use exonum::blockchain::{Service, ServiceContext, Transaction};
 use exonum::encoding::Error as EncodingError;
 use exonum::messages::RawTransaction;
 use exonum::node::Node;
-use exonum::storage::MemoryDB;
+use exonum::storage::{MemoryDB, Snapshot};
 use exonum::helpers;
+use exonum::crypto::Hash;
 
 struct CommitWatcherService(pub Mutex<Option<oneshot::Sender<()>>>);
 
@@ -41,6 +41,10 @@ impl Service for CommitWatcherService {
 
     fn service_name(&self) -> &'static str {
         "commit_watcher"
+    }
+
+    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+        Vec::new()
     }
 
     fn tx_from_raw(&self, _raw: RawTransaction) -> Result<Box<Transaction>, EncodingError> {

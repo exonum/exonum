@@ -14,7 +14,7 @@
 
 use exonum::crypto::{PublicKey, Hash};
 use exonum::blockchain::{Service, Transaction, Schema};
-use exonum::messages::{RawTransaction, Message, FromRaw};
+use exonum::messages::{RawTransaction, Message};
 use exonum::storage::{Snapshot, Fork};
 use exonum::encoding::Error as MessageError;
 use exonum::blockchain::StoredConfiguration;

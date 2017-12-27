@@ -12,15 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate rand;
-
 use std::collections::HashSet;
-use rand::{thread_rng, Rng};
+
+use rand::{self, thread_rng, Rng};
 use crypto::{hash, Hash, HashStream};
 use storage::db::Database;
 use encoding::serialize::json::reexport::to_string;
 use encoding::serialize::reexport::{Serialize, Serializer};
-
 use super::{DBKey, ProofMapIndex};
 use super::proof::MapProof;
 use super::key::{KEY_SIZE, LEAF_KEY_PREFIX};

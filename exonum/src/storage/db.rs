@@ -13,17 +13,128 @@
 // limitations under the License.
 
 use std::collections::HashMap;
-use std::collections::btree_map::{BTreeMap, Range};
+use std::collections::btree_map::{BTreeMap, Range, Iter as BtmIter, IntoIter as BtmIntoIter};
+use std::collections::hash_map::{Iter as HmIter, IntoIter as HmIntoIter, Entry as HmEntry};
 use std::collections::Bound::*;
 use std::cmp::Ordering::*;
-use std::iter::Peekable;
+use std::iter::{Peekable, Iterator as StdIterator};
 
 use super::Result;
-
 use self::NextIterValue::*;
 
+/// Map containing changes with corresponding key.
+#[derive(Debug, Clone)]
+pub struct Changes {
+    data: BTreeMap<Vec<u8>, Change>,
+}
+
+impl Changes {
+    /// Creates a new empty `Changes` instance.
+    fn new() -> Self {
+        Self { data: BTreeMap::new() }
+    }
+
+    /// Returns iterator over changes.
+    pub fn iter(&self) -> BtmIter<Vec<u8>, Change> {
+        self.data.iter()
+    }
+}
+
+/// Iterator over the `Changes` data.
+#[derive(Debug)]
+pub struct ChangesIterator {
+    inner: BtmIntoIter<Vec<u8>, Change>,
+}
+
+impl StdIterator for ChangesIterator {
+    type Item = (Vec<u8>, Change);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+
+impl IntoIterator for Changes {
+    type Item = (Vec<u8>, Change);
+    type IntoIter = ChangesIterator;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Self::IntoIter { inner: self.data.into_iter() }
+    }
+}
+
 /// A set of serial changes that should be applied to a storage atomically.
-pub type Patch = HashMap<String, BTreeMap<Vec<u8>, Change>>;
+#[derive(Debug, Clone)]
+pub struct Patch {
+    changes: HashMap<String, Changes>,
+}
+
+impl Patch {
+    /// Creates a new empty `Patch` instance.
+    fn new() -> Self {
+        Self { changes: HashMap::new() }
+    }
+
+    /// Returns changes for the given name.
+    fn changes(&self, name: &str) -> Option<&Changes> {
+        self.changes.get(name)
+    }
+
+    /// Returns a mutable reference to the changes corresponding to the `name`.
+    fn changes_mut(&mut self, name: &str) -> Option<&mut Changes> {
+        self.changes.get_mut(name)
+    }
+
+    /// Gets the given names's corresponding entry in the map for in-place manipulation.
+    fn changes_entry(&mut self, name: String) -> HmEntry<String, Changes> {
+        self.changes.entry(name)
+    }
+
+    /// Inserts changes with the given name.
+    fn insert_changes(&mut self, name: String, changes: Changes) {
+        self.changes.insert(name, changes);
+    }
+
+    /// Returns iterator over changes.
+    pub fn iter(&self) -> HmIter<String, Changes> {
+        self.changes.iter()
+    }
+
+    /// Returns the number of changes.
+    pub fn len(&self) -> usize {
+        self.changes.iter().fold(0, |acc, (_, changes)| {
+            acc + changes.data.len()
+        })
+    }
+
+    /// Returns `true` if this patch contains no changes and `false` otherwise.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+/// Iterator over the `Patch` data.
+#[derive(Debug)]
+pub struct PatchIterator {
+    inner: HmIntoIter<String, Changes>,
+}
+
+impl StdIterator for PatchIterator {
+    type Item = (String, Changes);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+
+impl IntoIterator for Patch {
+    type Item = (String, Changes);
+    type IntoIter = PatchIterator;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Self::IntoIter { inner: self.changes.into_iter() }
+    }
+}
 
 /// A generalized iterator over the storage views.
 pub type Iter<'a> = Box<Iterator + 'a>;
@@ -63,7 +174,7 @@ pub enum Change {
 /// [`put`]: #method.put
 /// [`remove`]: #method.remove
 /// [`remove_by_prefix`]: #method.remove_by_prefix
-/// [`Patch`]: type.Patch.html
+/// [`Patch`]: struct.Patch.html
 /// [`into_patch`]: #method.into_patch
 /// [`merge`]: trait.Database.html#tymethod.merge
 /// [`checkpoint`]: #method.checkpoint
@@ -114,7 +225,7 @@ enum NextIterValue {
 /// [1]: #tymethod.snapshot
 /// [`Fork`]: struct.Fork.html
 /// [2]: #method.fork
-/// [`Patch`]: type.Patch.html
+/// [`Patch`]: struct.Patch.html
 /// [`merge`]: #tymethod.merge
 pub trait Database: Send + Sync + 'static {
     /// Creates a new reference to the database as `Box<Database>`.
@@ -193,8 +304,8 @@ pub trait Iterator {
 
 impl Snapshot for Fork {
     fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>> {
-        if let Some(changes) = self.patch.get(name) {
-            if let Some(change) = changes.get(key) {
+        if let Some(changes) = self.patch.changes(name) {
+            if let Some(change) = changes.data.get(key) {
                 match *change {
                     Change::Put(ref v) => return Some(v.clone()),
                     Change::Delete => return None,
@@ -205,8 +316,8 @@ impl Snapshot for Fork {
     }
 
     fn contains(&self, name: &str, key: &[u8]) -> bool {
-        if let Some(changes) = self.patch.get(name) {
-            if let Some(change) = changes.get(key) {
+        if let Some(changes) = self.patch.changes(name) {
+            if let Some(change) = changes.data.get(key) {
                 match *change {
                     Change::Put(..) => return true,
                     Change::Delete => return false,
@@ -218,8 +329,8 @@ impl Snapshot for Fork {
 
     fn iter<'a>(&'a self, name: &str, from: &[u8]) -> Iter<'a> {
         let range = (Included(from), Unbounded);
-        let changes = match self.patch.get(name) {
-            Some(changes) => Some(changes.range::<[u8], _>(range).peekable()),
+        let changes = match self.patch.changes(name) {
+            Some(changes) => Some(changes.data.range::<[u8], _>(range).peekable()),
             None => None,
         };
 
@@ -268,10 +379,10 @@ impl Fork {
             panic!("call rollback before checkpoint");
         }
         for (name, k, c) in self.changelog.drain(..).rev() {
-            if let Some(changes) = self.patch.get_mut(&name) {
+            if let Some(changes) = self.patch.changes_mut(&name) {
                 match c {
-                    Some(change) => changes.insert(k, change),
-                    None => changes.remove(&k),
+                    Some(change) => changes.data.insert(k, change),
+                    None => changes.data.remove(&k),
                 };
             }
         }
@@ -280,60 +391,54 @@ impl Fork {
 
     /// Inserts the key-value pair into the fork with the given name `name`.
     pub fn put(&mut self, name: &str, key: Vec<u8>, value: Vec<u8>) {
-        if !self.patch.contains_key(name) {
-            self.patch.insert(name.to_string(), BTreeMap::new());
-        }
-
-        let changes = self.patch.get_mut(name).unwrap();
-
+        let changes = self.patch.changes_entry(name.to_string()).or_insert_with(
+            Changes::new,
+        );
         if self.logged {
             self.changelog.push((
                 name.to_string(),
                 key.clone(),
-                changes.insert(key, Change::Put(value)),
+                changes.data.insert(key, Change::Put(value)),
             ));
         } else {
-            changes.insert(key, Change::Put(value));
+            changes.data.insert(key, Change::Put(value));
         }
     }
 
     /// Removes the key from the fork with the given name `name`.
     pub fn remove(&mut self, name: &str, key: Vec<u8>) {
-        if !self.patch.contains_key(name) {
-            self.patch.insert(name.to_string(), BTreeMap::new());
-        }
-
-        let changes = self.patch.get_mut(name).unwrap();
+        let changes = self.patch.changes_entry(name.to_string()).or_insert_with(
+            Changes::new,
+        );
         if self.logged {
             self.changelog.push((
                 name.to_string(),
                 key.clone(),
-                changes.insert(key, Change::Delete),
+                changes.data.insert(key, Change::Delete),
             ));
         } else {
-            changes.insert(key, Change::Delete);
+            changes.data.insert(key, Change::Delete);
         }
     }
 
     /// Removes all keys starting with the specified prefix from the fork with name `name`.
     pub fn remove_by_prefix(&mut self, name: &str, prefix: Option<&Vec<u8>>) {
-        if !self.patch.contains_key(name) {
-            self.patch.insert(name.to_string(), BTreeMap::new());
-        }
-
-        let changes = self.patch.get_mut(name).unwrap();
+        let changes = self.patch.changes_entry(name.to_string()).or_insert_with(
+            Changes::new,
+        );
         // Remove changes
         if let Some(prefix) = prefix {
             let keys = changes
+                .data
                 .range::<Vec<u8>, _>((Included(prefix), Unbounded))
                 .map(|(k, _)| k.to_vec())
                 .take_while(|k| k.starts_with(prefix))
                 .collect::<Vec<_>>();
             for k in keys {
-                changes.remove(&k);
+                changes.data.remove(&k);
             }
         } else {
-            changes.clear();
+            changes.data.clear();
         }
         // Remove from storage
         let mut iter = self.snapshot.iter(
@@ -341,7 +446,7 @@ impl Fork {
             prefix.map_or(&[], |k| k.as_slice()),
         );
         while let Some((k, ..)) = iter.next() {
-            let change = changes.insert(k.to_vec(), Change::Delete);
+            let change = changes.data.insert(k.to_vec(), Change::Delete);
             if self.logged {
                 self.changelog.push((name.to_string(), k.to_vec(), change));
             }
@@ -351,6 +456,11 @@ impl Fork {
     /// Converts the fork into `Patch`.
     pub fn into_patch(self) -> Patch {
         self.patch
+    }
+
+    /// Returns reference to the inner `Patch`.
+    pub fn patch(&self) -> &Patch {
+        &self.patch
     }
 
     /// Merges patch from another fork to this fork.
@@ -367,12 +477,12 @@ impl Fork {
         }
 
         for (name, changes) in patch {
-            if let Some(in_changes) = self.patch.get_mut(&name) {
-                in_changes.extend(changes);
+            if let Some(in_changes) = self.patch.changes_mut(&name) {
+                in_changes.data.extend(changes.into_iter());
                 continue;
             }
             {
-                self.patch.insert(name, changes);
+                self.patch.insert_changes(name.to_owned(), changes);
             }
         }
     }

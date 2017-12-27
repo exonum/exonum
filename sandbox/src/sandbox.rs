@@ -12,12 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 // Workaround: Clippy does not correctly handle borrowing checking rules for returned types.
 #![cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
-
-use futures::{self, Async, Future, Stream};
-use futures::sync::mpsc;
 
 use std::ops::{AddAssign, Deref};
 use std::sync::{Arc, Mutex};
@@ -27,6 +23,9 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet, VecDeque};
 use std::iter::FromIterator;
 
+use futures::{self, Async, Future, Stream};
+use futures::Sink;
+use futures::sync::mpsc;
 use exonum::node::{Configuration, ExternalMessage, ListenerConfig, NodeHandler, NodeSender,
                    ServiceConfig, State, SystemStateProvider, ApiSender};
 use exonum::blockchain::{Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema,
@@ -38,7 +37,8 @@ use exonum::crypto::{gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed};
 #[cfg(test)]
 use exonum::crypto::gen_keypair;
 use exonum::helpers::{Height, Milliseconds, Round, ValidatorId, user_agent};
-use exonum::events::{Event, EventHandler, NetworkEvent, NetworkRequest, TimeoutRequest};
+use exonum::events::{Event, InternalEvent, EventHandler, NetworkEvent, NetworkRequest,
+                     TimeoutRequest, InternalRequest};
 use exonum::events::network::NetworkConfiguration;
 
 use timestamping::TimestampingService;
@@ -71,15 +71,16 @@ pub struct SandboxInner {
     pub events: VecDeque<Event>,
     pub timers: BinaryHeap<TimeoutRequest>,
     pub network_requests_rx: mpsc::Receiver<NetworkRequest>,
-    pub timeout_requests_rx: mpsc::Receiver<TimeoutRequest>,
+    pub internal_requests_rx: mpsc::Receiver<InternalRequest>,
     pub api_requests_rx: mpsc::Receiver<ExternalMessage>,
 }
 
 impl SandboxInner {
     pub fn process_events(&mut self) {
+        self.process_internal_requests();
         self.process_api_requests();
         self.process_network_requests();
-        self.process_timeout_requests();
+        self.process_internal_requests();
     }
 
     pub fn handle_event<E: Into<Event>>(&mut self, e: E) {
@@ -100,17 +101,23 @@ impl SandboxInner {
         });
         network_getter.wait().unwrap();
     }
+    fn process_internal_requests(&mut self) {
+        let internal_getter = futures::lazy(|| -> Result<(), ()> {
+            while let Async::Ready(Some(internal)) = self.internal_requests_rx.poll()? {
+                match internal {
+                    InternalRequest::Timeout(t) => self.timers.push(t),
+                    InternalRequest::JumpToRound(height, round) => {
+                        self.handler.handle_event(
+                            InternalEvent::JumpToRound(height, round).into(),
+                        )
+                    }
+                }
 
-    fn process_timeout_requests(&mut self) {
-        let timeouts_getter = futures::lazy(|| -> Result<(), ()> {
-            while let Async::Ready(Some(timeout)) = self.timeout_requests_rx.poll()? {
-                self.timers.push(timeout);
             }
             Ok(())
         });
-        timeouts_getter.wait().unwrap();
+        internal_getter.wait().unwrap();
     }
-
     fn process_api_requests(&mut self) {
         let api_getter = futures::lazy(|| -> Result<(), ()> {
             while let Async::Ready(Some(api)) = self.api_requests_rx.poll()? {
@@ -615,11 +622,11 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
     let shared_time = Arc::clone(&system_state.shared_time);
 
     let network_channel = mpsc::channel(100);
-    let timeout_channel = mpsc::channel(100);
+    let internal_channel = mpsc::channel(100);
     let node_sender = NodeSender {
-        network_requests: network_channel.0.clone(),
-        timeout_requests: timeout_channel.0.clone(),
-        api_requests: api_channel.0.clone(),
+        network_requests: network_channel.0.clone().wait(),
+        internal_requests: internal_channel.0.clone().wait(),
+        api_requests: api_channel.0.clone().wait(),
     };
 
     let mut handler = NodeHandler::new(
@@ -636,9 +643,9 @@ pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
         sent: VecDeque::new(),
         events: VecDeque::new(),
         timers: BinaryHeap::new(),
-        timeout_requests_rx: timeout_channel.1,
         network_requests_rx: network_channel.1,
         api_requests_rx: api_channel.1,
+        internal_requests_rx: internal_channel.1,
         handler,
         time: shared_time,
     };
@@ -665,10 +672,10 @@ pub fn timestamping_sandbox() -> Sandbox {
 #[cfg(test)]
 mod tests {
     use exonum::blockchain::ServiceContext;
-    use exonum::messages::{FromRaw, RawTransaction};
+    use exonum::messages::RawTransaction;
     use exonum::encoding;
     use exonum::crypto::{gen_keypair_from_seed, Seed};
-    use exonum::storage::Fork;
+    use exonum::storage::{Fork, Snapshot};
 
     use sandbox_tests_helper::{add_one_height, SandboxState, VALIDATOR_1, VALIDATOR_2,
                                VALIDATOR_3, HEIGHT_ONE, ROUND_ONE, ROUND_TWO};
@@ -711,6 +718,10 @@ mod tests {
 
         fn service_id(&self) -> u16 {
             SERVICE_ID
+        }
+
+        fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+            Vec::new()
         }
 
         fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {

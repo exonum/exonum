@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use byteorder::{ByteOrder, LittleEndian};
-
-use std::{mem, convert, sync};
+use std::{convert, mem, sync};
 use std::fmt::Debug;
 use std::ops::Deref;
 
-use crypto::{PublicKey, SecretKey, Signature, sign, verify, Hash, hash, SIGNATURE_LENGTH};
-use encoding::{Field, Error, Result as StreamStructResult, Offset, CheckedOffset};
+use byteorder::{ByteOrder, LittleEndian};
+
+use crypto::{hash, sign, verify, Hash, PublicKey, SecretKey, Signature, SIGNATURE_LENGTH};
+use encoding::{CheckedOffset, Field, Offset, Result as StreamStructResult};
 
 /// Length of the message header.
 pub const HEADER_LENGTH: usize = 10;
@@ -38,6 +38,11 @@ impl RawMessage {
     pub fn new(buffer: MessageBuffer) -> Self {
         RawMessage(sync::Arc::new(buffer))
     }
+
+    /// Creates a new `RawMessage` instance from the given `Vec<u8>`.
+    pub fn from_vec(vec: Vec<u8>) -> Self {
+        RawMessage(sync::Arc::new(MessageBuffer::from_vec(vec)))
+    }
 }
 
 impl Deref for RawMessage {
@@ -45,6 +50,12 @@ impl Deref for RawMessage {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl AsRef<[u8]> for RawMessage {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_ref().as_ref()
     }
 }
 
@@ -259,12 +270,6 @@ pub trait Message: Debug + Send + Sync {
     fn verify_signature(&self, pub_key: &PublicKey) -> bool {
         self.raw().verify_signature(pub_key)
     }
-}
-
-/// Represents conversion from the raw message into the specific one.
-pub trait FromRaw: Sized + Send + Message {
-    /// Converts the raw message into the specific one.
-    fn from_raw(raw: RawMessage) -> Result<Self, Error>;
 }
 
 impl Message for RawMessage {

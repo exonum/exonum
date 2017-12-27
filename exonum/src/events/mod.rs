@@ -17,38 +17,56 @@ pub mod tests;
 pub mod codec;
 pub mod error;
 pub mod network;
-pub mod timeouts;
-
-use futures::{Future, Async, Poll, Stream};
-use futures::sync::mpsc;
+pub mod internal;
 
 use std::time::SystemTime;
 use std::cmp::Ordering;
 
+use futures::{Future, Async, Poll, Stream};
+use futures::sink::Wait;
+use futures::sync::mpsc::{self, Sender};
+
 use node::{ExternalMessage, NodeTimeout};
-
 pub use self::network::{NetworkEvent, NetworkRequest, NetworkPart, NetworkConfiguration};
-pub use self::timeouts::TimeoutsPart;
+pub use self::internal::InternalPart;
+use helpers::{Height, Round};
 
+pub type SyncSender<T> = Wait<Sender<T>>;
 
+/// This kind of events is used to schedule execution in next event-loop ticks
+/// Usable to make flat logic and remove recursions.
 #[derive(Debug)]
-pub enum Event {
-    Network(NetworkEvent),
+pub enum InternalEvent {
+    /// Round update event.
+    JumpToRound(Height, Round),
     Timeout(NodeTimeout),
-    Api(ExternalMessage),
 }
 
-pub trait EventHandler {
-    fn handle_event(&mut self, event: Event);
+#[derive(Debug, PartialEq, Eq)]
+pub enum InternalRequest {
+    Timeout(TimeoutRequest),
+    JumpToRound(Height, Round),
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct TimeoutRequest(pub SystemTime, pub NodeTimeout);
 
 #[derive(Debug)]
+pub enum Event {
+    Network(NetworkEvent),
+    Api(ExternalMessage),
+    Internal(InternalEvent),
+}
+
+pub trait EventHandler {
+    fn handle_event(&mut self, event: Event);
+}
+
+
+#[derive(Debug)]
 pub struct HandlerPart<H: EventHandler> {
     pub handler: H,
-    pub timeout_rx: mpsc::Receiver<NodeTimeout>,
+    pub internal_rx: mpsc::Receiver<InternalEvent>,
     pub network_rx: mpsc::Receiver<NetworkEvent>,
     pub api_rx: mpsc::Receiver<ExternalMessage>,
 }
@@ -57,13 +75,19 @@ impl<H: EventHandler + 'static> HandlerPart<H> {
     pub fn run(self) -> Box<Future<Item = (), Error = ()>> {
         let mut handler = self.handler;
 
-        let fut = EventsAggregator::new(self.timeout_rx, self.network_rx, self.api_rx)
+        let fut = EventsAggregator::new(self.internal_rx, self.network_rx, self.api_rx)
             .for_each(move |event| {
                 handler.handle_event(event);
                 Ok(())
             });
 
         tobox(fut)
+    }
+}
+
+impl Into<InternalRequest> for TimeoutRequest {
+    fn into(self) -> InternalRequest {
+        InternalRequest::Timeout(self)
     }
 }
 
@@ -87,7 +111,7 @@ impl Into<Event> for NetworkEvent {
 
 impl Into<Event> for NodeTimeout {
     fn into(self) -> Event {
-        Event::Timeout(self)
+        Event::Internal(InternalEvent::Timeout(self))
     }
 }
 
@@ -97,6 +121,11 @@ impl Into<Event> for ExternalMessage {
     }
 }
 
+impl Into<Event> for InternalEvent {
+    fn into(self) -> Event {
+        Event::Internal(self)
+    }
+}
 /// Receives timeout, network and api events and invokes `handle_event` method of handler.
 /// If one of these streams closes, the aggregator stream completes immediately.
 #[derive(Debug)]
@@ -107,7 +136,7 @@ where
     S3: Stream,
 {
     done: bool,
-    timeout: S1,
+    internal: S1,
     network: S2,
     api: S3,
 }
@@ -118,19 +147,19 @@ where
     S2: Stream,
     S3: Stream,
 {
-    pub fn new(timeout: S1, network: S2, api: S3) -> EventsAggregator<S1, S2, S3> {
+    pub fn new(internal: S1, network: S2, api: S3) -> EventsAggregator<S1, S2, S3> {
         EventsAggregator {
             done: false,
-            network: network,
-            timeout: timeout,
-            api: api,
+            network,
+            internal,
+            api,
         }
     }
 }
 
 impl<S1, S2, S3> Stream for EventsAggregator<S1, S2, S3>
 where
-    S1: Stream<Item = NodeTimeout>,
+    S1: Stream<Item = InternalEvent>,
     S2: Stream<
         Item = NetworkEvent,
         Error = S1::Error,
@@ -147,9 +176,9 @@ where
         if self.done {
             Ok(Async::Ready(None))
         } else {
-            match self.timeout.poll()? {
+            match self.internal.poll()? {
                 Async::Ready(Some(item)) => {
-                    return Ok(Async::Ready(Some(Event::Timeout(item))));
+                    return Ok(Async::Ready(Some(Event::Internal(item))));
                 }
                 Async::Ready(None) => {
                     self.done = true;

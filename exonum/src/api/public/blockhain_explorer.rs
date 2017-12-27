@@ -65,7 +65,7 @@ impl ExplorerApi {
 impl Api for ExplorerApi {
     fn wire(&self, router: &mut Router) {
 
-        let _self = self.clone();
+        let self_ = self.clone();
         let blocks = move |req: &mut Request| -> IronResult<Response> {
             let map = req.get_ref::<Params>().unwrap();
             let count: u64 = match map.find(&["count"]) {
@@ -96,11 +96,11 @@ impl Api for ExplorerApi {
                 }
                 _ => false,
             };
-            let info = _self.get_blocks(count, latest, skip_empty_blocks)?;
-            _self.ok_response(&::serde_json::to_value(info).unwrap())
+            let info = self_.get_blocks(count, latest, skip_empty_blocks)?;
+            self_.ok_response(&::serde_json::to_value(info).unwrap())
         };
 
-        let _self = self.clone();
+        let self_ = self.clone();
         let block = move |req: &mut Request| -> IronResult<Response> {
             let params = req.extensions.get::<Router>().unwrap();
             match params.find("height") {
@@ -108,8 +108,8 @@ impl Api for ExplorerApi {
                     let height: u64 = height_str.parse().map_err(|e: ParseIntError| {
                         ApiError::IncorrectRequest(Box::new(e))
                     })?;
-                    let info = _self.get_block(Height(height))?;
-                    _self.ok_response(&::serde_json::to_value(info).unwrap())
+                    let info = self_.get_block(Height(height))?;
+                    self_.ok_response(&::serde_json::to_value(info).unwrap())
                 }
                 None => {
                     Err(ApiError::IncorrectRequest(

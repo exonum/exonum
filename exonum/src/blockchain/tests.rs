@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #![allow(dead_code)]
+
 use std::collections::BTreeMap;
 
 use rand::{thread_rng, Rng};

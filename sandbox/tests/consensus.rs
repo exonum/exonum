@@ -20,12 +20,11 @@ extern crate log;
 extern crate env_logger;
 extern crate bit_vec;
 
-use rand::{thread_rng, Rng};
-use bit_vec::BitVec;
-
 use std::time::Duration;
 use std::collections::BTreeMap;
 
+use rand::{thread_rng, Rng};
+use bit_vec::BitVec;
 use exonum::messages::{RawMessage, Message, Propose, Prevote, Precommit, ProposeRequest,
                        TransactionsRequest, PrevotesRequest, CONSENSUS};
 use exonum::crypto::{Hash, Seed, gen_keypair, gen_keypair_from_seed};
@@ -102,6 +101,45 @@ fn test_reach_one_height() {
 
     add_one_height(&sandbox, &sandbox_state);
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+}
+
+/// Validator2,3,4 starts in 5th round
+/// Validator1 starts with delay
+/// Validator1 receive consensus messages, and reach actual round
+#[test]
+fn test_reach_actual_round() {
+    let sandbox = timestamping_sandbox();
+
+    // get some tx
+    let tx = gen_timestamping_tx();
+
+    let block_at_first_height = BlockBuilder::new(&sandbox)
+        .with_proposer_id(VALIDATOR_3)
+        .with_tx_hash(&tx.hash())
+        .build();
+
+    let future_propose = Propose::new(
+        VALIDATOR_3,
+        HEIGHT_ONE,
+        ROUND_FOUR,
+        &block_at_first_height.clone().hash(),
+        &[], // there are no transactions in future propose
+        sandbox.s(VALIDATOR_3),
+    );
+
+    sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
+    sandbox.recv(&future_propose);
+    sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
+    sandbox.recv(&Prevote::new(
+        VALIDATOR_2,
+        HEIGHT_ONE,
+        ROUND_FOUR,
+        &block_at_first_height.clone().hash(),
+        Round::zero(),
+        sandbox.s(VALIDATOR_2),
+    ));
+
+    sandbox.assert_state(HEIGHT_ONE, ROUND_FOUR);
 }
 
 /// idea of the test is to reach one height two times and compare block hash
@@ -363,7 +401,6 @@ fn test_ignore_message_from_prev_height() {
 /// - send prevote when lock=0 for known propose
 #[test]
 fn positive_get_propose_send_prevote() {
-    let _ = env_logger::init();
 
     let sandbox = timestamping_sandbox();
 

@@ -15,25 +15,26 @@
 //! This module defines the Exonum services interfaces. Like smart contracts in some other
 //! blockchain platforms, Exonum services encapsulate business logic of the blockchain application.
 
-use serde_json::Value;
-use iron::Handler;
-
 use std::fmt;
 use std::sync::{Arc, RwLock};
 use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
 
+use serde_json::Value;
+use iron::Handler;
+
 use crypto::{Hash, PublicKey, SecretKey};
 use storage::{Fork, Snapshot};
 use messages::{Message, RawTransaction};
 use encoding::Error as MessageError;
+use encoding::serialize::json::ExonumJson;
 use node::{ApiSender, Node, State, TransactionSend};
 use blockchain::{Blockchain, ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use helpers::{Height, Milliseconds, ValidatorId};
 
 /// A trait that describes transaction processing rules (a group of sequential operations
 /// with the Exonum storage) for the given `Message`.
-pub trait Transaction: Message + 'static {
+pub trait Transaction: Message + ExonumJson + 'static {
     /// Verifies the transaction, which includes the message signature verification and other
     /// specific internal constraints. verify is intended to check the internal consistency of
     /// a transaction; it has no access to the blockchain state.
@@ -52,48 +53,6 @@ pub trait Transaction: Message + 'static {
     /// - If the execute method of a transaction raises a `panic`, the changes made by the
     /// transactions are discarded, but the transaction itself is still considered committed.
     fn execute(&self, fork: &mut Fork);
-    /// Returns the useful information about the transaction in the JSON format. The returned value
-    /// is used to fill the [`TxInfo.content`] field in [the blockchain explorer][explorer].
-    ///
-    /// # Notes
-    ///
-    /// The default implementation returns `null`. For transactions defined with
-    /// the [`message!`] macro, you may redefine `info()` as
-    ///
-    /// ```
-    /// # #[macro_use] extern crate exonum;
-    /// extern crate serde_json;
-    /// # use exonum::blockchain::Transaction;
-    /// # use exonum::storage::Fork;
-    ///
-    /// message! {
-    ///     struct MyTransaction {
-    ///         // Transaction definition...
-    /// #       const TYPE = 1;
-    /// #       const ID = 1;
-    /// #       const SIZE = 8;
-    /// #       field foo: u64 [0 => 8]
-    ///     }
-    /// }
-    ///
-    /// impl Transaction for MyTransaction {
-    ///     // Other methods...
-    /// #   fn verify(&self) -> bool { true }
-    /// #   fn execute(&self, _: &mut Fork) { }
-    ///
-    ///     fn info(&self) -> serde_json::Value {
-    ///         serde_json::to_value(self).expect("Cannot serialize transaction to JSON")
-    ///     }
-    /// }
-    /// # fn main() { }
-    /// ```
-    ///
-    /// [`TxInfo.content`]: ../explorer/struct.TxInfo.html#structfield.content
-    /// [explorer]: ../explorer/index.html
-    /// [`message!`]: ../macro.message.html
-    fn info(&self) -> Value {
-        Value::Null
-    }
 }
 
 /// A trait that describes a business-logic of the concrete service.
@@ -103,19 +62,75 @@ pub trait Service: Send + Sync + 'static {
     fn service_id(&self) -> u16;
 
     /// Unique human readable service name.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::blockchain::Service;
+    /// use exonum::crypto::Hash;
+    /// # use exonum::blockchain::Transaction;
+    /// # use exonum::messages::RawTransaction;
+    /// # use exonum::encoding::Error as MessageError;
+    /// # use exonum::storage::Snapshot;
+    ///
+    /// struct MyService {}
+    ///
+    /// impl Service for MyService {
+    /// #   fn service_id(&self) -> u16 {
+    /// #       8000
+    /// #   }
+    ///     fn service_name(&self) -> &'static str {
+    ///         "my_special_unique_service"
+    ///     }
+    /// #   fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    /// #       Vec::new()
+    /// #   }
+    /// #   fn tx_from_raw(&self, _: RawTransaction) -> Result<Box<Transaction>, MessageError> {
+    /// #       unimplemented!()
+    /// #   }
+    /// }
+    /// ```
     fn service_name(&self) -> &'static str;
 
     /// Returns a list of root hashes of tables that determine the current state
     /// of the service database. These hashes are collected from all services in a common
     ///  `MerklePatriciaTable` that named [`state_hash_aggregator`][1].
     ///
+    /// Empty `Vec` can be returned if service don't want to change blockchain state.
+    ///
     /// See also [`service_table_unique_key`][2].
     ///
     /// [1]: struct.Schema.html#method.state_hash_aggregator
     /// [2]: struct.Blockchain.html#method.service_table_unique_key
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
-        Vec::new()
-    }
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::blockchain::Service;
+    /// use exonum::crypto::Hash;
+    /// use exonum::storage::Snapshot;
+    /// # use exonum::blockchain::Transaction;
+    /// # use exonum::messages::RawTransaction;
+    /// # use exonum::encoding::Error as MessageError;
+    ///
+    /// struct MyService {}
+    ///
+    /// impl Service for MyService {
+    /// #   fn service_id(&self) -> u16 {
+    /// #       8000
+    /// #   }
+    /// #   fn service_name(&self) -> &'static str {
+    /// #       "my_special_unique_service"
+    /// #   }
+    ///     fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+    ///         Vec::new()
+    ///     }
+    /// #   fn tx_from_raw(&self, _: RawTransaction) -> Result<Box<Transaction>, MessageError> {
+    /// #       unimplemented!()
+    /// #   }
+    /// }
+    /// ```
+    fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash>;
 
     /// Tries to create `Transaction` object from the given raw message.
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError>;

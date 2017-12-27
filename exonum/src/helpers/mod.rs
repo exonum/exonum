@@ -14,12 +14,12 @@
 
 //! Different assorted utilities.
 
+use std::env;
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use log::{LogRecord, LogLevel, SetLoggerError};
 use env_logger::LogBuilder;
 use colored::*;
-
-use std::env;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use blockchain::{GenesisConfig, ValidatorKeys};
 use node::NodeConfig;

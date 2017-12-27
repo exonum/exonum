@@ -14,9 +14,9 @@
 
 //! Common widely used typedefs.
 
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
-
 use std::fmt;
+
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
 
 /// Number of milliseconds.
 pub type Milliseconds = u64;

@@ -14,7 +14,7 @@
 
 use rand::{Rng, XorShiftRng, SeedableRng};
 
-use exonum::messages::{FromRaw, Message, RawTransaction};
+use exonum::messages::{Message, RawTransaction};
 use exonum::encoding::Error as MessageError;
 use exonum::crypto::{PublicKey, SecretKey, Hash, gen_keypair};
 use exonum::storage::{Snapshot, Fork};
