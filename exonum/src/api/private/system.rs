@@ -158,13 +158,13 @@ impl SystemApi {
 impl Api for SystemApi {
     fn wire(&self, router: &mut Router) {
 
-        let _self = self.clone();
+        let self_ = self.clone();
         let peer_add = move |req: &mut Request| -> IronResult<Response> {
             let map = req.get_ref::<Params>().unwrap();
             match map.find(&["ip"]) {
                 Some(&ParamsValue::String(ref ip_str)) => {
-                    _self.peer_add(ip_str)?;
-                    _self.ok_response(&::serde_json::to_value("Ok").unwrap())
+                    self_.peer_add(ip_str)?;
+                    self_.ok_response(&::serde_json::to_value("Ok").unwrap())
                 }
                 _ => {
                     Err(ApiError::IncorrectRequest(
@@ -174,16 +174,16 @@ impl Api for SystemApi {
             }
         };
 
-        let _self = self.clone();
+        let self_ = self.clone();
         let peers_info = move |_: &mut Request| -> IronResult<Response> {
-            let info = _self.get_peers_info();
-            _self.ok_response(&::serde_json::to_value(info).unwrap())
+            let info = self_.get_peers_info();
+            self_.ok_response(&::serde_json::to_value(info).unwrap())
         };
 
-        let _self = self.clone();
+        let self_ = self.clone();
         let network = move |_: &mut Request| -> IronResult<Response> {
-            let info = _self.get_network_info();
-            _self.ok_response(&::serde_json::to_value(info).unwrap())
+            let info = self_.get_network_info();
+            self_.ok_response(&::serde_json::to_value(info).unwrap())
         };
 
         router.get("/v1/peers", peers_info, "peers_info");
