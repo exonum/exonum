@@ -127,7 +127,6 @@ extern crate exonum;
 extern crate futures;
 extern crate iron;
 extern crate iron_test;
-extern crate mount;
 extern crate router;
 extern crate serde;
 extern crate serde_json;
@@ -135,12 +134,10 @@ extern crate serde_json;
 use futures::Stream;
 use futures::executor::{self, Spawn};
 use futures::sync::mpsc;
-use iron::{IronError, Handler};
+use iron::{IronError, Handler, Chain};
 use iron::headers::{ContentType, Headers};
 use iron::status::StatusClass;
 use iron_test::{request, response};
-use mount::Mount;
-use router::Router;
 use serde::{Deserialize, Serialize};
 
 use std::collections::BTreeMap;
@@ -152,7 +149,8 @@ use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Schema as C
 use exonum::crypto;
 use exonum::helpers::{Height, Round, ValidatorId};
 use exonum::messages::{Message, Precommit, Propose};
-use exonum::node::{ApiSender, ExternalMessage, State as NodeState, TransactionSend, TxPool};
+use exonum::node::{ApiSender, ExternalMessage, State as NodeState, TransactionSend, TxPool,
+                   NodeApiConfig, create_public_api_handler, create_private_api_handler};
 use exonum::storage::{MemoryDB, Snapshot};
 
 #[macro_use]
@@ -478,6 +476,7 @@ pub struct TestKit {
     api_sender: ApiSender,
     mempool: TxPool,
     cfg_proposal: Option<ConfigurationProposalState>,
+    api_config: NodeApiConfig,
 }
 
 impl fmt::Debug for TestKit {
@@ -541,17 +540,8 @@ impl TestKit {
             network,
             mempool: Arc::clone(&mempool),
             cfg_proposal: None,
+            api_config: Default::default(),
         }
-    }
-
-    /// Creates a mounting point for public APIs used by the blockchain.
-    fn public_api_mount(&self) -> Mount {
-        self.blockchain.mount_public_api()
-    }
-
-    /// Creates a mounting point for public APIs used by the blockchain.
-    fn private_api_mount(&self) -> Mount {
-        self.blockchain.mount_private_api()
     }
 
     /// Creates an instance of `TestKitApi` to test the API provided by services.
@@ -1128,8 +1118,8 @@ impl ApiKind {
 /// API encapsulation for the testkit. Allows to execute and synchronously retrieve results
 /// for REST-ful endpoints of services.
 pub struct TestKitApi {
-    public_handler: Mount,
-    private_handler: Mount,
+    public_handler: Chain,
+    private_handler: Chain,
     api_sender: ApiSender,
 }
 
@@ -1143,40 +1133,23 @@ impl TestKitApi {
     /// Creates a new instance of API.
     fn new(testkit: &TestKit) -> Self {
         use std::sync::Arc;
-        use exonum::api::{public, Api};
 
         let blockchain = &testkit.blockchain;
+        let api_state = SharedNodeState::new(10_000);
 
         TestKitApi {
-            public_handler: {
-                let mut mount = Mount::new();
+            public_handler: create_public_api_handler(
+                blockchain.clone(),
+                Arc::clone(&testkit.mempool),
+                api_state.clone(),
+                &testkit.api_config,
+            ),
 
-                let service_mount = testkit.public_api_mount();
-                mount.mount("api/services", service_mount);
-
-                let mut router = Router::new();
-                let pool = Arc::clone(&testkit.mempool);
-                let api_state = SharedNodeState::new(10_000);
-                let system_api = public::SystemApi::new(pool, blockchain.clone(), api_state);
-                system_api.wire(&mut router);
-                mount.mount("api/system", router);
-
-                let mut router = Router::new();
-                let explorer_api = public::ExplorerApi::new(blockchain.clone());
-                explorer_api.wire(&mut router);
-                mount.mount("api/explorer", router);
-
-                mount
-            },
-
-            private_handler: {
-                let mut mount = Mount::new();
-
-                let service_mount = testkit.private_api_mount();
-                mount.mount("api/services", service_mount);
-
-                mount
-            },
+            private_handler: create_private_api_handler(
+                blockchain.clone(),
+                api_state,
+                testkit.api_sender.clone(),
+            ),
 
             api_sender: testkit.api_sender.clone(),
         }
@@ -1184,13 +1157,13 @@ impl TestKitApi {
 
     /// Returns the mounting point for public APIs. Useful for intricate testing not covered
     /// by `get*` and `post*` functions.
-    pub fn public_handler(&self) -> &Mount {
+    pub fn public_handler(&self) -> &Chain {
         &self.public_handler
     }
 
     /// Returns the mounting point for private APIs. Useful for intricate testing not covered
     /// by `get*` and `post*` functions.
-    pub fn private_handler(&self) -> &Mount {
+    pub fn private_handler(&self) -> &Chain {
         &self.private_handler
     }
 
