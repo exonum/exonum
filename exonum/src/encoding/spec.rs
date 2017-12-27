@@ -201,7 +201,7 @@ macro_rules! encoding_struct {
             #[allow(unused_mut)]
             fn serialize_field(&self)
                 -> Result<$crate::encoding::serialize::json::reexport::Value,
-                          Box<::std::error::Error>>
+                          Box<::std::error::Error + Send + Sync>>
             {
                 use $crate::encoding::serialize::json::reexport::Value;
                 let mut map = $crate::encoding::serialize::json::reexport::Map::new();

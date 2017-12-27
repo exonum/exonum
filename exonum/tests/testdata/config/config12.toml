@@ -33,7 +33,7 @@ tx_pool_capacity = 100000
 api_requests_capacity = 1024
 network_events_capacity = 512
 network_requests_capacity = 512
-timeout_requests_capacity = 128
+internal_events_capacity = 128
 
 [network]
 max_incoming_connections = 128

@@ -21,6 +21,7 @@ use messages::{BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit
 use helpers::{Height, Round, ValidatorId};
 use storage::Patch;
 use node::{NodeHandler, RequestData};
+use events::InternalRequest;
 
 // TODO reduce view invokations (ECR-171)
 impl NodeHandler {
@@ -48,7 +49,15 @@ impl NodeHandler {
                 self.state.height(),
                 self.state.round()
             );
+            let validator = msg.validator();
+            let round = msg.round();
             self.state.add_queued(msg);
+            trace!("Trying to reach actual round.");
+            if let Some(r) = self.state.get_actual_round(validator, round) {
+                trace!("Scheduling jump to round.");
+                let height = self.state.height();
+                self.execute_later(InternalRequest::JumpToRound(height, r));
+            }
             return;
         }
 
@@ -583,6 +592,42 @@ impl NodeHandler {
         }
     }
 
+    /// Handle new round, after jump.
+    pub fn handle_new_round(&mut self, height: Height, round: Round) {
+        trace!("Handle new round");
+        if height != self.state.height() {
+            return;
+        }
+
+        if round <= self.state.round() {
+            return;
+        }
+
+        info!("Jump to a new round = {}", round);
+        self.state.jump_round(round);
+        self.process_new_round();
+    }
+
+    // Try to process consensus messages from the future round.
+    fn process_new_round(&mut self) {
+        if self.state.is_validator() {
+            // Send prevote if we are locked or propose if we are leader
+            if let Some(hash) = self.state.locked_propose() {
+                let round = self.state.round();
+                let has_majority_prevotes = self.broadcast_prevote(round, &hash);
+                if has_majority_prevotes {
+                    self.has_majority_prevotes(round, &hash);
+                }
+            } else if self.state.is_leader() {
+                self.add_propose_timeout();
+            }
+        }
+
+        // Handle queued messages
+        for msg in self.state.queued() {
+            self.handle_consensus(msg);
+        }
+    }
     /// Handles round timeout. As result node sends `Propose` if it is a leader or `Prevote` if it
     /// is locked to some round.
     pub fn handle_round_timeout(&mut self, height: Height, round: Round) {
@@ -601,25 +646,7 @@ impl NodeHandler {
         // Add timeout for this round
         self.add_round_timeout();
 
-        if !self.state.is_validator() {
-            return;
-        }
-
-        // Send prevote if we are locked or propose if we are leader
-        if let Some(hash) = self.state.locked_propose() {
-            let round = self.state.round();
-            let has_majority_prevotes = self.broadcast_prevote(round, &hash);
-            if has_majority_prevotes {
-                self.has_majority_prevotes(round, &hash);
-            }
-        } else if self.state.is_leader() {
-            self.add_propose_timeout();
-        }
-
-        // Handle queued messages
-        for msg in self.state.queued() {
-            self.handle_consensus(msg);
-        }
+        self.process_new_round();
     }
 
     /// Handles propose timeout. Node sends `Propose` and `Prevote` if it is a leader as result.

@@ -32,11 +32,9 @@ use hex::FromHex;
 use crypto::{Hash, PublicKey, Signature};
 use helpers::{Height, Round, ValidatorId};
 use messages::RawMessage;
-
-// TODO: should we implement serialize for: `SecretKey`, `Seed` (ECR-156)?
-
 use encoding::{Field, Offset};
 use super::WriteBufferWrapper;
+// TODO: should we implement serialize for: `SecretKey`, `Seed` (ECR-156)?
 
 macro_rules! impl_default_deserialize_owned {
     (@impl $name:ty) => {
@@ -64,9 +62,11 @@ pub trait ExonumJson {
         buffer: &mut B,
         from: Offset,
         to: Offset,
-    ) -> Result<(), Box<Error>>;
+    ) -> Result<(), Box<Error>>
+    where
+        Self: Sized;
     /// serialize field as `json::Value`
-    fn serialize_field(&self) -> Result<Value, Box<Error>>;
+    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>>;
 }
 
 /// `ExonumJsonDeserialize` is trait for objects that could be constructed from exonum json.
@@ -97,7 +97,7 @@ macro_rules! impl_deserialize_int {
                 Ok(())
             }
 
-            fn serialize_field(&self) -> Result<Value, Box<Error>> {
+            fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
                 Ok(Value::Number((*self).into()))
             }
         }
@@ -120,35 +120,13 @@ macro_rules! impl_deserialize_bigint {
                 Ok(())
             }
 
-            fn serialize_field(&self) -> Result<Value, Box<Error>> {
+            fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
                 Ok(Value::String(self.to_string()))
             }
         }
     };
     ($($name:ty);*) => ($(impl_deserialize_bigint!{@impl $name})*);
 }
-
-/*
-macro_rules! impl_deserialize_float {
-    (@impl $traitname:ident $typename:ty) => {
-        impl<'a> ExonumJson for $typename {
-            fn deserialize(value: &Value, buffer: &'a mut Vec<u8>,
-                            from: usize, to: usize ) -> bool {
-                    value.as_f64()
-                         .map(|v| v as $typename)
-                         .map(|val| val.write(buffer, from, to))
-                         .is_some()
-            }
-
-            fn serialize_field(&self) -> Result<Value, Box<Error>> {
-                Value::Number(self.into())
-            }
-        }
-    };
-    ( $($name:ty);*) => ($(impl_deserialize_float!{@impl  $name})*);
-}
-impl_deserialize_int!{ f32; f64 }
-*/
 
 macro_rules! impl_deserialize_hex_segment {
     (@impl $typename:ty) => {
@@ -165,7 +143,7 @@ macro_rules! impl_deserialize_hex_segment {
                 Ok(())
             }
 
-            fn serialize_field(&self) -> Result<Value, Box<Error>> {
+            fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
                 let hex_str = $crate::encoding::serialize::encode_hex(&self[..]);
                 Ok(Value::String(hex_str))
             }
@@ -176,11 +154,9 @@ macro_rules! impl_deserialize_hex_segment {
 
 impl_deserialize_int!{u8; u16; u32; i8; i16; i32}
 impl_deserialize_bigint!{u64; i64}
-
 impl_deserialize_hex_segment!{Hash; PublicKey; Signature}
-
 impl_default_deserialize_owned!{u8; u16; u32; i8; i16; i32; u64; i64;
-Hash; PublicKey; Signature; bool}
+                                Hash; PublicKey; Signature; bool}
 
 impl ExonumJson for bool {
     fn deserialize_field<B: WriteBufferWrapper>(
@@ -194,7 +170,7 @@ impl ExonumJson for bool {
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
         Ok(Value::Bool(*self))
     }
 }
@@ -211,7 +187,7 @@ impl<'a> ExonumJson for &'a str {
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
         Ok(Value::String(self.to_string()))
     }
 }
@@ -230,7 +206,7 @@ impl ExonumJson for SystemTime {
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
         let duration = self.duration_since(UNIX_EPOCH)?;
         let duration = DurationHelper {
             secs: duration.as_secs().to_string(),
@@ -252,7 +228,7 @@ impl ExonumJson for SocketAddr {
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
         Ok(::serde_json::to_value(&self)?)
     }
 }
@@ -275,7 +251,7 @@ impl<'a> ExonumJson for &'a [Hash] {
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
         let mut vec = Vec::new();
         for hash in self.iter() {
             vec.push(hash.serialize_field()?)
@@ -296,7 +272,7 @@ impl<'a> ExonumJson for &'a [u8] {
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
         Ok(Value::String(::encoding::serialize::encode_hex(self)))
     }
 }
@@ -320,7 +296,7 @@ impl ExonumJson for Vec<RawMessage> {
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
         let vec = self.iter()
             .map(|slice| {
                 Value::String(::encoding::serialize::encode_hex(slice))
@@ -370,7 +346,7 @@ where
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
         let mut vec = Vec::new();
         for item in self {
             vec.push(item.serialize_field()?);
@@ -402,7 +378,7 @@ impl ExonumJson for BitVec {
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
         let mut out = String::new();
         for i in self.iter() {
             if i {
@@ -428,7 +404,7 @@ impl ExonumJson for Height {
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
         let val: u64 = self.to_owned().into();
         Ok(Value::String(val.to_string()))
     }
@@ -446,7 +422,7 @@ impl ExonumJson for Round {
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
         let val: u32 = self.to_owned().into();
         Ok(Value::Number(val.into()))
     }
@@ -464,7 +440,7 @@ impl ExonumJson for ValidatorId {
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
         let val: u16 = self.to_owned().into();
         Ok(Value::Number(val.into()))
     }

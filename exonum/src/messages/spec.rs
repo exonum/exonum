@@ -311,7 +311,7 @@ macro_rules! message {
             #[allow(unused_mut)]
             fn serialize_field(&self)
                 -> Result<$crate::encoding::serialize::json::reexport::Value,
-                            Box<::std::error::Error>>
+                            Box<::std::error::Error + Send + Sync>>
             {
                 use $crate::encoding::serialize::json::reexport::Value;
                 use $crate::encoding::serialize::json::reexport::Map;

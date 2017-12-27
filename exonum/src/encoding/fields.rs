@@ -172,7 +172,7 @@ impl<'a> Field<'a> for bool {
         1
     }
 
-    unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> bool {
+    unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> Self {
         buffer[from as usize] == 1
     }
 
@@ -205,7 +205,7 @@ impl<'a> Field<'a> for u8 {
         mem::size_of::<Self>() as Offset
     }
 
-    unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> u8 {
+    unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> Self {
         buffer[from as usize]
     }
 
@@ -230,7 +230,7 @@ impl<'a> Field<'a> for i8 {
         mem::size_of::<Self>() as Offset
     }
 
-    unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> i8 {
+    unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> Self {
         buffer[from as usize] as i8
     }
 
