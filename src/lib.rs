@@ -135,7 +135,7 @@ extern crate serde_json;
 use futures::Stream;
 use futures::executor::{self, Spawn};
 use futures::sync::mpsc;
-use iron::IronError;
+use iron::{IronError, Handler};
 use iron::headers::{ContentType, Headers};
 use iron::status::StatusClass;
 use iron_test::{request, response};
@@ -1128,8 +1128,8 @@ impl ApiKind {
 /// API encapsulation for the testkit. Allows to execute and synchronously retrieve results
 /// for REST-ful endpoints of services.
 pub struct TestKitApi {
-    public_mount: Mount,
-    private_mount: Mount,
+    public_handler: Mount,
+    private_handler: Mount,
     api_sender: ApiSender,
 }
 
@@ -1148,7 +1148,7 @@ impl TestKitApi {
         let blockchain = &testkit.blockchain;
 
         TestKitApi {
-            public_mount: {
+            public_handler: {
                 let mut mount = Mount::new();
 
                 let service_mount = testkit.public_api_mount();
@@ -1169,7 +1169,7 @@ impl TestKitApi {
                 mount
             },
 
-            private_mount: {
+            private_handler: {
                 let mut mount = Mount::new();
 
                 let service_mount = testkit.private_api_mount();
@@ -1184,14 +1184,14 @@ impl TestKitApi {
 
     /// Returns the mounting point for public APIs. Useful for intricate testing not covered
     /// by `get*` and `post*` functions.
-    pub fn public_mount(&self) -> &Mount {
-        &self.public_mount
+    pub fn public_handler(&self) -> &Mount {
+        &self.public_handler
     }
 
     /// Returns the mounting point for private APIs. Useful for intricate testing not covered
     /// by `get*` and `post*` functions.
-    pub fn private_mount(&self) -> &Mount {
-        &self.private_mount
+    pub fn private_handler(&self) -> &Mount {
+        &self.private_handler
     }
 
     /// Sends a transaction to the node via `ApiSender`.
@@ -1201,8 +1201,9 @@ impl TestKitApi {
         );
     }
 
-    fn get_internal<D>(mount: &Mount, url: &str, expect_error: bool) -> D
+    fn get_internal<H, D>(handler: &H, url: &str, expect_error: bool) -> D
     where
+        H: Handler,
         for<'de> D: Deserialize<'de>,
     {
         let status_class = if expect_error {
@@ -1212,7 +1213,7 @@ impl TestKitApi {
         };
 
         let url = format!("http://localhost:3000/{}", url);
-        let resp = request::get(&url, Headers::new(), mount);
+        let resp = request::get(&url, Headers::new(), handler);
         let resp = if expect_error {
             // Support either "normal" or erroneous responses.
             // For example, `Api.not_found_response()` returns the response as `Ok(..)`.
@@ -1247,7 +1248,7 @@ impl TestKitApi {
         for<'de> D: Deserialize<'de>,
     {
         TestKitApi::get_internal(
-            &self.public_mount,
+            &self.public_handler,
             &format!("{}/{}", kind.into_prefix(), endpoint),
             false,
         )
@@ -1264,7 +1265,7 @@ impl TestKitApi {
         for<'de> D: Deserialize<'de>,
     {
         TestKitApi::get_internal(
-            &self.private_mount,
+            &self.private_handler,
             &format!("{}/{}", kind.into_prefix(), endpoint),
             false,
         )
@@ -1280,14 +1281,15 @@ impl TestKitApi {
         for<'de> D: Deserialize<'de>,
     {
         TestKitApi::get_internal(
-            &self.public_mount,
+            &self.public_handler,
             &format!("{}/{}", kind.into_prefix(), endpoint),
             true,
         )
     }
 
-    fn post_internal<T, D>(mount: &Mount, endpoint: &str, data: &T) -> D
+    fn post_internal<H, T, D>(handler: &H, endpoint: &str, data: &T) -> D
     where
+        H: Handler,
         T: Serialize,
         for<'de> D: Deserialize<'de>,
     {
@@ -1300,7 +1302,7 @@ impl TestKitApi {
                 headers
             },
             &serde_json::to_string(&data).expect("Cannot serialize data to JSON"),
-            mount,
+            handler,
         ).expect("Cannot send data");
 
         let resp = response::extract_body_to_string(resp);
@@ -1322,7 +1324,7 @@ impl TestKitApi {
         for<'de> D: Deserialize<'de>,
     {
         TestKitApi::post_internal(
-            &self.public_mount,
+            &self.public_handler,
             &format!("{}/{}", kind.into_prefix(), endpoint),
             transaction,
         )
@@ -1343,7 +1345,7 @@ impl TestKitApi {
         for<'de> D: Deserialize<'de>,
     {
         TestKitApi::post_internal(
-            &self.private_mount,
+            &self.private_handler,
             &format!("{}/{}", kind.into_prefix(), endpoint),
             transaction,
         )
