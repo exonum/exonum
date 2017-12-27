@@ -269,14 +269,20 @@ mod tests {
     use byteorder::{LittleEndian, ByteOrder};
     use encoding::Offset;
 
-    fn validate_constructor<T, V, C: Fn(V) -> T>(constructor: C, value: V, buffer: &[u8], header_size: Offset) -> bool
+    fn validate_constructor<T, V, C: Fn(V) -> T>(
+        constructor: C,
+        value: V,
+        buffer: &[u8],
+        header_size: Offset,
+    ) -> bool
     where
         C: panic::RefUnwindSafe,
         V: panic::UnwindSafe,
         T: for<'r> Field<'r> + PartialEq + ::std::fmt::Debug,
     {
         let constructor_result = panic::catch_unwind(|| constructor(value));
-        let check_result = <T as Field>::check(&buffer, 0.into(), header_size.into(), header_size.into());
+        let check_result =
+            <T as Field>::check(&buffer, 0.into(), header_size.into(), header_size.into());
         if constructor_result.is_err() && check_result.is_err() {
             return false;
         } else if constructor_result.is_ok() && check_result.is_ok() {

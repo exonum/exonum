@@ -117,7 +117,7 @@ use std::ops::{Add, Sub, Mul, Div};
 pub use self::fields::Field;
 pub use self::segments::SegmentField;
 pub use self::error::Error;
-#[cfg(feature="float_serialize")]
+#[cfg(feature = "float_serialize")]
 pub use self::float::{F32, F64};
 
 #[macro_use]
@@ -129,7 +129,7 @@ mod fields;
 mod segments;
 #[macro_use]
 mod spec;
-#[cfg(feature="float_serialize")]
+#[cfg(feature = "float_serialize")]
 mod float;
 
 #[cfg(test)]
