@@ -39,8 +39,11 @@ pub trait Transaction: Message + ExonumJson + 'static {
     /// # Examples
     ///
     /// ```
+    /// # #[macro_use] extern crate exonum;
+    /// #
     /// use exonum::blockchain::Transaction;
     /// use exonum::crypto::PublicKey;
+    /// use exonum::messages::Message;
     /// # use exonum::blockchain::TransactionStatus;
     /// # use exonum::storage::Fork;
     ///
@@ -63,6 +66,7 @@ pub trait Transaction: Message + ExonumJson + 'static {
     ///     // ...
     /// #   fn execute(&self, _: &mut Fork) -> TransactionStatus { TransactionStatus::Succeeded }
     /// }
+    /// # fn main() {}
     fn verify(&self) -> bool;
 
     /// Takes the current blockchain state via `fork` and can modify it if certain conditions
@@ -81,7 +85,9 @@ pub trait Transaction: Message + ExonumJson + 'static {
     /// # Examples
     ///
     /// ```
-    /// use exonum::blockchain::Transaction;
+    /// # #[macro_use] extern crate exonum;
+    /// #
+    /// use exonum::blockchain::{Transaction, TransactionStatus};
     /// use exonum::crypto::PublicKey;
     /// use exonum::storage::Fork;
     ///
@@ -96,7 +102,7 @@ pub trait Transaction: Message + ExonumJson + 'static {
     /// }
     ///
     /// impl Transaction for MyTransaction {
-    ///     fn execute(&self, fork: &mut Fork) {
+    ///     fn execute(&self, fork: &mut Fork) -> TransactionStatus {
     ///         // Read and/or write into storage.
     ///         // ...
     ///
@@ -108,6 +114,7 @@ pub trait Transaction: Message + ExonumJson + 'static {
     ///     // ...
     /// #   fn verify(&self) -> bool { true }
     /// }
+    /// # fn main() {}
     fn execute(&self, fork: &mut Fork) -> TransactionStatus;
 }
 
