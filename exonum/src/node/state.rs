@@ -1016,7 +1016,7 @@ impl State {
             match self.validator_state {
                 Some(ref validator_state) => {
                     if let Some(msg) = validator_state.our_prevotes.get(&round) {
-                        // TODO: unefficient (ECR-171)
+                        // TODO: inefficient (ECR-171)
                         if Some(*msg.propose_hash()) != self.locked_propose {
                             return true;
                         }

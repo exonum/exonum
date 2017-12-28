@@ -183,7 +183,7 @@ impl Default for EventsPoolCapacity {
 /// Memory pool configuration parameters.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MemoryPoolConfig {
-    /// Maximum number of uncommited transactions.
+    /// Maximum number of uncommitted transactions.
     pub tx_pool_capacity: usize,
     /// Sets the maximum number of messages that can be buffered on the event loop's
     /// notification channel before a send will fail.
@@ -599,7 +599,7 @@ pub struct Node {
 }
 
 impl NodeChannel {
-    /// Creates `NodeChannel` with the given pool capacitites.
+    /// Creates `NodeChannel` with the given pool capacities.
     pub fn new(buffer_sizes: &EventsPoolCapacity) -> NodeChannel {
         NodeChannel {
             network_requests: mpsc::channel(buffer_sizes.network_requests_capacity),
@@ -703,13 +703,13 @@ impl Node {
             );
             let network_handler = network_part.run(&core.handle());
             core.run(network_handler).map(drop).map_err(|e| {
-                other_error(&format!("An error in the `Network` thread occured: {}", e))
+                other_error(&format!("An error in the `Network` thread occurred: {}", e))
             })
         });
 
         let mut core = Core::new()?;
         core.run(handler_part.run()).map_err(|_| {
-            other_error("An error in the `Handler` thread occured")
+            other_error("An error in the `Handler` thread occurred")
         })?;
         network_thread.join().unwrap()
     }
