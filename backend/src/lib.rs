@@ -16,10 +16,6 @@ extern crate params;
 #[macro_use]
 extern crate log;
 #[cfg(test)]
-extern crate iron_test;
-#[cfg(test)]
-extern crate mime;
-#[cfg(test)]
 #[macro_use]
 extern crate exonum_testkit;
 
