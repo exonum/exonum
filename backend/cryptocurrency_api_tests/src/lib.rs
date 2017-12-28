@@ -35,7 +35,7 @@ mod tests {
     use exonum::crypto::{Seed, Hash, PublicKey, gen_keypair, gen_keypair_from_seed};
     use exonum::blockchain::{Service, Transaction};
     use exonum::events::error;
-    use exonum::messages::{FromRaw, Message, RawMessage};
+    use exonum::messages::{Message, RawMessage};
     use exonum::api::Api;
     use exonum::helpers::init_logger;
     use cryptocurrency::{CurrencyService, CurrencyTx, TxCreateWallet, TxIssue, TxTransfer, KeyBox};
@@ -202,7 +202,7 @@ mod tests {
         // it's 1 byte and 2 hex symbols shorter
         let pubkey_malformed_str = "cec750b8a1723960c9708a4fe11e49d90ac4592d0bd99d9b3757f8a0f517a3";
         let resp = sandbox.request_wallet_info_str(pubkey_malformed_str);
-        assert_response_status(resp, Status::Conflict, "InvalidHexLength");
+        assert_response_status(resp, Status::Conflict, "InvalidStringLength");
     }
 
     #[test]

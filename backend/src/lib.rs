@@ -9,8 +9,6 @@ extern crate serde;
 extern crate serde_derive;
 #[macro_use]
 extern crate log;
-#[cfg(test)]
-extern crate tempdir;
 #[macro_use]
 extern crate exonum;
 extern crate params;
@@ -22,6 +20,8 @@ extern crate percent_encoding;
 extern crate rand;
 #[cfg(test)]
 extern crate byteorder;
+#[cfg(test)]
+extern crate exonum_testkit;
 
 use iron::Handler;
 use router::Router;
@@ -29,7 +29,7 @@ use router::Router;
 use std::fmt;
 use std::error::Error;
 
-use exonum::messages::{RawMessage, RawTransaction, FromRaw, Message};
+use exonum::messages::{RawMessage, RawTransaction, Message};
 use exonum::crypto::{PublicKey, Hash};
 use exonum::storage::{Snapshot, Fork, MapIndex, ProofListIndex, ProofMapIndex};
 use exonum::blockchain::{Service, Transaction, ApiContext, gen_prefix};
@@ -38,7 +38,7 @@ use exonum::encoding::{Offset, Field, Error as StreamStructError};
 use exonum::helpers::fabric::{ServiceFactory, Context};
 use serde_json::{Value, to_value};
 use exonum::encoding::serialize::json::ExonumJson;
-use exonum::encoding::serialize::{WriteBufferWrapper, ToHex, FromHex};
+use exonum::encoding::serialize::{WriteBufferWrapper, FromHex, ToHex};
 
 use wallet::{Wallet, WalletAccess};
 use tx_metarecord::TxMetaRecord;
@@ -80,8 +80,9 @@ impl<'a> ExonumJson for &'a KeyBox {
     }
 
     fn serialize_field(&self) -> Result<Value, Box<Error>> {
-        let hex = ToHex::to_hex(&self.0.as_ref());
-        Ok(Value::String(hex))
+        let mut s = String::new();
+        self.0.as_ref().write_hex(&mut s).unwrap();
+        Ok(Value::String(s))
     }
 }
 
@@ -168,8 +169,8 @@ impl Message for CurrencyTx {
     }
 }
 
-impl FromRaw for CurrencyTx {
-    fn from_raw(raw: RawMessage) -> Result<Self, StreamStructError> {
+impl CurrencyTx {
+    pub fn from_raw(raw: RawMessage) -> Result<Self, StreamStructError> {
         match raw.message_type() {
             TX_TRANSFER_ID => Ok(CurrencyTx::Transfer(TxTransfer::from_raw(raw)?)),
             TX_ISSUE_ID => Ok(CurrencyTx::Issue(TxIssue::from_raw(raw)?)),
@@ -447,13 +448,14 @@ impl ServiceFactory for CurrencyService {
 mod tests {
     use byteorder::{ByteOrder, LittleEndian};
     use rand::{thread_rng, Rng};
-    use tempdir::TempDir;
 
     use exonum::crypto::{gen_keypair, Hash, hash, PublicKey};
-    use exonum::storage::{self, Database, Fork};
-    use exonum::blockchain::{Blockchain, Transaction};
-    use exonum::messages::{FromRaw, Message};
+    use exonum::blockchain::Transaction;
+    use exonum::storage::Fork;
+    use exonum::messages::Message;
     use exonum::encoding::serialize::json::reexport as serde_json;
+
+    use exonum_testkit::TestKitBuilder;
 
     use super::{CurrencyTx, CurrencyService, CurrencySchema, TxCreateWallet, TxIssue, TxTransfer,
                 KeyBox};
@@ -596,29 +598,30 @@ mod tests {
 
     #[test]
     fn test_wallet_history_txtransfer_false_status_absent_receiver_wallet() {
-        let db = create_db();
-        let b = Blockchain::new(db, vec![Box::new(CurrencyService::new())]);
-        let mut v = b.fork();
-        let mut s = CurrencySchema::new(&mut v);
+        let mut testkit = TestKitBuilder::validator()
+            .with_service(CurrencyService::new())
+            .create();
+        let mut fork = testkit.blockchain_mut().fork();
+        let mut schema = CurrencySchema::new(&mut fork);
 
         let (p1, s1) = gen_keypair();
         let (p2, _) = gen_keypair();
 
         let cw1 = TxCreateWallet::new(&p1, "login_wallet1", &KeyBox([0; 128]), &s1);
-        CurrencyTx::from(cw1.clone()).execute(s.as_mut());
+        CurrencyTx::from(cw1.clone()).execute(schema.as_mut());
 
         let iw1 = TxIssue::new(&p1, 1000, 1, &s1);
-        CurrencyTx::from(iw1.clone()).execute(s.as_mut());
+        CurrencyTx::from(iw1.clone()).execute(schema.as_mut());
 
         let tw = TxTransfer::new(&p1, &p2, 300, 3, &s1);
-        CurrencyTx::from(tw.clone()).execute(s.as_mut());
+        CurrencyTx::from(tw.clone()).execute(schema.as_mut());
 
-        let (w1, rh1) = get_wallet_and_history(&mut s, &p1);
-        let (w2, _) = get_wallet_and_history(&mut s, &p2);
+        let (w1, rh1) = get_wallet_and_history(&mut schema, &p1);
+        let (w2, _) = get_wallet_and_history(&mut schema, &p2);
         assert_wallet(&w1.unwrap(), &p1, "login_wallet1", 1000, 3, &rh1);
         assert_eq!(w2, None);
-        let h1 = s.collect_history(&p1);
-        let h2 = s.collect_history(&p2);
+        let h1 = schema.collect_history(&p1);
+        let h2 = schema.collect_history(&p2);
         let meta_create1 = TxMetaRecord::new(&cw1.hash(), true);
         let meta_issue1 = TxMetaRecord::new(&iw1.hash(), true);
         let meta_transfer = TxMetaRecord::new(&tw.hash(), false);
@@ -628,31 +631,32 @@ mod tests {
 
     #[test]
     fn test_wallet_history_txtransfer_false_status_insufficient_balance() {
-        let db = create_db();
-        let b = Blockchain::new(db, vec![Box::new(CurrencyService::new())]);
-        let mut v = b.fork();
-        let mut s = CurrencySchema::new(&mut v);
+        let mut testkit = TestKitBuilder::validator()
+            .with_service(CurrencyService::new())
+            .create();
+        let mut fork = testkit.blockchain_mut().fork();
+        let mut schema = CurrencySchema::new(&mut fork);
 
         let (p1, s1) = gen_keypair();
         let (p2, s2) = gen_keypair();
 
         let cw1 = TxCreateWallet::new(&p1, "login_wallet1", &KeyBox([0; 128]), &s1);
         let cw2 = TxCreateWallet::new(&p2, "login_wallet2", &KeyBox([0; 128]), &s2);
-        CurrencyTx::from(cw1.clone()).execute(s.as_mut());
-        CurrencyTx::from(cw2.clone()).execute(s.as_mut());
+        CurrencyTx::from(cw1.clone()).execute(schema.as_mut());
+        CurrencyTx::from(cw2.clone()).execute(schema.as_mut());
 
         let iw1 = TxIssue::new(&p1, 1000, 1, &s1);
-        CurrencyTx::from(iw1.clone()).execute(s.as_mut());
+        CurrencyTx::from(iw1.clone()).execute(schema.as_mut());
 
         let tw = TxTransfer::new(&p1, &p2, 1018, 3, &s1);
-        CurrencyTx::from(tw.clone()).execute(s.as_mut());
+        CurrencyTx::from(tw.clone()).execute(schema.as_mut());
 
-        let (w1, rh1) = get_wallet_and_history(&mut s, &p1);
-        let (w2, rh2) = get_wallet_and_history(&mut s, &p2);
+        let (w1, rh1) = get_wallet_and_history(&mut schema, &p1);
+        let (w2, rh2) = get_wallet_and_history(&mut schema, &p2);
         assert_wallet(&w1.unwrap(), &p1, "login_wallet1", 1000, 3, &rh1);
         assert_wallet(&w2.unwrap(), &p2, "login_wallet2", 0, 1, &rh2);
-        let h1 = s.collect_history(&p1);
-        let h2 = s.collect_history(&p2);
+        let h1 = schema.collect_history(&p1);
+        let h2 = schema.collect_history(&p2);
         let meta_create1 = TxMetaRecord::new(&cw1.hash(), true);
         let meta_create2 = TxMetaRecord::new(&cw2.hash(), true);
         let meta_issue1 = TxMetaRecord::new(&iw1.hash(), true);
@@ -663,10 +667,11 @@ mod tests {
 
     #[test]
     fn test_wallet_history_txcreate_false_status() {
-        let db = create_db();
-        let b = Blockchain::new(db, vec![Box::new(CurrencyService::new())]);
-        let mut v = b.fork();
-        let mut s = CurrencySchema::new(&mut v);
+        let mut testkit = TestKitBuilder::validator()
+            .with_service(CurrencyService::new())
+            .create();
+        let mut fork = testkit.blockchain_mut().fork();
+        let mut schema = CurrencySchema::new(&mut fork);
 
         let (p1, s1) = gen_keypair();
         let cw1 = TxCreateWallet::new(&p1, "login_wallet1", &KeyBox([0; 128]), &s1);
@@ -674,56 +679,56 @@ mod tests {
         let cw2 = TxCreateWallet::new(&p1, "login_wallet2", &KeyBox([0; 128]), &s1);
         let meta_create2 = TxMetaRecord::new(&cw2.hash(), false);
 
-        CurrencyTx::from(cw1.clone()).execute(s.as_mut());
-        CurrencyTx::from(cw2.clone()).execute(s.as_mut());
+        CurrencyTx::from(cw1.clone()).execute(schema.as_mut());
+        CurrencyTx::from(cw2.clone()).execute(schema.as_mut());
 
-        let (w, rh) = get_wallet_and_history(&mut s, &p1);
+        let (w, rh) = get_wallet_and_history(&mut schema, &p1);
         assert_wallet(&w.unwrap(), &p1, "login_wallet1", 0, 2, &rh);
-        let h1 = s.collect_history(&p1);
+        let h1 = schema.collect_history(&p1);
         assert_eq!(h1, vec![meta_create1, meta_create2]);
     }
 
     #[test]
     fn test_wallet_history_true_status() {
-        let db = create_db();
-        let b = Blockchain::new(db, vec![Box::new(CurrencyService::new())]);
-
-        let mut v = b.fork();
-        let mut s = CurrencySchema::new(&mut v);
+        let mut testkit = TestKitBuilder::validator()
+            .with_service(CurrencyService::new())
+            .create();
+        let mut fork = testkit.blockchain_mut().fork();
+        let mut schema = CurrencySchema::new(&mut fork);
 
         let (p1, s1) = gen_keypair();
         let (p2, s2) = gen_keypair();
 
         let cw1 = TxCreateWallet::new(&p1, "login_wallet1", &KeyBox([0; 128]), &s1);
         let cw2 = TxCreateWallet::new(&p2, "login_wallet2", &KeyBox([0; 128]), &s2);
-        CurrencyTx::from(cw1.clone()).execute(s.as_mut());
-        CurrencyTx::from(cw2.clone()).execute(s.as_mut());
+        CurrencyTx::from(cw1.clone()).execute(schema.as_mut());
+        CurrencyTx::from(cw2.clone()).execute(schema.as_mut());
 
-        let (w1, rh1) = get_wallet_and_history(&mut s, &p1);
-        let (w2, rh2) = get_wallet_and_history(&mut s, &p2);
+        let (w1, rh1) = get_wallet_and_history(&mut schema, &p1);
+        let (w2, rh2) = get_wallet_and_history(&mut schema, &p2);
         assert_wallet(&w1.unwrap(), &p1, "login_wallet1", 0, 1, &rh1);
         assert_wallet(&w2.unwrap(), &p2, "login_wallet2", 0, 1, &rh2);
 
         let iw1 = TxIssue::new(&p1, 1000, 1, &s1);
         let iw2 = TxIssue::new(&p2, 100, 2, &s2);
-        CurrencyTx::from(iw1.clone()).execute(s.as_mut());
-        CurrencyTx::from(iw2.clone()).execute(s.as_mut());
+        CurrencyTx::from(iw1.clone()).execute(schema.as_mut());
+        CurrencyTx::from(iw2.clone()).execute(schema.as_mut());
 
-        let (w1, rh1) = get_wallet_and_history(&mut s, &p1);
-        let (w2, rh2) = get_wallet_and_history(&mut s, &p2);
+        let (w1, rh1) = get_wallet_and_history(&mut schema, &p1);
+        let (w2, rh2) = get_wallet_and_history(&mut schema, &p2);
         assert_wallet(&w1.unwrap(), &p1, "login_wallet1", 1000, 2, &rh1);
         assert_wallet(&w2.unwrap(), &p2, "login_wallet2", 100, 2, &rh2);
 
         let tw = TxTransfer::new(&p1, &p2, 400, 3, &s1);
-        CurrencyTx::from(tw.clone()).execute(s.as_mut());
+        CurrencyTx::from(tw.clone()).execute(schema.as_mut());
 
-        let (w1, rh1) = get_wallet_and_history(&mut s, &p1);
-        let (w2, rh2) = get_wallet_and_history(&mut s, &p2);
+        let (w1, rh1) = get_wallet_and_history(&mut schema, &p1);
+        let (w2, rh2) = get_wallet_and_history(&mut schema, &p2);
         assert_wallet(&w1.unwrap(), &p1, "login_wallet1", 600, 3, &rh1);
         assert_wallet(&w2.unwrap(), &p2, "login_wallet2", 500, 3, &rh2);
 
-        let h1 = s.collect_history(&p1);
-        let h2 = s.collect_history(&p2);
+        let h1 = schema.collect_history(&p1);
+        let h2 = schema.collect_history(&p2);
         let meta_create1 = TxMetaRecord::new(&cw1.hash(), true);
         let meta_create2 = TxMetaRecord::new(&cw2.hash(), true);
         let meta_issue1 = TxMetaRecord::new(&iw1.hash(), true);
@@ -731,19 +736,6 @@ mod tests {
         let meta_transfer = TxMetaRecord::new(&tw.hash(), true);
         assert_eq!(h1, vec![meta_create1, meta_issue1, meta_transfer.clone()]);
         assert_eq!(h2, vec![meta_create2, meta_issue2, meta_transfer]);
-    }
-
-    #[cfg(feature = "memorydb")]
-    fn create_db() -> Box<Database> {
-        Box::new(storage::MemoryDB::new())
-    }
-
-    #[cfg(not(feature = "memorydb"))]
-    fn create_db() -> Box<Database> {
-        let mut options = storage::RocksDBOptions::default();
-        options.create_if_missing(true);
-        let dir = TempDir::new("cryptocurrency").unwrap();
-        Box::new(storage::RocksDB::open(dir.path(), options).unwrap())
     }
 
     #[derive(Serialize)]

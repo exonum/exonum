@@ -4,7 +4,7 @@ extern crate exonum_configuration;
 
 use exonum::helpers;
 use exonum::helpers::fabric::NodeBuilder;
-use exonum_configuration::ConfigurationService;
+use exonum_configuration::ConfigurationServiceFactory;
 use cryptocurrency::CurrencyService;
 
 fn main() {
@@ -12,7 +12,7 @@ fn main() {
     helpers::init_logger().unwrap();
 
     let node = NodeBuilder::new()
-        .with_service(Box::new(ConfigurationService::new()))
+        .with_service(Box::new(ConfigurationServiceFactory))
         .with_service(Box::new(CurrencyService::new()));
     node.run();
 }
