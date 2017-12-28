@@ -368,7 +368,7 @@ impl Fork {
         self.logged = false;
     }
 
-    /// Rollbakcs all changes after the last checkpoint.
+    /// Rollbacks all changes after the last checkpoint.
     ///
     /// # Panics
     ///

@@ -98,7 +98,7 @@ impl Blockchain {
         }
     }
 
-    /// Returnts service `VecMap` for all our services.
+    /// Returns service `VecMap` for all our services.
     pub fn service_map(&self) -> &Arc<VecMap<Box<Service>>> {
         &self.service_map
     }

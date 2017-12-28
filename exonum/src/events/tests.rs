@@ -87,7 +87,7 @@ impl TestHandler {
         match self.wait_for_event() {
             Ok(NetworkEvent::PeerConnected(_addr, connect)) => connect,
             Ok(other) => panic!("Unexpected connect received, {:?}", other),
-            Err(e) => panic!("An error during wait for connect occured, {:?}", e),
+            Err(e) => panic!("An error during wait for connect occurred, {:?}", e),
         }
     }
 
@@ -95,7 +95,7 @@ impl TestHandler {
         match self.wait_for_event() {
             Ok(NetworkEvent::PeerDisconnected(addr)) => addr,
             Ok(other) => panic!("Unexpected disconnect received, {:?}", other),
-            Err(e) => panic!("An error during wait for disconnect occured, {:?}", e),
+            Err(e) => panic!("An error during wait for disconnect occurred, {:?}", e),
         }
     }
 
@@ -103,7 +103,7 @@ impl TestHandler {
         match self.wait_for_event() {
             Ok(NetworkEvent::MessageReceived(_addr, msg)) => msg,
             Ok(other) => panic!("Unexpected message received, {:?}", other),
-            Err(e) => panic!("An error during wait for message occured, {:?}", e),
+            Err(e) => panic!("An error during wait for message occurred, {:?}", e),
         }
     }
 
