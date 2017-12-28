@@ -685,7 +685,7 @@ pub fn sandbox_restarted(sandbox: Sandbox) -> Sandbox {
 #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
 pub fn sandbox_restarted_uninitialized(sandbox: Sandbox) -> Sandbox {
     let network_channel = mpsc::channel(100);
-    let timeout_channel = mpsc::channel(100);
+    let internal_channel = mpsc::channel(100);
     let api_channel = mpsc::channel(100);
 
     let address = sandbox.a(VALIDATOR_0);
@@ -698,9 +698,9 @@ pub fn sandbox_restarted_uninitialized(sandbox: Sandbox) -> Sandbox {
     );
 
     let node_sender = NodeSender {
-        network_requests: network_channel.0.clone(),
-        timeout_requests: timeout_channel.0.clone(),
-        api_requests: api_channel.0.clone(),
+        network_requests: network_channel.0.clone().wait(),
+        internal_requests: internal_channel.0.clone().wait(),
+        api_requests: api_channel.0.clone().wait(),
     };
 
     let config = Configuration {
@@ -738,7 +738,7 @@ pub fn sandbox_restarted_uninitialized(sandbox: Sandbox) -> Sandbox {
         sent: VecDeque::new(),
         events: VecDeque::new(),
         timers: BinaryHeap::new(),
-        timeout_requests_rx: timeout_channel.1,
+        internal_requests_rx: internal_channel.1,
         network_requests_rx: network_channel.1,
         api_requests_rx: api_channel.1,
         handler,
