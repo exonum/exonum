@@ -751,7 +751,7 @@ mod tests {
     fn test_sandbox_recv_and_send() {
         let s = timestamping_sandbox();
         let (public, secret) = gen_keypair();
-        s.recv(Connect::new(
+        s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_2),
             s.time(),
@@ -802,7 +802,7 @@ mod tests {
     fn test_sandbox_expected_to_send_another_message() {
         let s = timestamping_sandbox();
         let (public, secret) = gen_keypair();
-        s.recv(Connect::new(
+        s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_2),
             s.time(),
@@ -826,7 +826,7 @@ mod tests {
     fn test_sandbox_unexpected_message_when_drop() {
         let s = timestamping_sandbox();
         let (public, secret) = gen_keypair();
-        s.recv(Connect::new(
+        s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_2),
             s.time(),
@@ -840,14 +840,14 @@ mod tests {
     fn test_sandbox_unexpected_message_when_handle_another_message() {
         let s = timestamping_sandbox();
         let (public, secret) = gen_keypair();
-        s.recv(Connect::new(
+        s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_2),
             s.time(),
             &user_agent::get(),
             &secret,
         ));
-        s.recv(Connect::new(
+        s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_3),
             s.time(),
@@ -862,7 +862,7 @@ mod tests {
     fn test_sandbox_unexpected_message_when_time_changed() {
         let s = timestamping_sandbox();
         let (public, secret) = gen_keypair();
-        s.recv(Connect::new(
+        s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_2),
             s.time(),
