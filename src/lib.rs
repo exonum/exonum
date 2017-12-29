@@ -1266,7 +1266,7 @@ impl TestKitApi {
         for<'de> D: Deserialize<'de>,
     {
         TestKitApi::get_internal(
-            &self.public_mount,
+            &self.private_mount,
             &format!("{}/{}", kind.into_prefix(), endpoint),
             false,
         )
