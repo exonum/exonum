@@ -133,7 +133,7 @@ impl DBKey {
 
     /// Shortens this DBKey to the specified length.
     pub fn prefix(&self, suffix: u16) -> DBKey {
-        debug_assert!(self.to + suffix <= self.data.len() as u16 * 8);
+        debug_assert!(self.from + suffix <= self.data.len() as u16 * 8);
 
         DBKey {
             data: self.data,
