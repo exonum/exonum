@@ -22,6 +22,7 @@ use std::thread;
 use std::net::SocketAddr;
 use std::time::{Duration, SystemTime};
 use std::collections::BTreeMap;
+use std::collections::HashSet;
 use std::fmt;
 
 use toml::Value;
@@ -304,6 +305,7 @@ impl NodeHandler {
             whitelist,
             stored,
             connect,
+            blockchain.get_saved_peers(),
             last_hash,
             last_height,
             system_state.current_time(),
@@ -354,12 +356,17 @@ impl NodeHandler {
 
     /// Performs node initialization, so it starts consensus process from the first round.
     pub fn initialize(&mut self) {
-        let addr = self.system_state.listen_address();
-        info!("Start listening address={}", addr);
-        for address in &self.peer_discovery.clone() {
-            if address == &self.system_state.listen_address() {
-                continue;
-            }
+        let listen_address = self.system_state.listen_address();
+        info!("Start listening address={}", listen_address);
+
+        let peers: HashSet<_> = {
+            let it = self.state.peers().values().map(Connect::addr);
+            let it = it.chain(self.peer_discovery.iter().cloned());
+            let it = it.filter(|&address| address != listen_address);
+            it.collect()
+        };
+
+        for address in &peers {
             self.connect(address);
             info!("Trying to connect with peer {}", address);
         }
