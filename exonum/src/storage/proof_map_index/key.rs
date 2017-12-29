@@ -122,7 +122,7 @@ impl DBKey {
 
         let pos = self.from + idx;
         let chunk = self.data[(pos / 8) as usize];
-        let bit = 7 - pos % 8;
+        let bit = pos % 8;
         let value = (1 << bit) & chunk;
         if value != 0 {
             ChildKind::Right
@@ -170,17 +170,32 @@ impl DBKey {
         if self.from != other.from {
             0
         } else {
-            let from = self.from / 8;
-            let to = min((self.to + 7) / 8, (other.to + 7) / 8);
-            let max_len = min(self.len(), other.len());
+            let mut max_len = min(self.len(), other.len());
 
-            for i in from..to {
-                let x = self.data[i as usize] ^ other.data[i as usize];
-                if x != 0 {
-                    let tail = x.leading_zeros() as u16;
-                    return min(i * 8 + tail - self.from, max_len);
+            // let from = self.from / 8;
+            // let to = min((self.to + 7) / 8, (other.to + 7) / 8);
+
+            // for i in from..to {
+            //     let x = self.data[i as usize] ^ other.data[i as usize];
+            //     if x != 0 {
+            //         let tail = x.leading_zeros() as u16;
+            //         max_len = min(i * 8 + tail - self.from, max_len);
+            //         break;
+            //     }
+            // }
+
+            for i in 0..max_len {
+                if self.get(i) != other.get(i) {
+                    max_len = i;
+                    break;
                 }
             }
+
+            info!("from: {}", self.from);
+            info!("to: {}", self.from + max_len);
+            info!("self: {:#?}", self);
+            info!("other: {:#?}", other);
+            info!("prefix: {:#?}", self.prefix(max_len));
             max_len
         }
     }
@@ -260,15 +275,26 @@ impl PartialEq for DBKey {
 impl ::std::fmt::Debug for DBKey {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         write!(f, "DBKey(")?;
-        for i in 0..self.len() {
-            write!(
-                f,
-                "{}",
-                match self.get(i) {
-                    ChildKind::Left => '0',
-                    ChildKind::Right => '1',
+        for byte in 0..self.data.len() {
+            let chunk = self.data[byte];
+            for bit in (0..8).rev() {
+                let i = (byte * 8 + bit) as u16;
+                match i {
+                    _ if i < self.from => write!(f, "_")?,
+                    _ if i >= self.to => write!(f, "_")?,
+                    _ => {
+                        write!(
+                            f,
+                            "{}",
+                            match (1 << bit) & chunk == 0 {
+                                true => '0',
+                                false => '1',
+                            }
+                        )?
+                    }
                 }
-            )?;
+            }
+            write!(f, "|")?;
         }
         write!(f, ")")
     }
@@ -277,34 +303,37 @@ impl ::std::fmt::Debug for DBKey {
 #[test]
 fn test_dbkey_suffix() {
     let b = DBKey::read(b"\x00\x01\x02\xFF\x0C0000000000000000000000000000\x20");
+
     assert_eq!(b.len(), 32);
-    assert_eq!(b.get(0), ChildKind::Left);
-    assert_eq!(b.get(7), ChildKind::Right);
+    assert_eq!(b.get(0), ChildKind::Right);
+    assert_eq!(b.get(7), ChildKind::Left);
     assert_eq!(b.get(8), ChildKind::Left);
-    assert_eq!(b.get(14), ChildKind::Right);
+    assert_eq!(b.get(9), ChildKind::Right);
     assert_eq!(b.get(15), ChildKind::Left);
     assert_eq!(b.get(16), ChildKind::Right);
     assert_eq!(b.get(20), ChildKind::Right);
     assert_eq!(b.get(23), ChildKind::Right);
+    assert_eq!(b.get(26), ChildKind::Right);
+    assert_eq!(b.get(27), ChildKind::Right);
     assert_eq!(b.get(31), ChildKind::Left);
     let b2 = b.suffix(8);
     assert_eq!(b2.len(), 24);
     assert_eq!(b2.get(0), ChildKind::Left);
-    assert_eq!(b2.get(6), ChildKind::Right);
+    assert_eq!(b2.get(1), ChildKind::Right);
     assert_eq!(b2.get(7), ChildKind::Left);
     assert_eq!(b2.get(12), ChildKind::Right);
     assert_eq!(b2.get(15), ChildKind::Right);
     let b3 = b2.suffix(24);
     assert_eq!(b3.len(), 0);
     let b4 = b.suffix(1);
-    assert_eq!(b4.get(6), ChildKind::Right);
+    assert_eq!(b4.get(6), ChildKind::Left);
     assert_eq!(b4.get(7), ChildKind::Left);
-    assert_eq!(b4.get(13), ChildKind::Right);
+    assert_eq!(b4.get(8), ChildKind::Right);
 }
 
 #[test]
 fn test_dbkey_truncate() {
-    let b = DBKey::read(b"\x00\x80wertyuiopasdfghjklzxcvbnm123456\x08");
+    let b = DBKey::read(b"\x00\x83wertyuiopasdfghjklzxcvbnm123456\x08");
     assert_eq!(b.len(), 8);
     assert_eq!(b.truncate(1).get(0), ChildKind::Right);
     assert_eq!(b.truncate(1).len(), 1);
@@ -341,26 +370,26 @@ fn test_dbkey_suffix_at_overflow() {
 #[test]
 fn test_dbkey_common_prefix() {
     let b1 = DBKey::read(b"\x01abcd0000000000000000000000000000\x00");
-    let b2 = DBKey::read(b"\x01abde0000000000000000000000000000\x00");
+    let b2 = DBKey::read(b"\x01abef0000000000000000000000000000\x00");
     assert_eq!(b1.common_prefix(&b1), 256);
     let c = b1.common_prefix(&b2);
-    assert_eq!(c, 21);
+    assert_eq!(c, 17);
     let c = b2.common_prefix(&b1);
-    assert_eq!(c, 21);
+    assert_eq!(c, 17);
     let b1 = b1.suffix(9);
     let b2 = b2.suffix(9);
     let c = b1.common_prefix(&b2);
-    assert_eq!(c, 12);
+    assert_eq!(c, 8);
     let b3 = DBKey::read(b"\x01\xFF0000000000000000000000000000000\x00");
-    let b4 = DBKey::read(b"\x01\xFE0000000000000000000000000000000\x00");
-    assert_eq!(b3.common_prefix(&b4), 7);
-    assert_eq!(b4.common_prefix(&b3), 7);
+    let b4 = DBKey::read(b"\x01\xF70000000000000000000000000000000\x00");
+    assert_eq!(b3.common_prefix(&b4), 3);
+    assert_eq!(b4.common_prefix(&b3), 3);
     assert_eq!(b3.common_prefix(&b3), 256);
     let b3 = b3.suffix(30);
     assert_eq!(b3.common_prefix(&b3), 226);
     let b3 = b3.truncate(200);
     assert_eq!(b3.common_prefix(&b3), 200);
-    let b5 = DBKey::read(b"\x01\xFF0000000000000000000000000000000\x00");
+    let b5 = DBKey::read(b"\x01\xF00000000000000000000000000000000\x00");
     assert_eq!(b5.truncate(0).common_prefix(&b3), 0);
 }
 
