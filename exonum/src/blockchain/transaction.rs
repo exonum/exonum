@@ -25,6 +25,9 @@ use encoding::serialize::json::ExonumJson;
 #[cfg_attr(feature = "cargo-clippy", allow(cast_lossless))]
 static MAX_RESERVED_VALUE: u16 = ::std::u8::MAX as u16;
 
+/// Result of the `Transaction`'s `execute' method.
+pub type TransactionResult = Result<TransactionValue, TransactionError>;
+
 /// A trait that describes transaction processing rules (a group of sequential operations
 /// with the Exonum storage) for the given `Message`.
 pub trait Transaction: Message + ExonumJson + 'static {
@@ -115,7 +118,27 @@ pub trait Transaction: Message + ExonumJson + 'static {
     /// #   fn verify(&self) -> bool { true }
     /// }
     /// # fn main() {}
-    fn execute(&self, fork: &mut Fork) -> TransactionStatus;
+    fn execute(&self, fork: &mut Fork) -> TransactionResult;
+}
+
+/// Result of successful transaction execution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum TransactionValue {
+    /// Successful transaction execution.
+    Success,
+    /// User defined code. Can have different meanings for different transactions and services.
+    Code(u8),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum TransactionError {
+    /// Panic occurred during transaction execution. This status should not be used explicitly.
+    Panic,
+    /// General failure (unspecified reason).
+    UnknownFailure,
+    /// User defined error-code. Can have different meanings for different transactions and
+    /// services.
+    Code(u8)
 }
 
 /// Execution status of the transaction.
