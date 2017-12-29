@@ -168,7 +168,7 @@ fn to_status(value: u16) -> TransactionStatus {
         2 => TransactionStatus::Failed,
         val => {
             assert!(
-                val > MAX_RESERVED_VALUE,
+                val > MAX_RESERVED_VALUE && (val - MAX_RESERVED_VALUE - 1) <= u8::MAX_VALUE,
                 "Invalid ExecutionStatus value: {}",
                 val
             );
