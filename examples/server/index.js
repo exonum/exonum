@@ -14,7 +14,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-'use strict'
 /* eslint-env node,mocha */
 
 const exonum = require('exonum-client')
@@ -25,30 +24,32 @@ const expect = require('chai').expect
 
 const TESTKIT_URL = 'http://127.0.0.1:9000/api/testkit'
 
-function createBlock (txHashes) {
+async function createBlock (txHashes) {
   const body = (txHashes === undefined) ? { } : {
     tx_hashes: txHashes
   }
 
-  return fetch(TESTKIT_URL + '/v1/blocks', {
+  const response = await fetch(TESTKIT_URL + '/v1/blocks', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body)
-  }).then(resp => resp.json())
+  })
+  return response.json()
 }
 
-function rollback (blocks) {
-  return fetch(TESTKIT_URL + '/v1/blocks', {
+async function rollback (blocks) {
+  const response = await fetch(TESTKIT_URL + '/v1/blocks', {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ blocks })
-  }).then(resp => resp.json())
+  })
+  return response.json()
 }
 
-function getBlockchainHeight () {
-  return fetch(TESTKIT_URL + '/v1/status')
-    .then(resp => resp.json())
-    .then(resp => resp.height)
+async function getBlockchainHeight () {
+  let response = await fetch(TESTKIT_URL + '/v1/status')
+  response = await response.json()
+  return response.height
 }
 
 describe('CurrencyService', function () {
@@ -125,38 +126,39 @@ describe('CurrencyService', function () {
 
   // // // // Service-specific functions // // // //
 
-  function createWallet (tx) {
-    return fetch(SERVICE_URL + '/v1/wallets', {
+  async function createWallet (tx) {
+    let response = await fetch(SERVICE_URL + '/v1/wallets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(tx)
-    }).then(resp => resp.json())
-      .then(resp => {
-        expect(resp.tx_hash).to.equal(tx.hash())
-      })
+    })
+    response = await response.json()
+    expect(response.tx_hash).to.equal(tx.hash())
   }
 
-  function transfer (tx) {
-    return fetch(SERVICE_URL + '/v1/wallets/transfer', {
+  async function transfer (tx) {
+    let response = await fetch(SERVICE_URL + '/v1/wallets/transfer', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(tx)
-    }).then(resp => resp.json())
-      .then(resp => {
-        expect(resp.tx_hash).to.equal(tx.hash())
-      })
+    })
+    response = await response.json()
+    expect(response.tx_hash).to.equal(tx.hash())
   }
 
-  function getWallet (pubkey) {
-    return fetch(SERVICE_URL + '/v1/wallet/' + pubkey)
-      .then(resp => resp.json())
+  async function getWallet (pubkey) {
+    const response = await fetch(SERVICE_URL + '/v1/wallet/' + pubkey)
+    return response.json()
   }
 
   // // // // Tests // // // //
 
-  beforeEach(() => getBlockchainHeight().then(height => rollback(height)))
+  beforeEach(async () => {
+    const height = await getBlockchainHeight()
+    await rollback(height)
+  })
 
-  it('should create wallet', () => {
+  it('should create wallet', async () => {
     const { publicKey, secretKey } = exonum.keyPair()
     const tx = TxCreateWallet.new({
       pub_key: publicKey,
@@ -164,18 +166,15 @@ describe('CurrencyService', function () {
     })
     tx.signature = TxCreateWallet.sign(secretKey, tx.body)
 
-    return createWallet(tx)
-      .then(() => createBlock())
-      .then(() => getBlockchainHeight())
-      .then(height => { expect(height).to.equal(1) })
-      .then(() => getWallet(publicKey))
-      .then(wallet => {
-        expect(wallet.name).to.equal('Alice')
-        expect('' + wallet.balance).to.equal('100')
-      })
+    await createWallet(tx)
+    await createBlock()
+    expect(await getBlockchainHeight()).to.equal(1)
+    const wallet = await getWallet(publicKey)
+    expect(wallet.name).to.equal('Alice')
+    expect('' + wallet.balance).to.equal('100')
   })
 
-  it('should perform transfer between wallets', () => {
+  it('should perform transfer between wallets', async () => {
     const { publicKey: alicePK, secretKey: aliceKey } = exonum.keyPair()
     const txAlice = TxCreateWallet.new({
       pub_key: alicePK,
@@ -198,26 +197,26 @@ describe('CurrencyService', function () {
     })
     transferTx.signature = TxTranfer.sign(aliceKey, transferTx.body)
 
-    return Promise.all([
+    await Promise.all([
       createWallet(txAlice),
       createWallet(txBob),
       transfer(transferTx)
-    ]).then(() => createBlock([
+    ])
+    await createBlock([
       txAlice.hash(),
       txBob.hash(),
       transferTx.hash()
-    ])).then(() => getBlockchainHeight())
-      .then(height => { expect(height).to.equal(1) })
-      .then(() => Promise.all([
-        getWallet(alicePK),
-        getWallet(bobPK)
-      ])).then(({ 0: aliceWallet, 1: bobWallet }) => {
-        expect('' + aliceWallet.balance).to.equal('85')
-        expect('' + bobWallet.balance).to.equal('115')
-      })
+    ])
+    expect(await getBlockchainHeight()).to.equal(1)
+    const [aliceWallet, bobWallet] = await Promise.all([
+      getWallet(alicePK),
+      getWallet(bobPK)
+    ])
+    expect('' + aliceWallet.balance).to.equal('85')
+    expect('' + bobWallet.balance).to.equal('115')
   })
 
-  it('should not perform transfer between wallets if the receiver is unknown', () => {
+  it('should not perform transfer between wallets if the receiver is unknown', async () => {
     const { publicKey: alicePK, secretKey: aliceKey } = exonum.keyPair()
     const txAlice = TxCreateWallet.new({
       pub_key: alicePK,
@@ -240,19 +239,20 @@ describe('CurrencyService', function () {
     })
     transferTx.signature = TxTranfer.sign(aliceKey, transferTx.body)
 
-    return Promise.all([
+    await Promise.all([
       createWallet(txAlice),
       createWallet(txBob),
       transfer(transferTx)
-    ]).then(() => createBlock([
+    ])
+    await createBlock([
       txAlice.hash(),
       transferTx.hash()
-    ])).then(() => Promise.all([
+    ])
+    const [aliceWallet, bobWallet] = await Promise.all([
       getWallet(alicePK),
       getWallet(bobPK)
-    ])).then(({ 0: aliceWallet, 1: bobWallet }) => {
-      expect('' + aliceWallet.balance).to.equal('100')
-      expect(bobWallet).to.equal('Wallet not found')
-    })
+    ])
+    expect('' + aliceWallet.balance).to.equal('100')
+    expect(bobWallet).to.equal('Wallet not found')
   })
 })
