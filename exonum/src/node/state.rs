@@ -361,6 +361,7 @@ impl State {
         whitelist: Whitelist,
         stored: StoredConfiguration,
         connect: Connect,
+        peers: HashMap<PublicKey, Connect>,
         last_hash: Hash,
         last_height: Height,
         height_start_time: SystemTime,
@@ -373,7 +374,7 @@ impl State {
             service_secret_key,
             tx_pool_capacity: tx_pool_capacity,
             whitelist: whitelist,
-            peers: HashMap::new(),
+            peers,
             connections: HashMap::new(),
             height: last_height,
             height_start_time,
@@ -1016,7 +1017,7 @@ impl State {
             match self.validator_state {
                 Some(ref validator_state) => {
                     if let Some(msg) = validator_state.our_prevotes.get(&round) {
-                        // TODO: unefficient (ECR-171)
+                        // TODO: inefficient (ECR-171)
                         if Some(*msg.propose_hash()) != self.locked_propose {
                             return true;
                         }

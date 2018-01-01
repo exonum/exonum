@@ -22,6 +22,7 @@ use std::thread;
 use std::net::SocketAddr;
 use std::time::{Duration, SystemTime};
 use std::collections::BTreeMap;
+use std::collections::HashSet;
 use std::fmt;
 
 use toml::Value;
@@ -183,7 +184,7 @@ impl Default for EventsPoolCapacity {
 /// Memory pool configuration parameters.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MemoryPoolConfig {
-    /// Maximum number of uncommited transactions.
+    /// Maximum number of uncommitted transactions.
     pub tx_pool_capacity: usize,
     /// Sets the maximum number of messages that can be buffered on the event loop's
     /// notification channel before a send will fail.
@@ -304,6 +305,7 @@ impl NodeHandler {
             whitelist,
             stored,
             connect,
+            blockchain.get_saved_peers(),
             last_hash,
             last_height,
             system_state.current_time(),
@@ -354,12 +356,17 @@ impl NodeHandler {
 
     /// Performs node initialization, so it starts consensus process from the first round.
     pub fn initialize(&mut self) {
-        let addr = self.system_state.listen_address();
-        info!("Start listening address={}", addr);
-        for address in &self.peer_discovery.clone() {
-            if address == &self.system_state.listen_address() {
-                continue;
-            }
+        let listen_address = self.system_state.listen_address();
+        info!("Start listening address={}", listen_address);
+
+        let peers: HashSet<_> = {
+            let it = self.state.peers().values().map(Connect::addr);
+            let it = it.chain(self.peer_discovery.iter().cloned());
+            let it = it.filter(|&address| address != listen_address);
+            it.collect()
+        };
+
+        for address in &peers {
             self.connect(address);
             info!("Trying to connect with peer {}", address);
         }
@@ -599,7 +606,7 @@ pub struct Node {
 }
 
 impl NodeChannel {
-    /// Creates `NodeChannel` with the given pool capacitites.
+    /// Creates `NodeChannel` with the given pool capacities.
     pub fn new(buffer_sizes: &EventsPoolCapacity) -> NodeChannel {
         NodeChannel {
             network_requests: mpsc::channel(buffer_sizes.network_requests_capacity),
@@ -703,13 +710,13 @@ impl Node {
             );
             let network_handler = network_part.run(&core.handle());
             core.run(network_handler).map(drop).map_err(|e| {
-                other_error(&format!("An error in the `Network` thread occured: {}", e))
+                other_error(&format!("An error in the `Network` thread occurred: {}", e))
             })
         });
 
         let mut core = Core::new()?;
         core.run(handler_part.run()).map_err(|_| {
-            other_error("An error in the `Handler` thread occured")
+            other_error("An error in the `Handler` thread occurred")
         })?;
         network_thread.join().unwrap()
     }

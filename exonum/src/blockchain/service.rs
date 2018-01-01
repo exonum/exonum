@@ -357,7 +357,7 @@ impl SharedNodeState {
             .remove(addr)
     }
 
-    /// Add reconect timeout
+    /// Add reconnect timeout
     pub fn add_reconnect_timeout(
         &self,
         addr: SocketAddr,
@@ -370,7 +370,7 @@ impl SharedNodeState {
             .insert(addr, timeout)
     }
 
-    /// Removes reconect timeout and returns the previous value.
+    /// Removes reconnect timeout and returns the previous value.
     pub fn remove_reconnect_timeout(&self, addr: &SocketAddr) -> Option<Milliseconds> {
         self.state
             .write()

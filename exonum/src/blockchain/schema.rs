@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crypto::Hash;
-use messages::{Precommit, RawMessage};
+use crypto::{PublicKey, Hash};
+use messages::{Precommit, RawMessage, Connect};
 use storage::{Fork, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex, Snapshot,
               StorageKey, StorageValue};
 use helpers::Height;
@@ -154,6 +154,12 @@ where
     /// service_id. Their vector is returned by `core_state_hash` method.
     pub fn state_hash_aggregator(&self) -> ProofMapIndex<&T, Hash, Hash> {
         ProofMapIndex::new(STATE_HASH_AGGREGATOR, &self.view)
+    }
+
+    /// Returns peers that have to be recovered in case of process' restart
+    /// after abnormal termination.
+    pub fn peers_cache(&self) -> MapIndex<&T, PublicKey, Connect> {
+        MapIndex::new("core.peers_cache", &self.view)
     }
 
     /// Returns block hash for the given height.
@@ -398,6 +404,13 @@ impl<'a> Schema<&'a mut Fork> {
     /// [1]: struct.Schema.html#method.state_hash_aggregator
     pub fn state_hash_aggregator_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, Hash> {
         ProofMapIndex::new(STATE_HASH_AGGREGATOR, &mut self.view)
+    }
+
+    /// Mutable reference to the [`peers_cache`][1] index.
+    ///
+    /// [1]: struct.Schema.html#method.peers_cache
+    pub fn peers_cache_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Connect> {
+        MapIndex::new("core.peers_cache", &mut self.view)
     }
 
     /// Adds a new configuration to the blockchain, which will become an actual at
