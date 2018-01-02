@@ -233,6 +233,26 @@ impl ExonumJson for SocketAddr {
     }
 }
 
+impl ExonumJson for RawMessage {
+    fn deserialize_field<B: WriteBufferWrapper>(
+        value: &Value,
+        buffer: &mut B,
+        from: Offset,
+        to: Offset,
+    ) -> Result<(), Box<Error>> {
+        use messages::MessageBuffer;
+        let element = value.as_str().ok_or("Can't cast json as string")?;
+        let str_hex = <Vec<u8> as FromHex>::from_hex(element)?;
+        let msg = RawMessage::new(MessageBuffer::from_vec(str_hex));
+        buffer.write(from, to, msg);
+        Ok(())
+    }
+
+    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+        Ok(Value::String(::encoding::serialize::encode_hex(self)))
+    }
+}
+
 impl<'a> ExonumJson for &'a [Hash] {
     fn deserialize_field<B: WriteBufferWrapper>(
         value: &Value,
