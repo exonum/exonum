@@ -17,7 +17,6 @@
 //! For details about consensus message handling see messages module documentation.
 
 use std::io;
-use std::sync::Arc;
 use std::thread;
 use std::net::SocketAddr;
 use std::time::{Duration, SystemTime};
@@ -755,9 +754,8 @@ impl Node {
                 mount.mount("api/services", blockchain.mount_public_api());
 
                 let mut router = Router::new();
-                let pool = Arc::clone(self.state().transactions());
                 let shared_api_state = self.handler().api_state().clone();
-                let system_api = public::SystemApi::new(pool, blockchain.clone(), shared_api_state);
+                let system_api = public::SystemApi::new(blockchain.clone(), shared_api_state);
                 system_api.wire(&mut router);
                 mount.mount("api/system", router);
                 if self.api_options.enable_blockchain_explorer {
