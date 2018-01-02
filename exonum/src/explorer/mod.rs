@@ -70,6 +70,7 @@ impl<'a> BlockchainExplorer<'a> {
         let res = match tx {
             None => None,
             Some(raw_tx) => {
+                let raw_tx = raw_tx.transaction();
                 let box_transaction = self.blockchain.tx_from_raw(raw_tx.clone()).ok_or_else(|| {
                     ApiError::Service(format!("Service not found for tx: {:?}", raw_tx).into())
                 })?;
