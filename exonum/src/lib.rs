@@ -16,8 +16,8 @@
 //!
 //! For more information see the project readme.
 
-#![deny(missing_debug_implementations)]
-#![deny(missing_docs)]
+//#![deny(missing_debug_implementations)]
+//#![deny(missing_docs)]
 
 #![cfg_attr(feature="cargo-clippy", allow(zero_prefixed_literal))]
 
