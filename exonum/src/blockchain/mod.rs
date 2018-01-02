@@ -52,7 +52,7 @@ pub use self::schema::{gen_prefix, Schema, TxLocation};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
 pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState};
-pub use self::transaction::{Transaction, TransactionStatus};
+pub use self::transaction::{Transaction, TransactionResult};
 
 mod block;
 mod schema;

@@ -24,6 +24,9 @@ use encoding::serialize::json::ExonumJson;
 // TODO: Remove attribute when `const fn` becomes stable.
 #[cfg_attr(feature = "cargo-clippy", allow(cast_lossless))]
 static MAX_RESERVED_VALUE: u16 = ::std::u8::MAX as u16;
+static TRANSACTION_SUCCESS: u16 = 0;
+static TRANSACTION_PANIC: u16 = 1;
+static TRANSACTION_FAILURE: u16 = 2;
 
 /// Result of the `Transaction`'s `execute' method.
 pub type TransactionResult = Result<TransactionValue, TransactionError>;
@@ -47,7 +50,7 @@ pub trait Transaction: Message + ExonumJson + 'static {
     /// use exonum::blockchain::Transaction;
     /// use exonum::crypto::PublicKey;
     /// use exonum::messages::Message;
-    /// # use exonum::blockchain::TransactionStatus;
+    /// # use exonum::blockchain::TransactionResult;
     /// # use exonum::storage::Fork;
     ///
     /// message! {
@@ -67,7 +70,9 @@ pub trait Transaction: Message + ExonumJson + 'static {
     ///
     ///     // Other methods...
     ///     // ...
-    /// #   fn execute(&self, _: &mut Fork) -> TransactionStatus { TransactionStatus::Succeeded }
+    /// #   fn execute(&self, _: &mut Fork) -> TransactionResult {
+    /// #       Ok(TransactionValue::Success)
+    /// #   }
     /// }
     /// # fn main() {}
     fn verify(&self) -> bool;
@@ -90,7 +95,7 @@ pub trait Transaction: Message + ExonumJson + 'static {
     /// ```
     /// # #[macro_use] extern crate exonum;
     /// #
-    /// use exonum::blockchain::{Transaction, TransactionStatus};
+    /// use exonum::blockchain::{Transaction, TransactionResult};
     /// use exonum::crypto::PublicKey;
     /// use exonum::storage::Fork;
     ///
@@ -105,12 +110,12 @@ pub trait Transaction: Message + ExonumJson + 'static {
     /// }
     ///
     /// impl Transaction for MyTransaction {
-    ///     fn execute(&self, fork: &mut Fork) -> TransactionStatus {
+    ///     fn execute(&self, fork: &mut Fork) -> TransactionResult {
     ///         // Read and/or write into storage.
     ///         // ...
     ///
     ///         // Returns execution status.
-    ///         TransactionStatus::Succeeded
+    ///         Ok(TransactionValue::Success)
     ///     }
     ///
     ///     // Other methods...
@@ -130,6 +135,7 @@ pub enum TransactionValue {
     Code(u8),
 }
 
+/// Result of unsuccessful transaction execution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum TransactionError {
     /// Panic occurred during transaction execution. This status should not be used explicitly.
@@ -141,42 +147,39 @@ enum TransactionError {
     Code(u8)
 }
 
-/// Execution status of the transaction.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum TransactionStatus {
-    /// Successful transaction execution.
-    Succeeded,
-    /// Panic occurred during transaction execution. This status should not be used explicitly.
-    Panic,
-    /// General failure (unspecified reason).
-    Failed,
-    /// User defined execution status. Can have different meanings for different transactions and
-    /// services.
-    Custom(u8),
-}
-
 impl<'a, T: Transaction> From<T> for Box<Transaction + 'a> {
     fn from(tx: T) -> Self {
         Box::new(tx) as Box<Transaction>
     }
 }
 
-impl StorageValue for TransactionStatus {
+impl StorageValue for TransactionResult {
     fn hash(&self) -> Hash {
-        u16::hash(&from_status(*self))
+        u16::hash(&from_result(*self))
     }
 
     fn into_bytes(self) -> Vec<u8> {
-        u16::into_bytes(from_status(self))
+        u16::into_bytes(from_result(self))
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
-        to_status(u16::from_bytes(value))
+        to_result(u16::from_bytes(value))
     }
 }
 
-fn from_status(status: TransactionStatus) -> u16 {
+fn from_result(result: TransactionResult) -> u16 {
     match status {
+        Ok(val) => match val {
+            TransactionValue::Success => TRANSACTION_SUCCESS,
+            // TODO: FIXME.
+            TransactionValue::Code(c) => c,
+        }
+        Err(err) => match err {
+            TransactionError::Panic => TRANSACTION_PANIC,
+            TransactionError::UnknownFailure => TRANSACTION_FAILURE,
+            // TODO: FIXME.
+            TransactionError::Code(c) => c,
+        }
         TransactionStatus::Succeeded => 0,
         TransactionStatus::Panic => 1,
         TransactionStatus::Failed => 2,
@@ -184,7 +187,7 @@ fn from_status(status: TransactionStatus) -> u16 {
     }
 }
 
-fn to_status(value: u16) -> TransactionStatus {
+fn to_result(value: u16) -> TransactionStatus {
     match value {
         0 => TransactionStatus::Succeeded,
         1 => TransactionStatus::Panic,
