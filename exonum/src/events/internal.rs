@@ -26,10 +26,11 @@ use std::time::{Duration, SystemTime};
 
 use super::error::{into_other, other_error, log_error};
 use super::{InternalRequest, TimeoutRequest, InternalEvent, tobox};
-use blockchain::Transaction;
+use blockchain::{Transaction, Blockchain, Schema};
 
 #[derive(Debug)]
 pub struct InternalPart {
+    pub blockchain: Blockchain,
     pub internal_tx: mpsc::Sender<InternalEvent>,
     pub internal_requests_rx: mpsc::Receiver<InternalRequest>,
 }
@@ -37,7 +38,8 @@ pub struct InternalPart {
 impl InternalPart {
     pub fn run(self, handle: Handle) -> Box<Future<Item = (), Error = io::Error>> {
         let pool = threadpool::Builder::new().build();
-        let internal_tx = self.internal_tx.clone();
+        let internal_tx = self.internal_tx;
+        let blockchain = self.blockchain;
         let fut = self.internal_requests_rx
             .for_each(move |request| {
                 let event = match request {
@@ -72,14 +74,26 @@ impl InternalPart {
                         tobox(fut)
                     }
                     InternalRequest::ValidateTransaction(tx) => {
+                        trace!("Handle validate transaction");
                         let internal_tx = internal_tx.clone();
+                        let mut blockchain = blockchain.clone();
                         pool.execute(move || {
+                            trace!("validating transaction in thread-pool");
                             let valid = tx.verify();
+                            if valid {
+                                let mut fork = blockchain.fork();
+                                Schema::new(&mut fork).unconfirmed_transactions_mut().put(&tx.hash(), tx.raw().clone());
+                                blockchain.merge(fork.into_patch()).expect(
+                                    "Unable to save transaction to persistent pool.",
+                                );
+                            }
+
                             internal_tx
                                 .send(InternalEvent::TransactionValidated(tx, valid))
                                 .map(drop)
                                 .map_err(log_error)
                                 .wait();
+
                         });
                         tobox(Ok(()).into_future())
                     }

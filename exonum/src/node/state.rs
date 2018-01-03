@@ -23,9 +23,9 @@ use std::time::{SystemTime, Duration};
 use serde_json::Value;
 use bit_vec::BitVec;
 
-use messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect};
+use messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect, RawMessage};
 use crypto::{PublicKey, SecretKey, Hash};
-use storage::{Patch, Snapshot};
+use storage::{Patch, Snapshot, MapIndex};
 use blockchain::{ValidatorKeys, ConsensusConfig, StoredConfiguration, Transaction,
                  TimeoutAdjusterConfig};
 use helpers::{Height, Round, ValidatorId, Milliseconds};
@@ -80,6 +80,7 @@ pub struct State {
 
     queued: Vec<ConsensusMessage>,
 
+    unconfirmed_txs: HashSet<Hash>,
     unknown_txs: HashMap<Hash, Vec<Hash>>,
     unknown_proposes_with_precommits: HashMap<Hash, Vec<(Round, Hash)>>,
 
@@ -360,6 +361,7 @@ impl State {
         connect: Connect,
         last_hash: Hash,
         last_height: Height,
+        unconfirmed_txs: HashSet<Hash>,
         height_start_time: SystemTime,
     ) -> Self {
         State {
@@ -368,7 +370,6 @@ impl State {
             consensus_secret_key,
             service_public_key,
             service_secret_key,
-            tx_pool_capacity: tx_pool_capacity,
             whitelist: whitelist,
             peers: HashMap::new(),
             connections: HashMap::new(),
@@ -384,9 +385,9 @@ impl State {
             prevotes: HashMap::new(),
             precommits: HashMap::new(),
 
-            transactions: Arc::new(RwLock::new(BTreeMap::new())),
-
             queued: Vec::new(),
+
+            unconfirmed_txs,
 
             unknown_txs: HashMap::new(),
             unknown_proposes_with_precommits: HashMap::new(),
@@ -402,6 +403,10 @@ impl State {
             propose_timeout: 0,
             config: stored,
         }
+    }
+
+    pub fn unconfirmed_txs(&mut self) -> &mut HashSet<Hash> {
+        &mut self.unconfirmed_txs
     }
 
     /// Returns `ValidatorState` if the node is validator.
@@ -707,16 +712,6 @@ impl State {
         self.locked_round = Round::zero();
         self.locked_propose = None;
         self.last_hash = *block_hash;
-        {
-            // Commit transactions if needed
-            let txs = self.block(block_hash).unwrap().txs.clone();
-            for hash in txs {
-                self.transactions
-                    .write()
-                    .expect("Expected write lock")
-                    .remove(&hash);
-            }
-        }
         // TODO: destruct/construct structure HeightState instead of call clear (ECR-171)
         self.blocks.clear();
         self.proposes.clear();
@@ -806,23 +801,30 @@ impl State {
     }
 
     /// Adds propose from other node. Returns `ProposeState` if it is a new propose.
-    pub fn add_propose(&mut self, msg: &Propose) -> Option<&ProposeState> {
+    pub fn add_propose(
+        &mut self,
+        msg: &Propose,
+        unconfirmed_txs: MapIndex<&Box<Snapshot>, Hash, RawMessage>,
+    ) -> Result<&ProposeState, &'static str> {
         let propose_hash = msg.hash();
-        let txs = &self.transactions.read().expect("Expected read lock");
         match self.proposes.entry(propose_hash) {
-            Entry::Occupied(..) => None,
+            Entry::Occupied(..) => Err("Propose already found."),
             Entry::Vacant(e) => {
-                let unknown_txs = msg.transactions()
-                    .iter()
-                    .filter(|tx| !txs.contains_key(tx))
-                    .cloned()
-                    .collect::<HashSet<Hash>>();
+
+                let mut unknown_txs = HashSet::new();
+                for hash in msg.transactions() {
+                    if !unconfirmed_txs.get(hash).is_some() {
+                        unknown_txs.insert(*hash);
+                    }
+                }
+
                 for tx in &unknown_txs {
                     self.unknown_txs.entry(*tx).or_insert_with(Vec::new).push(
                         propose_hash,
                     );
                 }
-                Some(e.insert(ProposeState {
+
+                Ok(e.insert(ProposeState {
                     propose: msg.clone(),
                     unknown_txs: unknown_txs,
                     block_hash: None,

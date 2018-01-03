@@ -15,7 +15,7 @@
 use std::collections::HashSet;
 
 use crypto::{Hash, PublicKey};
-use blockchain::{Schema, Transaction, StoredTransaction, TxStatus};
+use blockchain::{Schema, Transaction};
 use messages::{BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote,
                PrevotesRequest, Propose, ProposeRequest, RawTransaction, TransactionsRequest};
 use helpers::{Height, Round, ValidatorId};
@@ -115,8 +115,17 @@ impl NodeHandler {
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(snapshot);
         let txs = schema.transactions();
+        for hash in msg.transactions() {
+            if txs.get(hash).is_some() {
+                warn!(
+                    "Received propose with already\
+                                                committed transaction.",
+                );
+                return;
+            }
+        }
         //TODO: remove this match after errors refactor.
-        let has_unknown_txs = match self.state.add_propose(msg, txs) {
+        let has_unknown_txs = match self.state.add_propose(msg, schema.unconfirmed_transactions()) {
             Ok(state) => state.has_unknown_txs(),
             Err(err) => {
                 warn!("{}, msg={:?}", err, msg);
@@ -145,7 +154,7 @@ impl NodeHandler {
     // TODO write helper function which returns Result (ECR-123)
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_block(&mut self, msg: &BlockResponse) {
-        unimplemented!();/*
+        //unimplemented!(); /*
         // Request are sended to us
         if msg.to() != self.state.consensus_public_key() {
             error!(
@@ -197,34 +206,41 @@ impl NodeHandler {
         }
 
         if self.state.block(&block_hash).is_none() {
-            let snapshot = self.blockchain.snapshot();
-            let schema = Schema::new(&snapshot);
+
+
             // Verify transactions
             let mut tx_hashes = Vec::new();
-            for raw in msg.transactions() {
-                if let Some(tx) = self.blockchain.tx_from_raw(raw) {
-                    let hash = tx.hash();
-                    if schema.transactions().contains(&hash) {
-                        error!(
-                            "Received block with already committed transaction, block={:?}",
-                            msg
-                        );
-                        return;
-                    }
-                    profiler_span!("tx.verify()", {
+            let mut fork = self.blockchain.fork();
+            {
+                let mut schema = Schema::new(&mut fork);
+
+                for raw in msg.transactions() {
+                    if let Some(tx) = self.blockchain.tx_from_raw(raw) {
+                        let hash = tx.hash();
+                        if schema.transactions().get(&hash).is_some() {
+                            error!(
+                                "Received block with already committed transaction, block={:?}",
+                                msg
+                            );
+                            return;
+                        }
+                        profiler_span!("tx.verify()", {
                         if !tx.verify() {
                             error!("Incorrect transaction in block detected, block={:?}", msg);
                             return;
                         }
                     });
-                    self.state.add_transaction(hash, tx, true);
-                    tx_hashes.push(hash);
-                } else {
-                    error!("Unknown transaction in block detected, block={:?}", msg);
-                    return;
+                        schema.unconfirmed_transactions_mut().put(&hash, tx.raw().clone());
+                        tx_hashes.push(hash);
+                    } else {
+                        error!("Unknown transaction in block detected, block={:?}", msg);
+                        return;
+                    }
                 }
             }
-
+            self.blockchain.merge(fork.into_patch()).expect(
+                "Unable to save transaction to persistent pool.",
+            );
             let (block_hash, patch) =
                 self.create_block(block.proposer_id(), block.height(), tx_hashes.as_slice());
             // Verify block_hash
@@ -246,7 +262,7 @@ impl NodeHandler {
         }
         self.commit(block_hash, msg.precommits().iter(), None);
         self.request_next_block();
-        */
+
     }
 
     /// Executes and commits block. This function is called when node has full propose information.
@@ -463,11 +479,14 @@ impl NodeHandler {
                 &block_hash,
                 self.system_state.current_time(),
             );
+            for hash in block_state.txs() {
+                self.state.unconfirmed_txs().remove(hash);
+            }
             (block_state.txs().len(), block_state.proposer_id())
         };
 
-        let mempool_size: usize = unimplemented!();
-        /*
+        let mempool_size = self.state.unconfirmed_txs().len();
+
         metric!("node.mempool", mempool_size);
 
         let height = self.state.height();
@@ -500,26 +519,33 @@ impl NodeHandler {
         // Handle queued messages
         for msg in self.state.queued() {
             self.handle_consensus(msg);
-        }*/
+        }
+    }
+
+    /// Handles external boxed transaction. Additionally transaction will be broadcast to the
+    /// Node's peers.
+    pub fn handle_incoming_tx(&mut self, msg: Box<Transaction>) {
+        trace!("Handle incoming transaction");
+        let mut fork = self.blockchain.fork();
+        Schema::new(&mut fork).unconfirmed_transactions_mut().put(&msg.hash(), msg.raw().clone());
+        self.blockchain.merge(fork.into_patch()).expect(
+            "Unable to save transaction to persistent pool.",
+        );
+        // Broadcast transaction to validators
+        trace!("Broadcast transactions: {:?}", msg.raw());
+        self.broadcast(msg.raw());
+
+        self.handle_tx_valid(msg, true);
     }
 
     /// Handles validated transaction. Transaction status in pool should be changed, if transaction
     /// was valid, otherwise it is removed from the transactions pool.
     pub fn handle_tx_valid(&mut self, transaction: Box<Transaction>, valid: bool) {
+        trace!("Handle tx_valid");
         let hash = transaction.hash();
         if !valid {
-            let mut fork = self.blockchain.fork();
-            Schema::new(&mut fork).transactions_mut().remove(&hash);
-            self.blockchain.merge(fork.into_patch())
-                .expect("Unable to remove transaction from the persistent pool.");
             return;
         }
-        // TODO: Save fork for current height instead of creating new one each time.
-        // TODO: Change only part of status (tag) instead of copying transaction again.
-        let mut fork = self.blockchain.fork();
-        let status = StoredTransaction::new(TxStatus::InPool, transaction.raw().clone());
-        Schema::new(&mut fork).transactions_mut().put(&hash, status);
-        self.blockchain.merge(fork.into_patch()).expect("Unable to save transaction to persistent pool.");
 
         let full_proposes = self.state.transaction_validated(hash);
         // Go to has full propose if we get last transaction
@@ -527,14 +553,14 @@ impl NodeHandler {
             self.remove_request(&RequestData::Transactions(hash));
             self.has_full_propose(hash, round);
         }
-        unimplemented!();// Add check for handle_block transaction
+        //unimplemented!(); // Add check for handle_block transaction
     }
 
     /// Handles raw transaction. Transaction is ignored if it is already known, otherwise it is
     /// added to the transactions pool.
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_tx(&mut self, msg: RawTransaction) {
-        //trace!("Handle transaction");
+        trace!("Handle transaction");
         let hash = msg.hash();
         let tx = {
             let service_id = msg.service_id();
@@ -550,16 +576,16 @@ impl NodeHandler {
         };
 
         profiler_span!("Make sure that it is new transaction", {
+            if self.state.unconfirmed_txs().contains(&hash) {
+                return;
+            }
             let snapshot = self.blockchain.snapshot();
             if Schema::new(&snapshot).transactions().contains(&hash) {
                 return;
             }
         });
-        let mut fork = self.blockchain.fork();
-        let status = StoredTransaction::new(TxStatus::OnValidation, msg);
-        Schema::new(&mut fork).transactions_mut().put(&hash, status);
-        self.blockchain.merge(fork.into_patch()).expect("Unable to save transaction to persistent pool.");
 
+        self.state.unconfirmed_txs().insert(hash);
         let request = InternalRequest::ValidateTransaction(tx);
         self.channel.internal_requests.send(request);
     }
@@ -639,13 +665,18 @@ impl NodeHandler {
             if self.state.have_prevote(round) {
                 return;
             }
-            let pool_len: usize = unimplemented!();
-
-            info!("LEADER: pool = {}", pool_len);
-
             let round = self.state.round();
-            let max_count = ::std::cmp::min(self.txs_block_limit() as usize, pool_len);
-            let txs: Vec<Hash> = unimplemented!();
+            let txs: Vec<Hash> = {
+                let schema = Schema::new(self.blockchain.snapshot());
+
+                let pool_len = self.state.unconfirmed_txs().len();
+
+                info!("LEADER: pool = {}", pool_len);
+
+                let idx = schema.unconfirmed_transactions();
+                let vec = idx.keys().take(self.txs_block_limit() as usize).collect();
+                vec
+            };
             let propose = Propose::new(
                 validator_id,
                 self.state.height(),
@@ -736,11 +767,9 @@ impl NodeHandler {
         height: Height,
         tx_hashes: &[Hash],
     ) -> (Hash, Patch) {
-        self.blockchain.create_patch(
-            proposer_id,
-            height,
-            tx_hashes,
-        )
+        self.blockchain
+            .create_patch(proposer_id, height, tx_hashes)
+            .unwrap()
     }
 
     /// Calls `create_block` with transactions from the corresponding `Propose` and returns the

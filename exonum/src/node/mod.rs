@@ -80,7 +80,7 @@ pub enum NodeTimeout {
 
 /// A helper trait that provides the node with information about the state of the system such
 /// as current time or listen address.
-pub trait SystemStateProvider: ::std::fmt::Debug {
+pub trait SystemStateProvider: ::std::fmt::Debug + Send {
     /// Returns the current address that the node listens on.
     fn listen_address(&self) -> SocketAddr;
     /// Return the current system time.
@@ -293,6 +293,9 @@ impl NodeHandler {
 
         let mut whitelist = config.listener.whitelist;
         whitelist.set_validators(stored.validator_keys.iter().map(|x| x.consensus_key));
+        let schema = Schema::new(blockchain.snapshot());
+        let unconfirmed_txs = schema.unconfirmed_transactions();
+        let unconfirmed_txs = unconfirmed_txs.keys().collect();
         let mut state = State::new(
             validator_id,
             config.listener.consensus_public_key,
@@ -305,6 +308,7 @@ impl NodeHandler {
             connect,
             last_hash,
             last_height,
+            unconfirmed_txs,
             system_state.current_time(),
         );
 
@@ -796,10 +800,10 @@ impl Node {
             our_connect_message: connect_message,
             listen_address: self.handler.system_state.listen_address(),
             network_requests: self.channel.network_requests,
-            network_tx: network_tx,
+            network_tx,
             network_config: self.network_config,
         };
-
+        let blockchain = self.handler.blockchain.clone();
         let (internal_tx, internal_rx) = self.channel.internal_events;
         let handler_part = HandlerPart {
             handler: self.handler,
@@ -809,6 +813,7 @@ impl Node {
         };
 
         let timeouts_part = InternalPart {
+            blockchain,
             internal_tx,
             internal_requests_rx,
         };

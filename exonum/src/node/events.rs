@@ -50,7 +50,7 @@ impl NodeHandler {
     fn handle_api_event(&mut self, event: ExternalMessage) {
         match event {
             ExternalMessage::Transaction(tx) => {
-                self.handle_tx_valid(tx, true);
+                self.handle_incoming_tx(tx);
             }
             ExternalMessage::PeerAdd(address) => {
                 info!("Send Connect message to {}", address);

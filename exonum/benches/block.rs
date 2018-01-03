@@ -84,13 +84,22 @@ mod tests {
         }
 
         fn execute_block(
-            blockchain: &Blockchain,
+            blockchain: &mut Blockchain,
             height: u64,
             txs: &[Hash],
             pool: &BTreeMap<Hash, Box<Transaction>>,
         ) -> Patch {
+            {
+                let mut fork = blockchain.fork();
+                let mut schema = Schema::new(&mut fork);
+                for (hash, tx) in pool {
+                    schema.unconfirmed_transactions_mut().put(hash, tx.raw().clone());
+                }
+                blockchain.merge(fork.into_patch()).unwrap();
+            }
             blockchain
-                .create_patch(ValidatorId::zero(), Height(height), txs, pool)
+                .create_patch(ValidatorId::zero(), Height(height), txs)
+                .unwrap()
                 .1
         }
 
@@ -165,9 +174,20 @@ mod tests {
             txs: &[Hash],
             pool: &BTreeMap<Hash, Box<Transaction>>,
         ) -> Patch {
+
+            {
+                let mut fork = blockchain.fork();
+                let mut schema = Schema::new(&mut fork);
+                for (hash, tx) in pool {
+                    schema.unconfirmed_transactions_mut().put(hash, tx.raw().clone());
+                }
+                blockchain.merge(fork.into_patch()).unwrap();
+            }
             blockchain
-                .create_patch(ValidatorId::zero(), Height(height), txs, pool)
+                .create_patch(ValidatorId::zero(), Height(height), txs)
+                .unwrap()
                 .1
+
         }
 
         for i in 0..100 {

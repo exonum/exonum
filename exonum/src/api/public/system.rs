@@ -49,32 +49,28 @@ pub struct HealthCheckInfo {
 /// Public system API.
 #[derive(Clone, Debug)]
 pub struct SystemApi {
-    pool: TxPool,
     blockchain: Blockchain,
     shared_api_state: SharedNodeState,
 }
 
 impl SystemApi {
     /// Creates a new `private::SystemApi` instance.
-    pub fn new(
-        pool: TxPool,
-        blockchain: Blockchain,
-        shared_api_state: SharedNodeState,
-    ) -> SystemApi {
+    pub fn new(blockchain: Blockchain, shared_api_state: SharedNodeState) -> SystemApi {
         SystemApi {
-            pool,
             blockchain,
             shared_api_state,
         }
     }
 
     fn get_mempool_info(&self) -> MemPoolInfo {
-        MemPoolInfo { size: self.pool.read().expect("Expected read lock").len() }
+        unimplemented!()
+        // MemPoolInfo { size: self.pool.read().expect("Expected read lock").len() }
     }
 
     fn get_transaction(&self, hash_str: &str) -> Result<MemPoolResult, ApiError> {
         let hash = Hash::from_hex(hash_str)?;
-        self.pool
+        unimplemented!()
+        /* self.pool
             .read()
             .expect("Expected read lock")
             .get(&hash)
@@ -91,7 +87,7 @@ impl SystemApi {
                         content: o.serialize_field().map_err(ApiError::Serialize)?,
                     }))
                 },
-            )
+            )*/
     }
 
     fn get_healthcheck_info(&self) -> HealthCheckInfo {
