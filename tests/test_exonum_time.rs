@@ -48,7 +48,7 @@ fn test_exonum_time_service() {
     // number | 0       | 0    | 0    |
     // time   | 'time0' | None | None |
     //
-    // Time, that is saved in storage, does not change.
+    // Time, that is saved in storage, will have the value 'time0'.
 
     let time0 = SystemTime::now();
     let tx0 = {
@@ -69,7 +69,7 @@ fn test_exonum_time_service() {
             validators_time_storage.get(pub_key)
         );
     }
-    assert_eq!(schema.time().get(), None);
+    assert_eq!(schema.time().get(), Some(Time::new(time0)));
 
     // Add second transaction 'tx1' from second validator with time 'time1' = 'time0' + 10 sec.
     // After that validators time look like this:
@@ -77,7 +77,7 @@ fn test_exonum_time_service() {
     // time   | 'time0' | 'time1' | None |
     //
     // In sorted order: 'time1' >= 'time0'
-    // Time, that is saved in storage, does not change.
+    // Time, that is saved in storage, will have the value 'time1'.
 
     let time1 = time0 + Duration::new(10, 0);
     let tx1 = {
@@ -100,7 +100,7 @@ fn test_exonum_time_service() {
             validators_time_storage.get(pub_key)
         );
     }
-    assert_eq!(schema.time().get(), None);
+    assert_eq!(schema.time().get(), Some(Time::new(time1)));
 
     // Add third transaction 'tx2' from third validator with time 'time2' = 'time1' + 10 sec.
     // After that validators time look like this:
@@ -108,7 +108,7 @@ fn test_exonum_time_service() {
     // time   | 'time0' | 'time1' | 'time2' |
     //
     // In sorted order: 'time2' >= 'time1' >= 'time0'
-    // Time, that is saved in storage, will have the value 'time1'.
+    // Time, that is saved in storage, will have the value 'time2'.
 
     let time2 = time1 + Duration::new(10, 0);
     let tx2 = {
@@ -134,7 +134,7 @@ fn test_exonum_time_service() {
             validators_time_storage.get(pub_key)
         );
     }
-    assert_eq!(schema.time().get(), Some(Time::new(time1)));
+    assert_eq!(schema.time().get(), Some(Time::new(time2)));
 }
 
 // A struct that provides the node with the current time.
