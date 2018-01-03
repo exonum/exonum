@@ -101,40 +101,6 @@ fn test_exonum_time_service() {
         );
     }
     assert_eq!(schema.time().get(), Some(Time::new(time1)));
-
-    // Add third transaction 'tx2' from third validator with time 'time2' = 'time1' + 10 sec.
-    // After that validators time look like this:
-    // number | 0       | 1       | 2       |
-    // time   | 'time0' | 'time1' | 'time2' |
-    //
-    // In sorted order: 'time2' >= 'time1' >= 'time0'
-    // Time, that is saved in storage, will have the value 'time2'.
-
-    let time2 = time1 + Duration::new(10, 0);
-    let tx2 = {
-        let (pub_key, sec_key) = validators[2].service_keypair();
-        TxTime::new(time2, pub_key, sec_key)
-    };
-    testkit.create_block_with_transactions(txvec![tx2.clone()]);
-
-    let validators_time_test: Vec<Option<Time>> = vec![
-        Some(Time::new(time0)),
-        Some(Time::new(time1)),
-        Some(Time::new(time2)),
-    ];
-
-    let snapshot = testkit.snapshot();
-    let schema = TimeSchema::new(snapshot);
-    let validators_time_storage = schema.validators_time();
-
-    for (num, validator) in validators.iter().enumerate() {
-        let pub_key = &validator.public_keys().service_key;
-        assert_eq!(
-            validators_time_test[num],
-            validators_time_storage.get(pub_key)
-        );
-    }
-    assert_eq!(schema.time().get(), Some(Time::new(time2)));
 }
 
 // A struct that provides the node with the current time.
