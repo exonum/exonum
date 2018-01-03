@@ -21,9 +21,16 @@ use storage::{Fork, StorageValue};
 use crypto::Hash;
 use encoding::serialize::json::ExonumJson;
 
-// TODO: Remove attribute when `const fn` becomes stable.
-#[cfg_attr(feature = "cargo-clippy", allow(cast_lossless))]
-static MAX_RESERVED_VALUE: u16 = ::std::u8::MAX as u16;
+// There are three `0...255` ranges for each category:
+// - `0...255` - special values such as `TransactionValue::Success` or `TransactionError::Panic`.
+// - `256...511` - `TransactionValue::Code`.
+// - `512...767` - `TransactionError::Code`.
+static MIN_SUCCESS: u16 = 256;
+static MAX_SUCCESS: u16 = 511;
+static MIN_ERROR: u16 = 512;
+static MAX_ERROR: u16 = 767;
+
+// Special reserved values.
 static TRANSACTION_SUCCESS: u16 = 0;
 static TRANSACTION_PANIC: u16 = 1;
 static TRANSACTION_FAILURE: u16 = 2;
@@ -144,7 +151,7 @@ enum TransactionError {
     UnknownFailure,
     /// User defined error-code. Can have different meanings for different transactions and
     /// services.
-    Code(u8)
+    Code(u8),
 }
 
 impl<'a, T: Transaction> From<T> for Box<Transaction + 'a> {
@@ -169,37 +176,30 @@ impl StorageValue for TransactionResult {
 
 fn from_result(result: TransactionResult) -> u16 {
     match status {
-        Ok(val) => match val {
-            TransactionValue::Success => TRANSACTION_SUCCESS,
-            // TODO: FIXME.
-            TransactionValue::Code(c) => c,
+        Ok(val) => {
+            match val {
+                TransactionValue::Success => TRANSACTION_SUCCESS,
+                TransactionValue::Code(c) => u16::from(c) + MIN_SUCCESS,
+            }
         }
-        Err(err) => match err {
-            TransactionError::Panic => TRANSACTION_PANIC,
-            TransactionError::UnknownFailure => TRANSACTION_FAILURE,
-            // TODO: FIXME.
-            TransactionError::Code(c) => c,
+        Err(err) => {
+            match err {
+                TransactionError::Panic => TRANSACTION_PANIC,
+                TransactionError::UnknownFailure => TRANSACTION_FAILURE,
+                TransactionError::Code(c) => u16::from(c) + MIN_ERROR,
+            }
         }
-        TransactionStatus::Succeeded => 0,
-        TransactionStatus::Panic => 1,
-        TransactionStatus::Failed => 2,
-        TransactionStatus::Custom(value) => u16::from(value) + MAX_RESERVED_VALUE + 1,
     }
 }
 
-fn to_result(value: u16) -> TransactionStatus {
+fn to_result(value: u16) -> TransactionResult {
     match value {
-        0 => TransactionStatus::Succeeded,
-        1 => TransactionStatus::Panic,
-        2 => TransactionStatus::Failed,
-        val => {
-            assert!(
-                val > MAX_RESERVED_VALUE && (val - MAX_RESERVED_VALUE - 1) <= u8::MAX_VALUE,
-                "Invalid ExecutionStatus value: {}",
-                val
-            );
-            TransactionStatus::Custom((val - MAX_RESERVED_VALUE - 1) as u8)
-        }
+        TRANSACTION_SUCCESS => Ok(TransactionValue::Success),
+        TRANSACTION_PANIC => Err(TransactionError::Panic),
+        TRANSACTION_FAILURE => Err(TransactionError::UnknownFailure),
+        val @ MIN_SUCCESS...MAX_SUCCESS => Ok(TransactionValue::Code((val - MIN_SUCCESS) as u8)),
+        val @ MIN_ERROR...MAX_ERROR => Err(TransactionError::Code((val - MIN_ERROR) as u8)),
+        val => panic!("Invalid TransactionResult value: {}", val),
     }
 }
 
@@ -208,15 +208,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn execution_status_round_trip() {
+    fn transaction_result_round_trip() {
         let statuses = [
-            TransactionStatus::Succeeded,
-            TransactionStatus::Panic,
-            TransactionStatus::Failed,
-            TransactionStatus::Custom(0),
-            TransactionStatus::Custom(1),
-            TransactionStatus::Custom(100),
-            TransactionStatus::Custom(255),
+            Ok(TransactionValue::Success),
+            Ok(TransactionValue::Code(0)),
+            Ok(TransactionValue::Code(1)),
+            Ok(TransactionValue::Code(100)),
+            Ok(TransactionValue::Code(254)),
+            Ok(TransactionValue::Code(255)),
+            Err(TransactionError::Panic),
+            Err(TransactionError::UnknownFailure),
+            Err(TransactionError::Code(0)),
+            Err(TransactionError::Code(1)),
+            Err(TransactionError::Code(100)),
+            Err(TransactionError::Code(254)),
+            Err(TransactionError::Code(255)),
         ];
 
         for status in &statuses {
