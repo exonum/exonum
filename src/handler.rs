@@ -30,11 +30,10 @@ use serde_json;
 use super::{TestKit, TestNetworkConfiguration};
 
 ///  Creates an Iron handler for processing testkit-specific HTTP requests.
-pub fn create_testkit_handler(testkit: TestKit) -> Router {
-    let testkit = Arc::new(RwLock::new(testkit));
+pub fn create_testkit_handler(testkit: &Arc<RwLock<TestKit>>) -> Router {
     let mut router = Router::new();
 
-    let clone = Arc::clone(&testkit);
+    let clone = Arc::clone(testkit);
     router.get(
         "v1/status",
         move |req: &mut Request| {
@@ -46,7 +45,7 @@ pub fn create_testkit_handler(testkit: TestKit) -> Router {
         "status",
     );
 
-    let clone = Arc::clone(&testkit);
+    let clone = Arc::clone(testkit);
     router.post(
         "v1/blocks",
         move |req: &mut Request| {
@@ -58,7 +57,7 @@ pub fn create_testkit_handler(testkit: TestKit) -> Router {
         "create_block",
     );
 
-    let clone = Arc::clone(&testkit);
+    let clone = Arc::clone(testkit);
     router.delete(
         "v1/blocks/:height",
         move |req: &mut Request| {

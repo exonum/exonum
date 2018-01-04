@@ -1051,7 +1051,8 @@ impl TestKit {
         let api = self.api();
         let events_stream = self.remove_events_stream();
         let (public_mount, mut private_mount) = (api.public_mount, api.private_mount);
-        private_mount.mount("api/testkit", create_testkit_handler(self));
+        let testkit_ref = Arc::new(RwLock::new(self));
+        private_mount.mount("api/testkit", create_testkit_handler(&testkit_ref));
 
         let public_api_thread = thread::spawn(move || {
             let chain = Chain::new(public_mount);
