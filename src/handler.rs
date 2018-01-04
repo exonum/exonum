@@ -170,3 +170,247 @@ impl TestKitHandler for TestKit {
         ok_response(&block_info)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use exonum::blockchain::{Service, Transaction};
+    use exonum::crypto::{self, PublicKey, Hash};
+    use exonum::encoding::Error as EncodingError;
+    use exonum::explorer::BlockInfo;
+    use exonum::helpers::Height;
+    use exonum::messages::{Message, RawTransaction};
+    use exonum::storage::{Fork, Snapshot};
+    use iron::Handler;
+    use iron::headers::{ContentType, Headers};
+    use iron_test::{request, response};
+
+    use super::*;
+    use TestKitBuilder;
+
+    message! {
+        struct TxTimestamp {
+            const TYPE = 1000;
+            const ID = 1;
+            const SIZE = 40;
+            field from: &PublicKey [0 => 32]
+            field msg: &str [32 => 40]
+        }
+    }
+
+    impl TxTimestamp {
+        fn for_str(s: &str) -> Self {
+            let (pubkey, key) = crypto::gen_keypair();
+            TxTimestamp::new(&pubkey, s, &key)
+        }
+    }
+
+    impl Transaction for TxTimestamp {
+        fn verify(&self) -> bool {
+            self.verify_signature(self.from())
+        }
+
+        fn execute(&self, _: &mut Fork) {
+            /* no op */
+        }
+    }
+
+    /// Initializes testkit, passes it into a handler, and creates the specified number
+    /// of empty blocks in the testkit blockchain.
+    fn init_handler(height: Height) -> (Arc<RwLock<TestKit>>, Router) {
+        struct SampleService;
+
+        impl Service for SampleService {
+            fn service_id(&self) -> u16 {
+                1000
+            }
+
+            fn service_name(&self) -> &'static str {
+                "sample"
+            }
+
+            fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+                Vec::new()
+            }
+
+            fn tx_from_raw(&self, _: RawTransaction) -> Result<Box<Transaction>, EncodingError> {
+                unimplemented!();
+            }
+        }
+
+        let testkit = TestKitBuilder::validator()
+            .with_service(SampleService)
+            .create();
+        let testkit = Arc::new(RwLock::new(testkit));
+        let (testkit, handler) = (Arc::clone(&testkit), create_testkit_handler(&testkit));
+
+        {
+            let mut testkit = testkit.write().unwrap();
+            testkit.create_blocks_until(height);
+        }
+
+        (testkit, handler)
+    }
+
+    fn extract_block_info(resp: Response) -> BlockInfo {
+        serde_json::from_str(&response::extract_body_to_string(resp)).unwrap()
+    }
+
+    fn post_json<H, S>(url: &str, json: &S, handler: &H) -> IronResult<Response>
+    where
+        H: Handler,
+        S: Serialize,
+    {
+        request::post(
+            url,
+            {
+                let mut headers = Headers::new();
+                headers.set(ContentType::json());
+                headers
+            },
+            &serde_json::to_string(&json).unwrap(),
+            handler,
+        )
+    }
+
+    #[test]
+    fn test_create_block_with_empty_body() {
+        let (testkit, handler) = init_handler(Height(0));
+
+        let tx = TxTimestamp::for_str("foo");
+        {
+            let mut testkit = testkit.write().unwrap();
+            testkit.api().send(tx.clone());
+            testkit.poll_events();
+        }
+
+        // Test a bodiless request
+        let block_info = extract_block_info(
+            request::post(
+                "http://localhost:3000/v1/blocks",
+                Headers::new(),
+                "",
+                &handler,
+            ).unwrap(),
+        );
+        assert_eq!(block_info.block.height(), Height(1));
+        assert_eq!(block_info.txs, vec![tx.hash()]);
+
+        // Requests with a body that invoke `create_block`
+        let bodies = vec![
+            json!({}),
+            json!({
+                "tx_hashes": null
+            }),
+        ];
+
+        for body in bodies {
+            {
+                let mut testkit = testkit.write().unwrap();
+                testkit.rollback(1);
+                assert_eq!(testkit.height(), Height(0));
+                testkit.api().send(tx.clone());
+                testkit.poll_events();
+            }
+
+            let block_info = extract_block_info(
+                post_json("http://localhost:3000/v1/blocks", &body, &handler).unwrap(),
+            );
+            assert_eq!(block_info.block.height(), Height(1));
+            assert_eq!(block_info.txs, vec![tx.hash()]);
+        }
+    }
+
+    #[test]
+    fn test_create_block_with_specified_transactions() {
+        let (testkit, handler) = init_handler(Height(0));
+
+        let tx_foo = TxTimestamp::for_str("foo");
+        let tx_bar = TxTimestamp::for_str("bar");
+        {
+            let mut testkit = testkit.write().unwrap();
+            testkit.api().send(tx_foo.clone());
+            testkit.api().send(tx_bar.clone());
+            testkit.poll_events();
+        }
+
+        let body = json!({ "tx_hashes": [ tx_foo.hash().to_string() ] });
+        let block_info = extract_block_info(
+            post_json("http://localhost:3000/v1/blocks", &body, &handler).unwrap(),
+        );
+        assert_eq!(block_info.block.height(), Height(1));
+        assert_eq!(block_info.txs, vec![tx_foo.hash()]);
+
+        let body = json!({ "tx_hashes": [ tx_bar.hash().to_string() ] });
+        let block_info = extract_block_info(
+            post_json("http://localhost:3000/v1/blocks", &body, &handler).unwrap(),
+        );
+        assert_eq!(block_info.block.height(), Height(2));
+        assert_eq!(block_info.txs, vec![tx_bar.hash()]);
+    }
+
+    #[test]
+    fn test_create_block_with_bogus_transaction() {
+        let (_, handler) = init_handler(Height(0));
+        let body = json!({ "tx_hashes": [ Hash::default().to_string() ] });
+        let err = post_json("http://localhost:3000/v1/blocks", &body, &handler).unwrap_err();
+        assert!(response::extract_body_to_string(err.response).contains(
+            "Transaction not in mempool",
+        ));
+    }
+
+    #[test]
+    fn test_rollback_normal() {
+        let (testkit, handler) = init_handler(Height(4));
+
+        // Test that requests with "overflowing" heights do nothing
+        let block_info = extract_block_info(
+            request::delete(
+                "http://localhost:3000/v1/blocks/10",
+                Headers::new(),
+                &handler,
+            ).unwrap(),
+        );
+        assert_eq!(block_info.block.height(), Height(4));
+
+        // Test idempotency of the rollback endpoint
+        for _ in 0..2 {
+            let block_info = extract_block_info(
+                request::delete(
+                    "http://localhost:3000/v1/blocks/4",
+                    Headers::new(),
+                    &handler,
+                ).unwrap(),
+            );
+            assert_eq!(block_info.block.height(), Height(3));
+            {
+                let testkit = testkit.read().unwrap();
+                assert_eq!(testkit.height(), Height(3));
+            }
+        }
+
+        // Test roll-back to the genesis block
+        request::delete(
+            "http://localhost:3000/v1/blocks/1",
+            Headers::new(),
+            &handler,
+        ).unwrap();
+        {
+            let testkit = testkit.read().unwrap();
+            assert_eq!(testkit.height(), Height(0));
+        }
+    }
+
+    #[test]
+    fn test_rollback_past_genesis() {
+        let (_, handler) = init_handler(Height(4));
+
+        let err = request::delete(
+            "http://localhost:3000/v1/blocks/0",
+            Headers::new(),
+            &handler,
+        ).unwrap_err();
+        assert!(response::extract_body_to_string(err.response).contains(
+            "Cannot rollback past genesis block",
+        ));
+    }
+}

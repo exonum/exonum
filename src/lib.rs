@@ -125,6 +125,7 @@
 #![deny(missing_debug_implementations, missing_docs)]
 
 extern crate bodyparser;
+#[cfg_attr(test, macro_use)]
 extern crate exonum;
 extern crate futures;
 extern crate iron;
@@ -134,6 +135,7 @@ extern crate router;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
+#[cfg_attr(test, macro_use)]
 extern crate serde_json;
 extern crate tokio_core;
 
