@@ -111,21 +111,33 @@ impl TestKitHandler for TestKit {
             tx_hashes: Option<Vec<crypto::Hash>>,
         }
 
-        match req.get::<bodyparser::Struct<CreateBlockRequest>>() {
-            Ok(Some(req)) => {
-                if let Some(tx_hashes) = req.tx_hashes {
-                    self.create_block_with_tx_hashes(&tx_hashes);
-                } else {
-                    self.create_block();
-                }
-
-                let explorer = BlockchainExplorer::new(&self.blockchain);
-                let block_info = explorer.block_info(self.height());
-                ok_response(&block_info)
-            }
-            Ok(None) => Err(ApiError::IncorrectRequest("Empty request body".into()))?,
+        let req = match req.get::<bodyparser::Struct<CreateBlockRequest>>() {
+            Ok(Some(req)) => req,
+            Ok(None) => CreateBlockRequest { tx_hashes: None },
             Err(e) => Err(ApiError::IncorrectRequest(Box::new(e)))?,
+        };
+
+        if let Some(tx_hashes) = req.tx_hashes {
+            let maybe_missing_tx = {
+                let mempool = self.mempool();
+                tx_hashes.iter().find(|h| !mempool.contains_key(h))
+            };
+            if let Some(missing_tx) = maybe_missing_tx {
+                Err(ApiError::IncorrectRequest(
+                    format!(
+                        "Transaction not in mempool: {}",
+                        missing_tx.to_string()
+                    ).into(),
+                ))?;
+            }
+            self.create_block_with_tx_hashes(&tx_hashes);
+        } else {
+            self.create_block();
         }
+
+        let explorer = BlockchainExplorer::new(&self.blockchain);
+        let block_info = explorer.block_info(self.height());
+        ok_response(&block_info)
     }
 
     fn handle_rollback(&mut self, req: &mut Request) -> IronResult<Response> {
