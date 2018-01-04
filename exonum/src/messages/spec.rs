@@ -136,11 +136,11 @@ macro_rules! message {
             pub fn new($($field_name: $field_type,)*
                        secret_key: &$crate::crypto::SecretKey) -> $name {
                 use $crate::messages::{RawMessage, MessageWriter};
-                check_bounds!($body, $($field_name : $field_type [$from => $to],)*);
                 let mut writer = MessageWriter::new($crate::messages::PROTOCOL_MAJOR_VERSION,
                                                     $crate::messages::TEST_NETWORK_ID,
                                                     $extension, $id, $body);
-                $(writer.write($field_name, $from, $to);)*
+
+                for_each_field!(message_write_field, (writer), $( ($(#[$field_attr])*, $field_name, $field_type) )*);
                 $name { raw: RawMessage::new(writer.sign(secret_key)) }
             }
 
@@ -150,11 +150,10 @@ macro_rules! message {
             pub fn new_with_signature($($field_name: $field_type,)*
                        signature: &$crate::crypto::Signature) -> $name {
                 use $crate::messages::{RawMessage, MessageWriter};
-                check_bounds!($body, $($field_name : $field_type [$from => $to],)*);
                 let mut writer = MessageWriter::new($crate::messages::PROTOCOL_MAJOR_VERSION,
                                                     $crate::messages::TEST_NETWORK_ID,
                                                     $extension, $id, $body);
-                $(writer.write($field_name, $from, $to);)*
+                for_each_field!(message_write_field, (writer), $( ($(#[$field_attr])*, $field_name, $field_type) )*);
                 $name { raw: RawMessage::new(writer.append_signature(signature)) }
             }
 
@@ -208,13 +207,8 @@ macro_rules! message {
             -> $crate::encoding::Result {
                 let latest_segment = (($body + $crate::messages::HEADER_LENGTH)
                                         as $crate::encoding::Offset).into();
-                $(
-                    let field_from: $crate::encoding::Offset = $from;
-                    let field_to: $crate::encoding::Offset = $to;
-                    let latest_segment = raw_message.check::<$field_type>(field_from.into(),
-                                                    field_to.into(),
-                                                    latest_segment)?;
-                )*
+
+                for_each_field!(message_check_field, (latest_segment, raw_message), $( ($(#[$field_attr])*, $field_name, $field_type) )*);
                 Ok(latest_segment)
             }
 
@@ -237,11 +231,7 @@ macro_rules! message {
                 $crate::encoding::serialize::encode_hex(self.as_ref())
             }
 
-            $(
-            $(#[$field_attr])*
-            pub fn $field_name(&self) -> $field_type {
-                unsafe{ self.raw.read::<$field_type>($from, $to)}
-            })*
+            for_each_field!(message_mk_field, (), $( ($(#[$field_attr])*, $field_name, $field_type) )*);
         }
 
         impl AsRef<$crate::messages::RawMessage> for $name {
@@ -373,13 +363,7 @@ macro_rules! message {
                 let mut writer = MessageWriter::new(protocol_version, network_id,
                                                         service_id, message_type, $body);
                 let obj = body.as_object().ok_or("Can't cast body as object.")?;
-                $(
-                    let val = obj.get(stringify!($field_name))
-                                    .ok_or("Can't get object from json.")?;
-                    <$field_type as ExonumJson>::deserialize_field(val,
-                                                                    &mut writer, $from, $to )?;
-                )*
-
+                for_each_field!(message_deserialize_field, (obj, writer), $( ($(#[$field_attr])*, $field_name, $field_type) )*);
                 Ok($name { raw: RawMessage::new(writer.append_signature(&signature)) })
             }
         }
@@ -413,4 +397,74 @@ macro_rules! message {
         }
 
     );
+}
+
+// Applies the given macro $m to all fields. $m should have the following signature:
+// macro_rules! foo {
+//   (($arbitrary_env), $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr) => { ... }
+// }
+#[doc(hidden)]
+#[macro_export]
+macro_rules! for_each_field {
+    ($m:ident, ($($env:tt)*), $($fields:tt)*) => {
+        for_each_field!(@inner $m ($($env)*) (0); $($fields)* );
+    };
+
+    (@inner $m:ident ($($env:tt)*) ($start_offset:expr); ($(#[$field_attr:meta])*, $field_name:ident, $field_type:ty) $($rest:tt)* ) => {
+        $m!(
+            ($($env)*)
+            $(#[$field_attr])*,
+            $field_name,
+            $field_type,
+            $start_offset,
+            $start_offset + <$field_type as $crate::encoding::Field>::field_size()
+        );
+
+        for_each_field!(@inner $m ($($env)*) ($start_offset + <$field_type as $crate::encoding::Field>::field_size()); $($rest)*);
+    };
+
+    (@inner $m:ident ($($env:tt)*) ($start_offset:expr);) => { };
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! message_mk_field {
+    (() $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr) => {
+        $(#[$field_attr])*
+        pub fn $field_name(&self) -> $field_type {
+            unsafe { self.raw.read::<$field_type>($from, $to) }
+        }
+    }
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! message_write_field {
+    (($writer:ident) $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr) => {
+        $writer.write($field_name, $from, $to);
+    }
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! message_check_field {
+    (($latest_segment:ident, $raw_message:ident) $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr) => {
+        let field_from: $crate::encoding::Offset = $from;
+        let field_to: $crate::encoding::Offset = $to;
+        let $latest_segment = $raw_message.check::<$field_type>(
+            field_from.into(),
+            field_to.into(),
+            $latest_segment
+        )?;
+    }
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! message_deserialize_field {
+    (($obj:ident, $writer:ident) $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr) => {
+        let val = $obj.get(stringify!($field_name))
+                      .ok_or("Can't get object from json.")?;
+        <$field_type as ExonumJson>::deserialize_field(val, &mut $writer, $from, $to)?;
+    }
 }
