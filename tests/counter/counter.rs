@@ -181,6 +181,12 @@ impl CounterApi {
         let self_ = self.clone();
         let reset = move |req: &mut Request| self_.reset(req);
         router.post("/reset", reset, "reset");
+
+        // Expose `get_count` as both private and public endpoint
+        // in order to test private gets as well.
+        let self_ = self.clone();
+        let get_count = move |req: &mut Request| self_.get_count(req);
+        router.get("/count", get_count, "get_count");
     }
 }
 

@@ -137,7 +137,7 @@ fn test_private_api() {
     inc_count(&api, 3);
 
     testkit.create_block();
-    let counter: u64 = api.get(ApiKind::Service("counter"), "count");
+    let counter: u64 = api.get_private(ApiKind::Service("counter"), "count");
     assert_eq!(counter, 8);
 
     let (pubkey, key) = crypto::gen_keypair_from_seed(&crypto::Seed::from_slice(
@@ -150,7 +150,7 @@ fn test_private_api() {
     assert_eq!(tx_info.tx_hash, tx.hash());
 
     testkit.create_block();
-    let counter: u64 = api.get(ApiKind::Service("counter"), "count");
+    let counter: u64 = api.get_private(ApiKind::Service("counter"), "count");
     assert_eq!(counter, 0);
 }
 
