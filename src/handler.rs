@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use std::sync::{Arc, RwLock};
+use std::num::ParseIntError;
 
 use bodyparser;
 use exonum::api::ApiError;
@@ -59,7 +60,7 @@ pub fn create_testkit_handler(testkit: TestKit) -> Router {
 
     let clone = Arc::clone(&testkit);
     router.delete(
-        "v1/blocks",
+        "v1/blocks/:height",
         move |req: &mut Request| {
             clone
                 .write()
@@ -129,26 +130,32 @@ impl TestKitHandler for TestKit {
     }
 
     fn handle_rollback(&mut self, req: &mut Request) -> IronResult<Response> {
-        #[derive(Clone, Debug, Serialize, Deserialize)]
-        struct RollbackRequest {
-            blocks: usize,
+        let params = req.extensions.get::<Router>().unwrap();
+
+        let height: u64 = match params.find("height") {
+            Some(height_str) => {
+                height_str.parse().map_err(|e: ParseIntError| {
+                    ApiError::IncorrectRequest(Box::new(e))
+                })?
+            }
+            None => {
+                Err(ApiError::IncorrectRequest(
+                    "Required request parameter is missing: height".into(),
+                ))?
+            }
+        };
+        if height == 0 {
+            Err(ApiError::IncorrectRequest(
+                "Cannot rollback past genesis block".into(),
+            ))?;
         }
 
-        match req.get::<bodyparser::Struct<RollbackRequest>>() {
-            Ok(Some(req)) => {
-                if (req.blocks as u64) <= self.height().0 {
-                    self.rollback(req.blocks);
-                    let explorer = BlockchainExplorer::new(&self.blockchain);
-                    let block_info = explorer.block_info(self.height());
-                    ok_response(&block_info)
-                } else {
-                    Err(ApiError::IncorrectRequest(
-                        "Cannot rollback past genesis block".into(),
-                    ))?
-                }
-            }
-            Ok(None) => Err(ApiError::IncorrectRequest("Empty request body".into()))?,
-            Err(e) => Err(ApiError::IncorrectRequest(Box::new(e)))?,
+        if self.height().0 >= height {
+            let rollback_blocks = (self.height().0 - height + 1) as usize;
+            self.rollback(rollback_blocks);
         }
+        let explorer = BlockchainExplorer::new(&self.blockchain);
+        let block_info = explorer.block_info(self.height());
+        ok_response(&block_info)
     }
 }

@@ -37,11 +37,9 @@ async function createBlock (txHashes) {
   return response.json()
 }
 
-async function rollback (blocks) {
-  const response = await fetch(TESTKIT_URL + '/v1/blocks', {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ blocks })
+async function rollbackToHeight (height) {
+  const response = await fetch(TESTKIT_URL + '/v1/blocks/' + (height + 1), {
+    method: 'DELETE'
   })
   return response.json()
 }
@@ -154,8 +152,7 @@ describe('CurrencyService', function () {
   // // // // Tests // // // //
 
   beforeEach(async () => {
-    const height = await getBlockchainHeight()
-    await rollback(height)
+    await rollbackToHeight(0)
   })
 
   it('should create wallet', async () => {

@@ -509,10 +509,12 @@ impl TestKitBuilder {
 ///
 /// ## Roll back
 ///
-/// DELETE `{baseURL}/v1/blocks`
+/// DELETE `{baseURL}/v1/blocks/:height`
 ///
-/// Acts as a [`rollback`] equivalent. The number of blocks to roll back should be specified
-/// in the `blocks` parameter of the body.
+/// Acts as a rough [`rollback`] equivalent. The blocks are rolled back up and including the block
+/// at the specified `height` (a positive integer), so that after the request the blockchain height
+/// is equal to `height - 1`. If the specified height is greater than the blockchain height,
+/// the request performs no action.
 ///
 /// Returns the latest block from the blockchain on success.
 ///
