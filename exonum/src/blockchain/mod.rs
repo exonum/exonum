@@ -200,7 +200,8 @@ impl Blockchain {
                 schema.commit_configuration(config_propose);
             };
             self.merge(fork.into_patch())?;
-            self.create_patch(ValidatorId::zero(), Height::zero(), &[], &BTreeMap::new())
+            self.create_patch(ValidatorId::zero(), Height::zero(), &[])
+                .unwrap()
                 .1
         };
         self.merge(patch)?;
@@ -235,8 +236,7 @@ impl Blockchain {
         proposer_id: ValidatorId,
         height: Height,
         tx_hashes: &[Hash],
-        pool: &BTreeMap<Hash, Box<Transaction>>,
-    ) -> (Hash, Patch) {
+    ) -> Result<(Hash, Patch), Error> {
         // Create fork
         let mut fork = self.fork();
 
@@ -245,9 +245,20 @@ impl Blockchain {
             let last_hash = self.last_hash();
             // Save & execute transactions
             for (index, hash) in tx_hashes.iter().enumerate() {
-                let tx = pool.get(hash).expect(
-                    "BUG: Cannot find transaction in pool.",
-                );
+                let tx = {
+                    let mut schema = Schema::new(&fork);
+
+                    let tx = schema.transactions().get(hash).ok_or(
+                        "BUG: Cannot find transaction in database."
+                            .to_owned(),
+                    )?;
+
+                    self.tx_from_raw(tx).ok_or(
+                        "BUG: couldn't create tx from raw message"
+                            .to_owned(),
+                    )?
+                };
+
 
                 fork.checkpoint();
 
@@ -266,7 +277,7 @@ impl Blockchain {
                 }
 
                 let mut schema = Schema::new(&mut fork);
-                schema.transactions_mut().put(hash, tx.raw().clone());
+                schema.unconfirmed_transactions_mut().remove(hash);
                 schema.block_txs_mut(height).push(*hash);
                 let location = TxLocation::new(height, index as u64);
                 schema.tx_location_by_tx_hash_mut().put(hash, location);
@@ -334,7 +345,7 @@ impl Blockchain {
             block_hash
         };
 
-        (block_hash, fork.into_patch())
+        Ok((block_hash, fork.into_patch()))
     }
 
     /// Commits to the storage block that proposes by node `State`.

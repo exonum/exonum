@@ -34,6 +34,7 @@ impl NodeHandler {
         match event {
             InternalEvent::Timeout(timeout) => self.handle_timeout(timeout),
             InternalEvent::JumpToRound(height, round) => self.handle_new_round(height, round),
+            InternalEvent::TransactionValidated(tx, valid) => self.handle_tx_valid(tx, valid),
         }
     }
 

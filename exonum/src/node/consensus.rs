@@ -22,6 +22,7 @@ use helpers::{Height, Round, ValidatorId};
 use storage::Patch;
 use node::{NodeHandler, RequestData};
 use events::InternalRequest;
+use futures::Sink;
 
 // TODO reduce view invokations (ECR-171)
 impl NodeHandler {
@@ -109,28 +110,20 @@ impl NodeHandler {
             return;
         }
 
+        trace!("Handle propose");
+
         let snapshot = self.blockchain.snapshot();
-        // Check that transactions are not committed yet
-        for hash in msg.transactions() {
-            if Schema::new(&snapshot).transactions().contains(hash) {
-                error!(
-                    "Received propose with already committed transaction, msg={:?}",
-                    msg
-                );
+        let schema = Schema::new(snapshot);
+        //TODO: remove this match after errors refactor.
+        let has_unknown_txs = match self.state.add_propose(msg, schema.transactions(), schema.unconfirmed_transactions()) {
+            Ok(state) => state.has_unknown_txs(),
+            Err(err) => {
+                warn!("{}, msg={:?}", err, msg);
                 return;
             }
-        }
-
-        if self.state.propose(&msg.hash()).is_some() {
-            return;
-        }
-
-        trace!("Handle propose");
-        // Add propose
-        let (hash, has_unknown_txs) = match self.state.add_propose(msg) {
-            Some(state) => (state.hash(), state.has_unknown_txs()),
-            None => return,
         };
+
+        let hash = msg.hash();
 
         // Remove request info
         let known_nodes = self.remove_request(&RequestData::Propose(hash));
@@ -151,6 +144,7 @@ impl NodeHandler {
     // TODO write helper function which returns Result (ECR-123)
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_block(&mut self, msg: &BlockResponse) {
+        //unimplemented!(); /*
         // Request are sended to us
         if msg.to() != self.state.consensus_public_key() {
             error!(
@@ -202,34 +196,42 @@ impl NodeHandler {
         }
 
         if self.state.block(&block_hash).is_none() {
-            let snapshot = self.blockchain.snapshot();
-            let schema = Schema::new(&snapshot);
+
+
             // Verify transactions
             let mut tx_hashes = Vec::new();
-            for raw in msg.transactions() {
-                if let Some(tx) = self.blockchain.tx_from_raw(raw) {
-                    let hash = tx.hash();
-                    if schema.transactions().contains(&hash) {
-                        error!(
-                            "Received block with already committed transaction, block={:?}",
-                            msg
-                        );
-                        return;
-                    }
-                    profiler_span!("tx.verify()", {
+            let mut fork = self.blockchain.fork();
+            {
+                let mut schema = Schema::new(&mut fork);
+
+                for raw in msg.transactions() {
+                    if let Some(tx) = self.blockchain.tx_from_raw(raw) {
+                        let hash = tx.hash();
+                        if schema.transactions().get(&hash).is_some() {
+                            error!(
+                                "Received block with already committed transaction, block={:?}",
+                                msg
+                            );
+                            return;
+                        }
+                        profiler_span!("tx.verify()", {
                         if !tx.verify() {
                             error!("Incorrect transaction in block detected, block={:?}", msg);
                             return;
                         }
                     });
-                    self.state.add_transaction(hash, tx, true);
-                    tx_hashes.push(hash);
-                } else {
-                    error!("Unknown transaction in block detected, block={:?}", msg);
-                    return;
+                        schema.unconfirmed_transactions_mut().insert(hash);
+                        schema.transactions_mut().put(&hash, tx.raw().clone());
+                        tx_hashes.push(hash);
+                    } else {
+                        error!("Unknown transaction in block detected, block={:?}", msg);
+                        return;
+                    }
                 }
             }
-
+            self.blockchain.merge(fork.into_patch()).expect(
+                "Unable to save transaction to persistent pool.",
+            );
             let (block_hash, patch) =
                 self.create_block(block.proposer_id(), block.height(), tx_hashes.as_slice());
             // Verify block_hash
@@ -251,6 +253,7 @@ impl NodeHandler {
         }
         self.commit(block_hash, msg.precommits().iter(), None);
         self.request_next_block();
+
     }
 
     /// Executes and commits block. This function is called when node has full propose information.
@@ -467,14 +470,14 @@ impl NodeHandler {
                 &block_hash,
                 self.system_state.current_time(),
             );
+            for hash in block_state.txs() {
+                self.state.unconfirmed_txs().remove(hash);
+            }
             (block_state.txs().len(), block_state.proposer_id())
         };
 
-        let mempool_size = self.state
-            .transactions()
-            .read()
-            .expect("Expected read lock")
-            .len();
+        let mempool_size = self.state.unconfirmed_txs().len();
+
         metric!("node.mempool", mempool_size);
 
         let height = self.state.height();
@@ -510,15 +513,54 @@ impl NodeHandler {
         }
     }
 
+    /// Handles external boxed transaction. Additionally transaction will be broadcast to the
+    /// Node's peers.
+    pub fn handle_incoming_tx(&mut self, msg: Box<Transaction>) {
+        trace!("Handle incoming transaction");
+        let hash = msg.hash();
+        let mut fork = self.blockchain.fork();
+        {
+            let mut schema = Schema::new(&mut fork);
+            schema.unconfirmed_transactions_mut().insert(hash);
+            schema.transactions_mut().put(&hash, msg.raw().clone());
+        }
+        self.blockchain.merge(fork.into_patch()).expect(
+            "Unable to save transaction to persistent pool.",
+        );
+        // Broadcast transaction to validators
+        trace!("Broadcast transactions: {:?}", msg.raw());
+        self.broadcast(msg.raw());
+
+        self.handle_tx_valid(msg, true);
+    }
+
+    /// Handles validated transaction. Transaction status in pool should be changed, if transaction
+    /// was valid, otherwise it is removed from the transactions pool.
+    pub fn handle_tx_valid(&mut self, transaction: Box<Transaction>, valid: bool) {
+        trace!("Handle tx_valid");
+        let hash = transaction.hash();
+        if !valid {
+            return;
+        }
+
+        let full_proposes = self.state.transaction_validated(hash);
+        // Go to has full propose if we get last transaction
+        for (hash, round) in full_proposes {
+            self.remove_request(&RequestData::Transactions(hash));
+            self.has_full_propose(hash, round);
+        }
+        //unimplemented!(); // Add check for handle_block transaction
+    }
+
     /// Handles raw transaction. Transaction is ignored if it is already known, otherwise it is
     /// added to the transactions pool.
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_tx(&mut self, msg: RawTransaction) {
-        //trace!("Handle transaction");
+        trace!("Handle transaction");
         let hash = msg.hash();
         let tx = {
             let service_id = msg.service_id();
-            if let Some(tx) = self.blockchain.tx_from_raw(msg) {
+            if let Some(tx) = self.blockchain.tx_from_raw(msg.clone()) {
                 tx
             } else {
                 error!(
@@ -530,67 +572,20 @@ impl NodeHandler {
         };
 
         profiler_span!("Make sure that it is new transaction", {
-            if self.state
-                .transactions()
-                .read()
-                .expect("Expected read lock")
-                .contains_key(&hash)
-            {
+            if self.state.unconfirmed_txs().contains(&hash) {
                 return;
             }
-
             let snapshot = self.blockchain.snapshot();
             if Schema::new(&snapshot).transactions().contains(&hash) {
                 return;
             }
         });
 
-        profiler_span!("tx.verify()", {
-            if !tx.verify() {
-                return;
-            }
-        });
-
-        let full_proposes = self.state.add_transaction(hash, tx, false);
-        // Go to has full propose if we get last transaction
-        for (hash, round) in full_proposes {
-            self.remove_request(&RequestData::Transactions(hash));
-            self.has_full_propose(hash, round);
-        }
+        self.state.unconfirmed_txs().insert(hash);
+        let request = InternalRequest::ValidateTransaction(tx);
+        let _ = self.channel.internal_requests.send(request);
     }
 
-    /// Handles external boxed transaction. Additionally transaction will be broadcast to the
-    /// Node's peers.
-    pub fn handle_incoming_tx(&mut self, msg: Box<Transaction>) {
-        trace!("Handle incoming transaction");
-        let hash = msg.hash();
-
-        // Make sure that it is new transaction
-        if self.state
-            .transactions()
-            .read()
-            .expect("Expected read lock")
-            .contains_key(&hash)
-        {
-            return;
-        }
-
-        let snapshot = self.blockchain.snapshot();
-        if Schema::new(&snapshot).transactions().contains(&hash) {
-            return;
-        }
-
-        // Broadcast transaction to validators
-        trace!("Broadcast transactions: {:?}", msg.raw());
-        self.broadcast(msg.raw());
-
-        let full_proposes = self.state.add_transaction(hash, msg, false);
-        // Go to has full propose if we get last transaction
-        for (hash, round) in full_proposes {
-            self.remove_request(&RequestData::Transactions(hash));
-            self.has_full_propose(hash, round);
-        }
-    }
 
     /// Handle new round, after jump.
     pub fn handle_new_round(&mut self, height: Height, round: Round) {
@@ -666,24 +661,18 @@ impl NodeHandler {
             if self.state.have_prevote(round) {
                 return;
             }
-            let pool_len = self.state
-                .transactions()
-                .read()
-                .expect("Expected read lock")
-                .len();
-
-            info!("LEADER: pool = {}", pool_len);
-
             let round = self.state.round();
-            let max_count = ::std::cmp::min(self.txs_block_limit() as usize, pool_len);
-            let txs: Vec<Hash> = self.state
-                .transactions()
-                .read()
-                .expect("Expected read lock")
-                .keys()
-                .take(max_count)
-                .cloned()
-                .collect();
+            let txs: Vec<Hash> = {
+                let schema = Schema::new(self.blockchain.snapshot());
+
+                let pool_len = self.state.unconfirmed_txs().len();
+
+                info!("LEADER: pool = {}", pool_len);
+
+                let idx = schema.unconfirmed_transactions();
+                let vec = idx.iter().take(self.txs_block_limit() as usize).collect();
+                vec
+            };
             let propose = Propose::new(
                 validator_id,
                 self.state.height(),
@@ -774,14 +763,9 @@ impl NodeHandler {
         height: Height,
         tx_hashes: &[Hash],
     ) -> (Hash, Patch) {
-        self.blockchain.create_patch(
-            proposer_id,
-            height,
-            tx_hashes,
-            &self.state.transactions().read().expect(
-                "Expected read lock",
-            ),
-        )
+        self.blockchain
+            .create_patch(proposer_id, height, tx_hashes)
+            .unwrap()
     }
 
     /// Calls `create_block` with transactions from the corresponding `Propose` and returns the

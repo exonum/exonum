@@ -23,9 +23,9 @@ use std::time::{SystemTime, Duration};
 use serde_json::Value;
 use bit_vec::BitVec;
 
-use messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect};
+use messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect, RawMessage};
 use crypto::{PublicKey, SecretKey, Hash};
-use storage::{Patch, Snapshot};
+use storage::{Patch, Snapshot, MapIndex, KeySetIndex};
 use blockchain::{ValidatorKeys, ConsensusConfig, StoredConfiguration, Transaction,
                  TimeoutAdjusterConfig};
 use helpers::{Height, Round, ValidatorId, Milliseconds};
@@ -61,7 +61,6 @@ pub struct State {
 
     config: StoredConfiguration,
     whitelist: Whitelist,
-    tx_pool_capacity: usize,
 
     peers: HashMap<PublicKey, Connect>,
     connections: HashMap<SocketAddr, PublicKey>,
@@ -79,10 +78,9 @@ pub struct State {
     prevotes: HashMap<(Round, Hash), Votes<Prevote>>,
     precommits: HashMap<(Round, Hash), Votes<Precommit>>,
 
-    transactions: TxPool,
-
     queued: Vec<ConsensusMessage>,
 
+    unconfirmed_txs: HashSet<Hash>,
     unknown_txs: HashMap<Hash, Vec<Hash>>,
     unknown_proposes_with_precommits: HashMap<Hash, Vec<(Round, Hash)>>,
 
@@ -357,13 +355,13 @@ impl State {
         consensus_secret_key: SecretKey,
         service_public_key: PublicKey,
         service_secret_key: SecretKey,
-        tx_pool_capacity: usize,
         whitelist: Whitelist,
         stored: StoredConfiguration,
         connect: Connect,
         peers: HashMap<PublicKey, Connect>,
         last_hash: Hash,
         last_height: Height,
+        unconfirmed_txs: HashSet<Hash>,
         height_start_time: SystemTime,
     ) -> Self {
         State {
@@ -372,7 +370,6 @@ impl State {
             consensus_secret_key,
             service_public_key,
             service_secret_key,
-            tx_pool_capacity: tx_pool_capacity,
             whitelist: whitelist,
             peers,
             connections: HashMap::new(),
@@ -388,9 +385,9 @@ impl State {
             prevotes: HashMap::new(),
             precommits: HashMap::new(),
 
-            transactions: Arc::new(RwLock::new(BTreeMap::new())),
-
             queued: Vec::new(),
+
+            unconfirmed_txs,
 
             unknown_txs: HashMap::new(),
             unknown_proposes_with_precommits: HashMap::new(),
@@ -406,6 +403,10 @@ impl State {
             propose_timeout: 0,
             config: stored,
         }
+    }
+
+    pub fn unconfirmed_txs(&mut self) -> &mut HashSet<Hash> {
+        &mut self.unconfirmed_txs
     }
 
     /// Returns `ValidatorState` if the node is validator.
@@ -711,16 +712,6 @@ impl State {
         self.locked_round = Round::zero();
         self.locked_propose = None;
         self.last_hash = *block_hash;
-        {
-            // Commit transactions if needed
-            let txs = self.block(block_hash).unwrap().txs.clone();
-            for hash in txs {
-                self.transactions
-                    .write()
-                    .expect("Expected write lock")
-                    .remove(&hash);
-            }
-        }
         // TODO: destruct/construct structure HeightState instead of call clear (ECR-171)
         self.blocks.clear();
         self.proposes.clear();
@@ -745,51 +736,21 @@ impl State {
         self.queued.push(msg);
     }
 
-    /// Returns non-committed transactions.
-    pub fn transactions(&self) -> &TxPool {
-        &self.transactions
-    }
-
-    /// Adds a transaction to the pool and returns list of proposes that don't contain unknown
-    /// transactions now.
+    /// Handles a transaction validated event and returns list of proposes
+    /// that don't contain unknown transactions now.
     ///
     /// Transaction is ignored if the following criteria are fulfilled:
     /// - transactions pool size is exceeded
     /// - transaction isn't contained in unknown transaction list of any propose
     /// - transaction isn't a part of block
-    pub fn add_transaction(
-        &mut self,
-        tx_hash: Hash,
-        msg: Box<Transaction>,
-        // if tx is in some of propose or in a block,
-        // we should add it, or we could become stuck in some state
-        mut high_priority_tx: bool,
-    ) -> Vec<(Hash, Round)> {
+    pub fn transaction_validated(&mut self, tx_hash: Hash) -> Vec<(Hash, Round)> {
         let mut full_proposes = Vec::new();
         for (propose_hash, propose_state) in &mut self.proposes {
-            high_priority_tx |= propose_state.unknown_txs.remove(&tx_hash);
+            propose_state.unknown_txs.remove(&tx_hash);
             if propose_state.unknown_txs.is_empty() {
                 full_proposes.push((*propose_hash, propose_state.message().round()));
             }
         }
-        let tx_pool_len = self.transactions.read().expect("Expected read lock").len();
-        if tx_pool_len >= self.tx_pool_capacity {
-            // but make warn about pool exceeded, even if we should add tx
-            warn!(
-                "Too many transactions in pool, txs={}, high_priority={}",
-                tx_pool_len,
-                high_priority_tx
-            );
-            if !high_priority_tx {
-                return full_proposes;
-            }
-        }
-
-        self.transactions
-            .write()
-            .expect("Expected read lock")
-            .insert(tx_hash, msg);
-
         full_proposes
     }
 
@@ -840,23 +801,36 @@ impl State {
     }
 
     /// Adds propose from other node. Returns `ProposeState` if it is a new propose.
-    pub fn add_propose(&mut self, msg: &Propose) -> Option<&ProposeState> {
+    pub fn add_propose(
+        &mut self,
+        msg: &Propose,
+        transactions: MapIndex<&Box<Snapshot>, Hash, RawMessage>,
+        unconfirmed_txs: KeySetIndex<&Box<Snapshot>, Hash>
+    ) -> Result<&ProposeState, &'static str> {
         let propose_hash = msg.hash();
-        let txs = &self.transactions.read().expect("Expected read lock");
         match self.proposes.entry(propose_hash) {
-            Entry::Occupied(..) => None,
+            Entry::Occupied(..) => Err("Propose already found."),
             Entry::Vacant(e) => {
-                let unknown_txs = msg.transactions()
-                    .iter()
-                    .filter(|tx| !txs.contains_key(tx))
-                    .cloned()
-                    .collect::<HashSet<Hash>>();
+
+                let mut unknown_txs = HashSet::new();
+                for hash in msg.transactions() {
+                    if transactions.get(hash).is_some() {
+                        if !unconfirmed_txs.contains(hash) {
+                            return Err("Received propose with already\
+                                                committed transaction.")
+                        }
+                    } else {
+                        unknown_txs.insert(*hash);
+                    }
+                }
+
                 for tx in &unknown_txs {
                     self.unknown_txs.entry(*tx).or_insert_with(Vec::new).push(
                         propose_hash,
                     );
                 }
-                Some(e.insert(ProposeState {
+
+                Ok(e.insert(ProposeState {
                     propose: msg.clone(),
                     unknown_txs: unknown_txs,
                     block_hash: None,

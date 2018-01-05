@@ -105,6 +105,18 @@ impl SandboxInner {
         let internal_getter = futures::lazy(|| -> Result<(), ()> {
             while let Async::Ready(Some(internal)) = self.internal_requests_rx.poll()? {
                 match internal {
+                    InternalRequest::ValidateTransaction(tx) => {
+                        let valid = tx.verify();
+                        if valid {
+                            let mut fork = self.handler.blockchain.fork();
+                            Schema::new(&mut fork).unconfirmed_transactions_mut().put(&tx.hash(), tx.raw().clone());
+                            self.handler.blockchain.merge(fork.into_patch()).expect(
+                                "Unable to save transaction to persistent pool.",
+                            );
+                        }
+                        self.handler.handle_event(
+                            InternalEvent::TransactionValidated(tx, valid).into())
+                    }
                     InternalRequest::Timeout(t) => self.timers.push(t),
                     InternalRequest::JumpToRound(height, round) => {
                         self.handler.handle_event(
@@ -429,26 +441,46 @@ impl Sandbox {
     where
         I: IntoIterator<Item = &'a RawTransaction>,
     {
-        let blockchain = &self.blockchain_ref();
-        let (hashes, tx_pool) = {
-            let mut pool = BTreeMap::new();
+        let height = self.current_height();
+        let mut blockchain = self.blockchain_mut();
+        let (hashes, recover, patch) = {
             let mut hashes = Vec::new();
-            for raw in txs {
-                let tx = blockchain.tx_from_raw(raw.clone()).unwrap();
-                let hash = tx.hash();
-                hashes.push(hash);
-                pool.insert(hash, tx);
+            let mut recover = BTreeMap::new();
+            let mut fork = blockchain.fork();
+            {
+                let mut schema = Schema::new(&mut fork);
+                for raw in txs {
+                    let hash = raw.hash();
+                    hashes.push(hash);
+                    recover.insert(hash, schema.transactions().get(&hash));
+                    schema.unconfirmed_transactions_mut().put(&hash, raw.clone());
+                }
             }
-            (hashes, pool)
+
+            (hashes, recover, fork.into_patch())
         };
+        blockchain.merge(patch).unwrap();
 
         let fork = {
             let mut fork = blockchain.fork();
             let (_, patch) =
-                blockchain.create_patch(ValidatorId(0), self.current_height(), &hashes, &tx_pool);
+                blockchain.create_patch(ValidatorId(0), height, &hashes)
+                        .unwrap();
             fork.merge(patch);
             fork
         };
+        let patch = {
+            let mut fork = blockchain.fork();
+            {
+                let mut schema = Schema::new(&mut fork);
+                for (hash, tx) in recover.into_iter().filter_map(|(k, v)| v.map(|v| (k,v))) {
+                    schema.transactions_mut().put(&hash, tx);
+                }
+            }
+            fork.into_patch()
+        };
+
+        blockchain.merge(patch).unwrap();
         *Schema::new(&fork).last_block().state_hash()
     }
 
@@ -492,11 +524,12 @@ impl Sandbox {
     }
 
     pub fn transactions_hashes(&self) -> Vec<Hash> {
-        let node_state = self.node_state();
-        let rlock = node_state.transactions().read().expect(
-            "Expected read lock",
-        );
-        rlock.keys().cloned().collect()
+
+        let schema = Schema::new(self.blockchain_ref().snapshot());
+        let idx = schema.unconfirmed_transactions();
+        let vec = idx.keys().collect();
+        vec
+
     }
 
     pub fn current_round(&self) -> Round {

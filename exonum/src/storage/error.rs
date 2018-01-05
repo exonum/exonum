@@ -49,3 +49,9 @@ impl error::Error for Error {
         &self.message
     }
 }
+
+impl From<String> for Error {
+    fn from(s: String) -> Self {
+        Error { message: s }
+    }
+}

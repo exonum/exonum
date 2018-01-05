@@ -15,7 +15,7 @@
 use crypto::{PublicKey, Hash};
 use messages::{Precommit, RawMessage, Connect};
 use storage::{Fork, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex, Snapshot,
-              StorageKey, StorageValue};
+              StorageKey, StorageValue, KeySetIndex};
 use helpers::Height;
 use super::{Block, BlockProof, Blockchain};
 use super::config::StoredConfiguration;
@@ -67,6 +67,10 @@ where
     /// Returns table that represents a map from transaction hash into raw transaction message.
     pub fn transactions(&self) -> MapIndex<&T, Hash, RawMessage> {
         MapIndex::new("core.transactions", &self.view)
+    }
+
+    pub fn unconfirmed_transactions(&self) -> KeySetIndex<&T, Hash> {
+        KeySetIndex::new("core.unconfirmed_transactions", &self.view)
     }
 
     /// Returns table that keeps the block height and tx position inside block for every
@@ -304,6 +308,10 @@ impl<'a> Schema<&'a mut Fork> {
     /// [1]: struct.Schema.html#method.transactions
     pub fn transactions_mut(&mut self) -> MapIndex<&mut Fork, Hash, RawMessage> {
         MapIndex::new("core.transactions", &mut self.view)
+    }
+
+    pub fn unconfirmed_transactions_mut(&mut self) -> KeySetIndex<&mut Fork, Hash> {
+        KeySetIndex::new("core.unconfirmed_transactions", &mut self.view)
     }
 
     /// Mutable reference to the [`tx_location_by_tx_hash`][1] index.

@@ -74,18 +74,11 @@ impl NodeHandler {
     /// Handles `TransactionsRequest` message. For details see the message documentation.
     pub fn handle_request_txs(&mut self, msg: &TransactionsRequest) {
         trace!("HANDLE TRANSACTIONS REQUEST");
+
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
         for hash in msg.txs() {
-            let tx = self.state
-                .transactions()
-                .read()
-                .expect("Expected read lock")
-                .get(hash)
-                .map(|tx| tx.raw())
-                .cloned()
-                .or_else(|| schema.transactions().get(hash));
-
+            let tx = schema.transactions().get(hash);
             if let Some(tx) = tx {
                 self.send_to_peer(*msg.from(), &tx);
             }
@@ -119,6 +112,8 @@ impl NodeHandler {
             msg.height(),
             self.state.height()
         );
+        //unimplemented!();
+
         if msg.height() >= self.state.height() {
             return;
         }
@@ -141,10 +136,11 @@ impl NodeHandler {
             precommits.iter().collect(),
             transactions
                 .iter()
-                .map(|tx_hash| schema.transactions().get(&tx_hash).unwrap())
+                .map(|tx_hash| schema.transactions().get(&tx_hash).unwrap().clone())
                 .collect(),
             self.state.consensus_secret_key(),
         );
         self.send_to_peer(*msg.from(), block_msg.raw());
+
     }
 }
