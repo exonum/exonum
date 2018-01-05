@@ -26,7 +26,7 @@ use std::time::{Duration, SystemTime};
 
 use super::error::{into_other, other_error, log_error};
 use super::{InternalRequest, TimeoutRequest, InternalEvent, tobox};
-use blockchain::{Transaction, Blockchain, Schema};
+use blockchain::{Blockchain, Schema};
 
 #[derive(Debug)]
 pub struct InternalPart {
@@ -81,14 +81,20 @@ impl InternalPart {
                             trace!("validating transaction in thread-pool");
                             let valid = tx.verify();
                             if valid {
+                                let hash = tx.hash();
                                 let mut fork = blockchain.fork();
-                                Schema::new(&mut fork).unconfirmed_transactions_mut().put(&tx.hash(), tx.raw().clone());
+                                {
+                                    let mut schema = Schema::new(&mut fork);
+
+                                    schema.unconfirmed_transactions_mut().insert(hash);
+                                    schema.transactions_mut().put(&hash, tx.raw().clone());
+                                }
                                 blockchain.merge(fork.into_patch()).expect(
                                     "Unable to save transaction to persistent pool.",
                                 );
                             }
 
-                            internal_tx
+                            let _ = internal_tx
                                 .send(InternalEvent::TransactionValidated(tx, valid))
                                 .map(drop)
                                 .map_err(log_error)

@@ -236,7 +236,7 @@ impl Blockchain {
                 let tx = {
                     let mut schema = Schema::new(&fork);
 
-                    let tx = schema.unconfirmed_transactions().get(hash).ok_or(
+                    let tx = schema.transactions().get(hash).ok_or(
                         "BUG: Cannot find transaction in database."
                             .to_owned(),
                     )?;
@@ -266,7 +266,6 @@ impl Blockchain {
 
                 let mut schema = Schema::new(&mut fork);
                 schema.unconfirmed_transactions_mut().remove(hash);
-                schema.transactions_mut().put(hash, tx.raw().clone());
                 schema.block_txs_mut(height).push(*hash);
                 let location = TxLocation::new(height, index as u64);
                 schema.tx_location_by_tx_hash_mut().put(hash, location);

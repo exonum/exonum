@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::borrow::Cow;
-
 use crypto::Hash;
 use messages::{Precommit, RawMessage};
 use storage::{Fork, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex, Snapshot,
-              StorageKey, StorageValue, SparseListIndex};
+              StorageKey, StorageValue, KeySetIndex};
 use helpers::Height;
 use super::{Block, BlockProof, Blockchain};
 use super::config::StoredConfiguration;
@@ -71,8 +69,8 @@ where
         MapIndex::new("core.transactions", &self.view)
     }
 
-    pub fn unconfirmed_transactions(&self) -> MapIndex<&T, Hash, RawMessage> {
-        MapIndex::new("core.unconfirmed_transactions", &self.view)
+    pub fn unconfirmed_transactions(&self) -> KeySetIndex<&T, Hash> {
+        KeySetIndex::new("core.unconfirmed_transactions", &self.view)
     }
 
     /// Returns table that keeps the block height and tx position inside block for every
@@ -306,8 +304,8 @@ impl<'a> Schema<&'a mut Fork> {
         MapIndex::new("core.transactions", &mut self.view)
     }
 
-    pub fn unconfirmed_transactions_mut(&mut self) -> MapIndex<&mut Fork, Hash, RawMessage> {
-        MapIndex::new("core.unconfirmed_transactions", &mut self.view)
+    pub fn unconfirmed_transactions_mut(&mut self) -> KeySetIndex<&mut Fork, Hash> {
+        KeySetIndex::new("core.unconfirmed_transactions", &mut self.view)
     }
 
     /// Mutable reference to the [`tx_location_by_tx_hash`][1] index.

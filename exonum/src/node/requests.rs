@@ -79,7 +79,6 @@ impl NodeHandler {
         let schema = Schema::new(&snapshot);
         for hash in msg.txs() {
             let tx = schema.transactions().get(hash);
-            let tx = tx.or_else(|| schema.unconfirmed_transactions().get(hash));
             if let Some(tx) = tx {
                 self.send_to_peer(*msg.from(), &tx);
             }

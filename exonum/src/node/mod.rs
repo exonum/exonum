@@ -295,14 +295,13 @@ impl NodeHandler {
         whitelist.set_validators(stored.validator_keys.iter().map(|x| x.consensus_key));
         let schema = Schema::new(blockchain.snapshot());
         let unconfirmed_txs = schema.unconfirmed_transactions();
-        let unconfirmed_txs = unconfirmed_txs.keys().collect();
+        let unconfirmed_txs = unconfirmed_txs.iter().collect();
         let mut state = State::new(
             validator_id,
             config.listener.consensus_public_key,
             config.listener.consensus_secret_key,
             config.service.service_public_key,
             config.service.service_secret_key,
-            config.mempool.tx_pool_capacity,
             whitelist,
             stored,
             connect,

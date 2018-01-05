@@ -19,7 +19,7 @@ use blockchain::{Schema, Transaction};
 use messages::{BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote,
                PrevotesRequest, Propose, ProposeRequest, RawTransaction, TransactionsRequest};
 use helpers::{Height, Round, ValidatorId};
-use storage::{Database, Patch};
+use storage::Patch;
 use node::{NodeHandler, RequestData};
 use events::InternalRequest;
 use futures::Sink;
@@ -114,18 +114,8 @@ impl NodeHandler {
 
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(snapshot);
-        let txs = schema.transactions();
-        for hash in msg.transactions() {
-            if txs.get(hash).is_some() {
-                warn!(
-                    "Received propose with already\
-                                                committed transaction.",
-                );
-                return;
-            }
-        }
         //TODO: remove this match after errors refactor.
-        let has_unknown_txs = match self.state.add_propose(msg, schema.unconfirmed_transactions()) {
+        let has_unknown_txs = match self.state.add_propose(msg, schema.transactions(), schema.unconfirmed_transactions()) {
             Ok(state) => state.has_unknown_txs(),
             Err(err) => {
                 warn!("{}, msg={:?}", err, msg);
@@ -230,7 +220,8 @@ impl NodeHandler {
                             return;
                         }
                     });
-                        schema.unconfirmed_transactions_mut().put(&hash, tx.raw().clone());
+                        schema.unconfirmed_transactions_mut().insert(hash);
+                        schema.transactions_mut().put(&hash, tx.raw().clone());
                         tx_hashes.push(hash);
                     } else {
                         error!("Unknown transaction in block detected, block={:?}", msg);
@@ -526,8 +517,13 @@ impl NodeHandler {
     /// Node's peers.
     pub fn handle_incoming_tx(&mut self, msg: Box<Transaction>) {
         trace!("Handle incoming transaction");
+        let hash = msg.hash();
         let mut fork = self.blockchain.fork();
-        Schema::new(&mut fork).unconfirmed_transactions_mut().put(&msg.hash(), msg.raw().clone());
+        {
+            let mut schema = Schema::new(&mut fork);
+            schema.unconfirmed_transactions_mut().insert(hash);
+            schema.transactions_mut().put(&hash, msg.raw().clone());
+        }
         self.blockchain.merge(fork.into_patch()).expect(
             "Unable to save transaction to persistent pool.",
         );
@@ -587,7 +583,7 @@ impl NodeHandler {
 
         self.state.unconfirmed_txs().insert(hash);
         let request = InternalRequest::ValidateTransaction(tx);
-        self.channel.internal_requests.send(request);
+        let _ = self.channel.internal_requests.send(request);
     }
 
 
@@ -674,7 +670,7 @@ impl NodeHandler {
                 info!("LEADER: pool = {}", pool_len);
 
                 let idx = schema.unconfirmed_transactions();
-                let vec = idx.keys().take(self.txs_block_limit() as usize).collect();
+                let vec = idx.iter().take(self.txs_block_limit() as usize).collect();
                 vec
             };
             let propose = Propose::new(

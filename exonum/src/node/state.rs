@@ -25,7 +25,7 @@ use bit_vec::BitVec;
 
 use messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect, RawMessage};
 use crypto::{PublicKey, SecretKey, Hash};
-use storage::{Patch, Snapshot, MapIndex};
+use storage::{Patch, Snapshot, MapIndex, KeySetIndex};
 use blockchain::{ValidatorKeys, ConsensusConfig, StoredConfiguration, Transaction,
                  TimeoutAdjusterConfig};
 use helpers::{Height, Round, ValidatorId, Milliseconds};
@@ -355,7 +355,6 @@ impl State {
         consensus_secret_key: SecretKey,
         service_public_key: PublicKey,
         service_secret_key: SecretKey,
-        tx_pool_capacity: usize,
         whitelist: Whitelist,
         stored: StoredConfiguration,
         connect: Connect,
@@ -804,7 +803,8 @@ impl State {
     pub fn add_propose(
         &mut self,
         msg: &Propose,
-        unconfirmed_txs: MapIndex<&Box<Snapshot>, Hash, RawMessage>,
+        transactions: MapIndex<&Box<Snapshot>, Hash, RawMessage>,
+        unconfirmed_txs: KeySetIndex<&Box<Snapshot>, Hash>
     ) -> Result<&ProposeState, &'static str> {
         let propose_hash = msg.hash();
         match self.proposes.entry(propose_hash) {
@@ -813,7 +813,12 @@ impl State {
 
                 let mut unknown_txs = HashSet::new();
                 for hash in msg.transactions() {
-                    if !unconfirmed_txs.get(hash).is_some() {
+                    if transactions.get(hash).is_some() {
+                        if !unconfirmed_txs.contains(hash) {
+                            return Err("Received propose with already\
+                                                committed transaction.")
+                        }
+                    } else {
                         unknown_txs.insert(*hash);
                     }
                 }

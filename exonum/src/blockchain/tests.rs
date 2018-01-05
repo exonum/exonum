@@ -14,8 +14,6 @@
 
 #![allow(dead_code)]
 
-use std::collections::BTreeMap;
-
 use rand::{thread_rng, Rng};
 use serde_json;
 
@@ -192,6 +190,11 @@ fn gen_tempdir_name() -> String {
     thread_rng().gen_ascii_chars().take(10).collect()
 }
 
+fn insert_tx(schema: &mut Schema<&mut Fork>, hash: Hash, tx: RawTransaction) {
+    schema.unconfirmed_transactions_mut().insert(hash);
+    schema.transactions_mut().put(&hash, tx.raw().clone());
+}
+
 fn handling_tx_panic(blockchain: &mut Blockchain) {
 
 
@@ -206,10 +209,11 @@ fn handling_tx_panic(blockchain: &mut Blockchain) {
         let mut fork = blockchain.fork();
         {
             let mut schema = Schema::new(&mut fork);
-            schema.unconfirmed_transactions_mut().put(&tx_ok1.hash(), tx_ok1.raw().clone());
-            schema.unconfirmed_transactions_mut().put(&tx_ok2.hash(), tx_ok2.raw().clone());
-            schema.unconfirmed_transactions_mut().put(&tx_failed.hash(), tx_failed.raw().clone());
-            schema.unconfirmed_transactions_mut().put(&tx_storage_error.hash(), tx_storage_error.raw().clone());
+
+            insert_tx(&mut schema, tx_ok1.hash(), tx_ok1.raw().clone());
+            insert_tx(&mut schema, tx_ok2.hash(), tx_ok2.raw().clone());
+            insert_tx(&mut schema, tx_failed.hash(), tx_failed.raw().clone());
+            insert_tx(&mut schema, tx_storage_error.hash(), tx_storage_error.raw().clone());
         }
         fork.into_patch()
     };
@@ -261,10 +265,10 @@ fn handling_tx_panic_storage_error(blockchain: &mut Blockchain) {
         let mut fork = blockchain.fork();
         {
             let mut schema = Schema::new(&mut fork);
-            schema.unconfirmed_transactions_mut().put(&tx_ok1.hash(), tx_ok1.raw().clone());
-            schema.unconfirmed_transactions_mut().put(&tx_ok2.hash(), tx_ok2.raw().clone());
-            schema.unconfirmed_transactions_mut().put(&tx_failed.hash(), tx_failed.raw().clone());
-            schema.unconfirmed_transactions_mut().put(&tx_storage_error.hash(), tx_storage_error.raw().clone());
+            insert_tx(&mut schema, tx_ok1.hash(), tx_ok1.raw().clone());
+            insert_tx(&mut schema, tx_ok2.hash(), tx_ok2.raw().clone());
+            insert_tx(&mut schema, tx_failed.hash(), tx_failed.raw().clone());
+            insert_tx(&mut schema, tx_storage_error.hash(), tx_storage_error.raw().clone());
         }
         fork.into_patch()
     };
