@@ -302,3 +302,30 @@ macro_rules! check_bounds {
         debug_assert_eq!($size, 0, "size of empty struct should be 0");
     }};
 }
+
+// Applies the given macro $m to all fields. $m should have the following signature:
+// macro_rules! foo {
+//   (($arbitrary_env), $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr) => { ... }
+// }
+#[doc(hidden)]
+#[macro_export]
+macro_rules! _ex_for_each_field {
+    ($m:ident, ($($env:tt)*), $($fields:tt)*) => {
+        _ex_for_each_field!(@inner $m ($($env)*) (0); $($fields)* );
+    };
+
+    (@inner $m:ident ($($env:tt)*) ($start_offset:expr); ($(#[$field_attr:meta])*, $field_name:ident, $field_type:ty) $($rest:tt)* ) => {
+        $m!(
+            ($($env)*)
+            $(#[$field_attr])*,
+            $field_name,
+            $field_type,
+            $start_offset,
+            $start_offset + <$field_type as $crate::encoding::Field>::field_size()
+        );
+
+        _ex_for_each_field!(@inner $m ($($env)*) ($start_offset + <$field_type as $crate::encoding::Field>::field_size()); $($rest)*);
+    };
+
+    (@inner $m:ident ($($env:tt)*) ($start_offset:expr);) => { };
+}
