@@ -94,12 +94,12 @@ macro_rules! encoding_struct {
                     from_st_val.unchecked_offset(),
                     to_st_val.unchecked_offset())};
                 let latest_segment: $crate::encoding::CheckedOffset =
-                    ($body as $crate::encoding::Offset).into();
+                    $name::__header_size().into();
 
-                if vec.len() < $body {
+                if vec.len() < $name::__header_size() as usize {
                     return Err($crate::encoding::Error::UnexpectedlyShortPayload{
                         actual_size: vec.len() as $crate::encoding::Offset,
-                        minimum_size: $body as $crate::encoding::Offset
+                        minimum_size: $name::__header_size() as $crate::encoding::Offset
                     })
                 }
 
@@ -146,7 +146,7 @@ macro_rules! encoding_struct {
 
             /// Creates a new instance with given parameters.
             pub fn new($($field_name: $field_type,)*) -> $name {
-                let mut buf = vec![0; $body];
+                let mut buf = vec![0; $name::__header_size() as usize];
                 _ex_for_each_field!(
                     _ex_struct_write_field, (buf),
                     $( ($(#[$field_attr])*, $field_name, $field_type) )*
@@ -163,6 +163,10 @@ macro_rules! encoding_struct {
                 _ex_struct_mk_field, (),
                 $( ($(#[$field_attr])*, $field_name, $field_type) )*
             );
+
+            fn __header_size() -> $crate::encoding::Offset {
+                _ex_header_size!($($field_type),*)
+            }
         }
 
         impl ::std::fmt::Debug for $name {
@@ -212,7 +216,7 @@ macro_rules! encoding_struct {
             fn deserialize(value: &$crate::encoding::serialize::json::reexport::Value)
                 -> Result<Self, Box<::std::error::Error>> {
                 use $crate::encoding::serialize::json::ExonumJson as ExonumJson;
-                let mut buf = vec![0; $body];
+                let mut buf = vec![0; $name::__header_size() as usize];
                 let _obj = value.as_object().ok_or("Can't cast json as object.")?;
                 _ex_for_each_field!(
                     _ex_deserialize_field, (_obj, buf),
@@ -294,6 +298,18 @@ macro_rules! check_bounds {
     ($size:expr,) => {{
         debug_assert_eq!($size, 0, "size of empty struct should be 0");
     }};
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! _ex_header_size {
+    ( $($field_type:ty),* ) => {{
+        let mut acc = 0;
+        $(
+            acc += <$field_type as $crate::encoding::Field>::field_size();
+        )*
+        acc
+    }}
 }
 
 // Applies the given macro $m to all fields. $m should have the following signature:

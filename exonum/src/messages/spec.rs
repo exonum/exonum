@@ -136,9 +136,11 @@ macro_rules! message {
             pub fn new($($field_name: $field_type,)*
                        secret_key: &$crate::crypto::SecretKey) -> $name {
                 use $crate::messages::{RawMessage, MessageWriter};
-                let mut writer = MessageWriter::new($crate::messages::PROTOCOL_MAJOR_VERSION,
-                                                    $crate::messages::TEST_NETWORK_ID,
-                                                    $extension, $id, $body);
+                let mut writer = MessageWriter::new(
+                    $crate::messages::PROTOCOL_MAJOR_VERSION,
+                    $crate::messages::TEST_NETWORK_ID,
+                    $extension, $id, $name::__header_size() as usize,
+                );
                 _ex_for_each_field!(
                     _ex_message_write_field, (writer),
                     $( ($(#[$field_attr])*, $field_name, $field_type) )*
@@ -150,11 +152,13 @@ macro_rules! message {
             #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
             #[allow(dead_code, unused_mut)]
             pub fn new_with_signature($($field_name: $field_type,)*
-                       signature: &$crate::crypto::Signature) -> $name {
+                                      signature: &$crate::crypto::Signature) -> $name {
                 use $crate::messages::{RawMessage, MessageWriter};
-                let mut writer = MessageWriter::new($crate::messages::PROTOCOL_MAJOR_VERSION,
-                                                    $crate::messages::TEST_NETWORK_ID,
-                                                    $extension, $id, $body);
+                let mut writer = MessageWriter::new(
+                    $crate::messages::PROTOCOL_MAJOR_VERSION,
+                    $crate::messages::TEST_NETWORK_ID,
+                    $extension, $id, $name::__header_size() as usize,
+                );
                 _ex_for_each_field!(
                     _ex_message_write_field, (writer),
                     $( ($(#[$field_attr])*, $field_name, $field_type) )*
@@ -165,7 +169,7 @@ macro_rules! message {
             /// Converts the raw message into the specific one.
             pub fn from_raw(raw: $crate::messages::RawMessage)
                 -> Result<$name, $crate::encoding::Error> {
-                let min_message_size = $body as usize
+                let min_message_size = $name::__header_size() as usize
                             + $crate::messages::HEADER_LENGTH as usize
                             + $crate::crypto::SIGNATURE_LENGTH as usize;
                 if raw.len() < min_message_size {
@@ -210,8 +214,9 @@ macro_rules! message {
             #[allow(unused_variables)]
             fn check_fields(raw_message: &$crate::messages::RawMessage)
             -> $crate::encoding::Result {
-                let latest_segment = (($body + $crate::messages::HEADER_LENGTH)
-                                        as $crate::encoding::Offset).into();
+                let header_length =
+                    $crate::messages::HEADER_LENGTH as $crate::encoding::Offset;
+                let latest_segment = ($name::__header_size() + header_length).into();
                 _ex_for_each_field!(
                     _ex_message_check_field, (latest_segment, raw_message),
                     $( ($(#[$field_attr])*, $field_name, $field_type) )*
@@ -242,6 +247,10 @@ macro_rules! message {
                 _ex_message_mk_field, (),
                 $( ($(#[$field_attr])*, $field_name, $field_type) )*
             );
+
+            fn __header_size() -> $crate::encoding::Offset {
+                _ex_header_size!($($field_type),*)
+            }
         }
 
         impl AsRef<$crate::messages::RawMessage> for $name {
@@ -370,8 +379,13 @@ macro_rules! message {
                     return Err("message_id didn't equal real message_id.".into())
                 }
 
-                let mut writer = MessageWriter::new(protocol_version, network_id,
-                                                        service_id, message_type, $body);
+                let mut writer = MessageWriter::new(
+                    protocol_version,
+                    network_id,
+                    service_id,
+                    message_type,
+                    $name::__header_size() as usize,
+                );
                 let obj = body.as_object().ok_or("Can't cast body as object.")?;
                 _ex_for_each_field!(
                     _ex_deserialize_field, (obj, writer),

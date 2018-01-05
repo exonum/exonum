@@ -16,8 +16,6 @@ use crypto::Hash;
 use messages::Precommit;
 use helpers::{Height, ValidatorId};
 
-pub const BLOCK_SIZE: usize = 112;
-
 /// Current core information schema version.
 pub const SCHEMA_MAJOR_VERSION: u16 = 0;
 
@@ -31,7 +29,7 @@ encoding_struct!(
     /// Header only contains the amount of transactions and the transactions root hash as well as
     /// other information, but not the transactions themselves.
     struct Block {
-        const SIZE = BLOCK_SIZE;
+        const SIZE = 112;
 
         /// Information schema version.
         field schema_version:         u16         [00 => 02]
