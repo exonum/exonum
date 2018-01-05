@@ -103,7 +103,10 @@ macro_rules! encoding_struct {
                     })
                 }
 
-                _ex_for_each_field!(_ex_struct_check_field, (latest_segment, vec), $( ($(#[$field_attr])*, $field_name, $field_type) )*);
+                _ex_for_each_field!(
+                    _ex_struct_check_field, (latest_segment, vec),
+                    $( ($(#[$field_attr])*, $field_name, $field_type) )*
+                );
                 Ok(latest_segment_origin)
             }
 
@@ -144,7 +147,10 @@ macro_rules! encoding_struct {
             /// Creates a new instance with given parameters.
             pub fn new($($field_name: $field_type,)*) -> $name {
                 let mut buf = vec![0; $body];
-                _ex_for_each_field!(_ex_struct_write_field, (buf), $( ($(#[$field_attr])*, $field_name, $field_type) )*);
+                _ex_for_each_field!(
+                    _ex_struct_write_field, (buf),
+                    $( ($(#[$field_attr])*, $field_name, $field_type) )*
+                );
                 $name { raw: buf }
             }
 
@@ -153,7 +159,10 @@ macro_rules! encoding_struct {
                 $crate::crypto::hash(self.raw.as_ref())
             }
 
-            _ex_for_each_field!(_ex_struct_mk_field, (), $( ($(#[$field_attr])*, $field_name, $field_type) )*);
+            _ex_for_each_field!(
+                _ex_struct_mk_field, (),
+                $( ($(#[$field_attr])*, $field_name, $field_type) )*
+            );
         }
 
         impl ::std::fmt::Debug for $name {
@@ -205,7 +214,10 @@ macro_rules! encoding_struct {
                 use $crate::encoding::serialize::json::ExonumJson as ExonumJson;
                 let mut buf = vec![0; $body];
                 let _obj = value.as_object().ok_or("Can't cast json as object.")?;
-                _ex_for_each_field!(_ex_deserialize_field, (_obj, buf), $( ($(#[$field_attr])*, $field_name, $field_type) )*);
+                _ex_for_each_field!(
+                    _ex_deserialize_field, (_obj, buf),
+                    $( ($(#[$field_attr])*, $field_name, $field_type) )*
+                );
                 Ok($name { raw: buf })
             }
         }
@@ -286,7 +298,10 @@ macro_rules! check_bounds {
 
 // Applies the given macro $m to all fields. $m should have the following signature:
 // macro_rules! foo {
-//   (($arbitrary_env), $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr) => { ... }
+//     (
+//         ($arbitrary_env),
+//         $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr
+//     ) => { ... }
 // }
 #[doc(hidden)]
 #[macro_export]
@@ -295,9 +310,12 @@ macro_rules! _ex_for_each_field {
         _ex_for_each_field!(@inner $m ($($env)*) (0); $($fields)* );
     };
 
-    (@inner $m:ident ($($env:tt)*) ($start_offset:expr); ($(#[$field_attr:meta])*, $field_name:ident, $field_type:ty) $($rest:tt)* ) => {
+    (
+        @inner $m:ident ($($env:tt)*) ($start_offset:expr);
+        ($(#[$field_attr:meta])*, $field_name:ident, $field_type:ty) $($rest:tt)*
+    ) => {
         $m!(
-            ($($env)*)
+            ($($env)*),
             $(#[$field_attr])*,
             $field_name,
             $field_type,
@@ -305,7 +323,11 @@ macro_rules! _ex_for_each_field {
             $start_offset + <$field_type as $crate::encoding::Field>::field_size()
         );
 
-        _ex_for_each_field!(@inner $m ($($env)*) ($start_offset + <$field_type as $crate::encoding::Field>::field_size()); $($rest)*);
+        _ex_for_each_field!(
+            @inner $m ($($env)*)
+            ($start_offset + <$field_type as $crate::encoding::Field>::field_size());
+            $($rest)*
+        );
     };
 
     (@inner $m:ident ($($env:tt)*) ($start_offset:expr);) => { };
@@ -314,7 +336,10 @@ macro_rules! _ex_for_each_field {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! _ex_struct_check_field {
-    (($latest_segment:ident, $vec:ident) $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr) => {
+    (
+        ($latest_segment:ident, $vec:ident),
+        $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr
+    ) => {
         let $latest_segment = <$field_type as $crate::encoding::Field>::check(
             &$vec,
             $from.into(),
@@ -327,7 +352,10 @@ macro_rules! _ex_struct_check_field {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! _ex_struct_write_field {
-    (($buf:ident) $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr) => {
+    (
+        ($buf:ident),
+        $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr
+    ) => {
         $crate::encoding::Field::write(&$field_name, &mut $buf, $from, $to);
     }
 }
@@ -335,7 +363,10 @@ macro_rules! _ex_struct_write_field {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! _ex_struct_mk_field {
-    (() $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr) => {
+    (
+        (),
+        $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr
+    ) => {
         $(#[$field_attr])*
         pub fn $field_name(&self) -> $field_type {
             use $crate::encoding::Field;
@@ -346,11 +377,13 @@ macro_rules! _ex_struct_mk_field {
     }
 }
 
-
 #[doc(hidden)]
 #[macro_export]
 macro_rules! _ex_deserialize_field {
-    (($obj:ident, $writer:ident) $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr) => {
+    (
+        ($obj:ident, $writer:ident),
+        $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr
+    ) => {
         let val = $obj.get(stringify!($field_name))
                       .ok_or("Can't get object from json.")?;
         <$field_type as ExonumJson>::deserialize_field(val, &mut $writer, $from, $to)?;
