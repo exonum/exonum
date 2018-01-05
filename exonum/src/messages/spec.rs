@@ -363,7 +363,7 @@ macro_rules! message {
                 let mut writer = MessageWriter::new(protocol_version, network_id,
                                                         service_id, message_type, $body);
                 let obj = body.as_object().ok_or("Can't cast body as object.")?;
-                _ex_for_each_field!(message_deserialize_field, (obj, writer), $( ($(#[$field_attr])*, $field_name, $field_type) )*);
+                _ex_for_each_field!(_ex_deserialize_field, (obj, writer), $( ($(#[$field_attr])*, $field_name, $field_type) )*);
                 Ok($name { raw: RawMessage::new(writer.append_signature(&signature)) })
             }
         }
@@ -429,15 +429,5 @@ macro_rules! _ex_message_check_field {
             field_to.into(),
             $latest_segment
         )?;
-    }
-}
-
-#[doc(hidden)]
-#[macro_export]
-macro_rules! message_deserialize_field {
-    (($obj:ident, $writer:ident) $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr) => {
-        let val = $obj.get(stringify!($field_name))
-                      .ok_or("Can't get object from json.")?;
-        <$field_type as ExonumJson>::deserialize_field(val, &mut $writer, $from, $to)?;
     }
 }

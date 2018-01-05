@@ -103,12 +103,7 @@ macro_rules! encoding_struct {
                     })
                 }
 
-                $(
-                let latest_segment = <$field_type as $crate::encoding::Field>::check(&vec,
-                                                                        $from.into(),
-                                                                        $to.into(),
-                                                                        latest_segment)?;
-                )*
+                _ex_for_each_field!(_ex_struct_check_field, (latest_segment, vec), $( ($(#[$field_attr])*, $field_name, $field_type) )*);
                 Ok(latest_segment_origin)
             }
 
@@ -148,10 +143,8 @@ macro_rules! encoding_struct {
 
             /// Creates a new instance with given parameters.
             pub fn new($($field_name: $field_type,)*) -> $name {
-
-                check_bounds!($body, $($field_name : $field_type [$from => $to],)*);
                 let mut buf = vec![0; $body];
-                $($crate::encoding::Field::write(&$field_name, &mut buf, $from, $to);)*
+                _ex_for_each_field!(_ex_struct_write_field, (buf), $( ($(#[$field_attr])*, $field_name, $field_type) )*);
                 $name { raw: buf }
             }
 
@@ -160,14 +153,7 @@ macro_rules! encoding_struct {
                 $crate::crypto::hash(self.raw.as_ref())
             }
 
-            $(
-            $(#[$field_attr])*
-            pub fn $field_name(&self) -> $field_type {
-                use $crate::encoding::Field;
-                unsafe {
-                    Field::read(&self.raw, $from, $to)
-                }
-            })*
+            _ex_for_each_field!(_ex_struct_mk_field, (), $( ($(#[$field_attr])*, $field_name, $field_type) )*);
         }
 
         impl ::std::fmt::Debug for $name {
@@ -219,12 +205,7 @@ macro_rules! encoding_struct {
                 use $crate::encoding::serialize::json::ExonumJson as ExonumJson;
                 let mut buf = vec![0; $body];
                 let _obj = value.as_object().ok_or("Can't cast json as object.")?;
-                $(
-                    let val = _obj.get(stringify!($field_name))
-                                    .ok_or("Can't get object from json.")?;
-                    <$field_type as ExonumJson>::deserialize_field(val,
-                                                                    &mut buf, $from, $to )?;
-                )*
+                _ex_for_each_field!(_ex_deserialize_field, (_obj, buf), $( ($(#[$field_attr])*, $field_name, $field_type) )*);
                 Ok($name { raw: buf })
             }
         }
@@ -328,4 +309,50 @@ macro_rules! _ex_for_each_field {
     };
 
     (@inner $m:ident ($($env:tt)*) ($start_offset:expr);) => { };
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! _ex_struct_check_field {
+    (($latest_segment:ident, $vec:ident) $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr) => {
+        let $latest_segment = <$field_type as $crate::encoding::Field>::check(
+            &$vec,
+            $from.into(),
+            $to.into(),
+            $latest_segment,
+        )?;
+    }
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! _ex_struct_write_field {
+    (($buf:ident) $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr) => {
+        $crate::encoding::Field::write(&$field_name, &mut $buf, $from, $to);
+    }
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! _ex_struct_mk_field {
+    (() $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr) => {
+        $(#[$field_attr])*
+        pub fn $field_name(&self) -> $field_type {
+            use $crate::encoding::Field;
+            unsafe {
+                Field::read(&self.raw, $from, $to)
+            }
+        }
+    }
+}
+
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! _ex_deserialize_field {
+    (($obj:ident, $writer:ident) $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr) => {
+        let val = $obj.get(stringify!($field_name))
+                      .ok_or("Can't get object from json.")?;
+        <$field_type as ExonumJson>::deserialize_field(val, &mut $writer, $from, $to)?;
+    }
 }
