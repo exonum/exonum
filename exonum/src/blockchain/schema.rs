@@ -17,7 +17,7 @@ use messages::{Precommit, RawMessage, Connect};
 use storage::{Fork, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex, Snapshot,
               StorageKey, StorageValue};
 use helpers::Height;
-use super::{Block, BlockProof, Blockchain, TransactionStatus};
+use super::{Block, BlockProof, Blockchain, TransactionResult};
 use super::config::StoredConfiguration;
 
 /// Defines `&str` constants with given name and value.
@@ -33,7 +33,7 @@ macro_rules! define_names {
 
 define_names!(
     TRANSACTIONS => "transactions";
-    TRANSACTIONS_STATUS => "transactions_status";
+    TRANSACTIONS_RESULT => "transactions_result";
     TX_LOCATION_BY_TX_HASH => "tx_location_by_tx_hash";
     BLOCKS => "blocks";
     BLOCK_HASHES_BY_HEIGHT => "block_hashes_by_height";
@@ -93,9 +93,9 @@ where
         MapIndex::new(TRANSACTIONS, &self.view)
     }
 
-    /// Returns table that represents a map from transaction hash into execution status.
-    pub fn transactions_status(&self) -> MapIndex<&T, Hash, TransactionStatus> {
-        MapIndex::new(TRANSACTIONS_STATUS, &self.view)
+    /// Returns table that represents a map from transaction hash into execution result.
+    pub fn transaction_results(&self) -> MapIndex<&T, Hash, TransactionResult> {
+        MapIndex::new(TRANSACTIONS_RESULT, &self.view)
     }
 
     /// Returns table that keeps the block height and tx position inside block for every
@@ -335,11 +335,11 @@ impl<'a> Schema<&'a mut Fork> {
         MapIndex::new(TRANSACTIONS, &mut self.view)
     }
 
-    /// Mutable reference to the [`transactions_status`][1] index.
+    /// Mutable reference to the [`transaction_results`][1] index.
     ///
-    /// [1]: struct.Schema.html#method.transactions_status
-    pub fn transactions_status_mut(&mut self) -> MapIndex<&mut Fork, Hash, TransactionStatus> {
-        MapIndex::new(TRANSACTIONS_STATUS, &mut self.view)
+    /// [1]: struct.Schema.html#method.transaction_results
+    pub fn transaction_results_mut(&mut self) -> MapIndex<&mut Fork, Hash, TransactionResult> {
+        MapIndex::new(TRANSACTIONS_RESULT, &mut self.view)
     }
 
     /// Mutable reference to the [`tx_location_by_tx_hash`][1] index.

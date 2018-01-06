@@ -25,15 +25,15 @@ use encoding::serialize::json::ExonumJson;
 // - `0...255` - special values such as `TransactionValue::Success` or `TransactionError::Panic`.
 // - `256...511` - `TransactionValue::Code`.
 // - `512...767` - `TransactionError::Code`.
-static MIN_SUCCESS: u16 = 256;
-static MAX_SUCCESS: u16 = 511;
-static MIN_ERROR: u16 = 512;
-static MAX_ERROR: u16 = 767;
+const MIN_SUCCESS: u16 = 256;
+const MAX_SUCCESS: u16 = 511;
+const MIN_ERROR: u16 = 512;
+const MAX_ERROR: u16 = 767;
 
 // Special reserved values.
-static TRANSACTION_SUCCESS: u16 = 0;
-static TRANSACTION_PANIC: u16 = 1;
-static TRANSACTION_FAILURE: u16 = 2;
+const TRANSACTION_SUCCESS: u16 = 0;
+const TRANSACTION_PANIC: u16 = 1;
+const TRANSACTION_FAILURE: u16 = 2;
 
 /// Result of the `Transaction`'s `execute' method.
 pub type TransactionResult = Result<TransactionValue, TransactionError>;
@@ -144,7 +144,7 @@ pub enum TransactionValue {
 
 /// Result of unsuccessful transaction execution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum TransactionError {
+pub enum TransactionError {
     /// Panic occurred during transaction execution. This status should not be used explicitly.
     Panic,
     /// General failure (unspecified reason).
@@ -175,7 +175,7 @@ impl StorageValue for TransactionResult {
 }
 
 fn from_result(result: TransactionResult) -> u16 {
-    match status {
+    match result {
         Ok(val) => {
             match val {
                 TransactionValue::Success => TRANSACTION_SUCCESS,
@@ -227,7 +227,7 @@ mod tests {
 
         for status in &statuses {
             let bytes = status.clone().into_bytes();
-            let new_status = TransactionStatus::from_bytes(Cow::Borrowed(&bytes));
+            let new_status = TransactionResult::from_bytes(Cow::Borrowed(&bytes));
 
             assert_eq!(*status, new_status);
         }

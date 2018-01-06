@@ -763,7 +763,7 @@ pub fn timestamping_sandbox() -> Sandbox {
 
 #[cfg(test)]
 mod tests {
-    use exonum::blockchain::{ServiceContext, TransactionStatus};
+    use exonum::blockchain::{ServiceContext, TransactionResult, TransactionValue};
     use exonum::messages::RawTransaction;
     use exonum::encoding;
     use exonum::crypto::{gen_keypair_from_seed, Seed};
@@ -798,8 +798,8 @@ mod tests {
             true
         }
 
-        fn execute(&self, _: &mut Fork) -> TransactionStatus {
-            TransactionStatus::Succeeded
+        fn execute(&self, _: &mut Fork) -> TransactionResult {
+            Ok(TransactionValue::Success)
         }
     }
 

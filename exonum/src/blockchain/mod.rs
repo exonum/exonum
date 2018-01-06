@@ -52,7 +52,7 @@ pub use self::schema::{gen_prefix, Schema, TxLocation};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
 pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState};
-pub use self::transaction::{Transaction, TransactionResult};
+pub use self::transaction::{Transaction, TransactionResult, TransactionValue, TransactionError};
 
 mod block;
 mod schema;
@@ -267,13 +267,13 @@ impl Blockchain {
                         }
                         fork.rollback();
                         error!("{:?} transaction execution failed: {:?}", tx, err);
-                        TransactionStatus::Panic
+                        Err(TransactionError::Panic)
                     }
                 };
 
                 let mut schema = Schema::new(&mut fork);
                 schema.transactions_mut().put(hash, tx.raw().clone());
-                schema.transactions_status_mut().put(
+                schema.transaction_results_mut().put(
                     hash,
                     transaction_status,
                 );
