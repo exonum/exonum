@@ -165,18 +165,18 @@ use exonum::messages::{Message, Precommit, Propose};
 use exonum::node::{ApiSender, ExternalMessage, State as NodeState, TransactionSend, TxPool};
 use exonum::storage::{MemoryDB, Snapshot};
 
+pub mod compare;
+
+mod checkpoint_db;
+mod handler;
 #[macro_use]
 mod macros;
-mod checkpoint_db;
-pub mod compare;
-mod greedy_fold;
-mod handler;
+mod take_while_ready;
 
-#[doc(hidden)]
-pub use greedy_fold::GreedilyFoldable;
 pub use compare::ComparableSnapshot;
 
 use checkpoint_db::{CheckpointDb, CheckpointDbHandler};
+use take_while_ready::TakeWhileReady;
 use handler::create_testkit_handler;
 
 /// Emulated test network.
@@ -617,9 +617,10 @@ impl TestKit {
 
     /// Polls the *existing* events from the event loop until exhaustion. Does not wait
     /// until new events arrive.
-    pub fn poll_events(&mut self) -> Option<Result<(), ()>> {
-        let mut spawn = executor::spawn(self.events_stream.by_ref().greedy_fold((), |_, _| {}));
-        spawn.wait_stream()
+    pub fn poll_events(&mut self) {
+        let events = TakeWhileReady::new(self.events_stream.by_ref()).for_each(|_| Ok(()));
+        let mut spawn = executor::spawn(events);
+        spawn.wait_future().expect("Error polling testkit events");
     }
 
     /// Returns a snapshot of the current blockchain state.
