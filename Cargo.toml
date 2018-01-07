@@ -12,18 +12,14 @@ categories = ["cryptography", "date-and-time"]
 description = "The time oracle service for Exonum."
 
 [dependencies]
-exonum = "0.3.0"
-iron = "0.5.1"
-bodyparser = "0.7.0"
-router = "0.5.1"
-serde = "1.0.10"
-serde_json = "1.0.2"
-serde_derive = "1.0.10"
+exonum = "0.4.0"
+iron = "0.6.0"
+bodyparser = "0.8.0"
+router = "0.6.0"
+serde = "1.0"
+serde_json = "1.0"
+serde_derive = "1.0"
 pretty_assertions = "0.4.0"
 
-[dev-dependencies.exonum-testkit]
-git = "https://github.com/alekseysidorov/exonum-testkit"
-rev = "6b22c464efceaa5deb15ecb2eb40a3fca24e97f4"
-
-[patch.crates-io]
-exonum = { git = "https://github.com/exonum/exonum", rev = "adb1a9ab47a356b6efb3ef73755f981f6fd0af9a" }
+[dev-dependencies]
+exonum-testkit = "0.1.1"

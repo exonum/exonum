@@ -32,7 +32,7 @@ use std::time::SystemTime;
 use std::collections::HashMap;
 
 use exonum::blockchain::{Blockchain, Service, ServiceContext, Schema, Transaction, ApiContext};
-use exonum::messages::{RawTransaction, FromRaw, Message};
+use exonum::messages::{RawTransaction, Message};
 use exonum::encoding::serialize::json::reexport::Value;
 use exonum::storage::{Fork, Snapshot, MapIndex, Entry};
 use exonum::crypto::PublicKey;
