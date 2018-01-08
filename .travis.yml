@@ -106,7 +106,7 @@ script: |
       cd sandbox && cargo clippy --verbose -- -D warnings
   ;;
   "test-core" )
-      cargo test --manifest-path exonum/Cargo.toml --verbose --tests --lib
+      cargo test --manifest-path exonum/Cargo.toml --verbose --tests --lib --features "float_serialize"
   ;;
   "test-sandbox" )
       cargo test --manifest-path sandbox/Cargo.toml  --verbose
