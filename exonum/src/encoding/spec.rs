@@ -304,6 +304,7 @@ macro_rules! check_bounds {
 #[macro_export]
 macro_rules! __ex_header_size {
     ( $($field_type:ty),* ) => {{
+        #[allow(unused_mut)]
         let mut acc = 0;
         $(
             acc += <$field_type as $crate::encoding::Field>::field_size();
