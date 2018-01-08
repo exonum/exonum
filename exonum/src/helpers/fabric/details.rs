@@ -445,7 +445,6 @@ impl Command for Finalize {
                     ..Default::default()
                 },
                 mempool: Default::default(),
-                services_configs: Default::default(),
             }
         };
 

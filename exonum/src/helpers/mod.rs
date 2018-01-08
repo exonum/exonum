@@ -83,7 +83,6 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
                 whitelist: Default::default(),
                 api: Default::default(),
                 mempool: Default::default(),
-                services_configs: Default::default(),
             }
         })
         .collect::<Vec<_>>()
