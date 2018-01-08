@@ -139,10 +139,10 @@ macro_rules! message {
                 let mut writer = MessageWriter::new(
                     $crate::messages::PROTOCOL_MAJOR_VERSION,
                     $crate::messages::TEST_NETWORK_ID,
-                    $extension, $id, $name::__header_size() as usize,
+                    $extension, $id, $name::__ex_header_size() as usize,
                 );
-                _ex_for_each_field!(
-                    _ex_message_write_field, (writer),
+                __ex_for_each_field!(
+                    __ex_message_write_field, (writer),
                     $( ($(#[$field_attr])*, $field_name, $field_type) )*
                 );
                 $name { raw: RawMessage::new(writer.sign(secret_key)) }
@@ -157,10 +157,10 @@ macro_rules! message {
                 let mut writer = MessageWriter::new(
                     $crate::messages::PROTOCOL_MAJOR_VERSION,
                     $crate::messages::TEST_NETWORK_ID,
-                    $extension, $id, $name::__header_size() as usize,
+                    $extension, $id, $name::__ex_header_size() as usize,
                 );
-                _ex_for_each_field!(
-                    _ex_message_write_field, (writer),
+                __ex_for_each_field!(
+                    __ex_message_write_field, (writer),
                     $( ($(#[$field_attr])*, $field_name, $field_type) )*
                 );
                 $name { raw: RawMessage::new(writer.append_signature(signature)) }
@@ -169,7 +169,7 @@ macro_rules! message {
             /// Converts the raw message into the specific one.
             pub fn from_raw(raw: $crate::messages::RawMessage)
                 -> Result<$name, $crate::encoding::Error> {
-                let min_message_size = $name::__header_size() as usize
+                let min_message_size = $name::__ex_header_size() as usize
                             + $crate::messages::HEADER_LENGTH as usize
                             + $crate::crypto::SIGNATURE_LENGTH as usize;
                 if raw.len() < min_message_size {
@@ -216,9 +216,9 @@ macro_rules! message {
             -> $crate::encoding::Result {
                 let header_length =
                     $crate::messages::HEADER_LENGTH as $crate::encoding::Offset;
-                let latest_segment = ($name::__header_size() + header_length).into();
-                _ex_for_each_field!(
-                    _ex_message_check_field, (latest_segment, raw_message),
+                let latest_segment = ($name::__ex_header_size() + header_length).into();
+                __ex_for_each_field!(
+                    __ex_message_check_field, (latest_segment, raw_message),
                     $( ($(#[$field_attr])*, $field_name, $field_type) )*
                 );
                 Ok(latest_segment)
@@ -243,13 +243,14 @@ macro_rules! message {
                 $crate::encoding::serialize::encode_hex(self.as_ref())
             }
 
-            _ex_for_each_field!(
-                _ex_message_mk_field, (),
+            __ex_for_each_field!(
+                __ex_message_mk_field, (),
                 $( ($(#[$field_attr])*, $field_name, $field_type) )*
             );
 
-            fn __header_size() -> $crate::encoding::Offset {
-                _ex_header_size!($($field_type),*)
+            #[doc(hidden)]
+            fn __ex_header_size() -> $crate::encoding::Offset {
+                __ex_header_size!($($field_type),*)
             }
         }
 
@@ -384,11 +385,11 @@ macro_rules! message {
                     network_id,
                     service_id,
                     message_type,
-                    $name::__header_size() as usize,
+                    $name::__ex_header_size() as usize,
                 );
                 let obj = body.as_object().ok_or("Can't cast body as object.")?;
-                _ex_for_each_field!(
-                    _ex_deserialize_field, (obj, writer),
+                __ex_for_each_field!(
+                    __ex_deserialize_field, (obj, writer),
                     $( ($(#[$field_attr])*, $field_name, $field_type) )*
                 );
                 Ok($name { raw: RawMessage::new(writer.append_signature(&signature)) })
@@ -428,7 +429,7 @@ macro_rules! message {
 
 #[doc(hidden)]
 #[macro_export]
-macro_rules! _ex_message_mk_field {
+macro_rules! __ex_message_mk_field {
     (
         (),
         $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr
@@ -442,7 +443,7 @@ macro_rules! _ex_message_mk_field {
 
 #[doc(hidden)]
 #[macro_export]
-macro_rules! _ex_message_write_field {
+macro_rules! __ex_message_write_field {
     (
         ($writer:ident),
         $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr
@@ -453,7 +454,7 @@ macro_rules! _ex_message_write_field {
 
 #[doc(hidden)]
 #[macro_export]
-macro_rules! _ex_message_check_field {
+macro_rules! __ex_message_check_field {
     (
         ($latest_segment:ident, $raw_message:ident),
         $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr
