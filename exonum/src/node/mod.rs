@@ -21,11 +21,9 @@ use std::sync::Arc;
 use std::thread;
 use std::net::SocketAddr;
 use std::time::{Duration, SystemTime};
-use std::collections::BTreeMap;
 use std::collections::HashSet;
 use std::fmt;
 
-use toml::Value;
 use router::Router;
 use mount::Mount;
 use iron::{Chain, Iron};
@@ -227,8 +225,6 @@ pub struct NodeConfig {
     pub api: NodeApiConfig,
     /// Memory pool configuration.
     pub mempool: MemoryPoolConfig,
-    /// Additional config, usable for services.
-    pub services_configs: BTreeMap<String, Value>,
 }
 
 /// Configuration for the `NodeHandler`.

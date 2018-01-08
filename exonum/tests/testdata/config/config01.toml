@@ -39,8 +39,6 @@ tcp_nodelay = true
 tcp_connect_retry_timeout = 15000
 tcp_connect_max_retries = 10
 
-[services_configs]
-
 [whitelist]
 whitelist_enabled = false
 whitelisted_peers = []
