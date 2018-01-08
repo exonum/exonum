@@ -537,7 +537,7 @@ impl ApiSender {
         ApiSender(inner)
     }
 
-    /// Addr peer to peer list
+    /// Add peer to peer list
     pub fn peer_add(&self, addr: SocketAddr) -> io::Result<()> {
         let msg = ExternalMessage::PeerAdd(addr);
         self.0.clone().send(msg).wait().map(drop).map_err(
