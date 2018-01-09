@@ -159,8 +159,8 @@ impl Transaction for TxTime {
         }
 
         // The largest number of Byzantine nodes.
-        let max_byzantine_nodes = validator_keys.len() / 3;
-        if validators_time.len() <= max_byzantine_nodes {
+        let max_byzantine_nodes = (validator_keys.len() - 1) / 3;
+        if validators_time.len() <= 2 * max_byzantine_nodes {
             return;
         }
         // Ordering time from highest to lowest.
