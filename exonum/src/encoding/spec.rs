@@ -15,9 +15,7 @@
 /// `encoding_struct!` implement structure that could be saved in blockchain.
 ///
 /// Storage value unlike message, could be mapped on buffers without any checks.
-/// For now it's required to set `encoding_struct` fixed part size as `const SIZE`.
 ///
-/// For each field, it's required to set exact position in `encoding_struct`.
 /// # Usage Example:
 /// ```
 /// #[macro_use] extern crate exonum;
@@ -26,10 +24,9 @@
 ///
 /// encoding_struct! {
 ///     struct SaveTwoInteger {
-///         const SIZE = 16;
 ///
-///         field first: u64 [0 => 8]
-///         field second: u64 [8 => 16]
+///         first: u64,
+///         second: u64,
 ///     }
 /// }
 /// # fn main() {
@@ -43,7 +40,8 @@
 /// For additional reference about data layout see also
 /// *[ `encoding` documentation](./encoding/index.html).*
 ///
-/// `encoding_struct!` internaly use `ident_count!`, be sure to add this macro to namespace.
+/// `encoding_struct!` internally uses other exonum macros,
+/// be sure to add them all to namespace.
 #[macro_export]
 macro_rules! encoding_struct {
     (

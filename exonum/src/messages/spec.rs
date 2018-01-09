@@ -15,13 +15,12 @@
 /// `message!` implement structure that could be sent in exonum network.
 ///
 /// Each message is a piece of data that is signed by creators key.
-/// For now it's required to set service id as `const TYPE`, message id as `const ID`, and
-/// message fixed part size as `const SIZE`.
+/// For now it's required to set service id as `const TYPE`,
+/// and message id as `const ID`.
 ///
 /// - service id should be unique inside whole exonum.
 /// - message id should be unique inside each service.
 ///
-/// For each field, it's required to set exact position in message.
 /// # Usage Example:
 /// ```
 /// #[macro_use] extern crate exonum;
@@ -34,10 +33,9 @@
 ///     struct SendTwoInteger {
 ///         const TYPE = MY_NEW_MESSAGE_ID;
 ///         const ID   = MY_SERVICE_ID;
-///         const SIZE = 16;
 ///
-///         field first: u64 [0 => 8]
-///         field second: u64 [8 => 16]
+///         first: u64,
+///         second: u64,
 ///     }
 /// }
 ///
@@ -57,7 +55,8 @@
 /// For additionall reference about data layout see also
 /// *[ `encoding` documentation](./encoding/index.html).*
 ///
-/// `message!` internaly use `ident_count!`, be sure to add this macro to namespace.
+/// `message!` internally uses other exonum macros,
+/// be sure to add them all to namespace.
 #[macro_export]
 macro_rules! message {
     (
