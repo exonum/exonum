@@ -49,12 +49,11 @@ macro_rules! encoding_struct {
     (
     $(#[$attr:meta])*
     struct $name:ident {
-        const SIZE = $body:expr;
-
         $(
         $(#[$field_attr:meta])*
-        field $field_name:ident : $field_type:ty [$from:expr => $to:expr]
-        )*
+        $field_name:ident : $field_type:ty
+        ),*
+        $(,)*
     }) => (
         #[derive(Clone, PartialEq)]
         $(#[$attr])*

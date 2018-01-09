@@ -29,23 +29,21 @@ encoding_struct!(
     /// Header only contains the amount of transactions and the transactions root hash as well as
     /// other information, but not the transactions themselves.
     struct Block {
-        const SIZE = 112;
-
         /// Information schema version.
-        field schema_version:         u16         [00 => 02]
+        schema_version: u16,
         /// Block proposer id.
-        field proposer_id:            ValidatorId [02 => 04]
+        proposer_id: ValidatorId,
         /// Height of the committed block
-        field height:                 Height      [04 => 12]
+        height: Height,
         /// Number of transactions in block.
-        field tx_count:               u32         [12 => 16]
+        tx_count: u32,
         /// Hash link to the previous block in blockchain.
-        field prev_hash:              &Hash       [16 => 48]
+        prev_hash: &Hash,
         /// Root hash of [merkle tree](struct.Schema.html#method.block_txs) of current block
         /// transactions.
-        field tx_hash:                &Hash       [48 => 80]
+        tx_hash: &Hash,
         /// Hash of the current `exonum` state after applying transactions in the block.
-        field state_hash:             &Hash       [80 => 112]
+        state_hash: &Hash,
     }
 );
 

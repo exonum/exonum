@@ -27,11 +27,10 @@ message! {
     struct TxConfig {
         const TYPE = CONFIG_SERVICE;
         const ID = CONFIG_PROPOSE_MESSAGE_ID;
-        const SIZE = 48;
 
-        field from:               &PublicKey  [00 => 32]
-        field config:             &[u8]       [32 => 40]
-        field actual_from:        Height      [40 => 48]
+        from: &PublicKey,
+        config: &[u8],
+        actual_from: Height,
     }
 }
 

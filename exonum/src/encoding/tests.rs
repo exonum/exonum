@@ -35,15 +35,13 @@ mod ignore_new {
     use crypto::Hash;
     encoding_struct! {
         struct Parent {
-            const SIZE = 8;
-            field child: Child [0 => 8]
+            child: Child,
         }
     }
 
     encoding_struct! {
         struct Child {
-            const SIZE = 32;
-            field child: &Hash [0 => 32]
+            child: &Hash,
         }
     }
 }
@@ -491,37 +489,33 @@ fn test_request_block() {
 fn test_correct_encoding_struct() {
     encoding_struct! {
         struct NoFields {
-            const SIZE = 0;
         }
     }
     drop(NoFields::new());
 
     encoding_struct! {
         struct OneField {
-            const SIZE = 8;
 
-            field one:   u64 [00 => 08]
+            one: u64,
         }
     }
     drop(OneField::new(0));
 
     encoding_struct! {
         struct TwoFields {
-            const SIZE = 8;
 
-            field one:   u32 [00 => 04]
-            field two:   u32 [04 => 08]
+            one: u32,
+            two: u32,
         }
     }
     drop(TwoFields::new(0, 0));
 
     encoding_struct! {
         struct ThreeFields {
-            const SIZE = 8;
 
-            field one:   u16 [00 => 02]
-            field two:   u16 [02 => 04]
-            field three: u32 [04 => 08]
+            one: u16,
+            two: u16,
+            three: u32,
         }
     }
     drop(ThreeFields::new(0, 0, 0));

@@ -65,12 +65,12 @@ macro_rules! message {
     struct $name:ident {
         const TYPE = $extension:expr;
         const ID = $id:expr;
-        const SIZE = $body:expr;
 
         $(
         $(#[$field_attr:meta])*
-        field $field_name:ident : $field_type:ty [$from:expr => $to:expr]
-        )*
+        $field_name:ident : $field_type:ty
+        ),*
+        $(,)*
     }) => (
         #[derive(Clone, PartialEq)]
         $(#[$attr])*
