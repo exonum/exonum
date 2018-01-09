@@ -18,7 +18,7 @@ matrix:
     - env: FEATURE=non-fatal-checks
   fast_finish: true
   include:
-    - rust: nightly-2017-11-05
+    - rust: nightly-2017-12-11
       env: FEATURE=clippy
 
 cache:
@@ -32,7 +32,7 @@ sudo: required
 
 env:
   global:
-  - CLIPPY_VERS=0.0.169
+  - CLIPPY_VERS=0.0.175
   - RUSTFMT_VERS=0.9.0
   - DEADLINKS_VERS=0.3.0
   - SODIUM_VERS=1.0.13
