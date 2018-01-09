@@ -29,7 +29,6 @@ use iron::Handler;
 use router::Router;
 
 use std::time::SystemTime;
-use std::collections::HashMap;
 
 use exonum::blockchain::{Blockchain, Service, ServiceContext, Schema, Transaction, ApiContext};
 use exonum::messages::{RawTransaction, Message};
@@ -188,6 +187,18 @@ struct TimeApi {
     blockchain: Blockchain,
 }
 
+encoding_struct! {
+    /// Structure for saving validator's public key and last known local time.
+    struct ValidatorTime {
+        const SIZE = 44;
+
+        /// Validator's public key.
+        field public_key:     &PublicKey      [00 => 32]
+        /// Validator's time.
+        field time:           SystemTime      [32 => 44]
+    }
+}
+
 /// Shortcut to get data from storage.
 impl TimeApi {
     /// Endpoint for getting value of the time that is saved in storage.
@@ -204,14 +215,13 @@ impl TimeApi {
         let schema = TimeSchema::new(&view);
         let idx = schema.validators_time();
 
-        let validators_time: HashMap<_, _> = idx.iter().collect();
+        let validators_time: Vec<_> = idx.iter()
+            .map(|(public_key, time)| {
+                ValidatorTime::new(&public_key, time.time())
+            })
+            .collect();
 
-        if validators_time.is_empty() {
-            self.not_found_response(&serde_json::to_value("Validators time database is empty")
-                .unwrap())
-        } else {
-            self.ok_response(&serde_json::to_value(validators_time).unwrap())
-        }
+        self.ok_response(&serde_json::to_value(validators_time).unwrap())
     }
 
     fn wire_private(&self, router: &mut Router) {
