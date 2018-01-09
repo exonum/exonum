@@ -17,6 +17,8 @@
 #![deny(missing_debug_implementations, missing_docs)]
 
 extern crate serde;
+#[macro_use]
+extern crate serde_derive;
 extern crate serde_json;
 #[macro_use]
 extern crate exonum;
@@ -187,16 +189,13 @@ struct TimeApi {
     blockchain: Blockchain,
 }
 
-encoding_struct! {
-    /// Structure for saving validator's public key and last known local time.
-    struct ValidatorTime {
-        const SIZE = 44;
-
-        /// Validator's public key.
-        field public_key:     &PublicKey      [00 => 32]
-        /// Validator's time.
-        field time:           SystemTime      [32 => 44]
-    }
+/// Structure for saving validator's public key and last known local time.
+#[derive(Serialize)]
+struct ValidatorTime {
+    /// Validator's public key.
+    public_key: PublicKey,
+    /// Validator's time.
+    time: SystemTime,
 }
 
 /// Shortcut to get data from storage.
@@ -217,7 +216,10 @@ impl TimeApi {
 
         let validators_time: Vec<_> = idx.iter()
             .map(|(public_key, time)| {
-                ValidatorTime::new(&public_key, time.time())
+                ValidatorTime {
+                    public_key,
+                    time: time.time(),
+                }
             })
             .collect();
 
