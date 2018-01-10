@@ -241,7 +241,7 @@ impl StorageKey for DBKey {
             let right = (self.to as usize + 7) / 8;
             buffer[1..right + 1].copy_from_slice(&self.data[0..right]);
             if self.to % 8 != 0 {
-                buffer[right] &= !(255u8 >> (self.to % 8));
+                buffer[right] &= !(255u8 << (self.to % 8));
             }
             for i in buffer.iter_mut().take(KEY_SIZE + 1).skip(right + 1) {
                 *i = 0

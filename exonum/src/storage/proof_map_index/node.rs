@@ -74,8 +74,17 @@ impl BranchNode {
     }
 
     pub fn set_child(&mut self, kind: ChildKind, prefix: &DBKey, hash: &Hash) {
+        trace!("set_child, kind: {:?}, key: {:?}", kind, prefix);
+        let mut buf = vec![0; 34];
+        prefix.write(&mut buf);
+        let prefix2 = DBKey::read(&buf);
+        trace!("buf {:?}", buf);
+        trace!("read_child {:?}", prefix2);
+
+        trace!("before={:#?}", self);
         self.set_child_slice(kind, prefix);
         self.set_child_hash(kind, hash);
+        trace!("after={:#?}", self);
     }
 }
 
@@ -103,4 +112,23 @@ impl ::std::fmt::Debug for BranchNode {
             .field("hash", &self.hash())
             .finish()
     }
+}
+
+#[test]
+fn test_branch_node() {
+    let _ = ::helpers::init_logger();
+    let mut branch = BranchNode::empty();
+
+    let lh = hash(&[1, 2]);
+    let rh = hash(&[3, 4]);
+    let ls = DBKey::leaf(&[253; 32]);
+    let rs = DBKey::leaf(&[244; 32]);
+
+    branch.set_child(ChildKind::Left, &ls, &lh);
+    branch.set_child(ChildKind::Right, &rs, &rh);
+
+    assert_eq!(branch.child_hash(ChildKind::Left), &lh);
+    assert_eq!(branch.child_hash(ChildKind::Right), &rh);
+    assert_eq!(branch.child_slice(ChildKind::Left), ls);
+    assert_eq!(branch.child_slice(ChildKind::Right), rs);
 }
