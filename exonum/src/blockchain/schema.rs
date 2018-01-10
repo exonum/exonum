@@ -30,22 +30,20 @@ pub fn gen_prefix<K: StorageKey>(prefix: &K) -> Vec<u8> {
 encoding_struct! (
     /// Configuration index.
     struct ConfigReference {
-        const SIZE = 40;
         /// The height, starting from which this configuration becomes actual.
-        field actual_from: Height [00 => 08]
+        actual_from: Height,
         /// Hash of the configuration contents that serialized as raw bytes vec.
-        field cfg_hash:    &Hash  [08 => 40]
+        cfg_hash: &Hash,
     }
 );
 
 encoding_struct! (
     /// Transaction location in block.
     struct TxLocation {
-        const SIZE = 16;
         /// Height of block in the blockchain.
-        field block_height:         Height  [00 => 08]
+        block_height: Height,
         /// Index in block.
-        field position_in_block:    u64     [08 => 16]
+        position_in_block: u64,
     }
 );
 

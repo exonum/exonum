@@ -28,12 +28,6 @@
 //! - First one is `String`
 //! - second one is `u64`
 //!
-//! To create message for this structure now, you need to know how many bytes this fields
-//! took in header. See [Fields layout](#fields-layout).
-//!
-//! We know that `u64` [took 8 bytes](#primitive-types),
-//! and string took [8 segment bytes](#segment-fields).
-//!
 //! Then to create, for example [storage value](../macro.encoding_struct.html),
 //! you need to use macros like this:
 //!
@@ -43,10 +37,8 @@
 //! # extern crate serde_json;
 //! encoding_struct! {
 //!     struct MyAwesomeStructure {
-//!         const SIZE = 16;
-//!
-//!         field name: &str [0 => 8]
-//!         field age:  u64  [8 => 16]
+//!         name: &str,
+//!         age: u64,
 //!     }
 //! }
 //! // now if we create it in memory

@@ -78,14 +78,13 @@ message! {
     struct Connect {
         const TYPE = CONSENSUS;
         const ID = CONNECT_MESSAGE_ID;
-        const SIZE = 50;
 
         /// The sender's public key.
-        field pub_key:        &PublicKey  [00 => 32]
+        pub_key: &PublicKey,
         /// The node's address.
-        field addr:           SocketAddr  [32 => 38]
+        addr: SocketAddr,
         /// Time when the message was created.
-        field time:           SystemTime  [38 => 50]
+        time: SystemTime,
     }
 }
 
@@ -109,18 +108,17 @@ message! {
     struct Propose {
         const TYPE = CONSENSUS;
         const ID = PROPOSE_MESSAGE_ID;
-        const SIZE = 54;
 
         /// The validator id.
-        field validator:      ValidatorId [00 => 02]
+        validator: ValidatorId,
         /// The height to which the message is related.
-        field height:         Height      [02 => 10]
+        height: Height,
         /// The round to which the message is related.
-        field round:          Round       [10 => 14]
+        round: Round,
         /// Hash of the previous block.
-        field prev_hash:      &Hash       [14 => 46]
+        prev_hash: &Hash,
         /// The list of transactions to include in the next block.
-        field transactions:   &[Hash]     [46 => 54]
+        transactions: &[Hash],
     }
 }
 
@@ -144,18 +142,17 @@ message! {
     struct Prevote {
         const TYPE = CONSENSUS;
         const ID = PREVOTE_MESSAGE_ID;
-        const SIZE = 50;
 
         /// The validator id.
-        field validator:      ValidatorId [00 => 02]
+        validator: ValidatorId,
         /// The height to which the message is related.
-        field height:         Height      [02 => 10]
+        height: Height,
         /// The round to which the message is related.
-        field round:          Round       [10 => 14]
+        round: Round,
         /// Hash of the corresponding `Propose`.
-        field propose_hash:   &Hash       [14 => 46]
+        propose_hash: &Hash,
         /// Locked round.
-        field locked_round:   Round       [46 => 50]
+        locked_round: Round,
     }
 }
 
@@ -180,20 +177,19 @@ message! {
     struct Precommit {
         const TYPE = CONSENSUS;
         const ID = PRECOMMIT_MESSAGE_ID;
-        const SIZE = 90;
 
         /// The validator id.
-        field validator:      ValidatorId [00 => 02]
+        validator: ValidatorId,
         /// The height to which the message is related.
-        field height:         Height      [02 => 10]
+        height: Height,
         /// The round to which the message is related.
-        field round:          Round       [10 => 14]
+        round: Round,
         /// Hash of the corresponding `Propose`.
-        field propose_hash:   &Hash       [14 => 46]
+        propose_hash: &Hash,
         /// Hash of the new block.
-        field block_hash:     &Hash       [46 => 78]
+        block_hash: &Hash,
         /// Time of the `Precommit`.
-        field time:           SystemTime  [78 => 90]
+        time: SystemTime,
     }
 }
 
@@ -215,14 +211,13 @@ message! {
     struct Status {
         const TYPE = CONSENSUS;
         const ID = STATUS_MESSAGE_ID;
-        const SIZE = 72;
 
         /// The sender's public key.
-        field from:           &PublicKey          [00 => 32]
+        from: &PublicKey,
         /// The height to which the message is related.
-        field height:         Height              [32 => 40]
+        height: Height,
         /// Hash of the last committed block.
-        field last_hash:      &Hash               [40 => 72]
+        last_hash: &Hash,
     }
 }
 
@@ -242,18 +237,17 @@ message! {
     struct BlockResponse {
         const TYPE = CONSENSUS;
         const ID = BLOCK_RESPONSE_MESSAGE_ID;
-        const SIZE = 88;
 
         /// The sender's public key.
-        field from:           &PublicKey          [00 => 32]
+        from: &PublicKey,
         /// Public key of the recipient.
-        field to:             &PublicKey          [32 => 64]
+        to: &PublicKey,
         /// Block header.
-        field block:          blockchain::Block   [64 => 72]
+        block: blockchain::Block,
         /// List of pre-commits.
-        field precommits:     Vec<Precommit>      [72 => 80]
+        precommits: Vec<Precommit>,
         /// List of the transactions.
-        field transactions:   Vec<RawMessage>     [80 => 88]
+        transactions: Vec<RawMessage>,
     }
 }
 
@@ -271,16 +265,15 @@ message! {
     struct ProposeRequest {
         const TYPE = CONSENSUS;
         const ID = PROPOSE_REQUEST_MESSAGE_ID;
-        const SIZE = 104;
 
         /// The sender's public key.
-        field from:           &PublicKey  [00 => 32]
+        from: &PublicKey,
         /// Public key of the recipient.
-        field to:             &PublicKey  [32 => 64]
+        to: &PublicKey,
         /// The height to which the message is related.
-        field height:         Height      [64 => 72]
+        height: Height,
         /// Hash of the `Propose`.
-        field propose_hash:   &Hash       [72 => 104]
+        propose_hash: &Hash,
     }
 }
 
@@ -295,14 +288,13 @@ message! {
     struct TransactionsRequest {
         const TYPE = CONSENSUS;
         const ID = TRANSACTIONS_REQUEST_MESSAGE_ID;
-        const SIZE = 72;
 
         /// The sender's public key.
-        field from:           &PublicKey  [00 => 32]
+        from: &PublicKey,
         /// Public key of the recipient.
-        field to:             &PublicKey  [32 => 64]
+        to: &PublicKey,
         /// The list of the transaction hashes.
-        field txs:            &[Hash]     [64 => 72]
+        txs: &[Hash],
     }
 }
 
@@ -320,20 +312,19 @@ message! {
     struct PrevotesRequest {
         const TYPE = CONSENSUS;
         const ID = PREVOTES_REQUEST_MESSAGE_ID;
-        const SIZE = 116;
 
         /// The sender's public key.
-        field from:           &PublicKey  [00 => 32]
+        from: &PublicKey,
         /// Public key of the recipient.
-        field to:             &PublicKey  [32 => 64]
+        to: &PublicKey,
         /// The height to which the message is related.
-        field height:         Height      [64 => 72]
+        height: Height,
         /// The round to which the message is related.
-        field round:          Round       [72 => 76]
+        round: Round,
         /// Hash of the `Propose`.
-        field propose_hash:   &Hash       [76 => 108]
+        propose_hash: &Hash,
         /// The list of validators that send pre-votes.
-        field validators:     BitVec      [108 => 116]
+        validators: BitVec,
     }
 }
 
@@ -353,12 +344,11 @@ message! {
     struct PeersRequest {
         const TYPE = CONSENSUS;
         const ID = PEERS_REQUEST_MESSAGE_ID;
-        const SIZE = 64;
 
         /// The sender's public key.
-        field from:           &PublicKey  [00 => 32]
+        from: &PublicKey,
         /// Public key of the recipient.
-        field to:             &PublicKey  [32 => 64]
+        to: &PublicKey,
     }
 }
 
@@ -376,13 +366,12 @@ message! {
     struct BlockRequest {
         const TYPE = CONSENSUS;
         const ID = BLOCK_REQUEST_MESSAGE_ID;
-        const SIZE = 72;
 
         /// The sender's public key.
-        field from:           &PublicKey  [00 => 32]
+        from: &PublicKey,
         /// Public key of the recipient.
-        field to:             &PublicKey  [32 => 64]
+        to: &PublicKey,
         /// The height to which the message is related.
-        field height:         Height      [64 => 72]
+        height: Height,
     }
 }
