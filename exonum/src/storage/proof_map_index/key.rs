@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use std::cmp::min;
+use std::fmt::Write;
 
 use crypto::{Hash, PublicKey, HASH_SIZE};
 use super::super::StorageKey;
@@ -191,11 +192,11 @@ impl DBKey {
                 }
             }
 
-            info!("from: {}", self.from);
-            info!("to: {}", self.from + max_len);
-            info!("self: {:#?}", self);
-            info!("other: {:#?}", other);
-            info!("prefix: {:#?}", self.prefix(max_len));
+            // info!("from: {}", self.from);
+            // info!("to: {}", self.from + max_len);
+            // info!("self: {:#?}", self);
+            // info!("other: {:#?}", other);
+            // info!("prefix: {:#?}", self.prefix(max_len));
             max_len
         }
     }
@@ -274,17 +275,17 @@ impl PartialEq for DBKey {
 
 impl ::std::fmt::Debug for DBKey {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        write!(f, "DBKey(")?;
+        let mut bits = String::with_capacity(KEY_SIZE * 8);
         for byte in 0..self.data.len() {
             let chunk = self.data[byte];
             for bit in (0..8).rev() {
                 let i = (byte * 8 + bit) as u16;
                 match i {
-                    _ if i < self.from => write!(f, "_")?,
-                    _ if i >= self.to => write!(f, "_")?,
+                    _ if i < self.from => write!(&mut bits, "_")?,
+                    _ if i >= self.to => write!(&mut bits, "_")?,
                     _ => {
                         write!(
-                            f,
+                            &mut bits,
                             "{}",
                             match (1 << bit) & chunk == 0 {
                                 true => '0',
@@ -294,9 +295,14 @@ impl ::std::fmt::Debug for DBKey {
                     }
                 }
             }
-            write!(f, "|")?;
+            write!(&mut bits, "|")?;
         }
-        write!(f, ")")
+
+        f.debug_struct("DBKey")
+            .field("begin", &self.from)
+            .field("end", &self.to)
+            .field("bits", &bits)
+            .finish()
     }
 }
 
