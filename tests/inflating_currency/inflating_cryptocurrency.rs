@@ -46,12 +46,10 @@ pub const INIT_BALANCE: u64 = 0;
 
 encoding_struct! {
     struct Wallet {
-        const SIZE = 56;
-
-        field pub_key:            &PublicKey  [00 => 32]
-        field name:               &str        [32 => 40]
-        field balance:            u64         [40 => 48]
-        field last_update_height: u64         [48 => 56]
+        pub_key: &PublicKey,
+        name: &str,
+        balance: u64,
+        last_update_height: u64,
     }
 }
 
@@ -106,10 +104,9 @@ message! {
     struct TxCreateWallet {
         const TYPE = SERVICE_ID;
         const ID = TX_CREATE_WALLET_ID;
-        const SIZE = 40;
 
-        field pub_key:     &PublicKey  [00 => 32]
-        field name:        &str        [32 => 40]
+        pub_key: &PublicKey,
+        name: &str,
     }
 }
 
@@ -118,12 +115,11 @@ message! {
     struct TxTransfer {
         const TYPE = SERVICE_ID;
         const ID = TX_TRANSFER_ID;
-        const SIZE = 80;
 
-        field from:        &PublicKey  [00 => 32]
-        field to:          &PublicKey  [32 => 64]
-        field amount:      u64         [64 => 72]
-        field seed:        u64         [72 => 80]
+        from: &PublicKey,
+        to: &PublicKey,
+        amount: u64,
+        seed: u64,
     }
 }
 

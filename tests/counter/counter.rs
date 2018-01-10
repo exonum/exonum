@@ -78,10 +78,9 @@ message! {
     struct TxIncrement {
         const TYPE = SERVICE_ID;
         const ID = TX_INCREMENT_ID;
-        const SIZE = 40;
 
-        field author: &PublicKey [0 => 32]
-        field by: u64 [32 => 40]
+        author: &PublicKey,
+        by: u64,
     }
 }
 
@@ -100,9 +99,8 @@ message! {
     struct TxReset {
         const TYPE = SERVICE_ID;
         const ID = TX_INCREMENT_ID;
-        const SIZE = 32;
 
-        field author: &PublicKey [0 => 32]
+        author: &PublicKey,
     }
 }
 

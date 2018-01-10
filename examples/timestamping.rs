@@ -34,10 +34,9 @@ message! {
     struct TxTimestamp {
         const TYPE = SERVICE_ID;
         const ID = TX_TIMESTAMP_ID;
-        const SIZE = 40;
 
-        field from: &PublicKey [0 => 32]
-        field msg: &str [32 => 40]
+        from: &PublicKey,
+        msg: &str,
     }
 }
 
