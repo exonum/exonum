@@ -59,7 +59,7 @@ macro_rules! implement_exonum_serializer {
 
             fn serialize_field(&self) ->
                 Result<$crate::encoding::serialize::json::reexport::Value,
-                        Box<::std::error::Error>>
+                        Box<::std::error::Error + Send + Sync>>
             {
                 use $crate::encoding::serialize::json::reexport::to_value;
                 Ok(to_value(self)?)
