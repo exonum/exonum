@@ -191,7 +191,7 @@ impl DBKey {
                     break;
                 }
             }
-            
+
             max_len
         }
     }
