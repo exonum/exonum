@@ -173,7 +173,7 @@ impl<T, K, V> ProofMapIndex<T, K, V>
 where
     T: AsRef<Snapshot>,
     K: ProofMapKey,
-    V: StorageValue + fmt::Debug,
+    V: StorageValue,
 {
     fn get_root_key(&self) -> Option<DBKey> {
         self.base.iter(&()).next().map(|(k, _): (DBKey, ())| k)
@@ -569,7 +569,7 @@ where
 impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V>
 where
     K: ProofMapKey,
-    V: StorageValue + fmt::Debug,
+    V: StorageValue,
 {
     fn insert_leaf(&mut self, key: &DBKey, value: V) -> Hash {
         debug_assert!(key.is_leaf());
@@ -586,7 +586,6 @@ where
         key_slice: &DBKey,
         value: V,
     ) -> (Option<u16>, Hash) {
-        error!("key_slice {:?}", key_slice);
         let mut child_slice = parent.child_slice(key_slice.get(0));
         child_slice.set_from(key_slice.from());
         // If the slice is fully fit in key then there is a two cases
@@ -607,22 +606,15 @@ where
                         let (j, h) = self.insert_branch(&branch, &key_slice.suffix(i), value);
                         match j {
                             Some(j) => {
-                                warn!("key slice {:?}", key_slice);
-                                warn!("j {:?}, {:?}", j, key_slice.get(i));
-                                warn!("i {}, kind: {:?}", i, key_slice.get(i));
-                                warn!("branch before {:#?}", branch);
-                                warn!("set_child {:?}", key_slice.suffix(i).truncate(j));
                                 branch.set_child(
                                     key_slice.get(i),
                                     &key_slice.suffix(i).truncate(j),
                                     &h,
                                 );
-                                warn!("branch after {:#?}", branch);
                             }
                             None => branch.set_child_hash(key_slice.get(i), &h),
                         };
                         let hash = branch.hash();
-                        warn!("child_slice {:?}", child_slice);
                         self.base.put(&child_slice, branch);
                         (None, hash)
                     }
@@ -641,9 +633,6 @@ where
                 &child_slice.suffix(i),
                 parent.child_hash(key_slice.get(0)),
             );
-
-            info!("new_branch {:#?}", new_branch);
-            info!("suffix_slice {:?}", suffix_slice);
 
             let hash = new_branch.hash();
             self.base.put(&key_slice.truncate(i), new_branch);
@@ -670,7 +659,6 @@ where
     /// ```
     pub fn put(&mut self, key: &K, value: V) {
         let key_slice = DBKey::leaf(key);
-        debug!("put {:?}, {:?}", key_slice, value);
         match self.get_root_node() {
             Some((prefix, Node::Leaf(prefix_data))) => {
                 let prefix_slice = prefix;
@@ -723,7 +711,6 @@ where
                 self.insert_leaf(&key_slice, value);
             }
         }
-        debug!("{:#?}", self);
     }
 
     fn remove_node(&mut self, parent: &BranchNode, key_slice: &DBKey) -> RemoveResult {
@@ -794,7 +781,6 @@ where
     /// ```
     pub fn remove(&mut self, key: &K) {
         let key_slice = DBKey::leaf(key);
-        debug!("remove {:?}", key_slice);
         match self.get_root_node() {
             // If we have only on leaf, then we just need to remove it (if any)
             Some((prefix, Node::Leaf(_))) => {
@@ -863,7 +849,7 @@ impl<'a, T, K, V> ::std::iter::IntoIterator for &'a ProofMapIndex<T, K, V>
 where
     T: AsRef<Snapshot>,
     K: ProofMapKey,
-    V: StorageValue + fmt::Debug,
+    V: StorageValue,
 {
     type Item = (K, V);
     type IntoIter = ProofMapIndexIter<'a, K, V>;
