@@ -173,7 +173,7 @@ impl<T, K, V> ProofMapIndex<T, K, V>
 where
     T: AsRef<Snapshot>,
     K: ProofMapKey,
-    V: StorageValue,
+    V: StorageValue + fmt::Debug,
 {
     fn get_root_key(&self) -> Option<DBKey> {
         self.base.iter(&()).next().map(|(k, _): (DBKey, ())| k)
@@ -569,7 +569,7 @@ where
 impl<'a, K, V> ProofMapIndex<&'a mut Fork, K, V>
 where
     K: ProofMapKey,
-    V: StorageValue,
+    V: StorageValue + fmt::Debug,
 {
     fn insert_leaf(&mut self, key: &DBKey, value: V) -> Hash {
         debug_assert!(key.is_leaf());
@@ -659,6 +659,7 @@ where
     /// ```
     pub fn put(&mut self, key: &K, value: V) {
         let key_slice = DBKey::leaf(key);
+        debug!("put {:?}", key_slice);
         match self.get_root_node() {
             Some((prefix, Node::Leaf(prefix_data))) => {
                 let prefix_slice = prefix;
@@ -781,6 +782,7 @@ where
     /// ```
     pub fn remove(&mut self, key: &K) {
         let key_slice = DBKey::leaf(key);
+        debug!("remove {:?}", key_slice);
         match self.get_root_node() {
             // If we have only on leaf, then we just need to remove it (if any)
             Some((prefix, Node::Leaf(_))) => {
@@ -849,7 +851,7 @@ impl<'a, T, K, V> ::std::iter::IntoIterator for &'a ProofMapIndex<T, K, V>
 where
     T: AsRef<Snapshot>,
     K: ProofMapKey,
-    V: StorageValue,
+    V: StorageValue + fmt::Debug,
 {
     type Item = (K, V);
     type IntoIter = ProofMapIndexIter<'a, K, V>;
