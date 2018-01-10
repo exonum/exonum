@@ -74,17 +74,8 @@ impl BranchNode {
     }
 
     pub fn set_child(&mut self, kind: ChildKind, prefix: &DBKey, hash: &Hash) {
-        trace!("set_child, kind: {:?}, key: {:?}", kind, prefix);
-        let mut buf = vec![0; 34];
-        prefix.write(&mut buf);
-        let prefix2 = DBKey::read(&buf);
-        trace!("buf {:?}", buf);
-        trace!("read_child {:?}", prefix2);
-
-        trace!("before={:#?}", self);
         self.set_child_slice(kind, prefix);
         self.set_child_hash(kind, hash);
-        trace!("after={:#?}", self);
     }
 }
 

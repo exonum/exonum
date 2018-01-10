@@ -136,8 +136,6 @@ fn insert_simple(db1: Box<Database>, db2: Box<Database>) {
 }
 
 fn insert_reverse(db1: Box<Database>, db2: Box<Database>) {
-    let _ = ::helpers::init_logger();
-
     let mut storage1 = db1.fork();
     let mut index1 = ProofMapIndex::new(IDX_NAME, &mut storage1);
     index1.put(&[42; 32], vec![1]);

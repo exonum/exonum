@@ -191,12 +191,7 @@ impl DBKey {
                     break;
                 }
             }
-
-            // info!("from: {}", self.from);
-            // info!("to: {}", self.from + max_len);
-            // info!("self: {:#?}", self);
-            // info!("other: {:#?}", other);
-            // info!("prefix: {:#?}", self.prefix(max_len));
+            
             max_len
         }
     }
