@@ -146,7 +146,6 @@ fn insert_reverse(db1: Box<Database>, db2: Box<Database>) {
     index1.put(&[245; 32], vec![4]);
     index1.put(&[250; 32], vec![5]);
     index1.put(&[255; 32], vec![6]);
-    debug!("index1={:#?}", index1);
 
     let mut storage2 = db2.fork();
     let mut index2 = ProofMapIndex::new(IDX_NAME, &mut storage2);
@@ -156,7 +155,6 @@ fn insert_reverse(db1: Box<Database>, db2: Box<Database>) {
     index2.put(&[240; 32], vec![3]);
     index2.put(&[64; 32], vec![2]);
     index2.put(&[42; 32], vec![1]);
-    debug!("index2={:#?}", index2);
 
     assert!(index2.root_hash() != Hash::zero());
     assert_eq!(index2.root_hash(), index1.root_hash());
