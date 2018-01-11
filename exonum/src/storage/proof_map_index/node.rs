@@ -107,7 +107,6 @@ impl ::std::fmt::Debug for BranchNode {
 
 #[test]
 fn test_branch_node() {
-    let _ = ::helpers::init_logger();
     let mut branch = BranchNode::empty();
 
     let lh = hash(&[1, 2]);
