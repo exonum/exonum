@@ -142,11 +142,9 @@ It is used as placeholder in database for votes of validators, which didn't cast
 
 encoding_struct! {
     struct StorageValueConfigProposeData {
-        const SIZE = 48;
-
-        field tx_propose:            TxConfigPropose   [00 => 8]
-        field votes_history_hash:    &Hash             [8 => 40]
-        field num_votes:             u64               [40 => 48]
+        tx_propose: TxConfigPropose,
+        votes_history_hash: &Hash,
+        num_votes: u64,
     }
 }
 
@@ -180,10 +178,9 @@ message! {
     struct TxConfigPropose {
         const TYPE = CONFIG_SERVICE;
         const ID = CONFIG_PROPOSE_MESSAGE_ID;
-        const SIZE = 40;
 
-        field from:           &PublicKey  [00 => 32]
-        field cfg:            &str        [32 => 40]
+        from: &PublicKey,
+        cfg: &str,
     }
 }
 
@@ -191,10 +188,9 @@ message! {
     struct TxConfigVote {
         const TYPE = CONFIG_SERVICE;
         const ID = CONFIG_VOTE_MESSAGE_ID;
-        const SIZE = 64;
 
-        field from:           &PublicKey  [00 => 32]
-        field cfg_hash:       &Hash       [32 => 64]
+        from: &PublicKey,
+        cfg_hash: &Hash,
     }
 }
 
