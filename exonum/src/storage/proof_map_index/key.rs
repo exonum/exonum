@@ -275,10 +275,7 @@ impl ::std::fmt::Debug for DBKey {
                         write!(
                             &mut bits,
                             "{}",
-                            match (1 << bit) & chunk == 0 {
-                                true => '0',
-                                false => '1',
-                            }
+                            if (1 << bit) & chunk == 0 { '0' } else { '1' }
                         )?
                     }
                 }
