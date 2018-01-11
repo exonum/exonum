@@ -173,21 +173,14 @@ impl DBKey {
         } else {
             let mut max_len = min(self.len(), other.len());
 
-            // let from = self.from / 8;
-            // let to = min((self.to + 7) / 8, (other.to + 7) / 8);
+            let from = self.from / 8;
+            let to = min((self.to + 7) / 8, (other.to + 7) / 8);
 
-            // for i in from..to {
-            //     let x = self.data[i as usize] ^ other.data[i as usize];
-            //     if x != 0 {
-            //         let tail = x.leading_zeros() as u16;
-            //         max_len = min(i * 8 + tail - self.from, max_len);
-            //         break;
-            //     }
-            // }
-
-            for i in 0..max_len {
-                if self.get(i) != other.get(i) {
-                    max_len = i;
+            for i in from..to {
+                let x = self.data[i as usize] ^ other.data[i as usize];
+                if x != 0 {
+                    let tail = x.trailing_zeros() as u16;
+                    max_len = min(i * 8 + tail - self.from, max_len);
                     break;
                 }
             }
