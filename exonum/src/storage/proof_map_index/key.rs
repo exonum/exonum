@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use std::cmp::min;
-use std::fmt::Write;
 
 use crypto::{Hash, PublicKey, HASH_SIZE};
 use super::super::StorageKey;
@@ -50,7 +49,6 @@ impl StorageKey for [u8; KEY_SIZE] {
         value
     }
 }
-
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ChildKind {
@@ -171,17 +169,15 @@ impl DBKey {
         if self.from != other.from {
             0
         } else {
-            let mut max_len = min(self.len(), other.len());
-
             let from = self.from / 8;
             let to = min((self.to + 7) / 8, (other.to + 7) / 8);
+            let max_len = min(self.len(), other.len());
 
             for i in from..to {
                 let x = self.data[i as usize] ^ other.data[i as usize];
                 if x != 0 {
                     let tail = x.trailing_zeros() as u16;
-                    max_len = min(i * 8 + tail - self.from, max_len);
-                    break;
+                    return min(i * 8 + tail - self.from, max_len);
                 }
             }
 
@@ -268,19 +264,13 @@ impl ::std::fmt::Debug for DBKey {
             let chunk = self.data[byte];
             for bit in (0..8).rev() {
                 let i = (byte * 8 + bit) as u16;
-                match i {
-                    _ if i < self.from => write!(&mut bits, "_")?,
-                    _ if i >= self.to => write!(&mut bits, "_")?,
-                    _ => {
-                        write!(
-                            &mut bits,
-                            "{}",
-                            if (1 << bit) & chunk == 0 { '0' } else { '1' }
-                        )?
-                    }
+                if i < self.from || i >= self.to {
+                    bits.push('_');
+                } else {
+                    bits.push(if (1 << bit) & chunk == 0 { '0' } else { '1' });
                 }
             }
-            write!(&mut bits, "|")?;
+            bits.push('|');
         }
 
         f.debug_struct("DBKey")
