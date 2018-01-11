@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - The `Transaction` trait now inherit `ExonumJson`. (#402)
 - The list of peer connections is now restored to the last state after the process is restarted. (#378)
 - `message!` and `encoding_struct!` no longer require manual `SIZE` and offset specification.
+- The order of bytes and bits in the `DBKey` keys of `ProofMapIndex` became consistent. Note: this change will break old storages. (#419)
 
 ### Removed
 - Removed default `state_hash` implementation in the `Service` trait. (#399)
