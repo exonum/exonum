@@ -190,12 +190,19 @@ struct TimeApi {
 }
 
 /// Structure for saving validator's public key and last known local time.
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 struct ValidatorTime {
     /// Validator's public key.
     public_key: PublicKey,
     /// Validator's time.
-    time: SystemTime,
+    time: Option<SystemTime>,
+}
+
+/// Structure for saving current time.
+#[derive(Serialize, Deserialize)]
+struct CurrentTime {
+    /// Current time.
+    time: Option<SystemTime>,
 }
 
 /// Shortcut to get data from storage.
@@ -204,35 +211,76 @@ impl TimeApi {
     fn get_current_time(&self, _: &mut Request) -> IronResult<Response> {
         let view = self.blockchain.snapshot();
         let schema = TimeSchema::new(&view);
-        let current_time = schema.time().get();
-        self.ok_response(&serde_json::to_value(current_time).unwrap())
+
+        if let Some(current_time) = schema.time().get() {
+            self.ok_response(&serde_json::to_value(
+                CurrentTime { time: Some(current_time.time()) },
+            ).unwrap())
+        } else {
+            self.ok_response(&serde_json::to_value(CurrentTime { time: None }).unwrap())
+        }
     }
 
     /// Endpoint for getting time values for all validators.
-    fn get_validators_time(&self, _: &mut Request) -> IronResult<Response> {
+    fn get_all_validators_time(&self, _: &mut Request) -> IronResult<Response> {
         let view = self.blockchain.snapshot();
         let schema = TimeSchema::new(&view);
         let idx = schema.validators_time();
 
-        let validators_time: Vec<_> = idx.iter()
+        // The times of all validators for which time is known.
+        let validators_time = idx.iter()
             .map(|(public_key, time)| {
                 ValidatorTime {
                     public_key,
-                    time: time.time(),
+                    time: Some(time.time()),
                 }
             })
-            .collect();
+            .collect::<Vec<_>>();
+
+        self.ok_response(&serde_json::to_value(validators_time).unwrap())
+    }
+
+    /// Endpoint for getting time values for current validators.
+    fn get_current_validators_time(&self, _: &mut Request) -> IronResult<Response> {
+        let view = self.blockchain.snapshot();
+        let validator_keys = Schema::new(&view).actual_configuration().validator_keys;
+        let schema = TimeSchema::new(&view);
+        let idx = schema.validators_time();
+
+        // The times of current validators.
+        // `None` if the time of the validator is unknown.
+        let validators_time = validator_keys
+            .iter()
+            .map(|validator| {
+                ValidatorTime {
+                    public_key: validator.service_key,
+                    time: match idx.get(&validator.service_key) {
+                        Some(time) => Some(time.time()),
+                        None => None,
+                    },
+                }
+            })
+            .collect::<Vec<_>>();
 
         self.ok_response(&serde_json::to_value(validators_time).unwrap())
     }
 
     fn wire_private(&self, router: &mut Router) {
         let self_ = self.clone();
-        let get_validators_time = move |req: &mut Request| self_.get_validators_time(req);
+        let get_all_validators_time = move |req: &mut Request| self_.get_all_validators_time(req);
         router.get(
-            "/validators_time",
-            get_validators_time,
-            "get_validators_time",
+            "v1/validators_time/all",
+            get_all_validators_time,
+            "get_all_validators_time",
+        );
+
+        let self_ = self.clone();
+        let get_current_validators_time =
+            move |req: &mut Request| self_.get_current_validators_time(req);
+        router.get(
+            "v1/validators_time",
+            get_current_validators_time,
+            "get_current_validators_time",
         );
     }
 }
@@ -241,7 +289,7 @@ impl Api for TimeApi {
     fn wire(&self, router: &mut Router) {
         let self_ = self.clone();
         let get_current_time = move |req: &mut Request| self_.get_current_time(req);
-        router.get("/current_time", get_current_time, "get_current_time");
+        router.get("v1/current_time", get_current_time, "get_current_time");
     }
 }
 
