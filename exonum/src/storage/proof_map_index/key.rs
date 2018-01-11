@@ -295,6 +295,37 @@ impl ::std::fmt::Debug for DBKey {
 }
 
 #[test]
+fn test_dbkey_storage_key_leaf() {
+    let key = DBKey::leaf(&[250; 32]);
+    let mut buf = vec![0; DB_KEY_SIZE];
+    key.write(&mut buf);
+    let key2 = DBKey::read(&buf);
+
+    assert_eq!(buf[0], LEAF_KEY_PREFIX);
+    assert_eq!(buf[33], 0);
+    assert_eq!(&buf[1..33], &[250; 32]);
+    assert_eq!(key2, key);
+}
+
+#[test]
+fn test_dbkey_storage_key_branch() {
+    let mut key = DBKey::leaf(&[255; 32]);
+    key = key.prefix(11);
+    key = key.suffix(5);
+
+    let mut buf = vec![0; DB_KEY_SIZE];
+    key.write(&mut buf);
+    let mut key2 = DBKey::read(&buf);
+    key2.set_from(5);
+
+    assert_eq!(buf[0], BRANCH_KEY_PREFIX);
+    assert_eq!(buf[33], 11);
+    assert_eq!(&buf[1..3], &[255, 7]);
+    assert_eq!(&buf[3..33], &[0; 30]);
+    assert_eq!(key2, key);
+}
+
+#[test]
 fn test_dbkey_suffix() {
     let b = DBKey::read(b"\x00\x01\x02\xFF\x0C0000000000000000000000000000\x20");
 
