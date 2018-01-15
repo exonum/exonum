@@ -36,7 +36,7 @@ use exonum::blockchain::{Blockchain, Service, ServiceContext, Schema, Transactio
 use exonum::messages::{RawTransaction, Message};
 use exonum::encoding::serialize::json::reexport::Value;
 use exonum::storage::{Fork, Snapshot, MapIndex, Entry};
-use exonum::crypto::PublicKey;
+use exonum::crypto::{Hash, PublicKey};
 use exonum::encoding;
 use exonum::helpers::fabric::{ServiceFactory, Context};
 use exonum::api::Api;
@@ -51,10 +51,8 @@ const SERVICE_NAME: &str = "exonum_time";
 encoding_struct! {
     /// Time information.
     struct Time {
-        const SIZE = 12;
-
         /// Field that stores `SystemTime`.
-        field time:     SystemTime  [00 => 12]
+        time: SystemTime,
     }
 }
 
@@ -106,11 +104,10 @@ message! {
     struct TxTime {
         const TYPE = SERVICE_ID;
         const ID = TX_TIME_ID;
-        const SIZE = 44;
         /// Validator's time.
-        field time:     SystemTime  [00 => 12]
+        time: SystemTime,
         /// Validator's public key.
-        field pub_key:  &PublicKey  [12 => 44]
+        pub_key: &PublicKey,
     }
 }
 
@@ -189,20 +186,20 @@ struct TimeApi {
     blockchain: Blockchain,
 }
 
-/// Structure for saving validator's public key and last known local time.
-#[derive(Serialize, Deserialize)]
-struct ValidatorTime {
-    /// Validator's public key.
-    public_key: PublicKey,
-    /// Validator's time.
-    time: Option<SystemTime>,
+/// Structure for saving current time.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CurrentTime {
+    /// Current time.
+    pub time: Option<SystemTime>,
 }
 
-/// Structure for saving current time.
-#[derive(Serialize, Deserialize)]
-struct CurrentTime {
-    /// Current time.
-    time: Option<SystemTime>,
+/// Structure for saving validator's public key and last known local time.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ValidatorTime {
+    /// Validator's public key.
+    pub public_key: PublicKey,
+    /// Validator's time.
+    pub time: Option<SystemTime>,
 }
 
 /// Shortcut to get data from storage.
@@ -336,6 +333,10 @@ impl TimeService {
 impl Service for TimeService {
     fn service_name(&self) -> &'static str {
         SERVICE_NAME
+    }
+
+    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+        Vec::new()
     }
 
     fn service_id(&self) -> u16 {
