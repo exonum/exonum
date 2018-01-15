@@ -36,7 +36,7 @@ use exonum::blockchain::{Blockchain, Service, ServiceContext, Schema, Transactio
 use exonum::messages::{RawTransaction, Message};
 use exonum::encoding::serialize::json::reexport::Value;
 use exonum::storage::{Fork, Snapshot, MapIndex, Entry};
-use exonum::crypto::PublicKey;
+use exonum::crypto::{Hash, PublicKey};
 use exonum::encoding;
 use exonum::helpers::fabric::{ServiceFactory, Context};
 use exonum::api::Api;
@@ -51,10 +51,8 @@ const SERVICE_NAME: &str = "exonum_time";
 encoding_struct! {
     /// Time information.
     struct Time {
-        const SIZE = 12;
-
         /// Field that stores `SystemTime`.
-        field time:     SystemTime  [00 => 12]
+        time: SystemTime,
     }
 }
 
@@ -106,11 +104,10 @@ message! {
     struct TxTime {
         const TYPE = SERVICE_ID;
         const ID = TX_TIME_ID;
-        const SIZE = 44;
         /// Validator's time.
-        field time:     SystemTime  [00 => 12]
+        time: SystemTime,
         /// Validator's public key.
-        field pub_key:  &PublicKey  [12 => 44]
+        pub_key: &PublicKey,
     }
 }
 
@@ -189,20 +186,20 @@ struct TimeApi {
     blockchain: Blockchain,
 }
 
-/// Structure for saving validator's public key and last known local time.
-#[derive(Serialize, Deserialize)]
-struct ValidatorTime {
-    /// Validator's public key.
-    public_key: PublicKey,
-    /// Validator's time.
-    time: Option<SystemTime>,
+/// Structure for saving current time.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CurrentTime {
+    /// Current time.
+    pub time: Option<SystemTime>,
 }
 
-/// Structure for saving current time.
-#[derive(Serialize, Deserialize)]
-struct CurrentTime {
-    /// Current time.
-    time: Option<SystemTime>,
+/// Structure for saving validator's public key and last known local time.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ValidatorTime {
+    /// Validator's public key.
+    pub public_key: PublicKey,
+    /// Validator's time.
+    pub time: Option<SystemTime>,
 }
 
 /// Shortcut to get data from storage.
@@ -222,7 +219,7 @@ impl TimeApi {
     }
 
     /// Endpoint for getting time values for all validators.
-    fn get_all_validators_time(&self, _: &mut Request) -> IronResult<Response> {
+    fn get_all_validators_times(&self, _: &mut Request) -> IronResult<Response> {
         let view = self.blockchain.snapshot();
         let schema = TimeSchema::new(&view);
         let idx = schema.validators_time();
@@ -241,7 +238,7 @@ impl TimeApi {
     }
 
     /// Endpoint for getting time values for current validators.
-    fn get_current_validators_time(&self, _: &mut Request) -> IronResult<Response> {
+    fn get_current_validators_times(&self, _: &mut Request) -> IronResult<Response> {
         let view = self.blockchain.snapshot();
         let validator_keys = Schema::new(&view).actual_configuration().validator_keys;
         let schema = TimeSchema::new(&view);
@@ -267,20 +264,22 @@ impl TimeApi {
 
     fn wire_private(&self, router: &mut Router) {
         let self_ = self.clone();
-        let get_all_validators_time = move |req: &mut Request| self_.get_all_validators_time(req);
-        router.get(
-            "v1/validators_time/all",
-            get_all_validators_time,
-            "get_all_validators_time",
-        );
+        let get_current_validators_times =
+            move |req: &mut Request| self_.get_current_validators_times(req);
 
         let self_ = self.clone();
-        let get_current_validators_time =
-            move |req: &mut Request| self_.get_current_validators_time(req);
+        let get_all_validators_times = move |req: &mut Request| self_.get_all_validators_times(req);
+
         router.get(
-            "v1/validators_time",
-            get_current_validators_time,
-            "get_current_validators_time",
+            "v1/validators_times",
+            get_current_validators_times,
+            "get_current_validators_times",
+        );
+
+        router.get(
+            "v1/validators_times/all",
+            get_all_validators_times,
+            "get_all_validators_times",
         );
     }
 }
@@ -336,6 +335,10 @@ impl TimeService {
 impl Service for TimeService {
     fn service_name(&self) -> &'static str {
         SERVICE_NAME
+    }
+
+    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+        Vec::new()
     }
 
     fn service_id(&self) -> u16 {
