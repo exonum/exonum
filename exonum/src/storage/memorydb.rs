@@ -14,7 +14,7 @@
 
 //! An implementation of `MemoryDB` database.
 
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::clone::Clone;
 use std::collections::btree_map::BTreeMap;
 use std::collections::HashMap;
@@ -29,7 +29,7 @@ type DB = HashMap<String, BTreeMap<Vec<u8>, Vec<u8>>>;
 /// It's mainly used for testing and not designed to be efficient.
 #[derive(Default, Clone, Debug)]
 pub struct MemoryDB {
-    map: Arc<RwLock<DB>>,
+    map: Arc<DB>,
 }
 
 /// An iterator over the entries of a `MemoryDB`.
@@ -41,7 +41,7 @@ struct MemoryDBIter {
 impl MemoryDB {
     /// Creates a new, empty database.
     pub fn new() -> MemoryDB {
-        MemoryDB { map: Arc::new(RwLock::new(HashMap::new())) }
+        MemoryDB { map: Arc::new(HashMap::new()) }
     }
 }
 
@@ -51,18 +51,16 @@ impl Database for MemoryDB {
     }
 
     fn snapshot(&self) -> Box<Snapshot> {
-        Box::new(MemoryDB {
-            map: Arc::new(RwLock::new(self.map.read().unwrap().clone())),
-        })
+        Box::new(MemoryDB { map: Arc::clone(&self.map) })
     }
 
     fn merge(&mut self, patch: Patch) -> Result<()> {
+        let map = Arc::make_mut(&mut self.map);
         for (cf_name, changes) in patch {
-            let mut guard = self.map.write().unwrap();
-            if !guard.contains_key(&cf_name) {
-                guard.insert(cf_name.clone(), BTreeMap::new());
+            if !map.contains_key(&cf_name) {
+                map.insert(cf_name.clone(), BTreeMap::new());
             }
-            let table = guard.get_mut(&cf_name).unwrap();
+            let table = map.get_mut(&cf_name).unwrap();
             for (key, change) in changes {
                 match change {
                     Change::Put(ref value) => {
@@ -84,20 +82,18 @@ impl Database for MemoryDB {
 
 impl Snapshot for MemoryDB {
     fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>> {
-        self.map.read().unwrap().get(name).and_then(|table| {
-            table.get(key).cloned()
-        })
+        self.map.get(name).and_then(|table| table.get(key).cloned())
     }
 
     fn contains(&self, name: &str, key: &[u8]) -> bool {
-        self.map.read().unwrap().get(name).map_or(false, |table| {
-            table.contains_key(key)
-        })
+        self.map.get(name).map_or(
+            false,
+            |table| table.contains_key(key),
+        )
     }
 
     fn iter(&self, name: &str, from: &[u8]) -> Iter {
-        let map_guard = self.map.read().unwrap();
-        let data = match map_guard.get(name) {
+        let data = match self.map.get(name) {
             Some(table) => {
                 table
                     .iter()
