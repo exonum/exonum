@@ -22,7 +22,7 @@ use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageValue};
 use self::key::{ChildKind, DBKey, LEAF_KEY_PREFIX};
 use self::node::{BranchNode, Node};
 
-pub use self::key::{DBKey as ProofMapDBKey, KEY_SIZE as PROOF_MAP_KEY_SIZE, ProofMapKey};
+pub use self::key::{DBKey as ProofMapDBKey, KeyBitRange, KEY_SIZE as PROOF_MAP_KEY_SIZE, ProofMapKey};
 pub use self::proof::{BranchProofNode, MapProof, ProofNode};
 
 #[cfg(test)]
@@ -203,8 +203,7 @@ where
         current_branch: &BranchNode,
         searched_slice: &DBKey,
     ) -> Option<ProofNode<V>> {
-        let mut child_slice = current_branch.child_slice(searched_slice.get(0));
-        child_slice.set_from(searched_slice.from());
+        let child_slice = current_branch.child_slice(searched_slice.bit(0)).start_from(searched_slice.start());
         let c_pr_l = child_slice.common_prefix(searched_slice);
         debug_assert!(c_pr_l > 0);
         if c_pr_l < child_slice.len() {
@@ -221,20 +220,20 @@ where
                     self.construct_proof(&child_branch, &suf_searched_slice);
 
                 if let Some(child_proof) = proof_from_level_below {
-                    let child_proof_pos = suf_searched_slice.get(0);
+                    let child_proof_pos = suf_searched_slice.bit(0);
                     let neighbour_child_hash = *child_branch.child_hash(!child_proof_pos);
                     match child_proof_pos {
                         ChildKind::Left => ProofNode::Branch(BranchProofNode::LeftBranch {
                             left_node: Box::new(child_proof),
                             right_hash: neighbour_child_hash,
-                            left_key: l_s.suffix(searched_slice.from() + c_pr_l),
-                            right_key: r_s.suffix(searched_slice.from() + c_pr_l),
+                            left_key: l_s.suffix(searched_slice.start() + c_pr_l),
+                            right_key: r_s.suffix(searched_slice.start() + c_pr_l),
                         }),
                         ChildKind::Right => ProofNode::Branch(BranchProofNode::RightBranch {
                             left_hash: neighbour_child_hash,
                             right_node: Box::new(child_proof),
-                            left_key: l_s.suffix(searched_slice.from() + c_pr_l),
-                            right_key: r_s.suffix(searched_slice.from() + c_pr_l),
+                            left_key: l_s.suffix(searched_slice.start() + c_pr_l),
+                            right_key: r_s.suffix(searched_slice.start() + c_pr_l),
                         }),
                     }
                 } else {
@@ -243,8 +242,8 @@ where
                     ProofNode::Branch(BranchProofNode::BranchKeyNotFound {
                         left_hash: l_h,
                         right_hash: r_h,
-                        left_key: l_s.suffix(searched_slice.from() + c_pr_l),
-                        right_key: r_s.suffix(searched_slice.from() + c_pr_l),
+                        left_key: l_s.suffix(searched_slice.start() + c_pr_l),
+                        right_key: r_s.suffix(searched_slice.start() + c_pr_l),
                     })
                     // proof of exclusion of a key, because none of child slices is a
                     // prefix(searched_slice)
@@ -307,7 +306,7 @@ where
     /// assert_eq!(Some(2), index.get(&hash));
     /// ```
     pub fn get(&self, key: &K) -> Option<V> {
-        self.base.get(&DBKey::leaf(key))
+        self.base.get(&DBKey::new(key))
     }
 
     /// Returns `true` if the map contains a value for the specified key.
@@ -330,7 +329,7 @@ where
     /// assert!(index.contains(&hash));
     /// ```
     pub fn contains(&self, key: &K) -> bool {
-        self.base.contains(&DBKey::leaf(key))
+        self.base.contains(&DBKey::new(key))
     }
 
     /// Returns the proof of existence or non-existence for the specified key.
@@ -351,7 +350,7 @@ where
     /// # drop(proof);
     /// ```
     pub fn get_proof(&self, key: &K) -> MapProof<V> {
-        let searched_slice = DBKey::leaf(key);
+        let searched_slice = DBKey::new(key);
 
         match self.get_root_node() {
             Some((root_db_key, Node::Leaf(root_value))) => {
@@ -373,7 +372,7 @@ where
                         self.construct_proof(&branch, &suf_searched_slice);
 
                     if let Some(child_proof) = proof_from_level_below {
-                        let child_proof_pos = suf_searched_slice.get(0);
+                        let child_proof_pos = suf_searched_slice.bit(0);
                         let neighbour_child_hash = *branch.child_hash(!child_proof_pos);
                         match child_proof_pos {
                             ChildKind::Left => MapProof::Branch(BranchProofNode::LeftBranch {
@@ -511,7 +510,7 @@ where
     /// ```
     pub fn iter_from(&self, from: &K) -> ProofMapIndexIter<K, V> {
         ProofMapIndexIter {
-            base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &DBKey::leaf(from)),
+            base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &DBKey::new(from)),
             _k: PhantomData,
         }
     }
@@ -537,7 +536,7 @@ where
     /// ```
     pub fn keys_from(&self, from: &K) -> ProofMapIndexKeys<K> {
         ProofMapIndexKeys {
-            base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &DBKey::leaf(from)),
+            base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &DBKey::new(from)),
             _k: PhantomData,
         }
     }
@@ -562,7 +561,7 @@ where
     /// }
     /// ```
     pub fn values_from(&self, from: &K) -> ProofMapIndexValues<V> {
-        ProofMapIndexValues { base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &DBKey::leaf(from)) }
+        ProofMapIndexValues { base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &DBKey::new(from)) }
     }
 }
 
@@ -586,8 +585,7 @@ where
         key_slice: &DBKey,
         value: V,
     ) -> (Option<u16>, Hash) {
-        let mut child_slice = parent.child_slice(key_slice.get(0));
-        child_slice.set_from(key_slice.from());
+        let child_slice = parent.child_slice(key_slice.bit(0)).start_from(key_slice.start());
         // If the slice is fully fit in key then there is a two cases
         let i = child_slice.common_prefix(key_slice);
         if child_slice.len() == i {
@@ -607,12 +605,12 @@ where
                         match j {
                             Some(j) => {
                                 branch.set_child(
-                                    key_slice.get(i),
-                                    &key_slice.suffix(i).truncate(j),
+                                    key_slice.bit(i),
+                                    &key_slice.suffix(i).prefix(j),
                                     &h,
                                 );
                             }
-                            None => branch.set_child_hash(key_slice.get(i), &h),
+                            None => branch.set_child_hash(key_slice.bit(i), &h),
                         };
                         let hash = branch.hash();
                         self.base.put(&child_slice, branch);
@@ -626,16 +624,16 @@ where
             let mut new_branch = BranchNode::empty();
             // Add a new leaf
             let hash = self.insert_leaf(&suffix_slice, value);
-            new_branch.set_child(suffix_slice.get(0), &suffix_slice, &hash);
+            new_branch.set_child(suffix_slice.bit(0), &suffix_slice, &hash);
             // Move current branch
             new_branch.set_child(
-                child_slice.get(i),
+                child_slice.bit(i),
                 &child_slice.suffix(i),
-                parent.child_hash(key_slice.get(0)),
+                parent.child_hash(key_slice.bit(0)),
             );
 
             let hash = new_branch.hash();
-            self.base.put(&key_slice.truncate(i), new_branch);
+            self.base.put(&key_slice.prefix(i), new_branch);
             (Some(i), hash)
         }
     }
@@ -658,7 +656,7 @@ where
     /// assert!(index.contains(&hash));
     /// ```
     pub fn put(&mut self, key: &K, value: V) {
-        let key_slice = DBKey::leaf(key);
+        let key_slice = DBKey::new(key);
         match self.get_root_node() {
             Some((prefix, Node::Leaf(prefix_data))) => {
                 let prefix_slice = prefix;
@@ -667,13 +665,13 @@ where
                 let leaf_hash = self.insert_leaf(&key_slice, value);
                 if i < key_slice.len() {
                     let mut branch = BranchNode::empty();
-                    branch.set_child(key_slice.get(i), &key_slice.suffix(i), &leaf_hash);
+                    branch.set_child(key_slice.bit(i), &key_slice.suffix(i), &leaf_hash);
                     branch.set_child(
-                        prefix_slice.get(i),
+                        prefix_slice.bit(i),
                         &prefix_slice.suffix(i),
                         &prefix_data.hash(),
                     );
-                    let new_prefix = key_slice.truncate(i);
+                    let new_prefix = key_slice.prefix(i);
                     self.base.put(&new_prefix, branch);
                 }
             }
@@ -687,9 +685,9 @@ where
                     let (j, h) = self.insert_branch(&branch, &suffix_slice, value);
                     match j {
                         Some(j) => {
-                            branch.set_child(suffix_slice.get(0), &suffix_slice.truncate(j), &h)
+                            branch.set_child(suffix_slice.bit(0), &suffix_slice.prefix(j), &h)
                         }
-                        None => branch.set_child_hash(suffix_slice.get(0), &h),
+                        None => branch.set_child_hash(suffix_slice.bit(0), &h),
                     };
                     self.base.put(&prefix_slice, branch);
                 } else {
@@ -697,13 +695,13 @@ where
                     let hash = self.insert_leaf(&key_slice, value);
                     let mut new_branch = BranchNode::empty();
                     new_branch.set_child(
-                        prefix_slice.get(i),
+                        prefix_slice.bit(i),
                         &prefix_slice.suffix(i),
                         &branch.hash(),
                     );
-                    new_branch.set_child(key_slice.get(i), &key_slice.suffix(i), &hash);
+                    new_branch.set_child(key_slice.bit(i), &key_slice.suffix(i), &hash);
                     // Saves a new branch
-                    let new_prefix = prefix_slice.truncate(i);
+                    let new_prefix = prefix_slice.prefix(i);
                     self.base.put(&new_prefix, new_branch);
                 }
             }
@@ -714,8 +712,7 @@ where
     }
 
     fn remove_node(&mut self, parent: &BranchNode, key_slice: &DBKey) -> RemoveResult {
-        let mut child_slice = parent.child_slice(key_slice.get(0));
-        child_slice.set_from(key_slice.from());
+        let child_slice = parent.child_slice(key_slice.bit(0)).start_from(key_slice.start());
         let i = child_slice.common_prefix(key_slice);
 
         if i == child_slice.len() {
@@ -728,7 +725,7 @@ where
                     let suffix_slice = key_slice.suffix(i);
                     match self.remove_node(&branch, &suffix_slice) {
                         RemoveResult::Leaf => {
-                            let child = !suffix_slice.get(0);
+                            let child = !suffix_slice.bit(0);
                             let key = branch.child_slice(child);
                             let hash = branch.child_hash(child);
 
@@ -737,16 +734,15 @@ where
                             return RemoveResult::Branch((key, *hash));
                         }
                         RemoveResult::Branch((key, hash)) => {
-                            let mut new_child_slice = key.clone();
-                            new_child_slice.set_from(suffix_slice.from());
+                            let mut new_child_slice = key.start_from(suffix_slice.start());
 
-                            branch.set_child(suffix_slice.get(0), &new_child_slice, &hash);
+                            branch.set_child(suffix_slice.bit(0), &new_child_slice, &hash);
                             let h = branch.hash();
                             self.base.put(&child_slice, branch);
                             return RemoveResult::UpdateHash(h);
                         }
                         RemoveResult::UpdateHash(hash) => {
-                            branch.set_child_hash(suffix_slice.get(0), &hash);
+                            branch.set_child_hash(suffix_slice.bit(0), &hash);
                             let h = branch.hash();
                             self.base.put(&child_slice, branch);
                             return RemoveResult::UpdateHash(h);
@@ -780,7 +776,7 @@ where
     /// assert!(!index.contains(&hash));
     /// ```
     pub fn remove(&mut self, key: &K) {
-        let key_slice = DBKey::leaf(key);
+        let key_slice = DBKey::new(key);
         match self.get_root_node() {
             // If we have only on leaf, then we just need to remove it (if any)
             Some((prefix, Node::Leaf(_))) => {
@@ -797,13 +793,12 @@ where
                     match self.remove_node(&branch, &suffix_slice) {
                         RemoveResult::Leaf => self.base.remove(&prefix),
                         RemoveResult::Branch((key, hash)) => {
-                            let mut new_child_slice = key.clone();
-                            new_child_slice.set_from(suffix_slice.from());
-                            branch.set_child(suffix_slice.get(0), &new_child_slice, &hash);
+                            let mut new_child_slice = key.start_from(suffix_slice.start());
+                            branch.set_child(suffix_slice.bit(0), &new_child_slice, &hash);
                             self.base.put(&prefix, branch);
                         }
                         RemoveResult::UpdateHash(hash) => {
-                            branch.set_child_hash(suffix_slice.get(0), &hash);
+                            branch.set_child_hash(suffix_slice.bit(0), &hash);
                             self.base.put(&prefix, branch);
                         }
                         RemoveResult::KeyNotFound => return,
@@ -867,7 +862,7 @@ where
     type Item = (K, V);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.base_iter.next().map(|(k, v)| (K::read(k.as_ref()), v))
+        self.base_iter.next().map(|(k, v)| (K::read(k.raw_key()), v))
     }
 }
 
@@ -878,7 +873,7 @@ where
     type Item = K;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.base_iter.next().map(|(k, _)| K::read(k.as_ref()))
+        self.base_iter.next().map(|(k, _)| K::read(k.raw_key()))
     }
 }
 

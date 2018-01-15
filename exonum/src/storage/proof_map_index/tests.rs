@@ -321,7 +321,7 @@ fn build_proof_in_leaf_tree(db: Box<Database>) {
 
     match proof_path {
         MapProof::LeafRootExclusive(key, hash_val) => {
-            assert_eq!(key, DBKey::leaf(&root_key));
+            assert_eq!(key, DBKey::new(&root_key));
             assert_eq!(hash_val, hash(&root_val));
         }
         _ => assert!(false),
@@ -335,7 +335,7 @@ fn build_proof_in_leaf_tree(db: Box<Database>) {
     }
     match proof_path {
         MapProof::LeafRootInclusive(key, val) => {
-            assert_eq!(key, DBKey::leaf(&root_key));
+            assert_eq!(key, DBKey::new(&root_key));
             assert_eq!(val, root_val);
         }
         _ => assert!(false),

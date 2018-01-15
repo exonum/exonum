@@ -19,7 +19,7 @@ use serde::ser::SerializeMap;
 
 use crypto::{Hash, HashStream};
 use super::super::{StorageValue, Error};
-use super::key::{ProofMapKey, DBKey, ChildKind, KEY_SIZE};
+use super::key::{ProofMapKey, DBKey, KeyBitRange, ChildKind, KEY_SIZE};
 
 impl Serialize for DBKey {
     fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
@@ -28,8 +28,8 @@ impl Serialize for DBKey {
     {
         let mut repr = String::with_capacity(KEY_SIZE * 8);
         let bslice = self;
-        for ind in 0..self.to() - self.from() {
-            match bslice.get(ind) {
+        for ind in 0..self.end() - self.start() {
+            match bslice.bit(ind) {
                 ChildKind::Left => {
                     repr.push('0');
                 }
@@ -277,7 +277,7 @@ impl<V: fmt::Debug + StorageValue> MapProof<V> {
     /// If the proof is valid and the requested key does not exists, `Ok(None)` is returned.
     /// If the proof is invalid, `Err` is returned.
     pub fn validate<K: ProofMapKey>(&self, key: &K, root_hash: Hash) -> Result<Option<&V>, Error> {
-        let searched_slice = DBKey::leaf(key);
+        let searched_slice = DBKey::new(key);
         use self::MapProof::*;
 
         // if we inspect the topmost level of a proof
@@ -398,10 +398,8 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                 right_key: ref right_slice_key,
                 ..
             } => {
-                let mut left_slice = left_slice_key.clone();
-                left_slice.set_from(0);
-                let mut right_slice = right_slice_key.clone();
-                right_slice.set_from(0);
+                let mut left_slice = left_slice_key.start_from(0);
+                let mut right_slice = right_slice_key.start_from(0);
                 if !left_slice.starts_with(parent_slice) || !right_slice.starts_with(parent_slice) {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with itself: Proof: \
@@ -426,10 +424,8 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                 right_key: ref right_slice_key,
                 ..
             } => {
-                let mut left_slice = left_slice_key.clone();
-                left_slice.set_from(0);
-                let mut right_slice = right_slice_key.clone();
-                right_slice.set_from(0);
+                let mut left_slice = left_slice_key.start_from(0);
+                let mut right_slice = right_slice_key.start_from(0);
                 if !left_slice.starts_with(parent_slice) || !right_slice.starts_with(parent_slice) {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with itself: Proof: \
@@ -453,10 +449,8 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                 right_key: ref right_slice_key,
                 ..
             } => {
-                let mut left_slice = left_slice_key.clone();
-                left_slice.set_from(0);
-                let mut right_slice = right_slice_key.clone();
-                right_slice.set_from(0);
+                let mut left_slice = left_slice_key.start_from(0);
+                let mut right_slice = right_slice_key.start_from(0);
                 if !left_slice.starts_with(parent_slice) || !right_slice.starts_with(parent_slice) {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with itself: Proof: \

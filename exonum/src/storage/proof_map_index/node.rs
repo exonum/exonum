@@ -111,8 +111,8 @@ fn test_branch_node() {
 
     let lh = hash(&[1, 2]);
     let rh = hash(&[3, 4]);
-    let ls = DBKey::leaf(&[253; 32]);
-    let rs = DBKey::leaf(&[244; 32]);
+    let ls = DBKey::new(&[253; 32]);
+    let rs = DBKey::new(&[244; 32]);
 
     branch.set_child(ChildKind::Left, &ls, &lh);
     branch.set_child(ChildKind::Right, &rs, &rh);

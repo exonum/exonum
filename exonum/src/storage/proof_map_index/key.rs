@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use std::cmp::min;
-use std::ops::Deref;
 
 use crypto::{Hash, PublicKey, HASH_SIZE};
 use super::super::StorageKey;
@@ -57,14 +56,6 @@ pub enum ChildKind {
     Right,
 }
 
-/// A struct that represents a bit slices of the proof map keys.
-#[derive(Clone)]
-pub struct DBKey {
-    data: [u8; KEY_SIZE],
-    from: u16,
-    to: u16,
-}
-
 impl ::std::ops::Not for ChildKind {
     type Output = ChildKind;
 
@@ -76,771 +67,44 @@ impl ::std::ops::Not for ChildKind {
     }
 }
 
-impl DBKey {
-    /// Create a new bit slice from the given binary data.
-    pub fn leaf<K: ProofMapKey>(key: &K) -> DBKey {
-        debug_assert_eq!(key.size(), KEY_SIZE);
-
-        let mut data = [0; KEY_SIZE];
-        key.write(&mut data);
-        DBKey {
-            data: data,
-            from: 0,
-            to: (KEY_SIZE * 8) as u16,
-        }
-    }
-
-    #[doc(hidden)]
-    pub fn from(&self) -> u16 {
-        self.from
-    }
-
-    // TODO: terrible hack, try to remove this (ECR-22)
-    #[doc(hidden)]
-    pub fn set_from(&mut self, from: u16) {
-        self.from = from
-    }
-
-    #[doc(hidden)]
-    pub fn to(&self) -> u16 {
-        self.to
-    }
-
-    /// Returns length of the `DBKey`.
-    pub fn len(&self) -> u16 {
-        self.to - self.from
-    }
-
-    /// Returns true if `DBKey` has zero length.
-    pub fn is_empty(&self) -> bool {
-        self.to == self.from
-    }
-
-    /// Get bit at position `idx`.
-    pub fn get(&self, idx: u16) -> ChildKind {
-        debug_assert!(self.from + idx < self.to);
-
-        let pos = self.from + idx;
-        let chunk = self.data[(pos / 8) as usize];
-        let bit = pos % 8;
-        let value = (1 << bit) & chunk;
-        if value != 0 {
-            ChildKind::Right
-        } else {
-            ChildKind::Left
-        }
-    }
-
-    /// Shortens this DBKey to the specified length.
-    pub fn prefix(&self, suffix: u16) -> DBKey {
-        debug_assert!(self.from + suffix <= self.data.len() as u16 * 8);
-
-        DBKey {
-            data: self.data,
-            from: self.from,
-            to: self.from + suffix,
-        }
-    }
-
-    /// Return object which represents a view on to this slice (further) offset by `i` bits.
-    pub fn suffix(&self, suffix: u16) -> DBKey {
-        debug_assert!(self.from + suffix <= self.to);
-
-        DBKey {
-            data: self.data,
-            from: self.from + suffix,
-            to: self.to,
-        }
-    }
-
-    /// Shortens this DBKey to the specified length.
-    pub fn truncate(&self, size: u16) -> DBKey {
-        debug_assert!(self.from + size <= self.to);
-
-        DBKey {
-            data: self.data,
-            from: self.from,
-            to: self.from + size,
-        }
-    }
-
-    /// Returns how many bits at the beginning matches with `other`
-    pub fn common_prefix(&self, other: &Self) -> u16 {
-        // We assume that all slices created from byte arrays with the same length
-        if self.from != other.from {
-            0
-        } else {
-            let from = self.from / 8;
-            let to = min((self.to + 7) / 8, (other.to + 7) / 8);
-            let max_len = min(self.len(), other.len());
-
-            for i in from..to {
-                let x = self.data[i as usize] ^ other.data[i as usize];
-                if x != 0 {
-                    let tail = x.trailing_zeros() as u16;
-                    return min(i * 8 + tail - self.from, max_len);
-                }
-            }
-
-            max_len
-        }
-    }
-
-    /// Returns true if we starts with the same prefix at the whole of `Other`
-    pub fn starts_with(&self, other: &Self) -> bool {
-        self.common_prefix(other) == other.len()
-    }
-
-    /// Returns true if self.to not changed
-    pub fn is_leaf(&self) -> bool {
-        self.to == (KEY_SIZE * 8) as u16
-    }
-
-    // TODO: terrible hack, try to remove this (ECR-22)
-    /// Represents `DBKey` as byte array and returns it
-    pub fn as_bytes(&self) -> Box<[u8]> {
-        let mut buffer = Box::new([0u8; DB_KEY_SIZE as usize]);
-        self.write(buffer.as_mut());
-        buffer
-    }
-}
-
-impl AsRef<[u8]> for DBKey {
-    fn as_ref(&self) -> &[u8] {
-        &self.data
-    }
-}
-
-impl StorageKey for DBKey {
-    fn size(&self) -> usize {
-        DB_KEY_SIZE
-    }
-
-    fn write(&self, buffer: &mut [u8]) {
-        if self.is_leaf() {
-            buffer[0] = LEAF_KEY_PREFIX;
-            buffer[1..KEY_SIZE + 1].copy_from_slice(&self.data);
-            buffer[KEY_SIZE + 1] = 0;
-        } else {
-            buffer[0] = BRANCH_KEY_PREFIX;
-            let right = (self.to as usize + 7) / 8;
-            buffer[1..right + 1].copy_from_slice(&self.data[0..right]);
-            if self.to % 8 != 0 {
-                buffer[right] &= !(255u8 << (self.to % 8));
-            }
-            for i in buffer.iter_mut().take(KEY_SIZE + 1).skip(right + 1) {
-                *i = 0
-            }
-            buffer[KEY_SIZE + 1] = self.to as u8;
-        }
-    }
-
-    fn read(buffer: &[u8]) -> Self {
-        debug_assert_eq!(buffer.len(), DB_KEY_SIZE);
-        let mut data = [0; KEY_SIZE];
-        data[..].copy_from_slice(&buffer[1..KEY_SIZE + 1]);
-        let to = match buffer[0] {
-            LEAF_KEY_PREFIX => KEY_SIZE as u16 * 8,
-            BRANCH_KEY_PREFIX => u16::from(buffer[DB_KEY_SIZE - 1]),
-            _ => unreachable!("wrong key prefix"),
-        };
-        DBKey {
-            data: data,
-            from: 0,
-            to: to,
-        }
-    }
-}
-
-impl PartialEq for DBKey {
-    fn eq(&self, other: &Self) -> bool {
-        self.len() == other.len() && self.starts_with(other)
-    }
-}
-
-impl ::std::fmt::Debug for DBKey {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        let mut bits = String::with_capacity(KEY_SIZE * 8);
-        for byte in 0..self.data.len() {
-            let chunk = self.data[byte];
-            for bit in (0..8).rev() {
-                let i = (byte * 8 + bit) as u16;
-                if i < self.from || i >= self.to {
-                    bits.push('_');
-                } else {
-                    bits.push(if (1 << bit) & chunk == 0 { '0' } else { '1' });
-                }
-            }
-            bits.push('|');
-        }
-
-        f.debug_struct("DBKey")
-            .field("begin", &self.from)
-            .field("end", &self.to)
-            .field("bits", &bits)
-            .finish()
-    }
-}
-
-#[test]
-fn test_dbkey_storage_key_leaf() {
-    let key = DBKey::leaf(&[250; 32]);
-    let mut buf = vec![0; DB_KEY_SIZE];
-    key.write(&mut buf);
-    let key2 = DBKey::read(&buf);
-
-    assert_eq!(buf[0], LEAF_KEY_PREFIX);
-    assert_eq!(buf[33], 0);
-    assert_eq!(&buf[1..33], &[250; 32]);
-    assert_eq!(key2, key);
-}
-
-#[test]
-fn test_dbkey_storage_key_branch() {
-    let mut key = DBKey::leaf(&[255; 32]);
-    key = key.prefix(11);
-    key = key.suffix(5);
-
-    let mut buf = vec![0; DB_KEY_SIZE];
-    key.write(&mut buf);
-    let mut key2 = DBKey::read(&buf);
-    key2.set_from(5);
-
-    assert_eq!(buf[0], BRANCH_KEY_PREFIX);
-    assert_eq!(buf[33], 11);
-    assert_eq!(&buf[1..3], &[255, 7]);
-    assert_eq!(&buf[3..33], &[0; 30]);
-    assert_eq!(key2, key);
-}
-
-#[test]
-fn test_dbkey_suffix() {
-    let b = DBKey::read(b"\x00\x01\x02\xFF\x0C0000000000000000000000000000\x20");
-
-    assert_eq!(b.len(), 32);
-    assert_eq!(b.get(0), ChildKind::Right);
-    assert_eq!(b.get(7), ChildKind::Left);
-    assert_eq!(b.get(8), ChildKind::Left);
-    assert_eq!(b.get(9), ChildKind::Right);
-    assert_eq!(b.get(15), ChildKind::Left);
-    assert_eq!(b.get(16), ChildKind::Right);
-    assert_eq!(b.get(20), ChildKind::Right);
-    assert_eq!(b.get(23), ChildKind::Right);
-    assert_eq!(b.get(26), ChildKind::Right);
-    assert_eq!(b.get(27), ChildKind::Right);
-    assert_eq!(b.get(31), ChildKind::Left);
-    let b2 = b.suffix(8);
-    assert_eq!(b2.len(), 24);
-    assert_eq!(b2.get(0), ChildKind::Left);
-    assert_eq!(b2.get(1), ChildKind::Right);
-    assert_eq!(b2.get(7), ChildKind::Left);
-    assert_eq!(b2.get(12), ChildKind::Right);
-    assert_eq!(b2.get(15), ChildKind::Right);
-    let b3 = b2.suffix(24);
-    assert_eq!(b3.len(), 0);
-    let b4 = b.suffix(1);
-    assert_eq!(b4.get(6), ChildKind::Left);
-    assert_eq!(b4.get(7), ChildKind::Left);
-    assert_eq!(b4.get(8), ChildKind::Right);
-}
-
-#[test]
-fn test_dbkey_truncate() {
-    let b = DBKey::read(b"\x00\x83wertyuiopasdfghjklzxcvbnm123456\x08");
-    assert_eq!(b.len(), 8);
-    assert_eq!(b.truncate(1).get(0), ChildKind::Right);
-    assert_eq!(b.truncate(1).len(), 1);
-}
-
-#[test]
-fn test_dbkey_len() {
-    let b = DBKey::read(b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00");
-    assert_eq!(b.len(), 256);
-}
-
-#[test]
-#[should_panic(expected = "self.from + idx < self.to")]
-fn test_dbkey_at_overflow() {
-    let b = DBKey::read(b"\x00qwertyuiopasdfghjklzxcvbnm123456\x0F");
-    b.get(32);
-}
-
-#[test]
-#[should_panic(expected = "self.from + suffix <= self.to")]
-fn test_dbkey_suffix_overflow() {
-    let b = DBKey::read(b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
-    assert_eq!(b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00".len(), 34);
-    b.suffix(255).suffix(2);
-}
-
-#[test]
-#[should_panic(expected = "self.from + idx < self.to")]
-fn test_dbkey_suffix_at_overflow() {
-    let b = DBKey::read(b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
-    b.suffix(1).get(255);
-}
-
-#[test]
-fn test_dbkey_common_prefix() {
-    let b1 = DBKey::read(b"\x01abcd0000000000000000000000000000\x00");
-    let b2 = DBKey::read(b"\x01abef0000000000000000000000000000\x00");
-    assert_eq!(b1.common_prefix(&b1), 256);
-    let c = b1.common_prefix(&b2);
-    assert_eq!(c, 17);
-    let c = b2.common_prefix(&b1);
-    assert_eq!(c, 17);
-    let b1 = b1.suffix(9);
-    let b2 = b2.suffix(9);
-    let c = b1.common_prefix(&b2);
-    assert_eq!(c, 8);
-    let b3 = DBKey::read(b"\x01\xFF0000000000000000000000000000000\x00");
-    let b4 = DBKey::read(b"\x01\xF70000000000000000000000000000000\x00");
-    assert_eq!(b3.common_prefix(&b4), 3);
-    assert_eq!(b4.common_prefix(&b3), 3);
-    assert_eq!(b3.common_prefix(&b3), 256);
-    let b3 = b3.suffix(30);
-    assert_eq!(b3.common_prefix(&b3), 226);
-    let b3 = b3.truncate(200);
-    assert_eq!(b3.common_prefix(&b3), 200);
-    let b5 = DBKey::read(b"\x01\xF00000000000000000000000000000000\x00");
-    assert_eq!(b5.truncate(0).common_prefix(&b3), 0);
-}
-
-#[test]
-fn test_dbkey_is_leaf() {
-    let b = DBKey::read(b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00");
-    assert_eq!(b.len(), 256);
-    assert_eq!(b.suffix(4).is_leaf(), true);
-    assert_eq!(b.suffix(8).is_leaf(), true);
-    assert_eq!(b.suffix(250).is_leaf(), true);
-    assert_eq!(b.truncate(16).is_leaf(), false);
-}
-
-#[test]
-fn test_dbkey_is_branch() {
-    let b = DBKey::read(b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
-    assert_eq!(b.len(), 255);
-    assert_eq!(b.is_leaf(), false);
-}
-
-#[derive(Clone, Copy)]
-pub struct DBKey2([u8; DB_KEY_SIZE]);
-
-impl AsRef<[u8]> for DBKey2 {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
-    }
-}
-
-impl PartialEq for DBKey2 {
-    fn eq(&self, other: &Self) -> bool {
-        self.0.as_ref() == other.0.as_ref()
-    }
-}
-
-impl DBKey2 {
-    /// Create a new bit slice from the given binary data.
-    pub fn leaf<K: ProofMapKey>(key: &K) -> DBKey2 {
-        debug_assert_eq!(key.size(), KEY_SIZE);
-
-        let mut data = [0; DB_KEY_SIZE];
-        data[0] = LEAF_KEY_PREFIX;
-        key.write(&mut data[1..KEY_SIZE + 1]);
-        data[KEY_SIZE + 1] = 0;
-        DBKey2(data)
-    }
-
-    pub fn is_leaf(&self) -> bool {
-        self.0[0] == LEAF_KEY_PREFIX
-    }
-
-    pub fn end(&self) -> u16 {
-        if self.is_leaf() {
-            KEY_SIZE as u16 * 8
-        } else {
-            u16::from(self.0[DB_KEY_SIZE - 1])
-        }
-    }
-}
-
-impl StorageKey for DBKey2 {
-    fn size(&self) -> usize {
-        DB_KEY_SIZE
-    }
-
-    fn write(&self, buffer: &mut [u8]) {
-        buffer.copy_from_slice(&self.0);
-        // Cut of the bits that lie to the right of the end.
-        if !self.is_leaf() {
-            let right = (self.end() as usize + 7) / 8;
-            if self.end() % 8 != 0 {
-                buffer[right] &= !(255u8 << (self.end() % 8));
-            }
-            for i in buffer.iter_mut().take(KEY_SIZE + 1).skip(right + 1) {
-                *i = 0
-            }
-        }
-    }
-
-    fn read(buffer: &[u8]) -> Self {
-        debug_assert_eq!(buffer.len(), DB_KEY_SIZE);
-        let mut data = [0; DB_KEY_SIZE];
-        data.copy_from_slice(&buffer);
-        DBKey2(data)
-    }
-}
-
-impl ::std::fmt::Debug for DBKey2 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        f.debug_tuple("DBKey2").field(&self.0.as_ref()).finish()
-    }
-}
-
-pub struct DBKeyBitRange {
-    inner: DBKey2,
-    start: u16,
-}
-
-impl PartialEq for DBKeyBitRange {
-    fn eq(&self, other: &Self) -> bool {
-        self.len() == other.len() && self.starts_with(other)
-    }
-}
-
-impl ::std::fmt::Debug for DBKeyBitRange {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        let mut bits = String::with_capacity(KEY_SIZE * 8);
-        for byte in 0..self.data().len() {
-            let chunk = self.data()[byte];
-            for bit in (0..8).rev() {
-                let i = (byte * 8 + bit) as u16;
-                if i < self.start() || i >= self.end() {
-                    bits.push('_');
-                } else {
-                    bits.push(if (1 << bit) & chunk == 0 { '0' } else { '1' });
-                }
-            }
-            bits.push('|');
-        }
-
-        f.debug_struct("DBKeyBitRange")
-            .field("start", &self.start())
-            .field("end", &self.end())
-            .field("bits", &bits)
-            .finish()
-    }
-}
-
-impl DBKeyBitRange {
-    // TODO
-    pub fn new(key: DBKey2, start: u16, end: u16) -> DBKeyBitRange {
-        let mut range = DBKeyBitRange { inner: key, start };
-        range.set_end(end);
-        range
-    }
-
-    // TODO
-    pub fn from_raw(raw: [u8; DB_KEY_SIZE]) -> DBKeyBitRange {
-        DBKeyBitRange {
-            inner: DBKey2(raw),
-            start: 0,
-        }
-    }
-
-    // TODO
-    pub fn leaf<K: ProofMapKey>(key: &K) -> DBKeyBitRange {
-        DBKeyBitRange {
-            inner: DBKey2::leaf(key),
-            start: 0,
-        }
-    }
-
-    // TODO
-    pub fn start(&self) -> u16 {
-        self.start
-    }
-
-    /// Returns length of the `DBKey`.
-    pub fn len(&self) -> u16 {
-        self.end() - self.start()
-    }
-
-    /// Returns true if `DBKey` has zero length.
-    pub fn is_empty(&self) -> bool {
-        self.end() == self.start()
-    }
-
-    /// Get bit at position `idx`.
-    pub fn bit(&self, idx: u16) -> ChildKind {
-        debug_assert!(self.start() + idx < self.end());
-
-        let pos = self.start() + idx;
-        let chunk = self.data()[(pos / 8) as usize];
-        let bit = pos % 8;
-        let value = (1 << bit) & chunk;
-        if value != 0 {
-            ChildKind::Right
-        } else {
-            ChildKind::Left
-        }
-    }
-
-    /// Shortens this DBKey to the specified length.
-    pub fn prefix(&self, suffix: u16) -> DBKeyBitRange {
-        debug_assert!(self.start() + suffix <= self.data().len() as u16 * 8);
-
-        DBKeyBitRange::new(self.inner, self.start(), self.start() + suffix)
-    }
-
-    /// Return object which represents a view on to this slice (further) offset by `i` bits.
-    pub fn suffix(&self, suffix: u16) -> DBKeyBitRange {
-        debug_assert!(self.start() + suffix <= self.end());
-
-        DBKeyBitRange::new(self.inner, self.start() + suffix, self.end())
-    }
-
-    /// Returns how many bits at the beginning matches with `other`
-    pub fn common_prefix(&self, other: &Self) -> u16 {
-        // We assume that all slices created from byte arrays with the same length
-        if self.start() != other.start() {
-            0
-        } else {
-            let from = self.start() / 8;
-            let to = min((self.end() + 7) / 8, (other.end() + 7) / 8);
-            let max_len = min(self.len(), other.len());
-
-            for i in from..to {
-                let x = self.data()[i as usize] ^ other.data()[i as usize];
-                if x != 0 {
-                    let tail = x.trailing_zeros() as u16;
-                    return min(i * 8 + tail - self.start(), max_len);
-                }
-            }
-
-            max_len
-        }
-    }
-
-    /// Returns true if we starts with the same prefix at the whole of `Other`
-    pub fn starts_with(&self, other: &Self) -> bool {
-        self.common_prefix(other) == other.len()
-    }
-
-    pub fn set_end(&mut self, end: u16) {
-        let max_len = (KEY_SIZE * 8) as u16;
-        assert!(end <= max_len);
-        // Update DBKey kind and right bound.
-        if end == max_len {
-            self.inner.0[DB_KEY_SIZE - 1] = 0;
-            self.inner.0[0] = LEAF_KEY_PREFIX;
-        } else {
-            self.inner.0[0] = BRANCH_KEY_PREFIX;
-            self.inner.0[DB_KEY_SIZE - 1] = end as u8;
-        };
-    }
-
-    fn data(&self) -> &[u8] {
-        &self.inner.0[1..1 + KEY_SIZE]
-    }
-}
-
-impl From<DBKey2> for DBKeyBitRange {
-    fn from(key: DBKey2) -> DBKeyBitRange {
-        DBKeyBitRange {
-            inner: key,
-            start: 0,
-        }
-    }
-}
-
-impl<K: ProofMapKey> From<K> for DBKeyBitRange {
-    fn from(key: K) -> DBKeyBitRange {
-        DBKeyBitRange::from(DBKey2::leaf(&key))
-    }
-}
-
-impl Deref for DBKeyBitRange {
-    type Target = DBKey2;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-#[test]
-fn test_dbkey2_storage_key_leaf() {
-    let key = DBKey2::leaf(&[250; 32]);
-    let mut buf = vec![0; DB_KEY_SIZE];
-    key.write(&mut buf);
-    let key2 = DBKey2::read(&buf);
-
-    assert_eq!(buf[0], LEAF_KEY_PREFIX);
-    assert_eq!(buf[33], 0);
-    assert_eq!(&buf[1..33], &[250; 32]);
-    assert_eq!(key2, key);
-}
-
-#[test]
-fn test_dbkey2_storage_key_branch() {
-    let mut key = DBKeyBitRange::leaf(&[255u8; 32]);
-    key = key.prefix(11);
-    key = key.suffix(5);
-
-    let mut buf = vec![0; DB_KEY_SIZE];
-    key.write(&mut buf);
-    let mut key2 = DBKeyBitRange::from(DBKey2::read(&buf));
-    key2.start = 5;
-
-    assert_eq!(buf[0], BRANCH_KEY_PREFIX);
-    assert_eq!(buf[33], 11);
-    assert_eq!(&buf[1..3], &[255, 7]);
-    assert_eq!(&buf[3..33], &[0; 30]);
-    assert_eq!(key2, key);
-}
-
-#[test]
-fn test_dbkey2_suffix() {
-    let b = DBKeyBitRange::from_raw(*b"\x00\x01\x02\xFF\x0C0000000000000000000000000000\x20");
-
-    println!("{:?}", b);
-
-    assert_eq!(b.len(), 32);
-    assert_eq!(b.bit(0), ChildKind::Right);
-    assert_eq!(b.bit(7), ChildKind::Left);
-    assert_eq!(b.bit(8), ChildKind::Left);
-    assert_eq!(b.bit(9), ChildKind::Right);
-    assert_eq!(b.bit(15), ChildKind::Left);
-    assert_eq!(b.bit(16), ChildKind::Right);
-    assert_eq!(b.bit(20), ChildKind::Right);
-    assert_eq!(b.bit(23), ChildKind::Right);
-    assert_eq!(b.bit(26), ChildKind::Right);
-    assert_eq!(b.bit(27), ChildKind::Right);
-    assert_eq!(b.bit(31), ChildKind::Left);
-    let b2 = b.suffix(8);
-    assert_eq!(b2.len(), 24);
-    assert_eq!(b2.bit(0), ChildKind::Left);
-    assert_eq!(b2.bit(1), ChildKind::Right);
-    assert_eq!(b2.bit(7), ChildKind::Left);
-    assert_eq!(b2.bit(12), ChildKind::Right);
-    assert_eq!(b2.bit(15), ChildKind::Right);
-    let b3 = b2.suffix(24);
-    assert_eq!(b3.len(), 0);
-    let b4 = b.suffix(1);
-    assert_eq!(b4.bit(6), ChildKind::Left);
-    assert_eq!(b4.bit(7), ChildKind::Left);
-    assert_eq!(b4.bit(8), ChildKind::Right);
-}
-
-#[test]
-fn test_dbkey2_prefix() {
-    let b = DBKeyBitRange::from_raw(*b"\x00\x83wertyuiopasdfghjklzxcvbnm123456\x08");
-    assert_eq!(b.len(), 8);
-    assert_eq!(b.prefix(1).bit(0), ChildKind::Right);
-    assert_eq!(b.prefix(1).len(), 1);
-}
-
-#[test]
-fn test_dbkey2_len() {
-    let b = DBKeyBitRange::from_raw(*b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00");
-    assert_eq!(b.len(), 256);
-}
-
-#[test]
-#[should_panic(expected = "self.start() + idx < self.end()")]
-fn test_dbkey2_at_overflow() {
-    let b = DBKeyBitRange::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\x0F");
-    b.bit(32);
-}
-
-#[test]
-#[should_panic(expected = "self.start() + suffix <= self.end()")]
-fn test_dbkey2_suffix_overflow() {
-    let b = DBKeyBitRange::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
-    assert_eq!(b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00".len(), 34);
-    b.suffix(255).suffix(2);
-}
-
-#[test]
-#[should_panic(expected = "self.start() + idx < self.end()")]
-fn test_dbkey2_suffix_bit_overflow() {
-    let b = DBKeyBitRange::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
-    b.suffix(1).bit(255);
-}
-
-#[test]
-fn test_dbkey2_common_prefix() {
-    let b1 = DBKeyBitRange::from_raw(*b"\x01abcd0000000000000000000000000000\x00");
-    let b2 = DBKeyBitRange::from_raw(*b"\x01abef0000000000000000000000000000\x00");
-    assert_eq!(b1.common_prefix(&b1), 256);
-    let c = b1.common_prefix(&b2);
-    assert_eq!(c, 17);
-    let c = b2.common_prefix(&b1);
-    assert_eq!(c, 17);
-    let b1 = b1.suffix(9);
-    let b2 = b2.suffix(9);
-    let c = b1.common_prefix(&b2);
-    assert_eq!(c, 8);
-    let b3 = DBKeyBitRange::from_raw(*b"\x01\xFF0000000000000000000000000000000\x00");
-    let b4 = DBKeyBitRange::from_raw(*b"\x01\xF70000000000000000000000000000000\x00");
-    assert_eq!(b3.common_prefix(&b4), 3);
-    assert_eq!(b4.common_prefix(&b3), 3);
-    assert_eq!(b3.common_prefix(&b3), 256);
-    let b3 = b3.suffix(30);
-    assert_eq!(b3.common_prefix(&b3), 226);
-    let b3 = b3.prefix(200);
-    assert_eq!(b3.common_prefix(&b3), 200);
-    let b5 = DBKeyBitRange::from_raw(*b"\x01\xF00000000000000000000000000000000\x00");
-    assert_eq!(b5.prefix(0).common_prefix(&b3), 0);
-}
-
-#[test]
-fn test_dbkey2_is_leaf() {
-    let b = DBKeyBitRange::from_raw(*b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00");
-    assert_eq!(b.len(), 256);
-    assert_eq!(b.suffix(4).is_leaf(), true);
-    assert_eq!(b.suffix(8).is_leaf(), true);
-    assert_eq!(b.suffix(250).is_leaf(), true);
-    assert_eq!(b.prefix(16).is_leaf(), false);
-}
-
-#[test]
-fn test_dbkey2_is_branch() {
-    let b = DBKeyBitRange::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
-    assert_eq!(b.len(), 255);
-    assert_eq!(b.is_leaf(), false);
-}
-
+/// A structure that represents paths to the any kinds of `ProofMapIndex` nodes.
 #[derive(Copy, Clone)]
-struct DBKey3 {
+pub struct DBKey {
     bytes: [u8; DB_KEY_SIZE],
     start: u16,
 }
 
-impl DBKey3 {
-    // TODO
-    pub fn new<K: ProofMapKey>(key: &K) -> DBKey3 {
+impl DBKey {
+    /// Create a path from the given key.
+    pub fn new<K: ProofMapKey>(key: &K) -> DBKey {
         debug_assert_eq!(key.size(), KEY_SIZE);
 
         let mut data = [0; DB_KEY_SIZE];
         data[0] = LEAF_KEY_PREFIX;
         key.write(&mut data[1..KEY_SIZE + 1]);
         data[KEY_SIZE + 1] = 0;
-        DBKey3::from_raw(data)
+        DBKey::from_raw(data)
     }
 
-    // TODO
+    /// Shows the type of path.
     pub fn is_leaf(&self) -> bool {
         self.bytes[0] == LEAF_KEY_PREFIX
     }
 
-    // TODO
-    fn from_raw(raw: [u8; DB_KEY_SIZE]) -> DBKey3 {
-        DBKey3 {
+    /// Returns the byte representation of `DBKey`.
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    /// Constructs the `DBKey` from raw bytes.
+    fn from_raw(raw: [u8; DB_KEY_SIZE]) -> DBKey {
+        DBKey {
             bytes: raw,
             start: 0,
         }
     }
 
+    /// Sets the right border of the bit range.
     fn set_end(&mut self, end: u16) {
         let max_len = (KEY_SIZE * 8) as u16;
         assert!(end <= max_len);
@@ -855,16 +119,24 @@ impl DBKey3 {
     }
 }
 
+/// The bits representation of the `DBKey`.
 pub trait KeyBitRange {
+    /// Returns the left border of the range.
     fn start(&self) -> u16;
+    /// Returns the right border of the range.
     fn end(&self) -> u16;
+    /// Returns length in bits of the range.
     fn len(&self) -> u16 {
         self.end() - self.start()
     }
+    /// Returns true if the range has zero length.
     fn is_empty(&self) -> bool {
         self.end() == self.start()
     }
+    /// Get bit at position `idx`.
     fn bit(&self, idx: u16) -> ChildKind;
+    /// Returns the new `DBKey` with the given left border.
+    fn start_from(&self, idx: u16) -> Self;
     /// Shortens this DBKey to the specified length.
     fn prefix(&self, pos: u16) -> Self;
     /// Return object which represents a view on to this slice (further) offset by `i` bits.
@@ -875,10 +147,11 @@ pub trait KeyBitRange {
     }
     /// Returns how many bits at the beginning matches with `other`
     fn common_prefix(&self, other: &Self) -> u16;
-    fn as_bytes(&self) -> &[u8];
+    /// Returns the raw bytes of the key.
+    fn raw_key(&self) -> &[u8];
 }
 
-impl KeyBitRange for DBKey3 {
+impl KeyBitRange for DBKey {
     fn start(&self) -> u16 {
         self.start
     }
@@ -895,7 +168,7 @@ impl KeyBitRange for DBKey3 {
         debug_assert!(self.start() + idx < self.end());
 
         let pos = self.start() + idx;
-        let chunk = self.as_bytes()[(pos / 8) as usize];
+        let chunk = self.raw_key()[(pos / 8) as usize];
         let bit = pos % 8;
         let value = (1 << bit) & chunk;
         if value != 0 {
@@ -905,10 +178,18 @@ impl KeyBitRange for DBKey3 {
         }
     }
 
-    fn prefix(&self, pos: u16) -> Self {
-        debug_assert!(self.start() + pos <= self.as_bytes().len() as u16 * 8);
+    fn start_from(&self, start: u16) -> Self {
+        debug_assert!(start <= self.end());
 
-        let mut key = DBKey3::from_raw(self.bytes);
+        let mut key = DBKey::from_raw(self.bytes);
+        key.start = start;
+        key
+    }
+
+    fn prefix(&self, pos: u16) -> Self {
+        debug_assert!(self.start() + pos <= self.raw_key().len() as u16 * 8);
+
+        let mut key = DBKey::from_raw(self.bytes);
         key.start = self.start;
         key.set_end(self.start + pos);
         key
@@ -917,7 +198,7 @@ impl KeyBitRange for DBKey3 {
     fn suffix(&self, pos: u16) -> Self {
         debug_assert!(self.start() + pos <= self.end());
 
-        let mut key = DBKey3::from_raw(self.bytes);
+        let mut key = DBKey::from_raw(self.bytes);
         key.start = self.start + pos;
         key
     }
@@ -932,7 +213,7 @@ impl KeyBitRange for DBKey3 {
             let max_len = min(self.len(), other.len());
 
             for i in from..to {
-                let x = self.as_bytes()[i as usize] ^ other.as_bytes()[i as usize];
+                let x = self.raw_key()[i as usize] ^ other.raw_key()[i as usize];
                 if x != 0 {
                     let tail = x.trailing_zeros() as u16;
                     return min(i * 8 + tail - self.start(), max_len);
@@ -943,22 +224,22 @@ impl KeyBitRange for DBKey3 {
         }
     }
 
-    fn as_bytes(&self) -> &[u8] {
+    fn raw_key(&self) -> &[u8] {
         &self.bytes[1..KEY_SIZE + 1]
     }
 }
 
-impl PartialEq for DBKey3 {
+impl PartialEq for DBKey {
     fn eq(&self, other: &Self) -> bool {
         self.len() == other.len() && self.starts_with(other)
     }
 }
 
-impl ::std::fmt::Debug for DBKey3 {
+impl ::std::fmt::Debug for DBKey {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         let mut bits = String::with_capacity(KEY_SIZE * 8);
-        for byte in 0..self.as_bytes().len() {
-            let chunk = self.as_bytes()[byte];
+        for byte in 0..self.raw_key().len() {
+            let chunk = self.raw_key()[byte];
             for bit in (0..8).rev() {
                 let i = (byte * 8 + bit) as u16;
                 if i < self.start() || i >= self.end() {
@@ -978,7 +259,7 @@ impl ::std::fmt::Debug for DBKey3 {
     }
 }
 
-impl StorageKey for DBKey3 {
+impl StorageKey for DBKey {
     fn size(&self) -> usize {
         DB_KEY_SIZE
     }
@@ -1001,16 +282,16 @@ impl StorageKey for DBKey3 {
         debug_assert_eq!(buffer.len(), DB_KEY_SIZE);
         let mut data = [0; DB_KEY_SIZE];
         data.copy_from_slice(&buffer);
-        DBKey3::from_raw(data)
+        DBKey::from_raw(data)
     }
 }
 
 #[test]
-fn test_dbkey3_storage_key_leaf() {
-    let key = DBKey3::new(&[250; 32]);
+fn test_dbkey_storage_key_leaf() {
+    let key = DBKey::new(&[250; 32]);
     let mut buf = vec![0; DB_KEY_SIZE];
     key.write(&mut buf);
-    let key2 = DBKey3::read(&buf);
+    let key2 = DBKey::read(&buf);
 
     assert_eq!(buf[0], LEAF_KEY_PREFIX);
     assert_eq!(buf[33], 0);
@@ -1019,14 +300,14 @@ fn test_dbkey3_storage_key_leaf() {
 }
 
 #[test]
-fn test_dbkey3_storage_key_branch() {
-    let mut key = DBKey3::new(&[255u8; 32]);
+fn test_dbkey_storage_key_branch() {
+    let mut key = DBKey::new(&[255u8; 32]);
     key = key.prefix(11);
     key = key.suffix(5);
 
     let mut buf = vec![0; DB_KEY_SIZE];
     key.write(&mut buf);
-    let mut key2 = DBKey3::read(&buf);
+    let mut key2 = DBKey::read(&buf);
     key2.start = 5;
 
     assert_eq!(buf[0], BRANCH_KEY_PREFIX);
@@ -1037,8 +318,8 @@ fn test_dbkey3_storage_key_branch() {
 }
 
 #[test]
-fn test_dbkey3_suffix() {
-    let b = DBKey3::from_raw(*b"\x00\x01\x02\xFF\x0C0000000000000000000000000000\x20");
+fn test_dbkey_suffix() {
+    let b = DBKey::from_raw(*b"\x00\x01\x02\xFF\x0C0000000000000000000000000000\x20");
 
     println!("{:?}", b);
 
@@ -1070,45 +351,45 @@ fn test_dbkey3_suffix() {
 }
 
 #[test]
-fn test_dbkey3_prefix() {
-    let b = DBKey3::from_raw(*b"\x00\x83wertyuiopasdfghjklzxcvbnm123456\x08");
+fn test_dbkey_prefix() {
+    let b = DBKey::from_raw(*b"\x00\x83wertyuiopasdfghjklzxcvbnm123456\x08");
     assert_eq!(b.len(), 8);
     assert_eq!(b.prefix(1).bit(0), ChildKind::Right);
     assert_eq!(b.prefix(1).len(), 1);
 }
 
 #[test]
-fn test_dbkey3_len() {
-    let b = DBKey3::from_raw(*b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00");
+fn test_dbkey_len() {
+    let b = DBKey::from_raw(*b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00");
     assert_eq!(b.len(), 256);
 }
 
 #[test]
 #[should_panic(expected = "self.start() + idx < self.end()")]
-fn test_dbkey3_at_overflow() {
-    let b = DBKey3::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\x0F");
+fn test_dbkey_at_overflow() {
+    let b = DBKey::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\x0F");
     b.bit(32);
 }
 
 #[test]
 #[should_panic(expected = "self.start() + pos <= self.end()")]
-fn test_dbkey3_suffix_overflow() {
-    let b = DBKey3::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
+fn test_dbkey_suffix_overflow() {
+    let b = DBKey::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
     assert_eq!(b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00".len(), 34);
     b.suffix(255).suffix(2);
 }
 
 #[test]
 #[should_panic(expected = "self.start() + idx < self.end()")]
-fn test_dbkey3_suffix_bit_overflow() {
-    let b = DBKey3::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
+fn test_dbkey_suffix_bit_overflow() {
+    let b = DBKey::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
     b.suffix(1).bit(255);
 }
 
 #[test]
-fn test_dbkey3_common_prefix() {
-    let b1 = DBKey3::from_raw(*b"\x01abcd0000000000000000000000000000\x00");
-    let b2 = DBKey3::from_raw(*b"\x01abef0000000000000000000000000000\x00");
+fn test_dbkey_common_prefix() {
+    let b1 = DBKey::from_raw(*b"\x01abcd0000000000000000000000000000\x00");
+    let b2 = DBKey::from_raw(*b"\x01abef0000000000000000000000000000\x00");
     assert_eq!(b1.common_prefix(&b1), 256);
     let c = b1.common_prefix(&b2);
     assert_eq!(c, 17);
@@ -1118,8 +399,8 @@ fn test_dbkey3_common_prefix() {
     let b2 = b2.suffix(9);
     let c = b1.common_prefix(&b2);
     assert_eq!(c, 8);
-    let b3 = DBKey3::from_raw(*b"\x01\xFF0000000000000000000000000000000\x00");
-    let b4 = DBKey3::from_raw(*b"\x01\xF70000000000000000000000000000000\x00");
+    let b3 = DBKey::from_raw(*b"\x01\xFF0000000000000000000000000000000\x00");
+    let b4 = DBKey::from_raw(*b"\x01\xF70000000000000000000000000000000\x00");
     assert_eq!(b3.common_prefix(&b4), 3);
     assert_eq!(b4.common_prefix(&b3), 3);
     assert_eq!(b3.common_prefix(&b3), 256);
@@ -1127,13 +408,13 @@ fn test_dbkey3_common_prefix() {
     assert_eq!(b3.common_prefix(&b3), 226);
     let b3 = b3.prefix(200);
     assert_eq!(b3.common_prefix(&b3), 200);
-    let b5 = DBKey3::from_raw(*b"\x01\xF00000000000000000000000000000000\x00");
+    let b5 = DBKey::from_raw(*b"\x01\xF00000000000000000000000000000000\x00");
     assert_eq!(b5.prefix(0).common_prefix(&b3), 0);
 }
 
 #[test]
-fn test_dbkey3_is_leaf() {
-    let b = DBKey3::from_raw(*b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00");
+fn test_dbkey_is_leaf() {
+    let b = DBKey::from_raw(*b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00");
     assert_eq!(b.len(), 256);
     println!("{:?}", b.suffix(4));
     assert_eq!(b.suffix(4).is_leaf(), true);
@@ -1143,8 +424,8 @@ fn test_dbkey3_is_leaf() {
 }
 
 #[test]
-fn test_dbkey3_is_branch() {
-    let b = DBKey3::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
+fn test_dbkey_is_branch() {
+    let b = DBKey::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
     assert_eq!(b.len(), 255);
     assert_eq!(b.is_leaf(), false);
 }
