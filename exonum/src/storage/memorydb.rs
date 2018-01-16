@@ -56,7 +56,7 @@ impl Database for MemoryDB {
         })
     }
 
-    fn merge(&mut self, patch: Patch) -> Result<()> {
+    fn merge(&self, patch: Patch) -> Result<()> {
         for (cf_name, changes) in patch {
             let mut guard = self.map.write().unwrap();
             if !guard.contains_key(&cf_name) {
@@ -77,7 +77,7 @@ impl Database for MemoryDB {
         Ok(())
     }
 
-    fn merge_sync(&mut self, patch: Patch) -> Result<()> {
+    fn merge_sync(&self, patch: Patch) -> Result<()> {
         self.merge(patch)
     }
 }
