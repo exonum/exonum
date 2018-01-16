@@ -19,7 +19,7 @@
 use std::fs;
 use std::path::Path;
 use std::net::SocketAddr;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use toml::Value;
 
@@ -27,13 +27,13 @@ use blockchain::GenesisConfig;
 use blockchain::config::ValidatorKeys;
 use helpers::generate_testnet_config;
 use helpers::config::ConfigFile;
-use node::{NodeConfig, NodeApiConfig};
+use node::{NodeApiConfig, NodeConfig};
 use storage::Database;
 use crypto;
-use super::internal::{Command, Feedback};
-use super::{Argument, Context, CommandName};
-use super::shared::{AbstractConfig, NodePublicConfig, SharedConfig, NodePrivateConfig,
-                    CommonConfigTemplate};
+use super::internal::{CollectedCommand, Command, Feedback};
+use super::{Argument, CommandName, Context};
+use super::shared::{AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig,
+                    SharedConfig};
 use super::DEFAULT_EXONUM_LISTEN_PORT;
 use super::keys;
 
@@ -123,7 +123,12 @@ impl Command for Run {
         "Run application"
     }
 
-    fn execute(&self, mut context: Context, exts: &Fn(Context) -> Context) -> Feedback {
+    fn execute(
+        &self,
+        _commands: &HashMap<CommandName, CollectedCommand>,
+        mut context: Context,
+        exts: &Fn(Context) -> Context,
+    ) -> Feedback {
         let config = Self::node_config(&context);
         let public_addr = Self::public_api_address(&context);
         let private_addr = Self::private_api_address(&context);
@@ -171,7 +176,12 @@ impl Command for GenerateCommonConfig {
         "Generate basic config template."
     }
 
-    fn execute(&self, mut context: Context, exts: &Fn(Context) -> Context) -> Feedback {
+    fn execute(
+        &self,
+        _commands: &HashMap<CommandName, CollectedCommand>,
+        mut context: Context,
+        exts: &Fn(Context) -> Context,
+    ) -> Feedback {
         let template_path = context.arg::<String>("COMMON_CONFIG").expect(
             "COMMON_CONFIG not found",
         );
@@ -241,7 +251,12 @@ impl Command for GenerateNodeConfig {
         "Generate node secret and public configs."
     }
 
-    fn execute(&self, mut context: Context, exts: &Fn(Context) -> Context) -> Feedback {
+    fn execute(
+        &self,
+        _commands: &HashMap<CommandName, CollectedCommand>,
+        mut context: Context,
+        exts: &Fn(Context) -> Context,
+    ) -> Feedback {
         let common_config_path = context.arg::<String>("COMMON_CONFIG").expect(
             "expected common config path",
         );
@@ -348,7 +363,6 @@ impl Finalize {
             {
                 panic!("Found duplicate consenus keys in PUBLIC_CONFIGS");
             }
-
         }
         (
             common,
@@ -398,7 +412,12 @@ impl Command for Finalize {
         "Collect public and secret configs into node config."
     }
 
-    fn execute(&self, mut context: Context, exts: &Fn(Context) -> Context) -> Feedback {
+    fn execute(
+        &self,
+        _commands: &HashMap<CommandName, CollectedCommand>,
+        mut context: Context,
+        exts: &Fn(Context) -> Context,
+    ) -> Feedback {
         let public_configs_path = context.arg_multiple::<String>("PUBLIC_CONFIGS").expect(
             "keychain path not found",
         );
@@ -510,8 +529,12 @@ impl Command for GenerateTestnet {
         "Generates genesis configuration for testnet"
     }
 
-    fn execute(&self, mut context: Context, exts: &Fn(Context) -> Context) -> Feedback {
-
+    fn execute(
+        &self,
+        _commands: &HashMap<CommandName, CollectedCommand>,
+        mut context: Context,
+        exts: &Fn(Context) -> Context,
+    ) -> Feedback {
         let dir = context.arg::<String>("OUTPUT_DIR").expect("output dir");
         let count: u8 = context.arg("COUNT").expect("count as int");
         let start_port = context.arg::<u16>("START_PORT").unwrap_or(

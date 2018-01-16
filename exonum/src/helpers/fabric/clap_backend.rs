@@ -13,24 +13,29 @@
 // limitations under the License.
 
 use std::ffi::OsString;
+use std::collections::HashMap;
 
 use clap;
 
 use super::{Context, ArgumentType};
 use super::internal::{Feedback, CollectedCommand};
+use super::CommandName;
 
 pub struct ClapBackend;
 
 impl ClapBackend {
     // TODO: remove code duplication (ECR-164)
     #[doc(hidden)]
-    pub fn execute_cmd_string<I, T>(commands: &[CollectedCommand], line: I) -> Feedback
+    pub fn execute_cmd_string<I, T>(
+        commands: &HashMap<CommandName, CollectedCommand>,
+        line: I,
+    ) -> Feedback
     where
         I: IntoIterator<Item = T>,
         T: Into<OsString> + Clone,
     {
         let subcommands: Vec<_> = commands
-            .iter()
+            .values()
             .map(|command| ClapBackend::command_into_subcommand(command))
             .collect();
         let matches = clap::App::new("Exonum application based on fabric configuration.")
@@ -45,21 +50,16 @@ impl ClapBackend {
             .unwrap();
 
         let subcommand = matches.subcommand();
-        for command in commands {
-            if command.name() == subcommand.0 {
-                return command.execute(Context::new_from_args(
-                    command.args(),
-                    subcommand.1.expect("Arguments not found."),
-                ));
-            }
-        }
-
-        panic!("Subcommand not found");
+        let command = commands.get(subcommand.0).expect("Subcommand not found.");
+        command.execute(
+            commands,
+            Context::new_from_args(command.args(), subcommand.1.expect("Arguments not found.")),
+        )
     }
 
-    pub fn execute(commands: &[CollectedCommand]) -> Feedback {
+    pub fn execute(commands: &HashMap<CommandName, CollectedCommand>) -> Feedback {
         let subcommands: Vec<_> = commands
-            .iter()
+            .values()
             .map(|command| ClapBackend::command_into_subcommand(command))
             .collect();
 
@@ -72,31 +72,22 @@ impl ClapBackend {
             .get_matches();
 
         let subcommand = matches.subcommand();
-        for command in commands {
-            if command.name() == subcommand.0 {
-                return command.execute(Context::new_from_args(
-                    command.args(),
-                    subcommand.1.expect("Arguments not found."),
-                ));
-            }
-        }
-
-        panic!("Subcommand not found");
+        let command = commands.get(subcommand.0).expect("Subcommand not found.");
+        command.execute(
+            commands,
+            Context::new_from_args(command.args(), subcommand.1.expect("Arguments not found.")),
+        )
     }
 
     fn command_into_subcommand(command: &CollectedCommand) -> clap::App {
-        let mut index = 1;
         let command_args: Vec<_> = command
             .args()
             .iter()
-            .map(|arg| {
+            .zip(1..)
+            .map(|(arg, index)| {
                 let clap_arg = clap::Arg::with_name(arg.name);
                 let clap_arg = match arg.argument_type {
-                    ArgumentType::Positional => {
-                        let arg = clap_arg.index(index);
-                        index += 1;
-                        arg
-                    }
+                    ArgumentType::Positional => clap_arg.index(index),
                     ArgumentType::Named(detail) => {
                         let mut clap_arg = clap_arg.long(detail.long_name);
                         if let Some(short) = detail.short_name {
@@ -106,7 +97,6 @@ impl ClapBackend {
                     }
                 };
                 clap_arg.help(arg.help).required(arg.required)
-
             })
             .collect();
 
