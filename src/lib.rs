@@ -36,7 +36,7 @@ use std::time::SystemTime;
 use exonum::blockchain::{Blockchain, Service, ServiceContext, Schema, Transaction, ApiContext};
 use exonum::messages::{RawTransaction, Message};
 use exonum::encoding::serialize::json::reexport::Value;
-use exonum::storage::{Fork, Snapshot, MapIndex, Entry};
+use exonum::storage::{Fork, Snapshot, ProofMapIndex, Entry};
 use exonum::crypto::{Hash, PublicKey};
 use exonum::encoding;
 use exonum::helpers::fabric::{ServiceFactory, Context};
@@ -70,8 +70,8 @@ impl<T: AsRef<Snapshot>> TimeSchema<T> {
     }
 
     /// Returns the table that stores `Time` struct for every validator.
-    pub fn validators_time(&self) -> MapIndex<&Snapshot, PublicKey, Time> {
-        MapIndex::new(
+    pub fn validators_time(&self) -> ProofMapIndex<&Snapshot, PublicKey, Time> {
+        ProofMapIndex::new(
             format!("{}.validators_time", SERVICE_NAME),
             self.view.as_ref(),
         )
@@ -88,8 +88,8 @@ impl<'a> TimeSchema<&'a mut Fork> {
     /// Mutable reference to the ['validators_time'][1] index.
     ///
     /// [1]: struct.TimeSchema.html#method.validators_time
-    pub fn validators_time_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Time> {
-        MapIndex::new(format!("{}.validators_time", SERVICE_NAME), self.view)
+    pub fn validators_time_mut(&mut self) -> ProofMapIndex<&mut Fork, PublicKey, Time> {
+        ProofMapIndex::new(format!("{}.validators_time", SERVICE_NAME), self.view)
     }
 
     /// Mutable reference to the ['time'][1] index.
