@@ -97,10 +97,6 @@ impl RocksDB {
 }
 
 impl Database for RocksDB {
-    fn clone(&self) -> Box<Database> {
-        Box::new(Clone::clone(self))
-    }
-
     fn snapshot(&self) -> Box<Snapshot> {
         let _p = ProfilerSpan::new("RocksDB::snapshot");
         Box::new(RocksDBSnapshot {

@@ -46,10 +46,6 @@ impl MemoryDB {
 }
 
 impl Database for MemoryDB {
-    fn clone(&self) -> Box<Database> {
-        Box::new(Clone::clone(self))
-    }
-
     fn snapshot(&self) -> Box<Snapshot> {
         Box::new(MemoryDB {
             map: Arc::new(RwLock::new(self.map.read().unwrap().clone())),
