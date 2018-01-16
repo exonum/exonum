@@ -257,7 +257,11 @@ impl Blockchain {
 
                 let transaction_status = match r {
                     Ok(status) => {
-                        fork.commit();
+                        if status.is_err() {
+                            fork.rollback();
+                        } else {
+                            fork.commit();
+                        }
                         status
                     }
                     Err(err) => {
@@ -266,7 +270,7 @@ impl Blockchain {
                             panic::resume_unwind(err);
                         }
                         fork.rollback();
-                        error!("{:?} transaction execution failed: {:?}", tx, err);
+                        error!("{:?} transaction execution panicked: {:?}", tx, err);
                         Err(TransactionError::Panic)
                     }
                 };
