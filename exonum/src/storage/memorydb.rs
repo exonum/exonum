@@ -53,8 +53,8 @@ impl Database for MemoryDB {
     }
 
     fn merge(&self, patch: Patch) -> Result<()> {
+        let mut guard = self.map.write().unwrap();
         for (cf_name, changes) in patch {
-            let mut guard = self.map.write().unwrap();
             if !guard.contains_key(&cf_name) {
                 guard.insert(cf_name.clone(), BTreeMap::new());
             }

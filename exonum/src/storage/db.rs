@@ -248,6 +248,9 @@ pub trait Database: Send + Sync + 'static {
 
     /// Atomically applies a sequence of patch changes to the database.
     ///
+    /// Note that this method may be called concurrently from different threads, the
+    /// onus to guarantee atomicity is on the implementor of the trait.
+    ///
     /// # Errors
     /// If this method encounters any form of I/O or other error during merging, an error variant
     /// will be returned. In case of an error the method guarantees no changes were applied to
@@ -255,6 +258,9 @@ pub trait Database: Send + Sync + 'static {
     fn merge(&self, patch: Patch) -> Result<()>;
 
     /// Atomically applies a sequence of patch changes to the database with fsync.
+    ///
+    /// Note that this method may be called concurrently from different threads, the
+    /// onus to guarantee atomicity is on the implementor of the trait.
     ///
     /// # Errors
     /// If this method encounters any form of I/O or other error during merging, an error variant
