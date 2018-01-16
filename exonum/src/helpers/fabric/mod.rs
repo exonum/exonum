@@ -232,6 +232,11 @@ impl Context {
         }
     }
 
+    /// Inserts value to the command line arguments map.
+    pub fn set_arg(&mut self, key: &str, value: String) {
+        self.args.insert(String::from(key), value);
+    }
+
     /// Gets multiple values of the command line argument.
     pub fn arg_multiple<T: FromStr>(&self, key: &str) -> Result<Vec<T>, Box<Error>>
     where
@@ -242,6 +247,11 @@ impl Context {
         } else {
             Err(Box::new(NotFoundInMap))
         }
+    }
+
+    /// Inserts multiple values to the command line arguments map.
+    pub fn set_arg_multiple(&mut self, key: &str, values: Vec<String>) {
+        self.multiple_args.insert(String::from(key), values);
     }
 
     /// Gets the variable from the context.
