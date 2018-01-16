@@ -12,6 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! These are tests concerning the business logic of transactions in the cryptocurrency service.
+//! See `api.rs` for tests focused on the API of the service.
+//!
+//! Note how business logic tests use `TestKit::create_block*` methods to send transactions,
+//! the service schema to make assertions about the storage state.
+
 extern crate exonum;
 extern crate exonum_cryptocurrency as cryptocurrency;
 #[macro_use]
