@@ -26,9 +26,9 @@ use encoding::serialize::json::ExonumJson;
 // - `256...511` - `TransactionValue::Code`.
 // - `512...767` - `TransactionError::Code`.
 const MIN_SUCCESS: u16 = 256;
-const MAX_SUCCESS: u16 = 511;
-const MIN_ERROR: u16 = 512;
-const MAX_ERROR: u16 = 767;
+const MAX_SUCCESS: u16 = MIN_SUCCESS + 255;
+const MIN_ERROR: u16 = MAX_SUCCESS + 1;
+const MAX_ERROR: u16 = MIN_ERROR + 255;
 
 // Special reserved values.
 const TRANSACTION_SUCCESS: u16 = 0;
@@ -138,7 +138,7 @@ pub trait Transaction: Message + ExonumJson + 'static {
 pub enum TransactionValue {
     /// Successful transaction execution.
     Success,
-    /// User defined code. Can have different meanings for different transactions and services.
+    /// User-defined code. Can have different meanings for different transactions and services.
     Code(u8),
 }
 
@@ -149,7 +149,7 @@ pub enum TransactionError {
     Panic,
     /// General failure (unspecified reason).
     UnknownFailure,
-    /// User defined error-code. Can have different meanings for different transactions and
+    /// User-defined error-code. Can have different meanings for different transactions and
     /// services.
     Code(u8),
 }
