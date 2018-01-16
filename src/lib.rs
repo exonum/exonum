@@ -81,6 +81,11 @@ impl<T: AsRef<Snapshot>> TimeSchema<T> {
     pub fn time(&self) -> Entry<&Snapshot, Time> {
         Entry::new(format!("{}.time", SERVICE_NAME), self.view.as_ref())
     }
+
+    /// Returns hashes for stored tables.
+    pub fn state_hash(&self) -> Vec<Hash> {
+        vec![self.validators_time().root_hash(), self.time().hash()]
+    }
 }
 
 
@@ -329,8 +334,9 @@ impl Service for TimeService {
         SERVICE_NAME
     }
 
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
-        Vec::new()
+    fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash> {
+        let schema = TimeSchema::new(snapshot);
+        schema.state_hash()
     }
 
     fn service_id(&self) -> u16 {
