@@ -15,13 +15,12 @@
 /// `message!` implement structure that could be sent in exonum network.
 ///
 /// Each message is a piece of data that is signed by creators key.
-/// For now it's required to set service id as `const TYPE`, message id as `const ID`, and
-/// message fixed part size as `const SIZE`.
+/// For now it's required to set service id as `const TYPE`,
+/// and message id as `const ID`.
 ///
 /// - service id should be unique inside whole exonum.
 /// - message id should be unique inside each service.
 ///
-/// For each field, it's required to set exact position in message.
 /// # Usage Example:
 /// ```
 /// #[macro_use] extern crate exonum;
@@ -34,10 +33,9 @@
 ///     struct SendTwoInteger {
 ///         const TYPE = MY_NEW_MESSAGE_ID;
 ///         const ID   = MY_SERVICE_ID;
-///         const SIZE = 16;
 ///
-///         field first: u64 [0 => 8]
-///         field second: u64 [8 => 16]
+///         first: u64,
+///         second: u64,
 ///     }
 /// }
 ///
@@ -57,7 +55,8 @@
 /// For additionall reference about data layout see also
 /// *[ `encoding` documentation](./encoding/index.html).*
 ///
-/// `message!` internaly use `ident_count!`, be sure to add this macro to namespace.
+/// `message!` internally uses other exonum macros,
+/// be sure to add them all to namespace.
 #[macro_export]
 macro_rules! message {
     (
@@ -65,12 +64,12 @@ macro_rules! message {
     struct $name:ident {
         const TYPE = $extension:expr;
         const ID = $id:expr;
-        const SIZE = $body:expr;
 
         $(
         $(#[$field_attr:meta])*
-        field $field_name:ident : $field_type:ty [$from:expr => $to:expr]
-        )*
+        $field_name:ident : $field_type:ty
+        ),*
+        $(,)*
     }) => (
         #[derive(Clone, PartialEq)]
         $(#[$attr])*
@@ -136,11 +135,15 @@ macro_rules! message {
             pub fn new($($field_name: $field_type,)*
                        secret_key: &$crate::crypto::SecretKey) -> $name {
                 use $crate::messages::{RawMessage, MessageWriter};
-                check_bounds!($body, $($field_name : $field_type [$from => $to],)*);
-                let mut writer = MessageWriter::new($crate::messages::PROTOCOL_MAJOR_VERSION,
-                                                    $crate::messages::TEST_NETWORK_ID,
-                                                    $extension, $id, $body);
-                $(writer.write($field_name, $from, $to);)*
+                let mut writer = MessageWriter::new(
+                    $crate::messages::PROTOCOL_MAJOR_VERSION,
+                    $crate::messages::TEST_NETWORK_ID,
+                    $extension, $id, $name::__ex_header_size() as usize,
+                );
+                __ex_for_each_field!(
+                    __ex_message_write_field, (writer),
+                    $( ($(#[$field_attr])*, $field_name, $field_type) )*
+                );
                 $name { raw: RawMessage::new(writer.sign(secret_key)) }
             }
 
@@ -148,20 +151,24 @@ macro_rules! message {
             #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
             #[allow(dead_code, unused_mut)]
             pub fn new_with_signature($($field_name: $field_type,)*
-                       signature: &$crate::crypto::Signature) -> $name {
+                                      signature: &$crate::crypto::Signature) -> $name {
                 use $crate::messages::{RawMessage, MessageWriter};
-                check_bounds!($body, $($field_name : $field_type [$from => $to],)*);
-                let mut writer = MessageWriter::new($crate::messages::PROTOCOL_MAJOR_VERSION,
-                                                    $crate::messages::TEST_NETWORK_ID,
-                                                    $extension, $id, $body);
-                $(writer.write($field_name, $from, $to);)*
+                let mut writer = MessageWriter::new(
+                    $crate::messages::PROTOCOL_MAJOR_VERSION,
+                    $crate::messages::TEST_NETWORK_ID,
+                    $extension, $id, $name::__ex_header_size() as usize,
+                );
+                __ex_for_each_field!(
+                    __ex_message_write_field, (writer),
+                    $( ($(#[$field_attr])*, $field_name, $field_type) )*
+                );
                 $name { raw: RawMessage::new(writer.append_signature(signature)) }
             }
 
             /// Converts the raw message into the specific one.
             pub fn from_raw(raw: $crate::messages::RawMessage)
                 -> Result<$name, $crate::encoding::Error> {
-                let min_message_size = $body as usize
+                let min_message_size = $name::__ex_header_size() as usize
                             + $crate::messages::HEADER_LENGTH as usize
                             + $crate::crypto::SIGNATURE_LENGTH as usize;
                 if raw.len() < min_message_size {
@@ -206,15 +213,13 @@ macro_rules! message {
             #[allow(unused_variables)]
             fn check_fields(raw_message: &$crate::messages::RawMessage)
             -> $crate::encoding::Result {
-                let latest_segment = (($body + $crate::messages::HEADER_LENGTH)
-                                        as $crate::encoding::Offset).into();
-                $(
-                    let field_from: $crate::encoding::Offset = $from;
-                    let field_to: $crate::encoding::Offset = $to;
-                    let latest_segment = raw_message.check::<$field_type>(field_from.into(),
-                                                    field_to.into(),
-                                                    latest_segment)?;
-                )*
+                let header_length =
+                    $crate::messages::HEADER_LENGTH as $crate::encoding::Offset;
+                let latest_segment = ($name::__ex_header_size() + header_length).into();
+                __ex_for_each_field!(
+                    __ex_message_check_field, (latest_segment, raw_message),
+                    $( ($(#[$field_attr])*, $field_name, $field_type) )*
+                );
                 Ok(latest_segment)
             }
 
@@ -237,11 +242,15 @@ macro_rules! message {
                 $crate::encoding::serialize::encode_hex(self.as_ref())
             }
 
-            $(
-            $(#[$field_attr])*
-            pub fn $field_name(&self) -> $field_type {
-                unsafe{ self.raw.read::<$field_type>($from, $to)}
-            })*
+            __ex_for_each_field!(
+                __ex_message_mk_field, (),
+                $( ($(#[$field_attr])*, $field_name, $field_type) )*
+            );
+
+            #[doc(hidden)]
+            fn __ex_header_size() -> $crate::encoding::Offset {
+                __ex_header_size!($($field_type),*)
+            }
         }
 
         impl AsRef<$crate::messages::RawMessage> for $name {
@@ -370,16 +379,18 @@ macro_rules! message {
                     return Err("message_id didn't equal real message_id.".into())
                 }
 
-                let mut writer = MessageWriter::new(protocol_version, network_id,
-                                                        service_id, message_type, $body);
+                let mut writer = MessageWriter::new(
+                    protocol_version,
+                    network_id,
+                    service_id,
+                    message_type,
+                    $name::__ex_header_size() as usize,
+                );
                 let obj = body.as_object().ok_or("Can't cast body as object.")?;
-                $(
-                    let val = obj.get(stringify!($field_name))
-                                    .ok_or("Can't get object from json.")?;
-                    <$field_type as ExonumJson>::deserialize_field(val,
-                                                                    &mut writer, $from, $to )?;
-                )*
-
+                __ex_for_each_field!(
+                    __ex_deserialize_field, (obj, writer),
+                    $( ($(#[$field_attr])*, $field_name, $field_type) )*
+                );
                 Ok($name { raw: RawMessage::new(writer.append_signature(&signature)) })
             }
         }
@@ -402,8 +413,8 @@ macro_rules! message {
         impl $crate::encoding::serialize::reexport::Serialize for $name {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
                 where S: $crate::encoding::serialize::reexport::Serializer
-           {
-               use $crate::encoding::serialize::reexport::SerError;
+            {
+                use $crate::encoding::serialize::reexport::SerError;
                 use $crate::encoding::serialize::json::ExonumJson;
                 self.serialize_field()
                     .map_err(|_| S::Error::custom(
@@ -413,4 +424,44 @@ macro_rules! message {
         }
 
     );
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __ex_message_mk_field {
+    (
+        (),
+        $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr
+    ) => {
+        $(#[$field_attr])*
+        pub fn $field_name(&self) -> $field_type {
+            unsafe { self.raw.read::<$field_type>($from, $to) }
+        }
+    }
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __ex_message_write_field {
+    (
+        ($writer:ident),
+        $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr
+    ) => {
+        $writer.write($field_name, $from, $to);
+    }
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __ex_message_check_field {
+    (
+        ($latest_segment:ident, $raw_message:ident),
+        $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr
+    ) => {
+        let $latest_segment = $raw_message.check::<$field_type>(
+            $from.into(),
+            $to.into(),
+            $latest_segment
+        )?;
+    }
 }

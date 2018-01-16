@@ -780,9 +780,8 @@ mod tests {
         struct TxAfterCommit {
             const TYPE = SERVICE_ID;
             const ID = TX_AFTER_COMMIT_ID;
-            const SIZE = 8;
 
-            field height: Height [0 => 8]
+            height: Height,
         }
     }
 

@@ -29,6 +29,8 @@ use toml::Value;
 use router::Router;
 use mount::Mount;
 use iron::{Chain, Iron};
+use iron_cors::CorsMiddleware;
+use serde::{ser, de};
 use futures::{Future, Sink};
 use futures::sync::mpsc;
 use tokio_core::reactor::Core;
@@ -143,6 +145,11 @@ pub struct NodeApiConfig {
     pub public_api_address: Option<SocketAddr>,
     /// Listen address for private api endpoints.
     pub private_api_address: Option<SocketAddr>,
+    /// Cross-origin resource sharing ([CORS][cors]) options for responses returned
+    /// by API handlers.
+    ///
+    /// [cors]: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
+    pub allow_origin: Option<AllowOrigin>,
 }
 
 impl Default for NodeApiConfig {
@@ -152,9 +159,111 @@ impl Default for NodeApiConfig {
             enable_blockchain_explorer: true,
             public_api_address: None,
             private_api_address: None,
+            allow_origin: None,
         }
     }
 }
+
+/// CORS header specification
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AllowOrigin {
+    /// Allow access from any host.
+    Any,
+    /// Allow access only from the following hosts.
+    Whitelist(Vec<String>),
+}
+
+impl From<AllowOrigin> for CorsMiddleware {
+    fn from(allow_origin: AllowOrigin) -> CorsMiddleware {
+        match allow_origin {
+            AllowOrigin::Any => CorsMiddleware::with_allow_any(),
+            AllowOrigin::Whitelist(hosts) => CorsMiddleware::with_whitelist(
+                hosts.into_iter().collect(),
+            ),
+        }
+    }
+}
+
+impl ser::Serialize for AllowOrigin {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        match *self {
+            AllowOrigin::Any => "*".serialize(serializer),
+            AllowOrigin::Whitelist(ref hosts) => {
+                if hosts.len() == 1 {
+                    hosts[0].serialize(serializer)
+                } else {
+                    hosts.serialize(serializer)
+                }
+            }
+        }
+    }
+}
+
+impl<'de> de::Deserialize<'de> for AllowOrigin {
+    fn deserialize<D>(d: D) -> Result<AllowOrigin, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = AllowOrigin;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a list of hosts or \"*\"")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<AllowOrigin, E>
+            where
+                E: de::Error,
+            {
+                match value {
+                    "*" => Ok(AllowOrigin::Any),
+                    _ => Ok(AllowOrigin::Whitelist(vec![value.to_string()])),
+                }
+            }
+
+            fn visit_seq<A>(self, seq: A) -> Result<AllowOrigin, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let hosts =
+                    de::Deserialize::deserialize(de::value::SeqAccessDeserializer::new(seq))?;
+                Ok(AllowOrigin::Whitelist(hosts))
+            }
+        }
+
+        d.deserialize_any(Visitor)
+    }
+}
+
+#[test]
+fn allow_origin_serde() {
+    fn check(text: &str, allow_origin: AllowOrigin) {
+        #[derive(Serialize, Deserialize)]
+        struct Config {
+            allow_origin: AllowOrigin,
+        }
+        let config_toml = format!("allow_origin = {}\n", text);
+        let config: Config = ::toml::from_str(&config_toml).unwrap();
+        assert_eq!(config.allow_origin, allow_origin);
+        assert_eq!(::toml::to_string(&config).unwrap(), config_toml);
+    }
+
+    check(r#""*""#, AllowOrigin::Any);
+    check(
+        r#""http://example.com""#,
+        AllowOrigin::Whitelist(vec!["http://example.com".to_string()]),
+    );
+    check(
+        r#"["http://a.org", "http://b.org"]"#,
+        AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
+    );
+}
+
 
 /// Events pool capacities.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -537,7 +646,7 @@ impl ApiSender {
         ApiSender(inner)
     }
 
-    /// Addr peer to peer list
+    /// Add peer to peer list
     pub fn peer_add(&self, addr: SocketAddr) -> io::Result<()> {
         let msg = ExternalMessage::PeerAdd(addr);
         self.0.clone().send(msg).wait().map(drop).map_err(
@@ -774,10 +883,15 @@ impl Node {
                     mount.mount("api/explorer", router);
                 }
 
+                let cors_middleware = self.api_options.allow_origin.clone().map(
+                    CorsMiddleware::from,
+                );
                 let thread = thread::spawn(move || {
                     info!("Public exonum api started on {}", listen_address);
-
-                    let chain = Chain::new(mount);
+                    let mut chain = Chain::new(mount);
+                    if let Some(middleware) = cors_middleware {
+                        chain.link_around(middleware);
+                    }
                     Iron::new(chain).http(listen_address).unwrap();
                 });
                 Some(thread)
