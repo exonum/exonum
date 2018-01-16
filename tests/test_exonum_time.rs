@@ -14,32 +14,27 @@ use exonum::storage::Snapshot;
 use exonum_time::{TimeService, TimeSchema, TxTime, Time, TimeProvider};
 use exonum_testkit::{TestKitBuilder, TestNode};
 
-fn verify_validators_times<T: AsRef<Snapshot>>(
+fn verify_data<T: AsRef<Snapshot>>(
     snapshot: T,
     validators: &[TestNode],
-    expected_times: &[Option<SystemTime>],
+    expected_current_time: Option<SystemTime>,
+    expected_validators_times: &[Option<SystemTime>],
 ) {
     let schema = TimeSchema::new(snapshot);
-    let validators_times = schema.validators_time();
 
+    assert_eq!(
+        schema.time().get().map(|time| time.time()),
+        expected_current_time
+    );
+
+    let validators_times = schema.validators_time();
     for (i, validator) in validators.iter().enumerate() {
         let public_key = &validator.public_keys().service_key;
 
-        if let Some(time) = validators_times.get(public_key) {
-            assert_eq!(Some(time.time()), expected_times[i]);
-        } else {
-            assert_eq!(None, expected_times[i]);
-        }
-    }
-}
-
-fn verify_consolidated_time<T: AsRef<Snapshot>>(snapshot: T, expected_time: &Option<SystemTime>) {
-    let schema = TimeSchema::new(snapshot);
-
-    if let Some(time) = schema.time().get() {
-        assert_eq!(&Some(time.time()), expected_time);
-    } else {
-        assert_eq!(&None, expected_time);
+        assert_eq!(
+            validators_times.get(public_key).map(|time| time.time()),
+            expected_validators_times[i]
+        );
     }
 }
 
@@ -58,8 +53,7 @@ fn test_exonum_time_service_with_3_validators() {
     //
     // Consolidated time is None.
 
-    verify_validators_times(&testkit.snapshot(), &validators, &[None, None, None]);
-    verify_consolidated_time(&testkit.snapshot(), &None);
+    verify_data(&testkit.snapshot(), &validators, None, &[None, None, None]);
 
     // Add first transaction `tx0` from first validator with time `time0`.
     // After that validators time look like this:
@@ -75,8 +69,12 @@ fn test_exonum_time_service_with_3_validators() {
     };
     testkit.create_block_with_transactions(txvec![tx0]);
 
-    verify_validators_times(&testkit.snapshot(), &validators, &[Some(time0), None, None]);
-    verify_consolidated_time(&testkit.snapshot(), &Some(time0));
+    verify_data(
+        &testkit.snapshot(),
+        &validators,
+        Some(time0),
+        &[Some(time0), None, None],
+    );
 
     // Add second transaction `tx1` from second validator with time `time1` = `time0` + 10 sec.
     // After that validators time look like this:
@@ -93,12 +91,12 @@ fn test_exonum_time_service_with_3_validators() {
     };
     testkit.create_block_with_transactions(txvec![tx1]);
 
-    verify_validators_times(
+    verify_data(
         &testkit.snapshot(),
         &validators,
+        Some(time1),
         &[Some(time0), Some(time1), None],
     );
-    verify_consolidated_time(&testkit.snapshot(), &Some(time1));
 }
 
 #[test]
@@ -118,8 +116,12 @@ fn test_exonum_time_service_with_4_validators() {
     //
     // Consolidated time is None.
 
-    verify_validators_times(testkit.snapshot(), &validators, &[None, None, None, None]);
-    verify_consolidated_time(&testkit.snapshot(), &None);
+    verify_data(
+        testkit.snapshot(),
+        &validators,
+        None,
+        &[None, None, None, None],
+    );
 
     // Add first transaction `tx0` from first validator with time `time0`.
     // After that validators time look like this:
@@ -135,12 +137,12 @@ fn test_exonum_time_service_with_4_validators() {
     };
     testkit.create_block_with_transactions(txvec![tx0]);
 
-    verify_validators_times(
+    verify_data(
         &testkit.snapshot(),
         &validators,
+        None,
         &[Some(time0), None, None, None],
     );
-    verify_consolidated_time(&testkit.snapshot(), &None);
 
     // Add second transaction `tx1` from second validator with time `time1` = `time0` + 10 sec.
     // After that validators time look like this:
@@ -157,12 +159,12 @@ fn test_exonum_time_service_with_4_validators() {
     };
     testkit.create_block_with_transactions(txvec![tx1]);
 
-    verify_validators_times(
+    verify_data(
         &testkit.snapshot(),
         &validators,
+        None,
         &[Some(time0), Some(time1), None, None],
     );
-    verify_consolidated_time(&testkit.snapshot(), &None);
 
     // Add third transaction `tx2` from third validator with time `time2` = `time1` + 10 sec.
     // After that validators time look like this:
@@ -179,12 +181,12 @@ fn test_exonum_time_service_with_4_validators() {
     };
     testkit.create_block_with_transactions(txvec![tx2]);
 
-    verify_validators_times(
+    verify_data(
         &testkit.snapshot(),
         &validators,
+        Some(time1),
         &[Some(time0), Some(time1), Some(time2), None],
     );
-    verify_consolidated_time(&testkit.snapshot(), &Some(time1));
 
     // Add fourth transaction `tx3` from fourth validator with time `time3` = `time2` + 10 sec.
     // After that validators time look like this:
@@ -201,12 +203,12 @@ fn test_exonum_time_service_with_4_validators() {
     };
     testkit.create_block_with_transactions(txvec![tx3]);
 
-    verify_validators_times(
+    verify_data(
         &testkit.snapshot(),
         &validators,
+        Some(time2),
         &[Some(time0), Some(time1), Some(time2), Some(time3)],
     );
-    verify_consolidated_time(&testkit.snapshot(), &Some(time2));
 }
 
 // A struct that provides the node with the current time.
