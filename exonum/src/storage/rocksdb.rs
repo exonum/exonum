@@ -41,7 +41,6 @@ impl From<_Error> for Error {
 }
 
 /// Database implementation on the top of `RocksDB` backend.
-#[derive(Clone)]
 pub struct RocksDB {
     db: Arc<_RocksDB>,
 }
