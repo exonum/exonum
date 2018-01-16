@@ -19,6 +19,7 @@
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
 extern crate serde_json;
 #[macro_use]
 extern crate exonum;
@@ -186,13 +187,6 @@ struct TimeApi {
     blockchain: Blockchain,
 }
 
-/// Structure for saving current time.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CurrentTime {
-    /// Current time.
-    pub time: Option<SystemTime>,
-}
-
 /// Structure for saving validator's public key and last known local time.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ValidatorTime {
@@ -210,11 +204,9 @@ impl TimeApi {
         let schema = TimeSchema::new(&view);
 
         if let Some(current_time) = schema.time().get() {
-            self.ok_response(&serde_json::to_value(
-                CurrentTime { time: Some(current_time.time()) },
-            ).unwrap())
+            self.ok_response(&json!(Some(current_time.time())))
         } else {
-            self.ok_response(&serde_json::to_value(CurrentTime { time: None }).unwrap())
+            self.ok_response(&json!(None::<Box<SystemTime>>))
         }
     }
 

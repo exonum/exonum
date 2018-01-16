@@ -11,7 +11,7 @@ use std::time::{SystemTime, Duration, UNIX_EPOCH};
 use exonum::helpers::{Height, ValidatorId};
 use exonum::crypto::{gen_keypair, PublicKey};
 
-use exonum_time::{TimeService, TimeSchema, TxTime, Time, TimeProvider, CurrentTime, ValidatorTime};
+use exonum_time::{TimeService, TimeSchema, TxTime, Time, TimeProvider, ValidatorTime};
 use exonum_testkit::{ApiKind, TestKitApi, TestKitBuilder, TestNode};
 
 #[test]
@@ -253,7 +253,7 @@ fn test_transaction_time_less_than_validator_time_in_storage() {
     );
 }
 
-fn get_current_time(api: &TestKitApi) -> CurrentTime {
+fn get_current_time(api: &TestKitApi) -> Option<SystemTime> {
     api.get(ApiKind::Service("exonum_time"), "v1/current_time")
 }
 
@@ -267,7 +267,7 @@ fn get_all_validators_times(api: &TestKitApi) -> Vec<ValidatorTime> {
 
 fn verify_current_time(api: &TestKitApi, expected_time: Option<SystemTime>) {
     let current_time = get_current_time(api);
-    assert_eq!(expected_time, current_time.time);
+    assert_eq!(expected_time, current_time);
 }
 
 fn verify_current_validators_times(
