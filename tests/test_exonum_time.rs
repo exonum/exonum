@@ -14,23 +14,33 @@ use exonum::storage::Snapshot;
 use exonum_time::{TimeService, TimeSchema, TxTime, Time, TimeProvider};
 use exonum_testkit::{TestKitBuilder, TestNode};
 
-fn verify_validators_times(
-    snapshot: Box<Snapshot>,
+fn verify_validators_times<T: AsRef<Snapshot>>(
+    snapshot: T,
     validators: &[TestNode],
-    expected_times: &[Option<Time>],
+    expected_times: &[Option<SystemTime>],
 ) {
     let schema = TimeSchema::new(snapshot);
     let validators_times = schema.validators_time();
 
-    validators.iter().enumerate().for_each(|(i, validator)| {
+    for (i, validator) in validators.iter().enumerate() {
         let public_key = &validator.public_keys().service_key;
-        assert_eq!(expected_times[i], validators_times.get(public_key));
-    });
+
+        if let Some(time) = validators_times.get(public_key) {
+            assert_eq!(Some(time.time()), expected_times[i]);
+        } else {
+            assert_eq!(None, expected_times[i]);
+        }
+    }
 }
 
-fn verify_consolidated_time(snapshot: Box<Snapshot>, expected_time: &Option<Time>) {
+fn verify_consolidated_time<T: AsRef<Snapshot>>(snapshot: T, expected_time: &Option<SystemTime>) {
     let schema = TimeSchema::new(snapshot);
-    assert_eq!(schema.time().get(), *expected_time);
+
+    if let Some(time) = schema.time().get() {
+        assert_eq!(&Some(time.time()), expected_time);
+    } else {
+        assert_eq!(&None, expected_time);
+    }
 }
 
 #[test]
@@ -48,51 +58,47 @@ fn test_exonum_time_service_with_3_validators() {
     //
     // Consolidated time is None.
 
-    verify_validators_times(testkit.snapshot(), &validators, &[None, None, None]);
-    verify_consolidated_time(testkit.snapshot(), &None);
+    verify_validators_times(&testkit.snapshot(), &validators, &[None, None, None]);
+    verify_consolidated_time(&testkit.snapshot(), &None);
 
-    // Add first transaction 'tx0' from first validator with time 'time0'.
+    // Add first transaction `tx0` from first validator with time `time0`.
     // After that validators time look like this:
     // number | 0       | 1    | 2    |
-    // time   | 'time0' | None | None |
+    // time   | `time0` | None | None |
     //
-    // Consolidated time will have the value 'time0'.
+    // Consolidated time will have the value `time0`.
 
     let time0 = SystemTime::now();
     let tx0 = {
         let (pub_key, sec_key) = validators[0].service_keypair();
         TxTime::new(time0, pub_key, sec_key)
     };
-    testkit.create_block_with_transactions(txvec![tx0.clone()]);
+    testkit.create_block_with_transactions(txvec![tx0]);
 
-    verify_validators_times(
-        testkit.snapshot(),
-        &validators,
-        &[Some(Time::new(time0)), None, None],
-    );
-    verify_consolidated_time(testkit.snapshot(), &Some(Time::new(time0)));
+    verify_validators_times(&testkit.snapshot(), &validators, &[Some(time0), None, None]);
+    verify_consolidated_time(&testkit.snapshot(), &Some(time0));
 
-    // Add second transaction 'tx1' from second validator with time 'time1' = 'time0' + 10 sec.
+    // Add second transaction `tx1` from second validator with time `time1` = `time0` + 10 sec.
     // After that validators time look like this:
     // number | 0       | 1       | 2    |
-    // time   | 'time0' | 'time1' | None |
+    // time   | `time0` | `time1` | None |
     //
-    // In sorted order: 'time1' >= 'time0'.
-    // Consolidated time will have the value 'time1'.
+    // In sorted order: `time1` >= `time0`.
+    // Consolidated time will have the value `time1`.
 
     let time1 = time0 + Duration::new(10, 0);
     let tx1 = {
         let (pub_key, sec_key) = validators[1].service_keypair();
         TxTime::new(time1, pub_key, sec_key)
     };
-    testkit.create_block_with_transactions(txvec![tx1.clone()]);
+    testkit.create_block_with_transactions(txvec![tx1]);
 
     verify_validators_times(
-        testkit.snapshot(),
+        &testkit.snapshot(),
         &validators,
-        &[Some(Time::new(time0)), Some(Time::new(time1)), None],
+        &[Some(time0), Some(time1), None],
     );
-    verify_consolidated_time(testkit.snapshot(), &Some(Time::new(time1)));
+    verify_consolidated_time(&testkit.snapshot(), &Some(time1));
 }
 
 #[test]
@@ -113,12 +119,12 @@ fn test_exonum_time_service_with_4_validators() {
     // Consolidated time is None.
 
     verify_validators_times(testkit.snapshot(), &validators, &[None, None, None, None]);
-    verify_consolidated_time(testkit.snapshot(), &None);
+    verify_consolidated_time(&testkit.snapshot(), &None);
 
-    // Add first transaction 'tx0' from first validator with time 'time0'.
+    // Add first transaction `tx0` from first validator with time `time0`.
     // After that validators time look like this:
     // number | 0       | 1    | 2    | 3    |
-    // time   | 'time0' | None | None | None |
+    // time   | `time0` | None | None | None |
     //
     // Consolidated time doesn't change.
 
@@ -127,21 +133,21 @@ fn test_exonum_time_service_with_4_validators() {
         let (pub_key, sec_key) = validators[0].service_keypair();
         TxTime::new(time0, pub_key, sec_key)
     };
-    testkit.create_block_with_transactions(txvec![tx0.clone()]);
+    testkit.create_block_with_transactions(txvec![tx0]);
 
     verify_validators_times(
-        testkit.snapshot(),
+        &testkit.snapshot(),
         &validators,
-        &[Some(Time::new(time0)), None, None, None],
+        &[Some(time0), None, None, None],
     );
-    verify_consolidated_time(testkit.snapshot(), &None);
+    verify_consolidated_time(&testkit.snapshot(), &None);
 
-    // Add second transaction 'tx1' from second validator with time 'time1' = 'time0' + 10 sec.
+    // Add second transaction `tx1` from second validator with time `time1` = `time0` + 10 sec.
     // After that validators time look like this:
     // number | 0       | 1       | 2    | 3    |
-    // time   | 'time0' | 'time1' | None | None |
+    // time   | `time0` | `time1` | None | None |
     //
-    // In sorted order: 'time1' >= 'time0'.
+    // In sorted order: `time1` >= `time0`.
     // Consolidated time doesn't change.
 
     let time1 = time0 + Duration::new(10, 0);
@@ -149,68 +155,58 @@ fn test_exonum_time_service_with_4_validators() {
         let (pub_key, sec_key) = validators[1].service_keypair();
         TxTime::new(time1, pub_key, sec_key)
     };
-    testkit.create_block_with_transactions(txvec![tx1.clone()]);
+    testkit.create_block_with_transactions(txvec![tx1]);
 
     verify_validators_times(
-        testkit.snapshot(),
+        &testkit.snapshot(),
         &validators,
-        &[Some(Time::new(time0)), Some(Time::new(time1)), None, None],
+        &[Some(time0), Some(time1), None, None],
     );
-    verify_consolidated_time(testkit.snapshot(), &None);
+    verify_consolidated_time(&testkit.snapshot(), &None);
 
-    // Add third transaction 'tx2' from third validator with time 'time2' = 'time1' + 10 sec.
+    // Add third transaction `tx2` from third validator with time `time2` = `time1` + 10 sec.
     // After that validators time look like this:
     // number | 0       | 1       | 2       | 3    |
-    // time   | 'time0' | 'time1' | 'time2' | None |
+    // time   | `time0` | `time1` | `time2` | None |
     //
-    // In sorted order: 'time2' >= 'time1' >= 'time0'.
-    // Consolidated time will have the value 'time1'.
+    // In sorted order: `time2` >= `time1` >= `time0`.
+    // Consolidated time will have the value `time1`.
 
     let time2 = time1 + Duration::new(10, 0);
     let tx2 = {
         let (pub_key, sec_key) = validators[2].service_keypair();
         TxTime::new(time2, pub_key, sec_key)
     };
-    testkit.create_block_with_transactions(txvec![tx2.clone()]);
+    testkit.create_block_with_transactions(txvec![tx2]);
 
     verify_validators_times(
-        testkit.snapshot(),
+        &testkit.snapshot(),
         &validators,
-        &[
-            Some(Time::new(time0)),
-            Some(Time::new(time1)),
-            Some(Time::new(time2)),
-            None,
-        ],
+        &[Some(time0), Some(time1), Some(time2), None],
     );
-    verify_consolidated_time(testkit.snapshot(), &Some(Time::new(time1)));
+    verify_consolidated_time(&testkit.snapshot(), &Some(time1));
 
-    // Add fourth transaction 'tx3' from fourth validator with time 'time3' = 'time2' + 10 sec.
+    // Add fourth transaction `tx3` from fourth validator with time `time3` = `time2` + 10 sec.
     // After that validators time look like this:
     // number | 0       | 1       | 2       | 3       |
-    // time   | 'time0' | 'time1' | 'time2' | 'time3' |
+    // time   | `time0` | `time1` | `time2` | `time3` |
     //
-    // In sorted order: 'time3' >= 'time2' >= 'time1' >= 'time0'.
-    // Consolidated time will have the value 'time2'.
+    // In sorted order: `time3` >= `time2` >= `time1` >= `time0`.
+    // Consolidated time will have the value `time2`.
 
     let time3 = time2 + Duration::new(10, 0);
     let tx3 = {
         let (pub_key, sec_key) = validators[3].service_keypair();
         TxTime::new(time3, pub_key, sec_key)
     };
-    testkit.create_block_with_transactions(txvec![tx3.clone()]);
+    testkit.create_block_with_transactions(txvec![tx3]);
 
     verify_validators_times(
-        testkit.snapshot(),
+        &testkit.snapshot(),
         &validators,
-        &[
-            Some(Time::new(time0)),
-            Some(Time::new(time1)),
-            Some(Time::new(time2)),
-            Some(Time::new(time3)),
-        ],
+        &[Some(time0), Some(time1), Some(time2), Some(time3)],
     );
-    verify_consolidated_time(testkit.snapshot(), &Some(Time::new(time2)));
+    verify_consolidated_time(&testkit.snapshot(), &Some(time2));
 }
 
 // A struct that provides the node with the current time.
@@ -295,7 +291,7 @@ fn test_selected_time_less_than_time_in_storage() {
         let tx = {
             TxTime::new(time_tx, pub_key_1, sec_key_1)
         };
-        testkit.create_block_with_transactions(txvec![tx.clone()]);
+        testkit.create_block_with_transactions(txvec![tx]);
     }
 
     let snapshot = testkit.snapshot();
@@ -315,7 +311,7 @@ fn test_creating_transaction_is_not_validator() {
 
     let (pub_key, sec_key) = gen_keypair();
     let tx = TxTime::new(SystemTime::now(), &pub_key, &sec_key);
-    testkit.create_block_with_transactions(txvec![tx.clone()]);
+    testkit.create_block_with_transactions(txvec![tx]);
 
     let snapshot = testkit.snapshot();
     let schema = TimeSchema::new(snapshot);
@@ -336,7 +332,7 @@ fn test_transaction_time_less_than_validator_time_in_storage() {
     let time0 = SystemTime::now();
     let tx0 = TxTime::new(time0, pub_key, sec_key);
 
-    testkit.create_block_with_transactions(txvec![tx0.clone()]);
+    testkit.create_block_with_transactions(txvec![tx0]);
 
     let snapshot = testkit.snapshot();
     let schema = TimeSchema::new(snapshot);
@@ -350,7 +346,7 @@ fn test_transaction_time_less_than_validator_time_in_storage() {
     let time1 = time0 - Duration::new(10, 0);
     let tx1 = TxTime::new(time1, pub_key, sec_key);
 
-    testkit.create_block_with_transactions(txvec![tx1.clone()]);
+    testkit.create_block_with_transactions(txvec![tx1]);
 
     let snapshot = testkit.snapshot();
     let schema = TimeSchema::new(snapshot);
