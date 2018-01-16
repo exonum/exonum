@@ -28,9 +28,8 @@
 // Import crates with necessary types into a new project.
 
 extern crate serde;
-extern crate serde_json;
 #[macro_use]
-extern crate serde_derive;
+extern crate serde_json;
 #[macro_use]
 extern crate exonum;
 extern crate router;
@@ -44,7 +43,7 @@ use exonum::encoding::serialize::FromHex;
 use exonum::node::{TransactionSend, ApiSender};
 use exonum::messages::{RawTransaction, Message};
 use exonum::storage::{Fork, MapIndex, Snapshot};
-use exonum::crypto::{PublicKey, Hash};
+use exonum::crypto::PublicKey;
 use exonum::encoding;
 use exonum::api::{Api, ApiError};
 use iron::prelude::*;
@@ -253,13 +252,6 @@ struct CryptocurrencyApi {
     blockchain: Blockchain,
 }
 
-/// The structure returned by the REST API in response to transaction POST requests.
-#[derive(Serialize, Deserialize)]
-pub struct TransactionResponse {
-    /// Hash of the `POST`ed transaction.
-    pub tx_hash: Hash,
-}
-
 impl CryptocurrencyApi {
     /// Endpoint for getting a single wallet.
     fn get_wallet(&self, req: &mut Request) -> IronResult<Response> {
@@ -300,8 +292,9 @@ impl CryptocurrencyApi {
                 let transaction: Box<Transaction> = Box::new(transaction);
                 let tx_hash = transaction.hash();
                 self.channel.send(transaction).map_err(ApiError::from)?;
-                let json = TransactionResponse { tx_hash };
-                self.ok_response(&serde_json::to_value(&json).unwrap())
+                self.ok_response(&json!({
+                    "tx_hash": tx_hash
+                }))
             }
             Ok(None) => Err(ApiError::IncorrectRequest("Empty request body".into()))?,
             Err(e) => Err(ApiError::IncorrectRequest(Box::new(e)))?,
