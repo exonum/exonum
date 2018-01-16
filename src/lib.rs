@@ -30,7 +30,7 @@ use exonum::blockchain::{Blockchain, Service, Transaction, ApiContext};
 use exonum::encoding::serialize::FromHex;
 use exonum::node::{TransactionSend, ApiSender};
 use exonum::messages::{RawTransaction, Message};
-use exonum::storage::{Fork, MapIndex};
+use exonum::storage::{Fork, MapIndex, Snapshot};
 use exonum::crypto::{PublicKey, Hash};
 use exonum::encoding;
 use exonum::api::{Api, ApiError};
@@ -89,27 +89,38 @@ impl Wallet {
 
 // // // // // // // // // // DATA LAYOUT // // // // // // // // // //
 
-/// Create schema of the key-value storage implemented by `MemoryDB`. In the
-/// present case a `Fork` of the database is used.
-pub struct CurrencySchema<'a> {
-    view: &'a mut Fork,
+/// Schema of the key-value storage used by the demo cryptocurrency service.
+pub struct CurrencySchema<T> {
+    view: T,
 }
 
 /// Declare layout of the data. Use an instance of [`MapIndex`]
 /// to keep wallets in storage. Index values are serialized `Wallet` structs.
 ///
-/// Isolate the wallets map into a separate entity by adding a unique prefix,
-/// i.e. the first argument to the `MapIndex::new` call.
-///
 /// [`MapIndex`]: https://exonum.com/doc/architecture/storage#mapindex
-impl<'a> CurrencySchema<'a> {
-    pub fn wallets(&mut self) -> MapIndex<&mut Fork, PublicKey, Wallet> {
-        MapIndex::new("cryptocurrency.wallets", self.view)
+impl<T: AsRef<Snapshot>> CurrencySchema<T> {
+    /// Creates the schema instance.
+    pub fn new(view: T) -> Self {
+        CurrencySchema { view }
     }
 
-    /// Get a separate wallet from the storage.
-    pub fn wallet(&mut self, pub_key: &PublicKey) -> Option<Wallet> {
+    /// Returns an immutable version of the wallets table.
+    pub fn wallets(&self) -> MapIndex<&Snapshot, PublicKey, Wallet> {
+        MapIndex::new("cryptocurrency.wallets", self.view.as_ref())
+    }
+
+    /// Gets a separate wallet from the storage.
+    pub fn wallet(&self, pub_key: &PublicKey) -> Option<Wallet> {
         self.wallets().get(pub_key)
+    }
+}
+
+/// A mutable version of the schema declaring an additional method to persist wallets
+/// to the storage.
+impl<'a> CurrencySchema<&'a mut Fork> {
+    /// Returns a mutable version of the wallets table.
+    pub fn wallets_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Wallet> {
+        MapIndex::new("cryptocurrency.wallets", &mut self.view)
     }
 }
 
@@ -153,11 +164,11 @@ impl Transaction for TxCreateWallet {
 
     /// Apply logic to the storage when executing the transaction.
     fn execute(&self, view: &mut Fork) {
-        let mut schema = CurrencySchema { view };
+        let mut schema = CurrencySchema::new(view);
         if schema.wallet(self.pub_key()).is_none() {
             let wallet = Wallet::new(self.pub_key(), self.name(), INIT_BALANCE);
             println!("Create the wallet: {:?}", wallet);
-            schema.wallets().put(self.pub_key(), wallet)
+            schema.wallets_mut().put(self.pub_key(), wallet)
         }
     }
 
@@ -177,7 +188,7 @@ impl Transaction for TxTransfer {
     /// Retrieve two wallets to apply the transfer. Check the sender's
     /// balance and apply changes to the balances of the wallets.
     fn execute(&self, view: &mut Fork) {
-        let mut schema = CurrencySchema { view };
+        let mut schema = CurrencySchema::new(view);
         let sender = schema.wallet(self.from());
         let receiver = schema.wallet(self.to());
         if let (Some(sender), Some(receiver)) = (sender, receiver) {
@@ -186,7 +197,7 @@ impl Transaction for TxTransfer {
                 let sender = sender.decrease(amount);
                 let receiver = receiver.increase(amount);
                 println!("Transfer between wallets: {:?} => {:?}", sender, receiver);
-                let mut wallets = schema.wallets();
+                let mut wallets = schema.wallets_mut();
                 wallets.put(self.from(), sender);
                 wallets.put(self.to(), receiver);
             }
@@ -223,8 +234,8 @@ impl CryptocurrencyApi {
         let public_key = PublicKey::from_hex(wallet_key).map_err(ApiError::FromHex)?;
 
         let wallet = {
-            let mut view = self.blockchain.fork();
-            let mut schema = CurrencySchema { view: &mut view };
+            let snapshot = self.blockchain.snapshot();
+            let schema = CurrencySchema::new(snapshot);
             schema.wallet(&public_key)
         };
 
@@ -237,8 +248,8 @@ impl CryptocurrencyApi {
 
     /// Endpoint for dumping all wallets from the storage.
     fn get_wallets(&self, _: &mut Request) -> IronResult<Response> {
-        let mut view = self.blockchain.fork();
-        let mut schema = CurrencySchema { view: &mut view };
+        let snapshot = self.blockchain.snapshot();
+        let schema = CurrencySchema::new(snapshot);
         let idx = schema.wallets();
         let wallets: Vec<Wallet> = idx.values().collect();
 
