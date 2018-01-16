@@ -23,7 +23,8 @@ use node::Node;
 use super::internal::{CollectedCommand, Feedback};
 use super::clap_backend::ClapBackend;
 use super::ServiceFactory;
-use super::details::{Run, Finalize, GenerateNodeConfig, GenerateCommonConfig, GenerateTestnet};
+use super::details::{Run, RunDev, Finalize, GenerateNodeConfig, GenerateCommonConfig,
+                     GenerateTestnet};
 use super::keys;
 use super::CommandName;
 
@@ -117,6 +118,7 @@ impl NodeBuilder {
             CollectedCommand::new(Box::new(GenerateTestnet)),
         );
         commands.insert(Run::name(), CollectedCommand::new(Box::new(Run)));
+        commands.insert(RunDev::name(), CollectedCommand::new(Box::new(RunDev)));
         commands.insert(
             GenerateNodeConfig::name(),
             CollectedCommand::new(Box::new(GenerateNodeConfig)),

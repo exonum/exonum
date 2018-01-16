@@ -17,7 +17,7 @@
 //! This module implement all core commands.
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::net::SocketAddr;
 use std::collections::{BTreeMap, HashMap};
 
@@ -150,6 +150,106 @@ impl Command for Run {
         new_context.set(keys::NODE_CONFIG, config);
 
         Feedback::RunNode(new_context)
+    }
+}
+
+/// Command for running service in dev mode.
+pub struct RunDev;
+
+impl RunDev {
+    /// Returns the name of the `Run` command.
+    pub fn name() -> CommandName {
+        "run-dev"
+    }
+
+    fn artifacts_directory(ctx: &Context) -> PathBuf {
+        let directory = ctx.arg::<String>("ARTIFACTS_DIR").unwrap_or_else(|_| {
+            String::from(".exonum")
+        });
+        PathBuf::from(&directory)
+    }
+
+    fn artifacts_path(inner_path: &str, ctx: &Context) -> String {
+        let mut path = Self::artifacts_directory(ctx);
+        path.push(inner_path);
+        String::from(path.to_str().expect("Expected correct path"))
+    }
+
+    fn generate_config(commands: &HashMap<CommandName, CollectedCommand>, ctx: &Context) -> String {
+        let common_config_path = Self::artifacts_path("common.toml", ctx);
+        let peer_addr = "127.0.0.1";
+        let pub_config_path = Self::artifacts_path("public.toml", ctx);
+        let sec_config_path = Self::artifacts_path("secret.toml", ctx);
+        let output_config_path = Self::artifacts_path("output.toml", ctx);
+
+        let mut common_config_ctx = ctx.clone();
+        common_config_ctx.set_arg("COMMON_CONFIG", common_config_path.clone());
+        let common_config_command = commands.get(GenerateCommonConfig::name()).expect(
+            "Expected GenerateCommonConfig in the commands list.",
+        );
+        common_config_command.execute(commands, common_config_ctx);
+
+        let mut node_config_ctx = ctx.clone();
+        node_config_ctx.set_arg("COMMON_CONFIG", common_config_path.clone());
+        node_config_ctx.set_arg("PUB_CONFIG", pub_config_path.clone());
+        node_config_ctx.set_arg("SEC_CONFIG", sec_config_path.clone());
+        node_config_ctx.set_arg("PEER_ADDR", String::from(peer_addr));
+        let node_config_command = commands.get(GenerateNodeConfig::name()).expect(
+            "Expected GenerateNodeConfig in the commands list.",
+        );
+        node_config_command.execute(commands, node_config_ctx);
+
+        let mut finalize_ctx = ctx.clone();
+        finalize_ctx.set_arg_multiple("PUBLIC_CONFIGS", vec![pub_config_path.clone()]);
+        finalize_ctx.set_arg("SECRET_CONFIG", sec_config_path.clone());
+        finalize_ctx.set_arg("OUTPUT_CONFIG_PATH", output_config_path.clone());
+        let finalize_command = commands.get(Finalize::name()).expect(
+            "Expected Finalize in the commands list.",
+        );
+        finalize_command.execute(commands, finalize_ctx);
+
+        output_config_path
+    }
+}
+
+impl Command for RunDev {
+    fn args(&self) -> Vec<Argument> {
+        vec![
+            Argument::new_named(
+                "ARTIFACTS_DIR",
+                false,
+                "The path where configuration and db files will be generated.",
+                "a",
+                "artifacts-dir",
+                false
+            ),
+        ]
+    }
+
+    fn name(&self) -> CommandName {
+        Self::name()
+    }
+
+    fn about(&self) -> &str {
+        "Run application in development mode (generate configuration and db files automatically)"
+    }
+
+    fn execute(
+        &self,
+        commands: &HashMap<CommandName, CollectedCommand>,
+        mut context: Context,
+        exts: &Fn(Context) -> Context,
+    ) -> Feedback {
+        let node_config_path = Self::generate_config(commands, &context);
+        let db_path = Self::artifacts_path("db", &context);
+        context.set_arg("NODE_CONFIG_PATH", node_config_path);
+        context.set_arg(DATABASE_PATH, db_path);
+        let new_context = exts(context);
+        // TODO: clean up artifacts directory.
+        commands
+            .get(Run::name())
+            .expect("Expected Run in the commands list.")
+            .execute(commands, new_context.clone())
     }
 }
 
