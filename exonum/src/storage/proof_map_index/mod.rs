@@ -22,7 +22,8 @@ use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageValue};
 use self::key::{ChildKind, DBKey, LEAF_KEY_PREFIX};
 use self::node::{BranchNode, Node};
 
-pub use self::key::{DBKey as ProofMapDBKey, KeyBitRange, KEY_SIZE as PROOF_MAP_KEY_SIZE, ProofMapKey};
+pub use self::key::{DBKey as ProofMapDBKey, KeyBitRange, KEY_SIZE as PROOF_MAP_KEY_SIZE,
+                    ProofMapKey};
 pub use self::proof::{BranchProofNode, MapProof, ProofNode};
 
 #[cfg(test)]
@@ -203,7 +204,9 @@ where
         current_branch: &BranchNode,
         searched_slice: &DBKey,
     ) -> Option<ProofNode<V>> {
-        let child_slice = current_branch.child_slice(searched_slice.bit(0)).start_from(searched_slice.start());
+        let child_slice = current_branch
+            .child_slice(searched_slice.bit(0))
+            .start_from(searched_slice.start());
         let c_pr_l = child_slice.common_prefix(searched_slice);
         debug_assert!(c_pr_l > 0);
         if c_pr_l < child_slice.len() {
@@ -277,7 +280,7 @@ where
         match self.get_root_node() {
             Some((k, Node::Leaf(v))) => {
                 HashStream::new()
-                    .update(&k.as_bytes())
+                    .update(k.as_bytes())
                     .update(v.hash().as_ref())
                     .hash()
             }
@@ -585,7 +588,9 @@ where
         key_slice: &DBKey,
         value: V,
     ) -> (Option<u16>, Hash) {
-        let child_slice = parent.child_slice(key_slice.bit(0)).start_from(key_slice.start());
+        let child_slice = parent.child_slice(key_slice.bit(0)).start_from(
+            key_slice.start(),
+        );
         // If the slice is fully fit in key then there is a two cases
         let i = child_slice.common_prefix(key_slice);
         if child_slice.len() == i {
@@ -712,7 +717,9 @@ where
     }
 
     fn remove_node(&mut self, parent: &BranchNode, key_slice: &DBKey) -> RemoveResult {
-        let child_slice = parent.child_slice(key_slice.bit(0)).start_from(key_slice.start());
+        let child_slice = parent.child_slice(key_slice.bit(0)).start_from(
+            key_slice.start(),
+        );
         let i = child_slice.common_prefix(key_slice);
 
         if i == child_slice.len() {
@@ -862,7 +869,9 @@ where
     type Item = (K, V);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.base_iter.next().map(|(k, v)| (K::read(k.raw_key()), v))
+        self.base_iter.next().map(
+            |(k, v)| (K::read(k.raw_key()), v),
+        )
     }
 }
 

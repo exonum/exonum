@@ -281,7 +281,7 @@ impl StorageKey for DBKey {
     fn read(buffer: &[u8]) -> Self {
         debug_assert_eq!(buffer.len(), DB_KEY_SIZE);
         let mut data = [0; DB_KEY_SIZE];
-        data.copy_from_slice(&buffer);
+        data.copy_from_slice(buffer);
         DBKey::from_raw(data)
     }
 }

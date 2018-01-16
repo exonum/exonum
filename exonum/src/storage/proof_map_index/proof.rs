@@ -107,13 +107,13 @@ impl<V: StorageValue> MapProof<V> {
             Empty => Hash::zero(),
             LeafRootInclusive(ref root_key, ref root_val) => {
                 HashStream::new()
-                    .update(&root_key.as_bytes())
+                    .update(root_key.as_bytes())
                     .update(root_val.hash().as_ref())
                     .hash()
             }
             LeafRootExclusive(ref root_key, ref root_val_hash) => {
                 HashStream::new()
-                    .update(&root_key.as_bytes())
+                    .update(root_key.as_bytes())
                     .update(root_val_hash.as_ref())
                     .hash()
             }
@@ -144,8 +144,8 @@ impl<V: StorageValue> BranchProofNode<V> {
                 HashStream::new()
                     .update(left_hash.as_ref())
                     .update(right_hash.as_ref())
-                    .update(&left_key.as_bytes())
-                    .update(&right_key.as_bytes())
+                    .update(left_key.as_bytes())
+                    .update(right_key.as_bytes())
                     .hash()
             }
             LeftBranch {
@@ -157,8 +157,8 @@ impl<V: StorageValue> BranchProofNode<V> {
                 HashStream::new()
                     .update(left_node.root_hash().as_ref())
                     .update(right_hash.as_ref())
-                    .update(&left_key.as_bytes())
-                    .update(&right_key.as_bytes())
+                    .update(left_key.as_bytes())
+                    .update(right_key.as_bytes())
                     .hash()
             }
             RightBranch {
@@ -170,8 +170,8 @@ impl<V: StorageValue> BranchProofNode<V> {
                 HashStream::new()
                     .update(left_hash.as_ref())
                     .update(right_node.root_hash().as_ref())
-                    .update(&left_key.as_bytes())
-                    .update(&right_key.as_bytes())
+                    .update(left_key.as_bytes())
+                    .update(right_key.as_bytes())
                     .hash()
             }
         }
