@@ -1,7 +1,7 @@
 extern crate core;
 
 use serde_json::Value;
-use serde::de::{Deserialize, DeserializeOwned, Deserializer};
+use serde::de::{DeserializeOwned};
 
 use iron::prelude::*;
 use iron::Handler;
@@ -67,8 +67,8 @@ pub struct TransactionResponse {
 }
 
 
-/// TODO
-pub trait Srv: Send + Sync + 'static {
+/// Service capable of receiving and processing transactions
+pub trait TransactionService: Send + Sync + 'static {
     /// TODO
     type Transactions: TransactionSet;
     // = NoTransactions
@@ -86,27 +86,85 @@ pub trait Srv: Send + Sync + 'static {
     }
 
     /// TODO
-    fn handle_commit(&self, _context: &ServiceContext) {}
-
-    /// TODO
-    fn wire_public_api(&self, router: &mut Router, ctx: &ApiContext) {
+    fn handle_commit(&self, _context: &ServiceContext) {
     }
 
     /// TODO
-    fn wire_private_api(&self, router: &mut Router, ctx: &ApiContext) {
+    fn wire_public_api(&self, _router: &mut Router, _ctx: &ApiContext) {
+    }
+
+    /// TODO
+    fn wire_private_api(&self, _router: &mut Router, _ctx: &ApiContext) {
     }
 
     /// TODO
     fn into_service(self) -> Box<Service> where Self: Sized {
-        Box::new(SrvService(self))
+        Box::new(TransactionServiceImpl(self))
+    }
+}
+
+/// Service without transactions, which can observe blockchain state, but does not allow to
+/// change it
+pub trait ObserverService: Send + Sync + 'static {
+    /// TODO
+    const ID: u16;
+    /// TODO
+    const NAME: &'static str;
+
+    /// TODO
+    fn initialize(&self, _fork: &mut Fork) -> Value {
+        Value::Null
+    }
+
+    /// TODO
+    fn handle_commit(&self, _context: &ServiceContext) {
+    }
+
+    /// TODO
+    fn wire_public_api(&self, _router: &mut Router, _ctx: &ApiContext) {
+    }
+
+    /// TODO
+    fn wire_private_api(&self, _router: &mut Router, _ctx: &ApiContext) {
+    }
+
+    /// TODO
+    fn into_service(self) -> Box<Service> where Self: Sized {
+        struct ObserverServiceImpl<S>(S);
+
+        impl<S: ObserverService> Service for ObserverServiceImpl<S> {
+            fn service_id(&self) -> u16 { S::ID }
+            fn service_name(&self) -> &'static str { S::NAME }
+            fn state_hash(&self, _: &Snapshot) -> Vec<Hash> { Vec::new() }
+            fn initialize(&self, fork: &mut Fork) -> Value { self.0.initialize(fork) }
+            fn handle_commit(&self, context: &ServiceContext) { self.0.handle_commit(context) }
+
+            fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
+                Err(MessageError::IncorrectMessageType { message_type: raw.message_type() })
+            }
+
+            fn public_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
+                let mut router = Router::new();
+                self.0.wire_public_api(&mut router, context);
+                Some(Box::new(router))
+            }
+
+            fn private_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
+                let mut router = Router::new();
+                self.0.wire_private_api(&mut router, context);
+                Some(Box::new(router))
+            }
+        }
+
+        Box::new(ObserverServiceImpl(self))
     }
 }
 
 
 
-struct SrvService<S>(S);
+struct TransactionServiceImpl<S>(S);
 
-impl<S: Srv> Service for SrvService<S> {
+impl<S: TransactionService> Service for TransactionServiceImpl<S> {
     fn service_id(&self) -> u16 {
         S::ID
     }
@@ -132,7 +190,7 @@ impl<S: Srv> Service for SrvService<S> {
     }
 
     fn public_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
-        let api = SrvApi::<S> {
+        let api = TransactionServiceImplApi::<S> {
             srv: PhantomData,
             api_sender: context.node_channel().clone()
         };
@@ -149,18 +207,18 @@ impl<S: Srv> Service for SrvService<S> {
     }
 }
 
-struct SrvApi<S> {
+struct TransactionServiceImplApi<S> {
     srv: PhantomData<S>,
     api_sender: ApiSender,
 }
 
-impl<S> Clone for SrvApi<S> {
+impl<S> Clone for TransactionServiceImplApi<S> {
     fn clone(&self) -> Self {
-        SrvApi { srv: PhantomData, api_sender: self.api_sender.clone() }
+        TransactionServiceImplApi { srv: PhantomData, api_sender: self.api_sender.clone() }
     }
 }
 
-impl<S: Srv> Api for SrvApi<S> {
+impl<S: TransactionService> Api for TransactionServiceImplApi<S> {
     fn wire<'b>(&self, router: &'b mut Router) {
         let self_ = self.clone(); // TODO: whyyyy do we need this?
         router.post(
