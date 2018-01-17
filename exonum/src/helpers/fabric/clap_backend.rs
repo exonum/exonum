@@ -80,14 +80,18 @@ impl ClapBackend {
     }
 
     fn command_into_subcommand(command: &CollectedCommand) -> clap::App {
+        let mut index = 1;
         let command_args: Vec<_> = command
             .args()
             .iter()
-            .zip(1..)
-            .map(|(arg, index)| {
+            .map(|arg| {
                 let clap_arg = clap::Arg::with_name(arg.name);
                 let clap_arg = match arg.argument_type {
-                    ArgumentType::Positional => clap_arg.index(index),
+                    ArgumentType::Positional => {
+                        let arg = clap_arg.index(index);
+                        index += 1;
+                        arg
+                    }
                     ArgumentType::Named(detail) => {
                         let mut clap_arg = clap_arg.long(detail.long_name);
                         if let Some(short) = detail.short_name {
