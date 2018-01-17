@@ -1,11 +1,9 @@
 extern crate core;
 
 use serde_json::Value;
-use serde::de::{DeserializeOwned};
 
 use iron::prelude::*;
 use iron::Handler;
-use bodyparser;
 use router::Router;
 
 use serde_json;
@@ -22,18 +20,17 @@ use super::{Transaction, ServiceContext, ApiContext, Service};
 use std::marker::PhantomData;
 
 /// TODO
-pub trait TransactionSet: DeserializeOwned + Into<Box<Transaction>> + Clone {
+pub trait TransactionSet {
     /// TODO
     fn tx_from_raw(raw: RawTransaction) -> Result<Box<Transaction>, MessageError>;
+    /// TODO
+    fn tx_from_request(request: &mut Request) -> Result<Box<Transaction>, ApiError>;
 }
 
 #[macro_export]
 macro_rules! transaction_set {
     ( $name:ident { $($tx:ident),* } ) => {
-        #[derive(Deserialize, Clone)]
-        #[serde(untagged)] // :(
         pub enum $name {
-            $($tx($tx),)*
         }
 
         impl $crate::blockchain::TransactionSet for $name {
@@ -47,13 +44,27 @@ macro_rules! transaction_set {
 
                 return Err($crate::encoding::Error::IncorrectMessageType { message_type })
             }
-        }
 
-        impl Into<Box<Transaction>> for $name {
-            fn into(self) -> Box<Transaction> {
-                match self {$(
-                   $name::$tx(tx) => Box::new(tx),
-                )*}
+            //TODO: reexport & $crate::
+            fn tx_from_request(request: &mut $crate::iron::Request) -> Result<Box<$crate::blockchain::Transaction>, $crate::api::ApiError> {
+                use $crate::iron::prelude::*;
+
+                #[derive(Deserialize, Clone)]
+                #[serde(untagged)] // :(
+                enum Any {
+                    $($tx($tx),)*
+                }
+
+                match request.get::<$crate::bodyparser::Struct<Any>>() {
+                    Ok(None) => Err($crate::api::ApiError::IncorrectRequest("Empty request body".into()))?,
+                    Err(e) => Err($crate::api::ApiError::IncorrectRequest(Box::new(e)))?,
+                    Ok(Some(any)) => {
+                        match any {$(
+                            Any::$tx(tx) => Ok(Box::new(tx)),
+                        )*}
+                    }
+                }
+
             }
         }
     }
@@ -224,17 +235,11 @@ impl<S: TransactionService> Api for TransactionServiceImplApi<S> {
         router.post(
             "/transactions",
             move |req: &mut Request| -> IronResult<Response> {
-                match req.get::<bodyparser::Struct<S::Transactions>>() {
-                    Ok(None) => Err(ApiError::IncorrectRequest("Empty request body".into()))?,
-                    Err(e) => Err(ApiError::IncorrectRequest(Box::new(e)))?,
-                    Ok(Some(transaction)) => {
-                        let transaction: Box<Transaction> = transaction.into();
-                        let tx_hash = transaction.hash();
-                        self_.api_sender.send(transaction).map_err(ApiError::from)?;
-                        let json = TransactionResponse { tx_hash };
-                        self_.ok_response(&serde_json::to_value(&json).unwrap())
-                    }
-                }
+                let tx = S::Transactions::tx_from_request(req)?;
+                let tx_hash = tx.hash();
+                self_.api_sender.send(tx).map_err(ApiError::from)?;
+                let json = TransactionResponse { tx_hash };
+                self_.ok_response(&serde_json::to_value(&json).unwrap())
             },
             "transaction",
         );
