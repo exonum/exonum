@@ -210,6 +210,18 @@ impl RunDev {
 
         output_config_path
     }
+
+    fn cleanup(ctx: &Context) {
+        let database_dir_path = ctx.arg::<String>(DATABASE_PATH).expect(
+            "Expected DATABASE_PATH being set.",
+        );
+        let database_dir = Path::new(&database_dir_path);
+        if database_dir.exists() {
+            fs::remove_dir_all(Self::artifacts_directory(ctx)).expect(
+                "Expected DATABASE_PATH folder being removable.",
+            );
+        }
+    }
 }
 
 impl Command for RunDev {
@@ -240,10 +252,13 @@ impl Command for RunDev {
         mut context: Context,
         exts: &Fn(Context) -> Context,
     ) -> Feedback {
-        let node_config_path = Self::generate_config(commands, &context);
         let db_path = Self::artifacts_path("db", &context);
-        context.set_arg("NODE_CONFIG_PATH", node_config_path);
         context.set_arg(DATABASE_PATH, db_path);
+        Self::cleanup(&context);
+
+        let node_config_path = Self::generate_config(commands, &context);
+        context.set_arg("NODE_CONFIG_PATH", node_config_path);
+
         let new_context = exts(context);
         // TODO: clean up artifacts directory.
         commands
