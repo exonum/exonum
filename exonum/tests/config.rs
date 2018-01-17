@@ -19,8 +19,9 @@ extern crate toml;
 extern crate exonum;
 
 use std::ffi::OsString;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::fs;
+use std::path::Path;
 use std::panic;
 use std::io::Read;
 
@@ -47,6 +48,14 @@ fn full_tmp_name(filename: &str, folder: &str) -> String {
 
 fn full_testdata_name(filename: &str) -> String {
     format!("{}{}", CONFIG_TESTDATA_FOLDER, filename)
+}
+
+fn touch(path: &str) {
+    OpenOptions::new()
+        .create(true)
+        .write(true)
+        .open(path)
+        .unwrap();
 }
 
 fn compare_files(filename: &str, folder: &str) {
@@ -126,6 +135,15 @@ fn run_node(config: &str, folder: &str) {
     ]));
 }
 
+fn run_dev(folder: &str) {
+    assert!(default_run_with_matches(vec![
+        "exonum-config-test",
+        "run-dev",
+        "-a",
+        &full_tmp_folder(folder),
+    ]));
+}
+
 #[test]
 fn test_generate_template() {
     let command = "generate-template";
@@ -190,4 +208,25 @@ fn test_generate_full_config_run() {
     if let Err(err) = result {
         panic::resume_unwind(err);
     }
+}
+
+#[test]
+fn test_run_dev() {
+    let artifacts_dir = ".exonum";
+    let db_dir = format!("{}/{}", artifacts_dir, "db");
+    let full_db_dir = full_tmp_folder(&db_dir);
+
+    fs::create_dir_all(Path::new(&full_db_dir)).expect("Expected db temp folder to be created.");
+    let old_db_file = full_tmp_name("1", &db_dir);
+    touch(&old_db_file);
+
+    let result = panic::catch_unwind(|| { run_dev(artifacts_dir); });
+
+    if let Err(err) = result {
+        panic::resume_unwind(err);
+    }
+
+    // Test cleaning up.
+    assert!(!Path::new(&old_db_file).exists());
+    fs::remove_dir_all(full_tmp_folder(artifacts_dir)).unwrap();
 }
