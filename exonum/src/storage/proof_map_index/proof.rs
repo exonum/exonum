@@ -19,16 +19,16 @@ use serde::ser::SerializeMap;
 
 use crypto::{Hash, HashStream};
 use super::super::{StorageValue, Error};
-use super::key::{ProofMapKey, DBKey, KeyBitRange, ChildKind, KEY_SIZE};
+use super::key::{ProofMapKey, ProofPath, BitsRange, ChildKind, KEY_SIZE};
 
-impl Serialize for DBKey {
+impl Serialize for ProofPath {
     fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         let mut repr = String::with_capacity(KEY_SIZE * 8);
         let bslice = self;
-        for ind in 0..self.end() - self.start() {
+        for ind in 0..self.len() {
             match bslice.bit(ind) {
                 ChildKind::Left => {
                     repr.push('0');
@@ -45,9 +45,9 @@ impl Serialize for DBKey {
 /// An enum that represents a proof of existence or non-existence for a proof map key.
 pub enum MapProof<V> {
     /// A boundary case with a single element tree and a matching key.
-    LeafRootInclusive(DBKey, V),
+    LeafRootInclusive(ProofPath, V),
     /// A boundary case with a single element tree and a non-matching key
-    LeafRootExclusive(DBKey, Hash),
+    LeafRootExclusive(ProofPath, Hash),
     /// A boundary case with empty tree.
     Empty,
     /// A root branch of the tree.
@@ -71,9 +71,9 @@ pub enum BranchProofNode<V> {
         /// A hash of the right child.
         right_hash: Hash,
         /// A key of the left child.
-        left_key: DBKey,
+        left_key: ProofPath,
         /// A key of the right child.
-        right_key: DBKey,
+        right_key: ProofPath,
     },
     /// A branch of proof in which left child may contain the requested key.
     LeftBranch {
@@ -82,9 +82,9 @@ pub enum BranchProofNode<V> {
         /// A hash of the right child.
         right_hash: Hash,
         /// A key of the left child.
-        left_key: DBKey,
+        left_key: ProofPath,
         /// A key of the right child.
-        right_key: DBKey,
+        right_key: ProofPath,
     },
     /// A branch of proof in which right child may contain the requested key.
     RightBranch {
@@ -93,9 +93,9 @@ pub enum BranchProofNode<V> {
         /// A right child node.
         right_node: Box<ProofNode<V>>,
         /// A key of the left child.
-        left_key: DBKey,
+        left_key: ProofPath,
         /// A key of the right child.
-        right_key: DBKey,
+        right_key: ProofPath,
     },
 }
 
@@ -277,7 +277,7 @@ impl<V: fmt::Debug + StorageValue> MapProof<V> {
     /// If the proof is valid and the requested key does not exists, `Ok(None)` is returned.
     /// If the proof is invalid, `Err` is returned.
     pub fn validate<K: ProofMapKey>(&self, key: &K, root_hash: Hash) -> Result<Option<&V>, Error> {
-        let searched_slice = DBKey::new(key);
+        let searched_slice = ProofPath::new(key);
         use self::MapProof::*;
 
         // if we inspect the topmost level of a proof
@@ -323,7 +323,7 @@ impl<V: fmt::Debug + StorageValue> MapProof<V> {
 }
 
 impl<V: fmt::Debug> BranchProofNode<V> {
-    fn validate(&self, searched_slice: &DBKey) -> Result<Option<&V>, Error> {
+    fn validate(&self, searched_slice: &ProofPath) -> Result<Option<&V>, Error> {
         use self::BranchProofNode::*;
 
         // if we inspect the topmost level of a proof
@@ -385,8 +385,8 @@ impl<V: fmt::Debug> BranchProofNode<V> {
 
     fn validate_consistency<'a>(
         &'a self,
-        parent_slice: &DBKey,
-        searched_slice: &DBKey,
+        parent_slice: &ProofPath,
+        searched_slice: &ProofPath,
     ) -> Result<Option<&'a V>, Error> {
         use self::BranchProofNode::*;
 
@@ -478,8 +478,8 @@ impl<V: fmt::Debug> BranchProofNode<V> {
 impl<V: fmt::Debug> ProofNode<V> {
     fn validate_consistency<'a>(
         &'a self,
-        parent_slice: &DBKey,
-        searched_slice: &DBKey,
+        parent_slice: &ProofPath,
+        searched_slice: &ProofPath,
     ) -> Result<Option<&'a V>, Error> {
         use self::ProofNode::*;
 

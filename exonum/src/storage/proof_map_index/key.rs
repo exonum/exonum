@@ -69,21 +69,21 @@ impl ::std::ops::Not for ChildKind {
 
 /// A structure that represents paths to the any kinds of `ProofMapIndex` nodes.
 #[derive(Copy, Clone)]
-pub struct DBKey {
+pub struct ProofPath {
     bytes: [u8; DB_KEY_SIZE],
     start: u16,
 }
 
-impl DBKey {
+impl ProofPath {
     /// Create a path from the given key.
-    pub fn new<K: ProofMapKey>(key: &K) -> DBKey {
+    pub fn new<K: ProofMapKey>(key: &K) -> ProofPath {
         debug_assert_eq!(key.size(), KEY_SIZE);
 
         let mut data = [0; DB_KEY_SIZE];
         data[0] = LEAF_KEY_PREFIX;
         key.write(&mut data[1..KEY_SIZE + 1]);
         data[KEY_SIZE + 1] = 0;
-        DBKey::from_raw(data)
+        ProofPath::from_raw(data)
     }
 
     /// Shows the type of path.
@@ -91,14 +91,14 @@ impl DBKey {
         self.bytes[0] == LEAF_KEY_PREFIX
     }
 
-    /// Returns the byte representation of `DBKey`.
+    /// Returns the byte representation of `ProofPath`.
     pub fn as_bytes(&self) -> &[u8] {
         &self.bytes
     }
 
-    /// Constructs the `DBKey` from raw bytes.
-    fn from_raw(raw: [u8; DB_KEY_SIZE]) -> DBKey {
-        DBKey {
+    /// Constructs the `ProofPath` from raw bytes.
+    fn from_raw(raw: [u8; DB_KEY_SIZE]) -> ProofPath {
+        ProofPath {
             bytes: raw,
             start: 0,
         }
@@ -108,7 +108,7 @@ impl DBKey {
     fn set_end(&mut self, end: u16) {
         let max_len = (KEY_SIZE * 8) as u16;
         assert!(end <= max_len);
-        // Update DBKey kind and right bound.
+        // Update ProofPath kind and right bound.
         if end == max_len {
             self.bytes[DB_KEY_SIZE - 1] = 0;
             self.bytes[0] = LEAF_KEY_PREFIX;
@@ -119,8 +119,8 @@ impl DBKey {
     }
 }
 
-/// The bits representation of the `DBKey`.
-pub trait KeyBitRange {
+/// The bits representation of the `ProofPath`.
+pub trait BitsRange {
     /// Returns the left border of the range.
     fn start(&self) -> u16;
     /// Returns the right border of the range.
@@ -135,9 +135,9 @@ pub trait KeyBitRange {
     }
     /// Get bit at position `idx`.
     fn bit(&self, idx: u16) -> ChildKind;
-    /// Returns the new `DBKey` with the given left border.
+    /// Returns the new `ProofPath` with the given left border.
     fn start_from(&self, idx: u16) -> Self;
-    /// Shortens this DBKey to the specified length.
+    /// Shortens this ProofPath to the specified length.
     fn prefix(&self, pos: u16) -> Self;
     /// Return object which represents a view on to this slice (further) offset by `i` bits.
     fn suffix(&self, pos: u16) -> Self;
@@ -151,7 +151,7 @@ pub trait KeyBitRange {
     fn raw_key(&self) -> &[u8];
 }
 
-impl KeyBitRange for DBKey {
+impl BitsRange for ProofPath {
     fn start(&self) -> u16 {
         self.start
     }
@@ -181,7 +181,7 @@ impl KeyBitRange for DBKey {
     fn start_from(&self, start: u16) -> Self {
         debug_assert!(start <= self.end());
 
-        let mut key = DBKey::from_raw(self.bytes);
+        let mut key = ProofPath::from_raw(self.bytes);
         key.start = start;
         key
     }
@@ -189,7 +189,7 @@ impl KeyBitRange for DBKey {
     fn prefix(&self, pos: u16) -> Self {
         debug_assert!(self.start() + pos <= self.raw_key().len() as u16 * 8);
 
-        let mut key = DBKey::from_raw(self.bytes);
+        let mut key = ProofPath::from_raw(self.bytes);
         key.start = self.start;
         key.set_end(self.start + pos);
         key
@@ -198,7 +198,7 @@ impl KeyBitRange for DBKey {
     fn suffix(&self, pos: u16) -> Self {
         debug_assert!(self.start() + pos <= self.end());
 
-        let mut key = DBKey::from_raw(self.bytes);
+        let mut key = ProofPath::from_raw(self.bytes);
         key.start = self.start + pos;
         key
     }
@@ -229,13 +229,13 @@ impl KeyBitRange for DBKey {
     }
 }
 
-impl PartialEq for DBKey {
+impl PartialEq for ProofPath {
     fn eq(&self, other: &Self) -> bool {
         self.len() == other.len() && self.starts_with(other)
     }
 }
 
-impl ::std::fmt::Debug for DBKey {
+impl ::std::fmt::Debug for ProofPath {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         let mut bits = String::with_capacity(KEY_SIZE * 8);
         for byte in 0..self.raw_key().len() {
@@ -251,7 +251,7 @@ impl ::std::fmt::Debug for DBKey {
             bits.push('|');
         }
 
-        f.debug_struct("DBKeyBitRange")
+        f.debug_struct("ProofPathBitRange")
             .field("start", &self.start())
             .field("end", &self.end())
             .field("bits", &bits)
@@ -259,7 +259,7 @@ impl ::std::fmt::Debug for DBKey {
     }
 }
 
-impl StorageKey for DBKey {
+impl StorageKey for ProofPath {
     fn size(&self) -> usize {
         DB_KEY_SIZE
     }
@@ -282,16 +282,16 @@ impl StorageKey for DBKey {
         debug_assert_eq!(buffer.len(), DB_KEY_SIZE);
         let mut data = [0; DB_KEY_SIZE];
         data.copy_from_slice(buffer);
-        DBKey::from_raw(data)
+        ProofPath::from_raw(data)
     }
 }
 
 #[test]
-fn test_dbkey_storage_key_leaf() {
-    let key = DBKey::new(&[250; 32]);
+fn test_proof_path_storage_key_leaf() {
+    let key = ProofPath::new(&[250; 32]);
     let mut buf = vec![0; DB_KEY_SIZE];
     key.write(&mut buf);
-    let key2 = DBKey::read(&buf);
+    let key2 = ProofPath::read(&buf);
 
     assert_eq!(buf[0], LEAF_KEY_PREFIX);
     assert_eq!(buf[33], 0);
@@ -300,14 +300,14 @@ fn test_dbkey_storage_key_leaf() {
 }
 
 #[test]
-fn test_dbkey_storage_key_branch() {
-    let mut key = DBKey::new(&[255u8; 32]);
+fn test_proof_path_storage_key_branch() {
+    let mut key = ProofPath::new(&[255u8; 32]);
     key = key.prefix(11);
     key = key.suffix(5);
 
     let mut buf = vec![0; DB_KEY_SIZE];
     key.write(&mut buf);
-    let mut key2 = DBKey::read(&buf);
+    let mut key2 = ProofPath::read(&buf);
     key2.start = 5;
 
     assert_eq!(buf[0], BRANCH_KEY_PREFIX);
@@ -318,8 +318,8 @@ fn test_dbkey_storage_key_branch() {
 }
 
 #[test]
-fn test_dbkey_suffix() {
-    let b = DBKey::from_raw(*b"\x00\x01\x02\xFF\x0C0000000000000000000000000000\x20");
+fn test_proof_path_suffix() {
+    let b = ProofPath::from_raw(*b"\x00\x01\x02\xFF\x0C0000000000000000000000000000\x20");
 
     println!("{:?}", b);
 
@@ -351,45 +351,45 @@ fn test_dbkey_suffix() {
 }
 
 #[test]
-fn test_dbkey_prefix() {
-    let b = DBKey::from_raw(*b"\x00\x83wertyuiopasdfghjklzxcvbnm123456\x08");
+fn test_proof_path_prefix() {
+    let b = ProofPath::from_raw(*b"\x00\x83wertyuiopasdfghjklzxcvbnm123456\x08");
     assert_eq!(b.len(), 8);
     assert_eq!(b.prefix(1).bit(0), ChildKind::Right);
     assert_eq!(b.prefix(1).len(), 1);
 }
 
 #[test]
-fn test_dbkey_len() {
-    let b = DBKey::from_raw(*b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00");
+fn test_proof_path_len() {
+    let b = ProofPath::from_raw(*b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00");
     assert_eq!(b.len(), 256);
 }
 
 #[test]
 #[should_panic(expected = "self.start() + idx < self.end()")]
-fn test_dbkey_at_overflow() {
-    let b = DBKey::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\x0F");
+fn test_proof_path_at_overflow() {
+    let b = ProofPath::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\x0F");
     b.bit(32);
 }
 
 #[test]
 #[should_panic(expected = "self.start() + pos <= self.end()")]
-fn test_dbkey_suffix_overflow() {
-    let b = DBKey::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
+fn test_proof_path_suffix_overflow() {
+    let b = ProofPath::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
     assert_eq!(b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00".len(), 34);
     b.suffix(255).suffix(2);
 }
 
 #[test]
 #[should_panic(expected = "self.start() + idx < self.end()")]
-fn test_dbkey_suffix_bit_overflow() {
-    let b = DBKey::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
+fn test_proof_path_suffix_bit_overflow() {
+    let b = ProofPath::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
     b.suffix(1).bit(255);
 }
 
 #[test]
-fn test_dbkey_common_prefix() {
-    let b1 = DBKey::from_raw(*b"\x01abcd0000000000000000000000000000\x00");
-    let b2 = DBKey::from_raw(*b"\x01abef0000000000000000000000000000\x00");
+fn test_proof_path_common_prefix() {
+    let b1 = ProofPath::from_raw(*b"\x01abcd0000000000000000000000000000\x00");
+    let b2 = ProofPath::from_raw(*b"\x01abef0000000000000000000000000000\x00");
     assert_eq!(b1.common_prefix(&b1), 256);
     let c = b1.common_prefix(&b2);
     assert_eq!(c, 17);
@@ -399,8 +399,8 @@ fn test_dbkey_common_prefix() {
     let b2 = b2.suffix(9);
     let c = b1.common_prefix(&b2);
     assert_eq!(c, 8);
-    let b3 = DBKey::from_raw(*b"\x01\xFF0000000000000000000000000000000\x00");
-    let b4 = DBKey::from_raw(*b"\x01\xF70000000000000000000000000000000\x00");
+    let b3 = ProofPath::from_raw(*b"\x01\xFF0000000000000000000000000000000\x00");
+    let b4 = ProofPath::from_raw(*b"\x01\xF70000000000000000000000000000000\x00");
     assert_eq!(b3.common_prefix(&b4), 3);
     assert_eq!(b4.common_prefix(&b3), 3);
     assert_eq!(b3.common_prefix(&b3), 256);
@@ -408,13 +408,13 @@ fn test_dbkey_common_prefix() {
     assert_eq!(b3.common_prefix(&b3), 226);
     let b3 = b3.prefix(200);
     assert_eq!(b3.common_prefix(&b3), 200);
-    let b5 = DBKey::from_raw(*b"\x01\xF00000000000000000000000000000000\x00");
+    let b5 = ProofPath::from_raw(*b"\x01\xF00000000000000000000000000000000\x00");
     assert_eq!(b5.prefix(0).common_prefix(&b3), 0);
 }
 
 #[test]
-fn test_dbkey_is_leaf() {
-    let b = DBKey::from_raw(*b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00");
+fn test_proof_path_is_leaf() {
+    let b = ProofPath::from_raw(*b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00");
     assert_eq!(b.len(), 256);
     println!("{:?}", b.suffix(4));
     assert_eq!(b.suffix(4).is_leaf(), true);
@@ -424,8 +424,8 @@ fn test_dbkey_is_leaf() {
 }
 
 #[test]
-fn test_dbkey_is_branch() {
-    let b = DBKey::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
+fn test_proof_path_is_branch() {
+    let b = ProofPath::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
     assert_eq!(b.len(), 255);
     assert_eq!(b.is_leaf(), false);
 }

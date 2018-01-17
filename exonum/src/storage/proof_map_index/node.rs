@@ -14,12 +14,12 @@
 
 use std::borrow::Cow;
 
-use crypto::{Hash, hash, HASH_SIZE};
+use crypto::{hash, Hash, HASH_SIZE};
 
 use super::super::{StorageKey, StorageValue};
-use super::key::{DBKey, ChildKind, DB_KEY_SIZE};
+use super::key::{ChildKind, ProofPath, DB_KEY_SIZE};
 
-// TODO: implement Field for DBKey and define BranchNode as StorageValue (ECR-22)
+// TODO: implement Field for ProofPath and define BranchNode as StorageValue (ECR-22)
 
 const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + DB_KEY_SIZE);
 
@@ -49,15 +49,15 @@ impl BranchNode {
         }
     }
 
-    pub fn child_slice(&self, kind: ChildKind) -> DBKey {
+    pub fn child_slice(&self, kind: ChildKind) -> ProofPath {
         let from = match kind {
             ChildKind::Right => 2 * HASH_SIZE + DB_KEY_SIZE,
             ChildKind::Left => 2 * HASH_SIZE,
         };
-        DBKey::read(&self.raw[from..from + DB_KEY_SIZE])
+        ProofPath::read(&self.raw[from..from + DB_KEY_SIZE])
     }
 
-    pub fn set_child_slice(&mut self, kind: ChildKind, prefix: &DBKey) {
+    pub fn set_child_slice(&mut self, kind: ChildKind, prefix: &ProofPath) {
         let from = match kind {
             ChildKind::Right => 2 * HASH_SIZE + DB_KEY_SIZE,
             ChildKind::Left => 2 * HASH_SIZE,
@@ -73,7 +73,7 @@ impl BranchNode {
         self.raw[from..from + HASH_SIZE].copy_from_slice(hash.as_ref());
     }
 
-    pub fn set_child(&mut self, kind: ChildKind, prefix: &DBKey, hash: &Hash) {
+    pub fn set_child(&mut self, kind: ChildKind, prefix: &ProofPath, hash: &Hash) {
         self.set_child_slice(kind, prefix);
         self.set_child_hash(kind, hash);
     }
@@ -111,8 +111,8 @@ fn test_branch_node() {
 
     let lh = hash(&[1, 2]);
     let rh = hash(&[3, 4]);
-    let ls = DBKey::new(&[253; 32]);
-    let rs = DBKey::new(&[244; 32]);
+    let ls = ProofPath::new(&[253; 32]);
+    let rs = ProofPath::new(&[244; 32]);
 
     branch.set_child(ChildKind::Left, &ls, &lh);
     branch.set_child(ChildKind::Right, &rs, &rh);

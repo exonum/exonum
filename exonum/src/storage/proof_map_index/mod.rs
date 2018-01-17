@@ -19,11 +19,10 @@ use std::fmt;
 
 use crypto::{Hash, HashStream};
 use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageValue};
-use self::key::{ChildKind, DBKey, LEAF_KEY_PREFIX};
+use self::key::{ChildKind, LEAF_KEY_PREFIX};
 use self::node::{BranchNode, Node};
 
-pub use self::key::{DBKey as ProofMapDBKey, KeyBitRange, KEY_SIZE as PROOF_MAP_KEY_SIZE,
-                    ProofMapKey};
+pub use self::key::{ProofPath, BitsRange, KEY_SIZE as PROOF_MAP_KEY_SIZE, ProofMapKey};
 pub use self::proof::{BranchProofNode, MapProof, ProofNode};
 
 #[cfg(test)]
@@ -61,7 +60,7 @@ pub struct ProofMapIndex<T, K, V> {
 /// [`ProofMapIndex`]: struct.ProofMapIndex.html
 #[derive(Debug)]
 pub struct ProofMapIndexIter<'a, K, V> {
-    base_iter: BaseIndexIter<'a, DBKey, V>,
+    base_iter: BaseIndexIter<'a, ProofPath, V>,
     _k: PhantomData<K>,
 }
 
@@ -75,7 +74,7 @@ pub struct ProofMapIndexIter<'a, K, V> {
 /// [`ProofMapIndex`]: struct.ProofMapIndex.html
 #[derive(Debug)]
 pub struct ProofMapIndexKeys<'a, K> {
-    base_iter: BaseIndexIter<'a, DBKey, ()>,
+    base_iter: BaseIndexIter<'a, ProofPath, ()>,
     _k: PhantomData<K>,
 }
 
@@ -89,13 +88,13 @@ pub struct ProofMapIndexKeys<'a, K> {
 /// [`ProofMapIndex`]: struct.ProofMapIndex.html
 #[derive(Debug)]
 pub struct ProofMapIndexValues<'a, V> {
-    base_iter: BaseIndexIter<'a, DBKey, V>,
+    base_iter: BaseIndexIter<'a, ProofPath, V>,
 }
 
 enum RemoveResult {
     KeyNotFound,
     Leaf,
-    Branch((DBKey, Hash)),
+    Branch((ProofPath, Hash)),
     UpdateHash(Hash),
 }
 
@@ -176,11 +175,11 @@ where
     K: ProofMapKey,
     V: StorageValue,
 {
-    fn get_root_key(&self) -> Option<DBKey> {
-        self.base.iter(&()).next().map(|(k, _): (DBKey, ())| k)
+    fn get_root_key(&self) -> Option<ProofPath> {
+        self.base.iter(&()).next().map(|(k, _): (ProofPath, ())| k)
     }
 
-    fn get_root_node(&self) -> Option<(DBKey, Node<V>)> {
+    fn get_root_node(&self) -> Option<(ProofPath, Node<V>)> {
         match self.get_root_key() {
             Some(key) => {
                 let node = self.get_node_unchecked(&key);
@@ -190,7 +189,7 @@ where
         }
     }
 
-    fn get_node_unchecked(&self, key: &DBKey) -> Node<V> {
+    fn get_node_unchecked(&self, key: &ProofPath) -> Node<V> {
         // TODO: unwraps (ECR-84)?
         if key.is_leaf() {
             Node::Leaf(self.base.get(key).unwrap())
@@ -202,7 +201,7 @@ where
     fn construct_proof(
         &self,
         current_branch: &BranchNode,
-        searched_slice: &DBKey,
+        searched_slice: &ProofPath,
     ) -> Option<ProofNode<V>> {
         let child_slice = current_branch
             .child_slice(searched_slice.bit(0))
@@ -309,7 +308,7 @@ where
     /// assert_eq!(Some(2), index.get(&hash));
     /// ```
     pub fn get(&self, key: &K) -> Option<V> {
-        self.base.get(&DBKey::new(key))
+        self.base.get(&ProofPath::new(key))
     }
 
     /// Returns `true` if the map contains a value for the specified key.
@@ -332,7 +331,7 @@ where
     /// assert!(index.contains(&hash));
     /// ```
     pub fn contains(&self, key: &K) -> bool {
-        self.base.contains(&DBKey::new(key))
+        self.base.contains(&ProofPath::new(key))
     }
 
     /// Returns the proof of existence or non-existence for the specified key.
@@ -353,7 +352,7 @@ where
     /// # drop(proof);
     /// ```
     pub fn get_proof(&self, key: &K) -> MapProof<V> {
-        let searched_slice = DBKey::new(key);
+        let searched_slice = ProofPath::new(key);
 
         match self.get_root_node() {
             Some((root_db_key, Node::Leaf(root_value))) => {
@@ -513,7 +512,7 @@ where
     /// ```
     pub fn iter_from(&self, from: &K) -> ProofMapIndexIter<K, V> {
         ProofMapIndexIter {
-            base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &DBKey::new(from)),
+            base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &ProofPath::new(from)),
             _k: PhantomData,
         }
     }
@@ -539,7 +538,7 @@ where
     /// ```
     pub fn keys_from(&self, from: &K) -> ProofMapIndexKeys<K> {
         ProofMapIndexKeys {
-            base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &DBKey::new(from)),
+            base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &ProofPath::new(from)),
             _k: PhantomData,
         }
     }
@@ -564,7 +563,9 @@ where
     /// }
     /// ```
     pub fn values_from(&self, from: &K) -> ProofMapIndexValues<V> {
-        ProofMapIndexValues { base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &DBKey::new(from)) }
+        ProofMapIndexValues {
+            base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &ProofPath::new(from)),
+        }
     }
 }
 
@@ -573,7 +574,7 @@ where
     K: ProofMapKey,
     V: StorageValue,
 {
-    fn insert_leaf(&mut self, key: &DBKey, value: V) -> Hash {
+    fn insert_leaf(&mut self, key: &ProofPath, value: V) -> Hash {
         debug_assert!(key.is_leaf());
         let hash = value.hash();
         self.base.put(key, value);
@@ -585,7 +586,7 @@ where
     fn insert_branch(
         &mut self,
         parent: &BranchNode,
-        key_slice: &DBKey,
+        key_slice: &ProofPath,
         value: V,
     ) -> (Option<u16>, Hash) {
         let child_slice = parent.child_slice(key_slice.bit(0)).start_from(
@@ -661,7 +662,7 @@ where
     /// assert!(index.contains(&hash));
     /// ```
     pub fn put(&mut self, key: &K, value: V) {
-        let key_slice = DBKey::new(key);
+        let key_slice = ProofPath::new(key);
         match self.get_root_node() {
             Some((prefix, Node::Leaf(prefix_data))) => {
                 let prefix_slice = prefix;
@@ -716,7 +717,7 @@ where
         }
     }
 
-    fn remove_node(&mut self, parent: &BranchNode, key_slice: &DBKey) -> RemoveResult {
+    fn remove_node(&mut self, parent: &BranchNode, key_slice: &ProofPath) -> RemoveResult {
         let child_slice = parent.child_slice(key_slice.bit(0)).start_from(
             key_slice.start(),
         );
@@ -783,7 +784,7 @@ where
     /// assert!(!index.contains(&hash));
     /// ```
     pub fn remove(&mut self, key: &K) {
-        let key_slice = DBKey::new(key);
+        let key_slice = ProofPath::new(key);
         match self.get_root_node() {
             // If we have only on leaf, then we just need to remove it (if any)
             Some((prefix, Node::Leaf(_))) => {
@@ -901,17 +902,21 @@ where
 enum ProofMapIndexEntry<V: StorageValue + fmt::Debug> {
     Branch {
         hash: Hash,
-        prefix: DBKey,
+        prefix: ProofPath,
         left: Box<ProofMapIndexEntry<V>>,
         right: Box<ProofMapIndexEntry<V>>,
     },
-    Leaf { key: DBKey, hash: Hash, value: V },
+    Leaf {
+        key: ProofPath,
+        hash: Hash,
+        value: V,
+    },
 }
 
 impl<V: StorageValue + fmt::Debug> ProofMapIndexEntry<V> {
     fn dump<T, K>(
         index: &ProofMapIndex<T, K, V>,
-        root_prefix: DBKey,
+        root_prefix: ProofPath,
         root_node: Node<V>,
     ) -> ProofMapIndexEntry<V>
     where
