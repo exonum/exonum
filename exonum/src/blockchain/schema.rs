@@ -92,7 +92,7 @@ where
     }
 
     /// Returns table that represents a map from transaction hash into execution result.
-    pub fn transaction_results(&self) -> MapIndex<&T, Hash, TransactionResult> {
+    pub fn transaction_results(&self) -> ProofMapIndex<&T, Hash, TransactionResult> {
         MapIndex::new(TRANSACTIONS_RESULT, &self.view)
     }
 
@@ -274,7 +274,7 @@ where
 
     /// Returns the `state_hash` table for core tables.
     pub fn core_state_hash(&self) -> Vec<Hash> {
-        vec![self.configs().root_hash()]
+        vec![self.configs().root_hash(), self.transaction_results().root_hash()]
     }
 
     /// Constructs a proof of inclusion of root hash of a specific service
@@ -336,7 +336,7 @@ impl<'a> Schema<&'a mut Fork> {
     /// Mutable reference to the [`transaction_results`][1] index.
     ///
     /// [1]: struct.Schema.html#method.transaction_results
-    pub fn transaction_results_mut(&mut self) -> MapIndex<&mut Fork, Hash, TransactionResult> {
+    pub fn transaction_results_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, TransactionResult> {
         MapIndex::new(TRANSACTIONS_RESULT, &mut self.view)
     }
 
