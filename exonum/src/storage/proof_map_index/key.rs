@@ -22,7 +22,9 @@ pub const LEAF_KEY_PREFIX: u8 = 01;
 
 /// Size in bytes of the `ProofMapKey`.
 pub const KEY_SIZE: usize = HASH_SIZE;
-pub const DB_KEY_SIZE: usize = KEY_SIZE + 2;
+pub const PROOF_PATH_SIZE: usize = KEY_SIZE + 2;
+pub const PROOF_PATH_KIND_POS: usize = 0;
+pub const PROOF_PATH_LEN_POS: usize = KEY_SIZE + 1;
 
 /// A trait that defines a subset of storage key types which are suitable for use with
 /// `ProofMapIndex`.
@@ -70,7 +72,7 @@ impl ::std::ops::Not for ChildKind {
 /// A structure that represents paths to the any kinds of `ProofMapIndex` nodes.
 #[derive(Copy, Clone)]
 pub struct ProofPath {
-    bytes: [u8; DB_KEY_SIZE],
+    bytes: [u8; PROOF_PATH_SIZE],
     start: u16,
 }
 
@@ -79,10 +81,10 @@ impl ProofPath {
     pub fn new<K: ProofMapKey>(key: &K) -> ProofPath {
         debug_assert_eq!(key.size(), KEY_SIZE);
 
-        let mut data = [0; DB_KEY_SIZE];
+        let mut data = [0; PROOF_PATH_SIZE];
         data[0] = LEAF_KEY_PREFIX;
         key.write(&mut data[1..KEY_SIZE + 1]);
-        data[KEY_SIZE + 1] = 0;
+        data[PROOF_PATH_LEN_POS] = 0;
         ProofPath::from_raw(data)
     }
 
@@ -97,7 +99,16 @@ impl ProofPath {
     }
 
     /// Constructs the `ProofPath` from raw bytes.
-    fn from_raw(raw: [u8; DB_KEY_SIZE]) -> ProofPath {
+    fn from_raw(raw: [u8; PROOF_PATH_SIZE]) -> ProofPath {
+        debug_assert!(
+            if raw[PROOF_PATH_KIND_POS] == LEAF_KEY_PREFIX {
+                raw[PROOF_PATH_LEN_POS] == 0
+            } else {
+                true
+            },
+            "ProofPath is inconsistent"
+        );
+
         ProofPath {
             bytes: raw,
             start: 0,
@@ -110,11 +121,11 @@ impl ProofPath {
         assert!(end <= max_len);
         // Update ProofPath kind and right bound.
         if end == max_len {
-            self.bytes[DB_KEY_SIZE - 1] = 0;
             self.bytes[0] = LEAF_KEY_PREFIX;
+            self.bytes[PROOF_PATH_LEN_POS] = 0;
         } else {
             self.bytes[0] = BRANCH_KEY_PREFIX;
-            self.bytes[DB_KEY_SIZE - 1] = end as u8;
+            self.bytes[PROOF_PATH_LEN_POS] = end as u8;
         };
     }
 }
@@ -139,9 +150,9 @@ pub trait BitsRange {
     fn start_from(&self, idx: u16) -> Self;
     /// Shortens this ProofPath to the specified length.
     fn prefix(&self, pos: u16) -> Self;
-    /// Return object which represents a view on to this slice (further) offset by `i` bits.
+    /// Return object which represents a view on to this slice (further) offset by `pos` bits.
     fn suffix(&self, pos: u16) -> Self;
-    /// Returns true if we starts with the same prefix at the whole of `Other`
+    /// Returns true if we starts with the same prefix at the whole of `other`
     fn starts_with(&self, other: &Self) -> bool {
         self.common_prefix(other) == other.len()
     }
@@ -160,7 +171,7 @@ impl BitsRange for ProofPath {
         if self.is_leaf() {
             KEY_SIZE as u16 * 8
         } else {
-            u16::from(self.bytes[DB_KEY_SIZE - 1])
+            u16::from(self.bytes[PROOF_PATH_LEN_POS])
         }
     }
 
@@ -196,11 +207,7 @@ impl BitsRange for ProofPath {
     }
 
     fn suffix(&self, pos: u16) -> Self {
-        debug_assert!(self.start() + pos <= self.end());
-
-        let mut key = ProofPath::from_raw(self.bytes);
-        key.start = self.start + pos;
-        key
+        self.start_from(self.start() + pos)
     }
 
     fn common_prefix(&self, other: &Self) -> u16 {
@@ -261,7 +268,7 @@ impl ::std::fmt::Debug for ProofPath {
 
 impl StorageKey for ProofPath {
     fn size(&self) -> usize {
-        DB_KEY_SIZE
+        PROOF_PATH_SIZE
     }
 
     fn write(&self, buffer: &mut [u8]) {
@@ -279,8 +286,8 @@ impl StorageKey for ProofPath {
     }
 
     fn read(buffer: &[u8]) -> Self {
-        debug_assert_eq!(buffer.len(), DB_KEY_SIZE);
-        let mut data = [0; DB_KEY_SIZE];
+        debug_assert_eq!(buffer.len(), PROOF_PATH_SIZE);
+        let mut data = [0; PROOF_PATH_SIZE];
         data.copy_from_slice(buffer);
         ProofPath::from_raw(data)
     }
@@ -289,7 +296,7 @@ impl StorageKey for ProofPath {
 #[test]
 fn test_proof_path_storage_key_leaf() {
     let key = ProofPath::new(&[250; 32]);
-    let mut buf = vec![0; DB_KEY_SIZE];
+    let mut buf = vec![0; PROOF_PATH_SIZE];
     key.write(&mut buf);
     let key2 = ProofPath::read(&buf);
 
@@ -305,7 +312,7 @@ fn test_proof_path_storage_key_branch() {
     key = key.prefix(11);
     key = key.suffix(5);
 
-    let mut buf = vec![0; DB_KEY_SIZE];
+    let mut buf = vec![0; PROOF_PATH_SIZE];
     key.write(&mut buf);
     let mut key2 = ProofPath::read(&buf);
     key2.start = 5;
@@ -372,7 +379,7 @@ fn test_proof_path_at_overflow() {
 }
 
 #[test]
-#[should_panic(expected = "self.start() + pos <= self.end()")]
+#[should_panic(expected = "start <= self.end()")]
 fn test_proof_path_suffix_overflow() {
     let b = ProofPath::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
     assert_eq!(b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00".len(), 34);

@@ -17,11 +17,11 @@ use std::borrow::Cow;
 use crypto::{hash, Hash, HASH_SIZE};
 
 use super::super::{StorageKey, StorageValue};
-use super::key::{ChildKind, ProofPath, DB_KEY_SIZE};
+use super::key::{ChildKind, ProofPath, PROOF_PATH_SIZE};
 
 // TODO: implement Field for ProofPath and define BranchNode as StorageValue (ECR-22)
 
-const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + DB_KEY_SIZE);
+const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + PROOF_PATH_SIZE);
 
 #[derive(Debug)]
 pub enum Node<T: StorageValue> {
@@ -51,18 +51,18 @@ impl BranchNode {
 
     pub fn child_slice(&self, kind: ChildKind) -> ProofPath {
         let from = match kind {
-            ChildKind::Right => 2 * HASH_SIZE + DB_KEY_SIZE,
+            ChildKind::Right => 2 * HASH_SIZE + PROOF_PATH_SIZE,
             ChildKind::Left => 2 * HASH_SIZE,
         };
-        ProofPath::read(&self.raw[from..from + DB_KEY_SIZE])
+        ProofPath::read(&self.raw[from..from + PROOF_PATH_SIZE])
     }
 
     pub fn set_child_slice(&mut self, kind: ChildKind, prefix: &ProofPath) {
         let from = match kind {
-            ChildKind::Right => 2 * HASH_SIZE + DB_KEY_SIZE,
+            ChildKind::Right => 2 * HASH_SIZE + PROOF_PATH_SIZE,
             ChildKind::Left => 2 * HASH_SIZE,
         };
-        prefix.write(&mut self.raw[from..from + DB_KEY_SIZE]);
+        prefix.write(&mut self.raw[from..from + PROOF_PATH_SIZE]);
     }
 
     pub fn set_child_hash(&mut self, kind: ChildKind, hash: &Hash) {
