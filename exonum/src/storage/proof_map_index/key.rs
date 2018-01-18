@@ -17,8 +17,8 @@ use std::cmp::min;
 use crypto::{Hash, PublicKey, HASH_SIZE};
 use super::super::StorageKey;
 
-pub const BRANCH_KEY_PREFIX: u8 = 00;
-pub const LEAF_KEY_PREFIX: u8 = 01;
+pub const BRANCH_KEY_PREFIX: u8 = 0;
+pub const LEAF_KEY_PREFIX: u8 = 1;
 
 /// Size in bytes of the `ProofMapKey`.
 pub const KEY_SIZE: usize = HASH_SIZE;
