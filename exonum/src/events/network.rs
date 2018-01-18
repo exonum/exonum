@@ -60,6 +60,9 @@ pub struct NetworkConfiguration {
     pub tcp_keep_alive: Option<u64>,
     pub tcp_connect_retry_timeout: Milliseconds,
     pub tcp_connect_max_retries: u64,
+    /// Maximum message length (in bytes), gets populated from `ConsensusConfig`.
+    #[serde(skip)]
+    pub max_message_len: usize,
 }
 
 impl Default for NetworkConfiguration {
@@ -71,6 +74,7 @@ impl Default for NetworkConfiguration {
             tcp_nodelay: true,
             tcp_connect_retry_timeout: 15_000,
             tcp_connect_max_retries: 10,
+            max_message_len: 1024 * 1024, // 1 MB
         }
     }
 }
@@ -155,7 +159,9 @@ impl ConnectionsPool {
             .and_then(move |sock| {
                 trace!("Established connection with peer={}", peer);
 
-                let stream = sock.framed(MessagesCodec);
+                let stream = sock.framed(MessagesCodec {
+                    max_message_len: network_config.max_message_len,
+                });
                 let (sink, stream) = stream.split();
 
                 let writer = conn_rx
@@ -358,7 +364,9 @@ impl Listener {
                 return tobox(future::ok(()));
             }
             trace!("Accepted incoming connection with peer={}", addr);
-            let stream = sock.framed(MessagesCodec);
+            let stream = sock.framed(MessagesCodec {
+                max_message_len: network_config.max_message_len,
+            });
             let (_, stream) = stream.split();
             let network_tx = network_tx.clone();
             let connection_handler = stream

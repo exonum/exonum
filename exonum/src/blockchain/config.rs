@@ -62,6 +62,8 @@ pub struct ConsensusConfig {
     pub peers_timeout: Milliseconds,
     /// Maximum number of transactions per block.
     pub txs_block_limit: u32,
+    /// Maximum message length (in bytes).
+    pub max_message_len: usize,
     /// `TimeoutAdjuster` configuration.
     pub timeout_adjuster: TimeoutAdjusterConfig,
 }
@@ -73,6 +75,7 @@ impl Default for ConsensusConfig {
             status_timeout: 5000,
             peers_timeout: 10_000,
             txs_block_limit: 1000,
+            max_message_len: 1024 * 1024, // 1 MB
             timeout_adjuster: TimeoutAdjusterConfig::Constant { timeout: 500 },
         }
     }
