@@ -596,6 +596,7 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandb
         status_timeout: 600_000,
         peers_timeout: 600_000,
         txs_block_limit: 1000,
+        max_message_len: 1024 * 1024,
         timeout_adjuster: TimeoutAdjusterConfig::Constant { timeout: 200 },
     };
     let genesis = GenesisConfig::new_with_consensus(
