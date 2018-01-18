@@ -258,7 +258,7 @@ impl ::std::fmt::Debug for ProofPath {
             bits.push('|');
         }
 
-        f.debug_struct("ProofPathBitRange")
+        f.debug_struct("ProofPath")
             .field("start", &self.start())
             .field("end", &self.end())
             .field("bits", &bits)
@@ -327,8 +327,6 @@ fn test_proof_path_storage_key_branch() {
 #[test]
 fn test_proof_path_suffix() {
     let b = ProofPath::from_raw(*b"\x00\x01\x02\xFF\x0C0000000000000000000000000000\x20");
-
-    println!("{:?}", b);
 
     assert_eq!(b.len(), 32);
     assert_eq!(b.bit(0), ChildKind::Right);
@@ -423,7 +421,6 @@ fn test_proof_path_common_prefix() {
 fn test_proof_path_is_leaf() {
     let b = ProofPath::from_raw(*b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00");
     assert_eq!(b.len(), 256);
-    println!("{:?}", b.suffix(4));
     assert_eq!(b.suffix(4).is_leaf(), true);
     assert_eq!(b.suffix(8).is_leaf(), true);
     assert_eq!(b.suffix(250).is_leaf(), true);
