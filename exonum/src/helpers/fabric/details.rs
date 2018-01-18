@@ -163,16 +163,16 @@ impl RunDev {
     }
 
     fn artifacts_directory(ctx: &Context) -> PathBuf {
-        let directory = ctx.arg::<String>("ARTIFACTS_DIR").unwrap_or_else(|_| {
-            String::from(".exonum")
-        });
+        let directory = ctx.arg::<String>("ARTIFACTS_DIR").unwrap_or_else(
+            |_| ".exonum".into(),
+        );
         PathBuf::from(&directory)
     }
 
     fn artifacts_path(inner_path: &str, ctx: &Context) -> String {
         let mut path = Self::artifacts_directory(ctx);
         path.push(inner_path);
-        String::from(path.to_str().expect("Expected correct path"))
+        path.to_str().expect("Expected correct path").into()
     }
 
     fn generate_config(commands: &HashMap<CommandName, CollectedCommand>, ctx: &Context) -> String {
@@ -193,7 +193,7 @@ impl RunDev {
         node_config_ctx.set_arg("COMMON_CONFIG", common_config_path.clone());
         node_config_ctx.set_arg("PUB_CONFIG", pub_config_path.clone());
         node_config_ctx.set_arg("SEC_CONFIG", sec_config_path.clone());
-        node_config_ctx.set_arg("PEER_ADDR", String::from(peer_addr));
+        node_config_ctx.set_arg("PEER_ADDR", peer_addr.into());
         let node_config_command = commands.get(GenerateNodeConfig::name()).expect(
             "Expected GenerateNodeConfig in the commands list.",
         );
@@ -260,7 +260,6 @@ impl Command for RunDev {
         context.set_arg("NODE_CONFIG_PATH", node_config_path);
 
         let new_context = exts(context);
-        // TODO: clean up artifacts directory.
         commands
             .get(Run::name())
             .expect("Expected Run in the commands list.")

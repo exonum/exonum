@@ -234,7 +234,7 @@ impl Context {
 
     /// Inserts value to the command line arguments map.
     pub fn set_arg(&mut self, key: &str, value: String) {
-        self.args.insert(String::from(key), value);
+        self.args.insert(key.into(), value);
     }
 
     /// Gets multiple values of the command line argument.
@@ -251,7 +251,7 @@ impl Context {
 
     /// Inserts multiple values to the command line arguments map.
     pub fn set_arg_multiple(&mut self, key: &str, values: Vec<String>) {
-        self.multiple_args.insert(String::from(key), values);
+        self.multiple_args.insert(key.into(), values);
     }
 
     /// Gets the variable from the context.

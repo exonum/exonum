@@ -216,17 +216,21 @@ fn test_run_dev() {
     let db_dir = format!("{}/{}", artifacts_dir, "db");
     let full_db_dir = full_tmp_folder(&db_dir);
 
+    // Mock existence of old DB files that are supposed to be cleaned up.
     fs::create_dir_all(Path::new(&full_db_dir)).expect("Expected db temp folder to be created.");
     let old_db_file = full_tmp_name("1", &db_dir);
     touch(&old_db_file);
 
-    let result = panic::catch_unwind(|| { run_dev(artifacts_dir); });
+    let result = panic::catch_unwind(|| {
+        run_dev(artifacts_dir);
+
+        // Test cleaning up.
+        assert!(!Path::new(&old_db_file).exists());
+    });
+
+    fs::remove_dir_all(full_tmp_folder(artifacts_dir)).unwrap();
 
     if let Err(err) = result {
         panic::resume_unwind(err);
     }
-
-    // Test cleaning up.
-    assert!(!Path::new(&old_db_file).exists());
-    fs::remove_dir_all(full_tmp_folder(artifacts_dir)).unwrap();
 }
