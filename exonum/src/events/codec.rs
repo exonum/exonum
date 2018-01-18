@@ -24,11 +24,11 @@ use super::error::other_error;
 #[derive(Debug)]
 pub struct MessagesCodec {
     /// Maximum message length (in bytes), gets populated from `NetworkConfiguration`.
-    max_message_len: usize,
+    max_message_len: u32,
 }
 
 impl MessagesCodec {
-    pub fn new(max_message_len: usize) -> MessagesCodec {
+    pub fn new(max_message_len: u32) -> MessagesCodec {
         MessagesCodec { max_message_len }
     }
 }
@@ -44,9 +44,9 @@ impl Decoder for MessagesCodec {
         }
         // Check payload len
         let total_len = LittleEndian::read_u32(&buf[6..10]) as usize;
-        if total_len > self.max_message_len {
+        if total_len as u32 > self.max_message_len {
             return Err(other_error(format!(
-                "Received message is too long: {}, maximum allowed length is {}",
+                "Received message is too long: {}, maximum allowed length is {} bytes",
                 total_len,
                 self.max_message_len,
             )));

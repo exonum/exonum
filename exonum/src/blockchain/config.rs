@@ -63,7 +63,7 @@ pub struct ConsensusConfig {
     /// Maximum number of transactions per block.
     pub txs_block_limit: u32,
     /// Maximum message length (in bytes).
-    pub max_message_len: usize,
+    pub max_message_len: u32,
     /// `TimeoutAdjuster` configuration.
     pub timeout_adjuster: TimeoutAdjusterConfig,
 }

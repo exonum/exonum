@@ -62,7 +62,7 @@ pub struct NetworkConfiguration {
     pub tcp_connect_max_retries: u64,
     /// Maximum message length (in bytes), gets populated from `ConsensusConfig`.
     #[serde(skip)]
-    pub max_message_len: usize,
+    pub max_message_len: u32,
 }
 
 impl Default for NetworkConfiguration {
