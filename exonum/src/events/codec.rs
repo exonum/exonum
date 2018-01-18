@@ -24,7 +24,13 @@ use super::error::other_error;
 #[derive(Debug)]
 pub struct MessagesCodec {
     /// Maximum message length (in bytes), gets populated from `NetworkConfiguration`.
-    pub max_message_len: usize,
+    max_message_len: usize,
+}
+
+impl MessagesCodec {
+    pub fn new(max_message_len: usize) -> MessagesCodec {
+        MessagesCodec { max_message_len }
+    }
 }
 
 impl Decoder for MessagesCodec {

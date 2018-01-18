@@ -159,9 +159,7 @@ impl ConnectionsPool {
             .and_then(move |sock| {
                 trace!("Established connection with peer={}", peer);
 
-                let stream = sock.framed(MessagesCodec {
-                    max_message_len: network_config.max_message_len,
-                });
+                let stream = sock.framed(MessagesCodec::new(network_config.max_message_len));
                 let (sink, stream) = stream.split();
 
                 let writer = conn_rx
@@ -364,9 +362,7 @@ impl Listener {
                 return tobox(future::ok(()));
             }
             trace!("Accepted incoming connection with peer={}", addr);
-            let stream = sock.framed(MessagesCodec {
-                max_message_len: network_config.max_message_len,
-            });
+            let stream = sock.framed(MessagesCodec::new(network_config.max_message_len));
             let (_, stream) = stream.split();
             let network_tx = network_tx.clone();
             let connection_handler = stream
