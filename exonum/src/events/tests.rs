@@ -162,6 +162,7 @@ impl TestEvents {
             our_connect_message: connect_message(self.listen_address),
             listen_address: self.listen_address,
             network_config,
+            max_message_len: ::blockchain::ConsensusConfig::DEFAULT_MESSAGE_MAX_LEN,
             network_requests: channel.network_requests,
             network_tx: network_tx.clone(),
         };

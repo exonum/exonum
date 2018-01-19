@@ -23,7 +23,7 @@ use super::error::other_error;
 
 #[derive(Debug)]
 pub struct MessagesCodec {
-    /// Maximum message length (in bytes), gets populated from `NetworkConfiguration`.
+    /// Maximum message length (in bytes), gets populated from `ConsensusConfig`.
     max_message_len: u32,
 }
 

@@ -68,6 +68,11 @@ pub struct ConsensusConfig {
     pub timeout_adjuster: TimeoutAdjusterConfig,
 }
 
+impl ConsensusConfig {
+    /// Default value for max_message_len.
+    pub const DEFAULT_MESSAGE_MAX_LEN: u32 = 1024 * 1024; // 1 MB
+}
+
 impl Default for ConsensusConfig {
     fn default() -> Self {
         ConsensusConfig {
@@ -75,7 +80,7 @@ impl Default for ConsensusConfig {
             status_timeout: 5000,
             peers_timeout: 10_000,
             txs_block_limit: 1000,
-            max_message_len: 1024 * 1024, // 1 MB
+            max_message_len: Self::DEFAULT_MESSAGE_MAX_LEN,
             timeout_adjuster: TimeoutAdjusterConfig::Constant { timeout: 500 },
         }
     }

@@ -712,6 +712,7 @@ pub struct Node {
     network_config: NetworkConfiguration,
     handler: NodeHandler,
     channel: NodeChannel,
+    max_message_len: u32,
 }
 
 impl NodeChannel {
@@ -787,8 +788,7 @@ impl Node {
         };
         let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
         let system_state = Box::new(DefaultSystemState(node_cfg.listen_address));
-        let mut network_config = config.network;
-        network_config.max_message_len = node_cfg.genesis.consensus.max_message_len;
+        let network_config = config.network;
         let handler = NodeHandler::new(
             blockchain,
             external_address,
@@ -802,6 +802,7 @@ impl Node {
             handler,
             channel,
             network_config,
+            max_message_len: node_cfg.genesis.consensus.max_message_len,
         }
     }
 
@@ -922,6 +923,7 @@ impl Node {
             network_requests: self.channel.network_requests,
             network_tx: network_tx,
             network_config: self.network_config,
+            max_message_len: self.max_message_len,
         };
 
         let (internal_tx, internal_rx) = self.channel.internal_events;

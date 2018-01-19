@@ -60,9 +60,6 @@ pub struct NetworkConfiguration {
     pub tcp_keep_alive: Option<u64>,
     pub tcp_connect_retry_timeout: Milliseconds,
     pub tcp_connect_max_retries: u64,
-    /// Maximum message length (in bytes), gets populated from `ConsensusConfig`.
-    #[serde(skip)]
-    pub max_message_len: u32,
 }
 
 impl Default for NetworkConfiguration {
@@ -74,7 +71,6 @@ impl Default for NetworkConfiguration {
             tcp_nodelay: true,
             tcp_connect_retry_timeout: 15_000,
             tcp_connect_max_retries: 10,
-            max_message_len: 1024 * 1024, // 1 MB
         }
     }
 }
@@ -84,6 +80,7 @@ pub struct NetworkPart {
     pub our_connect_message: Connect,
     pub listen_address: SocketAddr,
     pub network_config: NetworkConfiguration,
+    pub max_message_len: u32,
     pub network_requests: (mpsc::Sender<NetworkRequest>, mpsc::Receiver<NetworkRequest>),
     pub network_tx: mpsc::Sender<NetworkEvent>,
 }
@@ -119,6 +116,7 @@ impl ConnectionsPool {
     fn connect_to_peer(
         self,
         network_config: NetworkConfiguration,
+        max_message_len: u32,
         peer: SocketAddr,
         network_tx: mpsc::Sender<NetworkEvent>,
         handle: &Handle,
@@ -159,7 +157,7 @@ impl ConnectionsPool {
             .and_then(move |sock| {
                 trace!("Established connection with peer={}", peer);
 
-                let stream = sock.framed(MessagesCodec::new(network_config.max_message_len));
+                let stream = sock.framed(MessagesCodec::new(max_message_len));
                 let (sink, stream) = stream.split();
 
                 let writer = conn_rx
@@ -216,6 +214,7 @@ impl NetworkPart {
         let requests_handle = RequestHandler::new(
             self.our_connect_message,
             network_config,
+            self.max_message_len,
             self.network_tx.clone(),
             handle.clone(),
             self.network_requests.1,
@@ -224,6 +223,7 @@ impl NetworkPart {
         // TODO Don't use unwrap here!
         let server = Listener::bind(
             network_config,
+            self.max_message_len,
             self.listen_address,
             handle.clone(),
             &self.network_tx,
@@ -248,6 +248,7 @@ impl RequestHandler {
     fn new(
         connect_message: Connect,
         network_config: NetworkConfiguration,
+        max_message_len: u32,
         network_tx: mpsc::Sender<NetworkEvent>,
         handle: Handle,
         receiver: mpsc::Receiver<NetworkRequest>,
@@ -268,6 +269,7 @@ impl RequestHandler {
                                     .clone()
                                     .connect_to_peer(
                                         network_config,
+                                        max_message_len,
                                         peer,
                                         network_tx.clone(),
                                         &handle,
@@ -338,6 +340,7 @@ struct Listener(Box<Future<Item = (), Error = io::Error>>);
 impl Listener {
     fn bind(
         network_config: NetworkConfiguration,
+        max_message_len: u32,
         listen_address: SocketAddr,
         handle: Handle,
         network_tx: &mpsc::Sender<NetworkEvent>,
@@ -362,7 +365,7 @@ impl Listener {
                 return tobox(future::ok(()));
             }
             trace!("Accepted incoming connection with peer={}", addr);
-            let stream = sock.framed(MessagesCodec::new(network_config.max_message_len));
+            let stream = sock.framed(MessagesCodec::new(max_message_len));
             let (_, stream) = stream.split();
             let network_tx = network_tx.clone();
             let connection_handler = stream
