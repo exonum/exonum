@@ -14,7 +14,7 @@
 
 use crypto::{PublicKey, SecretKey, Signature, gen_keypair};
 use messages::raw::MessageBuffer;
-use messages::RawMessage;
+use messages::{Message, RawMessage};
 use encoding::serialize::FromHex;
 
 message! {
