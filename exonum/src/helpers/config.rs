@@ -15,7 +15,7 @@
 //! Loading and saving TOML-encoded configurations.
 
 use std::path::Path;
-use std::io::{self, Read, Write};
+use std::io::{Read, Write};
 use std::fs::{self, File};
 use std::error::Error;
 
@@ -36,10 +36,7 @@ impl ConfigFile {
         let mut file = File::open(path.as_ref())?;
         let mut toml = String::new();
         file.read_to_string(&mut toml)?;
-        toml::de::from_str(&toml).map_err(|_| {
-            let e = io::Error::new(io::ErrorKind::InvalidData, "Unable to decode toml file");
-            Box::new(e) as Box<Error>
-        })
+        toml::de::from_str(&toml).map_err(|e| Box::new(e) as Box<Error>)
     }
 
     /// Saves TOML-encoded file.
