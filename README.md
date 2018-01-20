@@ -8,8 +8,8 @@
 [gitter-image]: https://img.shields.io/gitter/room/exonum/exonum.svg?style=flat-square
 [gitter-url]: https://gitter.im/exonum/exonum
 
-Minimal Exonum blockchain example that uses the [Exonum](https://github.com/exonum/exonum) framework
-to implement a simple cryptocurrency.
+Minimal [Exonum](https://github.com/exonum/exonum) blockchain example implementing
+a simple cryptocurrency.
 
 See [the documentation](https://exonum.com/doc/get-started/create-service)
 for a detailed step-by-step guide how to approach this example.

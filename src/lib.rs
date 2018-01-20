@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Demo [Exonum][exonum] service implementing a simplified cryptocurrency.
+//! Demo [Exonum][exonum] service implementing a simple cryptocurrency.
 //! See [the documentation][docs] for a detailed step-by-step guide how to approach this demo,
 //! and [the reporitory README][readme] on how to use, test, and contribute to it.
 //!
@@ -197,7 +197,7 @@ impl Transaction for TxCreateWallet {
         if schema.wallet(self.pub_key()).is_none() {
             let wallet = Wallet::new(self.pub_key(), self.name(), INIT_BALANCE);
             println!("Create the wallet: {:?}", wallet);
-            schema.wallets_mut().put(self.pub_key(), wallet)
+            schema.wallets_mut().put(self.pub_key(), wallet);
         }
     }
 
