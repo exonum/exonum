@@ -37,6 +37,7 @@ impl Decoder for MessagesCodec {
         }
         // Check payload len
         let total_len = LittleEndian::read_u32(&buf[6..10]) as usize;
+
         if total_len > MAX_MESSAGE_LEN {
             return Err(other_error(format!(
                 "Received message is too long: {}, maximum allowed length is {}",
@@ -44,7 +45,14 @@ impl Decoder for MessagesCodec {
                 MAX_MESSAGE_LEN
             )));
         }
-
+        if total_len < HEADER_LENGTH {
+            return Err(other_error(format!(
+                "Received malicious message with insufficient \
+                size in header: {}, expected header size {}",
+                total_len,
+                HEADER_LENGTH
+            )));
+        }
         // Read message
         if buf.len() >= total_len {
             let data = buf.split_to(total_len).to_vec();
@@ -62,5 +70,32 @@ impl Encoder for MessagesCodec {
     fn encode(&mut self, msg: Self::Item, buf: &mut BytesMut) -> io::Result<()> {
         buf.extend_from_slice(msg.as_ref());
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::MessagesCodec;
+
+    use messages::{MessageBuffer, RawMessage};
+    use bytes::BytesMut;
+    use tokio_io::codec::Decoder;
+    #[test]
+    fn decode_message_valid_header_size() {
+        let data = vec![0u8, 0, 0, 0, 0, 0, 10, 0, 0, 0];
+        let mut bytes: BytesMut = data.as_slice().into();
+        let mut codec = MessagesCodec;
+        match codec.decode(&mut bytes) {
+            Ok(Some(ref r)) if r == &RawMessage::new(MessageBuffer::from_vec(data)) => {}
+            _ => panic!("Wrong input"),
+        };
+    }
+
+    #[test]
+    fn decode_message_small_size_in_header() {
+        let data = vec![0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        let mut bytes: BytesMut = data.as_slice().into();
+        let mut codec = MessagesCodec;
+        assert!(codec.decode(&mut bytes).is_err());
     }
 }
