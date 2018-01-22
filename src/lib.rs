@@ -43,7 +43,7 @@ use exonum::encoding::serialize::FromHex;
 use exonum::node::{TransactionSend, ApiSender};
 use exonum::messages::{RawTransaction, Message};
 use exonum::storage::{Fork, MapIndex, Snapshot};
-use exonum::crypto::PublicKey;
+use exonum::crypto::{Hash, PublicKey};
 use exonum::encoding;
 use exonum::api::{Api, ApiError};
 use iron::prelude::*;
@@ -73,14 +73,12 @@ const INIT_BALANCE: u64 = 100;
 encoding_struct! {
     /// Wallet struct used to persist data within the service.
     struct Wallet {
-        const SIZE = 48;
-
         /// Public key of the wallet owner.
-        field pub_key:            &PublicKey  [00 => 32]
+        pub_key: &PublicKey,
         /// Name of the wallet owner.
-        field name:               &str        [32 => 40]
+        name: &str,
         /// Current balance.
-        field balance:            u64         [40 => 48]
+        balance: u64,
     }
 }
 
@@ -148,12 +146,11 @@ message! {
     struct TxCreateWallet {
         const TYPE = SERVICE_ID;
         const ID = TX_CREATE_WALLET_ID;
-        const SIZE = 40;
 
         /// Public key of the wallet's owner.
-        field pub_key:     &PublicKey  [00 => 32]
+        pub_key: &PublicKey,
         /// UTF-8 string with the owner's name.
-        field name:        &str        [32 => 40]
+        name: &str,
     }
 }
 
@@ -165,18 +162,17 @@ message! {
     struct TxTransfer {
         const TYPE = SERVICE_ID;
         const ID = TX_TRANSFER_ID;
-        const SIZE = 80;
 
         /// Public key of the sender.
-        field from:        &PublicKey  [00 => 32]
+        from: &PublicKey,
         /// Public key of the receiver.
-        field to:          &PublicKey  [32 => 64]
+        to: &PublicKey,
         /// Number of tokens to transfer from sender's account to receiver's account.
-        field amount:      u64         [64 => 72]
+        amount: u64,
         /// Auxiliary number to guarantee [non-idempotence][idempotence] of transactions.
         ///
         /// [idempotence]: https://en.wikipedia.org/wiki/Idempotence
-        field seed:        u64         [72 => 80]
+        seed: u64,
     }
 }
 
@@ -199,11 +195,6 @@ impl Transaction for TxCreateWallet {
             println!("Create the wallet: {:?}", wallet);
             schema.wallets_mut().put(self.pub_key(), wallet);
         }
-    }
-
-    /// Provides information about the transaction to be used in the blockchain explorer.
-    fn info(&self) -> serde_json::Value {
-        serde_json::to_value(&self).expect("Cannot serialize transaction to JSON")
     }
 }
 
@@ -235,11 +226,6 @@ impl Transaction for TxTransfer {
                 wallets.put(self.to(), receiver);
             }
         }
-    }
-
-    /// Provides information about the transaction to be used in the blockchain explorer.
-    fn info(&self) -> serde_json::Value {
-        serde_json::to_value(&self).expect("Cannot serialize transaction to JSON")
     }
 }
 
@@ -391,6 +377,15 @@ impl Service for CurrencyService {
             }
         };
         Ok(trans)
+    }
+
+    // Hashes for the service tables that will be included into the state hash.
+    // To simplify things, we don't have [Merkelized tables][merkle] in the service storage
+    // for now, so we return an empty vector.
+    //
+    // [merkle]: https://exonum.com/doc/architecture/storage/#merklized-indices
+    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+        vec![]
     }
 
     // Create a REST `Handler` to process web requests to the node.
