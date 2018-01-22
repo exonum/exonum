@@ -8,8 +8,8 @@
 [gitter-image]: https://img.shields.io/gitter/room/exonum/exonum.svg?style=flat-square
 [gitter-url]: https://gitter.im/exonum/exonum
 
-Minimal Exonum blockchain example that uses the [Exonum](https://github.com/exonum/exonum) framework
-to implement a simple cryptocurrency.
+Minimal [Exonum](https://github.com/exonum/exonum) blockchain example implementing
+a simple cryptocurrency.
 
 See [the documentation](https://exonum.com/doc/get-started/create-service)
 for a detailed step-by-step guide how to approach this example.
@@ -30,11 +30,11 @@ To build and run a single node use:
 git clone git@github.com:exonum/cryptocurrency.git
 cd cryptocurrency
 
-# build and run
-cargo run
+# build and run a zero-configuration demo
+cargo run --example demo
 ```
 
-Now the node is listening HTTP requests on `localhost:8000`.
+Now the node is listening to HTTP requests on http://localhost:8000.
 
 ### Sample Transactions & Read Requests
 
@@ -44,7 +44,7 @@ script in the **examples** directory. This script creates two wallets, performs 
 among them, and then verifies that the wallet status was correctly updated.
 
 Alternatively, you may use command-line utilities, such as `curl`, to manually POST transactions
-on [the transaction endpoint](http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets/transaction)
+on [the transaction endpoint](http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets)
 and read data from wallet endpoints (the [`wallets_info.sh`](examples/wallets_info.sh) script
 provides a handy way to do this).
 

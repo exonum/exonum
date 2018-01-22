@@ -12,16 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate cryptocurrency;
 extern crate exonum;
+extern crate exonum_cryptocurrency as cryptocurrency;
 extern crate exonum_testkit;
+#[macro_use]
+extern crate serde_json;
 
 use exonum::crypto::{self, PublicKey, SecretKey};
 use exonum::messages::Message;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 // Import datatypes used in tests from the crate where the service is defined.
-use cryptocurrency::{TxCreateWallet, TxTransfer, TransactionResponse, Wallet, CurrencyService};
+use cryptocurrency::{TxCreateWallet, TxTransfer, Wallet, CurrencyService};
 
 /// Wrapper for the cryptocurrency service API allowing to easily use it
 /// (compared to `TestKitApi` calls).
@@ -32,7 +34,7 @@ struct CryptocurrencyApi {
 impl CryptocurrencyApi {
     /// Generates a wallet creation transaction with a random key pair, sends it over HTTP,
     /// and checks the synchronous result (i.e., the hash of the transaction returned
-    /// within the `TransactionResponse` struct).
+    /// within the response).
     /// Note that the transaction is not immediately added to the blockchain, but rather is put
     /// to the pool of unconfirmed transactions.
     fn create_wallet(&self, name: &str) -> (TxCreateWallet, SecretKey) {
@@ -40,23 +42,23 @@ impl CryptocurrencyApi {
         // Create a presigned transaction
         let tx = TxCreateWallet::new(&pubkey, name, &key);
 
-        let tx_info: TransactionResponse = self.inner.post(
+        let tx_info: serde_json::Value = self.inner.post(
             ApiKind::Service("cryptocurrency"),
             "v1/wallets",
             &tx,
         );
-        assert_eq!(tx_info.tx_hash, tx.hash());
+        assert_eq!(tx_info, json!({ "tx_hash": tx.hash() }));
         (tx, key)
     }
 
     /// Sends a transfer transaction over HTTP and checks the synchronous result.
     fn transfer(&self, tx: &TxTransfer) {
-        let tx_info: TransactionResponse = self.inner.post(
+        let tx_info: serde_json::Value = self.inner.post(
             ApiKind::Service("cryptocurrency"),
             "v1/wallets/transfer",
             tx,
         );
-        assert_eq!(tx_info.tx_hash, tx.hash());
+        assert_eq!(tx_info, json!({ "tx_hash": tx.hash() }));
     }
 
     /// Gets the state of a particular wallet using an HTTP request.
