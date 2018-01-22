@@ -14,13 +14,42 @@
 
 //! Loading and saving TOML-encoded configurations.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::io::{Read, Write};
 use std::fs::{self, File};
 use std::error::Error;
+use std::fmt;
 
 use serde::{Serialize, Deserialize};
 use toml;
+
+#[derive(Debug)]
+struct DeserializeError {
+    path: PathBuf,
+    inner: toml::de::Error,
+}
+
+impl DeserializeError {
+    pub fn new(path: PathBuf, inner: toml::de::Error) -> Self {
+        Self { path, inner }
+    }
+}
+
+impl fmt::Display for DeserializeError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Could not read {}: {}", self.path.display(), self.inner)
+    }
+}
+
+impl Error for DeserializeError {
+    fn description(&self) -> &str {
+        "Could not read toml config."
+    }
+
+    fn cause(&self) -> Option<&Error> {
+        Some(&self.inner)
+    }
+}
 
 /// Implements loading and saving TOML-encoded configurations.
 #[derive(Debug)]
@@ -36,7 +65,9 @@ impl ConfigFile {
         let mut file = File::open(path.as_ref())?;
         let mut toml = String::new();
         file.read_to_string(&mut toml)?;
-        toml::de::from_str(&toml).map_err(|e| Box::new(e) as Box<Error>)
+        toml::de::from_str(&toml).map_err(|e| {
+            Box::new(DeserializeError::new(path.as_ref().to_owned(), e)) as Box<Error>
+        })
     }
 
     /// Saves TOML-encoded file.
