@@ -23,3 +23,7 @@ pretty_assertions = "0.4.0"
 
 [dev-dependencies]
 exonum-testkit = "0.1.1"
+
+[patch.crates-io]
+exonum = { git = 'https://github.com/exonum/exonum', rev = 'e66158647' }
+exonum-testkit = { git = 'https://github.com/exonum/exonum-testkit', rev = '73cb369'}

@@ -17,6 +17,9 @@
 #![deny(missing_debug_implementations, missing_docs)]
 
 extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+#[macro_use]
 extern crate serde_json;
 #[macro_use]
 extern crate exonum;
@@ -29,13 +32,12 @@ use iron::Handler;
 use router::Router;
 
 use std::time::SystemTime;
-use std::collections::HashMap;
 
 use exonum::blockchain::{Blockchain, Service, ServiceContext, Schema, Transaction, ApiContext};
 use exonum::messages::{RawTransaction, Message};
 use exonum::encoding::serialize::json::reexport::Value;
-use exonum::storage::{Fork, Snapshot, MapIndex, Entry};
-use exonum::crypto::PublicKey;
+use exonum::storage::{Fork, Snapshot, ProofMapIndex, Entry};
+use exonum::crypto::{Hash, PublicKey};
 use exonum::encoding;
 use exonum::helpers::fabric::{ServiceFactory, Context};
 use exonum::api::Api;
@@ -50,10 +52,8 @@ const SERVICE_NAME: &str = "exonum_time";
 encoding_struct! {
     /// Time information.
     struct Time {
-        const SIZE = 12;
-
         /// Field that stores `SystemTime`.
-        field time:     SystemTime  [00 => 12]
+        time: SystemTime,
     }
 }
 
@@ -70,8 +70,8 @@ impl<T: AsRef<Snapshot>> TimeSchema<T> {
     }
 
     /// Returns the table that stores `Time` struct for every validator.
-    pub fn validators_time(&self) -> MapIndex<&Snapshot, PublicKey, Time> {
-        MapIndex::new(
+    pub fn validators_time(&self) -> ProofMapIndex<&Snapshot, PublicKey, Time> {
+        ProofMapIndex::new(
             format!("{}.validators_time", SERVICE_NAME),
             self.view.as_ref(),
         )
@@ -81,6 +81,11 @@ impl<T: AsRef<Snapshot>> TimeSchema<T> {
     pub fn time(&self) -> Entry<&Snapshot, Time> {
         Entry::new(format!("{}.time", SERVICE_NAME), self.view.as_ref())
     }
+
+    /// Returns hashes for stored tables.
+    pub fn state_hash(&self) -> Vec<Hash> {
+        vec![self.validators_time().root_hash(), self.time().hash()]
+    }
 }
 
 
@@ -88,8 +93,8 @@ impl<'a> TimeSchema<&'a mut Fork> {
     /// Mutable reference to the ['validators_time'][1] index.
     ///
     /// [1]: struct.TimeSchema.html#method.validators_time
-    pub fn validators_time_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Time> {
-        MapIndex::new(format!("{}.validators_time", SERVICE_NAME), self.view)
+    pub fn validators_time_mut(&mut self) -> ProofMapIndex<&mut Fork, PublicKey, Time> {
+        ProofMapIndex::new(format!("{}.validators_time", SERVICE_NAME), self.view)
     }
 
     /// Mutable reference to the ['time'][1] index.
@@ -105,11 +110,10 @@ message! {
     struct TxTime {
         const TYPE = SERVICE_ID;
         const ID = TX_TIME_ID;
-        const SIZE = 44;
         /// Validator's time.
-        field time:     SystemTime  [00 => 12]
+        time: SystemTime,
         /// Validator's public key.
-        field pub_key:  &PublicKey  [12 => 44]
+        pub_key: &PublicKey,
     }
 }
 
@@ -188,39 +192,91 @@ struct TimeApi {
     blockchain: Blockchain,
 }
 
+/// Structure for saving validator's public key and last known local time.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ValidatorTime {
+    /// Validator's public key.
+    pub public_key: PublicKey,
+    /// Validator's time.
+    pub time: Option<SystemTime>,
+}
+
 /// Shortcut to get data from storage.
 impl TimeApi {
     /// Endpoint for getting value of the time that is saved in storage.
     fn get_current_time(&self, _: &mut Request) -> IronResult<Response> {
         let view = self.blockchain.snapshot();
         let schema = TimeSchema::new(&view);
-        let current_time = schema.time().get();
-        self.ok_response(&serde_json::to_value(current_time).unwrap())
+
+        if let Some(current_time) = schema.time().get() {
+            self.ok_response(&json!(Some(current_time.time())))
+        } else {
+            self.ok_response(&json!(None::<Box<SystemTime>>))
+        }
     }
 
     /// Endpoint for getting time values for all validators.
-    fn get_validators_time(&self, _: &mut Request) -> IronResult<Response> {
+    fn get_all_validators_times(&self, _: &mut Request) -> IronResult<Response> {
         let view = self.blockchain.snapshot();
         let schema = TimeSchema::new(&view);
         let idx = schema.validators_time();
 
-        let validators_time: HashMap<_, _> = idx.iter().collect();
+        // The times of all validators for which time is known.
+        let validators_time = idx.iter()
+            .map(|(public_key, time)| {
+                ValidatorTime {
+                    public_key,
+                    time: Some(time.time()),
+                }
+            })
+            .collect::<Vec<_>>();
 
-        if validators_time.is_empty() {
-            self.not_found_response(&serde_json::to_value("Validators time database is empty")
-                .unwrap())
-        } else {
-            self.ok_response(&serde_json::to_value(validators_time).unwrap())
-        }
+        self.ok_response(&serde_json::to_value(validators_time).unwrap())
+    }
+
+    /// Endpoint for getting time values for current validators.
+    fn get_current_validators_times(&self, _: &mut Request) -> IronResult<Response> {
+        let view = self.blockchain.snapshot();
+        let validator_keys = Schema::new(&view).actual_configuration().validator_keys;
+        let schema = TimeSchema::new(&view);
+        let idx = schema.validators_time();
+
+        // The times of current validators.
+        // `None` if the time of the validator is unknown.
+        let validators_time = validator_keys
+            .iter()
+            .map(|validator| {
+                ValidatorTime {
+                    public_key: validator.service_key,
+                    time: match idx.get(&validator.service_key) {
+                        Some(time) => Some(time.time()),
+                        None => None,
+                    },
+                }
+            })
+            .collect::<Vec<_>>();
+
+        self.ok_response(&serde_json::to_value(validators_time).unwrap())
     }
 
     fn wire_private(&self, router: &mut Router) {
         let self_ = self.clone();
-        let get_validators_time = move |req: &mut Request| self_.get_validators_time(req);
+        let get_current_validators_times =
+            move |req: &mut Request| self_.get_current_validators_times(req);
+
+        let self_ = self.clone();
+        let get_all_validators_times = move |req: &mut Request| self_.get_all_validators_times(req);
+
         router.get(
-            "/validators_time",
-            get_validators_time,
-            "get_validators_time",
+            "v1/validators_times",
+            get_current_validators_times,
+            "get_current_validators_times",
+        );
+
+        router.get(
+            "v1/validators_times/all",
+            get_all_validators_times,
+            "get_all_validators_times",
         );
     }
 }
@@ -229,7 +285,7 @@ impl Api for TimeApi {
     fn wire(&self, router: &mut Router) {
         let self_ = self.clone();
         let get_current_time = move |req: &mut Request| self_.get_current_time(req);
-        router.get("/current_time", get_current_time, "get_current_time");
+        router.get("v1/current_time", get_current_time, "get_current_time");
     }
 }
 
@@ -276,6 +332,11 @@ impl TimeService {
 impl Service for TimeService {
     fn service_name(&self) -> &'static str {
         SERVICE_NAME
+    }
+
+    fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash> {
+        let schema = TimeSchema::new(snapshot);
+        schema.state_hash()
     }
 
     fn service_id(&self) -> u16 {
