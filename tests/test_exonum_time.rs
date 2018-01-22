@@ -213,6 +213,225 @@ fn test_exonum_time_service_with_4_validators() {
     );
 }
 
+#[test]
+fn test_exonum_time_service_with_7_validators() {
+    let mut testkit = TestKitBuilder::validator()
+        .with_validators(7)
+        .with_service(TimeService::new())
+        .create();
+
+    let validators = testkit.network().validators().to_vec();
+
+    // Validators time, that is saved in storage, look like this:
+    // number | 0    | 1    | 2    | 3    | 4    | 5    | 6    |
+    // time   | None | None | None | None | None | None | None |
+    //
+    // max_byzantine_nodes = (7 - 1) / 3 = 2.
+    //
+    // Consolidated time is `null`.
+
+    verify_data(
+        testkit.snapshot(),
+        &validators,
+        None,
+        &[None, None, None, None, None, None, None],
+    );
+
+    // After 1st transaction:
+    // number | 0       | 1    | 2    | 3    | 4    | 5    | 6    |
+    // time   | `time0` | None | None | None | None | None | None |
+    //
+    // Times: `time0`.
+    //
+    // Consolidated time is `null`.
+
+    let time0 = SystemTime::now();
+    let tx0 = {
+        let (pub_key, sec_key) = validators[0].service_keypair();
+        TxTime::new(time0, pub_key, sec_key)
+    };
+    testkit.create_block_with_transactions(txvec![tx0]);
+
+    verify_data(
+        testkit.snapshot(),
+        &validators,
+        None,
+        &[Some(time0), None, None, None, None, None, None],
+    );
+
+    // After 2nd transaction:
+    // number | 0       | 1       | 2    | 3    | 4    | 5    | 6    |
+    // time   | `time0` | `time1` | None | None | None | None | None |
+    //
+    // Times: `time1` > `time0`.
+    //
+    // Consolidated time is `null`.
+
+    let time1 = time0 + Duration::new(10, 0);
+    let tx1 = {
+        let (pub_key, sec_key) = validators[1].service_keypair();
+        TxTime::new(time1, pub_key, sec_key)
+    };
+    testkit.create_block_with_transactions(txvec![tx1]);
+
+    verify_data(
+        testkit.snapshot(),
+        &validators,
+        None,
+        &[Some(time0), Some(time1), None, None, None, None, None],
+    );
+
+    // After 3rd transaction:
+    // number | 0       | 1       | 2       | 3    | 4    | 5    | 6    |
+    // time   | `time0` | `time1` | 'time2' | None | None | None | None |
+    //
+    // Times: `time2` > `time1` > `time0`.
+    //
+    // Consolidated time is `null`.
+
+    let time2 = time1 + Duration::new(10, 0);
+    let tx2 = {
+        let (pub_key, sec_key) = validators[2].service_keypair();
+        TxTime::new(time2, pub_key, sec_key)
+    };
+    testkit.create_block_with_transactions(txvec![tx2]);
+
+    verify_data(
+        testkit.snapshot(),
+        &validators,
+        None,
+        &[
+            Some(time0),
+            Some(time1),
+            Some(time2),
+            None,
+            None,
+            None,
+            None,
+        ],
+    );
+
+    // After 4th transaction:
+    // number | 0       | 1       | 2       | 3       | 4    | 5    | 6    |
+    // time   | `time0` | `time1` | `time2` | `time3` | None | None | None |
+    //
+    // Times: `time3` > `time2` > `time1` > `time0`.
+    //
+    // Consolidated time is `null`.
+
+    let time3 = time2 + Duration::new(10, 0);
+    let tx3 = {
+        let (pub_key, sec_key) = validators[3].service_keypair();
+        TxTime::new(time3, pub_key, sec_key)
+    };
+    testkit.create_block_with_transactions(txvec![tx3]);
+
+    verify_data(
+        testkit.snapshot(),
+        &validators,
+        None,
+        &[
+            Some(time0),
+            Some(time1),
+            Some(time2),
+            Some(time3),
+            None,
+            None,
+            None,
+        ],
+    );
+
+    // After 5th transaction:
+    // number | 0       | 1       | 2       | 3       | 4       | 5    | 6    |
+    // time   | `time0` | `time1` | `time2` | `time3` | `time4` | None | None |
+    //
+    // Times: `time4` > `time3` > `time2` > `time1` > `time0`.
+    //
+    // Consolidated time is `time2`.
+
+    let time4 = time3 + Duration::new(10, 0);
+    let tx4 = {
+        let (pub_key, sec_key) = validators[4].service_keypair();
+        TxTime::new(time4, pub_key, sec_key)
+    };
+    testkit.create_block_with_transactions(txvec![tx4]);
+
+    verify_data(
+        testkit.snapshot(),
+        &validators,
+        Some(time2),
+        &[
+            Some(time0),
+            Some(time1),
+            Some(time2),
+            Some(time3),
+            Some(time4),
+            None,
+            None,
+        ],
+    );
+
+    // After 6th transaction:
+    // number | 0       | 1       | 2       | 3       | 4       | 5       | 6    |
+    // time   | `time0` | `time1` | `time2` | `time3` | `time4` | `time5` | None |
+    //
+    // Times: `time5` > `time4` > `time3` > `time2` > `time1` > `time0`.
+    //
+    // Consolidated time is `time3`.
+
+    let time5 = time4 + Duration::new(10, 0);
+    let tx5 = {
+        let (pub_key, sec_key) = validators[5].service_keypair();
+        TxTime::new(time5, pub_key, sec_key)
+    };
+    testkit.create_block_with_transactions(txvec![tx5]);
+
+    verify_data(
+        testkit.snapshot(),
+        &validators,
+        Some(time3),
+        &[
+            Some(time0),
+            Some(time1),
+            Some(time2),
+            Some(time3),
+            Some(time4),
+            Some(time5),
+            None,
+        ],
+    );
+
+    // After 7th transaction:
+    // number | 0       | 1       | 2       | 3       | 4       | 5       | 6       |
+    // time   | `time0` | `time1` | `time2` | `time3` | `time4` | `time5` | `time6` |
+    //
+    // Times: `time6` > `time5` > `time4` > `time3` > `time2` > `time1` > `time0`.
+    //
+    // Consolidated time is `time4`.
+
+    let time6 = time5 + Duration::new(10, 0);
+    let tx6 = {
+        let (pub_key, sec_key) = validators[6].service_keypair();
+        TxTime::new(time6, pub_key, sec_key)
+    };
+    testkit.create_block_with_transactions(txvec![tx6]);
+
+    verify_data(
+        testkit.snapshot(),
+        &validators,
+        Some(time4),
+        &[
+            Some(time0),
+            Some(time1),
+            Some(time2),
+            Some(time3),
+            Some(time4),
+            Some(time5),
+            Some(time6),
+        ],
+    );
+}
+
 // A struct that provides the node with the current time.
 #[derive(Debug)]
 struct MyTimeProvider;
