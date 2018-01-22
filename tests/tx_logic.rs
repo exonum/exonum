@@ -33,7 +33,6 @@ use cryptocurrency::{CurrencySchema, CurrencyService, TxCreateWallet, TxTransfer
 
 fn init_testkit() -> TestKit {
     TestKitBuilder::validator()
-        .with_validators(4)
         .with_service(CurrencyService)
         .create()
 }
@@ -78,7 +77,7 @@ fn test_transfer() {
         assert_eq!(alice_wallet.balance(), 90);
         assert_eq!(bob_wallet.balance(), 110);
     } else {
-        panic!("Wallets not persisted")
+        panic!("Wallets not persisted");
     }
 }
 
@@ -100,7 +99,7 @@ fn test_transfer_from_nonexisting_wallet() {
     if let (None, Some(bob_wallet)) = wallets {
         assert_eq!(bob_wallet.balance(), 100);
     } else {
-        panic!("Wallets not persisted")
+        panic!("Wallets not persisted");
     }
 }
 
@@ -125,7 +124,7 @@ fn test_transfer_to_nonexisting_wallet() {
         assert_eq!(alice_wallet.balance(), 100);
         assert_eq!(bob_wallet.balance(), 100);
     } else {
-        panic!("Wallets not persisted")
+        panic!("Wallets not persisted");
     }
 }
 
@@ -151,7 +150,7 @@ fn test_transfer_overcharge() {
         assert_eq!(alice_wallet.balance(), 100);
         assert_eq!(bob_wallet.balance(), 100);
     } else {
-        panic!("Wallets not persisted")
+        panic!("Wallets not persisted");
     }
 }
 
