@@ -19,7 +19,7 @@ use std::ops::Deref;
 use byteorder::{ByteOrder, LittleEndian};
 
 use crypto::{hash, sign, verify, Hash, PublicKey, SecretKey, Signature, SIGNATURE_LENGTH};
-use encoding::{CheckedOffset, Field, Offset, Result as StreamStructResult};
+use encoding::{self, CheckedOffset, Field, Offset, Result as StreamStructResult};
 
 /// Length of the message header.
 pub const HEADER_LENGTH: usize = 10;
@@ -258,6 +258,11 @@ impl MessageWriter {
 
 /// Represents generic message interface.
 pub trait Message: Debug + Send + Sync {
+    /// Converts the raw message into the specific one.
+    fn from_raw(raw: RawMessage) -> Result<Self, encoding::Error>
+    where
+        Self: Sized;
+
     /// Returns raw message.
     fn raw(&self) -> &RawMessage;
 
@@ -273,6 +278,10 @@ pub trait Message: Debug + Send + Sync {
 }
 
 impl Message for RawMessage {
+    fn from_raw(raw: RawMessage) -> Result<Self, encoding::Error> {
+        Ok(raw)
+    }
+
     fn raw(&self) -> &RawMessage {
         self
     }
