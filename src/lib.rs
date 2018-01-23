@@ -130,6 +130,8 @@ extern crate iron_test;
 extern crate router;
 extern crate serde;
 extern crate serde_json;
+#[macro_use]
+extern crate log;
 
 use futures::Stream;
 use futures::executor::{self, Spawn};
@@ -1174,7 +1176,7 @@ impl TestKitApi {
         );
     }
 
-    fn get_internal<H, D>(handler: &H, url: &str, expect_error: bool) -> D
+    fn get_internal<H, D>(handler: &H, endpoint: &str, expect_error: bool, is_public: bool) -> D
     where
         H: Handler,
         for<'de> D: Deserialize<'de>,
@@ -1185,7 +1187,7 @@ impl TestKitApi {
             StatusClass::Success
         };
 
-        let url = format!("http://localhost:3000/{}", url);
+        let url = format!("http://localhost:3000/{}", endpoint);
         let resp = request::get(&url, Headers::new(), handler);
         let resp = if expect_error {
             // Support either "normal" or erroneous responses.
@@ -1207,6 +1209,10 @@ impl TestKitApi {
         }
 
         let resp = response::extract_body_to_string(resp);
+
+        let publicity = if is_public { "" } else { " private" };
+        trace!("GET{} {}\nResponse:\n{}\n", publicity, endpoint, resp);
+
         serde_json::from_str(&resp).unwrap()
     }
 
@@ -1224,6 +1230,7 @@ impl TestKitApi {
             &self.public_handler,
             &format!("{}/{}", kind.into_prefix(), endpoint),
             false,
+            true,
         )
     }
 
@@ -1241,6 +1248,7 @@ impl TestKitApi {
             &self.private_handler,
             &format!("{}/{}", kind.into_prefix(), endpoint),
             false,
+            false,
         )
     }
 
@@ -1257,16 +1265,18 @@ impl TestKitApi {
             &self.public_handler,
             &format!("{}/{}", kind.into_prefix(), endpoint),
             true,
+            true,
         )
     }
 
-    fn post_internal<H, T, D>(handler: &H, endpoint: &str, data: &T) -> D
+    fn post_internal<H, T, D>(handler: &H, endpoint: &str, data: &T, is_public: bool) -> D
     where
         H: Handler,
         T: Serialize,
         for<'de> D: Deserialize<'de>,
     {
         let url = format!("http://localhost:3000/{}", endpoint);
+        let body = serde_json::to_string(&data).expect("Cannot serialize data to JSON");
         let resp = request::post(
             &url,
             {
@@ -1274,11 +1284,21 @@ impl TestKitApi {
                 headers.set(ContentType::json());
                 headers
             },
-            &serde_json::to_string(&data).expect("Cannot serialize data to JSON"),
+            &body,
             handler,
         ).expect("Cannot send data");
 
         let resp = response::extract_body_to_string(resp);
+
+        let publicity = if is_public { "" } else { " private" };
+        trace!(
+            "POST{} {}\nBody: \n{}\nResponse:\n{}\n",
+            publicity,
+            endpoint,
+            body,
+            resp
+        );
+
         serde_json::from_str(&resp).expect("Cannot parse result")
     }
 
@@ -1300,6 +1320,7 @@ impl TestKitApi {
             &self.public_handler,
             &format!("{}/{}", kind.into_prefix(), endpoint),
             transaction,
+            true,
         )
     }
 
@@ -1321,6 +1342,7 @@ impl TestKitApi {
             &self.private_handler,
             &format!("{}/{}", kind.into_prefix(), endpoint),
             transaction,
+            false,
         )
     }
 }
