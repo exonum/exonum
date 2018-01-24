@@ -66,7 +66,7 @@ pub mod config;
 /// Only blockchains with the identical set of services and genesis block can be combined
 /// into the single network.
 pub struct Blockchain {
-    db: Box<Database>,
+    db: Arc<Database>,
     service_map: Arc<VecMap<Box<Service>>>,
     service_keypair: (PublicKey, SecretKey),
     api_sender: ApiSender,
@@ -94,7 +94,7 @@ impl Blockchain {
         }
 
         Blockchain {
-            db: storage,
+            db: storage.into(),
             service_map: Arc::new(service_map),
             service_keypair: (service_public_key, service_secret_key),
             api_sender,
@@ -463,7 +463,7 @@ impl fmt::Debug for Blockchain {
 impl Clone for Blockchain {
     fn clone(&self) -> Blockchain {
         Blockchain {
-            db: self.db.clone(),
+            db: Arc::clone(&self.db),
             service_map: Arc::clone(&self.service_map),
             api_sender: self.api_sender.clone(),
             service_keypair: self.service_keypair.clone(),

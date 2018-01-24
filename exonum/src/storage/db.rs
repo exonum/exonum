@@ -205,9 +205,7 @@ enum NextIterValue {
 
 /// A trait that defines a low-level storage backend.
 ///
-/// The trait `Database` requires to implement traits `Send` and `Sync` and should not be borrowed
-/// data, so you can use method [`clone`] to get the references to the database for concurrent
-/// usage.
+/// A `Database` instance is shared across different threads, so it must be `Sync` and `Send`.
 ///
 /// There is no way to directly interact with data in the database.
 ///
@@ -218,7 +216,8 @@ enum NextIterValue {
 /// If you need to make any changes to the data, you need to create a [`Fork`] using method
 /// [`fork`][2]. As well as `Snapshot`, `Fork` provides read isolation and also allows you to create
 /// a sequence of changes to the database that are specified as a [`Patch`]. Later you can
-/// atomically merge a patch into the database using method [`merge`].
+/// atomically merge a patch into the database using method [`merge`]. Note that different threads
+/// may call `merge` concurrently.
 ///
 /// [`clone`]: #tymethod.fork
 /// [`Snapshot`]: trait.Snapshot.html
@@ -228,9 +227,6 @@ enum NextIterValue {
 /// [`Patch`]: struct.Patch.html
 /// [`merge`]: #tymethod.merge
 pub trait Database: Send + Sync + 'static {
-    /// Creates a new reference to the database as `Box<Database>`.
-    fn clone(&self) -> Box<Database>;
-
     /// Creates a new snapshot of the database from its current state.
     ///
     /// See [`Snapshot`] documentation for more.
@@ -252,19 +248,25 @@ pub trait Database: Send + Sync + 'static {
 
     /// Atomically applies a sequence of patch changes to the database.
     ///
-    /// # Errors
-    /// If this method encounters any form of I/O or other error during merging, an error variant
-    /// will be returned. In case of an error the method guarantees no changes were applied to
-    /// the database.
-    fn merge(&mut self, patch: Patch) -> Result<()>;
-
-    /// Atomically applies a sequence of patch changes to the database with fsync.
+    /// Note that this method may be called concurrently from different threads, the
+    /// onus to guarantee atomicity is on the implementor of the trait.
     ///
     /// # Errors
     /// If this method encounters any form of I/O or other error during merging, an error variant
     /// will be returned. In case of an error the method guarantees no changes were applied to
     /// the database.
-    fn merge_sync(&mut self, patch: Patch) -> Result<()>;
+    fn merge(&self, patch: Patch) -> Result<()>;
+
+    /// Atomically applies a sequence of patch changes to the database with fsync.
+    ///
+    /// Note that this method may be called concurrently from different threads, the
+    /// onus to guarantee atomicity is on the implementor of the trait.
+    ///
+    /// # Errors
+    /// If this method encounters any form of I/O or other error during merging, an error variant
+    /// will be returned. In case of an error the method guarantees no changes were applied to
+    /// the database.
+    fn merge_sync(&self, patch: Patch) -> Result<()>;
 }
 
 /// A trait that defines a snapshot of storage backend.
