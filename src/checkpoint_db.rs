@@ -20,77 +20,90 @@ use exonum::storage::{Database, Patch, Result as StorageResult, Snapshot};
 /// function.
 ///
 /// **Note:** Intended for testing purposes only. Probably inefficient.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct CheckpointDb<T> {
-    inner: T,
-    journal: Arc<RwLock<Vec<Patch>>>,
+    inner: Arc<RwLock<CheckpointDbInner<T>>>,
 }
 
-impl<T: Database + Clone> CheckpointDb<T> {
+impl<T: Database> CheckpointDb<T> {
     /// Creates a new checkpointed database that uses the specified `db` as the underlying
     /// data storage.
     pub fn new(db: T) -> Self {
-        CheckpointDb {
-            inner: db,
-            journal: Arc::new(RwLock::new(Vec::new())),
-        }
+        CheckpointDb { inner: Arc::new(RwLock::new(CheckpointDbInner::new(db))) }
     }
 
+    /// Returns a handler to the database. The handler could be used to roll the database back
+    /// without having the ownership to it.
+    pub fn handler(&self) -> CheckpointDbHandler<T> {
+        CheckpointDbHandler { inner: Arc::clone(&self.inner) }
+    }
+}
+
+impl<T: Database> Database for CheckpointDb<T> {
+    fn snapshot(&self) -> Box<Snapshot> {
+        self.inner
+            .read()
+            .expect("Cannot lock CheckpointDb for snapshot")
+            .snapshot()
+    }
+
+    fn merge(&self, patch: Patch) -> StorageResult<()> {
+        self.inner
+            .write()
+            .expect("Cannot lock CheckpointDb for merge")
+            .merge(patch)
+    }
+
+    fn merge_sync(&self, patch: Patch) -> StorageResult<()> {
+        self.merge(patch)
+    }
+}
+
+/// Handler to a checkpointed database.
+#[derive(Debug)]
+pub struct CheckpointDbHandler<T> {
+    inner: Arc<RwLock<CheckpointDbInner<T>>>,
+}
+
+impl<T: Database> CheckpointDbHandler<T> {
     /// Rolls back this database by udoing the latest `count` `merge()` operations.
     ///
     /// # Panics
     ///
     /// - Panics if more operations are attempted to be reverted than the number of operations
     ///   in the DB journal.
-    pub fn rollback(&mut self, count: usize) -> bool {
-        let journal_len = self.journal
-            .read()
-            .expect("Cannot acquire read lock on journal")
-            .len();
-        assert!(
-            journal_len >= count,
-            "Cannot rollback {} changes; only {} checkpoints in the journal",
-            count,
-            journal_len
-        );
-
-        let mut journal = self.journal.write().expect(
-            "Cannot acquire write lock on journal",
-        );
-
-        for _ in 0..count {
-            if let Some(patch) = journal.pop() {
-                self.inner.merge(patch).expect(
-                    "Cannot merge roll-back patch",
-                );
-            } else {
-                panic!("Cannot rollback the database, the journal is empty");
-            }
-        }
-
-        journal_len < count
-    }
-
-    /// Returns a handler to the database. The handler could be used to roll the database back
-    /// without having the ownership to it.
-    pub fn handler(&self) -> CheckpointDbHandler<T> {
-        CheckpointDbHandler(Clone::clone(self))
+    pub fn rollback(&self, count: usize) {
+        self.inner
+            .write()
+            .expect("Cannot lock CheckpointDb for rollback")
+            .rollback(count);
     }
 }
 
-impl<T: Database + Clone> Database for CheckpointDb<T> {
-    fn clone(&self) -> Box<Database> {
-        Box::new(Clone::clone(self))
+#[derive(Debug)]
+struct CheckpointDbInner<T> {
+    db: T,
+    journal: Vec<Patch>,
+}
+
+impl<T: Database> CheckpointDbInner<T> {
+    fn new(db: T) -> Self {
+        CheckpointDbInner {
+            db,
+            journal: Vec::new(),
+        }
     }
 
     fn snapshot(&self) -> Box<Snapshot> {
-        self.inner.snapshot()
+        self.db.snapshot()
     }
 
     fn merge(&mut self, patch: Patch) -> StorageResult<()> {
-        let snapshot = self.inner.snapshot();
-        self.inner.merge(patch.clone())?;
-        let mut rev_fork = self.fork();
+        // NB: make sure that **both** the db and the journal
+        // are updated atomically.
+        let snapshot = self.db.snapshot();
+        self.db.merge(patch.clone())?;
+        let mut rev_fork = self.db.fork();
 
         for (name, changes) in patch {
             for (key, _) in changes {
@@ -105,28 +118,22 @@ impl<T: Database + Clone> Database for CheckpointDb<T> {
             }
         }
 
-        {
-            let mut journal = self.journal.write().expect(
-                "Cannot acquire write lock on journal",
-            );
-            journal.push(rev_fork.into_patch());
-        }
+        self.journal.push(rev_fork.into_patch());
         Ok(())
     }
 
-    fn merge_sync(&mut self, patch: Patch) -> StorageResult<()> {
-        self.merge(patch)
-    }
-}
+    fn rollback(&mut self, count: usize) {
+        assert!(
+            self.journal.len() >= count,
+            "Cannot rollback {} changes; only {} checkpoints in the journal",
+            count,
+            self.journal.len()
+        );
 
-/// Handler to a checkpointed database.
-#[derive(Clone, Debug)]
-pub struct CheckpointDbHandler<T>(CheckpointDb<T>);
-
-impl<T: Database + Clone> CheckpointDbHandler<T> {
-    /// Rolls back this database by udoing the latest `count` `merge()` operations.
-    pub fn rollback(&mut self, count: usize) -> bool {
-        self.0.rollback(count)
+        for _ in 0..count {
+            let patch = self.journal.pop().unwrap();
+            self.db.merge(patch).expect("Cannot merge roll-back patch");
+        }
     }
 }
 
@@ -182,14 +189,13 @@ mod tests {
 
     #[test]
     fn test_checkpointdb_basics() {
-        let mut db = CheckpointDb::new(MemoryDB::new());
+        let db = CheckpointDb::new(MemoryDB::new());
         let mut fork = db.fork();
         fork.put("foo", vec![], vec![2]);
         db.merge(fork.into_patch()).unwrap();
         {
-            let journal = db.journal.read().expect(
-                "Cannot acquire read lock on journal",
-            );
+            let inner = db.inner.read().unwrap();
+            let journal = &inner.journal;
             assert_eq!(journal.len(), 1);
             check_patch(&journal[0], vec![("foo", vec![], Change::Delete)]);
         }
@@ -202,9 +208,8 @@ mod tests {
         fork.put("bar", vec![1], vec![4]);
         db.merge(fork.into_patch()).unwrap();
         {
-            let journal = db.journal.read().expect(
-                "Cannot acquire read lock on journal",
-            );
+            let inner = db.inner.read().unwrap();
+            let journal = &inner.journal;
             assert_eq!(journal.len(), 2);
             check_patch(&journal[0], vec![("foo", vec![], Change::Delete)]);
             check_patch(
@@ -221,7 +226,8 @@ mod tests {
 
     #[test]
     fn test_checkpointdb_rollback() {
-        let mut db = CheckpointDb::new(MemoryDB::new());
+        let db = CheckpointDb::new(MemoryDB::new());
+        let handler = db.handler();
         let mut fork = db.fork();
         fork.put("foo", vec![], vec![2]);
         db.merge(fork.into_patch()).unwrap();
@@ -231,22 +237,20 @@ mod tests {
         fork.put("bar", vec![1], vec![4]);
         db.merge(fork.into_patch()).unwrap();
         {
-            let journal = db.journal.read().expect(
-                "Cannot acquire read lock on journal",
-            );
+            let inner = db.inner.read().unwrap();
+            let journal = &inner.journal;
             assert_eq!(journal.len(), 2);
         }
 
         let snapshot = db.snapshot();
         assert_eq!(snapshot.get("foo", &[]), Some(vec![3]));
-        db.rollback(1);
+        handler.rollback(1);
         let snapshot = db.snapshot();
         assert_eq!(snapshot.get("foo", &[]), Some(vec![2]));
         assert_eq!(snapshot.get("bar", &[1]), None);
         {
-            let journal = db.journal.read().expect(
-                "Cannot acquire read lock on journal",
-            );
+            let inner = db.inner.read().unwrap();
+            let journal = &inner.journal;
             assert_eq!(journal.len(), 1);
         }
 
@@ -256,9 +260,8 @@ mod tests {
         fork.put("foo", vec![0, 0], vec![255]);
         db.merge(fork.into_patch()).unwrap();
         {
-            let journal = db.journal.read().expect(
-                "Cannot acquire read lock on journal",
-            );
+            let inner = db.inner.read().unwrap();
+            let journal = &inner.journal;
             assert_eq!(journal.len(), 2);
         }
         let snapshot = db.snapshot();
@@ -269,9 +272,8 @@ mod tests {
         fork.put("bar", vec![1], vec![254]);
         db.merge(fork.into_patch()).unwrap();
         {
-            let journal = db.journal.read().expect(
-                "Cannot acquire read lock on journal",
-            );
+            let inner = db.inner.read().unwrap();
+            let journal = &inner.journal;
             assert_eq!(journal.len(), 3);
         }
         let new_snapshot = db.snapshot();
@@ -279,11 +281,10 @@ mod tests {
         assert_eq!(new_snapshot.get("foo", &[0, 0]), Some(vec![255]));
         assert_eq!(new_snapshot.get("bar", &[1]), Some(vec![254]));
 
-        db.rollback(2);
+        handler.rollback(2);
         {
-            let journal = db.journal.read().expect(
-                "Cannot acquire read lock on journal",
-            );
+            let inner = db.inner.read().unwrap();
+            let journal = &inner.journal;
             assert_eq!(journal.len(), 1);
         }
         let snapshot = db.snapshot();
@@ -297,38 +298,9 @@ mod tests {
     }
 
     #[test]
-    fn test_checkpointdb_clone() {
-        let mut db = CheckpointDb::new(MemoryDB::new());
-        let mut db_clone = Database::clone(&db);
-
-        let mut fork = db.fork();
-        fork.put("foo", vec![], vec![2]);
-        db.merge(fork.into_patch()).unwrap();
-
-        let snapshot = db_clone.snapshot();
-        assert_eq!(snapshot.get("foo", &[]), Some(vec![2]));
-
-        let mut fork = db_clone.fork();
-        fork.put("foo", vec![], vec![3]);
-        db_clone.merge(fork.into_patch()).unwrap();
-
-        let snapshot = db.snapshot();
-        assert_eq!(snapshot.get("foo", &[]), Some(vec![3]));
-
-        // Check rollback on clones
-        let mut db_clone = Clone::clone(&db);
-        db_clone.rollback(1);
-        let snapshot = db.snapshot();
-        assert_eq!(snapshot.get("foo", &[]), Some(vec![2]));
-        db.rollback(1);
-        let snapshot = db_clone.snapshot();
-        assert_eq!(snapshot.get("foo", &[]), None);
-    }
-
-    #[test]
     fn test_checkpointdb_handler() {
-        let mut db = CheckpointDb::new(MemoryDB::new());
-        let mut db_handler = db.handler();
+        let db = CheckpointDb::new(MemoryDB::new());
+        let db_handler = db.handler();
 
         let mut fork = db.fork();
         fork.put("foo", vec![], vec![2]);

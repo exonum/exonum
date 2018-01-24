@@ -32,4 +32,4 @@ serde_derive = "1.0.0"
 rand = "0.3"
 
 [patch.crates-io]
-exonum = { git = 'https://github.com/matklad/exonum', branch = 'testkit-api' }
+exonum = { git = 'https://github.com/exonum/exonum', rev = '5b44b36' }
