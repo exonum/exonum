@@ -259,7 +259,8 @@ impl PartialEq for DBKey {
 
 impl ::std::fmt::Debug for DBKey {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        let mut bits = String::with_capacity(KEY_SIZE * 8);
+        // 8 bits + '|' symbol per byte.
+        let mut bits = String::with_capacity(KEY_SIZE * 9);
         for byte in 0..self.data.len() {
             let chunk = self.data[byte];
             for bit in (0..8).rev() {
@@ -420,4 +421,34 @@ fn test_dbkey_is_branch() {
     let b = DBKey::read(b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
     assert_eq!(b.len(), 255);
     assert_eq!(b.is_leaf(), false);
+}
+
+#[test]
+fn test_dbkey_debug_leaf() {
+    use std::fmt::Write;
+    let b = DBKey::read(b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00");
+    let mut buf = String::new();
+    write!(&mut buf, "{:?}", b).unwrap();
+    assert_eq!(
+        buf,
+        "DBKey { begin: 0, end: 256, bits: \"01110001|01110111|01100101|01110010|01110100|01111001\
+        |01110101|01101001|01101111|01110000|01100001|01110011|01100100|01100110|01100111|01101000\
+        |01101010|01101011|01101100|01111010|01111000|01100011|01110110|01100010|01101110|01101101\
+        |00110001|00110010|00110011|00110100|00110101|00110110|\" }"
+    );
+}
+
+#[test]
+fn test_dbkey_debug_branch() {
+    use std::fmt::Write;
+    let b = DBKey::read(b"\x00qwertyuiopasdfghjklzxcvbnm123456\xF0").suffix(12);
+    let mut buf = String::new();
+    write!(&mut buf, "{:?}", b).unwrap();
+    assert_eq!(
+        buf,
+        "DBKey { begin: 12, end: 240, bits: \"________|0111____|01100101|01110010|01110100|0111100\
+        1|01110101|01101001|01101111|01110000|01100001|01110011|01100100|01100110|01100111|0110100\
+        0|01101010|01101011|01101100|01111010|01111000|01100011|01110110|01100010|01101110|0110110\
+        1|00110001|00110010|00110011|00110100|________|________|\" }"
+    );
 }
