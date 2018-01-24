@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - Log dependency was updated to 0.4, which can cause issues with previous versions. (#433)
 - The `Database` trait is simplified: it is not longer required to implement state-sharing `clone` method.
   Instead, the `merge` method now takes a shared reference to `self`.
-- The order of bytes and bits in the `DBKey` keys of `ProofMapIndex` became consistent. Note: this change will break old storages. (#419)
+- The order of bytes and bits in the `DBKey` keys of `ProofMapIndex` became consistent. Note: this change will break old storages using map proofs. (#419)
 
 ### Removed
 - Removed default `state_hash` implementation in the `Service` trait. (#399)
