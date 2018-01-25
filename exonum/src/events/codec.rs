@@ -89,11 +89,12 @@ mod test {
     use messages::{MessageBuffer, RawMessage};
     use bytes::BytesMut;
     use tokio_io::codec::Decoder;
+
     #[test]
     fn decode_message_valid_header_size() {
         let data = vec![0u8, 0, 0, 0, 0, 0, 10, 0, 0, 0];
         let mut bytes: BytesMut = data.as_slice().into();
-        let mut codec = MessagesCodec;
+        let mut codec = MessagesCodec { max_message_len: 10000 };
         match codec.decode(&mut bytes) {
             Ok(Some(ref r)) if r == &RawMessage::new(MessageBuffer::from_vec(data)) => {}
             _ => panic!("Wrong input"),
@@ -104,7 +105,7 @@ mod test {
     fn decode_message_small_size_in_header() {
         let data = vec![0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0];
         let mut bytes: BytesMut = data.as_slice().into();
-        let mut codec = MessagesCodec;
+        let mut codec = MessagesCodec { max_message_len: 10000 };
         assert!(codec.decode(&mut bytes).is_err());
     }
 }
