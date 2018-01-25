@@ -21,10 +21,17 @@ use tokio_io::codec::{Decoder, Encoder};
 use messages::{HEADER_LENGTH, MessageBuffer, RawMessage};
 use super::error::other_error;
 
-pub const MAX_MESSAGE_LEN: usize = 1024 * 1024; // 1 MB
-
 #[derive(Debug)]
-pub struct MessagesCodec;
+pub struct MessagesCodec {
+    /// Maximum message length (in bytes), gets populated from `ConsensusConfig`.
+    max_message_len: u32,
+}
+
+impl MessagesCodec {
+    pub fn new(max_message_len: u32) -> MessagesCodec {
+        MessagesCodec { max_message_len }
+    }
+}
 
 impl Decoder for MessagesCodec {
     type Item = RawMessage;
@@ -37,11 +44,11 @@ impl Decoder for MessagesCodec {
         }
         // Check payload len
         let total_len = LittleEndian::read_u32(&buf[6..10]) as usize;
-        if total_len > MAX_MESSAGE_LEN {
+        if total_len as u32 > self.max_message_len {
             return Err(other_error(format!(
-                "Received message is too long: {}, maximum allowed length is {}",
+                "Received message is too long: {}, maximum allowed length is {} bytes",
                 total_len,
-                MAX_MESSAGE_LEN
+                self.max_message_len,
             )));
         }
 
