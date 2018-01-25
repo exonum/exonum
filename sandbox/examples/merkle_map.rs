@@ -84,7 +84,7 @@ fn main() {
         (k, v)
     };
 
-    let mut db = create_database(path);
+    let db = create_database(path);
 
     let patch;
     {

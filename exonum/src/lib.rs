@@ -16,10 +16,7 @@
 //!
 //! For more information see the project readme.
 
-#![deny(missing_debug_implementations)]
-#![deny(missing_docs)]
-
-#![cfg_attr(feature="cargo-clippy", allow(zero_prefixed_literal))]
+#![deny(missing_debug_implementations, missing_docs)]
 
 #![cfg_attr(feature="flame_profile", feature(plugin, custom_attribute))]
 #![cfg_attr(feature="flame_profile", plugin(exonum_flamer))]

@@ -17,8 +17,8 @@ use std::cmp::min;
 use crypto::{Hash, PublicKey, HASH_SIZE};
 use super::super::StorageKey;
 
-pub const BRANCH_KEY_PREFIX: u8 = 00;
-pub const LEAF_KEY_PREFIX: u8 = 01;
+pub const BRANCH_KEY_PREFIX: u8 = 0;
+pub const LEAF_KEY_PREFIX: u8 = 1;
 
 /// Size in bytes of the `ProofMapKey`.
 pub const KEY_SIZE: usize = HASH_SIZE;
@@ -432,4 +432,34 @@ fn test_proof_path_is_branch() {
     let b = ProofPath::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
     assert_eq!(b.len(), 255);
     assert_eq!(b.is_leaf(), false);
+}
+
+#[test]
+fn test_proof_path_debug_leaf() {
+    use std::fmt::Write;
+    let b = ProofPath::from_raw(*b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00");
+    let mut buf = String::new();
+    write!(&mut buf, "{:?}", b).unwrap();
+    assert_eq!(
+        buf,
+        "ProofPath { start: 0, end: 256, bits: \"01110001|01110111|01100101|01110010|01110100|0111\
+        1001|01110101|01101001|01101111|01110000|01100001|01110011|01100100|01100110|01100111|0110\
+        1000|01101010|01101011|01101100|01111010|01111000|01100011|01110110|01100010|01101110|0110\
+        1101|00110001|00110010|00110011|00110100|00110101|00110110|\" }"
+    );
+}
+
+#[test]
+fn test_proof_path_debug_branch() {
+    use std::fmt::Write;
+    let b = ProofPath::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xF0").suffix(12);
+    let mut buf = String::new();
+    write!(&mut buf, "{:?}", b).unwrap();
+    assert_eq!(
+        buf,
+        "ProofPath { start: 12, end: 240, bits: \"________|0111____|01100101|01110010|01110100|011\
+        11001|01110101|01101001|01101111|01110000|01100001|01110011|01100100|01100110|01100111|011\
+        01000|01101010|01101011|01101100|01111010|01111000|01100011|01110110|01100010|01101110|011\
+        01101|00110001|00110010|00110011|00110100|________|________|\" }"
+    );
 }

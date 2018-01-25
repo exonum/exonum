@@ -78,95 +78,7 @@ macro_rules! message {
         }
 
         impl $crate::messages::Message for $name {
-            fn raw(&self) -> &$crate::messages::RawMessage {
-                &self.raw
-            }
-        }
-
-        impl<'a> $crate::encoding::SegmentField<'a> for $name {
-
-            fn item_size() -> $crate::encoding::Offset {
-                1
-            }
-
-            fn count(&self) -> $crate::encoding::Offset {
-                self.raw.len() as $crate::encoding::Offset
-            }
-
-            fn extend_buffer(&self, buffer: &mut Vec<u8>) {
-                buffer.extend_from_slice(self.raw.as_ref().as_ref())
-            }
-
-            unsafe fn from_buffer(buffer: &'a [u8],
-                                    from: $crate::encoding::Offset,
-                                    count: $crate::encoding::Offset) -> Self {
-                let raw_message: $crate::messages::RawMessage =
-                                    $crate::encoding::SegmentField::from_buffer(buffer,
-                                                                from,
-                                                                count);
-                $name::from_raw(raw_message).unwrap()
-            }
-
-            fn check_data(buffer: &'a [u8],
-                    from: $crate::encoding::CheckedOffset,
-                    count: $crate::encoding::CheckedOffset,
-                    latest_segment: $crate::encoding::CheckedOffset)
-              -> $crate::encoding::Result {
-                let latest_segment_origin = <$crate::messages::RawMessage as
-                                $crate::encoding::SegmentField>::check_data(buffer,
-                                                                from,
-                                                                count,
-                                                                latest_segment)?;
-                // TODO: remove this allocation,
-                // by allowing creating message from borrowed data (ECR-156)
-                let raw_message: $crate::messages::RawMessage =
-                                    unsafe { $crate::encoding::SegmentField::from_buffer(buffer,
-                                                                from.unchecked_offset(),
-                                                                count.unchecked_offset())};
-                let _: $name = $name::from_raw(raw_message)?;
-                Ok(latest_segment_origin)
-            }
-        }
-
-        impl $name {
-            #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
-            /// Creates messsage and sign it.
-            #[allow(unused_mut)]
-            pub fn new($($field_name: $field_type,)*
-                       secret_key: &$crate::crypto::SecretKey) -> $name {
-                use $crate::messages::{RawMessage, MessageWriter};
-                let mut writer = MessageWriter::new(
-                    $crate::messages::PROTOCOL_MAJOR_VERSION,
-                    $crate::messages::TEST_NETWORK_ID,
-                    $extension, $id, $name::__ex_header_size() as usize,
-                );
-                __ex_for_each_field!(
-                    __ex_message_write_field, (writer),
-                    $( ($(#[$field_attr])*, $field_name, $field_type) )*
-                );
-                $name { raw: RawMessage::new(writer.sign(secret_key)) }
-            }
-
-            /// Creates message and appends existing signature.
-            #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
-            #[allow(dead_code, unused_mut)]
-            pub fn new_with_signature($($field_name: $field_type,)*
-                                      signature: &$crate::crypto::Signature) -> $name {
-                use $crate::messages::{RawMessage, MessageWriter};
-                let mut writer = MessageWriter::new(
-                    $crate::messages::PROTOCOL_MAJOR_VERSION,
-                    $crate::messages::TEST_NETWORK_ID,
-                    $extension, $id, $name::__ex_header_size() as usize,
-                );
-                __ex_for_each_field!(
-                    __ex_message_write_field, (writer),
-                    $( ($(#[$field_attr])*, $field_name, $field_type) )*
-                );
-                $name { raw: RawMessage::new(writer.append_signature(signature)) }
-            }
-
-            /// Converts the raw message into the specific one.
-            pub fn from_raw(raw: $crate::messages::RawMessage)
+            fn from_raw(raw: $crate::messages::RawMessage)
                 -> Result<$name, $crate::encoding::Error> {
                 let min_message_size = $name::__ex_header_size() as usize
                             + $crate::messages::HEADER_LENGTH as usize
@@ -208,6 +120,94 @@ macro_rules! message {
                 }
 
                 Ok($name { raw: raw })
+            }
+
+
+            fn raw(&self) -> &$crate::messages::RawMessage {
+                &self.raw
+            }
+        }
+
+        impl<'a> $crate::encoding::SegmentField<'a> for $name {
+
+            fn item_size() -> $crate::encoding::Offset {
+                1
+            }
+
+            fn count(&self) -> $crate::encoding::Offset {
+                self.raw.len() as $crate::encoding::Offset
+            }
+
+            fn extend_buffer(&self, buffer: &mut Vec<u8>) {
+                buffer.extend_from_slice(self.raw.as_ref().as_ref())
+            }
+
+            unsafe fn from_buffer(buffer: &'a [u8],
+                                    from: $crate::encoding::Offset,
+                                    count: $crate::encoding::Offset) -> Self {
+                let raw_message: $crate::messages::RawMessage =
+                                    $crate::encoding::SegmentField::from_buffer(buffer,
+                                                                from,
+                                                                count);
+                $crate::messages::Message::from_raw(raw_message).unwrap()
+            }
+
+            fn check_data(buffer: &'a [u8],
+                    from: $crate::encoding::CheckedOffset,
+                    count: $crate::encoding::CheckedOffset,
+                    latest_segment: $crate::encoding::CheckedOffset)
+              -> $crate::encoding::Result {
+                let latest_segment_origin = <$crate::messages::RawMessage as
+                                $crate::encoding::SegmentField>::check_data(buffer,
+                                                                from,
+                                                                count,
+                                                                latest_segment)?;
+                // TODO: remove this allocation,
+                // by allowing creating message from borrowed data (ECR-156)
+                let raw_message: $crate::messages::RawMessage =
+                                    unsafe { $crate::encoding::SegmentField::from_buffer(buffer,
+                                                                from.unchecked_offset(),
+                                                                count.unchecked_offset())};
+                let _: $name = $crate::messages::Message::from_raw(raw_message)?;
+                Ok(latest_segment_origin)
+            }
+        }
+
+        impl $name {
+            #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
+            /// Creates messsage and sign it.
+            #[allow(unused_mut)]
+            pub fn new($($field_name: $field_type,)*
+                       secret_key: &$crate::crypto::SecretKey) -> $name {
+                use $crate::messages::{RawMessage, MessageWriter};
+                let mut writer = MessageWriter::new(
+                    $crate::messages::PROTOCOL_MAJOR_VERSION,
+                    $crate::messages::TEST_NETWORK_ID,
+                    $extension, $id, $name::__ex_header_size() as usize,
+                );
+                __ex_for_each_field!(
+                    __ex_message_write_field, (writer),
+                    $( ($(#[$field_attr])*, $field_name, $field_type) )*
+                );
+                $name { raw: RawMessage::new(writer.sign(secret_key)) }
+            }
+
+            /// Creates message and appends existing signature.
+            #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
+            #[allow(dead_code, unused_mut)]
+            pub fn new_with_signature($($field_name: $field_type,)*
+                                      signature: &$crate::crypto::Signature) -> $name {
+                use $crate::messages::{RawMessage, MessageWriter};
+                let mut writer = MessageWriter::new(
+                    $crate::messages::PROTOCOL_MAJOR_VERSION,
+                    $crate::messages::TEST_NETWORK_ID,
+                    $extension, $id, $name::__ex_header_size() as usize,
+                );
+                __ex_for_each_field!(
+                    __ex_message_write_field, (writer),
+                    $( ($(#[$field_attr])*, $field_name, $field_type) )*
+                );
+                $name { raw: RawMessage::new(writer.append_signature(signature)) }
             }
 
             #[allow(unused_variables)]
@@ -270,7 +270,7 @@ macro_rules! message {
                 }
                 let buf = $crate::messages::MessageBuffer::from_vec(vec);
                 let raw = $crate::messages::RawMessage::new(buf);
-                $name::from_raw(raw)
+                $crate::messages::Message::from_raw(raw)
             }
         }
 
