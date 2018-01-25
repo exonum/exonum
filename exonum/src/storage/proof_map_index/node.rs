@@ -104,3 +104,21 @@ impl ::std::fmt::Debug for BranchNode {
             .finish()
     }
 }
+
+#[test]
+fn test_branch_node() {
+    let mut branch = BranchNode::empty();
+
+    let lh = hash(&[1, 2]);
+    let rh = hash(&[3, 4]);
+    let ls = DBKey::leaf(&[253; 32]);
+    let rs = DBKey::leaf(&[244; 32]);
+
+    branch.set_child(ChildKind::Left, &ls, &lh);
+    branch.set_child(ChildKind::Right, &rs, &rh);
+
+    assert_eq!(branch.child_hash(ChildKind::Left), &lh);
+    assert_eq!(branch.child_hash(ChildKind::Right), &rh);
+    assert_eq!(branch.child_slice(ChildKind::Left), ls);
+    assert_eq!(branch.child_slice(ChildKind::Right), rs);
+}

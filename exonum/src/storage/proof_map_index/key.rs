@@ -50,7 +50,6 @@ impl StorageKey for [u8; KEY_SIZE] {
     }
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ChildKind {
     Left,
@@ -122,7 +121,7 @@ impl DBKey {
 
         let pos = self.from + idx;
         let chunk = self.data[(pos / 8) as usize];
-        let bit = 7 - pos % 8;
+        let bit = pos % 8;
         let value = (1 << bit) & chunk;
         if value != 0 {
             ChildKind::Right
@@ -177,10 +176,11 @@ impl DBKey {
             for i in from..to {
                 let x = self.data[i as usize] ^ other.data[i as usize];
                 if x != 0 {
-                    let tail = x.leading_zeros() as u16;
+                    let tail = x.trailing_zeros() as u16;
                     return min(i * 8 + tail - self.from, max_len);
                 }
             }
+
             max_len
         }
     }
@@ -225,7 +225,7 @@ impl StorageKey for DBKey {
             let right = (self.to as usize + 7) / 8;
             buffer[1..right + 1].copy_from_slice(&self.data[0..right]);
             if self.to % 8 != 0 {
-                buffer[right] &= !(255u8 >> (self.to % 8));
+                buffer[right] &= !(255u8 << (self.to % 8));
             }
             for i in buffer.iter_mut().take(KEY_SIZE + 1).skip(right + 1) {
                 *i = 0
@@ -259,52 +259,94 @@ impl PartialEq for DBKey {
 
 impl ::std::fmt::Debug for DBKey {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        write!(f, "DBKey(")?;
-        for i in 0..self.len() {
-            write!(
-                f,
-                "{}",
-                match self.get(i) {
-                    ChildKind::Left => '0',
-                    ChildKind::Right => '1',
+        // 8 bits + '|' symbol per byte.
+        let mut bits = String::with_capacity(KEY_SIZE * 9);
+        for byte in 0..self.data.len() {
+            let chunk = self.data[byte];
+            for bit in (0..8).rev() {
+                let i = (byte * 8 + bit) as u16;
+                if i < self.from || i >= self.to {
+                    bits.push('_');
+                } else {
+                    bits.push(if (1 << bit) & chunk == 0 { '0' } else { '1' });
                 }
-            )?;
+            }
+            bits.push('|');
         }
-        write!(f, ")")
+
+        f.debug_struct("DBKey")
+            .field("begin", &self.from)
+            .field("end", &self.to)
+            .field("bits", &bits)
+            .finish()
     }
+}
+
+#[test]
+fn test_dbkey_storage_key_leaf() {
+    let key = DBKey::leaf(&[250; 32]);
+    let mut buf = vec![0; DB_KEY_SIZE];
+    key.write(&mut buf);
+    let key2 = DBKey::read(&buf);
+
+    assert_eq!(buf[0], LEAF_KEY_PREFIX);
+    assert_eq!(buf[33], 0);
+    assert_eq!(&buf[1..33], &[250; 32]);
+    assert_eq!(key2, key);
+}
+
+#[test]
+fn test_dbkey_storage_key_branch() {
+    let mut key = DBKey::leaf(&[255; 32]);
+    key = key.prefix(11);
+    key = key.suffix(5);
+
+    let mut buf = vec![0; DB_KEY_SIZE];
+    key.write(&mut buf);
+    let mut key2 = DBKey::read(&buf);
+    key2.set_from(5);
+
+    assert_eq!(buf[0], BRANCH_KEY_PREFIX);
+    assert_eq!(buf[33], 11);
+    assert_eq!(&buf[1..3], &[255, 7]);
+    assert_eq!(&buf[3..33], &[0; 30]);
+    assert_eq!(key2, key);
 }
 
 #[test]
 fn test_dbkey_suffix() {
     let b = DBKey::read(b"\x00\x01\x02\xFF\x0C0000000000000000000000000000\x20");
+
     assert_eq!(b.len(), 32);
-    assert_eq!(b.get(0), ChildKind::Left);
-    assert_eq!(b.get(7), ChildKind::Right);
+    assert_eq!(b.get(0), ChildKind::Right);
+    assert_eq!(b.get(7), ChildKind::Left);
     assert_eq!(b.get(8), ChildKind::Left);
-    assert_eq!(b.get(14), ChildKind::Right);
+    assert_eq!(b.get(9), ChildKind::Right);
     assert_eq!(b.get(15), ChildKind::Left);
     assert_eq!(b.get(16), ChildKind::Right);
     assert_eq!(b.get(20), ChildKind::Right);
     assert_eq!(b.get(23), ChildKind::Right);
+    assert_eq!(b.get(26), ChildKind::Right);
+    assert_eq!(b.get(27), ChildKind::Right);
     assert_eq!(b.get(31), ChildKind::Left);
     let b2 = b.suffix(8);
     assert_eq!(b2.len(), 24);
     assert_eq!(b2.get(0), ChildKind::Left);
-    assert_eq!(b2.get(6), ChildKind::Right);
+    assert_eq!(b2.get(1), ChildKind::Right);
     assert_eq!(b2.get(7), ChildKind::Left);
     assert_eq!(b2.get(12), ChildKind::Right);
     assert_eq!(b2.get(15), ChildKind::Right);
     let b3 = b2.suffix(24);
     assert_eq!(b3.len(), 0);
     let b4 = b.suffix(1);
-    assert_eq!(b4.get(6), ChildKind::Right);
+    assert_eq!(b4.get(6), ChildKind::Left);
     assert_eq!(b4.get(7), ChildKind::Left);
-    assert_eq!(b4.get(13), ChildKind::Right);
+    assert_eq!(b4.get(8), ChildKind::Right);
 }
 
 #[test]
 fn test_dbkey_truncate() {
-    let b = DBKey::read(b"\x00\x80wertyuiopasdfghjklzxcvbnm123456\x08");
+    let b = DBKey::read(b"\x00\x83wertyuiopasdfghjklzxcvbnm123456\x08");
     assert_eq!(b.len(), 8);
     assert_eq!(b.truncate(1).get(0), ChildKind::Right);
     assert_eq!(b.truncate(1).len(), 1);
@@ -341,26 +383,26 @@ fn test_dbkey_suffix_at_overflow() {
 #[test]
 fn test_dbkey_common_prefix() {
     let b1 = DBKey::read(b"\x01abcd0000000000000000000000000000\x00");
-    let b2 = DBKey::read(b"\x01abde0000000000000000000000000000\x00");
+    let b2 = DBKey::read(b"\x01abef0000000000000000000000000000\x00");
     assert_eq!(b1.common_prefix(&b1), 256);
     let c = b1.common_prefix(&b2);
-    assert_eq!(c, 21);
+    assert_eq!(c, 17);
     let c = b2.common_prefix(&b1);
-    assert_eq!(c, 21);
+    assert_eq!(c, 17);
     let b1 = b1.suffix(9);
     let b2 = b2.suffix(9);
     let c = b1.common_prefix(&b2);
-    assert_eq!(c, 12);
+    assert_eq!(c, 8);
     let b3 = DBKey::read(b"\x01\xFF0000000000000000000000000000000\x00");
-    let b4 = DBKey::read(b"\x01\xFE0000000000000000000000000000000\x00");
-    assert_eq!(b3.common_prefix(&b4), 7);
-    assert_eq!(b4.common_prefix(&b3), 7);
+    let b4 = DBKey::read(b"\x01\xF70000000000000000000000000000000\x00");
+    assert_eq!(b3.common_prefix(&b4), 3);
+    assert_eq!(b4.common_prefix(&b3), 3);
     assert_eq!(b3.common_prefix(&b3), 256);
     let b3 = b3.suffix(30);
     assert_eq!(b3.common_prefix(&b3), 226);
     let b3 = b3.truncate(200);
     assert_eq!(b3.common_prefix(&b3), 200);
-    let b5 = DBKey::read(b"\x01\xFF0000000000000000000000000000000\x00");
+    let b5 = DBKey::read(b"\x01\xF00000000000000000000000000000000\x00");
     assert_eq!(b5.truncate(0).common_prefix(&b3), 0);
 }
 
@@ -379,4 +421,34 @@ fn test_dbkey_is_branch() {
     let b = DBKey::read(b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
     assert_eq!(b.len(), 255);
     assert_eq!(b.is_leaf(), false);
+}
+
+#[test]
+fn test_dbkey_debug_leaf() {
+    use std::fmt::Write;
+    let b = DBKey::read(b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00");
+    let mut buf = String::new();
+    write!(&mut buf, "{:?}", b).unwrap();
+    assert_eq!(
+        buf,
+        "DBKey { begin: 0, end: 256, bits: \"01110001|01110111|01100101|01110010|01110100|01111001\
+        |01110101|01101001|01101111|01110000|01100001|01110011|01100100|01100110|01100111|01101000\
+        |01101010|01101011|01101100|01111010|01111000|01100011|01110110|01100010|01101110|01101101\
+        |00110001|00110010|00110011|00110100|00110101|00110110|\" }"
+    );
+}
+
+#[test]
+fn test_dbkey_debug_branch() {
+    use std::fmt::Write;
+    let b = DBKey::read(b"\x00qwertyuiopasdfghjklzxcvbnm123456\xF0").suffix(12);
+    let mut buf = String::new();
+    write!(&mut buf, "{:?}", b).unwrap();
+    assert_eq!(
+        buf,
+        "DBKey { begin: 12, end: 240, bits: \"________|0111____|01100101|01110010|01110100|0111100\
+        1|01110101|01101001|01101111|01110000|01100001|01110011|01100100|01100110|01100111|0110100\
+        0|01101010|01101011|01101100|01111010|01111000|01100011|01110110|01100010|01101110|0110110\
+        1|00110001|00110010|00110011|00110100|________|________|\" }"
+    );
 }
