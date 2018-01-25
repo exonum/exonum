@@ -55,6 +55,25 @@ pub struct TxInfo {
     pub proof_to_block_merkle_root: ListProof<Hash>,
 }
 
+/// Range Information
+#[derive(Debug, Serialize)]
+pub struct Range {
+    /// Left border of the range, >=0
+    pub from: u64,
+    /// Right border of the range
+    pub to: u64,
+}
+
+/// Information on blocks coupled with the corresponding
+/// range in the clockchain
+#[derive(Debug, Serialize)]
+pub struct BlocksRange {
+    /// Range
+    pub range: Range,
+    /// Blocks in the range
+    pub blocks: Vec<Block>,
+}
+
 impl<'a> BlockchainExplorer<'a> {
     /// Creates a new `BlockchainExplorer` instance.
     pub fn new(blockchain: &'a Blockchain) -> Self {
@@ -124,7 +143,7 @@ impl<'a> BlockchainExplorer<'a> {
         count: u64,
         upper: Option<u64>,
         skip_empty_blocks: bool,
-    ) -> Vec<Block> {
+    ) -> BlocksRange {
         let b = self.blockchain.clone();
         let snapshot = b.snapshot();
         let schema = Schema::new(&snapshot);
@@ -133,12 +152,15 @@ impl<'a> BlockchainExplorer<'a> {
 
         let max_len = hashes.len();
         let upper = upper.map(|x| cmp::min(x, max_len)).unwrap_or(max_len);
-        let lower = upper.checked_sub(count).unwrap_or(0);
 
+        let mut height = upper - 1;
         let mut v = Vec::new();
-        for height in (lower..upper).rev() {
+        let mut collected: u64 = 0;
+
+        while (height != 0) & (collected < count) {
             let block_txs = schema.block_txs(Height(height));
             if skip_empty_blocks && block_txs.is_empty() {
+                height -= 1;
                 continue;
             }
             let block_hash = hashes.get(height).expect(&format!(
@@ -149,8 +171,16 @@ impl<'a> BlockchainExplorer<'a> {
                 "Block not found, hash:{:?}",
                 block_hash
             ));
-            v.push(block)
+            v.push(block);
+            height -= 1;
+            collected += 1;
         }
-        v
+        BlocksRange {
+            range: Range {
+                from: height + 1,
+                to: upper - 1,
+            },
+            blocks: v,
+        }
     }
 }
