@@ -55,10 +55,9 @@ mod tests {
             struct Tx {
                 const TYPE = 1;
                 const ID = 0;
-                const SIZE = 64;
 
-                field from: &PublicKey [00 => 32]
-                field data: &Hash      [32 => 64]
+                from: &PublicKey,
+                data: &Hash,
             }
         }
 
@@ -112,10 +111,9 @@ mod tests {
             struct Tx {
                 const TYPE = 1;
                 const ID = 0;
-                const SIZE = 64;
 
-                field from: &PublicKey [00 => 32]
-                field to:   &PublicKey [32 => 64]
+                from: &PublicKey,
+                to: &PublicKey,
             }
         }
 

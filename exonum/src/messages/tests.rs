@@ -14,16 +14,16 @@
 
 use crypto::{PublicKey, SecretKey, Signature, gen_keypair};
 use messages::raw::MessageBuffer;
-use messages::RawMessage;
+use messages::{Message, RawMessage};
 use encoding::serialize::FromHex;
 
 message! {
     struct TxSimple {
         const TYPE = 0;
         const ID = 0;
-        const SIZE = 40;
-        field public_key: &PublicKey [0 => 32]
-        field msg: &str [32 => 40]
+
+        public_key: &PublicKey,
+        msg: &str,
     }
 }
 
@@ -33,7 +33,6 @@ fn test_message_without_fields() {
         struct NoFields {
             const TYPE = 0;
             const ID = 0;
-            const SIZE = 0;
         }
     }
     drop(NoFields::new(&SecretKey::new([1; 64])));
@@ -65,8 +64,8 @@ fn test_message_with_small_size() {
         struct SmallField {
             const TYPE = 0;
             const ID = 0;
-            const SIZE = 1;
-            field test: bool [0 => 1]
+
+            test: bool,
         }
     }
 
@@ -92,8 +91,8 @@ fn test_hex_wrong_length_into_message() {
         struct TxOtherSize {
             const TYPE = 0;
             const ID = 0;
-            const SIZE = 32;
-            field public_key: &PublicKey [0 => 32]
+
+            public_key: &PublicKey,
         }
     }
     let keypair = gen_keypair();
@@ -110,12 +109,12 @@ fn test_hex_wrong_body_into_message() {
         struct TxOtherBody {
             const TYPE = 0;
             const ID = 0;
-            const SIZE = 40;
-            field a: u64 [0 => 8]
-            field b: u64 [8 => 16]
-            field c: u64 [16 => 24]
-            field d: u64 [24 => 32]
-            field e: u64 [32 => 40]
+
+            a: u64,
+            b: u64,
+            c: u64,
+            d: u64,
+            e: u64,
         }
     }
     let msg = TxOtherBody::new_with_signature(0, 1, 2, 3, 4, &Signature::zero());
@@ -131,9 +130,9 @@ fn test_hex_wrong_id_into_message() {
         struct TxOtherId {
             const TYPE = 0;
             const ID = 1;
-            const SIZE = 40;
-            field public_key: &PublicKey [0 => 32]
-            field msg: &str [32 => 40]
+
+            public_key: &PublicKey,
+            msg: &str,
         }
     }
     let keypair = gen_keypair();
@@ -150,9 +149,9 @@ fn test_hex_wrong_type_into_message() {
         struct TxOtherType {
             const TYPE = 1;
             const ID = 0;
-            const SIZE = 40;
-            field public_key: &PublicKey [0 => 32]
-            field msg: &str [32 => 40]
+
+            public_key: &PublicKey,
+            msg: &str,
         }
     }
     let keypair = gen_keypair();

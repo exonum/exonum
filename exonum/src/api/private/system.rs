@@ -69,27 +69,27 @@ struct ReconnectInfo {
 
 #[derive(Serialize)]
 #[serde(tag = "type")]
-enum IncommingConnectionState {
+enum IncomingConnectionState {
     Active,
     Reconnect(ReconnectInfo),
 }
 
-impl Default for IncommingConnectionState {
-    fn default() -> IncommingConnectionState {
-        IncommingConnectionState::Active
+impl Default for IncomingConnectionState {
+    fn default() -> IncomingConnectionState {
+        IncomingConnectionState::Active
     }
 }
 
 #[derive(Serialize, Default)]
-struct IncommingConnection {
+struct IncomingConnection {
     public_key: Option<PublicKey>,
-    state: IncommingConnectionState,
+    state: IncomingConnectionState,
 }
 
 #[derive(Serialize)]
 struct PeersInfo {
     incoming_connections: Vec<SocketAddr>,
-    outgoing_connections: HashMap<SocketAddr, IncommingConnection>,
+    outgoing_connections: HashMap<SocketAddr, IncomingConnection>,
 }
 
 /// Private system API.
@@ -118,7 +118,7 @@ impl SystemApi {
     }
 
     fn get_peers_info(&self) -> PeersInfo {
-        let mut outgoing_connections: HashMap<SocketAddr, IncommingConnection> = HashMap::new();
+        let mut outgoing_connections: HashMap<SocketAddr, IncomingConnection> = HashMap::new();
 
         for socket in self.shared_api_state.outgoing_connections() {
             outgoing_connections.insert(socket, Default::default());
@@ -128,7 +128,7 @@ impl SystemApi {
             outgoing_connections
                 .entry(s)
                 .or_insert_with(Default::default)
-                .state = IncommingConnectionState::Reconnect(ReconnectInfo { delay });
+                .state = IncomingConnectionState::Reconnect(ReconnectInfo { delay });
         }
 
         for (s, p) in self.shared_api_state.peers_info() {

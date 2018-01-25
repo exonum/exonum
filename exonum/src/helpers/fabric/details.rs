@@ -35,6 +35,7 @@ use super::{Argument, Context, CommandName};
 use super::shared::{AbstractConfig, NodePublicConfig, SharedConfig, NodePrivateConfig,
                     CommonConfigTemplate};
 use super::DEFAULT_EXONUM_LISTEN_PORT;
+use super::keys;
 
 const DATABASE_PATH: &str = "DATABASE_PATH";
 
@@ -127,9 +128,9 @@ impl Command for Run {
         let public_addr = Self::public_api_address(&context);
         let private_addr = Self::private_api_address(&context);
 
-        context.set("node_config", config);
+        context.set(keys::NODE_CONFIG, config);
         let mut new_context = exts(context);
-        let mut config: NodeConfig = new_context.get("node_config").expect(
+        let mut config = new_context.get(keys::NODE_CONFIG).expect(
             "cant load node_config",
         );
         // Override api options
@@ -141,7 +142,7 @@ impl Command for Run {
             config.api.private_api_address = Some(private_api_address);
         }
 
-        new_context.set("node_config", config);
+        new_context.set(keys::NODE_CONFIG, config);
 
         Feedback::RunNode(new_context)
     }
@@ -175,9 +176,9 @@ impl Command for GenerateCommonConfig {
             "COMMON_CONFIG not found",
         );
 
-        context.set("services_config", AbstractConfig::default());
+        context.set(keys::SERVICES_CONFIG, AbstractConfig::default());
         let new_context = exts(context);
-        let services_config = new_context.get("services_config").unwrap_or_default();
+        let services_config = new_context.get(keys::SERVICES_CONFIG).unwrap_or_default();
 
         let template = CommonConfigTemplate {
             services_config,
@@ -254,18 +255,18 @@ impl Command for GenerateNodeConfig {
         let addr = Self::addr(&context);
         let common: CommonConfigTemplate =
             ConfigFile::load(&common_config_path).expect("Could not load common config");
-        context.set("common_config", common.clone());
+        context.set(keys::COMMON_CONFIG, common.clone());
         context.set(
-            "services_public_configs",
+            keys::SERVICES_PUBLIC_CONFIGS,
             BTreeMap::<String, Value>::default(),
         );
         context.set(
-            "services_secret_configs",
+            keys::SERVICES_SECRET_CONFIGS,
             BTreeMap::<String, Value>::default(),
         );
         let new_context = exts(context);
-        let services_public_configs = new_context.get("services_public_configs").unwrap();
-        let services_secret_configs = new_context.get("services_secret_configs");
+        let services_public_configs = new_context.get(keys::SERVICES_PUBLIC_CONFIGS).unwrap();
+        let services_secret_configs = new_context.get(keys::SERVICES_SECRET_CONFIGS);
 
         let (consensus_public_key, consensus_secret_key) = crypto::gen_keypair();
         let (service_public_key, service_secret_key) = crypto::gen_keypair();
@@ -421,7 +422,7 @@ impl Command for Finalize {
             .collect();
         let (common, list, our) = Self::reduce_configs(public_configs, &secret_config);
 
-        context.set("auditor_mode", our.is_none());
+        context.set(keys::AUDITOR_MODE, our.is_none());
 
         let peers = list.iter().map(|c| c.addr).collect();
 
@@ -449,17 +450,17 @@ impl Command for Finalize {
             }
         };
 
-        context.set("public_config_list", list);
-        context.set("node_config", config);
-        context.set("common_config", common);
+        context.set(keys::PUBLIC_CONFIG_LIST, list);
+        context.set(keys::NODE_CONFIG, config);
+        context.set(keys::COMMON_CONFIG, common);
         context.set(
-            "services_secret_configs",
+            keys::SERVICES_SECRET_CONFIGS,
             secret_config.services_secret_configs,
         );
 
         let new_context = exts(context);
 
-        let config: NodeConfig = new_context.get("node_config").expect(
+        let config = new_context.get(keys::NODE_CONFIG).expect(
             "Could not create config from template, services return error",
         );
         ConfigFile::save(&config, output_config_path).expect("Could not write config file.");
@@ -528,9 +529,9 @@ impl Command for GenerateTestnet {
         }
 
         let configs = generate_testnet_config(count, start_port);
-        context.set("configs", configs);
+        context.set(keys::CONFIGS, configs);
         let new_context = exts(context);
-        let configs: Vec<NodeConfig> = new_context.get("configs").expect(
+        let configs = new_context.get(keys::CONFIGS).expect(
             "Couldn't read testnet configs after exts call.",
         );
 

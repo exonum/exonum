@@ -154,7 +154,6 @@ fn insert_reverse(db1: Box<Database>, db2: Box<Database>) {
     index2.put(&[64; 32], vec![2]);
     index2.put(&[42; 32], vec![1]);
 
-
     assert!(index2.root_hash() != Hash::zero());
     assert_eq!(index2.root_hash(), index1.root_hash());
 }

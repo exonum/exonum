@@ -28,18 +28,21 @@
 //!
 //! [1]: https://github.com/exonum/exonum-doc/blob/master/src/get-started/create-service.md
 
+
 use std::sync::Arc;
 use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::mem;
 use std::fmt;
 use std::panic;
+use std::net::SocketAddr;
 
 use vec_map::VecMap;
 use byteorder::{ByteOrder, LittleEndian};
 use mount::Mount;
 
 use crypto::{self, Hash, PublicKey, SecretKey};
-use messages::{CONSENSUS as CORE_SERVICE, Precommit, RawMessage};
+use messages::{CONSENSUS as CORE_SERVICE, Precommit, RawMessage, Connect};
 use storage::{Database, Error, Fork, Patch, Snapshot};
 use helpers::{Height, ValidatorId};
 use node::ApiSender;
@@ -63,7 +66,7 @@ pub mod config;
 /// Only blockchains with the identical set of services and genesis block can be combined
 /// into the single network.
 pub struct Blockchain {
-    db: Box<Database>,
+    db: Arc<Database>,
     service_map: Arc<VecMap<Box<Service>>>,
     service_keypair: (PublicKey, SecretKey),
     api_sender: ApiSender,
@@ -91,14 +94,23 @@ impl Blockchain {
         }
 
         Blockchain {
-            db: storage,
+            db: storage.into(),
             service_map: Arc::new(service_map),
             service_keypair: (service_public_key, service_secret_key),
             api_sender,
         }
     }
 
-    /// Returnts service `VecMap` for all our services.
+    /// Recreates the blockchain to reuse with a sandbox.
+    #[doc(hidden)]
+    pub fn clone_with_api_sender(&self, api_sender: ApiSender) -> Blockchain {
+        Blockchain {
+            api_sender,
+            ..self.clone()
+        }
+    }
+
+    /// Returns service `VecMap` for all our services.
     pub fn service_map(&self) -> &Arc<VecMap<Box<Service>>> {
         &self.service_map
     }
@@ -400,6 +412,46 @@ impl Blockchain {
             &self.service_keypair.1,
         )
     }
+
+    /// Saves peer to the peers cache
+    pub fn save_peer(&mut self, pubkey: &PublicKey, peer: Connect) {
+        let mut fork = self.fork();
+
+        {
+            let mut schema = Schema::new(&mut fork);
+            schema.peers_cache_mut().put(pubkey, peer);
+        }
+
+        self.merge(fork.into_patch()).expect(
+            "Unable to save peer to the peers cache",
+        );
+    }
+
+    /// Removes peer from the peers cache
+    pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) {
+        let mut fork = self.fork();
+
+        {
+            let mut schema = Schema::new(&mut fork);
+            let mut peers = schema.peers_cache_mut();
+            let peer = peers.iter().find(|&(_, ref v)| v.addr() == *addr);
+            if let Some(pubkey) = peer.map(|(k, _)| k) {
+                peers.remove(&pubkey);
+            }
+        }
+
+        self.merge(fork.into_patch()).expect(
+            "Unable to remove peer from the peers cache",
+        );
+    }
+
+    /// Recover cached peers if any.
+    pub fn get_saved_peers(&self) -> HashMap<PublicKey, Connect> {
+        let schema = Schema::new(self.snapshot());
+        let peers_cache = schema.peers_cache();
+        let it = peers_cache.iter().map(|(k, v)| (k, v.clone()));
+        it.collect()
+    }
 }
 
 impl fmt::Debug for Blockchain {
@@ -411,7 +463,7 @@ impl fmt::Debug for Blockchain {
 impl Clone for Blockchain {
     fn clone(&self) -> Blockchain {
         Blockchain {
-            db: self.db.clone(),
+            db: Arc::clone(&self.db),
             service_map: Arc::clone(&self.service_map),
             api_sender: self.api_sender.clone(),
             service_keypair: self.service_keypair.clone(),

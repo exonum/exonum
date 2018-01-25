@@ -17,12 +17,13 @@ use std::panic::{self, PanicInfo};
 use std::ffi::OsString;
 
 use blockchain::Service;
-use node::{NodeConfig, Node};
+use node::Node;
 
 use super::internal::{CollectedCommand, Feedback};
 use super::clap_backend::ClapBackend;
 use super::ServiceFactory;
 use super::details::{Run, Finalize, GenerateNodeConfig, GenerateCommonConfig, GenerateTestnet};
+use super::keys;
 
 /// `NodeBuilder` is a high level object,
 /// usable for fast prototyping and creating app from services list.
@@ -73,8 +74,9 @@ impl NodeBuilder {
         match ClapBackend::execute(self.commands.as_slice()) {
             Feedback::RunNode(ref ctx) => {
                 let db = Run::db_helper(ctx);
-                let config: NodeConfig =
-                    ctx.get("node_config").expect("could not find node_config");
+                let config = ctx.get(keys::NODE_CONFIG).expect(
+                    "could not find node_config",
+                );
                 let services: Vec<Box<Service>> = self.service_factories
                     .into_iter()
                     .map(|mut factory| factory.make_service(ctx))

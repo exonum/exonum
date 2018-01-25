@@ -31,15 +31,13 @@ const IDX_NAME: &'static str = "idx_name";
 fn test_encode_decode() {
     encoding_struct! {
         struct Parent {
-            const SIZE = 8;
-            field child:        Child     [00 => 08]
+            child: Child,
         }
     }
 
     encoding_struct! {
         struct Child {
-            const SIZE = 32;
-            field child:          &Hash       [00 => 32]
+            child: &Hash,
         }
     }
     let content = Child::new(&Hash::zero());
@@ -52,8 +50,7 @@ fn test_encode_decode() {
 fn test_u64() {
     encoding_struct! {
         struct Test {
-            const SIZE = 8;
-            field some_test:u64 [0 => 8]
+            some_test: u64,
         }
     }
     let test_data = r##"{"some_test":"1234"}"##;
@@ -67,8 +64,7 @@ fn test_system_time() {
     use std::time::{SystemTime, UNIX_EPOCH};
     encoding_struct! {
         struct Test {
-            const SIZE = 12;
-            field some_test:SystemTime [0 => 12]
+            some_test: SystemTime,
         }
     }
     let test_data = r##"{"some_test":{"nanos":0,"secs":"0"}}"##;
@@ -83,9 +79,8 @@ use encoding::Field;
 
 encoding_struct! {
     struct StructWithTwoSegments {
-        const SIZE = 16;
-        field first:  &[u8]     [0 => 8]
-        field second: &[u8]     [8 => 16]
+        first: &[u8],
+        second: &[u8],
     }
 }
 
@@ -151,9 +146,8 @@ fn handling_tx_panic(blockchain: &Blockchain, db: &mut Box<Database>) {
         struct Tx {
             const TYPE = 1;
             const ID = 0;
-            const SIZE = 8;
 
-            field value: u64 [0 => 8]
+            value: u64,
         }
     }
 
@@ -231,9 +225,8 @@ fn handling_tx_panic_storage_error(blockchain: &Blockchain) {
         struct Tx {
             const TYPE = 1;
             const ID = 0;
-            const SIZE = 8;
 
-            field value: u64 [0 => 8]
+            value: u64,
         }
     }
 

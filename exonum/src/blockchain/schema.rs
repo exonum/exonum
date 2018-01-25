@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crypto::Hash;
-use messages::{Precommit, RawMessage};
+use crypto::{PublicKey, Hash};
+use messages::{Precommit, RawMessage, Connect};
 use storage::{Fork, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex, Snapshot,
               StorageKey, StorageValue};
 use helpers::Height;
@@ -30,22 +30,20 @@ pub fn gen_prefix<K: StorageKey>(prefix: &K) -> Vec<u8> {
 encoding_struct! (
     /// Configuration index.
     struct ConfigReference {
-        const SIZE = 40;
         /// The height, starting from which this configuration becomes actual.
-        field actual_from: Height [00 => 08]
+        actual_from: Height,
         /// Hash of the configuration contents that serialized as raw bytes vec.
-        field cfg_hash:    &Hash  [08 => 40]
+        cfg_hash: &Hash,
     }
 );
 
 encoding_struct! (
     /// Transaction location in block.
     struct TxLocation {
-        const SIZE = 16;
         /// Height of block in the blockchain.
-        field block_height:         Height  [00 => 08]
+        block_height: Height,
         /// Index in block.
-        field position_in_block:    u64     [08 => 16]
+        position_in_block: u64,
     }
 );
 
@@ -125,6 +123,12 @@ where
     /// service_id. Their vector is returned by `core_state_hash` method.
     pub fn state_hash_aggregator(&self) -> ProofMapIndex<&T, Hash, Hash> {
         ProofMapIndex::new("core.state_hash_aggregator", &self.view)
+    }
+
+    /// Returns peers that have to be recovered in case of process' restart
+    /// after abnormal termination.
+    pub fn peers_cache(&self) -> MapIndex<&T, PublicKey, Connect> {
+        MapIndex::new("core.peers_cache", &self.view)
     }
 
     /// Returns block hash for the given height.
@@ -362,6 +366,13 @@ impl<'a> Schema<&'a mut Fork> {
     /// [1]: struct.Schema.html#method.state_hash_aggregator
     pub fn state_hash_aggregator_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, Hash> {
         ProofMapIndex::new("core.state_hash_aggregator", &mut self.view)
+    }
+
+    /// Mutable reference to the [`peers_cache`][1] index.
+    ///
+    /// [1]: struct.Schema.html#method.peers_cache
+    pub fn peers_cache_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Connect> {
+        MapIndex::new("core.peers_cache", &mut self.view)
     }
 
     /// Adds a new configuration to the blockchain, which will become an actual at

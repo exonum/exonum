@@ -22,12 +22,15 @@ use std::thread;
 use std::net::SocketAddr;
 use std::time::{Duration, SystemTime};
 use std::collections::BTreeMap;
+use std::collections::HashSet;
 use std::fmt;
 
 use toml::Value;
 use router::Router;
 use mount::Mount;
 use iron::{Chain, Iron};
+use iron_cors::CorsMiddleware;
+use serde::{ser, de};
 use futures::{Future, Sink};
 use futures::sync::mpsc;
 use tokio_core::reactor::Core;
@@ -142,6 +145,11 @@ pub struct NodeApiConfig {
     pub public_api_address: Option<SocketAddr>,
     /// Listen address for private api endpoints.
     pub private_api_address: Option<SocketAddr>,
+    /// Cross-origin resource sharing ([CORS][cors]) options for responses returned
+    /// by API handlers.
+    ///
+    /// [cors]: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
+    pub allow_origin: Option<AllowOrigin>,
 }
 
 impl Default for NodeApiConfig {
@@ -151,9 +159,111 @@ impl Default for NodeApiConfig {
             enable_blockchain_explorer: true,
             public_api_address: None,
             private_api_address: None,
+            allow_origin: None,
         }
     }
 }
+
+/// CORS header specification
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AllowOrigin {
+    /// Allow access from any host.
+    Any,
+    /// Allow access only from the following hosts.
+    Whitelist(Vec<String>),
+}
+
+impl From<AllowOrigin> for CorsMiddleware {
+    fn from(allow_origin: AllowOrigin) -> CorsMiddleware {
+        match allow_origin {
+            AllowOrigin::Any => CorsMiddleware::with_allow_any(),
+            AllowOrigin::Whitelist(hosts) => CorsMiddleware::with_whitelist(
+                hosts.into_iter().collect(),
+            ),
+        }
+    }
+}
+
+impl ser::Serialize for AllowOrigin {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        match *self {
+            AllowOrigin::Any => "*".serialize(serializer),
+            AllowOrigin::Whitelist(ref hosts) => {
+                if hosts.len() == 1 {
+                    hosts[0].serialize(serializer)
+                } else {
+                    hosts.serialize(serializer)
+                }
+            }
+        }
+    }
+}
+
+impl<'de> de::Deserialize<'de> for AllowOrigin {
+    fn deserialize<D>(d: D) -> Result<AllowOrigin, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = AllowOrigin;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a list of hosts or \"*\"")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<AllowOrigin, E>
+            where
+                E: de::Error,
+            {
+                match value {
+                    "*" => Ok(AllowOrigin::Any),
+                    _ => Ok(AllowOrigin::Whitelist(vec![value.to_string()])),
+                }
+            }
+
+            fn visit_seq<A>(self, seq: A) -> Result<AllowOrigin, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let hosts =
+                    de::Deserialize::deserialize(de::value::SeqAccessDeserializer::new(seq))?;
+                Ok(AllowOrigin::Whitelist(hosts))
+            }
+        }
+
+        d.deserialize_any(Visitor)
+    }
+}
+
+#[test]
+fn allow_origin_serde() {
+    fn check(text: &str, allow_origin: AllowOrigin) {
+        #[derive(Serialize, Deserialize)]
+        struct Config {
+            allow_origin: AllowOrigin,
+        }
+        let config_toml = format!("allow_origin = {}\n", text);
+        let config: Config = ::toml::from_str(&config_toml).unwrap();
+        assert_eq!(config.allow_origin, allow_origin);
+        assert_eq!(::toml::to_string(&config).unwrap(), config_toml);
+    }
+
+    check(r#""*""#, AllowOrigin::Any);
+    check(
+        r#""http://example.com""#,
+        AllowOrigin::Whitelist(vec!["http://example.com".to_string()]),
+    );
+    check(
+        r#"["http://a.org", "http://b.org"]"#,
+        AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
+    );
+}
+
 
 /// Events pool capacities.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -183,7 +293,7 @@ impl Default for EventsPoolCapacity {
 /// Memory pool configuration parameters.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MemoryPoolConfig {
-    /// Maximum number of uncommited transactions.
+    /// Maximum number of uncommitted transactions.
     pub tx_pool_capacity: usize,
     /// Sets the maximum number of messages that can be buffered on the event loop's
     /// notification channel before a send will fail.
@@ -304,6 +414,7 @@ impl NodeHandler {
             whitelist,
             stored,
             connect,
+            blockchain.get_saved_peers(),
             last_hash,
             last_height,
             system_state.current_time(),
@@ -354,12 +465,17 @@ impl NodeHandler {
 
     /// Performs node initialization, so it starts consensus process from the first round.
     pub fn initialize(&mut self) {
-        let addr = self.system_state.listen_address();
-        info!("Start listening address={}", addr);
-        for address in &self.peer_discovery.clone() {
-            if address == &self.system_state.listen_address() {
-                continue;
-            }
+        let listen_address = self.system_state.listen_address();
+        info!("Start listening address={}", listen_address);
+
+        let peers: HashSet<_> = {
+            let it = self.state.peers().values().map(Connect::addr);
+            let it = it.chain(self.peer_discovery.iter().cloned());
+            let it = it.filter(|&address| address != listen_address);
+            it.collect()
+        };
+
+        for address in &peers {
             self.connect(address);
             info!("Trying to connect with peer {}", address);
         }
@@ -530,7 +646,7 @@ impl ApiSender {
         ApiSender(inner)
     }
 
-    /// Addr peer to peer list
+    /// Add peer to peer list
     pub fn peer_add(&self, addr: SocketAddr) -> io::Result<()> {
         let msg = ExternalMessage::PeerAdd(addr);
         self.0.clone().send(msg).wait().map(drop).map_err(
@@ -596,10 +712,11 @@ pub struct Node {
     network_config: NetworkConfiguration,
     handler: NodeHandler,
     channel: NodeChannel,
+    max_message_len: u32,
 }
 
 impl NodeChannel {
-    /// Creates `NodeChannel` with the given pool capacitites.
+    /// Creates `NodeChannel` with the given pool capacities.
     pub fn new(buffer_sizes: &EventsPoolCapacity) -> NodeChannel {
         NodeChannel {
             network_requests: mpsc::channel(buffer_sizes.network_requests_capacity),
@@ -685,6 +802,7 @@ impl Node {
             handler,
             channel,
             network_config,
+            max_message_len: node_cfg.genesis.consensus.max_message_len,
         }
     }
 
@@ -703,13 +821,13 @@ impl Node {
             );
             let network_handler = network_part.run(&core.handle());
             core.run(network_handler).map(drop).map_err(|e| {
-                other_error(&format!("An error in the `Network` thread occured: {}", e))
+                other_error(&format!("An error in the `Network` thread occurred: {}", e))
             })
         });
 
         let mut core = Core::new()?;
         core.run(handler_part.run()).map_err(|_| {
-            other_error("An error in the `Handler` thread occured")
+            other_error("An error in the `Handler` thread occurred")
         })?;
         network_thread.join().unwrap()
     }
@@ -725,25 +843,14 @@ impl Node {
 
         let private_config_api_thread = match self.api_options.private_api_address {
             Some(listen_address) => {
-                let mut mount = Mount::new();
-                mount.mount("api/services", blockchain.mount_private_api());
-                let shared_api_state = self.handler().api_state().clone();
-                let mut router = Router::new();
-                let node_info =
-                    private::NodeInfo::new(blockchain.service_map().iter().map(|(_, s)| s));
-                let system_api = private::SystemApi::new(
-                    node_info,
+                let handler = create_private_api_handler(
                     blockchain.clone(),
-                    shared_api_state,
+                    self.handler().api_state().clone(),
                     api_sender,
                 );
-                system_api.wire(&mut router);
-                mount.mount("api/system", router);
-
                 let thread = thread::spawn(move || {
                     info!("Private exonum api started on {}", listen_address);
-                    let chain = Chain::new(mount);
-                    Iron::new(chain).http(listen_address).unwrap();
+                    Iron::new(handler).http(listen_address).unwrap();
                 });
                 Some(thread)
             }
@@ -751,27 +858,15 @@ impl Node {
         };
         let public_config_api_thread = match self.api_options.public_api_address {
             Some(listen_address) => {
-                let mut mount = Mount::new();
-                mount.mount("api/services", blockchain.mount_public_api());
-
-                let mut router = Router::new();
-                let pool = Arc::clone(self.state().transactions());
-                let shared_api_state = self.handler().api_state().clone();
-                let system_api = public::SystemApi::new(pool, blockchain.clone(), shared_api_state);
-                system_api.wire(&mut router);
-                mount.mount("api/system", router);
-                if self.api_options.enable_blockchain_explorer {
-                    let mut router = Router::new();
-                    let explorer_api = public::ExplorerApi::new(blockchain);
-                    explorer_api.wire(&mut router);
-                    mount.mount("api/explorer", router);
-                }
-
+                let handler = create_public_api_handler(
+                    blockchain,
+                    Arc::clone(self.state().transactions()),
+                    self.handler.api_state().clone(),
+                    &self.api_options,
+                );
                 let thread = thread::spawn(move || {
                     info!("Public exonum api started on {}", listen_address);
-
-                    let chain = Chain::new(mount);
-                    Iron::new(chain).http(listen_address).unwrap();
+                    Iron::new(handler).http(listen_address).unwrap();
                 });
                 Some(thread)
             }
@@ -800,6 +895,7 @@ impl Node {
             network_requests: self.channel.network_requests,
             network_tx: network_tx,
             network_config: self.network_config,
+            max_message_len: self.max_message_len,
         };
 
         let (internal_tx, internal_rx) = self.channel.internal_events;
@@ -836,4 +932,53 @@ impl Node {
     pub fn channel(&self) -> ApiSender {
         ApiSender::new(self.channel.api_requests.0.clone())
     }
+}
+
+/// Public for testing
+#[doc(hidden)]
+pub fn create_public_api_handler(
+    blockchain: Blockchain,
+    pool: TxPool,
+    shared_api_state: SharedNodeState,
+    config: &NodeApiConfig,
+) -> Chain {
+    let mut mount = Mount::new();
+    mount.mount("api/services", blockchain.mount_public_api());
+
+    if config.enable_blockchain_explorer {
+        let mut router = Router::new();
+        let explorer_api = public::ExplorerApi::new(blockchain.clone());
+        explorer_api.wire(&mut router);
+        mount.mount("api/explorer", router);
+    }
+
+    let mut router = Router::new();
+    let system_api = public::SystemApi::new(pool, blockchain, shared_api_state);
+    system_api.wire(&mut router);
+    mount.mount("api/system", router);
+
+    let mut chain = Chain::new(mount);
+    if let Some(ref allow_origin) = config.allow_origin {
+        chain.link_around(CorsMiddleware::from(allow_origin.clone()));
+    }
+    chain
+}
+
+/// Public for testing
+#[doc(hidden)]
+pub fn create_private_api_handler(
+    blockchain: Blockchain,
+    shared_api_state: SharedNodeState,
+    api_sender: ApiSender,
+) -> Chain {
+    let mut mount = Mount::new();
+    mount.mount("api/services", blockchain.mount_private_api());
+
+    let mut router = Router::new();
+    let node_info = private::NodeInfo::new(blockchain.service_map().iter().map(|(_, s)| s));
+    let system_api = private::SystemApi::new(node_info, blockchain, shared_api_state, api_sender);
+    system_api.wire(&mut router);
+    mount.mount("api/system", router);
+
+    Chain::new(mount)
 }

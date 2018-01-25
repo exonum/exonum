@@ -27,10 +27,9 @@ message! {
     struct TimestampTx {
         const TYPE = TIMESTAMPING_SERVICE;
         const ID = TIMESTAMPING_TRANSACTION_MESSAGE_ID;
-        const SIZE = 40;
 
-        field pub_key:        &PublicKey  [00 => 32]
-        field data:           &[u8]       [32 => 40]
+        pub_key: &PublicKey,
+        data: &[u8],
     }
 }
 
