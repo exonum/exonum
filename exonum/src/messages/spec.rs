@@ -12,27 +12,40 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// `message!` implement structure that could be sent in exonum network.
+/// `message!` specifies a datatype for digitally signed messages that can be sent
+/// in Exonum networks. The macro offers a practical way to create [`Transaction`] types,
+/// although it does not implement `Transaction` by itself.
 ///
-/// Each message is a piece of data that is signed by creators key.
-/// For now it's required to set service id as `const TYPE`,
-/// and message id as `const ID`.
+/// Each Exonum message is a piece of data that is signed by the creator's [Ed25519] key.
+/// The `message!` macro specifies fields of data pretty much in the same way they
+/// are specified for Rust structures. Additionally, the macro is required to set:
 ///
-/// - service id should be unique inside whole exonum.
-/// - message id should be unique inside each service.
+/// - Identifier of a service, which will be used [in parsing messages][parsing], as `const TYPE`.
+///   Service ID should be unique within the Exonum blockchain.
+/// - Message identifier, as `const ID`. Message ID should be unique within each service.
 ///
-/// # Usage Example:
+/// For additional reference about data layout see the
+/// documentation of the [`encoding` module](./encoding/index.html).
+///
+/// **NB.** `message!` uses other macros in the `exonum` crate internally.
+/// Be sure to add them to the global scope.
+///
+/// [Ed25519]: ./crypto/index.html
+/// [`Transaction`]: ./blockchain/trait.Transaction.html
+/// [parsing]: ./blockchain/trait.Service.html#tymethod.tx_from_raw
+///
+/// # Examples
+///
 /// ```
 /// #[macro_use] extern crate exonum;
-/// # extern crate serde;
 ///
 /// const MY_SERVICE_ID: u16 = 777;
-/// const MY_NEW_MESSAGE_ID: u16 = 1;
+/// const MY_MESSAGE_ID: u16 = 1;
 ///
 /// message! {
-///     struct SendTwoInteger {
-///         const TYPE = MY_NEW_MESSAGE_ID;
-///         const ID   = MY_SERVICE_ID;
+///     struct SendTwoIntegers {
+///         const TYPE = MY_SERVICE_ID;
+///         const ID   = MY_MESSAGE_ID;
 ///
 ///         first: u64,
 ///         second: u64,
@@ -40,23 +53,11 @@
 /// }
 ///
 /// # fn main() {
-///     let (_, creators_key) = ::exonum::crypto::gen_keypair();
-/// #    let structure = create_message(&creators_key);
-/// #    println!("Debug structure = {:?}", structure);
-/// # }
-///
-/// # fn create_message(creators_key: &::exonum::crypto::SecretKey) -> SendTwoInteger {
-///     let first = 1u64;
-///     let second = 2u64;
-///     SendTwoInteger::new(first, second, creators_key)
+/// let (_, creator_key) = exonum::crypto::gen_keypair();
+/// let tx = SendTwoIntegers::new(1, 2, &creator_key);
+/// println!("Transaction: {:?}", tx);
 /// # }
 /// ```
-///
-/// For additionall reference about data layout see also
-/// *[ `encoding` documentation](./encoding/index.html).*
-///
-/// `message!` internally uses other exonum macros,
-/// be sure to add them all to namespace.
 #[macro_export]
 macro_rules! message {
     (
