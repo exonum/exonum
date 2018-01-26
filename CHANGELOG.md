@@ -1,40 +1,54 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
-and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
+All notable changes to this project will be documented in this file. The project adheres to
+[Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Added
-- Added `patch` method to the `Fork` structure. (#393)
-- Added a public `helthcheck` endpoint. (#405)
-- Added serialization support floating point types through special wrapper(`F32` and `F64`). This feature is hidden behind `float_serialize` gate. Note: special values (Infinity and NaN) aren't supported. (#384)
+## 0.5 - 2018-01-29
 
-### Changed
+### Breaking changes
+- The order of bytes and bits in the `DBKey` keys of `ProofMapIndex` became consistent. The change influences how
+  Merkle Patricia trees are built for `ProofMapIndex`: the bits in each byte of a `DBKey` are now enumerated from the
+  least significant bit (LSB) to the most significant bit (MSB), compared to MSB-to-LSB ordering used before. Note:
+  this change will break old storages using map proofs. (#419)
+- The `Database` trait is simplified: it is no longer required to implement state-sharing `clone` method.
+  Instead, the `merge` method now takes a shared reference to `self`. (#422)
+- `message!` and `encoding_struct!` no longer require manual `SIZE` and offset specification. (#413)
+- `from_raw(raw: RawMessage)`  method is moved to the `Message` trait. To migrate, add `use exonum::messages::Message`.
+  (#427)
 - Changed iterators over `Patch` and `Changes` data into custom types instead of standard collection iterators. (#393)
-- Fixed typo in `SparceListIndexKeys` and `SparceListIndexValues` (#398)
-- Fixed #15 consensus on the threshold of 1/3 sleeping validators. (#388)
-- Replaced config param `timeout_events_capacity` with `internal_events_capacity`. (#388)
-- The `Transaction` trait now inherit `ExonumJson`. (#402)
-- The list of peer connections is now restored to the last state after the process is restarted. (#378)
-- `message!` and `encoding_struct!` no longer require manual `SIZE` and offset specification.
-- `from_raw(raw: RawMessage)` method is not part of the `Message` trait, and not an inherent method. (#427)
-- Log dependency was updated to 0.4, which can cause issues with previous versions. (#433)
-- The `Database` trait is simplified: it is not longer required to implement state-sharing `clone` method.
-  Instead, the `merge` method now takes a shared reference to `self`.
-- The order of bytes and bits in the `DBKey` keys of `ProofMapIndex` became consistent. The change influences how Merkle Patricia trees are built for `ProofMapIndex`: the bits in each byte of a `DBKey` are now enumerated from the least significant bit (LSB) to the most significant bit (MSB), compared to MSB-to-LSB ordering used before. Note: this change will break old storages using map proofs. (#419)
-
-### Removed
+- Fixed typo in `SparceListIndexKeys` and `SparceListIndexValues`. (#398)
 - Removed default `state_hash` implementation in the `Service` trait. (#399)
 - Removed `info` method from the `Transaction`. (#402)
+- Replaced config param `timeout_events_capacity` with `internal_events_capacity`. (#388)
+- The `Transaction` trait now inherits from `ExonumJson`. (#402)
+
+### New features
+- Added `patch` method to the `Fork` structure. (#393)
+- Added a public `healthcheck` endpoint. (#405)
+- Added serialization support floating point types through special wrapper (`F32` and `F64`). This feature is hidden
+  behind `float_serialize` gate. Note: special values (Infinity and NaN) aren't supported. (#384)
+- Added a possibility to set maximum message size (`pub max_message_len` field in `ConsensusConfig`). (#426)
+- Added support for CORS. (#406)
+- Added `run-dev` command that performs a simplified node start for testing purposes. (#423)
+
+### Bug fixes
+- Fixed consensus on the threshold of 1/3 sleeping validators. (#388)
+- Fixed a bunch of inconsistencies and mistakes in the docs. (#439)
+- Fixed a bug with message header validation. (#430)
+
+### Internal improvements
+- The list of peer connections is now restored to the last state after the process is restarted. (#378)
+- Log dependency was updated to 0.4, which can cause issues with previous versions. (#433)
+- Better error reporting for configs in the `.toml` format. (#429)
 
 ## 0.4 - 2017-12-08
 
 ### Added
 - Allow creating auditor node from command line. (#364)
-- Added a new function `merge_sync`. In this function a write will be flushed from the operating system buffer cache before the write is considered complete. (#368)
+- Added a new function `merge_sync`. In this function a write will be flushed from the operating system buffer cache
+  before the write is considered complete. (#368)
 - Added conversion into boxed values for values which implement `Service` or `Transaction` traits. (#366)
 - Added constructor for the `ServiceContext` which can be useful for the alternative node implementations. (#366)
 - Implemented `AsRef<RawMessage>` for any Exonum messages that were created using the `message!` macro. (#372)
@@ -43,7 +57,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### Changed
 - Changed a signature of `open` function in a `rocksdb` module. `RocksDBOptions` should pass by the reference. (#369)
 - `ValidatorState` in the `ServiceContext` replaced by the `ValidatorId`. (#366)
-- `add_transaction` in the `ServiceContext` replaced by the `transaction_sender` which implements the `TransactionSend` trait. (#366)
+- `add_transaction` in the `ServiceContext` replaced by the `transaction_sender` which implements the `TransactionSend`
+  trait. (#366)
 - The `Node` constructor now requires `db` and `services` variables instead of `blockchain` instance. (#366)
 - The `Blockchain` constructor now requires services keypair and an `ApiSender` instance. (#366)
 - `mount_*_api` methods in `Blockchain` instance now do not require `ApiContext`. (#366)
@@ -67,8 +82,10 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## 0.3 - 2017-11-02
 
 ### Added
-- New events implementation based on the `tokio` with the separated queues for network events and timeouts and different threads for the network and node code (#300)
-- Added a new index `SparseListIndex`. It is a list of items stored in sequential order. Similar to `ListIndex` but it may contain indexes without elements (#312)
+- New events implementation based on the `tokio` with the separated queues for network events and timeouts and
+  different threads for the network and node code (#300)
+- Added a new index `SparseListIndex`. It is a list of items stored in sequential order. Similar to `ListIndex` but it
+  may contain indexes without elements (#312)
 - Implement `FromStr` and `ToString` traits for public sodium types (#318)
 - Add a new macro `metric!` for collecting statistical information (#329)
 - Make type `DBKey` public because it is used in `MapProof` (#306)
