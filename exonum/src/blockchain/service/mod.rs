@@ -32,6 +32,10 @@ use node::{ApiSender, Node, State, TransactionSend};
 use blockchain::{Blockchain, ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use helpers::{Height, Milliseconds, ValidatorId};
 
+#[macro_use]
+mod srv;
+pub use self::srv::{TransactionService, TransactionSet, TransactionResponse, ObserverService};
+
 /// A trait that describes transaction processing rules (a group of sequential operations
 /// with the Exonum storage) for the given `Message`.
 pub trait Transaction: Message + ExonumJson + 'static {

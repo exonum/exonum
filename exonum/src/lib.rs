@@ -46,8 +46,9 @@ extern crate term;
 #[macro_use(crate_version, crate_authors)]
 extern crate clap;
 extern crate hyper;
-extern crate iron;
+pub extern crate iron;
 extern crate iron_cors;
+pub extern crate bodyparser;
 extern crate router;
 extern crate params;
 extern crate cookie;

@@ -51,11 +51,12 @@ pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
 pub use self::schema::{gen_prefix, Schema, TxLocation};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
-pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState, Transaction};
+pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState, Transaction, TransactionService, TransactionSet, TransactionResponse, ObserverService};
 
 mod block;
 mod schema;
 mod genesis;
+#[macro_use]
 mod service;
 #[cfg(test)]
 mod tests;
