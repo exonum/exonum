@@ -12,36 +12,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// `encoding_struct!` implement structure that could be saved in blockchain.
+/// `encoding_struct!` macro implements a structure that can be saved in an Exonum blockchain.
 ///
-/// Storage value unlike message, could be mapped on buffers without any checks.
+/// Unlike [`Message`]s, the resulting structures are mapped to buffers without any checks;
+/// it is assumed that the relevant checks have been performed when persisting the structure
+/// to the blockchain storage.
 ///
-/// # Usage Example:
+/// For additional reference about data layout see the
+/// documentation of the [`encoding` module](./encoding/index.html).
+///
+/// **NB.** `encoding_struct!` uses other macros in the `exonum` crate internally.
+/// Be sure to add them to the global scope.
+///
+/// [`Message`]: ./messages/Message.html
+///
+/// # Examples
+///
 /// ```
 /// #[macro_use] extern crate exonum;
-/// # extern crate serde;
-/// # extern crate serde_json;
 ///
 /// encoding_struct! {
-///     struct SaveTwoInteger {
-///
+///     struct SaveTwoIntegers {
 ///         first: u64,
 ///         second: u64,
 ///     }
 /// }
+///
 /// # fn main() {
-///     let first = 1u64;
-///     let second = 2u64;
-///     let s = SaveTwoInteger::new(first, second);
-///     println!("Debug structure = {:?}", s);
+/// let s = SaveTwoIntegers::new(1, 2);
+/// println!("Two integers: {:?}", s);
 /// # }
 /// ```
-///
-/// For additional reference about data layout see also
-/// *[ `encoding` documentation](./encoding/index.html).*
-///
-/// `encoding_struct!` internally uses other exonum macros,
-/// be sure to add them all to namespace.
 #[macro_export]
 macro_rules! encoding_struct {
     (
