@@ -59,14 +59,15 @@ impl<T: Database> Database for CheckpointDb<T> {
     }
 }
 
-/// Handler to a checkpointed database.
+/// Handler to a checkpointed database, which
+/// allows rollback of transactions.
 #[derive(Debug)]
 pub struct CheckpointDbHandler<T> {
     inner: Arc<RwLock<CheckpointDbInner<T>>>,
 }
 
 impl<T: Database> CheckpointDbHandler<T> {
-    /// Rolls back this database by udoing the latest `count` `merge()` operations.
+    /// Rolls back this database by undoing the latest `count` `merge()` operations.
     ///
     /// # Panics
     ///
