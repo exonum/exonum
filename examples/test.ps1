@@ -4,6 +4,8 @@
 
 # Base URL for demo service endpoints
 $BASE_URL = 'http://127.0.0.1:8000/api/services/cryptocurrency/v1';
+# Directory with the current script
+$wd = $myinvocation.mycommand.path | Split-Path;
 
 # Creates a wallet using a transaction stored in the specified file.
 function Create-Wallet ($jsonFilename) {
@@ -77,12 +79,12 @@ function Main () {
   $txs = @(
     @{
       name = 'Johnny Doe';
-      json = 'create-wallet-1.json';
+      json = "$wd/create-wallet-1.json";
       hash = '44c6c2c58eaab71f8d627d75ca72f244289bc84586a7fb42186a676b2ec4626b';
     },
     @{
       name = 'Janie Roe';
-      json = 'create-wallet-2.json';
+      json = "$wd/create-wallet-2.json";
       hash = '8714e90607afc05f43b82c475c883a484eecf2193df97b243b0d8630812863fd';
     }
   );
@@ -107,7 +109,7 @@ function Main () {
 
   echo 'Transferring tokens between Johnny and Janie...';
   $transferHash = 'e63b28caa07adffb6e2453390a59509a1469e66698c75b4cfb2f0ae7a6887fdc';
-  $hash = Transfer('transfer-funds.json');
+  $hash = Transfer("$wd/transfer-funds.json");
   if ($hash -ne $transferHash) {
     throw "Unexpected transaction hash: $hash";
   }
