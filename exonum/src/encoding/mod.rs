@@ -59,7 +59,7 @@
 //!
 //!
 //! #Fields layout
-//! Fields could be splitted into tree main parts:
+//! Fields could be split into three main parts:
 //!
 //! ### Primitive types
 //!

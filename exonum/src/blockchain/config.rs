@@ -38,7 +38,7 @@ pub struct ValidatorKeys {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct StoredConfiguration {
     /// Link to the previous configuration.
-    /// For configuration in genesis block `hash` is just an array of zeroes.
+    /// For configuration in the genesis block `hash` is just an array of zeros.
     pub previous_cfg_hash: Hash,
     /// The height, starting from which this configuration becomes actual.
     pub actual_from: Height,

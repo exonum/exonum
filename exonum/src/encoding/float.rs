@@ -290,8 +290,8 @@ mod tests {
             return false;
         } else if constructor_result.is_ok() && check_result.is_ok() {
             let constructed = constructor_result.unwrap();
-            let readed = unsafe { <T as Field>::read(&buffer, 0, header_size) };
-            assert_eq!(constructed, readed);
+            let read = unsafe { <T as Field>::read(&buffer, 0, header_size) };
+            assert_eq!(constructed, read);
             return true;
         } else {
             panic!("{:?} != {:?}", constructor_result, check_result);

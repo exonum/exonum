@@ -24,7 +24,8 @@
 //! - Create data structure that implements `Service` trait.
 //! - Optionally you can write api handlers.
 //!
-//! You may follow the [`minibank`][1] tutorial to get experience of programming your services.
+//! You may follow the [`cryptocurrency`][1] tutorial to get experience of programming
+//! your services.
 //!
 //! [1]: https://github.com/exonum/exonum-doc/blob/master/src/get-started/create-service.md
 
