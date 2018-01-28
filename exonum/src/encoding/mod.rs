@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! `encoding` is a lazy serialization library supporting zero-copy (de)serialization
+//! `encoding` is a serialization library supporting zero-copy (de)serialization
 //! of primitive types, heterogeneous structures and arrays.
 //!
 //! See also [the documentation page on serialization][doc:serialization].
@@ -23,7 +23,7 @@
 //! Binary representation of structures is split into two main parts:
 //!
 //! - **Header:** a fixed-sized part
-//! - **Body:** dynamic-sized part, known only after parsing the header
+//! - **Body:** dynamically sized part, known only after parsing the header
 //!
 //! To create a structure type, you can use [`message!`] and [`encoding_struct!`] macros.
 //!
