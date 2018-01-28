@@ -59,13 +59,13 @@ pub trait Transaction: Message + ExonumJson + 'static {
     fn execute(&self, fork: &mut Fork);
 }
 
-/// A trait that describes a business-logic of the concrete service.
+/// A trait that describes business logic of a concrete service.
 #[allow(unused_variables, unused_mut)]
 pub trait Service: Send + Sync + 'static {
-    /// Unique service identification for database schema and service messages.
+    /// Service identifier for database schema and service messages.
+    /// Must be unique within the blockchain.
     fn service_id(&self) -> u16;
 
-    /// Unique human readable service name.
     ///
     /// # Examples
     ///
@@ -94,13 +94,14 @@ pub trait Service: Send + Sync + 'static {
     /// #   }
     /// }
     /// ```
+    /// Human-readable service name. Must be unique within the blockchain.
     fn service_name(&self) -> &'static str;
 
     /// Returns a list of root hashes of tables that determine the current state
     /// of the service database. These hashes are collected from all services in a common
-    ///  `MerklePatriciaTable` that named [`state_hash_aggregator`][1].
+    /// `ProofMapIndex` accessible in the core schema as [`state_hash_aggregator`][1].
     ///
-    /// Empty `Vec` can be returned if service don't want to change blockchain state.
+    /// An empty vector can be returned if the service does not influence the blockchain state.
     ///
     /// See also [`service_table_unique_key`][2].
     ///
@@ -136,28 +137,37 @@ pub trait Service: Send + Sync + 'static {
     /// ```
     fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash>;
 
-    /// Tries to create `Transaction` object from the given raw message.
+    /// Tries to create a `Transaction` from the given raw message.
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError>;
 
-    /// By this method you can initialize information schema of service
-    /// and generates initial service configuration.
-    /// This method is called on genesis block creation event.
+    /// Initializes the information schema of service
+    /// and generates an initial service configuration.
+    /// Called on genesis block creation.
     fn initialize(&self, fork: &mut Fork) -> Value {
         Value::Null
     }
 
-    /// Handles commit event. This handler is invoked for each service after commit of the block.
-    /// For example service can create some transaction if the specific condition occurred.
+    /// Handles block commit. This handler is invoked for each service after commit of the block.
+    /// For example, a service can create one or more transactions if a specific condition
+    /// has occurred.
     ///
-    /// *Try not to perform long operations here*.
+    /// *Try not to perform long operations in this handler*.
     fn handle_commit(&self, context: &ServiceContext) {}
 
-    /// Returns api handler for public users.
+    /// Returns an API handler for public requests. The handler is mounted on
+    /// the `/api/services/{service_name}` path on [the public listen address][pub-addr]
+    /// of all full nodes in the blockchain network.
+    ///
+    /// [pub-addr]: ../node/struct.NodeApiConfig.html#structfield.public_api_address
     fn public_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
         None
     }
 
-    /// Returns api handler for maintainers.
+    /// Returns an API handler for private requests. The handler is mounted on
+    /// the `/api/services/{service_name}` path on [the private listen address][priv-addr]
+    /// of all full nodes in the blockchain network.
+    ///
+    /// [priv-addr]: ../node/struct.NodeApiConfig.html#structfield.private_api_address
     fn private_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
         None
     }
