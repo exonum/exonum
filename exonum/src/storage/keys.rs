@@ -17,20 +17,16 @@
 use byteorder::{ByteOrder, BigEndian};
 use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 
-/// A trait that defines serialization of corresponding types as storage keys.
+/// A type that can be (de)serialized as a key in the blockchain storage.
 ///
 /// Since internally the keys are sorted in a serialized form, the big-endian encoding is used.
 ///
 /// # Examples
 ///
-/// Implementing `StorageKey` for the type:
-///
 /// ```
 /// # extern crate exonum;
 /// # extern crate byteorder;
-///
 /// use std::mem;
-///
 /// use exonum::storage::StorageKey;
 /// use byteorder::{LittleEndian, ByteOrder};
 ///
@@ -61,18 +57,19 @@ pub trait StorageKey {
     /// Returns the size of the serialized key in bytes.
     fn size(&self) -> usize;
 
-    /// Serialize a key into the specified buffer of bytes.
+    /// Serializes the key into the specified buffer of bytes.
     ///
     /// The caller must guarantee that the size of the buffer is equal to the precalculated size
     /// of the serialized key.
     // TODO: should be unsafe (ECR-174)?
     fn write(&self, buffer: &mut [u8]);
 
-    /// Deserialize a key from the specified buffer of bytes.
+    /// Deserializes the key from the specified buffer of bytes.
     // TODO: should be unsafe (ECR-174)?
     fn read(buffer: &[u8]) -> Self;
 }
 
+/// No-op implementation.
 impl StorageKey for () {
     fn size(&self) -> usize {
         0
@@ -101,6 +98,7 @@ impl StorageKey for u8 {
     }
 }
 
+/// Uses big-endian encoding.
 impl StorageKey for u16 {
     fn size(&self) -> usize {
         2
@@ -115,6 +113,7 @@ impl StorageKey for u16 {
     }
 }
 
+/// Uses big-endian encoding.
 impl StorageKey for u32 {
     fn size(&self) -> usize {
         4
@@ -129,6 +128,7 @@ impl StorageKey for u32 {
     }
 }
 
+/// Uses big-endian encoding.
 impl StorageKey for u64 {
     fn size(&self) -> usize {
         8
@@ -143,6 +143,7 @@ impl StorageKey for u64 {
     }
 }
 
+/// **Not sorted in the natural order.**
 impl StorageKey for i8 {
     fn size(&self) -> usize {
         1
@@ -157,6 +158,7 @@ impl StorageKey for i8 {
     }
 }
 
+/// Uses big-endian encoding. **Not sorted in the natural order.**
 impl StorageKey for i16 {
     fn size(&self) -> usize {
         2
@@ -171,6 +173,7 @@ impl StorageKey for i16 {
     }
 }
 
+/// Uses big-endian encoding. **Not sorted in the natural order.**
 impl StorageKey for i32 {
     fn size(&self) -> usize {
         4
@@ -185,6 +188,7 @@ impl StorageKey for i32 {
     }
 }
 
+/// Uses big-endian encoding. **Not sorted in the natural order.**
 impl StorageKey for i64 {
     fn size(&self) -> usize {
         8
@@ -241,6 +245,7 @@ impl StorageKey for Vec<u8> {
     }
 }
 
+/// Uses UTF-8 string serialization.
 impl StorageKey for String {
     fn size(&self) -> usize {
         self.len()
