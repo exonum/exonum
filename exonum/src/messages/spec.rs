@@ -16,23 +16,37 @@
 /// in Exonum networks. The macro offers a practical way to create [`Transaction`] types,
 /// although it does not implement `Transaction` by itself.
 ///
-/// Each Exonum message is a piece of data that is signed by the creator's [Ed25519] key.
 /// The `message!` macro specifies fields of data pretty much in the same way they
-/// are specified for Rust structures. Additionally, the macro is required to set:
+/// are specified for Rust structures. (For additional reference about data layout see the
+/// documentation of the [`encoding` module](./encoding/index.html).)
+/// Additionally, the macro is required to set:
 ///
 /// - Identifier of a service, which will be used [in parsing messages][parsing], as `const TYPE`.
 ///   Service ID should be unique within the Exonum blockchain.
 /// - Message identifier, as `const ID`. Message ID should be unique within each service.
 ///
-/// For additional reference about data layout see the
-/// documentation of the [`encoding` module](./encoding/index.html).
+/// The macro creates getter methods for all fields with the same names as fields.
+/// In addition, two constructors are defined:
+///
+/// - `new` takes all fields in the order of their declaration in the macro, and a [`SecretKey`]
+///   to sign the message as the last argument.
+/// - `new_with_signature` takes all fields in the order of their declaration in the macro,
+///   and a message [`Signature`].
+///
+/// `message!` also implements [`Message`], [`SegmentField`], [`ExonumJson`]
+/// and [`StorageValue`] traits for the declared datatype.
 ///
 /// **NB.** `message!` uses other macros in the `exonum` crate internally.
 /// Be sure to add them to the global scope.
 ///
-/// [Ed25519]: ./crypto/index.html
 /// [`Transaction`]: ./blockchain/trait.Transaction.html
 /// [parsing]: ./blockchain/trait.Service.html#tymethod.tx_from_raw
+/// [`SecretKey`]: ./crypto/struct.SecretKey.html
+/// [`Signature`]: ./crypto/struct.Signature.html
+/// [`SegmentField`]: ./encoding/trait.SegmentField.html
+/// [`ExonumJson`]: ./encoding/serialize/json/trait.ExonumJson.html
+/// [`StorageValue`]: ./storage/trait.StorageValue.html
+/// [`Message`]: ./messages/trait.Message.html
 ///
 /// # Examples
 ///

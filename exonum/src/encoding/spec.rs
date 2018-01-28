@@ -14,9 +14,15 @@
 
 /// `encoding_struct!` macro implements a structure that can be saved in an Exonum blockchain.
 ///
-/// Unlike [`Message`]s, the resulting structures are mapped to buffers without any checks;
-/// it is assumed that the relevant checks have been performed when persisting the structure
-/// to the blockchain storage.
+/// The macro creates getter methods for all fields with the same names as fields.
+/// In addition, the macro declares a `new` constructor, which takes all fields
+/// in the order of their declaration in the macro.
+/// The macro also implements [`Field`], [`ExonumJson`] and [`StorageValue`] traits
+/// for the declared datatype.
+///
+/// Unlike types created with [`message!`], the datatype is mapped to a byte buffer
+/// without any checks; it is assumed that the relevant checks have been performed
+/// when persisting the structure to the blockchain storage.
 ///
 /// For additional reference about data layout see the
 /// documentation of the [`encoding` module](./encoding/index.html).
@@ -24,7 +30,10 @@
 /// **NB.** `encoding_struct!` uses other macros in the `exonum` crate internally.
 /// Be sure to add them to the global scope.
 ///
-/// [`Message`]: ./messages/Message.html
+/// [`Field`]: ./encoding/trait.Field.html
+/// [`ExonumJson`]: ./encoding/serialize/json/trait.ExonumJson.html
+/// [`StorageValue`]: ./storage/trait.StorageValue.html
+/// [`message!`]: macro.message.html
 ///
 /// # Examples
 ///
