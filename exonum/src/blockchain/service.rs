@@ -32,26 +32,30 @@ use node::{ApiSender, Node, State, TransactionSend};
 use blockchain::{Blockchain, ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use helpers::{Height, Milliseconds, ValidatorId};
 
-/// A trait that describes transaction processing rules (a group of sequential operations
-/// with the Exonum storage) for the given `Message`.
+/// Transaction processing functionality for `Message`s allowing to apply authenticated, atomic,
+/// constraint-preserving groups of changes to the blockchain storage.
 pub trait Transaction: Message + ExonumJson + 'static {
-    /// Verifies the transaction, which includes the message signature verification and other
-    /// specific internal constraints. verify is intended to check the internal consistency of
-    /// a transaction; it has no access to the blockchain state.
-    /// If a transaction fails verify, it is considered incorrect and cannot be included into
+    /// Verifies the internal consistency of the transaction. `verify` should usually include
+    /// checking the message signature (via [`verify_signature`]) and, possibly,
+    /// other internal constraints. `verify` has no access to the blockchain state;
+    /// checks involving the blockchains state must be preformed in [`execute`](#tymethod.execute).
+    ///
+    /// If a transaction fails `verify`, it is considered incorrect and cannot be included into
     /// any correct block proposal. Incorrect transactions are never included into the blockchain.
     ///
     /// *This method should not use external data, that is, it must be a pure function.*
+    ///
+    /// [`verify_signature`]: ../messages/trait.Message.html#method.verify_signature
     fn verify(&self) -> bool;
-    /// Takes the current blockchain state via `fork` and can modify it if certain conditions
-    /// are met.
+    /// Receives a fork of the current blockchain state and can modify it depending on the contents
+    /// of the transaction.
     ///
     /// # Notes
     ///
     /// - When programming `execute`, you should perform state-related checks before any changes
-    /// to the state and return early if these checks fail.
-    /// - If the execute method of a transaction raises a `panic`, the changes made by the
-    /// transactions are discarded, but the transaction itself is still considered committed.
+    ///   to the state and return early if these checks fail.
+    /// - If the execute method of a transaction raises a panic, the changes made by the
+    ///   transaction are discarded, but it is still considered committed.
     fn execute(&self, fork: &mut Fork);
 }
 
