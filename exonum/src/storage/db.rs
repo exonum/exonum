@@ -205,40 +205,23 @@ enum NextIterValue {
     Finished,
 }
 
-/// A trait that defines a low-level storage backend.
+/// Low-level storage backend implementing a collection of named key-value stores
+/// (aka column families).
 ///
 /// A `Database` instance is shared across different threads, so it must be `Sync` and `Send`.
 ///
-/// There is no way to directly interact with data in the database.
+/// There is no way to directly interact with data in the database; use [`snapshot`], [`fork`]
+/// and [`merge`] methods for indirect interaction. See [the module documentation](index.html)
+/// for more details.
 ///
-/// If you only need to read the data, you can create a [`Snapshot`] using method [`snapshot`][1].
-/// Snapshots provide a read isolation, so you are guaranteed to work with consistent values even
-/// if the data in the database changes between reads.
-///
-/// If you need to make any changes to the data, you need to create a [`Fork`] using method
-/// [`fork`][2]. As well as `Snapshot`, `Fork` provides read isolation and also allows you to create
-/// a sequence of changes to the database that are specified as a [`Patch`]. Later you can
-/// atomically merge a patch into the database using method [`merge`]. Note that different threads
-/// may call `merge` concurrently.
-///
-/// [`clone`]: #tymethod.fork
-/// [`Snapshot`]: trait.Snapshot.html
-/// [1]: #tymethod.snapshot
-/// [`Fork`]: struct.Fork.html
-/// [2]: #method.fork
-/// [`Patch`]: struct.Patch.html
+/// [`snapshot`]: #tymethod.snapshot
+/// [`fork`]: #method.fork
 /// [`merge`]: #tymethod.merge
 pub trait Database: Send + Sync + 'static {
     /// Creates a new snapshot of the database from its current state.
-    ///
-    /// See [`Snapshot`] documentation for more.
-    /// [`Snapshot`]: trait.Snapshot.html
     fn snapshot(&self) -> Box<Snapshot>;
 
     /// Creates a new fork of the database from its current state.
-    ///
-    /// See [`Fork`] documentation for more.
-    /// [`Fork`]: struct.Fork.html
     fn fork(&self) -> Fork {
         Fork {
             snapshot: self.snapshot(),
@@ -254,6 +237,7 @@ pub trait Database: Send + Sync + 'static {
     /// onus to guarantee atomicity is on the implementor of the trait.
     ///
     /// # Errors
+    ///
     /// If this method encounters any form of I/O or other error during merging, an error variant
     /// will be returned. In case of an error the method guarantees no changes were applied to
     /// the database.
@@ -265,6 +249,7 @@ pub trait Database: Send + Sync + 'static {
     /// onus to guarantee atomicity is on the implementor of the trait.
     ///
     /// # Errors
+    ///
     /// If this method encounters any form of I/O or other error during merging, an error variant
     /// will be returned. In case of an error the method guarantees no changes were applied to
     /// the database.
