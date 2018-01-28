@@ -271,23 +271,22 @@ pub trait Database: Send + Sync + 'static {
     fn merge_sync(&self, patch: Patch) -> Result<()>;
 }
 
-/// A trait that defines a snapshot of storage backend.
+/// Read-only snapshot of a storage backend.
 ///
-/// `Snapshot` instance is immutable representation of storage state. It provides read isolation,
-/// so using snapshot you are guaranteed to work with consistent values even if the data in
+/// A `Snapshot` instance is an immutable representation of a certain storage state.
+/// It provides read isolation, so consistency is guaranteed even if the data in
 /// the database changes between reads.
 ///
-/// `Snapshot` provides all the necessary methods for reading data from the database, so `&Storage`
-/// is used as a storage view for creating read-only indices representation.
+/// **Note.** Unless stated otherwise, "key" in the method descriptions below refers
+/// to a full key (a string column family name + key as an array of bytes within the family).
 pub trait Snapshot: 'static {
-    /// Returns a value as raw vector of bytes corresponding to the specified key
-    /// or `None` if does not exist.
+    /// Returns a value corresponding to the specified key as a raw vector of bytes,
+    /// or `None` if it does not exist.
     fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>>;
 
     /// Returns `true` if the snapshot contains a value for the specified key.
     ///
-    /// Default implementation tries to read the value using method [`get`].
-    /// [`get`]: #tymethod.get
+    /// Default implementation checks the existence of the value using [`get`](#tymethod.get).
     fn contains(&self, name: &str, key: &[u8]) -> bool {
         self.get(name, key).is_some()
     }
