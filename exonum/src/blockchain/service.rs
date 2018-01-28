@@ -34,6 +34,10 @@ use helpers::{Height, Milliseconds, ValidatorId};
 
 /// Transaction processing functionality for `Message`s allowing to apply authenticated, atomic,
 /// constraint-preserving groups of changes to the blockchain storage.
+///
+/// See also [the documentation page on transactions][doc:transactions].
+///
+/// [doc:transactions]: https://exonum.com/doc/architecture/transactions/
 pub trait Transaction: Message + ExonumJson + 'static {
     /// Verifies the internal consistency of the transaction. `verify` should usually include
     /// checking the message signature (via [`verify_signature`]) and, possibly,
@@ -60,6 +64,9 @@ pub trait Transaction: Message + ExonumJson + 'static {
 }
 
 /// A trait that describes business logic of a concrete service.
+///
+/// See also [the documentation page on services][doc:services].
+///
 /// # Examples
 ///
 /// The following example provides a barebone foundation for implementing a service.
@@ -142,6 +149,8 @@ pub trait Transaction: Message + ExonumJson + 'static {
 /// }
 /// # fn main() { }
 /// ```
+///
+/// [doc:services]: https://exonum.com/doc/architecture/services/
 #[allow(unused_variables, unused_mut)]
 pub trait Service: Send + Sync + 'static {
     /// Service identifier for database schema and service messages.

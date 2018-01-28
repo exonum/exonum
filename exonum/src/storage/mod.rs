@@ -14,6 +14,8 @@
 
 //! A module that provides interfaces to work with persisted blockchain data.
 //!
+//! See also [the documentation page on storage][doc:storage].
+//!
 //! # Database
 //!
 //! A [`Database`] is a container for data persistence. Internally, a `Database` is
@@ -99,6 +101,7 @@
 //! [`KeySetIndex`]: key_set_index/struct.KeySetIndex.html
 //! [`ValueSetIndex`]: value_set_index/struct.ValueSetIndex.html
 //! [`BaseIndex`]: base_index/struct.BaseIndex.html
+//! [doc:storage]: https://exonum.com/doc/architecture/storage
 //! [`Option`]: https://doc.rust-lang.org/std/option/enum.Option.html
 //! [`Box`]: https://doc.rust-lang.org/std/boxed/struct.Box.html
 //! [`Vec`]: https://doc.rust-lang.org/std/vec/struct.Vec.html

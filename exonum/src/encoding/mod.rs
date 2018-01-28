@@ -15,6 +15,8 @@
 //! `encoding` is a lazy serialization library supporting zero-copy (de)serialization
 //! of primitive types, heterogeneous structures and arrays.
 //!
+//! See also [the documentation page on serialization][doc:serialization].
+//!
 //! # Structure serialization
 //!
 //! Structures are in the root of any serializable Exonum object.
@@ -25,6 +27,7 @@
 //!
 //! To create a structure type, you can use [`message!`] and [`encoding_struct!`] macros.
 //!
+//! [doc:serialization]: https://exonum.com/doc/architecture/serialization/
 //! [`message!`]: ../macro.message.html
 //! [`encoding_struct!`]: ../macro.encoding_struct.html
 //!
