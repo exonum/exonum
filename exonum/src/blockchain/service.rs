@@ -60,40 +60,94 @@ pub trait Transaction: Message + ExonumJson + 'static {
 }
 
 /// A trait that describes business logic of a concrete service.
+/// # Examples
+///
+/// The following example provides a barebone foundation for implementing a service.
+///
+/// ```
+/// #[macro_use] extern crate exonum;
+/// // Exports from `exonum` crate skipped
+/// # use exonum::blockchain::Service;
+/// # use exonum::crypto::Hash;
+/// # use exonum::blockchain::Transaction;
+/// # use exonum::messages::{Message, RawTransaction};
+/// # use exonum::storage::{Fork, Snapshot};
+/// use exonum::encoding::Error as EncError;
+///
+/// // Reused constants
+/// const SERVICE_ID: u16 = 8000;
+/// const MY_TRANSACTION_ID: u16 = 1;
+///
+/// // Service schema
+/// struct MyServiceSchema<T> {
+///     view: T,
+/// }
+///
+/// impl<T: AsRef<Snapshot>> MyServiceSchema<T> {
+///     fn new(view: T) -> Self {
+///         MyServiceSchema { view }
+///     }
+///
+///     fn state_hash(&self) -> Vec<Hash> {
+///         // Calculates the shate hash of the service
+/// #       vec![]
+///     }
+///     // Other read-only methods
+/// }
+///
+/// impl<'a> MyServiceSchema<&'a mut Fork> {
+///     // Additional read-write methods
+/// }
+///
+/// // Transaction definitions
+/// message! {
+///     struct MyTransaction {
+///         const TYPE = SERVICE_ID;
+///         const ID = MY_TRANSACTION_ID;
+///         // Transaction fields
+///     }
+/// }
+///
+/// impl Transaction for MyTransaction {
+///     // Business logic implementation
+/// #   fn verify(&self) -> bool { true }
+/// #   fn execute(&self, fork: &mut Fork) { }
+/// }
+///
+/// // Service
+/// struct MyService {}
+///
+/// impl Service for MyService {
+///     fn service_id(&self) -> u16 {
+///        SERVICE_ID
+///     }
+///
+///     fn service_name(&self) -> &'static str {
+///         "my_special_unique_service"
+///     }
+///
+///     fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash> {
+///         MyServiceSchema::new(snapshot).state_hash()
+///     }
+///
+///     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, EncError> {
+///         let tx: Box<Transaction> = match raw.message_type() {
+///             MY_TRANSACTION_ID => Box::new(MyTransaction::from_raw(raw)?),
+///             _ => Err(EncError::IncorrectMessageType {
+///                 message_type: raw.message_type(),
+///             })?,
+///         };
+///         Ok(tx)
+///     }
+/// }
+/// # fn main() { }
+/// ```
 #[allow(unused_variables, unused_mut)]
 pub trait Service: Send + Sync + 'static {
     /// Service identifier for database schema and service messages.
     /// Must be unique within the blockchain.
     fn service_id(&self) -> u16;
 
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum::blockchain::Service;
-    /// use exonum::crypto::Hash;
-    /// # use exonum::blockchain::Transaction;
-    /// # use exonum::messages::RawTransaction;
-    /// # use exonum::encoding::Error as MessageError;
-    /// # use exonum::storage::Snapshot;
-    ///
-    /// struct MyService {}
-    ///
-    /// impl Service for MyService {
-    /// #   fn service_id(&self) -> u16 {
-    /// #       8000
-    /// #   }
-    ///     fn service_name(&self) -> &'static str {
-    ///         "my_special_unique_service"
-    ///     }
-    /// #   fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
-    /// #       Vec::new()
-    /// #   }
-    /// #   fn tx_from_raw(&self, _: RawTransaction) -> Result<Box<Transaction>, MessageError> {
-    /// #       unimplemented!()
-    /// #   }
-    /// }
-    /// ```
     /// Human-readable service name. Must be unique within the blockchain.
     fn service_name(&self) -> &'static str;
 
@@ -107,34 +161,6 @@ pub trait Service: Send + Sync + 'static {
     ///
     /// [1]: struct.Schema.html#method.state_hash_aggregator
     /// [2]: struct.Blockchain.html#method.service_table_unique_key
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum::blockchain::Service;
-    /// use exonum::crypto::Hash;
-    /// use exonum::storage::Snapshot;
-    /// # use exonum::blockchain::Transaction;
-    /// # use exonum::messages::RawTransaction;
-    /// # use exonum::encoding::Error as MessageError;
-    ///
-    /// struct MyService {}
-    ///
-    /// impl Service for MyService {
-    /// #   fn service_id(&self) -> u16 {
-    /// #       8000
-    /// #   }
-    /// #   fn service_name(&self) -> &'static str {
-    /// #       "my_special_unique_service"
-    /// #   }
-    ///     fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
-    ///         Vec::new()
-    ///     }
-    /// #   fn tx_from_raw(&self, _: RawTransaction) -> Result<Box<Transaction>, MessageError> {
-    /// #       unimplemented!()
-    /// #   }
-    /// }
-    /// ```
     fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash>;
 
     /// Tries to create a `Transaction` from the given raw message.
