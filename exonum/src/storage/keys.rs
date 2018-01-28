@@ -19,7 +19,10 @@ use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 
 /// A type that can be (de)serialized as a key in the blockchain storage.
 ///
-/// Since internally the keys are sorted in a serialized form, the big-endian encoding is used.
+/// Since keys are sorted in a serialized form, the big-endian encoding should be used
+/// with unsigned integer types. Note however that the big-endian encoding
+/// will **not** sort signed integer types in the natural order; a possible solution is
+/// mapping the type to a corresponding unsigned one as shown in the example below.
 ///
 /// # Examples
 ///
@@ -28,7 +31,7 @@ use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 /// # extern crate byteorder;
 /// use std::mem;
 /// use exonum::storage::StorageKey;
-/// use byteorder::{LittleEndian, ByteOrder};
+/// use byteorder::{BigEndian, ByteOrder};
 ///
 /// struct Key {
 ///     a: i16,
@@ -41,17 +44,31 @@ use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 ///     }
 ///
 ///     fn write(&self, buffer: &mut [u8]) {
-///         LittleEndian::write_i16(&mut buffer[0..2], self.a);
-///         LittleEndian::write_u32(&mut buffer[2..6], self.b);
+///         // Maps `a` to the `u16` range in the natural order:
+///         // -32768 -> 0, -32767 -> 1, ..., 32767 -> 65535
+///         let mapped_a = self.a.wrapping_add(i16::min_value()) as u16;
+///         BigEndian::write_u16(&mut buffer[0..2], mapped_a);
+///         BigEndian::write_u32(&mut buffer[2..6], self.b);
 ///     }
 ///
 ///     fn read(buffer: &[u8]) -> Self {
-///         let a = LittleEndian::read_i16(&buffer[0..2]);
-///         let b = LittleEndian::read_u32(&buffer[2..6]);
+///         let mapped_a = BigEndian::read_u16(&buffer[0..2]);
+///         let a = mapped_a.wrapping_add(i16::min_value() as u16) as i16;
+///         let b = BigEndian::read_u32(&buffer[2..6]);
 ///         Key { a, b }
 ///     }
 /// }
-/// # fn main() {}
+/// # fn main() {
+/// # // Check the natural ordering of keys
+/// # let (mut x, mut y) = (vec![0u8; 6], vec![0u8; 6]);
+/// # Key { a: -1, b: 2 }.write(&mut x);
+/// # Key { a: 1, b: 513 }.write(&mut y);
+/// # assert!(x < y);
+/// # // Check the roundtrip
+/// # let key = Key::read(&x);
+/// # assert_eq!(key.a, -1);
+/// # assert_eq!(key.b, 2);
+/// # }
 /// ```
 pub trait StorageKey {
     /// Returns the size of the serialized key in bytes.
