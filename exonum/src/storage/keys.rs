@@ -20,9 +20,9 @@ use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 /// A type that can be (de)serialized as a key in the blockchain storage.
 ///
 /// Since keys are sorted in a serialized form, the big-endian encoding should be used
-/// with unsigned integer types. Note however that the big-endian encoding
-/// will **not** sort signed integer types in the natural order; a possible solution is
-/// mapping the type to a corresponding unsigned one as shown in the example below.
+/// with unsigned integer types. Note however that the big-endian encoding on its own
+/// will not sort signed integer types in the natural order; therefore, they are
+/// mapped to a corresponding unsigned type by adding a constant to a source value.
 ///
 /// # Examples
 ///
@@ -44,17 +44,13 @@ use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 ///     }
 ///
 ///     fn write(&self, buffer: &mut [u8]) {
-///         // Maps `a` to the `u16` range in the natural order:
-///         // -32768 -> 0, -32767 -> 1, ..., 32767 -> 65535
-///         let mapped_a = self.a.wrapping_add(i16::min_value()) as u16;
-///         BigEndian::write_u16(&mut buffer[0..2], mapped_a);
-///         BigEndian::write_u32(&mut buffer[2..6], self.b);
+///         self.a.write(&mut buffer[0..2]);
+///         self.b.write(&mut buffer[2..6]);
 ///     }
 ///
 ///     fn read(buffer: &[u8]) -> Self {
-///         let mapped_a = BigEndian::read_u16(&buffer[0..2]);
-///         let a = mapped_a.wrapping_add(i16::min_value() as u16) as i16;
-///         let b = BigEndian::read_u32(&buffer[2..6]);
+///         let a = i16::read(&buffer[0..2]);
+///         let b = u32::read(&buffer[2..6]);
 ///         Key { a, b }
 ///     }
 /// }
