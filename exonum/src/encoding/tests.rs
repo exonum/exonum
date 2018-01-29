@@ -29,8 +29,8 @@ static HEIGHT: Height = Height(123_123_123);
 static ROUND: Round = Round(321_321_312);
 
 #[allow(dead_code)]
-// This structures used to test deserialize,
-// so we should ingore unused `new` method.
+// This structures used to test deserialization,
+// so we should ignore unused `new` method.
 mod ignore_new {
     use crypto::Hash;
     encoding_struct! {

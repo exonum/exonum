@@ -61,7 +61,7 @@ impl AsRef<[u8]> for RawMessage {
 
 // TODO: reduce `to` argument from `write`, `read` and `check` methods
 // TODO: payload_length as a first value into message header
-// TODO: make sure that message length is enougth when using mem::transmute
+// TODO: make sure that message length is enough when using mem::transmute
 // (ECR-166)
 
 /// A raw message represented by the bytes buffer.

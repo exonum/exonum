@@ -190,7 +190,7 @@ macro_rules! message {
 
         impl $name {
             #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
-            /// Creates messsage and sign it.
+            /// Creates message and signs it.
             #[allow(unused_mut)]
             pub fn new($($field_name: $field_type,)*
                        secret_key: &$crate::crypto::SecretKey) -> $name {
@@ -238,13 +238,13 @@ macro_rules! message {
                 Ok(latest_segment)
             }
 
-            /// Returns `message_id` useable for matching.
+            /// Returns `message_id` usable for matching.
             #[allow(dead_code)]
             pub fn message_id() -> u16 {
                 $id
             }
 
-            /// Returns `service_id` useable for matching.
+            /// Returns `service_id` usable for matching.
             #[allow(dead_code)]
             pub fn service_id() -> u16 {
                 $extension

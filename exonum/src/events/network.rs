@@ -30,7 +30,7 @@ use tokio_retry::strategy::{jitter, FixedInterval};
 
 use messages::{Any, Connect, RawMessage, Message};
 use helpers::Milliseconds;
-use super::tobox;
+use super::to_box;
 use super::error::{into_other, log_error, other_error, result_ok};
 use super::codec::MessagesCodec;
 
@@ -200,7 +200,7 @@ impl ConnectionsPool {
                     .map_err(|_| other_error("can't send disconnect"))
             })
             .map(drop);
-        tobox(fut)
+        to_box(fut)
     }
 }
 
@@ -235,7 +235,7 @@ impl NetworkPart {
             .map(drop)
             .select(cancel_handler)
             .map_err(|(e, _)| e);
-        tobox(fut)
+        to_box(fut)
     }
 }
 
@@ -292,7 +292,7 @@ impl RequestHandler {
                                     other_error("can't send message to a connection")
                                 })
                             });
-                            tobox(fut)
+                            to_box(fut)
                         } else {
                             let event = NetworkEvent::UnableConnectToPeer(peer);
                             let fut = network_tx
@@ -300,7 +300,7 @@ impl RequestHandler {
                                 .send(event)
                                 .map_err(|_| other_error("can't send network event"))
                                 .into_future();
-                            tobox(fut)
+                            to_box(fut)
                         }
                     }
                     NetworkRequest::DisconnectWithPeer(peer) => {
@@ -317,11 +317,11 @@ impl RequestHandler {
                                 )
                             })
                             .into_future();
-                        tobox(fut)
+                        to_box(fut)
                     }
                 }
             });
-        RequestHandler(tobox(requests_handler))
+        RequestHandler(to_box(requests_handler))
     }
 }
 
@@ -362,7 +362,7 @@ impl Listener {
                      connections limit reached.",
                     addr
                 );
-                return tobox(future::ok(()));
+                return to_box(future::ok(()));
             }
             trace!("Accepted incoming connection with peer={}", addr);
             let stream = sock.framed(MessagesCodec::new(max_message_len));
@@ -399,11 +399,11 @@ impl Listener {
                     let _holder = holder;
                 })
                 .map_err(log_error);
-            handle.spawn(tobox(connection_handler));
-            tobox(future::ok(()))
+            handle.spawn(to_box(connection_handler));
+            to_box(future::ok(()))
         });
 
-        Ok(Listener(tobox(server)))
+        Ok(Listener(to_box(server)))
     }
 }
 

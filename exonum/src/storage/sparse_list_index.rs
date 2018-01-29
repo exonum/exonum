@@ -300,7 +300,7 @@ where
         SparseListIndexIter { base_iter: self.base.iter_from(&(), &0u64) }
     }
 
-    /// Returns an iterator over the indices of the 'SparceListIndex'.
+    /// Returns an iterator over the indices of the 'SparseListIndex'.
     ///
     /// # Examples
     ///
@@ -321,7 +321,7 @@ where
         SparseListIndexKeys { base_iter: self.base.iter_from(&(), &0u64) }
     }
 
-    /// Returns an iterator over the values of the 'SparceListIndex'. The iterator element type is
+    /// Returns an iterator over the values of the 'SparseListIndex'. The iterator element type is
     /// V.
     ///
     /// # Examples
@@ -377,7 +377,7 @@ where
         self.size.set(Some(size));
     }
 
-    /// Appends an element to the back of the 'SparceListIndex'.
+    /// Appends an element to the back of the 'SparseListIndex'.
     ///
     /// # Examples
     ///
@@ -531,7 +531,7 @@ where
         self.base.clear()
     }
 
-    /// Removes the first element from the 'SparceListIndex' and returns it, or None if it is empty.
+    /// Removes the first element from the 'SparseListIndex' and returns it, or None if it is empty.
     ///
     /// # Examples
     ///
