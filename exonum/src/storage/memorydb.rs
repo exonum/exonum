@@ -133,7 +133,7 @@ impl Iterator for MemoryDBIter {
 
 #[test]
 fn test_memorydb_snapshot() {
-    let mut db = MemoryDB::new();
+    let db = MemoryDB::new();
     let idx_name = "idx_name";
     {
         let mut fork = db.fork();

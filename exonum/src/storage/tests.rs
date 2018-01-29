@@ -16,7 +16,7 @@ use super::{Database, Snapshot, Fork};
 
 const IDX_NAME: &'static str = "idx_name";
 
-fn fork_iter<T: Database>(mut db: T) {
+fn fork_iter<T: Database>(db: T) {
     let mut fork = db.fork();
 
     fork.put(IDX_NAME, vec![10], vec![10]);
