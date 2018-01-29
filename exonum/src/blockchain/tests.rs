@@ -142,11 +142,9 @@ fn gen_tempdir_name() -> String {
 }
 
 fn handling_tx_panic(blockchain: &Blockchain, db: &mut Box<Database>) {
-    message! {
+    messages! {
+        const SERVICE_ID = 1;
         struct Tx {
-            const TYPE = 1;
-            const ID = 0;
-
             value: u64,
         }
     }
@@ -224,11 +222,9 @@ fn handling_tx_panic(blockchain: &Blockchain, db: &mut Box<Database>) {
 }
 
 fn handling_tx_panic_storage_error(blockchain: &Blockchain) {
-    message! {
+    messages! {
+        const SERVICE_ID = 1;
         struct Tx {
-            const TYPE = 1;
-            const ID = 0;
-
             value: u64,
         }
     }

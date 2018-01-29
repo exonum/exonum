@@ -45,13 +45,12 @@ use super::transaction::Transaction;
 /// // Exports from `exonum` crate skipped
 /// # use exonum::blockchain::{Service, Transaction, ExecutionResult};
 /// # use exonum::crypto::Hash;
-/// # use exonum::messages::{Message, RawTransaction};
+/// # use exonum::messages::{ServiceMessage, Message, RawTransaction};
 /// # use exonum::storage::{Fork, Snapshot};
 /// use exonum::encoding::Error as EncError;
 ///
 /// // Reused constants
 /// const SERVICE_ID: u16 = 8000;
-/// const MY_TRANSACTION_ID: u16 = 1;
 ///
 /// // Service schema
 /// struct MyServiceSchema<T> {
@@ -75,10 +74,9 @@ use super::transaction::Transaction;
 /// }
 ///
 /// // Transaction definitions
-/// message! {
+/// messages! {
+///     const SERVICE_ID = SERVICE_ID;
 ///     struct MyTransaction {
-///         const TYPE = SERVICE_ID;
-///         const ID = MY_TRANSACTION_ID;
 ///         // Transaction fields
 ///     }
 /// }
@@ -107,7 +105,7 @@ use super::transaction::Transaction;
 ///
 ///     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, EncError> {
 ///         let tx: Box<Transaction> = match raw.message_type() {
-///             MY_TRANSACTION_ID => Box::new(MyTransaction::from_raw(raw)?),
+///             MyTransaction::MESSAGE_ID => Box::new(MyTransaction::from_raw(raw)?),
 ///             _ => Err(EncError::IncorrectMessageType {
 ///                 message_type: raw.message_type(),
 ///             })?,

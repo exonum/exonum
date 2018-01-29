@@ -44,6 +44,11 @@ impl RawMessage {
     pub fn from_vec(vec: Vec<u8>) -> Self {
         RawMessage(sync::Arc::new(MessageBuffer::from_vec(vec)))
     }
+
+    /// Returns hash of the `RawMessage`.
+    pub fn hash(&self) -> Hash {
+        hash(self.as_ref())
+    }
 }
 
 impl Deref for RawMessage {
@@ -255,6 +260,14 @@ impl MessageWriter {
         debug_assert_eq!(self.raw.len(), payload_length);
         MessageBuffer { raw: self.raw }
     }
+}
+
+/// TODO
+pub trait ServiceMessage {
+    /// TODO
+    const SERVICE_ID: u16;
+    /// TODO
+    const MESSAGE_ID: u16;
 }
 
 /// Represents generic message interface.

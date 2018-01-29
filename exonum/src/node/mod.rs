@@ -511,7 +511,7 @@ impl NodeHandler {
         if let Some(conn) = self.state.peers().get(&public_key) {
             let address = conn.addr();
             trace!("Send to address: {}", address);
-            let request = NetworkRequest::SendMessage(address, message.raw().clone());
+            let request = NetworkRequest::SendMessage(address, message.clone());
             self.channel.network_requests.send(request).log_error();
         } else {
             warn!("Hasn't connection with peer {:?}", public_key);
@@ -526,11 +526,11 @@ impl NodeHandler {
     }
 
     /// Broadcasts given message to all peers.
-    pub fn broadcast(&mut self, message: &Message) {
+    pub fn broadcast(&mut self, message: &RawMessage) {
         for conn in self.state.peers().values() {
             let address = conn.addr();
             trace!("Send to address: {}", address);
-            let request = NetworkRequest::SendMessage(address, message.raw().clone());
+            let request = NetworkRequest::SendMessage(address, message.clone());
             self.channel.network_requests.send(request).log_error();
         }
     }

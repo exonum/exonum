@@ -243,6 +243,6 @@ impl NodeHandler {
             self.state.consensus_secret_key(),
         );
         trace!("Broadcast status: {:?}", status);
-        self.broadcast(&status);
+        self.broadcast(status.raw());
     }
 }
