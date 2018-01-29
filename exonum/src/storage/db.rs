@@ -220,7 +220,7 @@ enum NextIterValue {
 ///
 /// ```
 /// use exonum::storage::{Database, MemoryDB};
-/// 
+///
 /// // not declared as `mut db`!
 /// let db: Box<Database> = Box::new(MemoryDB::new());
 /// let mut fork = db.fork();
