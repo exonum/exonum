@@ -257,6 +257,11 @@ impl MessageWriter {
 }
 
 /// Represents generic message interface.
+///
+/// An Exonum message is a piece of data that is signed by the creator's [Ed25519] key;
+/// the resulting digital signature is a part of the message.
+///
+/// [Ed25519]: ../crypto/index.html
 pub trait Message: Debug + Send + Sync {
     /// Converts the raw message into the specific one.
     fn from_raw(raw: RawMessage) -> Result<Self, encoding::Error>

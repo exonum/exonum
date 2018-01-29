@@ -77,7 +77,8 @@ pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
     (PublicKey(sod_pub_key), SecretKey(sod_secr_key))
 }
 
-/// Randomly generates a secret key and a corresponding public key.
+/// Generates a secret key and a corresponding public key using a cryptographically secure
+/// pseudo-random number generator.
 ///
 /// # Examples
 ///
@@ -111,7 +112,7 @@ pub fn verify(sig: &Signature, data: &[u8], pubkey: &PublicKey) -> bool {
     verify_detached(&sig.0, data, &pubkey.0)
 }
 
-/// Calculates `SHA256` hash of bytes slice.
+/// Calculates an SHA-256 hash digest of a bytes slice.
 ///
 /// # Examples
 ///
@@ -147,7 +148,9 @@ pub fn init() {
     }
 }
 
-/// This structure provides a possibility to calculate hash for a stream of data
+/// This structure provides a possibility to calculate a SHA-256 hash digest
+/// for a stream of data.
+///
 /// # Example
 ///
 /// ```rust
@@ -164,25 +167,27 @@ pub fn init() {
 pub struct HashStream(HashState);
 
 impl HashStream {
-    /// Creates a new instance of `HashStream`
+    /// Creates a new instance of `HashStream`.
     pub fn new() -> Self {
         HashStream(HashState::init())
     }
 
-    /// Processes chunk of stream using state and returns instance of `HashStream`
+    /// Processes a chunk of stream and returns a `HashStream` with the updated internal state.
     pub fn update(mut self, chunk: &[u8]) -> Self {
         self.0.update(chunk);
         self
     }
 
-    /// Completes process and returns final hash of stream data
+    /// Returns the hash of data supplied to the stream so far.
     pub fn hash(self) -> Hash {
         let dig = self.0.finalize();
         Hash(dig)
     }
 }
 
-/// This structure provides a possibility to create signature for a stream of data
+/// This structure provides a possibility to create and/or verify Ed25519 digital signatures
+/// for a stream of data.
+///
 /// # Example
 ///
 /// ```rust
@@ -203,26 +208,25 @@ impl HashStream {
 pub struct SignStream(SignState);
 
 impl SignStream {
-    /// Creates a new instance of `SignStream`
+    /// Creates a new instance of `SignStream`.
     pub fn new() -> Self {
         SignStream(SignState::init())
     }
 
-    /// Adds a new `chunk` to the message that will eventually be signed
+    /// Adds a new `chunk` to the message that will eventually be signed and/or verified.
     pub fn update(mut self, chunk: &[u8]) -> Self {
         self.0.update(chunk);
         self
     }
 
-    /// Computes a signature for the previously supplied messages
-    /// using the secret key `secret_key` and returns `Signature`
+    /// Computes and returns a signature for the previously supplied message
+    /// using the given `secret_key`.
     pub fn sign(&mut self, secret_key: &SecretKey) -> Signature {
         Signature(self.0.finalize(&secret_key.0))
     }
 
-    /// Verifies that `sig` is a valid signature for the message whose content
-    /// has been previously supplied using `update` using the public key
-    /// `public_key`
+    /// Verifies that `sig` is a valid signature for the previously supplied message
+    /// using the given `public_key`.
     pub fn verify(&mut self, sig: &Signature, public_key: &PublicKey) -> bool {
         self.0.verify(&sig.0, &public_key.0)
     }
@@ -346,7 +350,7 @@ macro_rules! implement_private_sodium_wrapper {
 }
 
 implement_public_sodium_wrapper! {
-/// Public key used for verifying signatures.
+/// Ed25519 public key used to verify digital signatures.
 ///
 /// # Examples
 ///
@@ -361,8 +365,9 @@ implement_public_sodium_wrapper! {
 }
 
 implement_private_sodium_wrapper! {
-/// Secret key used for signing.
-////// # Examples
+/// Ed25519 secret key used to create digital signatures over messages.
+///
+/// # Examples
 ///
 /// ```
 /// use exonum::crypto;
@@ -375,9 +380,7 @@ implement_private_sodium_wrapper! {
 }
 
 implement_public_sodium_wrapper! {
-/// SHA256 hash.
-///
-/// `Default` implementation for the `Hash` returns hash consisting of zeros.
+/// SHA-256 hash.
 ///
 /// # Examples
 ///
@@ -394,7 +397,7 @@ implement_public_sodium_wrapper! {
 }
 
 implement_public_sodium_wrapper! {
-/// Signature.
+/// Ed25519 digital signature.
 ///
 /// # Examples
 ///
@@ -411,7 +414,7 @@ implement_public_sodium_wrapper! {
 }
 
 implement_private_sodium_wrapper! {
-/// Seed that can be used for keypair generation.
+/// Ed25519 seed that can be used for deterministic keypair generation.
 ///
 /// # Examples
 ///
@@ -519,6 +522,7 @@ implement_index_traits! {SecretKey}
 implement_index_traits! {Seed}
 implement_index_traits! {Signature}
 
+/// Returns hash consisting of zeros.
 impl Default for Hash {
     fn default() -> Hash {
         Hash::zero()

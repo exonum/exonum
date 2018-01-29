@@ -15,20 +15,22 @@
 //! The module containing building blocks for creating blockchains powered by the
 //! Exonum framework.
 //!
-//! Services are the main extension point for the Exonum framework. To create your own service on
-//! top of Exonum blockchain you need to define following things:
+//! Services are the main extension point for the Exonum framework. To create your service on
+//! top of Exonum blockchain you need to do the following:
 //!
 //! - Define your own information schema.
-//! - Create one or more types of messages using a macro `message!` and implement
-//! `Transaction` trait for them.
-//! - Create data structure that implements `Service` trait.
-//! - Optionally you can write api handlers.
+//! - Create one or more transaction types using the [`message!`] macro and implement
+//!   the [`Transaction`] trait for them.
+//! - Create a data structure implementing the [`Service`] trait.
+//! - Optionally you can write API handlers for the service.
 //!
-//! You may follow the [`cryptocurrency`][1] tutorial to get experience of programming
-//! your services.
+//! You may consult [the service creation tutorial][doc:create-service] for a more detailed
+//! manual how to create services.
 //!
-//! [1]: https://github.com/exonum/exonum-doc/blob/master/src/get-started/create-service.md
-
+//! [`message!`]: ../macro.message.html
+//! [`Transaction`]: ./trait.Transaction.html
+//! [`Service`]: ./trait.Service.html
+//! [doc:create-service]: https://exonum.com/doc/get-started/create-service
 
 use std::sync::Arc;
 use std::collections::BTreeMap;
