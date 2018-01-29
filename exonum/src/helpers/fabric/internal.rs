@@ -59,7 +59,7 @@ pub trait Command {
 ///
 /// 1. `Command` by its nature should be stateless, but it's harder to make
 /// abstracted dynamic object without trait objects.
-/// 2. Additinaly this state is common for all commands.
+/// 2. Additionally this state is common for all commands.
 pub struct CollectedCommand {
     command: Box<Command>,
     args: Vec<Argument>,

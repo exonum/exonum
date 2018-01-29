@@ -24,7 +24,7 @@ use std::time::{Duration, SystemTime};
 
 
 use super::error::{into_other, other_error};
-use super::{InternalRequest, TimeoutRequest, InternalEvent, tobox};
+use super::{InternalRequest, TimeoutRequest, InternalEvent, to_box};
 
 #[derive(Debug)]
 pub struct InternalPart {
@@ -53,7 +53,7 @@ impl InternalPart {
                                     .map_err(into_other)
                             })
                             .map_err(|_| panic!("Can't timeout"));
-                        tobox(fut)
+                        to_box(fut)
                     }
                     InternalRequest::JumpToRound(height, round) => {
                         let internal_tx = internal_tx.clone();
@@ -66,7 +66,7 @@ impl InternalPart {
                                     .map_err(into_other)
                             })
                             .map_err(|_| panic!("Can't execute jump to round"));
-                        tobox(fut)
+                        to_box(fut)
                     }
                 };
 
@@ -74,6 +74,6 @@ impl InternalPart {
                 Ok(())
             })
             .map_err(|_| other_error("Can't handle timeout request"));
-        tobox(fut)
+        to_box(fut)
     }
 }

@@ -101,7 +101,7 @@ pub enum Error {
         /// start of new segment
         start: Offset,
     },
-    /// Between segments foud spaces
+    /// Spaces found between segments
     SpaceBetweenSegments {
         /// last segment ended position
         last_end: Offset,

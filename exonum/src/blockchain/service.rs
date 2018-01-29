@@ -345,7 +345,7 @@ impl SharedNodeState {
         self.state_update_timeout
     }
 
-    /// add incomming connection into state
+    /// add incoming connection into state
     pub fn add_incoming_connection(&self, addr: SocketAddr) {
         self.state
             .write()
@@ -362,7 +362,7 @@ impl SharedNodeState {
             .insert(addr);
     }
 
-    /// remove incomming connection from state
+    /// remove incoming connection from state
     pub fn remove_incoming_connection(&self, addr: &SocketAddr) -> bool {
         self.state
             .write()
