@@ -49,7 +49,7 @@ impl BranchNode {
         }
     }
 
-    pub fn child_slice(&self, kind: ChildKind) -> ProofPath {
+    pub fn child_path(&self, kind: ChildKind) -> ProofPath {
         let from = match kind {
             ChildKind::Right => 2 * HASH_SIZE + PROOF_PATH_SIZE,
             ChildKind::Left => 2 * HASH_SIZE,
@@ -57,7 +57,7 @@ impl BranchNode {
         ProofPath::read(&self.raw[from..from + PROOF_PATH_SIZE])
     }
 
-    pub fn set_child_slice(&mut self, kind: ChildKind, prefix: &ProofPath) {
+    pub fn set_child_path(&mut self, kind: ChildKind, prefix: &ProofPath) {
         let from = match kind {
             ChildKind::Right => 2 * HASH_SIZE + PROOF_PATH_SIZE,
             ChildKind::Left => 2 * HASH_SIZE,
@@ -74,7 +74,7 @@ impl BranchNode {
     }
 
     pub fn set_child(&mut self, kind: ChildKind, prefix: &ProofPath, hash: &Hash) {
-        self.set_child_slice(kind, prefix);
+        self.set_child_path(kind, prefix);
         self.set_child_hash(kind, hash);
     }
 }
@@ -96,9 +96,9 @@ impl StorageValue for BranchNode {
 impl ::std::fmt::Debug for BranchNode {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         f.debug_struct("BranchNode")
-            .field("left_prefix", &self.child_slice(ChildKind::Left))
+            .field("left_path", &self.child_path(ChildKind::Left))
             .field("left_hash", &self.child_hash(ChildKind::Left))
-            .field("right_prefix", &self.child_slice(ChildKind::Right))
+            .field("right_path", &self.child_path(ChildKind::Right))
             .field("right_hash", &self.child_hash(ChildKind::Right))
             .field("hash", &self.hash())
             .finish()
@@ -119,6 +119,6 @@ fn test_branch_node() {
 
     assert_eq!(branch.child_hash(ChildKind::Left), &lh);
     assert_eq!(branch.child_hash(ChildKind::Right), &rh);
-    assert_eq!(branch.child_slice(ChildKind::Left), ls);
-    assert_eq!(branch.child_slice(ChildKind::Right), rs);
+    assert_eq!(branch.child_path(ChildKind::Left), ls);
+    assert_eq!(branch.child_path(ChildKind::Right), rs);
 }

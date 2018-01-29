@@ -22,8 +22,11 @@ pub const LEAF_KEY_PREFIX: u8 = 1;
 
 /// Size in bytes of the `ProofMapKey`.
 pub const KEY_SIZE: usize = HASH_SIZE;
+/// Size in bytes of the `ProofPath`.
 pub const PROOF_PATH_SIZE: usize = KEY_SIZE + 2;
+/// Position of the byte with kind of the `ProofPath`.
 pub const PROOF_PATH_KIND_POS: usize = 0;
+/// Position of the byte with total length of the branch.
 pub const PROOF_PATH_LEN_POS: usize = KEY_SIZE + 1;
 
 /// A trait that defines a subset of storage key types which are suitable for use with
@@ -70,6 +73,15 @@ impl ::std::ops::Not for ChildKind {
 }
 
 /// A structure that represents paths to the any kinds of `ProofMapIndex` nodes.
+///
+/// # Binary representation
+///
+/// | Position in bytes     | Description                   	                    |
+/// |-------------------    |----------------------------------------------         |
+/// | 0               	    | `ProofPath` kind: (0 is branch, 1 is leaf)            |
+/// | 1..33                 | `ProofMapKey` bytes.    	                            |
+/// | 33                    | Total length in bits of `ProofMapKey` for branches.   |
+///
 #[derive(Copy, Clone)]
 pub struct ProofPath {
     bytes: [u8; PROOF_PATH_SIZE],
@@ -88,12 +100,12 @@ impl ProofPath {
         ProofPath::from_raw(data)
     }
 
-    /// Shows the type of path.
+    /// Checks if this is a path to a leaf `ProofMapIndex` node.
     pub fn is_leaf(&self) -> bool {
         self.bytes[0] == LEAF_KEY_PREFIX
     }
 
-    /// Returns the byte representation of `ProofPath`.
+    /// Returns the byte representation of contained `ProofMapKey`.
     pub fn as_bytes(&self) -> &[u8] {
         &self.bytes
     }
@@ -101,11 +113,7 @@ impl ProofPath {
     /// Constructs the `ProofPath` from raw bytes.
     fn from_raw(raw: [u8; PROOF_PATH_SIZE]) -> ProofPath {
         debug_assert!(
-            if raw[PROOF_PATH_KIND_POS] == LEAF_KEY_PREFIX {
-                raw[PROOF_PATH_LEN_POS] == 0
-            } else {
-                true
-            },
+            (raw[PROOF_PATH_KIND_POS] != LEAF_KEY_PREFIX) || (raw[PROOF_PATH_LEN_POS] == 0),
             "ProofPath is inconsistent"
         );
 
@@ -116,22 +124,20 @@ impl ProofPath {
     }
 
     /// Sets the right border of the bit range.
-    fn set_end(&mut self, end: u16) {
-        let max_len = (KEY_SIZE * 8) as u16;
-        assert!(end <= max_len);
+    fn set_end(&mut self, end: Option<u8>) {
         // Update ProofPath kind and right bound.
-        if end == max_len {
+        if let Some(pos) = end {
+            self.bytes[0] = BRANCH_KEY_PREFIX;
+            self.bytes[PROOF_PATH_LEN_POS] = pos as u8;
+        } else {
             self.bytes[0] = LEAF_KEY_PREFIX;
             self.bytes[PROOF_PATH_LEN_POS] = 0;
-        } else {
-            self.bytes[0] = BRANCH_KEY_PREFIX;
-            self.bytes[PROOF_PATH_LEN_POS] = end as u8;
         };
     }
 }
 
 /// The bits representation of the `ProofPath`.
-pub trait BitsRange {
+pub(crate) trait BitsRange {
     /// Returns the left border of the range.
     fn start(&self) -> u16;
     /// Returns the right border of the range.
@@ -144,37 +150,7 @@ pub trait BitsRange {
     fn is_empty(&self) -> bool {
         self.end() == self.start()
     }
-    /// Get bit at position `idx`.
-    fn bit(&self, idx: u16) -> ChildKind;
-    /// Returns the new `ProofPath` with the given left border.
-    fn start_from(&self, idx: u16) -> Self;
-    /// Shortens this ProofPath to the specified length.
-    fn prefix(&self, pos: u16) -> Self;
-    /// Return object which represents a view on to this slice (further) offset by `pos` bits.
-    fn suffix(&self, pos: u16) -> Self;
-    /// Returns true if we starts with the same prefix at the whole of `other`
-    fn starts_with(&self, other: &Self) -> bool {
-        self.common_prefix(other) == other.len()
-    }
-    /// Returns how many bits at the beginning matches with `other`
-    fn common_prefix(&self, other: &Self) -> u16;
-    /// Returns the raw bytes of the key.
-    fn raw_key(&self) -> &[u8];
-}
-
-impl BitsRange for ProofPath {
-    fn start(&self) -> u16 {
-        self.start
-    }
-
-    fn end(&self) -> u16 {
-        if self.is_leaf() {
-            KEY_SIZE as u16 * 8
-        } else {
-            u16::from(self.bytes[PROOF_PATH_LEN_POS])
-        }
-    }
-
+    /// Get bit at index `idx`.
     fn bit(&self, idx: u16) -> ChildKind {
         debug_assert!(self.start() + idx < self.end());
 
@@ -188,30 +164,23 @@ impl BitsRange for ProofPath {
             ChildKind::Left
         }
     }
-
-    fn start_from(&self, start: u16) -> Self {
-        debug_assert!(start <= self.end());
-
-        let mut key = ProofPath::from_raw(self.bytes);
-        key.start = start;
-        key
+    /// Returns the copy of this bit range with the given left border.
+    fn start_from(&self, pos: u16) -> Self;
+    /// Returns a copy of this bit range shortened to the specified length.
+    fn prefix(&self, len: u16) -> Self;
+    /// Returns the copy of this bit range where the start is shifted by the `len` bit to the right.
+    fn suffix(&self, len: u16) -> Self;
+    /// Checks if this bit range contains the other bit range as a prefix,
+    /// provided that the start positions of both ranges are the same.
+    fn starts_with(&self, other: &Self) -> bool {
+        self.common_prefix_len(other) == other.len()
     }
-
-    fn prefix(&self, pos: u16) -> Self {
-        debug_assert!(self.start() + pos <= self.raw_key().len() as u16 * 8);
-
-        let mut key = ProofPath::from_raw(self.bytes);
-        key.start = self.start;
-        key.set_end(self.start + pos);
-        key
-    }
-
-    fn suffix(&self, pos: u16) -> Self {
-        self.start_from(self.start() + pos)
-    }
-
-    fn common_prefix(&self, other: &Self) -> u16 {
-        // We assume that all slices created from byte arrays with the same length
+    /// Returns the raw bytes of the key.
+    fn raw_key(&self) -> &[u8];
+    /// Returns the length of the common prefix between this and the other range,
+    /// provided that they start from the same position.
+    /// If start positions differ, returns 0.
+    fn common_prefix_len(&self, other: &Self) -> u16 {
         if self.start() != other.start() {
             0
         } else {
@@ -230,6 +199,43 @@ impl BitsRange for ProofPath {
             max_len
         }
     }
+}
+
+impl BitsRange for ProofPath {
+    fn start(&self) -> u16 {
+        self.start
+    }
+
+    fn end(&self) -> u16 {
+        if self.is_leaf() {
+            KEY_SIZE as u16 * 8
+        } else {
+            u16::from(self.bytes[PROOF_PATH_LEN_POS])
+        }
+    }
+
+    fn start_from(&self, pos: u16) -> Self {
+        debug_assert!(pos <= self.end());
+
+        let mut key = ProofPath::from_raw(self.bytes);
+        key.start = pos;
+        key
+    }
+
+    fn prefix(&self, len: u16) -> Self {
+        let end = self.start + len;
+        let key_len = self.raw_key().len() as u16 * 8;
+        debug_assert!(end < key_len);
+
+        let mut key = ProofPath::from_raw(self.bytes);
+        key.start = self.start;
+        key.set_end(Some(end as u8));
+        key
+    }
+
+    fn suffix(&self, len: u16) -> Self {
+        self.start_from(self.start() + len)
+    }
 
     fn raw_key(&self) -> &[u8] {
         &self.bytes[1..KEY_SIZE + 1]
@@ -244,7 +250,8 @@ impl PartialEq for ProofPath {
 
 impl ::std::fmt::Debug for ProofPath {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        let mut bits = String::with_capacity(KEY_SIZE * 8);
+        // 8 bits + '|' symbol per byte.
+        let mut bits = String::with_capacity(KEY_SIZE * 9);
         for byte in 0..self.raw_key().len() {
             let chunk = self.raw_key()[byte];
             for bit in (0..8).rev() {
@@ -377,7 +384,7 @@ fn test_proof_path_at_overflow() {
 }
 
 #[test]
-#[should_panic(expected = "start <= self.end()")]
+#[should_panic(expected = "pos <= self.end()")]
 fn test_proof_path_suffix_overflow() {
     let b = ProofPath::from_raw(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
     assert_eq!(b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00".len(), 34);
@@ -392,29 +399,29 @@ fn test_proof_path_suffix_bit_overflow() {
 }
 
 #[test]
-fn test_proof_path_common_prefix() {
+fn test_proof_path_common_prefix_len() {
     let b1 = ProofPath::from_raw(*b"\x01abcd0000000000000000000000000000\x00");
     let b2 = ProofPath::from_raw(*b"\x01abef0000000000000000000000000000\x00");
-    assert_eq!(b1.common_prefix(&b1), 256);
-    let c = b1.common_prefix(&b2);
+    assert_eq!(b1.common_prefix_len(&b1), 256);
+    let c = b1.common_prefix_len(&b2);
     assert_eq!(c, 17);
-    let c = b2.common_prefix(&b1);
+    let c = b2.common_prefix_len(&b1);
     assert_eq!(c, 17);
     let b1 = b1.suffix(9);
     let b2 = b2.suffix(9);
-    let c = b1.common_prefix(&b2);
+    let c = b1.common_prefix_len(&b2);
     assert_eq!(c, 8);
     let b3 = ProofPath::from_raw(*b"\x01\xFF0000000000000000000000000000000\x00");
     let b4 = ProofPath::from_raw(*b"\x01\xF70000000000000000000000000000000\x00");
-    assert_eq!(b3.common_prefix(&b4), 3);
-    assert_eq!(b4.common_prefix(&b3), 3);
-    assert_eq!(b3.common_prefix(&b3), 256);
+    assert_eq!(b3.common_prefix_len(&b4), 3);
+    assert_eq!(b4.common_prefix_len(&b3), 3);
+    assert_eq!(b3.common_prefix_len(&b3), 256);
     let b3 = b3.suffix(30);
-    assert_eq!(b3.common_prefix(&b3), 226);
+    assert_eq!(b3.common_prefix_len(&b3), 226);
     let b3 = b3.prefix(200);
-    assert_eq!(b3.common_prefix(&b3), 200);
+    assert_eq!(b3.common_prefix_len(&b3), 200);
     let b5 = ProofPath::from_raw(*b"\x01\xF00000000000000000000000000000000\x00");
-    assert_eq!(b5.prefix(0).common_prefix(&b3), 0);
+    assert_eq!(b5.prefix(0).common_prefix_len(&b3), 0);
 }
 
 #[test]
@@ -443,9 +450,9 @@ fn test_proof_path_debug_leaf() {
     assert_eq!(
         buf,
         "ProofPath { start: 0, end: 256, bits: \"01110001|01110111|01100101|01110010|01110100|0111\
-        1001|01110101|01101001|01101111|01110000|01100001|01110011|01100100|01100110|01100111|0110\
-        1000|01101010|01101011|01101100|01111010|01111000|01100011|01110110|01100010|01101110|0110\
-        1101|00110001|00110010|00110011|00110100|00110101|00110110|\" }"
+         1001|01110101|01101001|01101111|01110000|01100001|01110011|01100100|01100110|01100111|0110\
+         1000|01101010|01101011|01101100|01111010|01111000|01100011|01110110|01100010|01101110|0110\
+         1101|00110001|00110010|00110011|00110100|00110101|00110110|\" }"
     );
 }
 
@@ -458,8 +465,8 @@ fn test_proof_path_debug_branch() {
     assert_eq!(
         buf,
         "ProofPath { start: 12, end: 240, bits: \"________|0111____|01100101|01110010|01110100|011\
-        11001|01110101|01101001|01101111|01110000|01100001|01110011|01100100|01100110|01100111|011\
-        01000|01101010|01101011|01101100|01111010|01111000|01100011|01110110|01100010|01101110|011\
-        01101|00110001|00110010|00110011|00110100|________|________|\" }"
+         11001|01110101|01101001|01101111|01110000|01100001|01110011|01100100|01100110|01100111|011\
+         01000|01101010|01101011|01101100|01111010|01111000|01100011|01110110|01100010|01101110|011\
+         01101|00110001|00110010|00110011|00110100|________|________|\" }"
     );
 }
