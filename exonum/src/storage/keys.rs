@@ -230,3 +230,69 @@ impl StorageKey for String {
         unsafe { ::std::str::from_utf8_unchecked(buffer).to_string() }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Number of samples for fuzz testing
+    const FUZZ_SAMPLES: usize = 10_000;
+
+    macro_rules! test_storage_key_for_int_type {
+        (full $type:ident, $size:expr => $test_name:ident) => {
+            #[test]
+            fn $test_name() {
+                // Roundtrip
+                let mut buffer = [0u8; $size];
+                for x in $type::min_value()..$type::max_value() {
+                    x.write(&mut buffer);
+                    assert_eq!($type::read(&buffer), x);
+                }
+
+                // Ordering
+                let (mut x_buffer, mut y_buffer) = ([0u8; $size], [0u8; $size]);
+                for x in $type::min_value()..$type::max_value() {
+                    let y = x + 1;
+                    x.write(&mut x_buffer);
+                    y.write(&mut y_buffer);
+                    assert!(x_buffer < y_buffer);
+                }
+            }
+        };
+        (fuzz $type:ident, $size:expr => $test_name:ident) => {
+            #[test]
+            fn $test_name() {
+                use rand::{Rng, thread_rng};
+                let mut rng = thread_rng();
+
+                // Fuzzed roundtrip
+                let mut buffer = [0u8; $size];
+                for _ in 0..FUZZ_SAMPLES {
+                    let x: $type = rng.gen();
+                    x.write(&mut buffer);
+                    assert_eq!($type::read(&buffer), x);
+                }
+
+                // Fuzzed ordering
+                let (mut x_buffer, mut y_buffer) = ([0u8; $size], [0u8; $size]);
+                let mut vals: Vec<$type> = rng.gen_iter().take(FUZZ_SAMPLES).collect();
+                vals.sort();
+                for w in vals.windows(2) {
+                    let (x, y) = (w[0], w[1]);
+                    x.write(&mut x_buffer);
+                    y.write(&mut y_buffer);
+                    assert!(x_buffer < y_buffer);
+                }
+            }
+        }
+    }
+
+    test_storage_key_for_int_type!{full  u8, 1 => test_storage_key_for_u8}
+    test_storage_key_for_int_type!{full  i8, 1 => test_storage_key_for_i8}
+    test_storage_key_for_int_type!{full u16, 2 => test_storage_key_for_u16}
+    test_storage_key_for_int_type!{full i16, 2 => test_storage_key_for_i16}
+    test_storage_key_for_int_type!{fuzz u32, 4 => test_storage_key_for_u32}
+    test_storage_key_for_int_type!{fuzz i32, 4 => test_storage_key_for_i32}
+    test_storage_key_for_int_type!{fuzz u64, 8 => test_storage_key_for_u64}
+    test_storage_key_for_int_type!{fuzz i64, 8 => test_storage_key_for_i64}
+}
