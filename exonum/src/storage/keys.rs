@@ -115,110 +115,64 @@ impl StorageKey for u8 {
     }
 }
 
-/// Uses big-endian encoding.
-impl StorageKey for u16 {
-    fn size(&self) -> usize {
-        2
-    }
-
-    fn write(&self, buffer: &mut [u8]) {
-        BigEndian::write_u16(buffer, *self)
-    }
-
-    fn read(buffer: &[u8]) -> Self {
-        BigEndian::read_u16(buffer)
-    }
-}
-
-/// Uses big-endian encoding.
-impl StorageKey for u32 {
-    fn size(&self) -> usize {
-        4
-    }
-
-    fn write(&self, buffer: &mut [u8]) {
-        BigEndian::write_u32(buffer, *self)
-    }
-
-    fn read(buffer: &[u8]) -> Self {
-        BigEndian::read_u32(buffer)
-    }
-}
-
-/// Uses big-endian encoding.
-impl StorageKey for u64 {
-    fn size(&self) -> usize {
-        8
-    }
-
-    fn write(&self, buffer: &mut [u8]) {
-        BigEndian::write_u64(buffer, *self)
-    }
-
-    fn read(buffer: &[u8]) -> Self {
-        BigEndian::read_u64(buffer)
-    }
-}
-
-/// **Not sorted in the natural order.**
+/// Uses encoding with the values mapped to `u8`
+/// by adding the corresponding constant (`128`) to the value.
 impl StorageKey for i8 {
     fn size(&self) -> usize {
         1
     }
 
     fn write(&self, buffer: &mut [u8]) {
-        buffer[0] = *self as u8
+        buffer[0] = self.wrapping_add(i8::min_value()) as u8;
     }
 
     fn read(buffer: &[u8]) -> Self {
-        buffer[0] as i8
+        buffer[0].wrapping_add(i8::min_value() as u8) as i8
     }
 }
 
-/// Uses big-endian encoding. **Not sorted in the natural order.**
-impl StorageKey for i16 {
-    fn size(&self) -> usize {
-        2
-    }
+macro_rules! storage_key_for_ints {
+    ($utype:ident, $itype:ident, $size:expr, $read_method:ident, $write_method:ident) => {
+        /// Uses big-endian encoding.
+        impl StorageKey for $utype {
+            fn size(&self) -> usize {
+                $size
+            }
 
-    fn write(&self, buffer: &mut [u8]) {
-        BigEndian::write_i16(buffer, *self)
-    }
+            fn write(&self, buffer: &mut [u8]) {
+                BigEndian::$write_method(buffer, *self);
+            }
 
-    fn read(buffer: &[u8]) -> Self {
-        BigEndian::read_i16(buffer)
+            fn read(buffer: &[u8]) -> Self {
+                BigEndian::$read_method(buffer)
+            }
+        }
+
+        /// Uses big-endian encoding with the values mapped to the unsigned format
+        /// by adding the corresponding constant to the value.
+        impl StorageKey for $itype {
+            fn size(&self) -> usize {
+                $size
+            }
+
+            fn write(&self, buffer: &mut [u8]) {
+                BigEndian::$write_method(
+                    buffer,
+                    self.wrapping_add($itype::min_value()) as $utype,
+                );
+            }
+
+            fn read(buffer: &[u8]) -> Self {
+                BigEndian::$read_method(buffer)
+                    .wrapping_add($itype::min_value() as $utype) as $itype
+            }
+        }
     }
 }
 
-/// Uses big-endian encoding. **Not sorted in the natural order.**
-impl StorageKey for i32 {
-    fn size(&self) -> usize {
-        4
-    }
-
-    fn write(&self, buffer: &mut [u8]) {
-        BigEndian::write_i32(buffer, *self)
-    }
-
-    fn read(buffer: &[u8]) -> Self {
-        BigEndian::read_i32(buffer)
-    }
-}
-
-/// Uses big-endian encoding. **Not sorted in the natural order.**
-impl StorageKey for i64 {
-    fn size(&self) -> usize {
-        8
-    }
-
-    fn write(&self, buffer: &mut [u8]) {
-        BigEndian::write_i64(buffer, *self)
-    }
-
-    fn read(buffer: &[u8]) -> Self {
-        BigEndian::read_i64(buffer)
-    }
-}
+storage_key_for_ints!{u16, i16, 2, read_u16, write_u16}
+storage_key_for_ints!{u32, i32, 4, read_u32, write_u32}
+storage_key_for_ints!{u64, i64, 8, read_u64, write_u64}
 
 impl StorageKey for Hash {
     fn size(&self) -> usize {
