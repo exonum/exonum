@@ -36,7 +36,7 @@ use exonum::blockchain::{Service, Transaction, ApiContext, gen_prefix};
 use exonum::encoding::serialize::json::reexport as serde_json;
 use exonum::encoding::{Offset, Field, Error as StreamStructError};
 use exonum::helpers::fabric::{ServiceFactory, Context};
-use serde_json::{Value, to_value};
+use serde_json::Value;
 use exonum::encoding::serialize::json::ExonumJson;
 use exonum::encoding::serialize::{WriteBufferWrapper, FromHex, ToHex};
 
@@ -79,9 +79,9 @@ impl<'a> ExonumJson for &'a KeyBox {
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
         let mut s = String::new();
-        self.0.as_ref().write_hex(&mut s).unwrap();
+        self.0.as_ref().write_hex(&mut s)?;
         Ok(Value::String(s))
     }
 }
@@ -101,12 +101,11 @@ message! {
     struct TxTransfer {
         const TYPE = CRYPTOCURRENCY_SERVICE_ID;
         const ID = TX_TRANSFER_ID;
-        const SIZE = 80;
 
-        field from:        &PublicKey  [00 => 32]
-        field to:          &PublicKey  [32 => 64]
-        field amount:      u64         [64 => 72]
-        field seed:        u64         [72 => 80]
+        from:        &PublicKey,
+        to:          &PublicKey,
+        amount:      u64,
+        seed:        u64,
     }
 }
 
@@ -115,11 +114,10 @@ message! {
     struct TxIssue {
         const TYPE = CRYPTOCURRENCY_SERVICE_ID;
         const ID = TX_ISSUE_ID;
-        const SIZE = 48;
 
-        field wallet:      &PublicKey  [00 => 32]
-        field amount:      u64         [32 => 40]
-        field seed:        u64         [40 => 48]
+        wallet:      &PublicKey,
+        amount:      u64,
+        seed:        u64,
     }
 }
 
@@ -128,11 +126,10 @@ message! {
     struct TxCreateWallet {
         const TYPE = CRYPTOCURRENCY_SERVICE_ID;
         const ID = TX_WALLET_ID;
-        const SIZE = 168;
 
-        field pub_key:     &PublicKey  [00 => 32]
-        field login:       &str        [32 => 40]
-        field key_box:     &KeyBox     [40 => 168]
+        pub_key:     &PublicKey,
+        login:       &str,
+        key_box:     &KeyBox,
     }
 }
 
@@ -167,10 +164,8 @@ impl Message for CurrencyTx {
             CurrencyTx::CreateWallet(ref msg) => msg.raw(),
         }
     }
-}
 
-impl CurrencyTx {
-    pub fn from_raw(raw: RawMessage) -> Result<Self, StreamStructError> {
+    fn from_raw(raw: RawMessage) -> Result<Self, StreamStructError> {
         match raw.message_type() {
             TX_TRANSFER_ID => Ok(CurrencyTx::Transfer(TxTransfer::from_raw(raw)?)),
             TX_ISSUE_ID => Ok(CurrencyTx::Issue(TxIssue::from_raw(raw)?)),
@@ -372,11 +367,31 @@ impl TxCreateWallet {
     }
 }
 
-impl Transaction for CurrencyTx {
-    fn info(&self) -> Value {
-        to_value(self).unwrap()
+impl ExonumJson for CurrencyTx {
+    fn deserialize_field<B: WriteBufferWrapper>(
+        value: &Value,
+        buffer: &mut B,
+        from: Offset,
+        to: Offset,
+    ) -> Result<(), Box<Error>>
+    where
+        Self: Sized,
+    {
+        let tx = serde_json::from_value(value.clone())?;
+        match tx {
+            CurrencyTx::Transfer(ref t) => buffer.write(from, to, t.clone()),
+            CurrencyTx::Issue(ref t) => buffer.write(from, to, t.clone()),
+            CurrencyTx::CreateWallet(ref t) => buffer.write(from, to, t.clone()),
+        }
+        Ok(())
     }
 
+    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+        Ok(serde_json::to_value(self).unwrap())
+    }
+}
+
+impl Transaction for CurrencyTx {
     fn verify(&self) -> bool {
         let res = self.verify_signature(self.pub_key());
         let res1 = match *self {
