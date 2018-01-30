@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file. The project
 
 ## [Unreleased]
 
+### Breaking changes
+
+- `exonum::crypto::CryptoHash` trait is introduced, and `StorageValue::hash` and `Message::hash` methods are removed.
+   Migration path:
+     - For implementations of `StorageValue`, move the `hash` method to `CryptoHash` implementation instead.
+     - For implementations of `Message` simply remove `hash` method, there's a blanket impl of `CryptoHash`
+       for `Message`.
+     - Add `use exonum::crypto::CryptoHash` to use the `hash` method.
+
 ## 0.5 - 2018-01-30
 
 ### Breaking changes

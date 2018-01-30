@@ -20,7 +20,7 @@ use rand::{thread_rng, Rng};
 use serde_json;
 
 use blockchain::{Blockchain, Schema, Transaction};
-use crypto::{gen_keypair, Hash};
+use crypto::{gen_keypair, CryptoHash, Hash};
 use storage::{Database, Error, Fork, ListIndex};
 use messages::Message;
 use helpers::{Height, ValidatorId};
