@@ -31,7 +31,9 @@ use iron::prelude::*;
 use iron::Handler;
 use router::Router;
 
-use std::time::SystemTime;
+use std::ops::AddAssign;
+use std::sync::{Arc, RwLock};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use exonum::blockchain::{Blockchain, Service, ServiceContext, Schema, Transaction, ApiContext};
 use exonum::messages::{RawTransaction, Message};
@@ -301,6 +303,47 @@ struct SystemTimeProvider;
 impl TimeProvider for SystemTimeProvider {
     fn current_time(&self) -> SystemTime {
         SystemTime::now()
+    }
+}
+
+/// Mock provider for service testing.
+#[derive(Debug, Clone)]
+pub struct MockTimeProvider {
+    /// Local time value.
+    pub time: Arc<RwLock<SystemTime>>,
+}
+
+impl Default for MockTimeProvider {
+    fn default() -> MockTimeProvider {
+        MockTimeProvider { time: Arc::new(RwLock::new(UNIX_EPOCH)) }
+    }
+}
+
+impl MockTimeProvider {
+    #[warn(unused_variables)]
+    /// Create a new `MockTimeProvider`.
+    pub fn new() -> MockTimeProvider {
+        MockTimeProvider::default()
+    }
+
+    #[warn(unused_variables)]
+    /// Set the time value to `new_time`.
+    pub fn set_time(&self, new_time: SystemTime) {
+        let mut time = self.time.write().unwrap();
+        *time = new_time;
+    }
+
+    #[warn(unused_variables)]
+    /// Add `duration` to the value of `time`.
+    pub fn add_time(&self, duration: Duration) {
+        let mut time = self.time.write().unwrap();
+        time.add_assign(duration);
+    }
+}
+
+impl TimeProvider for MockTimeProvider {
+    fn current_time(&self) -> SystemTime {
+        *self.time.read().unwrap()
     }
 }
 
