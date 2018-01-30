@@ -394,8 +394,8 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                 right_key: ref right_path_key,
                 ..
             } => {
-                let mut left_path = left_path_key.start_from(0);
-                let mut right_path = right_path_key.start_from(0);
+                let left_path = left_path_key.start_from(0);
+                let right_path = right_path_key.start_from(0);
                 if !left_path.starts_with(parent_path) || !right_path.starts_with(parent_path) {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with itself: Proof: \
@@ -420,8 +420,8 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                 right_key: ref right_path_key,
                 ..
             } => {
-                let mut left_path = left_path_key.start_from(0);
-                let mut right_path = right_path_key.start_from(0);
+                let left_path = left_path_key.start_from(0);
+                let right_path = right_path_key.start_from(0);
                 if !left_path.starts_with(parent_path) || !right_path.starts_with(parent_path) {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with itself: Proof: \
@@ -445,8 +445,8 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                 right_key: ref right_path_key,
                 ..
             } => {
-                let mut left_path = left_path_key.start_from(0);
-                let mut right_path = right_path_key.start_from(0);
+                let left_path = left_path_key.start_from(0);
+                let right_path = right_path_key.start_from(0);
                 if !left_path.starts_with(parent_path) || !right_path.starts_with(parent_path) {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with itself: Proof: \
