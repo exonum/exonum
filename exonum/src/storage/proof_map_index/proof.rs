@@ -18,18 +18,18 @@ use serde::{Serialize, Serializer};
 use serde::ser::SerializeMap;
 
 use crypto::{Hash, HashStream};
-use super::super::{StorageValue, Error};
-use super::key::{ProofMapKey, DBKey, ChildKind, KEY_SIZE};
+use super::super::{Error, StorageValue};
+use super::key::{BitsRange, ChildKind, ProofMapKey, ProofPath, KEY_SIZE};
 
-impl Serialize for DBKey {
+impl Serialize for ProofPath {
     fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         let mut repr = String::with_capacity(KEY_SIZE * 8);
-        let bslice = self;
-        for ind in 0..self.to() - self.from() {
-            match bslice.get(ind) {
+        let bpath = self;
+        for ind in 0..self.len() {
+            match bpath.bit(ind) {
                 ChildKind::Left => {
                     repr.push('0');
                 }
@@ -45,9 +45,9 @@ impl Serialize for DBKey {
 /// An enum that represents a proof of existence or non-existence for a proof map key.
 pub enum MapProof<V> {
     /// A boundary case with a single element tree and a matching key.
-    LeafRootInclusive(DBKey, V),
+    LeafRootInclusive(ProofPath, V),
     /// A boundary case with a single element tree and a non-matching key
-    LeafRootExclusive(DBKey, Hash),
+    LeafRootExclusive(ProofPath, Hash),
     /// A boundary case with empty tree.
     Empty,
     /// A root branch of the tree.
@@ -71,9 +71,9 @@ pub enum BranchProofNode<V> {
         /// A hash of the right child.
         right_hash: Hash,
         /// A key of the left child.
-        left_key: DBKey,
+        left_key: ProofPath,
         /// A key of the right child.
-        right_key: DBKey,
+        right_key: ProofPath,
     },
     /// A branch of proof in which left child may contain the requested key.
     LeftBranch {
@@ -82,9 +82,9 @@ pub enum BranchProofNode<V> {
         /// A hash of the right child.
         right_hash: Hash,
         /// A key of the left child.
-        left_key: DBKey,
+        left_key: ProofPath,
         /// A key of the right child.
-        right_key: DBKey,
+        right_key: ProofPath,
     },
     /// A branch of proof in which right child may contain the requested key.
     RightBranch {
@@ -93,9 +93,9 @@ pub enum BranchProofNode<V> {
         /// A right child node.
         right_node: Box<ProofNode<V>>,
         /// A key of the left child.
-        left_key: DBKey,
+        left_key: ProofPath,
         /// A key of the right child.
-        right_key: DBKey,
+        right_key: ProofPath,
     },
 }
 
@@ -107,13 +107,13 @@ impl<V: StorageValue> MapProof<V> {
             Empty => Hash::zero(),
             LeafRootInclusive(ref root_key, ref root_val) => {
                 HashStream::new()
-                    .update(&root_key.as_bytes())
+                    .update(root_key.as_bytes())
                     .update(root_val.hash().as_ref())
                     .hash()
             }
             LeafRootExclusive(ref root_key, ref root_val_hash) => {
                 HashStream::new()
-                    .update(&root_key.as_bytes())
+                    .update(root_key.as_bytes())
                     .update(root_val_hash.as_ref())
                     .hash()
             }
@@ -144,8 +144,8 @@ impl<V: StorageValue> BranchProofNode<V> {
                 HashStream::new()
                     .update(left_hash.as_ref())
                     .update(right_hash.as_ref())
-                    .update(&left_key.as_bytes())
-                    .update(&right_key.as_bytes())
+                    .update(left_key.as_bytes())
+                    .update(right_key.as_bytes())
                     .hash()
             }
             LeftBranch {
@@ -157,8 +157,8 @@ impl<V: StorageValue> BranchProofNode<V> {
                 HashStream::new()
                     .update(left_node.root_hash().as_ref())
                     .update(right_hash.as_ref())
-                    .update(&left_key.as_bytes())
-                    .update(&right_key.as_bytes())
+                    .update(left_key.as_bytes())
+                    .update(right_key.as_bytes())
                     .hash()
             }
             RightBranch {
@@ -170,14 +170,13 @@ impl<V: StorageValue> BranchProofNode<V> {
                 HashStream::new()
                     .update(left_hash.as_ref())
                     .update(right_node.root_hash().as_ref())
-                    .update(&left_key.as_bytes())
-                    .update(&right_key.as_bytes())
+                    .update(left_key.as_bytes())
+                    .update(right_key.as_bytes())
                     .hash()
             }
         }
     }
 }
-
 
 impl<V: Serialize> Serialize for MapProof<V> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -257,7 +256,6 @@ impl<V: Serialize> Serialize for ProofNode<V> {
         use self::ProofNode::*;
         match *self {
             Leaf(ref value) => {
-
                 #[derive(Serialize)]
                 struct SerializeHelper<'a, V: Serialize + 'a> {
                     val: &'a V,
@@ -277,43 +275,43 @@ impl<V: fmt::Debug + StorageValue> MapProof<V> {
     /// If the proof is valid and the requested key does not exists, `Ok(None)` is returned.
     /// If the proof is invalid, `Err` is returned.
     pub fn validate<K: ProofMapKey>(&self, key: &K, root_hash: Hash) -> Result<Option<&V>, Error> {
-        let searched_slice = DBKey::leaf(key);
+        let searched_key = ProofPath::new(key);
         use self::MapProof::*;
 
         // if we inspect the topmost level of a proof
         let res: Option<&V> = match *self {
             Empty => None,
-            LeafRootInclusive(ref root_db_key, ref val) => {
-                let root_slice = root_db_key;
-                if root_slice != &searched_slice {
+            LeafRootInclusive(ref root_path, ref val) => {
+                let root_key = root_path;
+                if root_key != &searched_key {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with searched key: \
-                                                   {:?}. Proof: {:?}. ",
-                        searched_slice,
+                         {:?}. Proof: {:?}. ",
+                        searched_key,
                         self
                     )));
                 }
                 Some(val)
             }
-            LeafRootExclusive(ref root_db_key, _) => {
-                let root_slice = root_db_key;
-                if root_slice == &searched_slice {
+            LeafRootExclusive(ref root_path, _) => {
+                let root_key = root_path;
+                if root_key == &searched_key {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with searched key: \
-                                                   {:?}. Proof: {:?} ",
-                        searched_slice,
+                         {:?}. Proof: {:?} ",
+                        searched_key,
                         self
                     )));
                 }
                 None
             }
-            Branch(ref branch) => branch.validate(&searched_slice)?,
+            Branch(ref branch) => branch.validate(&searched_key)?,
         };
         let proof_hash = self.root_hash();
         if proof_hash != root_hash {
             return Err(Error::new(format!(
                 "The proof doesn't match the expected hash! \
-                                           Expected: {:?} , from proof: {:?}",
+                 Expected: {:?} , from proof: {:?}",
                 root_hash,
                 proof_hash
             )));
@@ -323,57 +321,55 @@ impl<V: fmt::Debug + StorageValue> MapProof<V> {
 }
 
 impl<V: fmt::Debug> BranchProofNode<V> {
-    fn validate(&self, searched_slice: &DBKey) -> Result<Option<&V>, Error> {
+    fn validate(&self, searched_key: &ProofPath) -> Result<Option<&V>, Error> {
         use self::BranchProofNode::*;
 
         // if we inspect the topmost level of a proof
         let res: Option<&V> = match *self {
             LeftBranch {
                 left_node: ref proof,
-                left_key: ref left_slice_key,
+                left_key: ref left_path_key,
                 ..
             } => {
-                let left_slice = left_slice_key;
-                if !searched_slice.starts_with(left_slice) {
+                let left_path = left_path_key;
+                if !searched_key.starts_with(left_path) {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with searched_key: \
-                                                   {:?}. Proof: {:?}",
-                        searched_slice,
+                         {:?}. Proof: {:?}",
+                        searched_key,
                         self
                     )));
                 }
-                proof.validate_consistency(left_slice, searched_slice)?
+                proof.validate_consistency(left_path, searched_key)?
             }
             RightBranch {
                 right_node: ref proof,
-                right_key: ref right_slice_key,
+                right_key: ref right_path_key,
                 ..
             } => {
-                let right_slice = right_slice_key;
-                if !searched_slice.starts_with(right_slice) {
+                let right_path = right_path_key;
+                if !searched_key.starts_with(right_path) {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with searched_key: \
-                                                   {:?}. Proof: {:?}",
-                        searched_slice,
+                         {:?}. Proof: {:?}",
+                        searched_key,
                         self
                     )));
                 }
-                proof.validate_consistency(right_slice, searched_slice)?
+                proof.validate_consistency(right_path, searched_key)?
             }
             BranchKeyNotFound {
-                left_key: ref left_slice_key,
-                right_key: ref right_slice_key,
+                left_key: ref left_path_key,
+                right_key: ref right_path_key,
                 ..
             } => {
-                let left_slice = left_slice_key;
-                let right_slice = right_slice_key;
-                if searched_slice.starts_with(left_slice) ||
-                    searched_slice.starts_with(right_slice)
-                {
+                let left_path = left_path_key;
+                let right_path = right_path_key;
+                if searched_key.starts_with(left_path) || searched_key.starts_with(right_path) {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with searched_key: \
-                                                   {:?}. Proof: {:?}",
-                        searched_slice,
+                         {:?}. Proof: {:?}",
+                        searched_key,
                         self
                     )));
                 }
@@ -385,8 +381,8 @@ impl<V: fmt::Debug> BranchProofNode<V> {
 
     fn validate_consistency<'a>(
         &'a self,
-        parent_slice: &DBKey,
-        searched_slice: &DBKey,
+        parent_path: &ProofPath,
+        searched_key: &ProofPath,
     ) -> Result<Option<&'a V>, Error> {
         use self::BranchProofNode::*;
 
@@ -394,84 +390,76 @@ impl<V: fmt::Debug> BranchProofNode<V> {
         let res: Option<&V> = match *self {
             LeftBranch {
                 left_node: ref proof,
-                left_key: ref left_slice_key,
-                right_key: ref right_slice_key,
+                left_key: ref left_path_key,
+                right_key: ref right_path_key,
                 ..
             } => {
-                let mut left_slice = left_slice_key.clone();
-                left_slice.set_from(0);
-                let mut right_slice = right_slice_key.clone();
-                right_slice.set_from(0);
-                if !left_slice.starts_with(parent_slice) || !right_slice.starts_with(parent_slice) {
+                let mut left_path = left_path_key.start_from(0);
+                let mut right_path = right_path_key.start_from(0);
+                if !left_path.starts_with(parent_path) || !right_path.starts_with(parent_path) {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with itself: Proof: \
-                                                   {:?} . Parent slice: {:?}",
+                         {:?} . Parent path: {:?}",
                         self,
-                        parent_slice
+                        parent_path
                     )));
                 }
-                if !searched_slice.starts_with(&left_slice) {
+                if !searched_key.starts_with(&left_path) {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with searched_key: \
-                                                   {:?}. Proof: {:?}",
-                        searched_slice,
+                         {:?}. Proof: {:?}",
+                        searched_key,
                         self
                     )));
                 }
-                proof.validate_consistency(&left_slice, searched_slice)?
+                proof.validate_consistency(&left_path, searched_key)?
             }
             RightBranch {
                 right_node: ref proof,
-                left_key: ref left_slice_key,
-                right_key: ref right_slice_key,
+                left_key: ref left_path_key,
+                right_key: ref right_path_key,
                 ..
             } => {
-                let mut left_slice = left_slice_key.clone();
-                left_slice.set_from(0);
-                let mut right_slice = right_slice_key.clone();
-                right_slice.set_from(0);
-                if !left_slice.starts_with(parent_slice) || !right_slice.starts_with(parent_slice) {
+                let mut left_path = left_path_key.start_from(0);
+                let mut right_path = right_path_key.start_from(0);
+                if !left_path.starts_with(parent_path) || !right_path.starts_with(parent_path) {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with itself: Proof: \
-                                                   {:?} . Parent slice: {:?}",
+                         {:?} . Parent path: {:?}",
                         self,
-                        parent_slice
+                        parent_path
                     )));
                 }
-                if !searched_slice.starts_with(&right_slice) {
+                if !searched_key.starts_with(&right_path) {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with searched_key: \
-                                                   {:?}. Proof: {:?}",
-                        searched_slice,
+                         {:?}. Proof: {:?}",
+                        searched_key,
                         self
                     )));
                 }
-                proof.validate_consistency(&right_slice, searched_slice)?
+                proof.validate_consistency(&right_path, searched_key)?
             }
             BranchKeyNotFound {
-                left_key: ref left_slice_key,
-                right_key: ref right_slice_key,
+                left_key: ref left_path_key,
+                right_key: ref right_path_key,
                 ..
             } => {
-                let mut left_slice = left_slice_key.clone();
-                left_slice.set_from(0);
-                let mut right_slice = right_slice_key.clone();
-                right_slice.set_from(0);
-                if !left_slice.starts_with(parent_slice) || !right_slice.starts_with(parent_slice) {
+                let mut left_path = left_path_key.start_from(0);
+                let mut right_path = right_path_key.start_from(0);
+                if !left_path.starts_with(parent_path) || !right_path.starts_with(parent_path) {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with itself: Proof: \
-                                                   {:?} . Parent slice: {:?}",
+                         {:?} . Parent path: {:?}",
                         self,
-                        parent_slice
+                        parent_path
                     )));
                 }
-                if searched_slice.starts_with(&left_slice) ||
-                    searched_slice.starts_with(&right_slice)
-                {
+                if searched_key.starts_with(&left_path) || searched_key.starts_with(&right_path) {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with searched_key: \
-                                                   {:?}. Proof: {:?}",
-                        searched_slice,
+                         {:?}. Proof: {:?}",
+                        searched_key,
                         self
                     )));
                 }
@@ -484,25 +472,25 @@ impl<V: fmt::Debug> BranchProofNode<V> {
 impl<V: fmt::Debug> ProofNode<V> {
     fn validate_consistency<'a>(
         &'a self,
-        parent_slice: &DBKey,
-        searched_slice: &DBKey,
+        parent_key: &ProofPath,
+        searched_key: &ProofPath,
     ) -> Result<Option<&'a V>, Error> {
         use self::ProofNode::*;
 
         // if we inspect sub-proofs of a proof
         let res: Option<&V> = match *self {
             Leaf(ref val) => {
-                if searched_slice != parent_slice {
+                if searched_key != parent_key {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with searched_key: \
-                                                   {:?}. Parent slice: {:?} ",
-                        searched_slice,
-                        parent_slice
+                         {:?}. Parent path: {:?} ",
+                        searched_key,
+                        parent_key
                     )));
                 }
                 Some(val)
             }
-            Branch(ref branch) => branch.validate_consistency(parent_slice, searched_slice)?,
+            Branch(ref branch) => branch.validate_consistency(parent_key, searched_key)?,
         };
         Ok(res)
     }
@@ -513,10 +501,10 @@ impl<V: fmt::Debug> fmt::Debug for MapProof<V> {
         use self::MapProof::*;
         match *self {
             LeafRootInclusive(ref db_key, ref val) => {
-                write!(f, "{{\"slice\":{:?},{:?}}}", db_key, val)
+                write!(f, "{{\"path\":{:?},{:?}}}", db_key, val)
             }
             LeafRootExclusive(ref db_key, ref val_hash) => {
-                write!(f, "{{\"slice\":{:?},\"val_hash\":{:?}}}", db_key, val_hash)
+                write!(f, "{{\"path\":{:?},\"val_hash\":{:?}}}", db_key, val_hash)
             }
             Empty => write!(f, "{{}}"),
             Branch(ref branch) => write!(f, "{:?}", branch),
@@ -545,7 +533,7 @@ impl<V: fmt::Debug> fmt::Debug for BranchProofNode<V> {
             } => {
                 write!(
                     f,
-                    "{{\"left\":{:?},\"right\":{:?},\"left_slice\":{:?},\"right_slice\":{:?}}}",
+                    "{{\"left\":{:?},\"right\":{:?},\"left_path\":{:?},\"right_path\":{:?}}}",
                     left_node,
                     right_hash,
                     left_key,
@@ -560,7 +548,7 @@ impl<V: fmt::Debug> fmt::Debug for BranchProofNode<V> {
             } => {
                 write!(
                     f,
-                    "{{\"left\":{:?},\"right\":{:?},\"left_slice\":{:?},\"right_slice\":{:?}}}",
+                    "{{\"left\":{:?},\"right\":{:?},\"left_path\":{:?},\"right_path\":{:?}}}",
                     left_hash,
                     right_node,
                     left_key,
@@ -575,7 +563,7 @@ impl<V: fmt::Debug> fmt::Debug for BranchProofNode<V> {
             } => {
                 write!(
                     f,
-                    "{{\"left\":{:?},\"right\":{:?},\"left_slice\":{:?},\"right_slice\":{:?}}}",
+                    "{{\"left\":{:?},\"right\":{:?},\"left_path\":{:?},\"right_path\":{:?}}}",
                     left_hash,
                     right_hash,
                     left_key,

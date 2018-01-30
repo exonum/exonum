@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 - The `Database` trait is simplified: it is not longer required to implement state-sharing `clone` method.
   Instead, the `merge` method now takes a shared reference to `self`.
 - The order of bytes and bits in the `DBKey` keys of `ProofMapIndex` became consistent. The change influences how Merkle Patricia trees are built for `ProofMapIndex`: the bits in each byte of a `DBKey` are now enumerated from the least significant bit (LSB) to the most significant bit (MSB), compared to MSB-to-LSB ordering used before. Note: this change will break old storages using map proofs. (#419)
+- `DBKey` renamed to `ProofPath` and part of its functionality was moved to the `BitsRange` trait. (#420)
 
 ### Removed
 - Removed default `state_hash` implementation in the `Service` trait. (#399)
