@@ -150,25 +150,27 @@ pub enum Change {
 
 /// A combination of a database snapshot and a sequence of changes on top of it.
 ///
-/// A `Fork` provides both immutable and mutable operations over database. As well as [`Snapshot`],
-/// it provides read isolation. When mutable operations ([`put`], [`remove`] and
-/// [`remove_by_prefix`] methods) are performed for fork, the data is presented as if these changes
-/// are applied to the database. However, instead of applying changes directly to the database,
-/// fork only accumulates these changes in memory.
+/// A `Fork` provides both immutable and mutable operations over database. Like [`Snapshot`],
+/// `Fork` provides read isolation. When mutable operations ([`put`], [`remove`] and
+/// [`remove_by_prefix`]) are performed for a fork, the subsequent reads act as if the changes
+/// are applied to the database; in reality, these changes are accumulated in memory.
 ///
-/// To apply changes to the database, you need to convert a `Fork` into a [`Patch`] using method
-/// [`into_patch`] and then atomically merge it into the database using method [`merge`]. If two
-/// conflicting forks are merged into a database, this can lead to a non-consistent state. If you
+/// To apply changes to the database, you need to convert a `Fork` into a [`Patch`] using
+/// [`into_patch`] and then atomically [`merge`] it into the database. If two
+/// conflicting forks are merged into a database, this can lead to an inconsistent state. If you
 /// need to consistently apply several sets of changes for the same data, the next fork should be
 /// created after the previous fork has been merged.
 ///
-/// `Fork` also supports a checkpoint mechanism (methods [`checkpoint`], [`commit`] and
-/// [`rollback`]) that allows you to rollback some of the latest changes if for some reason you
-/// can not provide a consistent state after the changes due to a runtime error.
+/// `Fork` also supports checkpoints ([`checkpoint`], [`commit`] and
+/// [`rollback`] methods), which allows to rollback some of the latest changes (e.g., after
+/// a runtime error).
 ///
-/// `Fork` implements [`Snapshot`] trait and provides all the necessary methods for both reading and
-/// writing data from the database, so `&mut Fork` is used as a storage view for creating
+/// `Fork` implements the [`Snapshot`] trait and provides methods for both reading and
+/// writing data. Thus, `&mut Fork` is used as a storage view for creating
 /// read-write indices representation.
+///
+/// **Note.** Unless stated otherwise, "key" in the method descriptions below refers
+/// to a full key (a string column family name + key as an array of bytes within the family).
 ///
 /// [`Snapshot`]: trait.Snapshot.html
 /// [`put`]: #method.put
@@ -203,40 +205,38 @@ enum NextIterValue {
     Finished,
 }
 
-/// A trait that defines a low-level storage backend.
+/// Low-level storage backend implementing a collection of named key-value stores
+/// (aka column families).
 ///
 /// A `Database` instance is shared across different threads, so it must be `Sync` and `Send`.
 ///
-/// There is no way to directly interact with data in the database.
+/// There is no way to directly interact with data in the database; use [`snapshot`], [`fork`]
+/// and [`merge`] methods for indirect interaction. See [the module documentation](index.html)
+/// for more details.
 ///
-/// If you only need to read the data, you can create a [`Snapshot`] using method [`snapshot`][1].
-/// Snapshots provide a read isolation, so you are guaranteed to work with consistent values even
-/// if the data in the database changes between reads.
+/// Note that `Database` effectively has [interior mutability][interior-mut];
+/// `merge` and `merge_sync` methods take a shared reference to the database (`&self`)
+/// rather than an exclusive one (`&mut self`). This means that the following code compiles:
 ///
-/// If you need to make any changes to the data, you need to create a [`Fork`] using method
-/// [`fork`][2]. As well as `Snapshot`, `Fork` provides read isolation and also allows you to create
-/// a sequence of changes to the database that are specified as a [`Patch`]. Later you can
-/// atomically merge a patch into the database using method [`merge`]. Note that different threads
-/// may call `merge` concurrently.
+/// ```
+/// use exonum::storage::{Database, MemoryDB};
 ///
-/// [`clone`]: #tymethod.fork
-/// [`Snapshot`]: trait.Snapshot.html
-/// [1]: #tymethod.snapshot
-/// [`Fork`]: struct.Fork.html
-/// [2]: #method.fork
-/// [`Patch`]: struct.Patch.html
+/// // not declared as `mut db`!
+/// let db: Box<Database> = Box::new(MemoryDB::new());
+/// let mut fork = db.fork();
+/// fork.put("index_name", vec![1, 2, 3], vec![123]);
+/// db.merge(fork.into_patch()).unwrap();
+/// ```
+///
+/// [`snapshot`]: #tymethod.snapshot
+/// [`fork`]: #method.fork
 /// [`merge`]: #tymethod.merge
+/// [interior-mut]: https://doc.rust-lang.org/book/second-edition/ch15-05-interior-mutability.html
 pub trait Database: Send + Sync + 'static {
     /// Creates a new snapshot of the database from its current state.
-    ///
-    /// See [`Snapshot`] documentation for more.
-    /// [`Snapshot`]: trait.Snapshot.html
     fn snapshot(&self) -> Box<Snapshot>;
 
     /// Creates a new fork of the database from its current state.
-    ///
-    /// See [`Fork`] documentation for more.
-    /// [`Fork`]: struct.Fork.html
     fn fork(&self) -> Fork {
         Fork {
             snapshot: self.snapshot(),
@@ -252,6 +252,7 @@ pub trait Database: Send + Sync + 'static {
     /// onus to guarantee atomicity is on the implementor of the trait.
     ///
     /// # Errors
+    ///
     /// If this method encounters any form of I/O or other error during merging, an error variant
     /// will be returned. In case of an error the method guarantees no changes were applied to
     /// the database.
@@ -263,29 +264,29 @@ pub trait Database: Send + Sync + 'static {
     /// onus to guarantee atomicity is on the implementor of the trait.
     ///
     /// # Errors
+    ///
     /// If this method encounters any form of I/O or other error during merging, an error variant
     /// will be returned. In case of an error the method guarantees no changes were applied to
     /// the database.
     fn merge_sync(&self, patch: Patch) -> Result<()>;
 }
 
-/// A trait that defines a snapshot of storage backend.
+/// Read-only snapshot of a storage backend.
 ///
-/// `Snapshot` instance is immutable representation of storage state. It provides read isolation,
-/// so using snapshot you are guaranteed to work with consistent values even if the data in
+/// A `Snapshot` instance is an immutable representation of a certain storage state.
+/// It provides read isolation, so consistency is guaranteed even if the data in
 /// the database changes between reads.
 ///
-/// `Snapshot` provides all the necessary methods for reading data from the database, so `&Storage`
-/// is used as a storage view for creating read-only indices representation.
+/// **Note.** Unless stated otherwise, "key" in the method descriptions below refers
+/// to a full key (a string column family name + key as an array of bytes within the family).
 pub trait Snapshot: 'static {
-    /// Returns a value as raw vector of bytes corresponding to the specified key
-    /// or `None` if does not exist.
+    /// Returns a value corresponding to the specified key as a raw vector of bytes,
+    /// or `None` if it does not exist.
     fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>>;
 
     /// Returns `true` if the snapshot contains a value for the specified key.
     ///
-    /// Default implementation tries to read the value using method [`get`].
-    /// [`get`]: #tymethod.get
+    /// Default implementation checks the existence of the value using [`get`](#tymethod.get).
     fn contains(&self, name: &str, key: &[u8]) -> bool {
         self.get(name, key).is_some()
     }
@@ -348,7 +349,7 @@ impl Fork {
     ///
     /// # Panics
     ///
-    /// Panics if another checkpoint was created before and it was not committed or rollbacked yet.
+    /// Panics if another checkpoint was created before and has not been committed or rolled back.
     pub fn checkpoint(&mut self) {
         if self.logged {
             panic!("call checkpoint before rollback or commit");
@@ -356,12 +357,12 @@ impl Fork {
         self.logged = true;
     }
 
-    /// Finalizes all changes after the last checkpoint.
+    /// Finalizes all changes after the latest checkpoint.
     ///
     /// # Panics
     ///
-    /// Panics if checkpoint was not created before or last checkpoint is already committed or
-    /// rollbacked.
+    /// Panics if there is no active checkpoint, or the latest checkpoint
+    /// is already committed or rolled back.
     pub fn commit(&mut self) {
         if !self.logged {
             panic!("call commit before checkpoint");
@@ -370,12 +371,12 @@ impl Fork {
         self.logged = false;
     }
 
-    /// Rollbacks all changes after the last checkpoint.
+    /// Rolls back all changes after the latest checkpoint.
     ///
     /// # Panics
     ///
-    /// Panics if checkpoint was not created before or last checkpoint is already committed or
-    /// rollbacked.
+    /// Panics if there is no active checkpoint, or the latest checkpoint
+    /// is already committed or rolled back.
     pub fn rollback(&mut self) {
         if !self.logged {
             panic!("call rollback before checkpoint");
@@ -391,7 +392,7 @@ impl Fork {
         self.logged = false;
     }
 
-    /// Inserts the key-value pair into the fork with the given name `name`.
+    /// Inserts a key-value pair into the fork.
     pub fn put(&mut self, name: &str, key: Vec<u8>, value: Vec<u8>) {
         let changes = self.patch.changes_entry(name.to_string()).or_insert_with(
             Changes::new,
@@ -407,7 +408,7 @@ impl Fork {
         }
     }
 
-    /// Removes the key from the fork with the given name `name`.
+    /// Removes the key from the fork.
     pub fn remove(&mut self, name: &str, key: Vec<u8>) {
         let changes = self.patch.changes_entry(name.to_string()).or_insert_with(
             Changes::new,
@@ -423,7 +424,8 @@ impl Fork {
         }
     }
 
-    /// Removes all keys starting with the specified prefix from the fork with name `name`.
+    /// Removes all keys starting with the specified prefix from the column family
+    /// with the given `name`.
     pub fn remove_by_prefix(&mut self, name: &str, prefix: Option<&Vec<u8>>) {
         let changes = self.patch.changes_entry(name.to_string()).or_insert_with(
             Changes::new,
@@ -467,8 +469,8 @@ impl Fork {
 
     /// Merges patch from another fork to this fork.
     ///
-    /// If both forks have changed the same data, this can lead to a non-consistent state. So this
-    /// method is useful only if you are sure that forks interacted with different indices.
+    /// If both forks have changed the same data, this can lead to an inconsistent state. Hence,
+    /// this method is useful only if you are sure that forks interacted with different indices.
     ///
     /// # Panics
     ///

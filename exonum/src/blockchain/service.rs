@@ -32,128 +32,177 @@ use node::{ApiSender, Node, State, TransactionSend};
 use blockchain::{Blockchain, ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use helpers::{Height, Milliseconds, ValidatorId};
 
-/// A trait that describes transaction processing rules (a group of sequential operations
-/// with the Exonum storage) for the given `Message`.
+/// Transaction processing functionality for `Message`s allowing to apply authenticated, atomic,
+/// constraint-preserving groups of changes to the blockchain storage.
+///
+/// See also [the documentation page on transactions][doc:transactions].
+///
+/// [doc:transactions]: https://exonum.com/doc/architecture/transactions/
 pub trait Transaction: Message + ExonumJson + 'static {
-    /// Verifies the transaction, which includes the message signature verification and other
-    /// specific internal constraints. verify is intended to check the internal consistency of
-    /// a transaction; it has no access to the blockchain state.
-    /// If a transaction fails verify, it is considered incorrect and cannot be included into
+    /// Verifies the internal consistency of the transaction. `verify` should usually include
+    /// checking the message signature (via [`verify_signature`]) and, possibly,
+    /// other internal constraints. `verify` has no access to the blockchain state;
+    /// checks involving the blockchains state must be preformed in [`execute`](#tymethod.execute).
+    ///
+    /// If a transaction fails `verify`, it is considered incorrect and cannot be included into
     /// any correct block proposal. Incorrect transactions are never included into the blockchain.
     ///
     /// *This method should not use external data, that is, it must be a pure function.*
+    ///
+    /// [`verify_signature`]: ../messages/trait.Message.html#method.verify_signature
     fn verify(&self) -> bool;
-    /// Takes the current blockchain state via `fork` and can modify it if certain conditions
-    /// are met.
+    /// Receives a fork of the current blockchain state and can modify it depending on the contents
+    /// of the transaction.
     ///
     /// # Notes
     ///
     /// - When programming `execute`, you should perform state-related checks before any changes
-    /// to the state and return early if these checks fail.
-    /// - If the execute method of a transaction raises a `panic`, the changes made by the
-    /// transactions are discarded, but the transaction itself is still considered committed.
+    ///   to the state and return early if these checks fail.
+    /// - If the execute method of a transaction raises a panic, the changes made by the
+    ///   transaction are discarded, but it is still considered committed.
     fn execute(&self, fork: &mut Fork);
 }
 
-/// A trait that describes a business-logic of the concrete service.
+/// A trait that describes business logic of a concrete service.
+///
+/// See also [the documentation page on services][doc:services].
+///
+/// # Examples
+///
+/// The following example provides a barebone foundation for implementing a service.
+///
+/// ```
+/// #[macro_use] extern crate exonum;
+/// // Exports from `exonum` crate skipped
+/// # use exonum::blockchain::Service;
+/// # use exonum::crypto::Hash;
+/// # use exonum::blockchain::Transaction;
+/// # use exonum::messages::{Message, RawTransaction};
+/// # use exonum::storage::{Fork, Snapshot};
+/// use exonum::encoding::Error as EncError;
+///
+/// // Reused constants
+/// const SERVICE_ID: u16 = 8000;
+/// const MY_TRANSACTION_ID: u16 = 1;
+///
+/// // Service schema
+/// struct MyServiceSchema<T> {
+///     view: T,
+/// }
+///
+/// impl<T: AsRef<Snapshot>> MyServiceSchema<T> {
+///     fn new(view: T) -> Self {
+///         MyServiceSchema { view }
+///     }
+///
+///     fn state_hash(&self) -> Vec<Hash> {
+///         // Calculates the shate hash of the service
+/// #       vec![]
+///     }
+///     // Other read-only methods
+/// }
+///
+/// impl<'a> MyServiceSchema<&'a mut Fork> {
+///     // Additional read-write methods
+/// }
+///
+/// // Transaction definitions
+/// message! {
+///     struct MyTransaction {
+///         const TYPE = SERVICE_ID;
+///         const ID = MY_TRANSACTION_ID;
+///         // Transaction fields
+///     }
+/// }
+///
+/// impl Transaction for MyTransaction {
+///     // Business logic implementation
+/// #   fn verify(&self) -> bool { true }
+/// #   fn execute(&self, fork: &mut Fork) { }
+/// }
+///
+/// // Service
+/// struct MyService {}
+///
+/// impl Service for MyService {
+///     fn service_id(&self) -> u16 {
+///        SERVICE_ID
+///     }
+///
+///     fn service_name(&self) -> &'static str {
+///         "my_special_unique_service"
+///     }
+///
+///     fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash> {
+///         MyServiceSchema::new(snapshot).state_hash()
+///     }
+///
+///     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, EncError> {
+///         let tx: Box<Transaction> = match raw.message_type() {
+///             MY_TRANSACTION_ID => Box::new(MyTransaction::from_raw(raw)?),
+///             _ => Err(EncError::IncorrectMessageType {
+///                 message_type: raw.message_type(),
+///             })?,
+///         };
+///         Ok(tx)
+///     }
+/// }
+/// # fn main() { }
+/// ```
+///
+/// [doc:services]: https://exonum.com/doc/architecture/services/
 #[allow(unused_variables, unused_mut)]
 pub trait Service: Send + Sync + 'static {
-    /// Unique service identification for database schema and service messages.
+    /// Service identifier for database schema and service messages.
+    /// Must be unique within the blockchain.
     fn service_id(&self) -> u16;
 
-    /// Unique human readable service name.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum::blockchain::Service;
-    /// use exonum::crypto::Hash;
-    /// # use exonum::blockchain::Transaction;
-    /// # use exonum::messages::RawTransaction;
-    /// # use exonum::encoding::Error as MessageError;
-    /// # use exonum::storage::Snapshot;
-    ///
-    /// struct MyService {}
-    ///
-    /// impl Service for MyService {
-    /// #   fn service_id(&self) -> u16 {
-    /// #       8000
-    /// #   }
-    ///     fn service_name(&self) -> &'static str {
-    ///         "my_special_unique_service"
-    ///     }
-    /// #   fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
-    /// #       Vec::new()
-    /// #   }
-    /// #   fn tx_from_raw(&self, _: RawTransaction) -> Result<Box<Transaction>, MessageError> {
-    /// #       unimplemented!()
-    /// #   }
-    /// }
-    /// ```
+    /// Human-readable service name. Must be unique within the blockchain.
     fn service_name(&self) -> &'static str;
 
     /// Returns a list of root hashes of tables that determine the current state
     /// of the service database. These hashes are collected from all services in a common
-    ///  `MerklePatriciaTable` that named [`state_hash_aggregator`][1].
+    /// `ProofMapIndex` accessible in the core schema as [`state_hash_aggregator`][1].
     ///
-    /// Empty `Vec` can be returned if service don't want to change blockchain state.
+    /// An empty vector can be returned if the service does not influence the blockchain state.
     ///
     /// See also [`service_table_unique_key`][2].
     ///
     /// [1]: struct.Schema.html#method.state_hash_aggregator
     /// [2]: struct.Blockchain.html#method.service_table_unique_key
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum::blockchain::Service;
-    /// use exonum::crypto::Hash;
-    /// use exonum::storage::Snapshot;
-    /// # use exonum::blockchain::Transaction;
-    /// # use exonum::messages::RawTransaction;
-    /// # use exonum::encoding::Error as MessageError;
-    ///
-    /// struct MyService {}
-    ///
-    /// impl Service for MyService {
-    /// #   fn service_id(&self) -> u16 {
-    /// #       8000
-    /// #   }
-    /// #   fn service_name(&self) -> &'static str {
-    /// #       "my_special_unique_service"
-    /// #   }
-    ///     fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
-    ///         Vec::new()
-    ///     }
-    /// #   fn tx_from_raw(&self, _: RawTransaction) -> Result<Box<Transaction>, MessageError> {
-    /// #       unimplemented!()
-    /// #   }
-    /// }
-    /// ```
     fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash>;
 
-    /// Tries to create `Transaction` object from the given raw message.
+    /// Tries to create a `Transaction` from the given raw message.
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError>;
 
-    /// By this method you can initialize information schema of service
-    /// and generates initial service configuration.
-    /// This method is called on genesis block creation event.
+    /// Initializes the information schema of service
+    /// and generates an initial service configuration.
+    /// Called on genesis block creation.
     fn initialize(&self, fork: &mut Fork) -> Value {
         Value::Null
     }
 
-    /// Handles commit event. This handler is invoked for each service after commit of the block.
-    /// For example service can create some transaction if the specific condition occurred.
+    /// Handles block commit. This handler is invoked for each service after commit of the block.
+    /// For example, a service can create one or more transactions if a specific condition
+    /// has occurred.
     ///
-    /// *Try not to perform long operations here*.
+    /// *Try not to perform long operations in this handler*.
     fn handle_commit(&self, context: &ServiceContext) {}
 
-    /// Returns api handler for public users.
+    /// Returns an API handler for public requests. The handler is mounted on
+    /// the `/api/services/{service_name}` path on [the public listen address][pub-addr]
+    /// of all full nodes in the blockchain network.
+    ///
+    /// [pub-addr]: ../node/struct.NodeApiConfig.html#structfield.public_api_address
     fn public_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
         None
     }
 
-    /// Returns api handler for maintainers.
+    /// Returns an API handler for private requests. The handler is mounted on
+    /// the `/api/services/{service_name}` path on [the private listen address][priv-addr]
+    /// of all full nodes in the blockchain network.
+    ///
+    /// [priv-addr]: ../node/struct.NodeApiConfig.html#structfield.private_api_address
     fn private_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
         None
     }
@@ -345,7 +394,7 @@ impl SharedNodeState {
         self.state_update_timeout
     }
 
-    /// add incomming connection into state
+    /// add incoming connection into state
     pub fn add_incoming_connection(&self, addr: SocketAddr) {
         self.state
             .write()
@@ -362,7 +411,7 @@ impl SharedNodeState {
             .insert(addr);
     }
 
-    /// remove incomming connection from state
+    /// remove incoming connection from state
     pub fn remove_incoming_connection(&self, addr: &SocketAddr) -> bool {
         self.state
             .write()

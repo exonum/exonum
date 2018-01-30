@@ -81,7 +81,7 @@ impl<H: EventHandler + 'static> HandlerPart<H> {
                 Ok(())
             });
 
-        tobox(fut)
+        to_box(fut)
     }
 }
 
@@ -213,6 +213,6 @@ where
 }
 
 
-fn tobox<F: Future + 'static>(f: F) -> Box<Future<Item = (), Error = F::Error>> {
+fn to_box<F: Future + 'static>(f: F) -> Box<Future<Item = (), Error = F::Error>> {
     Box::new(f.map(drop))
 }

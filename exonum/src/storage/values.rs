@@ -22,9 +22,11 @@ use byteorder::{ByteOrder, LittleEndian};
 use crypto::{Hash, hash, PublicKey};
 use messages::{RawMessage, MessageBuffer, Message};
 
-/// A trait that defines serialization of corresponding types as storage values.
+/// A type that can be (de)serialized as a value in the blockchain storage.
 ///
-/// For compatibility with modern architectures the little-endian encoding is used.
+/// `StorageValue` is automatically implemented by the [`encoding_struct!`] and [`message!`]
+/// macros. In case you need to implement it manually, use little-endian encoding
+/// for integer types for compatibility with modern architectures.
 ///
 /// # Examples
 ///
@@ -33,9 +35,7 @@ use messages::{RawMessage, MessageBuffer, Message};
 /// ```
 /// # extern crate exonum;
 /// # extern crate byteorder;
-///
 /// use std::borrow::Cow;
-///
 /// use exonum::storage::StorageValue;
 /// use exonum::crypto::{self, Hash};
 /// use byteorder::{LittleEndian, ByteOrder};
@@ -68,12 +68,15 @@ use messages::{RawMessage, MessageBuffer, Message};
 /// }
 /// # fn main() {}
 /// ```
+///
+/// [`encoding_struct!`]: ../macro.encoding_struct.html
+/// [`message!`]: ../macro.message.html
 pub trait StorageValue: Sized {
     /// Returns a hash of the value.
     ///
     /// This method is actively used to build indices, so the hashing strategy must satisfy
     /// the basic requirements of cryptographic hashing: equal values must have the same hash and
-    /// not equal values must have different hashes.
+    /// not equal values must have different hashes (except for negligible probability).
     fn hash(&self) -> Hash;
 
     /// Serialize a value into a vector of bytes.
@@ -83,6 +86,7 @@ pub trait StorageValue: Sized {
     fn from_bytes(value: Cow<[u8]>) -> Self;
 }
 
+/// No-op implementation.
 impl StorageValue for () {
     fn into_bytes(self) -> Vec<u8> {
         Vec::new()
@@ -111,6 +115,7 @@ impl StorageValue for u8 {
     }
 }
 
+/// Uses little-endian encoding.
 impl StorageValue for u16 {
     fn into_bytes(self) -> Vec<u8> {
         let mut v = vec![0; 2];
@@ -129,6 +134,7 @@ impl StorageValue for u16 {
     }
 }
 
+/// Uses little-endian encoding.
 impl StorageValue for u32 {
     fn into_bytes(self) -> Vec<u8> {
         let mut v = vec![0; 4];
@@ -147,6 +153,7 @@ impl StorageValue for u32 {
     }
 }
 
+/// Uses little-endian encoding.
 impl StorageValue for u64 {
     fn into_bytes(self) -> Vec<u8> {
         let mut v = vec![0; mem::size_of::<u64>()];
@@ -179,6 +186,7 @@ impl StorageValue for i8 {
     }
 }
 
+/// Uses little-endian encoding.
 impl StorageValue for i16 {
     fn into_bytes(self) -> Vec<u8> {
         let mut v = vec![0; 2];
@@ -197,6 +205,7 @@ impl StorageValue for i16 {
     }
 }
 
+/// Uses little-endian encoding.
 impl StorageValue for i32 {
     fn into_bytes(self) -> Vec<u8> {
         let mut v = vec![0; 4];
@@ -215,6 +224,7 @@ impl StorageValue for i32 {
     }
 }
 
+/// Uses little-endian encoding.
 impl StorageValue for i64 {
     fn into_bytes(self) -> Vec<u8> {
         let mut v = vec![0; 8];
@@ -289,6 +299,7 @@ impl StorageValue for Vec<u8> {
     }
 }
 
+/// Uses UTF-8 string serialization.
 impl StorageValue for String {
     fn into_bytes(self) -> Vec<u8> {
         String::into_bytes(self)
