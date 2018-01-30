@@ -310,31 +310,28 @@ impl TimeProvider for SystemTimeProvider {
 /// # Examples
 ///
 /// ```
-/// extern crate exonum;
-/// extern crate exonum_testkit;
-/// extern crate exonum_time;
+/// # extern crate exonum;
+/// # extern crate exonum_testkit;
+/// # extern crate exonum_time;
 /// use std::time::{Duration, UNIX_EPOCH};
 /// use exonum::helpers::Height;
 /// use exonum_testkit::TestKitBuilder;
-/// use exonum_time::{MockTimeProvider, TimeProvider, TimeSchema, TimeService};
+/// use exonum_time::{MockTimeProvider, TimeSchema, TimeService};
 ///
-/// fn main() {
-///     let mock_provider = MockTimeProvider::new(UNIX_EPOCH + Duration::new(10, 0));
-///     assert_eq!(UNIX_EPOCH + Duration::new(10, 0), mock_provider.time());
+/// # fn main() {
+///     let mock_provider = MockTimeProvider::default();
 ///
 ///     let mut testkit = TestKitBuilder::validator()
-///         .with_service(TimeService::with_provider(
-///             Box::new(mock_provider.clone()) as Box<TimeProvider>,
-///         ))
+///         .with_service(TimeService::with_provider(mock_provider.clone()))
 ///         .create();
 ///
 ///     mock_provider.add_time(Duration::new(15, 0));
-///     assert_eq!(UNIX_EPOCH + Duration::new(25, 0), mock_provider.time());
+///     assert_eq!(UNIX_EPOCH + Duration::new(15, 0), mock_provider.time());
 ///     testkit.create_blocks_until(Height(2));
 ///     let snapshot = testkit.snapshot();
 ///     let schema = TimeSchema::new(snapshot);
 ///     assert_eq!(
-///         Some(UNIX_EPOCH + Duration::new(25, 0)),
+///         Some(UNIX_EPOCH + Duration::new(15, 0)),
 ///         schema.time().get().map(|time| time.time())
 ///     );
 /// }
@@ -372,13 +369,19 @@ impl MockTimeProvider {
     /// Adds `duration` to the value of `time`.
     pub fn add_time(&self, duration: Duration) {
         let mut time = self.time.write().unwrap();
-        *time += duration
+        *time += duration;
     }
 }
 
 impl TimeProvider for MockTimeProvider {
     fn current_time(&self) -> SystemTime {
-        *self.time.read().unwrap()
+        self.time()
+    }
+}
+
+impl From<MockTimeProvider> for Box<TimeProvider> {
+    fn from(mock_time_provider: MockTimeProvider) -> Self {
+        Box::new(mock_time_provider) as Box<TimeProvider>
     }
 }
 
