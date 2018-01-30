@@ -275,37 +275,37 @@ impl<V: fmt::Debug + StorageValue> MapProof<V> {
     /// If the proof is valid and the requested key does not exists, `Ok(None)` is returned.
     /// If the proof is invalid, `Err` is returned.
     pub fn validate<K: ProofMapKey>(&self, key: &K, root_hash: Hash) -> Result<Option<&V>, Error> {
-        let searched_path = ProofPath::new(key);
+        let searched_key = ProofPath::new(key);
         use self::MapProof::*;
 
         // if we inspect the topmost level of a proof
         let res: Option<&V> = match *self {
             Empty => None,
-            LeafRootInclusive(ref root_db_key, ref val) => {
-                let root_path = root_db_key;
-                if root_path != &searched_path {
+            LeafRootInclusive(ref root_path, ref val) => {
+                let root_key = root_path;
+                if root_key != &searched_key {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with searched key: \
                          {:?}. Proof: {:?}. ",
-                        searched_path,
+                        searched_key,
                         self
                     )));
                 }
                 Some(val)
             }
-            LeafRootExclusive(ref root_db_key, _) => {
-                let root_path = root_db_key;
-                if root_path == &searched_path {
+            LeafRootExclusive(ref root_path, _) => {
+                let root_key = root_path;
+                if root_key == &searched_key {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with searched key: \
                          {:?}. Proof: {:?} ",
-                        searched_path,
+                        searched_key,
                         self
                     )));
                 }
                 None
             }
-            Branch(ref branch) => branch.validate(&searched_path)?,
+            Branch(ref branch) => branch.validate(&searched_key)?,
         };
         let proof_hash = self.root_hash();
         if proof_hash != root_hash {
@@ -321,55 +321,55 @@ impl<V: fmt::Debug + StorageValue> MapProof<V> {
 }
 
 impl<V: fmt::Debug> BranchProofNode<V> {
-    fn validate(&self, searched_path: &ProofPath) -> Result<Option<&V>, Error> {
+    fn validate(&self, searched_key: &ProofPath) -> Result<Option<&V>, Error> {
         use self::BranchProofNode::*;
 
         // if we inspect the topmost level of a proof
         let res: Option<&V> = match *self {
             LeftBranch {
                 left_node: ref proof,
-                left_key: ref left_path,
+                left_key: ref left_path_key,
                 ..
             } => {
-                let left_path = left_path;
-                if !searched_path.starts_with(left_path) {
+                let left_path = left_path_key;
+                if !searched_key.starts_with(left_path) {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with searched_key: \
                          {:?}. Proof: {:?}",
-                        searched_path,
+                        searched_key,
                         self
                     )));
                 }
-                proof.validate_consistency(left_path, searched_path)?
+                proof.validate_consistency(left_path, searched_key)?
             }
             RightBranch {
                 right_node: ref proof,
-                right_key: ref right_path,
+                right_key: ref right_path_key,
                 ..
             } => {
-                let right_path = right_path;
-                if !searched_path.starts_with(right_path) {
+                let right_path = right_path_key;
+                if !searched_key.starts_with(right_path) {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with searched_key: \
                          {:?}. Proof: {:?}",
-                        searched_path,
+                        searched_key,
                         self
                     )));
                 }
-                proof.validate_consistency(right_path, searched_path)?
+                proof.validate_consistency(right_path, searched_key)?
             }
             BranchKeyNotFound {
-                left_key: ref left_path,
-                right_key: ref right_path,
+                left_key: ref left_path_key,
+                right_key: ref right_path_key,
                 ..
             } => {
-                let left_path = left_path;
-                let right_path = right_path;
-                if searched_path.starts_with(left_path) || searched_path.starts_with(right_path) {
+                let left_path = left_path_key;
+                let right_path = right_path_key;
+                if searched_key.starts_with(left_path) || searched_key.starts_with(right_path) {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with searched_key: \
                          {:?}. Proof: {:?}",
-                        searched_path,
+                        searched_key,
                         self
                     )));
                 }
@@ -382,7 +382,7 @@ impl<V: fmt::Debug> BranchProofNode<V> {
     fn validate_consistency<'a>(
         &'a self,
         parent_path: &ProofPath,
-        searched_path: &ProofPath,
+        searched_key: &ProofPath,
     ) -> Result<Option<&'a V>, Error> {
         use self::BranchProofNode::*;
 
@@ -390,12 +390,12 @@ impl<V: fmt::Debug> BranchProofNode<V> {
         let res: Option<&V> = match *self {
             LeftBranch {
                 left_node: ref proof,
-                left_key: ref left_path,
-                right_key: ref right_path,
+                left_key: ref left_path_key,
+                right_key: ref right_path_key,
                 ..
             } => {
-                let mut left_path = left_path.start_from(0);
-                let mut right_path = right_path.start_from(0);
+                let mut left_path = left_path_key.start_from(0);
+                let mut right_path = right_path_key.start_from(0);
                 if !left_path.starts_with(parent_path) || !right_path.starts_with(parent_path) {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with itself: Proof: \
@@ -404,24 +404,24 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                         parent_path
                     )));
                 }
-                if !searched_path.starts_with(&left_path) {
+                if !searched_key.starts_with(&left_path) {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with searched_key: \
                          {:?}. Proof: {:?}",
-                        searched_path,
+                        searched_key,
                         self
                     )));
                 }
-                proof.validate_consistency(&left_path, searched_path)?
+                proof.validate_consistency(&left_path, searched_key)?
             }
             RightBranch {
                 right_node: ref proof,
-                left_key: ref left_path,
-                right_key: ref right_path,
+                left_key: ref left_path_key,
+                right_key: ref right_path_key,
                 ..
             } => {
-                let mut left_path = left_path.start_from(0);
-                let mut right_path = right_path.start_from(0);
+                let mut left_path = left_path_key.start_from(0);
+                let mut right_path = right_path_key.start_from(0);
                 if !left_path.starts_with(parent_path) || !right_path.starts_with(parent_path) {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with itself: Proof: \
@@ -430,23 +430,23 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                         parent_path
                     )));
                 }
-                if !searched_path.starts_with(&right_path) {
+                if !searched_key.starts_with(&right_path) {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with searched_key: \
                          {:?}. Proof: {:?}",
-                        searched_path,
+                        searched_key,
                         self
                     )));
                 }
-                proof.validate_consistency(&right_path, searched_path)?
+                proof.validate_consistency(&right_path, searched_key)?
             }
             BranchKeyNotFound {
-                left_key: ref left_path,
-                right_key: ref right_path,
+                left_key: ref left_path_key,
+                right_key: ref right_path_key,
                 ..
             } => {
-                let mut left_path = left_path.start_from(0);
-                let mut right_path = right_path.start_from(0);
+                let mut left_path = left_path_key.start_from(0);
+                let mut right_path = right_path_key.start_from(0);
                 if !left_path.starts_with(parent_path) || !right_path.starts_with(parent_path) {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with itself: Proof: \
@@ -455,11 +455,11 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                         parent_path
                     )));
                 }
-                if searched_path.starts_with(&left_path) || searched_path.starts_with(&right_path) {
+                if searched_key.starts_with(&left_path) || searched_key.starts_with(&right_path) {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with searched_key: \
                          {:?}. Proof: {:?}",
-                        searched_path,
+                        searched_key,
                         self
                     )));
                 }
@@ -472,25 +472,25 @@ impl<V: fmt::Debug> BranchProofNode<V> {
 impl<V: fmt::Debug> ProofNode<V> {
     fn validate_consistency<'a>(
         &'a self,
-        parent_path: &ProofPath,
-        searched_path: &ProofPath,
+        parent_key: &ProofPath,
+        searched_key: &ProofPath,
     ) -> Result<Option<&'a V>, Error> {
         use self::ProofNode::*;
 
         // if we inspect sub-proofs of a proof
         let res: Option<&V> = match *self {
             Leaf(ref val) => {
-                if searched_path != parent_path {
+                if searched_key != parent_key {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with searched_key: \
                          {:?}. Parent path: {:?} ",
-                        searched_path,
-                        parent_path
+                        searched_key,
+                        parent_key
                     )));
                 }
                 Some(val)
             }
-            Branch(ref branch) => branch.validate_consistency(parent_path, searched_path)?,
+            Branch(ref branch) => branch.validate_consistency(parent_key, searched_key)?,
         };
         Ok(res)
     }

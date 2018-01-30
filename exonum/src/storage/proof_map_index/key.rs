@@ -72,7 +72,7 @@ impl ::std::ops::Not for ChildKind {
     }
 }
 
-/// A structure that represents paths to the any kinds of `ProofMapIndex` nodes.
+/// A structure that represents paths to `ProofMapIndex` nodes.
 ///
 /// # Binary representation
 ///
@@ -140,16 +140,20 @@ impl ProofPath {
 pub(crate) trait BitsRange {
     /// Returns the left border of the range.
     fn start(&self) -> u16;
+
     /// Returns the right border of the range.
     fn end(&self) -> u16;
+
     /// Returns length in bits of the range.
     fn len(&self) -> u16 {
         self.end() - self.start()
     }
+
     /// Returns true if the range has zero length.
     fn is_empty(&self) -> bool {
         self.end() == self.start()
     }
+
     /// Get bit at index `idx`.
     fn bit(&self, idx: u16) -> ChildKind {
         debug_assert!(self.start() + idx < self.end());
@@ -164,19 +168,26 @@ pub(crate) trait BitsRange {
             ChildKind::Left
         }
     }
+
     /// Returns the copy of this bit range with the given left border.
     fn start_from(&self, pos: u16) -> Self;
+
     /// Returns a copy of this bit range shortened to the specified length.
     fn prefix(&self, len: u16) -> Self;
-    /// Returns the copy of this bit range where the start is shifted by the `len` bit to the right.
+
+    /// Returns the copy of this bit range where the start is shifted by the `len`
+    /// bits to the right.
     fn suffix(&self, len: u16) -> Self;
+
     /// Checks if this bit range contains the other bit range as a prefix,
     /// provided that the start positions of both ranges are the same.
     fn starts_with(&self, other: &Self) -> bool {
         self.common_prefix_len(other) == other.len()
     }
+
     /// Returns the raw bytes of the key.
     fn raw_key(&self) -> &[u8];
+
     /// Returns the length of the common prefix between this and the other range,
     /// provided that they start from the same position.
     /// If start positions differ, returns 0.
