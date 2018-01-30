@@ -23,5 +23,8 @@ percent-encoding = "1.0"
 [dev-dependencies]
 exonum-testkit = "0.5"
 
+[replace]
+"exonum:0.5.0" = { git = "https://github.com/exonum/exonum.git", tag="v0.5" }
+
 [features]
 byzantine-behavior = []
