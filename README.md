@@ -9,14 +9,14 @@ and keep its current value in the blockchain.
 
 ## Usage
 
-Add the following line to the `Cargo.toml`:
+Include `exonum-time` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
 exonum-time = "0.1.0"
 ```
 
-And activate service in the main project file:
+Add the time oracle service to the blockchain in the main project file:
 
 ```rust
 extern crate exonum;
@@ -44,7 +44,6 @@ which must be executed no later than the specified time
 ```rust
 message! {
     struct Tx {
-        ...
         time: SystemTime,
         ...
     }
@@ -57,31 +56,32 @@ impl Transaction for Tx {
         let time_schema = exonum_time::TimeSchema::new(&view);
         // The time in the transaction should be less than in the blockchain.
         match time_schema.time().get() {
-            Some(ref current_time) if current_time.time() > self.time() => {
-                return;
+            Some(ref current_time) if current_time.time() <= self.time() => {
+                // Execute transaction business logic.
+                ...
             }
-            _ => { ... }
+            _ => {}
         }
-        ...
     }
     ... 
 }
 ```
 
+See the full implementation of the [service][service], which uses the time oracle.
+
 You can get the time of each validator node in the same manner the consolidated time of the system is obtained:
 
 ```rust
 let time_schema = exonum_time::TimeSchema::new(&view);
+// Gets the times of all validators.
 let validators_time = time_schema.validators_time();
+// Gets the time of validator with a public key equal to `public_key`. 
+let validator_time = time_schema.validators_time().get(&public_key);
 ```
-
-See the full implementation of the [`service`][service], which uses the time oracle.
-For testing the service [`exonum-testkit`][exonum-testkit] is used.
 
 ## License
 
-`exonum-time` is licensed under the Apache License (Version 2.0). See [LICENSE][license] for details.
+`exonum-time` is licensed under the Apache License (Version 2.0). See [LICENSE](LICENSE) for details.
 
 [service]: examples/simple_service.rs
 [exonum-testkit]: https://github.com/exonum/exonum-testkit
-[license]: https://github.com/exonum/exonum-time/blob/master/LICENSE

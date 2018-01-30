@@ -7,7 +7,6 @@ extern crate pretty_assertions;
 
 use std::collections::HashMap;
 use std::iter::FromIterator;
-use std::sync::{Arc, RwLock};
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
 use exonum::helpers::{Height, ValidatorId};
@@ -18,7 +17,7 @@ use exonum_time::{MockTimeProvider, TimeService, TimeSchema, TxTime, Time, TimeP
                   ValidatorTime};
 use exonum_testkit::{ApiKind, TestKitApi, TestKitBuilder, TestNode};
 
-fn verify_data<T: AsRef<Snapshot>>(
+fn assert_data<T: AsRef<Snapshot>>(
     snapshot: T,
     validators: &[TestNode],
     expected_current_time: Option<SystemTime>,
@@ -57,7 +56,7 @@ fn test_exonum_time_service_with_3_validators() {
     //
     // Consolidated time is None.
 
-    verify_data(&testkit.snapshot(), &validators, None, &[None, None, None]);
+    assert_data(testkit.snapshot(), &validators, None, &[None, None, None]);
 
     // Add first transaction `tx0` from first validator with time `time0`.
     // After that validators time look like this:
@@ -73,8 +72,8 @@ fn test_exonum_time_service_with_3_validators() {
     };
     testkit.create_block_with_transactions(txvec![tx0]);
 
-    verify_data(
-        &testkit.snapshot(),
+    assert_data(
+        testkit.snapshot(),
         &validators,
         Some(time0),
         &[Some(time0), None, None],
@@ -95,8 +94,8 @@ fn test_exonum_time_service_with_3_validators() {
     };
     testkit.create_block_with_transactions(txvec![tx1]);
 
-    verify_data(
-        &testkit.snapshot(),
+    assert_data(
+        testkit.snapshot(),
         &validators,
         Some(time1),
         &[Some(time0), Some(time1), None],
@@ -120,7 +119,7 @@ fn test_exonum_time_service_with_4_validators() {
     //
     // Consolidated time is None.
 
-    verify_data(
+    assert_data(
         testkit.snapshot(),
         &validators,
         None,
@@ -141,8 +140,8 @@ fn test_exonum_time_service_with_4_validators() {
     };
     testkit.create_block_with_transactions(txvec![tx0]);
 
-    verify_data(
-        &testkit.snapshot(),
+    assert_data(
+        testkit.snapshot(),
         &validators,
         None,
         &[Some(time0), None, None, None],
@@ -163,8 +162,8 @@ fn test_exonum_time_service_with_4_validators() {
     };
     testkit.create_block_with_transactions(txvec![tx1]);
 
-    verify_data(
-        &testkit.snapshot(),
+    assert_data(
+        testkit.snapshot(),
         &validators,
         None,
         &[Some(time0), Some(time1), None, None],
@@ -185,8 +184,8 @@ fn test_exonum_time_service_with_4_validators() {
     };
     testkit.create_block_with_transactions(txvec![tx2]);
 
-    verify_data(
-        &testkit.snapshot(),
+    assert_data(
+        testkit.snapshot(),
         &validators,
         Some(time1),
         &[Some(time0), Some(time1), Some(time2), None],
@@ -207,21 +206,15 @@ fn test_exonum_time_service_with_4_validators() {
     };
     testkit.create_block_with_transactions(txvec![tx3]);
 
-    verify_data(
-        &testkit.snapshot(),
+    assert_data(
+        testkit.snapshot(),
         &validators,
         Some(time2),
         &[Some(time0), Some(time1), Some(time2), Some(time3)],
     );
 }
 
-fn verify_storage_time<T: AsRef<Snapshot>>(
-    expected_time: SystemTime,
-    mock_time: &Arc<RwLock<SystemTime>>,
-    snapshot: T,
-) {
-    assert_eq!(expected_time, *mock_time.read().unwrap());
-
+fn assert_storage_time<T: AsRef<Snapshot>>(snapshot: T, expected_time: SystemTime) {
     let schema = TimeSchema::new(snapshot);
     assert_eq!(
         Some(expected_time),
@@ -231,7 +224,7 @@ fn verify_storage_time<T: AsRef<Snapshot>>(
 
 #[test]
 fn test_mock_provider() {
-    let mock_provider = MockTimeProvider::new();
+    let mock_provider = MockTimeProvider::default();
     let mut testkit = TestKitBuilder::validator()
         .with_service(TimeService::with_provider(
             Box::new(mock_provider.clone()) as Box<TimeProvider>,
@@ -239,43 +232,24 @@ fn test_mock_provider() {
         .create();
 
     mock_provider.add_time(Duration::new(10, 0));
+    assert_eq!(UNIX_EPOCH + Duration::new(10, 0), mock_provider.time());
     testkit.create_blocks_until(Height(2));
-    verify_storage_time(
-        UNIX_EPOCH + Duration::new(10, 0),
-        &mock_provider.time,
-        &testkit.snapshot(),
-    );
+    assert_storage_time(testkit.snapshot(), UNIX_EPOCH + Duration::new(10, 0));
 
     mock_provider.set_time(UNIX_EPOCH + Duration::new(50, 0));
+    assert_eq!(UNIX_EPOCH + Duration::new(50, 0), mock_provider.time());
     testkit.create_blocks_until(Height(4));
-    verify_storage_time(
-        UNIX_EPOCH + Duration::new(50, 0),
-        &mock_provider.time,
-        &testkit.snapshot(),
-    );
+    assert_storage_time(testkit.snapshot(), UNIX_EPOCH + Duration::new(50, 0));
 
     mock_provider.add_time(Duration::new(20, 0));
+    assert_eq!(UNIX_EPOCH + Duration::new(70, 0), mock_provider.time());
     testkit.create_blocks_until(Height(6));
-    verify_storage_time(
-        UNIX_EPOCH + Duration::new(70, 0),
-        &mock_provider.time,
-        &testkit.snapshot(),
-    );
+    assert_storage_time(testkit.snapshot(), UNIX_EPOCH + Duration::new(70, 0));
 
     mock_provider.set_time(UNIX_EPOCH + Duration::new(30, 0));
+    assert_eq!(UNIX_EPOCH + Duration::new(30, 0), mock_provider.time());
     testkit.create_blocks_until(Height(8));
-
-    assert_eq!(
-        UNIX_EPOCH + Duration::new(30, 0),
-        *mock_provider.time.read().unwrap()
-    );
-
-    let snapshot = testkit.snapshot();
-    let schema = TimeSchema::new(snapshot);
-    assert_eq!(
-        Some(UNIX_EPOCH + Duration::new(70, 0)),
-        schema.time().get().map(|time| time.time())
-    );
+    assert_storage_time(testkit.snapshot(), UNIX_EPOCH + Duration::new(70, 0));
 }
 
 #[test]

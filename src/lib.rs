@@ -31,7 +31,6 @@ use iron::prelude::*;
 use iron::Handler;
 use router::Router;
 
-use std::ops::AddAssign;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -307,34 +306,73 @@ impl TimeProvider for SystemTimeProvider {
 }
 
 /// Mock provider for service testing.
+///
+/// # Examples
+///
+/// ```
+/// extern crate exonum;
+/// extern crate exonum_testkit;
+/// extern crate exonum_time;
+/// use std::time::{Duration, UNIX_EPOCH};
+/// use exonum::helpers::Height;
+/// use exonum_testkit::TestKitBuilder;
+/// use exonum_time::{MockTimeProvider, TimeProvider, TimeSchema, TimeService};
+///
+/// fn main() {
+///     let mock_provider = MockTimeProvider::new(UNIX_EPOCH + Duration::new(10, 0));
+///     assert_eq!(UNIX_EPOCH + Duration::new(10, 0), mock_provider.time());
+///
+///     let mut testkit = TestKitBuilder::validator()
+///         .with_service(TimeService::with_provider(
+///             Box::new(mock_provider.clone()) as Box<TimeProvider>,
+///         ))
+///         .create();
+///
+///     mock_provider.add_time(Duration::new(15, 0));
+///     assert_eq!(UNIX_EPOCH + Duration::new(25, 0), mock_provider.time());
+///     testkit.create_blocks_until(Height(2));
+///     let snapshot = testkit.snapshot();
+///     let schema = TimeSchema::new(snapshot);
+///     assert_eq!(
+///         Some(UNIX_EPOCH + Duration::new(25, 0)),
+///         schema.time().get().map(|time| time.time())
+///     );
+/// }
+/// ```
 #[derive(Debug, Clone)]
 pub struct MockTimeProvider {
     /// Local time value.
-    pub time: Arc<RwLock<SystemTime>>,
+    time: Arc<RwLock<SystemTime>>,
 }
 
+/// Default mock provider is initialized with the Unix epoch start.
 impl Default for MockTimeProvider {
-    fn default() -> MockTimeProvider {
-        MockTimeProvider { time: Arc::new(RwLock::new(UNIX_EPOCH)) }
+    fn default() -> Self {
+        Self::new(UNIX_EPOCH)
     }
 }
 
 impl MockTimeProvider {
-    /// Create a new `MockTimeProvider`.
-    pub fn new() -> MockTimeProvider {
-        MockTimeProvider::default()
+    /// Creates a new `MockTimeProvider` with time value equal to `time`.
+    pub fn new(time: SystemTime) -> Self {
+        Self { time: Arc::new(RwLock::new(time)) }
     }
 
-    /// Set the time value to `new_time`.
+    /// Gets the time value.
+    pub fn time(&self) -> SystemTime {
+        *self.time.read().unwrap()
+    }
+
+    /// Sets the time value to `new_time`.
     pub fn set_time(&self, new_time: SystemTime) {
         let mut time = self.time.write().unwrap();
         *time = new_time;
     }
 
-    /// Add `duration` to the value of `time`.
+    /// Adds `duration` to the value of `time`.
     pub fn add_time(&self, duration: Duration) {
         let mut time = self.time.write().unwrap();
-        time.add_assign(duration);
+        *time += duration
     }
 }
 

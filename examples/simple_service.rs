@@ -14,8 +14,6 @@
 
 //! Service, which uses the time oracle.
 
-#![deny(missing_debug_implementations, missing_docs)]
-
 #[macro_use]
 extern crate exonum;
 extern crate exonum_time;
@@ -31,7 +29,7 @@ use exonum::encoding;
 use exonum::helpers::Height;
 use exonum::messages::{Message, RawTransaction};
 use exonum::storage::{Fork, ProofMapIndex, Snapshot};
-use exonum_time::{TimeService, TimeSchema, TimeProvider, Time, MockTimeProvider};
+use exonum_time::{TimeService, TimeSchema, TimeProvider, MockTimeProvider};
 use exonum_testkit::TestKitBuilder;
 
 /// Marker service id.
@@ -79,11 +77,9 @@ message! {
     struct TxMarker {
         const TYPE = SERVICE_ID;
         const ID = TX_MARKER_ID;
-        /// Node's public key.
+
         from: &PublicKey,
-        /// Mark value
         mark: i32,
-        /// Time
         time: SystemTime,
     }
 }
@@ -95,19 +91,15 @@ impl Transaction for TxMarker {
 
     fn execute(&self, view: &mut Fork) {
         {
-            // Import schema.
-            let time_schema = TimeSchema::new(&view);
-            // The time in the transaction should be less than in the blockchain.
-            match time_schema.time().get() {
-                Some(ref current_time) if current_time.time() > self.time() => {
-                    return;
+            let time = TimeSchema::new(&view).time().get();
+            match time {
+                Some(ref current_time) if current_time.time() <= self.time() => {
+                    let mut schema = MarkerSchema::new(view);
+                    schema.marks_mut().put(self.from(), self.mark());
                 }
                 _ => {}
             }
         }
-        // Mark the node whose public key is specified in the transaction.
-        let mut schema = MarkerSchema::new(view);
-        schema.marks_mut().put(self.from(), self.mark());
     }
 }
 
@@ -140,7 +132,7 @@ impl Service for MarkerService {
 }
 
 fn main() {
-    let mock_provider = MockTimeProvider::new();
+    let mock_provider = MockTimeProvider::default();
     // Create testkit for network with one validator.
     let mut testkit = TestKitBuilder::validator()
         .with_service(MarkerService)
@@ -148,28 +140,21 @@ fn main() {
             Box::new(mock_provider.clone()) as Box<TimeProvider>,
         ))
         .create();
-    // Set the time value to `UNIX_EPOCH + Duration::new(10, 0)`.
+
     mock_provider.set_time(UNIX_EPOCH + Duration::new(10, 0));
-    // Create two blocks to set the time in the blockchain.
     testkit.create_blocks_until(Height(2));
 
     let snapshot = testkit.snapshot();
     let time_schema = TimeSchema::new(&snapshot);
     assert_eq!(
-        time_schema.time().get(),
-        Some(Time::new(UNIX_EPOCH + Duration::new(10, 0)))
+        time_schema.time().get().map(|time| time.time()),
+        Some(mock_provider.time())
     );
 
-    // Create few transactions.
     let keypair1 = gen_keypair();
     let keypair2 = gen_keypair();
     let keypair3 = gen_keypair();
-    let tx1 = TxMarker::new(
-        &keypair1.0,
-        1,
-        UNIX_EPOCH + Duration::new(10, 0),
-        &keypair1.1,
-    );
+    let tx1 = TxMarker::new(&keypair1.0, 1, mock_provider.time(), &keypair1.1);
     let tx2 = TxMarker::new(
         &keypair2.0,
         2,
@@ -184,14 +169,12 @@ fn main() {
     );
     testkit.create_block_with_transactions(txvec![tx1, tx2, tx3]);
 
-    // Check results.
     let snapshot = testkit.snapshot();
     let schema = MarkerSchema::new(snapshot);
     assert_eq!(schema.marks().get(&keypair1.0), Some(1));
     assert_eq!(schema.marks().get(&keypair2.0), Some(2));
     assert_eq!(schema.marks().get(&keypair3.0), None);
 
-    // And create one more transaction.
     let tx4 = TxMarker::new(
         &keypair3.0,
         4,
@@ -200,7 +183,6 @@ fn main() {
     );
     testkit.create_block_with_transactions(txvec![tx4]);
 
-    // And check result.
     let snapshot = testkit.snapshot();
     let schema = MarkerSchema::new(snapshot);
     assert_eq!(schema.marks().get(&keypair3.0), Some(4));
