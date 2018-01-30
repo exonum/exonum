@@ -19,7 +19,7 @@ use crypto::{hash, Hash, HashStream};
 use storage::db::Database;
 use encoding::serialize::json::reexport::to_string;
 use encoding::serialize::reexport::{Serialize, Serializer};
-use super::{DBKey, ProofMapIndex};
+use super::{ProofMapIndex, ProofPath};
 use super::proof::MapProof;
 use super::key::{KEY_SIZE, LEAF_KEY_PREFIX};
 
@@ -321,7 +321,7 @@ fn build_proof_in_leaf_tree(db: Box<Database>) {
 
     match proof_path {
         MapProof::LeafRootExclusive(key, hash_val) => {
-            assert_eq!(key, DBKey::leaf(&root_key));
+            assert_eq!(key, ProofPath::new(&root_key));
             assert_eq!(hash_val, hash(&root_val));
         }
         _ => assert!(false),
@@ -335,7 +335,7 @@ fn build_proof_in_leaf_tree(db: Box<Database>) {
     }
     match proof_path {
         MapProof::LeafRootInclusive(key, val) => {
-            assert_eq!(key, DBKey::leaf(&root_key));
+            assert_eq!(key, ProofPath::new(&root_key));
             assert_eq!(val, root_val);
         }
         _ => assert!(false),

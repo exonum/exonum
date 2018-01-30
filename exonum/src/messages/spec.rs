@@ -12,27 +12,54 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// `message!` implement structure that could be sent in exonum network.
+/// `message!` specifies a datatype for digitally signed messages that can be sent
+/// in Exonum networks. The macro offers a practical way to create [`Transaction`] types,
+/// although it does not implement `Transaction` by itself.
 ///
-/// Each message is a piece of data that is signed by creators key.
-/// For now it's required to set service id as `const TYPE`,
-/// and message id as `const ID`.
+/// The `message!` macro specifies fields of data pretty much in the same way they
+/// are specified for Rust structures. (For additional reference about data layout see the
+/// documentation of the [`encoding` module](./encoding/index.html).)
+/// Additionally, the macro is required to set:
 ///
-/// - service id should be unique inside whole exonum.
-/// - message id should be unique inside each service.
+/// - Identifier of a service, which will be used [in parsing messages][parsing], as `const TYPE`.
+///   Service ID should be unique within the Exonum blockchain.
+/// - Message identifier, as `const ID`. Message ID should be unique within each service.
 ///
-/// # Usage Example:
+/// The macro creates getter methods for all fields with the same names as fields.
+/// In addition, two constructors are defined:
+///
+/// - `new` takes all fields in the order of their declaration in the macro, and a [`SecretKey`]
+///   to sign the message as the last argument.
+/// - `new_with_signature` takes all fields in the order of their declaration in the macro,
+///   and a message [`Signature`].
+///
+/// `message!` also implements [`Message`], [`SegmentField`], [`ExonumJson`]
+/// and [`StorageValue`] traits for the declared datatype.
+///
+/// **NB.** `message!` uses other macros in the `exonum` crate internally.
+/// Be sure to add them to the global scope.
+///
+/// [`Transaction`]: ./blockchain/trait.Transaction.html
+/// [parsing]: ./blockchain/trait.Service.html#tymethod.tx_from_raw
+/// [`SecretKey`]: ./crypto/struct.SecretKey.html
+/// [`Signature`]: ./crypto/struct.Signature.html
+/// [`SegmentField`]: ./encoding/trait.SegmentField.html
+/// [`ExonumJson`]: ./encoding/serialize/json/trait.ExonumJson.html
+/// [`StorageValue`]: ./storage/trait.StorageValue.html
+/// [`Message`]: ./messages/trait.Message.html
+///
+/// # Examples
+///
 /// ```
 /// #[macro_use] extern crate exonum;
-/// # extern crate serde;
 ///
 /// const MY_SERVICE_ID: u16 = 777;
-/// const MY_NEW_MESSAGE_ID: u16 = 1;
+/// const MY_MESSAGE_ID: u16 = 1;
 ///
 /// message! {
-///     struct SendTwoInteger {
-///         const TYPE = MY_NEW_MESSAGE_ID;
-///         const ID   = MY_SERVICE_ID;
+///     struct SendTwoIntegers {
+///         const TYPE = MY_SERVICE_ID;
+///         const ID   = MY_MESSAGE_ID;
 ///
 ///         first: u64,
 ///         second: u64,
@@ -40,23 +67,11 @@
 /// }
 ///
 /// # fn main() {
-///     let (_, creators_key) = ::exonum::crypto::gen_keypair();
-/// #    let structure = create_message(&creators_key);
-/// #    println!("Debug structure = {:?}", structure);
-/// # }
-///
-/// # fn create_message(creators_key: &::exonum::crypto::SecretKey) -> SendTwoInteger {
-///     let first = 1u64;
-///     let second = 2u64;
-///     SendTwoInteger::new(first, second, creators_key)
+/// let (_, creator_key) = exonum::crypto::gen_keypair();
+/// let tx = SendTwoIntegers::new(1, 2, &creator_key);
+/// println!("Transaction: {:?}", tx);
 /// # }
 /// ```
-///
-/// For additionall reference about data layout see also
-/// *[ `encoding` documentation](./encoding/index.html).*
-///
-/// `message!` internally uses other exonum macros,
-/// be sure to add them all to namespace.
 #[macro_export]
 macro_rules! message {
     (
@@ -175,7 +190,7 @@ macro_rules! message {
 
         impl $name {
             #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
-            /// Creates messsage and sign it.
+            /// Creates message and signs it.
             #[allow(unused_mut)]
             pub fn new($($field_name: $field_type,)*
                        secret_key: &$crate::crypto::SecretKey) -> $name {
@@ -223,13 +238,13 @@ macro_rules! message {
                 Ok(latest_segment)
             }
 
-            /// Returns `message_id` useable for matching.
+            /// Returns `message_id` usable for matching.
             #[allow(dead_code)]
             pub fn message_id() -> u16 {
                 $id
             }
 
-            /// Returns `service_id` useable for matching.
+            /// Returns `service_id` usable for matching.
             #[allow(dead_code)]
             pub fn service_id() -> u16 {
                 $extension

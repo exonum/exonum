@@ -475,7 +475,7 @@ impl Finalize {
             if map.insert(config.node.validator_keys.consensus_key, config.node)
                 .is_some()
             {
-                panic!("Found duplicate consenus keys in PUBLIC_CONFIGS");
+                panic!("Found duplicate consensus keys in PUBLIC_CONFIGS");
             }
         }
         (

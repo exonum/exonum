@@ -14,14 +14,14 @@
 
 use std::borrow::Cow;
 
-use crypto::{Hash, hash, HASH_SIZE};
+use crypto::{hash, Hash, HASH_SIZE};
 
 use super::super::{StorageKey, StorageValue};
-use super::key::{DBKey, ChildKind, DB_KEY_SIZE};
+use super::key::{ChildKind, ProofPath, PROOF_PATH_SIZE};
 
-// TODO: implement Field for DBKey and define BranchNode as StorageValue (ECR-22)
+// TODO: implement Field for ProofPath and define BranchNode as StorageValue (ECR-22)
 
-const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + DB_KEY_SIZE);
+const BRANCH_NODE_SIZE: usize = 2 * (HASH_SIZE + PROOF_PATH_SIZE);
 
 #[derive(Debug)]
 pub enum Node<T: StorageValue> {
@@ -49,20 +49,20 @@ impl BranchNode {
         }
     }
 
-    pub fn child_slice(&self, kind: ChildKind) -> DBKey {
+    pub fn child_path(&self, kind: ChildKind) -> ProofPath {
         let from = match kind {
-            ChildKind::Right => 2 * HASH_SIZE + DB_KEY_SIZE,
+            ChildKind::Right => 2 * HASH_SIZE + PROOF_PATH_SIZE,
             ChildKind::Left => 2 * HASH_SIZE,
         };
-        DBKey::read(&self.raw[from..from + DB_KEY_SIZE])
+        ProofPath::read(&self.raw[from..from + PROOF_PATH_SIZE])
     }
 
-    pub fn set_child_slice(&mut self, kind: ChildKind, prefix: &DBKey) {
+    pub fn set_child_path(&mut self, kind: ChildKind, prefix: &ProofPath) {
         let from = match kind {
-            ChildKind::Right => 2 * HASH_SIZE + DB_KEY_SIZE,
+            ChildKind::Right => 2 * HASH_SIZE + PROOF_PATH_SIZE,
             ChildKind::Left => 2 * HASH_SIZE,
         };
-        prefix.write(&mut self.raw[from..from + DB_KEY_SIZE]);
+        prefix.write(&mut self.raw[from..from + PROOF_PATH_SIZE]);
     }
 
     pub fn set_child_hash(&mut self, kind: ChildKind, hash: &Hash) {
@@ -73,8 +73,8 @@ impl BranchNode {
         self.raw[from..from + HASH_SIZE].copy_from_slice(hash.as_ref());
     }
 
-    pub fn set_child(&mut self, kind: ChildKind, prefix: &DBKey, hash: &Hash) {
-        self.set_child_slice(kind, prefix);
+    pub fn set_child(&mut self, kind: ChildKind, prefix: &ProofPath, hash: &Hash) {
+        self.set_child_path(kind, prefix);
         self.set_child_hash(kind, hash);
     }
 }
@@ -96,9 +96,9 @@ impl StorageValue for BranchNode {
 impl ::std::fmt::Debug for BranchNode {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         f.debug_struct("BranchNode")
-            .field("left_prefix", &self.child_slice(ChildKind::Left))
+            .field("left_path", &self.child_path(ChildKind::Left))
             .field("left_hash", &self.child_hash(ChildKind::Left))
-            .field("right_prefix", &self.child_slice(ChildKind::Right))
+            .field("right_path", &self.child_path(ChildKind::Right))
             .field("right_hash", &self.child_hash(ChildKind::Right))
             .field("hash", &self.hash())
             .finish()
@@ -111,14 +111,14 @@ fn test_branch_node() {
 
     let lh = hash(&[1, 2]);
     let rh = hash(&[3, 4]);
-    let ls = DBKey::leaf(&[253; 32]);
-    let rs = DBKey::leaf(&[244; 32]);
+    let ls = ProofPath::new(&[253; 32]);
+    let rs = ProofPath::new(&[244; 32]);
 
     branch.set_child(ChildKind::Left, &ls, &lh);
     branch.set_child(ChildKind::Right, &rs, &rh);
 
     assert_eq!(branch.child_hash(ChildKind::Left), &lh);
     assert_eq!(branch.child_hash(ChildKind::Right), &rh);
-    assert_eq!(branch.child_slice(ChildKind::Left), ls);
-    assert_eq!(branch.child_slice(ChildKind::Right), rs);
+    assert_eq!(branch.child_path(ChildKind::Left), ls);
+    assert_eq!(branch.child_path(ChildKind::Right), rs);
 }

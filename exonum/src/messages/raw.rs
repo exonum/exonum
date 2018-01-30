@@ -61,7 +61,7 @@ impl AsRef<[u8]> for RawMessage {
 
 // TODO: reduce `to` argument from `write`, `read` and `check` methods
 // TODO: payload_length as a first value into message header
-// TODO: make sure that message length is enougth when using mem::transmute
+// TODO: make sure that message length is enough when using mem::transmute
 // (ECR-166)
 
 /// A raw message represented by the bytes buffer.
@@ -257,6 +257,11 @@ impl MessageWriter {
 }
 
 /// Represents generic message interface.
+///
+/// An Exonum message is a piece of data that is signed by the creator's [Ed25519] key;
+/// the resulting digital signature is a part of the message.
+///
+/// [Ed25519]: ../crypto/index.html
 pub trait Message: Debug + Send + Sync {
     /// Converts the raw message into the specific one.
     fn from_raw(raw: RawMessage) -> Result<Self, encoding::Error>

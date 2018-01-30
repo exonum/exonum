@@ -23,6 +23,7 @@ All notable changes to this project will be documented in this file. The project
 - Removed `info` method from the `Transaction`. (#402)
 - Replaced config param `timeout_events_capacity` with `internal_events_capacity`. (#388)
 - The `Transaction` trait now inherits from `ExonumJson`. (#402)
+- `DBKey` renamed to `ProofPath` and part of its functionality was moved to the `BitsRange` trait. (#420)
 
 ### New features
 - Added `patch` method to the `Fork` structure. (#393)
