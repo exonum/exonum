@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file. The project
 
 ## [Unreleased]
 
-## 0.5 - 2018-01-29
+## 0.5 - 2018-01-30
 
 ### Breaking changes
 - The order of bytes and bits in the `DBKey` keys of `ProofMapIndex` became consistent. The change influences how
