@@ -122,6 +122,13 @@ fn my_api_test() {
 }
 ```
 
+In some situations, it can be useful to see the content of requests and corresponding responses. 
+`exonum-testkit` provides simple logging implementation for this purpose. 
+You can use `RUST_LOG` environment variable to enable logs:
+```
+RUST_LOG=exonum_testkit=trace cargo test
+```
+
 ## Advanced usage
 
 Here are examples of more complex and less common cases.
