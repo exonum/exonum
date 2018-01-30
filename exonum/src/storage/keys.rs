@@ -123,7 +123,7 @@ impl StorageKey for i8 {
     }
 
     fn read(buffer: &[u8]) -> Self {
-        buffer[0].wrapping_add(i8::min_value() as u8) as i8
+        buffer[0].wrapping_sub(i8::min_value() as u8) as i8
     }
 }
 
@@ -160,7 +160,7 @@ macro_rules! storage_key_for_ints {
 
             fn read(buffer: &[u8]) -> Self {
                 BigEndian::$read_method(buffer)
-                    .wrapping_add($itype::min_value() as $utype) as $itype
+                    .wrapping_sub($itype::min_value() as $utype) as $itype
             }
         }
     }
@@ -232,22 +232,27 @@ mod tests {
     use super::*;
 
     // Number of samples for fuzz testing
-    const FUZZ_SAMPLES: usize = 10_000;
+    const FUZZ_SAMPLES: usize = 100_000;
 
     macro_rules! test_storage_key_for_int_type {
         (full $type:ident, $size:expr => $test_name:ident) => {
             #[test]
             fn $test_name() {
+                use std::iter::once;
+
+                const MIN: $type = ::std::$type::MIN;
+                const MAX: $type = ::std::$type::MAX;
+
                 // Roundtrip
                 let mut buffer = [0u8; $size];
-                for x in $type::min_value()..$type::max_value() {
+                for x in (MIN..MAX).chain(once(MAX)) {
                     x.write(&mut buffer);
                     assert_eq!($type::read(&buffer), x);
                 }
 
                 // Ordering
                 let (mut x_buffer, mut y_buffer) = ([0u8; $size], [0u8; $size]);
-                for x in $type::min_value()..$type::max_value() {
+                for x in MIN..MAX {
                     let y = x + 1;
                     x.write(&mut x_buffer);
                     y.write(&mut y_buffer);
@@ -263,8 +268,8 @@ mod tests {
 
                 // Fuzzed roundtrip
                 let mut buffer = [0u8; $size];
-                for _ in 0..FUZZ_SAMPLES {
-                    let x: $type = rng.gen();
+                let handpicked_vals = vec![$type::min_value(), $type::max_value()];
+                for x in rng.gen_iter::<$type>().take(FUZZ_SAMPLES).chain(handpicked_vals) {
                     x.write(&mut buffer);
                     assert_eq!($type::read(&buffer), x);
                 }
@@ -275,6 +280,8 @@ mod tests {
                 vals.sort();
                 for w in vals.windows(2) {
                     let (x, y) = (w[0], w[1]);
+                    if x == y { continue; }
+
                     x.write(&mut x_buffer);
                     y.write(&mut y_buffer);
                     assert!(x_buffer < y_buffer);
