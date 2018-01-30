@@ -18,18 +18,19 @@ sudo: false
 
 env:
   global:
-  - CLIPPY_VERS=0.0.175
+  - CLIPPY_VERS=0.0.181
   - RUSTFMT_VERS=0.9.0
   - DEADLINKS_VERS=0.3.0
+  - LIBSODIUM_VERS=1.0.13
   - ROCKSDB_LIB_DIR=/usr/lib/x86_64-linux-gnu
   - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
 
 install:
 - |
   if [ ! -f "$HOME/.local/lib/libsodium.a" ]; then
-    wget https://download.libsodium.org/libsodium/releases/libsodium-1.0.13.tar.gz
-    tar xvf libsodium-1.0.13.tar.gz
-    cd libsodium-1.0.13
+    wget https://download.libsodium.org/libsodium/releases/libsodium-$LIBSODIUM_VERS.tar.gz
+    tar xvf libsodium-$LIBSODIUM_VERS.tar.gz
+    cd libsodium-$LIBSODIUM_VERS
     ./configure --prefix=$HOME/.local
     make
     make install
@@ -70,7 +71,7 @@ jobs:
     - cargo audit
     - cargo fmt -- --write-mode=diff
   - stage: test
-    rust: nightly-2017-12-11
+    rust: nightly-2018-01-22
     env:
     - FEATURE=clippy
     script:
