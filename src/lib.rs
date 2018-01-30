@@ -320,20 +320,17 @@ impl Default for MockTimeProvider {
 }
 
 impl MockTimeProvider {
-    #[warn(unused_variables)]
     /// Create a new `MockTimeProvider`.
     pub fn new() -> MockTimeProvider {
         MockTimeProvider::default()
     }
 
-    #[warn(unused_variables)]
     /// Set the time value to `new_time`.
     pub fn set_time(&self, new_time: SystemTime) {
         let mut time = self.time.write().unwrap();
         *time = new_time;
     }
 
-    #[warn(unused_variables)]
     /// Add `duration` to the value of `time`.
     pub fn add_time(&self, duration: Duration) {
         let mut time = self.time.write().unwrap();
