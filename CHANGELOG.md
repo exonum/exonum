@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## 0.5.0 - 2018-01-30
+
 ### Added
 - Added `rollback()` method for `TestKit` allowing to rollback blocks added to
   the testkit blockchain. (#8)
