@@ -1,5 +1,3 @@
-use serde_json::{Value, to_value};
-
 use exonum::storage::Fork;
 use exonum::blockchain::Transaction;
 use exonum::messages::Message;
@@ -26,10 +24,6 @@ impl Transaction for TxUpdateUser {
         }
         schema.add_user(user_id_hash, user);
     }
-
-    fn info(&self) -> Value {
-        to_value(self).unwrap()
-    }
 }
 
 impl Transaction for TxPayment {
@@ -40,10 +34,6 @@ impl Transaction for TxPayment {
     fn execute(&self, view: &mut Fork) {
         let mut schema = Schema::new(view);
         schema.add_payment(self.content());
-    }
-
-    fn info(&self) -> Value {
-        to_value(self).unwrap()
     }
 }
 
@@ -77,9 +67,5 @@ impl Transaction for TxTimestamp {
         } else {
             debug!("Key is not suitable");
         }
-    }
-
-    fn info(&self) -> Value {
-        to_value(self).unwrap()
     }
 }

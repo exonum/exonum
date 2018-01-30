@@ -9,70 +9,60 @@ pub const TX_TIMESTAMP_ID: u16 = 2;
 encoding_struct! {
     /// Information about timestapming user.
     struct UserInfo {
-        const SIZE = 56;
-
         /// Unique user identifier.
-        field id:                       &str        [00 => 08]
+        id:                       &str,
         /// Public key of user.
-        field pub_key:                  &PublicKey  [08 => 40]
+        pub_key:                  &PublicKey,
         /// Encrypted secret key.
-        field encrypted_secret_key:     &[u8]       [40 => 48]
+        encrypted_secret_key:     &[u8],
         /// Additional metadata.
-        field metadata:                 &str        [48 => 56]
+        metadata:                 &str,
     }
 }
 
 encoding_struct! {
     /// Information about payment.
     struct PaymentInfo {
-        const SIZE = 24;
-
         /// User identifier.
-        field user_id:                  &str        [00 => 08]
+        user_id:                  &str,
         /// Total amount of available transactions.
-        field total_amount:             u64         [08 => 16]
+        total_amount:             u64,
         /// Additional metadata.
-        field metadata:                 &str        [16 => 24]
+        metadata:                 &str,
     }
 }
 
 encoding_struct! {
     /// Information about payment.
     struct Timestamp {
-        const SIZE = 48;
-
         /// User identifier.
-        field user_id:                  &str        [00 => 08]
+        user_id:                  &str,
         /// Hash of content.
-        field content_hash:             &Hash       [08 => 40]
+        content_hash:             &Hash,
         /// Additional metadata.
-        field metadata:                 &str        [40 => 48]
+        metadata:                 &str,
     }
 }
 
 encoding_struct! {
     /// User information entry.
     struct UserInfoEntry {
-        const SIZE = 48;
-
         /// User information entry.
-        field info:                     UserInfo    [00 => 08]
+        info:                     UserInfo,
         /// Total amount of available transactions
-        field available_timestamps:     i64         [08 => 16]
+        available_timestamps:     i64,
         /// Root hash of user payments.
-        field payments_hash:            &Hash       [16 => 48]
+        payments_hash:            &Hash,
     }
 }
 
 encoding_struct! {
     /// Timestamp entry
     struct TimestampEntry {
-        const SIZE = 40;
-
         /// User identifier.
-        field timestamp:                Timestamp   [00 => 08]
+        timestamp:                Timestamp,
         /// Hash of tx.
-        field tx_hash:                  &Hash       [08 => 40]
+        tx_hash:                  &Hash,
     }
 }
 
@@ -82,12 +72,11 @@ message! {
     struct TxUpdateUser {
         const TYPE = TIMESTAMPING_SERVICE;
         const ID = TX_UPDATE_USER_ID;
-        const SIZE = 40;
 
         /// Public key of transaction.
-        field pub_key:                  &PublicKey  [00 => 32]
+        pub_key:                  &PublicKey,
         /// User information content.
-        field content:                  UserInfo    [32 => 40]
+        content:                  UserInfo,
     }
 }
 
@@ -96,12 +85,11 @@ message! {
     struct TxPayment {
         const TYPE = TIMESTAMPING_SERVICE;
         const ID = TX_PAYMENT_ID;
-        const SIZE = 40;
 
         /// Public key of transaction.
-        field pub_key:                  &PublicKey  [00 => 32]
+        pub_key:                  &PublicKey,
         /// Information about payment.
-        field content:                  PaymentInfo [32 => 40]
+        content:                  PaymentInfo,
     }
 }
 
@@ -110,12 +98,11 @@ message! {
     struct TxTimestamp {
         const TYPE = TIMESTAMPING_SERVICE;
         const ID = TX_TIMESTAMP_ID;
-        const SIZE = 40;
 
         /// Public key of transaction.
-        field pub_key:                  &PublicKey  [00 => 32]
+        pub_key:                  &PublicKey,
         /// Timestamp content.
-        field content:                  Timestamp   [32 => 40]
+        content:                  Timestamp,
     }
 }
 

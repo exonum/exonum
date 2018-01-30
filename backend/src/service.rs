@@ -6,7 +6,7 @@ use exonum::helpers::fabric::{ServiceFactory, Context};
 use exonum::crypto::Hash;
 use exonum::storage::Snapshot;
 use exonum::blockchain::{Transaction, Service, ApiContext};
-use exonum::messages::RawTransaction;
+use exonum::messages::{Message, RawTransaction};
 use exonum::encoding::Error as StreamStructError;
 
 use blockchain::dto::{TX_PAYMENT_ID, TX_TIMESTAMP_ID, TX_UPDATE_USER_ID, TxUpdateUser, TxPayment,
