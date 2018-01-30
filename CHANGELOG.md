@@ -23,7 +23,7 @@ All notable changes to this project will be documented in this file. The project
 - Removed `info` method from the `Transaction`. (#402)
 - Replaced config param `timeout_events_capacity` with `internal_events_capacity`. (#388)
 - The `Transaction` trait now inherits from `ExonumJson`. (#402)
-- `DBKey` renamed to `ProofPath` and part of its functionality was moved to the `BitsRange` trait. (#420)
+- Renamed `DBKey` to `ProofPath` and moved a part of its functionality to the `BitsRange` trait. (#420)
 
 ### New features
 - Added `patch` method to the `Fork` structure. (#393)
@@ -32,7 +32,7 @@ All notable changes to this project will be documented in this file. The project
   behind `float_serialize` gate. Note: special values (Infinity and NaN) aren't supported. (#384)
 - Added a possibility to set maximum message size (`pub max_message_len` field in `ConsensusConfig`). (#426)
 - Added support for CORS. (#406)
-- Added `run-dev` command that performs a simplified node start for testing purposes. (#423)
+- Added `run-dev` command that performs a simplified node launch for testing purposes. (#423)
 
 ### Bug fixes
 - Fixed consensus on the threshold of 1/3 sleeping validators. (#388)
@@ -40,8 +40,8 @@ All notable changes to this project will be documented in this file. The project
 - Fixed a bug with message header validation. (#430)
 
 ### Internal improvements
-- The list of peer connections is now restored to the last state after the process is restarted. (#378)
-- Log dependency was updated to 0.4, which can cause issues with previous versions. (#433)
+- The list of peer connections is now restored to the latest state after the process is restarted. (#378)
+- Log dependency was updated to 0.4, which can cause issues with the previous versions. (#433)
 - Better error reporting for configs in the `.toml` format. (#429)
 
 ## 0.4 - 2017-12-08

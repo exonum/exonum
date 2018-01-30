@@ -1,6 +1,7 @@
 [package]
 name = "sandbox"
 version = "0.0.0"
+publish = false
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 
 [dependencies]
