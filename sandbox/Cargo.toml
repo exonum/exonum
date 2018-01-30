@@ -1,14 +1,15 @@
 [package]
 name = "sandbox"
-version = "0.4.0"
+version = "0.0.0"
+publish = false
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 
 [dependencies]
-exonum = {version="0.4", path="../exonum"}
+exonum = {version="0.5", path="../exonum"}
 
-log = "0.3.8"
-env_logger = "0.4.3"
+log = "0.4.1"
+env_logger = "0.5.3"
 clap = {version="2.25.0", features=["unstable"]}
-rand = "0.3.15"
+rand = "0.4.2"
 bit-vec = "0.4.4"
 futures = "0.1.14"
