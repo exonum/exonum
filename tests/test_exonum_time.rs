@@ -7,16 +7,16 @@ extern crate pretty_assertions;
 
 use std::collections::HashMap;
 use std::iter::FromIterator;
-use std::time::{SystemTime, Duration, UNIX_EPOCH};
+use std::time::{SystemTime, Duration};
 
 use exonum::helpers::{Height, ValidatorId};
 use exonum::crypto::{gen_keypair, PublicKey};
 use exonum::storage::Snapshot;
 
-use exonum_time::{TimeService, TimeSchema, TxTime, Time, TimeProvider, ValidatorTime};
+use exonum_time::{TimeService, TimeSchema, TxTime, Time, ValidatorTime};
 use exonum_testkit::{ApiKind, TestKitApi, TestKitBuilder, TestNode};
 
-fn verify_data<T: AsRef<Snapshot>>(
+fn assert_storage_times_eq<T: AsRef<Snapshot>>(
     snapshot: T,
     validators: &[TestNode],
     expected_current_time: Option<SystemTime>,
@@ -55,7 +55,7 @@ fn test_exonum_time_service_with_3_validators() {
     //
     // Consolidated time is None.
 
-    verify_data(&testkit.snapshot(), &validators, None, &[None, None, None]);
+    assert_storage_times_eq(&testkit.snapshot(), &validators, None, &[None, None, None]);
 
     // Add first transaction `tx0` from first validator with time `time0`.
     // After that validators time look like this:
@@ -71,7 +71,7 @@ fn test_exonum_time_service_with_3_validators() {
     };
     testkit.create_block_with_transactions(txvec![tx0]);
 
-    verify_data(
+    assert_storage_times_eq(
         &testkit.snapshot(),
         &validators,
         Some(time0),
@@ -93,7 +93,7 @@ fn test_exonum_time_service_with_3_validators() {
     };
     testkit.create_block_with_transactions(txvec![tx1]);
 
-    verify_data(
+    assert_storage_times_eq(
         &testkit.snapshot(),
         &validators,
         Some(time1),
@@ -118,7 +118,7 @@ fn test_exonum_time_service_with_4_validators() {
     //
     // Consolidated time is None.
 
-    verify_data(
+    assert_storage_times_eq(
         testkit.snapshot(),
         &validators,
         None,
@@ -139,7 +139,7 @@ fn test_exonum_time_service_with_4_validators() {
     };
     testkit.create_block_with_transactions(txvec![tx0]);
 
-    verify_data(
+    assert_storage_times_eq(
         &testkit.snapshot(),
         &validators,
         None,
@@ -161,7 +161,7 @@ fn test_exonum_time_service_with_4_validators() {
     };
     testkit.create_block_with_transactions(txvec![tx1]);
 
-    verify_data(
+    assert_storage_times_eq(
         &testkit.snapshot(),
         &validators,
         None,
@@ -183,7 +183,7 @@ fn test_exonum_time_service_with_4_validators() {
     };
     testkit.create_block_with_transactions(txvec![tx2]);
 
-    verify_data(
+    assert_storage_times_eq(
         &testkit.snapshot(),
         &validators,
         Some(time1),
@@ -205,7 +205,7 @@ fn test_exonum_time_service_with_4_validators() {
     };
     testkit.create_block_with_transactions(txvec![tx3]);
 
-    verify_data(
+    assert_storage_times_eq(
         &testkit.snapshot(),
         &validators,
         Some(time2),
@@ -223,7 +223,7 @@ fn test_exonum_time_service_with_7_validators() {
     let validators = testkit.network().validators().to_vec();
     let mut validators_times = vec![None; 7];
 
-    verify_data(testkit.snapshot(), &validators, None, &validators_times);
+    assert_storage_times_eq(testkit.snapshot(), &validators, None, &validators_times);
 
     let time = SystemTime::now();
     let times = (0..7)
@@ -248,7 +248,7 @@ fn test_exonum_time_service_with_7_validators() {
 
         validators_times[i] = Some(times[i]);
 
-        verify_data(
+        assert_storage_times_eq(
             testkit.snapshot(),
             &validators,
             expected_storage_times[i],
