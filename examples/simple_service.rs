@@ -51,7 +51,7 @@ impl<T: AsRef<Snapshot>> MarkerSchema<T> {
         MarkerSchema { view }
     }
 
-    /// Returns the table that stores `i32` value for every node.
+    /// Returns the table mapping `i32` value to public keys authoring marker transactions.
     pub fn marks(&self) -> ProofMapIndex<&Snapshot, PublicKey, i32> {
         ProofMapIndex::new(format!("{}.marks", SERVICE_NAME), self.view.as_ref())
     }
@@ -154,13 +154,13 @@ fn main() {
     let tx2 = TxMarker::new(
         &keypair2.0,
         2,
-        UNIX_EPOCH + Duration::new(20, 0),
+        mock_provider.time() + Duration::new(10, 0),
         &keypair2.1,
     );
     let tx3 = TxMarker::new(
         &keypair3.0,
         3,
-        UNIX_EPOCH + Duration::new(5, 0),
+        mock_provider.time() - Duration::new(5, 0),
         &keypair3.1,
     );
     testkit.create_block_with_transactions(txvec![tx1, tx2, tx3]);

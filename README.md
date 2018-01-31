@@ -39,7 +39,7 @@ Typical usage of the service boils down to importing the schema and calling its 
 
 Below is an example of a method for processing a transaction, 
 which must be executed no later than the specified time 
-(this time is written in the transaction body by in a separate field):
+(this time is written in the transaction body in a separate field):
 
 ```rust
 message! {
