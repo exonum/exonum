@@ -12,6 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! These are tests concerning the API of the cryptocurrency service. See `tx_logic.rs`
+//! for tests focused on the business logic of transactions.
+//!
+//! Note how API tests predominantly use `TestKitApi` to send transactions and make assertions
+//! about the storage state.
+
 extern crate exonum;
 extern crate exonum_cryptocurrency as cryptocurrency;
 extern crate exonum_testkit;
