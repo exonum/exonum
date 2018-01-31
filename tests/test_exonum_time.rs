@@ -221,36 +221,29 @@ fn test_mock_provider() {
         .create();
 
     let validators = testkit.network().validators().to_vec();
+    let assert_storage_times = |snapshot: Box<Snapshot>| {
+        assert_storage_times_eq(
+            snapshot,
+            &validators,
+            Some(mock_provider.time()),
+            &[Some(mock_provider.time())],
+        );
+    };
 
     mock_provider.add_time(Duration::new(10, 0));
     assert_eq!(UNIX_EPOCH + Duration::new(10, 0), mock_provider.time());
     testkit.create_blocks_until(Height(2));
-    assert_storage_times_eq(
-        testkit.snapshot(),
-        &validators,
-        Some(mock_provider.time()),
-        &[Some(mock_provider.time())],
-    );
+    assert_storage_times(testkit.snapshot());
 
     mock_provider.set_time(UNIX_EPOCH + Duration::new(50, 0));
     assert_eq!(UNIX_EPOCH + Duration::new(50, 0), mock_provider.time());
     testkit.create_blocks_until(Height(4));
-    assert_storage_times_eq(
-        testkit.snapshot(),
-        &validators,
-        Some(mock_provider.time()),
-        &[Some(mock_provider.time())],
-    );
+    assert_storage_times(testkit.snapshot());
 
     mock_provider.add_time(Duration::new(20, 0));
     assert_eq!(UNIX_EPOCH + Duration::new(70, 0), mock_provider.time());
     testkit.create_blocks_until(Height(6));
-    assert_storage_times_eq(
-        testkit.snapshot(),
-        &validators,
-        Some(mock_provider.time()),
-        &[Some(mock_provider.time())],
-    );
+    assert_storage_times(testkit.snapshot());
 
     mock_provider.set_time(UNIX_EPOCH + Duration::new(30, 0));
     assert_eq!(UNIX_EPOCH + Duration::new(30, 0), mock_provider.time());
