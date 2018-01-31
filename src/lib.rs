@@ -23,10 +23,10 @@
 //! extern crate exonum_testkit;
 //! extern crate serde_json;
 //!
-//! use exonum::crypto::{gen_keypair, PublicKey};
+//! use exonum::crypto::{gen_keypair, Hash, PublicKey};
 //! use exonum::blockchain::{Block, Schema, Service, Transaction};
 //! use exonum::messages::{Message, RawTransaction};
-//! use exonum::storage::Fork;
+//! use exonum::storage::{Snapshot, Fork};
 //! use exonum::encoding;
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
@@ -39,10 +39,9 @@
 //!     struct TxTimestamp {
 //!         const TYPE = SERVICE_ID;
 //!         const ID = TX_TIMESTAMP_ID;
-//!         const SIZE = 40;
 //!
-//!         field from: &PublicKey [0 => 32]
-//!         field msg: &str [32 => 40]
+//!         from: &PublicKey,
+//!         msg: &str,
 //!     }
 //! }
 //!
@@ -54,15 +53,15 @@
 //!     }
 //!
 //!     fn execute(&self, _fork: &mut Fork) {}
-//!
-//!     fn info(&self) -> serde_json::Value {
-//!         serde_json::to_value(self).unwrap()
-//!     }
 //! }
 //!
 //! impl Service for TimestampingService {
 //!     fn service_name(&self) -> &'static str {
 //!         "timestamping"
+//!     }
+//!
+//!     fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+//!         Vec::new()
 //!     }
 //!
 //!     fn service_id(&self) -> u16 {
@@ -128,20 +127,19 @@ extern crate exonum;
 extern crate futures;
 extern crate iron;
 extern crate iron_test;
-extern crate mount;
 extern crate router;
 extern crate serde;
 extern crate serde_json;
+#[macro_use]
+extern crate log;
 
 use futures::Stream;
 use futures::executor::{self, Spawn};
 use futures::sync::mpsc;
-use iron::IronError;
+use iron::{IronError, Handler, Chain};
 use iron::headers::{ContentType, Headers};
 use iron::status::StatusClass;
 use iron_test::{request, response};
-use mount::Mount;
-use router::Router;
 use serde::{Deserialize, Serialize};
 
 use std::collections::BTreeMap;
@@ -149,11 +147,12 @@ use std::sync::{Arc, RwLock, RwLockReadGuard};
 use std::fmt;
 
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Schema as CoreSchema,
-                         Service, StoredConfiguration, Transaction, ValidatorKeys};
+                         Service, SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys};
 use exonum::crypto;
 use exonum::helpers::{Height, Round, ValidatorId};
 use exonum::messages::{Message, Precommit, Propose};
-use exonum::node::{ApiSender, ExternalMessage, State as NodeState, TransactionSend, TxPool};
+use exonum::node::{ApiSender, ExternalMessage, State as NodeState, TransactionSend, TxPool,
+                   NodeApiConfig, create_public_api_handler, create_private_api_handler};
 use exonum::storage::{MemoryDB, Snapshot};
 
 #[macro_use]
@@ -372,6 +371,9 @@ impl From<TestNode> for ValidatorKeys {
 /// #    fn service_name(&self) -> &'static str {
 /// #        "documentation"
 /// #    }
+/// #    fn state_hash(&self, _: &exonum::storage::Snapshot) -> Vec<exonum::crypto::Hash> {
+/// #        Vec::new()
+/// #    }
 /// #    fn service_id(&self) -> u16 {
 /// #        0
 /// #    }
@@ -476,6 +478,7 @@ pub struct TestKit {
     api_sender: ApiSender,
     mempool: TxPool,
     cfg_proposal: Option<ConfigurationProposalState>,
+    api_config: NodeApiConfig,
 }
 
 impl fmt::Debug for TestKit {
@@ -547,17 +550,8 @@ impl TestKit {
             network,
             mempool: Arc::clone(&mempool),
             cfg_proposal: None,
+            api_config: Default::default(),
         }
-    }
-
-    /// Creates a mounting point for public APIs used by the blockchain.
-    fn public_api_mount(&self) -> Mount {
-        self.blockchain.mount_public_api()
-    }
-
-    /// Creates a mounting point for public APIs used by the blockchain.
-    fn private_api_mount(&self) -> Mount {
-        self.blockchain.mount_private_api()
     }
 
     /// Creates an instance of `TestKitApi` to test the API provided by services.
@@ -602,6 +596,9 @@ impl TestKit {
     /// #    fn service_name(&self) -> &'static str {
     /// #        "documentation"
     /// #    }
+    /// #    fn state_hash(&self, _: &exonum::storage::Snapshot) -> Vec<exonum::crypto::Hash> {
+    /// #        Vec::new()
+    /// #    }
     /// #    fn service_id(&self) -> u16 {
     /// #        0
     /// #    }
@@ -614,9 +611,8 @@ impl TestKit {
     /// #     struct MyTransaction {
     /// #         const TYPE = 0;
     /// #         const ID = 0;
-    /// #         const SIZE = 40;
-    /// #         field from: &exonum::crypto::PublicKey [0 => 32]
-    /// #         field msg: &str [32 => 40]
+    /// #         from: &exonum::crypto::PublicKey,
+    /// #         msg: &str,
     /// #     }
     /// # }
     /// # impl Transaction for MyTransaction {
@@ -1138,8 +1134,8 @@ impl ApiKind {
 /// API encapsulation for the testkit. Allows to execute and synchronously retrieve results
 /// for REST-ful endpoints of services.
 pub struct TestKitApi {
-    public_mount: Mount,
-    private_mount: Mount,
+    public_handler: Chain,
+    private_handler: Chain,
     api_sender: ApiSender,
 }
 
@@ -1153,39 +1149,23 @@ impl TestKitApi {
     /// Creates a new instance of API.
     fn new(testkit: &TestKit) -> Self {
         use std::sync::Arc;
-        use exonum::api::{public, Api};
 
         let blockchain = &testkit.blockchain;
+        let api_state = SharedNodeState::new(10_000);
 
         TestKitApi {
-            public_mount: {
-                let mut mount = Mount::new();
+            public_handler: create_public_api_handler(
+                blockchain.clone(),
+                Arc::clone(&testkit.mempool),
+                api_state.clone(),
+                &testkit.api_config,
+            ),
 
-                let service_mount = testkit.public_api_mount();
-                mount.mount("api/services", service_mount);
-
-                let mut router = Router::new();
-                let pool = Arc::clone(&testkit.mempool);
-                let system_api = public::SystemApi::new(pool, blockchain.clone());
-                system_api.wire(&mut router);
-                mount.mount("api/system", router);
-
-                let mut router = Router::new();
-                let explorer_api = public::ExplorerApi::new(blockchain.clone());
-                explorer_api.wire(&mut router);
-                mount.mount("api/explorer", router);
-
-                mount
-            },
-
-            private_mount: {
-                let mut mount = Mount::new();
-
-                let service_mount = testkit.private_api_mount();
-                mount.mount("api/services", service_mount);
-
-                mount
-            },
+            private_handler: create_private_api_handler(
+                blockchain.clone(),
+                api_state,
+                testkit.api_sender.clone(),
+            ),
 
             api_sender: testkit.api_sender.clone(),
         }
@@ -1193,14 +1173,14 @@ impl TestKitApi {
 
     /// Returns the mounting point for public APIs. Useful for intricate testing not covered
     /// by `get*` and `post*` functions.
-    pub fn public_mount(&self) -> &Mount {
-        &self.public_mount
+    pub fn public_handler(&self) -> &Chain {
+        &self.public_handler
     }
 
     /// Returns the mounting point for private APIs. Useful for intricate testing not covered
     /// by `get*` and `post*` functions.
-    pub fn private_mount(&self) -> &Mount {
-        &self.private_mount
+    pub fn private_handler(&self) -> &Chain {
+        &self.private_handler
     }
 
     /// Sends a transaction to the node via `ApiSender`.
@@ -1210,8 +1190,9 @@ impl TestKitApi {
         );
     }
 
-    fn get_internal<D>(mount: &Mount, url: &str, expect_error: bool) -> D
+    fn get_internal<H, D>(handler: &H, endpoint: &str, expect_error: bool, is_public: bool) -> D
     where
+        H: Handler,
         for<'de> D: Deserialize<'de>,
     {
         let status_class = if expect_error {
@@ -1220,8 +1201,8 @@ impl TestKitApi {
             StatusClass::Success
         };
 
-        let url = format!("http://localhost:3000/{}", url);
-        let resp = request::get(&url, Headers::new(), mount);
+        let url = format!("http://localhost:3000/{}", endpoint);
+        let resp = request::get(&url, Headers::new(), handler);
         let resp = if expect_error {
             // Support either "normal" or erroneous responses.
             // For example, `Api.not_found_response()` returns the response as `Ok(..)`.
@@ -1242,6 +1223,10 @@ impl TestKitApi {
         }
 
         let resp = response::extract_body_to_string(resp);
+
+        let publicity = if is_public { "" } else { " private" };
+        trace!("GET{} {}\nResponse:\n{}\n", publicity, endpoint, resp);
+
         serde_json::from_str(&resp).unwrap()
     }
 
@@ -1256,9 +1241,10 @@ impl TestKitApi {
         for<'de> D: Deserialize<'de>,
     {
         TestKitApi::get_internal(
-            &self.public_mount,
+            &self.public_handler,
             &format!("{}/{}", kind.into_prefix(), endpoint),
             false,
+            true,
         )
     }
 
@@ -1273,8 +1259,9 @@ impl TestKitApi {
         for<'de> D: Deserialize<'de>,
     {
         TestKitApi::get_internal(
-            &self.public_mount,
+            &self.private_handler,
             &format!("{}/{}", kind.into_prefix(), endpoint),
+            false,
             false,
         )
     }
@@ -1289,18 +1276,21 @@ impl TestKitApi {
         for<'de> D: Deserialize<'de>,
     {
         TestKitApi::get_internal(
-            &self.public_mount,
+            &self.public_handler,
             &format!("{}/{}", kind.into_prefix(), endpoint),
+            true,
             true,
         )
     }
 
-    fn post_internal<T, D>(mount: &Mount, endpoint: &str, data: &T) -> D
+    fn post_internal<H, T, D>(handler: &H, endpoint: &str, data: &T, is_public: bool) -> D
     where
+        H: Handler,
         T: Serialize,
         for<'de> D: Deserialize<'de>,
     {
         let url = format!("http://localhost:3000/{}", endpoint);
+        let body = serde_json::to_string(&data).expect("Cannot serialize data to JSON");
         let resp = request::post(
             &url,
             {
@@ -1308,11 +1298,21 @@ impl TestKitApi {
                 headers.set(ContentType::json());
                 headers
             },
-            &serde_json::to_string(&data).expect("Cannot serialize data to JSON"),
-            mount,
+            &body,
+            handler,
         ).expect("Cannot send data");
 
         let resp = response::extract_body_to_string(resp);
+
+        let publicity = if is_public { "" } else { " private" };
+        trace!(
+            "POST{} {}\nBody: \n{}\nResponse:\n{}\n",
+            publicity,
+            endpoint,
+            body,
+            resp
+        );
+
         serde_json::from_str(&resp).expect("Cannot parse result")
     }
 
@@ -1331,9 +1331,10 @@ impl TestKitApi {
         for<'de> D: Deserialize<'de>,
     {
         TestKitApi::post_internal(
-            &self.public_mount,
+            &self.public_handler,
             &format!("{}/{}", kind.into_prefix(), endpoint),
             transaction,
+            true,
         )
     }
 
@@ -1352,9 +1353,10 @@ impl TestKitApi {
         for<'de> D: Deserialize<'de>,
     {
         TestKitApi::post_internal(
-            &self.private_mount,
+            &self.private_handler,
             &format!("{}/{}", kind.into_prefix(), endpoint),
             transaction,
+            false,
         )
     }
 }
