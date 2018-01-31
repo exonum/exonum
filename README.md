@@ -58,12 +58,10 @@ impl Transaction for Tx {
         match time_schema.time().get() {
             Some(ref current_time) if current_time.time() <= self.time() => {
                 // Execute transaction business logic.
-                ...
             }
             _ => {}
         }
     }
-    ... 
 }
 ```
 

@@ -90,15 +90,13 @@ impl Transaction for TxMarker {
     }
 
     fn execute(&self, view: &mut Fork) {
-        {
-            let time = TimeSchema::new(&view).time().get();
-            match time {
-                Some(ref current_time) if current_time.time() <= self.time() => {
-                    let mut schema = MarkerSchema::new(view);
-                    schema.marks_mut().put(self.from(), self.mark());
-                }
-                _ => {}
+        let time = TimeSchema::new(&view).time().get();
+        match time {
+            Some(ref current_time) if current_time.time() <= self.time() => {
+                let mut schema = MarkerSchema::new(view);
+                schema.marks_mut().put(self.from(), self.mark());
             }
+            _ => {}
         }
     }
 }
