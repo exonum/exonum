@@ -20,9 +20,9 @@ use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 /// A type that can be (de)serialized as a key in the blockchain storage.
 ///
 /// Since keys are sorted in a serialized form, the big-endian encoding should be used
-/// with unsigned integer types. Note however that the big-endian encoding
-/// will **not** sort signed integer types in the natural order; a possible solution is
-/// mapping the type to a corresponding unsigned one as shown in the example below.
+/// with unsigned integer types. Note however that the big-endian encoding on its own
+/// will not sort signed integer types in the natural order; therefore, they are
+/// mapped to a corresponding unsigned type by adding a constant to a source value.
 ///
 /// # Examples
 ///
@@ -44,17 +44,13 @@ use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 ///     }
 ///
 ///     fn write(&self, buffer: &mut [u8]) {
-///         // Maps `a` to the `u16` range in the natural order:
-///         // -32768 -> 0, -32767 -> 1, ..., 32767 -> 65535
-///         let mapped_a = self.a.wrapping_add(i16::min_value()) as u16;
-///         BigEndian::write_u16(&mut buffer[0..2], mapped_a);
-///         BigEndian::write_u32(&mut buffer[2..6], self.b);
+///         self.a.write(&mut buffer[0..2]);
+///         self.b.write(&mut buffer[2..6]);
 ///     }
 ///
 ///     fn read(buffer: &[u8]) -> Self {
-///         let mapped_a = BigEndian::read_u16(&buffer[0..2]);
-///         let a = mapped_a.wrapping_add(i16::min_value() as u16) as i16;
-///         let b = BigEndian::read_u32(&buffer[2..6]);
+///         let a = i16::read(&buffer[0..2]);
+///         let b = u32::read(&buffer[2..6]);
 ///         Key { a, b }
 ///     }
 /// }
@@ -115,110 +111,64 @@ impl StorageKey for u8 {
     }
 }
 
-/// Uses big-endian encoding.
-impl StorageKey for u16 {
-    fn size(&self) -> usize {
-        2
-    }
-
-    fn write(&self, buffer: &mut [u8]) {
-        BigEndian::write_u16(buffer, *self)
-    }
-
-    fn read(buffer: &[u8]) -> Self {
-        BigEndian::read_u16(buffer)
-    }
-}
-
-/// Uses big-endian encoding.
-impl StorageKey for u32 {
-    fn size(&self) -> usize {
-        4
-    }
-
-    fn write(&self, buffer: &mut [u8]) {
-        BigEndian::write_u32(buffer, *self)
-    }
-
-    fn read(buffer: &[u8]) -> Self {
-        BigEndian::read_u32(buffer)
-    }
-}
-
-/// Uses big-endian encoding.
-impl StorageKey for u64 {
-    fn size(&self) -> usize {
-        8
-    }
-
-    fn write(&self, buffer: &mut [u8]) {
-        BigEndian::write_u64(buffer, *self)
-    }
-
-    fn read(buffer: &[u8]) -> Self {
-        BigEndian::read_u64(buffer)
-    }
-}
-
-/// **Not sorted in the natural order.**
+/// Uses encoding with the values mapped to `u8`
+/// by adding the corresponding constant (`128`) to the value.
 impl StorageKey for i8 {
     fn size(&self) -> usize {
         1
     }
 
     fn write(&self, buffer: &mut [u8]) {
-        buffer[0] = *self as u8
+        buffer[0] = self.wrapping_add(i8::min_value()) as u8;
     }
 
     fn read(buffer: &[u8]) -> Self {
-        buffer[0] as i8
+        buffer[0].wrapping_sub(i8::min_value() as u8) as i8
     }
 }
 
-/// Uses big-endian encoding. **Not sorted in the natural order.**
-impl StorageKey for i16 {
-    fn size(&self) -> usize {
-        2
-    }
+macro_rules! storage_key_for_ints {
+    ($utype:ident, $itype:ident, $size:expr, $read_method:ident, $write_method:ident) => {
+        /// Uses big-endian encoding.
+        impl StorageKey for $utype {
+            fn size(&self) -> usize {
+                $size
+            }
 
-    fn write(&self, buffer: &mut [u8]) {
-        BigEndian::write_i16(buffer, *self)
-    }
+            fn write(&self, buffer: &mut [u8]) {
+                BigEndian::$write_method(buffer, *self);
+            }
 
-    fn read(buffer: &[u8]) -> Self {
-        BigEndian::read_i16(buffer)
+            fn read(buffer: &[u8]) -> Self {
+                BigEndian::$read_method(buffer)
+            }
+        }
+
+        /// Uses big-endian encoding with the values mapped to the unsigned format
+        /// by adding the corresponding constant to the value.
+        impl StorageKey for $itype {
+            fn size(&self) -> usize {
+                $size
+            }
+
+            fn write(&self, buffer: &mut [u8]) {
+                BigEndian::$write_method(
+                    buffer,
+                    self.wrapping_add($itype::min_value()) as $utype,
+                );
+            }
+
+            fn read(buffer: &[u8]) -> Self {
+                BigEndian::$read_method(buffer)
+                    .wrapping_sub($itype::min_value() as $utype) as $itype
+            }
+        }
     }
 }
 
-/// Uses big-endian encoding. **Not sorted in the natural order.**
-impl StorageKey for i32 {
-    fn size(&self) -> usize {
-        4
-    }
-
-    fn write(&self, buffer: &mut [u8]) {
-        BigEndian::write_i32(buffer, *self)
-    }
-
-    fn read(buffer: &[u8]) -> Self {
-        BigEndian::read_i32(buffer)
-    }
-}
-
-/// Uses big-endian encoding. **Not sorted in the natural order.**
-impl StorageKey for i64 {
-    fn size(&self) -> usize {
-        8
-    }
-
-    fn write(&self, buffer: &mut [u8]) {
-        BigEndian::write_i64(buffer, *self)
-    }
-
-    fn read(buffer: &[u8]) -> Self {
-        BigEndian::read_i64(buffer)
-    }
-}
+storage_key_for_ints!{u16, i16, 2, read_u16, write_u16}
+storage_key_for_ints!{u32, i32, 4, read_u32, write_u32}
+storage_key_for_ints!{u64, i64, 8, read_u64, write_u64}
 
 impl StorageKey for Hash {
     fn size(&self) -> usize {
@@ -274,5 +224,168 @@ impl StorageKey for String {
 
     fn read(buffer: &[u8]) -> Self {
         unsafe { ::std::str::from_utf8_unchecked(buffer).to_string() }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Number of samples for fuzz testing
+    const FUZZ_SAMPLES: usize = 100_000;
+
+    macro_rules! test_storage_key_for_int_type {
+        (full $type:ident, $size:expr => $test_name:ident) => {
+            #[test]
+            fn $test_name() {
+                use std::iter::once;
+
+                const MIN: $type = ::std::$type::MIN;
+                const MAX: $type = ::std::$type::MAX;
+
+                // Roundtrip
+                let mut buffer = [0u8; $size];
+                for x in (MIN..MAX).chain(once(MAX)) {
+                    x.write(&mut buffer);
+                    assert_eq!($type::read(&buffer), x);
+                }
+
+                // Ordering
+                let (mut x_buffer, mut y_buffer) = ([0u8; $size], [0u8; $size]);
+                for x in MIN..MAX {
+                    let y = x + 1;
+                    x.write(&mut x_buffer);
+                    y.write(&mut y_buffer);
+                    assert!(x_buffer < y_buffer);
+                }
+            }
+        };
+        (fuzz $type:ident, $size:expr => $test_name:ident) => {
+            #[test]
+            fn $test_name() {
+                use rand::{Rng, thread_rng};
+                let mut rng = thread_rng();
+
+                // Fuzzed roundtrip
+                let mut buffer = [0u8; $size];
+                let handpicked_vals = vec![$type::min_value(), $type::max_value()];
+                for x in rng.gen_iter::<$type>().take(FUZZ_SAMPLES).chain(handpicked_vals) {
+                    x.write(&mut buffer);
+                    assert_eq!($type::read(&buffer), x);
+                }
+
+                // Fuzzed ordering
+                let (mut x_buffer, mut y_buffer) = ([0u8; $size], [0u8; $size]);
+                let mut vals: Vec<$type> = rng.gen_iter().take(FUZZ_SAMPLES).collect();
+                vals.sort();
+                for w in vals.windows(2) {
+                    let (x, y) = (w[0], w[1]);
+                    if x == y { continue; }
+
+                    x.write(&mut x_buffer);
+                    y.write(&mut y_buffer);
+                    assert!(x_buffer < y_buffer);
+                }
+            }
+        }
+    }
+
+    test_storage_key_for_int_type!{full  u8, 1 => test_storage_key_for_u8}
+    test_storage_key_for_int_type!{full  i8, 1 => test_storage_key_for_i8}
+    test_storage_key_for_int_type!{full u16, 2 => test_storage_key_for_u16}
+    test_storage_key_for_int_type!{full i16, 2 => test_storage_key_for_i16}
+    test_storage_key_for_int_type!{fuzz u32, 4 => test_storage_key_for_u32}
+    test_storage_key_for_int_type!{fuzz i32, 4 => test_storage_key_for_i32}
+    test_storage_key_for_int_type!{fuzz u64, 8 => test_storage_key_for_u64}
+    test_storage_key_for_int_type!{fuzz i64, 8 => test_storage_key_for_i64}
+
+    #[test]
+    fn test_signed_int_key_in_index() {
+        use storage::{Database, MapIndex, MemoryDB};
+
+        let db: Box<Database> = Box::new(MemoryDB::new());
+        let mut fork = db.fork();
+        {
+            let mut index: MapIndex<_, i32, u64> = MapIndex::new("test_index", &mut fork);
+            index.put(&5, 100);
+            index.put(&-3, 200);
+        }
+        db.merge(fork.into_patch()).unwrap();
+
+        let snapshot = db.snapshot();
+        let index: MapIndex<_, i32, u64> = MapIndex::new("test_index", snapshot);
+        assert_eq!(index.get(&5), Some(100));
+        assert_eq!(index.get(&-3), Some(200));
+
+        assert_eq!(
+            index.iter_from(&-4).collect::<Vec<_>>(),
+            vec![(-3, 200), (5, 100)]
+        );
+        assert_eq!(index.iter_from(&-2).collect::<Vec<_>>(), vec![(5, 100)]);
+        assert_eq!(index.iter_from(&1).collect::<Vec<_>>(), vec![(5, 100)]);
+        assert_eq!(index.iter_from(&6).collect::<Vec<_>>(), vec![]);
+
+        assert_eq!(index.values().collect::<Vec<_>>(), vec![200, 100]);
+    }
+
+    // Example how to migrate from Exonum <= 0.5 implementation of `StorageKey`
+    // for signed integers.
+    #[test]
+    fn test_old_signed_int_key_in_index() {
+        use storage::{Database, MapIndex, MemoryDB};
+
+        // Simple wrapper around a signed integer type with the `StorageKey` implementation,
+        // which was used in Exonum <= 0.5.
+        #[derive(Debug, PartialEq)]
+        struct QuirkyI32Key(i32);
+
+        impl StorageKey for QuirkyI32Key {
+            fn size(&self) -> usize {
+                4
+            }
+
+            fn write(&self, buffer: &mut [u8]) {
+                BigEndian::write_i32(buffer, self.0);
+            }
+
+            fn read(buffer: &[u8]) -> Self {
+                QuirkyI32Key(BigEndian::read_i32(buffer))
+            }
+        }
+
+        let db: Box<Database> = Box::new(MemoryDB::new());
+        let mut fork = db.fork();
+        {
+            let mut index: MapIndex<_, QuirkyI32Key, u64> = MapIndex::new("test_index", &mut fork);
+            index.put(&QuirkyI32Key(5), 100);
+            index.put(&QuirkyI32Key(-3), 200);
+        }
+        db.merge(fork.into_patch()).unwrap();
+
+        let snapshot = db.snapshot();
+        let index: MapIndex<_, QuirkyI32Key, u64> = MapIndex::new("test_index", snapshot);
+        assert_eq!(index.get(&QuirkyI32Key(5)), Some(100));
+        assert_eq!(index.get(&QuirkyI32Key(-3)), Some(200));
+
+        // Bunch of counterintuitive behavior here
+        assert_eq!(
+            index.iter_from(&QuirkyI32Key(-4)).collect::<Vec<_>>(),
+            vec![(QuirkyI32Key(-3), 200)]
+        );
+        assert_eq!(
+            index.iter_from(&QuirkyI32Key(-2)).collect::<Vec<_>>(),
+            vec![]
+        );
+        assert_eq!(
+            index.iter_from(&QuirkyI32Key(1)).collect::<Vec<_>>(),
+            vec![(QuirkyI32Key(5), 100), (QuirkyI32Key(-3), 200)]
+        );
+        assert_eq!(
+            index.iter_from(&QuirkyI32Key(6)).collect::<Vec<_>>(),
+            vec![(QuirkyI32Key(-3), 200)]
+        );
+
+        // Notice the different order of values compared to the previous test
+        assert_eq!(index.values().collect::<Vec<_>>(), vec![100, 200]);
     }
 }
