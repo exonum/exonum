@@ -214,9 +214,24 @@ enum NextIterValue {
 /// and [`merge`] methods for indirect interaction. See [the module documentation](index.html)
 /// for more details.
 ///
+/// Note that `Database` effectively has [interior mutability][interior-mut];
+/// `merge` and `merge_sync` methods take a shared reference to the database (`&self`)
+/// rather than an exclusive one (`&mut self`). This means that the following code compiles:
+///
+/// ```
+/// use exonum::storage::{Database, MemoryDB};
+///
+/// // not declared as `mut db`!
+/// let db: Box<Database> = Box::new(MemoryDB::new());
+/// let mut fork = db.fork();
+/// fork.put("index_name", vec![1, 2, 3], vec![123]);
+/// db.merge(fork.into_patch()).unwrap();
+/// ```
+///
 /// [`snapshot`]: #tymethod.snapshot
 /// [`fork`]: #method.fork
 /// [`merge`]: #tymethod.merge
+/// [interior-mut]: https://doc.rust-lang.org/book/second-edition/ch15-05-interior-mutability.html
 pub trait Database: Send + Sync + 'static {
     /// Creates a new snapshot of the database from its current state.
     fn snapshot(&self) -> Box<Snapshot>;
