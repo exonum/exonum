@@ -95,9 +95,7 @@ script: |
   case "$FEATURE" in
 
   "fmt" )
-      cd exonum && cargo update && cd .. &&
-      cd sandbox && cargo update && cd .. &&
-      cd testkit && cargo update && cd .. &&
+      cargo update &&
       cd exonum && cargo audit && cd .. &&
       cd testkit && cargo audit && cd .. &&
       cd exonum && cargo fmt -- --write-mode=diff && cd .. &&
@@ -105,7 +103,7 @@ script: |
       cd testkit && cargo fmt -- --write-mode=diff && cd ..
   ;;
   "clippy-core" )
-      cd exonum && cargo clippy --verbose --features long_benchmarks  -- -D warnings
+      cd exonum && cargo clippy --verbose --features long_benchmarks -- -D warnings
   ;;
   "clippy-sandbox" )
       cd sandbox && cargo clippy --verbose -- -D warnings
@@ -114,16 +112,16 @@ script: |
       cd testkit && cargo clippy --verbose -- -D warnings
   ;;
   "test-core" )
-      cargo test --manifest-path exonum/Cargo.toml --verbose --tests --lib --features "float_serialize"
+      cargo test -p exonum --verbose --tests --lib --features "float_serialize"
   ;;
   "test-sandbox" )
-      cargo test --manifest-path sandbox/Cargo.toml --verbose
+      cargo test -p sandbox --verbose
   ;;
   "test-testkit" )
-      cargo test --manifest-path testkit/Cargo.toml --verbose
+      cargo test -p exonum-testkit --verbose
   ;;
   "test-doc" )
-      cargo test --manifest-path sandbox/Cargo.toml --verbose --doc  -- --test-threads=2
+      cargo test -p sandbox --verbose --doc -- --test-threads=2
   ;;
   "examples" )
       cargo run -p exonum-testkit --example timestamping &&
@@ -135,7 +133,7 @@ script: |
       cargo outdated --exit-code 1
   ;;
   "benchmarks" )
-        RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
+      RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
   ;;
 
   esac

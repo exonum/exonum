@@ -23,6 +23,6 @@ build_script:
   - cargo build %cargoflags%
 
 test_script:
-  - cargo test %cargoflags%
-  - cargo run --example timestamping %cargoflags%
-  - cargo run --example configuration_change %cargoflags%
+  - cargo test %cargoflags% --all
+  - cargo run -p exonum-testkit --example timestamping %cargoflags%
+  - cargo run -p exonum-testkit --example configuration_change %cargoflags%
