@@ -32,9 +32,7 @@ mod counter;
 use counter::{CounterSchema, CounterService, TransactionResponse, TxIncrement, TxReset, ADMIN_KEY};
 
 fn init_testkit() -> (TestKit, TestKitApi) {
-    let testkit = TestKitBuilder::validator()
-        .with_service(CounterService)
-        .create();
+    let testkit = TestKit::for_service(CounterService);
     let api = testkit.api();
     (testkit, api)
 }

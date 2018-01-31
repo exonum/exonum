@@ -493,6 +493,14 @@ impl fmt::Debug for TestKit {
 }
 
 impl TestKit {
+    /// Creates a new `TestKit` with a single validator with the given service.
+    pub fn for_service<S>(service: S) -> Self
+    where
+        S: Into<Box<Service>>,
+    {
+        TestKitBuilder::validator().with_service(service).create()
+    }
+
     fn assemble(services: Vec<Box<Service>>, network: TestNetwork) -> Self {
         let api_channel = mpsc::channel(1_000);
         let api_sender = ApiSender::new(api_channel.0.clone());
@@ -855,6 +863,7 @@ impl TestKit {
     /// Returns reference to validator with the given identifier.
     ///
     /// # Panics
+    ///
     /// - Panics if validator with the given id is absent in test network.
     pub fn validator(&self, id: ValidatorId) -> &TestNode {
         &self.network.validators[id.0 as usize]
@@ -966,6 +975,11 @@ impl TestKit {
             "There is an active configuration change proposal."
         );
         self.cfg_proposal = Some(Uncommitted(proposal));
+    }
+
+    /// Returns the node in the emulated network, from whose perspective the testkit operates.
+    pub fn us(&self) -> &TestNode {
+        self.network().us()
     }
 }
 
