@@ -17,7 +17,7 @@
 use std::marker::PhantomData;
 use std::fmt;
 
-use crypto::{Hash, HashStream};
+use crypto::{Hash, CryptoHash, HashStream};
 use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageValue};
 use self::key::{BitsRange, ChildKind, LEAF_KEY_PREFIX};
 use self::node::{BranchNode, Node};

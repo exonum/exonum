@@ -27,7 +27,7 @@ use rand::{thread_rng, Rng};
 use bit_vec::BitVec;
 use exonum::messages::{RawMessage, Message, Propose, Prevote, Precommit, ProposeRequest,
                        TransactionsRequest, PrevotesRequest, CONSENSUS, Connect, PeersRequest};
-use exonum::crypto::{Hash, Seed, gen_keypair, gen_keypair_from_seed};
+use exonum::crypto::{CryptoHash, Hash, Seed, gen_keypair, gen_keypair_from_seed};
 use exonum::blockchain::{Blockchain, Schema};
 use exonum::node::state::{PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT,
                           TRANSACTIONS_REQUEST_TIMEOUT};

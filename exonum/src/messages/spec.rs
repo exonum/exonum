@@ -290,10 +290,6 @@ macro_rules! message {
         }
 
         impl $crate::storage::StorageValue for $name {
-            fn hash(&self) -> $crate::crypto::Hash {
-                $crate::messages::Message::hash(self)
-            }
-
             fn into_bytes(self) -> Vec<u8> {
                 self.raw.as_ref().as_ref().to_vec()
             }
