@@ -69,15 +69,16 @@ messages! {
     /// Connect to a node.
     ///
     /// ### Validation
-    /// The message is ignored if its time is earlier than in the previous `Connect` message received
-    /// from the same peer.
+    /// The message is ignored if its time is earlier than in the previous
+    /// `Connect` message received from the same peer.
     ///
     /// ### Processing
     /// Connect to the peer.
     ///
     /// ### Generation
-    /// A node sends `Connect` message to all known addresses during initialization. Additionally,
-    /// the node responds by its own `Connect` message after receiving `node::Event::Connected`.
+    /// A node sends `Connect` message to all known addresses during
+    /// initialization. Additionally, the node responds by its own `Connect`
+    /// message after receiving `node::Event::Connected`.
     struct Connect {
         /// The sender's public key.
         pub_key: &PublicKey,
@@ -91,17 +92,17 @@ messages! {
     /// Current node status.
     ///
     /// ### Validation
-    /// The message is ignored if its signature is incorrect or its `height` is lower than a node's
-    /// height.
+    /// The message is ignored if its signature is incorrect or its `height` is
+    /// lower than a node's height.
     ///
     /// ### Processing
-    /// If the message's `height` number is bigger than a node's one, then `BlockRequest` with current
-    /// node's height is sent in reply.
+    /// If the message's `height` number is bigger than a node's one, then
+    /// `BlockRequest` with current node's height is sent in reply.
     ///
     /// ### Generation
     /// `Status` message is broadcast regularly with the timeout controlled by
-    /// `blockchain::ConsensusConfig::status_timeout`. Also, it is broadcast after accepting a new
-    /// block.
+    /// `blockchain::ConsensusConfig::status_timeout`. Also, it is broadcast
+    /// after accepting a new block.
     struct Status {
         /// The sender's public key.
         from: &PublicKey,
@@ -121,12 +122,13 @@ messages! {
     ///     * is already known
     ///
     /// ### Processing
-    /// If the message contains unknown transactions, then `TransactionsRequest` is sent in reply.
-    /// Otherwise `Prevote` is broadcast.
+    /// If the message contains unknown transactions, then `TransactionsRequest`
+    /// is sent in reply.  Otherwise `Prevote` is broadcast.
     ///
     /// ### Generation
-    /// A node broadcasts `Propose` if it is a leader and is not locked for a different proposal. Also
-    /// `Propose` can be sent as response to `ProposeRequest`.
+    /// A node broadcasts `Propose` if it is a leader and is not locked for a
+    /// different proposal. Also `Propose` can be sent as response to
+    /// `ProposeRequest`.
     struct Propose {
         /// The validator id.
         validator: ValidatorId,
@@ -143,19 +145,21 @@ messages! {
     /// Pre-vote for a new block.
     ///
     /// ### Validation
-    /// A node panics if it has already sent a different `Prevote` for the same round.
+    /// A node panics if it has already sent a different `Prevote` for the same
+    /// round.
     ///
     /// ### Processing
-    /// Pre-vote is added to the list of known votes for the same proposal.
-    /// If `locked_round` number from the message is bigger than in a node state, then a node replies
-    /// with `PrevotesRequest`.
-    /// If there are unknown transactions in the propose specified by `propose_hash`,
-    /// `TransactionsRequest` is sent in reply.
-    /// Otherwise if all transactions are known and there are +2/3 pre-votes, then a node is locked
-    /// to that proposal and `Precommit` is broadcast.
+    /// Pre-vote is added to the list of known votes for the same proposal.  If
+    /// `locked_round` number from the message is bigger than in a node state,
+    /// then a node replies with `PrevotesRequest`.  If there are unknown
+    /// transactions in the propose specified by `propose_hash`,
+    /// `TransactionsRequest` is sent in reply.  Otherwise if all transactions
+    /// are known and there are +2/3 pre-votes, then a node is locked to that
+    /// proposal and `Precommit` is broadcast.
     ///
     /// ### Generation
-    /// A node broadcasts `Prevote` in response to `Propose` when it has received all the transactions.
+    /// A node broadcasts `Prevote` in response to `Propose` when it has
+    /// received all the transactions.
     struct Prevote {
         /// The validator id.
         validator: ValidatorId,
@@ -172,20 +176,21 @@ messages! {
     /// Pre-commit for a proposal.
     ///
     /// ### Validation
-    /// A node panics if it  has already sent a different `Precommit` for the same round.
+    /// A node panics if it has already sent a different `Precommit` for the
+    /// same round.
     ///
     /// ### Processing
-    /// Pre-commit is added to the list of known pre-commits.
-    /// If a proposal is unknown to the node, `ProposeRequest` is sent in reply.
-    /// If `round` number from the message is bigger than a node's "locked round", then a node replies
-    /// with `PrevotesRequest`.
-    /// If there are unknown transactions, then `TransactionsRequest` is sent in reply.
-    /// If a validator receives +2/3 precommits for the same proposal with the same block_hash, then
+    /// Pre-commit is added to the list of known pre-commits.  If a proposal is
+    /// unknown to the node, `ProposeRequest` is sent in reply.  If `round`
+    /// number from the message is bigger than a node's "locked round", then a
+    /// node replies with `PrevotesRequest`.  If there are unknown transactions,
+    /// then `TransactionsRequest` is sent in reply.  If a validator receives
+    /// +2/3 precommits for the same proposal with the same block_hash, then
     /// block is executed and `Status` is broadcast.
     ///
     /// ### Generation
-    /// A node broadcasts `Precommit` in response to `Prevote` if there are +2/3 pre-votes and no
-    /// unknown transactions.
+    /// A node broadcasts `Precommit` in response to `Prevote` if there are +2/3
+    /// pre-votes and no unknown transactions.
     struct Precommit {
         /// The validator id.
         validator: ValidatorId,
@@ -206,7 +211,8 @@ messages! {
     /// ### Validation
     /// The message is ignored if
     ///     * its `to` field corresponds to a different node
-    ///     * the `block`, `transaction` and `precommits` fields cannot be parsed or verified
+    ///     * the `block`, `transaction` and `precommits` fields cannot be
+    ///     parsed or verified
     ///
     /// ### Processing
     /// The block is added to the blockchain.
@@ -229,13 +235,15 @@ messages! {
     /// Request for the `Propose`.
     ///
     /// ### Validation
-    /// The message is ignored if its `height` is not equal to the node's height.
+    /// The message is ignored if its `height` is not equal to the node's
+    /// height.
     ///
     /// ### Processing
     /// `Propose` is sent as the response.
     ///
     /// ### Generation
-    /// A node can send `ProposeRequest` during `Precommit` and `Prevote` handling.
+    /// A node can send `ProposeRequest` during `Precommit` and `Prevote`
+    /// handling.
     struct ProposeRequest {
         /// The sender's public key.
         from: &PublicKey,
@@ -253,7 +261,8 @@ messages! {
     /// Requested transactions are sent to the recipient.
     ///
     /// ### Generation
-    /// This message can be sent during `Propose`, `Prevote` and `Precommit` handling.
+    /// This message can be sent during `Propose`, `Prevote` and `Precommit`
+    /// handling.
     struct TransactionsRequest {
         /// The sender's public key.
         from: &PublicKey,
@@ -266,7 +275,8 @@ messages! {
     /// Request for pre-votes.
     ///
     /// ### Validation
-    /// The message is ignored if its `height` is not equal to the node's height.
+    /// The message is ignored if its `height` is not equal to the node's
+    /// height.
     ///
     /// ### Processing
     /// The requested pre-votes are sent to the recipient.
@@ -291,8 +301,8 @@ messages! {
     /// Request connected peers from a node.
     ///
     /// ### Validation
-    /// Request is considered valid if the sender of the message on the network level corresponds to
-    /// the `from` field.
+    /// Request is considered valid if the sender of the message on the network
+    /// level corresponds to the `from` field.
     ///
     /// ### Processing
     /// Peer `Connect` messages are sent to the recipient.

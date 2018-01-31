@@ -273,6 +273,94 @@ fn handling_tx_panic_storage_error(blockchain: &Blockchain) {
     );
 }
 
+mod transactions_tests {
+    use blockchain::{Transaction, TransactionSet};
+    use storage::Fork;
+    use crypto::gen_keypair;
+    use serde::Serialize;
+    use serde_json;
+
+    transactions! {
+        const SERVICE_ID = 92;
+
+        MyTransactions {
+            struct A {
+                a: u32
+            }
+
+            struct B {
+                b: u32,
+                c: u8
+            }
+
+            struct C {
+                a: u32
+            }
+        }
+    }
+
+    impl Transaction for A {
+        fn verify(&self) -> bool {
+            true
+        }
+
+        fn execute(&self, _: &mut Fork) {}
+    }
+
+    impl Transaction for B {
+        fn verify(&self) -> bool {
+            true
+        }
+
+        fn execute(&self, _: &mut Fork) {}
+    }
+
+    impl Transaction for C {
+        fn verify(&self) -> bool {
+            true
+        }
+
+        fn execute(&self, _: &mut Fork) {}
+    }
+
+    #[test]
+    fn deserialize_from_json() {
+        fn round_trip<T: Transaction + Serialize>(t: &T) {
+            let initial = serde_json::to_value(&t).unwrap();
+            let parsed: MyTransactions = serde_json::from_value(initial.clone()).unwrap();
+            let roundtripped = serde_json::to_value(&parsed).unwrap();
+            assert_eq!(initial, roundtripped);
+        }
+
+        let (_pub_key, sec_key) = gen_keypair();
+        let a = A::new(0, &sec_key);
+        let b = B::new(1, 2, &sec_key);
+        let c = C::new(0, &sec_key);
+        round_trip(&a);
+        round_trip(&b);
+        round_trip(&c);
+    }
+
+    #[test]
+    fn deserialize_from_raw() {
+        fn round_trip<T: Transaction + Serialize>(t: &T) {
+            let initial = serde_json::to_value(&t).unwrap();
+            let raw = t.raw();
+            let parsed: MyTransactions = TransactionSet::tx_from_raw(raw.clone()).unwrap();
+            let roundtripped = serde_json::to_value(&parsed).unwrap();
+            assert_eq!(initial, roundtripped);
+        }
+
+        let (_pub_key, sec_key) = gen_keypair();
+        let a = A::new(0, &sec_key);
+        let b = B::new(1, 2, &sec_key);
+        let c = C::new(0, &sec_key);
+        round_trip(&a);
+        round_trip(&b);
+        round_trip(&c);
+    }
+}
+
 mod memorydb_tests {
     use futures::sync::mpsc;
     use std::path::Path;
