@@ -319,22 +319,20 @@ impl TimeProvider for SystemTimeProvider {
 /// use exonum_time::{MockTimeProvider, TimeSchema, TimeService};
 ///
 /// # fn main() {
-///     let mock_provider = MockTimeProvider::default();
-///
-///     let mut testkit = TestKitBuilder::validator()
-///         .with_service(TimeService::with_provider(mock_provider.clone()))
-///         .create();
-///
-///     mock_provider.add_time(Duration::new(15, 0));
-///     assert_eq!(UNIX_EPOCH + Duration::new(15, 0), mock_provider.time());
-///     testkit.create_blocks_until(Height(2));
-///     let snapshot = testkit.snapshot();
-///     let schema = TimeSchema::new(snapshot);
-///     assert_eq!(
-///         Some(UNIX_EPOCH + Duration::new(15, 0)),
-///         schema.time().get().map(|time| time.time())
-///     );
-/// }
+/// let mock_provider = MockTimeProvider::default();
+/// let mut testkit = TestKitBuilder::validator()
+///     .with_service(TimeService::with_provider(mock_provider.clone()))
+///     .create();
+/// mock_provider.add_time(Duration::new(15, 0));
+/// assert_eq!(UNIX_EPOCH + Duration::new(15, 0), mock_provider.time());
+/// testkit.create_blocks_until(Height(2));
+/// let snapshot = testkit.snapshot();
+/// let schema = TimeSchema::new(snapshot);
+/// assert_eq!(
+///     Some(UNIX_EPOCH + Duration::new(15, 0)),
+///     schema.time().get().map(|time| time.time())
+/// );
+/// # }
 /// ```
 #[derive(Debug, Clone)]
 pub struct MockTimeProvider {
