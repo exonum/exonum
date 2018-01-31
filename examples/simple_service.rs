@@ -29,7 +29,7 @@ use exonum::encoding;
 use exonum::helpers::Height;
 use exonum::messages::{Message, RawTransaction};
 use exonum::storage::{Fork, ProofMapIndex, Snapshot};
-use exonum_time::{TimeService, TimeSchema, TimeProvider, MockTimeProvider};
+use exonum_time::{TimeService, TimeSchema, MockTimeProvider};
 use exonum_testkit::TestKitBuilder;
 
 /// Marker service id.
@@ -134,9 +134,7 @@ fn main() {
     // Create testkit for network with one validator.
     let mut testkit = TestKitBuilder::validator()
         .with_service(MarkerService)
-        .with_service(TimeService::with_provider(
-            Box::new(mock_provider.clone()) as Box<TimeProvider>,
-        ))
+        .with_service(TimeService::with_provider(mock_provider.clone()))
         .create();
 
     mock_provider.set_time(UNIX_EPOCH + Duration::new(10, 0));
