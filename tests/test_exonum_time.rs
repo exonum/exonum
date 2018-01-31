@@ -213,22 +213,6 @@ fn test_exonum_time_service_with_4_validators() {
     );
 }
 
-fn get_expected_storage_time(validators_times: &[Option<SystemTime>]) -> Option<SystemTime> {
-    let max_byzantine_nodes = (validators_times.len() - 1) / 3;
-
-    let mut times = validators_times
-        .iter()
-        .filter(|time| time.is_some())
-        .collect::<Vec<_>>();
-
-    if times.len() <= 2 * max_byzantine_nodes {
-        return None::<SystemTime>;
-    }
-
-    times.sort_by(|a, b| b.cmp(a));
-    *times[max_byzantine_nodes]
-}
-
 #[test]
 fn test_exonum_time_service_with_7_validators() {
     let mut testkit = TestKitBuilder::validator()
@@ -241,26 +225,35 @@ fn test_exonum_time_service_with_7_validators() {
 
     verify_data(testkit.snapshot(), &validators, None, &validators_times);
 
-    let mut time = SystemTime::now();
+    let time = SystemTime::now();
+    let times = (0..7)
+        .map(|x| time + Duration::new(x * 10, 0))
+        .collect::<Vec<_>>();
+    let expected_storage_times = vec![
+        None::<SystemTime>,
+        None::<SystemTime>,
+        None::<SystemTime>,
+        None::<SystemTime>,
+        Some(times[2]),
+        Some(times[3]),
+        Some(times[4]),
+    ];
+
     for (i, validator) in validators.iter().enumerate() {
         let tx = {
             let (pub_key, sec_key) = validator.service_keypair();
-            TxTime::new(time, pub_key, sec_key)
+            TxTime::new(times[i], pub_key, sec_key)
         };
         testkit.create_block_with_transactions(txvec![tx]);
 
-        validators_times[i] = Some(time);
-
-        let expected_storage_time = get_expected_storage_time(&validators_times);
+        validators_times[i] = Some(times[i]);
 
         verify_data(
             testkit.snapshot(),
             &validators,
-            expected_storage_time,
+            expected_storage_times[i],
             &validators_times,
         );
-
-        time += Duration::new(10, 0);
     }
 }
 
