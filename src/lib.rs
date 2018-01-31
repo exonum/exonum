@@ -305,48 +305,53 @@ impl TimeProvider for SystemTimeProvider {
     }
 }
 
-/// Mock provider for service testing.
+/// Mock time provider for service testing.
+///
+/// In terms of use, the mock time provider is similar to [`Arc`]; that is, clones of the provider
+/// control the same time record as the original instance. Therefore, to use the mock provider,
+/// one may clone its instance and use the clone to construct a [`TimeService`],
+/// while keeping the original instance to adjust the time reported to the validators
+/// along various test scenarios.
 ///
 /// # Examples
 ///
 /// ```
-/// extern crate exonum;
-/// extern crate exonum_testkit;
-/// extern crate exonum_time;
+/// # extern crate exonum;
+/// # extern crate exonum_testkit;
+/// # extern crate exonum_time;
 /// use std::time::{Duration, UNIX_EPOCH};
 /// use exonum::helpers::Height;
 /// use exonum_testkit::TestKitBuilder;
-/// use exonum_time::{MockTimeProvider, TimeProvider, TimeSchema, TimeService};
+/// use exonum_time::{MockTimeProvider, TimeSchema, TimeService};
 ///
-/// fn main() {
-///     let mock_provider = MockTimeProvider::new(UNIX_EPOCH + Duration::new(10, 0));
-///     assert_eq!(UNIX_EPOCH + Duration::new(10, 0), mock_provider.time());
+/// # fn main() {
+/// let mock_provider = MockTimeProvider::default();
+/// let mut testkit = TestKitBuilder::validator()
+///     .with_service(TimeService::with_provider(mock_provider.clone()))
+///     .create();
+/// mock_provider.add_time(Duration::new(15, 0));
+/// testkit.create_blocks_until(Height(2));
 ///
-///     let mut testkit = TestKitBuilder::validator()
-///         .with_service(TimeService::with_provider(
-///             Box::new(mock_provider.clone()) as Box<TimeProvider>,
-///         ))
-///         .create();
-///
-///     mock_provider.add_time(Duration::new(15, 0));
-///     assert_eq!(UNIX_EPOCH + Duration::new(25, 0), mock_provider.time());
-///     testkit.create_blocks_until(Height(2));
-///     let snapshot = testkit.snapshot();
-///     let schema = TimeSchema::new(snapshot);
-///     assert_eq!(
-///         Some(UNIX_EPOCH + Duration::new(25, 0)),
-///         schema.time().get().map(|time| time.time())
-///     );
-/// }
+/// // The time reported by the mock time provider is reflected by the service.
+/// let snapshot = testkit.snapshot();
+/// let schema = TimeSchema::new(snapshot);
+/// assert_eq!(
+///     Some(UNIX_EPOCH + Duration::new(15, 0)),
+///     schema.time().get().map(|time| time.time())
+/// );
+/// # }
 /// ```
+///
+/// [`Arc`]: https://doc.rust-lang.org/std/sync/struct.Arc.html
+/// [`TimeService`]: struct.TimeService.html
 #[derive(Debug, Clone)]
 pub struct MockTimeProvider {
     /// Local time value.
     time: Arc<RwLock<SystemTime>>,
 }
 
-/// Default mock provider is initialized with the Unix epoch start.
 impl Default for MockTimeProvider {
+    /// Initializes the provider with the time set to the Unix epoch start.
     fn default() -> Self {
         Self::new(UNIX_EPOCH)
     }
@@ -358,7 +363,7 @@ impl MockTimeProvider {
         Self { time: Arc::new(RwLock::new(time)) }
     }
 
-    /// Gets the time value.
+    /// Gets the time value currently reported by the provider.
     pub fn time(&self) -> SystemTime {
         *self.time.read().unwrap()
     }
@@ -372,13 +377,19 @@ impl MockTimeProvider {
     /// Adds `duration` to the value of `time`.
     pub fn add_time(&self, duration: Duration) {
         let mut time = self.time.write().unwrap();
-        *time += duration
+        *time += duration;
     }
 }
 
 impl TimeProvider for MockTimeProvider {
     fn current_time(&self) -> SystemTime {
-        *self.time.read().unwrap()
+        self.time()
+    }
+}
+
+impl From<MockTimeProvider> for Box<TimeProvider> {
+    fn from(mock_time_provider: MockTimeProvider) -> Self {
+        Box::new(mock_time_provider) as Box<TimeProvider>
     }
 }
 
