@@ -298,4 +298,94 @@ mod tests {
     test_storage_key_for_int_type!{fuzz i32, 4 => test_storage_key_for_i32}
     test_storage_key_for_int_type!{fuzz u64, 8 => test_storage_key_for_u64}
     test_storage_key_for_int_type!{fuzz i64, 8 => test_storage_key_for_i64}
+
+    #[test]
+    fn test_signed_int_key_in_index() {
+        use storage::{Database, MapIndex, MemoryDB};
+
+        let db: Box<Database> = Box::new(MemoryDB::new());
+        let mut fork = db.fork();
+        {
+            let mut index: MapIndex<_, i32, u64> = MapIndex::new("test_index", &mut fork);
+            index.put(&5, 100);
+            index.put(&-3, 200);
+        }
+        db.merge(fork.into_patch()).unwrap();
+
+        let snapshot = db.snapshot();
+        let index: MapIndex<_, i32, u64> = MapIndex::new("test_index", snapshot);
+        assert_eq!(index.get(&5), Some(100));
+        assert_eq!(index.get(&-3), Some(200));
+
+        assert_eq!(
+            index.iter_from(&-4).collect::<Vec<_>>(),
+            vec![(-3, 200), (5, 100)]
+        );
+        assert_eq!(index.iter_from(&-2).collect::<Vec<_>>(), vec![(5, 100)]);
+        assert_eq!(index.iter_from(&1).collect::<Vec<_>>(), vec![(5, 100)]);
+        assert_eq!(index.iter_from(&6).collect::<Vec<_>>(), vec![]);
+
+        assert_eq!(index.values().collect::<Vec<_>>(), vec![200, 100]);
+    }
+
+    // Example how to migrate from Exonum <= 0.5 implementation of `StorageKey`
+    // for signed integers.
+    #[test]
+    fn test_old_signed_int_key_in_index() {
+        use storage::{Database, MapIndex, MemoryDB};
+
+        // Simple wrapper around a signed integer type with the `StorageKey` implementation,
+        // which was used in Exonum <= 0.5.
+        #[derive(Debug, PartialEq)]
+        struct QuirkyI32Key(i32);
+
+        impl StorageKey for QuirkyI32Key {
+            fn size(&self) -> usize {
+                4
+            }
+
+            fn write(&self, buffer: &mut [u8]) {
+                BigEndian::write_i32(buffer, self.0);
+            }
+
+            fn read(buffer: &[u8]) -> Self {
+                QuirkyI32Key(BigEndian::read_i32(buffer))
+            }
+        }
+
+        let db: Box<Database> = Box::new(MemoryDB::new());
+        let mut fork = db.fork();
+        {
+            let mut index: MapIndex<_, QuirkyI32Key, u64> = MapIndex::new("test_index", &mut fork);
+            index.put(&QuirkyI32Key(5), 100);
+            index.put(&QuirkyI32Key(-3), 200);
+        }
+        db.merge(fork.into_patch()).unwrap();
+
+        let snapshot = db.snapshot();
+        let index: MapIndex<_, QuirkyI32Key, u64> = MapIndex::new("test_index", snapshot);
+        assert_eq!(index.get(&QuirkyI32Key(5)), Some(100));
+        assert_eq!(index.get(&QuirkyI32Key(-3)), Some(200));
+
+        // Bunch of counterintuitive behavior here
+        assert_eq!(
+            index.iter_from(&QuirkyI32Key(-4)).collect::<Vec<_>>(),
+            vec![(QuirkyI32Key(-3), 200)]
+        );
+        assert_eq!(
+            index.iter_from(&QuirkyI32Key(-2)).collect::<Vec<_>>(),
+            vec![]
+        );
+        assert_eq!(
+            index.iter_from(&QuirkyI32Key(1)).collect::<Vec<_>>(),
+            vec![(QuirkyI32Key(5), 100), (QuirkyI32Key(-3), 200)]
+        );
+        assert_eq!(
+            index.iter_from(&QuirkyI32Key(6)).collect::<Vec<_>>(),
+            vec![(QuirkyI32Key(-3), 200)]
+        );
+
+        // Notice the different order of values compared to the previous test
+        assert_eq!(index.values().collect::<Vec<_>>(), vec![100, 200]);
+    }
 }
