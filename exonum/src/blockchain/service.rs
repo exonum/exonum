@@ -21,6 +21,8 @@ use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
 
 use serde_json::Value;
+use serde::ser::Serialize;
+use serde::de::DeserializeOwned;
 use iron::Handler;
 
 use crypto::{Hash, PublicKey, SecretKey};
@@ -31,6 +33,81 @@ use node::{ApiSender, Node, State, TransactionSend};
 use blockchain::{Blockchain, ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use helpers::{Height, Milliseconds, ValidatorId};
 use super::transaction::Transaction;
+
+/// TODO
+pub trait TransactionSet: Into<Box<Transaction>> + DeserializeOwned + Serialize + Clone {
+    /// TODO
+    fn tx_from_raw(raw: RawTransaction) -> Result<Self, MessageError>;
+}
+
+#[macro_export]
+macro_rules! transactions {
+    {
+        const SERVICE_ID = $service_id:expr;
+
+        $transaction_set:ident {
+            $(
+                $(#[$tx_attr:meta])*
+                struct $name:ident {
+                $(
+                    $(#[$field_attr:meta])*
+                    $field_name:ident : $field_type:ty
+                ),*
+                $(,)* // optional trailing comma
+                }
+            )*
+        }
+    }
+
+    =>
+
+    {
+        messages! {
+            const SERVICE_ID = $service_id;
+            $(
+                $(#[$tx_attr])*
+                struct $name {
+                $(
+                    $(#[$field_attr])*
+                    $field_name : $field_type
+                ),*
+                }
+            )*
+        }
+
+        #[derive(Serialize, Deserialize, Clone)]
+        #[serde(untagged)]
+        enum $transaction_set {
+            $($name($name),)*
+        }
+
+        impl $crate::blockchain::TransactionSet for $transaction_set {
+            fn tx_from_raw(
+                raw: $crate::messages::RawTransaction
+            ) -> ::std::result::Result<Self, $crate::encoding::Error> {
+                let message_type = raw.message_type();
+                match message_type {
+                    $(
+                    <$name as $crate::messages::ServiceMessage>::MESSAGE_ID => {
+                        let tx = $crate::messages::Message::from_raw(raw)?;
+                        Ok($transaction_set::$name(tx))
+                    }
+                    )*
+                    _ => return Err($crate::encoding::Error::IncorrectMessageType { message_type })
+                }
+            }
+        }
+
+        impl Into<Box<$crate::blockchain::Transaction>> for $transaction_set {
+            fn into(self) -> Box<$crate::blockchain::Transaction> {
+                match self {$(
+                    $transaction_set::$name(tx) => Box::new(tx),
+                )*}
+            }
+        }
+    };
+}
+
 
 /// A trait that describes business logic of a concrete service.
 ///

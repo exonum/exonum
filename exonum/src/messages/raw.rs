@@ -266,7 +266,7 @@ impl MessageWriter {
 pub trait ServiceMessage {
     /// TODO
     const SERVICE_ID: u16;
-    /// TODO
+    /// TODO: should this be message type?
     const MESSAGE_ID: u16;
 }
 
