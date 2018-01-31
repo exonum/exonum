@@ -305,7 +305,13 @@ impl TimeProvider for SystemTimeProvider {
     }
 }
 
-/// Mock provider for service testing.
+/// Mock time provider for service testing.
+///
+/// In terms of use, the mock time provider is similar to [`Arc`]; that is, clones of the provider
+/// control the same time record as the original instance. Therefore, to use the mock provider,
+/// one may clone its instance and use the clone to construct a [`TimeService`],
+/// while keeping the original instance to adjust the time reported to the validators
+/// along various test scenarios.
 ///
 /// # Examples
 ///
@@ -324,8 +330,9 @@ impl TimeProvider for SystemTimeProvider {
 ///     .with_service(TimeService::with_provider(mock_provider.clone()))
 ///     .create();
 /// mock_provider.add_time(Duration::new(15, 0));
-/// assert_eq!(UNIX_EPOCH + Duration::new(15, 0), mock_provider.time());
 /// testkit.create_blocks_until(Height(2));
+///
+/// // The time reported by the mock time provider is reflected by the service.
 /// let snapshot = testkit.snapshot();
 /// let schema = TimeSchema::new(snapshot);
 /// assert_eq!(
@@ -334,14 +341,17 @@ impl TimeProvider for SystemTimeProvider {
 /// );
 /// # }
 /// ```
+///
+/// [`Arc`]: https://doc.rust-lang.org/std/sync/struct.Arc.html
+/// [`TimeService`]: struct.TimeService.html
 #[derive(Debug, Clone)]
 pub struct MockTimeProvider {
     /// Local time value.
     time: Arc<RwLock<SystemTime>>,
 }
 
-/// Default mock provider is initialized with the Unix epoch start.
 impl Default for MockTimeProvider {
+    /// Initializes the provider with the time set to the Unix epoch start.
     fn default() -> Self {
         Self::new(UNIX_EPOCH)
     }
@@ -353,7 +363,7 @@ impl MockTimeProvider {
         Self { time: Arc::new(RwLock::new(time)) }
     }
 
-    /// Gets the time value.
+    /// Gets the time value currently reported by the provider.
     pub fn time(&self) -> SystemTime {
         *self.time.read().unwrap()
     }
