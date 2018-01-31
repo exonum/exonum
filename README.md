@@ -40,8 +40,10 @@ Now the node is listening to HTTP requests on http://localhost:8000.
 
 When node is launched, you can use transaction examples to check that it works properly.
 A simplest way to do this is launching the [`test.sh`](examples/test.sh)
-script in the **examples** directory. This script creates two wallets, performs a transfer
-among them, and then verifies that the wallet status was correctly updated.
+script in the **examples** directory (for \*NIX platforms), or [`test.ps1`](examples/test.ps1)
+in the same directory (for Windows with PowerShell installed).
+The script creates two wallets, performs a transfer
+between them, and then verifies that the wallet status was correctly updated.
 
 Alternatively, you may use command-line utilities, such as `curl`, to manually POST transactions
 on [the transaction endpoint](http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets)
