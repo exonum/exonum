@@ -535,7 +535,7 @@ implement_index_traits! {SecretKey}
 implement_index_traits! {Seed}
 implement_index_traits! {Signature}
 
-/// Returns hash consisting of zeros.
+/// Returns a hash consisting of zeros.
 impl Default for Hash {
     fn default() -> Hash {
         Hash::zero()

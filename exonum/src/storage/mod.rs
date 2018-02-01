@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! A module that provides interfaces to work with persisted blockchain data.
+//! A module that provides interfaces to work with the persisted blockchain data.
 //!
 //! See also [the documentation page on storage][doc:storage].
 //!
@@ -21,8 +21,8 @@
 //! A [`Database`] is a container for data persistence. Internally, a `Database` is
 //! a collection of named key-value stores (aka column families)
 //! with reading isolation and atomic writes. The database is assumed to be embedded,
-//! that is, the Exonum process has exclusive access to DB during blockchain operation.
-//! You can interact with a `Database` from multiple threads by cloning its instance.
+//! that is, the Exonum process has exclusive access to the DB during blockchain operation.
+//! You can interact with the `Database` from multiple threads by cloning its instance.
 //!
 //! Exonum provides two database types: [`RocksDB`] and [`MemoryDB`].
 //!
@@ -31,35 +31,35 @@
 //! Snapshots and forks facilitate access to the database.
 //!
 //! If you need to read the data, you can create a [`Snapshot`] using the [`snapshot`][1] method
-//! of a `Database` instance. Snapshots provide read isolation, so you are guaranteed to work
+//! of the `Database` instance. Snapshots provide read isolation, so you are guaranteed to work
 //! with consistent values even if the data in the database changes between reads. `Snapshot`
 //! provides all the necessary methods for reading data from the database, so `&Snapshot`
-//! is used as a storage view for creating a read-only representation of [indices](#indices).
+//! is used as a storage view for creating a read-only representation of the [indices](#indices).
 //!
 //! If you need to make changes to the database, you need to create a [`Fork`] using
-//! the [`fork`][2] method of a `Database`. Like `Snapshot`, `Fork` provides read isolation,
+//! the [`fork`][2] method of the `Database`. Like `Snapshot`, `Fork` provides read isolation,
 //! but also allows to create a sequence of changes to the database that are specified
 //! as a [`Patch`]. A patch can be atomically [`merge`]d into a database. Different threads
 //! may call `merge` concurrently.
 //!
 //! # `StorageKey` and `StorageValue` traits
 //!
-//! If you need to use your own data types as keys or values in storage, you need to implement
+//! If you need to use your own data types as keys or values in the storage, you need to implement
 //! the [`StorageKey`] or [`StorageValue`] traits respectively. These traits are already
 //! implemented for most standard types.
 //!
 //! # Indices
 //!
-//! Indices are structures representing data collections stored in a database.
+//! Indices are structures representing data collections stored in the database.
 //! This concept is similar to tables in relational databases. The interfaces
 //! of the indices are similar to ordinary collections (like arrays, maps and sets).
 //!
-//! Each index occupies a certain set of keys in a single comlumn family of the [`Database`].
+//! Each index occupies a certain set of keys in a single column family of the [`Database`].
 //! On the other hand, multiple indices can be stored in the same column family, provided
 //! that their keyspaces do not intersect. Isolation is commonly achieved with the help
-//! of prefixes; see `with_prefix` constructor in built-in index types.
+//! of prefixes; see `with_prefix` constructor in the built-in index types.
 //!
-//! Merklized indices can generate cryptographic proofs about the inclusion
+//! Merklized indices can generate cryptographic proofs about inclusion
 //! of entries. Having such a proof, an external client may verify locally that the received data
 //! was authorized by the blockchain validators without having to replicate
 //! the entire blockchain contents.
@@ -68,8 +68,8 @@
 //!
 //! - [`Entry`] is a specific index that stores only one value. Useful for global values, such as
 //!   configuration. Similar to a combination of [`Box`] and [`Option`].
-//! - [`ListIndex`] is a list of items stored in sequential order. Similar to [`Vec`].
-//! - [`SparseListIndex`] is a list of items stored in sequential order. Similar to `ListIndex`,
+//! - [`ListIndex`] is a list of items stored in the sequential order. Similar to [`Vec`].
+//! - [`SparseListIndex`] is a list of items stored in the sequential order. Similar to `ListIndex`,
 //!   but may contain indices without elements.
 //! - [`MapIndex`] is a map of keys and values. Similar to [`BTreeMap`].
 //! - [`ProofListIndex`] is a Merklized version of `ListIndex` that supports cryptographic

@@ -47,7 +47,7 @@ All notable changes to this project will be documented in this file. The project
 ### New features
 - Added `patch` method to the `Fork` structure. (#393)
 - Added a public `healthcheck` endpoint. (#405)
-- Added serialization support floating point types through special wrapper (`F32` and `F64`). This feature is hidden
+- Added serialization support of floating point types through special wrapper (`F32` and `F64`). This feature is hidden
   behind `float_serialize` gate. Note: special values (Infinity and NaN) aren't supported. (#384)
 - Added a possibility to set maximum message size (`pub max_message_len` field in `ConsensusConfig`). (#426)
 - Added support for CORS. (#406)
