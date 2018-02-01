@@ -57,6 +57,7 @@ env:
   - FEATURE=fmt
   - FEATURE=test-core
   - FEATURE=test-sandbox
+  - FEATURE=test-testkit
   - FEATURE=test-doc
   - FEATURE=non-fatal-checks
 
@@ -96,7 +97,6 @@ script: |
 
   "fmt" )
       cargo update &&
-      cd exonum &&
       cd exonum && cargo fmt -- --write-mode=diff && cd .. &&
       cd sandbox && cargo fmt -- --write-mode=diff && cd .. &&
       cd testkit && cargo fmt -- --write-mode=diff && cd ..
@@ -118,13 +118,11 @@ script: |
   ;;
   "test-testkit" )
       cargo test -p exonum-testkit --verbose
+      cargo run -p exonum-testkit --example timestamping &&
+      cargo run -p exonum-testkit --example configuration_change
   ;;
   "test-doc" )
       cargo test -p sandbox --verbose --doc -- --test-threads=2
-  ;;
-  "examples" )
-      cargo run -p exonum-testkit --example timestamping &&
-      cargo run -p exonum-testkit --example configuration_change
   ;;
   "non-fatal-checks" )
       cargo doc --no-deps &&
