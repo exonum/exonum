@@ -1,6 +1,6 @@
 [package]
 name = "exonum-time"
-version = "0.1.0"
+version = "0.5.0"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 homepage = "https://github.com/exonum/exonum-time"
 repository = "https://github.com/exonum/exonum-time"
@@ -12,7 +12,7 @@ categories = ["cryptography", "date-and-time"]
 description = "The time oracle service for Exonum."
 
 [dependencies]
-exonum = "0.4.0"
+exonum = "0.5.0"
 iron = "0.6.0"
 bodyparser = "0.8.0"
 router = "0.6.0"
@@ -22,8 +22,4 @@ serde_derive = "1.0"
 pretty_assertions = "0.4.0"
 
 [dev-dependencies]
-exonum-testkit = "0.1.1"
-
-[patch.crates-io]
-exonum = { git = 'https://github.com/exonum/exonum', rev = 'e66158647' }
-exonum-testkit = { git = 'https://github.com/exonum/exonum-testkit', rev = '73cb369'}
+exonum-testkit = "0.5.0"
