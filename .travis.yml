@@ -1,78 +1,170 @@
 language: rust
 
-rust:
-  - stable
-
 addons:
   apt:
     sources:
     - sourceline: 'ppa:giskou/librocksdb'
     packages:
-    - librocksdb
+    - gcc
+    - g++
+    - libssl-dev
+    - libcurl4-openssl-dev
+    - libelf-dev
+    - libdw-dev
+    - binutils-dev
+    - libiberty-dev
     - libsnappy-dev
+    - librocksdb
 
-cache: cargo
-sudo: false
+rust:
+  - stable
+
+matrix:
+  allow_failures:
+    - env: FEATURE=non-fatal-checks
+  fast_finish: true
+  include:
+    - rust: nightly-2018-01-22
+      env: FEATURE=benchmarks
+    - rust: nightly-2018-01-22
+      env: FEATURE=clippy-core
+    - rust: nightly-2018-01-22
+      env: FEATURE=clippy-sandbox
+    - rust: nightly-2018-01-22
+      env: FEATURE=clippy-testkit
+
+cache:
+  directories:
+  - $HOME/.cargo
+  - $HOME/.local
+  - $TRAVIS_BUILD_DIR/target
+  - $TRAVIS_BUILD_DIR/sandbox/target
+
 dist: trusty
+sudo: required
 
 env:
   global:
-    - CLIPPY_VERS=0.0.170
-    - RUSTFMT_VERS=0.9.0
-    - ROCKSDB_LIB_DIR=/usr/lib/x86_64-linux-gnu
-    - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
+  - CLIPPY_VERS=0.0.181
+  - RUSTFMT_VERS=0.9.0
+  - DEADLINKS_VERS=0.3.0
+  - OUTDATED_VERS=0.7.0
+  - SODIUM_VERS=1.0.13
+  - CARGO_INCREMENTAL=1
+  - RUSTFLAGS="-C link-dead-code"
+  - CODECOV_TOKEN=90006bf6-e4b7-4825-b880-8d19c4e21c21
+  - ROCKSDB_LIB_DIR=/usr/lib/x86_64-linux-gnu
+  - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
   matrix:
-    - FEATURE=test
-script:
-  - cargo test
-  - cargo run --example timestamping
-  - cargo run --example configuration_change
+  - FEATURE=fmt
+  - FEATURE=test-core
+  - FEATURE=test-sandbox
+  - FEATURE=test-testkit
+  - FEATURE=test-doc
+  - FEATURE=non-fatal-checks
 
-stages:
-  - test
-jobs:
-  include:
-    - stage: test
-      env:
-        - FEATURE=fmt
-      before_install:
-        - >
-          rustfmt --version | grep $RUSTFMT_VERS ||
-          cargo install rustfmt --force --vers $RUSTFMT_VERS
-      script:
-        - cargo fmt -- --write-mode=diff
-    - stage: test
-      rust: nightly-2017-11-13
-      env:
-        - FEATURE=clippy
-      before_install:
-        - >
-          cargo clippy --version | grep $CLIPPY_VERS ||
-          cargo install clippy --force --vers $CLIPPY_VERS
-      script:
-        - cargo clippy -- -D warnings
-    - stage: test
-    - stage: test
-      cache:
-        cargo: true
-        directories:
-          - examples/server/node_modules
-      env:
-        - FEATURE=client-tests
-      before_install:
-        - nvm install 8 && nvm use 8
-        - node --version
-        - npm --version
-      install:
-        - cd examples/server && npm install
-      script:
-        - cargo build --example server
-        - npm run lint
-        - npm run test:unix
-      # Kill the server from example if it's still running
-      after_script:
-        - npm run posttest:unix
+install:
+- |
+  if [ ! -f "$HOME/.local/lib/libsodium.a" ]; then
+    wget "https://github.com/jedisct1/libsodium/releases/download/$SODIUM_VERS/libsodium-$SODIUM_VERS.tar.gz" -t 5 -O "libsodium.tar.gz"
+    tar xvf libsodium.tar.gz
+    cd libsodium-$SODIUM_VERS
+    ./configure --prefix=$HOME/.local
+    make
+    make install
+    cd ..
+  fi
+- export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.local/lib
+- export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$HOME/.local/lib/pkgconfig
+- |
+  if [[ "$FEATURE" == "non-fatal-checks" ]]; then
+    cargo-outdated -V | grep $OUTDATED_VERS || cargo install cargo-outdated --vers $OUTDATED_VERS --force
+    cargo-deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
+    fi
+- |
+  if [[ "$FEATURE" == "fmt" ]]; then
+    cargo-audit -V || cargo install cargo-audit --force
+    rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
+  fi
+- |
+  if [[ "$FEATURE" == "test-testkit" ]];
+    nvm install 8 && nvm use 8
+    node --version
+    npm --version
+  fi
+- |
+  case "$FEATURE" in
+  clippy* )
+    cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
+  ;;
+  esac
+- cargo install --list
+
+script: |
+  case "$FEATURE" in
+
+  "fmt" )
+      cargo update &&
+      cd exonum && cargo fmt -- --write-mode=diff && cd .. &&
+      cd sandbox && cargo fmt -- --write-mode=diff && cd .. &&
+      cd testkit && cargo fmt -- --write-mode=diff && cd ..
+  ;;
+  "clippy-core" )
+      cd exonum && cargo clippy --verbose --features long_benchmarks -- -D warnings
+  ;;
+  "clippy-sandbox" )
+      cd sandbox && cargo clippy --verbose -- -D warnings
+  ;;
+  "clippy-testkit" )
+      cd testkit && cargo clippy --verbose -- -D warnings
+  ;;
+  "test-core" )
+      cargo test -p exonum --verbose --tests --lib --features "float_serialize"
+  ;;
+  "test-sandbox" )
+      cargo test -p sandbox --verbose
+  ;;
+  "test-testkit" )
+      cargo test -p exonum-testkit --verbose
+      cargo run -p exonum-testkit --example timestamping &&
+      cargo run -p exonum-testkit --example configuration_change &&
+      cargo build -p exonum-testkit --example server
+      cd testkit/examples/server && npm run lint && npm run test:unix
+  ;;
+  "test-doc" )
+      cargo test -p sandbox --verbose --doc -- --test-threads=2
+  ;;
+  "non-fatal-checks" )
+      cargo doc --no-deps &&
+      cargo deadlinks --dir target/doc &&
+      cargo outdated --exit-code 1
+  ;;
+  "benchmarks" )
+      RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
+  ;;
+
+  esac
+
+after_success: |
+  [ $TRAVIS_BRANCH = master ] &&
+  [ $TRAVIS_PULL_REQUEST = false ] &&
+  wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz &&
+  tar xzf master.tar.gz &&
+  cd kcov-master &&
+  mkdir build &&
+  cd build &&
+  cmake .. &&
+  make &&
+  make install &&
+  cd ../.. &&
+  rm -rf kcov-master &&
+  for file in target/debug/exonum-*[^\.d]; do mkdir -p "target/cov/$(basename $file)"; kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
+  bash <(curl -s https://codecov.io/bash) &&
+  echo "Uploaded code coverage"
+
 notifications:
   slack:
-    rooms:
-      secure: nGc6g5/JQdZNVUGhdZ+jwqq+qTfRMGw2whO8whaCDJZg7XN/jNb5GRBQrtfpF+V1rmayayMV+2PWMhAI/5H+6JjqrVNwEZwruR7sB3aXTh+1p1mp076tsPl3BYyfsJ+R52B5b2NXU4tFo9RVhwI40LC/iOgQL5rAYjeNX6gH4WOlx9IcUhObQVaIKexAhM5lE4bK/QRI6QCvNkARkzYMulibovGeU0n2aJGew6vxTK1H4VVb8QQTBoub8zag2r54Yumj2TT4vYmbE93Oc9kaIXorrTuFv4gdqmuZZnbyHM2LXZJXMVAZJrf52ofDqce17IaCHV4+mcw9SS6tn46DqfrIlIxKYNsQJelb5+ZGCjtQNL+iiH0+V1RHxHpkSpmSKSzRXzROhybwSdi3HFXJm5clt/DseuqG5Cmm5L/PgoZbGcfYh5qN5xIJI+899bF/bBwC8nEUFf1SQVVuoPAkShUtqOdOJ2XPJl6JMVDjFCYA40QFFCBUmdwp7xHvPIsb2qT2eIdxDwdZ6R7Jj+NTzUo9uhqHq48RjDROlk0riTVPCVs3ex3yyrQ3vIp9aDfE5LRWq6lWaHXi1O6Y3CeCVThB+RuAZ3nGbv51OgUNVwR1jOYzIINSMfXP8WSBWvjw1DAZEbQWCpEDsXZD189rlNqT/DyMTIBk3kVZVWjSZYo=
+    secure: ufnH5/ilJ/GkfzU28GguFgQzL1Jb7gGGVaBytCi1VW9cvME7wHC/Pf3ZDM9cVv7t8Cq6K423J8pSkT8vErB7GzHLGRJK8EsBkuGxiAJiHJIVNf/a20gjyqtS2wSyoVDDFz1LRtCNvQanSy2psSWyJcWtnAllluwRNHKXZWYFOpU6uqt2XIi1s3vuMyVw177alNyQkUJ6mhnt9ZDGoMXfcwXIvZ1bt3GPwAbuvAiHsShIrtVGJYTbIBDBsFsGgc1313xdz670xa1JrvZpIl0ZF91Z/0rxtQZjYos859ARnP+v5TfMpsOZbhVHtLI81/o/dOu/Dnrv2xo4VgLaHCTPfhO7LE7kGZ1OyEFqzsadL+k97JQnfkyyFRA84FrVNvgn5NStJtNRJu593v0zuI1OpmY5Xcu/XG2X3dpYZJGciKywoI8gFCc18taIqWY8P3uL/KdxX3VLikMkmYX+cXxHwhH/RvNLbfxD+hTepz+sGWBnLg/dFNpy3WdzJrSNKE9OAH3Gy53z32fT7XiGF8+juN3RB7MmoLA+sOKnGnjal+o44Ga7KDxHe9lOjRVWAQFH6lIEVNwpdEp+2zqu2QAyCIbYcyEdxo8oKXMwAOPFeIqFGshAYGSQAYbT9V75J2Hfcpqb+EXhiBluCSjoaacg4Yhsc/tFhqI7B5+tq7Z5KVU=
+  webhooks:
+    urls:
+    - https://webhooks.gitter.im/e/9599da7e3a500810190d

@@ -1,0 +1,56 @@
+consensus_public_key = "16ef83ca4b231404daec6d07b24beb84d89c25944285d2e32a2dcf8f0f3eda72"
+consensus_secret_key = "2a751e6595af66f7644bd33cf7710b6226cf8d0de4b3d18bc8fc2d80f19325a716ef83ca4b231404daec6d07b24beb84d89c25944285d2e32a2dcf8f0f3eda72"
+external_address = "127.0.0.1:6333"
+listen_address = "0.0.0.0:6333"
+peers = ["127.0.0.1:6333", "127.0.0.1:6333", "127.0.0.1:6333", "127.0.0.1:6333"]
+service_public_key = "523ead8ea8457de570e165a512dd5d1b6688cb5757c3d744e03d1173f3e3e237"
+service_secret_key = "18544ebbf3ceeeebca847fe6b4e6ce88f83fc92b6b0e24d5466f3cd08aea37bb523ead8ea8457de570e165a512dd5d1b6688cb5757c3d744e03d1173f3e3e237"
+
+[api]
+enable_blockchain_explorer = true
+state_update_timeout = 10000
+[[genesis.validator_keys]]
+consensus_key = "16ef83ca4b231404daec6d07b24beb84d89c25944285d2e32a2dcf8f0f3eda72"
+service_key = "523ead8ea8457de570e165a512dd5d1b6688cb5757c3d744e03d1173f3e3e237"
+[[genesis.validator_keys]]
+consensus_key = "41dd7940903ca3102c041222a4c51f9f7978499b082833c733c3b15165202f80"
+service_key = "066f9874c7b32fca4c1ad4dacbe9bc9aa0de38b480d8c71ea05e5b3c70422152"
+[[genesis.validator_keys]]
+consensus_key = "648e98a2405a40325d946bf8de6937795fe5c22ab095bca765a8b218e49ff5a3"
+service_key = "ed0c18a99cf373b0436376449da688e8150a93083d7b7ecdda3372e7bf70b80a"
+[[genesis.validator_keys]]
+consensus_key = "924625eb77b9ad21e76713e7ada715945fbf0a926698832e121484c797fcc58e"
+service_key = "7413a596e4fa0953cf22b120bd1ee0ba233bd1c619f10b21e6854b6b3cc9a6e9"
+
+[genesis.consensus]
+max_message_len = 1048576
+peers_timeout = 10000
+round_timeout = 3000
+status_timeout = 5000
+txs_block_limit = 1000
+
+[genesis.consensus.timeout_adjuster]
+type = "Constant"
+timeout = 500
+
+[mempool]
+tx_pool_capacity = 100000
+
+[mempool.events_pool_capacity]
+api_requests_capacity = 1024
+network_events_capacity = 512
+network_requests_capacity = 512
+internal_events_capacity = 128
+
+[network]
+max_incoming_connections = 128
+max_outgoing_connections = 128
+tcp_nodelay = true
+tcp_connect_retry_timeout = 15000
+tcp_connect_max_retries = 10
+
+[services_configs]
+
+[whitelist]
+whitelist_enabled = false
+whitelisted_peers = []

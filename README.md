@@ -1,40 +1,21 @@
-# exonum-testkit
+# Exonum
 
-[![Version][crates-io-image]][crates-io-url]
-[![Build status][travis-image]][travis-url]
-[![Build status][appveyor-image]][appveyor-url]
-[![Gitter][gitter-image]][gitter-url]
+[![Build Status](https://travis-ci.org/exonum/exonum.svg?branch=master)](https://travis-ci.org/exonum/exonum)
+[![Join the chat at https://gitter.im/exonum/exonum](https://badges.gitter.im/exonum/exonum.svg)](https://gitter.im/exonum/exonum)
 
-Testkit for Exonum blockchain is a framework that allows to test operation of the whole service.
-Specifically, it allows to test transaction execution and APIs in the synchronous environment
-(without consensus algorithm) and in the same system process.
+[Exonum](https://exonum.com/) is an extensible open-source framework for creating blockchain
+applications. Exonum can be used to create cryptographically powered distributed ledgers in
+virtually any problem domain, including FinTech, GovTech, and LegalTech. The Exonum framework is
+oriented towards creating permissioned blockchains, that is, blockchains with the known set of
+blockchain infrastructure providers.
 
-## Usage
-
-Just add the following line to the `Cargo.toml`:
-
-```toml
-[dev-dependencies]
-exonum-testkit = "0.1.0"
-```
-
-[Read more...][tutorial]
-
-## Examples
-
-See the [**tests**](tests) and [**examples**](examples) folders for examples of building a
-service and then testing it with the testkit.
-
-## License
-
-Licensed under the Apache License (Version 2.0). See [LICENSE](LICENSE) for details.
-
-[travis-image]: https://travis-ci.org/exonum/exonum-testkit.svg?branch=master
-[travis-url]: https://travis-ci.org/exonum/exonum-testkit
-[appveyor-image]: https://ci.appveyor.com/api/projects/status/lhu2aykh9nyti78p/branch/master?svg=true
-[appveyor-url]: https://ci.appveyor.com/project/alekseysidorov/exonum-testkit/branch/master
-[gitter-image]: https://img.shields.io/gitter/room/exonum/exonum.svg
-[gitter-url]: https://gitter.im/exonum/exonum
-[crates-io-image]: https://img.shields.io/crates/v/exonum-testkit.svg
-[crates-io-url]: https://crates.io/crates/exonum-testkit
-[tutorial]: TUTORIAL.md
+This is the main Exonum repository that includes
+* [Exonum core library](https://github.com/exonum/exonum/blob/master/exonum/README.md).
+* [Exonum testing framework](https://github.com/exonum/exonum/blob/master/testkit/README.md).
+* Services:
+  * Configuration service (currently in [exonum-configuration](https://github.com/exonum/exonum-configuration) repository).
+  * Time service (currently in [exonum-time](https://github.com/exonum/exonum-time) repository).
+* Demos
+  * Cryprocurrency (currently in [cryptocurrency](https://github.com/exonum/cryptocurrency) repository).
+  
+See individual projects' readme for the details.

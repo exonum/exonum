@@ -1,3 +1,15 @@
-target/
-**/*.rs.bk
+# vim files
+*.swp
+# macos files
+*.DS_Store
+
+# cargo
+target
+*/target
+*.rs.bk
 Cargo.lock
+
+# IDE files
+.idea
+.vscode
+*.iml

@@ -1,0 +1,21 @@
+[common.consensus_config]
+max_message_len = 1048576
+peers_timeout = 10000
+round_timeout = 3000
+status_timeout = 5000
+txs_block_limit = 1000
+
+[common.consensus_config.timeout_adjuster]
+type = "Constant"
+timeout = 500
+
+[common.services_config]
+
+[node]
+addr = "127.0.0.1:6333"
+
+[node.services_public_configs]
+
+[node.validator_keys]
+consensus_key = "41dd7940903ca3102c041222a4c51f9f7978499b082833c733c3b15165202f80"
+service_key = "066f9874c7b32fca4c1ad4dacbe9bc9aa0de38b480d8c71ea05e5b3c70422152"

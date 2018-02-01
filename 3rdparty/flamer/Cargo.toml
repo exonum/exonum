@@ -1,0 +1,14 @@
+[package]
+name = "exonum_flamer"
+version = "0.1.6"
+authors = ["Andre Bogus <bogusandre@gmail.com>", "The Exonum Team <exonum@bitfury.com>"]
+description = "a procedural macro to insert `flame::start_guard(_)` calls"
+license = "Apache-2.0"
+repository = "https://github.com/exonum/exonum"
+readme = "README.md"
+keywords = ["flame-graph", "profiling", "compiler-plugin"]
+
+[lib]
+plugin = true
+
+

@@ -1,0 +1,13 @@
+[package]
+name = "exonum_profiler"
+version = "0.1.2"
+authors = ["Ty Overby <ty@pre-alpha.com>", "The Exonum Team <exonum@bitfury.com>"]
+repository = "https://github.com/exonum/exonum"
+description = "A profiling / flamegraph library."
+license = "Apache-2.0"
+
+[dependencies]
+lazy_static = "0.2.8"
+ctrlc = "3.0.3"
+[features]
+nomock = []
