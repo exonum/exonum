@@ -34,12 +34,22 @@ use blockchain::{Blockchain, ConsensusConfig, Schema, StoredConfiguration, Valid
 use helpers::{Height, Milliseconds, ValidatorId};
 use super::transaction::Transaction;
 
-/// TODO
+/// `TransactionSet` trait describes a type which is an `enum` of several transactions.
+/// The implementation of this trait is generated automatically by the `transactions!`
+/// macro.
 pub trait TransactionSet: Into<Box<Transaction>> + DeserializeOwned + Serialize + Clone {
-    /// TODO
+    /// Parse a transaction from this set from a `RawMessage`.
     fn tx_from_raw(raw: RawTransaction) -> Result<Self, MessageError>;
 }
 
+
+/// `transactions!` is used to declare a set of trasactions of a particular service.
+///
+/// The macro generates a type for each transaction and a helper enum which can hold
+/// any of the transactions. You must implement `Transaction` trait for each of the
+/// transactions yourself.
+///
+/// See `Service` trait documentation for an example of usage.
 #[macro_export]
 macro_rules! transactions {
     {
@@ -119,8 +129,9 @@ macro_rules! transactions {
 ///
 /// ```
 /// #[macro_use] extern crate exonum;
+/// #[macro_use] extern crate serde_derive;
 /// // Exports from `exonum` crate skipped
-/// # use exonum::blockchain::{Service, Transaction, ExecutionResult};
+/// # use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
 /// # use exonum::crypto::Hash;
 /// # use exonum::messages::{ServiceMessage, Message, RawTransaction};
 /// # use exonum::storage::{Fork, Snapshot};
@@ -151,17 +162,29 @@ macro_rules! transactions {
 /// }
 ///
 /// // Transaction definitions
-/// messages! {
+/// transactions! {
 ///     const SERVICE_ID = SERVICE_ID;
-///     struct MyTransaction {
-///         // Transaction fields
+///
+///     MyTransactions {
+///         struct TxA {
+///             // Transaction fields
+///         }
+///
+///         struct TxB {
+///             // ...
+///         }
 ///     }
 /// }
 ///
-/// impl Transaction for MyTransaction {
+/// impl Transaction for TxA {
 ///     // Business logic implementation
 /// #   fn verify(&self) -> bool { true }
 /// #   fn execute(&self, fork: &mut Fork) -> ExecutionResult { Ok(()) }
+/// }
+///
+/// impl Transaction for TxB {
+/// #   fn verify(&self) -> bool { true }
+/// #   fn execute(&self, fork: &mut Fork) { }
 /// }
 ///
 /// // Service
@@ -181,13 +204,8 @@ macro_rules! transactions {
 ///     }
 ///
 ///     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, EncError> {
-///         let tx: Box<Transaction> = match raw.message_type() {
-///             MyTransaction::MESSAGE_ID => Box::new(MyTransaction::from_raw(raw)?),
-///             _ => Err(EncError::IncorrectMessageType {
-///                 message_type: raw.message_type(),
-///             })?,
-///         };
-///         Ok(tx)
+///         let tx = MyTransactions::tx_from_raw(raw)?;
+///         Ok(tx.into())
 ///     }
 /// }
 /// # fn main() { }

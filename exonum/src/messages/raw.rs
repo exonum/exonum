@@ -262,11 +262,16 @@ impl MessageWriter {
     }
 }
 
-/// TODO
-pub trait ServiceMessage {
-    /// TODO
+// this is a trait that is required for technical reasons:
+// you can't make associated constants object-safe. This
+// limitation of the Rust language might be lifted in the
+// future.
+/// A `Message` which belongs to a particular service.
+pub trait ServiceMessage: Message {
+    /// ID of the service this message belongs to.
     const SERVICE_ID: u16;
-    /// TODO: should this be message type?
+    /// ID of the message itself. Should be unique
+    /// within a service.
     const MESSAGE_ID: u16;
 }
 
