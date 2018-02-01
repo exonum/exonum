@@ -96,8 +96,7 @@ script: |
 
   "fmt" )
       cargo update &&
-      cd exonum && cargo audit && cd .. &&
-      cd testkit && cargo audit && cd .. &&
+      cargo audit &&
       cd exonum && cargo fmt -- --write-mode=diff && cd .. &&
       cd sandbox && cargo fmt -- --write-mode=diff && cd .. &&
       cd testkit && cargo fmt -- --write-mode=diff && cd ..
