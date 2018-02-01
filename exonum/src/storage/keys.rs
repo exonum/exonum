@@ -127,6 +127,8 @@ impl StorageKey for i8 {
     }
 }
 
+// spell-checker:ignore utype, itype, vals, ints
+
 macro_rules! storage_key_for_ints {
     ($utype:ident, $itype:ident, $size:expr, $read_method:ident, $write_method:ident) => {
         /// Uses big-endian encoding.

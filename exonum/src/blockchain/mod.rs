@@ -326,7 +326,7 @@ impl Blockchain {
                 &state_hash,
             );
             trace!("execute block = {:?}", block);
-            // Eval block hash
+            // Calculate block hash
             let block_hash = block.hash();
             // Update height
             let mut schema = Schema::new(&mut fork);

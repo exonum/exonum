@@ -375,6 +375,7 @@ fn test_proof_path_suffix() {
 
 #[test]
 fn test_proof_path_prefix() {
+    // spell-checker:disable
     let b = ProofPath::from_raw(*b"\x00\x83wertyuiopasdfghjklzxcvbnm123456\x08");
     assert_eq!(b.len(), 8);
     assert_eq!(b.prefix(1).bit(0), ChildKind::Right);

@@ -69,7 +69,7 @@ macro_rules! encoding_struct {
             raw: Vec<u8>
         }
 
-        // Reimplement `Field` for `encoding_struct!`
+        // Re-implement `Field` for `encoding_struct!`
         // to write fields in place of another structure
         impl<'a> $crate::encoding::Field<'a> for $name {
             unsafe fn read(buffer: &'a [u8],

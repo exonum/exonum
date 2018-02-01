@@ -44,7 +44,7 @@ mod tests {
     }
 
     #[bench]
-    fn bench_sign_1024_inited_sodium(b: &mut Bencher) {
+    fn bench_sign_1024_initialized_sodium(b: &mut Bencher) {
         ::exonum::crypto::init();
         let (_, secret_key) = gen_keypair();
         let data = (0..1024).map(|x| (x % 255) as u8).collect::<Vec<_>>();
@@ -76,7 +76,7 @@ mod tests {
     }
 
     #[bench]
-    fn bench_verify_1024_inited_sodium(b: &mut Bencher) {
+    fn bench_verify_1024_initialized_sodium(b: &mut Bencher) {
         ::exonum::crypto::init();
         let (public_key, secret_key) = gen_keypair();
         let data = (0..1024).map(|x| (x % 255) as u8).collect::<Vec<_>>();
@@ -103,7 +103,7 @@ mod tests {
     }
 
     #[bench]
-    fn bench_hash_1024_inited_sodium(b: &mut Bencher) {
+    fn bench_hash_1024_initialized_sodium(b: &mut Bencher) {
         ::exonum::crypto::init();
         let data = (0..1024).map(|x| (x % 255) as u8).collect::<Vec<_>>();
         b.iter(|| hash(&data))

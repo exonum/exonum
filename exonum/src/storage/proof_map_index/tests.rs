@@ -369,8 +369,8 @@ fn fuzz_insert_build_proofs_in_table_filled_with_hashes(db: Box<Database>) {
         key_found: true,
     };
 
-    let json_repre = to_string(&proof_info).unwrap();
-    assert!(json_repre.len() > 0);
+    let json_representation = to_string(&proof_info).unwrap();
+    assert!(json_representation.len() > 0);
     let check_res = proof_path_to_key.validate(&item.0, table_root_hash);
     let proved_value: Option<&Hash> = check_res.unwrap();
     assert_eq!(proved_value.unwrap(), &item.1);
@@ -400,8 +400,8 @@ fn fuzz_insert_build_proofs(db: Box<Database>) {
             key_found: true,
         };
 
-        let json_repre = to_string(&proof_info).unwrap();
-        assert!(json_repre.len() > 0);
+        let json_representation = to_string(&proof_info).unwrap();
+        assert!(json_representation.len() > 0);
     }
 }
 
@@ -598,12 +598,12 @@ fn iter(db: Box<Database>) {
 }
 
 fn bytes_to_hex<T: AsRef<[u8]> + ?Sized>(bytes: &T) -> String {
-    let strs: Vec<String> = bytes
+    let strings: Vec<String> = bytes
         .as_ref()
         .iter()
         .map(|b| format!("{:02x}", b))
         .collect();
-    strs.join("")
+    strings.join("")
 }
 
 fn serialize_str_u8<S, A>(data: &A, serializer: S) -> Result<S::Ok, S::Error>
