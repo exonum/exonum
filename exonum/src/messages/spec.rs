@@ -13,7 +13,7 @@
 // limitations under the License.
 
 /// `message!` specifies a datatype for digitally signed messages that can be sent
-/// in Exonum networks. The macro offers a practical way to create [`Transaction`] types,
+/// in Exonum network. The macro offers a practical way to create [`Transaction`] types,
 /// although it does not implement `Transaction` by itself.
 ///
 /// The `message!` macro specifies fields of data pretty much in the same way they
