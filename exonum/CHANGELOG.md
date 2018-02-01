@@ -22,44 +22,31 @@ All notable changes to this project will be documented in this file. The project
 ## 0.5 - 2018-01-30
 
 ### Breaking changes
-- The order of bytes and bits in the `DBKey` keys of `ProofMapIndex` became
-  consistent. The change influences how
-  Merkle Patricia trees are built for `ProofMapIndex`: the bits in each byte of
-  a `DBKey` are now enumerated from the
-  least significant bit (LSB) to the most significant bit (MSB), compared to
-  MSB-to-LSB ordering used before. Note:
+- The order of bytes and bits in the `DBKey` keys of `ProofMapIndex` became consistent. The change influences how
+  Merkle Patricia trees are built for `ProofMapIndex`: the bits in each byte of a `DBKey` are now enumerated from the
+  least significant bit (LSB) to the most significant bit (MSB), compared to MSB-to-LSB ordering used before. Note:
   this change will break old storages using map proofs. (#419)
-- The `Database` trait is simplified: it is no longer required to implement
-  state-sharing `clone` method.
+- The `Database` trait is simplified: it is no longer required to implement state-sharing `clone` method.
   Instead, the `merge` method now takes a shared reference to `self`. (#422)
-- `message!` and `encoding_struct!` no longer require manual `SIZE` and offset
-  specification. (#413)
-- `from_raw(raw: RawMessage)`  method is moved to the `Message` trait. To
-  migrate, add `use exonum::messages::Message`.
+- `message!` and `encoding_struct!` no longer require manual `SIZE` and offset specification. (#413)
+- `from_raw(raw: RawMessage)`  method is moved to the `Message` trait. To migrate, add `use exonum::messages::Message`.
   (#427)
-- Changed iterators over `Patch` and `Changes` data into custom types instead of
-  standard collection iterators. (#393)
+- Changed iterators over `Patch` and `Changes` data into custom types instead of standard collection iterators. (#393)
 - Fixed typo in `SparceListIndexKeys` and `SparceListIndexValues`. (#398)
 - Removed default `state_hash` implementation in the `Service` trait. (#399)
 - Removed `info` method from the `Transaction`. (#402)
-- Replaced config param `timeout_events_capacity` with
-  `internal_events_capacity`. (#388)
+- Replaced config param `timeout_events_capacity` with `internal_events_capacity`. (#388)
 - The `Transaction` trait now inherits from `ExonumJson`. (#402)
-- Renamed `DBKey` to `ProofPath` and moved a part of its functionality to the
-  `BitsRange` trait. (#420)
+- Renamed `DBKey` to `ProofPath` and moved a part of its functionality to the `BitsRange` trait. (#420)
 
 ### New features
 - Added `patch` method to the `Fork` structure. (#393)
 - Added a public `healthcheck` endpoint. (#405)
-- Added serialization support of floating point types through special wrapper
-  (`F32` and `F64`). This feature is hidden
-  behind `float_serialize` gate. Note: special values (Infinity and NaN) aren't
-  supported. (#384)
-- Added a possibility to set maximum message size (`pub max_message_len` field
-  in `ConsensusConfig`). (#426)
+- Added serialization support of floating point types through special wrapper (`F32` and `F64`). This feature is hidden
+  behind `float_serialize` gate. Note: special values (Infinity and NaN) aren't supported. (#384)
+- Added a possibility to set maximum message size (`pub max_message_len` field in `ConsensusConfig`). (#426)
 - Added support for CORS. (#406)
-- Added `run-dev` command that performs a simplified node launch for testing
-  purposes. (#423)
+- Added `run-dev` command that performs a simplified node launch for testing purposes. (#423)
 
 ### Bug fixes
 - Fixed consensus on the threshold of 1/3 sleeping validators. (#388)
@@ -67,33 +54,26 @@ All notable changes to this project will be documented in this file. The project
 - Fixed a bug with message header validation. (#430)
 
 ### Internal improvements
-- The list of peer connections is now restored to the latest state after the
-  process is restarted. (#378)
-- Log dependency was updated to 0.4, which can cause issues with the previous
-  versions. (#433)
+- The list of peer connections is now restored to the latest state after the process is restarted. (#378)
+- Log dependency was updated to 0.4, which can cause issues with the previous versions. (#433)
 - Better error reporting for configs in the `.toml` format. (#429)
 
 ## 0.4 - 2017-12-08
 
 ### Added
 - Allow creating auditor node from command line. (#364)
-- Added a new function `merge_sync`. In this function a write will be flushed
-  from the operating system buffer cache
+- Added a new function `merge_sync`. In this function a write will be flushed from the operating system buffer cache
   before the write is considered complete. (#368)
-- Added conversion into boxed values for values which implement `Service` or
-  `Transaction` traits. (#366)
-- Added constructor for the `ServiceContext` which can be useful for the
-  alternative node implementations. (#366)
-- Implemented `AsRef<RawMessage>` for any Exonum messages that were created
-  using the `message!` macro. (#372)
+- Added conversion into boxed values for values which implement `Service` or `Transaction` traits. (#366)
+- Added constructor for the `ServiceContext` which can be useful for the alternative node implementations. (#366)
+- Implemented `AsRef<RawMessage>` for any Exonum messages that were created using the `message!` macro. (#372)
 - Implemented additional checks for conversion from raw message. (#372)
 
 ### Changed
-- Changed a signature of `open` function in a `rocksdb` module. `RocksDBOptions`
-  should pass by the reference. (#369)
+- Changed a signature of `open` function in a `rocksdb` module. `RocksDBOptions` should pass by the reference. (#369)
 - `ValidatorState` in the `ServiceContext` replaced by the `ValidatorId`. (#366)
-- `add_transaction` in the `ServiceContext` replaced by the `transaction_sender`
-  which implements the `TransactionSend` trait. (#366)
+- `add_transaction` in the `ServiceContext` replaced by the `transaction_sender` which implements the `TransactionSend`
+  trait. (#366)
 - The `Node` constructor now requires `db` and `services` variables instead of `blockchain` instance. (#366)
 - The `Blockchain` constructor now requires services keypair and an `ApiSender` instance. (#366)
 - `mount_*_api` methods in `Blockchain` instance now do not require `ApiContext`. (#366)
