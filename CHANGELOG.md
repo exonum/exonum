@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file. The project
 
 ## [Unreleased]
 
+## 0.5.1 - 2018-02-01
+
+### Bug fixes
+- Fixed logger output (#451)
+
 ## 0.5 - 2018-01-29
 
 ### Breaking changes
