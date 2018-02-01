@@ -20,7 +20,7 @@ All notable changes to this project will be documented in this file. The project
   See the unit tests for `StorageKey` for an example.
   
 ### New features
-- `StorageKey` and `StorageValue` implement for `SystemTime`. (#456)
+- `StorageKey` and `StorageValue` are implemented for `SystemTime`. (#456)
 
 ## 0.5 - 2018-01-30
 
