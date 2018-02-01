@@ -292,7 +292,7 @@ fn test_transfers_in_single_block() {
 
     let wallets = get_all_wallets(&api);
     assert_eq!(wallets.len(), 2);
-    assert_eq!(wallets.iter().fold(0, |acc, w| acc + w.balance()), 200);
+    assert_eq!(wallets.iter().map(|w| w.balance()).sum::<u64>(), 200);
     assert_eq!(
         BTreeSet::from_iter(wallets.iter().map(|w| *w.pub_key())),
         BTreeSet::from_iter(vec![*tx_alice.pub_key(), *tx_bob.pub_key()])
