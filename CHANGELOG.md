@@ -18,6 +18,9 @@ All notable changes to this project will be documented in this file. The project
   around a type (e.g., `struct QuirkyI32Key(i32)`) and implement `StorageKey` for it
   using big endian encoding. Then, use the wrapper instead of the int type in indices.
   See the unit tests for `StorageKey` for an example.
+  
+### New features
+- `StorageKey` and `StorageValue` implement for `SystemTime`. (#456)
 
 ## 0.5 - 2018-01-30
 

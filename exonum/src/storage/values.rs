@@ -16,10 +16,11 @@
 
 use std::mem;
 use std::borrow::Cow;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use byteorder::{ByteOrder, LittleEndian};
 
-use crypto::{CryptoHash, Hash, PublicKey};
+use crypto::{self, CryptoHash, Hash, PublicKey};
 use messages::{RawMessage, MessageBuffer};
 
 /// A type that can be (de)serialized as a value in the blockchain storage.
@@ -238,5 +239,61 @@ impl StorageValue for String {
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
         String::from_utf8(value.into_owned()).unwrap()
+    }
+}
+
+/// Uses little-endian encoding.
+impl CryptoHash for SystemTime {
+    fn hash(&self) -> Hash {
+        let duration = self.duration_since(UNIX_EPOCH).unwrap();
+        let secs = duration.as_secs();
+        let nanos = duration.subsec_nanos();
+
+        let mut buffer = vec![0; 12];
+        LittleEndian::write_u64(&mut buffer[0..8], secs);
+        LittleEndian::write_u32(&mut buffer[8..12], nanos);
+        crypto::hash(&buffer)
+    }
+}
+
+/// Uses little-endian encoding.
+impl StorageValue for SystemTime {
+    fn into_bytes(self) -> Vec<u8> {
+        let duration = self.duration_since(UNIX_EPOCH).unwrap();
+        let secs = duration.as_secs();
+        let nanos = duration.subsec_nanos();
+
+        let mut buffer = vec![0; 12];
+        LittleEndian::write_u64(&mut buffer[0..8], secs);
+        LittleEndian::write_u32(&mut buffer[8..12], nanos);
+        buffer
+    }
+
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        let secs = LittleEndian::read_u64(&value[0..8]);
+        let nanos = LittleEndian::read_u32(&value[8..12]);
+        UNIX_EPOCH + Duration::new(secs, nanos)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_storage_key_for_system_time_round_trip() {
+        use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+        let times = [
+            UNIX_EPOCH,
+            UNIX_EPOCH + Duration::new(13, 23),
+            SystemTime::now(),
+            SystemTime::now() + Duration::new(17, 15),
+        ];
+
+        for time in times.iter() {
+            let buffer = time.into_bytes();
+            assert_eq!(*time, SystemTime::from_bytes(Cow::Borrowed(&buffer)));
+        }
     }
 }
