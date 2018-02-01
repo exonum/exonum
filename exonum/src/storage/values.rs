@@ -19,8 +19,8 @@ use std::borrow::Cow;
 
 use byteorder::{ByteOrder, LittleEndian};
 
-use crypto::{Hash, hash, PublicKey};
-use messages::{RawMessage, MessageBuffer, Message};
+use crypto::{CryptoHash, Hash, PublicKey};
+use messages::{RawMessage, MessageBuffer};
 
 /// A type that can be (de)serialized as a value in the blockchain storage.
 ///
@@ -37,12 +37,21 @@ use messages::{RawMessage, MessageBuffer, Message};
 /// # extern crate byteorder;
 /// use std::borrow::Cow;
 /// use exonum::storage::StorageValue;
-/// use exonum::crypto::{self, Hash};
+/// use exonum::crypto::{self, CryptoHash, Hash};
 /// use byteorder::{LittleEndian, ByteOrder};
 ///
 /// struct Data {
 ///     a: i16,
 ///     b: u32,
+/// }
+///
+/// impl CryptoHash for Data {
+///     fn hash(&self) -> Hash {
+///         let mut buffer = [0; 6];
+///         LittleEndian::write_i16(&mut buffer[0..2], self.a);
+///         LittleEndian::write_u32(&mut buffer[2..6], self.b);
+///         crypto::hash(&buffer)
+///     }
 /// }
 ///
 /// impl StorageValue for Data {
@@ -58,27 +67,13 @@ use messages::{RawMessage, MessageBuffer, Message};
 ///         let b = LittleEndian::read_u32(&value[2..6]);
 ///         Data { a, b }
 ///     }
-///
-///     fn hash(&self) -> Hash {
-///         let mut buffer = [0; 6];
-///         LittleEndian::write_i16(&mut buffer[0..2], self.a);
-///         LittleEndian::write_u32(&mut buffer[2..6], self.b);
-///         crypto::hash(&buffer)
-///     }
 /// }
 /// # fn main() {}
 /// ```
 ///
 /// [`encoding_struct!`]: ../macro.encoding_struct.html
 /// [`message!`]: ../macro.message.html
-pub trait StorageValue: Sized {
-    /// Returns a hash of the value.
-    ///
-    /// This method is actively used to build indices, so the hashing strategy must satisfy
-    /// the basic requirements of cryptographic hashing: equal values must have the same hash and
-    /// not equal values must have different hashes (except for negligible probability).
-    fn hash(&self) -> Hash;
-
+pub trait StorageValue: CryptoHash + Sized {
     /// Serialize a value into a vector of bytes.
     fn into_bytes(self) -> Vec<u8>;
 
@@ -95,10 +90,6 @@ impl StorageValue for () {
     fn from_bytes(_value: Cow<[u8]>) -> Self {
         ()
     }
-
-    fn hash(&self) -> Hash {
-        Hash::zero()
-    }
 }
 
 impl StorageValue for u8 {
@@ -108,10 +99,6 @@ impl StorageValue for u8 {
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
         value[0]
-    }
-
-    fn hash(&self) -> Hash {
-        hash(&[*self])
     }
 }
 
@@ -126,12 +113,6 @@ impl StorageValue for u16 {
     fn from_bytes(value: Cow<[u8]>) -> Self {
         LittleEndian::read_u16(value.as_ref())
     }
-
-    fn hash(&self) -> Hash {
-        let mut v = [0; 2];
-        LittleEndian::write_u16(&mut v, *self);
-        hash(&v)
-    }
 }
 
 /// Uses little-endian encoding.
@@ -144,12 +125,6 @@ impl StorageValue for u32 {
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
         LittleEndian::read_u32(value.as_ref())
-    }
-
-    fn hash(&self) -> Hash {
-        let mut v = [0; 4];
-        LittleEndian::write_u32(&mut v, *self);
-        hash(&v)
     }
 }
 
@@ -164,12 +139,6 @@ impl StorageValue for u64 {
     fn from_bytes(value: Cow<[u8]>) -> Self {
         LittleEndian::read_u64(value.as_ref())
     }
-
-    fn hash(&self) -> Hash {
-        let mut v = [0; 8];
-        LittleEndian::write_u64(&mut v, *self);
-        hash(&v)
-    }
 }
 
 impl StorageValue for i8 {
@@ -179,10 +148,6 @@ impl StorageValue for i8 {
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
         value[0] as i8
-    }
-
-    fn hash(&self) -> Hash {
-        hash(&[*self as u8])
     }
 }
 
@@ -197,12 +162,6 @@ impl StorageValue for i16 {
     fn from_bytes(value: Cow<[u8]>) -> Self {
         LittleEndian::read_i16(value.as_ref())
     }
-
-    fn hash(&self) -> Hash {
-        let mut v = [0; 2];
-        LittleEndian::write_i16(&mut v, *self);
-        hash(&v)
-    }
 }
 
 /// Uses little-endian encoding.
@@ -215,12 +174,6 @@ impl StorageValue for i32 {
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
         LittleEndian::read_i32(value.as_ref())
-    }
-
-    fn hash(&self) -> Hash {
-        let mut v = [0; 4];
-        LittleEndian::write_i32(&mut v, *self);
-        hash(&v)
     }
 }
 
@@ -235,12 +188,6 @@ impl StorageValue for i64 {
     fn from_bytes(value: Cow<[u8]>) -> Self {
         LittleEndian::read_i64(value.as_ref())
     }
-
-    fn hash(&self) -> Hash {
-        let mut v = [0; 8];
-        LittleEndian::write_i64(&mut v, *self);
-        hash(&v)
-    }
 }
 
 impl StorageValue for Hash {
@@ -250,10 +197,6 @@ impl StorageValue for Hash {
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
         Self::from_slice(value.as_ref()).unwrap()
-    }
-
-    fn hash(&self) -> Hash {
-        *self
     }
 }
 
@@ -265,10 +208,6 @@ impl StorageValue for PublicKey {
     fn from_bytes(value: Cow<[u8]>) -> Self {
         PublicKey::from_slice(value.as_ref()).unwrap()
     }
-
-    fn hash(&self) -> Hash {
-        hash(self.as_ref())
-    }
 }
 
 impl StorageValue for RawMessage {
@@ -278,10 +217,6 @@ impl StorageValue for RawMessage {
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
         Self::new(MessageBuffer::from_vec(value.into_owned()))
-    }
-
-    fn hash(&self) -> Hash {
-        Message::hash(self)
     }
 }
 
@@ -293,10 +228,6 @@ impl StorageValue for Vec<u8> {
     fn from_bytes(value: Cow<[u8]>) -> Self {
         value.into_owned()
     }
-
-    fn hash(&self) -> Hash {
-        hash(self)
-    }
 }
 
 /// Uses UTF-8 string serialization.
@@ -307,9 +238,5 @@ impl StorageValue for String {
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
         String::from_utf8(value.into_owned()).unwrap()
-    }
-
-    fn hash(&self) -> Hash {
-        hash(self.as_ref())
     }
 }

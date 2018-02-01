@@ -33,7 +33,7 @@ use exonum::blockchain::{Block, BlockProof, Blockchain, ConsensusConfig, Genesis
                          Transaction, ValidatorKeys};
 use exonum::storage::{MapProof, MemoryDB};
 use exonum::messages::{Any, Connect, Message, RawMessage, RawTransaction, Status};
-use exonum::crypto::{gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed};
+use exonum::crypto::{gen_keypair_from_seed, CryptoHash, Hash, PublicKey, SecretKey, Seed};
 #[cfg(test)]
 use exonum::crypto::gen_keypair;
 use exonum::helpers::{Height, Milliseconds, Round, ValidatorId};

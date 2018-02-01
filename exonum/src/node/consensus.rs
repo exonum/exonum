@@ -14,7 +14,7 @@
 
 use std::collections::HashSet;
 
-use crypto::{Hash, PublicKey};
+use crypto::{Hash, CryptoHash, PublicKey};
 use blockchain::{Schema, Transaction};
 use messages::{BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote,
                PrevotesRequest, Propose, ProposeRequest, RawTransaction, TransactionsRequest};

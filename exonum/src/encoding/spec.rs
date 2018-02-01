@@ -130,6 +130,12 @@ macro_rules! encoding_struct {
             }
         }
 
+        impl $crate::crypto::CryptoHash for $name {
+            fn hash(&self) -> $crate::crypto::Hash {
+                $name::hash(self)
+            }
+        }
+
         impl $crate::storage::StorageValue for $name {
             fn into_bytes(self) -> Vec<u8> {
                 self.raw
@@ -139,10 +145,6 @@ macro_rules! encoding_struct {
                 $name {
                     raw: v.into_owned()
                 }
-            }
-
-            fn hash(&self) -> $crate::crypto::Hash {
-                $name::hash(self)
             }
         }
 
