@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file. The project
 ## [Unreleased]
 
 ### Breaking changes
-- `exonum::crypto::CryptoHash` trait is introduced, and `StorageValue::hash` and `Message::hash` methods are removed. (#422)
+- `exonum::crypto::CryptoHash` trait is introduced, and `StorageValue::hash` and `Message::hash` methods are removed. (#442)
    Migration path:
      - For implementations of `StorageValue`, move the `hash` method to `CryptoHash` implementation instead.
      - For implementations of `Message` simply remove `hash` method, there's a blanket impl of `CryptoHash`
@@ -17,7 +17,12 @@ All notable changes to this project will be documented in this file. The project
   signed integers as keys. To emulate the old implementation, you may create a wrapper
   around a type (e.g., `struct QuirkyI32Key(i32)`) and implement `StorageKey` for it
   using big endian encoding. Then, use the wrapper instead of the int type in indices.
-  See the unit tests for `StorageKey` for an example.
+  See the unit tests for `StorageKey` for an example. (#443)
+
+## 0.5.1 - 2018-02-01
+
+### Bug fixes
+- Fixed logger output (#451)
 
 ## 0.5 - 2018-01-30
 
