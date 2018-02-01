@@ -12,20 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! The module containing building blocks for creating blockchains powered by the
-//! Exonum framework.
+//! The module containing building blocks for creating blockchains powered by
+//! the Exonum framework.
 //!
-//! Services are the main extension point for the Exonum framework. To create your service on
-//! top of Exonum blockchain you need to do the following:
+//! Services are the main extension point for the Exonum framework. To create
+//! your service on top of Exonum blockchain you need to do the following:
 //!
 //! - Define your own information schema.
-//! - Create one or more transaction types using the [`message!`] macro and implement
-//!   the [`Transaction`] trait for them.
+//! - Create one or more transaction types using the [`message!`] macro and
+//!   implement the [`Transaction`] trait for them.
 //! - Create a data structure implementing the [`Service`] trait.
-//! - Optionally you can write API handlers for the service.
+//! - Write API handlers for the service, if required.
 //!
 //! You may consult [the service creation tutorial][doc:create-service] for a more detailed
-//! manual how to create services.
+//! manual on how to create services.
 //!
 //! [`message!`]: ../macro.message.html
 //! [`Transaction`]: ./trait.Transaction.html
