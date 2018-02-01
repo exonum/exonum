@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::sync::{Arc, RwLock};
 use std::num::ParseIntError;
+use std::sync::{Arc, RwLock};
 
 use bodyparser;
 use exonum::api::ApiError;
@@ -174,7 +174,7 @@ impl TestKitHandler for TestKit {
 #[cfg(test)]
 mod tests {
     use exonum::blockchain::{Service, Transaction};
-    use exonum::crypto::{self, PublicKey, Hash};
+    use exonum::crypto::{Hash, PublicKey};
     use exonum::encoding::Error as EncodingError;
     use exonum::explorer::BlockInfo;
     use exonum::helpers::Height;

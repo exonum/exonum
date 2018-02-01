@@ -140,7 +140,6 @@ extern crate serde_json;
 extern crate tokio_core;
 
 use futures::{executor, Future, Stream};
-use futures::future::ok as future_ok;
 use futures::sync::mpsc;
 use iron::{Chain, Iron, IronError};
 use iron::headers::{ContentType, Headers};
@@ -585,7 +584,7 @@ impl TestKit {
                     }
                     ExternalMessage::PeerAdd(_) => { /* Ignored */ }
                 }
-                future_ok(())
+                Ok(())
             }))
         };
 
@@ -1086,7 +1085,7 @@ impl TestKit {
     /// Future that runs the event stream of this testkit to completion.
     fn remove_events_stream(&mut self) -> Box<Future<Item = (), Error = ()>> {
         let stream = std::mem::replace(&mut self.events_stream, Box::new(futures::stream::empty()));
-        Box::new(stream.for_each(|_| future_ok(())))
+        Box::new(stream.for_each(|_| Ok(())))
     }
 }
 
