@@ -27,8 +27,7 @@ extern crate serde_derive;
 use std::collections::BTreeSet;
 use std::iter::FromIterator;
 
-use exonum::crypto::{self, PublicKey, SecretKey};
-use exonum::messages::Message;
+use exonum::crypto::{self, PublicKey, SecretKey, CryptoHash};
 use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};
 
 mod cryptocurrency;

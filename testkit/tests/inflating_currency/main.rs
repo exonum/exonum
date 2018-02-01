@@ -25,9 +25,8 @@ extern crate rand;
 extern crate serde_derive;
 
 use exonum::blockchain::Transaction;
-use exonum::crypto::{self, PublicKey, SecretKey};
+use exonum::crypto::{self, PublicKey, SecretKey, CryptoHash};
 use exonum::helpers::Height;
-use exonum::messages::Message;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use rand::Rng;
 

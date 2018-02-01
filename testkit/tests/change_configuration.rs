@@ -19,10 +19,10 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 
+use exonum::blockchain::Schema;
+use exonum::crypto::CryptoHash;
 use exonum::helpers::{Height, ValidatorId};
 use exonum_testkit::TestKitBuilder;
-use exonum::blockchain::Schema;
-use exonum::storage::StorageValue;
 
 #[test]
 fn test_following_config() {

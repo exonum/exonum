@@ -21,7 +21,7 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 
-use exonum::crypto::{self, PublicKey};
+use exonum::crypto::{self, PublicKey, CryptoHash};
 use exonum::helpers::Height;
 use exonum::messages::Message;
 use exonum::encoding::serialize::FromHex;

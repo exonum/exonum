@@ -18,9 +18,9 @@ extern crate serde;
 extern crate serde_json;
 
 use exonum::helpers::{Height, ValidatorId};
-use exonum_testkit::TestKitBuilder;
 use exonum::blockchain::Schema;
-use exonum::storage::StorageValue;
+use exonum::crypto::CryptoHash;
+use exonum_testkit::TestKitBuilder;
 
 fn main() {
     let mut testkit = TestKitBuilder::auditor().with_validators(3).create();
