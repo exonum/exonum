@@ -33,7 +33,7 @@ use exonum::blockchain::{Block, BlockProof, Blockchain, ConsensusConfig, Genesis
                          Transaction, ValidatorKeys};
 use exonum::storage::{MapProof, MemoryDB};
 use exonum::messages::{Any, Connect, Message, RawMessage, RawTransaction, Status};
-use exonum::crypto::{gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed};
+use exonum::crypto::{gen_keypair_from_seed, CryptoHash, Hash, PublicKey, SecretKey, Seed};
 #[cfg(test)]
 use exonum::crypto::gen_keypair;
 use exonum::helpers::{Height, Milliseconds, Round, ValidatorId};
@@ -596,6 +596,7 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandb
         status_timeout: 600_000,
         peers_timeout: 600_000,
         txs_block_limit: 1000,
+        max_message_len: 1024 * 1024,
         timeout_adjuster: TimeoutAdjusterConfig::Constant { timeout: 200 },
     };
     let genesis = GenesisConfig::new_with_consensus(

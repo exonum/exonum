@@ -14,7 +14,7 @@
 
 //! An implementation of `MemoryDB` database.
 
-use std::sync::{Arc, RwLock};
+use std::sync::RwLock;
 use std::clone::Clone;
 use std::collections::btree_map::BTreeMap;
 use std::collections::HashMap;
@@ -27,9 +27,9 @@ type DB = HashMap<String, BTreeMap<Vec<u8>, Vec<u8>>>;
 /// Database implementation that stores all the data in memory.
 ///
 /// It's mainly used for testing and not designed to be efficient.
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Debug)]
 pub struct MemoryDB {
-    map: Arc<RwLock<DB>>,
+    map: RwLock<DB>,
 }
 
 /// An iterator over the entries of a `MemoryDB`.
@@ -41,24 +41,20 @@ struct MemoryDBIter {
 impl MemoryDB {
     /// Creates a new, empty database.
     pub fn new() -> MemoryDB {
-        MemoryDB { map: Arc::new(RwLock::new(HashMap::new())) }
+        MemoryDB { map: RwLock::new(HashMap::new()) }
     }
 }
 
 impl Database for MemoryDB {
-    fn clone(&self) -> Box<Database> {
-        Box::new(Clone::clone(self))
-    }
-
     fn snapshot(&self) -> Box<Snapshot> {
         Box::new(MemoryDB {
-            map: Arc::new(RwLock::new(self.map.read().unwrap().clone())),
+            map: RwLock::new(self.map.read().unwrap().clone()),
         })
     }
 
-    fn merge(&mut self, patch: Patch) -> Result<()> {
+    fn merge(&self, patch: Patch) -> Result<()> {
+        let mut guard = self.map.write().unwrap();
         for (cf_name, changes) in patch {
-            let mut guard = self.map.write().unwrap();
             if !guard.contains_key(&cf_name) {
                 guard.insert(cf_name.clone(), BTreeMap::new());
             }
@@ -77,7 +73,7 @@ impl Database for MemoryDB {
         Ok(())
     }
 
-    fn merge_sync(&mut self, patch: Patch) -> Result<()> {
+    fn merge_sync(&self, patch: Patch) -> Result<()> {
         self.merge(patch)
     }
 }
@@ -137,7 +133,7 @@ impl Iterator for MemoryDBIter {
 
 #[test]
 fn test_memorydb_snapshot() {
-    let mut db = MemoryDB::new();
+    let db = MemoryDB::new();
     let idx_name = "idx_name";
     {
         let mut fork = db.fork();
@@ -155,12 +151,6 @@ fn test_memorydb_snapshot() {
     }
 
     assert!(!snapshot.contains(idx_name, vec![2, 3, 4].as_slice()));
-
-    {
-        let db_clone = Clone::clone(&db);
-        let snap_clone = db_clone.snapshot();
-        assert!(snap_clone.contains(idx_name, vec![2, 3, 4].as_slice()));
-    }
 
     let snapshot = db.snapshot();
     assert!(snapshot.contains(idx_name, vec![2, 3, 4].as_slice()));

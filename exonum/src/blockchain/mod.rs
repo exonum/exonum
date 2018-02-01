@@ -15,19 +15,22 @@
 //! The module containing building blocks for creating blockchains powered by the
 //! Exonum framework.
 //!
-//! Services are the main extension point for the Exonum framework. To create your own service on
-//! top of Exonum blockchain you need to define following things:
+//! Services are the main extension point for the Exonum framework. To create your service on
+//! top of Exonum blockchain you need to do the following:
 //!
 //! - Define your own information schema.
-//! - Create one or more types of messages using a macro `message!` and implement
-//! `Transaction` trait for them.
-//! - Create data structure that implements `Service` trait.
-//! - Optionally you can write api handlers.
+//! - Create one or more transaction types using the [`message!`] macro and implement
+//!   the [`Transaction`] trait for them.
+//! - Create a data structure implementing the [`Service`] trait.
+//! - Optionally you can write API handlers for the service.
 //!
-//! You may follow the [`minibank`][1] tutorial to get experience of programming your services.
+//! You may consult [the service creation tutorial][doc:create-service] for a more detailed
+//! manual how to create services.
 //!
-//! [1]: https://github.com/exonum/exonum-doc/blob/master/src/get-started/create-service.md
-
+//! [`message!`]: ../macro.message.html
+//! [`Transaction`]: ./trait.Transaction.html
+//! [`Service`]: ./trait.Service.html
+//! [doc:create-service]: https://exonum.com/doc/get-started/create-service
 
 use std::sync::Arc;
 use std::collections::BTreeMap;
@@ -68,7 +71,7 @@ pub mod config;
 /// Only blockchains with the identical set of services and genesis block can be combined
 /// into the single network.
 pub struct Blockchain {
-    db: Box<Database>,
+    db: Arc<Database>,
     service_map: Arc<VecMap<Box<Service>>>,
     service_keypair: (PublicKey, SecretKey),
     api_sender: ApiSender,
@@ -96,7 +99,7 @@ impl Blockchain {
         }
 
         Blockchain {
-            db: storage,
+            db: storage.into(),
             service_map: Arc::new(service_map),
             service_keypair: (service_public_key, service_secret_key),
             api_sender,
@@ -477,7 +480,7 @@ impl fmt::Debug for Blockchain {
 impl Clone for Blockchain {
     fn clone(&self) -> Blockchain {
         Blockchain {
-            db: self.db.clone(),
+            db: Arc::clone(&self.db),
             service_map: Arc::clone(&self.service_map),
             api_sender: self.api_sender.clone(),
             service_keypair: self.service_keypair.clone(),

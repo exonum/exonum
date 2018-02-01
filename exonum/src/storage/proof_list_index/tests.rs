@@ -14,8 +14,8 @@
 
 use rand::{thread_rng, Rng};
 
-use crypto::{Hash, hash};
-use storage::{Database, StorageValue};
+use crypto::{CryptoHash, Hash, hash};
+use storage::Database;
 use encoding::serialize::json::reexport::{to_string, from_str};
 use encoding::serialize::reexport::Serialize;
 use super::{ProofListIndex, ListProof, pair_hash};
@@ -633,7 +633,7 @@ mod memorydb_tests {
     }
 
     #[test]
-    fn test_siple_root_hash() {
+    fn test_simple_root_hash() {
         let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
         let path = dir.path();
         let db = create_database(path);
@@ -747,7 +747,7 @@ mod rocksdb_tests {
     }
 
     #[test]
-    fn test_siple_root_hash() {
+    fn test_simple_root_hash() {
         let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
         let path = dir.path();
         let db = create_database(path);

@@ -17,9 +17,9 @@
 //! This module implement all core commands.
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::net::SocketAddr;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use toml::Value;
 
@@ -27,13 +27,13 @@ use blockchain::GenesisConfig;
 use blockchain::config::ValidatorKeys;
 use helpers::generate_testnet_config;
 use helpers::config::ConfigFile;
-use node::{NodeConfig, NodeApiConfig};
+use node::{NodeApiConfig, NodeConfig};
 use storage::Database;
 use crypto;
-use super::internal::{Command, Feedback};
-use super::{Argument, Context, CommandName};
-use super::shared::{AbstractConfig, NodePublicConfig, SharedConfig, NodePrivateConfig,
-                    CommonConfigTemplate};
+use super::internal::{CollectedCommand, Command, Feedback};
+use super::{Argument, CommandName, Context};
+use super::shared::{AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig,
+                    SharedConfig};
 use super::DEFAULT_EXONUM_LISTEN_PORT;
 use super::keys;
 
@@ -123,7 +123,12 @@ impl Command for Run {
         "Run application"
     }
 
-    fn execute(&self, mut context: Context, exts: &Fn(Context) -> Context) -> Feedback {
+    fn execute(
+        &self,
+        _commands: &HashMap<CommandName, CollectedCommand>,
+        mut context: Context,
+        exts: &Fn(Context) -> Context,
+    ) -> Feedback {
         let config = Self::node_config(&context);
         let public_addr = Self::public_api_address(&context);
         let private_addr = Self::private_api_address(&context);
@@ -145,6 +150,120 @@ impl Command for Run {
         new_context.set(keys::NODE_CONFIG, config);
 
         Feedback::RunNode(new_context)
+    }
+}
+
+/// Command for running service in dev mode.
+pub struct RunDev;
+
+impl RunDev {
+    /// Returns the name of the `Run` command.
+    pub fn name() -> CommandName {
+        "run-dev"
+    }
+
+    fn artifacts_directory(ctx: &Context) -> PathBuf {
+        let directory = ctx.arg::<String>("ARTIFACTS_DIR").unwrap_or_else(
+            |_| ".exonum".into(),
+        );
+        PathBuf::from(&directory)
+    }
+
+    fn artifacts_path(inner_path: &str, ctx: &Context) -> String {
+        let mut path = Self::artifacts_directory(ctx);
+        path.push(inner_path);
+        path.to_str().expect("Expected correct path").into()
+    }
+
+    fn generate_config(commands: &HashMap<CommandName, CollectedCommand>, ctx: &Context) -> String {
+        let common_config_path = Self::artifacts_path("common.toml", ctx);
+        let peer_addr = "127.0.0.1";
+        let pub_config_path = Self::artifacts_path("public.toml", ctx);
+        let sec_config_path = Self::artifacts_path("secret.toml", ctx);
+        let output_config_path = Self::artifacts_path("output.toml", ctx);
+
+        let mut common_config_ctx = ctx.clone();
+        common_config_ctx.set_arg("COMMON_CONFIG", common_config_path.clone());
+        let common_config_command = commands.get(GenerateCommonConfig::name()).expect(
+            "Expected GenerateCommonConfig in the commands list.",
+        );
+        common_config_command.execute(commands, common_config_ctx);
+
+        let mut node_config_ctx = ctx.clone();
+        node_config_ctx.set_arg("COMMON_CONFIG", common_config_path.clone());
+        node_config_ctx.set_arg("PUB_CONFIG", pub_config_path.clone());
+        node_config_ctx.set_arg("SEC_CONFIG", sec_config_path.clone());
+        node_config_ctx.set_arg("PEER_ADDR", peer_addr.into());
+        let node_config_command = commands.get(GenerateNodeConfig::name()).expect(
+            "Expected GenerateNodeConfig in the commands list.",
+        );
+        node_config_command.execute(commands, node_config_ctx);
+
+        let mut finalize_ctx = ctx.clone();
+        finalize_ctx.set_arg_multiple("PUBLIC_CONFIGS", vec![pub_config_path.clone()]);
+        finalize_ctx.set_arg("SECRET_CONFIG", sec_config_path.clone());
+        finalize_ctx.set_arg("OUTPUT_CONFIG_PATH", output_config_path.clone());
+        let finalize_command = commands.get(Finalize::name()).expect(
+            "Expected Finalize in the commands list.",
+        );
+        finalize_command.execute(commands, finalize_ctx);
+
+        output_config_path
+    }
+
+    fn cleanup(ctx: &Context) {
+        let database_dir_path = ctx.arg::<String>(DATABASE_PATH).expect(
+            "Expected DATABASE_PATH being set.",
+        );
+        let database_dir = Path::new(&database_dir_path);
+        if database_dir.exists() {
+            fs::remove_dir_all(Self::artifacts_directory(ctx)).expect(
+                "Expected DATABASE_PATH folder being removable.",
+            );
+        }
+    }
+}
+
+impl Command for RunDev {
+    fn args(&self) -> Vec<Argument> {
+        vec![
+            Argument::new_named(
+                "ARTIFACTS_DIR",
+                false,
+                "The path where configuration and db files will be generated.",
+                "a",
+                "artifacts-dir",
+                false
+            ),
+        ]
+    }
+
+    fn name(&self) -> CommandName {
+        Self::name()
+    }
+
+    fn about(&self) -> &str {
+        "Run application in development mode (generate configuration and db files automatically)"
+    }
+
+    fn execute(
+        &self,
+        commands: &HashMap<CommandName, CollectedCommand>,
+        mut context: Context,
+        exts: &Fn(Context) -> Context,
+    ) -> Feedback {
+        let db_path = Self::artifacts_path("db", &context);
+        context.set_arg(DATABASE_PATH, db_path);
+        Self::cleanup(&context);
+
+        let node_config_path = Self::generate_config(commands, &context);
+        context.set_arg("NODE_CONFIG_PATH", node_config_path);
+
+        let new_context = exts(context);
+        commands
+            .get(Run::name())
+            .expect("Expected Run in the commands list.")
+            .execute(commands, new_context.clone())
     }
 }
 
@@ -171,7 +290,12 @@ impl Command for GenerateCommonConfig {
         "Generate basic config template."
     }
 
-    fn execute(&self, mut context: Context, exts: &Fn(Context) -> Context) -> Feedback {
+    fn execute(
+        &self,
+        _commands: &HashMap<CommandName, CollectedCommand>,
+        mut context: Context,
+        exts: &Fn(Context) -> Context,
+    ) -> Feedback {
         let template_path = context.arg::<String>("COMMON_CONFIG").expect(
             "COMMON_CONFIG not found",
         );
@@ -241,7 +365,12 @@ impl Command for GenerateNodeConfig {
         "Generate node secret and public configs."
     }
 
-    fn execute(&self, mut context: Context, exts: &Fn(Context) -> Context) -> Feedback {
+    fn execute(
+        &self,
+        _commands: &HashMap<CommandName, CollectedCommand>,
+        mut context: Context,
+        exts: &Fn(Context) -> Context,
+    ) -> Feedback {
         let common_config_path = context.arg::<String>("COMMON_CONFIG").expect(
             "expected common config path",
         );
@@ -346,9 +475,8 @@ impl Finalize {
             if map.insert(config.node.validator_keys.consensus_key, config.node)
                 .is_some()
             {
-                panic!("Found duplicate consenus keys in PUBLIC_CONFIGS");
+                panic!("Found duplicate consensus keys in PUBLIC_CONFIGS");
             }
-
         }
         (
             common,
@@ -398,7 +526,12 @@ impl Command for Finalize {
         "Collect public and secret configs into node config."
     }
 
-    fn execute(&self, mut context: Context, exts: &Fn(Context) -> Context) -> Feedback {
+    fn execute(
+        &self,
+        _commands: &HashMap<CommandName, CollectedCommand>,
+        mut context: Context,
+        exts: &Fn(Context) -> Context,
+    ) -> Feedback {
         let public_configs_path = context.arg_multiple::<String>("PUBLIC_CONFIGS").expect(
             "keychain path not found",
         );
@@ -510,8 +643,12 @@ impl Command for GenerateTestnet {
         "Generates genesis configuration for testnet"
     }
 
-    fn execute(&self, mut context: Context, exts: &Fn(Context) -> Context) -> Feedback {
-
+    fn execute(
+        &self,
+        _commands: &HashMap<CommandName, CollectedCommand>,
+        mut context: Context,
+        exts: &Fn(Context) -> Context,
+    ) -> Feedback {
         let dir = context.arg::<String>("OUTPUT_DIR").expect("output dir");
         let count: u8 = context.arg("COUNT").expect("count as int");
         let start_port = context.arg::<u16>("START_PORT").unwrap_or(

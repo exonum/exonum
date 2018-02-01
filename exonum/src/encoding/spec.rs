@@ -12,36 +12,46 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// `encoding_struct!` implement structure that could be saved in blockchain.
+/// `encoding_struct!` macro implements a structure that can be saved in an Exonum blockchain.
 ///
-/// Storage value unlike message, could be mapped on buffers without any checks.
+/// The macro creates getter methods for all fields with the same names as fields.
+/// In addition, the macro declares a `new` constructor, which takes all fields
+/// in the order of their declaration in the macro.
+/// The macro also implements [`Field`], [`ExonumJson`] and [`StorageValue`] traits
+/// for the declared datatype.
 ///
-/// # Usage Example:
+/// Unlike types created with [`message!`], the datatype is mapped to a byte buffer
+/// without any checks; it is assumed that the relevant checks have been performed
+/// when persisting the structure to the blockchain storage.
+///
+/// For additional reference about data layout see the
+/// documentation of the [`encoding` module](./encoding/index.html).
+///
+/// **NB.** `encoding_struct!` uses other macros in the `exonum` crate internally.
+/// Be sure to add them to the global scope.
+///
+/// [`Field`]: ./encoding/trait.Field.html
+/// [`ExonumJson`]: ./encoding/serialize/json/trait.ExonumJson.html
+/// [`StorageValue`]: ./storage/trait.StorageValue.html
+/// [`message!`]: macro.message.html
+///
+/// # Examples
+///
 /// ```
 /// #[macro_use] extern crate exonum;
-/// # extern crate serde;
-/// # extern crate serde_json;
 ///
 /// encoding_struct! {
-///     struct SaveTwoInteger {
-///
+///     struct SaveTwoIntegers {
 ///         first: u64,
 ///         second: u64,
 ///     }
 /// }
+///
 /// # fn main() {
-///     let first = 1u64;
-///     let second = 2u64;
-///     let s = SaveTwoInteger::new(first, second);
-///     println!("Debug structure = {:?}", s);
+/// let s = SaveTwoIntegers::new(1, 2);
+/// println!("Two integers: {:?}", s);
 /// # }
 /// ```
-///
-/// For additional reference about data layout see also
-/// *[ `encoding` documentation](./encoding/index.html).*
-///
-/// `encoding_struct!` internally uses other exonum macros,
-/// be sure to add them all to namespace.
 #[macro_export]
 macro_rules! encoding_struct {
     (
@@ -120,6 +130,12 @@ macro_rules! encoding_struct {
             }
         }
 
+        impl $crate::crypto::CryptoHash for $name {
+            fn hash(&self) -> $crate::crypto::Hash {
+                $name::hash(self)
+            }
+        }
+
         impl $crate::storage::StorageValue for $name {
             fn into_bytes(self) -> Vec<u8> {
                 self.raw
@@ -129,10 +145,6 @@ macro_rules! encoding_struct {
                 $name {
                     raw: v.into_owned()
                 }
-            }
-
-            fn hash(&self) -> $crate::crypto::Hash {
-                $name::hash(self)
             }
         }
 

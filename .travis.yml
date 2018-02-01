@@ -18,17 +18,20 @@ addons:
 
 rust:
   - stable
+
 matrix:
   allow_failures:
     - env: FEATURE=non-fatal-checks
   fast_finish: true
   include:
-    - rust: nightly-2017-12-11
+    - rust: nightly-2018-01-22
       env: FEATURE=benchmarks
-    - rust: nightly-2017-12-11
+    - rust: nightly-2018-01-22
       env: FEATURE=clippy-core
-    - rust: nightly-2017-12-11
+    - rust: nightly-2018-01-22
       env: FEATURE=clippy-sandbox
+    - rust: nightly-2018-01-22
+      env: FEATURE=clippy-testkit
 
 cache:
   directories:
@@ -42,7 +45,7 @@ sudo: required
 
 env:
   global:
-  - CLIPPY_VERS=0.0.175
+  - CLIPPY_VERS=0.0.181
   - RUSTFMT_VERS=0.9.0
   - DEADLINKS_VERS=0.3.0
   - OUTDATED_VERS=0.7.0
@@ -56,6 +59,7 @@ env:
   - FEATURE=fmt
   - FEATURE=test-core
   - FEATURE=test-sandbox
+  - FEATURE=test-testkit
   - FEATURE=test-doc
   - FEATURE=non-fatal-checks
 
@@ -89,39 +93,46 @@ install:
   ;;
   esac
 - cargo install --list
+
 script: |
   case "$FEATURE" in
 
   "fmt" )
-      cd exonum && cargo update && cd .. &&
-      cd sandbox && cargo update && cd .. &&
-      cd exonum && cargo audit && cd .. &&
+      cargo update &&
       cd exonum && cargo fmt -- --write-mode=diff && cd .. &&
-      cd sandbox && cargo fmt -- --write-mode=diff && cd ..
+      cd sandbox && cargo fmt -- --write-mode=diff && cd .. &&
+      cd testkit && cargo fmt -- --write-mode=diff && cd ..
   ;;
   "clippy-core" )
-      cd exonum && cargo clippy --verbose --features long_benchmarks  -- -D warnings
+      cd exonum && cargo clippy --verbose --features long_benchmarks -- -D warnings
   ;;
   "clippy-sandbox" )
       cd sandbox && cargo clippy --verbose -- -D warnings
   ;;
+  "clippy-testkit" )
+      cd testkit && cargo clippy --verbose -- -D warnings
+  ;;
   "test-core" )
-      cargo test --manifest-path exonum/Cargo.toml --verbose --tests --lib
+      cargo test -p exonum --verbose --tests --lib --features "float_serialize"
   ;;
   "test-sandbox" )
-      cargo test --manifest-path sandbox/Cargo.toml  --verbose
+      cargo test -p sandbox --verbose
+  ;;
+  "test-testkit" )
+      cargo test -p exonum-testkit --verbose
+      cargo run -p exonum-testkit --example timestamping &&
+      cargo run -p exonum-testkit --example configuration_change
   ;;
   "test-doc" )
-      cargo test --manifest-path sandbox/Cargo.toml  --verbose --doc  -- --test-threads=2
+      cargo test -p sandbox --verbose --doc -- --test-threads=2
   ;;
   "non-fatal-checks" )
-      cd exonum &&
       cargo doc --no-deps &&
       cargo deadlinks --dir target/doc &&
       cargo outdated --exit-code 1
   ;;
   "benchmarks" )
-        RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
+      RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
   ;;
 
   esac

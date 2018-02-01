@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crypto::{PublicKey, Hash};
+use crypto::{PublicKey, Hash, CryptoHash};
 use messages::{Precommit, RawMessage, Connect};
 use storage::{Fork, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex, Snapshot,
-              StorageKey, StorageValue};
+              StorageKey};
 use helpers::Height;
 use super::{Block, BlockProof, Blockchain, TransactionResult};
 use super::config::StoredConfiguration;

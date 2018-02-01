@@ -18,8 +18,9 @@ use std::ops::Deref;
 
 use byteorder::{ByteOrder, LittleEndian};
 
-use crypto::{hash, sign, verify, Hash, PublicKey, SecretKey, Signature, SIGNATURE_LENGTH};
-use encoding::{CheckedOffset, Field, Offset, Result as StreamStructResult};
+use crypto::{hash, sign, verify, CryptoHash, Hash, PublicKey, SecretKey, Signature,
+             SIGNATURE_LENGTH};
+use encoding::{self, CheckedOffset, Field, Offset, Result as StreamStructResult};
 
 /// Length of the message header.
 pub const HEADER_LENGTH: usize = 10;
@@ -61,7 +62,7 @@ impl AsRef<[u8]> for RawMessage {
 
 // TODO: reduce `to` argument from `write`, `read` and `check` methods
 // TODO: payload_length as a first value into message header
-// TODO: make sure that message length is enougth when using mem::transmute
+// TODO: make sure that message length is enough when using mem::transmute
 // (ECR-166)
 
 /// A raw message represented by the bytes buffer.
@@ -257,14 +258,19 @@ impl MessageWriter {
 }
 
 /// Represents generic message interface.
-pub trait Message: Debug + Send + Sync {
+///
+/// An Exonum message is a piece of data that is signed by the creator's [Ed25519] key;
+/// the resulting digital signature is a part of the message.
+///
+/// [Ed25519]: ../crypto/index.html
+pub trait Message: CryptoHash + Debug + Send + Sync {
+    /// Converts the raw message into the specific one.
+    fn from_raw(raw: RawMessage) -> Result<Self, encoding::Error>
+    where
+        Self: Sized;
+
     /// Returns raw message.
     fn raw(&self) -> &RawMessage;
-
-    /// Returns hash of the `RawMessage`.
-    fn hash(&self) -> Hash {
-        self.raw().hash()
-    }
 
     /// Verifies the message using given public key.
     fn verify_signature(&self, pub_key: &PublicKey) -> bool {
@@ -272,13 +278,19 @@ pub trait Message: Debug + Send + Sync {
     }
 }
 
+impl<T: Message> CryptoHash for T {
+    fn hash(&self) -> Hash {
+        hash(self.raw().as_ref())
+    }
+}
+
 impl Message for RawMessage {
-    fn raw(&self) -> &RawMessage {
-        self
+    fn from_raw(raw: RawMessage) -> Result<Self, encoding::Error> {
+        Ok(raw)
     }
 
-    fn hash(&self) -> Hash {
-        hash(self.as_ref())
+    fn raw(&self) -> &RawMessage {
+        self
     }
 
     fn verify_signature(&self, pub_key: &PublicKey) -> bool {

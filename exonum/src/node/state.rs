@@ -24,7 +24,7 @@ use serde_json::Value;
 use bit_vec::BitVec;
 
 use messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect};
-use crypto::{PublicKey, SecretKey, Hash};
+use crypto::{CryptoHash, PublicKey, SecretKey, Hash};
 use storage::{Patch, Snapshot};
 use blockchain::{ValidatorKeys, ConsensusConfig, StoredConfiguration, Transaction,
                  TimeoutAdjusterConfig};
@@ -678,7 +678,7 @@ impl State {
         self.locked_propose
     }
 
-    /// Returns muttable propose state identified by hash.
+    /// Returns mutable propose state identified by hash.
     pub fn propose_mut(&mut self, hash: &Hash) -> Option<&mut ProposeState> {
         self.proposes.get_mut(hash)
     }

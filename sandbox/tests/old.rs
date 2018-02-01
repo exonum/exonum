@@ -17,9 +17,9 @@ extern crate sandbox;
 
 use std::time::Duration;
 
-use exonum::messages::{Message, Propose, Prevote, Precommit};
+use exonum::messages::{Propose, Prevote, Precommit};
 use exonum::blockchain::{Block, SCHEMA_MAJOR_VERSION};
-use exonum::crypto::Hash;
+use exonum::crypto::{CryptoHash, Hash};
 use exonum::helpers::{Height, Round};
 
 use sandbox::timestamping_sandbox;

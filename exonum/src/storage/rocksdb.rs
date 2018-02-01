@@ -41,7 +41,6 @@ impl From<_Error> for Error {
 }
 
 /// Database implementation on the top of `RocksDB` backend.
-#[derive(Clone)]
 pub struct RocksDB {
     db: Arc<_RocksDB>,
 }
@@ -73,7 +72,7 @@ impl RocksDB {
         Ok(RocksDB { db: Arc::new(db) })
     }
 
-    fn merge(&mut self, patch: Patch, w_opts: &RocksDBWriteOptions) -> Result<()> {
+    fn do_merge(&self, patch: Patch, w_opts: &RocksDBWriteOptions) -> Result<()> {
         let _p = ProfilerSpan::new("RocksDB::merge");
         let mut batch = WriteBatch::default();
         for (cf_name, changes) in patch {
@@ -97,10 +96,6 @@ impl RocksDB {
 }
 
 impl Database for RocksDB {
-    fn clone(&self) -> Box<Database> {
-        Box::new(Clone::clone(self))
-    }
-
     fn snapshot(&self) -> Box<Snapshot> {
         let _p = ProfilerSpan::new("RocksDB::snapshot");
         Box::new(RocksDBSnapshot {
@@ -109,15 +104,15 @@ impl Database for RocksDB {
         })
     }
 
-    fn merge(&mut self, patch: Patch) -> Result<()> {
+    fn merge(&self, patch: Patch) -> Result<()> {
         let w_opts = RocksDBWriteOptions::default();
-        self.merge(patch, &w_opts)
+        self.do_merge(patch, &w_opts)
     }
 
-    fn merge_sync(&mut self, patch: Patch) -> Result<()> {
+    fn merge_sync(&self, patch: Patch) -> Result<()> {
         let mut w_opts = RocksDBWriteOptions::default();
         w_opts.set_sync(true);
-        self.merge(patch, &w_opts)
+        self.do_merge(patch, &w_opts)
     }
 }
 

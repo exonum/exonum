@@ -20,7 +20,7 @@ use serde::de::Error;
 use serde_json::{self, Error as JsonError};
 
 use storage::StorageValue;
-use crypto::{hash, PublicKey, Hash};
+use crypto::{hash, CryptoHash, PublicKey, Hash};
 use helpers::{Height, Milliseconds};
 
 /// Public keys of a validator.
@@ -38,7 +38,7 @@ pub struct ValidatorKeys {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct StoredConfiguration {
     /// Link to the previous configuration.
-    /// For configuration in genesis block `hash` is just an array of zeroes.
+    /// For configuration in the genesis block `hash` is just an array of zeros.
     pub previous_cfg_hash: Hash,
     /// The height, starting from which this configuration becomes actual.
     pub actual_from: Height,
@@ -62,8 +62,15 @@ pub struct ConsensusConfig {
     pub peers_timeout: Milliseconds,
     /// Maximum number of transactions per block.
     pub txs_block_limit: u32,
+    /// Maximum message length (in bytes).
+    pub max_message_len: u32,
     /// `TimeoutAdjuster` configuration.
     pub timeout_adjuster: TimeoutAdjusterConfig,
+}
+
+impl ConsensusConfig {
+    /// Default value for max_message_len.
+    pub const DEFAULT_MESSAGE_MAX_LEN: u32 = 1024 * 1024; // 1 MB
 }
 
 impl Default for ConsensusConfig {
@@ -73,6 +80,7 @@ impl Default for ConsensusConfig {
             status_timeout: 5000,
             peers_timeout: 10_000,
             txs_block_limit: 1000,
+            max_message_len: Self::DEFAULT_MESSAGE_MAX_LEN,
             timeout_adjuster: TimeoutAdjusterConfig::Constant { timeout: 500 },
         }
     }
@@ -149,6 +157,13 @@ impl StoredConfiguration {
     }
 }
 
+impl CryptoHash for StoredConfiguration {
+    fn hash(&self) -> Hash {
+        let vec_bytes = self.try_serialize().unwrap();
+        hash(&vec_bytes)
+    }
+}
+
 impl StorageValue for StoredConfiguration {
     fn into_bytes(self) -> Vec<u8> {
         self.try_serialize().unwrap()
@@ -156,11 +171,6 @@ impl StorageValue for StoredConfiguration {
 
     fn from_bytes(v: ::std::borrow::Cow<[u8]>) -> Self {
         StoredConfiguration::try_deserialize(v.as_ref()).unwrap()
-    }
-
-    fn hash(&self) -> Hash {
-        let vec_bytes = self.try_serialize().unwrap();
-        hash(&vec_bytes)
     }
 }
 

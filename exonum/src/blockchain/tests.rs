@@ -20,7 +20,7 @@ use rand::{thread_rng, Rng};
 use serde_json;
 
 use blockchain::{Blockchain, Schema, Transaction, TransactionResult, TransactionValue};
-use crypto::{gen_keypair, Hash};
+use crypto::{gen_keypair, CryptoHash, Hash};
 use storage::{Database, Fork, Error, ListIndex};
 use messages::Message;
 use helpers::{Height, ValidatorId};
@@ -93,9 +93,9 @@ fn test_correct_encoding_struct() {
     test.write(&mut buffer, 0, 8);
     assert_eq!(buffer, dat);
     <StructWithTwoSegments as Field>::check(&dat, 0.into(), 8.into(), 8.into()).unwrap();
-    let strukt = unsafe { <StructWithTwoSegments as Field>::read(&dat, 0, 8) };
-    assert_eq!(strukt.first(), &[1u8]);
-    assert_eq!(strukt.second(), &[2u8]);
+    let struct_ = unsafe { <StructWithTwoSegments as Field>::read(&dat, 0, 8) };
+    assert_eq!(struct_.first(), &[1u8]);
+    assert_eq!(struct_.second(), &[2u8]);
 }
 
 #[test]
