@@ -108,7 +108,8 @@ script: |
       cd sandbox && cargo fmt -- --write-mode=diff && cd .. &&
       cd testkit && cargo fmt -- --write-mode=diff && cd .. &&
       cspell sandbox/{src,examples,tests}/**/*.rs &&
-      cspell exonum/{src,benches,tests}/**/*.rs
+      cspell exonum/{src,benches,tests}/**/*.rs &&
+      cspell testkit/{src,examples,tests}/**/*.rs
   ;;
   "clippy-core" )
       cd exonum && cargo clippy --verbose --features long_benchmarks -- -D warnings
