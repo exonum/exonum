@@ -148,9 +148,9 @@ use std::fmt;
 
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Schema as CoreSchema,
                          Service, SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys};
-use exonum::crypto;
+use exonum::crypto::{self, CryptoHash};
 use exonum::helpers::{Height, Round, ValidatorId};
-use exonum::messages::{Message, Precommit, Propose};
+use exonum::messages::{Precommit, Propose};
 use exonum::node::{ApiSender, ExternalMessage, State as NodeState, TransactionSend, TxPool,
                    NodeApiConfig, create_public_api_handler, create_private_api_handler};
 use exonum::storage::{MemoryDB, Snapshot};
@@ -1004,7 +1004,7 @@ impl TestNetworkConfiguration {
         validators: Vec<TestNode>,
         mut stored_configuration: StoredConfiguration,
     ) -> Self {
-        let prev_hash = exonum::storage::StorageValue::hash(&stored_configuration);
+        let prev_hash = exonum::crypto::CryptoHash::hash(&stored_configuration);
         stored_configuration.previous_cfg_hash = prev_hash;
         TestNetworkConfiguration {
             us,

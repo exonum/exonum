@@ -30,6 +30,8 @@ matrix:
       env: FEATURE=clippy-core
     - rust: nightly-2018-01-22
       env: FEATURE=clippy-sandbox
+    - rust: nightly-2018-01-22
+      env: FEATURE=clippy-testkit
 
 cache:
   directories:
