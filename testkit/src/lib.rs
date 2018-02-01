@@ -23,7 +23,7 @@
 //! extern crate exonum_testkit;
 //! extern crate serde_json;
 //!
-//! use exonum::crypto::{gen_keypair, Hash, PublicKey};
+//! use exonum::crypto::{gen_keypair, Hash, PublicKey, CryptoHash};
 //! use exonum::blockchain::{Block, Schema, Service, Transaction};
 //! use exonum::messages::{Message, RawTransaction};
 //! use exonum::storage::{Snapshot, Fork};
@@ -924,10 +924,10 @@ impl TestKit {
     /// extern crate serde;
     /// extern crate serde_json;
     ///
+    /// use exonum::blockchain::Schema;
+    /// use exonum::crypto::CryptoHash;
     /// use exonum::helpers::{Height, ValidatorId};
     /// use exonum_testkit::TestKitBuilder;
-    /// use exonum::blockchain::Schema;
-    /// use exonum::storage::StorageValue;
     ///
     /// fn main() {
     ///    let mut testkit = TestKitBuilder::auditor().with_validators(3).create();
