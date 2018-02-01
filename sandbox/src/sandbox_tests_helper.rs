@@ -22,7 +22,7 @@ use bit_vec::BitVec;
 use exonum::messages::{RawTransaction, Message, Propose, Prevote, Precommit, ProposeRequest,
                        PrevotesRequest};
 use exonum::blockchain::{Block, SCHEMA_MAJOR_VERSION};
-use exonum::crypto::{Hash, HASH_SIZE};
+use exonum::crypto::{CryptoHash, Hash, HASH_SIZE};
 use exonum::storage::Database;
 use exonum::helpers::{Height, Round, ValidatorId, Milliseconds};
 

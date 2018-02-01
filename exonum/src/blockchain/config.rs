@@ -20,7 +20,7 @@ use serde::de::Error;
 use serde_json::{self, Error as JsonError};
 
 use storage::StorageValue;
-use crypto::{hash, PublicKey, Hash};
+use crypto::{hash, CryptoHash, PublicKey, Hash};
 use helpers::{Height, Milliseconds};
 
 /// Public keys of a validator.
@@ -157,6 +157,13 @@ impl StoredConfiguration {
     }
 }
 
+impl CryptoHash for StoredConfiguration {
+    fn hash(&self) -> Hash {
+        let vec_bytes = self.try_serialize().unwrap();
+        hash(&vec_bytes)
+    }
+}
+
 impl StorageValue for StoredConfiguration {
     fn into_bytes(self) -> Vec<u8> {
         self.try_serialize().unwrap()
@@ -164,11 +171,6 @@ impl StorageValue for StoredConfiguration {
 
     fn from_bytes(v: ::std::borrow::Cow<[u8]>) -> Self {
         StoredConfiguration::try_deserialize(v.as_ref()).unwrap()
-    }
-
-    fn hash(&self) -> Hash {
-        let vec_bytes = self.try_serialize().unwrap();
-        hash(&vec_bytes)
     }
 }
 

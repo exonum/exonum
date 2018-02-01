@@ -26,10 +26,12 @@ use sodiumoxide::crypto::sign::ed25519::{gen_keypair as gen_keypair_sodium, keyp
                                          PublicKey as PublicKeySodium,
                                          SecretKey as SecretKeySodium, Seed as SeedSodium,
                                          Signature as SignatureSodium, State as SignState};
-use sodiumoxide::crypto::hash::sha256::{hash as hash_sodium, Digest, State as HashState};
+use sodiumoxide::crypto::hash::sha256::{hash as hash_sodium, Digest as DigestSodium,
+                                        State as HashState};
 use sodiumoxide;
 use serde::{Serialize, Serializer};
 use serde::de::{self, Deserialize, Deserializer, Visitor};
+use byteorder::{ByteOrder, LittleEndian};
 
 use encoding::serialize::FromHex;
 
@@ -127,6 +129,17 @@ pub fn verify(sig: &Signature, data: &[u8], pubkey: &PublicKey) -> bool {
 pub fn hash(data: &[u8]) -> Hash {
     let dig = hash_sodium(data);
     Hash(dig)
+}
+
+/// A common trait for the ability to compute a
+/// cryptographic hash.
+pub trait CryptoHash {
+    /// Returns a hash of the value.
+    ///
+    /// The hashing strategy must satisfy the basic requirements of cryptographic hashing:
+    /// equal values must have the same hash and not equal values must have different hashes
+    /// (except for negligible probability).
+    fn hash(&self) -> Hash;
 }
 
 /// Initializes the sodium library and chooses faster versions of the primitives if possible.
@@ -393,7 +406,7 @@ implement_public_sodium_wrapper! {
 /// # drop(hash_from_data);
 /// # drop(default_hash);
 /// ```
-    struct Hash, Digest, HASH_SIZE
+    struct Hash, DigestSodium, HASH_SIZE
 }
 
 implement_public_sodium_wrapper! {
@@ -526,6 +539,97 @@ implement_index_traits! {Signature}
 impl Default for Hash {
     fn default() -> Hash {
         Hash::zero()
+    }
+}
+
+impl CryptoHash for u8 {
+    fn hash(&self) -> Hash {
+        hash(&[*self])
+    }
+}
+
+impl CryptoHash for u16 {
+    fn hash(&self) -> Hash {
+        let mut v = [0; 2];
+        LittleEndian::write_u16(&mut v, *self);
+        hash(&v)
+    }
+}
+
+impl CryptoHash for u32 {
+    fn hash(&self) -> Hash {
+        let mut v = [0; 4];
+        LittleEndian::write_u32(&mut v, *self);
+        hash(&v)
+    }
+}
+
+impl CryptoHash for u64 {
+    fn hash(&self) -> Hash {
+        let mut v = [0; 8];
+        LittleEndian::write_u64(&mut v, *self);
+        hash(&v)
+    }
+}
+
+impl CryptoHash for i8 {
+    fn hash(&self) -> Hash {
+        hash(&[*self as u8])
+    }
+}
+
+impl CryptoHash for i16 {
+    fn hash(&self) -> Hash {
+        let mut v = [0; 2];
+        LittleEndian::write_i16(&mut v, *self);
+        hash(&v)
+    }
+}
+
+impl CryptoHash for i32 {
+    fn hash(&self) -> Hash {
+        let mut v = [0; 4];
+        LittleEndian::write_i32(&mut v, *self);
+        hash(&v)
+    }
+}
+
+impl CryptoHash for i64 {
+    fn hash(&self) -> Hash {
+        let mut v = [0; 8];
+        LittleEndian::write_i64(&mut v, *self);
+        hash(&v)
+    }
+}
+
+impl CryptoHash for () {
+    fn hash(&self) -> Hash {
+        Hash::zero()
+    }
+}
+
+
+impl CryptoHash for Hash {
+    fn hash(&self) -> Hash {
+        *self
+    }
+}
+
+impl CryptoHash for PublicKey {
+    fn hash(&self) -> Hash {
+        hash(self.as_ref())
+    }
+}
+
+impl CryptoHash for Vec<u8> {
+    fn hash(&self) -> Hash {
+        hash(self)
+    }
+}
+
+impl CryptoHash for String {
+    fn hash(&self) -> Hash {
+        hash(self.as_ref())
     }
 }
 
