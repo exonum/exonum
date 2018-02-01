@@ -17,7 +17,7 @@
 use std::marker::PhantomData;
 use std::fmt;
 
-use crypto::{Hash, HashStream};
+use crypto::{Hash, CryptoHash, HashStream};
 use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageValue};
 use self::key::{BitsRange, ChildKind, LEAF_KEY_PREFIX};
 use self::node::{BranchNode, Node};
@@ -741,7 +741,7 @@ where
                             return RemoveResult::Branch((key, *hash));
                         }
                         RemoveResult::Branch((key, hash)) => {
-                            let mut new_child_path = key.start_from(suffix_path.start());
+                            let new_child_path = key.start_from(suffix_path.start());
 
                             branch.set_child(suffix_path.bit(0), &new_child_path, &hash);
                             let h = branch.hash();
@@ -800,7 +800,7 @@ where
                     match self.remove_node(&branch, &suffix_path) {
                         RemoveResult::Leaf => self.base.remove(&prefix),
                         RemoveResult::Branch((key, hash)) => {
-                            let mut new_child_path = key.start_from(suffix_path.start());
+                            let new_child_path = key.start_from(suffix_path.start());
                             branch.set_child(suffix_path.bit(0), &new_child_path, &hash);
                             self.base.put(&prefix, branch);
                         }

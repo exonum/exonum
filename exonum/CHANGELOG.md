@@ -11,6 +11,21 @@ All notable changes to this project will be documented in this file. The project
 - Fixed logger output (#451)
 
 ## 0.5 - 2018-01-29
+### Breaking changes
+- `exonum::crypto::CryptoHash` trait is introduced, and `StorageValue::hash` and `Message::hash` methods are removed. (#422)
+   Migration path:
+     - For implementations of `StorageValue`, move the `hash` method to `CryptoHash` implementation instead.
+     - For implementations of `Message` simply remove `hash` method, there's a blanket impl of `CryptoHash`
+       for `Message`.
+     - Add `use exonum::crypto::CryptoHash` to use the `hash` method.
+- The `StorageKey` trait is re-implemented for signed integer types (`i8`, `i16`, `i32` and `i64`)
+  to achieve the natural ordering of produced keys. This change will break indices using
+  signed integers as keys. To emulate the old implementation, you may create a wrapper
+  around a type (e.g., `struct QuirkyI32Key(i32)`) and implement `StorageKey` for it
+  using big endian encoding. Then, use the wrapper instead of the int type in indices.
+  See the unit tests for `StorageKey` for an example.
+
+## 0.5 - 2018-01-30
 
 ### Breaking changes
 - The order of bytes and bits in the `DBKey` keys of `ProofMapIndex` became consistent. The change influences how

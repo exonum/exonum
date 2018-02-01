@@ -23,7 +23,7 @@ use std::marker::PhantomData;
 
 use byteorder::{BigEndian, ByteOrder};
 
-use crypto::{hash, Hash};
+use crypto::{hash, CryptoHash, Hash};
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -43,11 +43,13 @@ impl SparseListSize {
     }
 }
 
-impl StorageValue for SparseListSize {
+impl CryptoHash for SparseListSize {
     fn hash(&self) -> Hash {
         hash(&self.to_array())
     }
+}
 
+impl StorageValue for SparseListSize {
     fn into_bytes(self) -> Vec<u8> {
         self.to_array().to_vec()
     }

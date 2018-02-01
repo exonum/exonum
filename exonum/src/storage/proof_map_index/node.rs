@@ -14,7 +14,7 @@
 
 use std::borrow::Cow;
 
-use crypto::{hash, Hash, HASH_SIZE};
+use crypto::{hash, CryptoHash, Hash, HASH_SIZE};
 
 use super::super::{StorageKey, StorageValue};
 use super::key::{ChildKind, ProofPath, PROOF_PATH_SIZE};
@@ -79,6 +79,12 @@ impl BranchNode {
     }
 }
 
+impl CryptoHash for BranchNode {
+    fn hash(&self) -> Hash {
+        hash(&self.raw)
+    }
+}
+
 impl StorageValue for BranchNode {
     fn into_bytes(self) -> Vec<u8> {
         self.raw
@@ -86,10 +92,6 @@ impl StorageValue for BranchNode {
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
         BranchNode { raw: value.into_owned() }
-    }
-
-    fn hash(&self) -> Hash {
-        hash(&self.raw)
     }
 }
 

@@ -18,7 +18,8 @@ use std::ops::Deref;
 
 use byteorder::{ByteOrder, LittleEndian};
 
-use crypto::{hash, sign, verify, Hash, PublicKey, SecretKey, Signature, SIGNATURE_LENGTH};
+use crypto::{hash, sign, verify, CryptoHash, Hash, PublicKey, SecretKey, Signature,
+             SIGNATURE_LENGTH};
 use encoding::{self, CheckedOffset, Field, Offset, Result as StreamStructResult};
 
 /// Length of the message header.
@@ -262,7 +263,7 @@ impl MessageWriter {
 /// the resulting digital signature is a part of the message.
 ///
 /// [Ed25519]: ../crypto/index.html
-pub trait Message: Debug + Send + Sync {
+pub trait Message: CryptoHash + Debug + Send + Sync {
     /// Converts the raw message into the specific one.
     fn from_raw(raw: RawMessage) -> Result<Self, encoding::Error>
     where
@@ -271,14 +272,15 @@ pub trait Message: Debug + Send + Sync {
     /// Returns raw message.
     fn raw(&self) -> &RawMessage;
 
-    /// Returns hash of the `RawMessage`.
-    fn hash(&self) -> Hash {
-        self.raw().hash()
-    }
-
     /// Verifies the message using given public key.
     fn verify_signature(&self, pub_key: &PublicKey) -> bool {
         self.raw().verify_signature(pub_key)
+    }
+}
+
+impl<T: Message> CryptoHash for T {
+    fn hash(&self) -> Hash {
+        hash(self.raw().as_ref())
     }
 }
 
@@ -289,10 +291,6 @@ impl Message for RawMessage {
 
     fn raw(&self) -> &RawMessage {
         self
-    }
-
-    fn hash(&self) -> Hash {
-        hash(self.as_ref())
     }
 
     fn verify_signature(&self, pub_key: &PublicKey) -> bool {
