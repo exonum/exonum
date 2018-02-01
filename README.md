@@ -1,6 +1,6 @@
 # exonum-time
 
-[![Build Status](https://travis-ci.com/exonum/exonum-time.svg?branch=master)](https://travis-ci.com/exonum/exonum-time)
+[![Build Status](https://travis-ci.org/exonum/exonum-time.svg?branch=master)](https://travis-ci.org/exonum/exonum-time)
 
 Exonum-time is a time oracle service for [Exonum blockchain framework](https://exonum.com/).
 This service allows to determine time, 
