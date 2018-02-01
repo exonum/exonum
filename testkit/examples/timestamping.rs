@@ -19,7 +19,7 @@ extern crate exonum_testkit;
 extern crate serde_json;
 
 use exonum::crypto::{gen_keypair, Hash, PublicKey, CryptoHash};
-use exonum::blockchain::{Block, Schema, Service, Transaction, ExecutionResult};
+use exonum::blockchain::{Block, Schema, Service, Transaction, TransactionSet, ExecutionResult};
 use exonum::messages::{Message, RawTransaction};
 use exonum::storage::{Fork, Snapshot};
 use exonum::encoding;
@@ -28,15 +28,15 @@ use exonum_testkit::{ApiKind, TestKitBuilder};
 // Simple service implementation.
 
 const SERVICE_ID: u16 = 512;
-const TX_TIMESTAMP_ID: u16 = 0;
 
-message! {
-    struct TxTimestamp {
-        const TYPE = SERVICE_ID;
-        const ID = TX_TIMESTAMP_ID;
+transactions! {
+    const SERVICE_ID = SERVICE_ID;
 
-        from: &PublicKey,
-        msg: &str,
+    TimestampingServiceTransactions {
+        struct TxTimestamp {
+            from: &PublicKey,
+            msg: &str,
+        }
     }
 }
 
@@ -66,15 +66,8 @@ impl Service for TimestampingService {
     }
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
-        let trans: Box<Transaction> = match raw.message_type() {
-            TX_TIMESTAMP_ID => Box::new(TxTimestamp::from_raw(raw)?),
-            _ => {
-                return Err(encoding::Error::IncorrectMessageType {
-                    message_type: raw.message_type(),
-                });
-            }
-        };
-        Ok(trans)
+        let tx = TimestampingServiceTransactions::tx_from_raw(raw)?;
+        Ok(tx.into())
     }
 }
 

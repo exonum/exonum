@@ -18,7 +18,8 @@ extern crate router;
 extern crate serde;
 extern crate serde_json;
 
-use exonum::blockchain::{ApiContext, Blockchain, Service, Transaction, ExecutionResult};
+use exonum::blockchain::{ApiContext, Blockchain, Service, Transaction, TransactionSet,
+                         ExecutionResult};
 use exonum::node::{ApiSender, TransactionSend};
 use exonum::messages::{Message, RawTransaction};
 use exonum::storage::{Fork, MapIndex, Snapshot};
@@ -35,8 +36,6 @@ use self::router::Router;
 // // // // // // // // // // CONSTANTS // // // // // // // // // //
 
 const SERVICE_ID: u16 = 1;
-const TX_CREATE_WALLET_ID: u16 = 1;
-const TX_TRANSFER_ID: u16 = 2;
 
 /// Initial balance of newly created wallet.
 pub const INIT_BALANCE: u64 = 100;
@@ -92,27 +91,23 @@ impl<'a> CurrencySchema<&'a mut Fork> {
 
 // // // // // // // // // // TRANSACTIONS // // // // // // // // // //
 
-/// Create a new wallet.
-message! {
-    struct TxCreateWallet {
-        const TYPE = SERVICE_ID;
-        const ID = TX_CREATE_WALLET_ID;
+transactions! {
+    const SERVICE_ID = SERVICE_ID;
 
-        pub_key: &PublicKey,
-        name: &str,
-    }
-}
+    CurrencyTransactions {
+        /// Create a new wallet.
+        struct TxCreateWallet {
+            pub_key: &PublicKey,
+            name: &str,
+        }
 
-/// Transfer coins between the wallets.
-message! {
-    struct TxTransfer {
-        const TYPE = SERVICE_ID;
-        const ID = TX_TRANSFER_ID;
-
-        from: &PublicKey,
-        to: &PublicKey,
-        amount: u64,
-        seed: u64,
+        /// Transfer coins between the wallets.
+        struct TxTransfer {
+            from: &PublicKey,
+            to: &PublicKey,
+            amount: u64,
+            seed: u64,
+        }
     }
 }
 
@@ -195,27 +190,7 @@ impl CryptocurrencyApi {
 
     /// Endpoint for transactions.
     fn post_transaction(&self, req: &mut Request) -> IronResult<Response> {
-        /// Add an enum which joins transactions of both types to simplify request
-        /// processing.
-        #[serde(untagged)]
-        #[derive(Clone, Serialize, Deserialize)]
-        enum TransactionRequest {
-            CreateWallet(TxCreateWallet),
-            Transfer(TxTransfer),
-        }
-
-        /// Implement a trait for the enum for deserialized `TransactionRequest`s
-        /// to fit into the node channel.
-        impl Into<Box<Transaction>> for TransactionRequest {
-            fn into(self) -> Box<Transaction> {
-                match self {
-                    TransactionRequest::CreateWallet(trans) => Box::new(trans),
-                    TransactionRequest::Transfer(trans) => Box::new(trans),
-                }
-            }
-        }
-
-        match req.get::<bodyparser::Struct<TransactionRequest>>() {
+        match req.get::<bodyparser::Struct<CurrencyTransactions>>() {
             Ok(Some(transaction)) => {
                 let transaction: Box<Transaction> = transaction.into();
                 let tx_hash = transaction.hash();
@@ -299,16 +274,8 @@ impl Service for CurrencyService {
 
     /// Implement a method to deserialize transactions coming to the node.
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
-        let trans: Box<Transaction> = match raw.message_type() {
-            TX_TRANSFER_ID => Box::new(TxTransfer::from_raw(raw)?),
-            TX_CREATE_WALLET_ID => Box::new(TxCreateWallet::from_raw(raw)?),
-            _ => {
-                return Err(encoding::Error::IncorrectMessageType {
-                    message_type: raw.message_type(),
-                });
-            }
-        };
-        Ok(trans)
+        let tx = CurrencyTransactions::tx_from_raw(raw)?;
+        Ok(tx.into())
     }
 
     /// Create a REST `Handler` to process web requests to the node.

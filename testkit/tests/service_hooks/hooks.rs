@@ -14,7 +14,7 @@
 
 //! A special service which generates transactions on `handle_commit` events.
 
-use exonum::blockchain::{Service, ServiceContext, Transaction, ExecutionResult};
+use exonum::blockchain::{Service, ServiceContext, Transaction, TransactionSet, ExecutionResult};
 use exonum::messages::{RawTransaction, Message};
 use exonum::storage::{Fork, Snapshot};
 use exonum::crypto::{Hash, Signature};
@@ -22,14 +22,14 @@ use exonum::encoding;
 use exonum::helpers::Height;
 
 const SERVICE_ID: u16 = 512;
-const TX_AFTER_COMMIT_ID: u16 = 1;
 
-message! {
-    struct TxAfterCommit {
-        const TYPE = SERVICE_ID;
-        const ID = TX_AFTER_COMMIT_ID;
+transactions! {
+    const SERVICE_ID = SERVICE_ID;
 
-        height: Height,
+    HandleCommitTransactions {
+        struct TxAfterCommit {
+            height: Height,
+        }
     }
 }
 
@@ -59,15 +59,8 @@ impl Service for HandleCommitService {
     }
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
-        let tx: Box<Transaction> = match raw.message_type() {
-            TX_AFTER_COMMIT_ID => Box::new(TxAfterCommit::from_raw(raw)?),
-            _ => {
-                return Err(encoding::Error::IncorrectMessageType {
-                    message_type: raw.message_type(),
-                });
-            }
-        };
-        Ok(tx)
+        let tx = HandleCommitTransactions::tx_from_raw(raw)?;
+        Ok(tx.into())
     }
 
     fn handle_commit(&self, context: &ServiceContext) {

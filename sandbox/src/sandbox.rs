@@ -786,7 +786,7 @@ pub fn timestamping_sandbox() -> Sandbox {
 
 #[cfg(test)]
 mod tests {
-    use exonum::blockchain::{ServiceContext, ExecutionResult};
+    use exonum::blockchain::{ServiceContext, ExecutionResult,TransactionSet};
     use exonum::messages::RawTransaction;
     use exonum::encoding;
     use exonum::crypto::{gen_keypair_from_seed, Seed};
@@ -797,14 +797,14 @@ mod tests {
     use super::*;
 
     const SERVICE_ID: u16 = 1;
-    const TX_AFTER_COMMIT_ID: u16 = 1;
 
-    message! {
-        struct TxAfterCommit {
-            const TYPE = SERVICE_ID;
-            const ID = TX_AFTER_COMMIT_ID;
+    transactions! {
+        const SERVICE_ID = SERVICE_ID;
 
-            height: Height,
+        HandleCommitServiceTransactions {
+            struct TxAfterCommit {
+                height: Height,
+            }
         }
     }
 
@@ -841,15 +841,8 @@ mod tests {
         }
 
         fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
-            let tx: Box<Transaction> = match raw.message_type() {
-                TX_AFTER_COMMIT_ID => Box::new(TxAfterCommit::from_raw(raw)?),
-                _ => {
-                    return Err(encoding::Error::IncorrectMessageType {
-                        message_type: raw.message_type(),
-                    });
-                }
-            };
-            Ok(tx)
+            let tx = HandleCommitServiceTransactions::tx_from_raw(raw)?;
+            Ok(tx.into())
         }
 
         fn handle_commit(&self, context: &ServiceContext) {

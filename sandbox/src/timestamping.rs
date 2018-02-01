@@ -18,20 +18,30 @@ use exonum::messages::{Message, RawTransaction};
 use exonum::encoding::Error as MessageError;
 use exonum::crypto::{PublicKey, SecretKey, Hash, gen_keypair};
 use exonum::storage::{Fork, Snapshot};
-use exonum::blockchain::{Service, Transaction, ExecutionResult};
+use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
 
 pub const TIMESTAMPING_SERVICE: u16 = 129;
 pub const TIMESTAMPING_TRANSACTION_MESSAGE_ID: u16 = 128;
 
-message! {
-    struct TimestampTx {
-        const TYPE = TIMESTAMPING_SERVICE;
-        const ID = TIMESTAMPING_TRANSACTION_MESSAGE_ID;
+transactions! {
+    const SERVICE_ID = TIMESTAMPING_SERVICE;
 
-        pub_key: &PublicKey,
-        data: &[u8],
+    TimestampingTransactions {
+        struct TimestampTx {
+            pub_key: &PublicKey,
+            data: &[u8],
+        }
     }
 }
+
+impl Transaction for TimestampTx {
+    fn verify(&self) -> bool {
+        self.verify_signature(self.pub_key())
+    }
+
+    fn execute(&self, _: &mut Fork) {}
+}
+
 
 #[derive(Default)]
 pub struct TimestampingService {}
@@ -80,16 +90,6 @@ impl TimestampingService {
     }
 }
 
-impl Transaction for TimestampTx {
-    fn verify(&self) -> bool {
-        self.verify_signature(self.pub_key())
-    }
-
-    fn execute(&self, _: &mut Fork) -> ExecutionResult {
-        Ok(())
-    }
-}
-
 impl Service for TimestampingService {
     fn service_name(&self) -> &'static str {
         "sandbox_timestamping"
@@ -104,12 +104,7 @@ impl Service for TimestampingService {
     }
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
-        if raw.message_type() != TIMESTAMPING_TRANSACTION_MESSAGE_ID {
-            return Err(MessageError::IncorrectMessageType {
-                message_type: raw.message_type(),
-            });
-        }
-
-        TimestampTx::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)
+        let tx = TimestampingTransactions::tx_from_raw(raw)?;
+        Ok(tx.into())
     }
 }

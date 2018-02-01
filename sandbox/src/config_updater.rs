@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum::crypto::{PublicKey, Hash};
-use exonum::blockchain::{Service, Transaction, ExecutionResult, Schema};
+use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult, Schema};
 use exonum::messages::{RawTransaction, Message};
 use exonum::storage::{Fork, Snapshot};
 use exonum::encoding::Error as MessageError;
@@ -23,14 +23,15 @@ use exonum::helpers::Height;
 pub const CONFIG_SERVICE: u16 = 1;
 pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 0;
 
-message! {
-    struct TxConfig {
-        const TYPE = CONFIG_SERVICE;
-        const ID = CONFIG_PROPOSE_MESSAGE_ID;
+transactions! {
+    const SERVICE_ID = CONFIG_SERVICE;
 
-        from: &PublicKey,
-        config: &[u8],
-        actual_from: Height,
+    ConfigUpdateerTransactions {
+        struct TxConfig {
+            from: &PublicKey,
+            config: &[u8],
+            actual_from: Height,
+        }
     }
 }
 
@@ -69,11 +70,7 @@ impl Service for ConfigUpdateService {
     }
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
-        if raw.message_type() != CONFIG_PROPOSE_MESSAGE_ID {
-            return Err(MessageError::IncorrectMessageType {
-                message_type: raw.message_type(),
-            });
-        }
-        TxConfig::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)
+        let tx = ConfigUpdateerTransactions::tx_from_raw(raw)?;
+        Ok(tx.into())
     }
 }

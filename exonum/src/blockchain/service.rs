@@ -85,8 +85,7 @@ macro_rules! transactions {
             )*
         }
 
-        #[derive(Serialize, Deserialize, Clone)]
-        #[serde(untagged)]
+        #[derive(Clone)]
         enum $transaction_set {
             $($name($name),)*
         }
@@ -112,6 +111,52 @@ macro_rules! transactions {
             fn into(self) -> Box<$crate::blockchain::Transaction> {
                 match self {$(
                     $transaction_set::$name(tx) => Box::new(tx),
+                )*}
+            }
+        }
+
+         impl<'de> $crate::encoding::serialize::reexport::Deserialize<'de> for $transaction_set {
+            #[allow(unused_mut)]
+            fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+            where
+                D: $crate::encoding::serialize::reexport::Deserializer<'de>,
+            {
+                use $crate::encoding::serialize::json::reexport::{Value, from_value};
+                use $crate::encoding::serialize::reexport::{DeError, Deserialize};
+
+                let value = <Value as Deserialize>::deserialize(deserializer)?;
+                let message_id: Value = value.get("message_id")
+                    .ok_or(D::Error::custom("Can't get message_id from json"))?
+                    .clone();
+                let message_id: u16 = from_value(message_id)
+                    .map_err(|e| D::Error::custom(
+                        format!("Can't deserialize message_id: {}", e)
+                    ))?;
+
+                match message_id {
+                    $(
+                    <$name as $crate::messages::ServiceMessage>::MESSAGE_ID =>
+                        <$name as $crate::encoding::serialize::json::ExonumJsonDeserialize>::deserialize(
+                            &value
+                        ).map_err(|e| D::Error::custom(
+                            format!("Can't deserialize a value: {}", e.description())
+                        ))
+                        .map($transaction_set::$name),
+                    )*
+                    _ => Err(D::Error::custom(format!("invalid message_id: {}", message_id))),
+                }
+            }
+        }
+
+        impl $crate::encoding::serialize::reexport::Serialize for $transaction_set {
+            fn serialize<S>(&self, serializer: S) -> ::std::result::Result<S::Ok, S::Error>
+            where
+                S: $crate::encoding::serialize::reexport::Serializer,
+            {
+                use $crate::encoding::serialize::reexport::Serialize;
+
+                match self {$(
+                    &$transaction_set::$name(ref tx) => Serialize::serialize(tx, serializer),
                 )*}
             }
         }
