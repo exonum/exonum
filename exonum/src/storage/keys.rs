@@ -21,10 +21,10 @@ use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 
 /// A type that can be (de)serialized as a key in the blockchain storage.
 ///
-/// Since keys are sorted in a serialized form, the big-endian encoding should be used
-/// with unsigned integer types. Note however that the big-endian encoding on its own
+/// Since keys are sorted in the serialized form, the big-endian encoding should be used
+/// with unsigned integer types. Note however that the big-endian encoding
 /// will not sort signed integer types in the natural order; therefore, they are
-/// mapped to a corresponding unsigned type by adding a constant to a source value.
+/// mapped to the corresponding unsigned type by adding a constant to the source value.
 ///
 /// # Examples
 ///
@@ -128,6 +128,8 @@ impl StorageKey for i8 {
         buffer[0].wrapping_sub(i8::min_value() as u8) as i8
     }
 }
+
+// spell-checker:ignore utype, itype, vals, ints
 
 macro_rules! storage_key_for_ints {
     ($utype:ident, $itype:ident, $size:expr, $read_method:ident, $write_method:ident) => {

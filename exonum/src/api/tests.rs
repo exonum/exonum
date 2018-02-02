@@ -23,6 +23,7 @@ use super::*;
 
 #[test]
 fn test_json_response_for_complex_val() {
+    // spell-checker:disable-next
     let str_val = "sghdkgskgskldghshgsd";
     let txs = [34, 32];
     let tx_count = txs.len() as u32;

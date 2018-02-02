@@ -15,6 +15,7 @@
 //! Exonum blockchain framework.
 //!
 //! For more information see the project readme.
+// spell-checker:ignore cors
 
 #![deny(missing_debug_implementations, missing_docs)]
 

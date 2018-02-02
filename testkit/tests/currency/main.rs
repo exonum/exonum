@@ -43,7 +43,7 @@ fn init_testkit() -> TestKit {
 
 fn create_wallet(api: &TestKitApi, name: &str) -> (TxCreateWallet, SecretKey) {
     let (pubkey, key) = crypto::gen_keypair();
-    // Create a presigned transaction
+    // Create a pre-signed transaction
     let tx = TxCreateWallet::new(&pubkey, name, &key);
 
     let tx_info: TransactionResponse = api.post(
@@ -326,7 +326,7 @@ fn test_unknown_wallet_request() {
 }
 
 #[test]
-fn test_nonverified_transaction_in_create_block() {
+fn test_unverified_transaction_in_create_block() {
     let mut testkit = init_testkit();
     let api = testkit.api();
 
@@ -343,7 +343,7 @@ fn test_nonverified_transaction_in_create_block() {
 }
 
 #[test]
-fn test_nonsigned_transaction_in_create_block() {
+fn test_unsigned_transaction_in_create_block() {
     let mut testkit = init_testkit();
     let api = testkit.api();
 

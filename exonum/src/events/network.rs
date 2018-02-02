@@ -207,7 +207,7 @@ impl ConnectionsPool {
 impl NetworkPart {
     pub fn run(self, handle: &Handle) -> Box<Future<Item = (), Error = io::Error>> {
         let network_config = self.network_config;
-        // Cancelation token
+        // Cancellation token
         let (cancel_sender, cancel_handler) = unsync::oneshot::channel();
         let cancel_sender = Some(cancel_sender);
 
