@@ -42,7 +42,7 @@ pub struct StoredConfiguration {
     pub previous_cfg_hash: Hash,
     /// The height, starting from which this configuration becomes actual.
     pub actual_from: Height,
-    /// List of validator's consensus and service public keys.
+    /// List of validators' consensus and service public keys.
     pub validator_keys: Vec<ValidatorKeys>,
     /// Consensus algorithm parameters.
     pub consensus: ConsensusConfig,

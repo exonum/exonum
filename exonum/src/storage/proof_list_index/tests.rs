@@ -249,8 +249,8 @@ fn list_index_proof(db: Box<Database>) {
 fn randomly_generate_proofs(db: Box<Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
-    let num_vals = 100;
-    let values = random_values(num_vals as usize);
+    let num_values = 100;
+    let values = random_values(num_values as usize);
     let mut rng = thread_rng();
     for value in &values {
         index.push(value.clone());
@@ -259,19 +259,19 @@ fn randomly_generate_proofs(db: Box<Database>) {
     let table_root_hash = index.root_hash();
 
     for _ in 0..50 {
-        let start_range = rng.gen_range(0, num_vals);
-        let end_range = rng.gen_range(start_range + 1, num_vals + 1);
+        let start_range = rng.gen_range(0, num_values);
+        let end_range = rng.gen_range(start_range + 1, num_values + 1);
         let range_proof = index.get_range_proof(start_range, end_range);
         {
-            let (inds, actual_vals): (Vec<_>, Vec<_>) = range_proof
+            let (indices, actual_values): (Vec<_>, Vec<_>) = range_proof
                 .validate(table_root_hash, index.len())
                 .unwrap()
                 .into_iter()
                 .unzip();
-            assert_eq!(inds, (start_range..end_range).collect::<Vec<_>>());
+            assert_eq!(indices, (start_range..end_range).collect::<Vec<_>>());
 
-            let expect_vals = &values[start_range as usize..end_range as usize];
-            for (expected, actual) in expect_vals.iter().zip(actual_vals) {
+            let expect_values = &values[start_range as usize..end_range as usize];
+            for (expected, actual) in expect_values.iter().zip(actual_values) {
                 assert_eq!(*expected, *actual);
             }
         }
@@ -284,9 +284,9 @@ fn randomly_generate_proofs(db: Box<Database>) {
             range_end: end_range,
         };
 
-        let json_repr = to_string(&range_proof).unwrap();
-        assert!(json_repr.len() > 0);
-        assert_eq!(range_proof, from_str(&json_repr).unwrap());
+        let json_representation = to_string(&range_proof).unwrap();
+        assert!(json_representation.len() > 0);
+        assert_eq!(range_proof, from_str(&json_representation).unwrap());
     }
 }
 
@@ -350,9 +350,9 @@ fn index_and_proof_roots(db: Box<Database>) {
                 .len(),
             1
         );
-        let json_repre = to_string(&range_proof).unwrap();
-        let deser_proof: ListProof<Vec<u8>> = from_str(&json_repre).unwrap();
-        assert_eq!(deser_proof, range_proof);
+        let json_representation = to_string(&range_proof).unwrap();
+        let deserialized_proof: ListProof<Vec<u8>> = from_str(&json_representation).unwrap();
+        assert_eq!(deserialized_proof, range_proof);
         let range_proof = index.get_range_proof(0, proof_ind + 1);
         assert_eq!(
             range_proof
@@ -361,9 +361,9 @@ fn index_and_proof_roots(db: Box<Database>) {
                 .len(),
             (proof_ind + 1) as usize
         );
-        let json_repre = to_string(&range_proof).unwrap();
-        let deser_proof: ListProof<Vec<u8>> = from_str(&json_repre).unwrap();
-        assert_eq!(deser_proof, range_proof);
+        let json_representation = to_string(&range_proof).unwrap();
+        let deserialized_proof: ListProof<Vec<u8>> = from_str(&json_representation).unwrap();
+        assert_eq!(deserialized_proof, range_proof);
         let range_proof = index.get_range_proof(0, 1);
         assert_eq!(
             range_proof
@@ -372,19 +372,19 @@ fn index_and_proof_roots(db: Box<Database>) {
                 .len(),
             1
         );
-        let json_repre = to_string(&range_proof).unwrap();
-        let deser_proof: ListProof<Vec<u8>> = from_str(&json_repre).unwrap();
-        assert_eq!(deser_proof, range_proof);
+        let json_representation = to_string(&range_proof).unwrap();
+        let deserialized_proof: ListProof<Vec<u8>> = from_str(&json_representation).unwrap();
+        assert_eq!(deserialized_proof, range_proof);
     }
 
     let range_proof = index.get_range_proof(0, 8);
-    let (inds, val_refs): (Vec<_>, Vec<_>) = range_proof
+    let (indices, val_refs): (Vec<_>, Vec<_>) = range_proof
         .validate(index.root_hash(), index.len())
         .unwrap()
         .into_iter()
         .unzip();
-    assert_eq!(inds, (0..8).collect::<Vec<_>>());
-    let expect_vals = vec![
+    assert_eq!(indices, (0..8).collect::<Vec<_>>());
+    let expect_values = vec![
         vec![1, 2],
         vec![2, 3],
         vec![3, 4],
@@ -394,7 +394,7 @@ fn index_and_proof_roots(db: Box<Database>) {
         vec![7, 8],
         vec![8, 9],
     ];
-    let paired = expect_vals.into_iter().zip(val_refs);
+    let paired = expect_values.into_iter().zip(val_refs);
     for pair in paired {
         assert_eq!(pair.0, *pair.1);
     }
@@ -447,6 +447,8 @@ fn proof_structure(db: Box<Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
     assert_eq!(index.root_hash(), Hash::zero());
+
+    // spell-checker:ignore upup
 
     let h1 = hash(&vec![0, 1, 2]);
     let h2 = hash(&vec![1, 2, 3]);

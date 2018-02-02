@@ -18,7 +18,7 @@
 
 // TODO refer to difference between json serialization and exonum_json (ECR-156).
 // TODO implement Field for float (ECR-153).
-// TODO remove WriteBufferWraper hack (after refactor storage),
+// TODO remove WriteBufferWrapper hack (after refactor storage),
 // should be moved into storage (ECR-156).
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -114,8 +114,8 @@ macro_rules! impl_deserialize_bigint {
                                                         to: Offset)
             -> Result<(), Box<Error>>
             {
-                let stri = value.as_str().ok_or("Can't cast json as string")?;
-                let val: $typename =  stri.parse()?;
+                let string = value.as_str().ok_or("Can't cast json as string")?;
+                let val: $typename =  string.parse()?;
                 buffer.write(from, to, val);
                 Ok(())
             }
@@ -137,8 +137,8 @@ macro_rules! impl_deserialize_hex_segment {
                                                         to: Offset)
                 -> Result<(), Box<Error>>
             {
-                let stri = value.as_str().ok_or("Can't cast json as string")?;
-                let val = <$typename as FromHex>:: from_hex(stri)?;
+                let string = value.as_str().ok_or("Can't cast json as string")?;
+                let val = <$typename as FromHex>:: from_hex(string)?;
                 buffer.write(from, to, &val);
                 Ok(())
             }
@@ -243,8 +243,8 @@ impl<'a> ExonumJson for &'a [Hash] {
         let arr = value.as_array().ok_or("Can't cast json as array")?;
         let mut vec: Vec<Hash> = Vec::new();
         for el in arr {
-            let stri = el.as_str().ok_or("Can't cast json as string")?;
-            let hash = <Hash as FromHex>::from_hex(stri)?;
+            let string = el.as_str().ok_or("Can't cast json as string")?;
+            let hash = <Hash as FromHex>::from_hex(string)?;
             vec.push(hash)
         }
         buffer.write(from, to, vec.as_slice());
@@ -288,8 +288,8 @@ impl ExonumJson for Vec<RawMessage> {
         let bytes = value.as_array().ok_or("Can't cast json as array")?;
         let mut vec: Vec<_> = Vec::new();
         for el in bytes {
-            let stri = el.as_str().ok_or("Can't cast json as string")?;
-            let str_hex = <Vec<u8> as FromHex>::from_hex(stri)?;
+            let string = el.as_str().ok_or("Can't cast json as string")?;
+            let str_hex = <Vec<u8> as FromHex>::from_hex(string)?;
             vec.push(RawMessage::new(MessageBuffer::from_vec(str_hex)));
         }
         buffer.write(from, to, vec);
@@ -362,9 +362,9 @@ impl ExonumJson for BitVec {
         from: Offset,
         to: Offset,
     ) -> Result<(), Box<Error>> {
-        let stri = value.as_str().ok_or("Can't cast json as string")?;
+        let string = value.as_str().ok_or("Can't cast json as string")?;
         let mut vec = BitVec::new();
-        for (i, ch) in stri.chars().enumerate() {
+        for (i, ch) in string.chars().enumerate() {
             let val = if ch == '1' {
                 true
             } else if ch == '0' {
@@ -391,7 +391,7 @@ impl ExonumJson for BitVec {
     }
 }
 
-// TODO: Make a macro for tuple struct typedefs (ECR-154)?
+// TODO: Make a macro for tuple struct type definitions (ECR-154)?
 impl ExonumJson for Height {
     fn deserialize_field<B: WriteBufferWrapper>(
         value: &Value,

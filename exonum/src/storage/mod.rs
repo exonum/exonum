@@ -56,10 +56,10 @@
 //!
 //! Each index occupies a certain set of keys in a single column family of the [`Database`].
 //! On the other hand, multiple indices can be stored in the same column family, provided
-//! that their keyspaces do not intersect. Isolation is commonly achieved with the help
+//! that their key spaces do not intersect. Isolation is commonly achieved with the help
 //! of prefixes; see `with_prefix` constructor in the built-in index types.
 //!
-//! Merklized indices can generate cryptographic proofs about inclusion
+//! Merkelized indices can generate cryptographic proofs about inclusion
 //! of entries. Having such a proof, an external client may verify locally that the received data
 //! was authorized by the blockchain validators without having to replicate
 //! the entire blockchain contents.
@@ -72,9 +72,9 @@
 //! - [`SparseListIndex`] is a list of items stored in the sequential order. Similar to `ListIndex`,
 //!   but may contain indices without elements.
 //! - [`MapIndex`] is a map of keys and values. Similar to [`BTreeMap`].
-//! - [`ProofListIndex`] is a Merklized version of `ListIndex` that supports cryptographic
+//! - [`ProofListIndex`] is a Merkelized version of `ListIndex` that supports cryptographic
 //!   proofs of existence and is implemented as a Merkle tree.
-//! - [`ProofMapIndex`] is a Merklized version of `MapIndex` that supports cryptographic
+//! - [`ProofMapIndex`] is a Merkelized version of `MapIndex` that supports cryptographic
 //!   proofs of existence and is implemented as a binary Merkle Patricia tree.
 //! - [`KeySetIndex`] and [`ValueSetIndex`] is a set of items, similar to [`BTreeSet`] and
 //!   [`HashSet`].

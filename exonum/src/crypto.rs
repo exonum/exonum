@@ -34,12 +34,13 @@ use serde::de::{self, Deserialize, Deserializer, Visitor};
 use byteorder::{ByteOrder, LittleEndian};
 
 use encoding::serialize::FromHex;
-
+// spell-checker:disable
 pub use sodiumoxide::crypto::sign::ed25519::{PUBLICKEYBYTES as PUBLIC_KEY_LENGTH,
                                              SECRETKEYBYTES as SECRET_KEY_LENGTH,
                                              SEEDBYTES as SEED_LENGTH,
                                              SIGNATUREBYTES as SIGNATURE_LENGTH};
 pub use sodiumoxide::crypto::hash::sha256::DIGESTBYTES as HASH_SIZE;
+// spell-checker:enable
 
 /// The size to crop the string in debug messages.
 const BYTES_IN_DEBUG: usize = 4;
@@ -75,8 +76,8 @@ pub fn sign(data: &[u8], secret_key: &SecretKey) -> Signature {
 /// # drop(secret_key);
 /// ```
 pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
-    let (sod_pub_key, sod_secr_key) = keypair_from_seed(&seed.0);
-    (PublicKey(sod_pub_key), SecretKey(sod_secr_key))
+    let (sod_pub_key, sod_secret_key) = keypair_from_seed(&seed.0);
+    (PublicKey(sod_pub_key), SecretKey(sod_secret_key))
 }
 
 /// Generates a secret key and a corresponding public key using a cryptographically secure
@@ -93,8 +94,8 @@ pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
 /// # drop(secret_key);
 /// ```
 pub fn gen_keypair() -> (PublicKey, SecretKey) {
-    let (pubkey, secrkey) = gen_keypair_sodium();
-    (PublicKey(pubkey), SecretKey(secrkey))
+    let (pubkey, secret_key) = gen_keypair_sodium();
+    (PublicKey(pubkey), SecretKey(secret_key))
 }
 
 /// Verifies that `data` is signed with a secret key corresponding to the given public key.
@@ -499,29 +500,29 @@ implement_serde! {Seed}
 implement_serde! {Signature}
 
 macro_rules! implement_index_traits {
-    ($newtype:ident) => (
-        impl Index<Range<usize>> for $newtype {
+    ($new_type:ident) => (
+        impl Index<Range<usize>> for $new_type {
             type Output = [u8];
             fn index(&self, _index: Range<usize>) -> &[u8] {
                 let inner  = &self.0;
                 inner.0.index(_index)
             }
         }
-        impl Index<RangeTo<usize>> for $newtype {
+        impl Index<RangeTo<usize>> for $new_type {
             type Output = [u8];
             fn index(&self, _index: RangeTo<usize>) -> &[u8] {
                 let inner  = &self.0;
                 inner.0.index(_index)
             }
         }
-        impl Index<RangeFrom<usize>> for $newtype {
+        impl Index<RangeFrom<usize>> for $new_type {
             type Output = [u8];
             fn index(&self, _index: RangeFrom<usize>) -> &[u8] {
                 let inner  = &self.0;
                 inner.0.index(_index)
             }
         }
-        impl Index<RangeFull> for $newtype {
+        impl Index<RangeFull> for $new_type {
             type Output = [u8];
             fn index(&self, _index: RangeFull) -> &[u8] {
                 let inner  = &self.0;
@@ -659,7 +660,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ser_deser() {
+    fn test_serialize_deserialize() {
         let h = Hash::new([207; 32]);
         let json_h = serde_json::to_string(&h).unwrap();
         let h1 = serde_json::from_str(&json_h).unwrap();

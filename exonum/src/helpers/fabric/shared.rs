@@ -56,7 +56,7 @@ impl NodePublicConfig {
     }
 }
 
-/// Basepoint config.
+/// Base config.
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Default)]
 pub struct CommonConfigTemplate {
     /// Consensus configuration.
@@ -65,7 +65,7 @@ pub struct CommonConfigTemplate {
     pub services_config: AbstractConfig,
 }
 
-/// `NodePrivConfig` collect all public and secret keys.
+/// `NodePrivateConfig` collects all public and secret keys.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NodePrivateConfig {
     /// Listen address.
