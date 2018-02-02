@@ -17,11 +17,10 @@ All notable changes to this project will be documented in this file. The project
   signed integers as keys. To emulate the old implementation, you may create a wrapper
   around a type (e.g., `struct QuirkyI32Key(i32)`) and implement `StorageKey` for it
   using big endian encoding. Then, use the wrapper instead of the int type in indices.
-  See the unit tests for `StorageKey` for an example.
+  See the unit tests for `StorageKey` for an example. (#443)
   
 ### New features
-- `StorageKey` and `StorageValue` are implemented for `SystemTime`. (#456)
-  See the unit tests for `StorageKey` for an example. (#443)
+- `StorageKey` and `StorageValue` traits are implemented for `SystemTime`. (#456)
 
 ## 0.5.1 - 2018-02-01
 
