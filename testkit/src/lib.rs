@@ -1070,7 +1070,9 @@ impl TestKit {
             Iron::new(public_handler).http(public_api_address).unwrap();
         });
         let private_api_thread = thread::spawn(move || {
-            Iron::new(Chain::new(private_mount)).http(private_api_address).unwrap();
+            Iron::new(Chain::new(private_mount))
+                .http(private_api_address)
+                .unwrap();
         });
 
         // Run the event stream in a separate thread in order to put transactions to mempool
