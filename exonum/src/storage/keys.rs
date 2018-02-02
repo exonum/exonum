@@ -235,7 +235,9 @@ impl StorageKey for SystemTime {
     }
 
     fn write(&self, buffer: &mut [u8]) {
-        let duration = self.duration_since(UNIX_EPOCH).unwrap();
+        let duration = self.duration_since(UNIX_EPOCH).expect(
+            "time value is later than 1970-01-01 00:00:00 UTC.",
+        );
         let secs = duration.as_secs();
         let nanos = duration.subsec_nanos();
         secs.write(&mut buffer[0..8]);
@@ -245,6 +247,9 @@ impl StorageKey for SystemTime {
     fn read(buffer: &[u8]) -> Self {
         let secs = u64::read(&buffer[0..8]);
         let nanos = u32::read(&buffer[8..12]);
+        // `Duration` performs internal normalization of time.
+        // The value of nanoseconds can not be greater than or equal to 1,000,000,000.
+        assert!(nanos < 1_000_000_000);
         UNIX_EPOCH + Duration::new(secs, nanos)
     }
 }
@@ -420,6 +425,12 @@ mod tests {
             UNIX_EPOCH + Duration::new(13, 23),
             SystemTime::now(),
             SystemTime::now() + Duration::new(17, 15),
+            UNIX_EPOCH + Duration::new(0, u32::max_value()),
+            UNIX_EPOCH + Duration::new(i64::max_value() as u64, 0),
+            UNIX_EPOCH + Duration::new(i64::max_value() as u64, 999_999_999),
+            UNIX_EPOCH + Duration::new(i64::max_value() as u64 - 1, 1_000_000_000),
+            UNIX_EPOCH + Duration::new(i64::max_value() as u64 - 4, 4_000_000_000),
+            UNIX_EPOCH + Duration::new(i64::max_value() as u64 - 4, u32::max_value()),
         ];
 
         let mut buffer = [0u8; 12];
@@ -431,15 +442,29 @@ mod tests {
 
     #[test]
     fn test_storage_key_for_system_time_ordering() {
-        use std::time::{Duration, SystemTime};
+        use rand::{Rng, thread_rng};
+        use std::time::Duration;
+
+        let mut rng = thread_rng();
 
         let (mut buffer1, mut buffer2) = ([0u8; 12], [0u8; 12]);
         for _ in 0..FUZZ_SAMPLES {
-            let time1 = SystemTime::now();
-            let time2 = time1 + Duration::new(0, 1);
+            let time1 = UNIX_EPOCH +
+                Duration::new(
+                    rng.gen::<u64>() % (i32::max_value() as u64),
+                    rng.gen::<u32>() % 1_000_000_000,
+                );
+            let time2 = UNIX_EPOCH +
+                Duration::new(
+                    rng.gen::<u64>() % (i32::max_value() as u64),
+                    rng.gen::<u32>() % 1_000_000_000,
+                );
             time1.write(&mut buffer1);
             time2.write(&mut buffer2);
-            assert!(buffer1 < buffer2);
+            assert_eq!(
+                time1.cmp(&time2),
+                buffer1.cmp(&buffer2),
+            );
         }
     }
 

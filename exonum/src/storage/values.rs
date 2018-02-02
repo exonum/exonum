@@ -245,11 +245,13 @@ impl StorageValue for String {
 /// Uses little-endian encoding.
 impl CryptoHash for SystemTime {
     fn hash(&self) -> Hash {
-        let duration = self.duration_since(UNIX_EPOCH).unwrap();
+        let duration = self.duration_since(UNIX_EPOCH).expect(
+            "time value is later than 1970-01-01 00:00:00 UTC.",
+        );
         let secs = duration.as_secs();
         let nanos = duration.subsec_nanos();
 
-        let mut buffer = vec![0; 12];
+        let mut buffer = [0u8; 12];
         LittleEndian::write_u64(&mut buffer[0..8], secs);
         LittleEndian::write_u32(&mut buffer[8..12], nanos);
         crypto::hash(&buffer)
@@ -259,7 +261,9 @@ impl CryptoHash for SystemTime {
 /// Uses little-endian encoding.
 impl StorageValue for SystemTime {
     fn into_bytes(self) -> Vec<u8> {
-        let duration = self.duration_since(UNIX_EPOCH).unwrap();
+        let duration = self.duration_since(UNIX_EPOCH).expect(
+            "time value is later than 1970-01-01 00:00:00 UTC.",
+        );
         let secs = duration.as_secs();
         let nanos = duration.subsec_nanos();
 
@@ -272,6 +276,9 @@ impl StorageValue for SystemTime {
     fn from_bytes(value: Cow<[u8]>) -> Self {
         let secs = LittleEndian::read_u64(&value[0..8]);
         let nanos = LittleEndian::read_u32(&value[8..12]);
+        // `Duration` performs internal normalization of time.
+        // The value of nanoseconds can not be greater than or equal to 1,000,000,000.
+        assert!(nanos < 1_000_000_000);
         UNIX_EPOCH + Duration::new(secs, nanos)
     }
 }
@@ -281,7 +288,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_storage_key_for_system_time_round_trip() {
+    fn test_storage_value_for_system_time_round_trip() {
         use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
         let times = [
@@ -289,6 +296,12 @@ mod tests {
             UNIX_EPOCH + Duration::new(13, 23),
             SystemTime::now(),
             SystemTime::now() + Duration::new(17, 15),
+            UNIX_EPOCH + Duration::new(0, u32::max_value()),
+            UNIX_EPOCH + Duration::new(i64::max_value() as u64, 0),
+            UNIX_EPOCH + Duration::new(i64::max_value() as u64, 999_999_999),
+            UNIX_EPOCH + Duration::new(i64::max_value() as u64 - 1, 1_000_000_000),
+            UNIX_EPOCH + Duration::new(i64::max_value() as u64 - 4, 4_000_000_000),
+            UNIX_EPOCH + Duration::new(i64::max_value() as u64 - 4, u32::max_value()),
         ];
 
         for time in times.iter() {
