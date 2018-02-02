@@ -20,7 +20,6 @@ extern crate iron;
 extern crate router;
 extern crate serde;
 #[macro_use]
-extern crate serde_derive;
 extern crate serde_json;
 
 use exonum_testkit::TestKitBuilder;
