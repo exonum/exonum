@@ -40,6 +40,7 @@ cache:
   - $HOME/.local
   - $TRAVIS_BUILD_DIR/target
   - $TRAVIS_BUILD_DIR/sandbox/target
+  - $TRAVIS_BUILD_DIR/testkit/examples/server/node_modules
 
 dist: trusty
 sudo: required
@@ -87,12 +88,13 @@ install:
     cargo-audit -V || cargo install cargo-audit --force
     rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
     nvm install 8 && nvm use 8
-    npm install -g cspell
-    cspell --version
+    npm install cspell
+    ./node_modules/.bin/cspell --version
   fi
 - |
-  if [[ "$FEATURE" == "test-testkit" ]];
+  if [[ "$FEATURE" == "test-testkit" ]]; then
     nvm install 8 && nvm use 8
+    cd testkit/examples/server && npm install && cd ../../..
   fi
 - |
   case "$FEATURE" in
@@ -110,9 +112,9 @@ script: |
       cd exonum && cargo fmt -- --write-mode=diff && cd .. &&
       cd sandbox && cargo fmt -- --write-mode=diff && cd .. &&
       cd testkit && cargo fmt -- --write-mode=diff && cd .. &&
-      cspell sandbox/{src,examples,tests}/**/*.rs &&
-      cspell exonum/{src,benches,tests}/**/*.rs &&
-      cspell testkit/{src,examples,tests}/**/*.rs
+      ./node_modules/.bin/cspell sandbox/{src,examples,tests}/**/*.rs &&
+      ./node_modules/.bin/cspell exonum/{src,benches,tests}/**/*.rs &&
+      ./node_modules/.bin/cspell testkit/{src,examples,tests}/**/*.rs
   ;;
   "clippy-core" )
       cd exonum && cargo clippy --verbose --features long_benchmarks -- -D warnings
@@ -130,10 +132,10 @@ script: |
       cargo test -p sandbox --verbose
   ;;
   "test-testkit" )
-      cargo test -p exonum-testkit --verbose
+      cargo test -p exonum-testkit --verbose &&
       cargo run -p exonum-testkit --example timestamping &&
       cargo run -p exonum-testkit --example configuration_change &&
-      cargo build -p exonum-testkit --example server
+      cargo build -p exonum-testkit --example server &&
       cd testkit/examples/server && npm run lint && npm run test:unix
   ;;
   "test-doc" )
