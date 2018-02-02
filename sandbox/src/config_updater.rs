@@ -24,9 +24,9 @@ pub const CONFIG_SERVICE: u16 = 1;
 pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 0;
 
 transactions! {
-    const SERVICE_ID = CONFIG_SERVICE;
-
     ConfigUpdateerTransactions {
+        const SERVICE_ID = CONFIG_SERVICE;
+
         struct TxConfig {
             from: &PublicKey,
             config: &[u8],

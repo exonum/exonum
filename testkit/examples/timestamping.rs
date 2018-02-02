@@ -30,9 +30,9 @@ use exonum_testkit::{ApiKind, TestKitBuilder};
 const SERVICE_ID: u16 = 512;
 
 transactions! {
-    const SERVICE_ID = SERVICE_ID;
-
     TimestampingServiceTransactions {
+        const SERVICE_ID = SERVICE_ID;
+
         struct TxTimestamp {
             from: &PublicKey,
             msg: &str,

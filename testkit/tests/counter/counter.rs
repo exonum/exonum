@@ -76,9 +76,9 @@ impl<'a> CounterSchema<&'a mut Fork> {
 // // // // Transactions // // // //
 
 transactions! {
-    const SERVICE_ID = SERVICE_ID;
-
     CounterTransactions {
+        const SERVICE_ID = SERVICE_ID;
+
         struct TxIncrement {
             author: &PublicKey,
             by: u64,

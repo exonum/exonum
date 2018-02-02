@@ -33,7 +33,7 @@ use exonum::blockchain::{Block, BlockProof, Blockchain, ConsensusConfig, Genesis
                          Transaction, ValidatorKeys};
 use exonum::storage::{MapProof, MemoryDB};
 use exonum::messages::{Any, Connect, Message, RawMessage, RawTransaction, Status};
-use exonum::crypto::{gen_keypair_from_seed, CryptoHash, Hash, PublicKey, SecretKey, Seed};
+use exonum::crypto::{gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed};
 #[cfg(test)]
 use exonum::crypto::gen_keypair;
 use exonum::helpers::{Height, Milliseconds, Round, ValidatorId};
@@ -799,9 +799,9 @@ mod tests {
     const SERVICE_ID: u16 = 1;
 
     transactions! {
-        const SERVICE_ID = SERVICE_ID;
+        HandleCommitTransactions {
+            const SERVICE_ID = SERVICE_ID;
 
-        HandleCommitServiceTransactions {
             struct TxAfterCommit {
                 height: Height,
             }
@@ -841,7 +841,7 @@ mod tests {
         }
 
         fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
-            let tx = HandleCommitServiceTransactions::tx_from_raw(raw)?;
+            let tx = HandleCommitTransactions::tx_from_raw(raw)?;
             Ok(tx.into())
         }
 

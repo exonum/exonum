@@ -35,9 +35,9 @@
 //! const SERVICE_ID: u16 = 1;
 //!
 //! transactions! {
-//!     const SERVICE_ID = SERVICE_ID;
-//!
 //!     TimestampingTransactions {
+//!         const SERVICE_ID = SERVICE_ID;
+//!
 //!         struct TxTimestamp {
 //!             from: &PublicKey,
 //!             msg: &str,
@@ -604,9 +604,9 @@ impl TestKit {
     /// # }
     /// #
     /// # transactions! {
-    /// #     const SERVICE_ID = 0;
-    /// #
     /// #     Transactions {
+    /// #         const SERVICE_ID = 0;
+    /// #
     /// #         struct MyTransaction {
     /// #             from: &exonum::crypto::PublicKey,
     /// #             msg: &str,

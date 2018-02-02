@@ -262,7 +262,7 @@ impl MessageWriter {
     }
 }
 
-// this is a trait that is required for technical reasons:
+// This is a trait that is required for technical reasons:
 // you can't make associated constants object-safe. This
 // limitation of the Rust language might be lifted in the
 // future.

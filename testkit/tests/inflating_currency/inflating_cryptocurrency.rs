@@ -101,9 +101,9 @@ impl<'a> CurrencySchema<&'a mut Fork> {
 // // // // // // // // // // TRANSACTIONS // // // // // // // // // //
 
 transactions! {
-    const SERVICE_ID = SERVICE_ID;
-
     CurrencyTransactions {
+        const SERVICE_ID = SERVICE_ID;
+
         /// Create a new wallet.
         struct TxCreateWallet {
             pub_key: &PublicKey,

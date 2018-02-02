@@ -281,9 +281,9 @@ mod transactions_tests {
     use serde_json;
 
     transactions! {
-        const SERVICE_ID = 92;
-
         MyTransactions {
+            const SERVICE_ID = 92;
+
             struct A {
                 a: u32
             }

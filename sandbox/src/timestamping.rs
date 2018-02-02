@@ -24,9 +24,9 @@ pub const TIMESTAMPING_SERVICE: u16 = 129;
 pub const TIMESTAMPING_TRANSACTION_MESSAGE_ID: u16 = 128;
 
 transactions! {
-    const SERVICE_ID = TIMESTAMPING_SERVICE;
-
     TimestampingTransactions {
+        const SERVICE_ID = TIMESTAMPING_SERVICE;
+
         struct TimestampTx {
             pub_key: &PublicKey,
             data: &[u8],

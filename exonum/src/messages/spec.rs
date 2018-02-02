@@ -12,64 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// `message!` specifies a datatype for digitally signed messages that can be sent
-/// in Exonum network. The macro offers a practical way to create [`Transaction`] types,
-/// although it does not implement `Transaction` by itself.
-///
-/// The `message!` macro specifies fields of data pretty much in the same way they
-/// are specified for Rust structures. (For additional reference about data layout see the
-/// documentation of the [`encoding` module](./encoding/index.html).)
-/// Additionally, the macro is required to set:
-///
-/// - Identifier of a service, which will be used [in parsing messages][parsing], as `const TYPE`.
-///   Service ID should be unique within the Exonum blockchain.
-/// - Message identifier, as `const ID`. Message ID should be unique within each service.
-///
-/// The macro creates getter methods for all fields with the same names as fields.
-/// In addition, two constructors are defined:
-///
-/// - `new` takes all fields in the order of their declaration in the macro, and a [`SecretKey`]
-///   to sign the message as the last argument.
-/// - `new_with_signature` takes all fields in the order of their declaration in the macro,
-///   and a message [`Signature`].
-///
-/// `message!` also implements [`Message`], [`SegmentField`], [`ExonumJson`]
-/// and [`StorageValue`] traits for the declared datatype.
-///
-/// **NB.** `message!` uses other macros in the `exonum` crate internally.
-/// Be sure to add them to the global scope.
-///
-/// [`Transaction`]: ./blockchain/trait.Transaction.html
-/// [parsing]: ./blockchain/trait.Service.html#tymethod.tx_from_raw
-/// [`SecretKey`]: ./crypto/struct.SecretKey.html
-/// [`Signature`]: ./crypto/struct.Signature.html
-/// [`SegmentField`]: ./encoding/trait.SegmentField.html
-/// [`ExonumJson`]: ./encoding/serialize/json/trait.ExonumJson.html
-/// [`StorageValue`]: ./storage/trait.StorageValue.html
-/// [`Message`]: ./messages/trait.Message.html
-///
-/// # Examples
-///
-/// ```
-/// #[macro_use] extern crate exonum;
-///
-/// const MY_SERVICE_ID: u16 = 777;
-///
-/// messages! {
-///     const SERVICE_ID = MY_SERVICE_ID;
-///
-///     struct SendTwoIntegers {
-///         first: u64,
-///         second: u64,
-///     }
-/// }
-///
-/// # fn main() {
-/// let (_, creator_key) = exonum::crypto::gen_keypair();
-/// let tx = SendTwoIntegers::new(1, 2, &creator_key);
-/// println!("Transaction: {:?}", tx);
-/// # }
-/// ```
+/// A low-level versions of `transactions!` macro, which generates structs for messages,
+/// but does not require the messages to implement `Transaction`.
 #[macro_export]
 macro_rules! messages {
     {
@@ -90,7 +34,7 @@ macro_rules! messages {
     =>
 
     {
-        __ex_proto_messages!(
+        __ex_message!(
             $service_id,
             0,
             $(
@@ -107,7 +51,7 @@ macro_rules! messages {
 }
 
 #[macro_export]
-macro_rules! __ex_proto_messages {
+macro_rules! __ex_message {
     {
         $service_id:expr,
         $message_id:expr,
@@ -475,7 +419,7 @@ macro_rules! __ex_proto_messages {
         }
 
 
-        __ex_proto_messages!(
+        __ex_message!(
             $service_id,
             $message_id + 1,
             $($tt)*

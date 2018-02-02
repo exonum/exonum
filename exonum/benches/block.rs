@@ -51,9 +51,9 @@ mod tests {
         let mut blockchain = create_blockchain(db);
 
         transactions! {
-            const SERVICE_ID = 1;
-
             Transactions {
+                const SERVICE_ID = 1;
+
                 struct Tx {
                     from: &PublicKey,
                     data: &Hash,
@@ -110,9 +110,9 @@ mod tests {
         let mut blockchain = create_blockchain(db);
 
         transactions! {
-            const SERVICE_ID = 1;
-
             Transactions {
+                const SERVICE_ID = 1;
+
                 struct Tx {
                     from: &PublicKey,
                     to: &PublicKey,

@@ -43,19 +43,86 @@ pub trait TransactionSet: Into<Box<Transaction>> + DeserializeOwned + Serialize 
 }
 
 
-/// `transactions!` is used to declare a set of trasactions of a particular service.
+/// `transactions!` is used to declare a set of transactions of a particular service.
 ///
 /// The macro generates a type for each transaction and a helper enum which can hold
 /// any of the transactions. You must implement `Transaction` trait for each of the
 /// transactions yourself.
 ///
-/// See `Service` trait documentation for an example of usage.
+/// See `Service` trait documentation for a full example of usage.
+///
+/// Each transaction is specified as a Rust struct. For additional reference about
+/// data layout see the documentation of the [`encoding` module](./encoding/index.html).
+///
+/// Additionally, the macro must define identifier of a service, which will be used
+/// [in parsing messages][parsing], as `const SERVICE_ID`. Service ID should be unique
+/// within the Exonum blockchain.
+///
+/// For each transaction the macro creates getter methods for all fields with the same names as
+/// fields. In addition, two constructors are defined:
+///
+/// - `new` takes all fields in the order of their declaration in the macro, and a [`SecretKey`]
+///   to sign the message as the last argument.
+/// - `new_with_signature` takes all fields in the order of their declaration in the macro,
+///   and a message [`Signature`].
+///
+/// Each transaction also implements [`Message`], [`ServiceMessage`], [`SegmentField`],
+/// [`ExonumJson`] and [`StorageValue`] traits for the declared datatype.
+///
+///
+/// **NB.** `transactions!` uses other macros in the `exonum` crate internally.
+/// Be sure to add them to the global scope.
+///
+/// [`Transaction`]: ./blockchain/trait.Transaction.html
+/// [parsing]: ./blockchain/trait.Service.html#tymethod.tx_from_raw
+/// [`SecretKey`]: ./crypto/struct.SecretKey.html
+/// [`Signature`]: ./crypto/struct.Signature.html
+/// [`SegmentField`]: ./encoding/trait.SegmentField.html
+/// [`ExonumJson`]: ./encoding/serialize/json/trait.ExonumJson.html
+/// [`StorageValue`]: ./storage/trait.StorageValue.html
+/// [`Message`]: ./messages/trait.Message.html
+/// [`ServiceMessage`]: ./messages/trait.ServiceMessage.html
+/// # Examples
+///
+/// ```
+/// #[macro_use] extern crate exonum;
+/// use exonum::crypto::PublicKey;
+/// # use exonum::storage::Fork;
+/// # use exonum::blockchain::Transaction;
+///
+/// transactions! {
+///     WalletTransactions {
+///         const SERVICE_ID = 1;
+///
+///         struct Create {
+///             key: &PublicKey
+///         }
+///
+///         struct Transfer {
+///             from: &PublicKey,
+///             to: &PublicKey,
+///             amount: u64,
+///         }
+///     }
+/// }
+/// # impl Transaction for Create {
+/// #   fn verify(&self) -> bool { true }
+/// #   fn execute(&self, fork: &mut Fork) { }
+/// # }
+/// #
+/// # impl Transaction for Transfer {
+/// #   fn verify(&self) -> bool { true }
+/// #   fn execute(&self, fork: &mut Fork) { }
+/// # }
+/// #
+/// # fn main() { }
+/// ```
 #[macro_export]
 macro_rules! transactions {
     {
-        const SERVICE_ID = $service_id:expr;
-
         $transaction_set:ident {
+            const SERVICE_ID = $service_id:expr;
+
             $(
                 $(#[$tx_attr:meta])*
                 struct $name:ident {
@@ -174,7 +241,6 @@ macro_rules! transactions {
 ///
 /// ```
 /// #[macro_use] extern crate exonum;
-/// #[macro_use] extern crate serde_derive;
 /// // Exports from `exonum` crate skipped
 /// # use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
 /// # use exonum::crypto::Hash;
@@ -208,9 +274,9 @@ macro_rules! transactions {
 ///
 /// // Transaction definitions
 /// transactions! {
-///     const SERVICE_ID = SERVICE_ID;
-///
 ///     MyTransactions {
+///         const SERVICE_ID = SERVICE_ID;
+///
 ///         struct TxA {
 ///             // Transaction fields
 ///         }
