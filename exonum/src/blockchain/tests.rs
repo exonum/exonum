@@ -328,8 +328,8 @@ mod transactions_tests {
         fn round_trip<T: Transaction + Serialize>(t: &T) {
             let initial = serde_json::to_value(&t).unwrap();
             let parsed: MyTransactions = serde_json::from_value(initial.clone()).unwrap();
-            let roundtripped = serde_json::to_value(&parsed).unwrap();
-            assert_eq!(initial, roundtripped);
+            let round_tripped = serde_json::to_value(&parsed).unwrap();
+            assert_eq!(initial, round_tripped);
         }
 
         let (_pub_key, sec_key) = gen_keypair();
@@ -347,8 +347,8 @@ mod transactions_tests {
             let initial = serde_json::to_value(&t).unwrap();
             let raw = t.raw();
             let parsed: MyTransactions = TransactionSet::tx_from_raw(raw.clone()).unwrap();
-            let roundtripped = serde_json::to_value(&parsed).unwrap();
-            assert_eq!(initial, roundtripped);
+            let round_tripped = serde_json::to_value(&parsed).unwrap();
+            assert_eq!(initial, round_tripped);
         }
 
         let (_pub_key, sec_key) = gen_keypair();

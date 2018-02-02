@@ -37,7 +37,8 @@ use super::transaction::Transaction;
 /// `TransactionSet` trait describes a type which is an `enum` of several transactions.
 /// The implementation of this trait is generated automatically by the `transactions!`
 /// macro.
-pub trait TransactionSet: Into<Box<Transaction>> + DeserializeOwned + Serialize + Clone {
+pub trait TransactionSet
+    : Into<Box<Transaction>> + DeserializeOwned + Serialize + Clone {
     /// Parse a transaction from this set from a `RawMessage`.
     fn tx_from_raw(raw: RawTransaction) -> Result<Self, MessageError>;
 }
@@ -203,12 +204,12 @@ macro_rules! transactions {
                 match message_id {
                     $(
                     <$name as $crate::messages::ServiceMessage>::MESSAGE_ID =>
-                        <$name as $crate::encoding::serialize::json::ExonumJsonDeserialize>::deserialize(
-                            &value
-                        ).map_err(|e| D::Error::custom(
-                            format!("Can't deserialize a value: {}", e.description())
-                        ))
-                        .map($transaction_set::$name),
+                        <$name as $crate::encoding::serialize::json::ExonumJsonDeserialize>
+                            ::deserialize(&value)
+                            .map_err(|e| D::Error::custom(
+                                format!("Can't deserialize a value: {}", e.description())
+                            ))
+                            .map($transaction_set::$name),
                     )*
                     _ => Err(D::Error::custom(format!("invalid message_id: {}", message_id))),
                 }

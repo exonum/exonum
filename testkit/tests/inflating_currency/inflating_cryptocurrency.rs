@@ -37,8 +37,6 @@ use self::router::Router;
 // // // // // // // // // // CONSTANTS // // // // // // // // // //
 
 const SERVICE_ID: u16 = 1;
-const TX_CREATE_WALLET_ID: u16 = 1;
-const TX_TRANSFER_ID: u16 = 2;
 
 /// Initial balance of newly created wallet.
 pub const INIT_BALANCE: u64 = 0;

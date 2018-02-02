@@ -32,7 +32,6 @@ use self::router::Router;
 use serde_json;
 
 const SERVICE_ID: u16 = 1;
-const TX_INCREMENT_ID: u16 = 1;
 
 // "correct horse battery staple" brainwallet pubkey in Ed25519 with SHA-256 digest
 pub const ADMIN_KEY: &str = "506f27b1b4c2403f2602d663a059b0262afd6a5bcda95a08dd96a4614a89f1b0";

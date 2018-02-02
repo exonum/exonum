@@ -24,7 +24,7 @@ pub const CONFIG_SERVICE: u16 = 1;
 pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 0;
 
 transactions! {
-    ConfigUpdateerTransactions {
+    ConfigUpdaterTransactions {
         const SERVICE_ID = CONFIG_SERVICE;
 
         struct TxConfig {
@@ -70,7 +70,7 @@ impl Service for ConfigUpdateService {
     }
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
-        let tx = ConfigUpdateerTransactions::tx_from_raw(raw)?;
+        let tx = ConfigUpdaterTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }
 }
