@@ -814,7 +814,7 @@ impl TestKit {
         }
     }
 
-    /// Returns a reference to the scheduled configutation proposal, or `None` if
+    /// Returns a reference to the scheduled configuration proposal, or `None` if
     /// there is no such proposal.
     pub fn next_configuration(&self) -> Option<&TestNetworkConfiguration> {
         use ConfigurationProposalState::*;

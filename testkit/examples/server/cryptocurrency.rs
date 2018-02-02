@@ -14,7 +14,7 @@
 
 //! Demo [Exonum][exonum] service implementing a simple cryptocurrency.
 //! See [the documentation][docs] for a detailed step-by-step guide how to approach this demo,
-//! and [the reporitory README][readme] on how to use, test, and contribute to it.
+//! and [the repository README][readme] on how to use, test, and contribute to it.
 //!
 //! **Note.** The service in this crate is intended for demo purposes only. It is not intended
 //! for use in production.

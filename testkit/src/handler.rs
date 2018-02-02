@@ -372,7 +372,7 @@ mod tests {
         );
         assert_eq!(block_info.block.height(), Height(4));
 
-        // Test idempotency of the rollback endpoint
+        // Test idempotence of the rollback endpoint
         for _ in 0..2 {
             let block_info = extract_block_info(
                 request::delete(

@@ -30,6 +30,7 @@ deserializing
 Exonum
 fsync
 healthcheck
+idempotence
 keepalive
 keypair
 keypairs
