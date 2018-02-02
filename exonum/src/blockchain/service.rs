@@ -314,6 +314,7 @@ pub struct ApiNodeState {
     reconnects_timeout: HashMap<SocketAddr, Milliseconds>,
     //TODO: update on event?
     peers_info: HashMap<SocketAddr, PublicKey>,
+    is_enabled: bool,
 }
 
 impl ApiNodeState {
@@ -388,6 +389,18 @@ impl SharedNodeState {
                 .peers_info
                 .insert(c.addr(), *p);
         }
+    }
+
+    /// Is the node enabled?
+    pub fn is_enabled(&self) -> bool {
+        let state = self.state.read().expect("Expected read lock.");
+        state.is_enabled
+    }
+
+    /// Informs internal state about node's halting.
+    pub fn update_is_enabled(&self, is_enabled: bool) {
+        let mut state = self.state.write().expect("Expected read lock.");
+        state.is_enabled = is_enabled;
     }
 
     /// Returns value of the `state_update_timeout`.

@@ -257,6 +257,14 @@ pub fn add_round_with_transactions(
     sandbox_state: &SandboxState,
     transactions: &[Hash],
 ) -> Option<Propose> {
+    add_round_with_transactions_nopanic(sandbox, sandbox_state, transactions).unwrap()
+}
+
+pub fn add_round_with_transactions_nopanic(
+    sandbox: &TimestampingSandbox,
+    sandbox_state: &SandboxState,
+    transactions: &[Hash],
+) -> Result<Option<Propose>, String> {
     let mut res = None;
     let round_timeout = sandbox.round_timeout(); //use local var to save long code call
 
@@ -287,9 +295,10 @@ pub fn add_round_with_transactions(
 
 
     if sandbox.is_leader() {
-        res = check_and_broadcast_propose_and_prevote(sandbox, sandbox_state, transactions);
+        res =
+            check_and_broadcast_propose_and_prevote_nopanic(sandbox, sandbox_state, transactions)?;
     }
-    res
+    Ok(res)
 }
 
 pub fn gen_timestamping_tx() -> TimestampTx {
@@ -308,6 +317,31 @@ pub fn add_one_height_with_transactions<'a, I>(
     sandbox_state: &SandboxState,
     txs: I,
 ) -> Vec<Hash>
+where
+    I: IntoIterator<Item = &'a RawTransaction>,
+{
+    add_one_height_with_transactions_nopanic(sandbox, sandbox_state, txs).unwrap()
+}
+
+pub fn add_one_height_nopanic(
+    sandbox: &TimestampingSandbox,
+    sandbox_state: &SandboxState,
+) -> Result<(), String> {
+    // gen some tx
+    let tx = gen_timestamping_tx();
+    let result =
+        add_one_height_with_transactions_nopanic(sandbox, sandbox_state, &[tx.raw().clone()]);
+    match result {
+        Ok(_) => Ok(()),
+        Err(msg) => Err(msg),
+    }
+}
+
+pub fn add_one_height_with_transactions_nopanic<'a, I>(
+    sandbox: &TimestampingSandbox,
+    sandbox_state: &SandboxState,
+    txs: I,
+) -> Result<Vec<Hash>, String>
 where
     I: IntoIterator<Item = &'a RawTransaction>,
 {
@@ -338,7 +372,7 @@ where
 
     let n_validators = sandbox.n_validators();
     for _ in 0..n_validators {
-        propose = add_round_with_transactions(sandbox, sandbox_state, hashes.as_ref());
+        propose = add_round_with_transactions_nopanic(sandbox, sandbox_state, hashes.as_ref())?;
         let round = sandbox.current_round();
         if sandbox.is_leader() {
             // ok, we are leader
@@ -413,11 +447,13 @@ where
             }
             sandbox.check_broadcast_status(new_height, &block.hash());
 
-            return hashes;
+            return Ok(hashes);
         }
     }
 
-    unreachable!("because at one of loops we should become a leader and return");
+    Err(
+        "because at one of loops we should become a leader and return".into(),
+    )
 }
 
 pub fn add_one_height_with_transactions_from_other_validator(
@@ -545,8 +581,16 @@ fn check_and_broadcast_propose_and_prevote(
     sandbox_state: &SandboxState,
     transactions: &[Hash],
 ) -> Option<Propose> {
+    check_and_broadcast_propose_and_prevote_nopanic(sandbox, sandbox_state, transactions).unwrap()
+}
+
+fn check_and_broadcast_propose_and_prevote_nopanic(
+    sandbox: &TimestampingSandbox,
+    sandbox_state: &SandboxState,
+    transactions: &[Hash],
+) -> Result<Option<Propose>, String> {
     if *sandbox_state.time_millis_since_round_start.borrow() > sandbox.propose_timeout() {
-        return None;
+        return Ok(None);
     }
 
     let time_millis_since_round_start_copy = {
@@ -574,7 +618,7 @@ fn check_and_broadcast_propose_and_prevote(
     trace!("broadcasting propose with hash: {:?}", propose.hash());
     trace!("broadcasting propose with round: {:?}", propose.round());
     trace!("sandbox.current_round: {:?}", sandbox.current_round());
-    sandbox.broadcast(&propose);
+    sandbox.broadcast_nopanic(&propose)?;
 
     sandbox.broadcast(&Prevote::new(
         VALIDATOR_0,
@@ -584,7 +628,7 @@ fn check_and_broadcast_propose_and_prevote(
         LOCK_ZERO,
         sandbox.s(VALIDATOR_0),
     ));
-    Some(propose.clone())
+    Ok(Some(propose.clone()))
 }
 
 /// Idea of method is sandbox to receive correct propose from certain validator
