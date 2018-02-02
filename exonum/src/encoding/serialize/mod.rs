@@ -14,7 +14,7 @@
 
 //! Serialize structure into specific format.
 //! Currently support only json.
-//! This module is a pack of superstructures over serde `Serializer's`\\`Deserializer's`
+//! This module is a pack of superstructures over serde `Serializer`\`Deserializer`
 
 use encoding::Field;
 use messages::MessageWriter;

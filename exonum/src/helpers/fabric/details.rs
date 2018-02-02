@@ -15,6 +15,7 @@
 #![allow(missing_debug_implementations)]
 
 //! This module implement all core commands.
+// spell-checker:ignore exts
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -377,7 +378,7 @@ impl Command for GenerateNodeConfig {
         let pub_config_path = context.arg::<String>("PUB_CONFIG").expect(
             "expected public config path",
         );
-        let priv_config_path = context.arg::<String>("SEC_CONFIG").expect(
+        let private_config_path = context.arg::<String>("SEC_CONFIG").expect(
             "expected secret config path",
         );
 
@@ -418,7 +419,7 @@ impl Command for GenerateNodeConfig {
             "Could not write public config file.",
         );
 
-        let priv_config = NodePrivateConfig {
+        let private_config = NodePrivateConfig {
             listen_addr: addr.1,
             consensus_public_key,
             consensus_secret_key,
@@ -429,9 +430,8 @@ impl Command for GenerateNodeConfig {
             ),
         };
 
-        ConfigFile::save(&priv_config, priv_config_path).expect(
-            "Could not write secret config file.",
-        );
+        ConfigFile::save(&private_config, private_config_path)
+            .expect("Could not write secret config file.");
         Feedback::None
     }
 }
@@ -533,13 +533,13 @@ impl Command for Finalize {
         exts: &Fn(Context) -> Context,
     ) -> Feedback {
         let public_configs_path = context.arg_multiple::<String>("PUBLIC_CONFIGS").expect(
-            "keychain path not found",
+            "public config path not found",
         );
         let secret_config_path = context.arg::<String>("SECRET_CONFIG").expect(
-            "config path not found",
+            "private config path not found",
         );
         let output_config_path = context.arg::<String>("OUTPUT_CONFIG_PATH").expect(
-            "config path not found",
+            "output config path not found",
         );
 
         let public_addr = Run::public_api_address(&context);

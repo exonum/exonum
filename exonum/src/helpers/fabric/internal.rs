@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// spell-checker:ignore exts
+
 use std::fmt;
 use std::error::Error;
 use std::collections::HashMap;

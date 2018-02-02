@@ -31,6 +31,7 @@ pub struct ContextKey<T> {
 impl<T> Copy for ContextKey<T> {}
 
 // Bug in clippy, fixed on master branch.
+// spell-checker:ignore expl
 #[cfg_attr(feature = "cargo-clippy", allow(expl_impl_clone_on_copy))]
 impl<T> Clone for ContextKey<T> {
     fn clone(&self) -> Self {

@@ -96,7 +96,7 @@ where
 
     /// Returns table that represents a map from configuration hash into contents.
     pub fn configs(&self) -> ProofMapIndex<&T, Hash, StoredConfiguration> {
-        // configs patricia merkletree <block height> json
+        // configs patricia merkle tree <block height> json
         ProofMapIndex::new("core.configs", &self.view)
     }
 

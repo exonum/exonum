@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! An implementation of a Merklized version of a map (Merkle Patricia tree).
+//! An implementation of a Merkelized version of a map (Merkle Patricia tree).
 
 use std::marker::PhantomData;
 use std::fmt;
@@ -224,16 +224,16 @@ where
 
                 if let Some(child_proof) = proof_from_level_below {
                     let child_proof_pos = suf_searched_path.bit(0);
-                    let neighbour_child_hash = *child_branch.child_hash(!child_proof_pos);
+                    let neighbor_child_hash = *child_branch.child_hash(!child_proof_pos);
                     match child_proof_pos {
                         ChildKind::Left => ProofNode::Branch(BranchProofNode::LeftBranch {
                             left_node: Box::new(child_proof),
-                            right_hash: neighbour_child_hash,
+                            right_hash: neighbor_child_hash,
                             left_key: l_s.suffix(searched_path.start() + c_pr_l),
                             right_key: r_s.suffix(searched_path.start() + c_pr_l),
                         }),
                         ChildKind::Right => ProofNode::Branch(BranchProofNode::RightBranch {
-                            left_hash: neighbour_child_hash,
+                            left_hash: neighbor_child_hash,
                             right_node: Box::new(child_proof),
                             left_key: l_s.suffix(searched_path.start() + c_pr_l),
                             right_key: r_s.suffix(searched_path.start() + c_pr_l),
@@ -376,16 +376,16 @@ where
 
                     if let Some(child_proof) = proof_from_level_below {
                         let child_proof_pos = suf_searched_path.bit(0);
-                        let neighbour_child_hash = *branch.child_hash(!child_proof_pos);
+                        let neighbor_child_hash = *branch.child_hash(!child_proof_pos);
                         match child_proof_pos {
                             ChildKind::Left => MapProof::Branch(BranchProofNode::LeftBranch {
                                 left_node: Box::new(child_proof),
-                                right_hash: neighbour_child_hash,
+                                right_hash: neighbor_child_hash,
                                 left_key: l_s,
                                 right_key: r_s,
                             }),
                             ChildKind::Right => MapProof::Branch(BranchProofNode::RightBranch {
-                                left_hash: neighbour_child_hash,
+                                left_hash: neighbor_child_hash,
                                 right_node: Box::new(child_proof),
                                 left_key: l_s,
                                 right_key: r_s,

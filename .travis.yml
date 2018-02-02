@@ -35,6 +35,7 @@ matrix:
 
 cache:
   directories:
+  - node_modules
   - $HOME/.cargo
   - $HOME/.local
   - $TRAVIS_BUILD_DIR/target
@@ -85,12 +86,13 @@ install:
   if [[ "$FEATURE" == "fmt" ]]; then
     cargo-audit -V || cargo install cargo-audit --force
     rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
+    nvm install 8 && nvm use 8
+    npm install -g cspell
+    cspell --version
   fi
 - |
   if [[ "$FEATURE" == "test-testkit" ]];
     nvm install 8 && nvm use 8
-    node --version
-    npm --version
   fi
 - |
   case "$FEATURE" in
@@ -107,7 +109,10 @@ script: |
       cargo update &&
       cd exonum && cargo fmt -- --write-mode=diff && cd .. &&
       cd sandbox && cargo fmt -- --write-mode=diff && cd .. &&
-      cd testkit && cargo fmt -- --write-mode=diff && cd ..
+      cd testkit && cargo fmt -- --write-mode=diff && cd .. &&
+      cspell sandbox/{src,examples,tests}/**/*.rs &&
+      cspell exonum/{src,benches,tests}/**/*.rs &&
+      cspell testkit/{src,examples,tests}/**/*.rs
   ;;
   "clippy-core" )
       cd exonum && cargo clippy --verbose --features long_benchmarks -- -D warnings

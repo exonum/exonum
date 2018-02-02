@@ -60,12 +60,12 @@ impl<T> Comparison<T> {
     ///     .map(Vec::len)
     ///     .assert_before("Array length <= 5", |&len| len <= 5);
     /// ```
-    pub fn assert_before<P>(&self, message: &str, pred: P) -> &Self
+    pub fn assert_before<P>(&self, message: &str, predicate: P) -> &Self
     where
         P: Fn(&T) -> bool,
     {
         assert!(
-            pred(&self.old),
+            predicate(&self.old),
             format!("Precondition does not hold: {}", message)
         );
         self
@@ -86,12 +86,12 @@ impl<T> Comparison<T> {
     ///         v[1] > v[0]
     ///     });
     /// ```
-    pub fn assert_after<P>(&self, message: &str, pred: P) -> &Self
+    pub fn assert_after<P>(&self, message: &str, predicate: P) -> &Self
     where
         P: Fn(&T) -> bool,
     {
         assert!(
-            pred(&self.new),
+            predicate(&self.new),
             format!("Postcondition does not hold: {}", message)
         );
         self
@@ -111,12 +111,12 @@ impl<T> Comparison<T> {
     ///     .map(Vec::len)
     ///     .assert("Less elements after", |&old, &new| old > new);
     /// ```
-    pub fn assert<P>(&self, message: &str, pred: P) -> &Self
+    pub fn assert<P>(&self, message: &str, predicate: P) -> &Self
     where
         P: Fn(&T, &T) -> bool,
     {
         assert!(
-            pred(&self.old, &self.new),
+            predicate(&self.old, &self.new),
             format!("Comparison does not hold: {}", message)
         );
         self
@@ -136,16 +136,16 @@ impl<T> Comparison<T> {
     ///     .map(Vec::len)
     ///     .assert_inv("More than 1 element in array", |&len| len > 1);
     /// ```
-    pub fn assert_inv<P>(&self, message: &str, pred: P) -> &Self
+    pub fn assert_inv<P>(&self, message: &str, predicate: P) -> &Self
     where
         P: Fn(&T) -> bool,
     {
         assert!(
-            pred(&self.old),
+            predicate(&self.old),
             format!("Invariant does not hold for the older state: {}", message)
         );
         assert!(
-            pred(&self.new),
+            predicate(&self.new),
             format!("Invariant does not hold for the newer state: {}", message)
         );
         self
@@ -211,7 +211,7 @@ impl<T: PartialEq + ::std::fmt::Debug> Comparison<T> {
 ///     });
 /// ```
 ///
-/// Here `ServiceSchema` is a public struct defined in a service libarary that has public `new`
+/// Here `ServiceSchema` is a public struct defined in a service library that has public `new`
 /// method with a signature like `fn<S: AsRef<Snapshot>>(view: S) -> Self`.
 pub trait ComparableSnapshot<S> {
     /// Compares this snapshot with an older one.

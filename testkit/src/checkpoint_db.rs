@@ -189,7 +189,7 @@ mod tests {
     }
 
     #[test]
-    fn test_checkpointdb_basics() {
+    fn test_checkpoint_db_basics() {
         let db = CheckpointDb::new(MemoryDB::new());
         let mut fork = db.fork();
         fork.put("foo", vec![], vec![2]);
@@ -226,7 +226,7 @@ mod tests {
     }
 
     #[test]
-    fn test_checkpointdb_rollback() {
+    fn test_checkpoint_db_rollback() {
         let db = CheckpointDb::new(MemoryDB::new());
         let handler = db.handler();
         let mut fork = db.fork();
@@ -299,7 +299,7 @@ mod tests {
     }
 
     #[test]
-    fn test_checkpointdb_handler() {
+    fn test_checkpoint_db_handler() {
         let db = CheckpointDb::new(MemoryDB::new());
         let db_handler = db.handler();
 

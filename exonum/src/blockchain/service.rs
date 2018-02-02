@@ -69,7 +69,7 @@ pub trait Transaction: Message + ExonumJson + 'static {
 ///
 /// # Examples
 ///
-/// The following example provides a barebone foundation for implementing a service.
+/// The following example provides a bare-bones foundation for implementing a service.
 ///
 /// ```
 /// #[macro_use] extern crate exonum;
@@ -96,7 +96,7 @@ pub trait Transaction: Message + ExonumJson + 'static {
 ///     }
 ///
 ///     fn state_hash(&self) -> Vec<Hash> {
-///         // Calculates the shate hash of the service
+///         // Calculates the state hash of the service
 /// #       vec![]
 ///     }
 ///     // Other read-only methods
@@ -157,11 +157,12 @@ pub trait Service: Send + Sync + 'static {
     /// Must be unique within the blockchain.
     fn service_id(&self) -> u16;
 
-    /// Human-readable service name. Must be unique within the blockchain.
+    /// A comprehensive string service name. Must be unique within the
+    /// blockchain.
     fn service_name(&self) -> &'static str;
 
     /// Returns a list of root hashes of tables that determine the current state
-    /// of the service database. These hashes are collected from all services in a common
+    /// of the service database. These hashes are collected from all the services in a common
     /// `ProofMapIndex` accessible in the core schema as [`state_hash_aggregator`][1].
     ///
     /// An empty vector can be returned if the service does not influence the blockchain state.
@@ -175,7 +176,7 @@ pub trait Service: Send + Sync + 'static {
     /// Tries to create a `Transaction` from the given raw message.
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError>;
 
-    /// Initializes the information schema of service
+    /// Initializes the information schema of the service
     /// and generates an initial service configuration.
     /// Called on genesis block creation.
     fn initialize(&self, fork: &mut Fork) -> Value {
@@ -190,7 +191,7 @@ pub trait Service: Send + Sync + 'static {
     fn handle_commit(&self, context: &ServiceContext) {}
 
     /// Returns an API handler for public requests. The handler is mounted on
-    /// the `/api/services/{service_name}` path on [the public listen address][pub-addr]
+    /// the `/api/services/{service_name}` path at [the public listen address][pub-addr]
     /// of all full nodes in the blockchain network.
     ///
     /// [pub-addr]: ../node/struct.NodeApiConfig.html#structfield.public_api_address
@@ -199,10 +200,10 @@ pub trait Service: Send + Sync + 'static {
     }
 
     /// Returns an API handler for private requests. The handler is mounted on
-    /// the `/api/services/{service_name}` path on [the private listen address][priv-addr]
+    /// the `/api/services/{service_name}` path at [the private listen address][private-addr]
     /// of all full nodes in the blockchain network.
     ///
-    /// [priv-addr]: ../node/struct.NodeApiConfig.html#structfield.private_api_address
+    /// [private-addr]: ../node/struct.NodeApiConfig.html#structfield.private_api_address
     fn private_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
         None
     }

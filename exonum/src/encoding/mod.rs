@@ -33,7 +33,7 @@
 //!
 //! # Examples
 //!
-//! Consider a structure with two fields: a `String` and a `u64`.
+//! Consider a structure with two fields: `String` and `u64`.
 //! To implement Exonum (de)serialization for this structure
 //! you need to use macros like this:
 //!
@@ -68,7 +68,7 @@
 //! ## Primitive types
 //!
 //! Primitive types are all fixed-sized, and located fully in the header.
-// TODO explain how an signed integer is stored in memory (what codding) (ECR-155)
+// TODO explain how a signed integer is stored in memory (what codding) (ECR-155)
 //!
 //! | Type name | Size in Header | Info |
 //! |:--------|:---------------------|:--------------------------------------------------|
@@ -85,7 +85,7 @@
 //! | `bool`   | 1    | Stored as a byte, with `0x01` denoting true and `0x00` false \[3\] |
 //!
 //! \[1\]
-//! Special floating point values that cannot be represented as sequences of digits (such as
+//! Special floating point values that cannot be represented as a sequences of digits (such as
 //! Infinity, NaN and signaling NaN) are not permitted.
 //!
 //! \[2\]
@@ -96,12 +96,12 @@
 //!
 //! ## Segment fields
 //!
-//! All segment types take 8 bytes in header: 4 for position in buffer,
+//! All segment types take 8 bytes in the header: 4 for position in the buffer,
 //! and 4 for the segment field size.
 //!
 //! ## Custom fields
 //!
-//! These types could be implemented as per developer's design,
+//! These types can be implemented as per developer's design,
 //! but they should declare how many bytes they
 //! write in the header using the [`field_size()`] function.
 //!

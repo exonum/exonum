@@ -85,7 +85,7 @@ impl Patch {
         self.changes.get_mut(name)
     }
 
-    /// Gets the given names's corresponding entry in the map for in-place manipulation.
+    /// Gets the corresponding entry in the map by the given name for in-place manipulation.
     fn changes_entry(&mut self, name: String) -> HmEntry<String, Changes> {
         self.changes.entry(name)
     }
@@ -139,20 +139,20 @@ impl IntoIterator for Patch {
 /// A generalized iterator over the storage views.
 pub type Iter<'a> = Box<Iterator + 'a>;
 
-/// An enum that represents a kind of change to some key in storage.
+/// An enum that represents a kind of change to some key in the storage.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Change {
-    /// Put the specified value into storage for a corresponding key.
+    /// Put the specified value into the storage for the corresponding key.
     Put(Vec<u8>),
-    /// Delete a value from storage for a corresponding key.
+    /// Delete a value from the storage for the corresponding key.
     Delete,
 }
 
 /// A combination of a database snapshot and a sequence of changes on top of it.
 ///
-/// A `Fork` provides both immutable and mutable operations over database. Like [`Snapshot`],
+/// A `Fork` provides both immutable and mutable operations over the database. Like [`Snapshot`],
 /// `Fork` provides read isolation. When mutable operations ([`put`], [`remove`] and
-/// [`remove_by_prefix`]) are performed for a fork, the subsequent reads act as if the changes
+/// [`remove_by_prefix`]) are performed to a fork, the subsequent reads act as if the changes
 /// are applied to the database; in reality, these changes are accumulated in memory.
 ///
 /// To apply changes to the database, you need to convert a `Fork` into a [`Patch`] using
@@ -271,7 +271,7 @@ pub trait Database: Send + Sync + 'static {
     fn merge_sync(&self, patch: Patch) -> Result<()>;
 }
 
-/// Read-only snapshot of a storage backend.
+/// A read-only snapshot of a storage backend.
 ///
 /// A `Snapshot` instance is an immutable representation of a certain storage state.
 /// It provides read isolation, so consistency is guaranteed even if the data in
@@ -286,7 +286,7 @@ pub trait Snapshot: 'static {
 
     /// Returns `true` if the snapshot contains a value for the specified key.
     ///
-    /// Default implementation checks the existence of the value using [`get`](#tymethod.get).
+    /// Default implementation checks existence of the value using [`get`](#tymethod.get).
     fn contains(&self, name: &str, key: &[u8]) -> bool {
         self.get(name, key).is_some()
     }
@@ -474,7 +474,7 @@ impl Fork {
     ///
     /// # Panics
     ///
-    /// Panics if checkpoint was created before and it was not committed or rollbacked yet.
+    /// Panics if checkpoint was created before and it was not committed or rolled back yet.
     pub fn merge(&mut self, patch: Patch) {
         if self.logged {
             panic!("call merge before commit or rollback");

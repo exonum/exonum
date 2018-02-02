@@ -39,7 +39,7 @@ fn init_testkit() -> (TestKit, TestKitApi) {
 
 fn inc_count(api: &TestKitApi, by: u64) -> TxIncrement {
     let (pubkey, key) = crypto::gen_keypair();
-    // Create a presigned transaction
+    // Create a pre-signed transaction
     let tx = TxIncrement::new(&pubkey, by, &key);
 
     let tx_info: TransactionResponse = api.post(ApiKind::Service("counter"), "count", &tx);
@@ -52,7 +52,7 @@ fn test_inc_count_create_block() {
     let (mut testkit, api) = init_testkit();
     let (pubkey, key) = crypto::gen_keypair();
 
-    // Create a presigned transaction
+    // Create a pre-signed transaction
     testkit.create_block_with_transaction(TxIncrement::new(&pubkey, 5, &key));
 
     // Check that the user indeed is persisted by the service
@@ -73,7 +73,7 @@ fn test_inc_count_create_block() {
 fn test_inc_count_create_block_with_committed_transaction() {
     let (mut testkit, _) = init_testkit();
     let (pubkey, key) = crypto::gen_keypair();
-    // Create a presigned transaction
+    // Create a pre-signed transaction
     testkit.create_block_with_transaction(TxIncrement::new(&pubkey, 5, &key));
     // Create another block with the same transaction
     testkit.create_block_with_transaction(TxIncrement::new(&pubkey, 5, &key));

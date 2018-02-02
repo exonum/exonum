@@ -130,7 +130,7 @@ fn format_log_record(buf: &mut Formatter, record: &Record) -> io::Result<()> {
             Level::Debug => "DEBUG".cyan(),
             Level::Trace => "TRACE".white(),
         };
-        write!(
+        writeln!(
             buf,
             "[{} : {:03}] - [ {} ] - {} - {}",
             secs.bold(),
@@ -147,7 +147,7 @@ fn format_log_record(buf: &mut Formatter, record: &Record) -> io::Result<()> {
             Level::Debug => "DEBUG",
             Level::Trace => "TRACE",
         };
-        write!(
+        writeln!(
             buf,
             "[{} : {:03}] - [ {} ] - {} - {}",
             secs,
