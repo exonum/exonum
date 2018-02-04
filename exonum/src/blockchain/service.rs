@@ -31,25 +31,6 @@ use node::{ApiSender, Node, State, TransactionSend};
 use blockchain::{Blockchain, ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use helpers::{Height, Milliseconds, ValidatorId};
 use super::transaction::Transaction;
-/// Transaction processing functionality for `Message`s allowing to apply authenticated, atomic,
-/// constraint-preserving groups of changes to the blockchain storage.
-///
-/// See also [the documentation page on transactions][doc:transactions].
-///
-/// [doc:transactions]: https://exonum.com/doc/architecture/transactions/
-    /// Verifies the internal consistency of the transaction. `verify` should usually include
-    /// checking the message signature (via [`verify_signature`]) and, possibly,
-    /// other internal constraints. `verify` has no access to the blockchain state;
-    /// checks involving the blockchains state must be preformed in [`execute`](#tymethod.execute).
-    ///
-    /// If a transaction fails `verify`, it is considered incorrect and cannot be included into
-    ///
-    /// [`verify_signature`]: ../messages/trait.Message.html#method.verify_signature
-    /// Receives a fork of the current blockchain state and can modify it depending on the contents
-    /// of the transaction.
-    ///   to the state and return early if these checks fail.
-    /// - If the execute method of a transaction raises a panic, the changes made by the
-    ///   transaction are discarded, but it is still considered committed.
 
 /// A trait that describes business logic of a concrete service.
 ///

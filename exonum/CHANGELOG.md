@@ -5,24 +5,6 @@ All notable changes to this project will be documented in this file. The project
 
 ## [Unreleased]
 
-### Added
-- Added `patch` method to the `Fork` structure. (#393)
-- Added a public `helthcheck` endpoint. (#405)
-- Added serialization support floating point types through special wrapper(`F32` and `F64`). This feature is hidden behind `float_serialize` gate. Note: special values (Infinity and NaN) aren't supported. (#384)
-- Added `StorageValue` implementation for `bool`. (#385)
-- Added `TransactionStatus` representing transaction execution status.
-
-### Changed
-- Changed iterators over `Patch` and `Changes` data into custom types instead of standard collection iterators. (#393)
-- Fixed typo in `SparceListIndexKeys` and `SparceListIndexValues` (#398)
-- Fixed #15 consensus on the threshold of 1/3 sleeping validators. (#388)
-- Replaced config param `timeout_events_capacity` with `internal_events_capacity`. (#388)
-- The `Transaction` trait now inherit `ExonumJson`. (#402)
-- The list of peer connections is now restored to the last state after the process is restarted. (#378)
-- `message!` and `encoding_struct!` no longer require manual `SIZE` and offset specification.
-- `Transaction` `execute` method now returns  `TransactionStatus`. (#385)
-
-### Removed
 ### Breaking changes
 - `exonum::crypto::CryptoHash` trait is introduced, and `StorageValue::hash` and `Message::hash` methods are removed. (#422)
    Migration path:
@@ -36,6 +18,12 @@ All notable changes to this project will be documented in this file. The project
   around a type (e.g., `struct QuirkyI32Key(i32)`) and implement `StorageKey` for it
   using big endian encoding. Then, use the wrapper instead of the int type in indices.
   See the unit tests for `StorageKey` for an example.
+
+### New features
+- `StorageValue` trait is implemented for `bool`. (#385)
+- `Transaction` `execute` method now returns  `TransactionStatus` that is stored in the blockchain and can be accessed
+  through api. The changes made by transactions that return `Err` are discarded. To migrate, add `Ok(())` as the last
+  line to the `execute` method. (#385)
 
 ## 0.5 - 2018-01-30
 
