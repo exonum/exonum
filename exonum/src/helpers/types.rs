@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Common widely used typedefs.
+//! Common widely used type definitions.
 
 use std::fmt;
 

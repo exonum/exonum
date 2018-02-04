@@ -15,6 +15,7 @@
 //! Exonum node that performs consensus algorithm.
 //!
 //! For details about consensus message handling see messages module documentation.
+// spell-checker:ignore cors
 
 use std::io;
 use std::sync::Arc;
@@ -53,7 +54,7 @@ mod basic;
 mod consensus;
 mod requests;
 mod whitelist;
-pub mod state; // TODO: temporary solution to get access to WAIT consts (ECR-167)
+pub mod state; // TODO: temporary solution to get access to WAIT constants (ECR-167)
 pub mod timeout_adjuster;
 
 /// External messages.

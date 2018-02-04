@@ -18,7 +18,7 @@ Just add the following line to the `Cargo.toml`:
 exonum-testkit = "0.5.0"
 ```
 
-[Read more...][tutorial]
+[For more details, see Exonum documentation][documentation]
 
 ## Examples
 
@@ -37,4 +37,4 @@ Licensed under the Apache License (Version 2.0). See [LICENSE](LICENSE) for deta
 [gitter-url]: https://gitter.im/exonum/exonum
 [crates-io-image]: https://img.shields.io/crates/v/exonum-testkit.svg
 [crates-io-url]: https://crates.io/crates/exonum-testkit
-[tutorial]: TUTORIAL.md
+[documentation]: https://exonum.com/doc/advanced/service-testing/

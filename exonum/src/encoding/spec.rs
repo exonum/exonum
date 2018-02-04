@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-/// `encoding_struct!` macro implements a structure that can be saved in an Exonum blockchain.
+/// `encoding_struct!` macro implements a structure that can be saved in the Exonum blockchain.
 ///
 /// The macro creates getter methods for all fields with the same names as fields.
-/// In addition, the macro declares a `new` constructor, which takes all fields
+/// In addition, the macro declares a `new` constructor, which accepts all fields
 /// in the order of their declaration in the macro.
 /// The macro also implements [`Field`], [`ExonumJson`] and [`StorageValue`] traits
 /// for the declared datatype.
@@ -69,7 +69,7 @@ macro_rules! encoding_struct {
             raw: Vec<u8>
         }
 
-        // Reimplement `Field` for `encoding_struct!`
+        // Re-implement `Field` for `encoding_struct!`
         // to write fields in place of another structure
         impl<'a> $crate::encoding::Field<'a> for $name {
             unsafe fn read(buffer: &'a [u8],

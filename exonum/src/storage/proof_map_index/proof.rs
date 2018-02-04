@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// spell-checker:ignore lhash, rhash, lkey, rkey, bpath, repr
+
 use std::fmt;
 
 use serde::{Serialize, Serializer};

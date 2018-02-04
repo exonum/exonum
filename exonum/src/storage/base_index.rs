@@ -13,6 +13,7 @@
 // limitations under the License.
 
 //! An implementation of base index with most common features.
+// spell-checker:ignore subprefix
 
 use std::borrow::Cow;
 use std::marker::PhantomData;
@@ -262,6 +263,7 @@ mod tests {
 
     #[test]
     fn test_index_name_validator() {
+        // spell-checker:disable
         assert!(is_valid_name("index_name"));
         assert!(is_valid_name("_index_name"));
         assert!(is_valid_name("AinDex_name_"));

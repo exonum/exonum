@@ -773,14 +773,14 @@ impl TestKit {
             txs.into_iter()
                 .filter(|tx| tx.verify())
                 .map(|tx| {
-                    let txid = tx.hash();
+                    let tx_id = tx.hash();
                     assert!(
-                        !schema.transactions().contains(&txid),
+                        !schema.transactions().contains(&tx_id),
                         "Transaction is already committed: {:?}",
                         tx
                     );
-                    mempool.insert(txid, tx);
-                    txid
+                    mempool.insert(tx_id, tx);
+                    tx_id
                 })
                 .collect()
         };
@@ -869,7 +869,7 @@ impl TestKit {
         &self.network.validators[id.0 as usize]
     }
 
-    /// Returns sufficient number of validators for the Byzantine Fault Toulerance consensus.
+    /// Returns sufficient number of validators for the Byzantine Fault Tolerance consensus.
     pub fn majority_count(&self) -> usize {
         NodeState::byzantine_majority_count(self.network().validators().len())
     }
