@@ -18,7 +18,7 @@ synchronously.
 travis-ci = { repository = "exonum/exonum-testkit" }
 
 [dependencies]
-exonum = { version = "0.5", path = "../exonum" }
+exonum = { version = "0.5.1", path = "../exonum" }
 futures = "0.1.14"
 log = "0.4.1"
 serde = "1.0.0"

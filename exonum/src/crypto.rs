@@ -543,6 +543,12 @@ impl Default for Hash {
     }
 }
 
+impl CryptoHash for bool {
+    fn hash(&self) -> Hash {
+        hash(&[*self as u8])
+    }
+}
+
 impl CryptoHash for u8 {
     fn hash(&self) -> Hash {
         hash(&[*self])

@@ -92,6 +92,22 @@ impl StorageValue for () {
     }
 }
 
+impl StorageValue for bool {
+    fn into_bytes(self) -> Vec<u8> {
+        vec![self as u8]
+    }
+
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        assert_eq!(value.len(), 1);
+
+        match value[0] {
+            0 => false,
+            1 => true,
+            value => panic!("Invalid value for bool: {}", value),
+        }
+    }
+}
+
 impl StorageValue for u8 {
     fn into_bytes(self) -> Vec<u8> {
         vec![self]
@@ -189,26 +205,6 @@ impl StorageValue for i64 {
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
         LittleEndian::read_i64(value.as_ref())
-    }
-}
-
-impl StorageValue for bool {
-    fn into_bytes(self) -> Vec<u8> {
-        vec![self as u8]
-    }
-
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        assert_eq!(value.len(), 1);
-
-        match value[0] {
-            0 => false,
-            1 => true,
-            _ => unreachable!(),
-        }
-    }
-
-    fn hash(&self) -> Hash {
-        hash(&[*self as u8])
     }
 }
 

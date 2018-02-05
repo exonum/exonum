@@ -19,7 +19,7 @@ use std::collections::BTreeMap;
 use rand::{thread_rng, Rng};
 use serde_json;
 
-use blockchain::{Blockchain, Schema, Transaction, TransactionResult, TransactionValue};
+use blockchain::{Blockchain, Schema, Transaction, ExecutionStatus};
 use crypto::{gen_keypair, CryptoHash, Hash};
 use storage::{Database, Fork, Error, ListIndex};
 use messages::Message;
@@ -150,33 +150,31 @@ fn handling_tx_panic(blockchain: &Blockchain, db: &mut Box<Database>) {
             value: u64,
         }
     }
-}
 
-impl Transaction for TxPanic {
-    fn verify(&self) -> bool {
-        true
-    }
-
-    fn execute(&self, fork: &mut Fork) -> TransactionResult {
-        if self.value() == 42 {
-            panic!(Error::new("42"))
+    impl Transaction for Tx {
+        fn verify(&self) -> bool {
+            true
         }
 
-        let mut index = ListIndex::new(IDX_NAME, fork);
-        index.push(self.value());
-        index.push(42 / self.value());
+        fn execute(&self, fork: &mut Fork) -> ExecutionStatus {
+            if self.value() == 42 {
+                panic!(Error::new("42"))
+            }
 
-        Ok(TransactionValue::Success)
+            let mut index = ListIndex::new(IDX_NAME, fork);
+            index.push(self.value());
+            index.push(42 / self.value());
+
+            Ok(())
+        }
     }
-}
 
-fn handling_tx_panic(blockchain: &Blockchain, db: &mut Box<Database>) {
     let (_, sec_key) = gen_keypair();
 
-    let tx_ok1 = TxPanic::new(3, &sec_key);
-    let tx_ok2 = TxPanic::new(4, &sec_key);
-    let tx_failed = TxPanic::new(0, &sec_key);
-    let tx_storage_error = TxPanic::new(42, &sec_key);
+    let tx_ok1 = Tx::new(3, &sec_key);
+    let tx_ok2 = Tx::new(4, &sec_key);
+    let tx_failed = Tx::new(0, &sec_key);
+    let tx_storage_error = Tx::new(42, &sec_key);
 
     let mut pool: BTreeMap<Hash, Box<Transaction>> = BTreeMap::new();
 
@@ -240,22 +238,23 @@ fn handling_tx_panic_storage_error(blockchain: &Blockchain) {
             true
         }
 
-        fn execute(&self, view: &mut Fork) {
+        fn execute(&self, view: &mut Fork) -> ExecutionStatus {
             if self.value() == 42 {
                 panic!(Error::new("42"))
             }
             let mut index = ListIndex::new(IDX_NAME, view);
             index.push(self.value());
             index.push(42 / self.value());
+            Ok(())
         }
     }
 
     let (_, sec_key) = gen_keypair();
 
-    let tx_ok1 = TxPanic::new(3, &sec_key);
-    let tx_ok2 = TxPanic::new(4, &sec_key);
-    let tx_failed = TxPanic::new(0, &sec_key);
-    let tx_storage_error = TxPanic::new(42, &sec_key);
+    let tx_ok1 = Tx::new(3, &sec_key);
+    let tx_ok2 = Tx::new(4, &sec_key);
+    let tx_failed = Tx::new(0, &sec_key);
+    let tx_storage_error = Tx::new(42, &sec_key);
 
     let mut pool: BTreeMap<Hash, Box<Transaction>> = BTreeMap::new();
 

@@ -17,7 +17,7 @@ use messages::{Precommit, RawMessage, Connect};
 use storage::{Fork, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex, Snapshot,
               StorageKey};
 use helpers::Height;
-use super::{Block, BlockProof, Blockchain, TransactionResult};
+use super::{Block, BlockProof, Blockchain, TransactionStatus};
 use super::config::StoredConfiguration;
 
 /// Defines `&str` constants with given name and value.
@@ -93,7 +93,7 @@ where
 
     /// Returns table that represents a map from transaction hash into execution status.
     pub fn transaction_statuses(&self) -> ProofMapIndex<&T, Hash, TransactionStatus> {
-        MapIndex::new(TRANSACTIONS_STATUSES, &self.view)
+        ProofMapIndex::new(TRANSACTIONS_STATUSES, &self.view)
     }
 
     /// Returns table that keeps the block height and tx position inside block for every
@@ -336,8 +336,10 @@ impl<'a> Schema<&'a mut Fork> {
     /// Mutable reference to the [`transaction_statuses`][1] index.
     ///
     /// [1]: struct.Schema.html#method.transaction_statuses
-    pub fn transaction_statuses_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, TransactionStatus> {
-        MapIndex::new(TRANSACTIONS_STATUSES, &mut self.view)
+    pub fn transaction_statuses_mut(
+        &mut self,
+    ) -> ProofMapIndex<&mut Fork, Hash, TransactionStatus> {
+        ProofMapIndex::new(TRANSACTIONS_STATUSES, &mut self.view)
     }
 
     /// Mutable reference to the [`tx_location_by_tx_hash`][1] index.

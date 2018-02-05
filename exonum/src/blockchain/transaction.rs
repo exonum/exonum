@@ -16,15 +16,15 @@
 
 use std::borrow::Cow;
 use std::fmt;
-use std::u16;
+use std::u8;
 
 use messages::Message;
 use storage::{Fork, StorageValue};
-use crypto::Hash;
+use crypto::{Hash, CryptoHash};
 use encoding::serialize::json::ExonumJson;
 
 //  User-defined error codes (`TransactionError::Code(u8)`) have a `0...255` range.
-#[cfg_attr(feature="cargo-clippy", allow(cast_lossless))]
+#[cfg_attr(feature = "cargo-clippy", allow(cast_lossless))]
 const MAX_ERROR_CODE: u16 = u8::MAX as u16;
 // Represent `(Ok())` `TransactionStatus` value.
 const TRANSACTION_STATUS_OK: u16 = MAX_ERROR_CODE + 1;
@@ -54,7 +54,7 @@ pub trait Transaction: Message + ExonumJson + 'static {
     /// other internal constraints. `verify` has no access to the blockchain state;
     /// checks involving the blockchains state must be preformed in [`execute`](#tymethod.execute).
     ///
-    /// If a transaction fails `verify`, it is considered incorrect and cannot be included into
+    /// If a transaction fails `verify`,  is considered incorrect and cannot be included into
     /// any correct block proposal. Incorrect transactions are never included into the blockchain.
     ///
     /// *This method should not use external data, that is, it must be a pure function.*
@@ -141,11 +141,11 @@ pub trait Transaction: Message + ExonumJson + 'static {
     /// #   fn verify(&self) -> bool { true }
     /// }
     /// # fn main() {}
-    fn execute(&self, fork: &mut Fork) -> TransactionResult;
+    fn execute(&self, fork: &mut Fork) -> ExecutionStatus;
 }
 
 /// Result of unsuccessful transaction execution.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ExecutionError {
     /// General failure (unspecified reason).
     Failure,
@@ -153,7 +153,7 @@ pub enum ExecutionError {
     /// services.
     Code(u8),
     /// User-defined string error description.
-    Description(String)
+    Description(String),
 }
 
 /// Extended by the framework result of unsuccessful transaction execution.
@@ -176,7 +176,7 @@ pub enum ExecutionError {
 /// // Prints user friendly error description.
 /// println!("Transaction error: {}", transaction_error);
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TransactionError {
     /// Panic occurred during transaction execution.
     Panic,
@@ -186,7 +186,17 @@ pub enum TransactionError {
     /// services.
     Code(u8),
     /// User-defined string error description.
-    Description(String)
+    Description(String),
+}
+
+/// Converts from `ExecutionStatus` into `TransactionStatus`.
+pub fn convert_status(status: ExecutionStatus) -> TransactionStatus {
+    match status {
+        Ok(()) => Ok(()),
+        Err(ExecutionError::Failure) => Err(TransactionError::Failure),
+        Err(ExecutionError::Code(c)) => Err(TransactionError::Code(c)),
+        Err(ExecutionError::Description(s)) => Err(TransactionError::Description(s)),
+    }
 }
 
 impl<'a, T: Transaction> From<T> for Box<Transaction + 'a> {
@@ -195,57 +205,51 @@ impl<'a, T: Transaction> From<T> for Box<Transaction + 'a> {
     }
 }
 
-impl From<ExecutionError> for TransactionError {
-    fn from(value: ExecutionError) -> Self {
-        match value {
-            ExecutionError::Failure => TransactionError::Failure,
-            ExecutionError::Code(c) => TransactionError::Code(c),
-            ExecutionError::Description(s) => TransactionError::Description(s),
+impl fmt::Display for TransactionError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            TransactionError::Panic => write!(f, "Panic during execution"),
+            TransactionError::Failure => write!(f, "Unspecified failure"),
+            TransactionError::Code(c) => write!(f, "Error code: {}", c),
+            TransactionError::Description(ref s) => write!(f, "{}", s),
         }
     }
 }
 
-impl fmt::Display for TransactionError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            TransactionError::Panic => write!(f, "Panic during execution"),
-            TransactionError::Failure =>  write!(f, "Unspecified failure"),
-            TransactionError::Code(c) => write!(f, "Error code: {}", c),
-            TransactionError::Description(s) => write!(f, "{}", c),
-        }
+// String content (`TransactionError::Description`) is intentionally excluded from the hash
+// calculation because user can be tempted to use error description from a third-party libraries
+// which aren't stable across the versions.
+impl CryptoHash for TransactionStatus {
+    fn hash(&self) -> Hash {
+        u16::hash(&status_as_u16(self))
     }
 }
 
 // `TransactionStatus` is stored as `u16` with optional string part needed only for
 // `TransactionError::Description`.
 impl StorageValue for TransactionStatus {
-    fn hash(&self) -> Hash {
-        // String content (`TransactionError::Description`) is intentionally excluded from the hash
-        // calculation because user can be tempted to use error description from a third-party
-        // libraries which aren't stable across the versions.
-        u16::hash(&status_as_u16(*self))
-    }
-
     fn into_bytes(self) -> Vec<u8> {
-        let mut res = u16::into_bytes(status_as_u16(self));
+        let mut res = u16::into_bytes(status_as_u16(&self));
         match self {
             Err(TransactionError::Description(s)) => {
-                res.extend(s::into_bytes());
-            },
+                res.extend(String::into_bytes(s));
+            }
             _ => (),
         }
         res
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        let main_part = u16::from_bytes(value);
+        let main_part = u16::from_bytes(Cow::Borrowed(&bytes));
         match main_part {
             value @ 0...MAX_ERROR_CODE => Err(TransactionError::Code(value as u8)),
             TRANSACTION_STATUS_OK => Ok(()),
             TRANSACTION_STATUS_PANIC => Err(TransactionError::Panic),
             TRANSACTION_STATUS_FAILURE => Err(TransactionError::Failure),
             TRANSACTION_STATUS_DESCRIPTION => {
-                Err(TransactionError::Description(String::from_bytes(bytes[2..])))
+                Err(TransactionError::Description(
+                    String::from_bytes(Cow::Borrowed(&bytes[2..])),
+                ))
             }
             value => panic!("Invalid TransactionStatus value: {}", value),
         }
@@ -253,18 +257,32 @@ impl StorageValue for TransactionStatus {
 }
 
 fn status_as_u16(status: &TransactionStatus) -> u16 {
-    match status {
+    match *status {
         Ok(()) => TRANSACTION_STATUS_OK,
         Err(TransactionError::Panic) => TRANSACTION_STATUS_PANIC,
         Err(TransactionError::Failure) => TRANSACTION_STATUS_FAILURE,
         Err(TransactionError::Code(c)) => u16::from(c),
-        Err(TransactionError::Description(s)) => TRANSACTION_STATUS_DESCRIPTION,
+        Err(TransactionError::Description(_)) => TRANSACTION_STATUS_DESCRIPTION,
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use futures::sync::mpsc;
+
+    use std::collections::BTreeMap;
+    use std::sync::Mutex;
+
     use super::*;
+    use crypto;
+    use blockchain::Blockchain;
+    use storage::{Database, MemoryDB, Entry};
+    use node::ApiSender;
+    use helpers::{ValidatorId, Height};
+
+    lazy_static! {
+        static ref EXECUTION_STATUS: Mutex<ExecutionStatus> = Mutex::new(Ok(()));
+    }
 
     #[test]
     fn transaction_status_round_trip() {
@@ -280,21 +298,104 @@ mod tests {
             Err(TransactionError::Description("".to_owned())),
             Err(TransactionError::Description("e".to_owned())),
             Err(TransactionError::Description("just error".to_owned())),
-            Err(TransactionError::Description("(Not) really long error description".to_owned())),
-            Err(TransactionError::Description("_underscored_text_".to_owned())),
+            Err(TransactionError::Description(
+                "(Not) really long error description".to_owned(),
+            )),
+            Err(TransactionError::Description(
+                "_underscored_text_".to_owned(),
+            )),
             Err(TransactionError::Description("!@#$%^&*()".to_owned())),
         ];
 
         for status in &statuses {
             let bytes = status.clone().into_bytes();
-            let new_status = TransactionResult::from_bytes(Cow::Borrowed(&bytes));
-
+            let new_status = TransactionStatus::from_bytes(Cow::Borrowed(&bytes));
             assert_eq!(*status, new_status);
         }
     }
 
     #[test]
     fn error_discards_transaction_changes() {
-        // TODO:
+        let statuses = [
+            Err(ExecutionError::Failure),
+            Err(ExecutionError::Code(0)),
+            Err(ExecutionError::Code(255)),
+            Err(ExecutionError::Description("".to_owned())),
+            Err(ExecutionError::Description("Error description".to_owned())),
+            Ok(()),
+        ];
+
+        let (_, sec_key) = crypto::gen_keypair();
+        let (blockchain, mut pool) = create_blockchain();
+        let db = Box::new(MemoryDB::new());
+
+        for (index, status) in statuses.iter().enumerate() {
+            let index = index as u64;
+
+            *EXECUTION_STATUS.lock().unwrap() = status.clone();
+
+            let transaction = TxResult::new(index, &sec_key);
+            pool.insert(
+                transaction.hash(),
+                Box::new(transaction.clone()) as Box<Transaction>,
+            );
+
+            let (_, patch) = blockchain.create_patch(
+                ValidatorId::zero(),
+                Height(index),
+                &[transaction.hash()],
+                &pool,
+            );
+
+            db.merge(patch).unwrap();
+
+            let mut fork = db.fork();
+            let entry = create_entry(&mut fork);
+            if status.is_err() {
+                assert_eq!(None, entry.get());
+            } else {
+                assert_eq!(Some(index), entry.get());
+            }
+        }
+    }
+
+    fn create_blockchain() -> (Blockchain, BTreeMap<Hash, Box<Transaction>>) {
+        let service_keypair = crypto::gen_keypair();
+        let api_channel = mpsc::channel(1);
+        (
+            Blockchain::new(
+                Box::new(MemoryDB::new()),
+                Vec::new(),
+                service_keypair.0,
+                service_keypair.1,
+                ApiSender::new(api_channel.0),
+            ),
+            BTreeMap::new(),
+        )
+    }
+
+    message! {
+        struct TxResult {
+            const TYPE = 1;
+            const ID = 0;
+
+            index: u64,
+        }
+    }
+
+    impl Transaction for TxResult {
+        fn verify(&self) -> bool {
+            true
+        }
+
+        fn execute(&self, fork: &mut Fork) -> ExecutionStatus {
+            let mut entry = create_entry(fork);
+            entry.set(self.index());
+            EXECUTION_STATUS.lock().unwrap().clone()
+        }
+    }
+
+    fn create_entry(fork: &mut Fork) -> Entry<&mut Fork, u64> {
+        Entry::new("transaction_status_test", fork)
     }
 }

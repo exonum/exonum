@@ -257,16 +257,17 @@ impl Blockchain {
 
                 fork.checkpoint();
 
-                let r = panic::catch_unwind(panic::AssertUnwindSafe(|| tx.execute(&mut fork)));
+                let catch_result =
+                    panic::catch_unwind(panic::AssertUnwindSafe(|| tx.execute(&mut fork)));
 
-                let transaction_status = match r {
-                    Ok(status) => {
-                        if status.is_err() {
+                let transaction_status = match catch_result {
+                    Ok(execution_status) => {
+                        if execution_status.is_err() {
                             fork.rollback();
                         } else {
                             fork.commit();
                         }
-                        status
+                        transaction::convert_status(execution_status)
                     }
                     Err(err) => {
                         if err.is::<Error>() {
@@ -281,7 +282,7 @@ impl Blockchain {
 
                 let mut schema = Schema::new(&mut fork);
                 schema.transactions_mut().put(hash, tx.raw().clone());
-                schema.transaction_results_mut().put(
+                schema.transaction_statuses_mut().put(
                     hash,
                     transaction_status,
                 );

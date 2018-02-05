@@ -19,16 +19,16 @@ All notable changes to this project will be documented in this file. The project
   using big endian encoding. Then, use the wrapper instead of the int type in indices.
   See the unit tests for `StorageKey` for an example. (#443)
 
+### New features
+- `StorageValue` and `CryptoHash` traits are implemented for `bool`. (#385)
+- `Transaction` `execute` method now returns  `TransactionStatus` that is stored in the blockchain and can be accessed
+  through api. The changes made by transactions that return `Err` are discarded. To migrate, add `Ok(())` as the last
+  line to the `execute` method. (#385)
+
 ## 0.5.1 - 2018-02-01
 
 ### Bug fixes
 - Fixed logger output (#451)
-
-### New features
-- `StorageValue` trait is implemented for `bool`. (#385)
-- `Transaction` `execute` method now returns  `TransactionStatus` that is stored in the blockchain and can be accessed
-  through api. The changes made by transactions that return `Err` are discarded. To migrate, add `Ok(())` as the last
-  line to the `execute` method. (#385)
 
 ## 0.5 - 2018-01-30
 
