@@ -6,7 +6,7 @@ use exonum::helpers::fabric::{ServiceFactory, Context};
 use exonum::crypto::Hash;
 use exonum::storage::Snapshot;
 use exonum::blockchain::{Transaction, Service, ApiContext};
-use exonum::messages::{FromRaw, RawTransaction};
+use exonum::messages::{Message, RawTransaction};
 use exonum::encoding::Error as StreamStructError;
 
 use blockchain::dto::{TX_PAYMENT_ID, TX_TIMESTAMP_ID, TX_UPDATE_USER_ID, TxUpdateUser, TxPayment,
@@ -61,7 +61,7 @@ impl Service for TimestampingService {
 }
 
 impl ServiceFactory for TimestampingService {
-    fn make_service(_: &Context) -> Box<Service> {
+    fn make_service(&mut self, _: &Context) -> Box<Service> {
         Box::new(TimestampingService::new())
     }
 }

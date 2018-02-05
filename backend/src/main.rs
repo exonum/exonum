@@ -6,18 +6,18 @@ extern crate timestamping;
 
 use exonum::helpers::fabric::NodeBuilder;
 
-use exonum_configuration::ConfigurationService;
+use exonum_configuration::ConfigurationServiceFactory;
 #[cfg(feature = "anchoring")]
-use exonum_btc_anchoring::AnchoringService;
+use exonum_btc_anchoring::AnchoringServiceFactory;
 use timestamping::TimestampingService;
 
 #[cfg(feature = "anchoring")]
 fn main() {
     exonum::helpers::init_logger().unwrap();
     NodeBuilder::new()
-        .with_service::<ConfigurationService>()
-        .with_service::<TimestampingService>()
-        .with_service::<AnchoringService>()
+        .with_service(Box::new(ConfigurationServiceFactory))
+        .with_service(Box::new(TimestampingService::new()))
+        .with_service(Box::new(AnchoringServiceFactory))
         .run();
 }
 
@@ -25,7 +25,7 @@ fn main() {
 fn main() {
     exonum::helpers::init_logger().unwrap();
     NodeBuilder::new()
-        .with_service::<ConfigurationService>()
-        .with_service::<TimestampingService>()
+        .with_service(Box::new(ConfigurationServiceFactory))
+        .with_service(Box::new(TimestampingService::new()))
         .run();
 }

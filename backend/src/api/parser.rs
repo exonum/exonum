@@ -4,7 +4,7 @@ use params::{Value, Params};
 
 use exonum::api::ApiError;
 use exonum::crypto::Hash;
-use exonum::encoding::serialize::HexValue;
+use exonum::encoding::serialize::FromHex;
 
 pub trait TryParse: Sized {
     fn parse(s: &str) -> Result<Self, ApiError>;

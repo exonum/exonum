@@ -1,41 +1,29 @@
 [package]
 name = "timestamping"
-version = "0.1.0"
-authors = ["Aleksei Sidorov <aleksei.sidorov@xdev.re>"]
+version = "0.5.0"
+authors = ["Exonum Team <exonum@bitfury.com>"]
 
 [dependencies]
-clap = "2.22.0"
-env_logger = "0.4.0"
+env_logger = "0.4"
 
-params = "0.6.0"
-router = "0.5.1"
-iron = "0.5.1"
-bodyparser = "0.7.0"
+params = "0.8"
+router = "0.6"
+iron = "0.6"
+bodyparser = "0.8"
 
-rand = "0.3.0"
-log = "0.3.0"
-byteorder = "1.0.0"
+log = "0.4.1"
+byteorder = "1.2"
 
-serde = "1.0.0"
-serde_derive = "1.0.0"
-serde_json = "1.0.0"
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
 
-exonum = "0.2.0"
-exonum-configuration = "0.2.0"
-exonum-btc-anchoring = { version = "0.2.0", optional = true }
+exonum = "0.5.0"
+exonum-configuration = "0.5"
+exonum-btc-anchoring = { version = "0.5.0", optional = true }
 
 [dev-dependencies]
-iron-test = "0.5.0"
-mime = "0.2.0"
-
-[dev-dependencies.sandbox]
-git = "https://github.com/exonum/exonum.git"
-version = "0.2.0"
-tag = "v0.2"
-
-[replace."exonum:0.2.0"]
-git = "https://github.com/exonum/exonum.git"
-tag = "v0.2"
+exonum-testkit = "0.5"
 
 [features]
 default = []

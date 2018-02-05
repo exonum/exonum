@@ -2,7 +2,6 @@ use exonum::crypto::{Hash, PublicKey};
 use exonum::storage::{MapIndex, ListIndex, ProofMapIndex, ProofListIndex, Snapshot, Fork};
 use exonum::blockchain::gen_prefix;
 
-use TIMESTAMPING_SERVICE;
 use blockchain::ToHash;
 use blockchain::dto::{UserInfoEntry, UserInfo, TimestampEntry, PaymentInfo};
 
@@ -29,34 +28,30 @@ where
     T: AsRef<Snapshot>,
 {
     pub fn users(&self) -> ProofMapIndex<&T, Hash, UserInfoEntry> {
-        let prefix = gen_prefix(TIMESTAMPING_SERVICE, 0, &());
-        ProofMapIndex::new(prefix, &self.view)
+        ProofMapIndex::new("timestamping.users", &self.view)
     }
 
     pub fn timestamps(&self) -> ProofMapIndex<&T, Hash, TimestampEntry> {
-        let prefix = gen_prefix(TIMESTAMPING_SERVICE, 1, &());
-        ProofMapIndex::new(prefix, &self.view)
+        ProofMapIndex::new("timestamping.timestamps", &self.view)
     }
 
     pub fn payments(&self, user_id: &str) -> ProofListIndex<&T, PaymentInfo> {
-        let prefix = gen_prefix(TIMESTAMPING_SERVICE, 2, &user_id.to_owned());
-        ProofListIndex::new(prefix, &self.view)
+        let prefix = gen_prefix(&user_id.to_owned());
+        ProofListIndex::with_prefix("timestamping.payments", prefix, &self.view)
     }
 
     // TODO Wonder if the proofs is needed here?
     pub fn known_keys(&self) -> MapIndex<&T, PublicKey, Vec<u8>> {
-        let prefix = gen_prefix(TIMESTAMPING_SERVICE, 3, &());
-        MapIndex::new(prefix, &self.view)
+        MapIndex::new("timestamping.known_keys", &self.view)
     }
 
     pub fn timestamps_history(&self, user_id: &str) -> ListIndex<&T, Hash> {
-        let prefix = gen_prefix(TIMESTAMPING_SERVICE, 4, &user_id.to_owned());
-        ListIndex::new(prefix, &self.view)
+        let prefix = gen_prefix(&user_id.to_owned());
+        ListIndex::with_prefix("timestamping.timestamps_history", prefix, &self.view)
     }
 
     pub fn users_history(&self) -> ListIndex<&T, Hash> {
-        let prefix = gen_prefix(TIMESTAMPING_SERVICE, 5, &());
-        ListIndex::new(prefix, &self.view)
+        ListIndex::new("timestamping.users_history", &self.view)
     }
 
     pub fn state_hash(&self) -> Vec<Hash> {
@@ -66,33 +61,29 @@ where
 
 impl<'a> Schema<&'a mut Fork> {
     pub fn users_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, UserInfoEntry> {
-        let prefix = gen_prefix(TIMESTAMPING_SERVICE, 0, &());
-        ProofMapIndex::new(prefix, &mut self.view)
+        ProofMapIndex::new("timestamping.users", &mut self.view)
     }
 
     pub fn timestamps_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, TimestampEntry> {
-        let prefix = gen_prefix(TIMESTAMPING_SERVICE, 1, &());
-        ProofMapIndex::new(prefix, &mut self.view)
+        ProofMapIndex::new("timestamping.timestamps", &mut self.view)
     }
 
     pub fn payments_mut(&mut self, user_id: &str) -> ProofListIndex<&mut Fork, PaymentInfo> {
-        let prefix = gen_prefix(TIMESTAMPING_SERVICE, 2, &user_id.to_owned());
-        ProofListIndex::new(prefix, &mut self.view)
+        let prefix = gen_prefix(&user_id.to_owned());
+        ProofListIndex::with_prefix("timestamping.payments", prefix, &mut self.view)
     }
 
     pub fn known_keys_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Vec<u8>> {
-        let prefix = gen_prefix(TIMESTAMPING_SERVICE, 3, &());
-        MapIndex::new(prefix, &mut self.view)
+        MapIndex::new("timestamping.known_keys", &mut self.view)
     }
 
     pub fn timestamps_history_mut(&mut self, user_id: &str) -> ListIndex<&mut Fork, Hash> {
-        let prefix = gen_prefix(TIMESTAMPING_SERVICE, 4, &user_id.to_owned());
-        ListIndex::new(prefix, &mut self.view)
+        let prefix = gen_prefix(&user_id.to_owned());
+        ListIndex::with_prefix("timestamping.timestamps_history", prefix, &mut self.view)
     }
 
     pub fn users_history_mut(&mut self) -> ListIndex<&mut Fork, Hash> {
-        let prefix = gen_prefix(TIMESTAMPING_SERVICE, 5, &());
-        ListIndex::new(prefix, &mut self.view)
+        ListIndex::new("timestamping.users_history", &mut self.view)
     }
 
     pub fn add_user(&mut self, user_id_hash: Hash, user: UserInfo) {
