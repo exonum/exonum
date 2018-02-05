@@ -92,7 +92,7 @@ impl Transaction for TxMarker {
     fn execute(&self, view: &mut Fork) {
         let time = TimeSchema::new(&view).time().get();
         match time {
-            Some(ref current_time) if current_time.time() <= self.time() => {
+            Some(current_time) if current_time <= self.time() => {
                 let mut schema = MarkerSchema::new(view);
                 schema.marks_mut().put(self.from(), self.mark());
             }
@@ -143,7 +143,7 @@ fn main() {
     let snapshot = testkit.snapshot();
     let time_schema = TimeSchema::new(&snapshot);
     assert_eq!(
-        time_schema.time().get().map(|time| time.time()),
+        time_schema.time().get().map(|time| time),
         Some(mock_provider.time())
     );
 
