@@ -380,6 +380,7 @@ fn test_queue_propose_message_from_next_height() {
     let block_at_first_height = BlockBuilder::new(&sandbox)
         .with_proposer_id(VALIDATOR_0)
         .with_tx_hash(&tx.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
     let future_propose = Propose::new(VALIDATOR_0,
@@ -684,7 +685,10 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
         .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
-    let block = BlockBuilder::new(&sandbox).with_tx_hash(&tx.hash()).build();
+    let block = BlockBuilder::new(&sandbox)
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_tx_hash(&tx.hash())
+        .build();
 
     let precommit_1 = Precommit::new(
         VALIDATOR_1,
@@ -1282,6 +1286,7 @@ fn lock_to_propose_and_send_prevote() {
     let block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.round_timeout() + sandbox.propose_timeout())
         .with_tx_hash(&tx.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
     sandbox.recv(&propose);
@@ -1499,6 +1504,7 @@ fn handle_precommit_positive_scenario_commit() {
     let block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
         .with_tx_hash(&tx.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
     let precommit_1 = Precommit::new(
@@ -1899,6 +1905,7 @@ fn commit_using_unknown_propose_with_precommits() {
     let block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
         .with_tx_hash(&tx.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
     let precommit_1 = Precommit::new(
@@ -2191,7 +2198,6 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     // create some tx
     let tx = gen_timestamping_tx();
 
-
     // Precommits with this block will be received during get 1st height in
     // fn add_one_height_with_transaction()
     let first_block = BlockBuilder::new(&sandbox)
@@ -2200,6 +2206,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
         )
         .with_proposer_id(VALIDATOR_0)
         .with_tx_hash(&tx.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
     // this propose will be used during second commit
@@ -2221,6 +2228,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
             2 * sandbox.propose_timeout() + 2 * sandbox.round_timeout() + 1,
         )
         .with_prev_hash(&first_block.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
 
@@ -2347,6 +2355,7 @@ fn commit_as_leader_send_propose_round_timeout() {
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
         .with_prev_hash(&sandbox_state.accepted_block_hash.borrow())
         .with_tx_hash(&tx.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
     let precommit_1 = Precommit::new(
@@ -2563,6 +2572,7 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
     let block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
         .with_tx_hash(&tx.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
     let precommit_1 = Precommit::new(

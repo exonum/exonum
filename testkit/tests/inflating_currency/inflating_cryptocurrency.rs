@@ -140,8 +140,8 @@ impl Transaction for TxCreateWallet {
         if schema.wallet(self.pub_key()).is_none() {
             let wallet = Wallet::new(self.pub_key(), self.name(), INIT_BALANCE, height.0);
             schema.wallets_mut().put(self.pub_key(), wallet);
-            Ok(())
         }
+        Ok(())
     }
 }
 
@@ -167,9 +167,9 @@ impl Transaction for TxTransfer {
                 let mut wallets = schema.wallets_mut();
                 wallets.put(self.from(), sender);
                 wallets.put(self.to(), receiver);
-                Ok(())
             }
         }
+        Ok(())
     }
 }
 

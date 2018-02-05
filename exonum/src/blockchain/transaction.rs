@@ -230,11 +230,8 @@ impl CryptoHash for TransactionStatus {
 impl StorageValue for TransactionStatus {
     fn into_bytes(self) -> Vec<u8> {
         let mut res = u16::into_bytes(status_as_u16(&self));
-        match self {
-            Err(TransactionError::Description(s)) => {
-                res.extend(String::into_bytes(s));
-            }
-            _ => (),
+        if let Err(TransactionError::Description(s)) = self {
+            res.extend(String::into_bytes(s));
         }
         res
     }
