@@ -36,7 +36,7 @@ use futures::{Future, Sink};
 use futures::sync::mpsc;
 use tokio_core::reactor::Core;
 
-use crypto::{self, Hash, PublicKey, SecretKey};
+use crypto::{self, Hash, CryptoHash, PublicKey, SecretKey};
 use blockchain::{Blockchain, GenesisConfig, Schema, SharedNodeState, Transaction, Service};
 use api::{private, public, Api};
 use messages::{Connect, Message, RawMessage};
