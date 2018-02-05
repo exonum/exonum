@@ -22,7 +22,7 @@ use super::Result as EncodingResult;
 use super::Error as EncodingError;
 use encoding::{CheckedOffset, Field, Offset};
 use encoding::serialize::WriteBufferWrapper;
-use encoding::serialize::json::ExonumJson;
+use encoding::serialize::json::{ExonumJson, ExonumJsonDeserialize};
 
 /// Wrapper for the `f32` type that restricts non-finite
 /// (NaN, Infinity, negative zero and subnormal) values.
@@ -230,7 +230,13 @@ impl ExonumJson for F32 {
         to: Offset,
     ) -> Result<(), Box<Error>> {
         let number = value.as_f64().ok_or("Can't cast json as float")?;
-        buffer.write(from, to, Self::new(number as f32));
+        buffer.write(
+            from,
+            to,
+            Self::try_from(number as f32).ok_or(
+                "Invalid float value in json",
+            )?,
+        );
         Ok(())
     }
 
@@ -243,6 +249,15 @@ impl ExonumJson for F32 {
     }
 }
 
+impl ExonumJsonDeserialize for F32 {
+    fn deserialize(value: &Value) -> Result<Self, Box<Error>> {
+        let number = value.as_f64().ok_or("Can't cast json as float")?;
+        Ok(Self::try_from(number as f32).ok_or(
+            "Invalid float value in json",
+        )?)
+    }
+}
+
 impl ExonumJson for F64 {
     fn deserialize_field<B: WriteBufferWrapper>(
         value: &Value,
@@ -251,7 +266,11 @@ impl ExonumJson for F64 {
         to: Offset,
     ) -> Result<(), Box<Error>> {
         let number = value.as_f64().ok_or("Can't cast json as float")?;
-        buffer.write(from, to, Self::new(number));
+        buffer.write(
+            from,
+            to,
+            Self::try_from(number).ok_or("Invalid float value in json")?,
+        );
         Ok(())
     }
 
@@ -259,6 +278,13 @@ impl ExonumJson for F64 {
         Ok(Value::Number(Number::from_f64(self.get()).ok_or(
             "Can't cast float as json",
         )?))
+    }
+}
+
+impl ExonumJsonDeserialize for F64 {
+    fn deserialize(value: &Value) -> Result<Self, Box<Error>> {
+        let number = value.as_f64().ok_or("Can't cast json as float")?;
+        Ok(Self::try_from(number).ok_or("Invalid float value in json")?)
     }
 }
 
