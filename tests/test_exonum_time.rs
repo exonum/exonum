@@ -13,7 +13,7 @@ use exonum::helpers::{Height, ValidatorId};
 use exonum::crypto::{gen_keypair, PublicKey};
 use exonum::storage::Snapshot;
 
-use exonum_time::{MockTimeProvider, TimeService, TimeSchema, TxTime, Time, ValidatorTime};
+use exonum_time::{MockTimeProvider, TimeService, TimeSchema, TxTime, ValidatorTime};
 use exonum_testkit::{ApiKind, TestKitApi, TestKitBuilder, TestNode};
 
 fn assert_storage_times_eq<T: AsRef<Snapshot>>(
@@ -25,7 +25,7 @@ fn assert_storage_times_eq<T: AsRef<Snapshot>>(
     let schema = TimeSchema::new(snapshot);
 
     assert_eq!(
-        schema.time().get().map(|time| time.time()),
+        schema.time().get().map(|time| time),
         expected_current_time
     );
 
@@ -34,7 +34,7 @@ fn assert_storage_times_eq<T: AsRef<Snapshot>>(
         let public_key = &validator.public_keys().service_key;
 
         assert_eq!(
-            validators_times.get(public_key).map(|time| time.time()),
+            validators_times.get(public_key).map(|time| time),
             expected_validators_times[i]
         );
     }
@@ -333,7 +333,7 @@ fn test_selected_time_less_than_time_in_storage() {
     assert_eq!(schema.time().get(), schema.validators_time().get(pub_key_0));
 
     if let Some(time_in_storage) = schema.time().get() {
-        let time_tx = time_in_storage.time() - Duration::new(10, 0);
+        let time_tx = time_in_storage - Duration::new(10, 0);
         let tx = {
             TxTime::new(time_tx, pub_key_1, sec_key_1)
         };
@@ -397,10 +397,10 @@ fn test_transaction_time_less_than_validator_time_in_storage() {
     let snapshot = testkit.snapshot();
     let schema = TimeSchema::new(snapshot);
 
-    assert_eq!(schema.time().get(), Some(Time::new(time0)));
+    assert_eq!(schema.time().get(), Some(time0));
     assert_eq!(
         schema.validators_time().get(pub_key),
-        Some(Time::new(time0))
+        Some(time0)
     );
 }
 
@@ -516,7 +516,7 @@ fn test_endpoint_api() {
     let snapshot = testkit.snapshot();
     let schema = TimeSchema::new(&snapshot);
     if let Some(time) = schema.validators_time().get(public_key_0) {
-        all_validators_times.insert(*public_key_0, Some(time.time()));
+        all_validators_times.insert(*public_key_0, Some(time));
     }
 
     assert_current_time_eq(&api, Some(time2));
