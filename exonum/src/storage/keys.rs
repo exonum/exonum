@@ -14,6 +14,8 @@
 
 //! A definition of `StorageKey` trait and implementations for common types.
 
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
 use byteorder::{ByteOrder, BigEndian};
 use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 
@@ -229,6 +231,37 @@ impl StorageKey for String {
     }
 }
 
+/// The `SystemTime` (de)serialization is only possible for the values greater than
+/// 1970-01-01 00:00:00 UTC. Since the `SystemTime` type saves time in the form
+/// `(seconds: u64, nanoseconds: u32)`, the total occupied size of `SystemTime` in the storage
+/// is 12 bytes. The seconds are stored in the first 8 bytes as per the `StorageKey` implementation
+/// for u64, and nanoseconds in the remaining 4 bytes as per the `StorageKey`
+/// implementation for u32.
+impl StorageKey for SystemTime {
+    fn size(&self) -> usize {
+        12
+    }
+
+    fn write(&self, buffer: &mut [u8]) {
+        let duration = self.duration_since(UNIX_EPOCH).expect(
+            "time value is later than 1970-01-01 00:00:00 UTC.",
+        );
+        let secs = duration.as_secs();
+        let nanos = duration.subsec_nanos();
+        secs.write(&mut buffer[0..8]);
+        nanos.write(&mut buffer[8..12]);
+    }
+
+    fn read(buffer: &[u8]) -> Self {
+        let secs = u64::read(&buffer[0..8]);
+        let nanos = u32::read(&buffer[8..12]);
+        // `Duration` performs internal normalization of time.
+        // The value of nanoseconds can not be greater than or equal to 1,000,000,000.
+        assert!(nanos < 1_000_000_000);
+        UNIX_EPOCH + Duration::new(secs, nanos)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -389,5 +422,107 @@ mod tests {
 
         // Notice the different order of values compared to the previous test
         assert_eq!(index.values().collect::<Vec<_>>(), vec![100, 200]);
+    }
+
+    #[test]
+    fn test_storage_key_for_system_time_round_trip() {
+        use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+        let times = [
+            UNIX_EPOCH,
+            UNIX_EPOCH + Duration::new(13, 23),
+            SystemTime::now(),
+            SystemTime::now() + Duration::new(17, 15),
+            UNIX_EPOCH + Duration::new(0, u32::max_value()),
+            UNIX_EPOCH + Duration::new(i64::max_value() as u64, 0),
+            UNIX_EPOCH + Duration::new(i64::max_value() as u64, 999_999_999),
+            UNIX_EPOCH + Duration::new(i64::max_value() as u64 - 1, 1_000_000_000),
+            UNIX_EPOCH + Duration::new(i64::max_value() as u64 - 4, 4_000_000_000),
+            UNIX_EPOCH + Duration::new(i64::max_value() as u64 - 4, u32::max_value()),
+        ];
+
+        let mut buffer = [0u8; 12];
+        for time in times.iter() {
+            time.write(&mut buffer);
+            assert_eq!(*time, SystemTime::read(&buffer));
+        }
+    }
+
+    #[test]
+    fn test_storage_key_for_system_time_ordering() {
+        use rand::{Rng, thread_rng};
+        use std::time::Duration;
+
+        let mut rng = thread_rng();
+
+        let (mut buffer1, mut buffer2) = ([0u8; 12], [0u8; 12]);
+        for _ in 0..FUZZ_SAMPLES {
+            let time1 = UNIX_EPOCH +
+                Duration::new(
+                    rng.gen::<u64>() % (i32::max_value() as u64),
+                    rng.gen::<u32>() % 1_000_000_000,
+                );
+            let time2 = UNIX_EPOCH +
+                Duration::new(
+                    rng.gen::<u64>() % (i32::max_value() as u64),
+                    rng.gen::<u32>() % 1_000_000_000,
+                );
+            time1.write(&mut buffer1);
+            time2.write(&mut buffer2);
+            assert_eq!(
+                time1.cmp(&time2),
+                buffer1.cmp(&buffer2),
+            );
+        }
+    }
+
+    #[test]
+    fn test_system_time_key_in_index() {
+        use std::time::{Duration, SystemTime, UNIX_EPOCH};
+        use storage::{Database, MapIndex, MemoryDB};
+
+        let db: Box<Database> = Box::new(MemoryDB::new());
+        let x1 = UNIX_EPOCH + Duration::new(80, 0);
+        let x2 = UNIX_EPOCH + Duration::new(10, 0);
+        let y1 = SystemTime::now();
+        let y2 = y1 + Duration::new(10, 0);
+        let mut fork = db.fork();
+        {
+            let mut index: MapIndex<_, SystemTime, SystemTime> =
+                MapIndex::new("test_index", &mut fork);
+            index.put(&x1, y1);
+            index.put(&x2, y2);
+        }
+        db.merge(fork.into_patch()).unwrap();
+
+        let snapshot = db.snapshot();
+        let index: MapIndex<_, SystemTime, SystemTime> = MapIndex::new("test_index", snapshot);
+        assert_eq!(index.get(&x1), Some(y1));
+        assert_eq!(index.get(&x2), Some(y2));
+
+        assert_eq!(
+            index.iter_from(&UNIX_EPOCH).collect::<Vec<_>>(),
+            vec![(x2, y2), (x1, y1)]
+        );
+        assert_eq!(
+            index
+                .iter_from(&(UNIX_EPOCH + Duration::new(20, 0)))
+                .collect::<Vec<_>>(),
+            vec![(x1, y1)]
+        );
+        assert_eq!(
+            index
+                .iter_from(&(UNIX_EPOCH + Duration::new(80, 0)))
+                .collect::<Vec<_>>(),
+            vec![(x1, y1)]
+        );
+        assert_eq!(
+            index
+                .iter_from(&(UNIX_EPOCH + Duration::new(90, 0)))
+                .collect::<Vec<_>>(),
+            vec![]
+        );
+
+        assert_eq!(index.values().collect::<Vec<_>>(), vec![y2, y1]);
     }
 }

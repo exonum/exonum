@@ -20,6 +20,7 @@
 use std::default::Default;
 use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
 use std::fmt;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use sodiumoxide::crypto::sign::ed25519::{gen_keypair as gen_keypair_sodium, keypair_from_seed,
                                          sign_detached, verify_detached,
@@ -637,6 +638,21 @@ impl CryptoHash for Vec<u8> {
 impl CryptoHash for String {
     fn hash(&self) -> Hash {
         hash(self.as_ref())
+    }
+}
+
+impl CryptoHash for SystemTime {
+    fn hash(&self) -> Hash {
+        let duration = self.duration_since(UNIX_EPOCH).expect(
+            "time value is later than 1970-01-01 00:00:00 UTC.",
+        );
+        let secs = duration.as_secs();
+        let nanos = duration.subsec_nanos();
+
+        let mut buffer = [0u8; 12];
+        LittleEndian::write_u64(&mut buffer[0..8], secs);
+        LittleEndian::write_u32(&mut buffer[8..12], nanos);
+        hash(&buffer)
     }
 }
 
