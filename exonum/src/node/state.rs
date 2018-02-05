@@ -587,17 +587,17 @@ impl State {
             }
             *known_round = round;
         }
-        let max_byzant_count = self.validators().len() / 3;
-        if self.validators_rounds.len() <= max_byzant_count {
-            trace!("Count of validators, lower then max byzant.");
+        let max_byzantine_count = self.validators().len() / 3;
+        if self.validators_rounds.len() <= max_byzantine_count {
+            trace!("Count of validators, lower then max byzantine count.");
             return None;
         }
 
         let mut rounds: Vec<_> = self.validators_rounds.iter().map(|(_, v)| v).collect();
         rounds.sort_unstable_by(|a, b| b.cmp(a));
 
-        if rounds[max_byzant_count] > &self.round {
-            Some(*rounds[max_byzant_count])
+        if rounds[max_byzantine_count] > &self.round {
+            Some(*rounds[max_byzantine_count])
         } else {
             None
         }

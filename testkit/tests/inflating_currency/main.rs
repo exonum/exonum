@@ -42,7 +42,7 @@ fn init_testkit() -> TestKit {
 
 fn create_wallet(api: &TestKitApi, name: &str) -> (TxCreateWallet, SecretKey) {
     let (pubkey, key) = crypto::gen_keypair();
-    // Create a presigned transaction
+    // Create a pre-signed transaction
     let tx = TxCreateWallet::new(&pubkey, name, &key);
 
     let tx_info: TransactionResponse = api.post(
@@ -111,7 +111,7 @@ fn test_transfer_scenarios() {
     assert_eq!(get_balance(&api, tx_bob.pub_key()), 23); // 20 + 3
     testkit.rollback(3);
 
-    // If there is no block separating transactions, Alice's balance is insufficent
+    // If there is no block separating transactions, Alice's balance is insufficient
     // to complete the second transaction.
     testkit.create_block_with_transactions(txvec![tx_a_to_b.clone()]); // A: 4 + 1, B: 14 + 1
     testkit.create_block_with_transactions(txvec![next_tx_a_to_b.clone()]); // fails

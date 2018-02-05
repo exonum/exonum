@@ -44,7 +44,7 @@ use vec_map::VecMap;
 use byteorder::{ByteOrder, LittleEndian};
 use mount::Mount;
 
-use crypto::{self, Hash, PublicKey, SecretKey};
+use crypto::{self, Hash, CryptoHash, PublicKey, SecretKey};
 use messages::{CONSENSUS as CORE_SERVICE, Precommit, RawMessage, Connect};
 use storage::{Database, Error, Fork, Patch, Snapshot};
 use helpers::{Height, ValidatorId};
@@ -326,7 +326,7 @@ impl Blockchain {
                 &state_hash,
             );
             trace!("execute block = {:?}", block);
-            // Eval block hash
+            // Calculate block hash
             let block_hash = block.hash();
             // Update height
             let mut schema = Schema::new(&mut fork);

@@ -15,6 +15,7 @@
 //! Exonum node that performs consensus algorithm.
 //!
 //! For details about consensus message handling see messages module documentation.
+// spell-checker:ignore cors
 
 use std::io;
 use std::sync::Arc;
@@ -35,7 +36,7 @@ use futures::{Future, Sink};
 use futures::sync::mpsc;
 use tokio_core::reactor::Core;
 
-use crypto::{self, Hash, PublicKey, SecretKey};
+use crypto::{self, Hash, CryptoHash, PublicKey, SecretKey};
 use blockchain::{Blockchain, GenesisConfig, Schema, SharedNodeState, Transaction, Service};
 use api::{private, public, Api};
 use messages::{Connect, Message, RawMessage};
@@ -53,7 +54,7 @@ mod basic;
 mod consensus;
 mod requests;
 mod whitelist;
-pub mod state; // TODO: temporary solution to get access to WAIT consts (ECR-167)
+pub mod state; // TODO: temporary solution to get access to WAIT constants (ECR-167)
 pub mod timeout_adjuster;
 
 /// External messages.

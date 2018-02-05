@@ -87,7 +87,7 @@ macro_rules! implement_std_field {
     )
 }
 
-/// Implements `Field` for the tuple struct typedefs that contain simple types.
+/// Implements `Field` for the tuple struct type definitions that contain simple types.
 macro_rules! implement_std_typedef_field {
     ($name:ident ($t:ty) $fn_read:expr; $fn_write:expr) => (
         impl<'a> Field<'a> for $name {
@@ -224,7 +224,7 @@ impl<'a> Field<'a> for u8 {
     }
 }
 
-// TODO expect some codding of signed ints (ECR-156) ?
+// TODO expect some codding of signed integers (ECR-156) ?
 impl<'a> Field<'a> for i8 {
     fn field_size() -> Offset {
         mem::size_of::<Self>() as Offset

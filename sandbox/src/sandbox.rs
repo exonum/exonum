@@ -277,8 +277,8 @@ impl Sandbox {
     pub fn send<T: Message>(&self, addr: SocketAddr, msg: &T) {
         self.process_events();
         let any_expected_msg = Any::from_raw(msg.raw().clone()).unwrap();
-        let sended = self.inner.borrow_mut().sent.pop_front();
-        if let Some((real_addr, real_msg)) = sended {
+        let send = self.inner.borrow_mut().sent.pop_front();
+        if let Some((real_addr, real_msg)) = send {
             let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
             if real_addr != addr || any_real_msg != any_expected_msg {
                 panic!(
@@ -330,8 +330,8 @@ impl Sandbox {
         let mut expected_set: HashSet<_> = HashSet::from_iter(addresses);
 
         for _ in 0..expected_set.len() {
-            let sended = self.inner.borrow_mut().sent.pop_front();
-            if let Some((real_addr, real_msg)) = sended {
+            let send = self.inner.borrow_mut().sent.pop_front();
+            if let Some((real_addr, real_msg)) = send {
                 let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
                 if any_real_msg != any_expected_msg {
                     return Err(format!(
@@ -352,7 +352,7 @@ impl Sandbox {
                 }
             } else {
                 panic!(
-                    "Expected to broadcast the message {:?} but someone don't recieve \
+                    "Expected to broadcast the message {:?} but someone don't receive \
                      messages: {:?}",
                     any_expected_msg,
                     expected_set
@@ -515,10 +515,10 @@ impl Sandbox {
 
     pub fn transactions_hashes(&self) -> Vec<Hash> {
         let node_state = self.node_state();
-        let rlock = node_state.transactions().read().expect(
+        let read_lock = node_state.transactions().read().expect(
             "Expected read lock",
         );
-        rlock.keys().cloned().collect()
+        read_lock.keys().cloned().collect()
     }
 
     pub fn current_round(&self) -> Round {
@@ -542,9 +542,9 @@ impl Sandbox {
     pub fn assert_state(&self, expected_height: Height, expected_round: Round) {
         let state = self.node_state();
 
-        let achual_height = state.height();
+        let actual_height = state.height();
         let actual_round = state.round();
-        assert_eq!(achual_height, expected_height);
+        assert_eq!(actual_height, expected_height);
         assert_eq!(actual_round, expected_round);
     }
 

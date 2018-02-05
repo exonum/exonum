@@ -90,6 +90,7 @@ fn test_bitvec() {
 #[test]
 fn test_str_segment() {
     let mut buf = vec![0; 8];
+    // spell-checker:disable-next
     let s = "test юникодной строчки efw_adqq ss/adfq";
     Field::write(&s, &mut buf, 0, 8);
     <&str as Field>::check(&buf, 0.into(), 8.into(), 8.into()).unwrap();

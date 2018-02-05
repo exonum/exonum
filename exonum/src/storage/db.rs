@@ -85,7 +85,7 @@ impl Patch {
         self.changes.get_mut(name)
     }
 
-    /// Gets the given names's corresponding entry in the map for in-place manipulation.
+    /// Gets the corresponding entry in the map by the given name for in-place manipulation.
     fn changes_entry(&mut self, name: String) -> HmEntry<String, Changes> {
         self.changes.entry(name)
     }
@@ -474,7 +474,7 @@ impl Fork {
     ///
     /// # Panics
     ///
-    /// Panics if checkpoint was created before and it was not committed or rollbacked yet.
+    /// Panics if checkpoint was created before and it was not committed or rolled back yet.
     pub fn merge(&mut self, patch: Patch) {
         if self.logged {
             panic!("call merge before commit or rollback");

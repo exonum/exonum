@@ -69,7 +69,7 @@ macro_rules! encoding_struct {
             raw: Vec<u8>
         }
 
-        // Reimplement `Field` for `encoding_struct!`
+        // Re-implement `Field` for `encoding_struct!`
         // to write fields in place of another structure
         impl<'a> $crate::encoding::Field<'a> for $name {
             unsafe fn read(buffer: &'a [u8],
@@ -132,7 +132,7 @@ macro_rules! encoding_struct {
 
         impl $crate::crypto::CryptoHash for $name {
             fn hash(&self) -> $crate::crypto::Hash {
-                $name::hash(self)
+                $crate::crypto::hash(self.raw.as_ref())
             }
         }
 
@@ -161,11 +161,6 @@ macro_rules! encoding_struct {
                     $( ($(#[$field_attr])*, $field_name, $field_type) )*
                 );
                 $name { raw: buf }
-            }
-
-            /// Hashes data as a raw byte array and returns the resulting hash.
-            pub fn hash(&self) -> $crate::crypto::Hash {
-                $crate::crypto::hash(self.raw.as_ref())
             }
 
             __ex_for_each_field!(
