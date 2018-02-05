@@ -469,10 +469,7 @@ mod tests {
                 );
             time1.write(&mut buffer1);
             time2.write(&mut buffer2);
-            assert_eq!(
-                time1.cmp(&time2),
-                buffer1.cmp(&buffer2)
-            );
+            assert_eq!(time1.cmp(&time2), buffer1.cmp(&buffer2));
         }
     }
 

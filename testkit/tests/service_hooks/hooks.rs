@@ -14,7 +14,7 @@
 
 //! A special service which generates transactions on `handle_commit` events.
 
-use exonum::blockchain::{Service, ServiceContext, Transaction};
+use exonum::blockchain::{Service, ServiceContext, Transaction, ExecutionStatus};
 use exonum::messages::{RawTransaction, Message};
 use exonum::storage::{Fork, Snapshot};
 use exonum::crypto::{Hash, Signature};
@@ -38,7 +38,9 @@ impl Transaction for TxAfterCommit {
         true
     }
 
-    fn execute(&self, _fork: &mut Fork) {}
+    fn execute(&self, _fork: &mut Fork) -> ExecutionStatus {
+        Ok(())
+    }
 }
 
 pub struct HandleCommitService;

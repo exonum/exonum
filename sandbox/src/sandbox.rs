@@ -424,7 +424,7 @@ impl Sandbox {
             .collect()
     }
 
-    /// Extract state_hash from fake block
+    /// Extracts state_hash from the fake block.
     pub fn compute_state_hash<'a, I>(&self, txs: I) -> Hash
     where
         I: IntoIterator<Item = &'a RawTransaction>,
