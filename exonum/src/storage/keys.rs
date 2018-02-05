@@ -471,7 +471,7 @@ mod tests {
             time2.write(&mut buffer2);
             assert_eq!(
                 time1.cmp(&time2),
-                buffer1.cmp(&buffer2),
+                buffer1.cmp(&buffer2)
             );
         }
     }
