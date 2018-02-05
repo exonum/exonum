@@ -21,17 +21,8 @@ rust:
 
 matrix:
   allow_failures:
-    - env: FEATURE=non-fatal-checks
+  - env: FEATURE=non-fatal-checks
   fast_finish: true
-  include:
-    - rust: nightly-2018-01-22
-      env: FEATURE=benchmarks
-    - rust: nightly-2018-01-22
-      env: FEATURE=clippy-core
-    - rust: nightly-2018-01-22
-      env: FEATURE=clippy-sandbox
-    - rust: nightly-2018-01-22
-      env: FEATURE=clippy-testkit
 
 cache:
   directories:
@@ -58,14 +49,11 @@ env:
   - ROCKSDB_LIB_DIR=/usr/lib/x86_64-linux-gnu
   - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
   matrix:
-  - FEATURE=fmt
   - FEATURE=test-core
-  - FEATURE=test-sandbox
-  - FEATURE=test-testkit
-  - FEATURE=test-doc
-  - FEATURE=non-fatal-checks
 
-install:
+# Separate jobs should use `install` hook in order not to override these common
+# instructions.
+before_install:
 - |
   if [ ! -f "$HOME/.local/lib/libsodium.a" ]; then
     wget "https://github.com/jedisct1/libsodium/releases/download/$SODIUM_VERS/libsodium-$SODIUM_VERS.tar.gz" -t 5 -O "libsodium.tar.gz"
@@ -78,79 +66,78 @@ install:
   fi
 - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.local/lib
 - export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$HOME/.local/lib/pkgconfig
-- |
-  if [[ "$FEATURE" == "non-fatal-checks" ]]; then
-    cargo-outdated -V | grep $OUTDATED_VERS || cargo install cargo-outdated --vers $OUTDATED_VERS --force
-    cargo-deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
-    fi
-- |
-  if [[ "$FEATURE" == "fmt" ]]; then
-    cargo-audit -V || cargo install cargo-audit --force
-    rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
-    nvm install 8 && nvm use 8
-    npm install cspell
-    ./node_modules/.bin/cspell --version
-  fi
-- |
-  if [[ "$FEATURE" == "test-testkit" ]]; then
-    nvm install 8 && nvm use 8
-    cd testkit/examples/server && npm install && cd ../../..
-  fi
-- |
-  case "$FEATURE" in
-  clippy* )
-    cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
-  ;;
-  esac
-- cargo install --list
 
-script: |
-  case "$FEATURE" in
+jobs:
+  include:
+  # Formatting & other lints that do not require compilation
+  - env: FEATURE=fmt
+    install:
+    - cargo-audit -V || cargo install cargo-audit --force
+    - rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
+    - nvm install 8 && nvm use 8
+    - npm install cspell
+    - ./node_modules/.bin/cspell --version
+    script:
+    - cd exonum && cargo fmt -- --write-mode=diff && cd ..
+    - cd sandbox && cargo fmt -- --write-mode=diff && cd ..
+    - cd testkit && cargo fmt -- --write-mode=diff && cd ..
+    - ./node_modules/.bin/cspell sandbox/{src,examples,tests}/**/*.rs
+    - ./node_modules/.bin/cspell exonum/{src,benches,tests}/**/*.rs
+    - ./node_modules/.bin/cspell testkit/{src,examples,tests}/**/*.rs
 
-  "fmt" )
-      cargo update &&
-      cd exonum && cargo fmt -- --write-mode=diff && cd .. &&
-      cd sandbox && cargo fmt -- --write-mode=diff && cd .. &&
-      cd testkit && cargo fmt -- --write-mode=diff && cd .. &&
-      ./node_modules/.bin/cspell sandbox/{src,examples,tests}/**/*.rs &&
-      ./node_modules/.bin/cspell exonum/{src,benches,tests}/**/*.rs &&
-      ./node_modules/.bin/cspell testkit/{src,examples,tests}/**/*.rs
-  ;;
-  "clippy-core" )
-      cd exonum && cargo clippy --verbose --features long_benchmarks -- -D warnings
-  ;;
-  "clippy-sandbox" )
-      cd sandbox && cargo clippy --verbose -- -D warnings
-  ;;
-  "clippy-testkit" )
-      cd testkit && cargo clippy --verbose -- -D warnings
-  ;;
-  "test-core" )
-      cargo test -p exonum --verbose --tests --lib --features "float_serialize"
-  ;;
-  "test-sandbox" )
-      cargo test -p sandbox --verbose
-  ;;
-  "test-testkit" )
-      cargo test -p exonum-testkit --verbose &&
-      cargo run -p exonum-testkit --example timestamping &&
-      cargo run -p exonum-testkit --example configuration_change &&
-      cargo build -p exonum-testkit --example server &&
-      cd testkit/examples/server && npm run lint && npm run test:unix
-  ;;
-  "test-doc" )
-      cargo test -p sandbox --verbose --doc -- --test-threads=2
-  ;;
-  "non-fatal-checks" )
-      cargo doc --no-deps &&
-      cargo deadlinks --dir target/doc &&
-      cargo outdated --exit-code 1
-  ;;
-  "benchmarks" )
-      RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
-  ;;
+  # Clippy linting
+  - &clippy-core
+    env: FEATURE=clippy-core
+    rust: nightly-2018-01-22
+    install:
+    - cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
+    script:
+    - cd exonum && cargo clippy --verbose --features long_benchmarks -- -D warnings
+  - <<: *clippy-core
+    env: FEATURE=clippy-sandbox
+    script:
+    - cd sandbox && cargo clippy --verbose -- -D warnings
+  - <<: *clippy-core
+    env: FEATURE=clippy-testkit
+    script:
+    - cd testkit && cargo clippy --verbose -- -D warnings
 
-  esac
+  # Tests
+  - env: FEATURE=test-core
+    script:
+    - cargo test -p exonum --verbose --tests --lib --features "float_serialize"
+  - env: FEATURE=test-sandbox
+    script:
+    - cargo test -p sandbox --verbose
+  - env: FEATURE=test-testkit
+    install:
+    - nvm install 8 && nvm use 8
+    - cd testkit/examples/server && npm install && cd ../../..
+    script:
+    - cargo test -p exonum-testkit --verbose
+    - cargo run -p exonum-testkit --example timestamping
+    - cargo run -p exonum-testkit --example configuration_change
+    - cargo build -p exonum-testkit --example server
+    - cd testkit/examples/server && npm run lint && npm run test:unix
+  - env: FEATURE=test-doc
+    script:
+    - cargo test -p sandbox --verbose --doc -- --test-threads=2
+
+  # Benchmarks (compilation only)
+  - env: FEATURE=benchmarks
+    rust: nightly-2018-01-22
+    script:
+    - RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
+
+  # Non-fatal checks
+  - env: FEATURE=non-fatal-checks
+    install:
+    - cargo-outdated -V | grep $OUTDATED_VERS || cargo install cargo-outdated --vers $OUTDATED_VERS --force
+    - cargo-deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
+    script:
+    - cargo doc --no-deps
+    - cargo deadlinks --dir target/doc
+    - cargo outdated --exit-code 1
 
 after_success: |
   [ $TRAVIS_BRANCH = master ] &&
