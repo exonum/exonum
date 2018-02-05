@@ -257,10 +257,10 @@ pub fn add_round_with_transactions(
     sandbox_state: &SandboxState,
     transactions: &[Hash],
 ) -> Option<Propose> {
-    add_round_with_transactions_nopanic(sandbox, sandbox_state, transactions).unwrap()
+    try_add_round_with_transactions(sandbox, sandbox_state, transactions).unwrap()
 }
 
-pub fn add_round_with_transactions_nopanic(
+pub fn try_add_round_with_transactions(
     sandbox: &TimestampingSandbox,
     sandbox_state: &SandboxState,
     transactions: &[Hash],
@@ -295,8 +295,7 @@ pub fn add_round_with_transactions_nopanic(
 
 
     if sandbox.is_leader() {
-        res =
-            check_and_broadcast_propose_and_prevote_nopanic(sandbox, sandbox_state, transactions)?;
+        res = try_check_and_broadcast_propose_and_prevote(sandbox, sandbox_state, transactions)?;
     }
     Ok(res)
 }
@@ -320,24 +319,23 @@ pub fn add_one_height_with_transactions<'a, I>(
 where
     I: IntoIterator<Item = &'a RawTransaction>,
 {
-    add_one_height_with_transactions_nopanic(sandbox, sandbox_state, txs).unwrap()
+    try_add_one_height_with_transactions(sandbox, sandbox_state, txs).unwrap()
 }
 
-pub fn add_one_height_nopanic(
+pub fn try_add_one_height(
     sandbox: &TimestampingSandbox,
     sandbox_state: &SandboxState,
 ) -> Result<(), String> {
     // gen some tx
     let tx = gen_timestamping_tx();
-    let result =
-        add_one_height_with_transactions_nopanic(sandbox, sandbox_state, &[tx.raw().clone()]);
+    let result = try_add_one_height_with_transactions(sandbox, sandbox_state, &[tx.raw().clone()]);
     match result {
         Ok(_) => Ok(()),
         Err(msg) => Err(msg),
     }
 }
 
-pub fn add_one_height_with_transactions_nopanic<'a, I>(
+pub fn try_add_one_height_with_transactions<'a, I>(
     sandbox: &TimestampingSandbox,
     sandbox_state: &SandboxState,
     txs: I,
@@ -372,7 +370,7 @@ where
 
     let n_validators = sandbox.n_validators();
     for _ in 0..n_validators {
-        propose = add_round_with_transactions_nopanic(sandbox, sandbox_state, hashes.as_ref())?;
+        propose = try_add_round_with_transactions(sandbox, sandbox_state, hashes.as_ref())?;
         let round = sandbox.current_round();
         if sandbox.is_leader() {
             // ok, we are leader
@@ -581,10 +579,10 @@ fn check_and_broadcast_propose_and_prevote(
     sandbox_state: &SandboxState,
     transactions: &[Hash],
 ) -> Option<Propose> {
-    check_and_broadcast_propose_and_prevote_nopanic(sandbox, sandbox_state, transactions).unwrap()
+    try_check_and_broadcast_propose_and_prevote(sandbox, sandbox_state, transactions).unwrap()
 }
 
-fn check_and_broadcast_propose_and_prevote_nopanic(
+fn try_check_and_broadcast_propose_and_prevote(
     sandbox: &TimestampingSandbox,
     sandbox_state: &SandboxState,
     transactions: &[Hash],
@@ -618,7 +616,7 @@ fn check_and_broadcast_propose_and_prevote_nopanic(
     trace!("broadcasting propose with hash: {:?}", propose.hash());
     trace!("broadcasting propose with round: {:?}", propose.round());
     trace!("sandbox.current_round: {:?}", sandbox.current_round());
-    sandbox.broadcast_nopanic(&propose)?;
+    sandbox.try_broadcast(&propose)?;
 
     sandbox.broadcast(&Prevote::new(
         VALIDATOR_0,

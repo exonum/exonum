@@ -186,7 +186,7 @@ fn test_disable_and_enable() {
     let sandbox_state = SandboxState::new();
 
     sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
-    add_one_height_nopanic(&sandbox, &sandbox_state).unwrap();
+    try_add_one_height(&sandbox, &sandbox_state).unwrap();
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
 
     // Disable the node.
@@ -204,7 +204,7 @@ fn test_disable_and_enable() {
 
     // A fail is expected here as the node is disabled.
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
-    let result = add_one_height_nopanic(&sandbox, &sandbox_state);
+    let result = try_add_one_height(&sandbox, &sandbox_state);
     assert!(result.is_err());
 
     // Re-enable the node.
@@ -224,7 +224,7 @@ fn test_disable_and_enable() {
     sandbox.set_time(time_saved);
 
     // The node should work fine now
-    add_one_height_nopanic(&sandbox, &sandbox_state).unwrap();
+    try_add_one_height(&sandbox, &sandbox_state).unwrap();
     sandbox.assert_state(HEIGHT_THREE, ROUND_ONE);
 }
 

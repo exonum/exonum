@@ -302,8 +302,8 @@ impl Sandbox {
         self.broadcast_to_addrs(msg, self.addresses.iter().skip(1));
     }
 
-    pub fn broadcast_nopanic<T: Message>(&self, msg: &T) -> Result<(), String> {
-        self.broadcast_to_addrs_nopanic(msg, self.addresses.iter().skip(1))
+    pub fn try_broadcast<T: Message>(&self, msg: &T) -> Result<(), String> {
+        self.try_broadcast_to_addrs(msg, self.addresses.iter().skip(1))
     }
 
     // TODO: add self-test for broadcasting?
@@ -311,11 +311,11 @@ impl Sandbox {
     where
         I: IntoIterator<Item = &'a SocketAddr>,
     {
-        self.broadcast_to_addrs_nopanic(msg, addresses).unwrap();
+        self.try_broadcast_to_addrs(msg, addresses).unwrap();
     }
 
     // TODO: add self-test for broadcasting?
-    pub fn broadcast_to_addrs_nopanic<'a, T: Message, I>(
+    pub fn try_broadcast_to_addrs<'a, T: Message, I>(
         &self,
         msg: &T,
         addresses: I,
