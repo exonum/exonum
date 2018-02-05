@@ -20,7 +20,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use byteorder::{ByteOrder, LittleEndian};
 
-use crypto::{self, CryptoHash, Hash, PublicKey};
+use crypto::{CryptoHash, Hash, PublicKey};
 use messages::{RawMessage, MessageBuffer};
 
 /// A type that can be (de)serialized as a value in the blockchain storage.
@@ -239,22 +239,6 @@ impl StorageValue for String {
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
         String::from_utf8(value.into_owned()).unwrap()
-    }
-}
-
-/// Uses little-endian encoding.
-impl CryptoHash for SystemTime {
-    fn hash(&self) -> Hash {
-        let duration = self.duration_since(UNIX_EPOCH).expect(
-            "time value is later than 1970-01-01 00:00:00 UTC.",
-        );
-        let secs = duration.as_secs();
-        let nanos = duration.subsec_nanos();
-
-        let mut buffer = [0u8; 12];
-        LittleEndian::write_u64(&mut buffer[0..8], secs);
-        LittleEndian::write_u32(&mut buffer[8..12], nanos);
-        crypto::hash(&buffer)
     }
 }
 

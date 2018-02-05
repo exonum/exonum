@@ -26,13 +26,6 @@ use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 /// will not sort signed integer types in the natural order; therefore, they are
 /// mapped to the corresponding unsigned type by adding a constant to the source value.
 ///
-/// The `SystemTime` (de)serialization is only possible for the values greater than
-/// 1970-01-01 00:00:00 UTC. Since the `SystemTime` type saves time in the form
-/// `(seconds: u64, nanoseconds: u32)`, the total occupied size of `SystemTime` in the storage
-/// is 12 bytes, the time is stored as a buffer of bytes `buffer[0..12]: &[u8]`.
-/// Accordingly, the seconds are stored as a buffer of bytes `buffer[0..8]: &[u8]`,
-/// the nanoseconds - `buffer[8..12]: &[u8]`.
-///
 /// # Examples
 ///
 /// ```
@@ -238,6 +231,12 @@ impl StorageKey for String {
     }
 }
 
+/// The `SystemTime` (de)serialization is only possible for the values greater than
+/// 1970-01-01 00:00:00 UTC. Since the `SystemTime` type saves time in the form
+/// `(seconds: u64, nanoseconds: u32)`, the total occupied size of `SystemTime` in the storage
+/// is 12 bytes. The seconds are stored in the first 8 bytes as per the `StorageKey` implementation
+/// for u64, and nanoseconds in the remaining 4 bytes as per the `StorageKey`
+/// implementation for u32.
 impl StorageKey for SystemTime {
     fn size(&self) -> usize {
         12
@@ -513,7 +512,7 @@ mod tests {
         );
         assert_eq!(
             index
-                .iter_from(&(UNIX_EPOCH + Duration::new(30, 0)))
+                .iter_from(&(UNIX_EPOCH + Duration::new(80, 0)))
                 .collect::<Vec<_>>(),
             vec![(x1, y1)]
         );
