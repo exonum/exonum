@@ -21,6 +21,7 @@ All notable changes to this project will be documented in this file. The project
   
 ### New features
 - `StorageKey` and `StorageValue` traits are implemented for `SystemTime`. (#456)
+- Added a method `handle_execute` in `Service` trait. (#464)
 
 ## 0.5.1 - 2018-02-01
 

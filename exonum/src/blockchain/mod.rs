@@ -275,6 +275,13 @@ impl Blockchain {
                 schema.tx_location_by_tx_hash_mut().put(hash, location);
             }
 
+            // Invoke handle_execute for each service
+            fork.checkpoint();
+            for service in self.service_map.values() {
+                service.handle_execute(&mut fork);
+            }
+            fork.commit();
+
             // Get tx & state hash
             let (tx_hash, state_hash) = {
                 let state_hashes = {
