@@ -1,6 +1,6 @@
 # exonum-time
 
-[![Build Status](https://travis-ci.org/exonum/exonum-time.svg?branch=master)](https://travis-ci.org/exonum/exonum-time)
+[![Build Status](https://travis-ci.org/exonum/exonum.svg?branch=master)](https://travis-ci.org/exonum/exonum)
 
 Exonum-time is a time oracle service for [Exonum blockchain framework](https://exonum.com/).
 This service allows to determine time, 
@@ -82,4 +82,4 @@ let validator_time = time_schema.validators_time().get(&public_key);
 `exonum-time` is licensed under the Apache License (Version 2.0). See [LICENSE](LICENSE) for details.
 
 [service]: examples/simple_service.rs
-[exonum-testkit]: https://github.com/exonum/exonum-testkit
+[exonum-testkit]: ../../exonum/testkit

@@ -14,7 +14,7 @@ This is the main Exonum repository that includes
 * [Exonum testing framework](https://github.com/exonum/exonum/blob/master/testkit/README.md).
 * Services:
   * Configuration service (currently in [exonum-configuration](https://github.com/exonum/exonum-configuration) repository).
-  * Time service (currently in [exonum-time](https://github.com/exonum/exonum-time) repository).
+  * [Time service](https://github.com/exonum/exonum/blob/master/services/exonum-time/README.md).
 * Demos
   * Cryprocurrency (currently in [cryptocurrency](https://github.com/exonum/cryptocurrency) repository).
   

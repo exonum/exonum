@@ -135,15 +135,15 @@ script: |
       cargo test -p sandbox --verbose
   ;;
   "test-testkit" )
-      cargo test -p exonum-testkit --verbose
+      cargo test -p exonum-testkit --verbose &&
       cargo run -p exonum-testkit --example timestamping &&
       cargo run -p exonum-testkit --example configuration_change
   ;;
   "test-exonum-time" )
-        cargo test -p exonum-time --verbose
-        cargo run -p exonum-time --example exonum_time &&
-        cargo run -p exonum-time --example simple_service
-    ;;
+      cargo test -p exonum-time --verbose &&
+      cargo run -p exonum-time --example exonum_time &&
+      cargo run -p exonum-time --example simple_service
+  ;;
   "test-doc" )
       cargo test -p sandbox --verbose --doc -- --test-threads=2
   ;;
