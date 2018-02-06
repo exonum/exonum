@@ -15,7 +15,7 @@ synchronously.
 """
 
 [badges]
-travis-ci = { repository = "exonum/exonum-testkit" }
+travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
 exonum = { version = "0.5", path = "../exonum" }

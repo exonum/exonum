@@ -226,15 +226,8 @@ fn test_exonum_time_service_with_7_validators() {
     let times = (0..7)
         .map(|x| time + Duration::new(x * 10, 0))
         .collect::<Vec<_>>();
-    let expected_storage_times = vec![
-        None,
-        None,
-        None,
-        None,
-        Some(times[2]),
-        Some(times[3]),
-        Some(times[4]),
-    ];
+    let expected_storage_times =
+        vec![None, None, None, None, Some(times[2]), Some(times[3]), Some(times[4])];
 
     for (i, validator) in validators.iter().enumerate() {
         let tx = {
