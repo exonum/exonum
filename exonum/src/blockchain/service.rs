@@ -184,7 +184,6 @@ macro_rules! transactions {
         }
 
          impl<'de> $crate::encoding::serialize::reexport::Deserialize<'de> for $transaction_set {
-            #[allow(unused_mut)]
             fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
             where
                 D: $crate::encoding::serialize::reexport::Deserializer<'de>,
