@@ -22,6 +22,9 @@ All notable changes to this project will be documented in this file. The project
 ### New features
 - `StorageKey` and `StorageValue` traits are implemented for `SystemTime`. (#456)
 
+### Bug fixes
+- `ExonumJsonDeserialize` trait is implemented for `F32` and `F64`. (#461)
+
 ## 0.5.1 - 2018-02-01
 
 ### Bug fixes
