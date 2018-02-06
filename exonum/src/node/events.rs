@@ -38,6 +38,13 @@ impl NodeHandler {
     }
 
     fn handle_network_event(&mut self, event: NetworkEvent) {
+        if !self.is_enabled {
+            info!(
+                "Ignoring a network event {:?} because the node is disabled",
+                event
+            );
+            return;
+        }
         match event {
             NetworkEvent::PeerConnected(peer, connect) => self.handle_connected(peer, connect),
             NetworkEvent::PeerDisconnected(peer) => self.handle_disconnected(peer),
@@ -49,16 +56,50 @@ impl NodeHandler {
     fn handle_api_event(&mut self, event: ExternalMessage) {
         match event {
             ExternalMessage::Transaction(tx) => {
+                if !self.is_enabled {
+                    info!(
+                        "Ignoring a transaction {:?} because the node is disabled",
+                        tx
+                    );
+                    return;
+                }
                 self.handle_incoming_tx(tx);
             }
             ExternalMessage::PeerAdd(address) => {
+                if !self.is_enabled {
+                    info!(
+                        "Ignoring a connect message to {} because the node is disabled",
+                        address
+                    );
+                    return;
+                }
                 info!("Send Connect message to {}", address);
                 self.connect(&address);
+            }
+            ExternalMessage::Enable(value) => {
+                let s = if value { "enabled" } else { "disabled" };
+                if self.is_enabled == value {
+                    info!("Node is already {}", s);
+                } else {
+                    self.is_enabled = value;
+                    self.api_state().update_is_enabled(value);
+                    info!("The node is {} now", s);
+                    if self.is_enabled {
+                        self.add_round_timeout();
+                    }
+                }
             }
         }
     }
 
     fn handle_timeout(&mut self, timeout: NodeTimeout) {
+        if !self.is_enabled {
+            info!(
+                "Ignoring a timeout {:?} because the node is disabled",
+                timeout
+            );
+            return;
+        }
         match timeout {
             NodeTimeout::Round(height, round) => self.handle_round_timeout(height, round),
             NodeTimeout::Request(data, peer) => self.handle_request_timeout(&data, peer),
