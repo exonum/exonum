@@ -74,21 +74,26 @@ mod tests {
 
     #[test]
     fn test_take_while_ready() {
-        //! Check that the stream continues to return the initial value of the accumulator
-        let (mut sender, receiver) = mpsc::channel(16);
-        let stream = TakeWhileReady::new(receiver);
-        sender.try_send(1).unwrap();
-        sender.try_send(2).unwrap();
-        sender.try_send(3).unwrap();
-        sender.try_send(4).unwrap();
+        use futures::Async;
+        use futures::stream::{poll_fn, iter_ok};
 
-        let folded: Vec<_> = stream.wait().into_iter().collect();
-        assert_eq!(folded, vec![Ok(1), Ok(2), Ok(3), Ok(4)]);
+        let mut waiting = false;
+        let stream = iter_ok::<_, ()>(1..4).chain(poll_fn(move || {
+            if waiting {
+                Ok(Async::NotReady) // hang up the stream after one produced element
+            } else {
+                waiting = true;
+                Ok(Async::Ready(Some(4)))
+            }
+        }));
+        let stream = TakeWhileReady::new(stream);
+        let collected: Vec<_> = stream.wait().into_iter().collect();
+        assert_eq!(collected, vec![Ok(1), Ok(2), Ok(3), Ok(4)]);
     }
 
     #[test]
     fn test_take_while_ready_with_executor() {
-        let (mut sender, mut receiver) = mpsc::channel(1_024);
+        let (mut sender, mut receiver) = mpsc::channel(16);
         {
             let folded = TakeWhileReady::new(receiver.by_ref()).fold(0, |acc, i| Ok(acc + i));
             let mut exec = executor::spawn(folded);
