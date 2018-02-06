@@ -234,6 +234,11 @@ impl Sandbox {
         time
     }
 
+    pub fn set_time(&mut self, new_time: SystemTime) {
+        let mut inner = self.inner.borrow_mut();
+        *inner.time.lock().unwrap() = new_time;
+    }
+
     pub fn node_handler(&self) -> Ref<NodeHandler> {
         Ref::map(self.inner.borrow(), |inner| &inner.handler)
     }
@@ -265,7 +270,7 @@ impl Sandbox {
         self.inner.borrow_mut().handle_event(event);
     }
 
-    fn process_events(&self) {
+    pub fn process_events(&self) {
         self.inner.borrow_mut().process_events();
     }
 
@@ -297,8 +302,24 @@ impl Sandbox {
         self.broadcast_to_addrs(msg, self.addresses.iter().skip(1));
     }
 
+    pub fn try_broadcast<T: Message>(&self, msg: &T) -> Result<(), String> {
+        self.try_broadcast_to_addrs(msg, self.addresses.iter().skip(1))
+    }
+
     // TODO: add self-test for broadcasting?
     pub fn broadcast_to_addrs<'a, T: Message, I>(&self, msg: &T, addresses: I)
+    where
+        I: IntoIterator<Item = &'a SocketAddr>,
+    {
+        self.try_broadcast_to_addrs(msg, addresses).unwrap();
+    }
+
+    // TODO: add self-test for broadcasting?
+    pub fn try_broadcast_to_addrs<'a, T: Message, I>(
+        &self,
+        msg: &T,
+        addresses: I,
+    ) -> Result<(), String>
     where
         I: IntoIterator<Item = &'a SocketAddr>,
     {
@@ -313,12 +334,12 @@ impl Sandbox {
             if let Some((real_addr, real_msg)) = send {
                 let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
                 if any_real_msg != any_expected_msg {
-                    panic!(
+                    return Err(format!(
                         "Expected to broadcast the message {:?} instead sending {:?} to {}",
                         any_expected_msg,
                         any_real_msg,
                         real_addr
-                    )
+                    ));
                 }
                 if !expected_set.contains(&real_addr) {
                     panic!(
@@ -338,6 +359,7 @@ impl Sandbox {
                 );
             }
         }
+        Ok(())
     }
 
     pub fn check_broadcast_status(&self, height: Height, block_hash: &Hash) {
