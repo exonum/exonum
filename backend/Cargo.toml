@@ -1,35 +1,30 @@
 [package]
 name = "cryptocurrency"
-version = "0.3.0"
+version = "0.5.0"
 authors = ["Exonum Team <exonum@bitfury.com>"]
 
 [workspace]
 members = ["cryptocurrency_api_tests"]
 
 [dependencies]
-exonum = "0.3"
-exonum-configuration = "0.3"
-env_logger = "0.3"
-clap = { version="2.14", features=["unstable"] }
-time = "0.1"
-rand = "0.3"
-log = "0.3"
-byteorder = "0.5"
-serde = "1.0.0"
-serde_derive = "1.0.0"
-jsonway = "1.0"
-iron = "0.5.1"
-bodyparser = "0.7.0"
-router = "0.5.1"
-headers = "0.1.0"
-hyper = "0.10.4"
-cookie = "0.6.0"
-tempdir = "0.3.5"
-params = "0.6.0"
-percent-encoding = "1.0.0"
+exonum = "0.5"
+exonum-configuration = "0.5"
+rand = "0.4.2"
+log = "0.4.1"
+byteorder = "1.2"
+serde = "1.0"
+serde_derive = "1.0"
+iron = "0.6"
+bodyparser = "0.8"
+router = "0.6"
+params = "0.8.0"
+percent-encoding = "1.0"
+
+[dev-dependencies]
+exonum-testkit = "0.5"
 
 [replace]
-"exonum:0.3.0" = { git = "https://github.com/exonum/exonum.git", tag="v0.3" }
+"exonum:0.5.0" = { git = "https://github.com/exonum/exonum.git", tag="v0.5" }
 
 [features]
 byzantine-behavior = []

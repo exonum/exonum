@@ -7,13 +7,11 @@ use KeyBox;
 encoding_struct! {
 /// Wallet information stored in the database.
     struct Wallet {
-        const SIZE = 88;
-
-        field pub_key:            &PublicKey  [00 => 32]
-        field login:              &str        [32 => 40]
-        field balance:            u64         [40 => 48]
-        field history_len:        u64         [48 => 56]
-        field history_hash:       &Hash       [56 => 88]
+        pub_key:            &PublicKey,
+        login:              &str,
+        balance:            u64,
+        history_len:        u64,
+        history_hash:       &Hash,
     }
 }
 
@@ -51,10 +49,8 @@ impl Wallet {
 encoding_struct! {
 /// Wallet information stored in the database.
     struct WalletAccess {
-        const SIZE = 160;
-
-        field pub_key:            &PublicKey  [00 => 32]
-        field key_box:            &KeyBox     [32 => 160]
+        pub_key:            &PublicKey,
+        key_box:            &KeyBox,
     }
 }
 

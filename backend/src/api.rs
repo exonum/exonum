@@ -13,12 +13,13 @@ use std::fmt;
 use exonum::api::{Api, ApiError};
 use exonum::node::TransactionSend;
 use exonum::messages::Message;
-use exonum::crypto::{HexValue, PublicKey, Hash};
+use exonum::crypto::{PublicKey, Hash};
 use exonum::storage::{MapProof, ListProof};
 use exonum::blockchain::{self, Blockchain, BlockProof};
 use exonum::helpers::Height;
 #[cfg(feature = "byzantine-behavior")]
 use exonum::storage::proof_map_index::{BranchProofNode, ProofNode};
+use exonum::encoding::serialize::FromHex;
 
 use super::tx_metarecord::TxMetaRecord;
 use super::wallet::{Wallet, WalletAccess};
