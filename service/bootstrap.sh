@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 if [ -z "$SERVICE_ROOT" ]; then
     echo "Need to set environment variable SERVICE_ROOT"
