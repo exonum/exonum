@@ -50,14 +50,6 @@ const TX_TIME_ID: u16 = 1;
 /// Time service name.
 const SERVICE_NAME: &str = "exonum_time";
 
-encoding_struct! {
-    /// Time information.
-    struct Time {
-        /// Field that stores `SystemTime`.
-        time: SystemTime,
-    }
-}
-
 /// `Exonum-time` service database schema.
 #[derive(Debug)]
 pub struct TimeSchema<T> {
@@ -70,38 +62,38 @@ impl<T: AsRef<Snapshot>> TimeSchema<T> {
         TimeSchema { view }
     }
 
-    /// Returns the table that stores `Time` struct for every validator.
-    pub fn validators_time(&self) -> ProofMapIndex<&Snapshot, PublicKey, Time> {
+    /// Returns the table that stores `SystemTime` for every validator.
+    pub fn validators_times(&self) -> ProofMapIndex<&Snapshot, PublicKey, SystemTime> {
         ProofMapIndex::new(
-            format!("{}.validators_time", SERVICE_NAME),
+            format!("{}.validators_times", SERVICE_NAME),
             self.view.as_ref(),
         )
     }
 
-    /// Returns stored `Time`.
-    pub fn time(&self) -> Entry<&Snapshot, Time> {
+    /// Returns stored time.
+    pub fn time(&self) -> Entry<&Snapshot, SystemTime> {
         Entry::new(format!("{}.time", SERVICE_NAME), self.view.as_ref())
     }
 
     /// Returns hashes for stored tables.
     pub fn state_hash(&self) -> Vec<Hash> {
-        vec![self.validators_time().root_hash(), self.time().hash()]
+        vec![self.validators_times().root_hash(), self.time().hash()]
     }
 }
 
 
 impl<'a> TimeSchema<&'a mut Fork> {
-    /// Mutable reference to the ['validators_time'][1] index.
+    /// Mutable reference to the ['validators_times'][1] index.
     ///
-    /// [1]: struct.TimeSchema.html#method.validators_time
-    pub fn validators_time_mut(&mut self) -> ProofMapIndex<&mut Fork, PublicKey, Time> {
-        ProofMapIndex::new(format!("{}.validators_time", SERVICE_NAME), self.view)
+    /// [1]: struct.TimeSchema.html#method.validators_times
+    pub fn validators_times_mut(&mut self) -> ProofMapIndex<&mut Fork, PublicKey, SystemTime> {
+        ProofMapIndex::new(format!("{}.validators_times", SERVICE_NAME), self.view)
     }
 
     /// Mutable reference to the ['time'][1] index.
     ///
     /// [1]: struct.TimeSchema.html#method.time
-    pub fn time_mut(&mut self) -> Entry<&mut Fork, Time> {
+    pub fn time_mut(&mut self) -> Entry<&mut Fork, SystemTime> {
         Entry::new(format!("{}.time", SERVICE_NAME), self.view)
     }
 }
@@ -135,53 +127,50 @@ impl Transaction for TxTime {
         }
 
         let mut schema = TimeSchema::new(view);
-        match schema.validators_time().get(self.pub_key()) {
+        match schema.validators_times().get(self.pub_key()) {
             // The validator time in the storage should be less than in the transaction.
-            Some(ref storage_time) if storage_time.time() >= self.time() => {
+            Some(storage_time) if storage_time >= self.time() => {
                 return;
             }
             // Write the time for the validator.
             _ => {
-                schema.validators_time_mut().put(
+                schema.validators_times_mut().put(
                     self.pub_key(),
-                    Time::new(self.time()),
+                    self.time(),
                 )
             }
         }
 
         // Find all known times for the validators.
-        let mut validators_time: Vec<SystemTime>;
+        let mut validator_times: Vec<SystemTime>;
         {
-            let idx = schema.validators_time();
-            validators_time = idx.iter()
-                .filter_map(|pair| {
+            let idx = schema.validators_times();
+            validator_times = idx.iter()
+                .filter_map(|(public_key, time)| {
                     validator_keys
                         .iter()
-                        .find(|validator| validator.service_key == pair.0)
-                        .map(|_| pair.1.time())
+                        .find(|validator| validator.service_key == public_key)
+                        .map(|_| time)
                 })
                 .collect();
         }
 
         // The largest number of Byzantine nodes.
         let max_byzantine_nodes = (validator_keys.len() - 1) / 3;
-        if validators_time.len() <= 2 * max_byzantine_nodes {
+        if validator_times.len() <= 2 * max_byzantine_nodes {
             return;
         }
         // Ordering time from highest to lowest.
-        validators_time.sort_by(|a, b| b.cmp(a));
+        validator_times.sort_by(|a, b| b.cmp(a));
 
         match schema.time().get() {
             // Selected time should be longer than the time in the storage.
-            Some(ref current_time)
-                if current_time.time() >= validators_time[max_byzantine_nodes] => {
+            Some(current_time) if current_time >= validator_times[max_byzantine_nodes] => {
                 return;
             }
             _ => {
                 // Change the time in the storage.
-                schema.time_mut().set(Time::new(
-                    validators_time[max_byzantine_nodes],
-                ));
+                schema.time_mut().set(validator_times[max_byzantine_nodes]);
             }
         }
     }
@@ -208,31 +197,26 @@ impl TimeApi {
     fn get_current_time(&self, _: &mut Request) -> IronResult<Response> {
         let view = self.blockchain.snapshot();
         let schema = TimeSchema::new(&view);
-
-        if let Some(current_time) = schema.time().get() {
-            self.ok_response(&json!(Some(current_time.time())))
-        } else {
-            self.ok_response(&json!(None::<Box<SystemTime>>))
-        }
+        self.ok_response(&json!(schema.time().get()))
     }
 
     /// Endpoint for getting time values for all validators.
     fn get_all_validators_times(&self, _: &mut Request) -> IronResult<Response> {
         let view = self.blockchain.snapshot();
         let schema = TimeSchema::new(&view);
-        let idx = schema.validators_time();
+        let idx = schema.validators_times();
 
         // The times of all validators for which time is known.
-        let validators_time = idx.iter()
+        let validators_times = idx.iter()
             .map(|(public_key, time)| {
                 ValidatorTime {
                     public_key,
-                    time: Some(time.time()),
+                    time: Some(time),
                 }
             })
             .collect::<Vec<_>>();
 
-        self.ok_response(&serde_json::to_value(validators_time).unwrap())
+        self.ok_response(&serde_json::to_value(validators_times).unwrap())
     }
 
     /// Endpoint for getting time values for current validators.
@@ -240,24 +224,21 @@ impl TimeApi {
         let view = self.blockchain.snapshot();
         let validator_keys = Schema::new(&view).actual_configuration().validator_keys;
         let schema = TimeSchema::new(&view);
-        let idx = schema.validators_time();
+        let idx = schema.validators_times();
 
         // The times of current validators.
         // `None` if the time of the validator is unknown.
-        let validators_time = validator_keys
+        let validators_times = validator_keys
             .iter()
             .map(|validator| {
                 ValidatorTime {
                     public_key: validator.service_key,
-                    time: match idx.get(&validator.service_key) {
-                        Some(time) => Some(time.time()),
-                        None => None,
-                    },
+                    time: idx.get(&validator.service_key),
                 }
             })
             .collect::<Vec<_>>();
 
-        self.ok_response(&serde_json::to_value(validators_time).unwrap())
+        self.ok_response(&serde_json::to_value(validators_times).unwrap())
     }
 
     fn wire_private(&self, router: &mut Router) {
@@ -337,7 +318,7 @@ impl TimeProvider for SystemTimeProvider {
 /// let schema = TimeSchema::new(snapshot);
 /// assert_eq!(
 ///     Some(UNIX_EPOCH + Duration::new(15, 0)),
-///     schema.time().get().map(|time| time.time())
+///     schema.time().get().map(|time| time)
 /// );
 /// # }
 /// ```

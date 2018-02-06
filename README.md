@@ -56,7 +56,7 @@ impl Transaction for Tx {
         let time_schema = exonum_time::TimeSchema::new(&view);
         // The time in the transaction should be less than in the blockchain.
         match time_schema.time().get() {
-            Some(ref current_time) if current_time.time() <= self.time() => {
+            Some(current_time) if current_time <= self.time() => {
                 // Execute transaction business logic.
             }
             _ => {}

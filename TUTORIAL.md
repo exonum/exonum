@@ -107,7 +107,7 @@ To obtain local, reliable time external solutions like [tlsdate][], [roughtime][
 
 **The data schema** of such a service consists of two indices:
 
-+ `time: Entry<Time>` - is the consolidated time we target at.
++ `time: Entry<SystemTime>` - is the consolidated time we target at.
 
 + `validators_time: ProofMapIndex<PublicKey, SystemTime>` - the last known local time of the validator nodes.
 
