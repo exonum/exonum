@@ -48,8 +48,6 @@ pub enum ApiError {
     Service(Box<::std::error::Error + Send + Sync>),
     /// Storage error.
     Storage(storage::Error),
-    /// Converting from hex error.
-    FromHex(FromHexError),
     /// Input/output error.
     Io(::std::io::Error),
     /// File not found.
@@ -91,12 +89,6 @@ impl From<io::Error> for ApiError {
 impl From<storage::Error> for ApiError {
     fn from(e: storage::Error) -> ApiError {
         ApiError::Storage(e)
-    }
-}
-
-impl From<FromHexError> for ApiError {
-    fn from(e: FromHexError) -> ApiError {
-        ApiError::FromHex(e)
     }
 }
 

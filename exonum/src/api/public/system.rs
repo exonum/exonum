@@ -72,16 +72,15 @@ impl SystemApi {
         MemPoolInfo { size: self.pool.read().expect("Expected read lock").len() }
     }
 
-    fn get_transaction(&self, hash_str: &str) -> Result<MemPoolResult, ApiError> {
-        let hash = Hash::from_hex(hash_str)?;
+    fn get_transaction(&self, hash: &Hash) -> Result<MemPoolResult, ApiError> {
         self.pool
             .read()
             .expect("Expected read lock")
-            .get(&hash)
+            .get(hash)
             .map_or_else(
                 || {
                     let explorer = BlockchainExplorer::new(&self.blockchain);
-                    Ok(explorer.tx_info(&hash)?.map_or(
+                    Ok(explorer.tx_info(hash)?.map_or(
                         MemPoolResult::Unknown,
                         MemPoolResult::Committed,
                     ))
@@ -112,7 +111,13 @@ impl Api for SystemApi {
             let params = req.extensions.get::<Router>().unwrap();
             match params.find("hash") {
                 Some(hash_str) => {
-                    let info = self_.get_transaction(hash_str)?;
+                    let hash = Hash::from_hex(hash_str).map_err(|e| {
+                        ApiError::BadRequest(
+                            format!("Invalid transaction hash, {}", e).into()
+                        )
+                    })?;
+
+                    let info = self_.get_transaction(&hash)?;
                     let result = match info {
                         MemPoolResult::Unknown => Self::not_found_response,
                         _ => Self::ok_response,
