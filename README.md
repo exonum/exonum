@@ -10,11 +10,11 @@ oriented towards creating permissioned blockchains, that is, blockchains with th
 blockchain infrastructure providers.
 
 This is the main Exonum repository that includes
-* [Exonum core library](https://github.com/exonum/exonum/blob/master/exonum/README.md).
-* [Exonum testing framework](https://github.com/exonum/exonum/blob/master/testkit/README.md).
+* [Exonum core library](README.md).
+* [Exonum testing framework](testkit/README.md).
 * Services:
   * Configuration service (currently in [exonum-configuration](https://github.com/exonum/exonum-configuration) repository).
-  * [Time service](https://github.com/exonum/exonum/blob/master/services/exonum-time/README.md).
+  * [Time service](services/time/README.md).
 * Demos
   * Cryprocurrency (currently in [cryptocurrency](https://github.com/exonum/cryptocurrency) repository).
   

@@ -3,5 +3,5 @@ members = [
     "exonum",
     "sandbox",
     "testkit",
-    "services/exonum-time"
+    "services/time"
 ]
