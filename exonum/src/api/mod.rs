@@ -30,6 +30,7 @@ use router::Router;
 use serde_json;
 use serde::{Serialize, Serializer};
 use serde::de::{self, Visitor, Deserialize, Deserializer};
+use failure::Fail;
 
 use crypto::{PublicKey, SecretKey, Hash};
 use encoding::serialize::{FromHex, FromHexError, ToHex, encode_hex};
@@ -41,7 +42,7 @@ pub mod private;
 mod tests;
 
 /// List of possible Api errors.
-#[derive(Debug)]
+#[derive(Fail, Debug)]
 pub enum ApiError {
     /// Service error.
     Service(Box<::std::error::Error + Send + Sync>),
@@ -75,25 +76,6 @@ impl fmt::Display for ApiError {
     }
 }
 
-impl ::std::error::Error for ApiError {
-    fn description(&self) -> &str {
-        match *self {
-            ApiError::Service(ref error) |
-            ApiError::BadRequest(ref error) => error.description(),
-            ApiError::Storage(ref error) => "storage error", //FIXME
-            ApiError::FromHex(ref error) => error.description(),
-            ApiError::Io(ref error) => error.description(),
-            ApiError::FileNotFound(_) => "File not found",
-            ApiError::NotFound => "Not found",
-            ApiError::FileTooBig => "File too big",
-            ApiError::FileExists(_) => "File exists",
-            ApiError::Unauthorized => "Unauthorized",
-            ApiError::AddressParseError(_) => "AddressParseError",
-            ApiError::Serialize(_) => "Serialization error",
-        }
-    }
-}
-
 impl From<::std::net::AddrParseError> for ApiError {
     fn from(e: ::std::net::AddrParseError) -> ApiError {
         ApiError::AddressParseError(e)
@@ -120,11 +102,9 @@ impl From<FromHexError> for ApiError {
 
 impl From<ApiError> for IronError {
     fn from(e: ApiError) -> IronError {
-        use std::error::Error;
-
         let mut body = BTreeMap::new();
         body.insert("debug", format!("{:?}", e));
-        body.insert("description", e.description().to_string());
+        body.insert("description", e.to_string());
         let code = match e {
             ApiError::FileExists(hash) |
             ApiError::FileNotFound(hash) => {
@@ -134,10 +114,10 @@ impl From<ApiError> for IronError {
             ApiError::BadRequest(..) => status::BadRequest,
             _ => status::Conflict,
         };
-        IronError {
-            error: Box::new(e),
-            response: Response::with((code, ::serde_json::to_string_pretty(&body).unwrap())),
-        }
+        IronError::new(
+            e.compat(),
+            (code, ::serde_json::to_string_pretty(&body).unwrap())
+        )
     }
 }
 
