@@ -46,11 +46,17 @@ mod tests;
 pub enum ApiError {
     /// Storage error.
     #[fail(display = "Storage error: {}", _0)]
-    Storage(#[cause] storage::Error),
+    Storage(
+        #[cause]
+        storage::Error
+    ),
 
     /// Input/output error.
     #[fail(display = "IO error: {}", _0)]
-    Io(#[cause] ::std::io::Error),
+    Io(
+        #[cause]
+        ::std::io::Error
+    ),
 
     /// File not found.
     #[fail(display = "File not found")]
@@ -103,15 +109,15 @@ impl From<ApiError> for IronError {
             ApiError::FileNotFound(hash) => {
                 body.insert("hash", encode_hex(&hash));
                 status::Conflict
-            },
+            }
             ApiError::BadRequest(..) => status::BadRequest,
             ApiError::InternalError(..) => status::InternalServerError,
             _ => status::Conflict,
         };
-        IronError::new(
-            e.compat(),
-            (code, ::serde_json::to_string_pretty(&body).unwrap())
-        )
+        IronError::new(e.compat(), (
+            code,
+            ::serde_json::to_string_pretty(&body).unwrap(),
+        ))
     }
 }
 

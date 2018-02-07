@@ -112,9 +112,7 @@ impl Api for SystemApi {
             match params.find("hash") {
                 Some(hash_str) => {
                     let hash = Hash::from_hex(hash_str).map_err(|e| {
-                        ApiError::BadRequest(
-                            format!("Invalid transaction hash, {}", e).into()
-                        )
+                        ApiError::BadRequest(format!("Invalid transaction hash, {}", e).into())
                     })?;
 
                     let info = self_.get_transaction(&hash)?;
