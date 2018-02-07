@@ -62,8 +62,6 @@ pub enum ApiError {
     BadRequest(Box<::std::error::Error + Send + Sync>),
     /// Unauthorized error.
     Unauthorized,
-    /// Address parse error.
-    AddressParseError(::std::net::AddrParseError),
     /// Serialize error,
     Serialize(Box<::std::error::Error + Send + Sync>),
 }
@@ -71,12 +69,6 @@ pub enum ApiError {
 impl fmt::Display for ApiError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self)
-    }
-}
-
-impl From<::std::net::AddrParseError> for ApiError {
-    fn from(e: ::std::net::AddrParseError) -> ApiError {
-        ApiError::AddressParseError(e)
     }
 }
 

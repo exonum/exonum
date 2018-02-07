@@ -14,6 +14,7 @@
 
 use std::net::SocketAddr;
 use std::collections::HashMap;
+use std::error::Error;
 
 use router::Router;
 use iron::prelude::*;
@@ -156,12 +157,6 @@ impl SystemApi {
         self.node_channel.send_external_message(message)?;
         Ok(())
     }
-
-    fn peer_add(&self, ip_str: &str) -> Result<(), ApiError> {
-        let addr: SocketAddr = ip_str.parse()?;
-        self.node_channel.peer_add(addr)?;
-        Ok(())
-    }
 }
 
 impl Api for SystemApi {
@@ -172,7 +167,10 @@ impl Api for SystemApi {
             let map = req.get_ref::<Params>().unwrap();
             match map.find(&["ip"]) {
                 Some(&ParamsValue::String(ref ip_str)) => {
-                    self_.peer_add(ip_str)?;
+                    let addr = ip_str.parse::<SocketAddr>().map_err(|e| {
+                        ApiError::BadRequest(e.description().into())
+                    })?;
+                    self_.node_channel.peer_add(addr).map_err(ApiError::from)?;
                     self_.ok_response(&::serde_json::to_value("Ok").unwrap())
                 }
                 _ => {
