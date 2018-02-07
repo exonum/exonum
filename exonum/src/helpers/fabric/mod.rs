@@ -15,15 +15,14 @@
 //! Command line commands utilities.
 
 use std::str::FromStr;
-use std::error::Error;
 use std::collections::BTreeMap;
 
 use clap;
 use toml::Value;
 use serde::{Serialize, Deserialize};
+use failure;
 
 use blockchain::Service;
-use self::internal::NotFoundInMap;
 
 pub use self::builder::NodeBuilder;
 pub use self::details::{Run, Finalize, GenerateNodeConfig, GenerateCommonConfig, GenerateTestnet};
@@ -221,14 +220,13 @@ impl Context {
     }
 
     /// Gets value of the command line argument.
-    pub fn arg<T: FromStr>(&self, key: &str) -> Result<T, Box<Error>>
+    pub fn arg<T: FromStr>(&self, key: &str) -> Result<T, failure::Error>
     where
-        <T as FromStr>::Err: Error + 'static,
+        failure::Error: From<<T as FromStr>::Err>,
     {
-        if let Some(v) = self.args.get(key) {
-            Ok(v.parse()?)
-        } else {
-            Err(Box::new(NotFoundInMap))
+        match self.args.get(key) {
+            Some(v) => Ok(v.parse()?),
+            None => bail!("expected `{}` argument", key),
         }
     }
 
@@ -238,14 +236,13 @@ impl Context {
     }
 
     /// Gets multiple values of the command line argument.
-    pub fn arg_multiple<T: FromStr>(&self, key: &str) -> Result<Vec<T>, Box<Error>>
+    pub fn arg_multiple<T: FromStr>(&self, key: &str) -> Result<Vec<T>, failure::Error>
     where
-        <T as FromStr>::Err: Error + 'static,
+        failure::Error: From<<T as FromStr>::Err>,
     {
-        if let Some(values) = self.multiple_args.get(key) {
-            values.iter().map(|v| Ok(v.parse()?)).collect()
-        } else {
-            Err(Box::new(NotFoundInMap))
+        match self.multiple_args.get(key) {
+            Some(values) => values.iter().map(|v| Ok(v.parse()?)).collect(),
+            None => bail!("expected `{}` argument", key),
         }
     }
 
@@ -255,7 +252,7 @@ impl Context {
     }
 
     /// Gets the variable from the context.
-    pub fn get<'de, T: Deserialize<'de>>(&self, key: ContextKey<T>) -> Result<T, Box<Error>> {
+    pub fn get<'de, T: Deserialize<'de>>(&self, key: ContextKey<T>) -> Result<T, failure::Error> {
         self.get_raw(key.name())
     }
 
@@ -268,11 +265,10 @@ impl Context {
         self.set_raw(key.name(), value)
     }
 
-    fn get_raw<'de, T: Deserialize<'de>>(&self, key: &str) -> Result<T, Box<Error>> {
-        if let Some(v) = self.variables.get(key) {
-            Ok(v.clone().try_into()?)
-        } else {
-            Err(Box::new(NotFoundInMap))
+    fn get_raw<'de, T: Deserialize<'de>>(&self, key: &str) -> Result<T, failure::Error> {
+        match self.variables.get(key) {
+            Some(v) => Ok(v.clone().try_into()?),
+            _ => bail!("key `{}` not found", key),
         }
     }
 
@@ -287,7 +283,7 @@ pub trait CommandExtension {
     /// Returns arguments of the command.
     fn args(&self) -> Vec<Argument>;
     /// Executes command.
-    fn execute(&self, context: Context) -> Result<Context, Box<Error>>;
+    fn execute(&self, context: Context) -> Result<Context, failure::Error>;
 }
 
 /// Factory for service creation.
