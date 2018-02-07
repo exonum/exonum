@@ -45,7 +45,7 @@ impl ExplorerApi {
         skip_empty_blocks: bool,
     ) -> Result<Vec<Block>, ApiError> {
         if count > MAX_BLOCKS_PER_REQUEST {
-            return Err(ApiError::IncorrectRequest(
+            return Err(ApiError::BadRequest(
                 format!(
                     "Max block count per request exceeded ({})",
                     MAX_BLOCKS_PER_REQUEST
@@ -71,11 +71,11 @@ impl Api for ExplorerApi {
             let count: u64 = match map.find(&["count"]) {
                 Some(&Value::String(ref count_str)) => {
                     count_str.parse().map_err(|e: ParseIntError| {
-                        ApiError::IncorrectRequest(Box::new(e))
+                        ApiError::BadRequest(Box::new(e))
                     })?
                 }
                 _ => {
-                    return Err(ApiError::IncorrectRequest(
+                    return Err(ApiError::BadRequest(
                         "Required parameter of blocks 'count' is missing".into(),
                     ))?;
                 }
@@ -83,7 +83,7 @@ impl Api for ExplorerApi {
             let latest: Option<u64> = match map.find(&["latest"]) {
                 Some(&Value::String(ref from_str)) => {
                     Some(from_str.parse().map_err(|e: ParseIntError| {
-                        ApiError::IncorrectRequest(Box::new(e))
+                        ApiError::BadRequest(Box::new(e))
                     })?)
                 }
                 _ => None,
@@ -91,7 +91,7 @@ impl Api for ExplorerApi {
             let skip_empty_blocks: bool = match map.find(&["skip_empty_blocks"]) {
                 Some(&Value::String(ref skip_str)) => {
                     skip_str.parse().map_err(|e: ParseBoolError| {
-                        ApiError::IncorrectRequest(Box::new(e))
+                        ApiError::BadRequest(Box::new(e))
                     })?
                 }
                 _ => false,
@@ -106,13 +106,13 @@ impl Api for ExplorerApi {
             match params.find("height") {
                 Some(height_str) => {
                     let height: u64 = height_str.parse().map_err(|e: ParseIntError| {
-                        ApiError::IncorrectRequest(Box::new(e))
+                        ApiError::BadRequest(Box::new(e))
                     })?;
                     let info = self_.get_block(Height(height))?;
                     self_.ok_response(&::serde_json::to_value(info).unwrap())
                 }
                 None => {
-                    Err(ApiError::IncorrectRequest(
+                    Err(ApiError::BadRequest(
                         "Required parameter of block 'height' is missing".into(),
                     ))?
                 }

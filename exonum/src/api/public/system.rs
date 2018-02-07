@@ -120,7 +120,7 @@ impl Api for SystemApi {
                     result(&self_, &::serde_json::to_value(info).unwrap())
                 }
                 None => {
-                    Err(ApiError::IncorrectRequest(
+                    Err(ApiError::BadRequest(
                         "Required parameter of transaction 'hash' is missing".into(),
                     ))?
                 }

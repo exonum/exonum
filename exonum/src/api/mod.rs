@@ -59,8 +59,8 @@ pub enum ApiError {
     FileTooBig,
     /// File already exists.
     FileExists(Hash),
-    /// Incorrect request.
-    IncorrectRequest(Box<::std::error::Error + Send + Sync>),
+    /// Bad request.
+    BadRequest(Box<::std::error::Error + Send + Sync>),
     /// Unauthorized error.
     Unauthorized,
     /// Address parse error.
@@ -79,7 +79,7 @@ impl ::std::error::Error for ApiError {
     fn description(&self) -> &str {
         match *self {
             ApiError::Service(ref error) |
-            ApiError::IncorrectRequest(ref error) => error.description(),
+            ApiError::BadRequest(ref error) => error.description(),
             ApiError::Storage(ref error) => "storage error", //FIXME
             ApiError::FromHex(ref error) => error.description(),
             ApiError::Io(ref error) => error.description(),
@@ -130,7 +130,8 @@ impl From<ApiError> for IronError {
             ApiError::FileNotFound(hash) => {
                 body.insert("hash", encode_hex(&hash));
                 status::Conflict
-            }
+            },
+            ApiError::BadRequest(..) => status::BadRequest,
             _ => status::Conflict,
         };
         IronError {

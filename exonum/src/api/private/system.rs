@@ -176,7 +176,7 @@ impl Api for SystemApi {
                     self_.ok_response(&::serde_json::to_value("Ok").unwrap())
                 }
                 _ => {
-                    Err(ApiError::IncorrectRequest(
+                    Err(ApiError::BadRequest(
                         "Required parameter of peer 'ip' is missing".into(),
                     ))?
                 }
@@ -210,7 +210,7 @@ impl Api for SystemApi {
                     self_.ok_response(&::serde_json::to_value("Ok").unwrap())
                 }
                 _ => {
-                    Err(ApiError::IncorrectRequest(
+                    Err(ApiError::BadRequest(
                         "Required boolean parameter 'enabled' is missing".into(),
                     ))?
                 }
