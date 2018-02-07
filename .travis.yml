@@ -90,7 +90,7 @@ install:
     nvm use 8
     npm install -g cspell
     cspell --version
-    npm install -g markdownlint
+    npm install -g markdownlint-cli
     markdownlint --version
     fi
 - |
