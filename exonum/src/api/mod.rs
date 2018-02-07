@@ -47,9 +47,9 @@ pub enum ApiError {
     /// Service error.
     Service(Box<::std::error::Error + Send + Sync>),
     /// Storage error.
-    Storage(storage::Error),
+    Storage(#[cause] storage::Error),
     /// Input/output error.
-    Io(::std::io::Error),
+    Io(#[cause]::std::io::Error),
     /// File not found.
     FileNotFound(Hash),
     /// Not found.
