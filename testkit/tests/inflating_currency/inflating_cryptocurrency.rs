@@ -211,7 +211,7 @@ impl CryptocurrencyApi {
         let path = req.url.path();
         let wallet_key = path.last().unwrap();
         let public_key = PublicKey::from_hex(wallet_key).map_err(|e| {
-            IronError::new(ApiError::FromHex(e), (
+            IronError::new(e, (
                 Status::BadRequest,
                 Header(ContentType::json()),
                 "\"Invalid request param: `pub_key`\"",
@@ -222,7 +222,7 @@ impl CryptocurrencyApi {
             self.ok_response(&serde_json::to_value(wallet.actual_balance(height))
                 .unwrap())
         } else {
-            Err(IronError::new(ApiError::NotFound, (
+            Ok(Response::with((
                 Status::NotFound,
                 Header(ContentType::json()),
                 "\"Wallet not found\"",

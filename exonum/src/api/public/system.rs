@@ -87,7 +87,7 @@ impl SystemApi {
                 },
                 |o| {
                     Ok(MemPoolResult::MemPool(MemPoolTxInfo {
-                        content: o.serialize_field().map_err(ApiError::Serialize)?,
+                        content: o.serialize_field().map_err(ApiError::InternalError)?,
                     }))
                 },
             )

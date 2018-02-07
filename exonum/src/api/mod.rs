@@ -44,32 +44,41 @@ mod tests;
 /// List of possible Api errors.
 #[derive(Fail, Debug)]
 pub enum ApiError {
-    /// Service error.
-    Service(Box<::std::error::Error + Send + Sync>),
     /// Storage error.
+    #[fail(display = "Storage error: {}", _0)]
     Storage(#[cause] storage::Error),
-    /// Input/output error.
-    Io(#[cause]::std::io::Error),
-    /// File not found.
-    FileNotFound(Hash),
-    /// Not found.
-    NotFound,
-    /// File too big.
-    FileTooBig,
-    /// File already exists.
-    FileExists(Hash),
-    /// Bad request.
-    BadRequest(Box<::std::error::Error + Send + Sync>),
-    /// Unauthorized error.
-    Unauthorized,
-    /// Serialize error,
-    Serialize(Box<::std::error::Error + Send + Sync>),
-}
 
-impl fmt::Display for ApiError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
+    /// Input/output error.
+    #[fail(display = "IO error: {}", _0)]
+    Io(#[cause] ::std::io::Error),
+
+    /// File not found.
+    #[fail(display = "File not found")]
+    FileNotFound(Hash),
+
+    /// Not found.
+    #[fail(display = "Not found")]
+    NotFound,
+
+    /// File too big.
+    #[fail(display = "File too big")]
+    FileTooBig,
+
+    /// File already exists.
+    #[fail(display = "File exists")]
+    FileExists(Hash),
+
+    /// Bad request.
+    #[fail(display = "Bad request: {}", _0)]
+    BadRequest(Box<::std::error::Error + Send + Sync>),
+
+    /// Internal error.
+    #[fail(display = "Internal server error: {}", _0)]
+    InternalError(Box<::std::error::Error + Send + Sync>),
+
+    /// Unauthorized error.
+    #[fail(display = "Unauthorized")]
+    Unauthorized,
 }
 
 impl From<io::Error> for ApiError {
@@ -96,6 +105,7 @@ impl From<ApiError> for IronError {
                 status::Conflict
             },
             ApiError::BadRequest(..) => status::BadRequest,
+            ApiError::InternalError(..) => status::InternalServerError,
             _ => status::Conflict,
         };
         IronError::new(
