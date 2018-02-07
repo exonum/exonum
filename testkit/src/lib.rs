@@ -24,7 +24,7 @@
 //! extern crate serde_json;
 //!
 //! use exonum::crypto::{gen_keypair, Hash, PublicKey, CryptoHash};
-//! use exonum::blockchain::{Block, Schema, Service, Transaction, ExecutionStatus};
+//! use exonum::blockchain::{Block, Schema, Service, Transaction, ExecutionResult};
 //! use exonum::messages::{Message, RawTransaction};
 //! use exonum::storage::{Snapshot, Fork};
 //! use exonum::encoding;
@@ -52,7 +52,7 @@
 //!         self.verify_signature(self.from())
 //!     }
 //!
-//!     fn execute(&self, _fork: &mut Fork) -> ExecutionStatus {
+//!     fn execute(&self, _fork: &mut Fork) -> ExecutionResult {
 //!         Ok(())
 //!     }
 //! }
@@ -588,7 +588,7 @@ impl TestKit {
     /// ```
     /// # #[macro_use] extern crate exonum;
     /// # #[macro_use] extern crate exonum_testkit;
-    /// # use exonum::blockchain::{Service, Transaction, ExecutionStatus};
+    /// # use exonum::blockchain::{Service, Transaction, ExecutionResult};
     /// # use exonum::messages::RawTransaction;
     /// # use exonum::encoding;
     /// # use exonum_testkit::{TestKit, TestKitBuilder};
@@ -620,7 +620,7 @@ impl TestKit {
     /// # }
     /// # impl Transaction for MyTransaction {
     /// #     fn verify(&self) -> bool { true }
-    /// #     fn execute(&self, _: &mut exonum::storage::Fork) -> ExecutionStatus { Ok(()) }
+    /// #     fn execute(&self, _: &mut exonum::storage::Fork) -> ExecutionResult { Ok(()) }
     /// # }
     /// #
     /// # fn expensive_setup(_: &mut TestKit) {}

@@ -786,7 +786,7 @@ pub fn timestamping_sandbox() -> Sandbox {
 
 #[cfg(test)]
 mod tests {
-    use exonum::blockchain::{ServiceContext, ExecutionStatus};
+    use exonum::blockchain::{ServiceContext, ExecutionResult};
     use exonum::messages::RawTransaction;
     use exonum::encoding;
     use exonum::crypto::{gen_keypair_from_seed, Seed};
@@ -820,7 +820,7 @@ mod tests {
             true
         }
 
-        fn execute(&self, _: &mut Fork) -> ExecutionStatus {
+        fn execute(&self, _: &mut Fork) -> ExecutionResult {
             Ok(())
         }
     }

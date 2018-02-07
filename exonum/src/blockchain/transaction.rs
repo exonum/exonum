@@ -37,10 +37,10 @@ const TRANSACTION_STATUS_DESCRIPTION: u16 = TRANSACTION_STATUS_FAILURE + 1;
 
 /// Return value of the `Transaction`'s `execute' method. Changes made by the transaction are
 /// discarded if `Err` is returned, see `Transaction` documentation for the details.
-pub type ExecutionStatus = Result<(), ExecutionError>;
-/// Extended version of `ExecutionStatus` (with additional values set exclusively by Exonum
+pub type ExecutionResult = Result<(), ExecutionError>;
+/// Extended version of `ExecutionResult` (with additional values set exclusively by Exonum
 /// framework) that can be obtained through `Schema`'s `transaction_statuses` method.
-pub type TransactionStatus = Result<(), TransactionError>;
+pub type TransactionResult = Result<(), TransactionError>;
 
 /// Transaction processing functionality for `Message`s allowing to apply authenticated, atomic,
 /// constraint-preserving groups of changes to the blockchain storage.
@@ -69,7 +69,7 @@ pub trait Transaction: Message + ExonumJson + 'static {
     /// use exonum::blockchain::Transaction;
     /// use exonum::crypto::PublicKey;
     /// use exonum::messages::Message;
-    /// # use exonum::blockchain::ExecutionStatus;
+    /// # use exonum::blockchain::ExecutionResult;
     /// # use exonum::storage::Fork;
     ///
     /// message! {
@@ -89,7 +89,7 @@ pub trait Transaction: Message + ExonumJson + 'static {
     ///
     ///     // Other methods...
     ///     // ...
-    /// #   fn execute(&self, _: &mut Fork) -> ExecutionStatus {
+    /// #   fn execute(&self, _: &mut Fork) -> ExecutionResult {
     /// #       Ok(())
     /// #   }
     /// }
@@ -104,7 +104,7 @@ pub trait Transaction: Message + ExonumJson + 'static {
     /// - Transaction itself is considered committed regardless whether `Ok` or `Err` has been
     ///   returned or even if panic occurred during execution.
     /// - Changes made by the transaction are discarded if `Err` is returned or panic occurred.
-    /// - A transaction execution status (see `ExecutionStatus` and `TransactionStatus` for the
+    /// - A transaction execution status (see `ExecutionResult` and `TransactionResult` for the
     ///   details) is stored in the blockchain and can be accessed through api.
     /// - Blockchain state hash is affected by the transactions execution status.
     ///
@@ -113,7 +113,7 @@ pub trait Transaction: Message + ExonumJson + 'static {
     /// ```
     /// # #[macro_use] extern crate exonum;
     /// #
-    /// use exonum::blockchain::{Transaction, ExecutionStatus};
+    /// use exonum::blockchain::{Transaction, ExecutionResult};
     /// use exonum::crypto::PublicKey;
     /// use exonum::storage::Fork;
     ///
@@ -128,7 +128,7 @@ pub trait Transaction: Message + ExonumJson + 'static {
     /// }
     ///
     /// impl Transaction for MyTransaction {
-    ///     fn execute(&self, fork: &mut Fork) -> ExecutionStatus {
+    ///     fn execute(&self, fork: &mut Fork) -> ExecutionResult {
     ///         // Read and/or write into storage.
     ///         // ...
     ///
@@ -141,7 +141,7 @@ pub trait Transaction: Message + ExonumJson + 'static {
     /// #   fn verify(&self) -> bool { true }
     /// }
     /// # fn main() {}
-    fn execute(&self, fork: &mut Fork) -> ExecutionStatus;
+    fn execute(&self, fork: &mut Fork) -> ExecutionResult;
 }
 
 /// Result of unsuccessful transaction execution.
@@ -189,9 +189,9 @@ pub enum TransactionError {
     Description(String),
 }
 
-/// Converts from `ExecutionStatus` into `TransactionStatus`.
-pub fn convert_status(status: ExecutionStatus) -> TransactionStatus {
-    match status {
+/// Converts from `ExecutionResult` into `TransactionResult`.
+pub fn convert_result(result: ExecutionResult) -> TransactionResult {
+    match result {
         Ok(()) => Ok(()),
         Err(ExecutionError::Failure) => Err(TransactionError::Failure),
         Err(ExecutionError::Code(c)) => Err(TransactionError::Code(c)),
@@ -219,15 +219,15 @@ impl fmt::Display for TransactionError {
 // String content (`TransactionError::Description`) is intentionally excluded from the hash
 // calculation because user can be tempted to use error description from a third-party libraries
 // which aren't stable across the versions.
-impl CryptoHash for TransactionStatus {
+impl CryptoHash for TransactionResult {
     fn hash(&self) -> Hash {
         u16::hash(&status_as_u16(self))
     }
 }
 
-// `TransactionStatus` is stored as `u16` with optional string part needed only for
+// `TransactionResult` is stored as `u16` with optional string part needed only for
 // `TransactionError::Description`.
-impl StorageValue for TransactionStatus {
+impl StorageValue for TransactionResult {
     fn into_bytes(self) -> Vec<u8> {
         let mut res = u16::into_bytes(status_as_u16(&self));
         if let Err(TransactionError::Description(s)) = self {
@@ -248,12 +248,12 @@ impl StorageValue for TransactionStatus {
                     String::from_bytes(Cow::Borrowed(&bytes[2..])),
                 ))
             }
-            value => panic!("Invalid TransactionStatus value: {}", value),
+            value => panic!("Invalid TransactionResult value: {}", value),
         }
     }
 }
 
-fn status_as_u16(status: &TransactionStatus) -> u16 {
+fn status_as_u16(status: &TransactionResult) -> u16 {
     match *status {
         Ok(()) => TRANSACTION_STATUS_OK,
         Err(TransactionError::Panic) => TRANSACTION_STATUS_PANIC,
@@ -278,7 +278,7 @@ mod tests {
     use helpers::{ValidatorId, Height};
 
     lazy_static! {
-        static ref EXECUTION_STATUS: Mutex<ExecutionStatus> = Mutex::new(Ok(()));
+        static ref EXECUTION_STATUS: Mutex<ExecutionResult> = Mutex::new(Ok(()));
     }
 
     #[test]
@@ -306,7 +306,7 @@ mod tests {
 
         for status in &statuses {
             let bytes = status.clone().into_bytes();
-            let new_status = TransactionStatus::from_bytes(Cow::Borrowed(&bytes));
+            let new_status = TransactionResult::from_bytes(Cow::Borrowed(&bytes));
             assert_eq!(*status, new_status);
         }
     }
@@ -385,7 +385,7 @@ mod tests {
             true
         }
 
-        fn execute(&self, fork: &mut Fork) -> ExecutionStatus {
+        fn execute(&self, fork: &mut Fork) -> ExecutionResult {
             let mut entry = create_entry(fork);
             entry.set(self.index());
             EXECUTION_STATUS.lock().unwrap().clone()

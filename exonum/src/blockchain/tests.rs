@@ -19,7 +19,7 @@ use std::collections::BTreeMap;
 use rand::{thread_rng, Rng};
 use serde_json;
 
-use blockchain::{Blockchain, Schema, Transaction, ExecutionStatus};
+use blockchain::{Blockchain, Schema, Transaction, ExecutionResult};
 use crypto::{gen_keypair, CryptoHash, Hash};
 use storage::{Database, Fork, Error, ListIndex};
 use messages::Message;
@@ -156,7 +156,7 @@ fn handling_tx_panic(blockchain: &Blockchain, db: &mut Box<Database>) {
             true
         }
 
-        fn execute(&self, fork: &mut Fork) -> ExecutionStatus {
+        fn execute(&self, fork: &mut Fork) -> ExecutionResult {
             if self.value() == 42 {
                 panic!(Error::new("42"))
             }
@@ -238,7 +238,7 @@ fn handling_tx_panic_storage_error(blockchain: &Blockchain) {
             true
         }
 
-        fn execute(&self, view: &mut Fork) -> ExecutionStatus {
+        fn execute(&self, view: &mut Fork) -> ExecutionResult {
             if self.value() == 42 {
                 panic!(Error::new("42"))
             }

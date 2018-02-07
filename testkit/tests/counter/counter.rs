@@ -18,7 +18,7 @@ extern crate bodyparser;
 extern crate iron;
 extern crate router;
 
-use exonum::blockchain::{ApiContext, Blockchain, Service, Transaction, ExecutionStatus};
+use exonum::blockchain::{ApiContext, Blockchain, Service, Transaction, ExecutionResult};
 use exonum::messages::{Message, RawTransaction};
 use exonum::node::{ApiSender, TransactionSend};
 use exonum::storage::{Entry, Fork, Snapshot};
@@ -89,7 +89,7 @@ impl Transaction for TxIncrement {
         self.verify_signature(self.author())
     }
 
-    fn execute(&self, fork: &mut Fork) -> ExecutionStatus {
+    fn execute(&self, fork: &mut Fork) -> ExecutionResult {
         let mut schema = CounterSchema::new(fork);
         schema.inc_count(self.by());
         Ok(())
@@ -117,7 +117,7 @@ impl Transaction for TxReset {
         self.verify_author() && self.verify_signature(self.author())
     }
 
-    fn execute(&self, fork: &mut Fork) -> ExecutionStatus {
+    fn execute(&self, fork: &mut Fork) -> ExecutionResult {
         let mut schema = CounterSchema::new(fork);
         schema.set_count(0);
         Ok(())

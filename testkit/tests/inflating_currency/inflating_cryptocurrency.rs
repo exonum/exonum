@@ -19,7 +19,7 @@ extern crate serde;
 extern crate serde_json;
 
 use exonum::blockchain::{ApiContext, Blockchain, Schema as CoreSchema, Service, Transaction,
-                         ExecutionStatus};
+                         ExecutionResult};
 use exonum::node::{ApiSender, TransactionSend};
 use exonum::messages::{Message, RawTransaction};
 use exonum::storage::{Fork, MapIndex, Snapshot};
@@ -134,7 +134,7 @@ impl Transaction for TxCreateWallet {
     }
 
     /// Apply logic to the storage when executing the transaction.
-    fn execute(&self, view: &mut Fork) -> ExecutionStatus {
+    fn execute(&self, view: &mut Fork) -> ExecutionResult {
         let height = CoreSchema::new(&view).height();
         let mut schema = CurrencySchema { view };
         if schema.wallet(self.pub_key()).is_none() {
@@ -154,7 +154,7 @@ impl Transaction for TxTransfer {
 
     /// Retrieve two wallets to apply the transfer. Check the sender's
     /// balance and apply changes to the balances of the wallets.
-    fn execute(&self, view: &mut Fork) -> ExecutionStatus {
+    fn execute(&self, view: &mut Fork) -> ExecutionResult {
         let height = CoreSchema::new(&view).height();
         let mut schema = CurrencySchema { view };
         let sender = schema.wallet(self.from());

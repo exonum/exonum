@@ -19,7 +19,7 @@ extern crate exonum_testkit;
 extern crate serde_json;
 
 use exonum::crypto::{gen_keypair, Hash, PublicKey, CryptoHash};
-use exonum::blockchain::{Block, Schema, Service, Transaction, ExecutionStatus};
+use exonum::blockchain::{Block, Schema, Service, Transaction, ExecutionResult};
 use exonum::messages::{Message, RawTransaction};
 use exonum::storage::{Fork, Snapshot};
 use exonum::encoding;
@@ -47,7 +47,7 @@ impl Transaction for TxTimestamp {
         self.verify_signature(self.from())
     }
 
-    fn execute(&self, _fork: &mut Fork) -> ExecutionStatus {
+    fn execute(&self, _fork: &mut Fork) -> ExecutionResult {
         Ok(())
     }
 }

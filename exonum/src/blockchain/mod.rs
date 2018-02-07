@@ -55,7 +55,7 @@ pub use self::schema::{gen_prefix, Schema, TxLocation};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
 pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState};
-pub use self::transaction::{Transaction, ExecutionStatus, TransactionStatus, ExecutionError,
+pub use self::transaction::{Transaction, ExecutionResult, TransactionResult, ExecutionError,
                             TransactionError};
 
 mod block;
@@ -260,14 +260,14 @@ impl Blockchain {
                 let catch_result =
                     panic::catch_unwind(panic::AssertUnwindSafe(|| tx.execute(&mut fork)));
 
-                let transaction_status = match catch_result {
-                    Ok(execution_status) => {
-                        if execution_status.is_err() {
+                let transaction_result = match catch_result {
+                    Ok(execution_result) => {
+                        if execution_result.is_err() {
                             fork.rollback();
                         } else {
                             fork.commit();
                         }
-                        transaction::convert_status(execution_status)
+                        transaction::convert_result(execution_result)
                     }
                     Err(err) => {
                         if err.is::<Error>() {
@@ -282,9 +282,9 @@ impl Blockchain {
 
                 let mut schema = Schema::new(&mut fork);
                 schema.transactions_mut().put(hash, tx.raw().clone());
-                schema.transaction_statuses_mut().put(
+                schema.transaction_results_mut().put(
                     hash,
-                    transaction_status,
+                    transaction_result,
                 );
                 schema.block_txs_mut(height).push(*hash);
                 let location = TxLocation::new(height, index as u64);
