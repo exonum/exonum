@@ -18,9 +18,9 @@ All notable changes to this project will be documented in this file. The project
   around a type (e.g., `struct QuirkyI32Key(i32)`) and implement `StorageKey` for it
   using big endian encoding. Then, use the wrapper instead of the int type in indices.
   See the unit tests for `StorageKey` for an example. (#443)
-- `Transaction` `execute` method now returns  `TransactionStatus` that is stored in the blockchain and can be accessed
+- `Transaction::execute` method now returns `TransactionResult` that is stored in the blockchain and can be accessed
   through api. The changes made by transactions that return `Err` are discarded. To migrate, add `Ok(())` as the last
-  line to the `execute` method. (#385)
+  line to the `execute` method. More generally, make sure that the method returns `Ok(())` on successful execution. (#385)
   
 ### New features
 - `StorageKey` and `StorageValue` traits are implemented for `SystemTime`. (#456)
