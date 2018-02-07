@@ -140,9 +140,9 @@ script: |
       cargo run -p exonum-testkit --example configuration_change
   ;;
   "test-time" )
-      cargo test -p time --verbose &&
-      cargo run -p time --example exonum_time &&
-      cargo run -p time --example simple_service
+      cargo test -p exonum-time --verbose &&
+      cargo run -p exonum-time --example exonum_time &&
+      cargo run -p exonum-time --example simple_service
   ;;
   "test-doc" )
       cargo test -p sandbox --verbose --doc -- --test-threads=2
