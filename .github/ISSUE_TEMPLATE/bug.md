@@ -5,6 +5,7 @@ Please describe your issue here.
 -->
 
 ## Specifications
-  - Platform:
-  - Rust version:
-  - Exonum version:
+
+- Platform:
+- Rust version:
+- Exonum version:
