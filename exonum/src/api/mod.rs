@@ -33,7 +33,7 @@ use serde::de::{self, Visitor, Deserialize, Deserializer};
 
 use crypto::{PublicKey, SecretKey, Hash};
 use encoding::serialize::{FromHex, FromHexError, ToHex, encode_hex};
-use storage::{Result as StorageResult, Error as StorageError};
+use storage;
 
 pub mod public;
 pub mod private;
@@ -46,7 +46,7 @@ pub enum ApiError {
     /// Service error.
     Service(Box<::std::error::Error + Send + Sync>),
     /// Storage error.
-    Storage(StorageError),
+    Storage(storage::Error),
     /// Converting from hex error.
     FromHex(FromHexError),
     /// Input/output error.
@@ -80,7 +80,7 @@ impl ::std::error::Error for ApiError {
         match *self {
             ApiError::Service(ref error) |
             ApiError::IncorrectRequest(ref error) => error.description(),
-            ApiError::Storage(ref error) => error.description(),
+            ApiError::Storage(ref error) => "storage error", //FIXME
             ApiError::FromHex(ref error) => error.description(),
             ApiError::Io(ref error) => error.description(),
             ApiError::FileNotFound(_) => "File not found",
@@ -106,8 +106,8 @@ impl From<io::Error> for ApiError {
     }
 }
 
-impl From<StorageError> for ApiError {
-    fn from(e: StorageError) -> ApiError {
+impl From<storage::Error> for ApiError {
+    fn from(e: storage::Error) -> ApiError {
         ApiError::Storage(e)
     }
 }
@@ -215,7 +215,7 @@ pub trait Api {
         &self,
         request: &'a Request,
         key: &str,
-    ) -> StorageResult<Vec<u8>> {
+    ) -> storage::Result<Vec<u8>> {
         if let Some(&Cookie(ref cookies)) = request.headers.get() {
             for cookie in cookies.iter() {
                 if let Ok(c) = CookiePair::parse(cookie.as_str()) {
@@ -227,7 +227,7 @@ pub trait Api {
                 }
             }
         }
-        Err(StorageError::new(
+        Err(storage::Error::new(
             format!("Unable to find value with given key {}", key),
         ))
     }
