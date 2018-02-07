@@ -536,7 +536,8 @@ impl TestKit {
                                 .insert(tx.hash(), tx);
                         }
                     }
-                    ExternalMessage::PeerAdd(_) => { /* Ignored */ }
+                    ExternalMessage::PeerAdd(_) |
+                    ExternalMessage::Enable(_) => { /* Ignored */ }
                 }
             }))
         };

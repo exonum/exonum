@@ -20,7 +20,7 @@ use iron::prelude::*;
 use params::{Params, Value as ParamsValue};
 
 use crypto::PublicKey;
-use node::ApiSender;
+use node::{ExternalMessage, ApiSender};
 use blockchain::{Service, Blockchain, SharedNodeState};
 use api::{Api, ApiError};
 use messages::{TEST_NETWORK_ID, PROTOCOL_MAJOR_VERSION};
@@ -65,7 +65,6 @@ impl NodeInfo {
 struct ReconnectInfo {
     delay: u64,
 }
-
 
 #[derive(Serialize)]
 #[serde(tag = "type")]
@@ -148,6 +147,16 @@ impl SystemApi {
         self.info.clone()
     }
 
+    fn get_consensus_enabled_info(&self) -> bool {
+        self.shared_api_state.is_enabled()
+    }
+
+    fn set_consensus_enabled_info(&self, enabled: bool) -> Result<(), ApiError> {
+        let message = ExternalMessage::Enable(enabled);
+        self.node_channel.send_external_message(message)?;
+        Ok(())
+    }
+
     fn peer_add(&self, ip_str: &str) -> Result<(), ApiError> {
         let addr: SocketAddr = ip_str.parse()?;
         self.node_channel.peer_add(addr)?;
@@ -186,8 +195,40 @@ impl Api for SystemApi {
             self_.ok_response(&::serde_json::to_value(info).unwrap())
         };
 
+        let self_ = self.clone();
+        let consensus_enabled_info = move |_: &mut Request| -> IronResult<Response> {
+            let info = self_.get_consensus_enabled_info();
+            self_.ok_response(&::serde_json::to_value(info).unwrap())
+        };
+
+        let self_ = self.clone();
+        let consensus_enabled_set = move |req: &mut Request| -> IronResult<Response> {
+            let map = req.get_ref::<Params>().unwrap();
+            match map.find(&["enabled"]) {
+                Some(&ParamsValue::Boolean(enabled)) => {
+                    self_.set_consensus_enabled_info(enabled)?;
+                    self_.ok_response(&::serde_json::to_value("Ok").unwrap())
+                }
+                _ => {
+                    Err(ApiError::IncorrectRequest(
+                        "Required boolean parameter 'enabled' is missing".into(),
+                    ))?
+                }
+            }
+        };
+
         router.get("/v1/peers", peers_info, "peers_info");
         router.post("/v1/peers", peer_add, "peer_add");
         router.get("/v1/network", network, "network_info");
+        router.get(
+            "/v1/consensus_enabled",
+            consensus_enabled_info,
+            "consensus_enabled_info",
+        );
+        router.post(
+            "/v1/consensus_enabled",
+            consensus_enabled_set,
+            "consensus_enabled_set",
+        );
     }
 }

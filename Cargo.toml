@@ -5,3 +5,4 @@ members = [
     "testkit",
     "services/time"
 ]
+exclude = [ "3rdparty" ]
