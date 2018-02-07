@@ -14,6 +14,8 @@
 
 // spell-checker:ignore precommiters, uncommented, uncomment, commited
 
+#[macro_use]
+extern crate pretty_assertions;
 extern crate rand;
 extern crate exonum;
 extern crate sandbox;

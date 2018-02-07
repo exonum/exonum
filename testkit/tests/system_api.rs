@@ -14,6 +14,8 @@
 
 extern crate exonum;
 extern crate exonum_testkit;
+#[macro_use]
+extern crate pretty_assertions;
 
 use exonum_testkit::{ApiKind, TestKitBuilder};
 use exonum::api::public::HealthCheckInfo;

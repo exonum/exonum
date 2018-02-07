@@ -126,7 +126,7 @@ script: |
       cd testkit && cargo clippy --verbose -- -D warnings
   ;;
   "clippy-time" )
-        cd services/time && cargo clippy --verbose -- -D warnings
+      cd services/time && cargo clippy --verbose -- -D warnings
   ;;
   "test-core" )
       cargo test -p exonum --verbose --tests --lib --features "float_serialize"
@@ -141,8 +141,8 @@ script: |
   ;;
   "test-time" )
       cargo test -p exonum-time --verbose &&
-      cargo run -p exonum-time --example exonum_time &&
-      cargo run -p exonum-time --example simple_service
+      cargo run -p exonum-time --example simple_service &&
+      cargo build -p exonum-time --example exonum_time
   ;;
   "test-doc" )
       cargo test -p sandbox --verbose --doc -- --test-threads=2
