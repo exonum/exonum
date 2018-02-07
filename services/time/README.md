@@ -82,4 +82,3 @@ let validator_time = time_schema.validators_time().get(&public_key);
 `exonum-time` is licensed under the Apache License (Version 2.0). See [LICENSE](LICENSE) for details.
 
 [service]: examples/simple_service.rs
-[exonum-testkit]: ../../exonum/testkit
