@@ -253,10 +253,7 @@ impl Blockchain {
                 );
 
                 fork.checkpoint();
-
-                let r = panic::catch_unwind(panic::AssertUnwindSafe(|| { tx.execute(&mut fork); }));
-
-                match r {
+                match panic::catch_unwind(panic::AssertUnwindSafe(|| tx.execute(&mut fork))) {
                     Ok(..) => fork.commit(),
                     Err(err) => {
                         if err.is::<Error>() {
@@ -276,11 +273,26 @@ impl Blockchain {
             }
 
             // Invoke handle_execute for each service
-            fork.checkpoint();
             for service in self.service_map.values() {
-                service.handle_execute(&mut fork);
+                fork.checkpoint();
+                match panic::catch_unwind(panic::AssertUnwindSafe(
+                    || service.handle_execute(&mut fork),
+                )) {
+                    Ok(..) => fork.commit(),
+                    Err(err) => {
+                        if err.is::<Error>() {
+                            // Continue panic unwind if the reason is StorageError
+                            panic::resume_unwind(err);
+                        }
+                        fork.rollback();
+                        error!(
+                            "handle_execute failed for a service: {} with error: {:?}",
+                            service.service_name(),
+                            err
+                        );
+                    }
+                }
             }
-            fork.commit();
 
             // Get tx & state hash
             let (tx_hash, state_hash) = {
