@@ -1,66 +1,95 @@
 # Build instructions
+
 First of all, you need to install system dependencies.
 
-# Installing system dependencies
+## Installing system dependencies
+
 The crate uses these system libraries:
+
 * [rocksdb](https://github.com/facebook/rocksdb)
 * [libsodium](https://download.libsodium.org/doc/)
 * [openssl](https://www.openssl.org)
 
-Below you can find instructions on how to obtain them for the different operating systems:
+Below you can find instructions on how to obtain them for the different
+operating systems:
 
-## macOS 
+### macOS
+
 If you use `homebrew` you can simply install needed libraries with the command:
+
 ```shell
 brew install libsodium rocksdb openssl
 ```
 
-## Linux
+### Linux
+
 For deb based systems like Debian or Ubuntu you need the following packages:
+
 ```shell
-apt install build-essential libsodium-dev librocksdb-dev libsnappy-dev libssl-dev pkg-config
+apt install build-essential libsodium-dev librocksdb-dev libsnappy-dev \
+    libssl-dev pkg-config
 ```
+
 Other linux users may find the packages with similar names in their package managers.
 
-## Windows
+### Windows
+
 Building and workability is not guaranteed yet.
 
+## Adding environment variables
 
-#Adding environment variables:
 This variables needed for linking with the `rocksdb` and `snappy` libraries.
-## macOS
+
+### macOS
+
 ```shell
 export ROCKSDB_LIB_DIR=/usr/local/lib
 export SNAPPY_LIB_DIR=/usr/local/lib
 ```
-## Linux
+
+### Linux
+
 ```shell
 export ROCKSDB_LIB_DIR=/usr/lib/x86_64-linux-gnu
 export SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
 ```
-# Installing Rust
-The project uses a stable Rust version that can be installed by using the [rustup](https://www.rustup.rs) utility.
+
+## Installing Rust
+
+The project uses a stable Rust version that can be installed by using
+the [rustup](https://www.rustup.rs) utility.
 
 ```shell
 curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain stable
 ```
 
-Nightly (`2017-07-05`) version is used for [clippy](https://github.com/Manishearth/rust-clippy). You can install it with the following command:
+Nightly (`2017-07-05`) version is used for
+[clippy](https://github.com/Manishearth/rust-clippy).
+You can install it with the following command:
+
 ```shell
 rustup toolchain install nightly-2017-07-05
 ```
+
 And run Clippy checks this way:
+
 ```shell
 cargo +nightly-2017-07-05 clippy
 ```
 
-# Compiling the project 
-You can verify that you installed everything correctly by compiling the `exonum` crate and run tests suite with the command:
+## Compiling the project
+
+You can verify that you installed everything correctly by compiling
+the `exonum` crate and run tests suite with the command:
+
 ```shell
 cargo test --manifest-path exonum/Cargo.toml
 ```
+
 You may want to launch the extended tests suite which is named `sandbox`.
+
 ```shell
 cargo test --manifest-path sandbox/Cargo.toml
 ```
+
 After all this you can learn how to create your own blockchain solution.

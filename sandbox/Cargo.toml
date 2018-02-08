@@ -13,3 +13,6 @@ clap = { version = "2.25.0", features = ["unstable"] }
 rand = "0.4.2"
 bit-vec = "0.4.4"
 futures = "0.1.14"
+
+[dev-dependencies]
+pretty_assertions = "0.4.0"

@@ -20,6 +20,8 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
+#[macro_use]
+extern crate pretty_assertions;
 
 use exonum::crypto::{self, PublicKey, CryptoHash};
 use exonum::helpers::Height;

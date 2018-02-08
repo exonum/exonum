@@ -3,5 +3,6 @@ members = [
     "exonum",
     "sandbox",
     "testkit",
+    "services/time"
 ]
 exclude = [ "3rdparty" ]

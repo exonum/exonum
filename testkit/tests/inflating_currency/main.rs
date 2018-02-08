@@ -23,6 +23,8 @@ extern crate exonum_testkit;
 extern crate rand;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate pretty_assertions;
 
 use exonum::blockchain::Transaction;
 use exonum::crypto::{self, PublicKey, SecretKey, CryptoHash};
