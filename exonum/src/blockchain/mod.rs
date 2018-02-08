@@ -273,7 +273,7 @@ impl Blockchain {
                     }
                     Err(err) => {
                         if err.is::<Error>() {
-                            // Continue panic unwind if the reason is StorageError
+                            // Continue panic unwind if the reason is StorageError.
                             panic::resume_unwind(err);
                         }
                         fork.rollback();
