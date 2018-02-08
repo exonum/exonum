@@ -144,7 +144,7 @@ pub trait Transaction: Message + ExonumJson + 'static {
 /// Result of unsuccessful transaction execution.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ExecutionError {
-    /// User-defined error-code. Can have different meanings for different transactions and
+    /// User-defined error code. Can have different meanings for different transactions and
     /// services.
     code: u8,
     /// Optional error description.
@@ -174,12 +174,13 @@ impl ExecutionError {
 pub enum TransactionErrorType {
     /// Panic occurred during transaction execution.
     Panic,
-    /// User-defined error-code. Can have different meanings for different transactions and
+    /// User-defined error code. Can have different meanings for different transactions and
     /// services.
     Code(u8),
 }
 
-/// Extended by the framework result of unsuccessful transaction execution.
+/// Result of unsuccessful transaction execution encompassing both service and framework-wide error
+/// handling.
 ///
 /// # Notes:
 ///
@@ -238,8 +239,8 @@ impl TransactionError {
     }
 
     /// Returns an optional error description.
-    pub fn description(&self) -> &Option<String> {
-        &self.description
+    pub fn description(&self) -> Option<&str> {
+        self.description.as_ref().map(|d| d.as_ref())
     }
 }
 

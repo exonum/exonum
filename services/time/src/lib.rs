@@ -167,7 +167,6 @@ impl Transaction for TxTime {
         match schema.time().get() {
             // Selected time should be longer than the time in the storage.
             Some(current_time) if current_time >= validator_times[max_byzantine_nodes] => {
-                return Ok(());
             }
             _ => {
                 // Change the time in the storage.
