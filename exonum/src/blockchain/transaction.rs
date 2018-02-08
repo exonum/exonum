@@ -195,7 +195,7 @@ pub enum TransactionErrorType {
 /// ```
 /// use exonum::blockchain::TransactionError;
 ///
-/// # let transaction_error = TransactionError::Panic;
+/// # let transaction_error: TransactionError = ExecutionError::new(1).into();
 /// // Prints user friendly error description.
 /// println!("Transaction error: {}", transaction_error);
 /// ```

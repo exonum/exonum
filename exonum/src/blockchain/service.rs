@@ -43,7 +43,7 @@ use super::transaction::Transaction;
 /// ```
 /// #[macro_use] extern crate exonum;
 /// // Exports from `exonum` crate skipped
-/// # use exonum::blockchain::{Service, Transaction, ExecutionStatus};
+/// # use exonum::blockchain::{Service, Transaction, ExecutionResult};
 /// # use exonum::crypto::Hash;
 /// # use exonum::messages::{Message, RawTransaction};
 /// # use exonum::storage::{Fork, Snapshot};
@@ -86,7 +86,7 @@ use super::transaction::Transaction;
 /// impl Transaction for MyTransaction {
 ///     // Business logic implementation
 /// #   fn verify(&self) -> bool { true }
-/// #   fn execute(&self, fork: &mut Fork) -> ExecutionStatus { Ok(()) }
+/// #   fn execute(&self, fork: &mut Fork) -> ExecutionResult { Ok(()) }
 /// }
 ///
 /// // Service

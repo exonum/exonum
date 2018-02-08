@@ -34,7 +34,8 @@ use router::Router;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use exonum::blockchain::{Blockchain, Service, ServiceContext, Schema, Transaction, ApiContext};
+use exonum::blockchain::{Blockchain, Service, ServiceContext, Schema, Transaction, ApiContext,
+                         ExecutionResult};
 use exonum::messages::{RawTransaction, Message};
 use exonum::encoding::serialize::json::reexport::Value;
 use exonum::storage::{Fork, Snapshot, ProofMapIndex, Entry};
@@ -115,7 +116,7 @@ impl Transaction for TxTime {
         self.verify_signature(self.pub_key())
     }
 
-    fn execute(&self, view: &mut Fork) {
+    fn execute(&self, view: &mut Fork) -> ExecutionResult {
         let validator_keys = Schema::new(&view).actual_configuration().validator_keys;
 
         // The transaction must be signed by the validator.
@@ -123,14 +124,14 @@ impl Transaction for TxTime {
             validator.service_key == *self.pub_key()
         });
         if !signed {
-            return;
+            return Ok(());
         }
 
         let mut schema = TimeSchema::new(view);
         match schema.validators_times().get(self.pub_key()) {
             // The validator time in the storage should be less than in the transaction.
             Some(storage_time) if storage_time >= self.time() => {
-                return;
+                return Ok(());
             }
             // Write the time for the validator.
             _ => {
@@ -158,7 +159,7 @@ impl Transaction for TxTime {
         // The largest number of Byzantine nodes.
         let max_byzantine_nodes = (validator_keys.len() - 1) / 3;
         if validator_times.len() <= 2 * max_byzantine_nodes {
-            return;
+            return Ok(());
         }
         // Ordering time from highest to lowest.
         validator_times.sort_by(|a, b| b.cmp(a));
@@ -166,13 +167,15 @@ impl Transaction for TxTime {
         match schema.time().get() {
             // Selected time should be longer than the time in the storage.
             Some(current_time) if current_time >= validator_times[max_byzantine_nodes] => {
-                return;
+                return Ok(());
             }
             _ => {
                 // Change the time in the storage.
                 schema.time_mut().set(validator_times[max_byzantine_nodes]);
             }
         }
+
+        Ok(())
     }
 }
 

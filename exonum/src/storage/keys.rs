@@ -33,7 +33,6 @@ use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 /// # extern crate byteorder;
 /// use std::mem;
 /// use exonum::storage::StorageKey;
-/// use byteorder::{BigEndian, ByteOrder};
 ///
 /// struct Key {
 ///     a: i16,
