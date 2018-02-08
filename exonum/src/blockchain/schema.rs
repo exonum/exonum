@@ -91,7 +91,7 @@ where
         MapIndex::new(TRANSACTIONS, &self.view)
     }
 
-    /// Returns table that represents a map from transaction hash into execution status.
+    /// Returns table that represents a map from transaction hash into execution result.
     pub fn transaction_results(&self) -> ProofMapIndex<&T, Hash, TransactionResult> {
         ProofMapIndex::new(TRANSACTION_RESULTS, &self.view)
     }
