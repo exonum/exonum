@@ -276,7 +276,7 @@ impl Blockchain {
                         }
                         fork.rollback();
                         error!("{:?} transaction execution panicked: {:?}", tx, err);
-                        Err(TransactionError::Panic)
+                        Err(TransactionError::from_panic(&err))
                     }
                 };
 
