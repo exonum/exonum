@@ -69,7 +69,7 @@ before_install:
 jobs:
   include:
   # Formatting & other lints that do not require compilation
-  - env: FEATURE=fmt
+  - env: FEATURE=lints
     install:
     - cargo-audit -V || cargo install cargo-audit --force
     - rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
