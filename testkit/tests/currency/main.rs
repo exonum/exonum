@@ -23,6 +23,8 @@ extern crate exonum;
 extern crate exonum_testkit;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
+extern crate pretty_assertions;
 
 use std::collections::BTreeSet;
 use std::iter::FromIterator;

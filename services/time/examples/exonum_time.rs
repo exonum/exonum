@@ -13,18 +13,15 @@
 // limitations under the License.
 
 extern crate exonum;
-extern crate exonum_testkit;
-#[macro_use]
-extern crate pretty_assertions;
+extern crate exonum_time;
 
-use exonum_testkit::{ApiKind, TestKitBuilder};
-use exonum::api::public::HealthCheckInfo;
+use exonum::helpers::fabric::NodeBuilder;
 
-#[test]
-fn test_healthcheck_connectivity_false() {
-    let testkit = TestKitBuilder::validator().with_validators(2).create();
-    let api = testkit.api();
-    let info: HealthCheckInfo = api.get(ApiKind::System, "v1/healthcheck");
-    let expected = HealthCheckInfo { connectivity: false };
-    assert_eq!(info, expected);
+use exonum_time::TimeServiceFactory;
+
+fn main() {
+    exonum::helpers::init_logger().unwrap();
+    NodeBuilder::new()
+        .with_service(Box::new(TimeServiceFactory))
+        .run();
 }

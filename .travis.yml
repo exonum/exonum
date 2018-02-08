@@ -32,6 +32,8 @@ matrix:
       env: FEATURE=clippy-sandbox
     - rust: nightly-2018-01-22
       env: FEATURE=clippy-testkit
+    - rust: nightly-2018-01-22
+      env: FEATURE=clippy-time
 
 cache:
   directories:
@@ -61,6 +63,7 @@ env:
   - FEATURE=test-core
   - FEATURE=test-sandbox
   - FEATURE=test-testkit
+  - FEATURE=test-time
   - FEATURE=test-doc
   - FEATURE=non-fatal-checks
 
@@ -109,9 +112,11 @@ script: |
       cd exonum && cargo fmt -- --write-mode=diff && cd .. &&
       cd sandbox && cargo fmt -- --write-mode=diff && cd .. &&
       cd testkit && cargo fmt -- --write-mode=diff && cd .. &&
+      cd services/time && cargo fmt -- --write-mode=diff && cd ../.. &&
       cspell sandbox/{src,examples,tests}/**/*.rs &&
       cspell exonum/{src,benches,tests}/**/*.rs &&
       cspell testkit/{src,examples,tests}/**/*.rs &&
+      cspell services/time/{src, examples, tests}/**/*.rs &&
       find . -not -path "./3rdparty/*" -name "*.md" | xargs markdownlint --config .markdownlintrc
   ;;
   "clippy-core" )
@@ -123,6 +128,9 @@ script: |
   "clippy-testkit" )
       cd testkit && cargo clippy --verbose -- -D warnings
   ;;
+  "clippy-time" )
+      cd services/time && cargo clippy --verbose -- -D warnings
+  ;;
   "test-core" )
       cargo test -p exonum --verbose --tests --lib --features "float_serialize"
   ;;
@@ -130,9 +138,14 @@ script: |
       cargo test -p sandbox --verbose
   ;;
   "test-testkit" )
-      cargo test -p exonum-testkit --verbose
+      cargo test -p exonum-testkit --verbose &&
       cargo run -p exonum-testkit --example timestamping &&
       cargo run -p exonum-testkit --example configuration_change
+  ;;
+  "test-time" )
+      cargo test -p exonum-time --verbose &&
+      cargo run -p exonum-time --example simple_service &&
+      cargo build -p exonum-time --example exonum_time
   ;;
   "test-doc" )
       cargo test -p sandbox --verbose --doc -- --test-threads=2

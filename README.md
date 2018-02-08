@@ -12,16 +12,15 @@ infrastructure providers.
 
 This is the main Exonum repository that includes
 
-* [Exonum core library](https://github.com/exonum/exonum/blob/master/exonum/README.md).
-* [Exonum testing framework](https://github.com/exonum/exonum/blob/master/testkit/README.md).
+* [Exonum core library](exonum/README.md).
+* [Exonum testing framework](testkit/README.md).
 * Services:
   * Configuration service (currently in [exonum-configuration] repository).
-  * Time service (currently in [exonum-time] repository).
+  * [Time service](services/time/README.md).
 * Demos
   * Cryprocurrency (currently in [cryptocurrency] repository).
 
 See individual projects' readme for the details.
 
 [exonum-configuration]: https://github.com/exonum/exonum-configuration
-[exonum-time]: https://github.com/exonum/exonum-time
 [cryptocurrency]: https://github.com/exonum/cryptocurrency
