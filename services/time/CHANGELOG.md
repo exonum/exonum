@@ -8,9 +8,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 ### Breaking changes
 
 + The structure `Time` is removed, use `SystemTime`
-for saving validator's time in `ProofMapIndex` instead. (#20)
+  for saving validator's time in `ProofMapIndex` instead. (#20)
+
 + Renamed methods `validators_time`/`validators_time_mut` to
-`validators_times`/`validators_times_mut` in `Schema`. (#20)
+  `validators_times`/`validators_times_mut` in `Schema`. (#20)
 
 ## 0.5 - 2018-02-01
 

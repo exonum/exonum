@@ -68,7 +68,7 @@ impl Transaction for Tx {
 
 See the full implementation of the [service][service], which uses the time oracle.
 
-You can get the time of each validator node in the same manner 
+You can get the time of each validator node in the same manner
 the consolidated time of the system is obtained:
 
 ```rust
