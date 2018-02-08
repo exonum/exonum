@@ -193,7 +193,7 @@ pub enum TransactionErrorType {
 /// # Examples
 ///
 /// ```
-/// use exonum::blockchain::TransactionError;
+/// # use exonum::blockchain::{ExecutionError, TransactionError};
 ///
 /// # let transaction_error: TransactionError = ExecutionError::new(1).into();
 /// // Prints user friendly error description.
