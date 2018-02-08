@@ -11,8 +11,8 @@ permissioned blockchains, that is, blockchains with the known set of blockchain
 infrastructure providers.
 
 This is the main Exonum repository that includes
-* [Exonum core library](README.md).
 
+* [Exonum core library](exonum/README.md).
 * [Exonum testing framework](testkit/README.md).
 * Services:
   * Configuration service (currently in [exonum-configuration] repository).

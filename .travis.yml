@@ -116,7 +116,7 @@ script: |
       cspell sandbox/{src,examples,tests}/**/*.rs &&
       cspell exonum/{src,benches,tests}/**/*.rs &&
       cspell testkit/{src,examples,tests}/**/*.rs &&
-      cspell services/time/{src, examples, tests}/**/*.rs
+      cspell services/time/{src, examples, tests}/**/*.rs &&
       find . -not -path "./3rdparty/*" -name "*.md" | xargs markdownlint --config .markdownlintrc
   ;;
   "clippy-core" )
