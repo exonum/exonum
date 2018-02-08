@@ -30,7 +30,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `Transaction::execute` method now returns `TransactionResult` that is stored in
   the blockchain and can be accessed through api. The changes made by transactions
-  that return `Err` are discarded. To migrate, add `Ok(())` as the last line to 
+  that return `Err` are discarded. To migrate, add `Ok(())` as the last line to
   the `execute` method. More generally, make sure that the method returns `Ok(())`
   on successful execution. (#385)
 
