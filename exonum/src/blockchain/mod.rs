@@ -262,10 +262,12 @@ impl Blockchain {
 
                 let transaction_result = match catch_result {
                     Ok(execution_result) => {
-                        if execution_result.is_err() {
-                            fork.rollback();
-                        } else {
-                            fork.commit();
+                        match execution_result {
+                            Ok(()) => fork.commit(),
+                            Err(ref e) => {
+                                info!("{:?} transaction execution failed: {:?}", tx, e);
+                                fork.rollback();
+                            }
                         }
                         execution_result.map_err(TransactionError::from)
                     }
