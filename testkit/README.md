@@ -4,9 +4,10 @@
 [![Build status][travis-image]][travis-url]
 [![Gitter][gitter-image]][gitter-url]
 
-Testkit for Exonum blockchain is a framework that allows to test operation of the whole service.
-Specifically, it allows to test transaction execution and APIs in the synchronous environment
-(without consensus algorithm) and in the same system process.
+Testkit for Exonum blockchain is a framework that allows to test operation
+of the whole service. Specifically, it allows to test transaction execution
+and APIs in the synchronous environment (without consensus algorithm)
+and in the same system process.
 
 ## Usage
 
@@ -21,8 +22,8 @@ exonum-testkit = "0.5.0"
 
 ## Examples
 
-See the [**tests**](tests) and [**examples**](examples) folders for examples of building a
-service and then testing it with the testkit.
+See the [**tests**](tests) and [**examples**](examples) folders for examples
+of building a service and then testing it with the testkit.
 
 ## License
 
