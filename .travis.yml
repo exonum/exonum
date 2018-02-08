@@ -96,40 +96,19 @@ jobs:
     install:
     - cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
     script:
-    - cd exonum && cargo clippy --verbose --features long_benchmarks -- -D warnings
-  - <<: *clippy-core
-    env: FEATURE=clippy-sandbox
-    script:
-    - cd sandbox && cargo clippy --verbose -- -D warnings
-  - <<: *clippy-core
-    env: FEATURE=clippy-testkit
-    script:
-    - cd testkit && cargo clippy --verbose -- -D warnings
-  - <<: *clippy-core
-    env: FEATURE=clippy-time
-    script:
-    - cd services/time && cargo clippy --verbose -- -D warnings
+    - cargo clippy --all
 
   # Tests
   - env: FEATURE=test-core
     script:
-    - cargo test -p exonum --verbose --tests --lib --features "float_serialize"
-  - env: FEATURE=test-sandbox
+    - cargo test --all
+
+  # Examples
+  - env: FEATURE=examples
     script:
-    - cargo test -p sandbox --verbose
-  - env: FEATURE=test-testkit
-    script:
-    - cargo test -p exonum-testkit --verbose
     - cargo run -p exonum-testkit --example timestamping
     - cargo run -p exonum-testkit --example configuration_change
-  - env: FEATURE=test-time
-    script:
-    - cargo test -p exonum-time --verbose
-    - cargo build -p exonum-time --example exonum_time
     - cargo run -p exonum-time --example simple_service
-  - env: FEATURE=test-doc
-    script:
-    - cargo test -p sandbox --verbose --doc -- --test-threads=2
 
   # Benchmarks (compilation only)
   - env: FEATURE=benchmarks
