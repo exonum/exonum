@@ -267,7 +267,7 @@ impl Blockchain {
                         } else {
                             fork.commit();
                         }
-                        transaction::convert_result(execution_result)
+                        execution_result.map_err(TransactionError::from)
                     }
                     Err(err) => {
                         if err.is::<Error>() {

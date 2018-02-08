@@ -189,16 +189,6 @@ pub enum TransactionError {
     Description(String),
 }
 
-/// Converts from `ExecutionResult` into `TransactionResult`.
-pub fn convert_result(result: ExecutionResult) -> TransactionResult {
-    match result {
-        Ok(()) => Ok(()),
-        Err(ExecutionError::Failure) => Err(TransactionError::Failure),
-        Err(ExecutionError::Code(c)) => Err(TransactionError::Code(c)),
-        Err(ExecutionError::Description(s)) => Err(TransactionError::Description(s)),
-    }
-}
-
 impl<'a, T: Transaction> From<T> for Box<Transaction + 'a> {
     fn from(tx: T) -> Self {
         Box::new(tx) as Box<Transaction>
@@ -222,6 +212,16 @@ impl fmt::Display for TransactionError {
 impl CryptoHash for TransactionResult {
     fn hash(&self) -> Hash {
         u16::hash(&status_as_u16(self))
+    }
+}
+
+impl From<ExecutionError> for TransactionError {
+    fn from(error: ExecutionError) -> Self {
+        match error {
+            ExecutionError::Failure => TransactionError::Failure,
+            ExecutionError::Code(c) => TransactionError::Code(c),
+            ExecutionError::Description(s) => TransactionError::Description(s),
+        }
     }
 }
 
