@@ -194,11 +194,24 @@ pub enum TransactionErrorType {
 /// # Examples
 ///
 /// ```
-/// # use exonum::blockchain::{ExecutionError, TransactionError};
+/// # use exonum::storage::{MemoryDB, Database};
+/// # use exonum::crypto::Hash;
+/// use exonum::blockchain::Schema;
 ///
-/// # let transaction_error: TransactionError = ExecutionError::new(1).into();
-/// // Prints user friendly error description.
-/// println!("Transaction error: {}", transaction_error);
+/// # let db = MemoryDB::new();
+/// # let snapshot = db.snapshot();
+/// # let transaction_hash = Hash::zero();
+/// let schema = Schema::new(&snapshot);
+///
+/// if let Some(result) = schema.transaction_results().get(&transaction_hash) {
+///     match result {
+///         Ok(()) => println!("Successful transaction execution"),
+///         Err(transaction_error) => {
+///             // Prints user friendly error description.
+///             println!("Transaction error: {}", transaction_error);
+///         }
+///     }
+/// }
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TransactionError {
@@ -342,6 +355,54 @@ mod tests {
 
     lazy_static! {
         static ref EXECUTION_STATUS: Mutex<ExecutionResult> = Mutex::new(Ok(()));
+    }
+
+    #[test]
+    fn execution_error_new() {
+        let codes = [0, 1, 100, 255];
+
+        for code in &codes {
+            let error = ExecutionError::new(*code);
+            assert_eq!(*code, error.code);
+            assert_eq!(None, error.description);
+        }
+    }
+
+    #[test]
+    fn execution_error_with_description() {
+        let values = [
+            (0, "".to_owned()),
+            (1, "test".to_owned()),
+            (100, "errro".to_owned()),
+            (255, "hello".to_owned()),
+        ];
+
+        for value in &values {
+            let error = ExecutionError::with_description(value.0, value.1.clone());
+            assert_eq!(value.0, error.code);
+            assert_eq!(value.1, error.description.unwrap());
+        }
+    }
+
+    #[test]
+    fn transaction_error_new() {
+        let values = [
+            (TransactionErrorType::Panic, None),
+            (TransactionErrorType::Panic, Some("panic".to_owned())),
+            (TransactionErrorType::Code(0), None),
+            (TransactionErrorType::Code(1), Some("".to_owned())),
+            (TransactionErrorType::Code(100), None),
+            (
+                TransactionErrorType::Code(255),
+                Some("error description".to_owned()),
+            ),
+        ];
+
+        for value in &values {
+            let error = TransactionError::new(value.0, value.1.clone());
+            assert_eq!(value.0, error.error_type());
+            assert_eq!(value.1.as_ref().map(|d| d.as_ref()), error.description());
+        }
     }
 
     #[test]
