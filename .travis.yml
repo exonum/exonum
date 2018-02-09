@@ -81,10 +81,7 @@ jobs:
     - npm install markdownlint-cli
     - ./node_modules/.bin/markdownlint --version
     script:
-    - cd exonum && cargo fmt -- --write-mode=diff && cd ..
-    - cd sandbox && cargo fmt -- --write-mode=diff && cd ..
-    - cd testkit && cargo fmt -- --write-mode=diff && cd ..
-    - cd services/time && cargo fmt -- --write-mode=diff && cd ../..
+    - cargo fmt --all -- --write-mode=diff
     - ./node_modules/.bin/cspell sandbox/{src,examples,tests}/**/*.rs
     - ./node_modules/.bin/cspell exonum/{src,benches,tests}/**/*.rs
     - ./node_modules/.bin/cspell testkit/{src,examples,tests}/**/*.rs
