@@ -2,6 +2,8 @@
 
 [![Build Status](https://travis-ci.org/exonum/exonum.svg?branch=master)](https://travis-ci.org/exonum/exonum)
 [![Join the chat at https://gitter.im/exonum/exonum](https://badges.gitter.im/exonum/exonum.svg)](https://gitter.im/exonum/exonum)
+![rust 1.23+ required](https://img.shields.io/badge/rust-1.23+-blue.svg)
+<!--sync ^ with .travis.yml-->
 
 [Exonum](https://exonum.com/) is an extensible open-source framework for
 creating blockchain applications. Exonum can be used to create cryptographically
