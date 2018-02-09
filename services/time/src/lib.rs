@@ -34,8 +34,8 @@ use router::Router;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use exonum::blockchain::{Blockchain, Service, ServiceContext, Schema, Transaction, ApiContext,
-                         ExecutionResult};
+use exonum::blockchain::{Blockchain, Service, ServiceContext, Schema, ApiContext, Transaction,
+                         TransactionSet, ExecutionResult};
 use exonum::messages::{RawTransaction, Message};
 use exonum::encoding::serialize::json::reexport::Value;
 use exonum::storage::{Fork, Snapshot, ProofMapIndex, Entry};
@@ -46,8 +46,6 @@ use exonum::api::Api;
 
 /// Time service id.
 const SERVICE_ID: u16 = 4;
-/// `TxTime` transaction id.
-const TX_TIME_ID: u16 = 1;
 /// Time service name.
 const SERVICE_NAME: &str = "exonum_time";
 
@@ -99,15 +97,17 @@ impl<'a> TimeSchema<&'a mut Fork> {
     }
 }
 
-message! {
-    /// Transaction that is sent by the validator after the commit of the block.
-    struct TxTime {
-        const TYPE = SERVICE_ID;
-        const ID = TX_TIME_ID;
-        /// Validator's time.
-        time: SystemTime,
-        /// Validator's public key.
-        pub_key: &PublicKey,
+transactions! {
+    TimeTransactions {
+        const SERVICE_ID = SERVICE_ID;
+
+        /// Transaction that is sent by the validator after the commit of the block.
+        struct TxTime {
+            /// Validator's time.
+            time: SystemTime,
+            /// Validator's public key.
+            pub_key: &PublicKey,
+        }
     }
 }
 
@@ -415,14 +415,8 @@ impl Service for TimeService {
     }
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
-        match raw.message_type() {
-            TX_TIME_ID => Ok(Box::new(TxTime::from_raw(raw)?)),
-            _ => {
-                let error =
-                    encoding::Error::IncorrectMessageType { message_type: raw.message_type() };
-                Err(error)
-            }
-        }
+        let tx = TimeTransactions::tx_from_raw(raw)?;
+        Ok(tx.into())
     }
 
     fn initialize(&self, _fork: &mut Fork) -> Value {

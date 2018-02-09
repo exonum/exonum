@@ -23,7 +23,7 @@ extern crate serde_json;
 extern crate serde;
 
 use std::time::{UNIX_EPOCH, SystemTime, Duration};
-use exonum::blockchain::{Service, Transaction, ExecutionResult};
+use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
 use exonum::crypto::{gen_keypair, Hash, PublicKey};
 use exonum::encoding;
 use exonum::helpers::Height;
@@ -36,8 +36,6 @@ use exonum_testkit::TestKitBuilder;
 const SERVICE_ID: u16 = 128;
 /// Marker service name.
 const SERVICE_NAME: &str = "marker";
-/// `TxMarker` transaction id.
-const TX_MARKER_ID: u16 = 0;
 
 /// Marker service database schema.
 #[derive(Debug)]
@@ -72,15 +70,16 @@ impl<'a> MarkerSchema<&'a mut Fork> {
     }
 }
 
-message! {
-    /// Transaction, which must be executed no later than the specified time (field `time`).
-    struct TxMarker {
-        const TYPE = SERVICE_ID;
-        const ID = TX_MARKER_ID;
+transactions! {
+    MarkerTransactions {
+        const SERVICE_ID = SERVICE_ID;
 
-        from: &PublicKey,
-        mark: i32,
-        time: SystemTime,
+        /// Transaction, which must be executed no later than the specified time (field `time`).
+        struct TxMarker {
+            from: &PublicKey,
+            mark: i32,
+            time: SystemTime,
+        }
     }
 }
 
@@ -119,14 +118,8 @@ impl Service for MarkerService {
     }
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
-        match raw.message_type() {
-            TX_MARKER_ID => Ok(Box::new(TxMarker::from_raw(raw)?)),
-            _ => {
-                let error =
-                    encoding::Error::IncorrectMessageType { message_type: raw.message_type() };
-                Err(error)
-            }
-        }
+        let tx = MarkerTransactions::tx_from_raw(raw)?;
+        Ok(tx.into())
     }
 }
 

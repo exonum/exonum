@@ -274,7 +274,7 @@ fn handling_tx_panic_storage_error(blockchain: &Blockchain) {
 }
 
 mod transactions_tests {
-    use blockchain::{Transaction, TransactionSet};
+    use blockchain::{Transaction, TransactionSet, ExecutionResult};
     use storage::Fork;
     use crypto::gen_keypair;
     use serde::Serialize;
@@ -304,7 +304,9 @@ mod transactions_tests {
             true
         }
 
-        fn execute(&self, _: &mut Fork) {}
+        fn execute(&self, _: &mut Fork) -> ExecutionResult {
+            Ok(())
+        }
     }
 
     impl Transaction for B {
@@ -312,7 +314,9 @@ mod transactions_tests {
             true
         }
 
-        fn execute(&self, _: &mut Fork) {}
+        fn execute(&self, _: &mut Fork) -> ExecutionResult {
+            Ok(())
+        }
     }
 
     impl Transaction for C {
@@ -320,7 +324,9 @@ mod transactions_tests {
             true
         }
 
-        fn execute(&self, _: &mut Fork) {}
+        fn execute(&self, _: &mut Fork) -> ExecutionResult {
+            Ok(())
+        }
     }
 
     #[test]

@@ -18,8 +18,8 @@ extern crate router;
 extern crate serde;
 extern crate serde_json;
 
-use exonum::blockchain::{ApiContext, Blockchain, Schema as CoreSchema, Service,
-                         Transaction, TransactionSet, ExecutionResult};
+use exonum::blockchain::{ApiContext, Blockchain, Schema as CoreSchema, Service, Transaction,
+                         TransactionSet, ExecutionResult};
 use exonum::node::{ApiSender, TransactionSend};
 use exonum::messages::{Message, RawTransaction};
 use exonum::storage::{Fork, MapIndex, Snapshot};
