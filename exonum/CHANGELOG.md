@@ -31,6 +31,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 ### New features
 
 - `StorageKey` and `StorageValue` traits are implemented for `SystemTime`. (#456)
+- Added a method `handle_execute` in `Service` trait. (#464)
 
 ### Bug fixes
 
