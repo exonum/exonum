@@ -56,7 +56,7 @@ format same as for `actual`
         ]
       },
       "propose": {
-        "num_votes": "4",
+        "num_validators": "4",
         "tx_propose": {
           "body": {
             "cfg": "{\"previous_cfg_hash\":\"267e8cd86262117be995379e7f5acd205cac619ed5d346cc42d5c3578de33c06\",\"actual_from\":450,\"validators\":[\"de24ff6ba3ac92035ab09792c397d9af9264528af689cdaed98688a595e5b6ac\",\"5eb97034457d7632cd6f3d3230f958ef2f00c167e514d34b59975277fbb24baa\",\"1d087863b9b474520dd529ac16815d9a45b6c7d13133c7db0f59b94642b4e911\",\"1995c0a3f6313e872549316d52d2f070cc10ecebe78ce3bc730af1d24537f420\"],\"consensus\":{\"round_timeout\":3000,\"status_timeout\":5000,\"peers_timeout\":10000,\"propose_timeout\":500,\"txs_block_limit\":1000},\"services\":{\"1\":null}}",
@@ -192,7 +192,7 @@ format same as for `actual`
       {
         "hash": "acb7def92c28bc72c2de8b41b648a1e301f1a404cf79d5c350841b27abd30ab2",
         "propose_data": {
-          "num_votes": "1",
+          "num_validators": "1",
           "tx_propose": {
             "cfg": {
               "actual_from": 3400,
@@ -222,7 +222,7 @@ format same as for `actual`
       {
         "hash": "c9b98af9a860d4bf9479c3b17a22527c8a59acf3b68de43d748a362ce6ec67b1",
         "propose_data": {
-          "num_votes": "1",
+          "num_validators": "1",
           "tx_propose": {
             "cfg": {
               "actual_from": 3700,
@@ -252,7 +252,7 @@ format same as for `actual`
       {
         "hash": "4b149012d686b3b66a9a8061e7beb2e72e601675df9fa53e0afde418c0bcb7f4",
         "propose_data": {
-          "num_votes": "1",
+          "num_validators": "1",
           "tx_propose": {
             "cfg": {
               "actual_from": 4000,
