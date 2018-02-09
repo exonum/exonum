@@ -361,9 +361,9 @@ mod tests {
     fn execution_error_new() {
         let codes = [0, 1, 100, 255];
 
-        for code in &codes {
-            let error = ExecutionError::new(*code);
-            assert_eq!(*code, error.code);
+        for &code in &codes {
+            let error = ExecutionError::new(code);
+            assert_eq!(code, error.code);
             assert_eq!(None, error.description);
         }
     }
@@ -371,14 +371,14 @@ mod tests {
     #[test]
     fn execution_error_with_description() {
         let values = [
-            (0, "".to_owned()),
-            (1, "test".to_owned()),
-            (100, "errro".to_owned()),
-            (255, "hello".to_owned()),
+            (0, ""),
+            (1, "test"),
+            (100, "error"),
+            (255, "hello"),
         ];
 
         for value in &values {
-            let error = ExecutionError::with_description(value.0, value.1.clone());
+            let error = ExecutionError::with_description(value.0, value.1.to_owned());
             assert_eq!(value.0, error.code);
             assert_eq!(value.1, error.description.unwrap());
         }
@@ -388,18 +388,18 @@ mod tests {
     fn transaction_error_new() {
         let values = [
             (TransactionErrorType::Panic, None),
-            (TransactionErrorType::Panic, Some("panic".to_owned())),
+            (TransactionErrorType::Panic, Some("panic")),
             (TransactionErrorType::Code(0), None),
-            (TransactionErrorType::Code(1), Some("".to_owned())),
+            (TransactionErrorType::Code(1), Some("")),
             (TransactionErrorType::Code(100), None),
             (
                 TransactionErrorType::Code(255),
-                Some("error description".to_owned()),
+                Some("error description"),
             ),
         ];
 
         for value in &values {
-            let error = TransactionError::new(value.0, value.1.clone());
+            let error = TransactionError::new(value.0, value.1.map(str::to_owned));
             assert_eq!(value.0, error.error_type());
             assert_eq!(value.1.as_ref().map(|d| d.as_ref()), error.description());
         }
