@@ -50,13 +50,14 @@ mod tests {
     fn execute_timestamping(db: Box<Database>, b: &mut Bencher) {
         let mut blockchain = create_blockchain(db);
 
-        message! {
-            struct Tx {
-                const TYPE = 1;
-                const ID = 0;
+        transactions! {
+            Transactions {
+                const SERVICE_ID = 1;
 
-                from: &PublicKey,
-                data: &Hash,
+                struct Tx {
+                    from: &PublicKey,
+                    data: &Hash,
+                }
             }
         }
 
@@ -108,13 +109,14 @@ mod tests {
     fn execute_cryptocurrency(db: Box<Database>, b: &mut Bencher) {
         let mut blockchain = create_blockchain(db);
 
-        message! {
-            struct Tx {
-                const TYPE = 1;
-                const ID = 0;
+        transactions! {
+            Transactions {
+                const SERVICE_ID = 1;
 
-                from: &PublicKey,
-                to: &PublicKey,
+                struct Tx {
+                    from: &PublicKey,
+                    to: &PublicKey,
+                }
             }
         }
 

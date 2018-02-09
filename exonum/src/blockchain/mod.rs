@@ -55,13 +55,14 @@ pub use self::schema::{gen_prefix, Schema, TxLocation};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
 pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState};
-pub use self::transaction::{Transaction, ExecutionResult, TransactionResult, ExecutionError,
-                            TransactionError};
+pub use self::transaction::{Transaction, TransactionSet, ExecutionResult, TransactionResult,
+                            ExecutionError, TransactionError};
 
 mod block;
 mod schema;
 mod genesis;
 mod service;
+#[macro_use]
 mod transaction;
 #[cfg(test)]
 mod tests;

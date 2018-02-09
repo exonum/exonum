@@ -32,53 +32,54 @@ use std::time::SystemTime;
 use crypto::{Hash, PublicKey};
 use blockchain;
 use helpers::{Height, Round, ValidatorId};
-use super::{RawMessage, BitVec};
+use super::{ServiceMessage, RawMessage, BitVec};
 
 /// Consensus message type.
 pub const CONSENSUS: u16 = 0;
 
 /// `Connect` message id.
-pub const CONNECT_MESSAGE_ID: u16 = 0;
+pub const CONNECT_MESSAGE_ID: u16 = Connect::MESSAGE_ID;
 /// `Status` message id.
-pub const STATUS_MESSAGE_ID: u16 = 1;
+pub const STATUS_MESSAGE_ID: u16 = Status::MESSAGE_ID;
 
 /// `Propose` message id.
-pub const PROPOSE_MESSAGE_ID: u16 = 2;
+pub const PROPOSE_MESSAGE_ID: u16 = Propose::MESSAGE_ID;
 /// `Prevote` message id.
-pub const PREVOTE_MESSAGE_ID: u16 = 3;
+pub const PREVOTE_MESSAGE_ID: u16 = Prevote::MESSAGE_ID;
 /// `Precommit` message id.
-pub const PRECOMMIT_MESSAGE_ID: u16 = 4;
+pub const PRECOMMIT_MESSAGE_ID: u16 = Precommit::MESSAGE_ID;
 /// `BlockResponse` message id.
-pub const BLOCK_RESPONSE_MESSAGE_ID: u16 = 5;
+pub const BLOCK_RESPONSE_MESSAGE_ID: u16 = BlockResponse::MESSAGE_ID;
 
 /// `ProposeRequest` message id.
-pub const PROPOSE_REQUEST_MESSAGE_ID: u16 = 6;
+pub const PROPOSE_REQUEST_MESSAGE_ID: u16 = ProposeRequest::MESSAGE_ID;
 /// `TransactionsRequest` message id.
-pub const TRANSACTIONS_REQUEST_MESSAGE_ID: u16 = 7;
+pub const TRANSACTIONS_REQUEST_MESSAGE_ID: u16 = TransactionsRequest::MESSAGE_ID;
 /// `PrevotesRequest` message id.
-pub const PREVOTES_REQUEST_MESSAGE_ID: u16 = 8;
+pub const PREVOTES_REQUEST_MESSAGE_ID: u16 = PrevotesRequest::MESSAGE_ID;
 /// `PeersRequest` message id.
-pub const PEERS_REQUEST_MESSAGE_ID: u16 = 9;
+pub const PEERS_REQUEST_MESSAGE_ID: u16 = PeersRequest::MESSAGE_ID;
 /// `BlockRequest` message id.
-pub const BLOCK_REQUEST_MESSAGE_ID: u16 = 10;
+pub const BLOCK_REQUEST_MESSAGE_ID: u16 = BlockRequest::MESSAGE_ID;
 
-message! {
-/// Connect to a node.
-///
-/// ### Validation
-/// The message is ignored if its time is earlier than in the previous `Connect` message received
-/// from the same peer.
-///
-/// ### Processing
-/// Connect to the peer.
-///
-/// ### Generation
-/// A node sends `Connect` message to all known addresses during initialization. Additionally,
-/// the node responds by its own `Connect` message after receiving `node::Event::Connected`.
+
+messages! {
+    const SERVICE_ID = CONSENSUS;
+
+    /// Connect to a node.
+    ///
+    /// ### Validation
+    /// The message is ignored if its time is earlier than in the previous
+    /// `Connect` message received from the same peer.
+    ///
+    /// ### Processing
+    /// Connect to the peer.
+    ///
+    /// ### Generation
+    /// A node sends `Connect` message to all known addresses during
+    /// initialization. Additionally, the node responds by its own `Connect`
+    /// message after receiving `node::Event::Connected`.
     struct Connect {
-        const TYPE = CONSENSUS;
-        const ID = CONNECT_MESSAGE_ID;
-
         /// The sender's public key.
         pub_key: &PublicKey,
         /// The node's address.
@@ -86,29 +87,49 @@ message! {
         /// Time when the message was created.
         time: SystemTime,
     }
-}
 
-message! {
-/// Proposal for a new block.
-///
-/// ### Validation
-/// The message is ignored if it
-///     * contains incorrect `prev_hash`
-///     * is sent by non-leader
-///     * contains already committed transactions
-///     * is already known
-///
-/// ### Processing
-/// If the message contains unknown transactions, then `TransactionsRequest` is sent in reply.
-/// Otherwise `Prevote` is broadcast.
-///
-/// ### Generation
-/// A node broadcasts `Propose` if it is a leader and is not locked for a different proposal. Also
-/// `Propose` can be sent as response to `ProposeRequest`.
+
+    /// Current node status.
+    ///
+    /// ### Validation
+    /// The message is ignored if its signature is incorrect or its `height` is
+    /// lower than a node's height.
+    ///
+    /// ### Processing
+    /// If the message's `height` number is bigger than a node's one, then
+    /// `BlockRequest` with current node's height is sent in reply.
+    ///
+    /// ### Generation
+    /// `Status` message is broadcast regularly with the timeout controlled by
+    /// `blockchain::ConsensusConfig::status_timeout`. Also, it is broadcast
+    /// after accepting a new block.
+    struct Status {
+        /// The sender's public key.
+        from: &PublicKey,
+        /// The height to which the message is related.
+        height: Height,
+        /// Hash of the last committed block.
+        last_hash: &Hash,
+    }
+
+    /// Proposal for a new block.
+    ///
+    /// ### Validation
+    /// The message is ignored if it
+    ///     * contains incorrect `prev_hash`
+    ///     * is sent by non-leader
+    ///     * contains already committed transactions
+    ///     * is already known
+    ///
+    /// ### Processing
+    /// If the message contains unknown transactions, then `TransactionsRequest`
+    /// is sent in reply.  Otherwise `Prevote` is broadcast.
+    ///
+    /// ### Generation
+    /// A node broadcasts `Propose` if it is a leader and is not locked for a
+    /// different proposal. Also `Propose` can be sent as response to
+    /// `ProposeRequest`.
     struct Propose {
-        const TYPE = CONSENSUS;
-        const ID = PROPOSE_MESSAGE_ID;
-
         /// The validator id.
         validator: ValidatorId,
         /// The height to which the message is related.
@@ -120,29 +141,26 @@ message! {
         /// The list of transactions to include in the next block.
         transactions: &[Hash],
     }
-}
 
-message! {
-/// Pre-vote for a new block.
-///
-/// ### Validation
-/// A node panics if it has already sent a different `Prevote` for the same round.
-///
-/// ### Processing
-/// Pre-vote is added to the list of known votes for the same proposal.
-/// If `locked_round` number from the message is bigger than in a node state, then a node replies
-/// with `PrevotesRequest`.
-/// If there are unknown transactions in the propose specified by `propose_hash`,
-/// `TransactionsRequest` is sent in reply.
-/// Otherwise if all transactions are known and there are +2/3 pre-votes, then a node is locked
-/// to that proposal and `Precommit` is broadcast.
-///
-/// ### Generation
-/// A node broadcasts `Prevote` in response to `Propose` when it has received all the transactions.
+    /// Pre-vote for a new block.
+    ///
+    /// ### Validation
+    /// A node panics if it has already sent a different `Prevote` for the same
+    /// round.
+    ///
+    /// ### Processing
+    /// Pre-vote is added to the list of known votes for the same proposal.  If
+    /// `locked_round` number from the message is bigger than in a node state,
+    /// then a node replies with `PrevotesRequest`.  If there are unknown
+    /// transactions in the propose specified by `propose_hash`,
+    /// `TransactionsRequest` is sent in reply.  Otherwise if all transactions
+    /// are known and there are +2/3 pre-votes, then a node is locked to that
+    /// proposal and `Precommit` is broadcast.
+    ///
+    /// ### Generation
+    /// A node broadcasts `Prevote` in response to `Propose` when it has
+    /// received all the transactions.
     struct Prevote {
-        const TYPE = CONSENSUS;
-        const ID = PREVOTE_MESSAGE_ID;
-
         /// The validator id.
         validator: ValidatorId,
         /// The height to which the message is related.
@@ -154,30 +172,26 @@ message! {
         /// Locked round.
         locked_round: Round,
     }
-}
 
-message! {
-/// Pre-commit for a proposal.
-///
-/// ### Validation
-/// A node panics if it  has already sent a different `Precommit` for the same round.
-///
-/// ### Processing
-/// Pre-commit is added to the list of known pre-commits.
-/// If a proposal is unknown to the node, `ProposeRequest` is sent in reply.
-/// If `round` number from the message is bigger than a node's "locked round", then a node replies
-/// with `PrevotesRequest`.
-/// If there are unknown transactions, then `TransactionsRequest` is sent in reply.
-/// If a validator receives +2/3 precommits for the same proposal with the same block_hash, then
-/// block is executed and `Status` is broadcast.
-///
-/// ### Generation
-/// A node broadcasts `Precommit` in response to `Prevote` if there are +2/3 pre-votes and no
-/// unknown transactions.
+    /// Pre-commit for a proposal.
+    ///
+    /// ### Validation
+    /// A node panics if it has already sent a different `Precommit` for the
+    /// same round.
+    ///
+    /// ### Processing
+    /// Pre-commit is added to the list of known pre-commits.  If a proposal is
+    /// unknown to the node, `ProposeRequest` is sent in reply.  If `round`
+    /// number from the message is bigger than a node's "locked round", then a
+    /// node replies with `PrevotesRequest`.  If there are unknown transactions,
+    /// then `TransactionsRequest` is sent in reply.  If a validator receives
+    /// +2/3 precommits for the same proposal with the same block_hash, then
+    /// block is executed and `Status` is broadcast.
+    ///
+    /// ### Generation
+    /// A node broadcasts `Precommit` in response to `Prevote` if there are +2/3
+    /// pre-votes and no unknown transactions.
     struct Precommit {
-        const TYPE = CONSENSUS;
-        const ID = PRECOMMIT_MESSAGE_ID;
-
         /// The validator id.
         validator: ValidatorId,
         /// The height to which the message is related.
@@ -191,53 +205,21 @@ message! {
         /// Time of the `Precommit`.
         time: SystemTime,
     }
-}
 
-message! {
-/// Current node status.
-///
-/// ### Validation
-/// The message is ignored if its signature is incorrect or its `height` is lower than a node's
-/// height.
-///
-/// ### Processing
-/// If the message's `height` number is bigger than a node's one, then `BlockRequest` with current
-/// node's height is sent in reply.
-///
-/// ### Generation
-/// `Status` message is broadcast regularly with the timeout controlled by
-/// `blockchain::ConsensusConfig::status_timeout`. Also, it is broadcast after accepting a new
-/// block.
-    struct Status {
-        const TYPE = CONSENSUS;
-        const ID = STATUS_MESSAGE_ID;
-
-        /// The sender's public key.
-        from: &PublicKey,
-        /// The height to which the message is related.
-        height: Height,
-        /// Hash of the last committed block.
-        last_hash: &Hash,
-    }
-}
-
-message! {
-/// Information about a block.
-///
-/// ### Validation
-/// The message is ignored if
-///     * its `to` field corresponds to a different node
-///     * the `block`, `transaction` and `precommits` fields cannot be parsed or verified
-///
-/// ### Processing
-/// The block is added to the blockchain.
-///
-/// ### Generation
-/// The message is sent as response to `BlockRequest`.
+    /// Information about a block.
+    ///
+    /// ### Validation
+    /// The message is ignored if
+    ///     * its `to` field corresponds to a different node
+    ///     * the `block`, `transaction` and `precommits` fields cannot be
+    ///     parsed or verified
+    ///
+    /// ### Processing
+    /// The block is added to the blockchain.
+    ///
+    /// ### Generation
+    /// The message is sent as response to `BlockRequest`.
     struct BlockResponse {
-        const TYPE = CONSENSUS;
-        const ID = BLOCK_RESPONSE_MESSAGE_ID;
-
         /// The sender's public key.
         from: &PublicKey,
         /// Public key of the recipient.
@@ -249,23 +231,20 @@ message! {
         /// List of the transactions.
         transactions: Vec<RawMessage>,
     }
-}
 
-message! {
-/// Request for the `Propose`.
-///
-/// ### Validation
-/// The message is ignored if its `height` is not equal to the node's height.
-///
-/// ### Processing
-/// `Propose` is sent as the response.
-///
-/// ### Generation
-/// A node can send `ProposeRequest` during `Precommit` and `Prevote` handling.
+    /// Request for the `Propose`.
+    ///
+    /// ### Validation
+    /// The message is ignored if its `height` is not equal to the node's
+    /// height.
+    ///
+    /// ### Processing
+    /// `Propose` is sent as the response.
+    ///
+    /// ### Generation
+    /// A node can send `ProposeRequest` during `Precommit` and `Prevote`
+    /// handling.
     struct ProposeRequest {
-        const TYPE = CONSENSUS;
-        const ID = PROPOSE_REQUEST_MESSAGE_ID;
-
         /// The sender's public key.
         from: &PublicKey,
         /// Public key of the recipient.
@@ -275,20 +254,16 @@ message! {
         /// Hash of the `Propose`.
         propose_hash: &Hash,
     }
-}
 
-message! {
-/// Request for transactions by hash.
-///
-/// ### Processing
-/// Requested transactions are sent to the recipient.
-///
-/// ### Generation
-/// This message can be sent during `Propose`, `Prevote` and `Precommit` handling.
+    /// Request for transactions by hash.
+    ///
+    /// ### Processing
+    /// Requested transactions are sent to the recipient.
+    ///
+    /// ### Generation
+    /// This message can be sent during `Propose`, `Prevote` and `Precommit`
+    /// handling.
     struct TransactionsRequest {
-        const TYPE = CONSENSUS;
-        const ID = TRANSACTIONS_REQUEST_MESSAGE_ID;
-
         /// The sender's public key.
         from: &PublicKey,
         /// Public key of the recipient.
@@ -296,23 +271,19 @@ message! {
         /// The list of the transaction hashes.
         txs: &[Hash],
     }
-}
 
-message! {
-/// Request for pre-votes.
-///
-/// ### Validation
-/// The message is ignored if its `height` is not equal to the node's height.
-///
-/// ### Processing
-/// The requested pre-votes are sent to the recipient.
-///
-/// ### Generation
-/// This message can be sent during `Prevote` and `Precommit` handling.
+    /// Request for pre-votes.
+    ///
+    /// ### Validation
+    /// The message is ignored if its `height` is not equal to the node's
+    /// height.
+    ///
+    /// ### Processing
+    /// The requested pre-votes are sent to the recipient.
+    ///
+    /// ### Generation
+    /// This message can be sent during `Prevote` and `Precommit` handling.
     struct PrevotesRequest {
-        const TYPE = CONSENSUS;
-        const ID = PREVOTES_REQUEST_MESSAGE_ID;
-
         /// The sender's public key.
         from: &PublicKey,
         /// Public key of the recipient.
@@ -326,47 +297,37 @@ message! {
         /// The list of validators that send pre-votes.
         validators: BitVec,
     }
-}
 
-message! {
-/// Request connected peers from a node.
-///
-/// ### Validation
-/// Request is considered valid if the sender of the message on the network level corresponds to
-/// the `from` field.
-///
-/// ### Processing
-/// Peer `Connect` messages are sent to the recipient.
-///
-/// ### Generation
-/// `PeersRequest` message is sent regularly with the timeout controlled by
-/// `blockchain::ConsensusConfig::peers_timeout`.
+    /// Request connected peers from a node.
+    ///
+    /// ### Validation
+    /// Request is considered valid if the sender of the message on the network
+    /// level corresponds to the `from` field.
+    ///
+    /// ### Processing
+    /// Peer `Connect` messages are sent to the recipient.
+    ///
+    /// ### Generation
+    /// `PeersRequest` message is sent regularly with the timeout controlled by
+    /// `blockchain::ConsensusConfig::peers_timeout`.
     struct PeersRequest {
-        const TYPE = CONSENSUS;
-        const ID = PEERS_REQUEST_MESSAGE_ID;
-
         /// The sender's public key.
         from: &PublicKey,
         /// Public key of the recipient.
         to: &PublicKey,
     }
-}
 
-message! {
-/// Request for the block with the given `height`.
-///
-/// ### Validation
-/// The message is ignored if its `height` is bigger than the node's one.
-///
-/// ### Processing
-/// `BlockResponse` message is sent as the response.
-///
-/// ### Generation
-/// This message can be sent during `Status` processing.
+    /// Request for the block with the given `height`.
+    ///
+    /// ### Validation
+    /// The message is ignored if its `height` is bigger than the node's one.
+    ///
+    /// ### Processing
+    /// `BlockResponse` message is sent as the response.
+    ///
+    /// ### Generation
+    /// This message can be sent during `Status` processing.
     struct BlockRequest {
-        const TYPE = CONSENSUS;
-        const ID = BLOCK_REQUEST_MESSAGE_ID;
-
         /// The sender's public key.
         from: &PublicKey,
         /// Public key of the recipient.

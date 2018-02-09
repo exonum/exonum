@@ -17,11 +17,10 @@ use messages::raw::MessageBuffer;
 use messages::{Message, RawMessage};
 use encoding::serialize::FromHex;
 
-message! {
-    struct TxSimple {
-        const TYPE = 0;
-        const ID = 0;
+messages! {
+    const SERVICE_ID = 0;
 
+    struct TxSimple {
         public_key: &PublicKey,
         msg: &str,
     }
@@ -29,10 +28,10 @@ message! {
 
 #[test]
 fn test_message_without_fields() {
-    message! {
+    messages! {
+        const SERVICE_ID = 0;
+
         struct NoFields {
-            const TYPE = 0;
-            const ID = 0;
         }
     }
     drop(NoFields::new(&SecretKey::new([1; 64])));
@@ -60,11 +59,9 @@ fn test_incorrect_network_id() {
 #[allow(dead_code)]
 #[should_panic(expected = "Found error in from_raw: UnexpectedlyShortPayload")]
 fn test_message_with_small_size() {
-    message! {
+    messages! {
+        const SERVICE_ID = 0;
         struct SmallField {
-            const TYPE = 0;
-            const ID = 0;
-
             test: bool,
         }
     }
@@ -87,11 +84,9 @@ fn test_hex_valid_into_message() {
 #[allow(dead_code)]
 #[should_panic(expected = "Incorrect raw message length")]
 fn test_hex_wrong_length_into_message() {
-    message! {
+    messages! {
+        const SERVICE_ID = 0;
         struct TxOtherSize {
-            const TYPE = 0;
-            const ID = 0;
-
             public_key: &PublicKey,
         }
     }
@@ -105,11 +100,9 @@ fn test_hex_wrong_length_into_message() {
 #[allow(dead_code)]
 #[should_panic(expected = "OverlappingSegment")]
 fn test_hex_wrong_body_into_message() {
-    message! {
+    messages! {
+        const SERVICE_ID = 0;
         struct TxOtherBody {
-            const TYPE = 0;
-            const ID = 0;
-
             a: u64,
             b: u64,
             c: u64,
@@ -126,11 +119,12 @@ fn test_hex_wrong_body_into_message() {
 #[allow(dead_code)]
 #[should_panic(expected = "IncorrectMessageType")]
 fn test_hex_wrong_id_into_message() {
-    message! {
-        struct TxOtherId {
-            const TYPE = 0;
-            const ID = 1;
+    messages! {
+        const SERVICE_ID = 0;
+        struct MessageWithZeroId {
+        }
 
+        struct TxOtherId {
             public_key: &PublicKey,
             msg: &str,
         }
@@ -145,11 +139,9 @@ fn test_hex_wrong_id_into_message() {
 #[allow(dead_code)]
 #[should_panic(expected = "IncorrectServiceId")]
 fn test_hex_wrong_type_into_message() {
-    message! {
+    messages! {
+        const SERVICE_ID = 1;
         struct TxOtherType {
-            const TYPE = 1;
-            const ID = 0;
-
             public_key: &PublicKey,
             msg: &str,
         }

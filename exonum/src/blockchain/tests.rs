@@ -142,11 +142,9 @@ fn gen_tempdir_name() -> String {
 }
 
 fn handling_tx_panic(blockchain: &Blockchain, db: &mut Box<Database>) {
-    message! {
+    messages! {
+        const SERVICE_ID = 1;
         struct Tx {
-            const TYPE = 1;
-            const ID = 0;
-
             value: u64,
         }
     }
@@ -224,11 +222,9 @@ fn handling_tx_panic(blockchain: &Blockchain, db: &mut Box<Database>) {
 }
 
 fn handling_tx_panic_storage_error(blockchain: &Blockchain) {
-    message! {
+    messages! {
+        const SERVICE_ID = 1;
         struct Tx {
-            const TYPE = 1;
-            const ID = 0;
-
             value: u64,
         }
     }
@@ -275,6 +271,100 @@ fn handling_tx_panic_storage_error(blockchain: &Blockchain) {
         &[tx_ok1.hash(), tx_storage_error.hash(), tx_ok2.hash()],
         &pool,
     );
+}
+
+mod transactions_tests {
+    use blockchain::{Transaction, TransactionSet, ExecutionResult};
+    use storage::Fork;
+    use crypto::gen_keypair;
+    use serde::Serialize;
+    use serde_json;
+
+    transactions! {
+        MyTransactions {
+            const SERVICE_ID = 92;
+
+            struct A {
+                a: u32
+            }
+
+            struct B {
+                b: u32,
+                c: u8
+            }
+
+            struct C {
+                a: u32
+            }
+        }
+    }
+
+    impl Transaction for A {
+        fn verify(&self) -> bool {
+            true
+        }
+
+        fn execute(&self, _: &mut Fork) -> ExecutionResult {
+            Ok(())
+        }
+    }
+
+    impl Transaction for B {
+        fn verify(&self) -> bool {
+            true
+        }
+
+        fn execute(&self, _: &mut Fork) -> ExecutionResult {
+            Ok(())
+        }
+    }
+
+    impl Transaction for C {
+        fn verify(&self) -> bool {
+            true
+        }
+
+        fn execute(&self, _: &mut Fork) -> ExecutionResult {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn deserialize_from_json() {
+        fn round_trip<T: Transaction + Serialize>(t: &T) {
+            let initial = serde_json::to_value(&t).unwrap();
+            let parsed: MyTransactions = serde_json::from_value(initial.clone()).unwrap();
+            let round_tripped = serde_json::to_value(&parsed).unwrap();
+            assert_eq!(initial, round_tripped);
+        }
+
+        let (_pub_key, sec_key) = gen_keypair();
+        let a = A::new(0, &sec_key);
+        let b = B::new(1, 2, &sec_key);
+        let c = C::new(0, &sec_key);
+        round_trip(&a);
+        round_trip(&b);
+        round_trip(&c);
+    }
+
+    #[test]
+    fn deserialize_from_raw() {
+        fn round_trip<T: Transaction + Serialize>(t: &T) {
+            let initial = serde_json::to_value(&t).unwrap();
+            let raw = t.raw();
+            let parsed: MyTransactions = TransactionSet::tx_from_raw(raw.clone()).unwrap();
+            let round_tripped = serde_json::to_value(&parsed).unwrap();
+            assert_eq!(initial, round_tripped);
+        }
+
+        let (_pub_key, sec_key) = gen_keypair();
+        let a = A::new(0, &sec_key);
+        let b = B::new(1, 2, &sec_key);
+        let c = C::new(0, &sec_key);
+        round_trip(&a);
+        round_trip(&b);
+        round_trip(&c);
+    }
 }
 
 mod memorydb_tests {

@@ -32,6 +32,7 @@ use blockchain::{Blockchain, ConsensusConfig, Schema, StoredConfiguration, Valid
 use helpers::{Height, Milliseconds, ValidatorId};
 use super::transaction::Transaction;
 
+
 /// A trait that describes business logic of a concrete service.
 ///
 /// See also [the documentation page on services][doc:services].
@@ -43,15 +44,14 @@ use super::transaction::Transaction;
 /// ```
 /// #[macro_use] extern crate exonum;
 /// // Exports from `exonum` crate skipped
-/// # use exonum::blockchain::{Service, Transaction, ExecutionResult};
+/// # use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
 /// # use exonum::crypto::Hash;
-/// # use exonum::messages::{Message, RawTransaction};
+/// # use exonum::messages::{ServiceMessage, Message, RawTransaction};
 /// # use exonum::storage::{Fork, Snapshot};
 /// use exonum::encoding::Error as EncError;
 ///
 /// // Reused constants
 /// const SERVICE_ID: u16 = 8000;
-/// const MY_TRANSACTION_ID: u16 = 1;
 ///
 /// // Service schema
 /// struct MyServiceSchema<T> {
@@ -75,16 +75,27 @@ use super::transaction::Transaction;
 /// }
 ///
 /// // Transaction definitions
-/// message! {
-///     struct MyTransaction {
-///         const TYPE = SERVICE_ID;
-///         const ID = MY_TRANSACTION_ID;
-///         // Transaction fields
+/// transactions! {
+///     MyTransactions {
+///         const SERVICE_ID = SERVICE_ID;
+///
+///         struct TxA {
+///             // Transaction fields
+///         }
+///
+///         struct TxB {
+///             // ...
+///         }
 ///     }
 /// }
 ///
-/// impl Transaction for MyTransaction {
+/// impl Transaction for TxA {
 ///     // Business logic implementation
+/// #   fn verify(&self) -> bool { true }
+/// #   fn execute(&self, fork: &mut Fork) -> ExecutionResult { Ok(()) }
+/// }
+///
+/// impl Transaction for TxB {
 /// #   fn verify(&self) -> bool { true }
 /// #   fn execute(&self, fork: &mut Fork) -> ExecutionResult { Ok(()) }
 /// }
@@ -106,13 +117,8 @@ use super::transaction::Transaction;
 ///     }
 ///
 ///     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, EncError> {
-///         let tx: Box<Transaction> = match raw.message_type() {
-///             MY_TRANSACTION_ID => Box::new(MyTransaction::from_raw(raw)?),
-///             _ => Err(EncError::IncorrectMessageType {
-///                 message_type: raw.message_type(),
-///             })?,
-///         };
-///         Ok(tx)
+///         let tx = MyTransactions::tx_from_raw(raw)?;
+///         Ok(tx.into())
 ///     }
 /// }
 /// # fn main() { }

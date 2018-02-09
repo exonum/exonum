@@ -19,9 +19,13 @@ use std::any::Any;
 use std::fmt;
 use std::u8;
 
-use messages::Message;
+use serde::Serialize;
+use serde::de::DeserializeOwned;
+
+use messages::{Message, RawTransaction};
 use storage::{Fork, StorageValue};
 use crypto::{Hash, CryptoHash};
+use encoding;
 use encoding::serialize::json::ExonumJson;
 
 //  User-defined error codes (`TransactionErrorType::Code(u8)`) have a `0...255` range.
@@ -69,13 +73,14 @@ pub trait Transaction: Message + ExonumJson + 'static {
     /// # use exonum::blockchain::ExecutionResult;
     /// # use exonum::storage::Fork;
     ///
-    /// message! {
-    ///     struct MyTransaction {
-    ///         // Transaction definition...
-    /// #       const TYPE = 1;
-    /// #       const ID = 1;
-    /// #
-    ///         public_key: &PublicKey,
+    /// transactions! {
+    ///     MyTransactions {
+    ///         const SERVICE_ID = 1;
+    ///
+    ///         struct MyTransaction {
+    ///             // Transaction definition...
+    ///             public_key: &PublicKey,
+    ///         }
     ///     }
     /// }
     ///
@@ -86,9 +91,7 @@ pub trait Transaction: Message + ExonumJson + 'static {
     ///
     ///     // Other methods...
     ///     // ...
-    /// #   fn execute(&self, _: &mut Fork) -> ExecutionResult {
-    /// #       Ok(())
-    /// #   }
+    /// #   fn execute(&self, _: &mut Fork) -> ExecutionResult { Ok(()) }
     /// }
     /// # fn main() {}
     fn verify(&self) -> bool;
@@ -114,13 +117,14 @@ pub trait Transaction: Message + ExonumJson + 'static {
     /// use exonum::crypto::PublicKey;
     /// use exonum::storage::Fork;
     ///
-    /// message! {
-    ///     struct MyTransaction {
-    ///         // Transaction definition...
-    /// #       const TYPE = 1;
-    /// #       const ID = 1;
-    /// #
-    /// #       public_key: &PublicKey,
+    /// transactions! {
+    ///     MyTransactions {
+    ///         const SERVICE_ID = 1;
+    ///
+    ///         struct MyTransaction {
+    ///             // Transaction definition...
+    ///             public_key: &PublicKey,
+    ///         }
     ///     }
     /// }
     ///
@@ -339,6 +343,204 @@ fn status_as_u16(status: &TransactionResult) -> u16 {
     }
 }
 
+
+/// `TransactionSet` trait describes a type which is an `enum` of several transactions.
+/// The implementation of this trait is generated automatically by the `transactions!`
+/// macro.
+pub trait TransactionSet
+    : Into<Box<Transaction>> + DeserializeOwned + Serialize + Clone {
+    /// Parse a transaction from this set from a `RawMessage`.
+    fn tx_from_raw(raw: RawTransaction) -> Result<Self, encoding::Error>;
+}
+
+
+/// `transactions!` is used to declare a set of transactions of a particular service.
+///
+/// The macro generates a type for each transaction and a helper enum which can hold
+/// any of the transactions. You must implement `Transaction` trait for each of the
+/// transactions yourself.
+///
+/// See `Service` trait documentation for a full example of usage.
+///
+/// Each transaction is specified as a Rust struct. For additional reference about
+/// data layout see the documentation of the [`encoding` module](./encoding/index.html).
+///
+/// Additionally, the macro must define identifier of a service, which will be used
+/// [in parsing messages][parsing], as `const SERVICE_ID`. Service ID should be unique
+/// within the Exonum blockchain.
+///
+/// For each transaction the macro creates getter methods for all fields with the same names as
+/// fields. In addition, two constructors are defined:
+///
+/// - `new` takes all fields in the order of their declaration in the macro, and a [`SecretKey`]
+///   to sign the message as the last argument.
+/// - `new_with_signature` takes all fields in the order of their declaration in the macro,
+///   and a message [`Signature`].
+///
+/// Each transaction also implements [`Message`], [`ServiceMessage`], [`SegmentField`],
+/// [`ExonumJson`] and [`StorageValue`] traits for the declared datatype.
+///
+///
+/// **NB.** `transactions!` uses other macros in the `exonum` crate internally.
+/// Be sure to add them to the global scope.
+///
+/// [`Transaction`]: ./blockchain/trait.Transaction.html
+/// [parsing]: ./blockchain/trait.Service.html#tymethod.tx_from_raw
+/// [`SecretKey`]: ./crypto/struct.SecretKey.html
+/// [`Signature`]: ./crypto/struct.Signature.html
+/// [`SegmentField`]: ./encoding/trait.SegmentField.html
+/// [`ExonumJson`]: ./encoding/serialize/json/trait.ExonumJson.html
+/// [`StorageValue`]: ./storage/trait.StorageValue.html
+/// [`Message`]: ./messages/trait.Message.html
+/// [`ServiceMessage`]: ./messages/trait.ServiceMessage.html
+/// # Examples
+///
+/// ```
+/// #[macro_use] extern crate exonum;
+/// use exonum::crypto::PublicKey;
+/// # use exonum::storage::Fork;
+/// # use exonum::blockchain::{Transaction, ExecutionResult};
+///
+/// transactions! {
+///     WalletTransactions {
+///         const SERVICE_ID = 1;
+///
+///         struct Create {
+///             key: &PublicKey
+///         }
+///
+///         struct Transfer {
+///             from: &PublicKey,
+///             to: &PublicKey,
+///             amount: u64,
+///         }
+///     }
+/// }
+/// # impl Transaction for Create {
+/// #   fn verify(&self) -> bool { true }
+/// #   fn execute(&self, fork: &mut Fork) -> ExecutionResult { Ok(()) }
+/// # }
+/// #
+/// # impl Transaction for Transfer {
+/// #   fn verify(&self) -> bool { true }
+/// #   fn execute(&self, fork: &mut Fork) -> ExecutionResult { Ok(()) }
+/// # }
+/// #
+/// # fn main() { }
+/// ```
+#[macro_export]
+macro_rules! transactions {
+    {
+        $transaction_set:ident {
+            const SERVICE_ID = $service_id:expr;
+
+            $(
+                $(#[$tx_attr:meta])*
+                struct $name:ident {
+                $(
+                    $(#[$field_attr:meta])*
+                    $field_name:ident : $field_type:ty
+                ),*
+                $(,)* // optional trailing comma
+                }
+            )*
+        }
+    }
+
+    =>
+
+    {
+        messages! {
+            const SERVICE_ID = $service_id;
+            $(
+                $(#[$tx_attr])*
+                struct $name {
+                $(
+                    $(#[$field_attr])*
+                    $field_name : $field_type
+                ),*
+                }
+            )*
+        }
+
+        #[derive(Clone, Debug)]
+        enum $transaction_set {
+            $($name($name),)*
+        }
+
+        impl $crate::blockchain::TransactionSet for $transaction_set {
+            fn tx_from_raw(
+                raw: $crate::messages::RawTransaction
+            ) -> ::std::result::Result<Self, $crate::encoding::Error> {
+                let message_type = raw.message_type();
+                match message_type {
+                    $(
+                    <$name as $crate::messages::ServiceMessage>::MESSAGE_ID => {
+                        let tx = $crate::messages::Message::from_raw(raw)?;
+                        Ok($transaction_set::$name(tx))
+                    }
+                    )*
+                    _ => return Err($crate::encoding::Error::IncorrectMessageType { message_type })
+                }
+            }
+        }
+
+        impl Into<Box<$crate::blockchain::Transaction>> for $transaction_set {
+            fn into(self) -> Box<$crate::blockchain::Transaction> {
+                match self {$(
+                    $transaction_set::$name(tx) => Box::new(tx),
+                )*}
+            }
+        }
+
+        impl<'de> $crate::encoding::serialize::reexport::Deserialize<'de> for $transaction_set {
+            fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+            where
+                D: $crate::encoding::serialize::reexport::Deserializer<'de>,
+            {
+                use $crate::encoding::serialize::json::reexport::{Value, from_value};
+                use $crate::encoding::serialize::reexport::{DeError, Deserialize};
+
+                let value = <Value as Deserialize>::deserialize(deserializer)?;
+                let message_id: Value = value.get("message_id")
+                    .ok_or(D::Error::custom("Can't get message_id from json"))?
+                    .clone();
+                let message_id: u16 = from_value(message_id)
+                    .map_err(|e| D::Error::custom(
+                        format!("Can't deserialize message_id: {}", e)
+                    ))?;
+
+                match message_id {
+                    $(
+                    <$name as $crate::messages::ServiceMessage>::MESSAGE_ID =>
+                        <$name as $crate::encoding::serialize::json::ExonumJsonDeserialize>
+                            ::deserialize(&value)
+                            .map_err(|e| D::Error::custom(
+                                format!("Can't deserialize a value: {}", e.description())
+                            ))
+                            .map($transaction_set::$name),
+                    )*
+                    _ => Err(D::Error::custom(format!("invalid message_id: {}", message_id))),
+                }
+            }
+        }
+
+        impl $crate::encoding::serialize::reexport::Serialize for $transaction_set {
+            fn serialize<S>(&self, serializer: S) -> ::std::result::Result<S::Ok, S::Error>
+            where
+                S: $crate::encoding::serialize::reexport::Serializer,
+            {
+                use $crate::encoding::serialize::reexport::Serialize;
+
+                match self {$(
+                    &$transaction_set::$name(ref tx) => Serialize::serialize(tx, serializer),
+                )*}
+            }
+        }
+    };
+}
+
+
 #[cfg(test)]
 mod tests {
     use futures::sync::mpsc;
@@ -517,12 +719,13 @@ mod tests {
         )
     }
 
-    message! {
-        struct TxResult {
-            const TYPE = 1;
-            const ID = 0;
+    transactions! {
+        Transactions {
+            const SERVICE_ID = 1;
 
-            index: u64,
+            struct TxResult {
+                index: u64,
+            }
         }
     }
 
