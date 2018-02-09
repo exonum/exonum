@@ -370,12 +370,7 @@ mod tests {
 
     #[test]
     fn execution_error_with_description() {
-        let values = [
-            (0, ""),
-            (1, "test"),
-            (100, "error"),
-            (255, "hello"),
-        ];
+        let values = [(0, ""), (1, "test"), (100, "error"), (255, "hello")];
 
         for value in &values {
             let error = ExecutionError::with_description(value.0, value.1.to_owned());
@@ -392,10 +387,7 @@ mod tests {
             (TransactionErrorType::Code(0), None),
             (TransactionErrorType::Code(1), Some("")),
             (TransactionErrorType::Code(100), None),
-            (
-                TransactionErrorType::Code(255),
-                Some("error description"),
-            ),
+            (TransactionErrorType::Code(255), Some("error description")),
         ];
 
         for value in &values {
