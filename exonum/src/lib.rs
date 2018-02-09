@@ -22,14 +22,13 @@
 #![cfg_attr(feature="flame_profile", feature(plugin, custom_attribute))]
 #![cfg_attr(feature="flame_profile", plugin(exonum_flamer))]
 
+extern crate exonum_sodiumoxide as sodiumoxide;
+extern crate exonum_rocksdb as rocksdb;
 #[macro_use]
 extern crate exonum_profiler;
 #[macro_use]
 extern crate log;
 extern crate byteorder;
-extern crate exonum_sodiumoxide as sodiumoxide;
-extern crate exonum_rocksdb as rocksdb;
-
 extern crate rand;
 extern crate serde;
 #[macro_use]
@@ -39,8 +38,6 @@ extern crate toml;
 extern crate hex;
 extern crate bit_vec;
 extern crate vec_map;
-#[cfg(test)]
-extern crate tempdir;
 extern crate env_logger;
 extern crate colored;
 extern crate term;
@@ -61,6 +58,11 @@ extern crate tokio_timer;
 extern crate tokio_core;
 extern crate tokio_io;
 extern crate tokio_retry;
+#[cfg(test)]
+#[macro_use]
+extern crate lazy_static;
+#[cfg(test)]
+extern crate tempdir;
 
 #[macro_use]
 pub mod encoding;

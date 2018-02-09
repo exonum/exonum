@@ -28,9 +28,16 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   big endian encoding. Then, use the wrapper instead of the int type in indices.
   See the unit tests for `StorageKey` for an example.
 
+- `Transaction::execute` method now returns `TransactionResult` that is stored in
+  the blockchain and can be accessed through api. The changes made by transactions
+  that return `Err` are discarded. To migrate, add `Ok(())` as the last line to
+  the `execute` method. More generally, make sure that the method returns `Ok(())`
+  on successful execution. (#385)
+
 ### New features
 
 - `StorageKey` and `StorageValue` traits are implemented for `SystemTime`. (#456)
+- `StorageValue` and `CryptoHash` traits are implemented for `bool`. (#385)
 
 ### Bug fixes
 

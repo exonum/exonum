@@ -29,7 +29,7 @@ mod tests {
     use futures::sync::mpsc;
     use test::Bencher;
     use exonum::storage::{Database, Fork, Patch, ProofMapIndex, RocksDB, RocksDBOptions};
-    use exonum::blockchain::{Blockchain, Transaction};
+    use exonum::blockchain::{Blockchain, Transaction, ExecutionResult};
     use exonum::crypto::{gen_keypair, CryptoHash, Hash, PublicKey, SecretKey};
     use exonum::messages::Message;
     use exonum::helpers::{Height, ValidatorId};
@@ -65,7 +65,9 @@ mod tests {
                 self.verify_signature(self.from())
             }
 
-            fn execute(&self, _: &mut Fork) {}
+            fn execute(&self, _: &mut Fork) -> ExecutionResult {
+                Ok(())
+            }
         }
 
         fn prepare_txs(height: u64, count: u64) -> (Vec<Hash>, BTreeMap<Hash, Box<Transaction>>) {
@@ -121,12 +123,13 @@ mod tests {
                 self.verify_signature(self.from())
             }
 
-            fn execute(&self, view: &mut Fork) {
-                let mut index = ProofMapIndex::new("balances_txs", view);
+            fn execute(&self, fork: &mut Fork) -> ExecutionResult {
+                let mut index = ProofMapIndex::new("balances_txs", fork);
                 let from_balance = index.get(self.from()).unwrap_or(0u64);
                 let to_balance = index.get(self.to()).unwrap_or(0u64);
                 index.put(self.from(), from_balance - 1);
                 index.put(self.to(), to_balance + 1);
+                Ok(())
             }
         }
 

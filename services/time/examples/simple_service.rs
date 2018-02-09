@@ -23,7 +23,7 @@ extern crate serde_json;
 extern crate serde;
 
 use std::time::{UNIX_EPOCH, SystemTime, Duration};
-use exonum::blockchain::{Service, Transaction};
+use exonum::blockchain::{Service, Transaction, ExecutionResult};
 use exonum::crypto::{gen_keypair, Hash, PublicKey};
 use exonum::encoding;
 use exonum::helpers::Height;
@@ -89,7 +89,7 @@ impl Transaction for TxMarker {
         self.verify_signature(self.from())
     }
 
-    fn execute(&self, view: &mut Fork) {
+    fn execute(&self, view: &mut Fork) -> ExecutionResult {
         let time = TimeSchema::new(&view).time().get();
         match time {
             Some(current_time) if current_time <= self.time() => {
@@ -98,6 +98,7 @@ impl Transaction for TxMarker {
             }
             _ => {}
         }
+        Ok(())
     }
 }
 

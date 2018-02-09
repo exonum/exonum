@@ -93,12 +93,29 @@ impl StorageValue for () {
     }
 }
 
+impl StorageValue for bool {
+    fn into_bytes(self) -> Vec<u8> {
+        vec![self as u8]
+    }
+
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        assert_eq!(value.len(), 1);
+
+        match value[0] {
+            0 => false,
+            1 => true,
+            value => panic!("Invalid value for bool: {}", value),
+        }
+    }
+}
+
 impl StorageValue for u8 {
     fn into_bytes(self) -> Vec<u8> {
         vec![self]
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
+        assert_eq!(value.len(), 1);
         value[0]
     }
 }
@@ -148,6 +165,7 @@ impl StorageValue for i8 {
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
+        assert_eq!(value.len(), 1);
         value[0] as i8
     }
 }
@@ -270,6 +288,108 @@ impl StorageValue for SystemTime {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn u8_round_trip() {
+        let values = [u8::min_value(), 1, u8::max_value()];
+        for value in values.iter() {
+            let bytes = value.into_bytes();
+            assert_eq!(*value, u8::from_bytes(Cow::Borrowed(&bytes)));
+        }
+    }
+
+    #[test]
+    fn i8_round_trip() {
+        let values = [i8::min_value(), -1, 0, 1, i8::max_value()];
+        for value in values.iter() {
+            let bytes = value.into_bytes();
+            assert_eq!(*value, i8::from_bytes(Cow::Borrowed(&bytes)));
+        }
+    }
+
+    #[test]
+    fn u16_round_trip() {
+        let values = [u16::min_value(), 1, u16::max_value()];
+        for value in values.iter() {
+            let bytes = value.into_bytes();
+            assert_eq!(*value, u16::from_bytes(Cow::Borrowed(&bytes)));
+        }
+    }
+
+    #[test]
+    fn i16_round_trip() {
+        let values = [i16::min_value(), -1, 0, 1, i16::max_value()];
+        for value in values.iter() {
+            let bytes = value.into_bytes();
+            assert_eq!(*value, i16::from_bytes(Cow::Borrowed(&bytes)));
+        }
+    }
+
+    #[test]
+    fn u32_round_trip() {
+        let values = [u32::min_value(), 1, u32::max_value()];
+        for value in values.iter() {
+            let bytes = value.into_bytes();
+            assert_eq!(*value, u32::from_bytes(Cow::Borrowed(&bytes)));
+        }
+    }
+
+    #[test]
+    fn i32_round_trip() {
+        let values = [i32::min_value(), -1, 0, 1, i32::max_value()];
+        for value in values.iter() {
+            let bytes = value.into_bytes();
+            assert_eq!(*value, i32::from_bytes(Cow::Borrowed(&bytes)));
+        }
+    }
+
+    #[test]
+    fn u64_round_trip() {
+        let values = [u64::min_value(), 1, u64::max_value()];
+        for value in values.iter() {
+            let bytes = value.into_bytes();
+            assert_eq!(*value, u64::from_bytes(Cow::Borrowed(&bytes)));
+        }
+    }
+
+    #[test]
+    fn i64_round_trip() {
+        let values = [i64::min_value(), -1, 0, 1, i64::max_value()];
+        for value in values.iter() {
+            let bytes = value.into_bytes();
+            assert_eq!(*value, i64::from_bytes(Cow::Borrowed(&bytes)));
+        }
+    }
+
+    #[test]
+    fn bool_round_trip() {
+        let values = [false, true];
+        for value in values.iter() {
+            let bytes = value.into_bytes();
+            assert_eq!(*value, bool::from_bytes(Cow::Borrowed(&bytes)));
+        }
+    }
+
+    #[test]
+    fn vec_round_trip() {
+        let values = [vec![], vec![1], vec![1, 2, 3], vec![255; 100]];
+        for value in values.iter() {
+            let bytes = value.clone().into_bytes();
+            assert_eq!(*value, Vec::<u8>::from_bytes(Cow::Borrowed(&bytes)));
+        }
+    }
+
+    #[test]
+    fn string_round_trip() {
+        let values: Vec<_> = ["", "e", "2", "hello"]
+            .iter()
+            .map(|v| v.to_string())
+            .collect();
+        for value in values.iter() {
+            let bytes = value.clone().into_bytes();
+            assert_eq!(*value, String::from_bytes(Cow::Borrowed(&bytes)));
+        }
+    }
 
     #[test]
     fn test_storage_value_for_system_time_round_trip() {

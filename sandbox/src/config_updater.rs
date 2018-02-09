@@ -13,9 +13,9 @@
 // limitations under the License.
 
 use exonum::crypto::{PublicKey, Hash};
-use exonum::blockchain::{Service, Transaction, Schema};
+use exonum::blockchain::{Service, Transaction, ExecutionResult, Schema};
 use exonum::messages::{RawTransaction, Message};
-use exonum::storage::{Snapshot, Fork};
+use exonum::storage::{Fork, Snapshot};
 use exonum::encoding::Error as MessageError;
 use exonum::blockchain::StoredConfiguration;
 use exonum::helpers::Height;
@@ -48,9 +48,10 @@ impl Transaction for TxConfig {
         self.verify_signature(self.from())
     }
 
-    fn execute(&self, fork: &mut Fork) {
+    fn execute(&self, fork: &mut Fork) -> ExecutionResult {
         let mut schema = Schema::new(fork);
-        schema.commit_configuration(StoredConfiguration::try_deserialize(self.config()).unwrap())
+        schema.commit_configuration(StoredConfiguration::try_deserialize(self.config()).unwrap());
+        Ok(())
     }
 }
 
