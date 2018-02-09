@@ -144,7 +144,7 @@ encoding_struct! {
     struct StorageValueConfigProposeData {
         tx_propose: TxConfigPropose,
         votes_history_hash: &Hash,
-        num_votes: u64,
+        num_validators: u64,
     }
 }
 
@@ -156,9 +156,9 @@ encoding_struct! {
 ///   [`votes_by_config_hash`](struct.ConfigurationSchema.html#method.votes_by_config_hash) table.
 ///   This reference is represented by 2 fields:
 ///   - `votest_history_hash`
-///   - `num_votes`
+///   - `num_validators`
 ///
-/// Length of the table is stored in `num_votes` field, which isn't changed
+/// Length of the table is stored in `num_validators` field, which isn't changed
 /// after table initialization, because number of possible vote slots for a config is determined by
 /// number of validators in its previous config.
 ///
