@@ -334,7 +334,7 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
     /// following fields:
     ///
     /// - **tx_propose** - `tx_propose` argument
-    /// - **num_votes** - `validators.len()` of [StoredConfiguration]
+    /// - **num_validators** - `validators.len()` of [StoredConfiguration]
     /// (https://docs.rs/exonum/0.3.0/exonum/blockchain/config/struct.StoredConfiguration.html),
     /// referenced by `previous_cfg_hash` of config, stored in `tx_propose`.
     /// - **votes_history_hash** - root_hash of corresponding `votes_by_config_hash` table in a
