@@ -41,12 +41,10 @@ impl ExplorerApi {
         skip_empty_blocks: bool,
     ) -> Result<Vec<Block>, ApiError> {
         if count > MAX_BLOCKS_PER_REQUEST {
-            return Err(ApiError::BadRequest(
-                format!(
-                    "Max block count per request exceeded ({})",
-                    MAX_BLOCKS_PER_REQUEST
-                ).into(),
-            ));
+            return Err(ApiError::BadRequest(format!(
+                "Max block count per request exceeded ({})",
+                MAX_BLOCKS_PER_REQUEST
+            )));
         }
         let explorer = BlockchainExplorer::new(&self.blockchain);
         Ok(explorer.blocks_range(count, from, skip_empty_blocks))

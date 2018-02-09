@@ -78,7 +78,7 @@ pub enum ApiError {
 
     /// Bad request.
     #[fail(display = "Bad request: {}", _0)]
-    BadRequest(Box<::std::error::Error + Send + Sync>),
+    BadRequest(String),
 
     /// Internal error.
     #[fail(display = "Internal server error: {}", _0)]
@@ -286,10 +286,10 @@ where
 {
     let params = request.extensions.get::<Router>().unwrap();
     let fragment = params.find(name).ok_or_else(|| {
-        ApiError::BadRequest(format!("Required parameter '{}' is missing", name).into())
+        ApiError::BadRequest(format!("Required parameter '{}' is missing", name))
     })?;
     let value: T = T::from_str(fragment).map_err(|e| {
-        ApiError::BadRequest(format!("Invalid '{}' parameter: {}", name, e).into())
+        ApiError::BadRequest(format!("Invalid '{}' parameter: {}", name, e))
     })?;
     Ok(value)
 }
@@ -303,7 +303,7 @@ where
     let value = match map.find(&[name]) {
         Some(&params::Value::String(ref param)) => {
             let value: T = T::from_str(param).map_err(|e| {
-                ApiError::BadRequest(format!("Invalid '{}' parameter: {}", name, e).into())
+                ApiError::BadRequest(format!("Invalid '{}' parameter: {}", name, e))
             })?;
             Some(value)
         }
@@ -318,6 +318,6 @@ where
     T::Err: ::std::error::Error + Send + Sync + 'static,
 {
     optional_param(request, name)?.ok_or_else(|| {
-        ApiError::BadRequest(format!("Required parameter '{}' is missing", name).into())
+        ApiError::BadRequest(format!("Required parameter '{}' is missing", name))
     })
 }
