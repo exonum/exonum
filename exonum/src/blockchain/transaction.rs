@@ -253,7 +253,7 @@ impl TransactionError {
 
     /// Returns an optional error description.
     pub fn description(&self) -> Option<&str> {
-        self.description.as_ref().map(|d| d.as_ref())
+        self.description.as_ref().map(String::as_ref)
     }
 }
 
