@@ -144,7 +144,7 @@ impl CounterApi {
                 self.ok_response(&serde_json::to_value(&json).unwrap())
             }
             Ok(None) => Err(ApiError::BadRequest("Empty request body".into()))?,
-            Err(e) => Err(ApiError::BadRequest(Box::new(e)))?,
+            Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
         }
     }
 
@@ -169,7 +169,7 @@ impl CounterApi {
                 self.ok_response(&serde_json::to_value(&json).unwrap())
             }
             Ok(None) => Err(ApiError::BadRequest("Empty request body".into()))?,
-            Err(e) => Err(ApiError::BadRequest(Box::new(e)))?,
+            Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
         }
     }
 
