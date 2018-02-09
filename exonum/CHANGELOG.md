@@ -34,6 +34,16 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   the `execute` method. More generally, make sure that the method returns `Ok(())`
   on successful execution. (#385)
 
+- Service transactions are now defined through `transactions!` macro that
+  automatically assigns transaction IDs based on the declaration order. (#457)
+
+  Migration path:
+
+  - Move all separate transactions declared as `message!` into one
+  `transactions!` macro.
+  - Remove `ID` constants.
+  - Replace `TYPE` constants with a single `SERVICE_ID` constant.
+
 ### New features
 
 - `StorageKey` and `StorageValue` traits are implemented for `SystemTime`. (#456)
@@ -61,21 +71,31 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   from the least significant bit (LSB) to the most significant bit (MSB),
   compared to MSB-to-LSB ordering used before.
   Note: this change will break old storages using map proofs.
+
 - The `Database` trait is simplified: it is no longer required
   to implement state-sharing `clone` method.
   Instead, the `merge` method now takes a shared reference to `self`. (#422)
+
 - `message!` and `encoding_struct!` no longer require manual `SIZE`
   and offset specification. (#413)
+
 - `from_raw(raw: RawMessage)`  method is moved to the `Message` trait.
   To migrate, add `use exonum::messages::Message`. (#427)
+
 - Changed iterators over `Patch` and `Changes` data into custom types instead
   of standard collection iterators. (#393)
+
 - Fixed typo in `SparceListIndexKeys` and `SparceListIndexValues`. (#398)
+
 - Removed default `state_hash` implementation in the `Service` trait. (#399)
+
 - Removed `info` method from the `Transaction`. (#402)
+
 - Replaced config param `timeout_events_capacity` with
   `internal_events_capacity`. (#388)
+
 - The `Transaction` trait now inherits from `ExonumJson`. (#402)
+
 - Renamed `DBKey` to `ProofPath` and moved a part of its functionality
   to the `BitsRange` trait. (#420)
 
