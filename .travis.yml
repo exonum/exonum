@@ -17,7 +17,9 @@ addons:
     - librocksdb
 
 rust:
-  - stable
+  # Feel free to bump this version if you need features of newer Rust.
+  # Sync with badge in README.md
+  - 1.23.0
 
 matrix:
   allow_failures:
