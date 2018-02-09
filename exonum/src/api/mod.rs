@@ -28,6 +28,7 @@ use iron::headers::Cookie;
 use hyper::header::{ContentType, SetCookie};
 use cookie::Cookie as CookiePair;
 use router::Router;
+use params;
 use serde_json;
 use serde::{Serialize, Serializer};
 use serde::de::{self, Visitor, Deserialize, Deserializer};
@@ -291,4 +292,32 @@ where
         ApiError::BadRequest(format!("Invalid '{}' parameter: {}", name, e).into())
     })?;
     Ok(value)
+}
+
+fn optional_param<T>(request: &mut Request, name: &str) -> Result<Option<T>, ApiError>
+where
+    T: FromStr,
+    T::Err: ::std::error::Error + Send + Sync + 'static,
+{
+    let map = request.get_ref::<params::Params>().unwrap();
+    let value = match map.find(&[name]) {
+        Some(&params::Value::String(ref param)) => {
+            let value: T = T::from_str(param).map_err(|e| {
+                ApiError::BadRequest(format!("Invalid '{}' parameter: {}", name, e).into())
+            })?;
+            Some(value)
+        }
+        _ => None,
+    };
+    Ok(value)
+}
+
+fn required_param<T>(request: &mut Request, name: &str) -> Result<T, ApiError>
+where
+    T: FromStr,
+    T::Err: ::std::error::Error + Send + Sync + 'static,
+{
+    optional_param(request, name)?.ok_or_else(|| {
+        ApiError::BadRequest(format!("Required parameter '{}' is missing", name).into())
+    })
 }

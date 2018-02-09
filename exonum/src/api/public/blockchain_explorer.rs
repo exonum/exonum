@@ -12,16 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::num::ParseIntError;
-use std::str::ParseBoolError;
-
-use params::{Params, Value};
 use router::Router;
 use iron::prelude::*;
 
 use blockchain::{Blockchain, Block};
 use explorer::{BlockInfo, BlockchainExplorer};
-use api::{Api, ApiError, url_fragment};
+use api::{Api, ApiError, url_fragment, required_param, optional_param};
 use helpers::Height;
 
 const MAX_BLOCKS_PER_REQUEST: u64 = 1000;
@@ -67,35 +63,10 @@ impl Api for ExplorerApi {
 
         let self_ = self.clone();
         let blocks = move |req: &mut Request| -> IronResult<Response> {
-            let map = req.get_ref::<Params>().unwrap();
-            let count: u64 = match map.find(&["count"]) {
-                Some(&Value::String(ref count_str)) => {
-                    count_str.parse().map_err(|e: ParseIntError| {
-                        ApiError::BadRequest(Box::new(e))
-                    })?
-                }
-                _ => {
-                    return Err(ApiError::BadRequest(
-                        "Required parameter of blocks 'count' is missing".into(),
-                    ))?;
-                }
-            };
-            let latest: Option<u64> = match map.find(&["latest"]) {
-                Some(&Value::String(ref from_str)) => {
-                    Some(from_str.parse().map_err(|e: ParseIntError| {
-                        ApiError::BadRequest(Box::new(e))
-                    })?)
-                }
-                _ => None,
-            };
-            let skip_empty_blocks: bool = match map.find(&["skip_empty_blocks"]) {
-                Some(&Value::String(ref skip_str)) => {
-                    skip_str.parse().map_err(|e: ParseBoolError| {
-                        ApiError::BadRequest(Box::new(e))
-                    })?
-                }
-                _ => false,
-            };
+            let count: u64 = required_param(req, "count")?;
+            let latest: Option<u64> = optional_param(req, "latest")?;
+            let skip_empty_blocks: bool =
+                optional_param(req, "skip_empty_blocks")?.unwrap_or(false);
             let info = self_.get_blocks(count, latest, skip_empty_blocks)?;
             self_.ok_response(&::serde_json::to_value(info).unwrap())
         };
