@@ -19,6 +19,7 @@ use std::marker::PhantomData;
 use std::io;
 use std::collections::BTreeMap;
 use std::fmt;
+use std::str::FromStr;
 
 use iron::IronError;
 use iron::prelude::*;
@@ -275,4 +276,19 @@ pub trait Api {
 
     /// Used to extend Api.
     fn wire<'b>(&self, router: &'b mut Router);
+}
+
+fn url_fragment<T>(request: &Request, name: &str) -> Result<T, ApiError>
+where
+    T: FromStr,
+    T::Err: ::std::error::Error + Send + Sync + 'static,
+{
+    let params = request.extensions.get::<Router>().unwrap();
+    let fragment = params.find(name).ok_or_else(|| {
+        ApiError::BadRequest(format!("Required parameter '{}' is missing", name).into())
+    })?;
+    let value: T = T::from_str(fragment).map_err(|e| {
+        ApiError::BadRequest(format!("Invalid '{}' parameter: {}", name, e).into())
+    })?;
+    Ok(value)
 }

@@ -21,7 +21,7 @@ use iron::prelude::*;
 
 use blockchain::{Blockchain, Block};
 use explorer::{BlockInfo, BlockchainExplorer};
-use api::{Api, ApiError};
+use api::{Api, ApiError, url_fragment};
 use helpers::Height;
 
 const MAX_BLOCKS_PER_REQUEST: u64 = 1000;
@@ -102,21 +102,9 @@ impl Api for ExplorerApi {
 
         let self_ = self.clone();
         let block = move |req: &mut Request| -> IronResult<Response> {
-            let params = req.extensions.get::<Router>().unwrap();
-            match params.find("height") {
-                Some(height_str) => {
-                    let height: u64 = height_str.parse().map_err(|e: ParseIntError| {
-                        ApiError::BadRequest(Box::new(e))
-                    })?;
-                    let info = self_.get_block(Height(height))?;
-                    self_.ok_response(&::serde_json::to_value(info).unwrap())
-                }
-                None => {
-                    Err(ApiError::BadRequest(
-                        "Required parameter of block 'height' is missing".into(),
-                    ))?
-                }
-            }
+            let height: u64 = url_fragment(req, "height")?;
+            let info = self_.get_block(Height(height))?;
+            self_.ok_response(&::serde_json::to_value(info).unwrap())
         };
 
         router.get("/v1/blocks", blocks, "blocks");

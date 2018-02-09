@@ -19,8 +19,7 @@ use node::state::TxPool;
 use blockchain::{Blockchain, SharedNodeState};
 use crypto::Hash;
 use explorer::{BlockchainExplorer, TxInfo};
-use api::{Api, ApiError};
-use encoding::serialize::FromHex;
+use api::{Api, ApiError, url_fragment};
 
 #[derive(Serialize)]
 struct MemPoolTxInfo {
@@ -108,26 +107,13 @@ impl Api for SystemApi {
 
         let self_ = self.clone();
         let transaction = move |req: &mut Request| -> IronResult<Response> {
-            let params = req.extensions.get::<Router>().unwrap();
-            match params.find("hash") {
-                Some(hash_str) => {
-                    let hash = Hash::from_hex(hash_str).map_err(|e| {
-                        ApiError::BadRequest(format!("Invalid transaction hash, {}", e).into())
-                    })?;
-
-                    let info = self_.get_transaction(&hash)?;
-                    let result = match info {
-                        MemPoolResult::Unknown => Self::not_found_response,
-                        _ => Self::ok_response,
-                    };
-                    result(&self_, &::serde_json::to_value(info).unwrap())
-                }
-                None => {
-                    Err(ApiError::BadRequest(
-                        "Required parameter of transaction 'hash' is missing".into(),
-                    ))?
-                }
-            }
+            let hash: Hash = url_fragment(req, "hash")?;
+            let info = self_.get_transaction(&hash)?;
+            let result = match info {
+                MemPoolResult::Unknown => Self::not_found_response,
+                _ => Self::ok_response,
+            };
+            result(&self_, &::serde_json::to_value(info).unwrap())
         };
 
         let self_ = self.clone();
