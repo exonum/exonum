@@ -446,7 +446,7 @@ impl Sandbox {
             .collect()
     }
 
-    /// Extract state_hash from fake block
+    /// Extracts state_hash from the fake block.
     pub fn compute_state_hash<'a, I>(&self, txs: I) -> Hash
     where
         I: IntoIterator<Item = &'a RawTransaction>,
@@ -786,7 +786,7 @@ pub fn timestamping_sandbox() -> Sandbox {
 
 #[cfg(test)]
 mod tests {
-    use exonum::blockchain::ServiceContext;
+    use exonum::blockchain::{ServiceContext, ExecutionResult};
     use exonum::messages::RawTransaction;
     use exonum::encoding;
     use exonum::crypto::{gen_keypair_from_seed, Seed};
@@ -820,7 +820,9 @@ mod tests {
             true
         }
 
-        fn execute(&self, _fork: &mut Fork) {}
+        fn execute(&self, _: &mut Fork) -> ExecutionResult {
+            Ok(())
+        }
     }
 
     struct HandleCommitService;

@@ -54,12 +54,15 @@ pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
 pub use self::schema::{gen_prefix, Schema, TxLocation};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
-pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState, Transaction};
+pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState};
+pub use self::transaction::{Transaction, ExecutionResult, TransactionResult, ExecutionError,
+                            TransactionError};
 
 mod block;
 mod schema;
 mod genesis;
 mod service;
+mod transaction;
 #[cfg(test)]
 mod tests;
 
@@ -254,22 +257,37 @@ impl Blockchain {
 
                 fork.checkpoint();
 
-                let r = panic::catch_unwind(panic::AssertUnwindSafe(|| { tx.execute(&mut fork); }));
+                let catch_result =
+                    panic::catch_unwind(panic::AssertUnwindSafe(|| tx.execute(&mut fork)));
 
-                match r {
-                    Ok(..) => fork.commit(),
+                let transaction_result = match catch_result {
+                    Ok(execution_result) => {
+                        match execution_result {
+                            Ok(()) => fork.commit(),
+                            Err(ref e) => {
+                                info!("{:?} transaction execution failed: {:?}", tx, e);
+                                fork.rollback();
+                            }
+                        }
+                        execution_result.map_err(TransactionError::from)
+                    }
                     Err(err) => {
                         if err.is::<Error>() {
-                            // Continue panic unwind if the reason is StorageError
+                            // Continue panic unwind if the reason is StorageError.
                             panic::resume_unwind(err);
                         }
                         fork.rollback();
-                        error!("{:?} transaction execution failed: {:?}", tx, err);
+                        error!("{:?} transaction execution panicked: {:?}", tx, err);
+                        Err(TransactionError::from_panic(&err))
                     }
-                }
+                };
 
                 let mut schema = Schema::new(&mut fork);
                 schema.transactions_mut().put(hash, tx.raw().clone());
+                schema.transaction_results_mut().put(
+                    hash,
+                    transaction_result,
+                );
                 schema.block_txs_mut(height).push(*hash);
                 let location = TxLocation::new(height, index as u64);
                 schema.tx_location_by_tx_hash_mut().put(hash, location);

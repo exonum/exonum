@@ -5,7 +5,7 @@ publish = false
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 
 [dependencies]
-exonum = { version = "0.5", path = "../exonum" }
+exonum = { version = "0.5.1", path = "../exonum" }
 
 log = "0.4.1"
 env_logger = "0.5.3"
