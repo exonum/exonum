@@ -384,11 +384,7 @@ fn test_get_all_committed() {
         config: new_cfg_2.clone(),
     };
     assert_eq!(
-        vec![
-            expected_response_1.clone(),
-            expected_response_2.clone(),
-            expected_response_3.clone(),
-        ],
+        vec![expected_response_1.clone(), expected_response_2.clone(), expected_response_3.clone()],
         api.get_all_committed(None, None)
     );
     assert_eq!(
