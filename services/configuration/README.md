@@ -1,6 +1,6 @@
 ## Exonum Configuration Service
 
-[![Build Status](https://travis-ci.org/exonum/exonum-configuration.svg?branch=master)](https://travis-ci.org/exonum/exonum-configuration)
+[![Build Status](https://travis-ci.org/exonum/exonum.svg?branch=master)](https://travis-ci.org/exonum/exonum)
 
 This crate implements a service for [Exonum] blockchain that provides functionality of modifying
 the global configuration by the means of proposing a new configuration and voting for proposed
