@@ -1,9 +1,9 @@
 ### Public endpoints' response samples
 
-1.  <http://127.0.0.1:8000/api/services/configuration/v1/configs/actual>
+1. <http://127.0.0.1:8000/api/services/configuration/v1/configs/actual>
 
     ```javascript
-    {                                                                                            
+    {
       "config": {
         "actual_from": 5500,
         "consensus": {
@@ -28,10 +28,10 @@
     }
     ```
 
-1.  <http://127.0.0.1:8000/api/services/configuration/v1/configs/following> - 
-format same as for `actual`
+1. <http://127.0.0.1:8000/api/services/configuration/v1/configs/following> -
+   format same as for `actual`
 
-1.  <http://127.0.0.1:8000/api/services/configuration/v1/configs/d28fd41b85d4aef0c253f00c31d9a8f1a83afd271b3923b5fced6efbecf0bec7> 
+1. <http://127.0.0.1:8000/api/services/configuration/v1/configs/d28fd41b85d4aef0c253f00c31d9a8f1a83afd271b3923b5fced6efbecf0bec7>
 
     ```javascript
     {
@@ -73,7 +73,7 @@ format same as for `actual`
     }
     ```
 
-1.  <http://127.0.0.1:8000/api/services/configuration/v1/configs/d28fd41b85d4aef0c253f00c31d9a8f1a83afd271b3923b5fced6efbecf0bec7/votes> 
+1. <http://127.0.0.1:8000/api/services/configuration/v1/configs/d28fd41b85d4aef0c253f00c31d9a8f1a83afd271b3923b5fced6efbecf0bec7/votes>
 
     ```javascript
     [
@@ -114,7 +114,7 @@ format same as for `actual`
     ]
     ```
 
-1.  <http://127.0.0.1:8000/api/services/configuration/v1/configs/committed>
+1. <http://127.0.0.1:8000/api/services/configuration/v1/configs/committed>
 
     ```javascript
     [
@@ -185,7 +185,7 @@ format same as for `actual`
     ]
     ```
 
-1.  <http://127.0.0.1:8000/api/services/configuration/v1/configs/proposed?previous_cfg_hash=64c404b0ae6aa42aafc72398b0f454915902e094fde70029e7b6ab9d4d3bcd68&actual_from=3100>
+1. <http://127.0.0.1:8000/api/services/configuration/v1/configs/proposed?previous_cfg_hash=64c404b0ae6aa42aafc72398b0f454915902e094fde70029e7b6ab9d4d3bcd68&actual_from=3100>
 
     ```javascript
     [
@@ -284,28 +284,28 @@ format same as for `actual`
 
 ### Private endpoints' response samples
 
-1.  <http://127.0.0.1:8010/api/services/configuration/v1/configs/postpropose>
+1. <http://127.0.0.1:8010/api/services/configuration/v1/configs/postpropose>
 
     ```bash
-    curl -X POST -d '{                                                                                         
-    		  "actual_from": 5500,
-    		  "consensus": {
-    		    "peers_timeout": 10000,
-    		    "propose_timeout": 500,
-    		    "round_timeout": 3000,
-    		    "status_timeout": 5000,
-    		    "txs_block_limit": 1000
-    		  },
-    		  "previous_cfg_hash": "daeb250090f2d6b3689a5effd32cb16a77b7770bb1df123e1f32b13143cd3623",
-    		  "services": {
-    		    "1": null
-    		  },
-    		  "validators": [
-    		    "1087206077acf8a456e78cf52fef0f8f275becbb05338dd58822f29015f56f62",
-    		    "44d7e4d9df214a5d946e0f0c955c628f2e08ffedac9eba079446a183715a0796",
-    		    "3484e75181e584787da3a5fe040243b14e1275c9e277ba639e0e2169c5473d9f",
-    		    "d5864b6eb03fd70971d1b25302d2c344cc894d4b42bb953dd17a1d0fe4fba9c5"
-    		  ]
+    curl -X POST -d '{
+          "actual_from": 5500,
+          "consensus": {
+            "peers_timeout": 10000,
+            "propose_timeout": 500,
+            "round_timeout": 3000,
+            "status_timeout": 5000,
+            "txs_block_limit": 1000
+          },
+          "previous_cfg_hash": "daeb250090f2d6b3689a5effd32cb16a77b7770bb1df123e1f32b13143cd3623",
+          "services": {
+            "1": null
+          },
+          "validators": [
+            "1087206077acf8a456e78cf52fef0f8f275becbb05338dd58822f29015f56f62",
+            "44d7e4d9df214a5d946e0f0c955c628f2e08ffedac9eba079446a183715a0796",
+            "3484e75181e584787da3a5fe040243b14e1275c9e277ba639e0e2169c5473d9f",
+            "d5864b6eb03fd70971d1b25302d2c344cc894d4b42bb953dd17a1d0fe4fba9c5"
+          ]
     }'  http://127.0.0.1:8010/api/v1/configs/postpropose
     ```
     ```javascript
@@ -315,7 +315,7 @@ format same as for `actual`
     }
     ```
 
-1.  <http://127.0.0.1:8012/api/services/configuration/v1/configs/f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a/postvote>
+1. <http://127.0.0.1:8012/api/services/configuration/v1/configs/f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a/postvote>
 
     ```bash
     curl -X POST -d '{}' http://127.0.0.1:8012/api/v1/configs/f3e6f3e242365e6d2e1c577461c5924292249f9b52e88b51132a44d1be674e7a/postvote
