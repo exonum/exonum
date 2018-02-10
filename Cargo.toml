@@ -4,5 +4,6 @@ members = [
     "sandbox",
     "testkit",
     "services/time"
+    "services/configuration"
 ]
 exclude = [ "3rdparty" ]
