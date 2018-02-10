@@ -200,14 +200,14 @@ fn test_discard_propose_for_same_cfg() {
         cfg.set_service_config("dummy", "First cfg change");
         cfg.stored_configuration().clone()
     };
-    let (propose_tx, dublicated_propose_tx) = {
+    let (propose_tx, duplicated_propose_tx) = {
         let validators = testkit.network().validators();
         let propose_tx = new_tx_config_propose(&validators[1], new_cfg.clone());
-        let dublicated_propose_tx = new_tx_config_propose(&validators[0], new_cfg.clone());
-        (propose_tx, dublicated_propose_tx)
+        let duplicated_propose_tx = new_tx_config_propose(&validators[0], new_cfg.clone());
+        (propose_tx, duplicated_propose_tx)
     };
 
-    testkit.create_block_with_transactions(txvec![propose_tx.clone(), dublicated_propose_tx]);
+    testkit.create_block_with_transactions(txvec![propose_tx.clone(), duplicated_propose_tx]);
     assert_eq!(Some(propose_tx), testkit.find_propose(new_cfg.hash()));
 }
 

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// spell-checker:ignore postpropose, postvote
+
 use exonum::blockchain::{Schema, StoredConfiguration};
 use exonum::helpers::{Height, ValidatorId};
 use exonum::storage::StorageValue;
