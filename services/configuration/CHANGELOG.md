@@ -5,38 +5,30 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
-## 0.5 - 2018-01-30
+### Breaking changes
 
-### Changed
+- `CONFIG_SERVICE` constant has been renamed to `CONFIGURATION_SERVICE_ID`.
+
+## 0.5 - 2018-01-30
 
 - Update to the [Exonum 0.5.0] release (#82).
 
 ## 0.4 - 2017-12-08
 
-### Added
-
 - Added tests written on `exonum-testkit` (#69).
-
-### Changed
 
 - Separate type `ConfigurationServiceFactory` is used as `ServiceFactory`
   implementation (#66).
 
 - Update to the [Exonum 0.4.0] release (#77).
 
-### Removed
-
 - Sandbox tests are removed (#69).
 
 ## 0.3 - 2017-11-03
 
-### Changed
-
 - Update to the [Exonum 0.3.0] release (#65).
 
 ## 0.2 - 2017-09-14
-
-### Changed
 
 - Update to the [Exonum 0.2.0] release (#61).
 

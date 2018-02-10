@@ -374,7 +374,7 @@ where
     T: 'static + TransactionSend + Clone,
 {
     fn wire(&self, router: &mut Router) {
-        let _self = self.clone();
+        let self_ = self.clone();
         let put_config_propose = move |req: &mut Request| -> IronResult<Response> {
             match req.get::<bodyparser::Struct<StoredConfiguration>>() {
                 Ok(Some(cfg)) => {
@@ -386,7 +386,7 @@ where
             }
         };
 
-        let _self = self.clone();
+        let self_ = self.clone();
         let put_config_vote = move |req: &mut Request| -> IronResult<Response> {
             let params = req.extensions.get::<Router>().unwrap();
             match params.find("hash") {

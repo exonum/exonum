@@ -120,9 +120,10 @@ pub mod config_api;
 mod tests;
 
 type ProposeData = StorageValueConfigProposeData;
+
 /// Value of [`service_id`](struct.ConfigurationService.html#method.service_id) of
-/// `ConfigurationService`
-pub const CONFIG_SERVICE: u16 = 1;
+/// `ConfigurationService`.
+pub const CONFIGURATION_SERVICE_ID: u16 = 1;
 /// Value of [`message_type`][1] of `TxConfigPropose`.
 /// [1]: <https://docs.rs/exonum/0.3.0/exonum/messages/
 ///struct.MessageBuffer.html#method.message_type>
@@ -174,23 +175,21 @@ impl StorageValueConfigProposeData {
     }
 }
 
-message! {
-    struct TxConfigPropose {
-        const TYPE = CONFIG_SERVICE;
-        const ID = CONFIG_PROPOSE_MESSAGE_ID;
+transactions! {
+    ConfigurationTransactions {
+        const SERVICE_ID = CONFIGURATION_SERVICE_ID;
 
-        from: &PublicKey,
-        cfg: &str,
-    }
-}
+        /// Propose a new configuration.
+        struct TxConfigPropose {
+            from: &PublicKey,
+            cfg: &str,
+        }
 
-message! {
-    struct TxConfigVote {
-        const TYPE = CONFIG_SERVICE;
-        const ID = CONFIG_VOTE_MESSAGE_ID;
-
-        from: &PublicKey,
-        cfg_hash: &Hash,
+        /// Vote for the new configuration.
+        struct TxConfigVote {
+            from: &PublicKey,
+            cfg_hash: &Hash,
+        }
     }
 }
 
@@ -647,7 +646,7 @@ impl Service for ConfigurationService {
     }
 
     fn service_id(&self) -> u16 {
-        CONFIG_SERVICE
+        CONFIGURATION_SERVICE_ID
     }
 
     /// `ConfigurationService` returns a vector, containing the single [root_hash][1]
@@ -675,13 +674,8 @@ impl Service for ConfigurationService {
     /// Returns box ([Transaction][1]).
     /// [1]: https://docs.rs/exonum/0.3.0/exonum/blockchain/trait.Transaction.html
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, StreamStructError> {
-        match raw.message_type() {
-            CONFIG_PROPOSE_MESSAGE_ID => Ok(Box::new(TxConfigPropose::from_raw(raw)?)),
-            CONFIG_VOTE_MESSAGE_ID => Ok(Box::new(TxConfigVote::from_raw(raw)?)),
-            _ => Err(StreamStructError::IncorrectMessageType {
-                message_type: raw.message_type(),
-            }),
-        }
+        let tx = ConfigurationTransactions::tx_from_raw(raw)?;
+        Ok(tx.into())
     }
 
     fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
