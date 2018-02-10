@@ -282,7 +282,7 @@ pub trait Api {
 fn url_fragment<T>(request: &Request, name: &str) -> Result<T, ApiError>
 where
     T: FromStr,
-    T::Err: ::std::error::Error + Send + Sync + 'static,
+    T::Err: fmt::Display,
 {
     let params = request.extensions.get::<Router>().unwrap();
     let fragment = params.find(name).ok_or_else(|| {
@@ -297,7 +297,7 @@ where
 fn optional_param<T>(request: &mut Request, name: &str) -> Result<Option<T>, ApiError>
 where
     T: FromStr,
-    T::Err: ::std::error::Error + Send + Sync + 'static,
+    T::Err: fmt::Display,
 {
     let map = request.get_ref::<params::Params>().unwrap();
     let value = match map.find(&[name]) {
@@ -315,7 +315,7 @@ where
 fn required_param<T>(request: &mut Request, name: &str) -> Result<T, ApiError>
 where
     T: FromStr,
-    T::Err: ::std::error::Error + Send + Sync + 'static,
+    T::Err: fmt::Display,
 {
     optional_param(request, name)?.ok_or_else(|| {
         ApiError::BadRequest(format!("Required parameter '{}' is missing", name))
