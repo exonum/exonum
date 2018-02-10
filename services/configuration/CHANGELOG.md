@@ -9,6 +9,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `CONFIG_SERVICE` constant has been renamed to `CONFIGURATION_SERVICE_ID`.
 
+- `CONFIG_PROPOSE_MESSAGE_ID` and `CONFIG_VOTE_MESSAGE_ID` constants are no
+  longer public.
+
 ## 0.5 - 2018-01-30
 
 - Update to the [Exonum 0.5.0] release (#82).
