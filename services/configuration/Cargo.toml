@@ -1,0 +1,33 @@
+[package]
+name = "exonum-configuration"
+version = "0.5.0"
+authors = ["The Exonum Team <exonum@bitfury.com>"]
+homepage = "https://exonum.com/doc/advanced/configuration-updater/"
+repository = "https://github.com/exonum/exonum-configuration"
+documentation = "https://docs.rs/exonum-configuration"
+readme = "README.md"
+license = "Apache-2.0"
+keywords = ["exonum", "blockchain", "config", "configuration"]
+categories = ["database-implementations", "config"]
+description = "An Exonum service that provides functionality of modifying the global configuration."
+
+[badges]
+travis-ci = { repository = "exonum/exonum-configuration" }
+
+[dependencies]
+exonum = "0.5.0"
+clap = "2.25.0"
+tempdir = "0.3.5"
+env_logger = "0.5.3"
+log = "0.4.1"
+serde = "1.0.10"
+serde_derive = "1.0.10"
+lazy_static = "1.0.0"
+router = "0.6.0"
+iron = "0.6.0"
+bodyparser = "0.8.0"
+params = "0.8.0"
+
+[dev-dependencies]
+pretty_assertions = "0.4.0"
+exonum-testkit = "0.5.0"
