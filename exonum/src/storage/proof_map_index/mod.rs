@@ -24,7 +24,7 @@ use self::node::{BranchNode, Node};
 use self::proof::MapProofBuilder;
 
 pub use self::key::{KEY_SIZE as PROOF_MAP_KEY_SIZE, ProofMapKey, HashedKey, ProofPath};
-pub use self::proof::{MapProof, MapProofError};
+pub use self::proof::{CheckedMapProof, MapProof, MapProofError};
 
 #[cfg(test)]
 mod tests;

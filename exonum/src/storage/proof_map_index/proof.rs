@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::iter::FromIterator;
-
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
+
 use crypto::{Hash, HashStream};
 use storage::StorageValue;
 use super::key::{BitsPrefix, BitsRange, ChildKind, ProofMapKey, ProofPath, KEY_SIZE};
@@ -234,13 +233,6 @@ impl<K, V> OptionalEntry<K, V> {
             _ => None,
         }
     }
-
-    fn into_kv(self) -> Option<(K, V)> {
-        match self {
-            OptionalEntry::KV { key, value } => Some((key, value)),
-            _ => None,
-        }
-    }
 }
 
 impl<K, V> From<(K, Option<V>)> for OptionalEntry<K, V> {
@@ -269,8 +261,8 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 ///
 /// You can create `MapProof`s with [`get_proof()`] and [`get_multiproof()`] methods of
 /// `ProofMapIndex`. Proofs can be verified on the server side with the help of
-/// [`try_into()`]. Prior to the `try_into` conversion, you may use [`missing_keys()`]
-/// to extract the keys missing from the underlying index.
+/// [`check()`]. Prior to the `check` conversion, you may use `*unchecked` methods
+/// to obtain information about the proof.
 ///
 /// ```
 /// # use exonum::storage::{Database, MemoryDB, StorageValue, MapProof, ProofMapIndex};
@@ -282,10 +274,11 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 /// map.put(&h2, 200u32);
 /// // Get the proof from the index
 /// let proof = map.get_multiproof(vec![h1, h3]);
-/// // Check the missing elements
-/// assert_eq!(proof.missing_keys().unwrap(), vec![&h3]);
 /// // Check the proof consistency
-/// assert_eq!(proof.try_into().unwrap(), (vec![(h1, 100u32)], map.root_hash()));
+/// let checked_proof = proof.check().unwrap();
+/// assert_eq!(checked_proof.entries(), vec![(&h1, &100u32)]);
+/// assert_eq!(checked_proof.missing_keys(), vec![&h3]);
+/// assert_eq!(checked_proof.hash(), map.root_hash());
 /// ```
 ///
 /// # JSON serialization
@@ -327,13 +320,23 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 /// [`root_hash()`]: struct.ProofMapIndex.html#method.root_hash
 /// [`get_proof()`]: struct.ProofMapIndex.html#method.get_proof
 /// [`get_multiproof()`]: struct.ProofMapIndex.html#method.get_multiproof
-/// [`try_into()`]: #method.try_into
-/// [`missing_keys()`]: #method.missing_keys
+/// [`check()`]: #method.check
 /// [`ProofPath`]: struct.ProofPath.html
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MapProof<K, V> {
     entries: Vec<OptionalEntry<K, V>>,
     proof: Vec<MapProofEntry>,
+}
+
+/// Version of `MapProof` obtained after verification.
+///
+/// See [`MapProof`] for an example of usage.
+///
+/// [`MapProof`]: struct.MapProof.html#workflow
+#[derive(Debug)]
+pub struct CheckedMapProof<K, V> {
+    entries: Vec<(K, Option<V>)>,
+    hash: Hash,
 }
 
 /// Calculates hash for an isolated node in the Merkle Patricia tree.
@@ -526,7 +529,7 @@ impl<K, V> MapProof<K, V> {
     }
 
     /// Provides access to the proof part of the view. Useful mainly for debug purposes.
-    pub fn proof(&self) -> Vec<(ProofPath, Hash)> {
+    pub fn proof_unchecked(&self) -> Vec<(ProofPath, Hash)> {
         self.proof.iter().cloned().map(|e| e.into()).collect()
     }
 
@@ -542,7 +545,7 @@ where
     K: ProofMapKey,
     V: StorageValue,
 {
-    fn validate(&self) -> Result<(), MapProofError> {
+    fn prevalidate(&self) -> Result<(), MapProofError> {
         use std::cmp::Ordering;
 
         // Check that entries in proof are in increasing order
@@ -599,17 +602,7 @@ where
         Ok(())
     }
 
-    /// Retrieves references to keys that the proof shows as missing from the map.
-    /// Fails if the proof is malformed.
-    pub fn missing_keys(&self) -> Result<Vec<&K>, MapProofError> {
-        self.validate()?;
-        Ok(self.missing_keys_unchecked())
-    }
-
-    /// Consumes this proof producing a pair of:
-    ///
-    /// - Collection from key-value pairs present in the proof
-    /// - Hash of the [`ProofMapIndex`] that backs the proof
+    /// Consumes this proof producing a `CheckedMapProof` structure.
     ///
     /// Fails if the proof is malformed.
     ///
@@ -625,18 +618,14 @@ where
     /// map.put(&h2, 200u32);
     ///
     /// let proof = map.get_proof(h2);
-    /// assert_eq!(
-    ///     proof.try_into().unwrap(),
-    ///     (vec![(h2, 200u32)], map.root_hash())
-    /// );
+    /// let checked_proof = proof.check().unwrap();
+    /// assert_eq!(checked_proof.entries(), vec![(&h2, &200u32)]);
+    /// assert_eq!(checked_proof.hash(), map.root_hash());
     /// ```
     ///
     /// [`ProofMapIndex`]: struct.ProofMapIndex.html
-    pub fn try_into<T>(self) -> Result<(T, Hash), MapProofError>
-    where
-        T: FromIterator<(K, V)>,
-    {
-        self.validate()?;
+    pub fn check(self) -> Result<CheckedMapProof<K, V>, MapProofError> {
+        self.prevalidate()?;
         let (mut proof, entries) = (self.proof, self.entries);
 
         proof.extend(entries.iter().filter_map(|e| {
@@ -653,13 +642,48 @@ where
         });
 
         collect(&proof).map(|h| {
-            (
-                entries
-                    .into_iter()
-                    .filter_map(OptionalEntry::into_kv)
-                    .collect(),
-                h,
-            )
+            CheckedMapProof {
+                entries: entries.into_iter().map(OptionalEntry::into).collect(),
+                hash: h,
+            }
         })
+    }
+}
+
+impl<K, V> CheckedMapProof<K, V> {
+    /// Retrieves references to keys that the proof shows as missing from the map.
+    pub fn missing_keys(&self) -> Vec<&K> {
+        self.entries
+            .iter()
+            .filter_map(|kv| match *kv {
+                (ref key, None) => Some(key),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Retrieves references to key-value pairs that the proof shows as present in the map.
+    pub fn entries(&self) -> Vec<(&K, &V)> {
+        self.entries
+            .iter()
+            .filter_map(|kv| match *kv {
+                (ref key, Some(ref value)) => Some((key, value)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Retrieves references to existing and non-existing entries in the proof.
+    /// Existing entries have `Some` value, non-existing have `None`.
+    pub fn all_entries(&self) -> Vec<(&K, Option<&V>)> {
+        self.entries
+            .iter()
+            .map(|&(ref k, ref v)| (k, v.as_ref()))
+            .collect()
+    }
+
+    /// Returns a hash of the map that this proof is constructed for.
+    pub fn hash(&self) -> Hash {
+        self.hash
     }
 }
