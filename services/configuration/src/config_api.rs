@@ -20,7 +20,7 @@ use router::Router;
 use iron::prelude::*;
 use bodyparser;
 use exonum::api::{Api, ApiError};
-use exonum::crypto::{PublicKey, SecretKey, Hash};
+use exonum::crypto::{CryptoHash, PublicKey, SecretKey, Hash};
 use exonum::blockchain::{Blockchain, StoredConfiguration, Schema};
 use exonum::storage::StorageValue;
 use exonum::node::TransactionSend;

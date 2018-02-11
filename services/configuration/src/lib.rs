@@ -106,10 +106,10 @@ use router::Router;
 use iron::Handler;
 use exonum::api::Api;
 use exonum::blockchain::{StoredConfiguration, Service, Transaction, Schema, ApiContext,
-                         ExecutionResult, gen_prefix};
+                         ExecutionResult, TransactionSet, gen_prefix};
 use exonum::node::State;
 use exonum::helpers::fabric::{ServiceFactory, Context};
-use exonum::crypto::{Signature, PublicKey, Hash};
+use exonum::crypto::{CryptoHash, Signature, PublicKey, Hash};
 use exonum::messages::{Message, RawTransaction};
 use exonum::storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot, StorageValue};
 use exonum::encoding::{Field, Error as StreamStructError};
@@ -339,7 +339,7 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
     pub fn put_propose(&mut self, tx_propose: TxConfigPropose) -> bool {
         let cfg =
             <StoredConfiguration as StorageValue>::from_bytes(tx_propose.cfg().as_bytes().into());
-        let cfg_hash = &StorageValue::hash(&cfg);
+        let cfg_hash = &CryptoHash::hash(&cfg);
 
         if let Some(old_tx_propose) = self.get_propose(cfg_hash) {
             error!(

@@ -16,8 +16,7 @@
 
 use exonum::blockchain::{Schema, StoredConfiguration};
 use exonum::helpers::{Height, ValidatorId};
-use exonum::storage::StorageValue;
-use exonum::crypto::Hash;
+use exonum::crypto::{CryptoHash, Hash};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi};
 
 use ConfigurationSchema;
@@ -133,7 +132,6 @@ impl ConfigurationApiTest for TestKitApi {
         self.post_private(ApiKind::Service("configuration"), &endpoint, &())
     }
 }
-
 
 #[test]
 fn test_get_actual_config() {
