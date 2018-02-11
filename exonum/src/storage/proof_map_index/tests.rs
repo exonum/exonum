@@ -12,25 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate rand;
-extern crate serde_json;
-
 use std::collections::{HashSet, BTreeMap};
-use rand::{thread_rng, Rng, sample};
-use crypto::{hash, Hash, HashStream};
+
+use serde_json;
+use rand::{self, Rng};
+use rand::seq::sample_iter;
+
+use crypto::{hash, CryptoHash, Hash, HashStream};
 use storage::{Database, Fork, StorageValue};
 use encoding::serialize::reexport::Serialize;
-
-use super::{DBKey, ProofMapIndex, ProofMapKey};
-use super::proof::MapProof;
-use super::key::{ChildKind, HashedKey, KEY_SIZE, LEAF_KEY_PREFIX};
+use super::{ProofPath, ProofMapIndex, ProofMapKey, HashedKey, MapProof};
+use super::key::{ChildKind, BitsRange, KEY_SIZE, LEAF_KEY_PREFIX};
 use super::node::BranchNode;
 
 const IDX_NAME: &'static str = "idx_name";
 
 // Makes large data set with unique keys
 fn generate_random_data(len: usize) -> Vec<([u8; KEY_SIZE], Vec<u8>)> {
-    let mut rng = thread_rng();
+    let mut rng = rand::thread_rng();
     let mut exists_keys = HashSet::new();
     let mut base = [0; KEY_SIZE];
     rng.fill_bytes(&mut base);
@@ -57,7 +56,7 @@ fn generate_random_data(len: usize) -> Vec<([u8; KEY_SIZE], Vec<u8>)> {
 
 // Makes large data set with unique keys
 fn generate_fully_random_data_keys(len: usize) -> Vec<([u8; KEY_SIZE], Vec<u8>)> {
-    let mut rng = thread_rng();
+    let mut rng = rand::thread_rng();
 
     let mut exists_keys = HashSet::new();
 
@@ -78,7 +77,7 @@ fn generate_fully_random_data_keys(len: usize) -> Vec<([u8; KEY_SIZE], Vec<u8>)>
 }
 
 fn gen_tempdir_name() -> String {
-    thread_rng().gen_ascii_chars().take(10).collect()
+    rand::thread_rng().gen_ascii_chars().take(10).collect()
 }
 
 fn insert_trivial(db1: Box<Database>, db2: Box<Database>) {
@@ -156,7 +155,6 @@ fn insert_reverse(db1: Box<Database>, db2: Box<Database>) {
     index2.put(&[240; 32], vec![3]);
     index2.put(&[64; 32], vec![2]);
     index2.put(&[42; 32], vec![1]);
-
 
     assert!(index2.root_hash() != Hash::zero());
     assert_eq!(index2.root_hash(), index1.root_hash());
@@ -358,7 +356,7 @@ where
         (0..batch_size).collect()
     } else {
         let mut rng = rand::thread_rng();
-        sample(&mut rng, 0..batch_size, MAX_CHECKED_ELEMENTS)
+        sample_iter(&mut rng, 0..batch_size, MAX_CHECKED_ELEMENTS).unwrap()
     };
 
     for i in indexes {
@@ -392,13 +390,13 @@ where
     // Test for batches of 1, 11, ..., 101 keys
     for proof_size in (0..11).map(|x| x * 10 + 1) {
         // Check the multiproof only for existing keys
-        let keys = sample(&mut rng, data.iter().map(|&(k, _)| k), proof_size);
+        let keys = sample_iter(&mut rng, data.iter().map(|&(k, _)| k), proof_size).unwrap();
         let proof = table.get_multiproof(keys.clone());
         check_map_multiproof(proof, keys, &table);
 
         // Check the multiproof for the equal number of existing and non-existing keys
-        let mut keys = sample(&mut rng, data.iter().map(|&(k, _)| k), proof_size);
-        let non_keys = sample(&mut rng, &nonexisting_keys, proof_size);
+        let mut keys = sample_iter(&mut rng, data.iter().map(|&(k, _)| k), proof_size).unwrap();
+        let non_keys = sample_iter(&mut rng, &nonexisting_keys, proof_size).unwrap();
         keys.extend(non_keys);
         let proof = table.get_multiproof(keys.clone());
         check_map_multiproof(proof, keys, &table);
@@ -412,7 +410,7 @@ fn test_invalid_map_proofs() {
     let h = hash(&vec![1]);
 
     let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::builder()
-        .add_proof_entry(DBKey::leaf(&[1; 32]).truncate(240), h)
+        .add_proof_entry(ProofPath::new(&[1; 32]).prefix(240), h)
         .create();
     assert_eq!(
         proof.try_into::<Vec<_>>().unwrap_err().description(),
@@ -433,8 +431,8 @@ fn test_invalid_map_proofs() {
     );
 
     let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::builder()
-        .add_proof_entry(DBKey::leaf(&[1; 32]).truncate(3), h)
-        .add_proof_entry(DBKey::leaf(&[1; 32]).truncate(77), h)
+        .add_proof_entry(ProofPath::new(&[1; 32]).prefix(3), h)
+        .add_proof_entry(ProofPath::new(&[1; 32]).prefix(77), h)
         .create();
     assert_eq!(
         proof.try_into::<Vec<_>>().unwrap_err().description(),
@@ -442,7 +440,7 @@ fn test_invalid_map_proofs() {
     );
 
     let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::builder()
-        .add_proof_entry(DBKey::leaf(&[1; 32]).truncate(3), h)
+        .add_proof_entry(ProofPath::new(&[1; 32]).prefix(3), h)
         .add_entry([1; 32], vec![1, 2, 3])
         .create();
     assert_eq!(
@@ -451,7 +449,7 @@ fn test_invalid_map_proofs() {
     );
 
     let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::builder()
-        .add_proof_entry(DBKey::leaf(&[1; 32]).truncate(3), h)
+        .add_proof_entry(ProofPath::new(&[1; 32]).prefix(3), h)
         .add_entry([1; 32], vec![1, 2, 3])
         .create();
     assert_eq!(
@@ -460,8 +458,8 @@ fn test_invalid_map_proofs() {
     );
 
     let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::builder()
-        .add_proof_entry(DBKey::leaf(&[0; 32]).truncate(10), h)
-        .add_proof_entry(DBKey::leaf(&[1; 32]), h)
+        .add_proof_entry(ProofPath::new(&[0; 32]).prefix(10), h)
+        .add_proof_entry(ProofPath::new(&[1; 32]), h)
         .add_entry([1; 32], vec![1, 2, 3])
         .create();
     assert_eq!(
@@ -509,7 +507,7 @@ fn build_proof_in_single_node_tree(db: Box<Database>) {
     let proof = table.get_proof([128; 32]);
     assert_eq!(
         proof.proof(),
-        vec![(DBKey::leaf(&[230; 32]), hash(&vec![1]))]
+        vec![(ProofPath::new(&[230; 32]), hash(&vec![1]))]
     );
     check_map_proof(proof, None, &table);
 }
@@ -529,7 +527,7 @@ fn build_multiproof_in_single_node_tree(db: Box<Database>) {
     let proof = table.get_multiproof(keys.clone());
     assert_eq!(
         proof.proof(),
-        vec![(DBKey::leaf(&[230; 32]), hash(&vec![1]))]
+        vec![(ProofPath::new(&[230; 32]), hash(&vec![1]))]
     );
     check_map_multiproof(proof, keys, &table);
 }
@@ -538,27 +536,27 @@ fn build_proof_in_multinode_tree(db: Box<Database>) {
     let mut storage = db.fork();
     let mut table = ProofMapIndex::new(IDX_NAME, &mut storage);
 
-    table.put(&[1; 32], vec![1]);
-    table.put(&[4; 32], vec![2]);
-    let proof = table.get_proof([1; 32]);
-    assert_eq!(proof.proof(), vec![(DBKey::leaf(&[4; 32]), hash(&vec![2]))]);
-    check_map_proof(proof, Some([1; 32]), &table);
+    table.put(&[128; 32], vec![1]); // 128 = 0b1000_0000 ~ ProofPath(00000001...)
+    table.put(&[32; 32], vec![2]); //   32 = 0b0010_0000 ~ ProofPath(00000100...)
+    let proof = table.get_proof([128; 32]);
+    assert_eq!(proof.proof(), vec![(ProofPath::new(&[32; 32]), hash(&vec![2]))]);
+    check_map_proof(proof, Some([128; 32]), &table);
 
-    let proof = table.get_proof([4; 32]);
-    assert_eq!(proof.proof(), vec![(DBKey::leaf(&[1; 32]), hash(&vec![1]))]);
-    check_map_proof(proof, Some([4; 32]), &table);
+    let proof = table.get_proof([32; 32]);
+    assert_eq!(proof.proof(), vec![(ProofPath::new(&[128; 32]), hash(&vec![1]))]);
+    check_map_proof(proof, Some([32; 32]), &table);
 
     // Key left of all keys in the tree
     let proof = table.get_proof([0; 32]);
     let exp_proof = vec![
-        (DBKey::leaf(&[1; 32]), hash(&vec![1])),
-        (DBKey::leaf(&[4; 32]), hash(&vec![2])),
+        (ProofPath::new(&[128; 32]), hash(&vec![1])),
+        (ProofPath::new(&[32; 32]), hash(&vec![2])),
     ];
     assert_eq!(proof.proof(), exp_proof);
     check_map_proof(proof, None, &table);
 
     // Key between the keys in the tree
-    let proof = table.get_proof([2; 32]);
+    let proof = table.get_proof([64; 32]); // 64 ~ ProofPath(00000010...)
     assert_eq!(proof.proof(), exp_proof);
     check_map_proof(proof, None, &table);
 
@@ -568,98 +566,109 @@ fn build_proof_in_multinode_tree(db: Box<Database>) {
     check_map_proof(proof, None, &table);
 
     // Insert key that splits 15-bit segment off the left key in the tree.
-    // The key itself is to the left of the `[1; 32]` key.
+    // The key itself is to the left of the `[128; 32]` key.
     let left_key = {
         let mut key = [0; 32];
-        key[0] = 1;
+        key[0] = 128;
         table.put(&key, vec![3]);
         key
     };
 
     let left_hash = {
         let mut node = BranchNode::empty();
-        node.set_child(ChildKind::Left, &DBKey::leaf(&left_key), &hash(&vec![3]));
-        node.set_child(ChildKind::Right, &DBKey::leaf(&[1; 32]), &hash(&vec![1]));
+        node.set_child(ChildKind::Left, &ProofPath::new(&left_key), &hash(&vec![3]));
+        node.set_child(
+            ChildKind::Right,
+            &ProofPath::new(&[128; 32]),
+            &hash(&vec![1]),
+        );
         node.hash()
     };
-
-    let proof = table.get_proof([1; 32]);
-    assert_eq!(
-        proof.proof(),
-        vec![(DBKey::leaf(&left_key), hash(&vec![3])), (DBKey::leaf(&[4; 32]), hash(&vec![2]))]
-    );
-    check_map_proof(proof, Some([1; 32]), &table);
-
-    let proof = table.get_proof([2; 32]);
-    assert_eq!(
-        proof.proof(),
-        vec![
-            (DBKey::leaf(&left_key).truncate(15), left_hash),
-            (DBKey::leaf(&[4; 32]), hash(&vec![2])),
-        ]
-    );
-    check_map_proof(proof, None, &table);
-
-    let proof = table.get_proof([4; 32]);
-    assert_eq!(
-        proof.proof(),
-        vec![(DBKey::leaf(&left_key).truncate(15), left_hash)]
-    );
-    check_map_proof(proof, Some([4; 32]), &table);
 
     let proof = table.get_proof([128; 32]);
     assert_eq!(
         proof.proof(),
         vec![
-            (DBKey::leaf(&left_key).truncate(15), left_hash),
-            (DBKey::leaf(&[4; 32]), hash(&vec![2])),
+            (ProofPath::new(&left_key), hash(&vec![3])),
+            (ProofPath::new(&[32; 32]), hash(&vec![2])),
+        ]
+    );
+    check_map_proof(proof, Some([128; 32]), &table);
+
+    let proof = table.get_proof([64; 32]);
+    assert_eq!(
+        proof.proof(),
+        vec![
+            (ProofPath::new(&left_key).prefix(15), left_hash),
+            (ProofPath::new(&[32; 32]), hash(&vec![2])),
         ]
     );
     check_map_proof(proof, None, &table);
 
-    // Insert key that splits 12-bit segment off the [4; 32] key in the tree.
-    // The key is to the right of the [4; 32] key.
+    let proof = table.get_proof([32; 32]);
+    assert_eq!(
+        proof.proof(),
+        vec![(ProofPath::new(&left_key).prefix(15), left_hash)]
+    );
+    check_map_proof(proof, Some([32; 32]), &table);
+
+    let proof = table.get_proof([1; 32]);
+    assert_eq!(
+        proof.proof(),
+        vec![
+            (ProofPath::new(&left_key).prefix(15), left_hash),
+            (ProofPath::new(&[32; 32]), hash(&vec![2])),
+        ]
+    );
+    check_map_proof(proof, None, &table);
+
+    // Insert key that splits 12-bit segment off the [32; 32] key in the tree.
+    // The key is to the right of the [32; 32] key.
     let right_key = {
         let mut key = [0; 32];
-        key[0] = 4;
-        key[1] = 9;
+        key[0] = 32;
+        key[1] = 0b1001_0000; // represented as `..00001001..` in `ProofPath`
         table.put(&key, vec![4]);
         key
     };
 
     let right_hash = {
         let mut node = BranchNode::empty();
-        node.set_child(ChildKind::Left, &DBKey::leaf(&[4; 32]), &hash(&vec![2]));
-        node.set_child(ChildKind::Right, &DBKey::leaf(&right_key), &hash(&vec![4]));
+        node.set_child(ChildKind::Left, &ProofPath::new(&[32; 32]), &hash(&vec![2]));
+        node.set_child(
+            ChildKind::Right,
+            &ProofPath::new(&right_key),
+            &hash(&vec![4]),
+        );
         node.hash()
     };
 
-    let proof = table.get_proof([1; 32]);
+    let proof = table.get_proof([128; 32]);
     assert_eq!(
         proof.proof(),
         vec![
-            (DBKey::leaf(&left_key), hash(&vec![3])),
-            (DBKey::leaf(&right_key).truncate(12), right_hash),
+            (ProofPath::new(&left_key), hash(&vec![3])),
+            (ProofPath::new(&right_key).prefix(12), right_hash),
         ]
     );
-    check_map_proof(proof, Some([1; 32]), &table);
+    check_map_proof(proof, Some([128; 32]), &table);
 
     // Non-existing key between two children at the root node
-    let proof = table.get_proof([2; 32]);
+    let proof = table.get_proof([64; 32]);
     assert_eq!(
         proof.proof(),
         vec![
-            (DBKey::leaf(&left_key).truncate(15), left_hash),
-            (DBKey::leaf(&right_key).truncate(12), right_hash),
+            (ProofPath::new(&left_key).prefix(15), left_hash),
+            (ProofPath::new(&right_key).prefix(12), right_hash),
         ]
     );
     check_map_proof(proof, None, &table);
 
-    // Non-existing key between the first added node `[1; 32]` and the `left_key`.
+    // Non-existing key between the first added node `[128; 32]` and the `left_key`.
     let nonexisting_key = {
         let mut key = [0; 32];
-        key[0] = 1;
-        key[1] = 1;
+        key[0] = 128;
+        key[1] = 128;
         key[29] = 29;
         key
     };
@@ -668,9 +677,9 @@ fn build_proof_in_multinode_tree(db: Box<Database>) {
     assert_eq!(
         proof.proof(),
         vec![
-            (DBKey::leaf(&left_key), hash(&vec![3])),
-            (DBKey::leaf(&[1; 32]), hash(&vec![1])),
-            (DBKey::leaf(&right_key).truncate(12), right_hash),
+            (ProofPath::new(&left_key), hash(&vec![3])),
+            (ProofPath::new(&[128; 32]), hash(&vec![1])),
+            (ProofPath::new(&right_key).prefix(12), right_hash),
         ]
     );
     check_map_proof(proof, None, &table);
@@ -690,67 +699,73 @@ fn build_proof_in_multinode_tree(db: Box<Database>) {
     let proof = table.get_proof([129; 32]);
     assert_eq!(
         proof.proof(),
-        vec![(DBKey::leaf(&[0; 32]).truncate(5), subtree_hash)]
+        vec![(ProofPath::new(&[0; 32]).prefix(5), subtree_hash)]
     );
     check_map_proof(proof, Some([129; 32]), &table);
 
-    let proof = table.get_proof([128; 32]);
+    let proof = table.get_proof([1; 32]);
     assert_eq!(
         proof.proof(),
         vec![
-            (DBKey::leaf(&[0; 32]).truncate(5), subtree_hash),
-            (DBKey::leaf(&[129; 32]), hash(&vec![5])),
+            (ProofPath::new(&[0; 32]).prefix(5), subtree_hash),
+            (ProofPath::new(&[129; 32]), hash(&vec![5])),
         ]
     );
     check_map_proof(proof, None, &table);
 
-    let proof = table.get_proof([4; 32]);
+    let proof = table.get_proof([32; 32]);
     assert_eq!(
         proof.proof(),
         vec![
-            (DBKey::leaf(&left_key).truncate(15), left_hash),
-            (DBKey::leaf(&right_key), hash(&vec![4])),
-            (DBKey::leaf(&[129; 32]), hash(&vec![5])),
+            (ProofPath::new(&left_key).prefix(15), left_hash),
+            (ProofPath::new(&right_key), hash(&vec![4])),
+            (ProofPath::new(&[129; 32]), hash(&vec![5])),
         ]
     );
-    check_map_proof(proof, Some([4; 32]), &table);
+    check_map_proof(proof, Some([32; 32]), &table);
 }
 
 fn build_multiproof_simple(db: Box<Database>) {
     let mut storage = db.fork();
     let mut table = ProofMapIndex::new(IDX_NAME, &mut storage);
 
-    table.put(&[1; 32], vec![1]);
-    table.put(&[4; 32], vec![2]);
+    table.put(&[128; 32], vec![1]);
+    table.put(&[32; 32], vec![2]);
 
-    let keys = vec![[0; 32], [1; 32]];
+    let keys = vec![[0; 32], [128; 32]];
     let proof = table.get_multiproof(keys.clone());
-    assert_eq!(proof.proof(), vec![(DBKey::leaf(&[4; 32]), hash(&vec![2]))]);
+    assert_eq!(proof.proof(), vec![(ProofPath::new(&[32; 32]), hash(&vec![2]))]);
     check_map_multiproof(proof, keys, &table);
 
-    let keys = vec![[2; 32], [0; 32], [1; 32], [129; 32]];
+    let keys = vec![[64; 32], [0; 32], [128; 32], [129; 32]];
     let proof = table.get_multiproof(keys.clone());
-    assert_eq!(proof.proof(), vec![(DBKey::leaf(&[4; 32]), hash(&vec![2]))]);
+    assert_eq!(proof.proof(), vec![(ProofPath::new(&[32; 32]), hash(&vec![2]))]);
     check_map_multiproof(proof, keys, &table);
 
-    let keys = vec![[2; 32], [0; 32], [1; 32], [129; 32], [4; 32]];
+    let keys = vec![[64; 32], [0; 32], [128; 32], [129; 32], [32; 32]];
     let proof = table.get_multiproof(keys.clone());
     assert_eq!(proof.proof(), vec![]);
     check_map_multiproof(proof, keys, &table);
 
-    let keys = vec![[2; 32], [0; 32], [129; 32]];
+    let keys = vec![[64; 32], [0; 32], [129; 32]];
     let proof = table.get_multiproof(keys.clone());
     assert_eq!(
         proof.proof(),
-        vec![(DBKey::leaf(&[1; 32]), hash(&vec![1])), (DBKey::leaf(&[4; 32]), hash(&vec![2]))]
+        vec![
+            (ProofPath::new(&[128; 32]), hash(&vec![1])),
+            (ProofPath::new(&[32; 32]), hash(&vec![2])),
+        ]
     );
     check_map_multiproof(proof, keys, &table);
 
-    let keys = vec![[2; 32], [129; 32]];
+    let keys = vec![[64; 32], [129; 32]];
     let proof = table.get_multiproof(keys.clone());
     assert_eq!(
         proof.proof(),
-        vec![(DBKey::leaf(&[1; 32]), hash(&vec![1])), (DBKey::leaf(&[4; 32]), hash(&vec![2]))]
+        vec![
+            (ProofPath::new(&[128; 32]), hash(&vec![1])),
+            (ProofPath::new(&[32; 32]), hash(&vec![2])),
+        ]
     );
     check_map_multiproof(proof, keys, &table);
 
@@ -758,7 +773,10 @@ fn build_multiproof_simple(db: Box<Database>) {
     let proof = table.get_multiproof(keys.clone());
     assert_eq!(
         proof.proof(),
-        vec![(DBKey::leaf(&[1; 32]), hash(&vec![1])), (DBKey::leaf(&[4; 32]), hash(&vec![2]))]
+        vec![
+            (ProofPath::new(&[128; 32]), hash(&vec![1])),
+            (ProofPath::new(&[32; 32]), hash(&vec![2])),
+        ]
     );
     check_map_multiproof(proof, keys, &table);
 
@@ -766,15 +784,19 @@ fn build_multiproof_simple(db: Box<Database>) {
     // The key itself is to the left of the `[1; 32]` key.
     let left_key = {
         let mut key = [0; 32];
-        key[0] = 1;
+        key[0] = 128;
         table.put(&key, vec![3]);
         key
     };
 
     let left_hash = {
         let mut node = BranchNode::empty();
-        node.set_child(ChildKind::Left, &DBKey::leaf(&left_key), &hash(&vec![3]));
-        node.set_child(ChildKind::Right, &DBKey::leaf(&[1; 32]), &hash(&vec![1]));
+        node.set_child(ChildKind::Left, &ProofPath::new(&left_key), &hash(&vec![3]));
+        node.set_child(
+            ChildKind::Right,
+            &ProofPath::new(&[128; 32]),
+            &hash(&vec![1]),
+        );
         node.hash()
     };
 
@@ -782,64 +804,70 @@ fn build_multiproof_simple(db: Box<Database>) {
     assert_eq!(
         proof.proof(),
         vec![
-            (DBKey::leaf(&[1; 32]).truncate(15), left_hash),
-            (DBKey::leaf(&[4; 32]), hash(&vec![2])),
+            (ProofPath::new(&[128; 32]).prefix(15), left_hash),
+            (ProofPath::new(&[32; 32]), hash(&vec![2])),
         ]
     );
     check_map_multiproof(proof, vec![[0; 32]], &table);
 
     let keys = {
-        // `key > [1; 32]`, which is visible from the `left_key` / `[1; 32]` junction
-        let mut key = [1; 32];
-        key[1] = 16;
-        vec![[0; 32], key, [2; 32]]
+        // `key > [128; 32]`, which is visible from the `left_key` / `[128; 32]` junction
+        let mut key = [128; 32];
+        key[1] = 8;
+        vec![[0; 32], key, [64; 32]]
     };
     let proof = table.get_multiproof(keys.clone());
     assert_eq!(
         proof.proof(),
         vec![
-            (DBKey::leaf(&[1; 32]).truncate(15), left_hash),
-            (DBKey::leaf(&[4; 32]), hash(&vec![2])),
+            (ProofPath::new(&[128; 32]).prefix(15), left_hash),
+            (ProofPath::new(&[32; 32]), hash(&vec![2])),
         ]
     );
     check_map_multiproof(proof, keys, &table);
 
-    let keys = vec![[0; 32], [1; 32], [2; 32]];
+    let keys = vec![[0; 32], [128; 32], [64; 32]];
     let proof = table.get_multiproof(keys.clone());
     assert_eq!(
         proof.proof(),
-        vec![(DBKey::leaf(&left_key), hash(&vec![3])), (DBKey::leaf(&[4; 32]), hash(&vec![2]))]
+        vec![
+            (ProofPath::new(&left_key), hash(&vec![3])),
+            (ProofPath::new(&[32; 32]), hash(&vec![2])),
+        ]
     );
     check_map_multiproof(proof, keys, &table);
 
-    let keys = vec![[0; 32], [1; 32], [4; 32], [2; 32], [129; 32]];
+    let keys = vec![[0; 32], [128; 32], [32; 32], [64; 32], [129; 32]];
     let proof = table.get_multiproof(keys.clone());
     assert_eq!(
         proof.proof(),
-        vec![(DBKey::leaf(&left_key), hash(&vec![3]))]
+        vec![(ProofPath::new(&left_key), hash(&vec![3]))]
     );
     check_map_multiproof(proof, keys, &table);
 
-    let keys = vec![[0; 32], [4; 32], [255; 32]];
+    let keys = vec![[0; 32], [32; 32], [255; 32]];
     let proof = table.get_multiproof(keys.clone());
     assert_eq!(
         proof.proof(),
-        vec![(DBKey::leaf(&[1; 32]).truncate(15), left_hash)]
+        vec![(ProofPath::new(&[128; 32]).prefix(15), left_hash)]
     );
     check_map_multiproof(proof, keys, &table);
 
     let keys = {
-        // `key` is between `left_key` and `[1; 32]`, so they both should be returned in the proof
-        // to prove non-existence of `key`
+        // `key` is between `left_key` and `[128; 32]`, so they both should be returned
+        // in the proof to prove non-existence of `key`
         let mut key = [0; 32];
-        key[0] = 1;
-        key[1] = 1;
-        vec![[0; 32], [4; 32], key]
+        key[0] = 128;
+        key[1] = 128;
+        vec![[0; 32], [32; 32], key]
     };
     let proof = table.get_multiproof(keys.clone());
     assert_eq!(
         proof.proof(),
-        vec![(DBKey::leaf(&left_key), hash(&vec![3])), (DBKey::leaf(&[1; 32]), hash(&vec![1]))]
+        vec![
+            (ProofPath::new(&left_key), hash(&vec![3])),
+            (ProofPath::new(&[128; 32]), hash(&vec![1])),
+        ]
     );
     check_map_multiproof(proof, keys, &table);
 }
@@ -899,7 +927,8 @@ fn fuzz_delete_build_proofs(db: Box<Database>) {
 
     let (keys_to_remove, keys_to_remove_seq) = {
         let mut rng = rand::thread_rng();
-        let mut keys = sample(&mut rng, data.iter().map(|item| item.0.clone()), 2_000);
+        let mut keys = sample_iter(&mut rng, data.iter().map(|item| item.0.clone()), 2_000)
+            .unwrap();
         rng.shuffle(&mut keys);
         let seq_keys = keys.split_off(1_000);
         (keys, seq_keys)
@@ -1090,16 +1119,14 @@ fn tree_with_hashed_key(db: Box<Database>) {
 
     encoding_struct! {
         struct Point {
-            const SIZE = 4;
-
-            field x: u16 [0 => 2]
-            field y: u16 [2 => 4]
+            x: u16,
+            y: u16,
         }
     }
 
     impl HashedKey for Point {}
 
-    fn hash_isolated_node(key: &DBKey, h: &Hash) -> Hash {
+    fn hash_isolated_node(key: &ProofPath, h: &Hash) -> Hash {
         HashStream::new()
             .update(&key.as_bytes())
             .update(h.as_ref())
@@ -1133,7 +1160,7 @@ fn tree_with_hashed_key(db: Box<Database>) {
     let proof = table.get_proof(Point::new(1, 2));
     assert_eq!(
         proof.proof(),
-        vec![(DBKey::leaf(&Point::new(3, 4)), hash(&vec![2, 3, 4]))]
+        vec![(ProofPath::new(&Point::new(3, 4)), hash(&vec![2, 3, 4]))]
     );
 
     assert_eq!(proof.try_into().unwrap(), (
@@ -1168,7 +1195,7 @@ fn tree_with_hashed_key(db: Box<Database>) {
     assert_eq!(table.get(&other_key), Some(vec![1, 2, 3]));
     assert_eq!(
         table.root_hash(),
-        hash_isolated_node(&DBKey::leaf(&other_key.hash()), &hash(&vec![1, 2, 3]))
+        hash_isolated_node(&ProofPath::new(&other_key.hash()), &hash(&vec![1, 2, 3]))
     );
 }
 
@@ -1256,7 +1283,7 @@ mod rocksdb_tests {
     fn create_database(path: &Path) -> Box<Database> {
         let mut opts = RocksDBOptions::default();
         opts.create_if_missing(true);
-        Box::new(RocksDB::open(path, opts).unwrap())
+        Box::new(RocksDB::open(path, &opts).unwrap())
     }
 
     common_tests!{}

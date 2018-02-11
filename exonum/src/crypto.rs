@@ -17,28 +17,31 @@
 //! [Sodium library](https://github.com/jedisct1/libsodium) is used under the hood through
 //! [sodiumoxide rust bindings](https://github.com/dnaq/sodiumoxide).
 
-use sodiumoxide::crypto::sign::ed25519::{PublicKey as PublicKeySodium,
+use std::default::Default;
+use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
+use std::fmt;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use sodiumoxide::crypto::sign::ed25519::{gen_keypair as gen_keypair_sodium, keypair_from_seed,
+                                         sign_detached, verify_detached,
+                                         PublicKey as PublicKeySodium,
                                          SecretKey as SecretKeySodium, Seed as SeedSodium,
-                                         Signature as SignatureSodium, State as SignState,
-                                         sign_detached, verify_detached, keypair_from_seed,
-                                         gen_keypair as gen_keypair_sodium};
-use sodiumoxide::crypto::hash::sha256::{Digest, State as HashState, hash as hash_sodium};
+                                         Signature as SignatureSodium, State as SignState};
+use sodiumoxide::crypto::hash::sha256::{hash as hash_sodium, Digest as DigestSodium,
+                                        State as HashState};
 use sodiumoxide;
 use serde::{Serialize, Serializer};
-use serde::de::{self, Visitor, Deserialize, Deserializer};
-use hex::{ToHex, FromHex};
+use serde::de::{self, Deserialize, Deserializer, Visitor};
+use byteorder::{ByteOrder, LittleEndian};
 
-use std::default::Default;
-use std::ops::{Index, Range, RangeFrom, RangeTo, RangeFull};
-use std::fmt;
-
+use encoding::serialize::FromHex;
+// spell-checker:disable
 pub use sodiumoxide::crypto::sign::ed25519::{PUBLICKEYBYTES as PUBLIC_KEY_LENGTH,
                                              SECRETKEYBYTES as SECRET_KEY_LENGTH,
-                                             SIGNATUREBYTES as SIGNATURE_LENGTH,
-                                             SEEDBYTES as SEED_LENGTH};
+                                             SEEDBYTES as SEED_LENGTH,
+                                             SIGNATUREBYTES as SIGNATURE_LENGTH};
 pub use sodiumoxide::crypto::hash::sha256::DIGESTBYTES as HASH_SIZE;
-
-pub use encoding::serialize::{FromHexError, HexValue};
+// spell-checker:enable
 
 /// The size to crop the string in debug messages.
 const BYTES_IN_DEBUG: usize = 4;
@@ -74,11 +77,12 @@ pub fn sign(data: &[u8], secret_key: &SecretKey) -> Signature {
 /// # drop(secret_key);
 /// ```
 pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
-    let (sod_pub_key, sod_secr_key) = keypair_from_seed(&seed.0);
-    (PublicKey(sod_pub_key), SecretKey(sod_secr_key))
+    let (sod_pub_key, sod_secret_key) = keypair_from_seed(&seed.0);
+    (PublicKey(sod_pub_key), SecretKey(sod_secret_key))
 }
 
-/// Randomly generates a secret key and a corresponding public key.
+/// Generates a secret key and a corresponding public key using a cryptographically secure
+/// pseudo-random number generator.
 ///
 /// # Examples
 ///
@@ -91,8 +95,8 @@ pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
 /// # drop(secret_key);
 /// ```
 pub fn gen_keypair() -> (PublicKey, SecretKey) {
-    let (pubkey, secrkey) = gen_keypair_sodium();
-    (PublicKey(pubkey), SecretKey(secrkey))
+    let (pubkey, secret_key) = gen_keypair_sodium();
+    (PublicKey(pubkey), SecretKey(secret_key))
 }
 
 /// Verifies that `data` is signed with a secret key corresponding to the given public key.
@@ -112,7 +116,7 @@ pub fn verify(sig: &Signature, data: &[u8], pubkey: &PublicKey) -> bool {
     verify_detached(&sig.0, data, &pubkey.0)
 }
 
-/// Calculates `SHA256` hash of bytes slice.
+/// Calculates an SHA-256 hash digest of a bytes slice.
 ///
 /// # Examples
 ///
@@ -127,6 +131,17 @@ pub fn verify(sig: &Signature, data: &[u8], pubkey: &PublicKey) -> bool {
 pub fn hash(data: &[u8]) -> Hash {
     let dig = hash_sodium(data);
     Hash(dig)
+}
+
+/// A common trait for the ability to compute a
+/// cryptographic hash.
+pub trait CryptoHash {
+    /// Returns a hash of the value.
+    ///
+    /// The hashing strategy must satisfy the basic requirements of cryptographic hashing:
+    /// equal values must have the same hash and not equal values must have different hashes
+    /// (except for negligible probability).
+    fn hash(&self) -> Hash;
 }
 
 /// Initializes the sodium library and chooses faster versions of the primitives if possible.
@@ -148,7 +163,9 @@ pub fn init() {
     }
 }
 
-/// This structure provides a possibility to calculate hash for a stream of data
+/// This structure provides a possibility to calculate a SHA-256 hash digest
+/// for a stream of data.
+///
 /// # Example
 ///
 /// ```rust
@@ -165,25 +182,27 @@ pub fn init() {
 pub struct HashStream(HashState);
 
 impl HashStream {
-    /// Creates a new instance of `HashStream`
+    /// Creates a new instance of `HashStream`.
     pub fn new() -> Self {
         HashStream(HashState::init())
     }
 
-    /// Processes chunk of stream using state and returns instance of `HashStream`
+    /// Processes a chunk of stream and returns a `HashStream` with the updated internal state.
     pub fn update(mut self, chunk: &[u8]) -> Self {
         self.0.update(chunk);
         self
     }
 
-    /// Completes process and returns final hash of stream data
+    /// Returns the hash of data supplied to the stream so far.
     pub fn hash(self) -> Hash {
         let dig = self.0.finalize();
         Hash(dig)
     }
 }
 
-/// This structure provides a possibility to create signature for a stream of data
+/// This structure provides a possibility to create and/or verify Ed25519 digital signatures
+/// for a stream of data.
+///
 /// # Example
 ///
 /// ```rust
@@ -204,26 +223,25 @@ impl HashStream {
 pub struct SignStream(SignState);
 
 impl SignStream {
-    /// Creates a new instance of `SignStream`
+    /// Creates a new instance of `SignStream`.
     pub fn new() -> Self {
         SignStream(SignState::init())
     }
 
-    /// Adds a new `chunk` to the message that will eventually be signed
+    /// Adds a new `chunk` to the message that will eventually be signed and/or verified.
     pub fn update(mut self, chunk: &[u8]) -> Self {
         self.0.update(chunk);
         self
     }
 
-    /// Computes a signature for the previously supplied messages
-    /// using the secret key `secret_key` and returns `Signature`
+    /// Computes and returns a signature for the previously supplied message
+    /// using the given `secret_key`.
     pub fn sign(&mut self, secret_key: &SecretKey) -> Signature {
         Signature(self.0.finalize(&secret_key.0))
     }
 
-    /// Verifies that `sig` is a valid signature for the message whose content
-    /// has been previously supplied using `update` using the public key
-    /// `public_key`
+    /// Verifies that `sig` is a valid signature for the previously supplied message
+    /// using the given `public_key`.
     pub fn verify(&mut self, sig: &Signature, public_key: &PublicKey) -> bool {
         self.0.verify(&sig.0, &public_key.0)
     }
@@ -252,6 +270,12 @@ macro_rules! implement_public_sodium_wrapper {
         pub fn from_slice(bs: &[u8]) -> Option<Self> {
             $name_from::from_slice(bs).map($name)
         }
+
+        /// Returns the hex representation of the binary data.
+        /// Lower case letters are used (e.g. f9b4ca).
+        pub fn to_hex(&self) -> String {
+            $crate::encoding::serialize::encode_hex(self)
+        }
     }
 
     impl AsRef<[u8]> for $name {
@@ -269,7 +293,7 @@ macro_rules! implement_public_sodium_wrapper {
 
     impl ToString for $name {
         fn to_string(&self) -> String {
-            ::crypto::HexValue::to_hex(self)
+            self.to_hex()
         }
     }
 
@@ -309,6 +333,12 @@ macro_rules! implement_private_sodium_wrapper {
         pub fn from_slice(bs: &[u8]) -> Option<Self> {
             $name_from::from_slice(bs).map($name)
         }
+
+        /// Returns the hex representation of the binary data.
+        /// Lower case letters are used (e.g. f9b4ca).
+        pub fn to_hex(&self) -> String {
+            $crate::encoding::serialize::encode_hex(&self[..])
+        }
     }
 
     impl fmt::Debug for $name {
@@ -321,11 +351,21 @@ macro_rules! implement_private_sodium_wrapper {
             write!(f, "...)")
         }
     }
+
+    impl $crate::encoding::serialize::ToHex for $name {
+        fn write_hex<W: ::std::fmt::Write>(&self, w: &mut W) -> ::std::fmt::Result {
+            (self.0).0.as_ref().write_hex(w)
+        }
+
+        fn write_hex_upper<W: ::std::fmt::Write>(&self, w: &mut W) -> ::std::fmt::Result {
+            (self.0).0.as_ref().write_hex_upper(w)
+        }
+    }
     )
 }
 
 implement_public_sodium_wrapper! {
-/// Public key used for verifying signatures.
+/// Ed25519 public key used to verify digital signatures.
 ///
 /// # Examples
 ///
@@ -340,8 +380,9 @@ implement_public_sodium_wrapper! {
 }
 
 implement_private_sodium_wrapper! {
-/// Secret key used for signing.
-////// # Examples
+/// Ed25519 secret key used to create digital signatures over messages.
+///
+/// # Examples
 ///
 /// ```
 /// use exonum::crypto;
@@ -354,9 +395,7 @@ implement_private_sodium_wrapper! {
 }
 
 implement_public_sodium_wrapper! {
-/// SHA256 hash.
-///
-/// `Default` implementation for the `Hash` returns hash consisting of zeros.
+/// SHA-256 hash.
 ///
 /// # Examples
 ///
@@ -369,11 +408,11 @@ implement_public_sodium_wrapper! {
 /// # drop(hash_from_data);
 /// # drop(default_hash);
 /// ```
-    struct Hash, Digest, HASH_SIZE
+    struct Hash, DigestSodium, HASH_SIZE
 }
 
 implement_public_sodium_wrapper! {
-/// Signature.
+/// Ed25519 digital signature.
 ///
 /// # Examples
 ///
@@ -390,7 +429,7 @@ implement_public_sodium_wrapper! {
 }
 
 implement_private_sodium_wrapper! {
-/// Seed that can be used for keypair generation.
+/// Ed25519 seed that can be used for deterministic keypair generation.
 ///
 /// # Examples
 ///
@@ -407,18 +446,15 @@ implement_private_sodium_wrapper! {
 
 macro_rules! implement_serde {
 ($name:ident) => (
-    impl HexValue for $name {
-        fn to_hex(&self) -> String {
-            let inner = &self.0;
-            inner.0.as_ref().to_hex()
-        }
+    impl $crate::encoding::serialize::FromHex for $name {
+        type Error = $crate::encoding::serialize::FromHexError;
 
-        fn from_hex<T: AsRef<str>>(v: T) -> Result<Self, FromHexError> {
-            let bytes: Vec<u8> = FromHex::from_hex(v.as_ref())?;
+        fn from_hex<T: AsRef<[u8]>>(v: T) -> Result<Self, Self::Error> {
+            let bytes = Vec::<u8>::from_hex(v)?;
             if let Some(self_value) = Self::from_slice(bytes.as_ref()) {
                 Ok(self_value)
             } else {
-                Err(FromHexError::InvalidHexLength)
+                Err($crate::encoding::serialize::FromHexError::InvalidStringLength)
             }
         }
     }
@@ -428,7 +464,8 @@ macro_rules! implement_serde {
         fn serialize<S>(&self, ser:S) -> Result<S::Ok, S::Error>
         where S: Serializer
         {
-            ser.serialize_str(&HexValue::to_hex(self))
+            let hex_string = $crate::encoding::serialize::encode_hex(&self[..]);
+            ser.serialize_str(&hex_string)
         }
     }
 
@@ -463,38 +500,30 @@ implement_serde! {SecretKey}
 implement_serde! {Seed}
 implement_serde! {Signature}
 
-impl HexValue for Vec<u8> {
-    fn to_hex(&self) -> String {
-        ToHex::to_hex(self)
-    }
-    fn from_hex<T: AsRef<str>>(v: T) -> Result<Self, FromHexError> {
-        FromHex::from_hex(v.as_ref())
-    }
-}
 macro_rules! implement_index_traits {
-    ($newtype:ident) => (
-        impl Index<Range<usize>> for $newtype {
+    ($new_type:ident) => (
+        impl Index<Range<usize>> for $new_type {
             type Output = [u8];
             fn index(&self, _index: Range<usize>) -> &[u8] {
                 let inner  = &self.0;
                 inner.0.index(_index)
             }
         }
-        impl Index<RangeTo<usize>> for $newtype {
+        impl Index<RangeTo<usize>> for $new_type {
             type Output = [u8];
             fn index(&self, _index: RangeTo<usize>) -> &[u8] {
                 let inner  = &self.0;
                 inner.0.index(_index)
             }
         }
-        impl Index<RangeFrom<usize>> for $newtype {
+        impl Index<RangeFrom<usize>> for $new_type {
             type Output = [u8];
             fn index(&self, _index: RangeFrom<usize>) -> &[u8] {
                 let inner  = &self.0;
                 inner.0.index(_index)
             }
         }
-        impl Index<RangeFull> for $newtype {
+        impl Index<RangeFull> for $new_type {
             type Output = [u8];
             fn index(&self, _index: RangeFull) -> &[u8] {
                 let inner  = &self.0;
@@ -508,18 +537,131 @@ implement_index_traits! {SecretKey}
 implement_index_traits! {Seed}
 implement_index_traits! {Signature}
 
+/// Returns a hash consisting of zeros.
 impl Default for Hash {
     fn default() -> Hash {
         Hash::zero()
     }
 }
 
+impl CryptoHash for bool {
+    fn hash(&self) -> Hash {
+        hash(&[*self as u8])
+    }
+}
+
+impl CryptoHash for u8 {
+    fn hash(&self) -> Hash {
+        hash(&[*self])
+    }
+}
+
+impl CryptoHash for u16 {
+    fn hash(&self) -> Hash {
+        let mut v = [0; 2];
+        LittleEndian::write_u16(&mut v, *self);
+        hash(&v)
+    }
+}
+
+impl CryptoHash for u32 {
+    fn hash(&self) -> Hash {
+        let mut v = [0; 4];
+        LittleEndian::write_u32(&mut v, *self);
+        hash(&v)
+    }
+}
+
+impl CryptoHash for u64 {
+    fn hash(&self) -> Hash {
+        let mut v = [0; 8];
+        LittleEndian::write_u64(&mut v, *self);
+        hash(&v)
+    }
+}
+
+impl CryptoHash for i8 {
+    fn hash(&self) -> Hash {
+        hash(&[*self as u8])
+    }
+}
+
+impl CryptoHash for i16 {
+    fn hash(&self) -> Hash {
+        let mut v = [0; 2];
+        LittleEndian::write_i16(&mut v, *self);
+        hash(&v)
+    }
+}
+
+impl CryptoHash for i32 {
+    fn hash(&self) -> Hash {
+        let mut v = [0; 4];
+        LittleEndian::write_i32(&mut v, *self);
+        hash(&v)
+    }
+}
+
+impl CryptoHash for i64 {
+    fn hash(&self) -> Hash {
+        let mut v = [0; 8];
+        LittleEndian::write_i64(&mut v, *self);
+        hash(&v)
+    }
+}
+
+impl CryptoHash for () {
+    fn hash(&self) -> Hash {
+        Hash::zero()
+    }
+}
+
+
+impl CryptoHash for Hash {
+    fn hash(&self) -> Hash {
+        *self
+    }
+}
+
+impl CryptoHash for PublicKey {
+    fn hash(&self) -> Hash {
+        hash(self.as_ref())
+    }
+}
+
+impl CryptoHash for Vec<u8> {
+    fn hash(&self) -> Hash {
+        hash(self)
+    }
+}
+
+impl CryptoHash for String {
+    fn hash(&self) -> Hash {
+        hash(self.as_ref())
+    }
+}
+
+impl CryptoHash for SystemTime {
+    fn hash(&self) -> Hash {
+        let duration = self.duration_since(UNIX_EPOCH).expect(
+            "time value is later than 1970-01-01 00:00:00 UTC.",
+        );
+        let secs = duration.as_secs();
+        let nanos = duration.subsec_nanos();
+
+        let mut buffer = [0u8; 12];
+        LittleEndian::write_u64(&mut buffer[0..8], secs);
+        LittleEndian::write_u32(&mut buffer[8..12], nanos);
+        hash(&buffer)
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{hash, gen_keypair, Hash, PublicKey, SecretKey, Seed, Signature, HashStream,
-                SignStream};
-    use super::HexValue;
     use serde_json;
+    use encoding::serialize::FromHex;
+    use super::{gen_keypair, hash, Hash, HashStream, PublicKey, SecretKey, Seed, SignStream,
+                Signature};
 
     #[test]
     fn test_hash() {
@@ -540,7 +682,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ser_deser() {
+    fn test_serialize_deserialize() {
         let h = Hash::new([207; 32]);
         let json_h = serde_json::to_string(&h).unwrap();
         let h1 = serde_json::from_str(&json_h).unwrap();

@@ -15,132 +15,169 @@
 //! This module defines the Exonum services interfaces. Like smart contracts in some other
 //! blockchain platforms, Exonum services encapsulate business logic of the blockchain application.
 
-use serde_json::Value;
-use iron::Handler;
-use mount::Mount;
-
 use std::fmt;
 use std::sync::{Arc, RwLock};
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
 
+use serde_json::Value;
+use iron::Handler;
+
 use crypto::{Hash, PublicKey, SecretKey};
-use storage::{Snapshot, Fork};
-use messages::{Message, RawTransaction};
+use storage::{Fork, Snapshot};
+use messages::RawTransaction;
 use encoding::Error as MessageError;
-use node::{Node, State, ApiSender};
-use node::state::ValidatorState;
-use blockchain::{ConsensusConfig, Blockchain, ValidatorKeys};
-use helpers::{Height, Round, Milliseconds};
+use node::{ApiSender, Node, State, TransactionSend};
+use blockchain::{Blockchain, ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
+use helpers::{Height, Milliseconds, ValidatorId};
+use super::transaction::Transaction;
 
-/// A trait that describes transaction processing rules (a group of sequential operations
-/// with the Exonum storage) for the given `Message`.
-pub trait Transaction: Message + 'static {
-    /// Verifies the transaction, which includes the message signature verification and other
-    /// specific internal constraints. verify is intended to check the internal consistency of
-    /// a transaction; it has no access to the blockchain state.
-    /// If a transaction fails verify, it is considered incorrect and cannot be included into
-    /// any correct block proposal. Incorrect transactions are never included into the blockchain.
-    ///
-    /// *This method should not use external data, that is, it must be a pure function.*
-    fn verify(&self) -> bool;
-    /// Takes the current blockchain state via `fork` and can modify it if certain conditions
-    /// are met.
-    ///
-    /// # Notes
-    ///
-    /// - When programming `execute`, you should perform state-related checks before any changes
-    /// to the state and return early if these checks fail.
-    /// - If the execute method of a transaction raises a `panic`, the changes made by the
-    /// transactions are discarded, but the transaction itself is still considered committed.
-    fn execute(&self, fork: &mut Fork);
-    /// Returns the useful information about the transaction in the JSON format. The returned value
-    /// is used to fill the [`TxInfo.content`] field in [the blockchain explorer][explorer].
-    ///
-    /// # Notes
-    ///
-    /// The default implementation returns `null`. For transactions defined with
-    /// the [`message!`] macro, you may redefine `info()` as
-    ///
-    /// ```
-    /// # #[macro_use] extern crate exonum;
-    /// extern crate serde_json;
-    /// # use exonum::blockchain::Transaction;
-    /// # use exonum::storage::Fork;
-    ///
-    /// message! {
-    ///     struct MyTransaction {
-    ///         // Transaction definition...
-    /// #       const TYPE = 1;
-    /// #       const ID = 1;
-    /// #       const SIZE = 8;
-    /// #       field foo: u64 [0 => 8]
-    ///     }
-    /// }
-    ///
-    /// impl Transaction for MyTransaction {
-    ///     // Other methods...
-    /// #   fn verify(&self) -> bool { true }
-    /// #   fn execute(&self, _: &mut Fork) { }
-    ///
-    ///     fn info(&self) -> serde_json::Value {
-    ///         serde_json::to_value(self).expect("Cannot serialize transaction to JSON")
-    ///     }
-    /// }
-    /// # fn main() { }
-    /// ```
-    ///
-    /// [`TxInfo.content`]: ../explorer/struct.TxInfo.html#structfield.content
-    /// [explorer]: ../explorer/index.html
-    /// [`message!`]: ../macro.message.html
-    fn info(&self) -> Value {
-        Value::Null
-    }
-}
 
-/// A trait that describes a business-logic of the concrete service.
+/// A trait that describes business logic of a concrete service.
+///
+/// See also [the documentation page on services][doc:services].
+///
+/// # Examples
+///
+/// The following example provides a bare-bones foundation for implementing a service.
+///
+/// ```
+/// #[macro_use] extern crate exonum;
+/// // Exports from `exonum` crate skipped
+/// # use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
+/// # use exonum::crypto::Hash;
+/// # use exonum::messages::{ServiceMessage, Message, RawTransaction};
+/// # use exonum::storage::{Fork, Snapshot};
+/// use exonum::encoding::Error as EncError;
+///
+/// // Reused constants
+/// const SERVICE_ID: u16 = 8000;
+///
+/// // Service schema
+/// struct MyServiceSchema<T> {
+///     view: T,
+/// }
+///
+/// impl<T: AsRef<Snapshot>> MyServiceSchema<T> {
+///     fn new(view: T) -> Self {
+///         MyServiceSchema { view }
+///     }
+///
+///     fn state_hash(&self) -> Vec<Hash> {
+///         // Calculates the state hash of the service
+/// #       vec![]
+///     }
+///     // Other read-only methods
+/// }
+///
+/// impl<'a> MyServiceSchema<&'a mut Fork> {
+///     // Additional read-write methods
+/// }
+///
+/// // Transaction definitions
+/// transactions! {
+///     MyTransactions {
+///         const SERVICE_ID = SERVICE_ID;
+///
+///         struct TxA {
+///             // Transaction fields
+///         }
+///
+///         struct TxB {
+///             // ...
+///         }
+///     }
+/// }
+///
+/// impl Transaction for TxA {
+///     // Business logic implementation
+/// #   fn verify(&self) -> bool { true }
+/// #   fn execute(&self, fork: &mut Fork) -> ExecutionResult { Ok(()) }
+/// }
+///
+/// impl Transaction for TxB {
+/// #   fn verify(&self) -> bool { true }
+/// #   fn execute(&self, fork: &mut Fork) -> ExecutionResult { Ok(()) }
+/// }
+///
+/// // Service
+/// struct MyService {}
+///
+/// impl Service for MyService {
+///     fn service_id(&self) -> u16 {
+///        SERVICE_ID
+///     }
+///
+///     fn service_name(&self) -> &'static str {
+///         "my_special_unique_service"
+///     }
+///
+///     fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash> {
+///         MyServiceSchema::new(snapshot).state_hash()
+///     }
+///
+///     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, EncError> {
+///         let tx = MyTransactions::tx_from_raw(raw)?;
+///         Ok(tx.into())
+///     }
+/// }
+/// # fn main() { }
+/// ```
+///
+/// [doc:services]: https://exonum.com/doc/architecture/services/
 #[allow(unused_variables, unused_mut)]
 pub trait Service: Send + Sync + 'static {
-    /// Unique service identification for database schema and service messages.
+    /// Service identifier for database schema and service messages.
+    /// Must be unique within the blockchain.
     fn service_id(&self) -> u16;
 
-    /// Unique human readable service name.
+    /// A comprehensive string service name. Must be unique within the
+    /// blockchain.
     fn service_name(&self) -> &'static str;
 
     /// Returns a list of root hashes of tables that determine the current state
-    /// of the service database. These hashes are collected from all services in a common
-    ///  `MerklePatriciaTable` that named [`state_hash_aggregator`][1].
+    /// of the service database. These hashes are collected from all the services in a common
+    /// `ProofMapIndex` accessible in the core schema as [`state_hash_aggregator`][1].
+    ///
+    /// An empty vector can be returned if the service does not influence the blockchain state.
     ///
     /// See also [`service_table_unique_key`][2].
     ///
     /// [1]: struct.Schema.html#method.state_hash_aggregator
     /// [2]: struct.Blockchain.html#method.service_table_unique_key
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
-        Vec::new()
-    }
+    fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash>;
 
-    /// Tries to create `Transaction` object from the given raw message.
+    /// Tries to create a `Transaction` from the given raw message.
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError>;
 
-    /// By this method you can initialize information schema of service
-    /// and generates initial service configuration.
-    /// This method is called on genesis block creation event.
+    /// Initializes the information schema of the service
+    /// and generates an initial service configuration.
+    /// Called on genesis block creation.
     fn initialize(&self, fork: &mut Fork) -> Value {
         Value::Null
     }
 
-    /// Handles commit event. This handler is invoked for each service after commit of the block.
-    /// For example service can create some transaction if the specific condition occurred.
+    /// Handles block commit. This handler is invoked for each service after commit of the block.
+    /// For example, a service can create one or more transactions if a specific condition
+    /// has occurred.
     ///
-    /// *Try not to perform long operations here*.
-    fn handle_commit(&self, context: &mut ServiceContext) {}
+    /// *Try not to perform long operations in this handler*.
+    fn handle_commit(&self, context: &ServiceContext) {}
 
-    /// Returns api handler for public users.
+    /// Returns an API handler for public requests. The handler is mounted on
+    /// the `/api/services/{service_name}` path at [the public listen address][pub-addr]
+    /// of all full nodes in the blockchain network.
+    ///
+    /// [pub-addr]: ../node/struct.NodeApiConfig.html#structfield.public_api_address
     fn public_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
         None
     }
 
-    /// Returns api handler for maintainers.
+    /// Returns an API handler for private requests. The handler is mounted on
+    /// the `/api/services/{service_name}` path at [the private listen address][private-addr]
+    /// of all full nodes in the blockchain network.
+    ///
+    /// [private-addr]: ../node/struct.NodeApiConfig.html#structfield.private_api_address
     fn private_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
         None
     }
@@ -148,91 +185,99 @@ pub trait Service: Send + Sync + 'static {
 
 /// The current node state on which the blockchain is running, or in other words
 /// execution context.
-pub struct ServiceContext<'a, 'b> {
-    state: &'a mut State,
-    snapshot: &'b Snapshot,
-    txs: Vec<Box<Transaction>>,
+#[derive(Debug)]
+pub struct ServiceContext {
+    validator_id: Option<ValidatorId>,
+    service_keypair: (PublicKey, SecretKey),
+    api_sender: ApiSender,
+    fork: Fork,
+    stored_configuration: StoredConfiguration,
+    height: Height,
 }
 
+impl ServiceContext {
+    /// Creates the service context for the given node.
+    ///
+    /// This method is necessary if you want to implement an alternative exonum node.
+    /// For example, you can implement special node without consensus for regression
+    /// testing of services business logic.
+    pub fn new(
+        service_public_key: PublicKey,
+        service_secret_key: SecretKey,
+        api_sender: ApiSender,
+        fork: Fork,
+    ) -> ServiceContext {
+        let (stored_configuration, height) = {
+            let schema = Schema::new(fork.as_ref());
+            let stored_configuration = schema.actual_configuration();
+            let height = schema.height();
+            (stored_configuration, height)
+        };
+        let validator_id = stored_configuration
+            .validator_keys
+            .iter()
+            .position(|validator| service_public_key == validator.service_key)
+            .map(|id| ValidatorId(id as u16));
 
-impl<'a, 'b> ServiceContext<'a, 'b> {
-    #[doc(hidden)]
-    pub fn new(state: &'a mut State, snapshot: &'b Snapshot) -> ServiceContext<'a, 'b> {
         ServiceContext {
-            state: state,
-            snapshot: snapshot,
-            txs: Vec::new(),
+            validator_id,
+            service_keypair: (service_public_key, service_secret_key),
+            api_sender,
+            fork,
+            stored_configuration,
+            height,
         }
     }
 
-    /// If the current node is validator returns its state.
+    /// If the current node is validator returns its identifier.
     /// For other nodes return `None`.
-    pub fn validator_state(&self) -> &Option<ValidatorState> {
-        self.state.validator_state()
+    pub fn validator_id(&self) -> Option<ValidatorId> {
+        self.validator_id
     }
 
     /// Returns the current database snapshot.
-    pub fn snapshot(&self) -> &'b Snapshot {
-        self.snapshot
+    pub fn snapshot(&self) -> &Snapshot {
+        self.fork.as_ref()
     }
 
-    /// Returns the current blockchain height. This height is 'height of last committed block` + 1.
+    /// Returns the current blockchain height. This height is "height of the last committed block".
     pub fn height(&self) -> Height {
-        self.state.height()
-    }
-
-    /// Returns the current node round.
-    pub fn round(&self) -> Round {
-        self.state.round()
+        self.height
     }
 
     /// Returns the current list of validators.
     pub fn validators(&self) -> &[ValidatorKeys] {
-        self.state.validators()
+        self.stored_configuration.validator_keys.as_slice()
     }
 
     /// Returns current node's public key.
     pub fn public_key(&self) -> &PublicKey {
-        self.state.service_public_key()
+        &self.service_keypair.0
     }
 
     /// Returns current node's secret key.
     pub fn secret_key(&self) -> &SecretKey {
-        self.state.service_secret_key()
+        &self.service_keypair.1
     }
 
-    /// Returns the actual blockchain global configuration.
+    /// Returns the actual consensus configuration.
     pub fn actual_consensus_config(&self) -> &ConsensusConfig {
-        self.state.consensus_config()
+        &self.stored_configuration.consensus
     }
 
     /// Returns service specific global variables as json value.
     pub fn actual_service_config(&self, service: &Service) -> &Value {
-        let name = service.service_name();
-        self.state.services_config().get(name).unwrap()
+        &self.stored_configuration.services[service.service_name()]
     }
 
-    /// Adds transaction to the queue.
-    /// After the services handle commit event these transactions will be broadcast by node.
-    pub fn add_transaction(&mut self, tx: Box<Transaction>) {
-        assert!(tx.verify());
-        self.txs.push(tx);
+    /// Returns reference to the transaction sender.
+    pub fn transaction_sender(&self) -> &TransactionSend {
+        &self.api_sender
     }
 
-    #[doc(hidden)]
-    pub fn transactions(self) -> Vec<Box<Transaction>> {
-        self.txs
-    }
-}
-
-impl<'a, 'b> fmt::Debug for ServiceContext<'a, 'b> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "ServiceContext(state: {:?}, txs: {:?})",
-            self.state,
-            self.txs
-        )
+    /// Returns the actual blockchain global configuration.
+    pub fn stored_configuration(&self) -> &StoredConfiguration {
+        &self.stored_configuration
     }
 }
 
@@ -243,7 +288,9 @@ pub struct ApiNodeState {
     reconnects_timeout: HashMap<SocketAddr, Milliseconds>,
     //TODO: update on event?
     peers_info: HashMap<SocketAddr, PublicKey>,
+    is_enabled: bool,
 }
+
 impl ApiNodeState {
     fn new() -> ApiNodeState {
         Self::default()
@@ -318,12 +365,24 @@ impl SharedNodeState {
         }
     }
 
+    /// Is the node enabled?
+    pub fn is_enabled(&self) -> bool {
+        let state = self.state.read().expect("Expected read lock.");
+        state.is_enabled
+    }
+
+    /// Informs internal state about node's halting.
+    pub fn update_is_enabled(&self, is_enabled: bool) {
+        let mut state = self.state.write().expect("Expected read lock.");
+        state.is_enabled = is_enabled;
+    }
+
     /// Returns value of the `state_update_timeout`.
     pub fn state_update_timeout(&self) -> Milliseconds {
         self.state_update_timeout
     }
 
-    /// add incomming connection into state
+    /// add incoming connection into state
     pub fn add_incoming_connection(&self, addr: SocketAddr) {
         self.state
             .write()
@@ -340,7 +399,7 @@ impl SharedNodeState {
             .insert(addr);
     }
 
-    /// remove incomming connection from state
+    /// remove incoming connection from state
     pub fn remove_incoming_connection(&self, addr: &SocketAddr) -> bool {
         self.state
             .write()
@@ -358,7 +417,7 @@ impl SharedNodeState {
             .remove(addr)
     }
 
-    /// Add reconect timeout
+    /// Add reconnect timeout
     pub fn add_reconnect_timeout(
         &self,
         addr: SocketAddr,
@@ -371,7 +430,7 @@ impl SharedNodeState {
             .insert(addr, timeout)
     }
 
-    /// Removes reconect timeout and returns the previous value.
+    /// Removes reconnect timeout and returns the previous value.
     pub fn remove_reconnect_timeout(&self, addr: &SocketAddr) -> Option<Milliseconds> {
         self.state
             .write()
@@ -402,6 +461,21 @@ impl ApiContext {
         }
     }
 
+    /// Constructs context from raw parts.
+    pub fn from_parts(
+        blockchain: &Blockchain,
+        node_channel: ApiSender,
+        public_key: &PublicKey,
+        secret_key: &SecretKey,
+    ) -> ApiContext {
+        ApiContext {
+            blockchain: blockchain.clone(),
+            node_channel,
+            public_key: *public_key,
+            secret_key: secret_key.clone(),
+        }
+    }
+
     /// Returns reference to the node's blockchain.
     pub fn blockchain(&self) -> &Blockchain {
         &self.blockchain
@@ -421,16 +495,6 @@ impl ApiContext {
     pub fn secret_key(&self) -> &SecretKey {
         &self.secret_key
     }
-
-    /// Returns `Mount` object that aggregates public api handlers.
-    pub fn mount_public_api(&self) -> Mount {
-        self.blockchain.mount_public_api(self)
-    }
-
-    /// Returns `Mount` object that aggregates private api handlers.
-    pub fn mount_private_api(&self) -> Mount {
-        self.blockchain.mount_private_api(self)
-    }
 }
 
 impl ::std::fmt::Debug for ApiContext {
@@ -441,5 +505,11 @@ impl ::std::fmt::Debug for ApiContext {
             self.blockchain,
             self.public_key
         )
+    }
+}
+
+impl<'a, S: Service> From<S> for Box<Service + 'a> {
+    fn from(s: S) -> Self {
+        Box::new(s) as Box<Service>
     }
 }

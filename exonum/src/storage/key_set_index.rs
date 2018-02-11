@@ -13,6 +13,7 @@
 // limitations under the License.
 
 //! An implementation of set for items that implement `StorageKey` trait.
+
 use std::marker::PhantomData;
 
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageKey};
@@ -183,6 +184,7 @@ where
     /// index.insert(1);
     /// assert!(index.contains(&1));
     /// ```
+    #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
     pub fn insert(&mut self, item: K) {
         self.base.put(&item, ())
     }

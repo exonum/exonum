@@ -19,23 +19,23 @@ extern crate toml;
 extern crate exonum;
 
 use std::ffi::OsString;
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::fs;
+use std::path::Path;
 use std::panic;
 use std::io::Read;
 
 use exonum::helpers::fabric::NodeBuilder;
 
-const CONFIG_TMP_FOLDER: &'static str = "/tmp/";
-const CONFIG_TESTDATA_FOLDER: &'static str =
-    concat!(env!("CARGO_MANIFEST_DIR"), "/tests/testdata/config/");
+const CONFIG_TMP_FOLDER: &str = "/tmp/";
+const CONFIG_TESTDATA_FOLDER: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/testdata/config/");
 
-const GENERATED_TEMPLATE: &'static str = "template.toml";
+const GENERATED_TEMPLATE: &str = "template.toml";
 
-const SEC_CONFIG: [&'static str; 4] =
+const SEC_CONFIG: [&str; 4] =
     ["config0_sec.toml", "config1_sec.toml", "config2_sec.toml", "config3_sec.toml"];
 
-const PUB_CONFIG: [&'static str; 4] =
+const PUB_CONFIG: [&str; 4] =
     ["config0_pub.toml", "config1_pub.toml", "config2_pub.toml", "config3_pub.toml"];
 
 fn full_tmp_folder(folder: &str) -> String {
@@ -48,6 +48,14 @@ fn full_tmp_name(filename: &str, folder: &str) -> String {
 
 fn full_testdata_name(filename: &str) -> String {
     format!("{}{}", CONFIG_TESTDATA_FOLDER, filename)
+}
+
+fn touch(path: &str) {
+    OpenOptions::new()
+        .create(true)
+        .write(true)
+        .open(path)
+        .unwrap();
 }
 
 fn compare_files(filename: &str, folder: &str) {
@@ -127,6 +135,15 @@ fn run_node(config: &str, folder: &str) {
     ]));
 }
 
+fn run_dev(folder: &str) {
+    assert!(default_run_with_matches(vec![
+        "exonum-config-test",
+        "run-dev",
+        "-a",
+        &full_tmp_folder(folder),
+    ]));
+}
+
 #[test]
 fn test_generate_template() {
     let command = "generate-template";
@@ -187,6 +204,31 @@ fn test_generate_full_config_run() {
     });
 
     fs::remove_dir_all(full_tmp_folder(command)).unwrap();
+
+    if let Err(err) = result {
+        panic::resume_unwind(err);
+    }
+}
+
+#[test]
+fn test_run_dev() {
+    let artifacts_dir = ".exonum";
+    let db_dir = format!("{}/{}", artifacts_dir, "db");
+    let full_db_dir = full_tmp_folder(&db_dir);
+
+    // Mock existence of old DB files that are supposed to be cleaned up.
+    fs::create_dir_all(Path::new(&full_db_dir)).expect("Expected db temp folder to be created.");
+    let old_db_file = full_tmp_name("1", &db_dir);
+    touch(&old_db_file);
+
+    let result = panic::catch_unwind(|| {
+        run_dev(artifacts_dir);
+
+        // Test cleaning up.
+        assert!(!Path::new(&old_db_file).exists());
+    });
+
+    fs::remove_dir_all(full_tmp_folder(artifacts_dir)).unwrap();
 
     if let Err(err) = result {
         panic::resume_unwind(err);

@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Common widely used typedefs.
-
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
+//! Common widely used type definitions.
 
 use std::fmt;
+
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
 
 /// Number of milliseconds.
 pub type Milliseconds = u64;

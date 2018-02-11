@@ -14,13 +14,16 @@
 
 //! An implementation of array list of items with spaces.
 
-use byteorder::{BigEndian, ByteOrder};
+// TODO: Remove when https://github.com/rust-lang-nursery/rust-clippy/issues/2190 is fixed.
+#![cfg_attr(feature="cargo-clippy", allow(doc_markdown))]
 
 use std::borrow::Cow;
 use std::cell::Cell;
 use std::marker::PhantomData;
 
-use crypto::{hash, Hash};
+use byteorder::{BigEndian, ByteOrder};
+
+use crypto::{hash, CryptoHash, Hash};
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -40,11 +43,13 @@ impl SparseListSize {
     }
 }
 
-impl StorageValue for SparseListSize {
+impl CryptoHash for SparseListSize {
     fn hash(&self) -> Hash {
         hash(&self.to_array())
     }
+}
 
+impl StorageValue for SparseListSize {
     fn into_bytes(self) -> Vec<u8> {
         self.to_array().to_vec()
     }
@@ -65,7 +70,7 @@ impl StorageValue for SparseListSize {
 /// as an index.
 /// `SparseListIndex` requires that the elements implement the [`StorageValue`] trait.
 /// [`StorageValue`]: ../trait.StorageValue.html
-/// [`ListIndex`]: ../struct.ListIndex.html
+/// [`ListIndex`]: <../list_index/struct.ListIndex.html>
 #[derive(Debug)]
 pub struct SparseListIndex<T, V> {
     base: BaseIndex<T>,
@@ -78,7 +83,7 @@ pub struct SparseListIndex<T, V> {
 /// This struct is created by the [`iter`] method on [`SparseListIndex`].
 /// See its documentation for more.
 ///
-/// [`iter`]: struct.ListIndex.html#method.iter
+/// [`iter`]: struct.SparseListIndex.html#method.iter
 /// [`SparseListIndex`]: struct.SparseListIndex.html
 #[derive(Debug)]
 pub struct SparseListIndexIter<'a, V> {
@@ -91,10 +96,10 @@ pub struct SparseListIndexIter<'a, V> {
 /// This struct is created by the [`indices`] method on [`SparseListIndex`].
 /// See its documentation for more.
 ///
-/// [`indices`]: struct.ListIndex.html#method.indices
+/// [`indices`]: struct.SparseListIndex.html#method.indices
 /// [`SparseListIndex`]: struct.SparseListIndex.html
 #[derive(Debug)]
-pub struct SparceListIndexKeys<'a> {
+pub struct SparseListIndexKeys<'a> {
     base_iter: BaseIndexIter<'a, u64, ()>,
 }
 
@@ -104,10 +109,10 @@ pub struct SparceListIndexKeys<'a> {
 /// This struct is created by the [`values`] method on [`SparseListIndex`].
 /// See its documentation for more.
 ///
-/// [`values`]: struct.ListIndex.html#method.values
+/// [`values`]: struct.SparseListIndex.html#method.values
 /// [`SparseListIndex`]: struct.SparseListIndex.html
 #[derive(Debug)]
-pub struct SparceListIndexValues<'a, V> {
+pub struct SparseListIndexValues<'a, V> {
     base_iter: BaseIndexIter<'a, (), V>,
 }
 
@@ -297,7 +302,7 @@ where
         SparseListIndexIter { base_iter: self.base.iter_from(&(), &0u64) }
     }
 
-    /// Returns an iterator over the indices of the 'SparceListIndex'.
+    /// Returns an iterator over the indices of the 'SparseListIndex'.
     ///
     /// # Examples
     ///
@@ -314,11 +319,11 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn indices(&self) -> SparceListIndexKeys {
-        SparceListIndexKeys { base_iter: self.base.iter_from(&(), &0u64) }
+    pub fn indices(&self) -> SparseListIndexKeys {
+        SparseListIndexKeys { base_iter: self.base.iter_from(&(), &0u64) }
     }
 
-    /// Returns an iterator over the values of the 'SparceListIndex'. The iterator element type is
+    /// Returns an iterator over the values of the 'SparseListIndex'. The iterator element type is
     /// V.
     ///
     /// # Examples
@@ -336,8 +341,8 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn values(&self) -> SparceListIndexValues<V> {
-        SparceListIndexValues { base_iter: self.base.iter_from(&(), &0u64) }
+    pub fn values(&self) -> SparseListIndexValues<V> {
+        SparseListIndexValues { base_iter: self.base.iter_from(&(), &0u64) }
     }
 
     /// Returns an iterator over the list starting from the specified position. The iterator
@@ -374,7 +379,7 @@ where
         self.size.set(Some(size));
     }
 
-    /// Appends an element to the back of the 'SparceListIndex'.
+    /// Appends an element to the back of the 'SparseListIndex'.
     ///
     /// # Examples
     ///
@@ -528,7 +533,7 @@ where
         self.base.clear()
     }
 
-    /// Removes the first element from the 'SparceListIndex' and returns it, or None if it is empty.
+    /// Removes the first element from the 'SparseListIndex' and returns it, or None if it is empty.
     ///
     /// # Examples
     ///
@@ -585,7 +590,7 @@ where
     }
 }
 
-impl<'a> Iterator for SparceListIndexKeys<'a> {
+impl<'a> Iterator for SparseListIndexKeys<'a> {
     type Item = u64;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -593,7 +598,7 @@ impl<'a> Iterator for SparceListIndexKeys<'a> {
     }
 }
 
-impl<'a, V> Iterator for SparceListIndexValues<'a, V>
+impl<'a, V> Iterator for SparseListIndexValues<'a, V>
 where
     V: StorageValue,
 {
@@ -755,7 +760,7 @@ mod tests {
         fn create_database(path: &Path) -> Box<Database> {
             let mut opts = RocksDBOptions::default();
             opts.create_if_missing(true);
-            Box::new(RocksDB::open(path, opts).unwrap())
+            Box::new(RocksDB::open(path, &opts).unwrap())
         }
 
         #[test]

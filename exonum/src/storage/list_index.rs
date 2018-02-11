@@ -13,6 +13,7 @@
 // limitations under the License.
 
 //! An implementation of array list of items.
+
 use std::cell::Cell;
 use std::marker::PhantomData;
 
@@ -569,7 +570,7 @@ mod tests {
         fn create_database(path: &Path) -> Box<Database> {
             let mut opts = RocksDBOptions::default();
             opts.create_if_missing(true);
-            Box::new(RocksDB::open(path, opts).unwrap())
+            Box::new(RocksDB::open(path, &opts).unwrap())
         }
 
         #[test]

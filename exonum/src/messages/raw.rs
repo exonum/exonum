@@ -12,14 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use byteorder::{ByteOrder, LittleEndian};
-
-use std::{mem, convert, sync};
+use std::{convert, mem, sync};
 use std::fmt::Debug;
 use std::ops::Deref;
 
-use crypto::{PublicKey, SecretKey, Signature, sign, verify, Hash, hash, SIGNATURE_LENGTH};
-use encoding::{Field, Error, Result as StreamStructResult, Offset, CheckedOffset};
+use byteorder::{ByteOrder, LittleEndian};
+
+use crypto::{hash, sign, verify, CryptoHash, Hash, PublicKey, SecretKey, Signature,
+             SIGNATURE_LENGTH};
+use encoding::{self, CheckedOffset, Field, Offset, Result as StreamStructResult};
 
 /// Length of the message header.
 pub const HEADER_LENGTH: usize = 10;
@@ -38,6 +39,16 @@ impl RawMessage {
     pub fn new(buffer: MessageBuffer) -> Self {
         RawMessage(sync::Arc::new(buffer))
     }
+
+    /// Creates a new `RawMessage` instance from the given `Vec<u8>`.
+    pub fn from_vec(vec: Vec<u8>) -> Self {
+        RawMessage(sync::Arc::new(MessageBuffer::from_vec(vec)))
+    }
+
+    /// Returns hash of the `RawMessage`.
+    pub fn hash(&self) -> Hash {
+        hash(self.as_ref())
+    }
 }
 
 impl Deref for RawMessage {
@@ -48,9 +59,15 @@ impl Deref for RawMessage {
     }
 }
 
+impl AsRef<[u8]> for RawMessage {
+    fn as_ref(&self) -> &[u8] {
+        self.0.as_ref().as_ref()
+    }
+}
+
 // TODO: reduce `to` argument from `write`, `read` and `check` methods
 // TODO: payload_length as a first value into message header
-// TODO: make sure that message length is enougth when using mem::transmute
+// TODO: make sure that message length is enough when using mem::transmute
 // (ECR-166)
 
 /// A raw message represented by the bytes buffer.
@@ -217,6 +234,7 @@ impl MessageWriter {
     }
 
     /// Writes given field to the given offset.
+    #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
     pub fn write<'a, F: Field<'a>>(&'a mut self, field: F, from: Offset, to: Offset) {
         field.write(
             &mut self.raw,
@@ -244,15 +262,33 @@ impl MessageWriter {
     }
 }
 
+// This is a trait that is required for technical reasons:
+// you can't make associated constants object-safe. This
+// limitation of the Rust language might be lifted in the
+// future.
+/// A `Message` which belongs to a particular service.
+pub trait ServiceMessage: Message {
+    /// ID of the service this message belongs to.
+    const SERVICE_ID: u16;
+    /// ID of the message itself. Should be unique
+    /// within a service.
+    const MESSAGE_ID: u16;
+}
+
 /// Represents generic message interface.
-pub trait Message: Debug + Send + Sync {
+///
+/// An Exonum message is a piece of data that is signed by the creator's [Ed25519] key;
+/// the resulting digital signature is a part of the message.
+///
+/// [Ed25519]: ../crypto/index.html
+pub trait Message: CryptoHash + Debug + Send + Sync {
+    /// Converts the raw message into the specific one.
+    fn from_raw(raw: RawMessage) -> Result<Self, encoding::Error>
+    where
+        Self: Sized;
+
     /// Returns raw message.
     fn raw(&self) -> &RawMessage;
-
-    /// Returns hash of the `RawMessage`.
-    fn hash(&self) -> Hash {
-        self.raw().hash()
-    }
 
     /// Verifies the message using given public key.
     fn verify_signature(&self, pub_key: &PublicKey) -> bool {
@@ -260,19 +296,19 @@ pub trait Message: Debug + Send + Sync {
     }
 }
 
-/// Represents conversion from the raw message into the specific one.
-pub trait FromRaw: Sized + Send + Message {
-    /// Converts the raw message into the specific one.
-    fn from_raw(raw: RawMessage) -> Result<Self, Error>;
+impl<T: Message> CryptoHash for T {
+    fn hash(&self) -> Hash {
+        hash(self.raw().as_ref())
+    }
 }
 
 impl Message for RawMessage {
-    fn raw(&self) -> &RawMessage {
-        self
+    fn from_raw(raw: RawMessage) -> Result<Self, encoding::Error> {
+        Ok(raw)
     }
 
-    fn hash(&self) -> Hash {
-        hash(self.as_ref().as_ref())
+    fn raw(&self) -> &RawMessage {
+        self
     }
 
     fn verify_signature(&self, pub_key: &PublicKey) -> bool {

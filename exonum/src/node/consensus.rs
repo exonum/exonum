@@ -14,19 +14,28 @@
 
 use std::collections::HashSet;
 
-use crypto::{Hash, PublicKey, HexValue};
+use crypto::{Hash, CryptoHash, PublicKey};
 use blockchain::{Schema, Transaction};
-use messages::{ConsensusMessage, Propose, Prevote, Precommit, Message, ProposeRequest,
-               TransactionsRequest, PrevotesRequest, BlockRequest, BlockResponse, RawTransaction};
+use messages::{BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote,
+               PrevotesRequest, Propose, ProposeRequest, RawTransaction, TransactionsRequest};
 use helpers::{Height, Round, ValidatorId};
 use storage::Patch;
-use super::{NodeHandler, RequestData};
+use node::{NodeHandler, RequestData};
+use events::InternalRequest;
 
-// TODO reduce view invokations (ECR-171)
+// TODO reduce view invocations (ECR-171)
 impl NodeHandler {
     /// Validates consensus message, then redirects it to the corresponding `handle_...` function.
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_consensus(&mut self, msg: ConsensusMessage) {
+        if !self.is_enabled {
+            info!(
+                "Ignoring a consensus message {:?} because the node is disabled",
+                msg
+            );
+            return;
+        }
+
         // Ignore messages from previous and future height
         if msg.height() < self.state.height() || msg.height() > self.state.height().next() {
             warn!(
@@ -38,17 +47,25 @@ impl NodeHandler {
         }
 
         // Queued messages from next height or round
-        // TODO: shoud we ignore messages from far rounds (ECR-171)?
+        // TODO: should we ignore messages from far rounds (ECR-171)?
         if msg.height() == self.state.height().next() || msg.round() > self.state.round() {
             trace!(
                 "Received consensus message from future round: msg.height={}, msg.round={}, \
-                    self.height={}, self.round={}",
+                 self.height={}, self.round={}",
                 msg.height(),
                 msg.round(),
                 self.state.height(),
                 self.state.round()
             );
+            let validator = msg.validator();
+            let round = msg.round();
             self.state.add_queued(msg);
+            trace!("Trying to reach actual round.");
+            if let Some(r) = self.state.get_actual_round(validator, round) {
+                trace!("Scheduling jump to round.");
+                let height = self.state.height();
+                self.execute_later(InternalRequest::JumpToRound(height, r));
+            }
             return;
         }
 
@@ -71,14 +88,14 @@ impl NodeHandler {
 
         trace!("Handle message={:?}", msg);
         match msg {
-            ConsensusMessage::Propose(msg) => self.handle_propose(key, msg),
-            ConsensusMessage::Prevote(msg) => self.handle_prevote(key, msg),
-            ConsensusMessage::Precommit(msg) => self.handle_precommit(key, msg),
+            ConsensusMessage::Propose(msg) => self.handle_propose(key, &msg),
+            ConsensusMessage::Prevote(msg) => self.handle_prevote(key, &msg),
+            ConsensusMessage::Precommit(msg) => self.handle_precommit(key, &msg),
         }
     }
 
     /// Handles the `Propose` message. For details see the message documentation.
-    pub fn handle_propose(&mut self, from: PublicKey, msg: Propose) {
+    pub fn handle_propose(&mut self, from: PublicKey, msg: &Propose) {
         debug_assert_eq!(
             Some(from),
             self.state.consensus_public_key_of(msg.validator())
@@ -118,13 +135,13 @@ impl NodeHandler {
 
         trace!("Handle propose");
         // Add propose
-        let (hash, has_unknown_txs) = match self.state.add_propose(msg.clone()) {
+        let (hash, has_unknown_txs) = match self.state.add_propose(msg) {
             Some(state) => (state.hash(), state.has_unknown_txs()),
             None => return,
         };
 
         // Remove request info
-        let known_nodes = self.remove_request(RequestData::Propose(hash));
+        let known_nodes = self.remove_request(&RequestData::Propose(hash));
 
         if has_unknown_txs {
             trace!("REQUEST TRANSACTIONS");
@@ -141,8 +158,8 @@ impl NodeHandler {
     /// Handles the `Block` message. For details see the message documentation.
     // TODO write helper function which returns Result (ECR-123)
     #[cfg_attr(feature = "flame_profile", flame)]
-    pub fn handle_block(&mut self, msg: BlockResponse) {
-        // Request are sended to us
+    pub fn handle_block(&mut self, msg: &BlockResponse) {
+        // Request are sent to us
         if msg.to() != self.state.consensus_public_key() {
             error!(
                 "Received block that intended for another peer, to={}, from={}",
@@ -154,8 +171,8 @@ impl NodeHandler {
 
         if !self.state.whitelist().allow(msg.from()) {
             error!(
-                "Received request message from peer = {:?} which not in whitelist.",
-                msg.from()
+                "Received request message from peer = {} which not in whitelist.",
+                msg.from().to_hex()
             );
             return;
         }
@@ -179,7 +196,7 @@ impl NodeHandler {
         if block.prev_hash() != &self.last_block_hash() {
             error!(
                 "Received block prev_hash is distinct from the one in db, \
-                    block={:?}, block.prev_hash={:?}, db.last_block_hash={:?}",
+                 block={:?}, block.prev_hash={:?}, db.last_block_hash={:?}",
                 msg,
                 *block.prev_hash(),
                 self.last_block_hash()
@@ -227,7 +244,7 @@ impl NodeHandler {
             if block_hash != block.hash() {
                 panic!(
                     "Block_hash incorrect in the received block={:?}. Either a node's \
-                implementation is incorrect or validators majority works incorrectly",
+                     implementation is incorrect or validators majority works incorrectly",
                     msg
                 );
             }
@@ -272,7 +289,7 @@ impl NodeHandler {
             if our_block_hash != block_hash {
                 panic!(
                     "Full propose: wrong state hash. Either a node's implementation is \
-                incorrect or validators majority works incorrectly"
+                     incorrect or validators majority works incorrectly"
                 );
             }
 
@@ -282,7 +299,7 @@ impl NodeHandler {
     }
 
     /// Handles the `Prevote` message. For details see the message documentation.
-    pub fn handle_prevote(&mut self, from: PublicKey, msg: Prevote) {
+    pub fn handle_prevote(&mut self, from: PublicKey, msg: &Prevote) {
         trace!("Handle prevote");
 
         debug_assert_eq!(
@@ -291,7 +308,7 @@ impl NodeHandler {
         );
 
         // Add prevote
-        let has_consensus = self.state.add_prevote(&msg);
+        let has_consensus = self.state.add_prevote(msg);
 
         // Request propose or transactions
         let has_propose_with_txs = self.request_propose_or_txs(msg.propose_hash(), from);
@@ -314,7 +331,7 @@ impl NodeHandler {
     /// +2/3 pre-votes.
     pub fn has_majority_prevotes(&mut self, prevote_round: Round, propose_hash: &Hash) {
         // Remove request info
-        self.remove_request(RequestData::Prevotes(prevote_round, *propose_hash));
+        self.remove_request(&RequestData::Prevotes(prevote_round, *propose_hash));
         // Lock to propose
         if self.state.locked_round() < prevote_round && self.state.propose(propose_hash).is_some() {
             self.lock(prevote_round, *propose_hash);
@@ -393,13 +410,13 @@ impl NodeHandler {
                     }
                 }
                 // Remove request info
-                self.remove_request(RequestData::Prevotes(round, propose_hash));
+                self.remove_request(&RequestData::Prevotes(round, propose_hash));
             }
         }
     }
 
     /// Handles the `Precommit` message. For details see the message documentation.
-    pub fn handle_precommit(&mut self, from: PublicKey, msg: Precommit) {
+    pub fn handle_precommit(&mut self, from: PublicKey, msg: &Precommit) {
         trace!("Handle precommit");
 
         debug_assert_eq!(
@@ -408,7 +425,7 @@ impl NodeHandler {
         );
 
         // Add precommit
-        let has_consensus = self.state.add_precommit(&msg);
+        let has_consensus = self.state.add_precommit(msg);
 
         // Request propose
         if self.state.propose(msg.propose_hash()).is_none() {
@@ -442,20 +459,24 @@ impl NodeHandler {
         trace!("COMMIT {:?}", block_hash);
 
         // Merge changes into storage
-        let (commited_txs, new_txs, proposer) = {
-            let (txs_count, proposer) = {
-                let block_state = self.state.block(&block_hash).unwrap();
-                (block_state.txs().len(), block_state.proposer_id())
-            };
-
-            let txs = self.blockchain
-                .commit(&mut self.state, block_hash, precommits)
+        let (committed_txs, proposer) = {
+            // FIXME Avoid of clone here.
+            let block_state = self.state.block(&block_hash).unwrap().clone();
+            self.blockchain
+                .commit(block_state.patch(), block_hash, precommits)
                 .unwrap();
-
-            (txs_count, txs, proposer)
+            // Update node state
+            self.state.update_config(
+                Schema::new(&self.blockchain.snapshot()).actual_configuration(),
+            );
+            // Update state to new height
+            let block_hash = self.blockchain.last_hash();
+            self.state.new_height(
+                &block_hash,
+                self.system_state.current_time(),
+            );
+            (block_state.txs().len(), block_state.proposer_id())
         };
-
-        let height = self.state.height();
 
         let mempool_size = self.state
             .transactions()
@@ -464,20 +485,18 @@ impl NodeHandler {
             .len();
         metric!("node.mempool", mempool_size);
 
-        // Update state to new height
-        self.state.new_height(
-            &block_hash,
-            self.system_state.current_time(),
+        let height = self.state.height();
+        info!(
+            "COMMIT ====== height={}, proposer={}, round={}, committed={}, pool={}, hash={}",
+            height,
+            proposer,
+            round
+                .map(|x| format!("{}", x))
+                .unwrap_or_else(|| "?".into()),
+            committed_txs,
+            mempool_size,
+            block_hash.to_hex(),
         );
-
-        info!("COMMIT ====== height={}, proposer={}, round={}, committed={}, pool={}, hash={}",
-              height,
-              proposer,
-              round.map(|x| format!("{}", x)).unwrap_or_else(|| "?".into()),
-              commited_txs,
-              mempool_size,
-              block_hash.to_hex(),
-              );
 
         // TODO: reset status timeout (ECR-171).
         self.broadcast_status();
@@ -485,12 +504,6 @@ impl NodeHandler {
 
         // Adjust propose timeout after accepting a new block.
         self.state.adjust_timeout(&*self.blockchain.snapshot());
-
-        // Handle queued transactions from services
-        for tx in new_txs {
-            debug_assert!(tx.verify());
-            self.handle_incoming_tx(tx);
-        }
 
         // Add timeout for first round
         self.add_round_timeout();
@@ -549,7 +562,7 @@ impl NodeHandler {
         let full_proposes = self.state.add_transaction(hash, tx, false);
         // Go to has full propose if we get last transaction
         for (hash, round) in full_proposes {
-            self.remove_request(RequestData::Transactions(hash));
+            self.remove_request(&RequestData::Transactions(hash));
             self.has_full_propose(hash, round);
         }
     }
@@ -582,11 +595,47 @@ impl NodeHandler {
         let full_proposes = self.state.add_transaction(hash, msg, false);
         // Go to has full propose if we get last transaction
         for (hash, round) in full_proposes {
-            self.remove_request(RequestData::Transactions(hash));
+            self.remove_request(&RequestData::Transactions(hash));
             self.has_full_propose(hash, round);
         }
     }
 
+    /// Handle new round, after jump.
+    pub fn handle_new_round(&mut self, height: Height, round: Round) {
+        trace!("Handle new round");
+        if height != self.state.height() {
+            return;
+        }
+
+        if round <= self.state.round() {
+            return;
+        }
+
+        info!("Jump to a new round = {}", round);
+        self.state.jump_round(round);
+        self.process_new_round();
+    }
+
+    // Try to process consensus messages from the future round.
+    fn process_new_round(&mut self) {
+        if self.state.is_validator() {
+            // Send prevote if we are locked or propose if we are leader
+            if let Some(hash) = self.state.locked_propose() {
+                let round = self.state.round();
+                let has_majority_prevotes = self.broadcast_prevote(round, &hash);
+                if has_majority_prevotes {
+                    self.has_majority_prevotes(round, &hash);
+                }
+            } else if self.state.is_leader() {
+                self.add_propose_timeout();
+            }
+        }
+
+        // Handle queued messages
+        for msg in self.state.queued() {
+            self.handle_consensus(msg);
+        }
+    }
     /// Handles round timeout. As result node sends `Propose` if it is a leader or `Prevote` if it
     /// is locked to some round.
     pub fn handle_round_timeout(&mut self, height: Height, round: Round) {
@@ -605,25 +654,7 @@ impl NodeHandler {
         // Add timeout for this round
         self.add_round_timeout();
 
-        if !self.state.is_validator() {
-            return;
-        }
-
-        // Send prevote if we are locked or propose if we are leader
-        if let Some(hash) = self.state.locked_propose() {
-            let round = self.state.round();
-            let has_majority_prevotes = self.broadcast_prevote(round, &hash);
-            if has_majority_prevotes {
-                self.has_majority_prevotes(round, &hash);
-            }
-        } else if self.state.is_leader() {
-            self.add_propose_timeout();
-        }
-
-        // Handle queued messages
-        for msg in self.state.queued() {
-            self.handle_consensus(msg);
-        }
+        self.process_new_round();
     }
 
     /// Handles propose timeout. Node sends `Propose` and `Prevote` if it is a leader as result.
@@ -670,7 +701,7 @@ impl NodeHandler {
                 self.state.consensus_secret_key(),
             );
             trace!("Broadcast propose: {:?}", propose);
-            self.broadcast(&propose);
+            self.broadcast(propose.raw());
 
             // Save our propose into state
             let hash = self.state.add_self_propose(propose);
@@ -684,13 +715,13 @@ impl NodeHandler {
     }
 
     /// Handles request timeout by sending the corresponding request message to a peer.
-    pub fn handle_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
+    pub fn handle_request_timeout(&mut self, data: &RequestData, peer: Option<PublicKey>) {
         trace!("HANDLE REQUEST TIMEOUT");
         // FIXME: check height?
-        if let Some(peer) = self.state.retry(&data, peer) {
+        if let Some(peer) = self.state.retry(data, peer) {
             self.add_request_timeout(data.clone(), Some(peer));
 
-            let message = match data {
+            let message = match *data {
                 RequestData::Propose(ref propose_hash) => {
                     ProposeRequest::new(
                         self.state.consensus_public_key(),
@@ -837,9 +868,9 @@ impl NodeHandler {
     }
 
     /// Removes the specified request from the pending request list.
-    pub fn remove_request(&mut self, data: RequestData) -> HashSet<PublicKey> {
+    pub fn remove_request(&mut self, data: &RequestData) -> HashSet<PublicKey> {
         // TODO: clear timeout (ECR-171)
-        self.state.remove_request(&data)
+        self.state.remove_request(data)
     }
 
     /// Broadcasts the `Prevote` message to all peers.
@@ -858,7 +889,7 @@ impl NodeHandler {
         );
         let has_majority_prevotes = self.state.add_prevote(&prevote);
         trace!("Broadcast prevote: {:?}", prevote);
-        self.broadcast(&prevote);
+        self.broadcast(prevote.raw());
         has_majority_prevotes
     }
 
@@ -878,7 +909,7 @@ impl NodeHandler {
         );
         self.state.add_precommit(&precommit);
         trace!("Broadcast precommit: {:?}", precommit);
-        self.broadcast(&precommit);
+        self.broadcast(precommit.raw());
     }
 
     /// Checks that pre-commits count is correct and calls `verify_precommit` for each of them.

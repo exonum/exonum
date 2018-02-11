@@ -12,17 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! An implementation of a Merklized version of a map (Merkle Patricia tree).
+//! An implementation of a Merkelized version of a map (Merkle Patricia tree).
+
 use std::marker::PhantomData;
+use std::fmt;
 
-use crypto::{Hash, HashStream};
+use crypto::{Hash, CryptoHash, HashStream};
+use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageValue};
+use self::key::{BitsRange, ChildKind, LEAF_KEY_PREFIX};
+use self::node::{BranchNode, Node};
 
-use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
-
-use self::key::{DBKey, ChildKind, LEAF_KEY_PREFIX};
-use self::node::{Node, BranchNode};
-
-pub use self::key::{ProofMapKey, HashedKey, KEY_SIZE as PROOF_MAP_KEY_SIZE, DBKey as ProofMapDBKey};
+pub use self::key::{KEY_SIZE as PROOF_MAP_KEY_SIZE, ProofMapKey, HashedKey, ProofPath};
 pub use self::proof::{MapProof, MapProofBuilder, MapProofError};
 
 #[cfg(test)]
@@ -44,7 +44,6 @@ mod proof;
 /// [`StorageValue`]: ../trait.StorageValue.html
 /// [`Hash`]: ../../crypto/struct.Hash.html
 /// [`PublicKey`]: ../../crypto/struct.PublicKey.html
-#[derive(Debug)]
 pub struct ProofMapIndex<T, K, V> {
     base: BaseIndex<T>,
     _k: PhantomData<K>,
@@ -61,7 +60,7 @@ pub struct ProofMapIndex<T, K, V> {
 /// [`ProofMapIndex`]: struct.ProofMapIndex.html
 #[derive(Debug)]
 pub struct ProofMapIndexIter<'a, K, V> {
-    base_iter: BaseIndexIter<'a, DBKey, V>,
+    base_iter: BaseIndexIter<'a, ProofPath, V>,
     _k: PhantomData<K>,
 }
 
@@ -75,7 +74,7 @@ pub struct ProofMapIndexIter<'a, K, V> {
 /// [`ProofMapIndex`]: struct.ProofMapIndex.html
 #[derive(Debug)]
 pub struct ProofMapIndexKeys<'a, K> {
-    base_iter: BaseIndexIter<'a, DBKey, ()>,
+    base_iter: BaseIndexIter<'a, ProofPath, ()>,
     _k: PhantomData<K>,
 }
 
@@ -89,13 +88,13 @@ pub struct ProofMapIndexKeys<'a, K> {
 /// [`ProofMapIndex`]: struct.ProofMapIndex.html
 #[derive(Debug)]
 pub struct ProofMapIndexValues<'a, V> {
-    base_iter: BaseIndexIter<'a, DBKey, V>,
+    base_iter: BaseIndexIter<'a, ProofPath, V>,
 }
 
 enum RemoveResult {
     KeyNotFound,
     Leaf,
-    Branch((DBKey, Hash)),
+    Branch((ProofPath, Hash)),
     UpdateHash(Hash),
 }
 
@@ -176,12 +175,12 @@ where
     K: ProofMapKey,
     V: StorageValue,
 {
-    fn get_root_key(&self) -> Option<DBKey> {
-        self.base.iter(&()).next().map(|(k, _): (DBKey, ())| k)
+    fn get_root_path(&self) -> Option<ProofPath> {
+        self.base.iter(&()).next().map(|(k, _): (ProofPath, ())| k)
     }
 
-    fn get_root_node(&self) -> Option<(DBKey, Node<V>)> {
-        match self.get_root_key() {
+    fn get_root_node(&self) -> Option<(ProofPath, Node<V>)> {
+        match self.get_root_path() {
             Some(key) => {
                 let node = self.get_node_unchecked(&key);
                 Some((key, node))
@@ -190,7 +189,7 @@ where
         }
     }
 
-    fn get_node_unchecked(&self, key: &DBKey) -> Node<V> {
+    fn get_node_unchecked(&self, key: &ProofPath) -> Node<V> {
         // TODO: unwraps (ECR-84)?
         if key.is_leaf() {
             Node::Leaf(self.base.get(key).unwrap())
@@ -223,7 +222,7 @@ where
         match self.get_root_node() {
             Some((k, Node::Leaf(v))) => {
                 HashStream::new()
-                    .update(&k.as_bytes())
+                    .update(k.as_bytes())
                     .update(v.hash().as_ref())
                     .hash()
             }
@@ -252,7 +251,7 @@ where
     /// assert_eq!(Some(2), index.get(&hash));
     /// ```
     pub fn get(&self, key: &K) -> Option<V> {
-        self.base.get(&DBKey::leaf(key))
+        self.base.get(&ProofPath::new(key))
     }
 
     /// Returns `true` if the map contains a value for the specified key.
@@ -275,7 +274,7 @@ where
     /// assert!(index.contains(&hash));
     /// ```
     pub fn contains(&self, key: &K) -> bool {
-        self.base.contains(&DBKey::leaf(key))
+        self.base.contains(&ProofPath::new(key))
     }
 
     /// Returns the proof of existence or non-existence for the specified key.
@@ -300,54 +299,54 @@ where
         const DEFAULT_CAPACITY: usize = 8;
 
         fn combine(
-            mut left_hashes: Vec<(DBKey, Hash)>,
-            right_hashes: Vec<(DBKey, Hash)>,
-        ) -> Vec<(DBKey, Hash)> {
+            mut left_hashes: Vec<(ProofPath, Hash)>,
+            right_hashes: Vec<(ProofPath, Hash)>,
+        ) -> Vec<(ProofPath, Hash)> {
             left_hashes.extend(right_hashes.into_iter().rev());
             left_hashes
         }
 
-        let searched_key = DBKey::leaf(&key);
+        let searched_path = ProofPath::new(&key);
 
         match self.get_root_node() {
-            Some((root_key, Node::Branch(root_branch))) => {
-                let mut left_hashes: Vec<(DBKey, Hash)> = Vec::with_capacity(DEFAULT_CAPACITY);
-                let mut right_hashes: Vec<(DBKey, Hash)> = Vec::with_capacity(DEFAULT_CAPACITY);
+            Some((root_path, Node::Branch(root_branch))) => {
+                let mut left_hashes: Vec<(ProofPath, Hash)> = Vec::with_capacity(DEFAULT_CAPACITY);
+                let mut right_hashes: Vec<(ProofPath, Hash)> = Vec::with_capacity(DEFAULT_CAPACITY);
 
                 // Currently visited branch and its key, respectively
-                let (mut branch, mut node_key) = (root_branch, root_key);
+                let (mut branch, mut node_path) = (root_branch, root_path);
 
                 // Do at least one loop, even if the supplied key does not match the root key.
                 // This is necessary to put both children of the root node into the proof
                 // in this case.
                 loop {
-                    // <256 by induction; `branch` is always a branch node, and `node_key`
+                    // <256 by induction; `branch` is always a branch node, and `node_path`
                     // is its key
-                    let next_height = node_key.len();
-                    let next_bit = searched_key.get(next_height);
-                    node_key = branch.child_slice(next_bit);
+                    let next_height = node_path.len();
+                    let next_bit = searched_path.bit(next_height);
+                    node_path = branch.child_path(next_bit);
 
                     // XXX: strictly speaking, one of `*branch.child_hash()` copies could
                     // be avoided by dismatling `branch` via a consuming method
-                    let other_key_and_hash =
-                        (branch.child_slice(!next_bit), *branch.child_hash(!next_bit));
+                    let other_path_and_hash =
+                        (branch.child_path(!next_bit), *branch.child_hash(!next_bit));
                     match !next_bit {
-                        ChildKind::Left => left_hashes.push(other_key_and_hash),
-                        ChildKind::Right => right_hashes.push(other_key_and_hash),
+                        ChildKind::Left => left_hashes.push(other_path_and_hash),
+                        ChildKind::Right => right_hashes.push(other_path_and_hash),
                     }
 
-                    if !searched_key.matches_from(&node_key, next_height) {
+                    if !searched_path.matches_from(&node_path, next_height) {
                         // Both children of `branch` do not fit
 
                         let next_hash = *branch.child_hash(next_bit);
                         match next_bit {
-                            ChildKind::Left => left_hashes.push((node_key, next_hash)),
-                            ChildKind::Right => right_hashes.push((node_key, next_hash)),
+                            ChildKind::Left => left_hashes.push((node_path, next_hash)),
+                            ChildKind::Right => right_hashes.push((node_path, next_hash)),
                         }
 
                         return MapProof::for_absent_key(key, combine(left_hashes, right_hashes));
                     } else {
-                        let node = self.get_node_unchecked(&node_key);
+                        let node = self.get_node_unchecked(&node_path);
                         match node {
                             Node::Branch(branch_) => branch = branch_,
                             Node::Leaf(value) => {
@@ -364,11 +363,11 @@ where
                 }
             }
 
-            Some((root_key, Node::Leaf(root_value))) => {
-                if root_key == searched_key {
+            Some((root_path, Node::Leaf(root_value))) => {
+                if root_path == searched_path {
                     MapProof::for_entry((key, root_value), vec![])
                 } else {
-                    MapProof::for_absent_key(key, vec![(root_key, root_value.hash())])
+                    MapProof::for_absent_key(key, vec![(root_path, root_value.hash())])
                 }
             }
 
@@ -398,14 +397,14 @@ where
 
         #[derive(Debug)]
         struct ContourNode {
-            key: DBKey,
+            key: ProofPath,
             branch: BranchNode,
             visited_left: bool,
             visited_right: bool,
         }
 
         impl ContourNode {
-            fn new(key: DBKey, branch: BranchNode) -> Self {
+            fn new(key: ProofPath, branch: BranchNode) -> Self {
                 ContourNode {
                     key,
                     branch,
@@ -426,13 +425,13 @@ where
                     // to the proof. The observation is provable by induction.
                     if !self.visited_left {
                         builder = builder.add_proof_entry(
-                            self.branch.child_slice(ChildKind::Left),
+                            self.branch.child_path(ChildKind::Left),
                             *self.branch.child_hash(ChildKind::Left),
                         );
                     }
 
                     builder = builder.add_proof_entry(
-                        self.branch.child_slice(ChildKind::Right),
+                        self.branch.child_path(ChildKind::Right),
                         *self.branch.child_hash(ChildKind::Right),
                     );
                 }
@@ -446,16 +445,16 @@ where
         fn process_key<K, V, F>(
             contour: &mut Vec<ContourNode>,
             mut builder: MapProofBuilder<K, V>,
-            db_key: &DBKey,
+            proof_path: &ProofPath,
             key: K,
             lookup: F,
         ) -> MapProofBuilder<K, V>
         where
             V: StorageValue,
-            F: Fn(&DBKey) -> Node<V>,
+            F: Fn(&ProofPath) -> Node<V>,
         {
             // `unwrap()` is safe: there is at least 1 element in the contour by design
-            let common_prefix = db_key.common_prefix(&contour.last().unwrap().key);
+            let common_prefix = proof_path.common_prefix_len(&contour.last().unwrap().key);
 
             // Eject nodes from the contour while they will they can be "finalized"
             while let Some(node) = contour.pop() {
@@ -469,14 +468,14 @@ where
 
             // Push new items to the contour
             'traverse: loop {
-                let node_key = {
+                let node_path = {
                     let contour_tip = contour.last_mut().unwrap();
 
                     let next_height = contour_tip.key.len();
-                    let next_bit = db_key.get(next_height);
-                    let node_key = contour_tip.branch.child_slice(next_bit);
+                    let next_bit = proof_path.bit(next_height);
+                    let node_path = contour_tip.branch.child_path(next_bit);
 
-                    if !db_key.matches_from(&node_key, next_height) {
+                    if !proof_path.matches_from(&node_path, next_height) {
                         // Both children of `branch` do not fit; stop here
                         builder = builder.add_missing(key);
                         break 'traverse;
@@ -487,7 +486,7 @@ where
                                 if !contour_tip.visited_left {
                                     builder =
                                         builder.add_proof_entry(
-                                            contour_tip.branch.child_slice(ChildKind::Left),
+                                            contour_tip.branch.child_path(ChildKind::Left),
                                             *contour_tip.branch.child_hash(ChildKind::Left),
                                         );
                                 }
@@ -495,14 +494,14 @@ where
                             }
                         }
 
-                        node_key
+                        node_path
                     }
                 };
 
-                let node = lookup(&node_key);
+                let node = lookup(&node_path);
                 match node {
                     Node::Branch(branch) => {
-                        contour.push(ContourNode::new(node_key, branch));
+                        contour.push(ContourNode::new(node_path, branch));
                     }
 
                     Node::Leaf(value) => {
@@ -519,11 +518,12 @@ where
         // // // // `get_multiproof()` main section // // // //
 
         match self.get_root_node() {
-            Some((root_key, Node::Branch(root_branch))) => {
+            Some((root_path, Node::Branch(root_branch))) => {
                 let mut builder = MapProof::builder();
 
-                let searched_keys: Vec<_> = {
-                    let mut keys: Vec<_> = keys.into_iter().map(|k| (DBKey::leaf(&k), k)).collect();
+                let searched_paths: Vec<_> = {
+                    let mut keys: Vec<_> =
+                        keys.into_iter().map(|k| (ProofPath::new(&k), k)).collect();
 
                     keys.sort_by(|x, y| {
                         // `unwrap` is safe here because all keys start from the same position `0`
@@ -533,10 +533,10 @@ where
                 };
 
                 let mut contour = Vec::with_capacity(CONTOUR_CAPACITY);
-                contour.push(ContourNode::new(root_key, root_branch));
+                contour.push(ContourNode::new(root_path, root_branch));
 
-                for (db_key, key) in searched_keys {
-                    builder = process_key(&mut contour, builder, &db_key, key, |key| {
+                for (proof_path, key) in searched_paths {
+                    builder = process_key(&mut contour, builder, &proof_path, key, |key| {
                         self.get_node_unchecked(key)
                     });
                 }
@@ -549,14 +549,14 @@ where
                 builder.create()
             }
 
-            Some((root_key, Node::Leaf(root_value))) => {
+            Some((root_path, Node::Leaf(root_value))) => {
                 let mut builder = MapProof::builder();
                 // (One of) keys corresponding to the existing table entry.
                 let mut found_key: Option<K> = None;
 
                 for key in keys {
-                    let searched_key = DBKey::leaf(&key);
-                    if root_key == searched_key {
+                    let searched_path = ProofPath::new(&key);
+                    if root_path == searched_path {
                         found_key = Some(key);
                     } else {
                         builder = builder.add_missing(key);
@@ -566,7 +566,7 @@ where
                 builder = if let Some(key) = found_key {
                     builder.add_entry(key, root_value)
                 } else {
-                    builder.add_proof_entry(root_key, root_value.hash())
+                    builder.add_proof_entry(root_path, root_value.hash())
                 };
 
                 builder.create()
@@ -669,7 +669,7 @@ where
     /// ```
     pub fn iter_from(&self, from: &K) -> ProofMapIndexIter<K, V> {
         ProofMapIndexIter {
-            base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &DBKey::leaf(from)),
+            base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &ProofPath::new(from)),
             _k: PhantomData,
         }
     }
@@ -695,7 +695,7 @@ where
     /// ```
     pub fn keys_from(&self, from: &K) -> ProofMapIndexKeys<K> {
         ProofMapIndexKeys {
-            base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &DBKey::leaf(from)),
+            base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &ProofPath::new(from)),
             _k: PhantomData,
         }
     }
@@ -720,7 +720,9 @@ where
     /// }
     /// ```
     pub fn values_from(&self, from: &K) -> ProofMapIndexValues<V> {
-        ProofMapIndexValues { base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &DBKey::leaf(from)) }
+        ProofMapIndexValues {
+            base_iter: self.base.iter_from(&LEAF_KEY_PREFIX, &ProofPath::new(from)),
+        }
     }
 }
 
@@ -729,7 +731,7 @@ where
     K: ProofMapKey,
     V: StorageValue,
 {
-    fn insert_leaf(&mut self, key: &DBKey, value: V) -> Hash {
+    fn insert_leaf(&mut self, key: &ProofPath, value: V) -> Hash {
         debug_assert!(key.is_leaf());
         let hash = value.hash();
         self.base.put(key, value);
@@ -741,59 +743,60 @@ where
     fn insert_branch(
         &mut self,
         parent: &BranchNode,
-        key_slice: &DBKey,
+        proof_path: &ProofPath,
         value: V,
     ) -> (Option<u16>, Hash) {
-        let mut child_slice = parent.child_slice(key_slice.get(0));
-        child_slice.set_from(key_slice.from());
-        // If the slice is fully fit in key then there is a two cases
-        let i = child_slice.common_prefix(key_slice);
-        if child_slice.len() == i {
+        let child_path = parent.child_path(proof_path.bit(0)).start_from(
+            proof_path.start(),
+        );
+        // If the path is fully fit in key then there is a two cases
+        let i = child_path.common_prefix_len(proof_path);
+        if child_path.len() == i {
             // check that child is leaf to avoid unnecessary read
-            if child_slice.is_leaf() {
+            if child_path.is_leaf() {
                 // there is a leaf in branch and we needs to update its value
-                let hash = self.insert_leaf(key_slice, value);
+                let hash = self.insert_leaf(proof_path, value);
                 (None, hash)
             } else {
-                match self.get_node_unchecked(&child_slice) {
+                match self.get_node_unchecked(&child_path) {
                     Node::Leaf(_) => {
                         unreachable!("Something went wrong!");
                     }
                     // There is a child in branch and we needs to lookup it recursively
                     Node::Branch(mut branch) => {
-                        let (j, h) = self.insert_branch(&branch, &key_slice.suffix(i), value);
+                        let (j, h) = self.insert_branch(&branch, &proof_path.suffix(i), value);
                         match j {
                             Some(j) => {
                                 branch.set_child(
-                                    key_slice.get(i),
-                                    &key_slice.suffix(i).truncate(j),
+                                    proof_path.bit(i),
+                                    &proof_path.suffix(i).prefix(j),
                                     &h,
-                                )
+                                );
                             }
-                            None => branch.set_child_hash(key_slice.get(i), &h),
+                            None => branch.set_child_hash(proof_path.bit(i), &h),
                         };
                         let hash = branch.hash();
-                        self.base.put(&child_slice, branch);
+                        self.base.put(&child_path, branch);
                         (None, hash)
                     }
                 }
             }
         } else {
             // A simple case of inserting a new branch
-            let suffix_slice = key_slice.suffix(i);
+            let suffix_path = proof_path.suffix(i);
             let mut new_branch = BranchNode::empty();
             // Add a new leaf
-            let hash = self.insert_leaf(&suffix_slice, value);
-            new_branch.set_child(suffix_slice.get(0), &suffix_slice, &hash);
+            let hash = self.insert_leaf(&suffix_path, value);
+            new_branch.set_child(suffix_path.bit(0), &suffix_path, &hash);
             // Move current branch
             new_branch.set_child(
-                child_slice.get(i),
-                &child_slice.suffix(i),
-                parent.child_hash(key_slice.get(0)),
+                child_path.bit(i),
+                &child_path.suffix(i),
+                parent.child_hash(proof_path.bit(0)),
             );
 
             let hash = new_branch.hash();
-            self.base.put(&key_slice.truncate(i), new_branch);
+            self.base.put(&proof_path.prefix(i), new_branch);
             (Some(i), hash)
         }
     }
@@ -816,97 +819,95 @@ where
     /// assert!(index.contains(&hash));
     /// ```
     pub fn put(&mut self, key: &K, value: V) {
-        let key_slice = DBKey::leaf(key);
+        let proof_path = ProofPath::new(key);
         match self.get_root_node() {
             Some((prefix, Node::Leaf(prefix_data))) => {
-                let prefix_slice = prefix;
-                let i = prefix_slice.common_prefix(&key_slice);
+                let prefix_path = prefix;
+                let i = prefix_path.common_prefix_len(&proof_path);
 
-                let leaf_hash = self.insert_leaf(&key_slice, value);
-                if i < key_slice.len() {
+                let leaf_hash = self.insert_leaf(&proof_path, value);
+                if i < proof_path.len() {
                     let mut branch = BranchNode::empty();
-                    branch.set_child(key_slice.get(i), &key_slice.suffix(i), &leaf_hash);
+                    branch.set_child(proof_path.bit(i), &proof_path.suffix(i), &leaf_hash);
                     branch.set_child(
-                        prefix_slice.get(i),
-                        &prefix_slice.suffix(i),
+                        prefix_path.bit(i),
+                        &prefix_path.suffix(i),
                         &prefix_data.hash(),
                     );
-                    let new_prefix = key_slice.truncate(i);
+                    let new_prefix = proof_path.prefix(i);
                     self.base.put(&new_prefix, branch);
                 }
             }
             Some((prefix, Node::Branch(mut branch))) => {
-                let prefix_slice = prefix;
-                let i = prefix_slice.common_prefix(&key_slice);
+                let prefix_path = prefix;
+                let i = prefix_path.common_prefix_len(&proof_path);
 
-                if i == prefix_slice.len() {
-                    let suffix_slice = key_slice.suffix(i);
+                if i == prefix_path.len() {
+                    let suffix_path = proof_path.suffix(i);
                     // Just cut the prefix and recursively descent on.
-                    let (j, h) = self.insert_branch(&branch, &suffix_slice, value);
+                    let (j, h) = self.insert_branch(&branch, &suffix_path, value);
                     match j {
-                        Some(j) => {
-                            branch.set_child(suffix_slice.get(0), &suffix_slice.truncate(j), &h)
-                        }
-                        None => branch.set_child_hash(suffix_slice.get(0), &h),
+                        Some(j) => branch.set_child(suffix_path.bit(0), &suffix_path.prefix(j), &h),
+                        None => branch.set_child_hash(suffix_path.bit(0), &h),
                     };
-                    self.base.put(&prefix_slice, branch);
+                    self.base.put(&prefix_path, branch);
                 } else {
                     // Inserts a new branch and adds current branch as its child
-                    let hash = self.insert_leaf(&key_slice, value);
+                    let hash = self.insert_leaf(&proof_path, value);
                     let mut new_branch = BranchNode::empty();
                     new_branch.set_child(
-                        prefix_slice.get(i),
-                        &prefix_slice.suffix(i),
+                        prefix_path.bit(i),
+                        &prefix_path.suffix(i),
                         &branch.hash(),
                     );
-                    new_branch.set_child(key_slice.get(i), &key_slice.suffix(i), &hash);
+                    new_branch.set_child(proof_path.bit(i), &proof_path.suffix(i), &hash);
                     // Saves a new branch
-                    let new_prefix = prefix_slice.truncate(i);
+                    let new_prefix = prefix_path.prefix(i);
                     self.base.put(&new_prefix, new_branch);
                 }
             }
             None => {
-                self.insert_leaf(&key_slice, value);
+                self.insert_leaf(&proof_path, value);
             }
         }
     }
 
-    fn remove_node(&mut self, parent: &BranchNode, key_slice: &DBKey) -> RemoveResult {
-        let mut child_slice = parent.child_slice(key_slice.get(0));
-        child_slice.set_from(key_slice.from());
-        let i = child_slice.common_prefix(key_slice);
+    fn remove_node(&mut self, parent: &BranchNode, proof_path: &ProofPath) -> RemoveResult {
+        let child_path = parent.child_path(proof_path.bit(0)).start_from(
+            proof_path.start(),
+        );
+        let i = child_path.common_prefix_len(proof_path);
 
-        if i == child_slice.len() {
-            match self.get_node_unchecked(&child_slice) {
+        if i == child_path.len() {
+            match self.get_node_unchecked(&child_path) {
                 Node::Leaf(_) => {
-                    self.base.remove(key_slice);
+                    self.base.remove(proof_path);
                     return RemoveResult::Leaf;
                 }
                 Node::Branch(mut branch) => {
-                    let suffix_slice = key_slice.suffix(i);
-                    match self.remove_node(&branch, &suffix_slice) {
+                    let suffix_path = proof_path.suffix(i);
+                    match self.remove_node(&branch, &suffix_path) {
                         RemoveResult::Leaf => {
-                            let child = !suffix_slice.get(0);
-                            let key = branch.child_slice(child);
+                            let child = !suffix_path.bit(0);
+                            let key = branch.child_path(child);
                             let hash = branch.child_hash(child);
 
-                            self.base.remove(&child_slice);
+                            self.base.remove(&child_path);
 
                             return RemoveResult::Branch((key, *hash));
                         }
                         RemoveResult::Branch((key, hash)) => {
-                            let mut new_child_slice = key;
-                            new_child_slice.set_from(suffix_slice.from());
+                            let new_child_path = key.start_from(suffix_path.start());
 
-                            branch.set_child(suffix_slice.get(0), &new_child_slice, &hash);
+                            branch.set_child(suffix_path.bit(0), &new_child_path, &hash);
                             let h = branch.hash();
-                            self.base.put(&child_slice, branch);
+                            self.base.put(&child_path, branch);
                             return RemoveResult::UpdateHash(h);
                         }
                         RemoveResult::UpdateHash(hash) => {
-                            branch.set_child_hash(suffix_slice.get(0), &hash);
+                            branch.set_child_hash(suffix_path.bit(0), &hash);
                             let h = branch.hash();
-                            self.base.put(&child_slice, branch);
+                            self.base.put(&child_path, branch);
                             return RemoveResult::UpdateHash(h);
                         }
                         RemoveResult::KeyNotFound => return RemoveResult::KeyNotFound,
@@ -938,30 +939,29 @@ where
     /// assert!(!index.contains(&hash));
     /// ```
     pub fn remove(&mut self, key: &K) {
-        let key_slice = DBKey::leaf(key);
+        let proof_path = ProofPath::new(key);
         match self.get_root_node() {
             // If we have only on leaf, then we just need to remove it (if any)
             Some((prefix, Node::Leaf(_))) => {
-                let key = key_slice;
+                let key = proof_path;
                 if key == prefix {
                     self.base.remove(&key);
                 }
             }
             Some((prefix, Node::Branch(mut branch))) => {
                 // Truncate prefix
-                let i = prefix.common_prefix(&key_slice);
+                let i = prefix.common_prefix_len(&proof_path);
                 if i == prefix.len() {
-                    let suffix_slice = key_slice.suffix(i);
-                    match self.remove_node(&branch, &suffix_slice) {
+                    let suffix_path = proof_path.suffix(i);
+                    match self.remove_node(&branch, &suffix_path) {
                         RemoveResult::Leaf => self.base.remove(&prefix),
                         RemoveResult::Branch((key, hash)) => {
-                            let mut new_child_slice = key;
-                            new_child_slice.set_from(suffix_slice.from());
-                            branch.set_child(suffix_slice.get(0), &new_child_slice, &hash);
+                            let new_child_path = key.start_from(suffix_path.start());
+                            branch.set_child(suffix_path.bit(0), &new_child_path, &hash);
                             self.base.put(&prefix, branch);
                         }
                         RemoveResult::UpdateHash(hash) => {
-                            branch.set_child_hash(suffix_slice.get(0), &hash);
+                            branch.set_child_hash(suffix_path.bit(0), &hash);
                             self.base.put(&prefix, branch);
                         }
                         RemoveResult::KeyNotFound => return,
@@ -1028,7 +1028,7 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         self.base_iter.next().map(
-            |(k, v)| (K::read_key(k.as_ref()), v),
+            |(k, v)| (K::read_key(k.raw_key()), v),
         )
     }
 }
@@ -1042,7 +1042,7 @@ where
     type Item = OK;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.base_iter.next().map(|(k, _)| K::read_key(k.as_ref()))
+        self.base_iter.next().map(|(k, _)| K::read_key(k.raw_key()))
     }
 }
 
@@ -1054,5 +1054,16 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         self.base_iter.next().map(|(_, v)| v)
+    }
+}
+
+impl<T, K, V> ::std::fmt::Debug for ProofMapIndex<T, K, V>
+where
+    T: AsRef<Snapshot>,
+    K: ProofMapKey,
+    V: StorageValue + fmt::Debug,
+{
+    fn fmt(&self, _: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        unimplemented!();
     }
 }

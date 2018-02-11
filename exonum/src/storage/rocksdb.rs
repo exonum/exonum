@@ -13,12 +13,6 @@
 // limitations under the License.
 
 //! An implementation of `RocksDB` database.
-use exonum_profiler::ProfilerSpan;
-use rocksdb::DB as _RocksDB;
-use rocksdb::{WriteBatch, DBIterator};
-use rocksdb::Snapshot as _Snapshot;
-use rocksdb::Error as _Error;
-use rocksdb::utils::get_cf_names;
 
 use std::mem;
 use std::sync::Arc;
@@ -27,10 +21,18 @@ use std::fmt;
 use std::error;
 use std::iter::Peekable;
 
-pub use rocksdb::Options as RocksDBOptions;
-pub use rocksdb::BlockBasedOptions as RocksBlockOptions;
+use exonum_profiler::ProfilerSpan;
+use rocksdb::DB as _RocksDB;
+use rocksdb::{WriteBatch, DBIterator};
+use rocksdb::Snapshot as _Snapshot;
+use rocksdb::Error as _Error;
+use rocksdb::utils::get_cf_names;
 
-use super::{Database, Iterator, Iter, Snapshot, Error, Patch, Change, Result};
+use super::{Database, Iterator, Iter, Snapshot, Error, Patch, Result};
+use super::db::Change;
+
+pub use rocksdb::{Options as RocksDBOptions, WriteOptions as RocksDBWriteOptions};
+pub use rocksdb::BlockBasedOptions as RocksBlockOptions;
 
 impl From<_Error> for Error {
     fn from(err: _Error) -> Self {
@@ -39,7 +41,6 @@ impl From<_Error> for Error {
 }
 
 /// Database implementation on the top of `RocksDB` backend.
-#[derive(Clone)]
 pub struct RocksDB {
     db: Arc<_RocksDB>,
 }
@@ -59,33 +60,19 @@ struct RocksDBIterator {
 
 impl RocksDB {
     /// Open a database stored in the specified path with the specified options.
-    pub fn open<P: AsRef<Path>>(path: P, options: RocksDBOptions) -> Result<RocksDB> {
+    pub fn open<P: AsRef<Path>>(path: P, options: &RocksDBOptions) -> Result<RocksDB> {
         let db = {
             if let Ok(names) = get_cf_names(&path) {
                 let cf_names = names.iter().map(|name| name.as_str()).collect::<Vec<_>>();
-                _RocksDB::open_cf(&options, path, cf_names.as_ref())?
+                _RocksDB::open_cf(options, path, cf_names.as_ref())?
             } else {
-                _RocksDB::open(&options, path)?
+                _RocksDB::open(options, path)?
             }
         };
         Ok(RocksDB { db: Arc::new(db) })
     }
-}
 
-impl Database for RocksDB {
-    fn clone(&self) -> Box<Database> {
-        Box::new(Clone::clone(self))
-    }
-
-    fn snapshot(&self) -> Box<Snapshot> {
-        let _p = ProfilerSpan::new("RocksDB::snapshot");
-        Box::new(RocksDBSnapshot {
-            snapshot: unsafe { mem::transmute(self.db.snapshot()) },
-            _db: Arc::clone(&self.db),
-        })
-    }
-
-    fn merge(&mut self, patch: Patch) -> Result<()> {
+    fn do_merge(&self, patch: Patch, w_opts: &RocksDBWriteOptions) -> Result<()> {
         let _p = ProfilerSpan::new("RocksDB::merge");
         let mut batch = WriteBatch::default();
         for (cf_name, changes) in patch {
@@ -104,7 +91,28 @@ impl Database for RocksDB {
                 }
             }
         }
-        self.db.write(batch).map_err(Into::into)
+        self.db.write_opt(batch, w_opts).map_err(Into::into)
+    }
+}
+
+impl Database for RocksDB {
+    fn snapshot(&self) -> Box<Snapshot> {
+        let _p = ProfilerSpan::new("RocksDB::snapshot");
+        Box::new(RocksDBSnapshot {
+            snapshot: unsafe { mem::transmute(self.db.snapshot()) },
+            _db: Arc::clone(&self.db),
+        })
+    }
+
+    fn merge(&self, patch: Patch) -> Result<()> {
+        let w_opts = RocksDBWriteOptions::default();
+        self.do_merge(patch, &w_opts)
+    }
+
+    fn merge_sync(&self, patch: Patch) -> Result<()> {
+        let mut w_opts = RocksDBWriteOptions::default();
+        w_opts.set_sync(true);
+        self.do_merge(patch, &w_opts)
     }
 }
 

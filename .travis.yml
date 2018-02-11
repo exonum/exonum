@@ -17,30 +17,32 @@ addons:
     - librocksdb
 
 rust:
-  - stable
+  # Feel free to bump this version if you need features of newer Rust.
+  # Sync with badge in README.md
+  - 1.23.0
+
 matrix:
-  include:
-    - rust: nightly-2017-10-19
-      env: FEATURE=benchmarks
-    - rust: nightly-2017-10-19
-      env: FEATURE=clippy-core
-    - rust: nightly-2017-10-19
-      env: FEATURE=clippy-sandbox
+  allow_failures:
+  - env: FEATURE=non-fatal-checks
+  fast_finish: true
 
 cache:
   directories:
+  - node_modules
   - $HOME/.cargo
   - $HOME/.local
   - $TRAVIS_BUILD_DIR/target
+  - $TRAVIS_BUILD_DIR/sandbox/target
 
 dist: trusty
 sudo: required
 
 env:
   global:
-  - CLIPPY_VERS=0.0.166
+  - CLIPPY_VERS=0.0.181
   - RUSTFMT_VERS=0.9.0
-  - DEADLINKS_VERS=0.2.1
+  - DEADLINKS_VERS=0.3.0
+  - OUTDATED_VERS=0.7.0
   - SODIUM_VERS=1.0.13
   - CARGO_INCREMENTAL=1
   - RUSTFLAGS="-C link-dead-code"
@@ -48,13 +50,11 @@ env:
   - ROCKSDB_LIB_DIR=/usr/lib/x86_64-linux-gnu
   - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
   matrix:
-  - FEATURE=fmt
   - FEATURE=test-core
-  - FEATURE=test-sandbox
-  - FEATURE=test-doc
-  - FEATURE=non-fatal-checks
 
-install:
+# Separate jobs should use `install` hook in order not to override these common
+# instructions.
+before_install:
 - |
   if [ ! -f "$HOME/.local/lib/libsodium.a" ]; then
     wget "https://github.com/jedisct1/libsodium/releases/download/$SODIUM_VERS/libsodium-$SODIUM_VERS.tar.gz" -t 5 -O "libsodium.tar.gz"
@@ -67,56 +67,59 @@ install:
   fi
 - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.local/lib
 - export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$HOME/.local/lib/pkgconfig
-- |
-  if [[ "$FEATURE" == "non-fatal-checks" ]]; then
-    cargo-deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
-    fi
-- |
-  if [[ "$FEATURE" == "fmt" ]]; then
-    cargo-audit -V || cargo install cargo-audit --force
-    rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
-    cargo update
-    fi
-- |
-  case "$FEATURE" in
-  clippy* )
-    cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
-  ;;
-  esac
-- cargo install --list
-script: |
-  case "$FEATURE" in
 
-  "fmt" )
-      cargo audit &&
-      cargo fmt -p exonum -- --write-mode=diff &&
-      cargo fmt -p sandbox -- --write-mode=diff
-  ;;
-  "clippy-core" )
-      cd exonum && cargo clippy --verbose --features long_benchmarks  -- -D warnings
-  ;;
-  "clippy-sandbox" )
-      cd sandbox && cargo clippy --verbose -- -D warnings
-  ;;
-  "test-core" )
-      cargo test --manifest-path exonum/Cargo.toml --verbose --tests --lib
-  ;;
-  "test-sandbox" )
-      cargo test -p sandbox --verbose
-  ;;
-  "test-doc" )
-      cargo test -p exonum --verbose --doc  -- --test-threads=2
-  ;;
-  "non-fatal-checks" )
-      cargo doc --no-deps -p exonum &&
-      cargo deadlinks --dir target/doc ||
-      true
-  ;;
-  "benchmarks" )
-        RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
-  ;;
+jobs:
+  include:
+  # Formatting & other lints that do not require compilation
+  - env: FEATURE=lints
+    install:
+    - cargo-audit -V || cargo install cargo-audit --force
+    - rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
+    - nvm install 8 && nvm use 8
+    - npm install cspell
+    - ./node_modules/.bin/cspell --version
+    - npm install markdownlint-cli
+    - ./node_modules/.bin/markdownlint --version
+    script:
+    - cargo fmt --all -- --write-mode=diff
+    - ./node_modules/.bin/cspell sandbox/{src,examples,tests}/**/*.rs
+    - ./node_modules/.bin/cspell exonum/{src,benches,tests}/**/*.rs
+    - ./node_modules/.bin/cspell testkit/{src,examples,tests}/**/*.rs
+    - ./node_modules/.bin/cspell services/time/{src,examples,tests}/**/*.rs
+    - find . -not -path "./3rdparty/*" -and -not -path "./node_modules/*" -name "*.md" | xargs ./node_modules/.bin/markdownlint --config .markdownlintrc
 
-  esac
+  # Clippy linting
+  - &clippy-core
+    env: FEATURE=clippy-core
+    rust: nightly-2018-01-22
+    install:
+    - cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
+    script:
+    - cargo clippy --all
+
+  # Tests
+  - env: FEATURE=test-core
+    script:
+    - cargo test --all
+    - cargo run -p exonum-testkit --example timestamping
+    - cargo run -p exonum-testkit --example configuration_change
+    - cargo run -p exonum-time --example simple_service
+
+  # Benchmarks (compilation only)
+  - env: FEATURE=benchmarks
+    rust: nightly-2018-01-22
+    script:
+    - RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
+
+  # Non-fatal checks
+  - env: FEATURE=non-fatal-checks
+    install:
+    - cargo-outdated -V | grep $OUTDATED_VERS || cargo install cargo-outdated --vers $OUTDATED_VERS --force
+    - cargo-deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
+    script:
+    - cargo doc --no-deps
+    - cargo deadlinks --dir target/doc
+    - cargo outdated --exit-code 1
 
 after_success: |
   [ $TRAVIS_BRANCH = master ] &&

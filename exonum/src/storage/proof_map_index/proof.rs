@@ -16,19 +16,18 @@ use std::iter::FromIterator;
 
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use crypto::{Hash, HashStream};
+use storage::StorageValue;
+use super::key::{BitsRange, ChildKind, ProofMapKey, ProofPath, ProofPathPrefix, KEY_SIZE};
 
-use super::super::StorageValue;
-use super::key::{ProofMapKey, DBKey, DBKeyPrefix, ChildKind, KEY_SIZE};
-
-impl Serialize for DBKey {
+impl Serialize for ProofPath {
     fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         let mut repr = String::with_capacity(KEY_SIZE * 8);
-        let bslice = self;
-        for ind in 0..self.to() - self.from() {
-            match bslice.get(ind) {
+        let bpath = self;
+        for ind in 0..self.len() {
+            match bpath.bit(ind) {
                 ChildKind::Left => {
                     repr.push('0');
                 }
@@ -41,7 +40,7 @@ impl Serialize for DBKey {
     }
 }
 
-impl<'de> Deserialize<'de> for DBKey {
+impl<'de> Deserialize<'de> for ProofPath {
     fn deserialize<D>(deser: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -49,10 +48,10 @@ impl<'de> Deserialize<'de> for DBKey {
         use std::fmt;
         use serde::de::{self, Visitor, Unexpected};
 
-        struct DBKeyVisitor;
+        struct ProofPathVisitor;
 
-        impl<'de> Visitor<'de> for DBKeyVisitor {
-            type Value = DBKey;
+        impl<'de> Visitor<'de> for ProofPathVisitor {
+            type Value = ProofPath;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 write!(
@@ -62,7 +61,7 @@ impl<'de> Deserialize<'de> for DBKey {
                 )
             }
 
-            fn visit_str<E>(self, value: &str) -> Result<DBKey, E>
+            fn visit_str<E>(self, value: &str) -> Result<ProofPath, E>
             where
                 E: de::Error,
             {
@@ -75,16 +74,16 @@ impl<'de> Deserialize<'de> for DBKey {
                 for (i, ch) in value.chars().enumerate() {
                     match ch {
                         '0' => {}
-                        '1' => bytes[i / 8] += 1 << (7 - i % 8),
+                        '1' => bytes[i / 8] += 1 << (i % 8),
                         _ => return Err(de::Error::invalid_value(Unexpected::Str(value), &self)),
                     }
                 }
 
-                Ok(DBKey::leaf(&bytes).truncate(len as u16))
+                Ok(ProofPath::new(&bytes).prefix(len as u16))
             }
         }
 
-        deser.deserialize_str(DBKeyVisitor)
+        deser.deserialize_str(ProofPathVisitor)
     }
 }
 
@@ -92,21 +91,21 @@ impl<'de> Deserialize<'de> for DBKey {
 #[derive(Debug)]
 pub enum MapProofError {
     /// Non-terminal node for a map consisting of a single node.
-    NonTerminalNode(DBKey),
+    NonTerminalNode(ProofPath),
 
     /// One key in the proof is a prefix of another key.
     EmbeddedKeys {
         /// Prefix key
-        prefix: DBKey,
+        prefix: ProofPath,
         /// Key containing the prefix
-        key: DBKey,
+        key: ProofPath,
     },
 
     /// One key is mentioned several times in the proof.
-    DuplicateKey(DBKey),
+    DuplicateKey(ProofPath),
 
     /// Entries in the proof are not ordered by increasing key.
-    InvalidOrdering(DBKey, DBKey),
+    InvalidOrdering(ProofPath, ProofPath),
 }
 
 impl ::std::fmt::Display for MapProofError {
@@ -131,13 +130,18 @@ impl ::std::error::Error for MapProofError {
 #[derive(Debug)]
 struct ContourNode<'a> {
     left_hash: Hash,
-    left_key: DBKeyPrefix<'a>,
+    left_key: ProofPathPrefix<'a>,
     key_len: u16,
     right_key_len: u16,
 }
 
 impl<'a> ContourNode<'a> {
-    fn new(key_len: u16, left_key: DBKeyPrefix<'a>, left_hash: Hash, right_key_len: u16) -> Self {
+    fn new(
+        key_len: u16,
+        left_key: ProofPathPrefix<'a>,
+        left_hash: Hash,
+        right_key_len: u16,
+    ) -> Self {
         ContourNode {
             left_hash,
             left_key,
@@ -158,7 +162,7 @@ impl<'a> ContourNode<'a> {
 
     /// Outputs the hash of the node based on the finalized `right_hash` value and `contour_key`,
     /// which is an extension of the right child key.
-    fn finalize(self, contour_key: &DBKey, right_hash: Hash) -> Hash {
+    fn finalize(self, contour_key: &ProofPath, right_hash: Hash) -> Hash {
         let stream = HashStream::new().update(self.left_hash.as_ref()).update(
             right_hash.as_ref(),
         );
@@ -171,15 +175,15 @@ impl<'a> ContourNode<'a> {
     }
 }
 
-// Used instead of `(DBKey, Hash)` only for the purpose of clearer (de)serialization.
+// Used instead of `(ProofPath, Hash)` only for the purpose of clearer (de)serialization.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct MapProofEntry {
-    key: DBKey,
+    key: ProofPath,
     hash: Hash,
 }
 
-impl From<(DBKey, Hash)> for MapProofEntry {
-    fn from(val: (DBKey, Hash)) -> Self {
+impl From<(ProofPath, Hash)> for MapProofEntry {
+    fn from(val: (ProofPath, Hash)) -> Self {
         MapProofEntry {
             key: val.0,
             hash: val.1,
@@ -187,7 +191,7 @@ impl From<(DBKey, Hash)> for MapProofEntry {
     }
 }
 
-impl From<MapProofEntry> for (DBKey, Hash) {
+impl From<MapProofEntry> for (ProofPath, Hash) {
     fn from(val: MapProofEntry) -> Self {
         (val.key, val.hash)
     }
@@ -288,8 +292,8 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 ///
 /// `MapProof` is serialized to JSON as an object with 2 array fields:
 ///
-/// - `proof` is an array of `{ "key": DBKey, "hash": Hash }` objects. The entries are sorted by
-///   increasing [`DBKey`], but client implementors should not rely on this if security
+/// - `proof` is an array of `{ "key": ProofPath, "hash": Hash }` objects. The entries are sorted by
+///   increasing [`ProofPath`], but client implementors should not rely on this if security
 ///   is a concern.
 /// - `entries` is an array with 2 kinds of objects: `{ "missing": K }` for keys missing from
 ///   the underlying index, and `{ "key": K, "value": V }` for key-value pairs, existence of
@@ -299,8 +303,8 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 /// # extern crate exonum;
 /// # #[macro_use] extern crate serde_json;
 /// # use exonum::storage::{Database, MemoryDB, StorageValue, MapProof, ProofMapIndex};
-/// # use exonum::storage::proof_map_index::ProofMapDBKey;
-/// # use exonum::crypto::hash;
+/// # use exonum::storage::proof_map_index::ProofPath;
+/// # use exonum::crypto::{hash, CryptoHash};
 /// # fn main() {
 /// let mut fork = { let db = MemoryDB::new(); db.fork() };
 /// let mut map = ProofMapIndex::new("index", &mut fork);
@@ -312,7 +316,7 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 /// assert_eq!(
 ///     serde_json::to_value(&proof).unwrap(),
 ///     json!({
-///         "proof": [ { "key": ProofMapDBKey::leaf(&h1), "hash": 100u32.hash() } ],
+///         "proof": [ { "key": ProofPath::new(&h1), "hash": 100u32.hash() } ],
 ///         "entries": [ { "key": h2, "value": 200 } ]
 ///     })
 /// );
@@ -325,7 +329,7 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 /// [`get_multiproof()`]: struct.ProofMapIndex.html#method.get_multiproof
 /// [`try_into()`]: #method.try_into
 /// [`missing_keys()`]: #method.missing_keys
-/// [`DBKey`]: struct.ProofMapDBKey.html
+/// [`ProofPath`]: struct.ProofPath.html
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MapProof<K, V> {
     entries: Vec<OptionalEntry<K, V>>,
@@ -333,9 +337,9 @@ pub struct MapProof<K, V> {
 }
 
 /// Calculates hash for an isolated node in the Merkle Patricia tree.
-fn hash_isolated_node(key: &DBKey, h: &Hash) -> Hash {
+fn hash_isolated_node(key: &ProofPath, h: &Hash) -> Hash {
     HashStream::new()
-        .update(&key.as_bytes())
+        .update(key.as_bytes())
         .update(h.as_ref())
         .hash()
 }
@@ -345,7 +349,7 @@ fn hash_isolated_node(key: &DBKey, h: &Hash) -> Hash {
 ///
 /// The tree is not restored in full; instead, we add the keys to
 /// the tree in their lexicographic order (i.e., according to the `PartialOrd` implementation
-/// of `DBKey`) and keep track of the rightmost nodes (the right contour) of the tree.
+/// of `ProofPath`) and keep track of the rightmost nodes (the right contour) of the tree.
 /// It is easy to see that adding keys in the lexicographic order means that only
 /// the nodes in the right contour may be updated on each step. Further, on each step
 /// zero or more nodes are evicted from the contour, and a single new node is
@@ -358,7 +362,7 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
 
         1 => {
             if !entries[0].key.is_leaf() {
-                Err(MapProofError::NonTerminalNode(entries[0].key.clone()))
+                Err(MapProofError::NonTerminalNode(entries[0].key))
             } else {
                 Ok(hash_isolated_node(&entries[0].key, &entries[0].hash))
             }
@@ -369,7 +373,7 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
 
             for w in entries.windows(2) {
                 let (prev, entry) = (&w[0], &w[1]);
-                let common_prefix = entry.key.common_prefix(&prev.key);
+                let common_prefix = entry.key.common_prefix_len(&prev.key);
 
                 let mut fin_hash = prev.hash;
                 let mut fin_key_len = prev.key.len();
@@ -421,11 +425,11 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
 ///
 /// ```
 /// # use exonum::storage::{MapProof, StorageValue};
-/// # use exonum::storage::proof_map_index::ProofMapDBKey;
-/// # use exonum::crypto::hash;
+/// # use exonum::storage::proof_map_index::ProofPath;
+/// # use exonum::crypto::{hash, CryptoHash};
 /// let (k1, k2, k3) = ((-1i32).hash(), 0i32.hash(), 1i32.hash());
 /// let proof = MapProof::builder()
-///     .add_proof_entry(ProofMapDBKey::leaf(&k1), hash("FOO".as_ref()))
+///     .add_proof_entry(ProofPath::new(&k1), hash("FOO".as_ref()))
 ///     .add_entry(k2, "BAR".to_string())
 ///     .add_missing(k3)
 ///     .create();
@@ -438,7 +442,7 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
 #[derive(Debug)]
 pub struct MapProofBuilder<K, V> {
     entries: Vec<OptionalEntry<K, V>>,
-    proof: Vec<(DBKey, Hash)>,
+    proof: Vec<(ProofPath, Hash)>,
 }
 
 impl<K, V> MapProofBuilder<K, V> {
@@ -464,7 +468,7 @@ impl<K, V> MapProofBuilder<K, V> {
 
     /// Adds a proof entry into the builder. The `key` must be greater than keys of
     /// all proof entries previously added to the proof.
-    pub fn add_proof_entry(mut self, key: DBKey, hash: Hash) -> Self {
+    pub fn add_proof_entry(mut self, key: ProofPath, hash: Hash) -> Self {
         debug_assert!(if let Some(&(ref last_key, _)) = self.proof.last() {
             *last_key < key
         } else {
@@ -494,9 +498,9 @@ impl<K, V> MapProof<K, V> {
 
     /// Creates a proof for a single entry.
     #[doc(hidden)]
-    pub fn for_entry<I>(entry: (K, V), proof: I) -> Self
+    pub(crate) fn for_entry<I>(entry: (K, V), proof: I) -> Self
     where
-        I: IntoIterator<Item = (DBKey, Hash)>,
+        I: IntoIterator<Item = (ProofPath, Hash)>,
     {
         MapProof {
             entries: vec![OptionalEntry::value(entry.0, entry.1)],
@@ -506,9 +510,9 @@ impl<K, V> MapProof<K, V> {
 
     /// Creates a proof of absence of a key.
     #[doc(hidden)]
-    pub fn for_absent_key<I>(key: K, proof: I) -> Self
+    pub(crate) fn for_absent_key<I>(key: K, proof: I) -> Self
     where
-        I: IntoIterator<Item = (DBKey, Hash)>,
+        I: IntoIterator<Item = (ProofPath, Hash)>,
     {
         MapProof {
             entries: vec![OptionalEntry::missing(key)],
@@ -518,7 +522,7 @@ impl<K, V> MapProof<K, V> {
 
     /// Creates a proof for an empty map.
     #[doc(hidden)]
-    pub fn for_empty_map<KI>(keys: KI) -> Self
+    pub(crate) fn for_empty_map<KI>(keys: KI) -> Self
     where
         KI: IntoIterator<Item = K>,
     {
@@ -545,7 +549,7 @@ impl<K, V> MapProof<K, V> {
     }
 
     /// Provides access to the proof part of the view. Useful mainly for debug purposes.
-    pub fn proof(&self) -> Vec<(DBKey, Hash)> {
+    pub fn proof(&self) -> Vec<(ProofPath, Hash)> {
         self.proof.iter().cloned().map(|e| e.into()).collect()
     }
 
@@ -571,19 +575,16 @@ where
                 Some(Ordering::Less) => {
                     if key.starts_with(prev_key) {
                         return Err(MapProofError::EmbeddedKeys {
-                            prefix: prev_key.clone(),
-                            key: key.clone(),
+                            prefix: *prev_key,
+                            key: *key,
                         });
                     }
                 }
                 Some(Ordering::Equal) => {
-                    return Err(MapProofError::DuplicateKey(key.clone()));
+                    return Err(MapProofError::DuplicateKey(*key));
                 }
                 Some(Ordering::Greater) => {
-                    return Err(MapProofError::InvalidOrdering(
-                        prev_key.clone(),
-                        key.clone(),
-                    ));
+                    return Err(MapProofError::InvalidOrdering(*prev_key, *key));
                 }
                 None => unreachable!("Incomparable keys in proof"),
             }
@@ -593,7 +594,7 @@ where
         // In order to do this, it suffices to locate the closest smaller key in the proof entries
         // and check only it.
         for e in &self.entries {
-            let key = DBKey::leaf(e.key());
+            let key = ProofPath::new(e.key());
 
             match self.proof.binary_search_by(|pe| {
                 pe.key.partial_cmp(&key).expect(
@@ -608,7 +609,7 @@ where
                     let prev_key = &self.proof[index - 1].key;
                     if key.starts_with(prev_key) {
                         return Err(MapProofError::EmbeddedKeys {
-                            prefix: prev_key.clone(),
+                            prefix: *prev_key,
                             key,
                         });
                     }
@@ -662,7 +663,7 @@ where
         let (mut proof, entries) = (self.proof, self.entries);
 
         proof.extend(entries.iter().filter_map(|e| {
-            e.as_kv().map(|(k, v)| (DBKey::leaf(k), v.hash()).into())
+            e.as_kv().map(|(k, v)| (ProofPath::new(k), v.hash()).into())
         }));
         // Rust docs state that in the case `self.proof` and `self.entries` are sorted
         // (which is the case for `MapProof`s returned by `ProofMapIndex.get_proof()`),

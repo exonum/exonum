@@ -16,7 +16,7 @@ use super::{Database, Snapshot, Fork};
 
 const IDX_NAME: &'static str = "idx_name";
 
-fn fork_iter<T: Database>(mut db: T) {
+fn fork_iter<T: Database>(db: T) {
     let mut fork = db.fork();
 
     fork.put(IDX_NAME, vec![10], vec![10]);
@@ -199,7 +199,7 @@ mod rocksdb_tests {
     fn rocksdb_database(path: &Path) -> RocksDB {
         let mut options = RocksDBOptions::default();
         options.create_if_missing(true);
-        RocksDB::open(path, options).unwrap()
+        RocksDB::open(path, &options).unwrap()
     }
 
     #[test]

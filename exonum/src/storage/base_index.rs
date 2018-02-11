@@ -13,6 +13,8 @@
 // limitations under the License.
 
 //! An implementation of base index with most common features.
+// spell-checker:ignore subprefix
+
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
@@ -61,14 +63,12 @@ impl<T> BaseIndex<T> {
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
-        if is_valid_name(&name) {
-            BaseIndex {
-                name: name.as_ref().to_string(),
-                prefix: None,
-                view,
-            }
-        } else {
-            panic!("Wrong characters using in name. Use: a-zA-Z0-9 and _");
+        assert_valid_name(&name);
+
+        BaseIndex {
+            name: name.as_ref().to_string(),
+            prefix: None,
+            view,
         }
     }
 
@@ -81,14 +81,12 @@ impl<T> BaseIndex<T> {
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
-        if is_valid_name(&name) {
-            BaseIndex {
-                name: name.as_ref().to_string(),
-                prefix: Some(prefix),
-                view,
-            }
-        } else {
-            panic!("Wrong characters using in name. Use: a-zA-Z0-9 and _");
+        assert_valid_name(&name);
+
+        BaseIndex {
+            name: name.as_ref().to_string(),
+            prefix: Some(prefix),
+            view,
         }
     }
 
@@ -252,19 +250,43 @@ fn is_valid_name<S: AsRef<str>>(name: S) -> bool {
     })
 }
 
-#[test]
-fn test_index_name_validator() {
-    assert!(is_valid_name("index_name"));
-    assert!(is_valid_name("_index_name"));
-    assert!(is_valid_name("AinDex_name_"));
-    assert!(is_valid_name("core.index_name1Z"));
-    assert!(is_valid_name("configuration.indeX_1namE"));
-    assert!(is_valid_name("1index_Namez"));
+/// Calls the `is_valid_name` function with the given name and panics if it returns `false`.
+fn assert_valid_name<S: AsRef<str>>(name: S) {
+    if !is_valid_name(name) {
+        panic!("Wrong characters using in name. Use: a-zA-Z0-9 and _");
+    }
+}
 
-    assert!(!is_valid_name("index-name"));
-    assert!(!is_valid_name("_index-name"));
-    assert!(!is_valid_name("индекс_name_"));
-    assert!(!is_valid_name("core.index_имя3"));
-    assert!(!is_valid_name("indeX_1namE-"));
-    assert!(!is_valid_name("1in!dex_Namez"));
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_index_name_validator() {
+        // spell-checker:disable
+        assert!(is_valid_name("index_name"));
+        assert!(is_valid_name("_index_name"));
+        assert!(is_valid_name("AinDex_name_"));
+        assert!(is_valid_name("core.index_name1Z"));
+        assert!(is_valid_name("configuration.indeX_1namE"));
+        assert!(is_valid_name("1index_Namez"));
+
+        assert!(!is_valid_name("index-name"));
+        assert!(!is_valid_name("_index-name"));
+        assert!(!is_valid_name("индекс_name_"));
+        assert!(!is_valid_name("core.index_имя3"));
+        assert!(!is_valid_name("indeX_1namE-"));
+        assert!(!is_valid_name("1in!dex_Namez"));
+    }
+
+    #[test]
+    fn check_valid_name() {
+        assert_valid_name("valid_name");
+    }
+
+    #[test]
+    #[should_panic(expected = "Wrong characters using in name. Use: a-zA-Z0-9 and _")]
+    fn check_invalid_name() {
+        assert_valid_name("invalid-name");
+    }
 }

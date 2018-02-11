@@ -24,7 +24,7 @@ use super::NodeHandler;
 impl NodeHandler {
     /// Validates request, then redirects it to the corresponding `handle_...` function.
     pub fn handle_request(&mut self, msg: RequestMessage) {
-        // Request are sended to us
+        // Request are sent to us
         if msg.to() != self.state.consensus_public_key() {
             return;
         }
@@ -43,16 +43,16 @@ impl NodeHandler {
         }
 
         match msg {
-            RequestMessage::Propose(msg) => self.handle_request_propose(msg),
-            RequestMessage::Transactions(msg) => self.handle_request_txs(msg),
-            RequestMessage::Prevotes(msg) => self.handle_request_prevotes(msg),
-            RequestMessage::Peers(msg) => self.handle_request_peers(msg),
-            RequestMessage::Block(msg) => self.handle_request_block(msg),
+            RequestMessage::Propose(msg) => self.handle_request_propose(&msg),
+            RequestMessage::Transactions(msg) => self.handle_request_txs(&msg),
+            RequestMessage::Prevotes(msg) => self.handle_request_prevotes(&msg),
+            RequestMessage::Peers(msg) => self.handle_request_peers(&msg),
+            RequestMessage::Block(msg) => self.handle_request_block(&msg),
         }
     }
 
     /// Handles `ProposeRequest` message. For details see the message documentation.
-    pub fn handle_request_propose(&mut self, msg: ProposeRequest) {
+    pub fn handle_request_propose(&mut self, msg: &ProposeRequest) {
         trace!("HANDLE PROPOSE REQUEST");
         if msg.height() != self.state.height() {
             return;
@@ -72,7 +72,7 @@ impl NodeHandler {
     }
 
     /// Handles `TransactionsRequest` message. For details see the message documentation.
-    pub fn handle_request_txs(&mut self, msg: TransactionsRequest) {
+    pub fn handle_request_txs(&mut self, msg: &TransactionsRequest) {
         trace!("HANDLE TRANSACTIONS REQUEST");
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
@@ -93,7 +93,7 @@ impl NodeHandler {
     }
 
     /// Handles `PrevotesRequest` message. For details see the message documentation.
-    pub fn handle_request_prevotes(&mut self, msg: PrevotesRequest) {
+    pub fn handle_request_prevotes(&mut self, msg: &PrevotesRequest) {
         trace!("HANDLE PREVOTES REQUEST");
         if msg.height() != self.state.height() {
             return;
@@ -113,7 +113,7 @@ impl NodeHandler {
     }
 
     /// Handles `BlockRequest` message. For details see the message documentation.
-    pub fn handle_request_block(&mut self, msg: BlockRequest) {
+    pub fn handle_request_block(&mut self, msg: &BlockRequest) {
         trace!(
             "Handle block request with height:{}, our height: {}",
             msg.height(),

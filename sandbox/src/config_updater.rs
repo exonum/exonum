@@ -13,9 +13,9 @@
 // limitations under the License.
 
 use exonum::crypto::{PublicKey, Hash};
-use exonum::blockchain::{Service, Transaction, Schema};
-use exonum::messages::{RawTransaction, Message, FromRaw};
-use exonum::storage::{Snapshot, Fork};
+use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult, Schema};
+use exonum::messages::{RawTransaction, Message};
+use exonum::storage::{Fork, Snapshot};
 use exonum::encoding::Error as MessageError;
 use exonum::blockchain::StoredConfiguration;
 use exonum::helpers::Height;
@@ -23,15 +23,15 @@ use exonum::helpers::Height;
 pub const CONFIG_SERVICE: u16 = 1;
 pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 0;
 
-message! {
-    struct TxConfig {
-        const TYPE = CONFIG_SERVICE;
-        const ID = CONFIG_PROPOSE_MESSAGE_ID;
-        const SIZE = 48;
+transactions! {
+    ConfigUpdaterTransactions {
+        const SERVICE_ID = CONFIG_SERVICE;
 
-        field from:               &PublicKey  [00 => 32]
-        field config:             &[u8]       [32 => 40]
-        field actual_from:        Height      [40 => 48]
+        struct TxConfig {
+            from: &PublicKey,
+            config: &[u8],
+            actual_from: Height,
+        }
     }
 }
 
@@ -49,9 +49,10 @@ impl Transaction for TxConfig {
         self.verify_signature(self.from())
     }
 
-    fn execute(&self, fork: &mut Fork) {
+    fn execute(&self, fork: &mut Fork) -> ExecutionResult {
         let mut schema = Schema::new(fork);
-        schema.commit_configuration(StoredConfiguration::try_deserialize(self.config()).unwrap())
+        schema.commit_configuration(StoredConfiguration::try_deserialize(self.config()).unwrap());
+        Ok(())
     }
 }
 
@@ -69,11 +70,7 @@ impl Service for ConfigUpdateService {
     }
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
-        if raw.message_type() != CONFIG_PROPOSE_MESSAGE_ID {
-            return Err(MessageError::IncorrectMessageType {
-                message_type: raw.message_type(),
-            });
-        }
-        TxConfig::from_raw(raw).map(|tx| Box::new(tx) as Box<Transaction>)
+        let tx = ConfigUpdaterTransactions::tx_from_raw(raw)?;
+        Ok(tx.into())
     }
 }

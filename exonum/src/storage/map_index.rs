@@ -13,6 +13,7 @@
 // limitations under the License.
 
 //! An implementation of key-value map.
+
 use std::marker::PhantomData;
 
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageKey, StorageValue};
@@ -525,7 +526,7 @@ mod tests {
             use storage::{RocksDB, RocksDBOptions};
             let mut opts = RocksDBOptions::default();
             opts.create_if_missing(true);
-            Box::new(RocksDB::open(path, opts).unwrap())
+            Box::new(RocksDB::open(path, &opts).unwrap())
         }
 
         #[test]

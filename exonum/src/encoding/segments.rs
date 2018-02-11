@@ -17,7 +17,6 @@ use bit_vec::BitVec;
 
 use messages::{RawMessage, HEADER_LENGTH, MessageBuffer};
 use crypto::Hash;
-
 use super::{Result, Error, Field, Offset, CheckedOffset};
 
 /// Trait for fields, that has unknown `compile-time` size.
@@ -158,7 +157,7 @@ impl<'a> SegmentField<'a> for RawMessage {
     }
 
     fn count(&self) -> Offset {
-        self.as_ref().as_ref().len() as Offset
+        self.as_ref().len() as Offset
     }
 
     unsafe fn from_buffer(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
@@ -169,7 +168,7 @@ impl<'a> SegmentField<'a> for RawMessage {
 
     fn extend_buffer(&self, buffer: &mut Vec<u8>) {
 
-        buffer.extend_from_slice(self.as_ref().as_ref())
+        buffer.extend_from_slice(self.as_ref())
     }
 
     fn check_data(

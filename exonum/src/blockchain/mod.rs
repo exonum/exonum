@@ -12,48 +12,58 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! The module containing building blocks for creating blockchains powered by the
-//! Exonum framework.
+//! The module containing building blocks for creating blockchains powered by
+//! the Exonum framework.
 //!
-//! Services are the main extension point for the Exonum framework. To create your own service on
-//! top of Exonum blockchain you need to define following things:
+//! Services are the main extension point for the Exonum framework. To create
+//! your service on top of Exonum blockchain you need to do the following:
 //!
 //! - Define your own information schema.
-//! - Create one or more types of messages using a macro `message!` and implement
-//! `Transaction` trait for them.
-//! - Create data structure that implements `Service` trait.
-//! - Optionally you can write api handlers.
+//! - Create one or more transaction types using the [`message!`] macro and
+//!   implement the [`Transaction`] trait for them.
+//! - Create a data structure implementing the [`Service`] trait.
+//! - Write API handlers for the service, if required.
 //!
-//! You may follow the [`minibank`][1] tutorial to get experience of programming your services.
+//! You may consult [the service creation tutorial][doc:create-service] for a more detailed
+//! manual on how to create services.
 //!
-//! [1]: https://github.com/exonum/exonum-doc/blob/master/src/get-started/create-service.md
+//! [`message!`]: ../macro.message.html
+//! [`Transaction`]: ./trait.Transaction.html
+//! [`Service`]: ./trait.Service.html
+//! [doc:create-service]: https://exonum.com/doc/get-started/create-service
+
+use std::sync::Arc;
+use std::collections::BTreeMap;
+use std::collections::HashMap;
+use std::mem;
+use std::fmt;
+use std::panic;
+use std::net::SocketAddr;
 
 use vec_map::VecMap;
 use byteorder::{ByteOrder, LittleEndian};
 use mount::Mount;
 
-use std::sync::Arc;
-use std::collections::BTreeMap;
-use std::mem;
-use std::fmt;
-use std::panic;
-
-use crypto::{self, Hash};
-use messages::{RawMessage, Precommit, CONSENSUS as CORE_SERVICE};
-use node::State;
-use storage::{Patch, Database, Snapshot, Fork, Error};
+use crypto::{self, Hash, CryptoHash, PublicKey, SecretKey};
+use messages::{CONSENSUS as CORE_SERVICE, Precommit, RawMessage, Connect};
+use storage::{Database, Error, Fork, Patch, Snapshot};
 use helpers::{Height, ValidatorId};
+use node::ApiSender;
 
 pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
-pub use self::schema::{Schema, TxLocation, gen_prefix};
+pub use self::schema::{gen_prefix, Schema, TxLocation};
 pub use self::genesis::GenesisConfig;
-pub use self::config::{ValidatorKeys, StoredConfiguration, ConsensusConfig, TimeoutAdjusterConfig};
-pub use self::service::{Service, Transaction, ServiceContext, ApiContext, SharedNodeState};
+pub use self::config::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
+pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState};
+pub use self::transaction::{Transaction, TransactionSet, ExecutionResult, TransactionResult,
+                            ExecutionError, TransactionError};
 
 mod block;
 mod schema;
 mod genesis;
 mod service;
+#[macro_use]
+mod transaction;
 #[cfg(test)]
 mod tests;
 
@@ -63,13 +73,21 @@ pub mod config;
 /// Only blockchains with the identical set of services and genesis block can be combined
 /// into the single network.
 pub struct Blockchain {
-    db: Box<Database>,
+    db: Arc<Database>,
     service_map: Arc<VecMap<Box<Service>>>,
+    service_keypair: (PublicKey, SecretKey),
+    api_sender: ApiSender,
 }
 
 impl Blockchain {
     /// Constructs a blockchain for the given `storage` and list of `services`.
-    pub fn new(storage: Box<Database>, services: Vec<Box<Service>>) -> Blockchain {
+    pub fn new(
+        storage: Box<Database>,
+        services: Vec<Box<Service>>,
+        service_public_key: PublicKey,
+        service_secret_key: SecretKey,
+        api_sender: ApiSender,
+    ) -> Blockchain {
         let mut service_map = VecMap::new();
         for service in services {
             let id = service.service_id() as usize;
@@ -83,12 +101,23 @@ impl Blockchain {
         }
 
         Blockchain {
-            db: storage,
+            db: storage.into(),
             service_map: Arc::new(service_map),
+            service_keypair: (service_public_key, service_secret_key),
+            api_sender,
         }
     }
 
-    /// Returnts service `VecMap` for all our services.
+    /// Recreates the blockchain to reuse with a sandbox.
+    #[doc(hidden)]
+    pub fn clone_with_api_sender(&self, api_sender: ApiSender) -> Blockchain {
+        Blockchain {
+            api_sender,
+            ..self.clone()
+        }
+    }
+
+    /// Returns service `VecMap` for all our services.
     pub fn service_map(&self) -> &Arc<VecMap<Box<Service>>> {
         &self.service_map
     }
@@ -141,7 +170,7 @@ impl Blockchain {
     ///
     /// - If the genesis block was not committed.
     pub fn last_block(&self) -> Block {
-        Schema::new(&self.snapshot()).last_block().unwrap()
+        Schema::new(&self.snapshot()).last_block()
     }
 
     /// Creates and commits the genesis block for the given genesis configuration.
@@ -229,22 +258,37 @@ impl Blockchain {
 
                 fork.checkpoint();
 
-                let r = panic::catch_unwind(panic::AssertUnwindSafe(|| { tx.execute(&mut fork); }));
+                let catch_result =
+                    panic::catch_unwind(panic::AssertUnwindSafe(|| tx.execute(&mut fork)));
 
-                match r {
-                    Ok(..) => fork.commit(),
+                let transaction_result = match catch_result {
+                    Ok(execution_result) => {
+                        match execution_result {
+                            Ok(()) => fork.commit(),
+                            Err(ref e) => {
+                                info!("{:?} transaction execution failed: {:?}", tx, e);
+                                fork.rollback();
+                            }
+                        }
+                        execution_result.map_err(TransactionError::from)
+                    }
                     Err(err) => {
                         if err.is::<Error>() {
-                            // Continue panic unwind if the reason is StorageError
+                            // Continue panic unwind if the reason is StorageError.
                             panic::resume_unwind(err);
                         }
                         fork.rollback();
-                        error!("{:?} transaction execution failed: {:?}", tx, err);
+                        error!("{:?} transaction execution panicked: {:?}", tx, err);
+                        Err(TransactionError::from_panic(&err))
                     }
-                }
+                };
 
                 let mut schema = Schema::new(&mut fork);
                 schema.transactions_mut().put(hash, tx.raw().clone());
+                schema.transaction_results_mut().put(
+                    hash,
+                    transaction_result,
+                );
                 schema.block_txs_mut(height).push(*hash);
                 let location = TxLocation::new(height, index as u64);
                 schema.tx_location_by_tx_hash_mut().put(hash, location);
@@ -252,7 +296,6 @@ impl Blockchain {
 
             // Get tx & state hash
             let (tx_hash, state_hash) = {
-
                 let state_hashes = {
                     let schema = Schema::new(&fork);
 
@@ -302,7 +345,7 @@ impl Blockchain {
                 &state_hash,
             );
             trace!("execute block = {:?}", block);
-            // Eval block hash
+            // Calculate block hash
             let block_hash = block.hash();
             // Update height
             let mut schema = Schema::new(&mut fork);
@@ -322,16 +365,15 @@ impl Blockchain {
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn commit<'a, I>(
         &mut self,
-        state: &mut State,
+        patch: &Patch,
         block_hash: Hash,
         precommits: I,
-    ) -> Result<Vec<Box<Transaction>>, Error>
+    ) -> Result<(), Error>
     where
         I: Iterator<Item = &'a Precommit>,
     {
-        let (patch, txs) = {
+        let patch = {
             let mut fork = {
-                let patch = state.block(&block_hash).unwrap().patch();
                 let mut fork = self.db.fork();
                 fork.merge(patch.clone()); // FIXME: avoid cloning here
                 fork
@@ -342,29 +384,30 @@ impl Blockchain {
                 for precommit in precommits {
                     schema.precommits_mut(&block_hash).push(precommit.clone());
                 }
-
-                state.update_config(schema.actual_configuration());
             }
-
-            let transactions = {
-                let mut ctx = ServiceContext::new(state, &fork);
-                for service in self.service_map.values() {
-                    service.handle_commit(&mut ctx);
-                }
-                ctx.transactions()
-            };
-
-            (fork.into_patch(), transactions)
+            fork.into_patch()
         };
         self.merge(patch)?;
-        Ok(txs)
+        // Initializes the context after merge.
+        let context = ServiceContext::new(
+            self.service_keypair.0,
+            self.service_keypair.1.clone(),
+            self.api_sender.clone(),
+            self.fork(),
+        );
+        // Invokes `handle_commit` for each service in order of their identifiers
+        for service in self.service_map.values() {
+            service.handle_commit(&context);
+        }
+        Ok(())
     }
 
     /// Returns `Mount` object that aggregates public api handlers.
-    pub fn mount_public_api(&self, context: &ApiContext) -> Mount {
+    pub fn mount_public_api(&self) -> Mount {
+        let context = self.api_context();
         let mut mount = Mount::new();
         for service in self.service_map.values() {
-            if let Some(handler) = service.public_api_handler(context) {
+            if let Some(handler) = service.public_api_handler(&context) {
                 mount.mount(service.service_name(), handler);
             }
         }
@@ -372,14 +415,64 @@ impl Blockchain {
     }
 
     /// Returns `Mount` object that aggregates private api handlers.
-    pub fn mount_private_api(&self, context: &ApiContext) -> Mount {
+    pub fn mount_private_api(&self) -> Mount {
+        let context = self.api_context();
         let mut mount = Mount::new();
         for service in self.service_map.values() {
-            if let Some(handler) = service.private_api_handler(context) {
+            if let Some(handler) = service.private_api_handler(&context) {
                 mount.mount(service.service_name(), handler);
             }
         }
         mount
+    }
+
+    fn api_context(&self) -> ApiContext {
+        ApiContext::from_parts(
+            self,
+            self.api_sender.clone(),
+            &self.service_keypair.0,
+            &self.service_keypair.1,
+        )
+    }
+
+    /// Saves peer to the peers cache
+    pub fn save_peer(&mut self, pubkey: &PublicKey, peer: Connect) {
+        let mut fork = self.fork();
+
+        {
+            let mut schema = Schema::new(&mut fork);
+            schema.peers_cache_mut().put(pubkey, peer);
+        }
+
+        self.merge(fork.into_patch()).expect(
+            "Unable to save peer to the peers cache",
+        );
+    }
+
+    /// Removes peer from the peers cache
+    pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) {
+        let mut fork = self.fork();
+
+        {
+            let mut schema = Schema::new(&mut fork);
+            let mut peers = schema.peers_cache_mut();
+            let peer = peers.iter().find(|&(_, ref v)| v.addr() == *addr);
+            if let Some(pubkey) = peer.map(|(k, _)| k) {
+                peers.remove(&pubkey);
+            }
+        }
+
+        self.merge(fork.into_patch()).expect(
+            "Unable to remove peer from the peers cache",
+        );
+    }
+
+    /// Recover cached peers if any.
+    pub fn get_saved_peers(&self) -> HashMap<PublicKey, Connect> {
+        let schema = Schema::new(self.snapshot());
+        let peers_cache = schema.peers_cache();
+        let it = peers_cache.iter().map(|(k, v)| (k, v.clone()));
+        it.collect()
     }
 }
 
@@ -392,8 +485,10 @@ impl fmt::Debug for Blockchain {
 impl Clone for Blockchain {
     fn clone(&self) -> Blockchain {
         Blockchain {
-            db: self.db.clone(),
+            db: Arc::clone(&self.db),
             service_map: Arc::clone(&self.service_map),
+            api_sender: self.api_sender.clone(),
+            service_keypair: self.service_keypair.clone(),
         }
     }
 }

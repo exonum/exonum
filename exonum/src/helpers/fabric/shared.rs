@@ -14,9 +14,10 @@
 
 //! This module is used to collect structures that is shared into `CommandExtension` from `Command`.
 
-use toml::Value;
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
+
+use toml::Value;
 
 use crypto::{PublicKey, SecretKey};
 use blockchain::config::ConsensusConfig;
@@ -55,7 +56,7 @@ impl NodePublicConfig {
     }
 }
 
-/// Basepoint config.
+/// Base config.
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize, Default)]
 pub struct CommonConfigTemplate {
     /// Consensus configuration.
@@ -64,7 +65,7 @@ pub struct CommonConfigTemplate {
     pub services_config: AbstractConfig,
 }
 
-/// `NodePrivConfig` collect all public and secret keys.
+/// `NodePrivateConfig` collects all public and secret keys.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NodePrivateConfig {
     /// Listen address.
