@@ -245,20 +245,20 @@ fn test_query_state_hash() {
         let timestamp_t2_key = Blockchain::service_table_unique_key(TIMESTAMPING_SERVICE, 1);
 
         let proof_configs = sandbox.get_proof_to_service_table(CONSENSUS, 0);
-        let (entries, config_hash): (Vec<_>, _) = proof_configs.try_into().unwrap();
-        assert_eq!(state_hash, config_hash);
+        let proof = proof_configs.check().unwrap();
+        assert_eq!(proof.hash(), state_hash);
         assert_ne!(configs_rh, Hash::zero());
-        assert_eq!(entries, vec![(configs_key, configs_rh)]);
+        assert_eq!(proof.entries(), vec![(&configs_key, &configs_rh)]);
 
         let proof_configs = sandbox.get_proof_to_service_table(TIMESTAMPING_SERVICE, 0);
-        let (entries, config_hash): (Vec<_>, _) = proof_configs.try_into().unwrap();
-        assert_eq!(state_hash, config_hash);
-        assert_eq!(entries, vec![(timestamp_t1_key, Hash::new([127; 32]))]);
+        let proof = proof_configs.check().unwrap();
+        assert_eq!(proof.hash(), state_hash);
+        assert_eq!(proof.entries(), vec![(&timestamp_t1_key, &Hash::new([127; 32]))]);
 
         let proof_configs = sandbox.get_proof_to_service_table(TIMESTAMPING_SERVICE, 1);
-        let (entries, config_hash): (Vec<_>, _) = proof_configs.try_into().unwrap();
-        assert_eq!(state_hash, config_hash);
-        assert_eq!(entries, vec![(timestamp_t2_key, Hash::new([128; 32]))]);
+        let proof = proof_configs.check().unwrap();
+        assert_eq!(proof.hash(), state_hash);
+        assert_eq!(proof.entries(), vec![(&timestamp_t2_key, &Hash::new([128; 32]))]);
 
         add_one_height(&sandbox, &sandbox_state)
     }

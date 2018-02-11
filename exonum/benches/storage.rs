@@ -19,32 +19,6 @@ extern crate rand;
 extern crate tempdir;
 extern crate exonum;
 
-#[cfg(test)]
-mod short_tests {
-    use test::Bencher;
-    use exonum::crypto::{Hash, HashStream, hash};
-    use exonum::storage::proof_map_index::ProofMapDBKey as DBKey;
-
-    #[bench]
-    fn bench_dbkeyprefix_truncate_hashing(b: &mut Bencher) {
-        let key = DBKey::leaf(&[42; 32]);
-        b.iter(|| for i in 0..256 {
-            assert_ne!(Hash::default(), hash(key.truncate(i).as_bytes().as_ref()));
-        });
-    }
-
-    #[bench]
-    fn bench_dbkeyprefix_prefix_hashing(b: &mut Bencher) {
-        let key = DBKey::leaf(&[42; 32]);
-        b.iter(|| for i in 0..256 {
-            assert_ne!(
-                Hash::default(),
-                key.hashable_prefix(i).hash_to(HashStream::new()).hash()
-            );
-        });
-    }
-}
-
 #[cfg(all(test, feature = "long_benchmarks"))]
 mod tests {
     use std::collections::HashSet;
@@ -163,9 +137,9 @@ mod tests {
         });
 
         for (i, proof) in proofs.into_iter().enumerate() {
-            let (entries, hash): (Vec<_>, _) = proof.try_into().unwrap();
-            assert_eq!(entries[0].1, data[i].1);
-            assert_eq!(hash, table_root_hash);
+            let checked_proof = proof.check().unwrap();
+            assert_eq!(*checked_proof.entries()[0].1, data[i].1);
+            assert_eq!(checked_proof.hash(), table_root_hash);
         }
     }
 
@@ -181,9 +155,9 @@ mod tests {
         let proofs: Vec<_> = data.iter().map(|item| table.get_proof(item.0)).collect();
 
         b.iter(|| for (i, proof) in proofs.iter().enumerate() {
-            let (entries, hash): (Vec<_>, _) = proof.clone().try_into().unwrap();
-            assert_eq!(entries[0].1, data[i].1);
-            assert_eq!(hash, table_root_hash);
+            let checked_proof = proof.clone().check().unwrap();
+            assert_eq!(*checked_proof.entries()[0].1, data[i].1);
+            assert_eq!(checked_proof.hash(), table_root_hash);
         });
     }
 
