@@ -3,7 +3,7 @@
 if [ -z "$TESTNET_DESTDIR" ]; then
     echo "Need to set TESTNET_DESTDIR"
     exit 1
-fi 
+fi
 
 destdir=$TESTNET_DESTDIR
 scriptdir=`dirname "$BASH_SOURCE"`
@@ -20,7 +20,7 @@ enable() {
         supervisorctl reload || exit 1
     else
         supervisord || exit 1
-    fi 
+    fi
 }
 
 disable() {
@@ -28,7 +28,7 @@ disable() {
     if [ -e /tmp/supervisord.sock ]
     then
         supervisorctl shutdown || exit 1
-    fi 
+    fi
 }
 
 update() {
@@ -81,25 +81,25 @@ case "$1" in
     start)
         start $2
         ;;
-    stop) 
+    stop)
         stop $2
         ;;
     restart)
         restart $2
         ;;
-    enable) 
+    enable)
         enable $2
         ;;
-    disable) 
+    disable)
         disable $2
         ;;
-    update) 
+    update)
         update $2
         ;;
-    clear) 
+    clear)
         clear $2
         ;;
-    generate) 
+    generate)
         generate $2 $3 $4
         ;;
 esac
