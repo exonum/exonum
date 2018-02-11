@@ -465,17 +465,38 @@ impl StorageKey for ProofPath {
 impl PartialOrd for ProofPath {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         if self.start() != other.start() {
-            None
-        } else {
-            for i in self.start()..min(self.end(), other.end()) {
-                let cmp = self.bit(i).cmp(&other.bit(i));
-                if cmp != Ordering::Equal {
-                    return Some(cmp);
-                }
+            return None;
+        }
+        // NB: This check can be moved to "real" code; the method below does not work
+        // if `self.start() % 8 != 0` without additional modifications.
+        debug_assert_eq!(self.start(), 0);
+
+        let right_bit = min(self.end(), other.end());
+        let right = (right_bit as usize + 7) / 8;
+
+        for i in 0..right {
+            let (mut self_byte, mut other_byte) = (self.raw_key()[i], other.raw_key()[i]);
+
+            if i + 1 == right && right_bit % 8 != 0 {
+                // Cut possible junk after the end of path(s)
+                self_byte &= !(255 << (right_bit % 8));
+                other_byte &= !(255 << (right_bit % 8));
             }
 
-            Some(self.end().cmp(&other.end()))
+            // Try to find a first bit index at which this path is greater than the other path
+            // (i.e., a bit of this path is 1 and the corresponding bit of the other path
+            // is 0), and vice versa. The smaller of these indexes indicates the actual
+            // larger path. In turn, the indexes can be found by counting trailing zeros.
+            let self_zeros = (self_byte & !other_byte).trailing_zeros();
+            let other_zeros = (!self_byte & other_byte).trailing_zeros();
+
+            let cmp = other_zeros.cmp(&self_zeros);
+            if cmp != Ordering::Equal {
+                return Some(cmp);
+            }
         }
+
+        Some(self.end().cmp(&other.end()))
     }
 }
 
