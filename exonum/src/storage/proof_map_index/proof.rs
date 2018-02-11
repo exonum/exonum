@@ -17,7 +17,7 @@ use std::iter::FromIterator;
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use crypto::{Hash, HashStream};
 use storage::StorageValue;
-use super::key::{BitsRange, ChildKind, ProofMapKey, ProofPath, ProofPathPrefix, KEY_SIZE};
+use super::key::{BitsPrefix, BitsRange, ChildKind, ProofMapKey, ProofPath, KEY_SIZE};
 
 impl Serialize for ProofPath {
     fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
@@ -93,18 +93,18 @@ pub enum MapProofError {
     /// Non-terminal node for a map consisting of a single node.
     NonTerminalNode(ProofPath),
 
-    /// One key in the proof is a prefix of another key.
-    EmbeddedKeys {
+    /// One path in the proof is a prefix of another path.
+    EmbeddedPaths {
         /// Prefix key
         prefix: ProofPath,
         /// Key containing the prefix
-        key: ProofPath,
+        path: ProofPath,
     },
 
-    /// One key is mentioned several times in the proof.
-    DuplicateKey(ProofPath),
+    /// One path is mentioned several times in the proof.
+    DuplicatePath(ProofPath),
 
-    /// Entries in the proof are not ordered by increasing key.
+    /// Entries in the proof are not ordered by increasing path.
     InvalidOrdering(ProofPath, ProofPath),
 }
 
@@ -120,9 +120,9 @@ impl ::std::error::Error for MapProofError {
 
         match *self {
             NonTerminalNode(_) => "Non-terminal node as a single key in a map proof",
-            EmbeddedKeys { .. } => "Embedded keys in a map proof",
-            DuplicateKey(_) => "Duplicate keys in a map proof",
-            InvalidOrdering(_, _) => "Invalid key ordering in a map proof",
+            EmbeddedPaths { .. } => "Embedded paths in a map proof",
+            DuplicatePath(_) => "Duplicate paths in a map proof",
+            InvalidOrdering(_, _) => "Invalid path ordering in a map proof",
         }
     }
 }
@@ -130,44 +130,44 @@ impl ::std::error::Error for MapProofError {
 #[derive(Debug)]
 struct ContourNode<'a> {
     left_hash: Hash,
-    left_key: ProofPathPrefix<'a>,
-    key_len: u16,
-    right_key_len: u16,
+    left_path: BitsPrefix<'a, ProofPath>,
+    path_len: u16,
+    right_path_len: u16,
 }
 
 impl<'a> ContourNode<'a> {
     fn new(
-        key_len: u16,
-        left_key: ProofPathPrefix<'a>,
+        path_len: u16,
+        left_path: BitsPrefix<'a, ProofPath>,
         left_hash: Hash,
-        right_key_len: u16,
+        right_path_len: u16,
     ) -> Self {
         ContourNode {
             left_hash,
-            left_key,
-            key_len,
-            right_key_len,
+            left_path,
+            path_len,
+            right_path_len,
         }
     }
 
     #[inline]
-    fn key_len(&self) -> u16 {
-        self.key_len
+    fn path_len(&self) -> u16 {
+        self.path_len
     }
 
     #[inline]
-    fn truncate_right_key(&mut self, to_bits: u16) {
-        self.right_key_len = to_bits;
+    fn truncate_right_path(&mut self, to_bits: u16) {
+        self.right_path_len = to_bits;
     }
 
-    /// Outputs the hash of the node based on the finalized `right_hash` value and `contour_key`,
-    /// which is an extension of the right child key.
-    fn finalize(self, contour_key: &ProofPath, right_hash: Hash) -> Hash {
+    /// Outputs the hash of the node based on the finalized `right_hash` value and `contour_path`,
+    /// which is an extension of the right child path.
+    fn finalize(self, contour_path: &ProofPath, right_hash: Hash) -> Hash {
         let stream = HashStream::new().update(self.left_hash.as_ref()).update(
             right_hash.as_ref(),
         );
-        let stream = self.left_key.hash_to(stream);
-        let stream = contour_key.hashable_prefix(self.right_key_len).hash_to(
+        let stream = self.left_path.hash_to(stream);
+        let stream = contour_path.hashable_prefix(self.right_path_len).hash_to(
             stream,
         );
 
@@ -178,14 +178,14 @@ impl<'a> ContourNode<'a> {
 // Used instead of `(ProofPath, Hash)` only for the purpose of clearer (de)serialization.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct MapProofEntry {
-    key: ProofPath,
+    path: ProofPath,
     hash: Hash,
 }
 
 impl From<(ProofPath, Hash)> for MapProofEntry {
     fn from(val: (ProofPath, Hash)) -> Self {
         MapProofEntry {
-            key: val.0,
+            path: val.0,
             hash: val.1,
         }
     }
@@ -193,7 +193,7 @@ impl From<(ProofPath, Hash)> for MapProofEntry {
 
 impl From<MapProofEntry> for (ProofPath, Hash) {
     fn from(val: MapProofEntry) -> Self {
-        (val.key, val.hash)
+        (val.path, val.hash)
     }
 }
 
@@ -277,7 +277,7 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 /// # use exonum::crypto::hash;
 /// let mut fork = { let db = MemoryDB::new(); db.fork() };
 /// let mut map = ProofMapIndex::new("index", &mut fork);
-/// let (h1, h2, h3) = (hash(&vec![1]), hash(&vec![2]), hash(&vec![3]));
+/// let (h1, h2, h3) = (hash(&[1]), hash(&[2]), hash(&[3]));
 /// map.put(&h1, 100u32);
 /// map.put(&h2, 200u32);
 /// // Get the proof from the index
@@ -292,8 +292,8 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 ///
 /// `MapProof` is serialized to JSON as an object with 2 array fields:
 ///
-/// - `proof` is an array of `{ "key": ProofPath, "hash": Hash }` objects. The entries are sorted by
-///   increasing [`ProofPath`], but client implementors should not rely on this if security
+/// - `proof` is an array of `{ "path": ProofPath, "hash": Hash }` objects. The entries are sorted
+///   by increasing [`ProofPath`], but client implementors should not rely on this if security
 ///   is a concern.
 /// - `entries` is an array with 2 kinds of objects: `{ "missing": K }` for keys missing from
 ///   the underlying index, and `{ "key": K, "value": V }` for key-value pairs, existence of
@@ -308,7 +308,7 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 /// # fn main() {
 /// let mut fork = { let db = MemoryDB::new(); db.fork() };
 /// let mut map = ProofMapIndex::new("index", &mut fork);
-/// let (h1, h2) = (hash(&vec![1]), hash(&vec![2]));
+/// let (h1, h2) = (hash(&[1]), hash(&[2]));
 /// map.put(&h1, 100u32);
 /// map.put(&h2, 200u32);
 ///
@@ -316,7 +316,7 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 /// assert_eq!(
 ///     serde_json::to_value(&proof).unwrap(),
 ///     json!({
-///         "proof": [ { "key": ProofPath::new(&h1), "hash": 100u32.hash() } ],
+///         "proof": [ { "path": ProofPath::new(&h1), "hash": 100u32.hash() } ],
 ///         "entries": [ { "key": h2, "value": 200 } ]
 ///     })
 /// );
@@ -337,9 +337,9 @@ pub struct MapProof<K, V> {
 }
 
 /// Calculates hash for an isolated node in the Merkle Patricia tree.
-fn hash_isolated_node(key: &ProofPath, h: &Hash) -> Hash {
+fn hash_isolated_node(path: &ProofPath, h: &Hash) -> Hash {
     HashStream::new()
-        .update(key.as_bytes())
+        .update(path.as_bytes())
         .update(h.as_ref())
         .hash()
 }
@@ -347,24 +347,24 @@ fn hash_isolated_node(key: &ProofPath, h: &Hash) -> Hash {
 /// Computes the root hash of the Merkle Patricia tree backing the specified entries
 /// in the map view.
 ///
-/// The tree is not restored in full; instead, we add the keys to
+/// The tree is not restored in full; instead, we add the paths to
 /// the tree in their lexicographic order (i.e., according to the `PartialOrd` implementation
 /// of `ProofPath`) and keep track of the rightmost nodes (the right contour) of the tree.
-/// It is easy to see that adding keys in the lexicographic order means that only
+/// It is easy to see that adding paths in the lexicographic order means that only
 /// the nodes in the right contour may be updated on each step. Further, on each step
 /// zero or more nodes are evicted from the contour, and a single new node is
 /// added to it.
 ///
-/// `entries` are assumed to be sorted by the key in increasing order.
+/// `entries` are assumed to be sorted by the path in increasing order.
 fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
     match entries.len() {
         0 => Ok(Hash::default()),
 
         1 => {
-            if !entries[0].key.is_leaf() {
-                Err(MapProofError::NonTerminalNode(entries[0].key))
+            if !entries[0].path.is_leaf() {
+                Err(MapProofError::NonTerminalNode(entries[0].path))
             } else {
-                Ok(hash_isolated_node(&entries[0].key, &entries[0].hash))
+                Ok(hash_isolated_node(&entries[0].path, &entries[0].hash))
             }
         }
 
@@ -373,19 +373,19 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
 
             for w in entries.windows(2) {
                 let (prev, entry) = (&w[0], &w[1]);
-                let common_prefix = entry.key.common_prefix_len(&prev.key);
+                let common_prefix = entry.path.common_prefix_len(&prev.path);
 
                 let mut fin_hash = prev.hash;
-                let mut fin_key_len = prev.key.len();
+                let mut fin_path_len = prev.path.len();
                 while let Some(mut node) = right_contour.pop() {
-                    let len = node.key_len();
+                    let len = node.path_len();
                     if len < common_prefix {
-                        node.truncate_right_key(common_prefix);
+                        node.truncate_right_path(common_prefix);
                         right_contour.push(node);
                         break;
                     } else if len > 0 {
-                        fin_key_len = node.key_len();
-                        fin_hash = node.finalize(&prev.key, fin_hash);
+                        fin_path_len = node.path_len();
+                        fin_hash = node.finalize(&prev.path, fin_hash);
                     } else {
                         // `len == 0` is a special case; the node will be reinserted
                         // to the contour, so the left child length should not be updated.
@@ -393,22 +393,22 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
                 }
 
                 let node = ContourNode::new(
-                    common_prefix, // key length
-                    prev.key.hashable_prefix(fin_key_len), // left key
+                    common_prefix, // path length
+                    prev.path.hashable_prefix(fin_path_len), // left path
                     fin_hash, // left hash
-                    entry.key.len(), // right key length
+                    entry.path.len(), // right path length
                 );
                 right_contour.push(node);
             }
 
             // Iteratively finalize all remaining nodes in the tree. This handles the special case
-            // when all keys start with the same bit(s).
-            let (mut fin_hash, fin_key) = {
+            // when all paths start with the same bit(s).
+            let (mut fin_hash, fin_path) = {
                 let last_entry = entries.last().unwrap();
-                (last_entry.hash, &last_entry.key)
+                (last_entry.hash, &last_entry.path)
             };
             while let Some(node) = right_contour.pop() {
-                fin_hash = node.finalize(fin_key, fin_hash);
+                fin_hash = node.finalize(fin_path, fin_hash);
             }
             Ok(fin_hash)
         }
@@ -421,33 +421,18 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
 /// `MapProof`s can be created using [`get_proof()`] and [`get_multiproof()`] methods, or
 /// deserialized using `serde`.
 ///
-/// # Examples
-///
-/// ```
-/// # use exonum::storage::{MapProof, StorageValue};
-/// # use exonum::storage::proof_map_index::ProofPath;
-/// # use exonum::crypto::{hash, CryptoHash};
-/// let (k1, k2, k3) = ((-1i32).hash(), 0i32.hash(), 1i32.hash());
-/// let proof = MapProof::builder()
-///     .add_proof_entry(ProofPath::new(&k1), hash("FOO".as_ref()))
-///     .add_entry(k2, "BAR".to_string())
-///     .add_missing(k3)
-///     .create();
-/// # drop(proof);
-/// ```
-///
 /// [`MapProof`]: struct.MapProof.html
 /// [`get_proof()`]: struct.ProofMapIndex.html#method.get_proof
 /// [`get_multiproof()`]: struct.ProofMapIndex.html#method.get_multiproof
 #[derive(Debug)]
-pub struct MapProofBuilder<K, V> {
+pub(crate) struct MapProofBuilder<K, V> {
     entries: Vec<OptionalEntry<K, V>>,
     proof: Vec<(ProofPath, Hash)>,
 }
 
 impl<K, V> MapProofBuilder<K, V> {
     /// Creates a new builder.
-    fn new() -> Self {
+    pub fn new() -> Self {
         MapProofBuilder {
             entries: vec![],
             proof: vec![],
@@ -491,13 +476,7 @@ impl<K, V> MapProofBuilder<K, V> {
 }
 
 impl<K, V> MapProof<K, V> {
-    /// Creates a builder instance for the map proof.
-    pub fn builder() -> MapProofBuilder<K, V> {
-        MapProofBuilder::new()
-    }
-
     /// Creates a proof for a single entry.
-    #[doc(hidden)]
     pub(crate) fn for_entry<I>(entry: (K, V), proof: I) -> Self
     where
         I: IntoIterator<Item = (ProofPath, Hash)>,
@@ -509,7 +488,6 @@ impl<K, V> MapProof<K, V> {
     }
 
     /// Creates a proof of absence of a key.
-    #[doc(hidden)]
     pub(crate) fn for_absent_key<I>(key: K, proof: I) -> Self
     where
         I: IntoIterator<Item = (ProofPath, Hash)>,
@@ -521,7 +499,6 @@ impl<K, V> MapProof<K, V> {
     }
 
     /// Creates a proof for an empty map.
-    #[doc(hidden)]
     pub(crate) fn for_empty_map<KI>(keys: KI) -> Self
     where
         KI: IntoIterator<Item = K>,
@@ -570,47 +547,47 @@ where
 
         // Check that entries in proof are in increasing order
         for w in self.proof.windows(2) {
-            let (prev_key, key) = (&w[0].key, &w[1].key);
-            match prev_key.partial_cmp(key) {
+            let (prev_path, path) = (&w[0].path, &w[1].path);
+            match prev_path.partial_cmp(path) {
                 Some(Ordering::Less) => {
-                    if key.starts_with(prev_key) {
-                        return Err(MapProofError::EmbeddedKeys {
-                            prefix: *prev_key,
-                            key: *key,
+                    if path.starts_with(prev_path) {
+                        return Err(MapProofError::EmbeddedPaths {
+                            prefix: *prev_path,
+                            path: *path,
                         });
                     }
                 }
                 Some(Ordering::Equal) => {
-                    return Err(MapProofError::DuplicateKey(*key));
+                    return Err(MapProofError::DuplicatePath(*path));
                 }
                 Some(Ordering::Greater) => {
-                    return Err(MapProofError::InvalidOrdering(*prev_key, *key));
+                    return Err(MapProofError::InvalidOrdering(*prev_path, *path));
                 }
                 None => unreachable!("Incomparable keys in proof"),
             }
         }
 
-        // Check that no entry has a prefix among the keys in the proof entries.
-        // In order to do this, it suffices to locate the closest smaller key in the proof entries
+        // Check that no entry has a prefix among the paths in the proof entries.
+        // In order to do this, it suffices to locate the closest smaller path in the proof entries
         // and check only it.
         for e in &self.entries {
-            let key = ProofPath::new(e.key());
+            let path = ProofPath::new(e.key());
 
             match self.proof.binary_search_by(|pe| {
-                pe.key.partial_cmp(&key).expect(
-                    "Incomparable keys in proof",
+                pe.path.partial_cmp(&path).expect(
+                    "Incomparable paths in proof",
                 )
             }) {
                 Ok(_) => {
-                    return Err(MapProofError::DuplicateKey(key));
+                    return Err(MapProofError::DuplicatePath(path));
                 }
 
                 Err(index) if index > 0 => {
-                    let prev_key = &self.proof[index - 1].key;
-                    if key.starts_with(prev_key) {
-                        return Err(MapProofError::EmbeddedKeys {
-                            prefix: *prev_key,
-                            key,
+                    let prev_path = &self.proof[index - 1].path;
+                    if path.starts_with(prev_path) {
+                        return Err(MapProofError::EmbeddedPaths {
+                            prefix: *prev_path,
+                            path,
                         });
                     }
                 }
@@ -643,7 +620,7 @@ where
     /// # use exonum::crypto::hash;
     /// let mut fork = { let db = MemoryDB::new(); db.fork() };
     /// let mut map = ProofMapIndex::new("index", &mut fork);
-    /// let (h1, h2) = (hash(&vec![1]), hash(&vec![2]));
+    /// let (h1, h2) = (hash(&[1]), hash(&[2]));
     /// map.put(&h1, 100u32);
     /// map.put(&h2, 200u32);
     ///
@@ -669,9 +646,9 @@ where
         // (which is the case for `MapProof`s returned by `ProofMapIndex.get_proof()`),
         // the sort is performed very quickly.
         proof.sort_unstable_by(|x, y| {
-            x.key.partial_cmp(&y.key).expect(
-                "Incorrectly formed keys supplied to MapProof; \
-                                              keys should have `from` field set to 0",
+            x.path.partial_cmp(&y.path).expect(
+                "Incorrectly formed paths supplied to MapProof; \
+                 paths should have `from` field set to 0",
             )
         });
 

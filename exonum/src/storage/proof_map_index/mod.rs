@@ -21,9 +21,10 @@ use crypto::{Hash, CryptoHash, HashStream};
 use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageValue};
 use self::key::{BitsRange, ChildKind, LEAF_KEY_PREFIX};
 use self::node::{BranchNode, Node};
+use self::proof::MapProofBuilder;
 
 pub use self::key::{KEY_SIZE as PROOF_MAP_KEY_SIZE, ProofMapKey, HashedKey, ProofPath};
-pub use self::proof::{MapProof, MapProofBuilder, MapProofError};
+pub use self::proof::{MapProof, MapProofError};
 
 #[cfg(test)]
 mod tests;
@@ -286,12 +287,10 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let name = "name";
     /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &snapshot);
+    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new("index", &snapshot);
     ///
-    /// let hash = Hash::default();
-    /// let proof = index.get_proof(hash);
+    /// let proof = index.get_proof(Hash::default());
     /// # drop(proof);
     /// ```
     pub fn get_proof(&self, key: K) -> MapProof<K, V> {
@@ -351,8 +350,8 @@ where
                             Node::Branch(branch_) => branch = branch_,
                             Node::Leaf(value) => {
                                 // We have reached the leaf node and haven't diverged!
-                                // The key is there, we've just gotten the value, so we just need to
-                                // return it.
+                                // The key is there, we've just gotten the value, so we just
+                                // need to return it.
                                 return MapProof::for_entry(
                                     (key, value),
                                     combine(left_hashes, right_hashes),
@@ -519,7 +518,7 @@ where
 
         match self.get_root_node() {
             Some((root_path, Node::Branch(root_branch))) => {
-                let mut builder = MapProof::builder();
+                let mut builder = MapProofBuilder::new();
 
                 let searched_paths: Vec<_> = {
                     let mut keys: Vec<_> =
@@ -550,7 +549,7 @@ where
             }
 
             Some((root_path, Node::Leaf(root_value))) => {
-                let mut builder = MapProof::builder();
+                let mut builder = MapProofBuilder::new();
                 // (One of) keys corresponding to the existing table entry.
                 let mut found_key: Option<K> = None;
 
@@ -1087,7 +1086,11 @@ where
             }
 
             fn child(&self, self_branch: &BranchNode, kind: ChildKind) -> Self {
-                Self::new(self.index, *self_branch.child_hash(kind), self_branch.child_path(kind))
+                Self::new(
+                    self.index,
+                    *self_branch.child_hash(kind),
+                    self_branch.child_path(kind),
+                )
             }
         }
 

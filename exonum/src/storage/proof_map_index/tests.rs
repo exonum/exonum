@@ -24,6 +24,7 @@ use encoding::serialize::reexport::Serialize;
 use super::{ProofPath, ProofMapIndex, ProofMapKey, HashedKey, MapProof};
 use super::key::{ChildKind, BitsRange, KEY_SIZE, LEAF_KEY_PREFIX};
 use super::node::BranchNode;
+use super::proof::MapProofBuilder;
 
 const IDX_NAME: &'static str = "idx_name";
 
@@ -409,7 +410,7 @@ fn test_invalid_map_proofs() {
 
     let h = hash(&vec![1]);
 
-    let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::builder()
+    let proof: MapProof<[u8; 32], Vec<u8>> = MapProofBuilder::new()
         .add_proof_entry(ProofPath::new(&[1; 32]).prefix(240), h)
         .create();
     assert_eq!(
@@ -419,52 +420,52 @@ fn test_invalid_map_proofs() {
 
     let json = json!({
         "proof": [
-            { "key": "11", "hash": Hash::default() },
-            { "key": "0", "hash": Hash::default() },
+            { "path": "11", "hash": Hash::default() },
+            { "path": "0", "hash": Hash::default() },
         ],
         "entries": []
     });
     let proof: MapProof<[u8; 32], Vec<u8>> = serde_json::from_value(json).unwrap();
     assert_eq!(
         proof.try_into::<Vec<_>>().unwrap_err().description(),
-        "Invalid key ordering in a map proof"
+        "Invalid path ordering in a map proof"
     );
 
-    let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::builder()
+    let proof: MapProof<[u8; 32], Vec<u8>> = MapProofBuilder::new()
         .add_proof_entry(ProofPath::new(&[1; 32]).prefix(3), h)
         .add_proof_entry(ProofPath::new(&[1; 32]).prefix(77), h)
         .create();
     assert_eq!(
         proof.try_into::<Vec<_>>().unwrap_err().description(),
-        "Embedded keys in a map proof"
+        "Embedded paths in a map proof"
     );
 
-    let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::builder()
+    let proof: MapProof<[u8; 32], Vec<u8>> = MapProofBuilder::new()
         .add_proof_entry(ProofPath::new(&[1; 32]).prefix(3), h)
         .add_entry([1; 32], vec![1, 2, 3])
         .create();
     assert_eq!(
         proof.try_into::<Vec<_>>().unwrap_err().description(),
-        "Embedded keys in a map proof"
+        "Embedded paths in a map proof"
     );
 
-    let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::builder()
+    let proof: MapProof<[u8; 32], Vec<u8>> = MapProofBuilder::new()
         .add_proof_entry(ProofPath::new(&[1; 32]).prefix(3), h)
         .add_entry([1; 32], vec![1, 2, 3])
         .create();
     assert_eq!(
         proof.try_into::<Vec<_>>().unwrap_err().description(),
-        "Embedded keys in a map proof"
+        "Embedded paths in a map proof"
     );
 
-    let proof: MapProof<[u8; 32], Vec<u8>> = MapProof::builder()
+    let proof: MapProof<[u8; 32], Vec<u8>> = MapProofBuilder::new()
         .add_proof_entry(ProofPath::new(&[0; 32]).prefix(10), h)
         .add_proof_entry(ProofPath::new(&[1; 32]), h)
         .add_entry([1; 32], vec![1, 2, 3])
         .create();
     assert_eq!(
         proof.try_into::<Vec<_>>().unwrap_err().description(),
-        "Duplicate keys in a map proof"
+        "Duplicate paths in a map proof"
     );
 }
 

@@ -228,20 +228,6 @@ impl ProofPath {
             self.bytes[PROOF_PATH_LEN_POS] = 0;
         };
     }
-
-    pub(crate) fn hashable_prefix(&self, prefix_len: u16) -> ProofPathPrefix {
-        debug_assert_eq!(self.start(), 0);
-        debug_assert!(
-            prefix_len <= self.len(),
-            "Attempted to extract prefix with length {} from key with length {}",
-            prefix_len,
-            self.len()
-        );
-        ProofPathPrefix {
-            parent: self,
-            prefix_len: prefix_len,
-        }
-    }
 }
 
 /// The bits representation of the `ProofPath`.
@@ -329,6 +315,23 @@ pub(crate) trait BitsRange {
             self.match_len(other, self.start())
         }
     }
+
+    fn hashable_prefix(&self, prefix_len: u16) -> BitsPrefix<Self>
+    where
+        Self: Sized,
+    {
+        debug_assert_eq!(self.start(), 0);
+        debug_assert!(
+            prefix_len <= self.len(),
+            "Attempted to extract prefix with length {} from key with length {}",
+            prefix_len,
+            self.len()
+        );
+        BitsPrefix {
+            parent: self,
+            prefix_len: prefix_len,
+        }
+    }
 }
 
 impl BitsRange for ProofPath {
@@ -354,7 +357,7 @@ impl BitsRange for ProofPath {
 
     fn prefix(&self, len: u16) -> Self {
         let end = self.start + len;
-        let key_len = self.raw_key().len() as u16 * 8;
+        let key_len = KEY_SIZE as u16 * 8;
         debug_assert!(end < key_len);
 
         let mut key = ProofPath::from_raw(self.bytes);
@@ -380,13 +383,12 @@ impl PartialEq for ProofPath {
 
 #[doc(hidden)]
 #[derive(Debug)]
-pub(crate) struct ProofPathPrefix<'a> {
-    parent: &'a ProofPath,
+pub(crate) struct BitsPrefix<'a, T: 'a> {
+    parent: &'a T,
     prefix_len: u16,
 }
 
-#[doc(hidden)]
-impl<'a> ProofPathPrefix<'a> {
+impl<'a, T: BitsRange> BitsPrefix<'a, T> {
     pub fn hash_to(&self, stream: HashStream) -> HashStream {
         let mut buffer = [0u8; PROOF_PATH_SIZE];
 
@@ -405,65 +407,6 @@ impl<'a> ProofPathPrefix<'a> {
         }
 
         stream.update(&buffer)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crypto::hash;
-    use rand::{self, Rng};
-    use super::*;
-
-    #[test]
-    fn test_proofpath_prefix_leaf() {
-        let path = ProofPath::new(&[1; 32]);
-        let prefix = path.hashable_prefix(256);
-        assert_eq!(
-            hash(&{
-                let mut buf = [0; PROOF_PATH_SIZE];
-                path.write(&mut buf);
-                buf
-            }),
-            prefix.hash_to(HashStream::new()).hash()
-        );
-    }
-
-    #[test]
-    fn test_proofpath_prefix_nonleaf() {
-        let path = ProofPath::new(&[42; 32]);
-        for i in 0..256 {
-            let prefix = path.hashable_prefix(i);
-            assert_eq!(
-                hash(&{
-                    let mut buf = [0; PROOF_PATH_SIZE];
-                    path.prefix(i).write(&mut buf);
-                    buf
-                }),
-                prefix.hash_to(HashStream::new()).hash()
-            );
-        }
-    }
-
-    #[test]
-    fn test_fuzz_proofpath_prefix() {
-        let mut rng = rand::thread_rng();
-        for _ in 0..32 {
-            let mut bytes = [0u8; 32];
-            rng.fill_bytes(&mut bytes);
-
-            let path = ProofPath::new(&bytes);
-            for i in 0..256 {
-                let prefix = path.hashable_prefix(i);
-                assert_eq!(
-                    hash(&{
-                        let mut buf = [0; PROOF_PATH_SIZE];
-                        path.prefix(i).write(&mut buf);
-                        buf
-                    }),
-                    prefix.hash_to(HashStream::new()).hash()
-                );
-            }
-        }
     }
 }
 
@@ -532,6 +475,126 @@ impl PartialOrd for ProofPath {
             }
 
             Some(self.end().cmp(&other.end()))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::{self, Value};
+    use rand::{self, Rng};
+
+    use crypto::hash;
+    use super::*;
+
+    /// Creates a random non-leaf, non-empty path.
+    fn random_path<T: Rng>(rng: &mut T) -> ProofPath {
+        ProofPath::new(&{
+            let mut buf = [0; 32];
+            rng.fill_bytes(&mut buf);
+            buf
+        }).prefix(1 + rng.gen::<u16>() % 255)
+    }
+
+    #[test]
+    fn test_proof_path_serialization() {
+        let path = ProofPath::new(&[1; 32]).prefix(3);
+        assert_eq!(serde_json::to_value(&path).unwrap(), json!("100"));
+        let path: ProofPath = serde_json::from_value(json!("101001")).unwrap();
+        assert_eq!(path, ProofPath::new(&[0b00_100101; 32]).prefix(6));
+
+        // Fuzz tests for roundtrip
+        let mut rng = rand::thread_rng();
+        for _ in 0..1000 {
+            let path = random_path(&mut rng);
+
+            let value = serde_json::to_value(&path).unwrap();
+            let other_path: ProofPath = serde_json::from_value(value.clone()).unwrap();
+            assert_eq!(other_path, path);
+
+            if let Value::String(s) = value {
+                assert_eq!(s.len(), path.len() as usize);
+                for (i, byte) in s.bytes().enumerate() {
+                    assert_eq!(
+                        byte,
+                        match path.bit(i as u16) {
+                            ChildKind::Left => b'0',
+                            ChildKind::Right => b'1',
+                        }
+                    );
+                }
+            } else {
+                panic!("Incorrect ProofPath serialization, string expected");
+            }
+        }
+    }
+
+    #[test]
+    fn test_proof_path_ordering() {
+        assert!(ProofPath::new(&[1; 32]) > ProofPath::new(&[254; 32]));
+        assert!(ProofPath::new(&[0b0001_0001; 32]) > ProofPath::new(&[0b0010_0001; 32]));
+        assert!(ProofPath::new(&[1; 32]) == ProofPath::new(&[1; 32]));
+        assert!(ProofPath::new(&[1; 32]).prefix(6) == ProofPath::new(&[129; 32]).prefix(6));
+        assert!(ProofPath::new(&[1; 32]).prefix(254) < ProofPath::new(&[1; 32]));
+
+        let mut rng = rand::thread_rng();
+        for _ in 0..1000 {
+            let (x, y) = (random_path(&mut rng), random_path(&mut rng));
+            let x_bits = (0..x.len()).map(|i| x.bit(i));
+            let y_bits = (0..y.len()).map(|i| y.bit(i));
+            assert_eq!(x.partial_cmp(&y).unwrap(), x_bits.cmp(y_bits));
+        }
+    }
+
+    #[test]
+    fn test_proof_path_prefix_leaf() {
+        let path = ProofPath::new(&[1; 32]);
+        let prefix = path.hashable_prefix(256);
+        assert_eq!(
+            hash(&{
+                let mut buf = [0; PROOF_PATH_SIZE];
+                path.write(&mut buf);
+                buf
+            }),
+            prefix.hash_to(HashStream::new()).hash()
+        );
+    }
+
+    #[test]
+    fn test_proof_path_prefix_nonleaf() {
+        let path = ProofPath::new(&[42; 32]);
+        for i in 0..256 {
+            let prefix = path.hashable_prefix(i);
+            assert_eq!(
+                hash(&{
+                    let mut buf = [0; PROOF_PATH_SIZE];
+                    path.prefix(i).write(&mut buf);
+                    buf
+                }),
+                prefix.hash_to(HashStream::new()).hash()
+            );
+        }
+    }
+
+    #[test]
+    fn test_fuzz_proof_path_prefix() {
+        let mut rng = rand::thread_rng();
+        for _ in 0..32 {
+            let mut bytes = [0u8; 32];
+            rng.fill_bytes(&mut bytes);
+
+            let path = ProofPath::new(&bytes);
+            for i in 0..256 {
+                let prefix = path.hashable_prefix(i);
+                assert_eq!(
+                    hash(&{
+                        let mut buf = [0; PROOF_PATH_SIZE];
+                        path.prefix(i).write(&mut buf);
+                        buf
+                    }),
+                    prefix.hash_to(HashStream::new()).hash()
+                );
+            }
         }
     }
 }
