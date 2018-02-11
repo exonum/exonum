@@ -1057,13 +1057,75 @@ where
     }
 }
 
-impl<T, K, V> ::std::fmt::Debug for ProofMapIndex<T, K, V>
+impl<T, K, V> fmt::Debug for ProofMapIndex<T, K, V>
 where
     T: AsRef<Snapshot>,
     K: ProofMapKey,
     V: StorageValue + fmt::Debug,
 {
-    fn fmt(&self, _: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        unimplemented!();
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        struct Entry<'a, T: 'a, K: 'a, V: 'a + StorageValue> {
+            index: &'a ProofMapIndex<T, K, V>,
+            path: ProofPath,
+            hash: Hash,
+            node: Node<V>,
+        }
+
+        impl<'a, T, K, V> Entry<'a, T, K, V>
+        where
+            T: AsRef<Snapshot>,
+            K: ProofMapKey,
+            V: StorageValue,
+        {
+            fn new(index: &'a ProofMapIndex<T, K, V>, hash: Hash, path: ProofPath) -> Self {
+                Entry {
+                    index,
+                    path,
+                    hash,
+                    node: index.get_node_unchecked(&path),
+                }
+            }
+
+            fn child(&self, self_branch: &BranchNode, kind: ChildKind) -> Self {
+                Self::new(self.index, *self_branch.child_hash(kind), self_branch.child_path(kind))
+            }
+        }
+
+        impl<'a, T, K, V> fmt::Debug for Entry<'a, T, K, V>
+        where
+            T: AsRef<Snapshot>,
+            K: ProofMapKey,
+            V: StorageValue + fmt::Debug,
+        {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                match self.node {
+                    Node::Leaf(ref value) => {
+                        f.debug_struct("Leaf")
+                            .field("key", &self.path)
+                            .field("hash", &self.hash)
+                            .field("value", value)
+                            .finish()
+                    }
+                    Node::Branch(ref branch) => {
+                        f.debug_struct("Branch")
+                            .field("path", &self.path)
+                            .field("hash", &self.hash)
+                            .field("left", &self.child(branch, ChildKind::Left))
+                            .field("right", &self.child(branch, ChildKind::Right))
+                            .finish()
+                    }
+                }
+
+            }
+        }
+
+        if let Some(prefix) = self.get_root_path() {
+            let root_entry = Entry::new(self, self.root_hash(), prefix);
+            f.debug_struct("ProofMapIndex")
+                .field("entries", &root_entry)
+                .finish()
+        } else {
+            f.debug_struct("ProofMapIndex").finish()
+        }
     }
 }
