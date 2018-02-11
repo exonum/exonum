@@ -18,16 +18,16 @@ cargo install --example configuration
 
   - `4` is a required indexed parameter and stands for the number of nodes in
     testnet:
-  
+
     ```bash
     mkdir -p testnet/configuration_service
     cd testnet/configuration_service
     configuration generate-testnet --start 5400 4 --output_dir .
     cd ..
     ```
-    
+
   - This should create following config for testnet:
-  
+
     ```bash
     $ tree configuration_service/
     configuration_service/
@@ -37,7 +37,7 @@ cargo install --example configuration
       ├── 2.toml
       └── 3.toml
     ```
-    
+
 - Run `4` nodes:
 
   - manually for the each node's process:
@@ -67,51 +67,51 @@ cargo install --example configuration
         $ export TESTNET_DESTDIR=/Users/user/Exonum/testnet
         ```
 
-     1. run [helper script](../testnet/testnetctl.sh) for initializing
-        `supervisor` and `configuration_service` process group
-        [config](../testnet/supervisord) to `$TESTNET_DESDIR` directory.
+    1. run [helper script](../testnet/testnetctl.sh) for initializing
+       `supervisor` and `configuration_service` process group
+       [config](../testnet/supervisord) to `$TESTNET_DESDIR` directory.
 
-        ```bash
-        ./testnet/testnetctl.sh enable
-        ```
+       ```bash
+       ./testnet/testnetctl.sh enable
+       ```
 
-     1. go to `$TESTNET_DESTDIR`. It contains new `etc`, `run`, `log` folders.
+    1. go to `$TESTNET_DESTDIR`. It contains new `etc`, `run`, `log` folders.
 
-        ```bash
-        $ cd $TESTNET_DESTDIR
-        $ tree .
-        .
-        ├── configuration_service
-        │   └── validators
-        │       ├── 0.toml
-        │       ├── 1.toml
-        │       ├── 2.toml
-        │       └── 3.toml
-        ├── etc
-        │   ├── conf.d
-        │   │   └── configuration_service.conf
-        │   └── supervisord.conf
-        ├── log
-        │   ├── supervisor
-        │   │   ├── configuration_service_00-stderr---supervisor-rMqmIy.log
-        │   │   ... ...
-        │   │   └── configuration_service_03-stdout---supervisor-s29Fd_.log
-        │   └── supervisord.log
-        └── run
-            └── supervisord.pid
+       ```bash
+       $ cd $TESTNET_DESTDIR
+       $ tree .
+       .
+       ├── configuration_service
+       │   └── validators
+       │       ├── 0.toml
+       │       ├── 1.toml
+       │       ├── 2.toml
+       │       └── 3.toml
+       ├── etc
+       │   ├── conf.d
+       │   │   └── configuration_service.conf
+       │   └── supervisord.conf
+       ├── log
+       │   ├── supervisor
+       │   │   ├── configuration_service_00-stderr---supervisor-rMqmIy.log
+       │   │   ... ...
+       │   │   └── configuration_service_03-stdout---supervisor-s29Fd_.log
+       │   └── supervisord.log
+       └── run
+           └── supervisord.pid
 
-        7 directories, 16 files
-        ```
+       7 directories, 16 files
+       ```
 
-     1. launch `configuration_service` process group.
+    1. launch `configuration_service` process group.
 
-        ```bash
-        $ supervisorctl start configuration_service:*
-        configuration_service:configuration_service_01: started
-        configuration_service:configuration_service_00: started
-        configuration_service:configuration_service_03: started
-        configuration_service:configuration_service_02: started
-        ```
+       ```bash
+       $ supervisorctl start configuration_service:*
+       configuration_service:configuration_service_01: started
+       configuration_service:configuration_service_00: started
+       configuration_service:configuration_service_03: started
+       configuration_service:configuration_service_02: started
+       ```
 
 ## Global variable service http api
 
@@ -158,13 +158,13 @@ endpoint.
 
 #### Propose and vote transactions restrictions
 
-- Propose transactions will only get submitted and executed with state change 
+- Propose transactions will only get submitted and executed with state change
   if all of the following conditions take place:
-  
+
     1. new config body constitutes a valid json string and corresponds to
        [StoredConfiguration][exonum config] format.
 
-    1. `previous_cfg_hash` in proposed config body equals to hash of *actual* 
+    1. `previous_cfg_hash` in proposed config body equals to hash of *actual*
        config.
 
     1. `actual_from` in proposed config body is greater than *current height*.
@@ -186,13 +186,13 @@ endpoint.
 
 - Vote transactions will only get submitted and executed with state change if
   all of the following conditions take place:
-   
+
     1. the vote transaction references a config propose with known config hash.
 
     1. a *following* config isn't  already present.
 
     1. *actual* config contains the node-sender's public key in `validators`
-       field, as specified in `from` field of vote transaction. The `from` 
+       field, as specified in `from` field of vote transaction. The `from`
        field is determined by public key of node whose `postvote` endpoint is
        accessed for signing the transaction on the maintainer's behalf.
 

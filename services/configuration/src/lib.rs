@@ -105,7 +105,8 @@ extern crate lazy_static;
 use router::Router;
 use iron::Handler;
 use exonum::api::Api;
-use exonum::blockchain::{StoredConfiguration, Service, Transaction, Schema, ApiContext, gen_prefix};
+use exonum::blockchain::{StoredConfiguration, Service, Transaction, Schema, ApiContext,
+                         ExecutionResult, gen_prefix};
 use exonum::node::State;
 use exonum::helpers::fabric::{ServiceFactory, Context};
 use exonum::crypto::{Signature, PublicKey, Hash};
@@ -456,7 +457,7 @@ impl Transaction for TxConfigPropose {
         self.verify_signature(self.from())
     }
 
-    fn execute(&self, fork: &mut Fork) {
+    fn execute(&self, fork: &mut Fork) -> ExecutionResult {
         let following_config: Option<StoredConfiguration> = Schema::new(&fork)
             .following_configuration();
 
@@ -467,7 +468,7 @@ impl Transaction for TxConfigPropose {
                 serde_json::to_string(self).unwrap(),
                 foll_cfg
             );
-            return;
+            return Ok(());
         }
 
         let actual_config: StoredConfiguration = Schema::new(&fork).actual_configuration();
@@ -480,7 +481,7 @@ impl Transaction for TxConfigPropose {
                 "Discarding TxConfigPropose:{} from unknown validator. ",
                 serde_json::to_string(self).unwrap()
             );
-            return;
+            return Ok(());
         }
 
         let config_candidate = StoredConfiguration::try_deserialize(self.cfg().as_bytes());
@@ -491,7 +492,7 @@ impl Transaction for TxConfigPropose {
                 serde_json::to_string(self).unwrap(),
                 config_candidate
             );
-            return;
+            return Ok(());
         }
 
         let actual_config_hash = actual_config.hash();
@@ -502,7 +503,7 @@ impl Transaction for TxConfigPropose {
                 serde_json::to_string(self).unwrap(),
                 actual_config
             );
-            return;
+            return Ok(());
         }
 
         let current_height = Schema::new(&fork).height().next();
@@ -514,7 +515,7 @@ impl Transaction for TxConfigPropose {
                 serde_json::to_string(self).unwrap(),
                 current_height
             );
-            return;
+            return Ok(());
         }
 
         let result = ConfigurationSchema::new(fork).put_propose(self.clone());
@@ -525,6 +526,8 @@ impl Transaction for TxConfigPropose {
                 serde_json::to_string(self).unwrap()
             );
         }
+
+        Ok(())
     }
 }
 
@@ -533,14 +536,14 @@ impl Transaction for TxConfigVote {
         self.verify_signature(self.from())
     }
 
-    fn execute(&self, fork: &mut Fork) {
+    fn execute(&self, fork: &mut Fork) -> ExecutionResult {
         let propose_option = ConfigurationSchema::new(&fork).get_propose(self.cfg_hash());
         if propose_option.is_none() {
             error!(
                 "Discarding TxConfigVote:{:?} which references unknown config hash",
                 self
             );
-            return;
+            return Ok(());
         }
 
 
@@ -554,7 +557,7 @@ impl Transaction for TxConfigVote {
                 self,
                 foll_cfg
             );
-            return;
+            return Ok(());
         }
 
         let actual_config: StoredConfiguration = Schema::new(&fork).actual_configuration();
@@ -567,7 +570,7 @@ impl Transaction for TxConfigVote {
                 "Discarding TxConfigVote:{:?} from unknown validator. ",
                 self
             );
-            return;
+            return Ok(());
         }
 
         let referenced_tx_propose = propose_option.unwrap();
@@ -582,7 +585,7 @@ impl Transaction for TxConfigVote {
                 serde_json::to_string(&referenced_tx_propose).unwrap(),
                 actual_config
             );
-            return;
+            return Ok(());
         }
 
         let current_height = Schema::new(&fork).height().next();
@@ -595,13 +598,13 @@ impl Transaction for TxConfigVote {
                 serde_json::to_string(&referenced_tx_propose).unwrap(),
                 current_height
             );
-            return;
+            return Ok(());
         }
 
         let mut configuration_schema = ConfigurationSchema::new(fork);
         let result = configuration_schema.put_vote(self);
         if !result {
-            return;
+            return Ok(());
         }
 
         trace!(
@@ -623,6 +626,8 @@ impl Transaction for TxConfigVote {
         if votes_count >= State::byzantine_majority_count(actual_config.validator_keys.len()) {
             Schema::new(fork).commit_configuration(parsed_config);
         }
+
+        Ok(())
     }
 }
 
