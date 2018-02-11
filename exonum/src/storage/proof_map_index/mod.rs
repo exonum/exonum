@@ -326,7 +326,7 @@ where
                     node_path = branch.child_path(next_bit);
 
                     // XXX: strictly speaking, one of `*branch.child_hash()` copies could
-                    // be avoided by dismatling `branch` via a consuming method
+                    // be avoided by dismantling `branch` via a consuming method
                     let other_path_and_hash =
                         (branch.child_path(!next_bit), *branch.child_hash(!next_bit));
                     match !next_bit {

@@ -565,7 +565,7 @@ fn build_multiproof_in_single_node_tree(db: Box<Database>) {
     check_map_multiproof(proof, keys, &table);
 }
 
-fn build_proof_in_multinode_tree(db: Box<Database>) {
+fn build_proof_in_complex_tree(db: Box<Database>) {
     let mut storage = db.fork();
     let mut table = ProofMapIndex::new(IDX_NAME, &mut storage);
 
@@ -1222,33 +1222,33 @@ fn tree_with_hashed_key(db: Box<Database>) {
 // // // // Macros // // // //
 
 macro_rules! test_on_db {
-    {$testname:ident, $fnname:ident} => {
+    {$test_name:ident, $fn_name:ident} => {
         #[test]
-        fn $testname() {
+        fn $test_name() {
             let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
             let path = dir.path();
             let db = create_database(path);
-            super::$fnname(db);
+            super::$fn_name(db);
         }
     };
 }
 
 macro_rules! test_on_2dbs {
-    {$testname:ident, $fnname:ident} => {
+    {$test_name:ident, $fn_name:ident} => {
         #[test]
-        fn $testname() {
+        fn $test_name() {
             let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
             let path1 = dir1.path();
             let dir2 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
             let path2 = dir2.path();
             let db1 = create_database(path1);
             let db2 = create_database(path2);
-            super::$fnname(db1, db2);
+            super::$fn_name(db1, db2);
         }
     };
 }
 
-// // // // Testsuites // // // //
+// // // // Test suites // // // //
 
 macro_rules! common_tests {
     {} => {
@@ -1267,7 +1267,7 @@ macro_rules! common_tests {
             test_build_multiproof_in_single_node_tree,
             build_multiproof_in_single_node_tree
         }
-        test_on_db!{test_build_proof_in_multinode_tree, build_proof_in_multinode_tree}
+        test_on_db!{test_build_proof_in_complex_tree, build_proof_in_complex_tree}
         test_on_db!{test_build_multiproof_simple, build_multiproof_simple}
         test_on_db!{
             test_fuzz_insert_build_proofs_in_table_filled_with_hashes,

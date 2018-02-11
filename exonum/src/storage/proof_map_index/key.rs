@@ -561,7 +561,7 @@ mod tests {
     }
 
     #[test]
-    fn test_proof_path_prefix_nonleaf() {
+    fn test_proof_path_prefix_not_leaf() {
         let path = ProofPath::new(&[42; 32]);
         for i in 0..256 {
             let prefix = path.hashable_prefix(i);

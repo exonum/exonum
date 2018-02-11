@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// spell-checker:ignore bpath, deser, precheck, repr
+
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 
 use crypto::{Hash, HashStream};
@@ -545,7 +547,7 @@ where
     K: ProofMapKey,
     V: StorageValue,
 {
-    fn prevalidate(&self) -> Result<(), MapProofError> {
+    fn precheck(&self) -> Result<(), MapProofError> {
         use std::cmp::Ordering;
 
         // Check that entries in proof are in increasing order
@@ -625,7 +627,7 @@ where
     ///
     /// [`ProofMapIndex`]: struct.ProofMapIndex.html
     pub fn check(self) -> Result<CheckedMapProof<K, V>, MapProofError> {
-        self.prevalidate()?;
+        self.precheck()?;
         let (mut proof, entries) = (self.proof, self.entries);
 
         proof.extend(entries.iter().filter_map(|e| {

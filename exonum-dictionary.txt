@@ -29,6 +29,7 @@ deserializes
 deserializing
 Exonum
 fsync
+hashable
 healthcheck
 keepalive
 keypair
@@ -40,6 +41,8 @@ Merkelized
 Merkle
 millis
 mpsc
+multiproof
+multiproofs
 mutex
 nanos
 nodelay
