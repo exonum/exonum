@@ -143,6 +143,8 @@ fn test_get_actual_config() {
         ApiResponseConfigHashInfo {
             hash: stored.hash(),
             config: stored,
+            propose: None,
+            votes: None,
         }
     };
     assert_eq!(expected, actual);
@@ -166,6 +168,8 @@ fn test_get_following_config() {
         ApiResponseConfigHashInfo {
             hash: stored.hash(),
             config: stored,
+            propose: None,
+            votes: None,
         }
     };
     testkit.commit_configuration_change(cfg_proposal);
@@ -372,14 +376,20 @@ fn test_get_all_committed() {
     let expected_response_1 = ApiResponseConfigHashInfo {
         hash: initial_cfg.hash(),
         config: initial_cfg.clone(),
+        propose: None,
+        votes: None,
     };
     let expected_response_2 = ApiResponseConfigHashInfo {
         hash: new_cfg_1.hash(),
         config: new_cfg_1.clone(),
+        propose: Some(testkit.find_propose(new_cfg_1.hash()).unwrap().hash()),
+        votes: Some(testkit.votes_for_propose(new_cfg_1.hash())),
     };
     let expected_response_3 = ApiResponseConfigHashInfo {
         hash: new_cfg_2.hash(),
         config: new_cfg_2.clone(),
+        propose: Some(testkit.find_propose(new_cfg_2.hash()).unwrap().hash()),
+        votes: Some(testkit.votes_for_propose(new_cfg_2.hash())),
     };
     assert_eq!(
         vec![expected_response_1.clone(), expected_response_2.clone(), expected_response_3.clone()],
