@@ -222,11 +222,7 @@ impl CryptocurrencyApi {
             self.ok_response(&serde_json::to_value(wallet.actual_balance(height))
                 .unwrap())
         } else {
-            Ok(Response::with((
-                Status::NotFound,
-                Header(ContentType::json()),
-                "\"Wallet not found\"",
-            )))
+            self.not_found_response(&serde_json::to_value("Wallet not found").unwrap())
         }
     }
 }

@@ -219,11 +219,7 @@ impl CryptocurrencyApi {
         if let Some(wallet) = self.wallet(&public_key) {
             self.ok_response(&serde_json::to_value(wallet).unwrap())
         } else {
-            Ok(Response::with((
-                Status::NotFound,
-                Header(ContentType::json()),
-                "\"Wallet not found\"",
-            )))
+            self.not_found_response(&serde_json::to_value("Wallet not found").unwrap())
         }
     }
 
