@@ -58,6 +58,8 @@ extern crate tokio_timer;
 extern crate tokio_core;
 extern crate tokio_io;
 extern crate tokio_retry;
+#[macro_use]
+extern crate failure;
 #[cfg(test)]
 #[macro_use]
 extern crate lazy_static;

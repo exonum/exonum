@@ -19,6 +19,7 @@ use std::marker::PhantomData;
 use std::io;
 use std::collections::BTreeMap;
 use std::fmt;
+use std::str::FromStr;
 
 use iron::IronError;
 use iron::prelude::*;
@@ -27,13 +28,15 @@ use iron::headers::Cookie;
 use hyper::header::{ContentType, SetCookie};
 use cookie::Cookie as CookiePair;
 use router::Router;
+use params;
 use serde_json;
 use serde::{Serialize, Serializer};
 use serde::de::{self, Visitor, Deserialize, Deserializer};
+use failure::Fail;
 
-use crypto::{PublicKey, SecretKey, Hash};
+use crypto::{PublicKey, SecretKey};
 use encoding::serialize::{FromHex, FromHexError, ToHex, encode_hex};
-use storage::{Result as StorageResult, Error as StorageError};
+use storage;
 
 pub mod public;
 pub mod private;
@@ -41,63 +44,33 @@ pub mod private;
 mod tests;
 
 /// List of possible Api errors.
-#[derive(Debug)]
+#[derive(Fail, Debug)]
 pub enum ApiError {
-    /// Service error.
-    Service(Box<::std::error::Error + Send + Sync>),
     /// Storage error.
-    Storage(StorageError),
-    /// Converting from hex error.
-    FromHex(FromHexError),
+    #[fail(display = "Storage error: {}", _0)]
+    Storage(
+        #[cause]
+        storage::Error
+    ),
+
     /// Input/output error.
-    Io(::std::io::Error),
-    /// File not found.
-    FileNotFound(Hash),
-    /// Not found.
-    NotFound,
-    /// File too big.
-    FileTooBig,
-    /// File already exists.
-    FileExists(Hash),
-    /// Incorrect request.
-    IncorrectRequest(Box<::std::error::Error + Send + Sync>),
+    #[fail(display = "IO error: {}", _0)]
+    Io(
+        #[cause]
+        ::std::io::Error
+    ),
+
+    /// Bad request.
+    #[fail(display = "Bad request: {}", _0)]
+    BadRequest(String),
+
+    /// Internal error.
+    #[fail(display = "Internal server error: {}", _0)]
+    InternalError(Box<::std::error::Error + Send + Sync>),
+
     /// Unauthorized error.
+    #[fail(display = "Unauthorized")]
     Unauthorized,
-    /// Address parse error.
-    AddressParseError(::std::net::AddrParseError),
-    /// Serialize error,
-    Serialize(Box<::std::error::Error + Send + Sync>),
-}
-
-impl fmt::Display for ApiError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
-
-impl ::std::error::Error for ApiError {
-    fn description(&self) -> &str {
-        match *self {
-            ApiError::Service(ref error) |
-            ApiError::IncorrectRequest(ref error) => error.description(),
-            ApiError::Storage(ref error) => error.description(),
-            ApiError::FromHex(ref error) => error.description(),
-            ApiError::Io(ref error) => error.description(),
-            ApiError::FileNotFound(_) => "File not found",
-            ApiError::NotFound => "Not found",
-            ApiError::FileTooBig => "File too big",
-            ApiError::FileExists(_) => "File exists",
-            ApiError::Unauthorized => "Unauthorized",
-            ApiError::AddressParseError(_) => "AddressParseError",
-            ApiError::Serialize(_) => "Serialization error",
-        }
-    }
-}
-
-impl From<::std::net::AddrParseError> for ApiError {
-    fn from(e: ::std::net::AddrParseError) -> ApiError {
-        ApiError::AddressParseError(e)
-    }
 }
 
 impl From<io::Error> for ApiError {
@@ -106,37 +79,36 @@ impl From<io::Error> for ApiError {
     }
 }
 
-impl From<StorageError> for ApiError {
-    fn from(e: StorageError) -> ApiError {
+impl From<storage::Error> for ApiError {
+    fn from(e: storage::Error) -> ApiError {
         ApiError::Storage(e)
-    }
-}
-
-impl From<FromHexError> for ApiError {
-    fn from(e: FromHexError) -> ApiError {
-        ApiError::FromHex(e)
     }
 }
 
 impl From<ApiError> for IronError {
     fn from(e: ApiError) -> IronError {
-        use std::error::Error;
-
-        let mut body = BTreeMap::new();
-        body.insert("debug", format!("{:?}", e));
-        body.insert("description", e.description().to_string());
         let code = match e {
-            ApiError::FileExists(hash) |
-            ApiError::FileNotFound(hash) => {
-                body.insert("hash", encode_hex(&hash));
-                status::Conflict
-            }
-            _ => status::Conflict,
+            // Note that `status::Unauthorized` does not fit here, because
+            //
+            // > A server generating a 401 (Unauthorized) response MUST send a
+            // > WWW-Authenticate header field containing at least one challenge.
+            //
+            // https://tools.ietf.org/html/rfc7235#section-4.1
+            ApiError::Unauthorized => status::Forbidden,
+
+            ApiError::BadRequest(..) => status::BadRequest,
+
+            ApiError::Storage(..) |
+            ApiError::Io(..) |
+            ApiError::InternalError(..) => status::InternalServerError,
         };
-        IronError {
-            error: Box::new(e),
-            response: Response::with((code, ::serde_json::to_string_pretty(&body).unwrap())),
-        }
+        let body = {
+            let mut map = BTreeMap::new();
+            map.insert("debug", format!("{:?}", e));
+            map.insert("description", e.to_string());
+            serde_json::to_string_pretty(&map).unwrap()
+        };
+        IronError::new(e.compat(), (code, body))
     }
 }
 
@@ -210,12 +182,58 @@ where
 
 /// `Api` trait defines `RESTful` API.
 pub trait Api {
+    /// Deserializes an url fragment as `T`
+    fn url_fragment<T>(&self, request: &Request, name: &str) -> Result<T, ApiError>
+    where
+        T: FromStr,
+        T::Err: fmt::Display,
+    {
+        let params = request.extensions.get::<Router>().unwrap();
+        let fragment = params.find(name).ok_or_else(|| {
+            ApiError::BadRequest(format!("Required parameter '{}' is missing", name))
+        })?;
+        let value = T::from_str(fragment).map_err(|e| {
+            ApiError::BadRequest(format!("Invalid '{}' parameter: {}", name, e))
+        })?;
+        Ok(value)
+    }
+
+    /// Deserializes an optional parameter from request body or get-parameters
+    fn optional_param<T>(&self, request: &mut Request, name: &str) -> Result<Option<T>, ApiError>
+    where
+        T: FromStr,
+        T::Err: fmt::Display,
+    {
+        let map = request.get_ref::<params::Params>().unwrap();
+        let value = match map.find(&[name]) {
+            Some(&params::Value::String(ref param)) => {
+                let value = T::from_str(param).map_err(|e| {
+                    ApiError::BadRequest(format!("Invalid '{}' parameter: {}", name, e))
+                })?;
+                Some(value)
+            }
+            _ => None,
+        };
+        Ok(value)
+    }
+
+    /// Deserializes a required parameter from request body or get-parameters
+    fn required_param<T>(&self, request: &mut Request, name: &str) -> Result<T, ApiError>
+    where
+        T: FromStr,
+        T::Err: fmt::Display,
+    {
+        self.optional_param(request, name)?.ok_or_else(|| {
+            ApiError::BadRequest(format!("Required parameter '{}' is missing", name))
+        })
+    }
+
     /// Loads hex value from the cookies.
     fn load_hex_value_from_cookie<'a>(
         &self,
         request: &'a Request,
         key: &str,
-    ) -> StorageResult<Vec<u8>> {
+    ) -> storage::Result<Vec<u8>> {
         if let Some(&Cookie(ref cookies)) = request.headers.get() {
             for cookie in cookies.iter() {
                 if let Ok(c) = CookiePair::parse(cookie.as_str()) {
@@ -227,7 +245,7 @@ pub trait Api {
                 }
             }
         }
-        Err(StorageError::new(
+        Err(storage::Error::new(
             format!("Unable to find value with given key {}", key),
         ))
     }

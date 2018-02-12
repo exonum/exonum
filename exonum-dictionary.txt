@@ -15,6 +15,7 @@ byteorder
 checkpointed
 clippy
 clonned
+compat
 concat
 counterintuitive
 cryptocurrency

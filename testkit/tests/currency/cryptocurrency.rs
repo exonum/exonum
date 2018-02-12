@@ -198,8 +198,8 @@ impl CryptocurrencyApi {
                 let json = TransactionResponse { tx_hash };
                 self.ok_response(&serde_json::to_value(&json).unwrap())
             }
-            Ok(None) => Err(ApiError::IncorrectRequest("Empty request body".into()))?,
-            Err(e) => Err(ApiError::IncorrectRequest(Box::new(e)))?,
+            Ok(None) => Err(ApiError::BadRequest("Empty request body".into()))?,
+            Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
         }
     }
 
@@ -210,7 +210,7 @@ impl CryptocurrencyApi {
         let path = req.url.path();
         let wallet_key = path.last().unwrap();
         let public_key = PublicKey::from_hex(wallet_key).map_err(|e| {
-            IronError::new(ApiError::FromHex(e), (
+            IronError::new(e, (
                 Status::BadRequest,
                 Header(ContentType::json()),
                 "\"Invalid request param: `pub_key`\"",
@@ -219,11 +219,7 @@ impl CryptocurrencyApi {
         if let Some(wallet) = self.wallet(&public_key) {
             self.ok_response(&serde_json::to_value(wallet).unwrap())
         } else {
-            Err(IronError::new(ApiError::NotFound, (
-                Status::NotFound,
-                Header(ContentType::json()),
-                "\"Wallet not found\"",
-            )))
+            self.not_found_response(&serde_json::to_value("Wallet not found").unwrap())
         }
     }
 

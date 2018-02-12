@@ -15,6 +15,8 @@
 //! Common widely used type definitions.
 
 use std::fmt;
+use std::str::FromStr;
+use std::num::ParseIntError;
 
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 
@@ -321,6 +323,14 @@ impl<'de> Deserialize<'de> for Height {
     {
 
         Ok(Height(u64::deserialize(deserializer)?))
+    }
+}
+
+impl FromStr for Height {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Height, ParseIntError> {
+        u64::from_str(s).map(Height)
     }
 }
 
