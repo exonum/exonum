@@ -13,9 +13,7 @@
 // limitations under the License.
 
 use std::str;
-use std::num::ParseIntError;
 
-use params::{Map as ParamsMap, Params, Value};
 use router::Router;
 use iron::prelude::*;
 use bodyparser;
@@ -24,7 +22,6 @@ use exonum::crypto::{CryptoHash, PublicKey, SecretKey, Hash};
 use exonum::blockchain::{Blockchain, StoredConfiguration, Schema};
 use exonum::storage::StorageValue;
 use exonum::node::TransactionSend;
-use exonum::encoding::serialize::FromHex;
 use exonum::encoding::serialize::json::reexport as serde_json;
 use exonum::helpers::Height;
 
@@ -222,23 +219,12 @@ impl PublicConfigApi {
         Ok(committed_configs)
     }
 
-    fn retrieve_params(map: &ParamsMap) -> Result<(Option<Hash>, Option<Height>), ApiError> {
-        let actual_from: Option<Height>;
-        let previous_cfg_hash: Option<Hash>;
-        previous_cfg_hash = match map.find(&["previous_cfg_hash"]) {
-            Some(&Value::String(ref hash_string)) => {
-                Some(Hash::from_hex(hash_string).map_err(ApiError::FromHex)?)
-            }
-            _ => None,
-        };
-        actual_from = match map.find(&["actual_from"]) {
-            Some(&Value::String(ref from_str)) => {
-                Some(from_str.parse().map(Height).map_err(|e: ParseIntError| {
-                    ApiError::IncorrectRequest(Box::new(e))
-                })?)
-            }
-            _ => None,
-        };
+    fn retrieve_params(
+        &self,
+        request: &mut Request,
+    ) -> Result<(Option<Hash>, Option<Height>), ApiError> {
+        let previous_cfg_hash: Option<Hash> = self.optional_param(request, "previous_cfg_hash")?;
+        let actual_from: Option<Height> = self.optional_param(request, "actual_from")?;
         Ok((previous_cfg_hash, actual_from))
     }
 }
@@ -294,56 +280,28 @@ impl Api for PublicConfigApi {
 
         let self_ = self.clone();
         let config_by_hash = move |req: &mut Request| -> IronResult<Response> {
-            let params = req.extensions.get::<Router>().unwrap();
-            match params.find("hash") {
-                Some(hash_str) => {
-                    let hash = Hash::from_hex(hash_str).map_err(ApiError::from)?;
-                    let info = self_.get_config_by_hash(&hash)?;
-                    self_.ok_response(&serde_json::to_value(info).unwrap())
-                }
-                None => {
-                    Err(ApiError::IncorrectRequest(
-                        "Required route \
-                                           parameter of configuration \
-                                           'hash' is missing"
-                            .into(),
-                    ))?
-                }
-            }
+            let hash: Hash = self_.url_fragment(req, "hash")?;
+            let info = self_.get_config_by_hash(&hash)?;
+            self_.ok_response(&serde_json::to_value(info).unwrap())
         };
 
         let self_ = self.clone();
         let get_votes_for_propose = move |req: &mut Request| -> IronResult<Response> {
-            let params = req.extensions.get::<Router>().unwrap();
-            match params.find("hash") {
-                Some(hash_str) => {
-                    let propose_cfg_hash = Hash::from_hex(hash_str).map_err(ApiError::from)?;
-                    let info = self_.get_votes_for_propose(&propose_cfg_hash)?;
-                    self_.ok_response(&serde_json::to_value(info).unwrap())
-                }
-                None => {
-                    Err(ApiError::IncorrectRequest(
-                        "Required route \
-                                           parameter of configuration \
-                                           'hash' is missing"
-                            .into(),
-                    ))?
-                }
-            }
+            let propose_cfg_hash: Hash = self_.url_fragment(req, "hash")?;
+            let info = self_.get_votes_for_propose(&propose_cfg_hash)?;
+            self_.ok_response(&serde_json::to_value(info).unwrap())
         };
 
         let self_ = self.clone();
         let get_all_proposes = move |req: &mut Request| -> IronResult<Response> {
-            let map = req.get_ref::<Params>().unwrap();
-            let (previous_cfg_hash, actual_from) = PublicConfigApi::retrieve_params(map)?;
+            let (previous_cfg_hash, actual_from) = self_.retrieve_params(req)?;
             let info = self_.get_all_proposes(previous_cfg_hash, actual_from)?;
             self_.ok_response(&serde_json::to_value(info).unwrap())
         };
 
         let self_ = self.clone();
         let get_all_committed = move |req: &mut Request| -> IronResult<Response> {
-            let map = req.get_ref::<Params>().unwrap();
-            let (previous_cfg_hash, actual_from) = PublicConfigApi::retrieve_params(map)?;
+            let (previous_cfg_hash, actual_from) = self_.retrieve_params(req)?;
             let info = self_.get_all_committed(previous_cfg_hash, actual_from)?;
             self_.ok_response(&serde_json::to_value(info).unwrap())
         };
@@ -381,29 +339,16 @@ where
                     let info = self_.put_config_propose(cfg)?;
                     self_.ok_response(&serde_json::to_value(info).unwrap())
                 }
-                Ok(None) => Err(ApiError::IncorrectRequest("Empty request body".into()))?,
-                Err(e) => Err(ApiError::IncorrectRequest(Box::new(e)))?,
+                Ok(None) => Err(ApiError::BadRequest("Empty request body".into()))?,
+                Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
             }
         };
 
         let self_ = self.clone();
         let put_config_vote = move |req: &mut Request| -> IronResult<Response> {
-            let params = req.extensions.get::<Router>().unwrap();
-            match params.find("hash") {
-                Some(hash_str) => {
-                    let propose_cfg_hash = Hash::from_hex(hash_str).map_err(ApiError::from)?;
-                    let info = self_.put_config_vote(&propose_cfg_hash)?;
-                    self_.ok_response(&serde_json::to_value(info).unwrap())
-                }
-                None => {
-                    Err(ApiError::IncorrectRequest(
-                        "Required route \
-                                           parameter of configuration \
-                                           'hash' is missing"
-                            .into(),
-                    ))?
-                }
-            }
+            let propose_cfg_hash = self_.url_fragment(req, "hash")?;
+            let info = self_.put_config_vote(&propose_cfg_hash)?;
+            self_.ok_response(&serde_json::to_value(info).unwrap())
         };
         router.post(
             "/v1/configs/postpropose",

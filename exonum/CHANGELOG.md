@@ -63,6 +63,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `StorageKey` and `StorageValue` traits are implemented for `SystemTime`. (#456)
 - `StorageValue` and `CryptoHash` traits are implemented for `bool`. (#385)
+- `Height` implements `std::str::FromStr`. (#474)
 
 ### Bug fixes
 

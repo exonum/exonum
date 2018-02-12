@@ -21,7 +21,7 @@ use iron::prelude::*;
 use crypto::PublicKey;
 use node::{ExternalMessage, ApiSender};
 use blockchain::{Service, Blockchain, SharedNodeState};
-use api::{self, Api, ApiError};
+use api::{Api, ApiError};
 use messages::{TEST_NETWORK_ID, PROTOCOL_MAJOR_VERSION};
 
 #[derive(Serialize, Clone, Debug)]
@@ -162,7 +162,7 @@ impl Api for SystemApi {
 
         let self_ = self.clone();
         let peer_add = move |req: &mut Request| -> IronResult<Response> {
-            let addr: SocketAddr = api::required_param(req, "ip")?;
+            let addr: SocketAddr = self_.required_param(req, "ip")?;
             self_.node_channel.peer_add(addr).map_err(ApiError::from)?;
             self_.ok_response(&::serde_json::to_value("Ok").unwrap())
         };
@@ -187,7 +187,7 @@ impl Api for SystemApi {
 
         let self_ = self.clone();
         let consensus_enabled_set = move |req: &mut Request| -> IronResult<Response> {
-            let enabled: bool = api::required_param(req, "enabled")?;
+            let enabled: bool = self_.required_param(req, "enabled")?;
             self_.set_consensus_enabled_info(enabled)?;
             self_.ok_response(&::serde_json::to_value("Ok").unwrap())
         };

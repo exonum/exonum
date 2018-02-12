@@ -182,6 +182,52 @@ where
 
 /// `Api` trait defines `RESTful` API.
 pub trait Api {
+    /// Deserializes an url fragment as `T`
+    fn url_fragment<T>(&self, request: &Request, name: &str) -> Result<T, ApiError>
+    where
+        T: FromStr,
+        T::Err: fmt::Display,
+    {
+        let params = request.extensions.get::<Router>().unwrap();
+        let fragment = params.find(name).ok_or_else(|| {
+            ApiError::BadRequest(format!("Required parameter '{}' is missing", name))
+        })?;
+        let value = T::from_str(fragment).map_err(|e| {
+            ApiError::BadRequest(format!("Invalid '{}' parameter: {}", name, e))
+        })?;
+        Ok(value)
+    }
+
+    /// Deserializes an optional parameter from request body or get-parameters
+    fn optional_param<T>(&self, request: &mut Request, name: &str) -> Result<Option<T>, ApiError>
+    where
+        T: FromStr,
+        T::Err: fmt::Display,
+    {
+        let map = request.get_ref::<params::Params>().unwrap();
+        let value = match map.find(&[name]) {
+            Some(&params::Value::String(ref param)) => {
+                let value = T::from_str(param).map_err(|e| {
+                    ApiError::BadRequest(format!("Invalid '{}' parameter: {}", name, e))
+                })?;
+                Some(value)
+            }
+            _ => None,
+        };
+        Ok(value)
+    }
+
+    /// Deserializes a required parameter from request body or get-parameters
+    fn required_param<T>(&self, request: &mut Request, name: &str) -> Result<T, ApiError>
+    where
+        T: FromStr,
+        T::Err: fmt::Display,
+    {
+        self.optional_param(request, name)?.ok_or_else(|| {
+            ApiError::BadRequest(format!("Required parameter '{}' is missing", name))
+        })
+    }
+
     /// Loads hex value from the cookies.
     fn load_hex_value_from_cookie<'a>(
         &self,
@@ -266,47 +312,4 @@ pub trait Api {
 
     /// Used to extend Api.
     fn wire<'b>(&self, router: &'b mut Router);
-}
-
-fn url_fragment<T>(request: &Request, name: &str) -> Result<T, ApiError>
-where
-    T: FromStr,
-    T::Err: fmt::Display,
-{
-    let params = request.extensions.get::<Router>().unwrap();
-    let fragment = params.find(name).ok_or_else(|| {
-        ApiError::BadRequest(format!("Required parameter '{}' is missing", name))
-    })?;
-    let value = T::from_str(fragment).map_err(|e| {
-        ApiError::BadRequest(format!("Invalid '{}' parameter: {}", name, e))
-    })?;
-    Ok(value)
-}
-
-fn optional_param<T>(request: &mut Request, name: &str) -> Result<Option<T>, ApiError>
-where
-    T: FromStr,
-    T::Err: fmt::Display,
-{
-    let map = request.get_ref::<params::Params>().unwrap();
-    let value = match map.find(&[name]) {
-        Some(&params::Value::String(ref param)) => {
-            let value = T::from_str(param).map_err(|e| {
-                ApiError::BadRequest(format!("Invalid '{}' parameter: {}", name, e))
-            })?;
-            Some(value)
-        }
-        _ => None,
-    };
-    Ok(value)
-}
-
-fn required_param<T>(request: &mut Request, name: &str) -> Result<T, ApiError>
-where
-    T: FromStr,
-    T::Err: fmt::Display,
-{
-    optional_param(request, name)?.ok_or_else(|| {
-        ApiError::BadRequest(format!("Required parameter '{}' is missing", name))
-    })
 }
