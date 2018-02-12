@@ -277,7 +277,7 @@ where
     let fragment = params.find(name).ok_or_else(|| {
         ApiError::BadRequest(format!("Required parameter '{}' is missing", name))
     })?;
-    let value: T = T::from_str(fragment).map_err(|e| {
+    let value = T::from_str(fragment).map_err(|e| {
         ApiError::BadRequest(format!("Invalid '{}' parameter: {}", name, e))
     })?;
     Ok(value)
@@ -291,7 +291,7 @@ where
     let map = request.get_ref::<params::Params>().unwrap();
     let value = match map.find(&[name]) {
         Some(&params::Value::String(ref param)) => {
-            let value: T = T::from_str(param).map_err(|e| {
+            let value = T::from_str(param).map_err(|e| {
                 ApiError::BadRequest(format!("Invalid '{}' parameter: {}", name, e))
             })?;
             Some(value)
