@@ -44,6 +44,21 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - Remove `ID` constants.
   - Replace `TYPE` constants with a single `SERVICE_ID` constant.
 
+- Several variants were removed from `ApiError` enum. (#474)
+
+  Migration path:
+
+  - Use generic `ApiError::BadRequest` variant or create `IronError` directly.
+
+- `CommandExtension` uses `failure::Error` instead of `Box<std::error::Error>`
+  for errors. (#474)
+
+  Migration path:
+
+  - `std::error::Error` can be converted to `failure::Error` via `.into()` method.
+
+- `storage::Error` implements `failure::Fail` instead of `std::error::Error`. (#474)
+
 ### New features
 
 - `StorageKey` and `StorageValue` traits are implemented for `SystemTime`. (#456)
