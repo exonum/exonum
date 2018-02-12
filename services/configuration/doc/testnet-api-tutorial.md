@@ -51,8 +51,8 @@ cargo install --example configuration
     <!-- markdownlint-enable MD013 -->
 
     - parameters
-      - `--public-api-address` is for exonum's [public http api endpoints](#public-endpoints)
-      - `--private-api-address` is for exonum's [private http api endpoints](#private-endpoints)
+      - `--public-api-address` is for Exonum [public http api endpoints](#public-endpoints)
+      - `--private-api-address` is for Exonum [private http api endpoints](#private-endpoints)
       - `--node-config` path to the node's config
       - `--db-path` path to the database
 
@@ -69,7 +69,7 @@ cargo install --example configuration
 
     1. run [helper script](../testnet/testnetctl.sh) for initializing
        `supervisor` and `configuration_service` process group
-       [config](../testnet/supervisord) to `$TESTNET_DESDIR` directory.
+       [config](../testnet/supervisord) to `$TESTNET_DESTDIR` directory.
 
        ```bash
        ./testnet/testnetctl.sh enable
@@ -179,7 +179,7 @@ endpoint.
        `validators` field, as specified in `from` field of propose
        transaction. The `from` field is determined by public key of node whose
        `postpropose` endpoint is accessed for signing the transaction on
-       maintainter's behalf.
+       maintainers behalf.
 
     1. propose of config, which evaluates to the same hash, hasn't already
        been submitted.
@@ -194,7 +194,7 @@ endpoint.
     1. *actual* config contains the node-sender's public key in `validators`
        field, as specified in `from` field of vote transaction. The `from`
        field is determined by public key of node whose `postvote` endpoint is
-       accessed for signing the transaction on the maintainer's behalf.
+       accessed for signing the transaction on the maintainers behalf.
 
     1. `previous_cfg_hash` in the config propose, which is referenced by
        vote transaction, is equal to hash of *actual* config.

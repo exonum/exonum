@@ -20,7 +20,7 @@ This is the main Exonum repository that includes
   * [Configuration service](services/configuration/README.md).
   * [Time service](services/time/README.md).
 * Demos
-  * Cryprocurrency (currently in [cryptocurrency] repository).
+  * Cryptocurrency (currently in [cryptocurrency] repository).
 
 See individual projects' readme for the details.
 

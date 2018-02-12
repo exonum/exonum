@@ -89,7 +89,7 @@ and is updated after each transaction from any of the validators.
 
 #### Disadvantages of the Time Oracle Service
 
-* The time value is indicated as an index in the Exorum storage, hence,
+* The time value is indicated as an index in the Exonum storage, hence,
   receipt thereof by the client requires additional cryptographic checks.
 
 * Each Exonum block will contain time oracle transactions
@@ -122,12 +122,12 @@ To obtain local, reliable time external solutions like [tlsdate][],
   local time of the validator nodes.
 
 The service implements only one transaction consisting of the actual
-validator’s time and signed with its key. The logic of such transaction
+validators time and signed with its key. The logic of such transaction
 execution is as follows:
 
 1. It is checked that `PublicKey` belongs to the validator.
 
-2. The time specified in the transaction is greater than said validator’s time
+2. The time specified in the transaction is greater than said validators time
    specified in the storage (transactions potentially can be executed in
    the order reverse to their creation order,
    but the time must change monotonously).

@@ -86,8 +86,9 @@ jobs:
     - ./node_modules/.bin/cspell exonum/{src,benches,tests}/**/*.rs
     - ./node_modules/.bin/cspell exonum/fuzz/fuzz_targets/*.rs
     - ./node_modules/.bin/cspell testkit/{src,examples,tests}/**/*.rs
-    - ./node_modules/.bin/cspell services/configuration/{src,examples,tests}/**/*.rs
+    - ./node_modules/.bin/cspell services/configuration/{src,examples}/**/*.rs
     - ./node_modules/.bin/cspell services/time/{src,examples,tests}/**/*.rs
+    - find . -not -path "./3rdparty/*" -and -not -path "./node_modules/*" -name "*.md" | xargs ./node_modules/.bin/cspell
     - find . -not -path "./3rdparty/*" -and -not -path "./node_modules/*" -name "*.md" | xargs ./node_modules/.bin/markdownlint --config .markdownlintrc
 
   # Clippy linting

@@ -107,7 +107,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Changed iterators over `Patch` and `Changes` data into custom types instead
   of standard collection iterators. (#393)
 
-- Fixed typo in `SparceListIndexKeys` and `SparceListIndexValues`. (#398)
+- Fixed typo in `SparseListIndexKeys` and `SparseListIndexValues`. (#398)
 
 - Removed default `state_hash` implementation in the `Service` trait. (#399)
 
@@ -179,9 +179,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   do not require `ApiContext`. (#366)
 - Rename method `last_height` to `height` in `Schema`. (#379)
 - `last_block` now returns `Block` instead of `Option<Block>`. (#379)
-- Replaced `rocksdb` commandline parameter to more generic `db-path`. (#376)
+- Replaced `rocksdb` command-line parameter to more generic `db-path`. (#376)
 - Obsolete trait `HexValue` replaced by the `FromHex` and `ToHex` traits. (#372)
-- Changed `Patch` and `Changes` from typedefs into opaque structures. (#371)
+- Changed `Patch` and `Changes` from type definitions into opaque structures. (#371)
 - Help text is displayed if required argument is not specified. (#390)
 
 ### Removed
@@ -240,7 +240,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Add `RockDB` support (#273)
 - Add `TimeoutAdjusterConfig`, `Constant` and `Dynamic` timeout adjusters (#256)
 - Add stream hashing and signing: `HashStream` and `SignStream` (#254)
-- Add new typedefs `Height` and `ValidatorId` (#262)
+- Add new type definitions `Height` and `ValidatorId` (#262)
 - Fields of `BlockInfo` and `TxInfo` are now public (#283)
 - Public export of `PROOF_MAP_KEY_SIZE` constant (#270)
 
@@ -259,7 +259,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Fix network discover failure due to incorrect processing
   of the incoming buffer (#299)
 - Fix snapshot behavior for `MemoryDB` (#292)
-- Dissalow generate-testnet with 0 nodes (#258)
+- Disallow generate-testnet with 0 nodes (#258)
 
 ## 0.1.1 - 2017-09-13
 
@@ -268,7 +268,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Fix segfault when `LevelDBSnapshot` is destroyed after `LevelDB` (#285)
 - Fix panic during `BlockResponse` message processing
   if the transaction pool is full (#264)
-- Fix panic during deseralizaion of malformed messages (#278 #297)
+- Fix panic during deserialization of malformed messages (#278 #297)
 
 ## 0.1 - 2017-07-17
 
