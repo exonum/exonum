@@ -106,7 +106,7 @@ impl From<ApiError> for IronError {
             let mut map = BTreeMap::new();
             map.insert("debug", format!("{:?}", e));
             map.insert("description", e.to_string());
-            ::serde_json::to_string_pretty(&map).unwrap()
+            serde_json::to_string_pretty(&map).unwrap()
         };
         IronError::new(e.compat(), (code, body))
     }
