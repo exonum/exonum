@@ -103,23 +103,39 @@ impl From<storage::Error> for ApiError {
 
 impl From<ApiError> for IronError {
     fn from(e: ApiError) -> IronError {
-        let mut body = BTreeMap::new();
-        body.insert("debug", format!("{:?}", e));
-        body.insert("description", e.to_string());
         let code = match e {
-            ApiError::FileExists(hash) |
-            ApiError::FileNotFound(hash) => {
-                body.insert("hash", encode_hex(&hash));
-                status::Conflict
-            }
-            ApiError::BadRequest(..) => status::BadRequest,
+            ApiError::FileExists(..) => status::Conflict,
+            ApiError::FileNotFound(..) |
+            ApiError::NotFound => status::NotFound,
+            // Note that `status::Unauthorized` does not fit here, because
+            //
+            // > A server generating a 401 (Unauthorized) response MUST send a
+            // > WWW-Authenticate header field containing at least one challenge.
+            //
+            // https://tools.ietf.org/html/rfc7235#section-4.1
+            ApiError::Unauthorized => status::Forbidden,
+
+            ApiError::BadRequest(..) |
+            ApiError::FileTooBig => status::BadRequest,
+
+            ApiError::Storage(..) |
+            ApiError::Io(..) |
             ApiError::InternalError(..) => status::InternalServerError,
-            _ => status::Conflict,
         };
-        IronError::new(e.compat(), (
-            code,
-            ::serde_json::to_string_pretty(&body).unwrap(),
-        ))
+        let body = {
+            let mut map = BTreeMap::new();
+            map.insert("debug", format!("{:?}", e));
+            map.insert("description", e.to_string());
+            match e {
+                ApiError::FileExists(hash) |
+                ApiError::FileNotFound(hash) => {
+                    map.insert("hash", encode_hex(&hash));
+                }
+                _ => (),
+            }
+            ::serde_json::to_string_pretty(&map).unwrap()
+        };
+        IronError::new(e.compat(), (code, body))
     }
 }
 
