@@ -17,7 +17,7 @@ use iron::prelude::*;
 
 use blockchain::{Blockchain, Block};
 use explorer::{BlockInfo, BlockchainExplorer};
-use api::{Api, ApiError, url_fragment, required_param, optional_param};
+use api::{self, Api, ApiError};
 use helpers::Height;
 
 const MAX_BLOCKS_PER_REQUEST: u64 = 1000;
@@ -61,17 +61,17 @@ impl Api for ExplorerApi {
 
         let self_ = self.clone();
         let blocks = move |req: &mut Request| -> IronResult<Response> {
-            let count: u64 = required_param(req, "count")?;
-            let latest: Option<u64> = optional_param(req, "latest")?;
-            let skip_empty_blocks: bool =
-                optional_param(req, "skip_empty_blocks")?.unwrap_or(false);
+            let count: u64 = api::required_param(req, "count")?;
+            let latest: Option<u64> = api::optional_param(req, "latest")?;
+            let skip_empty_blocks: bool = api::optional_param(req, "skip_empty_blocks")?
+                .unwrap_or(false);
             let info = self_.get_blocks(count, latest, skip_empty_blocks)?;
             self_.ok_response(&::serde_json::to_value(info).unwrap())
         };
 
         let self_ = self.clone();
         let block = move |req: &mut Request| -> IronResult<Response> {
-            let height: u64 = url_fragment(req, "height")?;
+            let height: u64 = api::url_fragment(req, "height")?;
             let info = self_.get_block(Height(height))?;
             self_.ok_response(&::serde_json::to_value(info).unwrap())
         };

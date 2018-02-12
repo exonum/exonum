@@ -19,7 +19,7 @@ use node::state::TxPool;
 use blockchain::{Blockchain, SharedNodeState};
 use crypto::Hash;
 use explorer::{BlockchainExplorer, TxInfo};
-use api::{Api, ApiError, url_fragment};
+use api::{self, Api, ApiError};
 
 #[derive(Serialize)]
 struct MemPoolTxInfo {
@@ -107,7 +107,7 @@ impl Api for SystemApi {
 
         let self_ = self.clone();
         let transaction = move |req: &mut Request| -> IronResult<Response> {
-            let hash: Hash = url_fragment(req, "hash")?;
+            let hash: Hash = api::url_fragment(req, "hash")?;
             let info = self_.get_transaction(&hash)?;
             let result = match info {
                 MemPoolResult::Unknown => Self::not_found_response,
