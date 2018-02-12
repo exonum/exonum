@@ -253,12 +253,18 @@ fn test_query_state_hash() {
         let proof_configs = sandbox.get_proof_to_service_table(TIMESTAMPING_SERVICE, 0);
         let proof = proof_configs.check().unwrap();
         assert_eq!(proof.hash(), state_hash);
-        assert_eq!(proof.entries(), vec![(&timestamp_t1_key, &Hash::new([127; 32]))]);
+        assert_eq!(
+            proof.entries(),
+            vec![(&timestamp_t1_key, &Hash::new([127; 32]))]
+        );
 
         let proof_configs = sandbox.get_proof_to_service_table(TIMESTAMPING_SERVICE, 1);
         let proof = proof_configs.check().unwrap();
         assert_eq!(proof.hash(), state_hash);
-        assert_eq!(proof.entries(), vec![(&timestamp_t2_key, &Hash::new([128; 32]))]);
+        assert_eq!(
+            proof.entries(),
+            vec![(&timestamp_t2_key, &Hash::new([128; 32]))]
+        );
 
         add_one_height(&sandbox, &sandbox_state)
     }

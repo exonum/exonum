@@ -467,7 +467,7 @@ impl PartialOrd for ProofPath {
         if self.start() != other.start() {
             return None;
         }
-        // NB: This check can be moved to "real" code; the method below does not work
+        // NB: This check can be moved to "real" code; the code below does not work
         // if `self.start() % 8 != 0` without additional modifications.
         debug_assert_eq!(self.start(), 0);
 
