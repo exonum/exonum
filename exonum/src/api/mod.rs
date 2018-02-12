@@ -34,7 +34,7 @@ use serde::{Serialize, Serializer};
 use serde::de::{self, Visitor, Deserialize, Deserializer};
 use failure::Fail;
 
-use crypto::{PublicKey, SecretKey, Hash};
+use crypto::{PublicKey, SecretKey};
 use encoding::serialize::{FromHex, FromHexError, ToHex, encode_hex};
 use storage;
 
@@ -59,22 +59,6 @@ pub enum ApiError {
         #[cause]
         ::std::io::Error
     ),
-
-    /// File not found.
-    #[fail(display = "File not found")]
-    FileNotFound(Hash),
-
-    /// Not found.
-    #[fail(display = "Not found")]
-    NotFound,
-
-    /// File too big.
-    #[fail(display = "File too big")]
-    FileTooBig,
-
-    /// File already exists.
-    #[fail(display = "File exists")]
-    FileExists(Hash),
 
     /// Bad request.
     #[fail(display = "Bad request: {}", _0)]
@@ -104,9 +88,6 @@ impl From<storage::Error> for ApiError {
 impl From<ApiError> for IronError {
     fn from(e: ApiError) -> IronError {
         let code = match e {
-            ApiError::FileExists(..) => status::Conflict,
-            ApiError::FileNotFound(..) |
-            ApiError::NotFound => status::NotFound,
             // Note that `status::Unauthorized` does not fit here, because
             //
             // > A server generating a 401 (Unauthorized) response MUST send a
@@ -115,8 +96,7 @@ impl From<ApiError> for IronError {
             // https://tools.ietf.org/html/rfc7235#section-4.1
             ApiError::Unauthorized => status::Forbidden,
 
-            ApiError::BadRequest(..) |
-            ApiError::FileTooBig => status::BadRequest,
+            ApiError::BadRequest(..) => status::BadRequest,
 
             ApiError::Storage(..) |
             ApiError::Io(..) |
@@ -126,13 +106,6 @@ impl From<ApiError> for IronError {
             let mut map = BTreeMap::new();
             map.insert("debug", format!("{:?}", e));
             map.insert("description", e.to_string());
-            match e {
-                ApiError::FileExists(hash) |
-                ApiError::FileNotFound(hash) => {
-                    map.insert("hash", encode_hex(&hash));
-                }
-                _ => (),
-            }
             ::serde_json::to_string_pretty(&map).unwrap()
         };
         IronError::new(e.compat(), (code, body))
