@@ -25,36 +25,38 @@ use exonum::node::TransactionSend;
 use exonum::encoding::serialize::json::reexport as serde_json;
 use exonum::helpers::Height;
 
-use super::{StorageValueConfigProposeData, TxConfigPropose, TxConfigVote, ConfigurationSchema};
+use super::{ProposeData, TxConfigPropose, TxConfigVote, ConfigurationSchema};
+
+pub type VotesInfo = Option<Vec<Option<TxConfigVote>>>;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ApiResponseConfigHashInfo {
+pub struct ConfigHashInfo {
     pub hash: Hash,
     pub config: StoredConfiguration,
+    pub propose: Option<Hash>,
+    pub votes: VotesInfo,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ApiResponseProposeHashInfo {
+pub struct ProposeHashInfo {
     pub hash: Hash,
-    pub propose_data: StorageValueConfigProposeData,
+    pub propose_data: ProposeData,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ApiResponseConfigInfo {
+pub struct ConfigInfo {
     pub committed_config: Option<StoredConfiguration>,
-    pub propose: Option<StorageValueConfigProposeData>,
+    pub propose: Option<ProposeData>,
 }
 
-pub type ApiResponseVotesInfo = Option<Vec<Option<TxConfigVote>>>;
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ApiResponseProposePost {
+pub struct ProposeResponse {
     pub tx_hash: Hash,
     pub cfg_hash: Hash,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ApiResponseVotePost {
+pub struct VoteResponse {
     pub tx_hash: Hash,
 }
 
@@ -70,54 +72,56 @@ pub struct PublicConfigApi {
 }
 
 impl PublicConfigApi {
-    fn get_actual_config(&self) -> Result<ApiResponseConfigHashInfo, ApiError> {
-
-        let actual_cfg = Schema::new(&self.blockchain.snapshot()).actual_configuration();
-        let res = ApiResponseConfigHashInfo {
-            hash: actual_cfg.hash(),
-            config: actual_cfg,
-        };
-        Ok(res)
+    fn get_config_with_proofs(&self, config: StoredConfiguration) -> ConfigHashInfo {
+        let propose = ConfigurationSchema::new(self.blockchain.snapshot())
+            .get_propose(&config.hash())
+            .map(|p| p.hash());
+        let votes = self.get_votes_for_propose(&config.hash());
+        ConfigHashInfo {
+            hash: config.hash(),
+            config,
+            propose,
+            votes,
+        }
     }
 
-    fn get_following_config(&self) -> Result<Option<ApiResponseConfigHashInfo>, ApiError> {
-
-        let following_cfg = Schema::new(&self.blockchain.snapshot()).following_configuration();
-        let res = following_cfg.map(|cfg| {
-            ApiResponseConfigHashInfo {
-                hash: cfg.hash(),
-                config: cfg,
-            }
-        });
-        Ok(res)
+    fn get_actual_config(&self) -> ConfigHashInfo {
+        let snapshot = self.blockchain.snapshot();
+        let configuration_schema = Schema::new(&snapshot);
+        let actual_cfg = configuration_schema.actual_configuration();
+        self.get_config_with_proofs(actual_cfg)
     }
 
-    fn get_config_by_hash(&self, hash: &Hash) -> Result<ApiResponseConfigInfo, ApiError> {
+    fn get_following_config(&self) -> Option<ConfigHashInfo> {
+        Schema::new(self.blockchain.snapshot())
+            .following_configuration()
+            .map(|following_cfg| self.get_config_with_proofs(following_cfg))
+    }
+
+    fn get_config_by_hash(&self, hash: &Hash) -> ConfigInfo {
         let snapshot = self.blockchain.snapshot();
         let general_schema = Schema::new(&snapshot);
         let committed_config = general_schema.configs().get(hash);
 
         let configuration_schema = ConfigurationSchema::new(&snapshot);
         let propose = configuration_schema.propose_data_by_config_hash().get(hash);
-        let res = ApiResponseConfigInfo {
-            committed_config: committed_config,
-            propose: propose,
-        };
-        Ok(res)
+        ConfigInfo {
+            committed_config,
+            propose,
+        }
     }
 
-
-    fn get_votes_for_propose(&self, cfg_hash: &Hash) -> Result<ApiResponseVotesInfo, ApiError> {
+    fn get_votes_for_propose(&self, config_hash: &Hash) -> VotesInfo {
         let snapshot = self.blockchain.snapshot();
         let configuration_schema = ConfigurationSchema::new(&snapshot);
-        let res = match configuration_schema.propose_data_by_config_hash().get(
-            cfg_hash,
-        ) {
-            None => None,
-            Some(_) => Some(configuration_schema.get_votes(cfg_hash)),
-        };
-
-        Ok(res)
+        if configuration_schema
+            .propose_data_by_config_hash()
+            .contains(config_hash)
+        {
+            Some(configuration_schema.get_votes(config_hash))
+        } else {
+            None
+        }
     }
 
     fn filter_cfg_predicate(
@@ -142,7 +146,7 @@ impl PublicConfigApi {
         &self,
         previous_cfg_hash_filter: Option<Hash>,
         actual_from_filter: Option<Height>,
-    ) -> Result<Vec<ApiResponseProposeHashInfo>, ApiError> {
+    ) -> Vec<ProposeHashInfo> {
         let snapshot = self.blockchain.snapshot();
         let configuration_schema = ConfigurationSchema::new(&snapshot);
         let index = configuration_schema.config_hash_by_ordinal();
@@ -171,52 +175,47 @@ impl PublicConfigApi {
                     )
                 })
                 .map(|(cfg_hash, propose_data)| {
-                    ApiResponseProposeHashInfo {
+                    ProposeHashInfo {
                         hash: cfg_hash,
-                        propose_data: propose_data,
+                        propose_data,
                     }
                 })
                 .collect::<Vec<_>>()
         };
-        Ok(proposes)
+        proposes
     }
 
     fn get_all_committed(
         &self,
         previous_cfg_hash_filter: Option<Hash>,
         actual_from_filter: Option<Height>,
-    ) -> Result<Vec<ApiResponseConfigHashInfo>, ApiError> {
+    ) -> Vec<ConfigHashInfo> {
         let snapshot = self.blockchain.snapshot();
         let general_schema = Schema::new(&snapshot);
-        let index = general_schema.configs_actual_from();
+        let actual_from = general_schema.configs_actual_from();
+        let configs = general_schema.configs();
+
         let committed_configs = {
-            index
+            actual_from
                 .into_iter()
                 .map(|reference| {
-
-                    let cfg_hash = reference.cfg_hash();
-                    let cfg = general_schema.configs().get(cfg_hash).expect(&format!(
+                    let config_hash = reference.cfg_hash();
+                    configs.get(config_hash).expect(&format!(
                         "Config with hash {:?} is absent in configs table",
-                        cfg_hash
-                    ));
-                    (*cfg_hash, cfg)
+                        config_hash
+                    ))
                 })
-                .filter(|&(_, ref cfg)| {
+                .filter(|config| {
                     PublicConfigApi::filter_cfg_predicate(
-                        cfg,
+                        config,
                         previous_cfg_hash_filter,
                         actual_from_filter,
                     )
                 })
-                .map(|(cfg_hash, cfg)| {
-                    ApiResponseConfigHashInfo {
-                        hash: cfg_hash,
-                        config: cfg,
-                    }
-                })
+                .map(|config| self.get_config_with_proofs(config))
                 .collect::<Vec<_>>()
         };
-        Ok(committed_configs)
+        committed_configs
     }
 
     fn retrieve_params(
@@ -233,10 +232,7 @@ impl<T> PrivateConfigApi<T>
 where
     T: TransactionSend + Clone,
 {
-    fn put_config_propose(
-        &self,
-        cfg: StoredConfiguration,
-    ) -> Result<ApiResponseProposePost, ApiError> {
+    fn put_config_propose(&self, cfg: StoredConfiguration) -> Result<ProposeResponse, ApiError> {
         let cfg_hash = cfg.hash();
         let config_propose = TxConfigPropose::new(
             &self.config.0,
@@ -246,19 +242,16 @@ where
         let tx_hash = config_propose.hash();
         let ch = self.channel.clone();
         ch.send(Box::new(config_propose))?;
-        let res = ApiResponseProposePost {
-            tx_hash: tx_hash,
-            cfg_hash: cfg_hash,
-        };
+        let res = ProposeResponse { tx_hash, cfg_hash };
         Ok(res)
     }
 
-    fn put_config_vote(&self, cfg_hash: &Hash) -> Result<ApiResponseVotePost, ApiError> {
+    fn put_config_vote(&self, cfg_hash: &Hash) -> Result<VoteResponse, ApiError> {
         let config_vote = TxConfigVote::new(&self.config.0, cfg_hash, &self.config.1);
         let tx_hash = config_vote.hash();
         let ch = self.channel.clone();
         ch.send(Box::new(config_vote))?;
-        let res = ApiResponseVotePost { tx_hash: tx_hash };
+        let res = VoteResponse { tx_hash };
         Ok(res)
     }
 }
@@ -268,41 +261,41 @@ impl Api for PublicConfigApi {
 
         let self_ = self.clone();
         let config_actual = move |_: &mut Request| -> IronResult<Response> {
-            let info = self_.get_actual_config()?;
+            let info = self_.get_actual_config();
             self_.ok_response(&serde_json::to_value(info).unwrap())
         };
 
         let self_ = self.clone();
         let config_following = move |_: &mut Request| -> IronResult<Response> {
-            let info = self_.get_following_config()?;
+            let info = self_.get_following_config();
             self_.ok_response(&serde_json::to_value(info).unwrap())
         };
 
         let self_ = self.clone();
         let config_by_hash = move |req: &mut Request| -> IronResult<Response> {
             let hash: Hash = self_.url_fragment(req, "hash")?;
-            let info = self_.get_config_by_hash(&hash)?;
+            let info = self_.get_config_by_hash(&hash);
             self_.ok_response(&serde_json::to_value(info).unwrap())
         };
 
         let self_ = self.clone();
         let get_votes_for_propose = move |req: &mut Request| -> IronResult<Response> {
             let propose_cfg_hash: Hash = self_.url_fragment(req, "hash")?;
-            let info = self_.get_votes_for_propose(&propose_cfg_hash)?;
+            let info = self_.get_votes_for_propose(&propose_cfg_hash);
             self_.ok_response(&serde_json::to_value(info).unwrap())
         };
 
         let self_ = self.clone();
         let get_all_proposes = move |req: &mut Request| -> IronResult<Response> {
             let (previous_cfg_hash, actual_from) = self_.retrieve_params(req)?;
-            let info = self_.get_all_proposes(previous_cfg_hash, actual_from)?;
+            let info = self_.get_all_proposes(previous_cfg_hash, actual_from);
             self_.ok_response(&serde_json::to_value(info).unwrap())
         };
 
         let self_ = self.clone();
         let get_all_committed = move |req: &mut Request| -> IronResult<Response> {
             let (previous_cfg_hash, actual_from) = self_.retrieve_params(req)?;
-            let info = self_.get_all_committed(previous_cfg_hash, actual_from)?;
+            let info = self_.get_all_committed(previous_cfg_hash, actual_from);
             self_.ok_response(&serde_json::to_value(info).unwrap())
         };
         router.get("/v1/configs/actual", config_actual, "config_actual");
