@@ -401,7 +401,7 @@ impl TimeService {
 }
 
 impl Service for TimeService {
-    fn service_name(&self) -> &'static str {
+    fn service_name(&self) -> &str {
         SERVICE_NAME
     }
 

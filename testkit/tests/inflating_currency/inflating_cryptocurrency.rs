@@ -251,7 +251,7 @@ pub struct CurrencyService;
 
 /// Implement a `Service` trait for the service.
 impl Service for CurrencyService {
-    fn service_name(&self) -> &'static str {
+    fn service_name(&self) -> &str {
         "cryptocurrency"
     }
 

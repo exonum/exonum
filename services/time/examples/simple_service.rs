@@ -104,7 +104,7 @@ impl Transaction for TxMarker {
 struct MarkerService;
 
 impl Service for MarkerService {
-    fn service_name(&self) -> &'static str {
+    fn service_name(&self) -> &str {
         SERVICE_NAME
     }
 

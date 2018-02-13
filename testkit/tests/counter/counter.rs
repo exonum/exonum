@@ -203,7 +203,7 @@ impl Api for CounterApi {
 pub struct CounterService;
 
 impl Service for CounterService {
-    fn service_name(&self) -> &'static str {
+    fn service_name(&self) -> &str {
         "counter"
     }
 
