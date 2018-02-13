@@ -106,9 +106,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Changed iterators over `Patch` and `Changes` data into custom types instead
   of standard collection iterators. (#393)
-  
+
   <!-- spell-checker:disable -->
-  
+
 - Fixed typo in `SparceListIndexKeys` and `SparceListIndexValues`. (#398)
 
   <!-- spell-checker:enable -->

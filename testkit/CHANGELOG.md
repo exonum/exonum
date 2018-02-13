@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### Changed
 
-- Re-implemented `probe()` / `probe_all()` methods of the testkit with
+- Reimplemented `probe()` / `probe_all()` methods of the testkit with
   a revertible database. (#8)
 - Renamed `public_mount` and `private_mount` to `public_handler` and `private_handler`,
   respectively, and made these methods return `iron::Chain` references. (#23)

@@ -179,7 +179,7 @@ endpoint.
        `validators` field, as specified in `from` field of propose
        transaction. The `from` field is determined by public key of node whose
        `postpropose` endpoint is accessed for signing the transaction on
-       maintainers behalf.
+       maintainer's behalf.
 
     1. propose of config, which evaluates to the same hash, hasn't already
        been submitted.
@@ -194,7 +194,7 @@ endpoint.
     1. *actual* config contains the node-sender's public key in `validators`
        field, as specified in `from` field of vote transaction. The `from`
        field is determined by public key of node whose `postvote` endpoint is
-       accessed for signing the transaction on the maintainers behalf.
+       accessed for signing the transaction on the maintainer's behalf.
 
     1. `previous_cfg_hash` in the config propose, which is referenced by
        vote transaction, is equal to hash of *actual* config.
