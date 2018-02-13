@@ -68,7 +68,6 @@
 //! ## Primitive types
 //!
 //! Primitive types are all fixed-sized, and located fully in the header.
-// TODO explain how a signed integer is stored in memory (what codding) (ECR-155)
 //!
 //! | Type name | Size in Header | Info |
 //! |:--------|:---------------------|:--------------------------------------------------|
