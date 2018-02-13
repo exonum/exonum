@@ -53,7 +53,7 @@ impl Transaction for TxTimestamp {
 }
 
 impl Service for TimestampingService {
-    fn service_name(&self) -> &'static str {
+    fn service_name(&self) -> &str {
         "timestamping"
     }
 

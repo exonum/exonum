@@ -39,7 +39,7 @@ impl Service for CommitWatcherService {
         255
     }
 
-    fn service_name(&self) -> &'static str {
+    fn service_name(&self) -> &str {
         "commit_watcher"
     }
 
