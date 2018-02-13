@@ -8,14 +8,9 @@ publish = false
 [package.metadata]
 cargo-fuzz = true
 
-[dependencies.exonum]
-path = ".."
-[dependencies.libfuzzer-sys]
-git = "https://github.com/rust-fuzz/libfuzzer-sys.git"
-
-# Prevent this from interfering with workspaces
-[workspace]
-members = ["."]
+[dependencies]
+exonum = { path = ".." }
+libfuzzer-sys = { git = "https://github.com/rust-fuzz/libfuzzer-sys.git" }
 
 [[bin]]
 name = "raw_message"
