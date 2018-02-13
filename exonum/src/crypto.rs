@@ -612,7 +612,7 @@ impl CryptoHash for i64 {
 
 impl CryptoHash for () {
     fn hash(&self) -> Hash {
-        Hash::zero()
+        hash(&[])
     }
 }
 
