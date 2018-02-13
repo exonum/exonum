@@ -59,6 +59,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `storage::Error` implements `failure::Fail` instead of `std::error::Error`. (#474)
 
+- Removed the `'static` bound from the return value
+  of the `blockchain::Service::service_name()` method. (#485)
+
 ### New features
 
 - `StorageKey` and `StorageValue` traits are implemented for `SystemTime`. (#456)
