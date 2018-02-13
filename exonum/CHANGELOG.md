@@ -61,7 +61,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `CryptoHash` for `()` now correctly calculates a hash of an empty byte array
   instead of returning `Hash::zero()`. (#483)
-  
+
 - Removed the `'static` bound from the return value of the
   `blockchain::Service::service_name()` method. (#485)
 
