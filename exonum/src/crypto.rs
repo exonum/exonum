@@ -610,12 +610,48 @@ impl CryptoHash for i64 {
     }
 }
 
+const EMPTY_SLICE_HASH: Hash = Hash(DigestSodium(
+    [
+        227,
+        176,
+        196,
+        66,
+        152,
+        252,
+        28,
+        20,
+        154,
+        251,
+        244,
+        200,
+        153,
+        111,
+        185,
+        36,
+        39,
+        174,
+        65,
+        228,
+        100,
+        155,
+        147,
+        76,
+        164,
+        149,
+        153,
+        27,
+        120,
+        82,
+        184,
+        85,
+    ],
+));
+
 impl CryptoHash for () {
     fn hash(&self) -> Hash {
-        Hash::zero()
+        EMPTY_SLICE_HASH
     }
 }
-
 
 impl CryptoHash for Hash {
     fn hash(&self) -> Hash {
@@ -661,7 +697,7 @@ mod tests {
     use serde_json;
     use encoding::serialize::FromHex;
     use super::{gen_keypair, hash, Hash, HashStream, PublicKey, SecretKey, Seed, SignStream,
-                Signature};
+                Signature, EMPTY_SLICE_HASH};
 
     #[test]
     fn test_hash() {
@@ -775,5 +811,10 @@ mod tests {
         let sig = creation_stream.sign(&sk);
         let mut verified_stream = SignStream::new().update(&data[..5]).update(&data[5..]);
         assert!(verified_stream.verify(&sig, &pk));
+    }
+
+    #[test]
+    fn test_empty_slice_hash() {
+        assert_eq!(EMPTY_SLICE_HASH, hash(&[]));
     }
 }

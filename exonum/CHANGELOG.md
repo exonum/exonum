@@ -59,6 +59,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `storage::Error` implements `failure::Fail` instead of `std::error::Error`. (#474)
 
+- `CryptoHash` for `()` now correctly calculates a hash of an empty byte array
+  instead of returning `Hash::zero()`. (#483)
+
 ### New features
 
 - `StorageKey` and `StorageValue` traits are implemented for `SystemTime`. (#456)
