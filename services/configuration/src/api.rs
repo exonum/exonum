@@ -50,13 +50,13 @@ pub struct ConfigInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct ProposePost {
+pub struct ProposeResponse {
     pub tx_hash: Hash,
     pub cfg_hash: Hash,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct VotePost {
+pub struct VoteResponse {
     pub tx_hash: Hash,
 }
 
@@ -114,7 +114,10 @@ impl PublicConfigApi {
     fn get_votes_for_propose(&self, config_hash: &Hash) -> VotesInfo {
         let snapshot = self.blockchain.snapshot();
         let configuration_schema = ConfigurationSchema::new(&snapshot);
-        if configuration_schema.propose_data_by_config_hash().contains(config_hash) {
+        if configuration_schema
+            .propose_data_by_config_hash()
+            .contains(config_hash)
+        {
             Some(configuration_schema.get_votes(config_hash))
         } else {
             None
@@ -229,10 +232,7 @@ impl<T> PrivateConfigApi<T>
 where
     T: TransactionSend + Clone,
 {
-    fn put_config_propose(
-        &self,
-        cfg: StoredConfiguration,
-    ) -> Result<ProposePost, ApiError> {
+    fn put_config_propose(&self, cfg: StoredConfiguration) -> Result<ProposeResponse, ApiError> {
         let cfg_hash = cfg.hash();
         let config_propose = TxConfigPropose::new(
             &self.config.0,
@@ -242,16 +242,16 @@ where
         let tx_hash = config_propose.hash();
         let ch = self.channel.clone();
         ch.send(Box::new(config_propose))?;
-        let res = ProposePost { tx_hash, cfg_hash };
+        let res = ProposeResponse { tx_hash, cfg_hash };
         Ok(res)
     }
 
-    fn put_config_vote(&self, cfg_hash: &Hash) -> Result<VotePost, ApiError> {
+    fn put_config_vote(&self, cfg_hash: &Hash) -> Result<VoteResponse, ApiError> {
         let config_vote = TxConfigVote::new(&self.config.0, cfg_hash, &self.config.1);
         let tx_hash = config_vote.hash();
         let ch = self.channel.clone();
         ch.send(Box::new(config_vote))?;
-        let res = VotePost { tx_hash };
+        let res = VoteResponse { tx_hash };
         Ok(res)
     }
 }

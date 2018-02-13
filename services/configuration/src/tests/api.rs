@@ -20,7 +20,7 @@ use exonum::crypto::{CryptoHash, Hash};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi};
 
 use ConfigurationSchema;
-use api::{ConfigHashInfo, ConfigInfo, ProposeHashInfo, ProposePost, VotePost, VotesInfo};
+use api::{ConfigHashInfo, ConfigInfo, ProposeHashInfo, ProposeResponse, VoteResponse, VotesInfo};
 use super::{new_tx_config_propose, new_tx_config_vote, to_boxed, ConfigurationTestKit};
 
 trait ConfigurationApiTest {
@@ -44,9 +44,9 @@ trait ConfigurationApiTest {
 
     fn get_votes_for_propose(&self, cfg_hash: &Hash) -> VotesInfo;
 
-    fn post_config_propose(&self, cfg: &StoredConfiguration) -> ProposePost;
+    fn post_config_propose(&self, cfg: &StoredConfiguration) -> ProposeResponse;
 
-    fn post_config_vote(&self, cfg_hash: &Hash) -> VotePost;
+    fn post_config_vote(&self, cfg_hash: &Hash) -> VoteResponse;
 }
 
 fn params_to_query(
@@ -118,7 +118,7 @@ impl ConfigurationApiTest for TestKitApi {
         )
     }
 
-    fn post_config_propose(&self, cfg: &StoredConfiguration) -> ProposePost {
+    fn post_config_propose(&self, cfg: &StoredConfiguration) -> ProposeResponse {
         self.post_private(
             ApiKind::Service("configuration"),
             "/v1/configs/postpropose",
@@ -126,7 +126,7 @@ impl ConfigurationApiTest for TestKitApi {
         )
     }
 
-    fn post_config_vote(&self, cfg_hash: &Hash) -> VotePost {
+    fn post_config_vote(&self, cfg_hash: &Hash) -> VoteResponse {
         let endpoint = format!("/v1/configs/{}/postvote", cfg_hash.to_string());
         self.post_private(ApiKind::Service("configuration"), &endpoint, &())
     }

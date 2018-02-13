@@ -365,11 +365,7 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
                 votes_table.push(ZEROVOTE.clone());
             }
 
-            ProposeData::new(
-                tx_propose,
-                &votes_table.root_hash(),
-                num_validators as u64,
-            )
+            ProposeData::new(tx_propose, &votes_table.root_hash(), num_validators as u64)
         };
 
         {
