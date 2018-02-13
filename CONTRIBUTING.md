@@ -1,269 +1,79 @@
-# Contributing to Exonum Core
+# Contributing to Exonum
 
-This contribution guide is partially derived from
-[Bitcoin Contribution Guide](https://github.com/bitcoin/bitcoin/blob/master/CONTRIBUTING.md)
+Exonum welcomes contribution from everyone in the form of [suggestions], [bug
+reports] or pull requests. This document gives some guidance if you are
+thinking of helping us.
 
-The Exonum Core project and its separate modules operate an open contributor
-model where anyone is welcome to contribute towards development
-in the form of peer review, testing and patches.
-This document explains the practical process and guidelines for contributing.
-The guidelines are the same for other Exonum repositories.
+[Project overview] and [documentation] can help you to better understand current
+state of the project.
 
-Firstly in terms of structure, there is no particular concept of
-"Core developers" in the sense of privileged people.
-Open source often naturally revolves around meritocracy where
-longer term contributors gain more trust from the developer community.
-However, some hierarchy is necessary for practical purposes.
-As such there are repository "maintainers" who are responsible for merging
-pull requests as well as a "lead maintainer" who is responsible
-for the release cycle, overall merging, moderation and appointment of maintainers.
+You can always ask for help or guidance in our [gitter] channel. There is also
+a separate [channel][gitter-ru] for our Russian-speaking users.
 
-## Contributor Workflow
+## Quick Start
 
-The codebase is maintained using the "contributor workflow" where everyone
-without exception contributes patch proposals using "pull requests".
-This facilitates social contribution, easy testing and peer review.
+Install Rust and mandatory dependencies according to our [installation guide],
+then you can build the project and run the tests:
 
-To contribute a patch, the workflow is as follows:
-
-- Fork repository
-- Create topic branch
-- Commit patches
-
-The project coding conventions in the **TODO: insert here a link to developer notes**
-[developer notes](doc/developer-notes.md) must be adhered to.
-
-In general [commits should be atomic](https://en.wikipedia.org/wiki/Atomic_commit#Atomic_commit_convention)
-and diffs should be easy to read. For this reason do not mix any
-formatting fixes or code moves with actual code changes.
-
-Commit messages should be verbose by default consisting of a short subject line
-(50 chars max), a blank line and detailed explanatory text as separate paragraph(s);
-unless the title alone is self-explanatory (like "Corrected typo in init.rs")
-then a single title line is sufficient. Commit messages should be helpful
-to people reading your code in the future, so explain the reasoning for your decisions.
-Further explanation [here](http://chris.beams.io/posts/git-commit/).
-
-If a particular commit references another issue, please add the reference,
-for example `refs #1234`, or `fixes #4321`.
-Using the `fixes` or `closes` keywords will cause the corresponding issue
-to be closed when the pull request is merged.
-
-Please refer to the [Git manual](https://git-scm.com/doc)
-for more information about Git.
-
-- Push changes to your fork
-- Create pull request
-
-The title of the pull request should be prefixed by the component or
-area that the pull request affects. Valid areas as:
-
-- _Consensus_ for changes to consensus algorithm
-- _Docs_ for changes to the documentation
-- _Net_ or _P2P_ for changes to the peer-to-peer network code
-- _API_ for changes to the external APIs
-- _Tests_ for changes to the Exonum unit tests or QA tests
-- _Trivial_ should **only** be used for PRs that do not change generated
-    executable code. Notably, refactors (change of function arguments and code
-    reorganization) and changes in behavior should **not** be marked as trivial.
-    Examples of trivial PRs are changes to:
-
-  - comments
-  - whitespace
-  - variable names
-  - logging and messages
-
-- _Utils and libraries_ for changes to the utils and libraries
-
-Examples:
-
-```text
-Consensus: Move timespec from block to precommit
-Doc: Update leveldb templates documentation
-Tests: Add sandbox tests for #1234
-Trivial: Fix typo in init.rs
+```shell
+git clone https://github.com/exonum/exonum
+cd exonum
+cargo test --all
 ```
 
-If a pull request is specifically not to be considered
-for merging (yet) please prefix the title with [WIP] or use
-[Tasks Lists](https://help.github.com/articles/basic-writing-and-formatting-syntax/#task-lists)
-in the body of the pull request to indicate tasks are pending.
+## Finding something to fix or improve
 
-The body of the pull request should contain enough description about
-what the patch does together with any justification/reasoning.
-You should include references to any discussions.
+The [good first issue] label can be used to find the easy issues.
 
-At this stage one should expect comments and review from other contributors.
-You can add more commits to your pull request by committing them locally
-and pushing to your fork until you have satisfied all feedback.
+## Linters
 
-## Commit writing
+Notice that the repository uses a set of linters for static analysis:
 
-Good commit messages serve at least three important purposes:
+- [clippy]
+- [cargo audit]
+- [cargo-deadlinks]
+- [cargo-outdated]
+- [rustfmt 0.9.0]
+- [cspell]
+- [markdownlint-cli]
 
-- To speed up the reviewing process.
+You can set up and run these tools locally (see [Travis script] for the details).
 
-- To help us write a good release note.
+## Conventions
 
-- To help the future maintainers of Exonum (it could be you!),
-    say five years into the future, to find out why a particular change
-    was made to the code or why a specific feature was added.
+Generally, we follow common best practices established in the Rust community,
+but we have several additional conventions:
 
-Structure your commit message like this:
+- Don't use `debug!` log level.
 
-From: <http://git-scm.com/book/ch5-2.html>
+  It is convenient to use `debug!` when you develop some feature and are only
+  interested in your logging output.
 
-> ```text
-> Short (50 chars or less) summary of changes
->
-> More detailed explanatory text, if necessary.  Wrap it to about 72
-> characters or so.  In some contexts, the first line is treated as the
-> subject of an email and the rest of the text as the body.  The blank
-> line separating the summary from the body is critical (unless you omit
-> the body entirely); tools like rebase can get confused if you run the
-> two together.
->
-> Further paragraphs come after blank lines.
->
->   - Bullet points are okay, too
->
->   - Typically a hyphen or asterisk is used for the bullet, preceded by a
->     single space, with blank lines in between, but conventions vary here
-> ```
+- Don't use `_` in public APIs, instead use full variable names and
+  `#[allow(unused_variables)]`.
 
-- Write the summary line and description of what you have done in
-    the imperative mode, that is as if you were commanding someone.
-    Start the line with "Fix", "Add", "Change" instead of "Fixed",
-    "Added", "Changed".
-- Always leave the second line blank.
-- Line break the commit message (to make the commit message readable
-    without having to scroll horizontally in `gitk`).
-- Don't end the summary line with a period - it's a title
-    and titles don't end with a period.
+  Public method should be documented, but meaningful parameter names are also
+  helpful for better understanding.
 
-### Tips
+- Imports (`use`) should be in the following order:
 
-- If it seems difficult to summarize what your commit does, it may be
-    because it includes several logical changes or bug fixes,
-    and it would be better to split it up into several commits using `git add -p`.
+  - Third-party libraries.
+  - Standard library.
+  - Internal.
 
-### References
-
-The following blog post has a good story how changes in naming of commit messages,
-help maintain the project:
-
-"How to Write a Git Commit Message": <https://chris.beams.io/posts/git-commit/>
-
-## Squashing Commits
-
-If your pull request is accepted for merging, you may be asked by a maintainer
-to squash and or [rebase](https://git-scm.com/docs/git-rebase) your commits
-before it will be merged. The basic squashing workflow is shown below.
-
-```sh
-git checkout your_branch_name
-git rebase -i HEAD~n
-# n is normally the number of commits in the pull
-# set commits from 'pick' to 'squash', save and quit
-# on the next screen, edit/refine commit messages
-# save and quit
-git push -f # (force push to GitHub)
-```
-
-Please refrain from creating several pull requests for the same change.
-Use the pull request that is already open (or was created earlier) to amend changes.
-This preserves the discussion and review that happened earlier
-for the respective change set.
-
-The length of time required for peer review is unpredictable and will vary
-from pull request to pull request.
-
-## Pull Request Philosophy
-
-Patchsets should always be focused. For example, a pull request could add a feature,
-fix a bug, or refactor code; but not a mixture.
-Please also avoid super pull requests which attempt to do too much,
-are overly large, or overly complex as this makes review difficult.
-
-### Features
-
-When adding a new feature, thought must be given to the long term technical debt
-and maintenance that feature may require after inclusion.
-Before proposing a new feature that will require maintenance,
-please consider if you are willing to maintain it (including bug fixing).
-If features get orphaned with no maintainer in the future, they may be removed
-by the Repository Maintainer.
-
-### Refactoring
-
-Refactoring is a necessary part of any software project's evolution.
-The following guidelines cover refactoring pull requests for the project.
-
-There are three categories of refactoring, code only moves,
-code style fixes, code refactoring.
-In general refactoring pull requests should not mix these three kinds
-of activity in order to make refactoring pull requests easy to
-review and uncontroversial. In all cases, refactoring PRs must not change
-the behaviour of code within the pull request (bugs must be preserved as is).
-
-Project maintainers aim for a quick turnaround on refactoring pull requests,
-so where possible keep them short, uncomplex and easy to verify.
-
-## "Decision Making" Process
-
-The following applies to code changes to the Exonum Core project and related
-projects such as Exonum BTC Anchoring Service.
-
-Whether a pull request is merged into Exonum Core rests with the project merge
-maintainers and ultimately the project lead.
-
-Maintainers will take into consideration if a patch is in line with the general
-principles of the project; meets the minimum standards for inclusion;
-and will judge the general consensus of contributors.
-
-In general, all pull requests must:
-
-- have a clear use case, fix a demonstrable bug or serve the greater good
-    of the project (for example refactoring for modularisation);
-- be well peer reviewed;
-- have unit tests and sandbox tests where appropriate;
-- follow code style guidelines;
-- not break the existing test suite;
-- where bugs are fixed, where possible, there should be unit tests demonstrating
-    the bug and also proving the fix. This helps prevent regression.
-
-### Peer Review
-
-Anyone may participate in peer review which is expressed by comments
-in the pull request. Typically reviewers will review the code for obvious errors,
-as well as test out the patch set and opine on the technical merits of the patch.
-Project maintainers take into account the peer review when determining
-if there is consensus to merge a pull request.
-The following language is used within pull-request comments:
-
-- LGTM means "Looks Good To Me";
-- Concept LGTM means "I agree in the general principle of this pull request".
-
-Reviewers should include the commit hash which they reviewed in their comments.
-
-Project maintainers reserve the right to weigh the opinions of peer reviewers
-using common sense judgement and also may weight based on meritocracy:
-Those that have demonstrated a deeper commitment and understanding towards
-the project (over time) or have clear domain expertise may naturally
-have more weight, as one would expect in all walks of life.
-
-Where a patch set affects consensus critical code, the bar will be set
-much higher in terms of discussion and peer review requirements,
-keeping in mind that mistakes could be very costly to the wider community.
-This includes refactoring of consensus critical code.
-
-## Release Policy
-
-The project leader is the release manager for each Exonum Core release.
-
-## Copyright
-
-By contributing to this repository, you agree to license your work under
-the Apache v.2 license unless specified otherwise at the top of the file itself.
-Any work contributed where you are not the original author must contain
-its license header with the original author(s) and source.
+[suggestions]: https://github.com/exonum/exonum/issues/new?template=feature.md
+[bug reports]: https://github.com/exonum/exonum/issues/new?template=bug.md
+[Project overview]: ARCHITECTURE.md
+[documentation]: https://exonum.com/doc/
+[gitter]: https://gitter.im/exonum/exonum
+[gitter-ru]: https://gitter.im/exonum/ruExonum
+[installation guide]: INSTALL.md
+[good first issue]: https://github.com/exonum/exonum/labels/good%20first%20issue
+[clippy]: https://github.com/rust-lang-nursery/rust-clippy
+[cargo audit]: https://github.com/RustSec/cargo-audit
+[cargo-deadlinks]: https://github.com/deadlinks/cargo-deadlinks
+[cargo-outdated]: https://github.com/kbknapp/cargo-outdated
+[rustfmt 0.9.0]: https://github.com/rust-lang-nursery/rustfmt
+[cspell]: https://github.com/Jason3S/cspell
+[markdownlint-cli]: https://github.com/igorshubovych/markdownlint-cli
+[Travis script]: .travis.yml
