@@ -20,34 +20,33 @@ use exonum::crypto::{CryptoHash, Hash};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi};
 
 use ConfigurationSchema;
-use config_api::{ApiResponseConfigHashInfo, ApiResponseConfigInfo, ApiResponseProposeHashInfo,
-                 ApiResponseProposePost, ApiResponseVotePost, ApiResponseVotesInfo};
+use api::{ConfigHashInfo, ConfigInfo, ProposeHashInfo, ProposePost, VotePost, VotesInfo};
 use super::{new_tx_config_propose, new_tx_config_vote, to_boxed, ConfigurationTestKit};
 
 trait ConfigurationApiTest {
-    fn get_actual_config(&self) -> ApiResponseConfigHashInfo;
+    fn get_actual_config(&self) -> ConfigHashInfo;
 
-    fn get_following_config(&self) -> Option<ApiResponseConfigHashInfo>;
+    fn get_following_config(&self) -> Option<ConfigHashInfo>;
 
-    fn get_config_by_hash(&self, config_hash: Hash) -> ApiResponseConfigInfo;
+    fn get_config_by_hash(&self, config_hash: Hash) -> ConfigInfo;
 
     fn get_all_proposes(
         &self,
         previous_cfg_hash_filter: Option<Hash>,
         actual_from_filter: Option<Height>,
-    ) -> Vec<ApiResponseProposeHashInfo>;
+    ) -> Vec<ProposeHashInfo>;
 
     fn get_all_committed(
         &self,
         previous_cfg_hash_filter: Option<Hash>,
         actual_from_filter: Option<Height>,
-    ) -> Vec<ApiResponseConfigHashInfo>;
+    ) -> Vec<ConfigHashInfo>;
 
-    fn get_votes_for_propose(&self, cfg_hash: &Hash) -> ApiResponseVotesInfo;
+    fn get_votes_for_propose(&self, cfg_hash: &Hash) -> VotesInfo;
 
-    fn post_config_propose(&self, cfg: &StoredConfiguration) -> ApiResponseProposePost;
+    fn post_config_propose(&self, cfg: &StoredConfiguration) -> ProposePost;
 
-    fn post_config_vote(&self, cfg_hash: &Hash) -> ApiResponseVotePost;
+    fn post_config_vote(&self, cfg_hash: &Hash) -> VotePost;
 }
 
 fn params_to_query(
@@ -71,15 +70,15 @@ fn params_to_query(
 }
 
 impl ConfigurationApiTest for TestKitApi {
-    fn get_actual_config(&self) -> ApiResponseConfigHashInfo {
+    fn get_actual_config(&self) -> ConfigHashInfo {
         self.get(ApiKind::Service("configuration"), "/v1/configs/actual")
     }
 
-    fn get_following_config(&self) -> Option<ApiResponseConfigHashInfo> {
+    fn get_following_config(&self) -> Option<ConfigHashInfo> {
         self.get(ApiKind::Service("configuration"), "/v1/configs/following")
     }
 
-    fn get_config_by_hash(&self, config_hash: Hash) -> ApiResponseConfigInfo {
+    fn get_config_by_hash(&self, config_hash: Hash) -> ConfigInfo {
         self.get(
             ApiKind::Service("configuration"),
             &format!("/v1/configs/{}", config_hash.to_string()),
@@ -90,7 +89,7 @@ impl ConfigurationApiTest for TestKitApi {
         &self,
         previous_cfg_hash_filter: Option<Hash>,
         actual_from_filter: Option<Height>,
-    ) -> Vec<ApiResponseProposeHashInfo> {
+    ) -> Vec<ProposeHashInfo> {
         self.get(
             ApiKind::Service("configuration"),
             &format!(
@@ -100,7 +99,7 @@ impl ConfigurationApiTest for TestKitApi {
         )
     }
 
-    fn get_votes_for_propose(&self, cfg_hash: &Hash) -> ApiResponseVotesInfo {
+    fn get_votes_for_propose(&self, cfg_hash: &Hash) -> VotesInfo {
         let endpoint = format!("/v1/configs/{}/votes", cfg_hash.to_string());
         self.get(ApiKind::Service("configuration"), &endpoint)
     }
@@ -109,7 +108,7 @@ impl ConfigurationApiTest for TestKitApi {
         &self,
         previous_cfg_hash_filter: Option<Hash>,
         actual_from_filter: Option<Height>,
-    ) -> Vec<ApiResponseConfigHashInfo> {
+    ) -> Vec<ConfigHashInfo> {
         self.get(
             ApiKind::Service("configuration"),
             &format!(
@@ -119,7 +118,7 @@ impl ConfigurationApiTest for TestKitApi {
         )
     }
 
-    fn post_config_propose(&self, cfg: &StoredConfiguration) -> ApiResponseProposePost {
+    fn post_config_propose(&self, cfg: &StoredConfiguration) -> ProposePost {
         self.post_private(
             ApiKind::Service("configuration"),
             "/v1/configs/postpropose",
@@ -127,7 +126,7 @@ impl ConfigurationApiTest for TestKitApi {
         )
     }
 
-    fn post_config_vote(&self, cfg_hash: &Hash) -> ApiResponseVotePost {
+    fn post_config_vote(&self, cfg_hash: &Hash) -> VotePost {
         let endpoint = format!("/v1/configs/{}/postvote", cfg_hash.to_string());
         self.post_private(ApiKind::Service("configuration"), &endpoint, &())
     }
@@ -140,7 +139,7 @@ fn test_get_actual_config() {
     let actual = testkit.api().get_actual_config();
     let expected = {
         let stored = Schema::new(&testkit.snapshot()).actual_configuration();
-        ApiResponseConfigHashInfo {
+        ConfigHashInfo {
             hash: stored.hash(),
             config: stored,
             propose: None,
@@ -165,7 +164,7 @@ fn test_get_following_config() {
     };
     let expected = {
         let stored = cfg_proposal.stored_configuration().clone();
-        ApiResponseConfigHashInfo {
+        ConfigHashInfo {
             hash: stored.hash(),
             config: stored,
             propose: None,
@@ -184,7 +183,7 @@ fn test_get_config_by_hash1() {
     let testkit: TestKit = TestKit::configuration_default();
     let initial_cfg = Schema::new(&testkit.snapshot()).actual_configuration();
 
-    let expected = ApiResponseConfigInfo {
+    let expected = ConfigInfo {
         committed_config: Some(initial_cfg.clone()),
         propose: None,
     };
@@ -204,7 +203,7 @@ fn test_get_config_by_hash2() {
     };
     testkit.apply_configuration(ValidatorId(0), new_cfg.clone());
     // Check results
-    let expected = ApiResponseConfigInfo {
+    let expected = ConfigInfo {
         committed_config: Some(new_cfg.clone()),
         propose: Some(
             ConfigurationSchema::new(&testkit.snapshot())
@@ -231,7 +230,7 @@ fn test_get_config_by_hash3() {
     };
     testkit.apply_configuration(ValidatorId(0), new_cfg.clone());
     // Check results
-    let expected = ApiResponseConfigInfo {
+    let expected = ConfigInfo {
         committed_config: Some(new_cfg.clone()),
         propose: Some(
             ConfigurationSchema::new(&testkit.snapshot())
@@ -310,14 +309,14 @@ fn test_get_all_proposes() {
     let tx_propose_2 = new_tx_config_propose(&testkit.network().validators()[1], new_cfg_2.clone());
     testkit.create_block_with_transactions(txvec![tx_propose_1, tx_propose_2]);
     // Check results
-    let expected_response_1 = ApiResponseProposeHashInfo {
+    let expected_response_1 = ProposeHashInfo {
         hash: new_cfg_1.hash(),
         propose_data: ConfigurationSchema::new(&testkit.snapshot())
             .propose_data_by_config_hash()
             .get(&new_cfg_1.hash())
             .expect("Propose data is absent"),
     };
-    let expected_response_2 = ApiResponseProposeHashInfo {
+    let expected_response_2 = ProposeHashInfo {
         hash: new_cfg_2.hash(),
         propose_data: ConfigurationSchema::new(&testkit.snapshot())
             .propose_data_by_config_hash()
@@ -337,11 +336,11 @@ fn test_get_all_proposes() {
         api.get_all_proposes(None, Some(Height(15)))
     );
     assert_eq!(
-        Vec::<ApiResponseProposeHashInfo>::new(),
+        Vec::<ProposeHashInfo>::new(),
         api.get_all_proposes(None, Some(Height(16)))
     );
     assert_eq!(
-        Vec::<ApiResponseProposeHashInfo>::new(),
+        Vec::<ProposeHashInfo>::new(),
         api.get_all_proposes(Some(Hash::zero()), None)
     );
     let initial_cfg = Schema::new(&testkit.snapshot()).actual_configuration();
@@ -373,19 +372,19 @@ fn test_get_all_committed() {
     };
     testkit.apply_configuration(ValidatorId(1), new_cfg_2.clone());
     // Check results
-    let expected_response_1 = ApiResponseConfigHashInfo {
+    let expected_response_1 = ConfigHashInfo {
         hash: initial_cfg.hash(),
         config: initial_cfg.clone(),
         propose: None,
         votes: None,
     };
-    let expected_response_2 = ApiResponseConfigHashInfo {
+    let expected_response_2 = ConfigHashInfo {
         hash: new_cfg_1.hash(),
         config: new_cfg_1.clone(),
         propose: Some(testkit.find_propose(new_cfg_1.hash()).unwrap().hash()),
         votes: Some(testkit.votes_for_propose(new_cfg_1.hash())),
     };
-    let expected_response_3 = ApiResponseConfigHashInfo {
+    let expected_response_3 = ConfigHashInfo {
         hash: new_cfg_2.hash(),
         config: new_cfg_2.clone(),
         propose: Some(testkit.find_propose(new_cfg_2.hash()).unwrap().hash()),
@@ -408,7 +407,7 @@ fn test_get_all_committed() {
         api.get_all_committed(None, Some(Height(15)))
     );
     assert_eq!(
-        Vec::<ApiResponseConfigHashInfo>::new(),
+        Vec::<ConfigHashInfo>::new(),
         api.get_all_committed(None, Some(Height(16)))
     );
     assert_eq!(

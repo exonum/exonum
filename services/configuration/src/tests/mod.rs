@@ -22,7 +22,7 @@ use exonum_testkit::{TestKit, TestKitBuilder, TestNode};
 
 use {ConfigurationSchema, ConfigurationService, TxConfigPropose, TxConfigVote};
 
-mod config_api;
+mod api;
 
 pub fn to_boxed<T: Transaction>(tx: T) -> Box<Transaction> {
     Box::new(tx) as Box<Transaction>

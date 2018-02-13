@@ -116,11 +116,9 @@ use exonum::encoding::{Field, Error as StreamStructError};
 use exonum::encoding::serialize::json::reexport as serde_json;
 
 /// Configuration service http api.
-pub mod config_api;
+pub mod api;
 #[cfg(test)]
 mod tests;
-
-type ProposeData = StorageValueConfigProposeData;
 
 /// Value of [`service_id`](struct.ConfigurationService.html#method.service_id) of
 /// `ConfigurationService`.
@@ -135,7 +133,7 @@ It is used as placeholder in database for votes of validators, which didn't cast
 }
 
 encoding_struct! {
-    struct StorageValueConfigProposeData {
+    struct ProposeData {
         tx_propose: TxConfigPropose,
         votes_history_hash: &Hash,
         num_validators: u64,
@@ -158,7 +156,7 @@ encoding_struct! {
 ///
 /// Table's root hash - in `votes_history_hash` field, which is
 /// modified after a vote from validator is added.
-impl StorageValueConfigProposeData {
+impl ProposeData {
     /// Method to mutate `votes_history_hash` field containing root hash of
     /// [`votes_by_config_hash`](struct.ConfigurationSchema.html#method.votes_by_config_hash)
     /// after replacing [empty
@@ -209,8 +207,7 @@ where
     }
 
     /// Returns a `ProofMapIndex` table of all config proposes `TxConfigPropose`, which are stored
-    /// within
-    /// `StorageValueConfigProposeData` along with votes' data.
+    /// within `ProposeData` along with votes' data.
     ///
     /// - Table **key** is [hash of a configuration][1].
     /// This hash is normalized when a new propose is put via `put_propose`:
@@ -222,7 +219,7 @@ where
     ///   4. unique normalized `String` for a unique configuration ->
     ///   5. bytes ->
     ///   6. [hash](https://docs.rs/exonum/0.3.0/exonum/crypto/fn.hash.html)(bytes)
-    /// - Table **value** is `StorageValueConfigProposeData`, containing
+    /// - Table **value** is `ProposeData`, containing
     /// `TxConfigPropose`,
     /// which contains
     /// [bytes](struct.TxConfigPropose.html#method.cfg), corresponding to
@@ -322,7 +319,7 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
     }
 
 
-    /// Put a new `StorageValueConfigProposeData` into `propose_data_by_config_hash` table with
+    /// Put a new `ProposeData` into `propose_data_by_config_hash` table with
     /// following fields:
     ///
     /// - **tx_propose** - `tx_propose` argument
@@ -368,7 +365,7 @@ impl<'a> ConfigurationSchema<&'a mut Fork> {
                 votes_table.push(ZEROVOTE.clone());
             }
 
-            StorageValueConfigProposeData::new(
+            ProposeData::new(
                 tx_propose,
                 &votes_table.root_hash(),
                 num_validators as u64,
@@ -660,7 +657,7 @@ impl Service for ConfigurationService {
     /// [votes for a propose table](struct.ConfigurationSchema.html#method.votes_by_config_hash)
     /// is modified. Such hash is stored in each entry of [all config proposes table]
     /// (struct.ConfigurationSchema.html#method.propose_data_by_config_hash)
-    /// - `StorageValueConfigProposeData`.
+    /// - `ProposeData`.
     /// [1]: <https://docs.rs/exonum/0.3.0/exonum/storage/proof_map_index/
     ///struct.ProofMapIndex.html#method.root_hash>
     fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash> {
@@ -677,14 +674,14 @@ impl Service for ConfigurationService {
 
     fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
         let mut router = Router::new();
-        let api = config_api::PublicConfigApi { blockchain: ctx.blockchain().clone() };
+        let api = api::PublicConfigApi { blockchain: ctx.blockchain().clone() };
         api.wire(&mut router);
         Some(Box::new(router))
     }
 
     fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
         let mut router = Router::new();
-        let api = config_api::PrivateConfigApi {
+        let api = api::PrivateConfigApi {
             channel: ctx.node_channel().clone(),
             config: (*ctx.public_key(), ctx.secret_key().clone()),
         };
