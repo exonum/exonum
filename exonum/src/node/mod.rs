@@ -956,7 +956,7 @@ pub fn create_public_api_handler(
 
     if config.enable_blockchain_explorer {
         let mut router = Router::new();
-        let explorer_api = public::ExplorerApi::new(blockchain.clone());
+        let explorer_api = public::ExplorerApi::new(Arc::clone(&pool), blockchain.clone());
         explorer_api.wire(&mut router);
         mount.mount("api/explorer", router);
     }

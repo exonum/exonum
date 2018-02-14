@@ -16,25 +16,46 @@ use router::Router;
 use iron::prelude::*;
 
 use blockchain::{Blockchain, Block};
-use explorer::{BlockInfo, BlockchainExplorer};
+use explorer::{BlockInfo, BlockchainExplorer, TxInfo};
+use node::state::TxPool;
 use api::{Api, ApiError};
+use crypto::Hash;
 use helpers::Height;
 
 const MAX_BLOCKS_PER_REQUEST: u64 = 1000;
+
+#[derive(Serialize)]
+#[serde(tag = "type")]
+enum TransactionInfo {
+    Unknown,
+    InPool(PoolTransactionInfo),
+    Committed(CommittedTransactionInfo),
+}
+
+#[derive(Serialize)]
+struct PoolTransactionInfo {
+    content: ::serde_json::Value,
+}
+
+#[derive(Serialize)]
+struct CommittedTransactionInfo {
+    tx_info: TxInfo,
+}
 
 /// Public explorer API.
 #[derive(Clone, Debug)]
 pub struct ExplorerApi {
     blockchain: Blockchain,
+    pool: TxPool,
 }
 
 impl ExplorerApi {
     /// Creates a new `ExplorerApi` instance.
-    pub fn new(blockchain: Blockchain) -> Self {
-        ExplorerApi { blockchain }
+    pub fn new(pool: TxPool, blockchain: Blockchain) -> Self {
+        ExplorerApi { pool, blockchain }
     }
 
-    fn get_blocks(
+    fn blocks(
         &self,
         count: u64,
         from: Option<u64>,
@@ -50,34 +71,66 @@ impl ExplorerApi {
         Ok(explorer.blocks_range(count, from, skip_empty_blocks))
     }
 
-    fn get_block(&self, height: Height) -> Result<Option<BlockInfo>, ApiError> {
+    fn block(&self, height: Height) -> Option<BlockInfo> {
         let explorer = BlockchainExplorer::new(&self.blockchain);
-        Ok(explorer.block_info(height))
+        explorer.block_info(height)
+    }
+
+    fn transaction_info(&self, hash: &Hash) -> Result<TransactionInfo, ApiError> {
+        if let Some(tx) = self.pool.read().expect("Uanble to read pool").get(hash) {
+            Ok(TransactionInfo::InPool(PoolTransactionInfo {
+                content: tx.serialize_field().map_err(ApiError::InternalError)?,
+            }))
+        } else if let Some(tx_info) = BlockchainExplorer::new(&self.blockchain).tx_info(hash)? {
+            Ok(TransactionInfo::Committed(CommittedTransactionInfo{tx_info}))
+        } else {
+            Ok(TransactionInfo::Unknown)
+        }
     }
 }
 
 impl Api for ExplorerApi {
     fn wire(&self, router: &mut Router) {
-
-        let self_ = self.clone();
-        let blocks = move |req: &mut Request| -> IronResult<Response> {
-            let count: u64 = self_.required_param(req, "count")?;
-            let latest: Option<u64> = self_.optional_param(req, "latest")?;
-            let skip_empty_blocks: bool = self_
-                .optional_param(req, "skip_empty_blocks")?
-                .unwrap_or(false);
-            let info = self_.get_blocks(count, latest, skip_empty_blocks)?;
-            self_.ok_response(&::serde_json::to_value(info).unwrap())
-        };
-
-        let self_ = self.clone();
-        let block = move |req: &mut Request| -> IronResult<Response> {
-            let height: u64 = self_.url_fragment(req, "height")?;
-            let info = self_.get_block(Height(height))?;
-            self_.ok_response(&::serde_json::to_value(info).unwrap())
-        };
-
-        router.get("/v1/blocks", blocks, "blocks");
-        router.get("/v1/blocks/:height", block, "height");
+        set_blocks_response(self.clone(), router);
+        set_block_response(self.clone(), router);
+        set_transaction_info_response(self.clone(), router);
     }
+}
+
+fn set_blocks_response(api: ExplorerApi, router: &mut Router) {
+    let blocks = move |req: &mut Request| -> IronResult<Response> {
+        let count: u64 = api.required_param(req, "count")?;
+        let latest: Option<u64> = api.optional_param(req, "latest")?;
+        let skip_empty_blocks: bool = api.optional_param(req, "skip_empty_blocks")?.unwrap_or(
+            false,
+        );
+        let info = api.blocks(count, latest, skip_empty_blocks)?;
+        api.ok_response(&::serde_json::to_value(info).unwrap())
+    };
+
+    router.get("/v1/blocks", blocks, "blocks");
+}
+
+fn set_block_response(api: ExplorerApi, router: &mut Router) {
+    let block = move |req: &mut Request| -> IronResult<Response> {
+        let height: u64 = api.url_fragment(req, "height")?;
+        let info = api.block(Height(height));
+        api.ok_response(&::serde_json::to_value(info).unwrap())
+    };
+
+    router.get("/v1/blocks/:height", block, "height");
+}
+
+fn set_transaction_info_response(api: ExplorerApi, router: &mut Router) {
+    let transaction = move |req: &mut Request| -> IronResult<Response> {
+        let hash: Hash = api.url_fragment(req, "hash")?;
+        let info = api.transaction_info(&hash)?;
+        let result = match info {
+            TransactionInfo::Unknown => ExplorerApi::not_found_response,
+            _ => ExplorerApi::ok_response,
+        };
+        result(&api, &::serde_json::to_value(info).unwrap())
+    };
+
+    router.get("/v1/transactions/:hash", transaction, "hash");
 }
