@@ -14,11 +14,12 @@
 
 //! Common widely used type definitions.
 
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use encoding::ExonumJson;
+
 use std::fmt;
 use std::str::FromStr;
 use std::num::ParseIntError;
-
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
 
 /// Number of milliseconds.
 pub type Milliseconds = u64;
@@ -355,3 +356,97 @@ impl Iterator for RoundRangeIter {
         }
     }
 }
+
+// TODO: Make a macro for tuple struct type definitions (ECR-154)?
+impl ExonumJson for Height {
+    fn deserialize_field<B: WriteBufferWrapper>(
+        value: &Value,
+        buffer: &mut B,
+        from: Offset,
+        to: Offset,
+    ) -> Result<(), Box<Error>> {
+        let val: u64 = value.as_str().ok_or("Can't cast json as string")?.parse()?;
+        buffer.write(from, to, Height(val));
+        Ok(())
+    }
+
+    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+        let val: u64 = self.to_owned().into();
+        Ok(Value::String(val.to_string()))
+    }
+}
+
+impl ExonumJson for Round {
+    fn deserialize_field<B: WriteBufferWrapper>(
+        value: &Value,
+        buffer: &mut B,
+        from: Offset,
+        to: Offset,
+    ) -> Result<(), Box<Error>> {
+        let number = value.as_i64().ok_or("Can't cast json as integer")?;
+        buffer.write(from, to, Round(number as u32));
+        Ok(())
+    }
+
+    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+        let val: u32 = self.to_owned().into();
+        Ok(Value::Number(val.into()))
+    }
+}
+
+impl ExonumJson for ValidatorId {
+    fn deserialize_field<B: WriteBufferWrapper>(
+        value: &Value,
+        buffer: &mut B,
+        from: Offset,
+        to: Offset,
+    ) -> Result<(), Box<Error>> {
+        let number = value.as_i64().ok_or("Can't cast json as integer")?;
+        buffer.write(from, to, ValidatorId(number as u16));
+        Ok(())
+    }
+
+    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+        let val: u16 = self.to_owned().into();
+        Ok(Value::Number(val.into()))
+    }
+}
+
+
+/// Implements `Field` for the tuple struct type definitions that contain simple types.
+macro_rules! implement_std_typedef_field {
+    ($name:ident ($t:ty) $fn_read:expr; $fn_write:expr) => (
+        impl<'a> Field<'a> for $name {
+            fn field_size() -> $crate::Offset {
+                mem::size_of::<$t>() as $crate::Offset
+            }
+
+            unsafe fn read(buffer: &'a [u8],
+                           from: $crate::Offset,
+                           to: $crate::Offset) -> $name {
+                $name($fn_read(&buffer[from as usize..to as usize]))
+            }
+
+            fn write(&self,
+                        buffer: &mut Vec<u8>,
+                        from: $crate::Offset,
+                        to: $crate::Offset) {
+                $fn_write(&mut buffer[from as usize..to as usize], self.to_owned().into())
+            }
+
+            fn check(_: &'a [u8],
+                        from: $crate::CheckedOffset,
+                        to: $crate::CheckedOffset,
+                        latest_segment: CheckedOffset)
+            ->  $crate::Result
+            {
+                debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
+                Ok(latest_segment)
+            }
+        }
+    )
+}
+
+implement_std_typedef_field!{Height(u64) LittleEndian::read_u64; LittleEndian::write_u64}
+implement_std_typedef_field!{Round(u32) LittleEndian::read_u32; LittleEndian::write_u32}
+implement_std_typedef_field!{ValidatorId(u16) LittleEndian::read_u16; LittleEndian::write_u16}

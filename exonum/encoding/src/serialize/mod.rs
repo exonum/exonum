@@ -16,9 +16,8 @@
 //! Currently support only json.
 //! This module is a pack of superstructures over serde `Serializer`\`Deserializer`
 
-use encoding::Field;
 use messages::MessageWriter;
-use super::Offset;
+use super::{Offset, Field};
 
 pub use hex::{FromHexError, ToHex, FromHex, encode as encode_hex, decode as decode_hex};
 

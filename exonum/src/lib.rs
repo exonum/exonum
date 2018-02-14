@@ -27,6 +27,8 @@ extern crate exonum_rocksdb as rocksdb;
 #[macro_use]
 extern crate exonum_profiler;
 #[macro_use]
+extern crate exonum_encoding as encoding;
+#[macro_use]
 extern crate log;
 extern crate byteorder;
 extern crate rand;

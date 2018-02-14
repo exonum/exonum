@@ -29,26 +29,8 @@ use serde_json::value::Value;
 use bit_vec::BitVec;
 use hex::FromHex;
 
-use crypto::{Hash, PublicKey, Signature};
-use helpers::{Height, Round, ValidatorId};
 use messages::RawMessage;
-use encoding::{Field, Offset};
-use super::WriteBufferWrapper;
-// TODO: should we implement serialize for: `SecretKey`, `Seed` (ECR-156)?
-
-macro_rules! impl_default_deserialize_owned {
-    (@impl $name:ty) => {
-        impl $crate::encoding::serialize::json::ExonumJsonDeserialize for $name {
-            fn deserialize(value: &$crate::encoding::serialize::json::reexport::Value)
-                -> Result<Self, Box<::std::error::Error>> {
-                use $crate::encoding::serialize::json::reexport::from_value;
-                Ok(from_value(value.clone())?)
-            }
-        }
-    };
-    ($($name:ty);*) =>
-        ($(impl_default_deserialize_owned!{@impl $name})*);
-}
+use super::{Field, Offset, WriteBufferWrapper};
 
 /// `ExonumJson` is trait for object
 /// that can be serialized and deserialize "in-place".
@@ -128,35 +110,8 @@ macro_rules! impl_deserialize_bigint {
     ($($name:ty);*) => ($(impl_deserialize_bigint!{@impl $name})*);
 }
 
-macro_rules! impl_deserialize_hex_segment {
-    (@impl $typename:ty) => {
-        impl<'a> ExonumJson for &'a $typename {
-            fn deserialize_field<B: WriteBufferWrapper>(value: &Value,
-                                                        buffer: & mut B,
-                                                        from: Offset,
-                                                        to: Offset)
-                -> Result<(), Box<Error>>
-            {
-                let string = value.as_str().ok_or("Can't cast json as string")?;
-                let val = <$typename as FromHex>:: from_hex(string)?;
-                buffer.write(from, to, &val);
-                Ok(())
-            }
-
-            fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
-                let hex_str = $crate::encoding::serialize::encode_hex(&self[..]);
-                Ok(Value::String(hex_str))
-            }
-        }
-    };
-    ($($name:ty);*) => ($(impl_deserialize_hex_segment!{@impl $name})*);
-}
-
 impl_deserialize_int!{u8; u16; u32; i8; i16; i32}
 impl_deserialize_bigint!{u64; i64}
-impl_deserialize_hex_segment!{Hash; PublicKey; Signature}
-impl_default_deserialize_owned!{u8; u16; u32; i8; i16; i32; u64; i64;
-                                Hash; PublicKey; Signature; bool}
 
 impl ExonumJson for bool {
     fn deserialize_field<B: WriteBufferWrapper>(
@@ -233,32 +188,6 @@ impl ExonumJson for SocketAddr {
     }
 }
 
-impl<'a> ExonumJson for &'a [Hash] {
-    fn deserialize_field<B: WriteBufferWrapper>(
-        value: &Value,
-        buffer: &mut B,
-        from: Offset,
-        to: Offset,
-    ) -> Result<(), Box<Error>> {
-        let arr = value.as_array().ok_or("Can't cast json as array")?;
-        let mut vec: Vec<Hash> = Vec::new();
-        for el in arr {
-            let string = el.as_str().ok_or("Can't cast json as string")?;
-            let hash = <Hash as FromHex>::from_hex(string)?;
-            vec.push(hash)
-        }
-        buffer.write(from, to, vec.as_slice());
-        Ok(())
-    }
-
-    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
-        let mut vec = Vec::new();
-        for hash in self.iter() {
-            vec.push(hash.serialize_field()?)
-        }
-        Ok(Value::Array(vec))
-    }
-}
 impl<'a> ExonumJson for &'a [u8] {
     fn deserialize_field<B: WriteBufferWrapper>(
         value: &Value,
@@ -273,7 +202,7 @@ impl<'a> ExonumJson for &'a [u8] {
     }
 
     fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
-        Ok(Value::String(::encoding::serialize::encode_hex(self)))
+        Ok(Value::String(::serialize::encode_hex(self)))
     }
 }
 
@@ -299,7 +228,7 @@ impl ExonumJson for Vec<RawMessage> {
     fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
         let vec = self.iter()
             .map(|slice| {
-                Value::String(::encoding::serialize::encode_hex(slice))
+                Value::String(::serialize::encode_hex(slice))
             })
             .collect();
         Ok(Value::Array(vec))
@@ -388,61 +317,6 @@ impl ExonumJson for BitVec {
             }
         }
         Ok(Value::String(out))
-    }
-}
-
-// TODO: Make a macro for tuple struct type definitions (ECR-154)?
-impl ExonumJson for Height {
-    fn deserialize_field<B: WriteBufferWrapper>(
-        value: &Value,
-        buffer: &mut B,
-        from: Offset,
-        to: Offset,
-    ) -> Result<(), Box<Error>> {
-        let val: u64 = value.as_str().ok_or("Can't cast json as string")?.parse()?;
-        buffer.write(from, to, Height(val));
-        Ok(())
-    }
-
-    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
-        let val: u64 = self.to_owned().into();
-        Ok(Value::String(val.to_string()))
-    }
-}
-
-impl ExonumJson for Round {
-    fn deserialize_field<B: WriteBufferWrapper>(
-        value: &Value,
-        buffer: &mut B,
-        from: Offset,
-        to: Offset,
-    ) -> Result<(), Box<Error>> {
-        let number = value.as_i64().ok_or("Can't cast json as integer")?;
-        buffer.write(from, to, Round(number as u32));
-        Ok(())
-    }
-
-    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
-        let val: u32 = self.to_owned().into();
-        Ok(Value::Number(val.into()))
-    }
-}
-
-impl ExonumJson for ValidatorId {
-    fn deserialize_field<B: WriteBufferWrapper>(
-        value: &Value,
-        buffer: &mut B,
-        from: Offset,
-        to: Offset,
-    ) -> Result<(), Box<Error>> {
-        let number = value.as_i64().ok_or("Can't cast json as integer")?;
-        buffer.write(from, to, ValidatorId(number as u16));
-        Ok(())
-    }
-
-    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
-        let val: u16 = self.to_owned().into();
-        Ok(Value::Number(val.into()))
     }
 }
 

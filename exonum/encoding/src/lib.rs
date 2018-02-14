@@ -106,6 +106,14 @@
 //!
 //! [`field_size()`]: ./trait.Field.html#tymethod.field_size
 
+extern crate hex;
+extern crate serde_json;
+extern crate bit_vec;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+extern crate byteorder;
+
 use std::convert::From;
 use std::ops::{Add, Sub, Mul, Div};
 

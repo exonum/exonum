@@ -17,11 +17,6 @@
 //! [Sodium library](https://github.com/jedisct1/libsodium) is used under the hood through
 //! [sodiumoxide rust bindings](https://github.com/dnaq/sodiumoxide).
 
-use std::default::Default;
-use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
-use std::fmt;
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use sodiumoxide::crypto::sign::ed25519::{gen_keypair as gen_keypair_sodium, keypair_from_seed,
                                          sign_detached, verify_detached,
                                          PublicKey as PublicKeySodium,
@@ -33,8 +28,15 @@ use sodiumoxide;
 use serde::{Serialize, Serializer};
 use serde::de::{self, Deserialize, Deserializer, Visitor};
 use byteorder::{ByteOrder, LittleEndian};
+use encoding::{FromHex, Offset};
 
-use encoding::serialize::FromHex;
+use std::default::Default;
+use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
+use std::fmt;
+use std::mem;
+use std::slice;
+use std::time::{SystemTime, UNIX_EPOCH};
+
 // spell-checker:disable
 pub use sodiumoxide::crypto::sign::ed25519::{PUBLICKEYBYTES as PUBLIC_KEY_LENGTH,
                                              SECRETKEYBYTES as SECRET_KEY_LENGTH,
@@ -691,6 +693,124 @@ impl CryptoHash for SystemTime {
         hash(&buffer)
     }
 }
+
+impl<'a> ExonumJson for &'a [Hash] {
+    fn deserialize_field<B: WriteBufferWrapper>(
+        value: &Value,
+        buffer: &mut B,
+        from: Offset,
+        to: Offset,
+    ) -> Result<(), Box<Error>> {
+        let arr = value.as_array().ok_or("Can't cast json as array")?;
+        let mut vec: Vec<Hash> = Vec::new();
+        for el in arr {
+            let string = el.as_str().ok_or("Can't cast json as string")?;
+            let hash = <Hash as FromHex>::from_hex(string)?;
+            vec.push(hash)
+        }
+        buffer.write(from, to, vec.as_slice());
+        Ok(())
+    }
+
+    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+        let mut vec = Vec::new();
+        for hash in self.iter() {
+            vec.push(hash.serialize_field()?)
+        }
+        Ok(Value::Array(vec))
+    }
+}
+
+/// Implement field helper for all POD types. It writes POD type as byte array in place.
+///
+/// **Beware of platform specific data representation.**
+#[macro_export]
+macro_rules! implement_pod_as_ref_field {
+    ($name:ident) => (
+        impl<'a> Field<'a> for &'a $name {
+            fn field_size() ->  $crate::Offset {
+                ::std::mem::size_of::<$name>() as $crate::Offset
+            }
+
+            unsafe fn read(buffer: &'a [u8],
+                            from: $crate::Offset,
+                            _: $crate::Offset) -> &'a $name
+            {
+                ::std::mem::transmute(&buffer[from as usize])
+            }
+
+            fn write(&self,
+                        buffer: &mut Vec<u8>,
+                        from: $crate::Offset,
+                        to: $crate::Offset)
+            {
+                let ptr: *const $name = *self as *const $name;
+                let slice = unsafe {
+                    ::std::slice::from_raw_parts(ptr as * const u8,
+                                                        ::std::mem::size_of::<$name>())};
+                buffer[from as usize..to as usize].copy_from_slice(slice);
+            }
+
+            fn check(_: &'a [u8],
+                        from:  $crate::CheckedOffset,
+                        to:  $crate::CheckedOffset,
+                        latest_segment: $crate::CheckedOffset)
+            ->  $crate::Result
+            {
+                debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
+                Ok(latest_segment)
+            }
+        }
+
+
+    )
+}
+
+implement_pod_as_ref_field! {Signature}
+implement_pod_as_ref_field! {PublicKey}
+implement_pod_as_ref_field! {Hash}
+
+macro_rules! impl_default_deserialize_owned {
+    (@impl $name:ty) => {
+        impl $crate::serialize::json::ExonumJsonDeserialize for $name {
+            fn deserialize(value: &$crate::serialize::json::reexport::Value)
+                -> Result<Self, Box<::std::error::Error>> {
+                use $crate::serialize::json::reexport::from_value;
+                Ok(from_value(value.clone())?)
+            }
+        }
+    };
+    ($($name:ty);*) =>
+        ($(impl_default_deserialize_owned!{@impl $name})*);
+}
+
+macro_rules! impl_deserialize_hex_segment {
+    (@impl $typename:ty) => {
+        impl<'a> ExonumJson for &'a $typename {
+            fn deserialize_field<B: WriteBufferWrapper>(value: &Value,
+                                                        buffer: & mut B,
+                                                        from: Offset,
+                                                        to: Offset)
+                -> Result<(), Box<Error>>
+            {
+                let string = value.as_str().ok_or("Can't cast json as string")?;
+                let val = <$typename as FromHex>:: from_hex(string)?;
+                buffer.write(from, to, &val);
+                Ok(())
+            }
+
+            fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+                let hex_str = $crate::serialize::encode_hex(&self[..]);
+                Ok(Value::String(hex_str))
+            }
+        }
+    };
+    ($($name:ty);*) => ($(impl_deserialize_hex_segment!{@impl $name})*);
+}
+
+impl_deserialize_hex_segment!{Hash; PublicKey; Signature}
+impl_default_deserialize_owned!{u8; u16; u32; i8; i16; i32; u64; i64;
+                                Hash; PublicKey; Signature; bool}
 
 #[cfg(test)]
 mod tests {
