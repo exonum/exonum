@@ -133,7 +133,7 @@ pub trait Service: Send + Sync + 'static {
 
     /// A comprehensive string service name. Must be unique within the
     /// blockchain.
-    fn service_name(&self) -> &'static str;
+    fn service_name(&self) -> &str;
 
     /// Returns a list of root hashes of tables that determine the current state
     /// of the service database. These hashes are collected from all the services in a common

@@ -17,7 +17,6 @@ use std::collections::HashMap;
 
 use router::Router;
 use iron::prelude::*;
-use params::{Params, Value as ParamsValue};
 
 use crypto::PublicKey;
 use node::{ExternalMessage, ApiSender};
@@ -156,12 +155,6 @@ impl SystemApi {
         self.node_channel.send_external_message(message)?;
         Ok(())
     }
-
-    fn peer_add(&self, ip_str: &str) -> Result<(), ApiError> {
-        let addr: SocketAddr = ip_str.parse()?;
-        self.node_channel.peer_add(addr)?;
-        Ok(())
-    }
 }
 
 impl Api for SystemApi {
@@ -169,18 +162,9 @@ impl Api for SystemApi {
 
         let self_ = self.clone();
         let peer_add = move |req: &mut Request| -> IronResult<Response> {
-            let map = req.get_ref::<Params>().unwrap();
-            match map.find(&["ip"]) {
-                Some(&ParamsValue::String(ref ip_str)) => {
-                    self_.peer_add(ip_str)?;
-                    self_.ok_response(&::serde_json::to_value("Ok").unwrap())
-                }
-                _ => {
-                    Err(ApiError::IncorrectRequest(
-                        "Required parameter of peer 'ip' is missing".into(),
-                    ))?
-                }
-            }
+            let addr: SocketAddr = self_.required_param(req, "ip")?;
+            self_.node_channel.peer_add(addr).map_err(ApiError::from)?;
+            self_.ok_response(&::serde_json::to_value("Ok").unwrap())
         };
 
         let self_ = self.clone();
@@ -203,18 +187,9 @@ impl Api for SystemApi {
 
         let self_ = self.clone();
         let consensus_enabled_set = move |req: &mut Request| -> IronResult<Response> {
-            let map = req.get_ref::<Params>().unwrap();
-            match map.find(&["enabled"]) {
-                Some(&ParamsValue::Boolean(enabled)) => {
-                    self_.set_consensus_enabled_info(enabled)?;
-                    self_.ok_response(&::serde_json::to_value("Ok").unwrap())
-                }
-                _ => {
-                    Err(ApiError::IncorrectRequest(
-                        "Required boolean parameter 'enabled' is missing".into(),
-                    ))?
-                }
-            }
+            let enabled: bool = self_.required_param(req, "enabled")?;
+            self_.set_consensus_enabled_info(enabled)?;
+            self_.ok_response(&::serde_json::to_value("Ok").unwrap())
         };
 
         router.get("/v1/peers", peers_info, "peers_info");

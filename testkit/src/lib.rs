@@ -58,7 +58,7 @@
 //! }
 //!
 //! impl Service for TimestampingService {
-//!     fn service_name(&self) -> &'static str {
+//!     fn service_name(&self) -> &str {
 //!         "timestamping"
 //!     }
 //!
@@ -363,7 +363,7 @@ impl From<TestNode> for ValidatorKeys {
 /// # use exonum_testkit::TestKitBuilder;
 /// # pub struct MyService;
 /// # impl Service for MyService {
-/// #    fn service_name(&self) -> &'static str {
+/// #    fn service_name(&self) -> &str {
 /// #        "documentation"
 /// #    }
 /// #    fn state_hash(&self, _: &exonum::storage::Snapshot) -> Vec<exonum::crypto::Hash> {
@@ -589,7 +589,7 @@ impl TestKit {
     /// # type FromRawResult = Result<Box<Transaction>, encoding::Error>;
     /// # pub struct MyService;
     /// # impl Service for MyService {
-    /// #    fn service_name(&self) -> &'static str {
+    /// #    fn service_name(&self) -> &str {
     /// #        "documentation"
     /// #    }
     /// #    fn state_hash(&self, _: &exonum::storage::Snapshot) -> Vec<exonum::crypto::Hash> {

@@ -15,6 +15,7 @@ byteorder
 checkpointed
 clippy
 clonned
+compat
 concat
 counterintuitive
 cryptocurrency
@@ -29,12 +30,14 @@ deserializes
 deserializing
 Exonum
 fsync
+fuzzer
 hashable
 healthcheck
 keepalive
 keypair
 keypairs
 leveldb
+libfuzzer
 memorydb
 mempool
 Merkelized
@@ -92,7 +95,7 @@ unsync
 untagged
 usize
 validator
-validator's
 validators
+validator's
 whitelisted
 writeln

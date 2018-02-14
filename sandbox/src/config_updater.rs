@@ -57,7 +57,7 @@ impl Transaction for TxConfig {
 }
 
 impl Service for ConfigUpdateService {
-    fn service_name(&self) -> &'static str {
+    fn service_name(&self) -> &str {
         "sandbox_config_updater"
     }
 

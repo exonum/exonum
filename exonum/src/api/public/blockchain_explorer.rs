@@ -12,10 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::num::ParseIntError;
-use std::str::ParseBoolError;
-
-use params::{Params, Value};
 use router::Router;
 use iron::prelude::*;
 
@@ -45,12 +41,10 @@ impl ExplorerApi {
         skip_empty_blocks: bool,
     ) -> Result<Vec<Block>, ApiError> {
         if count > MAX_BLOCKS_PER_REQUEST {
-            return Err(ApiError::IncorrectRequest(
-                format!(
-                    "Max block count per request exceeded ({})",
-                    MAX_BLOCKS_PER_REQUEST
-                ).into(),
-            ));
+            return Err(ApiError::BadRequest(format!(
+                "Max block count per request exceeded ({})",
+                MAX_BLOCKS_PER_REQUEST
+            )));
         }
         let explorer = BlockchainExplorer::new(&self.blockchain);
         Ok(explorer.blocks_range(count, from, skip_empty_blocks))
@@ -67,56 +61,20 @@ impl Api for ExplorerApi {
 
         let self_ = self.clone();
         let blocks = move |req: &mut Request| -> IronResult<Response> {
-            let map = req.get_ref::<Params>().unwrap();
-            let count: u64 = match map.find(&["count"]) {
-                Some(&Value::String(ref count_str)) => {
-                    count_str.parse().map_err(|e: ParseIntError| {
-                        ApiError::IncorrectRequest(Box::new(e))
-                    })?
-                }
-                _ => {
-                    return Err(ApiError::IncorrectRequest(
-                        "Required parameter of blocks 'count' is missing".into(),
-                    ))?;
-                }
-            };
-            let latest: Option<u64> = match map.find(&["latest"]) {
-                Some(&Value::String(ref from_str)) => {
-                    Some(from_str.parse().map_err(|e: ParseIntError| {
-                        ApiError::IncorrectRequest(Box::new(e))
-                    })?)
-                }
-                _ => None,
-            };
-            let skip_empty_blocks: bool = match map.find(&["skip_empty_blocks"]) {
-                Some(&Value::String(ref skip_str)) => {
-                    skip_str.parse().map_err(|e: ParseBoolError| {
-                        ApiError::IncorrectRequest(Box::new(e))
-                    })?
-                }
-                _ => false,
-            };
+            let count: u64 = self_.required_param(req, "count")?;
+            let latest: Option<u64> = self_.optional_param(req, "latest")?;
+            let skip_empty_blocks: bool = self_
+                .optional_param(req, "skip_empty_blocks")?
+                .unwrap_or(false);
             let info = self_.get_blocks(count, latest, skip_empty_blocks)?;
             self_.ok_response(&::serde_json::to_value(info).unwrap())
         };
 
         let self_ = self.clone();
         let block = move |req: &mut Request| -> IronResult<Response> {
-            let params = req.extensions.get::<Router>().unwrap();
-            match params.find("height") {
-                Some(height_str) => {
-                    let height: u64 = height_str.parse().map_err(|e: ParseIntError| {
-                        ApiError::IncorrectRequest(Box::new(e))
-                    })?;
-                    let info = self_.get_block(Height(height))?;
-                    self_.ok_response(&::serde_json::to_value(info).unwrap())
-                }
-                None => {
-                    Err(ApiError::IncorrectRequest(
-                        "Required parameter of block 'height' is missing".into(),
-                    ))?
-                }
-            }
+            let height: u64 = self_.url_fragment(req, "height")?;
+            let info = self_.get_block(Height(height))?;
+            self_.ok_response(&::serde_json::to_value(info).unwrap())
         };
 
         router.get("/v1/blocks", blocks, "blocks");

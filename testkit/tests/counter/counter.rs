@@ -143,8 +143,8 @@ impl CounterApi {
                 let json = TransactionResponse { tx_hash };
                 self.ok_response(&serde_json::to_value(&json).unwrap())
             }
-            Ok(None) => Err(ApiError::IncorrectRequest("Empty request body".into()))?,
-            Err(e) => Err(ApiError::IncorrectRequest(Box::new(e)))?,
+            Ok(None) => Err(ApiError::BadRequest("Empty request body".into()))?,
+            Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
         }
     }
 
@@ -168,8 +168,8 @@ impl CounterApi {
                 let json = TransactionResponse { tx_hash };
                 self.ok_response(&serde_json::to_value(&json).unwrap())
             }
-            Ok(None) => Err(ApiError::IncorrectRequest("Empty request body".into()))?,
-            Err(e) => Err(ApiError::IncorrectRequest(Box::new(e)))?,
+            Ok(None) => Err(ApiError::BadRequest("Empty request body".into()))?,
+            Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
         }
     }
 
@@ -203,7 +203,7 @@ impl Api for CounterApi {
 pub struct CounterService;
 
 impl Service for CounterService {
-    fn service_name(&self) -> &'static str {
+    fn service_name(&self) -> &str {
         "counter"
     }
 
