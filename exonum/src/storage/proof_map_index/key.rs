@@ -14,7 +14,7 @@
 
 use std::cmp::{min, Ordering};
 
-use crypto::{CryptoHash, Hash, HashStream, PublicKey, HASH_SIZE};
+use crypto::{CryptoHash, Hash, PublicKey, HASH_SIZE};
 use storage::StorageKey;
 
 pub const BRANCH_KEY_PREFIX: u8 = 0;
@@ -315,23 +315,6 @@ pub(crate) trait BitsRange {
             self.match_len(other, self.start())
         }
     }
-
-    fn hashable_prefix(&self, prefix_len: u16) -> BitsPrefix<Self>
-    where
-        Self: Sized,
-    {
-        debug_assert_eq!(self.start(), 0);
-        debug_assert!(
-            prefix_len <= self.len(),
-            "Attempted to extract prefix with length {} from key with length {}",
-            prefix_len,
-            self.len()
-        );
-        BitsPrefix {
-            parent: self,
-            prefix_len: prefix_len,
-        }
-    }
 }
 
 impl BitsRange for ProofPath {
@@ -378,35 +361,6 @@ impl BitsRange for ProofPath {
 impl PartialEq for ProofPath {
     fn eq(&self, other: &Self) -> bool {
         self.len() == other.len() && self.starts_with(other)
-    }
-}
-
-#[doc(hidden)]
-#[derive(Debug)]
-pub(crate) struct BitsPrefix<'a, T: 'a> {
-    parent: &'a T,
-    prefix_len: u16,
-}
-
-impl<'a, T: BitsRange> BitsPrefix<'a, T> {
-    pub fn hash_to(&self, stream: HashStream) -> HashStream {
-        let mut buffer = [0u8; PROOF_PATH_SIZE];
-
-        if self.prefix_len == (KEY_SIZE * 8) as u16 {
-            buffer[0] = LEAF_KEY_PREFIX;
-            buffer[1..KEY_SIZE + 1].copy_from_slice(self.parent.raw_key());
-            buffer[KEY_SIZE + 1] = 0;
-        } else {
-            buffer[0] = BRANCH_KEY_PREFIX;
-            let right = (self.prefix_len as usize + 7) / 8;
-            buffer[1..right + 1].copy_from_slice(&self.parent.raw_key()[0..right]);
-            if self.prefix_len % 8 != 0 {
-                buffer[right] &= !(255u8 << (self.prefix_len % 8));
-            }
-            buffer[KEY_SIZE + 1] = self.prefix_len as u8;
-        }
-
-        stream.update(&buffer)
     }
 }
 
@@ -505,7 +459,6 @@ mod tests {
     use serde_json::{self, Value};
     use rand::{self, Rng};
 
-    use crypto::hash;
     use super::*;
 
     /// Creates a random non-leaf, non-empty path.
@@ -564,58 +517,6 @@ mod tests {
             let x_bits = (0..x.len()).map(|i| x.bit(i));
             let y_bits = (0..y.len()).map(|i| y.bit(i));
             assert_eq!(x.partial_cmp(&y).unwrap(), x_bits.cmp(y_bits));
-        }
-    }
-
-    #[test]
-    fn test_proof_path_prefix_leaf() {
-        let path = ProofPath::new(&[1; 32]);
-        let prefix = path.hashable_prefix(256);
-        assert_eq!(
-            hash(&{
-                let mut buf = [0; PROOF_PATH_SIZE];
-                path.write(&mut buf);
-                buf
-            }),
-            prefix.hash_to(HashStream::new()).hash()
-        );
-    }
-
-    #[test]
-    fn test_proof_path_prefix_not_leaf() {
-        let path = ProofPath::new(&[42; 32]);
-        for i in 0..256 {
-            let prefix = path.hashable_prefix(i);
-            assert_eq!(
-                hash(&{
-                    let mut buf = [0; PROOF_PATH_SIZE];
-                    path.prefix(i).write(&mut buf);
-                    buf
-                }),
-                prefix.hash_to(HashStream::new()).hash()
-            );
-        }
-    }
-
-    #[test]
-    fn test_fuzz_proof_path_prefix() {
-        let mut rng = rand::thread_rng();
-        for _ in 0..32 {
-            let mut bytes = [0u8; 32];
-            rng.fill_bytes(&mut bytes);
-
-            let path = ProofPath::new(&bytes);
-            for i in 0..256 {
-                let prefix = path.hashable_prefix(i);
-                assert_eq!(
-                    hash(&{
-                        let mut buf = [0; PROOF_PATH_SIZE];
-                        path.prefix(i).write(&mut buf);
-                        buf
-                    }),
-                    prefix.hash_to(HashStream::new()).hash()
-                );
-            }
         }
     }
 }

@@ -18,7 +18,7 @@ use serde::{Serialize, Serializer, Deserialize, Deserializer};
 
 use crypto::{CryptoHash, Hash, HashStream};
 use storage::StorageValue;
-use super::key::{BitsPrefix, BitsRange, ChildKind, ProofMapKey, ProofPath, KEY_SIZE};
+use super::key::{BitsRange, ChildKind, ProofMapKey, ProofPath, KEY_SIZE};
 use super::node::BranchNode;
 
 impl Serialize for ProofPath {
@@ -121,10 +121,10 @@ impl ::std::error::Error for MapProofError {
         use self::MapProofError::*;
 
         match *self {
-            NonTerminalNode(_) => "Non-terminal node as a single key in a map proof",
+            NonTerminalNode(..) => "Non-terminal node as a single key in a map proof",
             EmbeddedPaths { .. } => "Embedded paths in a map proof",
-            DuplicatePath(_) => "Duplicate paths in a map proof",
-            InvalidOrdering(_, _) => "Invalid path ordering in a map proof",
+            DuplicatePath(..) => "Duplicate paths in a map proof",
+            InvalidOrdering(..) => "Invalid path ordering in a map proof",
         }
     }
 }
@@ -134,21 +134,6 @@ impl ::std::error::Error for MapProofError {
 struct MapProofEntry {
     path: ProofPath,
     hash: Hash,
-}
-
-impl From<(ProofPath, Hash)> for MapProofEntry {
-    fn from(val: (ProofPath, Hash)) -> Self {
-        MapProofEntry {
-            path: val.0,
-            hash: val.1,
-        }
-    }
-}
-
-impl From<MapProofEntry> for (ProofPath, Hash) {
-    fn from(val: MapProofEntry) -> Self {
-        (val.path, val.hash)
-    }
 }
 
 // Used instead of `(K, Option<V>)` only for the purpose of clearer (de)serialization.
@@ -402,7 +387,7 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
 #[derive(Debug)]
 pub(crate) struct MapProofBuilder<K, V> {
     entries: Vec<OptionalEntry<K, V>>,
-    proof: Vec<(ProofPath, Hash)>,
+    proof: Vec<MapProofEntry>,
 }
 
 impl<K, V> MapProofBuilder<K, V> {
@@ -426,16 +411,25 @@ impl<K, V> MapProofBuilder<K, V> {
         self
     }
 
-    /// Adds a proof entry into the builder. The `key` must be greater than keys of
+    /// Adds a proof entry into the builder. The `path` must be greater than keys of
     /// all proof entries previously added to the proof.
-    pub fn add_proof_entry(mut self, key: ProofPath, hash: Hash) -> Self {
-        debug_assert!(if let Some(&(ref last_key, _)) = self.proof.last() {
-            *last_key < key
-        } else {
-            true
-        });
+    pub fn add_proof_entry(mut self, path: ProofPath, hash: Hash) -> Self {
+        debug_assert!(self.proof.last().map_or(true, |last| last.path < path));
 
-        self.proof.push((key, hash));
+        self.proof.push(MapProofEntry { path, hash });
+        self
+    }
+
+    /// Adds several proof entries into the builder. The `paths` must be greater than keys of
+    /// all proof entries previously added to the proof and sorted in increasing order.
+    pub fn add_proof_entries<I>(mut self, paths: I) -> Self
+    where
+        I: IntoIterator<Item = (ProofPath, Hash)>,
+    {
+        self.proof.extend(paths.into_iter().map(
+            |(path, hash)| MapProofEntry { path, hash },
+        ));
+        debug_assert!(self.proof.windows(2).all(|w| w[0].path < w[1].path));
         self
     }
 
@@ -445,45 +439,12 @@ impl<K, V> MapProofBuilder<K, V> {
     pub fn create(self) -> MapProof<K, V> {
         MapProof {
             entries: self.entries,
-            proof: self.proof.into_iter().map(|e| e.into()).collect(),
+            proof: self.proof,
         }
     }
 }
 
 impl<K, V> MapProof<K, V> {
-    /// Creates a proof for a single entry.
-    pub(crate) fn for_entry<I>(entry: (K, V), proof: I) -> Self
-    where
-        I: IntoIterator<Item = (ProofPath, Hash)>,
-    {
-        MapProof {
-            entries: vec![OptionalEntry::value(entry.0, entry.1)],
-            proof: proof.into_iter().map(|e| e.into()).collect(),
-        }
-    }
-
-    /// Creates a proof of absence of a key.
-    pub(crate) fn for_absent_key<I>(key: K, proof: I) -> Self
-    where
-        I: IntoIterator<Item = (ProofPath, Hash)>,
-    {
-        MapProof {
-            entries: vec![OptionalEntry::missing(key)],
-            proof: proof.into_iter().map(|e| e.into()).collect(),
-        }
-    }
-
-    /// Creates a proof for an empty map.
-    pub(crate) fn for_empty_map<KI>(keys: KI) -> Self
-    where
-        KI: IntoIterator<Item = K>,
-    {
-        MapProof {
-            entries: keys.into_iter().map(OptionalEntry::missing).collect(),
-            proof: vec![],
-        }
-    }
-
     /// Maps this proof to another type of keys and/or values.
     pub fn map<F, L, U>(self, map_fn: F) -> MapProof<L, U>
     where
@@ -492,9 +453,9 @@ impl<K, V> MapProof<K, V> {
         MapProof {
             entries: self.entries
                 .into_iter()
-                .map(|e| e.into())
+                .map(OptionalEntry::into)
                 .map(map_fn)
-                .map(|e| e.into())
+                .map(OptionalEntry::from)
                 .collect(),
             proof: self.proof,
         }
@@ -502,7 +463,11 @@ impl<K, V> MapProof<K, V> {
 
     /// Provides access to the proof part of the view. Useful mainly for debug purposes.
     pub fn proof_unchecked(&self) -> Vec<(ProofPath, Hash)> {
-        self.proof.iter().cloned().map(|e| e.into()).collect()
+        self.proof
+            .iter()
+            .cloned()
+            .map(|e| (e.path, e.hash))
+            .collect()
     }
 
     /// Retrieves references to keys that the proof shows as missing from the map.
@@ -602,7 +567,10 @@ where
 
         proof.extend(entries.iter().filter_map(|e| {
             e.as_kv().map(|(k, v)| {
-                MapProofEntry::from((ProofPath::new(k), v.hash()))
+                MapProofEntry {
+                    path: ProofPath::new(k),
+                    hash: v.hash(),
+                }
             })
         }));
         // Rust docs state that in the case `self.proof` and `self.entries` are sorted
@@ -611,7 +579,7 @@ where
         proof.sort_unstable_by(|x, y| {
             x.path.partial_cmp(&y.path).expect(
                 "Incorrectly formed paths supplied to MapProof; \
-                 paths should have `from` field set to 0",
+                 paths should have `start` field set to 0",
             )
         });
 

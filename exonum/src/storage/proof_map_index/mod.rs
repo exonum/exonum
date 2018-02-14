@@ -325,8 +325,6 @@ where
                     let next_bit = searched_path.bit(next_height);
                     node_path = branch.child_path(next_bit);
 
-                    // XXX: strictly speaking, one of `*branch.child_hash()` copies could
-                    // be avoided by dismantling `branch` via a consuming method
                     let other_path_and_hash =
                         (branch.child_path(!next_bit), *branch.child_hash(!next_bit));
                     match !next_bit {
@@ -343,7 +341,10 @@ where
                             ChildKind::Right => right_hashes.push((node_path, next_hash)),
                         }
 
-                        return MapProof::for_absent_key(key, combine(left_hashes, right_hashes));
+                        return MapProofBuilder::new()
+                            .add_missing(key)
+                            .add_proof_entries(combine(left_hashes, right_hashes))
+                            .create();
                     } else {
                         let node = self.get_node_unchecked(&node_path);
                         match node {
@@ -352,10 +353,10 @@ where
                                 // We have reached the leaf node and haven't diverged!
                                 // The key is there, we've just gotten the value, so we just
                                 // need to return it.
-                                return MapProof::for_entry(
-                                    (key, value),
-                                    combine(left_hashes, right_hashes),
-                                );
+                                return MapProofBuilder::new()
+                                    .add_entry(key, value)
+                                    .add_proof_entries(combine(left_hashes, right_hashes))
+                                    .create();
                             }
                         }
                     }
@@ -364,13 +365,16 @@ where
 
             Some((root_path, Node::Leaf(root_value))) => {
                 if root_path == searched_path {
-                    MapProof::for_entry((key, root_value), vec![])
+                    MapProofBuilder::new().add_entry(key, root_value).create()
                 } else {
-                    MapProof::for_absent_key(key, vec![(root_path, root_value.hash())])
+                    MapProofBuilder::new()
+                        .add_missing(key)
+                        .add_proof_entry(root_path, root_value.hash())
+                        .create()
                 }
             }
 
-            None => MapProof::for_empty_map(vec![key]),
+            None => MapProofBuilder::new().add_missing(key).create(),
         }
     }
 
@@ -571,7 +575,13 @@ where
                 builder.create()
             }
 
-            None => MapProof::for_empty_map(keys),
+            None => {
+                keys.into_iter()
+                    .fold(MapProofBuilder::new(), |builder, key| {
+                        builder.add_missing(key)
+                    })
+                    .create()
+            }
         }
     }
 
