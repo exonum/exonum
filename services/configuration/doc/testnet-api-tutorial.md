@@ -51,9 +51,9 @@ cargo install --example configuration
     <!-- markdownlint-enable MD013 -->
 
     - parameters
-      - `--public-api-address` is for exonum's [public http api endpoints](#public-endpoints)
-      - `--private-api-address` is for exonum's [private http api endpoints](#private-endpoints)
-      - `--node-config` path to the node's config
+      - `--public-api-address` is for Exonum [public http api endpoints](#public-endpoints)
+      - `--private-api-address` is for Exonum [private http api endpoints](#private-endpoints)
+      - `--node-config` path to the node config
       - `--db-path` path to the database
 
   - automatically via the [supervisord](http://supervisord.org/) utility.
@@ -69,7 +69,7 @@ cargo install --example configuration
 
     1. run [helper script](../testnet/testnetctl.sh) for initializing
        `supervisor` and `configuration_service` process group
-       [config](../testnet/supervisord) to `$TESTNET_DESDIR` directory.
+       [config](../testnet/supervisord) to `$TESTNET_DESTDIR` directory.
 
        ```bash
        ./testnet/testnetctl.sh enable
@@ -175,11 +175,11 @@ endpoint.
 
     1. a *following* config isn't  already present.
 
-    1. *actual* config contains the node-sender's public key in array of
-       `validators` field, as specified in `from` field of propose
-       transaction. The `from` field is determined by public key of node whose
+    1. *actual* config contains the node-sender public key in the `validators`
+       field array, as specified in `from` field of the propose transaction.
+       The `from` field is determined by the public key of the node which
        `postpropose` endpoint is accessed for signing the transaction on
-       maintainter's behalf.
+       maintainer's behalf.
 
     1. propose of config, which evaluates to the same hash, hasn't already
        been submitted.
@@ -202,7 +202,7 @@ endpoint.
     1. `actual_from` in the config propose, which is referenced by vote
        transaction, is greater than *current height*.
 
-    1. no vote from the same node's public key has been submitted previously.
+    1. no vote from the same node public key has been submitted previously.
 
 [Examples](response-samples.md#private-response-samples)
 
