@@ -90,12 +90,14 @@ impl<'de> Deserialize<'de> for ProofPath {
 }
 
 /// An error returned when a map proof is invalid.
-#[derive(Debug)]
+#[derive(Debug, Fail)]
 pub enum MapProofError {
     /// Non-terminal node for a map consisting of a single node.
+    #[fail(display = "non-terminal node as a single key in proof")]
     NonTerminalNode(ProofPath),
 
     /// One path in the proof is a prefix of another path.
+    #[fail(display = "embedded paths in proof")]
     EmbeddedPaths {
         /// Prefix key
         prefix: ProofPath,
@@ -104,29 +106,12 @@ pub enum MapProofError {
     },
 
     /// One path is mentioned several times in the proof.
+    #[fail(display = "duplicate path in proof")]
     DuplicatePath(ProofPath),
 
     /// Entries in the proof are not ordered by increasing path.
+    #[fail(display = "invalid path ordering")]
     InvalidOrdering(ProofPath, ProofPath),
-}
-
-impl ::std::fmt::Display for MapProofError {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        write!(f, "{:?}", &self)
-    }
-}
-
-impl ::std::error::Error for MapProofError {
-    fn description(&self) -> &str {
-        use self::MapProofError::*;
-
-        match *self {
-            NonTerminalNode(..) => "Non-terminal node as a single key in a map proof",
-            EmbeddedPaths { .. } => "Embedded paths in a map proof",
-            DuplicatePath(..) => "Duplicate paths in a map proof",
-            InvalidOrdering(..) => "Invalid path ordering in a map proof",
-        }
-    }
 }
 
 // Used instead of `(ProofPath, Hash)` only for the purpose of clearer (de)serialization.
@@ -484,6 +469,7 @@ where
 {
     fn precheck(&self) -> Result<(), MapProofError> {
         use std::cmp::Ordering;
+        use self::MapProofError::*;
 
         // Check that entries in proof are in increasing order
         for w in self.proof.windows(2) {
@@ -491,17 +477,17 @@ where
             match prev_path.partial_cmp(path) {
                 Some(Ordering::Less) => {
                     if path.starts_with(prev_path) {
-                        return Err(MapProofError::EmbeddedPaths {
+                        return Err(EmbeddedPaths {
                             prefix: *prev_path,
                             path: *path,
                         });
                     }
                 }
                 Some(Ordering::Equal) => {
-                    return Err(MapProofError::DuplicatePath(*path));
+                    return Err(DuplicatePath(*path));
                 }
                 Some(Ordering::Greater) => {
-                    return Err(MapProofError::InvalidOrdering(*prev_path, *path));
+                    return Err(InvalidOrdering(*prev_path, *path));
                 }
                 None => unreachable!("Incomparable keys in proof"),
             }
@@ -519,13 +505,13 @@ where
                 )
             }) {
                 Ok(_) => {
-                    return Err(MapProofError::DuplicatePath(path));
+                    return Err(DuplicatePath(path));
                 }
 
                 Err(index) if index > 0 => {
                     let prev_path = &self.proof[index - 1].path;
                     if path.starts_with(prev_path) {
-                        return Err(MapProofError::EmbeddedPaths {
+                        return Err(EmbeddedPaths {
                             prefix: *prev_path,
                             path,
                         });

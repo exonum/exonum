@@ -21,7 +21,7 @@ use rand::seq::sample_iter;
 use crypto::{hash, CryptoHash, Hash, HashStream};
 use storage::{Database, Fork, StorageValue};
 use encoding::serialize::reexport::Serialize;
-use super::{ProofPath, ProofMapIndex, ProofMapKey, HashedKey, MapProof};
+use super::{ProofPath, ProofMapIndex, ProofMapKey, HashedKey, MapProof, MapProofError};
 use super::key::{ChildKind, BitsRange, KEY_SIZE, LEAF_KEY_PREFIX};
 use super::node::BranchNode;
 use super::proof::MapProofBuilder;
@@ -438,17 +438,17 @@ where
 
 #[test]
 fn test_invalid_map_proofs() {
-    use std::error::Error;
+    use self::MapProofError::*;
 
     let h = hash(&vec![1]);
 
     let proof: MapProof<[u8; 32], Vec<u8>> = MapProofBuilder::new()
         .add_proof_entry(ProofPath::new(&[1; 32]).prefix(240), h)
         .create();
-    assert_eq!(
-        proof.check().unwrap_err().description(),
-        "Non-terminal node as a single key in a map proof"
-    );
+    match proof.check().unwrap_err() {
+        NonTerminalNode(..) => {}
+        e => panic!("expected non-terminal node error, got {}", e),
+    }
 
     let json = json!({
         "proof": [
@@ -458,47 +458,47 @@ fn test_invalid_map_proofs() {
         "entries": []
     });
     let proof: MapProof<[u8; 32], Vec<u8>> = serde_json::from_value(json).unwrap();
-    assert_eq!(
-        proof.check().unwrap_err().description(),
-        "Invalid path ordering in a map proof"
-    );
+    match proof.check().unwrap_err() {
+        InvalidOrdering(..) => {}
+        e => panic!("expected invalid ordering error, got {}", e),
+    }
 
     let proof: MapProof<[u8; 32], Vec<u8>> = MapProofBuilder::new()
         .add_proof_entry(ProofPath::new(&[1; 32]).prefix(3), h)
         .add_proof_entry(ProofPath::new(&[1; 32]).prefix(77), h)
         .create();
-    assert_eq!(
-        proof.check().unwrap_err().description(),
-        "Embedded paths in a map proof"
-    );
+    match proof.check().unwrap_err() {
+        EmbeddedPaths { .. } => {}
+        e => panic!("expected embedded paths error, got {}", e),
+    }
 
     let proof: MapProof<[u8; 32], Vec<u8>> = MapProofBuilder::new()
         .add_proof_entry(ProofPath::new(&[1; 32]).prefix(3), h)
         .add_entry([1; 32], vec![1, 2, 3])
         .create();
-    assert_eq!(
-        proof.check().unwrap_err().description(),
-        "Embedded paths in a map proof"
-    );
+    match proof.check().unwrap_err() {
+        EmbeddedPaths { .. } => {}
+        e => panic!("expected embedded paths error, got {}", e),
+    }
 
     let proof: MapProof<[u8; 32], Vec<u8>> = MapProofBuilder::new()
         .add_proof_entry(ProofPath::new(&[1; 32]).prefix(3), h)
         .add_entry([1; 32], vec![1, 2, 3])
         .create();
-    assert_eq!(
-        proof.check().unwrap_err().description(),
-        "Embedded paths in a map proof"
-    );
+    match proof.check().unwrap_err() {
+        EmbeddedPaths { .. } => {}
+        e => panic!("expected embedded paths error, got {}", e),
+    }
 
     let proof: MapProof<[u8; 32], Vec<u8>> = MapProofBuilder::new()
         .add_proof_entry(ProofPath::new(&[0; 32]).prefix(10), h)
         .add_proof_entry(ProofPath::new(&[1; 32]), h)
         .add_entry([1; 32], vec![1, 2, 3])
         .create();
-    assert_eq!(
-        proof.check().unwrap_err().description(),
-        "Duplicate paths in a map proof"
-    );
+    match proof.check().unwrap_err() {
+        DuplicatePath(..) => {}
+        e => panic!("expected duplicate path error, got {}", e),
+    }
 }
 
 fn build_proof_in_empty_tree(db: Box<Database>) {
