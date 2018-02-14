@@ -79,7 +79,6 @@ pub struct Schema<T> {
     view: T,
 }
 
-
 impl<T> Schema<T>
 where
     T: AsRef<Snapshot>,

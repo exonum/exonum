@@ -1012,7 +1012,7 @@ impl NodeHandler {
         Ok(())
     }
 
-    /// Check whether Propose is saved to the consensus cache and saves it otherwise
+    /// Checks whether Propose is saved to the consensus cache and saves it otherwise
     fn check_propose_saved(&mut self, round: Round, propose_hash: &Hash) {
         if let Some(propose_state) = self.state.propose_mut(propose_hash) {
             if !propose_state.is_saved() {

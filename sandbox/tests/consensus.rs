@@ -3315,15 +3315,6 @@ fn test_schema_config_changes() {
     );
 }
 
-//fn get_consensus_messages(blockchain: &Blockchain) -> Vec<RawMessage> {
-//    let snapshot = blockchain.snapshot();
-//    let schema = Schema::new(&snapshot);
-//    let msgs = schema.consensus_messages_cache();
-//    let messages: Vec<RawMessage> = msgs.iter().collect();
-//    messages
-//}
-
-
 // - lock to propose when get +2/3 prevote
 //     - only if propose is known     - covered in request_propose_when_get_prevote()
 //     - only if all txs is known     - covered in request_txs_when_get_propose_or_prevote()
