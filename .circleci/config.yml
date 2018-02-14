@@ -4,6 +4,9 @@ jobs:
   build_and_test:
     macos:
       xcode: "9.0"
+    environment:
+      - ROCKSDB_LIB_DIR: /usr/local/lib
+      - SNAPPY_LIB_DIR: /usr/local/lib
     steps:
       - checkout
       - run: curl https://sh.rustup.rs -sSf | sh -s -- -y
