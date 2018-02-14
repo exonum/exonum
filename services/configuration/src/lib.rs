@@ -79,6 +79,7 @@
 //! }
 //! ```
 
+// spell-checker:ignore ZEROVOTE
 #![cfg_attr(feature = "cargo-clippy", allow(block_in_if_condition_stmt))]
 // TODO: Remove when https://github.com/rust-lang-nursery/rust-clippy/issues/2190 is fixed.
 #![cfg_attr(feature="cargo-clippy", allow(doc_markdown))]
@@ -147,7 +148,7 @@ encoding_struct! {
 /// 2. Reference to
 ///   [`votes_by_config_hash`](struct.ConfigurationSchema.html#method.votes_by_config_hash) table.
 ///   This reference is represented by 2 fields:
-///   - `votest_history_hash`
+///   - `votes_history_hash`
 ///   - `num_validators`
 ///
 /// Length of the table is stored in `num_validators` field, which isn't changed
