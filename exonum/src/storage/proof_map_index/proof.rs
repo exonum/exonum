@@ -16,9 +16,10 @@
 
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 
-use crypto::{Hash, HashStream};
+use crypto::{CryptoHash, Hash, HashStream};
 use storage::StorageValue;
 use super::key::{BitsPrefix, BitsRange, ChildKind, ProofMapKey, ProofPath, KEY_SIZE};
+use super::node::BranchNode;
 
 impl Serialize for ProofPath {
     fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
@@ -128,56 +129,8 @@ impl ::std::error::Error for MapProofError {
     }
 }
 
-#[derive(Debug)]
-struct ContourNode<'a> {
-    left_hash: Hash,
-    left_path: BitsPrefix<'a, ProofPath>,
-    path_len: u16,
-    right_path_len: u16,
-}
-
-impl<'a> ContourNode<'a> {
-    fn new(
-        path_len: u16,
-        left_path: BitsPrefix<'a, ProofPath>,
-        left_hash: Hash,
-        right_path_len: u16,
-    ) -> Self {
-        ContourNode {
-            left_hash,
-            left_path,
-            path_len,
-            right_path_len,
-        }
-    }
-
-    #[inline]
-    fn path_len(&self) -> u16 {
-        self.path_len
-    }
-
-    #[inline]
-    fn truncate_right_path(&mut self, to_bits: u16) {
-        self.right_path_len = to_bits;
-    }
-
-    /// Outputs the hash of the node based on the finalized `right_hash` value and `contour_path`,
-    /// which is an extension of the right child path.
-    fn finalize(self, contour_path: &ProofPath, right_hash: Hash) -> Hash {
-        let stream = HashStream::new().update(self.left_hash.as_ref()).update(
-            right_hash.as_ref(),
-        );
-        let stream = self.left_path.hash_to(stream);
-        let stream = contour_path.hashable_prefix(self.right_path_len).hash_to(
-            stream,
-        );
-
-        stream.hash()
-    }
-}
-
 // Used instead of `(ProofPath, Hash)` only for the purpose of clearer (de)serialization.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 struct MapProofEntry {
     path: ProofPath,
     hash: Hash,
@@ -341,14 +294,6 @@ pub struct CheckedMapProof<K, V> {
     hash: Hash,
 }
 
-/// Calculates hash for an isolated node in the Merkle Patricia tree.
-fn hash_isolated_node(path: &ProofPath, h: &Hash) -> Hash {
-    HashStream::new()
-        .update(path.as_bytes())
-        .update(h.as_ref())
-        .hash()
-}
-
 /// Computes the root hash of the Merkle Patricia tree backing the specified entries
 /// in the map view.
 ///
@@ -362,6 +307,45 @@ fn hash_isolated_node(path: &ProofPath, h: &Hash) -> Hash {
 ///
 /// `entries` are assumed to be sorted by the path in increasing order.
 fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
+    fn common_prefix(x: &ProofPath, y: &ProofPath) -> ProofPath {
+        x.prefix(x.common_prefix_len(y))
+    }
+
+    /// Calculates hash for an isolated node in the Merkle Patricia tree.
+    fn hash_isolated_node(path: &ProofPath, h: &Hash) -> Hash {
+        HashStream::new()
+            .update(path.as_bytes())
+            .update(h.as_ref())
+            .hash()
+    }
+
+    fn hash_branch(left_child: &MapProofEntry, right_child: &MapProofEntry) -> Hash {
+        let mut branch = BranchNode::empty();
+        branch.set_child(ChildKind::Left, &left_child.path, &left_child.hash);
+        branch.set_child(ChildKind::Right, &right_child.path, &right_child.hash);
+        branch.hash()
+    }
+
+    /// Folds two last entries in a contour and replaces them with the folded entry.
+    ///
+    /// Returns an updated common prefix between two last entries in the contour.
+    fn fold(contour: &mut Vec<MapProofEntry>, last_prefix: ProofPath) -> Option<ProofPath> {
+        let last_entry = contour.pop().unwrap();
+        let penultimate_entry = contour.pop().unwrap();
+
+        contour.push(MapProofEntry {
+            path: last_prefix,
+            hash: hash_branch(&penultimate_entry, &last_entry),
+        });
+
+        if contour.len() > 1 {
+            let penultimate_entry = contour[contour.len() - 2];
+            Some(common_prefix(&penultimate_entry.path, &last_prefix))
+        } else {
+            None
+        }
+    }
+
     match entries.len() {
         0 => Ok(Hash::default()),
 
@@ -374,48 +358,34 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
         }
 
         _ => {
-            let mut right_contour: Vec<ContourNode> = Vec::with_capacity(8);
+            let mut contour: Vec<MapProofEntry> = Vec::with_capacity(8);
+            // invariant: equal to the common prefix of the 2 last nodes in the contour
+            let mut last_prefix;
 
-            for w in entries.windows(2) {
-                let (prev, entry) = (&w[0], &w[1]);
-                let common_prefix = entry.path.common_prefix_len(&prev.path);
+            {
+                let (first_entry, second_entry) = (&entries[0], &entries[1]);
+                last_prefix = common_prefix(&first_entry.path, &second_entry.path);
+                contour.push(*first_entry);
+                contour.push(*second_entry);
+            }
 
-                let mut fin_hash = prev.hash;
-                let mut fin_path_len = prev.path.len();
-                while let Some(mut node) = right_contour.pop() {
-                    let len = node.path_len();
-                    if len < common_prefix {
-                        node.truncate_right_path(common_prefix);
-                        right_contour.push(node);
-                        break;
-                    } else if len > 0 {
-                        fin_path_len = node.path_len();
-                        fin_hash = node.finalize(&prev.path, fin_hash);
-                    } else {
-                        // `len == 0` is a special case; the node will be reinserted
-                        // to the contour, so the left child length should not be updated.
-                    }
+            for entry in entries.iter().skip(2) {
+                let new_prefix = common_prefix(&contour.last().unwrap().path, &entry.path);
+                let new_prefix_len = new_prefix.len();
+
+                while contour.len() > 1 && new_prefix_len < last_prefix.len() {
+                    fold(&mut contour, last_prefix).map(|prefix| { last_prefix = prefix; });
                 }
 
-                let node = ContourNode::new(
-                    common_prefix, // path length
-                    prev.path.hashable_prefix(fin_path_len), // left path
-                    fin_hash, // left hash
-                    entry.path.len(), // right path length
-                );
-                right_contour.push(node);
+                contour.push(*entry);
+                last_prefix = new_prefix;
             }
 
-            // Iteratively finalize all remaining nodes in the tree. This handles the special case
-            // when all paths start with the same bit(s).
-            let (mut fin_hash, fin_path) = {
-                let last_entry = entries.last().unwrap();
-                (last_entry.hash, &last_entry.path)
-            };
-            while let Some(node) = right_contour.pop() {
-                fin_hash = node.finalize(fin_path, fin_hash);
+            while contour.len() > 1 {
+                fold(&mut contour, last_prefix).map(|prefix| { last_prefix = prefix; });
             }
-            Ok(fin_hash)
+
+            Ok(contour[0].hash)
         }
     }
 }
@@ -631,7 +601,9 @@ where
         let (mut proof, entries) = (self.proof, self.entries);
 
         proof.extend(entries.iter().filter_map(|e| {
-            e.as_kv().map(|(k, v)| (ProofPath::new(k), v.hash()).into())
+            e.as_kv().map(|(k, v)| {
+                MapProofEntry::from((ProofPath::new(k), v.hash()))
+            })
         }));
         // Rust docs state that in the case `self.proof` and `self.entries` are sorted
         // (which is the case for `MapProof`s returned by `ProofMapIndex.get_proof()`),
