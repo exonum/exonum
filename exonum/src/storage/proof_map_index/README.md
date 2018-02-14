@@ -55,7 +55,7 @@ We keep 2 arrays:
 
 Each time we go to the right, we push the other (i.e., left) child
 of the junction node to the end of `l`. Conversely, if we go to the left,
-we prepend the other (right) child of the junction to the beginning of `r`.
+we add the other (right) child of the junction to the beginning of `r`.
 The search ends when we reach the leaf node of the index tree with the searched
 key, or neither of the children of the current junction matches; in the latter
 case, we add both its children to `l` and `r` as described above.
@@ -74,32 +74,43 @@ a proof subtree and calculate the hash directly. The actual implementation
 is slightly more complex: instead of constructing a subtree, we emulate
 adding nodes to it iteratively in the order of increasing keys, keeping in memory
 just the right-most nodes of the subtree (we call these nodes a *contour*)
-and "finalizing" them as we go along.
+and "finalizing" them as we go along. The finalization procedure is as follows:
+
+Two last nodes in the contour `C` can be collapsed into a single node if
+and only if the common prefix of these nodes
+```none
+cp_last := common_prefix(C[-2], C[-1])
+```
+is longer than the common prefix between the last node in the contour
+and the node `V` currently being added to the contour, i.e.,
+
+```none
+cp_next := common_prefix(C[-1], V).
+```
 
 Let us cover this procedure on the proof for `V4`:
 
 1. The entries in the proof are ordered by increasing key: `H[1:2]`, `V3`,
   `V4`, `H[5:7]`.
-2. `H[1:2]` is added into the contour.
-3. We add `V3` to the contour. We determine the intersection between `V3`
-  and the current contour, which is `key(H[1:4])`. We move `H[1:2]`
-  out of the contour, replacing it with info on `H[1:4]` we know so far:
-  its left child `H[1:2]`. Then, we push `V3` to the contour as well.
-4. We add `V4` to the contour. Again, this starts from determining the intersection
-  with the current contour, `key(H[3:4])`. We replace `V3` in the contour with
-  the info on `H[3:4]`, and add `V4` to the contour.
-5. We add `H[5:7]` to the contour. The intersection with the previous contour is
-  `key(R)`. This means that all entries in the contour should be finalized.
-  The finalization is implemented as follows: we use the previously remembered information
-  about `H[3:4]` (i.e., its left child `V3`), augment it with the now finalized
-  right child `V4` and calculate `hash(H[3:4])`. Then, we repeat procedure with
-  `H[1:4]` as the branch and `H[3:4]` as the terminal node, obtaining `hash(H[1:4])`.
-  Finally, as in 2 previous cases, we add `R` into the contour together with
-  information about its left child `H[1:4]`. Then, we add `H[5:7]` into
-  the contour as well.
-6. At this point, we have run out of nodes in the proof, so we finalize the remaining
-  nodes in the contour. That is, we assume `H[5:7]` as the final right child
-  of `R` and calculate `hash(R)`.
+2. We move first two nodes into the contour: `C := [ H[1:2], V3 ]`.
+3. We now start processing the third node, `V4`. First, we check if the 2 latest
+  nodes in the contour can be finalized, i.e., collapsed into a single node.
+  The common prefix between nodes in the contour is `key(H[1:4])`, and a one
+  involving `V4` is `key(H[3:4])`. The second prefix is longer, meaning that
+  no nodes should be finalized.
+4. We add `V4` to the contour: `C := [ H[1:2], V3, V4 ]`.
+5. We add `H[5:7]` to the contour. The common prefix with `C[-1]` is `key(R)`,
+  which is shorter than `key(H[3:4])`. This means `V3` and `V4` can be replaced
+  with their combination, i.e., `H[3:4]`: `C := [ H[1:2], H[3:4] ]`.
+6. The common prefix between two nodes in the contour is `key(H[1:4])`, i.e.,
+  still shorter than the prefix with the new node, `key(R)`. The contour is
+  reduced to a single node: `C := [ H[1:4] ]`.
+7. We cannot collapse nodes in the contour any longer, so we finally add the
+  new node: `C := [ H[1:4], H[5:7] ]`.
+8. We have run out of nodes to add to the contour, so we start collapsing nodes
+  in it, staring from the end. In our case, this procedure has a single
+  iteration, after which `C := [ R ]`.
+9. We return the hash of the remaining node in the contour.
 
 It is easy to see that the above procedure works for any number of revealed
 nodes in the proof.
