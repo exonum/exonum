@@ -49,7 +49,7 @@ impl NodeHandler {
             NetworkEvent::PeerConnected(peer, connect) => self.handle_connected(peer, connect),
             NetworkEvent::PeerDisconnected(peer) => self.handle_disconnected(peer),
             NetworkEvent::UnableConnectToPeer(peer) => self.handle_unable_to_connect(peer),
-            NetworkEvent::MessageReceived(peer, raw) => self.handle_message(peer, raw),
+            NetworkEvent::MessageReceived(_, raw) => self.handle_message(raw),
         }
     }
 

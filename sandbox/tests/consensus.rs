@@ -320,8 +320,8 @@ fn should_not_send_propose_and_prevote_after_node_restart() {
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
         .build();
 
-    sandbox.broadcast(propose.clone());
-    sandbox.broadcast(make_prevote_from_propose(&sandbox, &propose.clone()));
+    sandbox.broadcast(&propose);
+    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
 
     let curr_height = sandbox.current_height();
     let curr_round = sandbox.current_round();
@@ -349,9 +349,9 @@ fn should_not_send_prevote_after_node_restart_incoming() {
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
         .build();
 
-    sandbox.recv(propose.clone());
+    sandbox.recv(&propose);
 
-    sandbox.broadcast(Prevote::new(
+    sandbox.broadcast(&Prevote::new(
         VALIDATOR_0,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -386,9 +386,9 @@ fn should_not_vote_after_node_restart() {
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
         .build();
 
-    sandbox.recv(propose.clone());
+    sandbox.recv(&propose);
 
-    sandbox.broadcast(Prevote::new(
+    sandbox.broadcast(&Prevote::new(
         VALIDATOR_0,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -397,7 +397,7 @@ fn should_not_vote_after_node_restart() {
         sandbox.s(VALIDATOR_0),
     ));
 
-    sandbox.recv(Prevote::new(
+    sandbox.recv(&Prevote::new(
         VALIDATOR_1,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -407,7 +407,7 @@ fn should_not_vote_after_node_restart() {
     ));
     sandbox.assert_lock(LOCK_ZERO, None); //do not lock if <2/3 prevotes
 
-    sandbox.recv(Prevote::new(
+    sandbox.recv(&Prevote::new(
         VALIDATOR_2,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -417,7 +417,7 @@ fn should_not_vote_after_node_restart() {
     ));
     sandbox.assert_lock(LOCK_ONE, Some(propose.hash()));
 
-    sandbox.broadcast(Precommit::new(
+    sandbox.broadcast(&Precommit::new(
         VALIDATOR_0,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -461,9 +461,9 @@ fn should_save_precommit_to_consensus_cache() {
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
         .build();
 
-    sandbox.recv(propose.clone());
+    sandbox.recv(&propose);
 
-    sandbox.broadcast(Prevote::new(
+    sandbox.broadcast(&Prevote::new(
         VALIDATOR_0,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -472,7 +472,7 @@ fn should_save_precommit_to_consensus_cache() {
         sandbox.s(VALIDATOR_0),
     ));
 
-    sandbox.recv(Prevote::new(
+    sandbox.recv(&Prevote::new(
         VALIDATOR_1,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -482,7 +482,7 @@ fn should_save_precommit_to_consensus_cache() {
     ));
     sandbox.assert_lock(LOCK_ZERO, None); //do not lock if <2/3 prevotes
 
-    sandbox.recv(Prevote::new(
+    sandbox.recv(&Prevote::new(
         VALIDATOR_2,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -492,7 +492,7 @@ fn should_save_precommit_to_consensus_cache() {
     ));
     sandbox.assert_lock(LOCK_ONE, Some(propose.hash()));
 
-    sandbox.broadcast(Precommit::new(
+    sandbox.broadcast(&Precommit::new(
         VALIDATOR_0,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -512,7 +512,7 @@ fn should_save_precommit_to_consensus_cache() {
     sandbox_restarted.assert_lock(LOCK_ONE, Some(propose.hash()));
     sandbox_restarted.assert_state(curr_height, curr_round);
 
-    sandbox_restarted.recv(Precommit::new(
+    sandbox_restarted.recv(&Precommit::new(
         VALIDATOR_1,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -522,7 +522,7 @@ fn should_save_precommit_to_consensus_cache() {
         sandbox_restarted.s(VALIDATOR_1),
     ));
 
-    sandbox_restarted.recv(Precommit::new(
+    sandbox_restarted.recv(&Precommit::new(
         VALIDATOR_2,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -555,9 +555,9 @@ fn test_recover_consensus_messages_in_other_round() {
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
         .build();
 
-    sandbox.recv(propose.clone());
+    sandbox.recv(&propose);
 
-    sandbox.broadcast(Prevote::new(
+    sandbox.broadcast(&Prevote::new(
         VALIDATOR_0,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -566,7 +566,7 @@ fn test_recover_consensus_messages_in_other_round() {
         sandbox.s(VALIDATOR_0),
     ));
 
-    sandbox.recv(Prevote::new(
+    sandbox.recv(&Prevote::new(
         VALIDATOR_1,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -576,7 +576,7 @@ fn test_recover_consensus_messages_in_other_round() {
     ));
     sandbox.assert_lock(LOCK_ZERO, None); //do not lock if <2/3 prevotes
 
-    sandbox.recv(Prevote::new(
+    sandbox.recv(&Prevote::new(
         VALIDATOR_2,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -586,7 +586,7 @@ fn test_recover_consensus_messages_in_other_round() {
     ));
     sandbox.assert_lock(LOCK_ONE, Some(propose.hash()));
 
-    sandbox.broadcast(Precommit::new(
+    sandbox.broadcast(&Precommit::new(
         VALIDATOR_0,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -601,7 +601,7 @@ fn test_recover_consensus_messages_in_other_round() {
     sandbox.assert_state(HEIGHT_ONE, ROUND_TWO);
 
     // make sure we broadcasted same Prevote for second round
-    sandbox.broadcast(Prevote::new(
+    sandbox.broadcast(&Prevote::new(
         VALIDATOR_0,
         HEIGHT_ONE,
         ROUND_TWO,
@@ -617,9 +617,9 @@ fn test_recover_consensus_messages_in_other_round() {
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
         .build();
 
-    sandbox.recv(propose_new.clone());
+    sandbox.recv(&propose_new);
 
-    sandbox.recv(Prevote::new(
+    sandbox.recv(&Prevote::new(
         VALIDATOR_1,
         HEIGHT_ONE,
         ROUND_TWO,
@@ -628,7 +628,7 @@ fn test_recover_consensus_messages_in_other_round() {
         sandbox.s(VALIDATOR_1),
     ));
 
-    sandbox.recv(Prevote::new(
+    sandbox.recv(&Prevote::new(
         VALIDATOR_2,
         HEIGHT_ONE,
         ROUND_TWO,
@@ -639,7 +639,7 @@ fn test_recover_consensus_messages_in_other_round() {
 
     sandbox.assert_lock(LOCK_ONE, Some(propose.hash()));
 
-    sandbox.recv(Prevote::new(
+    sandbox.recv(&Prevote::new(
         VALIDATOR_3,
         HEIGHT_ONE,
         ROUND_TWO,
@@ -650,7 +650,7 @@ fn test_recover_consensus_messages_in_other_round() {
 
     sandbox.assert_lock(LOCK_TWO, Some(propose_new.hash()));
 
-    sandbox.broadcast(Precommit::new(
+    sandbox.broadcast(&Precommit::new(
         VALIDATOR_0,
         HEIGHT_ONE,
         ROUND_TWO,

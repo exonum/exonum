@@ -558,8 +558,8 @@ impl Sandbox {
     }
 
     /// Creates new sandbox with "restarted" node. Old sandbox instance gets dropped.
-    pub fn restart(self) -> Sandbox {
-        sandbox_with_blockchain(self.blockchain_mut().clone())
+    pub fn restart(self) -> Self {
+        sandbox_restarted_uninitialized(self)
     }
 
     fn node_public_key(&self) -> PublicKey {
