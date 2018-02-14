@@ -1,4 +1,5 @@
 [common.consensus_config]
+max_message_len = 1048576
 peers_timeout = 10000
 round_timeout = 3000
 status_timeout = 5000

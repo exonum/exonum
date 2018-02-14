@@ -1,6 +1,6 @@
 [package]
 name = "exonum"
-version = "0.2.0"
+version = "0.5.1"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 homepage = "https://exonum.com/"
 repository = "https://github.com/exonum/exonum"
@@ -15,13 +15,12 @@ description = "An extensible framework for blockchain software projects."
 travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-log = "0.3.8"
-mio = "0.5.0"
+log = "0.4.1"
 byteorder = "1.1.0"
-hex = "0.2.0"
+hex = "0.3.0"
 bit-vec = "0.4.4"
 vec_map = "0.8.0"
-rand = "0.3.15"
+rand = "0.4.2"
 serde = "1.0.10"
 serde_derive = "1.0.10"
 serde_json = "1.0.2"
@@ -29,31 +28,36 @@ toml = "0.4.2"
 clap = "2.25.0"
 term = "0.4.6"
 colored = "1.5.2"
-env_logger = "0.4.3"
-hyper = "0.10.12"
-cookie = "0.9.1"
-router = "0.5.1"
-iron = "0.5.1"
+env_logger = "0.5.3"
+hyper = "0.10.13"
+cookie = "0.10.1"
+router = "0.6.0"
+iron = "0.6.0"
+iron-cors = "0.7.0"
 headers = "0.1.0"
-bodyparser = "0.7.0"
-params = "0.6.0"
-mount = "0.3.0"
+params = "0.8.0"
+mount = "0.4.0"
 atty = "0.2.2"
+bytes = "0.4.0"
+futures = "0.1.14"
+tokio-core = "0.1.9"
+tokio-io = "0.1.2"
+tokio-retry = "0.1.0"
+tokio-timer = "0.1.2"
 
-exonum_sodiumoxide = { version = "0.0.14" }
-exonum_rocksdb = { version = "0.6.1", optional = true }
-exonum_leveldb = { version = "0.9.1", optional = true }
-exonum_profiler = { version = "0.1.1" }
-exonum_flamer = { version = "0.1.5", optional = true }
+exonum_rocksdb = "0.7"
+exonum_sodiumoxide = "0.0.16"
+exonum_profiler = { path = "../3rdparty/profiler", version = "0.1.2" }
+exonum_flamer = { path = "../3rdparty/flamer", version = "0.1.6", optional = true }
 
 [dev-dependencies]
-pretty_assertions = "0.2.1"
+pretty_assertions = "0.4.0"
 tempdir = "0.3.5"
+lazy_static = "1.0.0"
 
 [features]
-default = ["leveldb"]
-leveldb = ["exonum_leveldb"]
-rocksdb = ["exonum_rocksdb"]
+default = []
+float_serialize = []
 long_benchmarks = []
-nightly = []
 flame_profile = ["exonum_profiler/nomock", "exonum_flamer"]
+metrics-log = []

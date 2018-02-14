@@ -15,19 +15,16 @@
 use messages::{RequestMessage, Message, ProposeRequest, TransactionsRequest, PrevotesRequest,
                BlockRequest, BlockResponse};
 use blockchain::Schema;
-use events::Channel;
-use super::{NodeHandler, ExternalMessage, NodeTimeout};
+use super::NodeHandler;
 
 // TODO: height should be updated after any message, not only after status (if signature is correct)
 // TODO: Request propose makes sense only if we know that node is on our height.
+// (ECR-171)
 
-impl<S> NodeHandler<S>
-where
-    S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>,
-{
+impl NodeHandler {
     /// Validates request, then redirects it to the corresponding `handle_...` function.
     pub fn handle_request(&mut self, msg: RequestMessage) {
-        // Request are sended to us
+        // Request are sent to us
         if msg.to() != self.state.consensus_public_key() {
             return;
         }
@@ -46,16 +43,16 @@ where
         }
 
         match msg {
-            RequestMessage::Propose(msg) => self.handle_request_propose(msg),
-            RequestMessage::Transactions(msg) => self.handle_request_txs(msg),
-            RequestMessage::Prevotes(msg) => self.handle_request_prevotes(msg),
-            RequestMessage::Peers(msg) => self.handle_request_peers(msg),
-            RequestMessage::Block(msg) => self.handle_request_block(msg),
+            RequestMessage::Propose(msg) => self.handle_request_propose(&msg),
+            RequestMessage::Transactions(msg) => self.handle_request_txs(&msg),
+            RequestMessage::Prevotes(msg) => self.handle_request_prevotes(&msg),
+            RequestMessage::Peers(msg) => self.handle_request_peers(&msg),
+            RequestMessage::Block(msg) => self.handle_request_block(&msg),
         }
     }
 
-    /// Handles `RequstPropose` message. For details see the message documentation.
-    pub fn handle_request_propose(&mut self, msg: ProposeRequest) {
+    /// Handles `ProposeRequest` message. For details see the message documentation.
+    pub fn handle_request_propose(&mut self, msg: &ProposeRequest) {
         trace!("HANDLE PROPOSE REQUEST");
         if msg.height() != self.state.height() {
             return;
@@ -74,8 +71,8 @@ where
         }
     }
 
-    /// Handles `RequestTransactions` message. For details see the message documentation.
-    pub fn handle_request_txs(&mut self, msg: TransactionsRequest) {
+    /// Handles `TransactionsRequest` message. For details see the message documentation.
+    pub fn handle_request_txs(&mut self, msg: &TransactionsRequest) {
         trace!("HANDLE TRANSACTIONS REQUEST");
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
@@ -95,8 +92,8 @@ where
         }
     }
 
-    /// Handles `RequestPrevotes` message. For details see the message documentation.
-    pub fn handle_request_prevotes(&mut self, msg: PrevotesRequest) {
+    /// Handles `PrevotesRequest` message. For details see the message documentation.
+    pub fn handle_request_prevotes(&mut self, msg: &PrevotesRequest) {
         trace!("HANDLE PREVOTES REQUEST");
         if msg.height() != self.state.height() {
             return;
@@ -115,8 +112,8 @@ where
         }
     }
 
-    /// Handles `RequestBlock` message. For details see the message documentation.
-    pub fn handle_request_block(&mut self, msg: BlockRequest) {
+    /// Handles `BlockRequest` message. For details see the message documentation.
+    pub fn handle_request_block(&mut self, msg: &BlockRequest) {
         trace!(
             "Handle block request with height:{}, our height: {}",
             msg.height(),

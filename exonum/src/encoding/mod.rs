@@ -12,29 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! `encoding` is a lazy serialization library,
-//! it allows to keep struct serialized in place, and deserialize fields on demand.
+//! `encoding` is a serialization library supporting zero-copy (de)serialization
+//! of primitive types, heterogeneous structures and arrays.
 //!
-//! Binary representation of structure is split into two main parts:
+//! See also [the documentation page on serialization][doc:serialization].
 //!
-//! - Header - fixed sized part.
-//! - Body - dynamic sized, known only after parsing header, part.
+//! # Structure serialization
 //!
-//! For easy creating this structures,
-//! in exonum you can use macros `message!` and `encoding_struct!`
-//! #Examples
-//! Imagine structure with just two field's
+//! Structures are in the root of any serializable Exonum object.
+//! Binary representation of structures is split into two main parts:
 //!
-//! - First one is `String`
-//! - second one is `u64`
+//! - **Header:** a fixed-sized part
+//! - **Body:** dynamically sized part, known only after parsing the header
 //!
-//! To create message for this structure now, you need to know how many bytes this fields
-//! took in header. See [Fields layout](#fields-layout).
+//! To create a structure type, you can use [`message!`] and [`encoding_struct!`] macros.
 //!
-//! We know that `u64` [took 8 bytes](#primitive-types),
-//! and string took [8 segment bytes](#segment-fields).
+//! [doc:serialization]: https://exonum.com/doc/architecture/serialization/
+//! [`message!`]: ../macro.message.html
+//! [`encoding_struct!`]: ../macro.encoding_struct.html
 //!
-//! Then to create, for example [storage value](../macro.encoding_struct.html),
+//! # Examples
+//!
+//! Consider a structure with two fields: `String` and `u64`.
+//! To implement Exonum (de)serialization for this structure
 //! you need to use macros like this:
 //!
 //! ```
@@ -43,64 +43,69 @@
 //! # extern crate serde_json;
 //! encoding_struct! {
 //!     struct MyAwesomeStructure {
-//!         const SIZE = 16;
-//!
-//!         field name: &str [0 => 8]
-//!         field age:  u64  [8 => 16]
+//!         name: &str,
+//!         age: u64,
 //!     }
 //! }
-//! // now if we create it in memory
 //!
 //! # fn main() {
-//!     let student = MyAwesomeStructure::new("Andrew", 23);
+//! let student = MyAwesomeStructure::new("Andrew", 23);
 //! # drop(student);
 //! # }
 //! ```
-//! Then in internal buffer of `student` you will get:
 //!
-//! | Position | Stored data  | Hexadecimal form | Comment |
-//! |:--------|:------:|:---------------------|:--------------------------------------------------|
-//! `0  => 4`  | 16    | `10 00 00 00`            | LE stored segment pointer to the data |
-//! `4  => 8`  | 6     | `06 00 00 00`            | LE stored segment size |
-//! `8  => 16` | 23    | `17 00 00 00 00 00 00 00`| number in little endian |
-//! `16 => 24` | Andrew| `41 6e 64 72 65 77`	    | Real text bytes|
+//! Then the internal buffer of `student` is as follows:
 //!
+//! | Position | Stored data | Hexadecimal form | Comment |
+//! |:--------|:------:|:---------------------|:------------------------------------------|
+//! | `0  => 4`  | 16    | `10 00 00 00`            | LE-encoded segment pointer to the data |
+//! | `4  => 8`  | 6     | `06 00 00 00`            | LE-encoded segment size |
+//! | `8  => 16` | 23    | `17 00 00 00 00 00 00 00` | number in little endian |
+//! | `16 => 24` | Andrew | `41 6e 64 72 65 77` | Text bytes in UTF-8 encoding |
 //!
-//! #Fields layout
-//! Fields could be splitted into tree main parts:
+//! # Structure fields
 //!
-//! ### Primitive types
+//! ## Primitive types
 //!
-//! Primitive types are all fixed sized, and located fully in header.
-// TODO explain how an signed integer is stored in memory (what codding)
+//! Primitive types are all fixed-sized, and located fully in the header.
+// TODO explain how a signed integer is stored in memory (what codding) (ECR-155)
 //!
 //! | Type name | Size in Header | Info |
 //! |:--------|:---------------------|:--------------------------------------------------|
-//! `u8`     | 1    | Regular byte  |
-//! `i8`     | 1    | Signed byte  |
-//! `u16`    | 2    | Short unsigned number stored in little endian  |
-//! `i16`    | 2    | Short signed number stored in little endian  |
-//! `u32`    | 4    | 32-bit unsigned number stored in little endian  |
-//! `i32`    | 4    | 32-bit signed number stored in little endian  |
-//! `u64`    | 8    | long unsigned number stored in little endian  |
-//! `i64`    | 8    | long signed number stored in little endian  |
-//! `bool`   | 1    | stored as single byte, where `0x01` - true `0x00` - false [\[1\]](#1)|
+//! | `u8`     | 1    | Regular byte  |
+//! | `i8`     | 1    | Signed byte  |
+//! | `u16`    | 2    | Short unsigned integer stored in little endian  |
+//! | `i16`    | 2    | Short signed integer stored in little endian  |
+//! | `u32`    | 4    | 32-bit unsigned integer stored in little endian  |
+//! | `i32`    | 4    | 32-bit signed integer stored in little endian  |
+//! | `u64`    | 8    | Long unsigned integer stored in little endian  |
+//! | `i64`    | 8    | Long signed integer stored in little endian  |
+//! | `F32`    | 4    | 32-bit floating point type stored in little endian \[1\]\[2\] |
+//! | `F64`    | 8    | 64-bit floating point type stored in little endian \[1\]\[2\] |
+//! | `bool`   | 1    | Stored as a byte, with `0x01` denoting true and `0x00` false \[3\] |
 //!
-//! ######\[1]
-//! **Trying to represent other values as bool leads to undefined behavior**.
+//! \[1\]
+//! Special floating point values that cannot be represented as a sequences of digits (such as
+//! Infinity, NaN and signaling NaN) are not permitted.
 //!
-//! ### Segment fields
+//! \[2\]
+//! Floating point value serialization is hidden behind the `float_serialize` feature gate.
 //!
-//! All segment types took 8 bytes in header,
-//! 4 for position in buffer,
-//! and 4 for segment field size
+//! \[3\]
+//! Trying to represent other values as `bool` leads to undefined behavior.
 //!
-//! ### Custom fields
+//! ## Segment fields
 //!
-//! This types could be implemented as creator want,
+//! All segment types take 8 bytes in the header: 4 for position in the buffer,
+//! and 4 for the segment field size.
+//!
+//! ## Custom fields
+//!
+//! These types can be implemented as per developer's design,
 //! but they should declare how many bytes they
-//! will write on header [in function `field_size()`](./trait.Field.html#tymethod.field_size)
+//! write in the header using the [`field_size()`] function.
 //!
+//! [`field_size()`]: ./trait.Field.html#tymethod.field_size
 
 use std::convert::From;
 use std::ops::{Add, Sub, Mul, Div};
@@ -108,6 +113,8 @@ use std::ops::{Add, Sub, Mul, Div};
 pub use self::fields::Field;
 pub use self::segments::SegmentField;
 pub use self::error::Error;
+#[cfg(feature = "float_serialize")]
+pub use self::float::{F32, F64};
 
 #[macro_use]
 pub mod serialize;
@@ -118,7 +125,8 @@ mod fields;
 mod segments;
 #[macro_use]
 mod spec;
-
+#[cfg(feature = "float_serialize")]
+mod float;
 
 #[cfg(test)]
 mod tests;
@@ -129,7 +137,7 @@ pub type Offset = u32;
 /// Type alias that should be returned in `check` method of `Field`
 pub type Result = ::std::result::Result<CheckedOffset, Error>;
 
-// TODO replace by more generic type
+// TODO replace by more generic type (ECR-156).
 /// `CheckedOffset` is a type that take control over overflow,
 /// so you can't panic without `unwrap`,
 /// and work with this value without overflow checks.

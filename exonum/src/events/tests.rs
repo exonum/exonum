@@ -12,210 +12,173 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(test)]
-use env_logger;
-
-use std::io;
 use std::net::SocketAddr;
-use std::collections::VecDeque;
-#[cfg(test)]
 use std::thread;
-use std::time::{SystemTime, Duration};
+use std::time::{self, Duration};
 
-use messages::{MessageWriter, RawMessage};
-use blockchain::SharedNodeState;
-use crypto::gen_keypair;
-use super::{Events, Reactor, Event, InternalEvent, Channel, Network, NetworkConfiguration,
-            EventHandler};
+use futures::{Future, Sink, Stream};
+use futures::stream::Wait;
+use futures::sync::mpsc;
+use tokio_core::reactor::Core;
+use tokio_timer::{TimeoutStream, Timer};
 
-pub type TestEvent = InternalEvent<(), u32>;
-
-#[derive(Debug)]
-pub struct BenchConfig {
-    pub times: usize,
-    pub len: usize,
-    pub tcp_nodelay: bool,
-}
+use crypto::{gen_keypair, PublicKey, Signature};
+use messages::{Connect, Message, MessageWriter, RawMessage};
+use events::{NetworkEvent, NetworkRequest};
+use events::network::{NetworkConfiguration, NetworkPart};
+use events::error::log_error;
+use node::{EventsPoolCapacity, NodeChannel};
+use blockchain::ConsensusConfig;
 
 #[derive(Debug)]
 pub struct TestHandler {
-    events: VecDeque<TestEvent>,
-    messages: VecDeque<RawMessage>,
+    handle: Option<thread::JoinHandle<()>>,
+    listen_address: SocketAddr,
+    network_events_rx: Wait<TimeoutStream<mpsc::Receiver<NetworkEvent>>>,
+    network_requests_tx: mpsc::Sender<NetworkRequest>,
 }
 
-pub trait TestPoller {
-    fn event(&mut self) -> Option<TestEvent>;
-    fn message(&mut self) -> Option<RawMessage>;
-}
-
-impl Default for TestHandler {
-    fn default() -> Self {
+impl TestHandler {
+    pub fn new(
+        listen_address: SocketAddr,
+        network_requests_tx: mpsc::Sender<NetworkRequest>,
+        network_events_rx: mpsc::Receiver<NetworkEvent>,
+    ) -> TestHandler {
+        let timer = Timer::default();
+        let receiver = timer.timeout_stream(network_events_rx, Duration::from_secs(30));
         TestHandler {
-            events: VecDeque::new(),
-            messages: VecDeque::new(),
+            handle: None,
+            listen_address,
+            network_requests_tx,
+            network_events_rx: receiver.wait(),
         }
+    }
+
+    pub fn wait_for_event(&mut self) -> Result<NetworkEvent, ()> {
+        let event = self.network_events_rx.next().unwrap()?;
+        Ok(event)
+    }
+
+    pub fn connect_with(&self, addr: SocketAddr) {
+        let connect = connect_message(self.listen_address);
+        self.network_requests_tx
+            .clone()
+            .send(NetworkRequest::SendMessage(addr, connect.raw().clone()))
+            .wait()
+            .unwrap();
+    }
+
+    pub fn disconnect_with(&self, addr: SocketAddr) {
+        self.network_requests_tx
+            .clone()
+            .send(NetworkRequest::DisconnectWithPeer(addr))
+            .wait()
+            .unwrap();
+    }
+
+    pub fn send_to(&self, addr: SocketAddr, raw: RawMessage) {
+        self.network_requests_tx
+            .clone()
+            .send(NetworkRequest::SendMessage(addr, raw))
+            .wait()
+            .unwrap();
+    }
+
+    pub fn wait_for_connect(&mut self) -> Connect {
+        match self.wait_for_event() {
+            Ok(NetworkEvent::PeerConnected(_addr, connect)) => connect,
+            Ok(other) => panic!("Unexpected connect received, {:?}", other),
+            Err(e) => panic!("An error during wait for connect occurred, {:?}", e),
+        }
+    }
+
+    pub fn wait_for_disconnect(&mut self) -> SocketAddr {
+        match self.wait_for_event() {
+            Ok(NetworkEvent::PeerDisconnected(addr)) => addr,
+            Ok(other) => panic!("Unexpected disconnect received, {:?}", other),
+            Err(e) => panic!("An error during wait for disconnect occurred, {:?}", e),
+        }
+    }
+
+    pub fn wait_for_message(&mut self) -> RawMessage {
+        match self.wait_for_event() {
+            Ok(NetworkEvent::MessageReceived(_addr, msg)) => msg,
+            Ok(other) => panic!("Unexpected message received, {:?}", other),
+            Err(e) => panic!("An error during wait for message occurred, {:?}", e),
+        }
+    }
+
+    pub fn shutdown(&mut self) {
+        self.network_requests_tx
+            .clone()
+            .send(NetworkRequest::Shutdown)
+            .wait()
+            .unwrap();
+        self.handle.take().expect("shutdown twice").join().unwrap();
     }
 }
 
-impl TestPoller for TestHandler {
-    fn event(&mut self) -> Option<TestEvent> {
-        self.events.pop_front()
-    }
-    fn message(&mut self) -> Option<RawMessage> {
-        self.messages.pop_front()
-    }
-}
-
-impl EventHandler for TestHandler {
-    type Timeout = ();
-    type ApplicationEvent = ();
-
-    fn handle_event(&mut self, event: Event) {
-        info!("handle event: {:?}", event);
-        match event {
-            Event::Incoming(raw) => self.messages.push_back(raw),
-            _ => {
-                self.events.push_back(InternalEvent::Node(event));
-            }
+impl Drop for TestHandler {
+    fn drop(&mut self) {
+        if !::std::thread::panicking() {
+            self.shutdown();
         }
-    }
-    fn handle_timeout(&mut self, _: Self::Timeout) {}
-    fn handle_application_event(&mut self, event: Self::ApplicationEvent) {
-        self.events.push_back(InternalEvent::Application(event));
     }
 }
 
 #[derive(Debug)]
-pub struct TestEvents(pub Events<TestHandler>);
+pub struct TestEvents {
+    pub listen_address: SocketAddr,
+    pub network_config: NetworkConfiguration,
+    pub events_config: EventsPoolCapacity,
+}
 
 impl TestEvents {
-    pub fn with_addr(addr: SocketAddr) -> TestEvents {
-        let network = Network::with_config(
-            addr,
-            NetworkConfiguration {
-                max_incoming_connections: 128,
-                max_outgoing_connections: 128,
-                tcp_nodelay: true,
-                tcp_keep_alive: Some(1),
-                tcp_reconnect_timeout: 1000,
-                tcp_reconnect_timeout_max: 600_000,
-            },
-            SharedNodeState::new(0),
-        );
-        let handler = TestHandler::default();
-
-        TestEvents(Events::new(network, handler).unwrap())
-    }
-
-    pub fn wait_for_bind(&mut self, addr: &SocketAddr) -> Option<()> {
-        self.0.bind().unwrap();
-        self.wait_for_connect(addr)
-    }
-
-    pub fn wait_for_connect(&mut self, addr: &SocketAddr) -> Option<()> {
-        self.0.channel().connect(addr);
-
-        let start = SystemTime::now();
-        loop {
-            self.process_events().unwrap();
-
-            if start + Duration::from_millis(10_000) < SystemTime::now() {
-                return None;
-            }
-            while let Some(e) = self.0.inner.handler.event() {
-                if let InternalEvent::Node(Event::Connected(_)) = e {
-                    return Some(());
-                }
-            }
+    pub fn with_addr(listen_address: SocketAddr) -> TestEvents {
+        TestEvents {
+            listen_address,
+            network_config: NetworkConfiguration::default(),
+            events_config: EventsPoolCapacity::default(),
         }
     }
 
-    pub fn wait_for_message(&mut self, duration: Duration) -> Option<RawMessage> {
-        let start = SystemTime::now();
-        loop {
-            self.process_events().unwrap();
-
-            if start + duration < SystemTime::now() {
-                return None;
-            }
-
-            while let Some(e) = self.0.inner.handler.event() {
-                if let InternalEvent::Node(Event::Error(e)) = e {
-                    error!("An error during wait occured {:?}", e);
-                }
-            }
-
-            if let Some(msg) = self.0.inner.handler.message() {
-                return Some(msg);
-            }
-        }
+    pub fn spawn(self) -> TestHandler {
+        let (mut handler_part, network_part) = self.into_reactor();
+        let handle = thread::spawn(move || {
+            let mut core = Core::new().unwrap();
+            let fut = network_part.run(&core.handle());
+            core.run(fut).map_err(log_error).unwrap();
+        });
+        handler_part.handle = Some(handle);
+        handler_part
     }
 
-    pub fn wait_for_messages(
-        &mut self,
-        mut count: usize,
-        duration: Duration,
-    ) -> Result<Vec<RawMessage>, String> {
-        let mut v = Vec::new();
-        let start = SystemTime::now();
-        loop {
-            self.process_events().unwrap();
+    fn into_reactor(self) -> (TestHandler, NetworkPart) {
+        let channel = NodeChannel::new(&self.events_config);
+        let network_config = self.network_config;
+        let (network_tx, network_rx) = channel.network_events;
+        let network_requests_tx = channel.network_requests.0.clone();
 
-            if start + duration < SystemTime::now() {
-                return Err(format!(
-                    "Timeout exceeded, {} messages is not received",
-                    count
-                ));
-            }
+        let network_part = NetworkPart {
+            our_connect_message: connect_message(self.listen_address),
+            listen_address: self.listen_address,
+            network_config,
+            max_message_len: ConsensusConfig::DEFAULT_MESSAGE_MAX_LEN,
+            network_requests: channel.network_requests,
+            network_tx: network_tx.clone(),
+        };
 
-            if let Some(msg) = self.0.inner.handler.message() {
-                v.push(msg);
-                count -= 1;
-                if count == 0 {
-                    return Ok(v);
-                }
-            }
-        }
-    }
-
-    pub fn wait_for_disconnect(&mut self, max_duration: Duration) -> Option<()> {
-        let start = SystemTime::now();
-        loop {
-            self.process_events().unwrap();
-
-            if start + max_duration < SystemTime::now() {
-                return None;
-            }
-            while let Some(e) = self.0.inner.handler.event() {
-                if let InternalEvent::Node(Event::Disconnected(_)) = e {
-                    return Some(());
-                }
-            }
-        }
-    }
-
-    pub fn send_to(&mut self, addr: &SocketAddr, msg: RawMessage) {
-        self.0.channel().send_to(addr, msg);
-        self.process_events().unwrap();
-    }
-
-    pub fn process_events(&mut self) -> io::Result<()> {
-        self.0.run_once(Some(100))
-    }
-
-    pub fn with_cfg(_: &BenchConfig, addr: SocketAddr) -> TestEvents {
-        let network = Network::with_config(
-            addr,
-            NetworkConfiguration::default(),
-            SharedNodeState::new(1000),
-        );
-        let handler = TestHandler::default();
-
-        TestEvents(Events::new(network, handler).unwrap())
+        let handler_part = TestHandler::new(self.listen_address, network_requests_tx, network_rx);
+        (handler_part, network_part)
     }
 }
 
-pub fn gen_message(id: u16, len: usize) -> RawMessage {
+pub fn connect_message(addr: SocketAddr) -> Connect {
+    let time = time::UNIX_EPOCH;
+    Connect::new_with_signature(&PublicKey::zero(), addr, time, &Signature::zero())
+}
+
+pub fn raw_message(id: u16, len: usize) -> RawMessage {
     let writer = MessageWriter::new(
         ::messages::PROTOCOL_MAJOR_VERSION,
         ::messages::TEST_NETWORK_ID,
@@ -227,149 +190,180 @@ pub fn gen_message(id: u16, len: usize) -> RawMessage {
 }
 
 #[test]
-fn big_message() {
-    let _ = env_logger::init();
-    let addrs: [SocketAddr; 2] =
-        ["127.0.0.1:7200".parse().unwrap(), "127.0.0.1:7201".parse().unwrap()];
+fn test_network_handshake() {
+    let first = "127.0.0.1:17230".parse().unwrap();
+    let second = "127.0.0.1:17231".parse().unwrap();
 
-    let m1 = gen_message(15, 100000);
-    let m2 = gen_message(16, 400);
+    let e1 = TestEvents::with_addr(first);
+    let e2 = TestEvents::with_addr(second);
 
-    let mut e1 = TestEvents::with_addr(addrs[0]);
-    let mut e2 = TestEvents::with_addr(addrs[1]);
-    e1.0.bind().unwrap();
-    e2.0.bind().unwrap();
+    let c1 = connect_message(first);
+    let c2 = connect_message(second);
 
-    let t1;
-    {
-        let m1 = m1.clone();
-        let m2 = m2.clone();
-        t1 = thread::spawn(move || {
-            let mut e = e1;
-            e.wait_for_connect(&addrs[1]);
+    let mut e1 = e1.spawn();
+    let mut e2 = e2.spawn();
 
-            e.send_to(&addrs[1], m1.clone());
-            e.send_to(&addrs[1], m2.clone());
-            e.send_to(&addrs[1], m1.clone());
+    e1.connect_with(second);
+    assert_eq!(e2.wait_for_connect(), c1);
 
-            let msgs = e.wait_for_messages(3, Duration::from_millis(10000))
-                .unwrap();
-            assert_eq!(msgs[0], m2);
-            assert_eq!(msgs[1], m1);
-            assert_eq!(msgs[2], m2);
-        });
-    }
+    e2.connect_with(first);
+    assert_eq!(e1.wait_for_connect(), c2);
 
-    let t2;
-    {
-        let m1 = m1.clone();
-        let m2 = m2.clone();
-        t2 = thread::spawn(move || {
-            let mut e = e2;
-            e.wait_for_connect(&addrs[0]);
+    e1.disconnect_with(second);
+    assert_eq!(e1.wait_for_disconnect(), second);
 
-            e.send_to(&addrs[0], m2.clone());
-            e.send_to(&addrs[0], m1.clone());
-            e.send_to(&addrs[0], m2.clone());
-            let msgs = e.wait_for_messages(3, Duration::from_millis(10000))
-                .unwrap();
-            assert_eq!(msgs[0], m1);
-            assert_eq!(msgs[1], m2);
-            assert_eq!(msgs[2], m1);
-            e.wait_for_disconnect(Duration::from_millis(10000)).unwrap();
-        });
-    }
-
-    t2.join().unwrap();
-    t1.join().unwrap();
+    e2.disconnect_with(first);
+    assert_eq!(e2.wait_for_disconnect(), first);
 }
 
 #[test]
-fn reconnect() {
-    let _ = env_logger::init();
-    let addrs: [SocketAddr; 2] =
-        ["127.0.0.1:9100".parse().unwrap(), "127.0.0.1:9101".parse().unwrap()];
+fn test_network_big_message() {
+    let first = "127.0.0.1:17200".parse().unwrap();
+    let second = "127.0.0.1:17201".parse().unwrap();
 
-    let m1 = gen_message(15, 250);
-    let m2 = gen_message(16, 400);
-    let m3 = gen_message(17, 600);
+    let m1 = raw_message(15, 100000);
+    let m2 = raw_message(16, 400);
 
-    let mut e1 = TestEvents::with_addr(addrs[0]);
-    let mut e2 = TestEvents::with_addr(addrs[1]);
-    e1.0.bind().unwrap();
-    e2.0.bind().unwrap();
+    let e1 = TestEvents::with_addr(first);
+    let e2 = TestEvents::with_addr(second);
 
-    let t1;
-    {
-        let m1 = m1.clone();
-        let m2 = m2.clone();
-        let m3 = m3.clone();
-        t1 = thread::spawn(move || {
-            {
-                let mut e = e1;
-                e.wait_for_connect(&addrs[1]).unwrap();
+    let mut e1 = e1.spawn();
+    let mut e2 = e2.spawn();
 
-                trace!("t1: connection opened");
-                trace!("t1: send m1 to t2");
-                e.send_to(&addrs[1], m1);
-                trace!("t1: wait for m2");
-                assert_eq!(e.wait_for_message(Duration::from_millis(5000)), Some(m2));
-                trace!("t1: received m2 from t2");
-            }
-            trace!("t1: connection closed");
-            {
-                let mut e = TestEvents::with_addr(addrs[0]);
-                e.wait_for_bind(&addrs[1]).unwrap();
+    e1.connect_with(second);
+    e2.wait_for_connect();
 
-                trace!("t1: connection reopened");
-                trace!("t1: send m3 to t2");
-                e.send_to(&addrs[1], m3.clone());
-                trace!("t1: wait for m3");
-                assert_eq!(e.wait_for_message(Duration::from_millis(5000)), Some(m3));
-                trace!("t1: received m3 from t2");
-                e.process_events().unwrap();
-            }
-            trace!("t1: finished");
-        });
-    }
+    e2.connect_with(first);
+    e1.wait_for_connect();
 
-    let t2;
-    {
-        let m1 = m1.clone();
-        let m2 = m2.clone();
-        let m3 = m3.clone();
-        t2 = thread::spawn(move || {
-            {
-                let mut e = e2;
-                e.wait_for_connect(&addrs[0]).unwrap();
+    e1.send_to(second, m1.clone());
+    assert_eq!(e2.wait_for_message(), m1);
 
-                trace!("t2: connection opened");
-                trace!("t2: send m2 to t1");
-                e.send_to(&addrs[0], m2);
-                trace!("t2: wait for m1");
-                assert_eq!(e.wait_for_message(Duration::from_millis(5000)), Some(m1));
-                trace!("t2: received m1 from t1");
-                trace!("t2: wait for m3");
-                assert_eq!(
-                    e.wait_for_message(Duration::from_millis(5000)),
-                    Some(m3.clone())
-                );
-                trace!("t2: received m3 from t1");
-            }
-            trace!("t2: connection closed");
-            {
-                trace!("t2: connection reopened");
-                let mut e = TestEvents::with_addr(addrs[1]);
-                e.wait_for_bind(&addrs[0]).unwrap();
+    e1.send_to(second, m2.clone());
+    assert_eq!(e2.wait_for_message(), m2);
 
-                trace!("t2: send m3 to t1");
-                e.send_to(&addrs[0], m3.clone());
-                e.wait_for_disconnect(Duration::from_millis(5000)).unwrap();
-            }
-            trace!("t2: finished");
-        });
-    }
+    e1.send_to(second, m1.clone());
+    assert_eq!(e2.wait_for_message(), m1);
 
-    t2.join().unwrap();
-    t1.join().unwrap();
+    e2.send_to(first, m2.clone());
+    assert_eq!(e1.wait_for_message(), m2);
+
+    e2.send_to(first, m1.clone());
+    assert_eq!(e1.wait_for_message(), m1);
+
+    e2.send_to(first, m2.clone());
+    assert_eq!(e1.wait_for_message(), m2);
+
+    e1.disconnect_with(second);
+    assert_eq!(e1.wait_for_disconnect(), second);
+
+    e2.disconnect_with(first);
+    assert_eq!(e2.wait_for_disconnect(), first);
+}
+
+#[test]
+fn test_network_max_message_len() {
+    let first = "127.0.0.1:17202".parse().unwrap();
+    let second = "127.0.0.1:17303".parse().unwrap();
+
+    let max_message_length = ConsensusConfig::DEFAULT_MESSAGE_MAX_LEN as usize;
+    let max_payload_length = max_message_length - ::messages::HEADER_LENGTH -
+        ::crypto::SIGNATURE_LENGTH;
+    let acceptable_message = raw_message(15, max_payload_length);
+    let too_big_message = raw_message(16, max_payload_length + 1000);
+
+    let e1 = TestEvents::with_addr(first);
+    let e2 = TestEvents::with_addr(second);
+
+    let mut e1 = e1.spawn();
+    let mut e2 = e2.spawn();
+
+    e1.connect_with(second);
+    e2.wait_for_connect();
+
+    e2.connect_with(first);
+    e1.wait_for_connect();
+
+    e1.send_to(second, acceptable_message.clone());
+    assert_eq!(e2.wait_for_message(), acceptable_message);
+
+    e2.send_to(first, too_big_message.clone());
+    assert!(e1.wait_for_event().is_err());
+}
+
+#[test]
+fn test_network_reconnect() {
+    let first = "127.0.0.1:19100".parse().unwrap();
+    let second = "127.0.0.1:19101".parse().unwrap();
+
+    let msg = raw_message(11, 1000);
+    let c1 = connect_message(first);
+
+    let mut t1 = TestEvents::with_addr(first).spawn();
+
+    // First connect attempt.
+    let mut t2 = TestEvents::with_addr(second).spawn();
+
+    // Handle first attempt.
+    t1.connect_with(second);
+    assert_eq!(t2.wait_for_connect(), c1);
+
+    t1.send_to(second, msg.clone());
+    assert_eq!(t2.wait_for_message(), msg);
+
+    drop(t2);
+    assert_eq!(t1.wait_for_disconnect(), second);
+
+    // Handle second attempt.
+    let mut t2 = TestEvents::with_addr(second).spawn();
+
+    t1.connect_with(second);
+    assert_eq!(t2.wait_for_connect(), c1);
+
+    t1.send_to(second, msg.clone());
+    assert_eq!(t2.wait_for_message(), msg);
+
+    t1.disconnect_with(second);
+    assert_eq!(t1.wait_for_disconnect(), second);
+}
+
+#[test]
+fn test_network_multiple_connect() {
+    let main = "127.0.0.1:19600".parse().unwrap();
+
+    let nodes = [
+        "127.0.0.1:19601".parse().unwrap(),
+        "127.0.0.1:19602".parse().unwrap(),
+        "127.0.0.1:19603".parse().unwrap(),
+    ];
+
+    let mut node = TestEvents::with_addr(main).spawn();
+
+    let connect_messages: Vec<_> = nodes.iter().cloned().map(connect_message).collect();
+    let connectors: Vec<_> = nodes
+        .iter()
+        .map(|addr| TestEvents::with_addr(*addr).spawn())
+        .collect();
+
+    connectors[0].connect_with(main);
+    assert_eq!(node.wait_for_connect(), connect_messages[0]);
+    connectors[1].connect_with(main);
+    assert_eq!(node.wait_for_connect(), connect_messages[1]);
+    connectors[2].connect_with(main);
+    assert_eq!(node.wait_for_connect(), connect_messages[2]);
+}
+
+#[test]
+fn test_send_first_not_connect() {
+    let main = "127.0.0.1:19500".parse().unwrap();
+    let other = "127.0.0.1:19501".parse().unwrap();
+
+    let mut node = TestEvents::with_addr(main).spawn();
+    let other_node = TestEvents::with_addr(other).spawn();
+
+    let message = raw_message(11, 1000);
+    other_node.send_to(main, message.clone()); // should connect before send message
+
+    assert_eq!(node.wait_for_connect(), connect_message(other));
+    assert_eq!(node.wait_for_message(), message);
 }

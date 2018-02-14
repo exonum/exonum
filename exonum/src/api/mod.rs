@@ -14,6 +14,12 @@
 
 //! `RESTful` API and corresponding utilities.
 
+use std::ops::Deref;
+use std::marker::PhantomData;
+use std::io;
+use std::collections::BTreeMap;
+use std::fmt;
+
 use iron::IronError;
 use iron::prelude::*;
 use iron::status;
@@ -25,15 +31,8 @@ use serde_json;
 use serde::{Serialize, Serializer};
 use serde::de::{self, Visitor, Deserialize, Deserializer};
 
-use std::ops::Deref;
-use std::marker::PhantomData;
-use std::io;
-use std::collections::BTreeMap;
-use std::fmt;
-
-use events::Error as EventsError;
-use crypto::{PublicKey, SecretKey, HexValue, FromHexError, Hash};
-use encoding::serialize::ToHex;
+use crypto::{PublicKey, SecretKey, Hash};
+use encoding::serialize::{FromHex, FromHexError, ToHex, encode_hex};
 use storage::{Result as StorageResult, Error as StorageError};
 
 pub mod public;
@@ -48,8 +47,6 @@ pub enum ApiError {
     Service(Box<::std::error::Error + Send + Sync>),
     /// Storage error.
     Storage(StorageError),
-    /// Events error.
-    Events(EventsError),
     /// Converting from hex error.
     FromHex(FromHexError),
     /// Input/output error.
@@ -68,6 +65,8 @@ pub enum ApiError {
     Unauthorized,
     /// Address parse error.
     AddressParseError(::std::net::AddrParseError),
+    /// Serialize error,
+    Serialize(Box<::std::error::Error + Send + Sync>),
 }
 
 impl fmt::Display for ApiError {
@@ -82,7 +81,6 @@ impl ::std::error::Error for ApiError {
             ApiError::Service(ref error) |
             ApiError::IncorrectRequest(ref error) => error.description(),
             ApiError::Storage(ref error) => error.description(),
-            ApiError::Events(ref error) => error.description(),
             ApiError::FromHex(ref error) => error.description(),
             ApiError::Io(ref error) => error.description(),
             ApiError::FileNotFound(_) => "File not found",
@@ -91,6 +89,7 @@ impl ::std::error::Error for ApiError {
             ApiError::FileExists(_) => "File exists",
             ApiError::Unauthorized => "Unauthorized",
             ApiError::AddressParseError(_) => "AddressParseError",
+            ApiError::Serialize(_) => "Serialization error",
         }
     }
 }
@@ -113,12 +112,6 @@ impl From<StorageError> for ApiError {
     }
 }
 
-impl From<EventsError> for ApiError {
-    fn from(e: EventsError) -> ApiError {
-        ApiError::Events(e)
-    }
-}
-
 impl From<FromHexError> for ApiError {
     fn from(e: FromHexError) -> ApiError {
         ApiError::FromHex(e)
@@ -135,7 +128,7 @@ impl From<ApiError> for IronError {
         let code = match e {
             ApiError::FileExists(hash) |
             ApiError::FileNotFound(hash) => {
-                body.insert("hash", ToHex::to_hex(&hash));
+                body.insert("hash", encode_hex(&hash));
                 status::Conflict
             }
             _ => status::Conflict,
@@ -170,20 +163,20 @@ where
     where
         S: Serializer,
     {
-        ser.serialize_str(&self.0.as_ref().to_hex())
+        ser.serialize_str(&encode_hex(&self.0))
     }
 }
 
 struct HexVisitor<T>
 where
-    T: AsRef<[u8]> + HexValue,
+    T: AsRef<[u8]> + Clone + FromHex<Error = FromHexError>,
 {
     _p: PhantomData<T>,
 }
 
 impl<'v, T> Visitor<'v> for HexVisitor<T>
 where
-    T: AsRef<[u8]> + HexValue + Clone,
+    T: AsRef<[u8]> + Clone + FromHex<Error = FromHexError>,
 {
     type Value = HexField<T>;
 
@@ -202,7 +195,10 @@ where
 
 impl<'de, T> Deserialize<'de> for HexField<T>
 where
-    T: AsRef<[u8]> + HexValue + Clone,
+    T: AsRef<[u8]>
+        + FromHex<Error = FromHexError>
+        + ToHex
+        + Clone,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -224,7 +220,7 @@ pub trait Api {
             for cookie in cookies.iter() {
                 if let Ok(c) = CookiePair::parse(cookie.as_str()) {
                     if c.name() == key {
-                        if let Ok(value) = HexValue::from_hex(c.value()) {
+                        if let Ok(value) = FromHex::from_hex(c.value()) {
                             return Ok(value);
                         }
                     }

@@ -14,16 +14,16 @@
 
 //! Consensus and other messages and related utilities.
 
-use bit_vec::BitVec;
-
 use std::fmt;
+
+use bit_vec::BitVec;
 
 use crypto::PublicKey;
 use encoding::Error;
 use helpers::{Height, Round, ValidatorId};
 
-pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, Message, FromRaw, HEADER_LENGTH,
-                    PROTOCOL_MAJOR_VERSION, TEST_NETWORK_ID};
+pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, ServiceMessage, Message,
+                    HEADER_LENGTH, PROTOCOL_MAJOR_VERSION, TEST_NETWORK_ID};
 pub use self::protocol::*;
 
 #[macro_use]
@@ -35,7 +35,7 @@ mod protocol;
 mod tests;
 
 // TODO: implement common methods for enum types (hash, raw, from_raw, verify)
-// TODO: use macro for implementing enums
+// TODO: use macro for implementing enums (ECR-166)
 
 /// Raw transaction type.
 pub type RawTransaction = RawMessage;
@@ -202,7 +202,7 @@ impl fmt::Debug for ConsensusMessage {
 impl Any {
     /// Converts the `RawMessage` to the `Any` message.
     pub fn from_raw(raw: RawMessage) -> Result<Any, Error> {
-        // TODO: check input message size
+        // TODO: check input message size (ECR-166)
         let msg = if raw.service_id() == CONSENSUS {
             match raw.message_type() {
                 CONNECT_MESSAGE_ID => Any::Connect(Connect::from_raw(raw)?),

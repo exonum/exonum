@@ -12,10 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::{Context, CommandName, Argument, CommandExtension};
+// spell-checker:ignore exts
 
 use std::fmt;
 use std::error::Error;
+use std::collections::HashMap;
+
+use super::{Argument, CommandExtension, CommandName, Context};
 
 /// Used to take some additional information from executed command
 #[derive(Debug, PartialEq, Clone)]
@@ -45,7 +48,12 @@ pub trait Command {
     fn args(&self) -> Vec<Argument>;
     fn name(&self) -> CommandName;
     fn about(&self) -> &str;
-    fn execute(&self, context: Context, extension: &Fn(Context) -> Context) -> Feedback;
+    fn execute(
+        &self,
+        commands: &HashMap<CommandName, CollectedCommand>,
+        context: Context,
+        exts: &Fn(Context) -> Context,
+    ) -> Feedback;
 }
 
 /// We keep command internal state into `CollectedCommand`
@@ -53,7 +61,7 @@ pub trait Command {
 ///
 /// 1. `Command` by its nature should be stateless, but it's harder to make
 /// abstracted dynamic object without trait objects.
-/// 2. Additinaly this state is common for all commands.
+/// 2. Additionally this state is common for all commands.
 pub struct CollectedCommand {
     command: Box<Command>,
     args: Vec<Argument>,
@@ -89,9 +97,13 @@ impl CollectedCommand {
         }
     }
 
-    pub fn execute(&self, context: Context) -> Feedback {
-        self.command.execute(context, &|context| {
-            // TODO: check duplicates, in services context keys
+    pub fn execute(
+        &self,
+        commands: &HashMap<CommandName, CollectedCommand>,
+        context: Context,
+    ) -> Feedback {
+        self.command.execute(commands, context, &|context| {
+            // TODO: check duplicates, in services context keys (ECR-164)
             let mut new_context = context.clone();
             for ext in &self.exts {
                 new_context = ext.execute(new_context).expect(

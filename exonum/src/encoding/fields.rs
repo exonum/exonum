@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use byteorder::{ByteOrder, LittleEndian};
-
 use std::mem;
 use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
+
+use byteorder::{ByteOrder, LittleEndian};
 
 use crypto::{Hash, PublicKey, Signature};
 use helpers::{Height, Round, ValidatorId};
@@ -24,8 +24,8 @@ use super::{Error, CheckedOffset, Offset, Result};
 
 /// Trait for all types that could be a field in `encoding`.
 pub trait Field<'a> {
-    // TODO: use Read and Cursor
-    // TODO: debug_assert_eq!(to-from == size of Self)
+    // TODO: use Read and Cursor (ECR-156)
+    // TODO: debug_assert_eq!(to-from == size of Self) (ECR-156)
 
     /// Read Field from buffer, with given position,
     /// beware of memory unsafety,
@@ -87,7 +87,7 @@ macro_rules! implement_std_field {
     )
 }
 
-/// Implements `Field` for the tuple struct typedefs that contain simple types.
+/// Implements `Field` for the tuple struct type definitions that contain simple types.
 macro_rules! implement_std_typedef_field {
     ($name:ident ($t:ty) $fn_read:expr; $fn_write:expr) => (
         impl<'a> Field<'a> for $name {
@@ -172,7 +172,7 @@ impl<'a> Field<'a> for bool {
         1
     }
 
-    unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> bool {
+    unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> Self {
         buffer[from as usize] == 1
     }
 
@@ -205,7 +205,7 @@ impl<'a> Field<'a> for u8 {
         mem::size_of::<Self>() as Offset
     }
 
-    unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> u8 {
+    unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> Self {
         buffer[from as usize]
     }
 
@@ -224,13 +224,13 @@ impl<'a> Field<'a> for u8 {
     }
 }
 
-// TODO expect some codding of signed ints?
+// TODO expect some codding of signed integers (ECR-156) ?
 impl<'a> Field<'a> for i8 {
     fn field_size() -> Offset {
         mem::size_of::<Self>() as Offset
     }
 
-    unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> i8 {
+    unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> Self {
         buffer[from as usize] as i8
     }
 
@@ -264,7 +264,7 @@ implement_pod_as_ref_field! {Signature}
 implement_pod_as_ref_field! {PublicKey}
 implement_pod_as_ref_field! {Hash}
 
-// TODO should we check `SystemTime` validity in check?
+// TODO should we check `SystemTime` validity in check (ECR-157)?
 impl<'a> Field<'a> for SystemTime {
     fn field_size() -> Offset {
         (mem::size_of::<u64>() + mem::size_of::<u32>()) as Offset
@@ -302,10 +302,10 @@ impl<'a> Field<'a> for SystemTime {
 }
 
 // TODO add socketaddr check, for now with only ipv4
-// all possible (>6 bytes long) sequences is a valid addr.
+// all possible (>6 bytes long) sequences is a valid addr (ECR-156).
 impl<'a> Field<'a> for SocketAddr {
     fn field_size() -> Offset {
-        // FIXME: reserve space for future compatibility
+        // FIXME: reserve space for future compatibility (ECR-156)
         6
     }
 
@@ -323,7 +323,7 @@ impl<'a> Field<'a> for SocketAddr {
                 buffer[from as usize..to as usize - 2].copy_from_slice(&addr.ip().octets());
             }
             SocketAddr::V6(_) => {
-                // FIXME: Supporting Ipv6
+                // FIXME: Supporting Ipv6 (ECR-156, ECR-158)
                 panic!("Ipv6 are currently unsupported")
             }
         }

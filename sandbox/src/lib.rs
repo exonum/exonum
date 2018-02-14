@@ -15,6 +15,7 @@
 extern crate rand;
 #[macro_use]
 extern crate log;
+extern crate futures;
 #[macro_use]
 extern crate exonum;
 extern crate bit_vec;

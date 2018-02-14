@@ -17,6 +17,7 @@ consensus_key = "924625eb77b9ad21e76713e7ada715945fbf0a926698832e121484c797fcc58
 service_key = "7413a596e4fa0953cf22b120bd1ee0ba233bd1c619f10b21e6854b6b3cc9a6e9"
 
 [genesis.consensus]
+max_message_len = 1048576
 peers_timeout = 10000
 round_timeout = 3000
 status_timeout = 5000
@@ -27,15 +28,20 @@ type = "Constant"
 timeout = 500
 
 [mempool]
-events_pool_capacity = 400000
 tx_pool_capacity = 100000
+
+[mempool.events_pool_capacity]
+api_requests_capacity = 1024
+network_events_capacity = 512
+network_requests_capacity = 512
+internal_events_capacity = 128
 
 [network]
 max_incoming_connections = 128
 max_outgoing_connections = 128
-tcp_nodelay = false
-tcp_reconnect_timeout = 500
-tcp_reconnect_timeout_max = 600000
+tcp_nodelay = true
+tcp_connect_retry_timeout = 15000
+tcp_connect_max_retries = 10
 
 [services_configs]
 

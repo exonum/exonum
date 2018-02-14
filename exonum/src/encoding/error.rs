@@ -22,7 +22,7 @@ use super::Offset;
 /// This structure represent `encoding` specific errors.
 /// This errors returned by function `check` of each `Field`.
 pub enum Error {
-    // TODO: Check this message after refactor buffer.
+    // TODO: Check this message after refactor buffer (ECR-156).
     /// Payload is short for this message.
     UnexpectedlyShortPayload {
         /// real message size
@@ -32,35 +32,42 @@ pub enum Error {
     },
     /// Boolean value is incorrect
     IncorrectBoolean {
-        /// position in buffer where error apears
+        /// position in buffer where error appears.
         position: Offset,
         /// value that was parsed as bool
         value: u8,
     },
+    /// Unsupported floating point value (Infinity, NaN or signaling NaN).
+    UnsupportedFloat {
+        /// Position in buffer where error appears.
+        position: Offset,
+        /// Value represented as `f64`.
+        value: f64,
+    },
     /// Segment reference is incorrect
     IncorrectSegmentReference {
-        /// position in buffer where error apears
+        /// position in buffer where error appears.
         position: Offset,
         /// value that was parsed as segment reference
         value: Offset,
     },
     /// Segment size is incorrect
     IncorrectSegmentSize {
-        /// position in buffer where error apears
+        /// position in buffer where error appears.
         position: Offset,
         /// value that was parsed as size
         value: Offset,
     },
     /// `RawMessage` is to short
     UnexpectedlyShortRawMessage {
-        /// position in buffer where error apears
+        /// position in buffer where error appears.
         position: Offset,
         /// size of raw message in buffer
         size: Offset,
     },
     /// Incorrect size of `RawMessage` found in buffer
     IncorrectSizeOfRawMessage {
-        /// position in buffer where error apears
+        /// position in buffer where error appears.
         position: Offset,
         /// parsed message size
         actual_size: Offset,
@@ -72,6 +79,21 @@ pub enum Error {
         /// expected `message_id`
         message_type: u16,
     },
+    /// Incorrect `service_id` found in buffer.
+    IncorrectServiceId {
+        /// expected `service_id`
+        service_id: u16,
+    },
+    /// Incorrect `network_id` found in buffer.
+    IncorrectNetworkId {
+        /// expected `network_id`
+        network_id: u8,
+    },
+    /// Unsupported message version.
+    UnsupportedProtocolVersion {
+        /// Actual message version.
+        version: u8,
+    },
     /// Different segments overlaps
     OverlappingSegment {
         /// last segment ended position
@@ -79,7 +101,7 @@ pub enum Error {
         /// start of new segment
         start: Offset,
     },
-    /// Between segments foud spaces
+    /// Spaces found between segments
     SpaceBetweenSegments {
         /// last segment ended position
         last_end: Offset,
@@ -88,14 +110,14 @@ pub enum Error {
     },
     /// Error in parsing `Utf8` `String`
     Utf8 {
-        /// position in buffer where error apears
+        /// position in buffer where error appears.
         position: Offset,
         /// what error exact was
         error: ::std::str::Utf8Error,
     },
     /// Overflow in Offsets
     OffsetOverflow,
-    /// Basic error suport, for custom fields
+    /// Basic error support, for custom fields.
     Basic(Cow<'static, str>),
     /// Other error for custom fields
     Other(Box<StdError>),
@@ -112,11 +134,15 @@ impl StdError for Error {
         match *self {
             Error::UnexpectedlyShortPayload { .. } => "Unexpectedly short payload",
             Error::IncorrectBoolean { .. } => "Incorrect boolean value",
+            Error::UnsupportedFloat { .. } => "Unsupported float value",
             Error::IncorrectSegmentReference { .. } => "Incorrect segment reference",
             Error::IncorrectSegmentSize { .. } => "Incorrect segment size",
             Error::UnexpectedlyShortRawMessage { .. } => "Unexpectedly short RawMessage",
             Error::IncorrectSizeOfRawMessage { .. } => "Incorrect size of RawMessage",
             Error::IncorrectMessageType { .. } => "Incorrect message type",
+            Error::IncorrectServiceId { .. } => "Incorrect service id",
+            Error::IncorrectNetworkId { .. } => "Incorrect network id",
+            Error::UnsupportedProtocolVersion { .. } => "Unsupported protocol version",
             Error::OverlappingSegment { .. } => "Overlapping segments",
             Error::SpaceBetweenSegments { .. } => "Space between segments",
             Error::Utf8 { .. } => "Utf8 error in parsing string",

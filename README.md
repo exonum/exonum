@@ -2,23 +2,27 @@
 
 [![Build Status](https://travis-ci.org/exonum/exonum.svg?branch=master)](https://travis-ci.org/exonum/exonum)
 [![Join the chat at https://gitter.im/exonum/exonum](https://badges.gitter.im/exonum/exonum.svg)](https://gitter.im/exonum/exonum)
+![rust 1.23+ required](https://img.shields.io/badge/rust-1.23+-blue.svg)
+<!--sync ^ with .travis.yml-->
 
-[Exonum](https://exonum.com/) is an extensible open-source framework for creating blockchain
-applications. Exonum can be used to create cryptographically powered distributed ledgers in
-virtually any problem domain, including FinTech, GovTech, and LegalTech. The Exonum framework is
-oriented towards creating permissioned blockchains, that is, blockchains with the known set of
-blockchain infrastructure providers.
+[Exonum](https://exonum.com/) is an extensible open-source framework for
+creating blockchain applications. Exonum can be used to create cryptographically
+powered distributed ledgers in virtually any problem domain, including FinTech,
+GovTech, and LegalTech. The Exonum framework is oriented towards creating
+permissioned blockchains, that is, blockchains with the known set of blockchain
+infrastructure providers.
 
-* [What is Exonum?](https://exonum.com/doc/get-started/what-is-exonum/)
-* [Design Overview](https://exonum.com/doc/get-started/design-overview/)
-* [Installation guide](https://exonum.com/doc/get-started/install/)
-* [Tutorial](https://exonum.com/doc/get-started/create-service/)
-* [Roadmap](https://exonum.com/doc/roadmap/)
-* [Full Specification](https://exonum.com/doc/)
-* [Reference documentation](https://docs.rs/exonum)
-* [Contributing guide](https://github.com/exonum/exonum/blob/master/CONTRIBUTING.md)
-* [Changelog](https://github.com/exonum/exonum/blob/master/CHANGELOG.md)
+This is the main Exonum repository that includes
 
-## LICENSE
+* [Exonum core library](exonum/README.md).
+* [Exonum testing framework](testkit/README.md).
+* Services:
+  * Configuration service (currently in [exonum-configuration] repository).
+  * [Time service](services/time/README.md).
+* Demos
+  * Cryprocurrency (currently in [cryptocurrency] repository).
 
-Exonum core library is licensed under the Apache License (Version 2.0). See [LICENSE](https://github.com/exonum/exonum/blob/master/LICENSE) for details.
+See individual projects' readme for the details.
+
+[exonum-configuration]: https://github.com/exonum/exonum-configuration
+[cryptocurrency]: https://github.com/exonum/cryptocurrency

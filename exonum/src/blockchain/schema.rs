@@ -12,47 +12,64 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use byteorder::{ByteOrder, BigEndian};
-
-use std::mem;
-
-use crypto::Hash;
-use messages::{RawMessage, Precommit, CONSENSUS};
-use storage::{Snapshot, Fork, StorageKey, StorageValue, ListIndex, MapIndex, ProofListIndex,
-              ProofMapIndex, MapProof, Entry};
+use crypto::{PublicKey, Hash, CryptoHash};
+use messages::{Precommit, RawMessage, Connect};
+use storage::{Entry, Fork, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex, Snapshot,
+              StorageKey};
 use helpers::Height;
-use super::{Block, BlockProof, Blockchain};
+use super::{Block, BlockProof, Blockchain, TransactionResult};
 use super::config::StoredConfiguration;
 
-/// Generates prefix that combines service identifier, table identifier and given suffix.
-pub fn gen_prefix<K: StorageKey>(service_id: u16, ord: u8, suffix: &K) -> Vec<u8> {
-    let pos = mem::size_of::<u16>();
-    let mut res = vec![0; pos + 1 + suffix.size()];
-    suffix.write(&mut res[pos + 1..]);
-    BigEndian::write_u16(&mut res[0..pos], service_id);
-    res[pos] = ord;
+/// Defines `&str` constants with given name and value.
+macro_rules! define_names {
+    (
+        $(
+            $name:ident => $value:expr;
+        )+
+    ) => (
+        $(const $name: &str = concat!("core.", $value);)*
+    )
+}
+
+define_names!(
+    TRANSACTIONS => "transactions";
+    TRANSACTION_RESULTS => "transaction_results";
+    TX_LOCATION_BY_TX_HASH => "tx_location_by_tx_hash";
+    BLOCKS => "blocks";
+    BLOCK_HASHES_BY_HEIGHT => "block_hashes_by_height";
+    BLOCK_TXS => "block_txs";
+    PRECOMMITS => "precommits";
+    CONFIGS => "configs";
+    CONFIGS_ACTUAL_FROM => "configs_actual_from";
+    STATE_HASH_AGGREGATOR => "state_hash_aggregator";
+    CONSENSUS_MESSAGES_CACHE => "consensus_messages_cache";
+    SAVED_ROUND => "saved_round";
+);
+
+/// Generates an array of bytes from the `prefix`.
+pub fn gen_prefix<K: StorageKey>(prefix: &K) -> Vec<u8> {
+    let mut res = vec![0; prefix.size()];
+    prefix.write(&mut res[..]);
     res
 }
 
 encoding_struct! (
     /// Configuration index.
     struct ConfigReference {
-        const SIZE = 40;
         /// The height, starting from which this configuration becomes actual.
-        field actual_from: Height [00 => 08]
+        actual_from: Height,
         /// Hash of the configuration contents that serialized as raw bytes vec.
-        field cfg_hash:    &Hash  [08 => 40]
+        cfg_hash: &Hash,
     }
 );
 
 encoding_struct! (
     /// Transaction location in block.
     struct TxLocation {
-        const SIZE = 16;
         /// Height of block in the blockchain.
-        field block_height:         Height  [00 => 08]
+        block_height: Height,
         /// Index in block.
-        field position_in_block:    u64     [08 => 16]
+        position_in_block: u64,
     }
 );
 
@@ -62,18 +79,6 @@ pub struct Schema<T> {
     view: T,
 }
 
-/// Constants for the 'ord' values used in prefix generation
-const TRANSACTION_BY_HASH_ORD: u8 = 0;
-const LOCATION_BY_HASH_ORD: u8 = 1;
-const BLOCK_BY_HEIGHT_ORD: u8 = 2;
-const BLOCK_HASH_BY_HEIGHT_ORD: u8 = 3;
-const BLOCK_TXS_ORD: u8 = 4;
-const PRECOMMITS_FOR_BLOCK_ORD: u8 = 5;
-const STORED_CONFIG_BY_HASH_ORD: u8 = 6;
-const CONFIGS_ACTUAL_FROM_ORD: u8 = 7;
-const STATE_HASH_AGGREGATOR_ORD: u8 = 8;
-const CONSENSUS_MESSAGES_CACHE_ORD: u8 = 9;
-const SAVED_ROUND_ORD: u8 = 10;
 
 impl<T> Schema<T>
 where
@@ -86,62 +91,51 @@ where
 
     /// Returns table that represents a map from transaction hash into raw transaction message.
     pub fn transactions(&self) -> MapIndex<&T, Hash, RawMessage> {
-        MapIndex::new(
-            gen_prefix(CONSENSUS, TRANSACTION_BY_HASH_ORD, &()),
-            &self.view,
-        )
+        MapIndex::new(TRANSACTIONS, &self.view)
+    }
+
+    /// Returns table that represents a map from transaction hash into execution result.
+    pub fn transaction_results(&self) -> ProofMapIndex<&T, Hash, TransactionResult> {
+        ProofMapIndex::new(TRANSACTION_RESULTS, &self.view)
     }
 
     /// Returns table that keeps the block height and tx position inside block for every
     /// transaction hash.
     pub fn tx_location_by_tx_hash(&self) -> MapIndex<&T, Hash, TxLocation> {
-        MapIndex::new(gen_prefix(CONSENSUS, LOCATION_BY_HASH_ORD, &()), &self.view)
+        MapIndex::new(TX_LOCATION_BY_TX_HASH, &self.view)
     }
 
     /// Returns table that stores block object for every block height.
     pub fn blocks(&self) -> MapIndex<&T, Hash, Block> {
-        MapIndex::new(gen_prefix(CONSENSUS, BLOCK_BY_HEIGHT_ORD, &()), &self.view)
+        MapIndex::new(BLOCKS, &self.view)
     }
 
     /// Returns table that keeps block hash for the corresponding height.
     pub fn block_hashes_by_height(&self) -> ListIndex<&T, Hash> {
-        ListIndex::new(
-            gen_prefix(CONSENSUS, BLOCK_HASH_BY_HEIGHT_ORD, &()),
-            &self.view,
-        )
+        ListIndex::new(BLOCK_HASHES_BY_HEIGHT, &self.view)
     }
 
     /// Returns table that keeps a list of transactions for the each block.
     pub fn block_txs(&self, height: Height) -> ProofListIndex<&T, Hash> {
         let height: u64 = height.into();
-        ProofListIndex::new(gen_prefix(CONSENSUS, BLOCK_TXS_ORD, &height), &self.view)
+        ProofListIndex::with_prefix(BLOCK_TXS, gen_prefix(&height), &self.view)
     }
 
     /// Returns table that saves a list of precommits for block with given hash.
     pub fn precommits(&self, hash: &Hash) -> ListIndex<&T, Precommit> {
-        ListIndex::new(
-            gen_prefix(CONSENSUS, PRECOMMITS_FOR_BLOCK_ORD, hash),
-            &self.view,
-        )
+        ListIndex::with_prefix(PRECOMMITS, gen_prefix(hash), &self.view)
     }
 
     /// Returns table that represents a map from configuration hash into contents.
     pub fn configs(&self) -> ProofMapIndex<&T, Hash, StoredConfiguration> {
-        // configs patricia merkletree <block height> json
-        ProofMapIndex::new(
-            gen_prefix(CONSENSUS, STORED_CONFIG_BY_HASH_ORD, &()),
-            &self.view,
-        )
+        // configs patricia merkle tree <block height> json
+        ProofMapIndex::new(CONFIGS, &self.view)
     }
 
     /// Returns auxiliary table that keeps hash references to configurations in order
     /// of increasing their `actual_from` height.
     pub fn configs_actual_from(&self) -> ListIndex<&T, ConfigReference> {
-        // TODO: consider List index to reduce storage volume
-        ListIndex::new(
-            gen_prefix(CONSENSUS, CONFIGS_ACTUAL_FROM_ORD, &()),
-            &self.view,
-        )
+        ListIndex::new(CONFIGS_ACTUAL_FROM, &self.view)
     }
 
     /// Returns the accessory `ProofMapIndex` for calculating
@@ -160,24 +154,24 @@ where
     /// Core tables participate in resulting state_hash with `CORE_SERVICE`
     /// service_id. Their vector is returned by `core_state_hash` method.
     pub fn state_hash_aggregator(&self) -> ProofMapIndex<&T, Hash, Hash> {
-        ProofMapIndex::new(
-            gen_prefix(CONSENSUS, STATE_HASH_AGGREGATOR_ORD, &()),
-            &self.view,
-        )
+        ProofMapIndex::new(STATE_HASH_AGGREGATOR, &self.view)
+    }
+
+    /// Returns peers that have to be recovered in case of process' restart
+    /// after abnormal termination.
+    pub fn peers_cache(&self) -> MapIndex<&T, PublicKey, Connect> {
+        MapIndex::new("core.peers_cache", &self.view)
     }
 
     /// Returns consensus messages that have to be recovered in case of process' restart
     /// after abnormal termination.
     pub fn consensus_messages_cache(&self) -> ListIndex<&T, RawMessage> {
-        ListIndex::new(
-            gen_prefix(CONSENSUS, CONSENSUS_MESSAGES_CACHE_ORD, &()),
-            &self.view,
-        )
+        ListIndex::new(CONSENSUS_MESSAGES_CACHE, &self.view)
     }
 
     /// Returns value for saved Round.
     pub fn saved_round(&self) -> Entry<&T, u32> {
-        Entry::new(gen_prefix(CONSENSUS, SAVED_ROUND_ORD, &()), &self.view)
+        Entry::new(SAVED_ROUND, &self.view)
     }
 
     /// Returns block hash for the given height.
@@ -194,48 +188,52 @@ where
         let block = self.blocks().get(&block_hash).unwrap();
         let precommits_table = self.precommits(&block_hash);
         let precommits = precommits_table.iter().collect();
-        let res = BlockProof {
-            block: block,
-            precommits: precommits,
-        };
+        let res = BlockProof { block, precommits };
         Some(res)
     }
 
     /// Returns latest committed block.
-    pub fn last_block(&self) -> Option<Block> {
-        match self.block_hashes_by_height().last() {
-            Some(hash) => Some(self.blocks().get(&hash).unwrap()),
-            None => None,
-        }
+    ///
+    /// # Panics
+    ///
+    /// Panics if the "genesis block" was not created.
+    pub fn last_block(&self) -> Block {
+        let hash = self.block_hashes_by_height().last().expect(
+            "An attempt to get the `last_block` during creating the genesis block.",
+        );
+        self.blocks().get(&hash).unwrap()
     }
 
     /// Returns height of the latest committed block.
-    pub fn last_height(&self) -> Option<Height> {
-        let block_opt = self.last_block();
-        block_opt.map(|block| block.height())
-    }
-
-    /// Returns the current height of the blockchain. Its value is equal to `last_height + 1`.
-    pub fn current_height(&self) -> Height {
-        let last_height = self.last_height();
-        match last_height {
-            Some(last_height) => last_height.next(),
-            None => Height::zero(),
-        }
+    ///
+    /// # Panics
+    ///
+    /// Panics if the "genesis block" was not created.
+    pub fn height(&self) -> Height {
+        let len = self.block_hashes_by_height().len();
+        assert!(
+            len > 0,
+            "An attempt to get the actual `height` during creating the genesis block."
+        );
+        Height(len - 1)
     }
 
     /// Returns configuration for the latest height of blockchain.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the "genesis block" was not created.
     pub fn actual_configuration(&self) -> StoredConfiguration {
-        let current_height = self.current_height();
-        let res = self.configuration_by_height(current_height);
+        let next_height = self.next_height();
+        let res = self.configuration_by_height(next_height);
         trace!("Retrieved actual_config: {:?}", res);
         res
     }
 
     /// Returns the nearest following configuration if it exists.
     pub fn following_configuration(&self) -> Option<StoredConfiguration> {
-        let current_height = self.current_height();
-        let idx = self.find_configurations_index_by_height(current_height);
+        let next_height = self.next_height();
+        let idx = self.find_configurations_index_by_height(next_height);
         match self.configs_actual_from().get(idx + 1) {
             Some(cfg_ref) => {
                 let cfg_hash = cfg_ref.cfg_hash();
@@ -251,8 +249,8 @@ where
 
     /// Returns the previous configuration if it exists.
     pub fn previous_configuration(&self) -> Option<StoredConfiguration> {
-        let current_height = self.current_height();
-        let idx = self.find_configurations_index_by_height(current_height);
+        let next_height = self.next_height();
+        let idx = self.find_configurations_index_by_height(next_height);
         if idx > 0 {
             let cfg_ref = self.configs_actual_from().get(idx - 1).expect(&format!(
                 "Configuration at index {} not found",
@@ -290,7 +288,7 @@ where
 
     /// Returns the `state_hash` table for core tables.
     pub fn core_state_hash(&self) -> Vec<Hash> {
-        vec![self.configs().root_hash()]
+        vec![self.configs().root_hash(), self.transaction_results().root_hash()]
     }
 
     /// Constructs a proof of inclusion of root hash of a specific service
@@ -329,9 +327,15 @@ where
         }
         panic!(
             "Couldn't not find any config for height {}, \
-                that means that genesis block was created incorrectly.",
+             that means that genesis block was created incorrectly.",
             height
         )
+    }
+
+    /// Returns the next height of the blockchain.
+    /// Its value is equal to "height of the latest committed block" + 1.
+    fn next_height(&self) -> Height {
+        Height(self.block_hashes_by_height().len())
     }
 }
 
@@ -340,40 +344,35 @@ impl<'a> Schema<&'a mut Fork> {
     ///
     /// [1]: struct.Schema.html#method.transactions
     pub fn transactions_mut(&mut self) -> MapIndex<&mut Fork, Hash, RawMessage> {
-        MapIndex::new(
-            gen_prefix(CONSENSUS, TRANSACTION_BY_HASH_ORD, &()),
-            &mut self.view,
-        )
+        MapIndex::new(TRANSACTIONS, &mut self.view)
+    }
+
+    /// Mutable reference to the [`transaction_results`][1] index.
+    ///
+    /// [1]: struct.Schema.html#method.transaction_results
+    pub fn transaction_results_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, TransactionResult> {
+        ProofMapIndex::new(TRANSACTION_RESULTS, &mut self.view)
     }
 
     /// Mutable reference to the [`tx_location_by_tx_hash`][1] index.
     ///
     /// [1]: struct.Schema.html#method.tx_location_by_tx_hash
     pub fn tx_location_by_tx_hash_mut(&mut self) -> MapIndex<&mut Fork, Hash, TxLocation> {
-        MapIndex::new(
-            gen_prefix(CONSENSUS, LOCATION_BY_HASH_ORD, &()),
-            &mut self.view,
-        )
+        MapIndex::new(TX_LOCATION_BY_TX_HASH, &mut self.view)
     }
 
     /// Mutable reference to the [`blocks][1] index.
     ///
     /// [1]: struct.Schema.html#method.blocks
     pub fn blocks_mut(&mut self) -> MapIndex<&mut Fork, Hash, Block> {
-        MapIndex::new(
-            gen_prefix(CONSENSUS, BLOCK_BY_HEIGHT_ORD, &()),
-            &mut self.view,
-        )
+        MapIndex::new(BLOCKS, &mut self.view)
     }
 
     /// Mutable reference to the [`block_hashes_by_height_mut`][1] index.
     ///
     /// [1]: struct.Schema.html#method.block_hashes_by_height_mut
     pub fn block_hashes_by_height_mut(&mut self) -> ListIndex<&mut Fork, Hash> {
-        ListIndex::new(
-            gen_prefix(CONSENSUS, BLOCK_HASH_BY_HEIGHT_ORD, &()),
-            &mut self.view,
-        )
+        ListIndex::new(BLOCK_HASHES_BY_HEIGHT, &mut self.view)
     }
 
     /// Mutable reference to the [`block_hash_by_height`][1] index.
@@ -388,67 +387,56 @@ impl<'a> Schema<&'a mut Fork> {
     /// [1]: struct.Schema.html#method.block_txs
     pub fn block_txs_mut(&mut self, height: Height) -> ProofListIndex<&mut Fork, Hash> {
         let height: u64 = height.into();
-        ProofListIndex::new(
-            gen_prefix(CONSENSUS, BLOCK_TXS_ORD, &height),
-            &mut self.view,
-        )
+        ProofListIndex::with_prefix(BLOCK_TXS, gen_prefix(&height), &mut self.view)
     }
 
     /// Mutable reference to the [`precommits`][1] index.
     ///
     /// [1]: struct.Schema.html#method.precommits
     pub fn precommits_mut(&mut self, hash: &Hash) -> ListIndex<&mut Fork, Precommit> {
-        ListIndex::new(
-            gen_prefix(CONSENSUS, PRECOMMITS_FOR_BLOCK_ORD, hash),
-            &mut self.view,
-        )
+        ListIndex::with_prefix(PRECOMMITS, gen_prefix(hash), &mut self.view)
     }
 
     /// Mutable reference to the [`configs`][1] index.
     ///
     /// [1]: struct.Schema.html#method.configs
     pub fn configs_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, StoredConfiguration> {
-        ProofMapIndex::new(
-            gen_prefix(CONSENSUS, STORED_CONFIG_BY_HASH_ORD, &()),
-            &mut self.view,
-        )
+        ProofMapIndex::new(CONFIGS, &mut self.view)
     }
 
     /// Mutable reference to the [`configs_actual_from`][1] index.
     ///
     /// [1]: struct.Schema.html#method.configs_actual_from
     pub fn configs_actual_from_mut(&mut self) -> ListIndex<&mut Fork, ConfigReference> {
-        ListIndex::new(
-            gen_prefix(CONSENSUS, CONFIGS_ACTUAL_FROM_ORD, &()),
-            &mut self.view,
-        )
+        ListIndex::new(CONFIGS_ACTUAL_FROM, &mut self.view)
     }
 
     /// Mutable reference to the [`state_hash_aggregator`][1] index.
     ///
     /// [1]: struct.Schema.html#method.state_hash_aggregator
     pub fn state_hash_aggregator_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, Hash> {
-        ProofMapIndex::new(
-            gen_prefix(CONSENSUS, STATE_HASH_AGGREGATOR_ORD, &()),
-            &mut self.view,
-        )
+        ProofMapIndex::new(STATE_HASH_AGGREGATOR, &mut self.view)
+    }
+
+    /// Mutable reference to the [`peers_cache`][1] index.
+    ///
+    /// [1]: struct.Schema.html#method.peers_cache
+    pub fn peers_cache_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Connect> {
+        MapIndex::new("core.peers_cache", &mut self.view)
     }
 
     /// Mutable reference to the [`consensus_messages_cache`][1] index.
     ///
     /// [1]: struct.Schema.html#method.consensus_messages
     pub fn consensus_messages_cache_mut(&mut self) -> ListIndex<&mut Fork, RawMessage> {
-        ListIndex::new(
-            gen_prefix(CONSENSUS, CONSENSUS_MESSAGES_CACHE_ORD, &()),
-            &mut self.view,
-        )
+        ListIndex::new(CONSENSUS_MESSAGES_CACHE, &mut self.view)
     }
 
     /// Mutable reference to the [`saved_round`][1] index.
     ///
     /// [1]: struct.Schema.html#method.saved_round
     pub fn saved_round_mut(&mut self) -> Entry<&mut Fork, u32> {
-        Entry::new(gen_prefix(CONSENSUS, SAVED_ROUND_ORD, &()), &mut self.view)
+        Entry::new(SAVED_ROUND, &mut self.view)
     }
 
     /// Adds a new configuration to the blockchain, which will become an actual at
@@ -457,10 +445,10 @@ impl<'a> Schema<&'a mut Fork> {
         let actual_from = config_data.actual_from;
         if let Some(last_cfg) = self.configs_actual_from().last() {
             if last_cfg.cfg_hash() != &config_data.previous_cfg_hash {
-                // TODO: Replace panic with errors.
+                // TODO: Replace panic with errors (ECR-123).
                 panic!(
                     "Attempting to commit configuration with incorrect previous hash: {:?}, \
-                    expected: {:?}",
+                     expected: {:?}",
                     config_data.previous_cfg_hash,
                     last_cfg.cfg_hash()
                 );
@@ -469,22 +457,23 @@ impl<'a> Schema<&'a mut Fork> {
             if actual_from <= last_cfg.actual_from() {
                 panic!(
                     "Attempting to commit configuration with actual_from {} less than the last \
-                    committed the last committed actual_from {}",
+                     committed the last committed actual_from {}",
                     actual_from,
                     last_cfg.actual_from()
                 );
             }
         }
 
+        info!(
+            "Scheduled the following configuration for acceptance: {:?}",
+            &config_data
+        );
+
         let cfg_hash = config_data.hash();
-        self.configs_mut().put(&cfg_hash, config_data.clone());
+        self.configs_mut().put(&cfg_hash, config_data);
 
         let cfg_ref = ConfigReference::new(actual_from, &cfg_hash);
         self.configs_actual_from_mut().push(cfg_ref);
-        info!(
-            "Scheduled the following configuration for acceptance: {:?}",
-            config_data
-        );
         // TODO: clear storages
     }
 }

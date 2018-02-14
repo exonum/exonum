@@ -16,22 +16,22 @@
 #![allow(dead_code)]
 extern crate test;
 extern crate rand;
-#[cfg(feature = "rocksdb")]
 extern crate tempdir;
 extern crate exonum;
 
 #[cfg(all(test, feature = "long_benchmarks"))]
 mod tests {
     use std::collections::HashSet;
+
     use test::Bencher;
     use rand::{Rng, thread_rng, XorShiftRng, SeedableRng};
-    #[cfg(feature = "rocksdb")]
     use tempdir::TempDir;
     use exonum::storage::{Database, MemoryDB};
-    #[cfg(feature = "rocksdb")]
     use exonum::storage::{RocksDB, RocksDBOptions};
     use exonum::storage::{ProofMapIndex, ProofListIndex};
     use exonum::storage::proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE;
+
+    const NAME: &str = "name";
 
     fn generate_random_kv(len: usize) -> Vec<([u8; KEY_SIZE], Vec<u8>)> {
         let mut rng = thread_rng();
@@ -62,7 +62,7 @@ mod tests {
     fn merkle_table_insertion<T: Database>(b: &mut Bencher, db: &T) {
         let mut rng = XorShiftRng::from_seed([192, 168, 56, 1]);
         let mut storage = db.fork();
-        let mut table = ProofListIndex::new(vec![123], &mut storage);
+        let mut table = ProofListIndex::new(NAME, &mut storage);
 
         b.iter(|| {
             let v_generator = |_| {
@@ -80,7 +80,7 @@ mod tests {
     fn merkle_patricia_table_insertion<T: Database>(b: &mut Bencher, db: &T) {
         let data = generate_random_kv(200);
         let mut storage = db.fork();
-        let mut table = ProofMapIndex::new(vec![123], &mut storage);
+        let mut table = ProofMapIndex::new(NAME, &mut storage);
 
         b.iter(|| for item in &data {
             table.put(&item.0, item.1.clone());
@@ -95,7 +95,7 @@ mod tests {
             {
                 let mut fork = db.fork();
                 {
-                    let mut table = ProofMapIndex::new(vec![234], &mut fork);
+                    let mut table = ProofMapIndex::new(NAME, &mut fork);
                     for item in &data {
                         table.put(&item.0, item.1.clone());
                     }
@@ -109,7 +109,7 @@ mod tests {
     fn merkle_patricia_table_insertion_large_map<T: Database>(b: &mut Bencher, db: &T) {
         let data = generate_random_kv(200);
         let mut storage = db.fork();
-        let mut table = ProofMapIndex::new(vec![134], &mut storage);
+        let mut table = ProofMapIndex::new(NAME, &mut storage);
 
         for item in &data {
             table.put(&item.0, item.1.clone());
@@ -120,11 +120,10 @@ mod tests {
         });
     }
 
-    #[cfg(feature = "rocksdb")]
     fn create_rocksdb(tempdir: &TempDir) -> RocksDB {
         let mut options = RocksDBOptions::default();
         options.create_if_missing(true);
-        RocksDB::open(tempdir.path(), options).unwrap()
+        RocksDB::open(tempdir.path(), &options).unwrap()
     }
 
     #[bench]
@@ -133,7 +132,6 @@ mod tests {
         merkle_table_insertion(b, &db);
     }
 
-    #[cfg(feature = "rocksdb")]
     #[bench]
     fn bench_merkle_table_append_rocksdb(b: &mut Bencher) {
         let tempdir = TempDir::new("exonum").unwrap();
@@ -153,7 +151,6 @@ mod tests {
         merkle_patricia_table_insertion_fork(b, &db);
     }
 
-    #[cfg(feature = "rocksdb")]
     #[bench]
     fn bench_merkle_patricia_table_insertion_rocksdb(b: &mut Bencher) {
         let tempdir = TempDir::new("exonum").unwrap();
@@ -161,7 +158,6 @@ mod tests {
         merkle_patricia_table_insertion(b, &db);
     }
 
-    #[cfg(feature = "rocksdb")]
     #[bench]
     fn bench_merkle_patricia_table_insertion_fork_rocksdb(b: &mut Bencher) {
         let tempdir = TempDir::new("exonum").unwrap();
@@ -175,7 +171,6 @@ mod tests {
         merkle_patricia_table_insertion_large_map(b, &db);
     }
 
-    #[cfg(feature = "rocksdb")]
     #[bench]
     fn long_bench_merkle_patricia_table_insertion_rocksdb(b: &mut Bencher) {
         let tempdir = TempDir::new("exonum").unwrap();

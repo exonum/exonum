@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! An implementation of a Merklized version of an array list (Merkle tree).
+//! An implementation of a Merkelized version of an array list (Merkle tree).
+
 use std::cell::Cell;
 use std::marker::PhantomData;
 
-use crypto::{Hash, hash, HASH_SIZE};
-
+use crypto::{Hash, hash, HashStream};
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
-
 use self::key::ProofListKey;
 
 pub use self::proof::{ListProof, ListProofError};
@@ -29,9 +28,9 @@ mod tests;
 mod key;
 mod proof;
 
-// TODO: implement pop and truncate methods for Merkle tree
+// TODO: implement pop and truncate methods for Merkle tree (ECR-173)
 
-/// A Merkalized version of an array list that provides proofs of existence for the list items.
+/// A Merkelized version of an array list that provides proofs of existence for the list items.
 ///
 /// `ProofListIndex` implements a Merkle tree, storing elements as leaves and using `u64` as
 /// an index. `ProofListIndex` requires that the elements implement the [`StorageValue`] trait.
@@ -57,7 +56,7 @@ pub struct ProofListIndexIter<'a, V> {
 }
 
 impl<T, V> ProofListIndex<T, V> {
-    /// Creates a new index representation based on the common prefix of its keys and storage view.
+    /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
@@ -71,19 +70,55 @@ impl<T, V> ProofListIndex<T, V> {
     /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "name";
     ///
     /// let snapshot = db.snapshot();
-    /// let index: ProofListIndex<_, u8> = ProofListIndex::new(prefix.clone(), &snapshot);
+    /// let index: ProofListIndex<_, u8> = ProofListIndex::new(name, &snapshot);
     ///
     /// let mut fork = db.fork();
-    /// let mut mut_index: ProofListIndex<_, u8> = ProofListIndex::new(prefix, &mut fork);
+    /// let mut mut_index: ProofListIndex<_, u8> = ProofListIndex::new(name, &mut fork);
     /// # drop(index);
     /// # drop(mut_index);
     /// ```
-    pub fn new(prefix: Vec<u8>, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
         ProofListIndex {
-            base: BaseIndex::new(prefix, view),
+            base: BaseIndex::new(name, view),
+            length: Cell::new(None),
+            _v: PhantomData,
+        }
+    }
+
+    /// Creates a new index representation based on the name, common prefix of its keys
+    /// and storage view.
+    ///
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
+    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// available.
+    /// [`&Snapshot`]: ../trait.Snapshot.html
+    /// [`&mut Fork`]: ../struct.Fork.html
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let name = "name";
+    /// let prefix = vec![01];
+    ///
+    /// let snapshot = db.snapshot();
+    /// let index: ProofListIndex<_, u8> =
+    ///                             ProofListIndex::with_prefix(name, prefix.clone(), &snapshot);
+    ///
+    /// let mut fork = db.fork();
+    /// let mut mut_index : ProofListIndex<_, u8> =
+    ///                                     ProofListIndex::with_prefix(name, prefix, &mut fork);
+    /// # drop(index);
+    /// # drop(mut_index);
+    /// ```
+    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
+        ProofListIndex {
+            base: BaseIndex::with_prefix(name, prefix, view),
             length: Cell::new(None),
             _v: PhantomData,
         }
@@ -91,10 +126,10 @@ impl<T, V> ProofListIndex<T, V> {
 }
 
 fn pair_hash(h1: &Hash, h2: &Hash) -> Hash {
-    let mut v = [0; HASH_SIZE * 2];
-    v[..HASH_SIZE].copy_from_slice(h1.as_ref());
-    v[HASH_SIZE..].copy_from_slice(h2.as_ref());
-    hash(&v)
+    HashStream::new()
+        .update(h1.as_ref())
+        .update(h2.as_ref())
+        .hash()
 }
 
 impl<T, V> ProofListIndex<T, V>
@@ -157,9 +192,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ProofListIndex::new(prefix, &mut fork);
+    /// let mut index = ProofListIndex::new(name, &mut fork);
     /// assert_eq!(None, index.get(0));
     ///
     /// index.push(10);
@@ -177,9 +212,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ProofListIndex::new(prefix, &mut fork);
+    /// let mut index = ProofListIndex::new(name, &mut fork);
     /// assert_eq!(None, index.last());
     ///
     /// index.push(1);
@@ -200,9 +235,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ProofListIndex::new(prefix, &mut fork);
+    /// let mut index = ProofListIndex::new(name, &mut fork);
     /// assert!(index.is_empty());
     ///
     /// index.push(10);
@@ -220,9 +255,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ProofListIndex::new(prefix, &mut fork);
+    /// let mut index = ProofListIndex::new(name, &mut fork);
     /// assert_eq!(0, index.len());
     ///
     /// index.push(1);
@@ -245,9 +280,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ProofListIndex::new(prefix, &mut fork);
+    /// let mut index = ProofListIndex::new(name, &mut fork);
     /// assert_eq!(1, index.height());
     ///
     /// index.push(1);
@@ -269,9 +304,9 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ProofListIndex::new(prefix, &mut fork);
+    /// let mut index = ProofListIndex::new(name, &mut fork);
     ///
     /// let default_hash = index.root_hash();
     /// assert_eq!(Hash::default(), default_hash);
@@ -296,9 +331,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ProofListIndex::new(prefix, &mut fork);
+    /// let mut index = ProofListIndex::new(name, &mut fork);
     ///
     /// index.push(1);
     ///
@@ -328,9 +363,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
     ///
     /// let db = MemoryDB::new();
-    /// let prefix = vec![1, 2, 3];
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ProofListIndex::new(prefix, &mut fork);
+    /// let mut index = ProofListIndex::new(name, &mut fork);
     ///
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     ///
@@ -364,8 +399,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let snapshot = db.snapshot();
-    /// let index: ProofListIndex<_, u8> = ProofListIndex::new(vec![1, 2, 3], &snapshot);
+    /// let index: ProofListIndex<_, u8> = ProofListIndex::new(name, &snapshot);
     ///
     /// for val in index.iter() {
     ///     println!("{}", val);
@@ -384,8 +420,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let snapshot = db.snapshot();
-    /// let index: ProofListIndex<_, u8> = ProofListIndex::new(vec![1, 2, 3], &snapshot);
+    /// let index: ProofListIndex<_, u8> = ProofListIndex::new(name, &snapshot);
     ///
     /// for val in index.iter_from(1) {
     ///     println!("{}", val);
@@ -419,8 +456,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ProofListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = ProofListIndex::new(name, &mut fork);
     ///
     /// index.push(1);
     /// assert!(!index.is_empty());
@@ -453,8 +491,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ProofListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = ProofListIndex::new(name, &mut fork);
     ///
     /// index.extend([1, 2, 3].iter().cloned());
     /// assert_eq!(3, index.len());
@@ -480,8 +519,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ProofListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = ProofListIndex::new(name, &mut fork);
     ///
     /// index.push(1);
     /// assert_eq!(Some(1), index.get(0));
@@ -529,8 +569,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = ProofListIndex::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = ProofListIndex::new(name, &mut fork);
     ///
     /// index.push(1);
     /// assert!(!index.is_empty());

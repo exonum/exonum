@@ -13,6 +13,7 @@
 // limitations under the License.
 
 //! An implementation of `Error` type.
+
 use std::fmt;
 use std::error;
 

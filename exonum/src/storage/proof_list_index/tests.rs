@@ -14,13 +14,14 @@
 
 use rand::{thread_rng, Rng};
 
-use crypto::{Hash, hash};
-use storage::{Database, StorageValue};
-use super::{ProofListIndex, ListProof, pair_hash};
+use crypto::{CryptoHash, Hash, hash};
+use storage::Database;
 use encoding::serialize::json::reexport::{to_string, from_str};
 use encoding::serialize::reexport::Serialize;
-
+use super::{ProofListIndex, ListProof, pair_hash};
 use self::ListProof::*;
+
+const IDX_NAME: &'static str = "idx_name";
 
 fn random_values(len: usize) -> Vec<Vec<u8>> {
     use std::collections::HashSet;
@@ -46,7 +47,7 @@ fn gen_tempdir_name() -> String {
 
 fn list_methods(db: Box<Database>) {
     let mut fork = db.fork();
-    let mut index = ProofListIndex::new(vec![255], &mut fork);
+    let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
 
     assert!(index.is_empty());
     assert_eq!(index.len(), 0);
@@ -67,7 +68,7 @@ fn list_methods(db: Box<Database>) {
 
 fn height(db: Box<Database>) {
     let mut fork = db.fork();
-    let mut index = ProofListIndex::new(vec![255], &mut fork);
+    let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
 
     index.push(vec![1]);
     assert_eq!(index.height(), 1);
@@ -93,7 +94,7 @@ fn height(db: Box<Database>) {
 
 fn iter(db: Box<Database>) {
     let mut fork = db.fork();
-    let mut list_index = ProofListIndex::new(vec![255], &mut fork);
+    let mut list_index = ProofListIndex::new(IDX_NAME, &mut fork);
 
     list_index.extend(vec![1u8, 2, 3]);
 
@@ -108,7 +109,7 @@ fn iter(db: Box<Database>) {
 
 fn list_index_proof(db: Box<Database>) {
     let mut fork = db.fork();
-    let mut index = ProofListIndex::new(vec![255], &mut fork);
+    let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
 
     let h0 = 2u64.hash();
     let h1 = 4u64.hash();
@@ -247,9 +248,9 @@ fn list_index_proof(db: Box<Database>) {
 
 fn randomly_generate_proofs(db: Box<Database>) {
     let mut fork = db.fork();
-    let mut index = ProofListIndex::new(vec![255], &mut fork);
-    let num_vals = 100;
-    let values = random_values(num_vals as usize);
+    let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
+    let num_values = 100;
+    let values = random_values(num_values as usize);
     let mut rng = thread_rng();
     for value in &values {
         index.push(value.clone());
@@ -258,19 +259,19 @@ fn randomly_generate_proofs(db: Box<Database>) {
     let table_root_hash = index.root_hash();
 
     for _ in 0..50 {
-        let start_range = rng.gen_range(0, num_vals);
-        let end_range = rng.gen_range(start_range + 1, num_vals + 1);
+        let start_range = rng.gen_range(0, num_values);
+        let end_range = rng.gen_range(start_range + 1, num_values + 1);
         let range_proof = index.get_range_proof(start_range, end_range);
         {
-            let (inds, actual_vals): (Vec<_>, Vec<_>) = range_proof
+            let (indices, actual_values): (Vec<_>, Vec<_>) = range_proof
                 .validate(table_root_hash, index.len())
                 .unwrap()
                 .into_iter()
                 .unzip();
-            assert_eq!(inds, (start_range..end_range).collect::<Vec<_>>());
+            assert_eq!(indices, (start_range..end_range).collect::<Vec<_>>());
 
-            let expect_vals = &values[start_range as usize..end_range as usize];
-            for (expected, actual) in expect_vals.iter().zip(actual_vals) {
+            let expect_values = &values[start_range as usize..end_range as usize];
+            for (expected, actual) in expect_values.iter().zip(actual_values) {
                 assert_eq!(*expected, *actual);
             }
         }
@@ -283,15 +284,15 @@ fn randomly_generate_proofs(db: Box<Database>) {
             range_end: end_range,
         };
 
-        let json_repr = to_string(&range_proof).unwrap();
-        assert!(json_repr.len() > 0);
-        assert_eq!(range_proof, from_str(&json_repr).unwrap());
+        let json_representation = to_string(&range_proof).unwrap();
+        assert!(json_representation.len() > 0);
+        assert_eq!(range_proof, from_str(&json_representation).unwrap());
     }
 }
 
 fn index_and_proof_roots(db: Box<Database>) {
     let mut fork = db.fork();
-    let mut index = ProofListIndex::new(vec![255], &mut fork);
+    let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
     assert_eq!(index.root_hash(), Hash::zero());
 
     let h1 = hash(&[1, 2]);
@@ -349,9 +350,9 @@ fn index_and_proof_roots(db: Box<Database>) {
                 .len(),
             1
         );
-        let json_repre = to_string(&range_proof).unwrap();
-        let deser_proof: ListProof<Vec<u8>> = from_str(&json_repre).unwrap();
-        assert_eq!(deser_proof, range_proof);
+        let json_representation = to_string(&range_proof).unwrap();
+        let deserialized_proof: ListProof<Vec<u8>> = from_str(&json_representation).unwrap();
+        assert_eq!(deserialized_proof, range_proof);
         let range_proof = index.get_range_proof(0, proof_ind + 1);
         assert_eq!(
             range_proof
@@ -360,9 +361,9 @@ fn index_and_proof_roots(db: Box<Database>) {
                 .len(),
             (proof_ind + 1) as usize
         );
-        let json_repre = to_string(&range_proof).unwrap();
-        let deser_proof: ListProof<Vec<u8>> = from_str(&json_repre).unwrap();
-        assert_eq!(deser_proof, range_proof);
+        let json_representation = to_string(&range_proof).unwrap();
+        let deserialized_proof: ListProof<Vec<u8>> = from_str(&json_representation).unwrap();
+        assert_eq!(deserialized_proof, range_proof);
         let range_proof = index.get_range_proof(0, 1);
         assert_eq!(
             range_proof
@@ -371,19 +372,19 @@ fn index_and_proof_roots(db: Box<Database>) {
                 .len(),
             1
         );
-        let json_repre = to_string(&range_proof).unwrap();
-        let deser_proof: ListProof<Vec<u8>> = from_str(&json_repre).unwrap();
-        assert_eq!(deser_proof, range_proof);
+        let json_representation = to_string(&range_proof).unwrap();
+        let deserialized_proof: ListProof<Vec<u8>> = from_str(&json_representation).unwrap();
+        assert_eq!(deserialized_proof, range_proof);
     }
 
     let range_proof = index.get_range_proof(0, 8);
-    let (inds, val_refs): (Vec<_>, Vec<_>) = range_proof
+    let (indices, val_refs): (Vec<_>, Vec<_>) = range_proof
         .validate(index.root_hash(), index.len())
         .unwrap()
         .into_iter()
         .unzip();
-    assert_eq!(inds, (0..8).collect::<Vec<_>>());
-    let expect_vals = vec![
+    assert_eq!(indices, (0..8).collect::<Vec<_>>());
+    let expect_values = vec![
         vec![1, 2],
         vec![2, 3],
         vec![3, 4],
@@ -393,7 +394,7 @@ fn index_and_proof_roots(db: Box<Database>) {
         vec![7, 8],
         vec![8, 9],
     ];
-    let paired = expect_vals.into_iter().zip(val_refs);
+    let paired = expect_values.into_iter().zip(val_refs);
     for pair in paired {
         assert_eq!(pair.0, *pair.1);
     }
@@ -419,14 +420,14 @@ fn index_and_proof_roots(db: Box<Database>) {
 
 fn proof_illegal_lower_bound(db: Box<Database>) {
     let mut fork = db.fork();
-    let mut index = ProofListIndex::new(vec![255], &mut fork);
+    let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
     index.get_range_proof(0, 1);
     index.push(vec![1]);
 }
 
 fn proof_illegal_bound_empty(db: Box<Database>) {
     let mut fork = db.fork();
-    let mut index = ProofListIndex::new(vec![255], &mut fork);
+    let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
     for i in 0u8..8 {
         index.push(vec![i]);
     }
@@ -435,7 +436,7 @@ fn proof_illegal_bound_empty(db: Box<Database>) {
 
 fn proof_illegal_range(db: Box<Database>) {
     let mut fork = db.fork();
-    let mut index = ProofListIndex::new(vec![255], &mut fork);
+    let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
     for i in 0u8..4 {
         index.push(vec![i]);
     }
@@ -444,8 +445,10 @@ fn proof_illegal_range(db: Box<Database>) {
 
 fn proof_structure(db: Box<Database>) {
     let mut fork = db.fork();
-    let mut index = ProofListIndex::new(vec![255], &mut fork);
+    let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
     assert_eq!(index.root_hash(), Hash::zero());
+
+    // spell-checker:ignore upup
 
     let h1 = hash(&vec![0, 1, 2]);
     let h2 = hash(&vec![1, 2, 3]);
@@ -496,7 +499,7 @@ fn simple_root_hash(db: Box<Database>) {
     let h2 = hash(&[2]);
 
     let mut fork = db.fork();
-    let mut index = ProofListIndex::new(vec![255], &mut fork);
+    let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
     assert_eq!(index.get(0), None);
     index.push(vec![1]);
     assert_eq!(index.root_hash(), h1);
@@ -508,7 +511,7 @@ fn simple_root_hash(db: Box<Database>) {
 fn same_root_hash(db1: Box<Database>, db2: Box<Database>) {
     let mut fork1 = db1.fork();
 
-    let mut i1 = ProofListIndex::new(vec![255], &mut fork1);
+    let mut i1 = ProofListIndex::new(IDX_NAME, &mut fork1);
     i1.push(vec![1]);
     i1.push(vec![2]);
     i1.push(vec![3]);
@@ -521,7 +524,7 @@ fn same_root_hash(db1: Box<Database>, db2: Box<Database>) {
 
     let mut fork2 = db2.fork();
 
-    let mut i2 = ProofListIndex::new(vec![255], &mut fork2);
+    let mut i2 = ProofListIndex::new(IDX_NAME, &mut fork2);
     i2.push(vec![4]);
     i2.push(vec![7]);
     i2.push(vec![5]);
@@ -632,7 +635,7 @@ mod memorydb_tests {
     }
 
     #[test]
-    fn test_siple_root_hash() {
+    fn test_simple_root_hash() {
         let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
         let path = dir.path();
         let db = create_database(path);
@@ -651,122 +654,6 @@ mod memorydb_tests {
     }
 }
 
-#[cfg(feature = "leveldb")]
-mod leveldb_tests {
-    use std::path::Path;
-    use tempdir::TempDir;
-    use storage::{Database, LevelDB, LevelDBOptions};
-
-    fn create_database(path: &Path) -> Box<Database> {
-        let mut opts = LevelDBOptions::default();
-        opts.create_if_missing = true;
-        Box::new(LevelDB::open(path, opts).unwrap())
-    }
-
-    #[test]
-    fn test_list_methods() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::list_methods(db);
-    }
-
-    #[test]
-    fn test_height() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::height(db);
-    }
-
-    #[test]
-    fn test_iter() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::iter(db);
-    }
-
-    #[test]
-    fn test_list_index_proof() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::list_index_proof(db);
-    }
-
-    #[test]
-    fn test_randomly_generate_proofs() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::randomly_generate_proofs(db);
-    }
-
-    #[test]
-    fn test_index_and_proof_roots() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::index_and_proof_roots(db);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_proof_illegal_lower_bound() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::proof_illegal_lower_bound(db);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_proof_illegal_bound_empty() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::proof_illegal_bound_empty(db);
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_proof_illegal_range() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::proof_illegal_range(db);
-    }
-
-    #[test]
-    fn test_proof_structure() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::proof_structure(db);
-    }
-
-    #[test]
-    fn test_siple_root_hash() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path = dir.path();
-        let db = create_database(path);
-        super::simple_root_hash(db);
-    }
-
-    #[test]
-    fn test_same_root_hash() {
-        let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path1 = dir1.path();
-        let db1 = create_database(path1);
-        let dir2 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path2 = dir2.path();
-        let db2 = create_database(path2);
-        super::same_root_hash(db1, db2);
-    }
-}
-
-#[cfg(feature = "rocksdb")]
 mod rocksdb_tests {
     use std::path::Path;
     use tempdir::TempDir;
@@ -775,7 +662,7 @@ mod rocksdb_tests {
     fn create_database(path: &Path) -> Box<Database> {
         let mut opts = RocksDBOptions::default();
         opts.create_if_missing(true);
-        Box::new(RocksDB::open(path, opts).unwrap())
+        Box::new(RocksDB::open(path, &opts).unwrap())
     }
 
     #[test]
@@ -862,7 +749,7 @@ mod rocksdb_tests {
     }
 
     #[test]
-    fn test_siple_root_hash() {
+    fn test_simple_root_hash() {
         let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
         let path = dir.path();
         let db = create_database(path);

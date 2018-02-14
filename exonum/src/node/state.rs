@@ -14,40 +14,39 @@
 
 //! State of the `NodeHandler`.
 
-use serde_json::Value;
-use bit_vec::BitVec;
-
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::collections::hash_map::Entry;
 use std::sync::{Arc, RwLock};
 use std::net::SocketAddr;
 use std::time::{SystemTime, Duration};
 
+use serde_json::Value;
+use bit_vec::BitVec;
+
 use messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect};
-use crypto::{PublicKey, SecretKey, Hash};
+use crypto::{CryptoHash, PublicKey, SecretKey, Hash};
 use storage::{Patch, Snapshot};
-use events::Milliseconds;
 use blockchain::{ValidatorKeys, ConsensusConfig, StoredConfiguration, Transaction,
                  TimeoutAdjusterConfig};
-use helpers::{Height, Round, ValidatorId};
+use helpers::{Height, Round, ValidatorId, Milliseconds};
 use node::whitelist::Whitelist;
 use node::timeout_adjuster::{TimeoutAdjuster, Constant, Dynamic, MovingAverage};
 
-// TODO: move request timeouts into node configuration
+// TODO: move request timeouts into node configuration (ECR-171)
 
-/// Timeout value for the `RequestPropose` message.
+/// Timeout value for the `ProposeRequest` message.
 pub const PROPOSE_REQUEST_TIMEOUT: Milliseconds = 100;
-/// Timeout value for the `RequestTransactions` message.
+/// Timeout value for the `TransactionsRequest` message.
 pub const TRANSACTIONS_REQUEST_TIMEOUT: Milliseconds = 100;
-/// Timeout value for the `RequestPrevotes` message.
+/// Timeout value for the `PrevotesRequest` message.
 pub const PREVOTES_REQUEST_TIMEOUT: Milliseconds = 100;
-/// Timeout value for the `RequestBlock` message.
+/// Timeout value for the `BlockRequest` message.
 pub const BLOCK_REQUEST_TIMEOUT: Milliseconds = 100;
 
 /// Transactions pool.
-// TODO replace by persistent TxPool
+// TODO replace by persistent TxPool (ECR-171)
 pub type TxPool = Arc<RwLock<BTreeMap<Hash, Box<Transaction>>>>;
-// TODO: reduce copying of Hash
+// TODO: reduce copying of Hash (ECR-171)
 
 /// State of the `NodeHandler`.
 #[derive(Debug)]
@@ -93,6 +92,8 @@ pub struct State {
     // maximum of node height in consensus messages
     nodes_max_height: BTreeMap<PublicKey, Height>,
 
+    validators_rounds: BTreeMap<ValidatorId, Round>,
+
     timeout_adjuster: Box<TimeoutAdjuster>,
     propose_timeout: Milliseconds,
 }
@@ -109,13 +110,13 @@ pub struct ValidatorState {
 /// translated to the corresponding request-message.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum RequestData {
-    /// Represents `RequestPropose` message.
+    /// Represents `ProposeRequest` message.
     Propose(Hash),
-    /// Represents `RequestTransactions` message.
+    /// Represents `TransactionsRequest` message.
     Transactions(Hash),
-    /// Represents `RequestPrevotes` message.
+    /// Represents `PrevotesRequest` message.
     Prevotes(Round, Hash),
-    /// Represents `RequestBlock` message.
+    /// Represents `BlockRequest` message.
     Block(Height),
 }
 
@@ -372,6 +373,7 @@ impl State {
         whitelist: Whitelist,
         stored: StoredConfiguration,
         connect: Connect,
+        peers: HashMap<PublicKey, Connect>,
         last_hash: Hash,
         last_height: Height,
         height_start_time: SystemTime,
@@ -384,7 +386,7 @@ impl State {
             service_secret_key,
             tx_pool_capacity: tx_pool_capacity,
             whitelist: whitelist,
-            peers: HashMap::new(),
+            peers,
             connections: HashMap::new(),
             height: last_height,
             height_start_time,
@@ -406,6 +408,7 @@ impl State {
             unknown_proposes_with_precommits: HashMap::new(),
 
             nodes_max_height: BTreeMap::new(),
+            validators_rounds: BTreeMap::new(),
 
             our_connect_message: connect,
 
@@ -577,6 +580,42 @@ impl State {
         ValidatorId(((height + round) % (self.validators().len() as u64)) as u16)
     }
 
+    /// Updates known round for a validator and returns
+    /// a new actual round if at least one non byzantine validators are on a higher round.
+    /// Otherwise returns None.
+    pub fn get_actual_round(&mut self, id: ValidatorId, round: Round) -> Option<Round> {
+        {
+            let known_round = self.validators_rounds.entry(id).or_insert_with(Round::zero);
+            if round <= *known_round {
+                // keep only maximum round
+                trace!(
+                    "Received a message from a lower round than we know already,\
+                message_round = {},\
+                known_round = {}.",
+                    round,
+                    known_round
+                );
+                return None;
+            }
+            *known_round = round;
+        }
+        let max_byzantine_count = self.validators().len() / 3;
+        if self.validators_rounds.len() <= max_byzantine_count {
+            trace!("Count of validators, lower then max byzantine count.");
+            return None;
+        }
+
+        let mut rounds: Vec<_> = self.validators_rounds.iter().map(|(_, v)| v).collect();
+        rounds.sort_unstable_by(|a, b| b.cmp(a));
+
+        if rounds[max_byzantine_count] > &self.round {
+            Some(*rounds[max_byzantine_count])
+        } else {
+            None
+        }
+
+    }
+
     /// Returns the height for a validator identified by the public key.
     pub fn node_height(&self, key: &PublicKey) -> Height {
         *self.nodes_max_height.get(key).unwrap_or(&Height::zero())
@@ -651,7 +690,7 @@ impl State {
         self.locked_propose
     }
 
-    /// Returns muttable propose state identified by hash.
+    /// Returns mutable propose state identified by hash.
     pub fn propose_mut(&mut self, hash: &Hash) -> Option<&mut ProposeState> {
         self.proposes.get_mut(hash)
     }
@@ -694,15 +733,16 @@ impl State {
                     .remove(&hash);
             }
         }
-        // TODO: destruct/construct structure HeightState instead of call clear
+        // TODO: destruct/construct structure HeightState instead of call clear (ECR-171)
         self.blocks.clear();
         self.proposes.clear();
         self.prevotes.clear();
         self.precommits.clear();
+        self.validators_rounds.clear();
         if let Some(ref mut validator_state) = self.validator_state {
             validator_state.clear();
         }
-        self.requests.clear(); // FIXME: clear all timeouts
+        self.requests.clear(); // FIXME: clear all timeouts (ECR-171)
     }
 
     /// Returns a list of queued consensus messages.
@@ -815,7 +855,7 @@ impl State {
     }
 
     /// Adds propose from other node. Returns `ProposeState` if it is a new propose.
-    pub fn add_propose(&mut self, msg: Propose) -> Option<&ProposeState> {
+    pub fn add_propose(&mut self, msg: &Propose) -> Option<&ProposeState> {
         let propose_hash = msg.hash();
         let txs = &self.transactions.read().expect("Expected read lock");
         match self.proposes.entry(propose_hash) {
@@ -993,7 +1033,7 @@ impl State {
             match self.validator_state {
                 Some(ref validator_state) => {
                     if let Some(msg) = validator_state.our_prevotes.get(&round) {
-                        // TODO: unefficient
+                        // TODO: inefficient (ECR-171)
                         if Some(*msg.propose_hash()) != self.locked_propose {
                             return true;
                         }

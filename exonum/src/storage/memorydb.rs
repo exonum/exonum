@@ -13,119 +13,145 @@
 // limitations under the License.
 
 //! An implementation of `MemoryDB` database.
-use std::sync::{Arc, RwLock, RwLockReadGuard};
-use std::clone::Clone;
-use std::collections::btree_map::{BTreeMap, Range};
-use std::iter::Peekable;
 
-use super::{Database, Snapshot, Patch, Change, Iterator, Iter, Result};
+use std::sync::RwLock;
+use std::clone::Clone;
+use std::collections::btree_map::BTreeMap;
+use std::collections::HashMap;
+
+use super::{Database, Snapshot, Patch, Iterator, Iter, Result};
+use super::db::Change;
+
+type DB = HashMap<String, BTreeMap<Vec<u8>, Vec<u8>>>;
 
 /// Database implementation that stores all the data in memory.
 ///
 /// It's mainly used for testing and not designed to be efficient.
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Debug)]
 pub struct MemoryDB {
-    map: Arc<RwLock<BTreeMap<Vec<u8>, Vec<u8>>>>,
+    map: RwLock<DB>,
 }
 
 /// An iterator over the entries of a `MemoryDB`.
-struct MemoryDBIter<'a> {
-    iter: Peekable<Range<'a, Vec<u8>, Vec<u8>>>,
-    _guard: RwLockReadGuard<'a, BTreeMap<Vec<u8>, Vec<u8>>>,
+struct MemoryDBIter {
+    data: Vec<(Vec<u8>, Vec<u8>)>,
+    index: usize,
 }
 
 impl MemoryDB {
     /// Creates a new, empty database.
     pub fn new() -> MemoryDB {
-        MemoryDB { map: Arc::new(RwLock::new(BTreeMap::new())) }
+        MemoryDB { map: RwLock::new(HashMap::new()) }
     }
 }
 
 impl Database for MemoryDB {
-    fn clone(&self) -> Box<Database> {
-        Box::new(Clone::clone(self))
-    }
-
     fn snapshot(&self) -> Box<Snapshot> {
         Box::new(MemoryDB {
-            map: Arc::new(RwLock::new(self.map.read().unwrap().clone())),
+            map: RwLock::new(self.map.read().unwrap().clone()),
         })
     }
 
-    fn merge(&mut self, patch: Patch) -> Result<()> {
-        for (key, change) in patch {
-            match change {
-                Change::Put(value) => {
-                    self.map.write().unwrap().insert(key, value);
-                }
-                Change::Delete => {
-                    self.map.write().unwrap().remove(&key);
+    fn merge(&self, patch: Patch) -> Result<()> {
+        let mut guard = self.map.write().unwrap();
+        for (cf_name, changes) in patch {
+            if !guard.contains_key(&cf_name) {
+                guard.insert(cf_name.clone(), BTreeMap::new());
+            }
+            let table = guard.get_mut(&cf_name).unwrap();
+            for (key, change) in changes {
+                match change {
+                    Change::Put(ref value) => {
+                        table.insert(key, value.to_vec());
+                    }
+                    Change::Delete => {
+                        table.remove(&key);
+                    }
                 }
             }
         }
         Ok(())
     }
+
+    fn merge_sync(&self, patch: Patch) -> Result<()> {
+        self.merge(patch)
+    }
 }
 
 impl Snapshot for MemoryDB {
-    fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
-        self.map.read().unwrap().get(key).cloned()
-    }
-
-    fn contains(&self, key: &[u8]) -> bool {
-        self.map.read().unwrap().contains_key(key)
-    }
-
-    fn iter<'a>(&'a self, from: &[u8]) -> Iter<'a> {
-        use std::collections::Bound::{Included, Unbounded};
-        use std::mem::transmute;
-        let range = (Included(from), Unbounded);
-        let guard = self.map.read().unwrap();
-
-        Box::new(MemoryDBIter {
-            iter: unsafe { transmute(guard.range::<[u8], _>(range).peekable()) },
-            _guard: guard,
+    fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>> {
+        self.map.read().unwrap().get(name).and_then(|table| {
+            table.get(key).cloned()
         })
+    }
+
+    fn contains(&self, name: &str, key: &[u8]) -> bool {
+        self.map.read().unwrap().get(name).map_or(false, |table| {
+            table.contains_key(key)
+        })
+    }
+
+    fn iter(&self, name: &str, from: &[u8]) -> Iter {
+        let map_guard = self.map.read().unwrap();
+        let data = match map_guard.get(name) {
+            Some(table) => {
+                table
+                    .iter()
+                    .skip_while(|&(k, _)| k.as_slice() < from)
+                    .map(|(k, v)| (k.to_vec(), v.to_vec()))
+                    .collect()
+            }
+            None => Vec::new(),
+        };
+
+        Box::new(MemoryDBIter { data, index: 0 })
     }
 }
 
-impl<'a> Iterator for MemoryDBIter<'a> {
+impl Iterator for MemoryDBIter {
     fn next(&mut self) -> Option<(&[u8], &[u8])> {
-        self.iter.next().map(|(k, v)| (k.as_slice(), v.as_slice()))
+        if self.index < self.data.len() {
+            self.index += 1;
+            self.data.get(self.index - 1).map(|&(ref k, ref v)| {
+                (k.as_slice(), v.as_slice())
+            })
+        } else {
+            None
+        }
     }
 
     fn peek(&mut self) -> Option<(&[u8], &[u8])> {
-        self.iter.peek().map(|&(k, v)| (k.as_slice(), v.as_slice()))
+        if self.index < self.data.len() {
+            self.data.get(self.index).map(|&(ref k, ref v)| {
+                (k.as_slice(), v.as_slice())
+            })
+        } else {
+            None
+        }
     }
 }
 
 #[test]
 fn test_memorydb_snapshot() {
-    let mut db = MemoryDB::new();
-
+    let db = MemoryDB::new();
+    let idx_name = "idx_name";
     {
         let mut fork = db.fork();
-        fork.put(vec![1, 2, 3], vec![123]);
+        fork.put(idx_name, vec![1, 2, 3], vec![123]);
         let _ = db.merge(fork.into_patch());
     }
 
     let snapshot = db.snapshot();
-    assert!(snapshot.contains(vec![1, 2, 3].as_slice()));
+    assert!(snapshot.contains(idx_name, vec![1, 2, 3].as_slice()));
 
     {
         let mut fork = db.fork();
-        fork.put(vec![2, 3, 4], vec![234]);
+        fork.put(idx_name, vec![2, 3, 4], vec![234]);
         let _ = db.merge(fork.into_patch());
     }
 
-    assert!(!snapshot.contains(vec![2, 3, 4].as_slice()));
-
-    {
-        let db_clone = Clone::clone(&db);
-        let snap_clone = db_clone.snapshot();
-        assert!(snap_clone.contains(vec![2, 3, 4].as_slice()));
-    }
+    assert!(!snapshot.contains(idx_name, vec![2, 3, 4].as_slice()));
 
     let snapshot = db.snapshot();
-    assert!(snapshot.contains(vec![2, 3, 4].as_slice()));
+    assert!(snapshot.contains(idx_name, vec![2, 3, 4].as_slice()));
 }

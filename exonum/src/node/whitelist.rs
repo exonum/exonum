@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// TODO: don't reload whitelisted_peers if path the same
 use std::collections::BTreeSet;
 
 use crypto::PublicKey;
+
+// TODO: don't reload whitelisted_peers if path the same (ECR-172)
 
 /// `Whitelist` is special set to keep peers that can connect to us.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

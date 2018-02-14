@@ -15,39 +15,48 @@
 //! Exonum node that performs consensus algorithm.
 //!
 //! For details about consensus message handling see messages module documentation.
+// spell-checker:ignore cors
 
+use std::io;
+use std::sync::Arc;
+use std::thread;
+use std::net::SocketAddr;
+use std::time::{Duration, SystemTime};
+use std::collections::BTreeMap;
+use std::collections::HashSet;
+use std::fmt;
+
+use toml::Value;
 use router::Router;
 use mount::Mount;
 use iron::{Chain, Iron};
-use toml::Value;
+use iron_cors::CorsMiddleware;
+use serde::{ser, de};
+use futures::{Future, Sink};
+use futures::sync::mpsc;
+use tokio_core::reactor::Core;
 
-use std::io;
-use std::net::SocketAddr;
-use std::time::{SystemTime, Duration};
-use std::collections::BTreeMap;
-use std::thread;
-use std::fmt;
+use crypto::{self, Hash, CryptoHash, PublicKey, SecretKey};
+use blockchain::{Blockchain, GenesisConfig, Schema, SharedNodeState, Transaction, Service};
+use api::{private, public, Api};
+use messages::{Connect, Message, RawMessage};
+use events::{NetworkRequest, TimeoutRequest, NetworkEvent, InternalRequest, InternalEvent,
+             SyncSender, HandlerPart, NetworkConfiguration, NetworkPart, InternalPart};
+use events::error::{into_other, other_error, LogError, log_error};
+use helpers::{Height, Milliseconds, Round, ValidatorId};
+use storage::Database;
 
-use crypto::{self, PublicKey, SecretKey, Hash};
-use events::{Events, Reactor, NetworkConfiguration, Event, EventsConfiguration, Channel,
-             MioChannel, Network, EventLoop, Milliseconds, EventHandler, Result as EventsResult,
-             Error as EventsError};
-use blockchain::{SharedNodeState, Blockchain, Schema, GenesisConfig, Transaction, ApiContext};
-use messages::{Connect, RawMessage};
-use api::{Api, public, private};
-use helpers::{Height, Round, ValidatorId};
-
-pub use self::state::{State, RequestData, TxPool, ValidatorState};
+pub use self::state::{RequestData, State, TxPool, ValidatorState};
 pub use self::whitelist::Whitelist;
 
+mod events;
 mod basic;
 mod consensus;
 mod requests;
 mod whitelist;
-pub mod state; // TODO: temporary solution to get access to WAIT consts
+pub mod state; // TODO: temporary solution to get access to WAIT constants (ECR-167)
 pub mod timeout_adjuster;
 
-const PROFILE_ENV_VARIABLE_NAME: &'static str = "EXONUM_PROFILE_FILENAME";
 /// External messages.
 #[derive(Debug)]
 pub enum ExternalMessage {
@@ -55,6 +64,8 @@ pub enum ExternalMessage {
     PeerAdd(SocketAddr),
     /// Transaction that implements the `Transaction` trait.
     Transaction(Box<Transaction>),
+    /// Enable or disable the node.
+    Enable(bool),
 }
 
 /// Node timeout types.
@@ -74,31 +85,36 @@ pub enum NodeTimeout {
     PeerExchange,
 }
 
-/// Transactions sender.
-#[derive(Clone)]
-pub struct ApiSender<S>
-where
-    S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>,
-{
-    inner: S,
+/// A helper trait that provides the node with information about the state of the system such
+/// as current time or listen address.
+pub trait SystemStateProvider: ::std::fmt::Debug {
+    /// Returns the current address that the node listens on.
+    fn listen_address(&self) -> SocketAddr;
+    /// Return the current system time.
+    fn current_time(&self) -> SystemTime;
 }
 
-/// Handler that performs consensus algorithm.
-pub struct NodeHandler<S>
-where
-    S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>,
-{
+/// Transactions sender.
+#[derive(Clone)]
+pub struct ApiSender(pub mpsc::Sender<ExternalMessage>);
+
+/// Handler that that performs consensus algorithm.
+pub struct NodeHandler {
     /// State of the `NodeHandler`.
     pub state: State,
     /// Shared api state
     pub api_state: SharedNodeState,
+    /// System state
+    pub system_state: Box<SystemStateProvider>,
     /// Channel for messages and timeouts.
-    pub channel: S,
+    pub channel: NodeSender,
     /// Blockchain.
     pub blockchain: Blockchain,
     /// Known peer addresses.
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
+    /// Does this node participate in the consensus?
+    is_enabled: bool,
 }
 
 /// Service configuration.
@@ -134,6 +150,11 @@ pub struct NodeApiConfig {
     pub public_api_address: Option<SocketAddr>,
     /// Listen address for private api endpoints.
     pub private_api_address: Option<SocketAddr>,
+    /// Cross-origin resource sharing ([CORS][cors]) options for responses returned
+    /// by API handlers.
+    ///
+    /// [cors]: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
+    pub allow_origin: Option<AllowOrigin>,
 }
 
 impl Default for NodeApiConfig {
@@ -143,25 +164,152 @@ impl Default for NodeApiConfig {
             enable_blockchain_explorer: true,
             public_api_address: None,
             private_api_address: None,
+            allow_origin: None,
         }
     }
 }
 
+/// CORS header specification
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AllowOrigin {
+    /// Allow access from any host.
+    Any,
+    /// Allow access only from the following hosts.
+    Whitelist(Vec<String>),
+}
+
+impl From<AllowOrigin> for CorsMiddleware {
+    fn from(allow_origin: AllowOrigin) -> CorsMiddleware {
+        match allow_origin {
+            AllowOrigin::Any => CorsMiddleware::with_allow_any(),
+            AllowOrigin::Whitelist(hosts) => CorsMiddleware::with_whitelist(
+                hosts.into_iter().collect(),
+            ),
+        }
+    }
+}
+
+impl ser::Serialize for AllowOrigin {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        match *self {
+            AllowOrigin::Any => "*".serialize(serializer),
+            AllowOrigin::Whitelist(ref hosts) => {
+                if hosts.len() == 1 {
+                    hosts[0].serialize(serializer)
+                } else {
+                    hosts.serialize(serializer)
+                }
+            }
+        }
+    }
+}
+
+impl<'de> de::Deserialize<'de> for AllowOrigin {
+    fn deserialize<D>(d: D) -> Result<AllowOrigin, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = AllowOrigin;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a list of hosts or \"*\"")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<AllowOrigin, E>
+            where
+                E: de::Error,
+            {
+                match value {
+                    "*" => Ok(AllowOrigin::Any),
+                    _ => Ok(AllowOrigin::Whitelist(vec![value.to_string()])),
+                }
+            }
+
+            fn visit_seq<A>(self, seq: A) -> Result<AllowOrigin, A::Error>
+            where
+                A: de::SeqAccess<'de>,
+            {
+                let hosts =
+                    de::Deserialize::deserialize(de::value::SeqAccessDeserializer::new(seq))?;
+                Ok(AllowOrigin::Whitelist(hosts))
+            }
+        }
+
+        d.deserialize_any(Visitor)
+    }
+}
+
+#[test]
+fn allow_origin_serde() {
+    fn check(text: &str, allow_origin: AllowOrigin) {
+        #[derive(Serialize, Deserialize)]
+        struct Config {
+            allow_origin: AllowOrigin,
+        }
+        let config_toml = format!("allow_origin = {}\n", text);
+        let config: Config = ::toml::from_str(&config_toml).unwrap();
+        assert_eq!(config.allow_origin, allow_origin);
+        assert_eq!(::toml::to_string(&config).unwrap(), config_toml);
+    }
+
+    check(r#""*""#, AllowOrigin::Any);
+    check(
+        r#""http://example.com""#,
+        AllowOrigin::Whitelist(vec!["http://example.com".to_string()]),
+    );
+    check(
+        r#"["http://a.org", "http://b.org"]"#,
+        AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
+    );
+}
+
+
+/// Events pool capacities.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct EventsPoolCapacity {
+    /// Maximum number of queued outgoing network messages.
+    pub network_requests_capacity: usize,
+    /// Maximum number of queued incoming network messages.
+    pub network_events_capacity: usize,
+    /// Maximum number of queued internal events.
+    pub internal_events_capacity: usize,
+    /// Maximum number of queued requests from api.
+    pub api_requests_capacity: usize,
+}
+
+impl Default for EventsPoolCapacity {
+    fn default() -> EventsPoolCapacity {
+        EventsPoolCapacity {
+            network_requests_capacity: 512,
+            network_events_capacity: 512,
+            internal_events_capacity: 128,
+            api_requests_capacity: 1024,
+        }
+    }
+}
+
+
 /// Memory pool configuration parameters.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MemoryPoolConfig {
-    /// Maximum number of uncommited transactions.
+    /// Maximum number of uncommitted transactions.
     pub tx_pool_capacity: usize,
     /// Sets the maximum number of messages that can be buffered on the event loop's
     /// notification channel before a send will fail.
-    pub events_pool_capacity: usize,
+    pub events_pool_capacity: EventsPoolCapacity,
 }
 
 impl Default for MemoryPoolConfig {
     fn default() -> MemoryPoolConfig {
         MemoryPoolConfig {
             tx_pool_capacity: 100_000,
-            events_pool_capacity: 400_000,
+            events_pool_capacity: EventsPoolCapacity::default(),
         }
     }
 }
@@ -204,8 +352,6 @@ pub struct Configuration {
     pub listener: ListenerConfig,
     /// Service configuration.
     pub service: ServiceConfig,
-    /// Events configuration.
-    pub events: EventsConfiguration,
     /// Network configuration.
     pub network: NetworkConfiguration,
     /// Known peer addresses.
@@ -214,25 +360,24 @@ pub struct Configuration {
     pub mempool: MemoryPoolConfig,
 }
 
-/// Channel for messages and timeouts.
-pub type NodeChannel = MioChannel<ExternalMessage, NodeTimeout>;
-
-/// Node that contains handler (`NodeHandler`) and `NodeApiConfig`.
+/// Channel for messages, timeouts and api requests.
 #[derive(Debug)]
-pub struct Node {
-    reactor: Events<NodeHandler<NodeChannel>>,
-    api_options: NodeApiConfig,
+pub struct NodeSender {
+    /// Internal requests sender.
+    pub internal_requests: SyncSender<InternalRequest>,
+    /// Network requests sender.
+    pub network_requests: SyncSender<NetworkRequest>,
+    /// Api requests sender.
+    pub api_requests: SyncSender<ExternalMessage>,
 }
 
-impl<S> NodeHandler<S>
-where
-    S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>,
-{
+impl NodeHandler {
     /// Creates `NodeHandler` using specified `Configuration`.
     pub fn new(
         blockchain: Blockchain,
         external_address: SocketAddr,
-        sender: S,
+        sender: NodeSender,
+        system_state: Box<SystemStateProvider>,
         config: Configuration,
         api_state: SharedNodeState,
     ) -> Self {
@@ -258,7 +403,7 @@ where
         let connect = Connect::new(
             &config.listener.consensus_public_key,
             external_address,
-            sender.get_time(),
+            system_state.current_time(),
             &config.listener.consensus_secret_key,
         );
 
@@ -274,9 +419,10 @@ where
             whitelist,
             stored,
             connect,
+            blockchain.get_saved_peers(),
             last_hash,
             last_height,
-            sender.get_time(),
+            system_state.current_time(),
         );
 
         // Adjust propose timeout for the first time.
@@ -285,9 +431,11 @@ where
         NodeHandler {
             blockchain,
             api_state,
+            system_state,
             state,
             channel: sender,
             peer_discovery: config.peer_discovery,
+            is_enabled: true,
         }
     }
 
@@ -323,11 +471,17 @@ where
 
     /// Performs node initialization, so it starts consensus process from the first round.
     pub fn initialize(&mut self) {
-        info!("Start listening address={}", self.channel.address());
-        for address in &self.peer_discovery.clone() {
-            if address == &self.channel.address() {
-                continue;
-            }
+        let listen_address = self.system_state.listen_address();
+        info!("Start listening address={}", listen_address);
+
+        let peers: HashSet<_> = {
+            let it = self.state.peers().values().map(Connect::addr);
+            let it = it.chain(self.peer_discovery.iter().cloned());
+            let it = it.filter(|&address| address != listen_address);
+            it.collect()
+        };
+
+        for address in &peers {
             self.connect(address);
             info!("Trying to connect with peer {}", address);
         }
@@ -358,16 +512,21 @@ where
 
     /// Sends the given message to a peer by its id.
     pub fn send_to_validator(&mut self, id: u32, message: &RawMessage) {
-        // TODO: check validator id
-        let public_key = self.state.validators()[id as usize].consensus_key;
-        self.send_to_peer(public_key, message);
+        if id as usize >= self.state.validators().len() {
+            error!("Invalid validator id: {}", id);
+        } else {
+            let public_key = self.state.validators()[id as usize].consensus_key;
+            self.send_to_peer(public_key, message);
+        }
     }
 
     /// Sends the given message to a peer by its public key.
     pub fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
         if let Some(conn) = self.state.peers().get(&public_key) {
-            trace!("Send to address: {}", conn.addr());
-            self.channel.send_to(&conn.addr(), message.clone());
+            let address = conn.addr();
+            trace!("Send to address: {}", address);
+            let request = NetworkRequest::SendMessage(address, message.clone());
+            self.channel.network_requests.send(request).log_error();
         } else {
             warn!("Hasn't connection with peer {:?}", public_key);
         }
@@ -376,21 +535,33 @@ where
     /// Sends `RawMessage` to the specified address.
     pub fn send_to_addr(&mut self, address: &SocketAddr, message: &RawMessage) {
         trace!("Send to address: {}", address);
-        self.channel.send_to(address, message.clone());
+        let request = NetworkRequest::SendMessage(*address, message.clone());
+        self.channel.network_requests.send(request).log_error();
     }
 
     /// Broadcasts given message to all peers.
-    // TODO: use Into<RawMessage>
     pub fn broadcast(&mut self, message: &RawMessage) {
         for conn in self.state.peers().values() {
-            trace!("Send to address: {}", conn.addr());
-            self.channel.send_to(&conn.addr(), message.clone());
+            let address = conn.addr();
+            trace!("Send to address: {}", address);
+            let request = NetworkRequest::SendMessage(address, message.clone());
+            self.channel.network_requests.send(request).log_error();
         }
     }
 
     /// Performs connection to the specified network address.
     pub fn connect(&mut self, address: &SocketAddr) {
-        self.channel.connect(address);
+        let connect = self.state.our_connect_message().clone();
+        self.send_to_addr(address, connect.raw());
+    }
+
+    /// Add timeout request.
+    pub fn add_timeout(&mut self, timeout: NodeTimeout, time: SystemTime) {
+        let request = TimeoutRequest(time, timeout);
+        self.channel
+            .internal_requests
+            .send(request.into())
+            .log_error();
     }
 
     /// Adds request timeout if it isn't already requested.
@@ -411,7 +582,7 @@ where
             self.state.round()
         );
         let timeout = NodeTimeout::Round(self.state.height(), self.state.round());
-        self.channel.add_timeout(timeout, time);
+        self.add_timeout(timeout, time);
     }
 
     /// Adds `NodeTimeout::Propose` timeout to the channel.
@@ -427,40 +598,35 @@ where
             self.state.round()
         );
         let timeout = NodeTimeout::Propose(self.state.height(), self.state.round());
-        self.channel.add_timeout(timeout, time);
+        self.add_timeout(timeout, time);
     }
 
     /// Adds `NodeTimeout::Status` timeout to the channel.
     pub fn add_status_timeout(&mut self) {
-        let time = self.channel.get_time() + Duration::from_millis(self.status_timeout());
-        self.channel.add_timeout(
-            NodeTimeout::Status(self.state.height()),
-            time,
-        );
+        let time = self.system_state.current_time() + Duration::from_millis(self.status_timeout());
+        let height = self.state.height();
+        self.add_timeout(NodeTimeout::Status(height), time);
     }
 
     /// Adds `NodeTimeout::Request` timeout with `RequestData` to the channel.
     pub fn add_request_timeout(&mut self, data: RequestData, peer: Option<PublicKey>) {
         trace!("ADD REQUEST TIMEOUT");
-        let time = self.channel.get_time() + data.timeout();
-        self.channel.add_timeout(
-            NodeTimeout::Request(data, peer),
-            time,
-        );
+        let time = self.system_state.current_time() + data.timeout();
+        self.add_timeout(NodeTimeout::Request(data, peer), time);
     }
 
     /// Adds `NodeTimeout::PeerExchange` timeout to the channel.
     pub fn add_peer_exchange_timeout(&mut self) {
         trace!("ADD PEER EXCHANGE TIMEOUT");
-        let time = self.channel.get_time() + Duration::from_millis(self.peers_timeout());
-        self.channel.add_timeout(NodeTimeout::PeerExchange, time);
+        let time = self.system_state.current_time() + Duration::from_millis(self.peers_timeout());
+        self.add_timeout(NodeTimeout::PeerExchange, time);
     }
 
     /// Adds `NodeTimeout::UpdateApiState` timeout to the channel.
     pub fn add_update_api_state_timeout(&mut self) {
-        let time = self.channel.get_time() +
+        let time = self.system_state.current_time() +
             Duration::from_millis(self.api_state().state_update_timeout());
-        self.channel.add_timeout(NodeTimeout::UpdateApiState, time);
+        self.add_timeout(NodeTimeout::UpdateApiState, time);
     }
 
     /// Returns hash of the last block.
@@ -476,56 +642,7 @@ where
     }
 }
 
-impl<S> EventHandler for NodeHandler<S>
-where
-    S: Channel<
-        ApplicationEvent = ExternalMessage,
-        Timeout = NodeTimeout,
-    >,
-{
-    type Timeout = NodeTimeout;
-    type ApplicationEvent = ExternalMessage;
-
-    fn handle_event(&mut self, event: Event) {
-        match event {
-            Event::Connected(addr) => self.handle_connected(&addr),
-            Event::Disconnected(addr) => self.handle_disconnected(&addr),
-            Event::Incoming(raw) => self.handle_message(raw),
-            Event::Error(_) => {}
-        }
-    }
-
-    fn handle_application_event(&mut self, event: Self::ApplicationEvent) {
-        match event {
-            ExternalMessage::Transaction(tx) => {
-                self.handle_incoming_tx(tx);
-            }
-            ExternalMessage::PeerAdd(address) => {
-                info!("Send Connect message to {}", address);
-                self.connect(&address);
-            }
-        }
-    }
-
-    fn handle_timeout(&mut self, timeout: Self::Timeout) {
-        match timeout {
-            NodeTimeout::Round(height, round) => self.handle_round_timeout(height, round),
-            NodeTimeout::Request(data, peer) => self.handle_request_timeout(data, peer),
-            NodeTimeout::Status(height) => self.handle_status_timeout(height),
-            NodeTimeout::PeerExchange => self.handle_peer_exchange_timeout(),
-            NodeTimeout::UpdateApiState => self.handle_update_api_state_timeout(),
-            NodeTimeout::Propose(height, round) => self.handle_propose_timeout(height, round),
-        }
-    }
-}
-
-impl<S> fmt::Debug for NodeHandler<S>
-where
-    S: Channel<
-        ApplicationEvent = ExternalMessage,
-        Timeout = NodeTimeout,
-    >,
-{
+impl fmt::Debug for NodeHandler {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -540,56 +657,112 @@ where
 /// implementation.
 pub trait TransactionSend: Send + Sync {
     /// Sends transaction. This can include transaction verification.
-    fn send(&self, tx: Box<Transaction>) -> EventsResult<()>;
+    fn send(&self, tx: Box<Transaction>) -> io::Result<()>;
 }
 
-impl<S> ApiSender<S>
-where
-    S: Channel<ApplicationEvent = ExternalMessage, Timeout = NodeTimeout>,
-{
+impl ApiSender {
     /// Creates new `ApiSender` with given channel.
-    pub fn new(inner: S) -> ApiSender<S> {
-        ApiSender { inner: inner }
+    pub fn new(inner: mpsc::Sender<ExternalMessage>) -> ApiSender {
+        ApiSender(inner)
     }
 
-    /// Addr peer to peer list
-    pub fn peer_add(&self, addr: SocketAddr) -> EventsResult<()> {
+    /// Add peer to peer list
+    pub fn peer_add(&self, addr: SocketAddr) -> io::Result<()> {
         let msg = ExternalMessage::PeerAdd(addr);
-        self.inner.post_event(msg)
+        self.send_external_message(msg)
+    }
+
+    /// Sends an external message.
+    pub fn send_external_message(&self, message: ExternalMessage) -> io::Result<()> {
+        self.0.clone().send(message).wait().map(drop).map_err(
+            into_other,
+        )
     }
 }
 
-impl<S> TransactionSend for ApiSender<S>
-where
-    S: Channel<
-        ApplicationEvent = ExternalMessage,
-        Timeout = NodeTimeout,
-    >,
-{
-    fn send(&self, tx: Box<Transaction>) -> EventsResult<()> {
+impl TransactionSend for ApiSender {
+    fn send(&self, tx: Box<Transaction>) -> io::Result<()> {
         if !tx.verify() {
-            return Err(EventsError::new("Unable to verify transaction"));
+            let msg = "Unable to verify transaction";
+            return Err(io::Error::new(io::ErrorKind::Other, msg));
         }
         let msg = ExternalMessage::Transaction(tx);
-        self.inner.post_event(msg)
+        self.send_external_message(msg)
     }
 }
 
-impl<T> fmt::Debug for ApiSender<T>
-where
-    T: Channel<
-        ApplicationEvent = ExternalMessage,
-        Timeout = NodeTimeout,
-    >,
-{
+impl fmt::Debug for ApiSender {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.pad("ApiSender { .. }")
     }
 }
 
+/// Default system state provider implementation which just uses `SystemTime::now`
+/// to get current time.
+#[derive(Debug)]
+pub struct DefaultSystemState(pub SocketAddr);
+
+impl SystemStateProvider for DefaultSystemState {
+    fn listen_address(&self) -> SocketAddr {
+        self.0
+    }
+    fn current_time(&self) -> SystemTime {
+        SystemTime::now()
+    }
+}
+
+/// Channel between the `NodeHandler` and events source.
+#[derive(Debug)]
+pub struct NodeChannel {
+    /// Channel for network requests.
+    pub network_requests: (mpsc::Sender<NetworkRequest>, mpsc::Receiver<NetworkRequest>),
+    /// Channel for timeout requests.
+    pub internal_requests: (mpsc::Sender<InternalRequest>, mpsc::Receiver<InternalRequest>),
+    /// Channel for api requests.
+    pub api_requests: (mpsc::Sender<ExternalMessage>, mpsc::Receiver<ExternalMessage>),
+    /// Channel for network events.
+    pub network_events: (mpsc::Sender<NetworkEvent>, mpsc::Receiver<NetworkEvent>),
+    /// Channel for internal events.
+    pub internal_events: (mpsc::Sender<InternalEvent>, mpsc::Receiver<InternalEvent>),
+}
+
+const PROFILE_ENV_VARIABLE_NAME: &str = "EXONUM_PROFILE_FILENAME";
+
+/// Node that contains handler (`NodeHandler`) and `NodeApiConfig`.
+#[derive(Debug)]
+pub struct Node {
+    api_options: NodeApiConfig,
+    network_config: NetworkConfiguration,
+    handler: NodeHandler,
+    channel: NodeChannel,
+    max_message_len: u32,
+}
+
+impl NodeChannel {
+    /// Creates `NodeChannel` with the given pool capacities.
+    pub fn new(buffer_sizes: &EventsPoolCapacity) -> NodeChannel {
+        NodeChannel {
+            network_requests: mpsc::channel(buffer_sizes.network_requests_capacity),
+            internal_requests: mpsc::channel(buffer_sizes.internal_events_capacity),
+            api_requests: mpsc::channel(buffer_sizes.api_requests_capacity),
+            network_events: mpsc::channel(buffer_sizes.network_events_capacity),
+            internal_events: mpsc::channel(buffer_sizes.internal_events_capacity),
+        }
+    }
+
+    /// Returns the channel for sending timeouts, networks and api requests.
+    pub fn node_sender(&self) -> NodeSender {
+        NodeSender {
+            internal_requests: self.internal_requests.0.clone().wait(),
+            network_requests: self.network_requests.0.clone().wait(),
+            api_requests: self.api_requests.0.clone().wait(),
+        }
+    }
+}
+
 impl Node {
-    /// Creates node for the given blockchain and node configuration.
-    pub fn new(mut blockchain: Blockchain, node_cfg: NodeConfig) -> Self {
+    /// Creates node for the given services and node configuration.
+    pub fn new(db: Box<Database>, services: Vec<Box<Service>>, node_cfg: NodeConfig) -> Self {
         crypto::init();
 
         if cfg!(feature = "flame_profile") {
@@ -601,13 +774,19 @@ impl Node {
             )
         };
 
+        let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
+        let mut blockchain = Blockchain::new(
+            db,
+            services,
+            node_cfg.service_public_key,
+            node_cfg.service_secret_key.clone(),
+            ApiSender::new(channel.api_requests.0.clone()),
+        );
         blockchain
             .create_genesis_block(node_cfg.genesis.clone())
             .unwrap();
 
 
-        let mut events_cfg = EventsConfiguration::default();
-        events_cfg.notify_capacity(node_cfg.mempool.events_pool_capacity);
         let config = Configuration {
             listener: ListenerConfig {
                 consensus_public_key: node_cfg.consensus_public_key,
@@ -621,7 +800,6 @@ impl Node {
             },
             mempool: node_cfg.mempool,
             network: node_cfg.network,
-            events: events_cfg,
             peer_discovery: node_cfg.peers,
         };
 
@@ -632,23 +810,49 @@ impl Node {
             node_cfg.listen_address
         };
         let api_state = SharedNodeState::new(node_cfg.api.state_update_timeout as u64);
-        let network =
-            Network::with_config(node_cfg.listen_address, config.network, api_state.clone());
-        let event_loop = EventLoop::configured(config.events.clone()).unwrap();
-        let channel = NodeChannel::new(node_cfg.listen_address, event_loop.channel());
-        let worker = NodeHandler::new(blockchain, external_address, channel, config, api_state);
+        let system_state = Box::new(DefaultSystemState(node_cfg.listen_address));
+        let network_config = config.network;
+        let handler = NodeHandler::new(
+            blockchain,
+            external_address,
+            channel.node_sender(),
+            system_state,
+            config,
+            api_state,
+        );
         Node {
-            reactor: Events::with_event_loop(network, worker, event_loop),
             api_options: node_cfg.api,
+            handler,
+            channel,
+            network_config,
+            max_message_len: node_cfg.genesis.consensus.max_message_len,
         }
     }
 
     /// Launches only consensus messages handler.
     /// This may be used if you want to customize api with the `ApiContext`.
-    pub fn run_handler(&mut self) -> io::Result<()> {
-        self.reactor.bind()?;
-        self.reactor.handler_mut().initialize();
-        self.reactor.run()
+    pub fn run_handler(mut self) -> io::Result<()> {
+        self.handler.initialize();
+
+        let (handler_part, network_part, timeouts_part) = self.into_reactor();
+
+        let network_thread = thread::spawn(move || {
+            let mut core = Core::new()?;
+            let handle = core.handle();
+            core.handle().spawn(
+                timeouts_part.run(handle).map_err(log_error),
+            );
+            let network_handler = network_part.run(&core.handle());
+            core.run(network_handler).map(drop).map_err(|e| {
+                other_error(&format!("An error in the `Network` thread occurred: {}", e))
+            })
+        });
+
+        let mut core = Core::new()?;
+        core.run(handler_part.run()).map_err(|_| {
+            other_error("An error in the `Handler` thread occurred")
+        })?;
+        network_thread.join().unwrap()
     }
 
     /// A generic implementation that launches `Node` and optionally creates threads
@@ -656,32 +860,20 @@ impl Node {
     /// Explorer api prefix is `/api/explorer`
     /// Public api prefix is `/api/services/{service_name}`
     /// Private api prefix is `/api/services/{service_name}`
-    pub fn run(&mut self) -> io::Result<()> {
+    pub fn run(self) -> io::Result<()> {
         let blockchain = self.handler().blockchain.clone();
-        let channel = self.channel();
+        let api_sender = self.channel();
 
         let private_config_api_thread = match self.api_options.private_api_address {
             Some(listen_address) => {
-                let api_context = ApiContext::new(self);
-                let mut mount = Mount::new();
-                mount.mount("api/services", api_context.mount_private_api());
-                let shared_api_state = self.handler().api_state().clone();
-                let mut router = Router::new();
-                let node_info =
-                    private::NodeInfo::new(blockchain.service_map().iter().map(|(_, s)| s));
-                let system_api = private::SystemApi::new(
-                    node_info,
+                let handler = create_private_api_handler(
                     blockchain.clone(),
-                    shared_api_state,
-                    channel,
+                    self.handler().api_state().clone(),
+                    api_sender,
                 );
-                system_api.wire(&mut router);
-                mount.mount("api/system", router);
-
                 let thread = thread::spawn(move || {
                     info!("Private exonum api started on {}", listen_address);
-                    let chain = Chain::new(mount);
-                    Iron::new(chain).http(listen_address).unwrap();
+                    Iron::new(handler).http(listen_address).unwrap();
                 });
                 Some(thread)
             }
@@ -689,27 +881,15 @@ impl Node {
         };
         let public_config_api_thread = match self.api_options.public_api_address {
             Some(listen_address) => {
-                let api_context = ApiContext::new(self);
-                let mut mount = Mount::new();
-                mount.mount("api/services", api_context.mount_public_api());
-
-                let mut router = Router::new();
-                let pool = self.state().transactions().clone();
-                let system_api = public::SystemApi::new(pool, blockchain.clone());
-                system_api.wire(&mut router);
-                mount.mount("api/system", router);
-                if self.api_options.enable_blockchain_explorer {
-                    let mut router = Router::new();
-                    let explorer_api = public::ExplorerApi::new(blockchain);
-                    explorer_api.wire(&mut router);
-                    mount.mount("api/explorer", router);
-                }
-
+                let handler = create_public_api_handler(
+                    blockchain,
+                    Arc::clone(self.state().transactions()),
+                    self.handler.api_state().clone(),
+                    &self.api_options,
+                );
                 let thread = thread::spawn(move || {
                     info!("Public exonum api started on {}", listen_address);
-
-                    let chain = Chain::new(mount);
-                    Iron::new(chain).http(listen_address).unwrap();
+                    Iron::new(handler).http(listen_address).unwrap();
                 });
                 Some(thread)
             }
@@ -728,18 +908,100 @@ impl Node {
         Ok(())
     }
 
+    fn into_reactor(self) -> (HandlerPart<NodeHandler>, NetworkPart, InternalPart) {
+        let connect_message = self.state().our_connect_message().clone();
+        let (network_tx, network_rx) = self.channel.network_events;
+        let internal_requests_rx = self.channel.internal_requests.1;
+        let network_part = NetworkPart {
+            our_connect_message: connect_message,
+            listen_address: self.handler.system_state.listen_address(),
+            network_requests: self.channel.network_requests,
+            network_tx: network_tx,
+            network_config: self.network_config,
+            max_message_len: self.max_message_len,
+        };
+
+        let (internal_tx, internal_rx) = self.channel.internal_events;
+        let handler_part = HandlerPart {
+            handler: self.handler,
+            internal_rx,
+            network_rx,
+            api_rx: self.channel.api_requests.1,
+        };
+
+        let timeouts_part = InternalPart {
+            internal_tx,
+            internal_requests_rx,
+        };
+        (handler_part, network_part, timeouts_part)
+    }
+
+    /// Returns `Blockchain` instance.
+    pub fn blockchain(&self) -> Blockchain {
+        self.handler.blockchain.clone()
+    }
+
     /// Returns `State`.
     pub fn state(&self) -> &State {
-        self.reactor.handler().state()
+        self.handler.state()
     }
 
     /// Returns `NodeHandler`.
-    pub fn handler(&self) -> &NodeHandler<NodeChannel> {
-        self.reactor.handler()
+    pub fn handler(&self) -> &NodeHandler {
+        &self.handler
     }
 
     /// Returns channel.
-    pub fn channel(&self) -> ApiSender<NodeChannel> {
-        ApiSender::new(self.reactor.handler().channel.clone())
+    pub fn channel(&self) -> ApiSender {
+        ApiSender::new(self.channel.api_requests.0.clone())
     }
+}
+
+/// Public for testing
+#[doc(hidden)]
+pub fn create_public_api_handler(
+    blockchain: Blockchain,
+    pool: TxPool,
+    shared_api_state: SharedNodeState,
+    config: &NodeApiConfig,
+) -> Chain {
+    let mut mount = Mount::new();
+    mount.mount("api/services", blockchain.mount_public_api());
+
+    if config.enable_blockchain_explorer {
+        let mut router = Router::new();
+        let explorer_api = public::ExplorerApi::new(blockchain.clone());
+        explorer_api.wire(&mut router);
+        mount.mount("api/explorer", router);
+    }
+
+    let mut router = Router::new();
+    let system_api = public::SystemApi::new(pool, blockchain, shared_api_state);
+    system_api.wire(&mut router);
+    mount.mount("api/system", router);
+
+    let mut chain = Chain::new(mount);
+    if let Some(ref allow_origin) = config.allow_origin {
+        chain.link_around(CorsMiddleware::from(allow_origin.clone()));
+    }
+    chain
+}
+
+/// Public for testing
+#[doc(hidden)]
+pub fn create_private_api_handler(
+    blockchain: Blockchain,
+    shared_api_state: SharedNodeState,
+    api_sender: ApiSender,
+) -> Chain {
+    let mut mount = Mount::new();
+    mount.mount("api/services", blockchain.mount_private_api());
+
+    let mut router = Router::new();
+    let node_info = private::NodeInfo::new(blockchain.service_map().iter().map(|(_, s)| s));
+    let system_api = private::SystemApi::new(node_info, blockchain, shared_api_state, api_sender);
+    system_api.wire(&mut router);
+    mount.mount("api/system", router);
+
+    Chain::new(mount)
 }

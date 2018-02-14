@@ -12,39 +12,54 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use mio::Timeout as MioTimeout;
-use mio::tcp::{TcpListener, TcpStream};
-use mio::util::Slab;
-
-use std::borrow::Borrow;
 use std::io;
-use std::fmt;
-use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::cmp;
-use std::default::Default;
+use std::time::Duration;
+use std::collections::HashMap;
+use std::rc::Rc;
+use std::cell::RefCell;
 
-use messages::RawMessage;
-use blockchain::SharedNodeState;
-use super::connection::{Connection, IncomingConnection, OutgoingConnection};
-use super::{Timeout, InternalTimeout, EventLoop, EventHandler, Event};
+use futures::{future, unsync, Future, IntoFuture, Sink, Stream, Poll};
+use futures::future::Either;
+use futures::sync::mpsc;
+use tokio_core::net::{TcpListener, TcpStream};
+use tokio_core::reactor::Handle;
+use tokio_io::AsyncRead;
+use tokio_retry::Retry;
+use tokio_retry::strategy::{jitter, FixedInterval};
 
-pub use mio::{EventSet, PollOpt, Token};
+use messages::{Any, Connect, RawMessage, Message};
+use helpers::Milliseconds;
+use super::to_box;
+use super::error::{into_other, log_error, other_error, result_ok};
+use super::codec::MessagesCodec;
 
-pub type PeerId = Token;
+const OUTGOING_CHANNEL_SIZE: usize = 10;
 
-const SERVER_ID: PeerId = Token(1);
-const RECONNECT_GROW_FACTOR: f32 = 2.0;
+#[derive(Debug)]
+pub enum NetworkEvent {
+    MessageReceived(SocketAddr, RawMessage),
+    PeerConnected(SocketAddr, Connect),
+    PeerDisconnected(SocketAddr),
+    UnableConnectToPeer(SocketAddr),
+}
+
+#[derive(Debug, Clone)]
+pub enum NetworkRequest {
+    SendMessage(SocketAddr, RawMessage),
+    DisconnectWithPeer(SocketAddr),
+    Shutdown,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub struct NetworkConfiguration {
-    // TODO: think more about config parameters
+    // TODO: think more about config parameters (ECR-162)
     pub max_incoming_connections: usize,
     pub max_outgoing_connections: usize,
     pub tcp_nodelay: bool,
-    pub tcp_keep_alive: Option<u32>,
-    pub tcp_reconnect_timeout: u64,
-    pub tcp_reconnect_timeout_max: u64,
+    pub tcp_keep_alive: Option<u64>,
+    pub tcp_connect_retry_timeout: Milliseconds,
+    pub tcp_connect_max_retries: u64,
 }
 
 impl Default for NetworkConfiguration {
@@ -53,477 +68,357 @@ impl Default for NetworkConfiguration {
             max_incoming_connections: 128,
             max_outgoing_connections: 128,
             tcp_keep_alive: None,
-            tcp_nodelay: false,
-            tcp_reconnect_timeout: 500,
-            tcp_reconnect_timeout_max: 600_000,
+            tcp_nodelay: true,
+            tcp_connect_retry_timeout: 15_000,
+            tcp_connect_max_retries: 10,
         }
     }
 }
 
-// TODO Implement generic ConnectionPool struct to avoid copy paste.
-// Write proper code to configure outgoing streams
-pub struct Network {
-    api_state: SharedNodeState,
-    config: NetworkConfiguration,
-    listen_address: SocketAddr,
-    listener: Option<TcpListener>,
-
-    incoming: Slab<IncomingConnection>,
-    outgoing: Slab<OutgoingConnection>,
-    // FIXME addresses only needs for outgoing connections
-    addresses: HashMap<SocketAddr, PeerId>,
-
-    reconnects: HashMap<SocketAddr, MioTimeout>,
+#[derive(Debug)]
+pub struct NetworkPart {
+    pub our_connect_message: Connect,
+    pub listen_address: SocketAddr,
+    pub network_config: NetworkConfiguration,
+    pub max_message_len: u32,
+    pub network_requests: (mpsc::Sender<NetworkRequest>, mpsc::Receiver<NetworkRequest>),
+    pub network_tx: mpsc::Sender<NetworkEvent>,
 }
 
-enum PeerKind {
-    Server,
-    Incoming,
-    Outgoing,
+#[derive(Debug, Default, Clone)]
+struct ConnectionsPool {
+    inner: Rc<RefCell<HashMap<SocketAddr, mpsc::Sender<RawMessage>>>>,
 }
 
-fn make_io_error<T: Borrow<str>>(s: T) -> io::Error {
-    io::Error::new(io::ErrorKind::Other, s.borrow())
-}
-
-impl Network {
-    pub fn with_config(
-        address: SocketAddr,
-        config: NetworkConfiguration,
-        api_state: SharedNodeState,
-    ) -> Network {
-        Network {
-            api_state,
-            config: config,
-            listen_address: address,
-            listener: None,
-
-            incoming: Slab::new_starting_at(Token(2), config.max_incoming_connections),
-            outgoing: Slab::new_starting_at(
-                Token(2 + config.max_incoming_connections),
-                config.max_outgoing_connections,
-            ),
-            addresses: HashMap::new(),
-
-            reconnects: HashMap::new(),
-        }
+impl ConnectionsPool {
+    fn new() -> ConnectionsPool {
+        ConnectionsPool::default()
     }
 
-    pub fn address(&self) -> &SocketAddr {
-        &self.listen_address
+    fn insert(&self, peer: SocketAddr, sender: &mpsc::Sender<RawMessage>) {
+        self.inner.borrow_mut().insert(peer, sender.clone());
     }
 
-    // TODO use error trait
-    pub fn bind<H: EventHandler>(&mut self, event_loop: &mut EventLoop<H>) -> io::Result<()> {
-        if self.listener.is_some() {
-            return Err(make_io_error("Already bind"));
-        }
-        let listener = TcpListener::bind(&self.listen_address)?;
-        event_loop.register(
-            &listener,
-            SERVER_ID,
-            EventSet::readable(),
-            PollOpt::level(),
-        )?;
-        self.listener = Some(listener);
-        Ok(())
-    }
-
-    // TODO: Use ticks for fast reregistering sockets
-    // TODO: Implement Connections collection with (re)registering
-    pub fn io<H: EventHandler>(
-        &mut self,
-        event_loop: &mut EventLoop<H>,
-        handler: &mut H,
-        id: PeerId,
-        set: EventSet,
-    ) -> io::Result<()> {
-
-        match self.peer_kind(id) {
-            PeerKind::Server => {
-                // Accept new connections
-                // FIXME: Fail-safe accepting of new connections?
-                let pair = match self.listener {
-                    Some(ref listener) => listener.accept()?,
-                    None => None,
-                };
-                if let Some((mut stream, address)) = pair {
-                    self.configure_stream(&mut stream)?;
-                    let peer = IncomingConnection::new(stream, address);
-                    self.add_incoming_connection(event_loop, peer)?;
-
-                    trace!(
-                        "{}: Accepted incoming connection from {} id: {}",
-                        self.address(),
-                        address,
-                        id.0
-                    );
-                }
-                return Ok(());
-            }
-            PeerKind::Incoming => {
-                if !self.incoming.contains(id) {
-                    return Ok(());
-                }
-
-                if set.is_hup() | set.is_error() {
-                    trace!(
-                        "{}: incoming connection with {} address is closed",
-                        self.address(),
-                        self.incoming[id].address()
-                    );
-
-                    self.remove_incoming_connection(event_loop, id);
-                    return Ok(());
-                }
-
-                if set.is_readable() {
-                    loop {
-                        match self.incoming[id].try_read() {
-                            Ok(Some(buf)) => {
-                                let msg = RawMessage::new(buf);
-                                handler.handle_event(Event::Incoming(msg));
-                            }
-                            Ok(None) => return Ok(()),
-                            Err(e) => {
-                                self.remove_incoming_connection(event_loop, id);
-                                return Err(e);
-                            }
-                        };
-                    }
-                }
-            }
-            PeerKind::Outgoing => {
-                if !self.outgoing.contains(id) {
-                    return Ok(());
-                }
-
-                if set.is_hup() | set.is_error() {
-                    let address = *self.outgoing[id].address();
-
-                    trace!(
-                        "{}: outgoing connection with address {} is closed",
-                        self.address(),
-                        self.outgoing[id].address()
-                    );
-
-                    self.remove_outgoing_connection(event_loop, id);
-                    if !self.reconnects.contains_key(&address) {
-                        handler.handle_event(Event::Disconnected(address));
-                    }
-                    return Ok(());
-                }
-
-                if set.is_writable() {
-                    let address = *self.outgoing[id].address();
-                    let r = {
-                        // Write data into socket
-                        self.outgoing[id].try_write()?;
-                        event_loop.reregister(
-                            self.outgoing[id].socket(),
-                            id,
-                            self.outgoing[id].interest(),
-                            PollOpt::edge(),
-                        )?;
-                        Ok(())
-                    };
-                    if let Err(e) = r {
-                        self.remove_outgoing_connection(event_loop, id);
-                        handler.handle_event(Event::Disconnected(address));
-                        return Err(e);
-                    }
-
-                    if self.mark_connected(event_loop, id) {
-                        trace!("{}: Handle connected with {}", self.address(), address);
-                        handler.handle_event(Event::Connected(address));
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-
-    pub fn tick<H: EventHandler>(&mut self, _: &mut EventLoop<H>) {}
-
-    pub fn send_to<H: EventHandler>(
-        &mut self,
-        event_loop: &mut EventLoop<H>,
-        address: &SocketAddr,
-        message: RawMessage,
-    ) -> io::Result<()> {
-        match self.get_outgoing_peer(address) {
-            Ok(id) => {
-                self.outgoing[id]
-                    .send(message)
-                    .and_then(|_| {
-                        event_loop.reregister(
-                            self.outgoing[id].socket(),
-                            id,
-                            self.outgoing[id].interest(),
-                            PollOpt::edge(),
-                        )?;
-                        self.mark_connected(event_loop, id);
-                        Ok(())
-                    })
-                    .or_else(|e| {
-                        self.remove_outgoing_connection(event_loop, id);
-                        Err(e)
-                    })
-            }
-            Err(e) => Err(e),
-        }
-    }
-
-    pub fn connect<H: EventHandler>(
-        &mut self,
-        event_loop: &mut EventLoop<H>,
-        address: &SocketAddr,
-    ) -> io::Result<()> {
-        if !self.is_connected(address) {
-            self.add_reconnect_request(event_loop, *address)?;
-
-            let mut stream = TcpStream::connect(address)?;
-            self.configure_stream(&mut stream)?;
-            let peer = OutgoingConnection::new(stream, *address);
-            let id = self.add_outgoing_connection(event_loop, peer)?;
-
-            trace!(
-                "{}: Establish connection with {}, id: {}",
-                self.address(),
-                address,
-                id.0
-            );
-        }
-        Ok(())
-    }
-
-    pub fn is_connected(&self, address: &SocketAddr) -> bool {
-        self.addresses.contains_key(address)
-    }
-
-    pub fn handle_timeout<H: EventHandler>(
-        &mut self,
-        event_loop: &mut EventLoop<H>,
-        timeout: InternalTimeout,
-    ) {
-        match timeout {
-            InternalTimeout::Reconnect(addr, delay) => {
-                if self.reconnects.contains_key(&addr) {
-                    trace!("Try to reconnect with '{}' delay", delay);
-
-                    if let Err(e) = self.connect(event_loop, &addr) {
-                        error!(
-                            "{}: Unable to create connection to address '{}', error: {:?}",
-                            self.address(),
-                            addr,
-                            e
-                        );
-                    }
-
-                    let delay = cmp::min(
-                        (delay as f32 * RECONNECT_GROW_FACTOR) as u64,
-                        self.config.tcp_reconnect_timeout_max,
-                    );
-
-                    if let Err(e) = self.add_reconnect_timeout(event_loop, addr, delay) {
-                        error!("{}: Unable to add timeout, error: {:?}", self.address(), e);
-                    }
-                }
-            }
-        }
-    }
-
-    fn peer_kind(&self, id: PeerId) -> PeerKind {
-        if id == SERVER_ID {
-            PeerKind::Server
-        } else if id.0 >= (2 + self.config.max_incoming_connections) {
-            PeerKind::Outgoing
-        } else {
-            PeerKind::Incoming
-        }
-    }
-
-    fn get_outgoing_peer(&self, addr: &SocketAddr) -> io::Result<PeerId> {
-        if let Some(id) = self.addresses.get(addr) {
-            return Ok(*id);
-        };
-        Err(make_io_error(format!(
-            "{}: Outgoing peer not found {}",
-            self.address(),
-            addr
-        )))
-    }
-
-    fn add_incoming_connection<H: EventHandler>(
-        &mut self,
-        event_loop: &mut EventLoop<H>,
-        connection: IncomingConnection,
-    ) -> io::Result<PeerId> {
-        let address = *connection.address();
-        let id = self.incoming.insert(connection).map_err(|_| {
-            make_io_error("Maximum incoming connections")
-        })?;
-        self.addresses.insert(address, id);
-        self.api_state.add_incoming_connection(address);
-
-        let r = event_loop.register(
-            self.incoming[id].socket(),
-            id,
-            self.incoming[id].interest(),
-            PollOpt::edge(),
-        );
-
-        if let Err(e) = r {
-            self.remove_incoming_connection(event_loop, id);
-            return Err(e);
-        }
-        Ok(id)
-    }
-
-    fn add_outgoing_connection<H: EventHandler>(
-        &mut self,
-        event_loop: &mut EventLoop<H>,
-        connection: OutgoingConnection,
-    ) -> io::Result<PeerId> {
-        let address = *connection.address();
-        let id = self.outgoing.insert(connection).map_err(|_| {
-            make_io_error("Maximum outgoing connections")
-        })?;
-        self.addresses.insert(address, id);
-        self.api_state.add_outgoing_connection(address);
-
-        let r = event_loop.register(
-            self.outgoing[id].socket(),
-            id,
-            self.outgoing[id].interest() | EventSet::writable(),
-            PollOpt::edge(),
-        );
-
-        if let Err(e) = r {
-            self.remove_outgoing_connection(event_loop, id);
-            return Err(e);
-        }
-        Ok(id)
-    }
-
-    fn remove_incoming_connection<H: EventHandler>(
-        &mut self,
-        event_loop: &mut EventLoop<H>,
-        id: PeerId,
-    ) {
-        let addr = *self.incoming[id].address();
-        self.addresses.remove(&addr);
-        self.api_state.remove_incoming_connection(&addr);
-
-        if let Some(connection) = self.incoming.remove(id) {
-            if let Err(e) = event_loop.deregister(connection.socket()) {
-                error!(
-                    "{}: Unable to deregister incoming connection, id: {}, error: {:?}",
-                    self.address(),
-                    id.0,
-                    e
-                );
-            }
-        }
-    }
-
-    fn remove_outgoing_connection<H: EventHandler>(
-        &mut self,
-        event_loop: &mut EventLoop<H>,
-        id: PeerId,
-    ) {
-        let addr = *self.outgoing[id].address();
-        self.addresses.remove(&addr);
-        self.api_state.remove_outgoing_connection(&addr);
-
-        if let Some(connection) = self.outgoing.remove(id) {
-            if let Err(e) = event_loop.deregister(connection.socket()) {
-                error!(
-                    "{}: Unable to deregister outgoing connection, id: {}, error: {:?}",
-                    self.address(),
-                    id.0,
-                    e
-                );
-            }
-        }
-    }
-
-    fn configure_stream(&self, stream: &mut TcpStream) -> io::Result<()> {
-        stream.take_socket_error()?;
-        stream.set_keepalive(self.config.tcp_keep_alive)?;
-        stream.set_nodelay(self.config.tcp_nodelay)?;
-        stream.take_socket_error()
-    }
-
-    fn add_reconnect_request<H: EventHandler>(
-        &mut self,
-        event_loop: &mut EventLoop<H>,
-        address: SocketAddr,
-    ) -> io::Result<()> {
-        if !self.reconnects.contains_key(&address) {
-            let delay = self.config.tcp_reconnect_timeout;
-            return self.add_reconnect_timeout(event_loop, address, delay);
-        }
-        Ok(())
-    }
-
-    fn add_reconnect_timeout<H: EventHandler>(
-        &mut self,
-        event_loop: &mut EventLoop<H>,
-        address: SocketAddr,
-        delay: u64,
-    ) -> io::Result<()> {
-        trace!(
-            "{}: Add reconnect timeout to {}, delay = {}",
-            self.address(),
-            address,
-            delay
-        );
-        let reconnect = Timeout::Internal(InternalTimeout::Reconnect(address, delay));
-        let timeout = event_loop.timeout_ms(reconnect, delay).map_err(|e| {
-            make_io_error(format!("A mio error occurred {:?}", e))
-        })?;
-        self.reconnects.insert(address, timeout);
-        self.api_state.add_reconnect_timeout(address, delay);
-
-        Ok(())
-    }
-
-    fn mark_connected<H: EventHandler>(
-        &mut self,
-        event_loop: &mut EventLoop<H>,
-        id: Token,
-    ) -> bool {
-        let address = *self.outgoing[id].address();
-        self.clear_reconnect_request(event_loop, &address)
-    }
-
-    fn clear_reconnect_request<H: EventHandler>(
-        &mut self,
-        event_loop: &mut EventLoop<H>,
-        addr: &SocketAddr,
-    ) -> bool {
-        if let Some(timeout) = self.reconnects.remove(addr) {
-            self.api_state.remove_reconnect_timeout(addr);
-            trace!("{}: Clear reconnect timeout to={}", self.address(), addr);
-            event_loop.clear_timeout(timeout);
-            return true;
-        }
-        false
-    }
-}
-
-impl fmt::Debug for Network {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "Network {{ listen_address: {:?}, listener: {:?}, incoming: {:?}, \
-        outgoing: {:?}, addresses: {:?}, reconnects: {{ .. }} }}",
-            self.listen_address,
-            self.listener,
-            self.incoming,
-            self.outgoing,
-            self.addresses
+    fn remove(&self, peer: &SocketAddr) -> Result<mpsc::Sender<RawMessage>, &'static str> {
+        self.inner.borrow_mut().remove(peer).ok_or(
+            "there is no sender in the connection pool",
         )
     }
+
+    fn get(&self, peer: SocketAddr) -> Option<mpsc::Sender<RawMessage>> {
+        self.inner.borrow_mut().get(&peer).cloned()
+    }
+
+    fn len(&self) -> usize {
+        self.inner.borrow_mut().len()
+    }
+
+    fn connect_to_peer(
+        self,
+        network_config: NetworkConfiguration,
+        max_message_len: u32,
+        peer: SocketAddr,
+        network_tx: mpsc::Sender<NetworkEvent>,
+        handle: &Handle,
+    ) -> Option<mpsc::Sender<RawMessage>> {
+
+        let limit = network_config.max_outgoing_connections;
+        if self.len() >= limit {
+            warn!(
+                "Rejected outgoing connection with peer={}, \
+                                     connections limit reached.",
+                peer
+            );
+            return None;
+        }
+        // Register outgoing channel.
+        let (conn_tx, conn_rx) = mpsc::channel(OUTGOING_CHANNEL_SIZE);
+        self.insert(peer, &conn_tx);
+        // Enable retry feature for outgoing connection.
+        let timeout = network_config.tcp_connect_retry_timeout;
+        let max_tries = network_config.tcp_connect_max_retries as usize;
+        let strategy = FixedInterval::from_millis(timeout).map(jitter).take(
+            max_tries,
+        );
+        let handle_clonned = handle.clone();
+
+        let action = move || TcpStream::connect(&peer, &handle_clonned);
+        let connect_handle = Retry::spawn(handle.clone(), strategy, action)
+            .map_err(into_other)
+            // Configure socket
+            .and_then(move |sock| {
+                sock.set_nodelay(network_config.tcp_nodelay)?;
+                let duration =
+                    network_config.tcp_keep_alive.map(Duration::from_millis);
+                sock.set_keepalive(duration)?;
+                Ok(sock)
+            })
+            // Connect socket with the outgoing channel
+            .and_then(move |sock| {
+                trace!("Established connection with peer={}", peer);
+
+                let stream = sock.framed(MessagesCodec::new(max_message_len));
+                let (sink, stream) = stream.split();
+
+                let writer = conn_rx
+                    .map_err(|_| other_error("Can't send data into socket"))
+                    .forward(sink);
+                let reader = stream.for_each(result_ok);
+
+                reader
+                    .select2(writer)
+                    .map_err(|_| other_error("Socket error"))
+                    .and_then(|res| match res {
+                        Either::A((_, _reader)) => Ok("by reader"),
+                        Either::B((_, _writer)) => Ok("by writer"),
+                    })
+            })
+            .then(move |res| {
+                trace!(
+                    "Disconnection with peer={}, reason={:?}",
+                    peer,
+                    res
+                );
+                self.disconnect_with_peer(peer, network_tx.clone())
+            })
+            .map_err(log_error);
+        handle.spawn(connect_handle);
+        Some(conn_tx)
+    }
+
+    fn disconnect_with_peer(
+        &self,
+        peer: SocketAddr,
+        network_tx: mpsc::Sender<NetworkEvent>,
+    ) -> Box<Future<Item = (), Error = io::Error>> {
+        let fut = self.remove(&peer)
+            .into_future()
+            .map_err(other_error)
+            .and_then(move |_| {
+                network_tx
+                    .send(NetworkEvent::PeerDisconnected(peer))
+                    .map_err(|_| other_error("can't send disconnect"))
+            })
+            .map(drop);
+        to_box(fut)
+    }
+}
+
+impl NetworkPart {
+    pub fn run(self, handle: &Handle) -> Box<Future<Item = (), Error = io::Error>> {
+        let network_config = self.network_config;
+        // Cancellation token
+        let (cancel_sender, cancel_handler) = unsync::oneshot::channel();
+        let cancel_sender = Some(cancel_sender);
+
+        let requests_handle = RequestHandler::new(
+            self.our_connect_message,
+            network_config,
+            self.max_message_len,
+            self.network_tx.clone(),
+            handle.clone(),
+            self.network_requests.1,
+            cancel_sender,
+        );
+        // TODO Don't use unwrap here!
+        let server = Listener::bind(
+            network_config,
+            self.max_message_len,
+            self.listen_address,
+            handle.clone(),
+            &self.network_tx,
+        ).unwrap();
+
+        let cancel_handler = cancel_handler.map_err(|_| other_error("can't cancel routine"));
+        let fut = server
+            .join(requests_handle)
+            .map(drop)
+            .select(cancel_handler)
+            .map_err(|(e, _)| e);
+        to_box(fut)
+    }
+}
+
+struct RequestHandler(
+    // TODO: Replace with concrete type
+    Box<Future<Item = (), Error = io::Error>>
+);
+
+impl RequestHandler {
+    fn new(
+        connect_message: Connect,
+        network_config: NetworkConfiguration,
+        max_message_len: u32,
+        network_tx: mpsc::Sender<NetworkEvent>,
+        handle: Handle,
+        receiver: mpsc::Receiver<NetworkRequest>,
+        mut cancel_sender: Option<unsync::oneshot::Sender<()>>,
+    ) -> RequestHandler {
+        let outgoing_connections = ConnectionsPool::new();
+        let requests_handler = receiver
+            .map_err(|_| other_error("no network requests"))
+            .for_each(move |request| {
+                match request {
+                    NetworkRequest::SendMessage(peer, msg) => {
+
+                        let conn_tx = outgoing_connections
+                            .get(peer)
+                            .map(|conn_tx| conn_fut(Ok(conn_tx).into_future()))
+                            .or_else(|| {
+                                outgoing_connections
+                                    .clone()
+                                    .connect_to_peer(
+                                        network_config,
+                                        max_message_len,
+                                        peer,
+                                        network_tx.clone(),
+                                        &handle,
+                                    )
+                                    .map(|conn_tx|
+                                        // if we create new connect, we should send connect message
+                                        if &msg != connect_message.raw() {
+                                            conn_fut(conn_tx.send(connect_message.raw().clone())
+                                                           .map_err(|_| {
+                                                other_error("can't send message to a connection")
+                                            }))
+                                        }
+                                        else {
+                                            conn_fut(Ok(conn_tx).into_future())
+                                    })
+                            });
+                        if let Some(conn_tx) = conn_tx {
+                            let fut = conn_tx.and_then(|conn_tx| {
+                                conn_tx.send(msg).map_err(|_| {
+                                    other_error("can't send message to a connection")
+                                })
+                            });
+                            to_box(fut)
+                        } else {
+                            let event = NetworkEvent::UnableConnectToPeer(peer);
+                            let fut = network_tx
+                                .clone()
+                                .send(event)
+                                .map_err(|_| other_error("can't send network event"))
+                                .into_future();
+                            to_box(fut)
+                        }
+                    }
+                    NetworkRequest::DisconnectWithPeer(peer) => {
+                        outgoing_connections.disconnect_with_peer(peer, network_tx.clone())
+                    }
+                    // Immediately stop the event loop.
+                    NetworkRequest::Shutdown => {
+                        let fut = cancel_sender
+                            .take()
+                            .ok_or_else(|| other_error("shutdown twice"))
+                            .and_then(|sender| {
+                                sender.send(()).map_err(
+                                    |_| other_error("can't send shutdown signal"),
+                                )
+                            })
+                            .into_future();
+                        to_box(fut)
+                    }
+                }
+            });
+        RequestHandler(to_box(requests_handler))
+    }
+}
+
+impl Future for RequestHandler {
+    type Item = ();
+    type Error = io::Error;
+
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        self.0.poll()
+    }
+}
+
+
+struct Listener(Box<Future<Item = (), Error = io::Error>>);
+
+impl Listener {
+    fn bind(
+        network_config: NetworkConfiguration,
+        max_message_len: u32,
+        listen_address: SocketAddr,
+        handle: Handle,
+        network_tx: &mpsc::Sender<NetworkEvent>,
+    ) -> Result<Listener, io::Error> {
+        // Incoming connections limiter
+        let incoming_connections_limit = network_config.max_incoming_connections;
+        // The reference counter is used to automatically count the number of the open connections.
+        let incoming_connections_counter: Rc<()> = Rc::default();
+        // Incoming connections handler
+        let listener = TcpListener::bind(&listen_address, &handle)?;
+        let network_tx = network_tx.clone();
+        let server = listener.incoming().for_each(move |(sock, addr)| {
+            let holder = Rc::downgrade(&incoming_connections_counter);
+            // Check incoming connections count
+            let connections_count = Rc::weak_count(&incoming_connections_counter);
+            if connections_count > incoming_connections_limit {
+                warn!(
+                    "Rejected incoming connection with peer={}, \
+                     connections limit reached.",
+                    addr
+                );
+                return to_box(future::ok(()));
+            }
+            trace!("Accepted incoming connection with peer={}", addr);
+            let stream = sock.framed(MessagesCodec::new(max_message_len));
+            let (_, stream) = stream.split();
+            let network_tx = network_tx.clone();
+            let connection_handler = stream
+                .into_future()
+                .map_err(|e| e.0)
+                .and_then(move |(raw, stream)| match raw.map(Any::from_raw) {
+                    Some(Ok(Any::Connect(msg))) => Ok((msg, stream)),
+                    Some(Ok(other)) => Err(other_error(
+                        &format!("First message is not Connect, got={:?}", other),
+                    )),
+                    Some(Err(e)) => Err(into_other(e)),
+                    None => Err(other_error("Incoming socket closed")),
+                })
+                .and_then(move |(connect, stream)| {
+                    trace!("Received handshake message={:?}", connect);
+                    let event = NetworkEvent::PeerConnected(addr, connect);
+                    let stream = network_tx
+                        .clone()
+                        .send(event)
+                        .map_err(into_other)
+                        .and_then(move |_| Ok(stream))
+                        .flatten_stream();
+
+                    stream.for_each(move |raw| {
+                        let event = NetworkEvent::MessageReceived(addr, raw);
+                        network_tx.clone().send(event).map_err(into_other).map(drop)
+                    })
+                })
+                .map(|_| {
+                    // Ensure that holder lives until the stream ends.
+                    let _holder = holder;
+                })
+                .map_err(log_error);
+            handle.spawn(to_box(connection_handler));
+            to_box(future::ok(()))
+        });
+
+        Ok(Listener(to_box(server)))
+    }
+}
+
+impl Future for Listener {
+    type Item = ();
+    type Error = io::Error;
+
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        self.0.poll()
+    }
+}
+
+fn conn_fut<F>(fut: F) -> Box<Future<Item = mpsc::Sender<RawMessage>, Error = io::Error>>
+where
+    F: Future<Item = mpsc::Sender<RawMessage>, Error = io::Error> + 'static,
+{
+    Box::new(fut)
 }

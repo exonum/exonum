@@ -13,10 +13,10 @@
 // limitations under the License.
 
 //! An implementation of index that may only contain one element.
+
 use std::marker::PhantomData;
 
 use crypto::Hash;
-
 use super::{BaseIndex, Snapshot, Fork, StorageValue};
 
 /// An index that may only contain one element.
@@ -30,7 +30,7 @@ pub struct Entry<T, V> {
 }
 
 impl<T, V> Entry<T, V> {
-    /// Creates a new index representation based on the prefix and storage view.
+    /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
@@ -44,14 +44,14 @@ impl<T, V> Entry<T, V> {
     /// use exonum::storage::{MemoryDB, Database, Entry};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let snapshot = db.snapshot();
-    /// let prefix = vec![1, 2, 3];
-    /// let index: Entry<_, u8> = Entry::new(prefix, &snapshot);
+    /// let index: Entry<_, u8> = Entry::new(name, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn new(prefix: Vec<u8>, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
         Entry {
-            base: BaseIndex::new(prefix, view),
+            base: BaseIndex::new(name, view),
             _v: PhantomData,
         }
     }
@@ -70,8 +70,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, Entry};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = Entry::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = Entry::new(name, &mut fork);
     /// assert_eq!(None, index.get());
     ///
     /// index.set(10);
@@ -89,8 +90,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, Entry};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = Entry::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = Entry::new(name, &mut fork);
     /// assert!(!index.exists());
     ///
     /// index.set(10);
@@ -109,8 +111,9 @@ where
     /// use exonum::crypto::{self, Hash};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = Entry::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = Entry::new(name, &mut fork);
     /// assert_eq!(Hash::default(), index.hash());
     ///
     /// let value = 10;
@@ -137,8 +140,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, Entry};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = Entry::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = Entry::new(name, &mut fork);
     ///
     /// index.set(10);
     /// assert_eq!(Some(10), index.get());
@@ -155,8 +159,9 @@ where
     /// use exonum::storage::{MemoryDB, Database, Entry};
     ///
     /// let db = MemoryDB::new();
+    /// let name = "name";
     /// let mut fork = db.fork();
-    /// let mut index = Entry::new(vec![1, 2, 3], &mut fork);
+    /// let mut index = Entry::new(name, &mut fork);
     ///
     /// index.set(10);
     /// assert_eq!(Some(10), index.get());

@@ -16,7 +16,7 @@
 
 use std::fmt::Debug;
 
-use events::Milliseconds;
+use helpers::Milliseconds;
 use storage::Snapshot;
 use blockchain::Schema;
 
@@ -28,7 +28,7 @@ use blockchain::Schema;
 ///
 /// ```
 /// use exonum::node::timeout_adjuster::TimeoutAdjuster;
-/// use exonum::events::Milliseconds;
+/// use exonum::helpers::Milliseconds;
 /// use exonum::storage::Snapshot;
 /// use exonum::blockchain::Schema;
 ///
@@ -39,7 +39,7 @@ use blockchain::Schema;
 /// impl TimeoutAdjuster for CustomAdjuster {
 ///     fn adjust_timeout(&mut self, snapshot: &Snapshot) -> Milliseconds {
 ///         let schema = Schema::new(snapshot);
-///         let transactions = schema.last_block().map_or(0, |block| block.tx_count());
+///         let transactions = schema.last_block().tx_count();
 ///         // Simply increase propose time after empty blocks.
 ///         if transactions == 0 {
 ///             1000
@@ -125,11 +125,7 @@ impl Dynamic {
 impl TimeoutAdjuster for Dynamic {
     fn adjust_timeout(&mut self, snapshot: &Snapshot) -> Milliseconds {
         let schema = Schema::new(snapshot);
-        let threshold = self.threshold;
-        self.adjust_timeout_impl(schema.last_block().map_or(
-            threshold,
-            |block| block.tx_count(),
-        ))
+        self.adjust_timeout_impl(schema.last_block().tx_count())
     }
 }
 
@@ -194,17 +190,14 @@ impl MovingAverage {
 impl TimeoutAdjuster for MovingAverage {
     fn adjust_timeout(&mut self, snapshot: &Snapshot) -> Milliseconds {
         let schema = Schema::new(snapshot);
-        self.adjust_timeout_impl(schema.last_block().map_or(
-            0.,
-            |block| f64::from(block.tx_count()),
-        ))
+        self.adjust_timeout_impl(f64::from(schema.last_block().tx_count()))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use events::Milliseconds;
+    use helpers::Milliseconds;
 
     #[test]
     fn dynamic_timeout_adjuster() {

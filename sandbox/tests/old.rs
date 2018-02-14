@@ -17,9 +17,9 @@ extern crate sandbox;
 
 use std::time::Duration;
 
-use exonum::messages::{Message, Propose, Prevote, Precommit};
+use exonum::messages::{Propose, Prevote, Precommit};
 use exonum::blockchain::{Block, SCHEMA_MAJOR_VERSION};
-use exonum::crypto::Hash;
+use exonum::crypto::{CryptoHash, Hash};
 use exonum::helpers::{Height, Round};
 
 use sandbox::timestamping_sandbox;
@@ -33,7 +33,7 @@ fn test_send_propose_and_prevote() {
 
     // get some tx
     let tx = gen_timestamping_tx();
-    sandbox.recv(tx.clone());
+    sandbox.recv(&tx);
 
     // round happens
     sandbox.add_time(Duration::from_millis(1000));
@@ -51,8 +51,8 @@ fn test_send_propose_and_prevote() {
         sandbox.s(VALIDATOR_0),
     );
 
-    sandbox.broadcast(propose.clone());
-    sandbox.broadcast(Prevote::new(
+    sandbox.broadcast(&propose);
+    sandbox.broadcast(&Prevote::new(
         VALIDATOR_0,
         HEIGHT_ONE,
         ROUND_THREE,
@@ -75,8 +75,8 @@ fn test_send_prevote() {
         sandbox.s(VALIDATOR_2),
     );
 
-    sandbox.recv(propose.clone());
-    sandbox.broadcast(Prevote::new(
+    sandbox.recv(&propose);
+    sandbox.broadcast(&Prevote::new(
         VALIDATOR_0,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -109,8 +109,8 @@ fn test_get_lock_and_send_precommit() {
         &sandbox.last_state_hash(),
     );
 
-    sandbox.recv(propose.clone());
-    sandbox.broadcast(Prevote::new(
+    sandbox.recv(&propose);
+    sandbox.broadcast(&Prevote::new(
         VALIDATOR_0,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -118,7 +118,7 @@ fn test_get_lock_and_send_precommit() {
         Round::zero(),
         sandbox.s(VALIDATOR_0),
     ));
-    sandbox.recv(Prevote::new(
+    sandbox.recv(&Prevote::new(
         VALIDATOR_1,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -127,7 +127,7 @@ fn test_get_lock_and_send_precommit() {
         sandbox.s(VALIDATOR_1),
     ));
     sandbox.assert_lock(Round::zero(), None);
-    sandbox.recv(Prevote::new(
+    sandbox.recv(&Prevote::new(
         VALIDATOR_2,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -135,7 +135,7 @@ fn test_get_lock_and_send_precommit() {
         Round::zero(),
         sandbox.s(VALIDATOR_2),
     ));
-    sandbox.broadcast(Precommit::new(
+    sandbox.broadcast(&Precommit::new(
         VALIDATOR_0,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -170,8 +170,8 @@ fn test_commit() {
         &sandbox.last_state_hash(),
     );
 
-    sandbox.recv(propose.clone());
-    sandbox.broadcast(Prevote::new(
+    sandbox.recv(&propose);
+    sandbox.broadcast(&Prevote::new(
         VALIDATOR_0,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -179,7 +179,7 @@ fn test_commit() {
         Round::zero(),
         sandbox.s(VALIDATOR_0),
     ));
-    sandbox.recv(Prevote::new(
+    sandbox.recv(&Prevote::new(
         VALIDATOR_1,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -187,7 +187,7 @@ fn test_commit() {
         Round::zero(),
         sandbox.s(VALIDATOR_1),
     ));
-    sandbox.recv(Prevote::new(
+    sandbox.recv(&Prevote::new(
         VALIDATOR_2,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -195,7 +195,7 @@ fn test_commit() {
         Round::zero(),
         sandbox.s(VALIDATOR_2),
     ));
-    sandbox.broadcast(Precommit::new(
+    sandbox.broadcast(&Precommit::new(
         VALIDATOR_0,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -204,7 +204,7 @@ fn test_commit() {
         sandbox.time(),
         sandbox.s(VALIDATOR_0),
     ));
-    sandbox.recv(Precommit::new(
+    sandbox.recv(&Precommit::new(
         VALIDATOR_2,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -213,7 +213,7 @@ fn test_commit() {
         sandbox.time(),
         sandbox.s(VALIDATOR_2),
     ));
-    sandbox.recv(Precommit::new(
+    sandbox.recv(&Precommit::new(
         VALIDATOR_3,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -236,7 +236,7 @@ fn received_unexpected_propose() {
     let propose = Propose::new(VALIDATOR_1, Height::zero(), ROUND_ONE,
                                &sandbox.last_hash(), &[], sandbox.s(VALIDATOR_1));
 
-    sandbox.recv(propose.clone());
-    sandbox.broadcast(Prevote::new(VALIDATOR_0, Height::zero(), ROUND_ONE, &propose.hash(),
+    sandbox.recv(&propose);
+    sandbox.broadcast(&Prevote::new(VALIDATOR_0, Height::zero(), ROUND_ONE, &propose.hash(),
                                    Round::zero(), sandbox.s(VALIDATOR_0)));
 }

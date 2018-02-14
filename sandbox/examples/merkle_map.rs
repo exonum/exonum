@@ -71,7 +71,7 @@ fn main() {
         .unwrap();
     let seed_part: u32 = matches.value_of("seed").unwrap_or("0").parse().unwrap();
     // TODO get them from command line
-    let prefix = vec![1];
+    let prefix = "name";
     let seed = [seed_part, 168, 56, 1];
 
     let mut rng = XorShiftRng::from_seed(seed);
@@ -84,7 +84,7 @@ fn main() {
         (k, v)
     };
 
-    let mut db = create_database(path);
+    let db = create_database(path);
 
     let patch;
     {

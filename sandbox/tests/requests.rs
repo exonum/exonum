@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//extern crate exonum;
-//extern crate sandbox;
+// extern crate exonum;
+// extern crate sandbox;
 
 // use exonum::messages::{Message, Propose, Prevote, Precommit};
 
@@ -44,7 +44,7 @@
 // - ignore if height != our height
 // - send prevotes we have (> +2/3, <+2/3, 0)
 
-// REQUEST PRECOMITS:
+// REQUEST PRECOMMITS:
 // - ignore if height > our height
 // - send precommits we have (> +2/3, <+2/3, 0) for out height
 // - send precommits from blockchain for prev height if we have (or not send if haven’t)

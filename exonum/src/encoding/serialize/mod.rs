@@ -14,12 +14,13 @@
 
 //! Serialize structure into specific format.
 //! Currently support only json.
-//! This module is a pack of superstructures over serde `Serializer's`\\`Deserializer's`
+//! This module is a pack of superstructures over serde `Serializer`\`Deserializer`
 
-pub use hex::{FromHexError, ToHex, FromHex};
 use encoding::Field;
 use messages::MessageWriter;
 use super::Offset;
+
+pub use hex::{FromHexError, ToHex, FromHex, encode as encode_hex, decode as decode_hex};
 
 /// implement exonum serialization\deserialization based on serde `Serialize`\ `Deserialize`
 ///
@@ -58,7 +59,7 @@ macro_rules! implement_exonum_serializer {
 
             fn serialize_field(&self) ->
                 Result<$crate::encoding::serialize::json::reexport::Value,
-                        Box<::std::error::Error>>
+                        Box<::std::error::Error + Send + Sync>>
             {
                 use $crate::encoding::serialize::json::reexport::to_value;
                 Ok(to_value(self)?)
@@ -69,20 +70,9 @@ macro_rules! implement_exonum_serializer {
     };
 }
 
-
 /// implement serializing wrappers and methods for json
 #[macro_use]
 pub mod json;
-
-/// `HexValue` is a converting trait,
-/// for values that could be converted from hex `String`,
-/// and writed as hex `String`
-pub trait HexValue: Sized {
-    /// Format value as hex representation.
-    fn to_hex(&self) -> String;
-    /// Convert value from hex representation.
-    fn from_hex<T: AsRef<str>>(v: T) -> Result<Self, FromHexError>;
-}
 
 /// `WriteBufferWrapper` is a trait specific for writing fields in place.
 #[doc(hidden)]

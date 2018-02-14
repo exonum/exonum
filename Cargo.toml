@@ -1,9 +1,8 @@
 [workspace]
-
 members = [
-    "3rdparty/leveldb",
     "exonum",
     "sandbox",
-    "3rdparty/flamer",
-    "3rdparty/profiler",
+    "testkit",
+    "services/time"
 ]
+exclude = [ "3rdparty" ]
