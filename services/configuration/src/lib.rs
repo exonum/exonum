@@ -256,7 +256,7 @@ where
     /// 2. Config, previous to a `StoredConfiguration` is referenced by
     /// `previous_cfg_hash` in `StoredConfiguration`.
     ///
-    /// - Table **index** is validator_id - position of a validator `PublicKey`
+    /// - Table **index** is validator_id - position of a validator's `PublicKey`
     /// in validator list of config,
     /// previous to config, referenced by the queried `config_hash`.
     /// - Table **value** is `TxConfigVote`, cast by validator with

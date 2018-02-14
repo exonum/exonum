@@ -122,12 +122,12 @@ To obtain local, reliable time external solutions like [tlsdate][],
   local time of the validator nodes.
 
 The service implements only one transaction consisting of the actual
-validators time and signed with its key. The logic of such transaction
+time of the validator and signed with its key. The logic of such transaction
 execution is as follows:
 
 1. It is checked that `PublicKey` belongs to the validator.
 
-2. The time specified in the transaction is greater than said validators time
+2. The time specified in the transaction is greater than time of said validator
    specified in the storage (transactions potentially can be executed in
    the order reverse to their creation order,
    but the time must change monotonously).

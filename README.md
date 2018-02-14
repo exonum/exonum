@@ -22,6 +22,6 @@ This is the main Exonum repository that includes
 * Demos
   * Cryptocurrency (currently in [cryptocurrency] repository).
 
-See individual projects' readme for the details.
+See individual projects readme for the details.
 
 [cryptocurrency]: https://github.com/exonum/cryptocurrency
