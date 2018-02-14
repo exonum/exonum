@@ -385,7 +385,7 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
 /// [`get_proof()`]: struct.ProofMapIndex.html#method.get_proof
 /// [`get_multiproof()`]: struct.ProofMapIndex.html#method.get_multiproof
 #[derive(Debug)]
-pub(crate) struct MapProofBuilder<K, V> {
+pub(super) struct MapProofBuilder<K, V> {
     entries: Vec<OptionalEntry<K, V>>,
     proof: Vec<MapProofEntry>,
 }
