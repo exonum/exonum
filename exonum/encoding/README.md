@@ -3,7 +3,8 @@
 [![Version][crates-io-image]][crates-io-url]
 [![Build status][travis-image]][travis-url]
 
-Serialization format implementation used in the Exonum project.
+Serialization format implementation used in the Exonum project. It is a bit
+unstable now and should not be used as general-purpose serialization library. 
 
 ## License
 

@@ -27,8 +27,6 @@ extern crate exonum_rocksdb as rocksdb;
 #[macro_use]
 extern crate exonum_profiler;
 #[macro_use]
-extern crate exonum_encoding as encoding;
-#[macro_use]
 extern crate log;
 extern crate byteorder;
 extern crate rand;
@@ -69,7 +67,8 @@ extern crate lazy_static;
 extern crate tempdir;
 
 #[macro_use]
-pub mod encoding;
+pub extern crate exonum_encoding as encoding;
+
 #[macro_use]
 pub mod messages;
 #[macro_use]

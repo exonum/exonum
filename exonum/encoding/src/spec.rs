@@ -71,7 +71,7 @@ macro_rules! encoding_struct {
 
         // Re-implement `Field` for `encoding_struct!`
         // to write fields in place of another structure
-        impl<'a> $crate::encoding::Field<'a> for $name {
+        impl<'a> ::encoding::Field<'a> for $name {
             unsafe fn read(buffer: &'a [u8],
                             from: $crate::encoding::Offset,
                             to: $crate::encoding::Offset) -> Self {
@@ -83,7 +83,7 @@ macro_rules! encoding_struct {
                             buffer: &mut Vec<u8>,
                             from: $crate::encoding::Offset,
                             to: $crate::encoding::Offset) {
-                $crate::encoding::Field::write(&self.raw, buffer, from, to);
+                ::encoding::Field::write(&self.raw, buffer, from, to);
             }
 
             #[allow(unused_variables)]
@@ -92,7 +92,7 @@ macro_rules! encoding_struct {
                         from_st_val: $crate::encoding::CheckedOffset,
                         to_st_val: $crate::encoding::CheckedOffset,
                         latest_segment: $crate::encoding::CheckedOffset)
-                -> $crate::encoding::Result
+                -> ::encoding::Result
             {
                 let latest_segment_origin = <&[u8] as $crate::encoding::Field>::check(
                     buffer, from_st_val, to_st_val, latest_segment)?;

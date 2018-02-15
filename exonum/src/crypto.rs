@@ -34,7 +34,6 @@ use std::default::Default;
 use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
 use std::fmt;
 use std::mem;
-use std::slice;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 // spell-checker:disable
@@ -775,8 +774,7 @@ macro_rules! impl_default_deserialize_owned {
         impl $crate::serialize::json::ExonumJsonDeserialize for $name {
             fn deserialize(value: &$crate::serialize::json::reexport::Value)
                 -> Result<Self, Box<::std::error::Error>> {
-                use $crate::serialize::json::reexport::from_value;
-                Ok(from_value(value.clone())?)
+                Ok(encoding::serialize::json::reexport::from_value(value.clone())?)
             }
         }
     };

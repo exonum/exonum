@@ -107,9 +107,9 @@
 //! [`field_size()`]: ./trait.Field.html#tymethod.field_size
 
 extern crate hex;
-extern crate serde_json;
 extern crate bit_vec;
 extern crate serde;
+extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
 extern crate byteorder;
@@ -117,9 +117,13 @@ extern crate byteorder;
 use std::convert::From;
 use std::ops::{Add, Sub, Mul, Div};
 
-pub use self::fields::Field;
-pub use self::segments::SegmentField;
-pub use self::error::Error;
+pub use hex::FromHex;
+
+pub use fields::Field;
+pub use segments::SegmentField;
+pub use error::Error;
+pub use serialize::json::ExonumJson;
+
 #[cfg(feature = "float_serialize")]
 pub use self::float::{F32, F64};
 
