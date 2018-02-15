@@ -46,7 +46,7 @@ impl Transaction for TxAfterCommit {
 pub struct HandleCommitService;
 
 impl Service for HandleCommitService {
-    fn service_name(&self) -> &'static str {
+    fn service_name(&self) -> &str {
         "handle_commit"
     }
 

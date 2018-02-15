@@ -15,7 +15,6 @@
 // spell-checker:ignore exts
 
 use std::fmt;
-use std::error::Error;
 use std::collections::HashMap;
 
 use super::{Argument, CommandExtension, CommandName, Context};
@@ -27,20 +26,6 @@ pub enum Feedback {
     RunNode(Context),
     /// Do nothing
     None,
-}
-#[derive(Clone, Debug, Copy)]
-pub struct NotFoundInMap;
-
-impl Error for NotFoundInMap {
-    fn description(&self) -> &str {
-        "Expected Some in getting context."
-    }
-}
-
-impl fmt::Display for NotFoundInMap {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.description())
-    }
 }
 
 /// `Command` trait is used to create sub-command for `NodeBuilder`.

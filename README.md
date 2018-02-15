@@ -17,12 +17,11 @@ This is the main Exonum repository that includes
 * [Exonum core library](exonum/README.md).
 * [Exonum testing framework](testkit/README.md).
 * Services:
-  * Configuration service (currently in [exonum-configuration] repository).
+  * [Configuration service](services/configuration/README.md).
   * [Time service](services/time/README.md).
 * Demos
-  * Cryprocurrency (currently in [cryptocurrency] repository).
+  * Cryptocurrency (currently in [cryptocurrency] repository).
 
-See individual projects' readme for the details.
+See individual projects readme for the details.
 
-[exonum-configuration]: https://github.com/exonum/exonum-configuration
 [cryptocurrency]: https://github.com/exonum/cryptocurrency

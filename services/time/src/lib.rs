@@ -103,9 +103,9 @@ transactions! {
 
         /// Transaction that is sent by the validator after the commit of the block.
         struct TxTime {
-            /// Validator's time.
+            /// Time of the validator.
             time: SystemTime,
-            /// Validator's public key.
+            /// Public key of the validator.
             pub_key: &PublicKey,
         }
     }
@@ -183,12 +183,12 @@ struct TimeApi {
     blockchain: Blockchain,
 }
 
-/// Structure for saving validator's public key and last known local time.
+/// Structure for saving public key of the validator and last known local time.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ValidatorTime {
-    /// Validator's public key.
+    /// Public key of the validator.
     pub public_key: PublicKey,
-    /// Validator's time.
+    /// Time of the validator.
     pub time: Option<SystemTime>,
 }
 
@@ -401,7 +401,7 @@ impl TimeService {
 }
 
 impl Service for TimeService {
-    fn service_name(&self) -> &'static str {
+    fn service_name(&self) -> &str {
         SERVICE_NAME
     }
 
