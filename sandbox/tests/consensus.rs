@@ -40,7 +40,6 @@ use exonum::helpers::{Height, Round};
 use sandbox::timestamping::{TimestampTx, TimestampingTxGenerator, TIMESTAMPING_SERVICE};
 use sandbox::timestamping_sandbox;
 use sandbox::sandbox::sandbox_with_services_uninitialized;
-use sandbox::sandbox::sandbox_restarted_uninitialized;
 use sandbox::sandbox_tests_helper::*;
 use sandbox::config_updater::TxConfig;
 
@@ -430,7 +429,7 @@ fn should_not_vote_after_node_restart() {
     let curr_height = sandbox.current_height();
     let curr_round = sandbox.current_round();
 
-    // Simulate node restart
+    // Simulate node restart.
     let sandbox_restarted = sandbox.restart();
 
     // assert that consensus messages were recovered and we're in locked state now
@@ -694,7 +693,7 @@ fn should_restore_peers_after_restart() {
     sandbox.send(a1, &connect_from_0);
 
     // restart the node
-    let sandbox_restarted = sandbox_restarted_uninitialized(sandbox);
+    let sandbox_restarted = sandbox.restart_uninitialized();
 
     // check that the node is connecting with the peer
     sandbox_restarted.send(a1, &connect_from_0);

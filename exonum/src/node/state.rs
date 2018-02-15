@@ -845,7 +845,7 @@ impl State {
                 propose: msg,
                 unknown_txs: HashSet::new(),
                 block_hash: None,
-                // FIXME: for the moment it's true because this code gets called immediately after
+                // TODO:: for the moment it's true because this code gets called immediately after
                 // saving a propose to the cache. Think about making this approach less error-prone
                 is_saved: true,
             },
@@ -873,7 +873,7 @@ impl State {
                 }
                 Some(e.insert(ProposeState {
                     propose: msg.clone(),
-                    unknown_txs: unknown_txs,
+                    unknown_txs,
                     block_hash: None,
                     is_saved: false,
                 }))
