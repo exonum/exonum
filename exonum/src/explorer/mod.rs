@@ -58,7 +58,7 @@ pub struct TxInfo {
 }
 
 /// Transaction execution status. Simplified version of `TransactionResult`.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum TxStatus {
     /// Successful transaction execution.
     Success,

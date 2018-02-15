@@ -530,7 +530,7 @@ fn test_explorer_transaction() {
         ApiKind::Explorer,
         &format!("v1/transactions/{}", &tx.hash().to_string()),
     );
-    if let TxInfo::InPool{ content } = info {
+    if let TxInfo::InPool { content } = info {
         assert_eq!(content, tx.serialize_field().unwrap());
     } else {
         panic!("Transaction should be in the pool");
