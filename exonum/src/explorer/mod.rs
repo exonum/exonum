@@ -21,7 +21,7 @@ use serde_json::Value;
 
 use storage::ListProof;
 use crypto::Hash;
-use blockchain::{Schema, Blockchain, Block, TxLocation, TransactionResult};
+use blockchain::{Schema, Blockchain, Block, TxLocation, TransactionResult, TransactionErrorType};
 use messages::Precommit;
 // TODO: if explorer is usable anywhere else, remove `ApiError` dependencies (ECR-163).
 use api::ApiError;
@@ -47,12 +47,12 @@ pub struct BlockInfo {
 /// Transaction information.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TxInfo {
-    /// `JSON` serialized transaction
+    /// `JSON` serialized transaction.
     pub content: Value,
-    /// Transaction location in block
+    /// Transaction location in block.
     pub location: TxLocation,
-    /// Proof that transaction really exist in database
-    pub proof_to_block_merkle_root: ListProof<Hash>,
+    /// Proof that transaction really exist in the database.
+    pub location_proof: ListProof<Hash>,
     /// Status of the transaction execution.
     pub status: TxStatus,
 }
@@ -62,8 +62,18 @@ pub struct TxInfo {
 pub enum TxStatus {
     /// Successful transaction execution.
     Success,
+    /// Panic during transaction execution.
+    Panic {
+        /// Panic description.
+        description: String,
+    },
     /// Error during transaction execution.
-    Error(String),
+    Error {
+        /// User-defined error code.
+        code: u8,
+        /// Error description.
+        description: String,
+    },
 }
 
 impl<'a> BlockchainExplorer<'a> {
@@ -75,42 +85,50 @@ impl<'a> BlockchainExplorer<'a> {
     /// Returns information about the transaction identified by the hash.
     pub fn tx_info(&self, tx_hash: &Hash) -> Result<Option<TxInfo>, ApiError> {
         let schema = Schema::new(self.blockchain.snapshot());
-        Ok(if let Some(raw_tx) = schema.transactions().get(tx_hash) {
-            let box_transaction = self.blockchain.tx_from_raw(raw_tx.clone()).ok_or_else(|| {
-                ApiError::InternalError(
-                    format!("Service not found for tx: {:?}", raw_tx).into(),
-                )
-            })?;
+        let raw_tx = match schema.transactions().get(tx_hash) {
+            Some(val) => val,
+            None => {
+                return Ok(None);
+            }
+        };
 
-            let content = box_transaction.serialize_field().map_err(
-                ApiError::InternalError,
-            )?;
+        let box_transaction = self.blockchain.tx_from_raw(raw_tx.clone()).ok_or_else(|| {
+            ApiError::InternalError(format!("Service not found for tx: {:?}", raw_tx).into())
+        })?;
 
-            let location = schema.tx_location_by_tx_hash().get(tx_hash).expect(
-                &format!(
-                    "Not found tx_hash location: {:?}",
-                    tx_hash
-                ),
-            );
+        let content = box_transaction.serialize_field().map_err(
+            ApiError::InternalError,
+        )?;
 
-            let proof_to_block_merkle_root = schema.block_txs(location.block_height())
-                .get_proof(location.position_in_block());
+        let location = schema.tx_location_by_tx_hash().get(tx_hash).expect(
+            &format!(
+                "Not found tx_hash location: {:?}",
+                tx_hash
+            ),
+        );
 
-            // Unwrap is OK here, because we already know that transaction is committed.
-            let status = match schema.transaction_results().get(tx_hash).unwrap() {
-                Ok(()) => TxStatus::Success,
-                Err(e) => TxStatus::Error(format!("{}", e))
-            };
+        let location_proof = schema.block_txs(location.block_height()).get_proof(
+            location.position_in_block(),
+        );
 
-            Some(TxInfo {
-                content,
-                location,
-                proof_to_block_merkle_root,
-                status,
-            })
-        } else {
-            None
-        })
+        // Unwrap is OK here, because we already know that transaction is committed.
+        let status = match schema.transaction_results().get(tx_hash).unwrap() {
+            Ok(()) => TxStatus::Success,
+            Err(e) => {
+                let description = e.description().unwrap_or_default().to_owned();
+                match e.error_type() {
+                    TransactionErrorType::Panic => TxStatus::Panic { description },
+                    TransactionErrorType::Code(code) => TxStatus::Error { code, description },
+                }
+            }
+        };
+
+        Ok(Some(TxInfo {
+            content,
+            location,
+            location_proof,
+            status,
+        }))
     }
 
     /// Returns block information for the specified height or `None` if there is no such block.
