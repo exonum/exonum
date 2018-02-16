@@ -148,6 +148,14 @@ pub trait Service: Send + Sync + 'static {
     fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash>;
 
     /// Tries to create a `Transaction` from the given raw message.
+    ///
+    /// Service should return an error in the following cases (see `MessageError` for more details):
+    /// - Incorrect transaction identifier.
+    /// - Incorrect data layout.
+    ///
+    /// Service _shouldn't_ perform signature check or logical validation of the transaction: these
+    /// operations should be performed in the `Transaction::verify` and `Transaction::execute`
+    /// methods respectively.
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError>;
 
     /// Initializes the information schema of the service
