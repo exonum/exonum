@@ -124,23 +124,6 @@ jobs:
     - cargo deadlinks --dir target/doc
     - cargo outdated --exit-code 1
 
-after_success: |
-  [ $TRAVIS_BRANCH = master ] &&
-  [ $TRAVIS_PULL_REQUEST = false ] &&
-  wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz &&
-  tar xzf master.tar.gz &&
-  cd kcov-master &&
-  mkdir build &&
-  cd build &&
-  cmake .. &&
-  make &&
-  make install &&
-  cd ../.. &&
-  rm -rf kcov-master &&
-  for file in target/debug/exonum-*[^\.d]; do mkdir -p "target/cov/$(basename $file)"; kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
-  bash <(curl -s https://codecov.io/bash) &&
-  echo "Uploaded code coverage"
-
 notifications:
   slack:
     secure: ufnH5/ilJ/GkfzU28GguFgQzL1Jb7gGGVaBytCi1VW9cvME7wHC/Pf3ZDM9cVv7t8Cq6K423J8pSkT8vErB7GzHLGRJK8EsBkuGxiAJiHJIVNf/a20gjyqtS2wSyoVDDFz1LRtCNvQanSy2psSWyJcWtnAllluwRNHKXZWYFOpU6uqt2XIi1s3vuMyVw177alNyQkUJ6mhnt9ZDGoMXfcwXIvZ1bt3GPwAbuvAiHsShIrtVGJYTbIBDBsFsGgc1313xdz670xa1JrvZpIl0ZF91Z/0rxtQZjYos859ARnP+v5TfMpsOZbhVHtLI81/o/dOu/Dnrv2xo4VgLaHCTPfhO7LE7kGZ1OyEFqzsadL+k97JQnfkyyFRA84FrVNvgn5NStJtNRJu593v0zuI1OpmY5Xcu/XG2X3dpYZJGciKywoI8gFCc18taIqWY8P3uL/KdxX3VLikMkmYX+cXxHwhH/RvNLbfxD+hTepz+sGWBnLg/dFNpy3WdzJrSNKE9OAH3Gy53z32fT7XiGF8+juN3RB7MmoLA+sOKnGnjal+o44Ga7KDxHe9lOjRVWAQFH6lIEVNwpdEp+2zqu2QAyCIbYcyEdxo8oKXMwAOPFeIqFGshAYGSQAYbT9V75J2Hfcpqb+EXhiBluCSjoaacg4Yhsc/tFhqI7B5+tq7Z5KVU=

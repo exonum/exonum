@@ -95,7 +95,7 @@ fn main() {
     let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10");
     assert_eq!(blocks.len(), 2);
     api.get::<serde_json::Value>(
-        ApiKind::System,
+        ApiKind::Explorer,
         &format!("v1/transactions/{}", tx1.hash().to_string()),
     );
 }

@@ -75,7 +75,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `Height` implements `std::str::FromStr`. (#474)
 
-- Key-indexes interface now allows to use borrowed types for the search 
+- `v1/transactions` endpoint has been extended with the transaction execution
+  status. (#488)
+
+- Key-indexes interface now allows to use borrowed types for the search
   operations. (#392)
 
 ### Bug fixes
