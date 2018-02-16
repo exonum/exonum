@@ -561,14 +561,15 @@ fn test_recover_consensus_messages_in_other_round() {
     sandbox.assert_state(HEIGHT_ONE, ROUND_TWO);
 
     // make sure we broadcasted same Prevote for second round
-    sandbox.broadcast(&Prevote::new(
-        VALIDATOR_0,
-        HEIGHT_ONE,
+    let updated_prevote = Prevote::new(
+        prevote.validator(),
+        prevote.height(),
         ROUND_TWO,
-        &propose.hash(),
+        prevote.propose_hash(),
         LOCK_ONE,
         sandbox.s(VALIDATOR_0),
-    ));
+    );
+    sandbox.broadcast(&updated_prevote);
 
     let propose_new = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
@@ -625,6 +626,7 @@ fn test_recover_consensus_messages_in_other_round() {
     let sandbox_new = sandbox.restart();
 
     sandbox_new.assert_lock(LOCK_TWO, Some(propose_new.hash()));
+    sandbox_new.assert_state(HEIGHT_ONE, ROUND_TWO);
     sandbox_new.broadcast(&prevote);
     sandbox_new.broadcast(&precommit);
     sandbox_new.broadcast(&prevote_new);
