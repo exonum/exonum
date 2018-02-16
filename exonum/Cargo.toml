@@ -15,6 +15,14 @@ description = "An extensible framework for blockchain software projects."
 travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
+# Components.
+exonum-encoding = { path = "components/encoding", version = "0.5.0" }
+# Our crates.
+exonum_rocksdb = "0.7"
+exonum_sodiumoxide = "0.0.16"
+exonum_profiler = { path = "../3rdparty/profiler", version = "0.1.2" }
+exonum_flamer = { path = "../3rdparty/flamer", version = "0.1.6", optional = true }
+# Normal dependencies.
 log = "0.4.1"
 byteorder = "1.1.0"
 hex = "0.3.0"
@@ -45,12 +53,6 @@ tokio-io = "0.1.2"
 tokio-retry = "0.1.0"
 tokio-timer = "0.1.2"
 failure = "0.1.1"
-
-exonum_rocksdb = "0.7"
-exonum_sodiumoxide = "0.0.16"
-exonum_profiler = { path = "../3rdparty/profiler", version = "0.1.2" }
-exonum_flamer = { path = "../3rdparty/flamer", version = "0.1.6", optional = true }
-exonum-encoding = { path = "encoding", version = "0.5.0" }
 
 [dev-dependencies]
 pretty_assertions = "0.4.0"
