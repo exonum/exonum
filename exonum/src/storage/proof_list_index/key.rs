@@ -103,6 +103,6 @@ impl StorageKey for ProofListKey {
     }
 
     fn read(buffer: &[u8]) -> Self {
-        Self::from_db_key(StorageKey::read(buffer))
+        Self::from_db_key(<u64 as StorageKey>::read(buffer))
     }
 }

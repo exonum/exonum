@@ -17,11 +17,11 @@
 // TODO: Remove when https://github.com/rust-lang-nursery/rust-clippy/issues/2190 is fixed.
 #![cfg_attr(feature="cargo-clippy", allow(doc_markdown))]
 
+use byteorder::{BigEndian, ByteOrder};
+
 use std::borrow::Cow;
 use std::cell::Cell;
 use std::marker::PhantomData;
-
-use byteorder::{BigEndian, ByteOrder};
 
 use crypto::{hash, CryptoHash, Hash};
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};

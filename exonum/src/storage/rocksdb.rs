@@ -14,16 +14,16 @@
 
 //! An implementation of `RocksDB` database.
 
+use exonum_profiler::ProfilerSpan;
+use rocksdb::{self, WriteBatch, DBIterator};
+use rocksdb::utils::get_cf_names;
+
 use std::mem;
 use std::sync::Arc;
 use std::path::Path;
 use std::fmt;
 use std::error::Error;
 use std::iter::Peekable;
-
-use exonum_profiler::ProfilerSpan;
-use rocksdb::{self, WriteBatch, DBIterator};
-use rocksdb::utils::get_cf_names;
 
 use storage::{self, Database, Iterator, Iter, Snapshot, Patch};
 use storage::db::Change;
