@@ -155,7 +155,10 @@ pub trait Service: Send + Sync + 'static {
     ///
     /// Service _shouldn't_ perform signature check or logical validation of the transaction: these
     /// operations should be performed in the `Transaction::verify` and `Transaction::execute`
-    /// methods respectively.
+    /// methods.
+    ///
+    /// `transactions!` macro generates code that allows simple implementation, see
+    /// [the `Service` example above](#examples).
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError>;
 
     /// Initializes the information schema of the service
