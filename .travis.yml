@@ -97,12 +97,12 @@ jobs:
     install:
     - cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
     script:
-    - cargo clippy --all
+    - cargo clippy --all -- -D warnings
 
   # Tests
   - env: FEATURE=test
     script:
-    - cargo test --all
+    - RUSTFLAGS="$RUSTFLAGS -D warnings" cargo test --all
     - cargo run -p exonum-testkit --example timestamping
     - cargo run -p exonum-testkit --example configuration_change
     - cargo run -p exonum-time --example simple_service
