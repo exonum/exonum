@@ -490,10 +490,7 @@ impl NodeHandler {
         let schema = Schema::new(&snapshot);
 
         // Recover previous saved round if any
-        let round = match schema.saved_round().get() {
-            Some(round) => Round(round),
-            None => Round::first(),
-        };
+        let round = schema.consensus_round();
         self.state.jump_round(round);
         info!("Jump to round {}", round);
 

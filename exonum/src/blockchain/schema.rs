@@ -16,7 +16,7 @@ use crypto::{PublicKey, Hash, CryptoHash};
 use messages::{Precommit, RawMessage, Connect};
 use storage::{Entry, Fork, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex, Snapshot,
               StorageKey};
-use helpers::Height;
+use helpers::{Height, Round};
 use super::{Block, BlockProof, Blockchain, TransactionResult};
 use super::config::StoredConfiguration;
 
@@ -43,7 +43,7 @@ define_names!(
     CONFIGS_ACTUAL_FROM => "configs_actual_from";
     STATE_HASH_AGGREGATOR => "state_hash_aggregator";
     CONSENSUS_MESSAGES_CACHE => "consensus_messages_cache";
-    SAVED_ROUND => "saved_round";
+    CONSENSUS_ROUND => "consensus_round";
 );
 
 /// Generates an array of bytes from the `prefix`.
@@ -168,9 +168,9 @@ where
         ListIndex::new(CONSENSUS_MESSAGES_CACHE, &self.view)
     }
 
-    /// Returns value for saved Round.
-    pub fn saved_round(&self) -> Entry<&T, u32> {
-        Entry::new(SAVED_ROUND, &self.view)
+    /// Returns saved value of the consensus round. Returns first round if it wasn't saved.
+    pub fn consensus_round(&self) -> Round {
+        Entry::new(CONSENSUS_ROUND, &self.view).get().unwrap_or_else(Round::first)
     }
 
     /// Returns block hash for the given height.
@@ -343,35 +343,35 @@ impl<'a> Schema<&'a mut Fork> {
     ///
     /// [1]: struct.Schema.html#method.transactions
     pub fn transactions_mut(&mut self) -> MapIndex<&mut Fork, Hash, RawMessage> {
-        MapIndex::new(TRANSACTIONS, &mut self.view)
+        MapIndex::new(TRANSACTIONS, self.view)
     }
 
     /// Mutable reference to the [`transaction_results`][1] index.
     ///
     /// [1]: struct.Schema.html#method.transaction_results
     pub fn transaction_results_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, TransactionResult> {
-        ProofMapIndex::new(TRANSACTION_RESULTS, &mut self.view)
+        ProofMapIndex::new(TRANSACTION_RESULTS, self.view)
     }
 
     /// Mutable reference to the [`tx_location_by_tx_hash`][1] index.
     ///
     /// [1]: struct.Schema.html#method.tx_location_by_tx_hash
     pub fn tx_location_by_tx_hash_mut(&mut self) -> MapIndex<&mut Fork, Hash, TxLocation> {
-        MapIndex::new(TX_LOCATION_BY_TX_HASH, &mut self.view)
+        MapIndex::new(TX_LOCATION_BY_TX_HASH, self.view)
     }
 
     /// Mutable reference to the [`blocks][1] index.
     ///
     /// [1]: struct.Schema.html#method.blocks
     pub fn blocks_mut(&mut self) -> MapIndex<&mut Fork, Hash, Block> {
-        MapIndex::new(BLOCKS, &mut self.view)
+        MapIndex::new(BLOCKS, self.view)
     }
 
     /// Mutable reference to the [`block_hashes_by_height_mut`][1] index.
     ///
     /// [1]: struct.Schema.html#method.block_hashes_by_height_mut
     pub fn block_hashes_by_height_mut(&mut self) -> ListIndex<&mut Fork, Hash> {
-        ListIndex::new(BLOCK_HASHES_BY_HEIGHT, &mut self.view)
+        ListIndex::new(BLOCK_HASHES_BY_HEIGHT, self.view)
     }
 
     /// Mutable reference to the [`block_hash_by_height`][1] index.
@@ -386,56 +386,55 @@ impl<'a> Schema<&'a mut Fork> {
     /// [1]: struct.Schema.html#method.block_txs
     pub fn block_txs_mut(&mut self, height: Height) -> ProofListIndex<&mut Fork, Hash> {
         let height: u64 = height.into();
-        ProofListIndex::with_prefix(BLOCK_TXS, gen_prefix(&height), &mut self.view)
+        ProofListIndex::with_prefix(BLOCK_TXS, gen_prefix(&height), self.view)
     }
 
     /// Mutable reference to the [`precommits`][1] index.
     ///
     /// [1]: struct.Schema.html#method.precommits
     pub fn precommits_mut(&mut self, hash: &Hash) -> ListIndex<&mut Fork, Precommit> {
-        ListIndex::with_prefix(PRECOMMITS, gen_prefix(hash), &mut self.view)
+        ListIndex::with_prefix(PRECOMMITS, gen_prefix(hash), self.view)
     }
 
     /// Mutable reference to the [`configs`][1] index.
     ///
     /// [1]: struct.Schema.html#method.configs
     pub fn configs_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, StoredConfiguration> {
-        ProofMapIndex::new(CONFIGS, &mut self.view)
+        ProofMapIndex::new(CONFIGS, self.view)
     }
 
     /// Mutable reference to the [`configs_actual_from`][1] index.
     ///
     /// [1]: struct.Schema.html#method.configs_actual_from
     pub fn configs_actual_from_mut(&mut self) -> ListIndex<&mut Fork, ConfigReference> {
-        ListIndex::new(CONFIGS_ACTUAL_FROM, &mut self.view)
+        ListIndex::new(CONFIGS_ACTUAL_FROM, self.view)
     }
 
     /// Mutable reference to the [`state_hash_aggregator`][1] index.
     ///
     /// [1]: struct.Schema.html#method.state_hash_aggregator
     pub fn state_hash_aggregator_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, Hash> {
-        ProofMapIndex::new(STATE_HASH_AGGREGATOR, &mut self.view)
+        ProofMapIndex::new(STATE_HASH_AGGREGATOR, self.view)
     }
 
     /// Mutable reference to the [`peers_cache`][1] index.
     ///
     /// [1]: struct.Schema.html#method.peers_cache
     pub fn peers_cache_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Connect> {
-        MapIndex::new("core.peers_cache", &mut self.view)
+        MapIndex::new("core.peers_cache", self.view)
     }
 
     /// Mutable reference to the [`consensus_messages_cache`][1] index.
     ///
     /// [1]: struct.Schema.html#method.consensus_messages
     pub fn consensus_messages_cache_mut(&mut self) -> ListIndex<&mut Fork, RawMessage> {
-        ListIndex::new(CONSENSUS_MESSAGES_CACHE, &mut self.view)
+        ListIndex::new(CONSENSUS_MESSAGES_CACHE, self.view)
     }
 
-    /// Mutable reference to the [`saved_round`][1] index.
-    ///
-    /// [1]: struct.Schema.html#method.saved_round
-    pub fn saved_round_mut(&mut self) -> Entry<&mut Fork, u32> {
-        Entry::new(SAVED_ROUND, &mut self.view)
+    /// Saves the given consensus round value into storage.
+    pub fn set_consensus_round(&mut self, round: Round) {
+        let mut entry: Entry<& mut Fork, _> = Entry::new(CONSENSUS_ROUND, self.view);
+        entry.set(round);
     }
 
     /// Adds a new configuration to the blockchain, which will become an actual at
