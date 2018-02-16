@@ -176,7 +176,9 @@ where
     V: StorageValue,
 {
     fn get_root_key(&self) -> Option<ProofPath> {
-        self.base.iter::<_, ProofPath, _>(&()).next().map(|(k, _): (ProofPath, ())| k)
+        self.base.iter::<_, ProofPath, _>(&()).next().map(
+            |(k, _): (ProofPath, ())| k,
+        )
     }
 
     fn get_root_node(&self) -> Option<(ProofPath, Node<V>)> {

@@ -155,7 +155,7 @@ where
     pub fn get<Q>(&self, key: &Q) -> Option<V>
     where
         K: Borrow<Q>,
-        Q: StorageKey + ToOwned<Owned = K> + ?Sized,
+        Q: StorageKey + ?Sized,
     {
         self.base.get(key)
     }
@@ -178,7 +178,7 @@ where
     pub fn contains<Q>(&self, key: &Q) -> bool
     where
         K: Borrow<Q>,
-        Q: StorageKey + ToOwned<Owned = K> + ?Sized,
+        Q: StorageKey + ?Sized,
     {
         self.base.contains(key)
     }
@@ -266,7 +266,7 @@ where
     pub fn iter_from<Q>(&self, from: &Q) -> MapIndexIter<K, V>
     where
         K: Borrow<Q>,
-        Q: StorageKey + ToOwned<Owned = K> + ?Sized,
+        Q: StorageKey + ?Sized,
     {
         MapIndexIter { base_iter: self.base.iter_from(&(), from) }
     }
@@ -291,7 +291,7 @@ where
     pub fn keys_from<Q>(&self, from: &Q) -> MapIndexKeys<K>
     where
         K: Borrow<Q>,
-        Q: StorageKey + ToOwned<Owned = K> + ?Sized,
+        Q: StorageKey + ?Sized,
     {
         MapIndexKeys { base_iter: self.base.iter_from(&(), from) }
     }
@@ -315,7 +315,7 @@ where
     pub fn values_from<Q>(&self, from: &Q) -> MapIndexValues<V>
     where
         K: Borrow<Q>,
-        Q: StorageKey + ToOwned<Owned = K> + ?Sized,
+        Q: StorageKey + ?Sized,
     {
         MapIndexValues { base_iter: self.base.iter_from(&(), from) }
     }
@@ -364,7 +364,7 @@ where
     pub fn remove<Q>(&mut self, key: &Q)
     where
         K: Borrow<Q>,
-        Q: StorageKey + ToOwned<Owned = K> + ?Sized,
+        Q: StorageKey + ?Sized,
     {
         self.base.remove(key)
     }

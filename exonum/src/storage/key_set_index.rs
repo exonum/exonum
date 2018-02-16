@@ -123,7 +123,7 @@ where
     pub fn contains<Q>(&self, item: &Q) -> bool
     where
         K: Borrow<Q>,
-        Q: StorageKey + ToOwned<Owned = K> + ?Sized,
+        Q: StorageKey + ?Sized,
     {
         self.base.contains(item)
     }
@@ -215,7 +215,7 @@ where
     pub fn remove<Q>(&mut self, item: &Q)
     where
         K: Borrow<Q>,
-        Q: StorageKey + ToOwned<Owned = K> + ?Sized,
+        Q: StorageKey + ?Sized,
     {
         self.base.remove(item)
     }
@@ -277,13 +277,14 @@ mod tests {
     use super::*;
     use super::super::{MemoryDB, Database};
 
+    const INDEX_NAME: &str = "test_index_name";
+
     #[test]
     fn str_key() {
         let db = MemoryDB::new();
         let mut fork = db.fork();
 
         const KEY: &str = "key_1";
-        const INDEX_NAME: &str = "test_index_name";
 
         let mut index: KeySetIndex<_, String> = KeySetIndex::new(INDEX_NAME, &mut fork);
         assert_eq!(false, index.contains(KEY));
