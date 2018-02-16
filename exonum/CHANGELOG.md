@@ -65,11 +65,21 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Removed the `'static` bound from the return value of the
   `blockchain::Service::service_name()` method. (#485)
 
+- `StorageKey` trait now requires `ToOwned` implementation. (#392)
+
 ### New features
 
 - `StorageKey` and `StorageValue` traits are implemented for `SystemTime`. (#456)
+
 - `StorageValue` and `CryptoHash` traits are implemented for `bool`. (#385)
+
 - `Height` implements `std::str::FromStr`. (#474)
+
+- `v1/transactions` endpoint has been extended with the transaction execution
+  status. (#488)
+
+- Key-indexes interface now allows to use borrowed types for the search
+  operations. (#392)
 
 ### Bug fixes
 

@@ -408,7 +408,7 @@ impl StorageKey for ProofPath {
         }
     }
 
-    fn read(buffer: &[u8]) -> Self {
+    fn read(buffer: &[u8]) -> Self::Owned {
         debug_assert_eq!(buffer.len(), PROOF_PATH_SIZE);
         let mut data = [0; PROOF_PATH_SIZE];
         data.copy_from_slice(buffer);

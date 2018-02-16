@@ -15,6 +15,7 @@
 //! An implementation of key-value map.
 
 use std::marker::PhantomData;
+use std::borrow::Borrow;
 
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageKey, StorageValue};
 
@@ -151,7 +152,11 @@ where
     /// index.put(&1, 2);
     /// assert_eq!(Some(2), index.get(&1));
     /// ```
-    pub fn get(&self, key: &K) -> Option<V> {
+    pub fn get<Q>(&self, key: &Q) -> Option<V>
+    where
+        K: Borrow<Q>,
+        Q: StorageKey + ?Sized,
+    {
         self.base.get(key)
     }
 
@@ -170,7 +175,11 @@ where
     ///
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
-    pub fn contains(&self, key: &K) -> bool {
+    pub fn contains<Q>(&self, key: &Q) -> bool
+    where
+        K: Borrow<Q>,
+        Q: StorageKey + ?Sized,
+    {
         self.base.contains(key)
     }
 
@@ -254,7 +263,11 @@ where
     ///     println!("{:?}", v);
     /// }
     /// ```
-    pub fn iter_from(&self, from: &K) -> MapIndexIter<K, V> {
+    pub fn iter_from<Q>(&self, from: &Q) -> MapIndexIter<K, V>
+    where
+        K: Borrow<Q>,
+        Q: StorageKey + ?Sized,
+    {
         MapIndexIter { base_iter: self.base.iter_from(&(), from) }
     }
 
@@ -275,7 +288,11 @@ where
     ///     println!("{}", key);
     /// }
     /// ```
-    pub fn keys_from(&self, from: &K) -> MapIndexKeys<K> {
+    pub fn keys_from<Q>(&self, from: &Q) -> MapIndexKeys<K>
+    where
+        K: Borrow<Q>,
+        Q: StorageKey + ?Sized,
+    {
         MapIndexKeys { base_iter: self.base.iter_from(&(), from) }
     }
 
@@ -295,7 +312,11 @@ where
     ///     println!("{}", val);
     /// }
     /// ```
-    pub fn values_from(&self, from: &K) -> MapIndexValues<V> {
+    pub fn values_from<Q>(&self, from: &Q) -> MapIndexValues<V>
+    where
+        K: Borrow<Q>,
+        Q: StorageKey + ?Sized,
+    {
         MapIndexValues { base_iter: self.base.iter_from(&(), from) }
     }
 }
@@ -340,7 +361,11 @@ where
     ///
     /// index.remove(&1);
     /// assert!(!index.contains(&1));
-    pub fn remove(&mut self, key: &K) {
+    pub fn remove<Q>(&mut self, key: &Q)
+    where
+        K: Borrow<Q>,
+        Q: StorageKey + ?Sized,
+    {
         self.base.remove(key)
     }
 
@@ -377,7 +402,7 @@ where
     K: StorageKey,
     V: StorageValue,
 {
-    type Item = (K, V);
+    type Item = (K::Owned, V);
     type IntoIter = MapIndexIter<'a, K, V>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -390,7 +415,7 @@ where
     K: StorageKey,
     V: StorageValue,
 {
-    type Item = (K, V);
+    type Item = (K::Owned, V);
 
     fn next(&mut self) -> Option<Self::Item> {
         self.base_iter.next()
@@ -401,7 +426,7 @@ impl<'a, K> Iterator for MapIndexKeys<'a, K>
 where
     K: StorageKey,
 {
-    type Item = K;
+    type Item = K::Owned;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.base_iter.next().map(|(k, ..)| k)
@@ -421,11 +446,45 @@ where
 
 #[cfg(test)]
 mod tests {
-    use storage::Database;
-    use super::MapIndex;
     use rand::{thread_rng, Rng};
+    use super::*;
+    use super::super::{MemoryDB, Database};
 
     const IDX_NAME: &'static str = "idx_name";
+
+    #[test]
+    fn str_key() {
+        let db = MemoryDB::new();
+        let mut fork = db.fork();
+
+        const KEY: &str = "key_1";
+
+        let mut index: MapIndex<_, String, _> = MapIndex::new(IDX_NAME, &mut fork);
+        assert_eq!(false, index.contains(KEY));
+
+        index.put(&KEY.to_owned(), 0);
+        assert_eq!(true, index.contains(KEY));
+
+        index.remove(KEY);
+        assert_eq!(false, index.contains(KEY));
+    }
+
+    #[test]
+    fn u8_slice_key() {
+        let db = MemoryDB::new();
+        let mut fork = db.fork();
+
+        const KEY: &[u8] = &[1, 2, 3];
+
+        let mut index: MapIndex<_, Vec<u8>, _> = MapIndex::new(IDX_NAME, &mut fork);
+        assert_eq!(false, index.contains(KEY));
+
+        index.put(&KEY.to_owned(), 0);
+        assert_eq!(true, index.contains(KEY));
+
+        index.remove(KEY);
+        assert_eq!(false, index.contains(KEY));
+    }
 
     fn iter(db: Box<Database>) {
         let mut fork = db.fork();

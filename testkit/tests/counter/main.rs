@@ -490,24 +490,18 @@ fn test_explorer_single_block() {
 }
 
 #[test]
-fn test_system_transaction() {
-    use exonum::explorer::{BlockInfo, TxInfo as CommittedTxInfo};
+fn test_explorer_transaction() {
+    use exonum::explorer::{BlockInfo, TxInfo as CommittedTxInfo, TxStatus};
     use exonum::helpers::Height;
 
-    // Analogs of structures defined by the system API handler.
+    // Analog of the structure defined by the system API handler.
     #[derive(Deserialize)]
-    struct MemPoolTxInfo {
-        content: serde_json::Value,
-    }
-
-    #[derive(Deserialize)]
-    #[serde(tag = "type")]
+    #[serde(rename_all = "kebab-case")]
     enum TxInfo {
         Unknown,
-        MemPool(MemPoolTxInfo),
+        InPool { content: serde_json::Value },
         Committed(CommittedTxInfo),
     }
-
 
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
@@ -521,7 +515,7 @@ fn test_system_transaction() {
     };
 
     let info: TxInfo = api.get_err(
-        ApiKind::System,
+        ApiKind::Explorer,
         &format!("v1/transactions/{}", &tx.hash().to_string()),
     );
     match info {
@@ -533,29 +527,30 @@ fn test_system_transaction() {
     testkit.poll_events();
 
     let info: TxInfo = api.get(
-        ApiKind::System,
+        ApiKind::Explorer,
         &format!("v1/transactions/{}", &tx.hash().to_string()),
     );
-    if let TxInfo::MemPool(info) = info {
-        assert_eq!(info.content, tx.serialize_field().unwrap());
+    if let TxInfo::InPool { content } = info {
+        assert_eq!(content, tx.serialize_field().unwrap());
     } else {
-        panic!("Transaction should be in the mempool");
+        panic!("Transaction should be in the pool");
     }
 
     testkit.create_block();
     let info: TxInfo = api.get(
-        ApiKind::System,
+        ApiKind::Explorer,
         &format!("v1/transactions/{}", &tx.hash().to_string()),
     );
     if let TxInfo::Committed(info) = info {
         assert_eq!(info.content, tx.serialize_field().unwrap());
         assert_eq!(info.location.block_height(), Height(1));
         assert_eq!(info.location.position_in_block(), 0);
+        assert_eq!(info.status, TxStatus::Success);
 
         let block: BlockInfo = api.get(ApiKind::Explorer, "v1/blocks/1");
         let block = block.block;
         assert!(
-            info.proof_to_block_merkle_root
+            info.location_proof
                 .validate(*block.tx_hash(), u64::from(block.tx_count()))
                 .is_ok()
         );

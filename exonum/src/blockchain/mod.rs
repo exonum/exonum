@@ -56,7 +56,7 @@ pub use self::genesis::GenesisConfig;
 pub use self::config::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
 pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState};
 pub use self::transaction::{Transaction, TransactionSet, ExecutionResult, TransactionResult,
-                            ExecutionError, TransactionError};
+                            ExecutionError, TransactionError, TransactionErrorType};
 
 mod block;
 mod schema;
