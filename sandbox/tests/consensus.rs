@@ -319,14 +319,16 @@ fn should_not_send_propose_and_prevote_after_node_restart() {
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
         .build();
 
+    let prevote = make_prevote_from_propose(&sandbox, &propose);
     sandbox.broadcast(&propose);
-    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
+    sandbox.broadcast(&prevote);
 
     let curr_height = sandbox.current_height();
     let curr_round = sandbox.current_round();
 
     let sandbox_restarted = sandbox.restart();
 
+    sandbox_restarted.broadcast(&prevote);
     sandbox_restarted.assert_lock(LOCK_ZERO, None);
     sandbox_restarted.assert_state(curr_height, curr_round);
 
@@ -350,20 +352,22 @@ fn should_not_send_prevote_after_node_restart_incoming() {
 
     sandbox.recv(&propose);
 
-    sandbox.broadcast(&Prevote::new(
+    let prevote = Prevote::new(
         VALIDATOR_0,
         HEIGHT_ONE,
         ROUND_ONE,
         &propose.hash(),
         LOCK_ZERO,
         sandbox.s(VALIDATOR_0),
-    ));
+    );
+    sandbox.broadcast(&prevote);
 
     let curr_height = sandbox.current_height();
     let curr_round = sandbox.current_round();
 
     let sandbox_restarted = sandbox.restart();
 
+    sandbox_restarted.broadcast(&prevote);
     sandbox_restarted.assert_lock(LOCK_ZERO, None);
     sandbox_restarted.assert_state(curr_height, curr_round);
 }
