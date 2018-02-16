@@ -261,6 +261,8 @@ fn assert_valid_name<S: AsRef<str>>(name: S) {
 mod tests {
     use super::*;
 
+    static INDEX_NAME: &str = "test_index_name";
+
     #[test]
     fn test_index_name_validator() {
         // spell-checker:disable

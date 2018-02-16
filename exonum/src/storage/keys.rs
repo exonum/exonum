@@ -215,6 +215,20 @@ impl StorageKey for Vec<u8> {
     }
 }
 
+impl StorageKey for [u8] {
+    fn size(&self) -> usize {
+        self.len()
+    }
+
+    fn write(&self, buffer: &mut [u8]) {
+        buffer.copy_from_slice(self)
+    }
+
+    fn read(buffer: &[u8]) -> Self::Owned {
+        Vec::<u8>::read(buffer)
+    }
+}
+
 /// Uses UTF-8 string serialization.
 impl StorageKey for String {
     fn size(&self) -> usize {
@@ -227,6 +241,20 @@ impl StorageKey for String {
 
     fn read(buffer: &[u8]) -> Self::Owned {
         unsafe { ::std::str::from_utf8_unchecked(buffer).to_string() }
+    }
+}
+
+impl StorageKey for str {
+    fn size(&self) -> usize {
+        self.len()
+    }
+
+    fn write(&self, buffer: &mut [u8]) {
+        buffer.copy_from_slice(self.as_bytes())
+    }
+
+    fn read(buffer: &[u8]) -> Self::Owned {
+        String::read(buffer)
     }
 }
 
@@ -520,5 +548,31 @@ mod tests {
         );
 
         assert_eq!(index.values().collect::<Vec<_>>(), vec![y2, y1]);
+    }
+
+    #[test]
+    fn str_key() {
+        let values = ["eee", "hello world", ""];
+        for val in values.iter() {
+            let mut buffer = get_buffer(*val);
+            val.write(&mut buffer);
+            let new_val = str::read(&buffer);
+            assert_eq!(new_val, *val);
+        }
+    }
+
+    #[test]
+    fn u8_slice_key() {
+        let values: &[&[u8]] = &[&[1, 2, 3], &[255], &[]];
+        for val in values.iter() {
+            let mut buffer = get_buffer(*val);
+            val.write(&mut buffer);
+            let new_val = <[u8] as StorageKey>::read(&buffer);
+            assert_eq!(new_val, *val);
+        }
+    }
+
+    fn get_buffer<T: StorageKey + ?Sized>(key: &T) -> Vec<u8> {
+        vec![0; key.size()]
     }
 }

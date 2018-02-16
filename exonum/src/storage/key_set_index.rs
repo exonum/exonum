@@ -283,8 +283,9 @@ mod tests {
         let mut fork = db.fork();
 
         const KEY: &str = "key_1";
+        const INDEX_NAME: &str = "test_index_name";
 
-        let mut index: KeySetIndex<_, String> = KeySetIndex::new("str_key", &mut fork);
+        let mut index: KeySetIndex<_, String> = KeySetIndex::new(INDEX_NAME, &mut fork);
         assert_eq!(false, index.contains(KEY));
 
         index.insert(KEY.to_owned());
@@ -301,7 +302,7 @@ mod tests {
 
         const KEY: &[u8] = &[1, 2, 3];
 
-        let mut index: KeySetIndex<_, Vec<u8>> = KeySetIndex::new("str_key", &mut fork);
+        let mut index: KeySetIndex<_, Vec<u8>> = KeySetIndex::new(INDEX_NAME, &mut fork);
         assert_eq!(false, index.contains(KEY));
 
         index.insert(KEY.to_owned());
