@@ -45,7 +45,7 @@ env:
   - OUTDATED_VERS=0.7.0
   - SODIUM_VERS=1.0.13
   - CARGO_INCREMENTAL=1
-  - RUSTFLAGS="-C link-dead-code"
+  - RUSTFLAGS="-C link-dead-code -D warnings"
   - CODECOV_TOKEN=90006bf6-e4b7-4825-b880-8d19c4e21c21
   - ROCKSDB_LIB_DIR=/usr/lib/x86_64-linux-gnu
   - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
@@ -102,7 +102,7 @@ jobs:
   # Tests
   - env: FEATURE=test
     script:
-    - RUSTFLAGS="$RUSTFLAGS -D warnings" cargo test --all
+    - cargo test --all
     - cargo run -p exonum-testkit --example timestamping
     - cargo run -p exonum-testkit --example configuration_change
     - cargo run -p exonum-time --example simple_service
