@@ -15,12 +15,11 @@
 use std::net::SocketAddr;
 use std::collections::HashMap;
 
-use crypto::PublicKey;
 use router::Router;
 use iron::prelude::*;
 
-use params::{Params, Value as ParamsValue};
-use node::ApiSender;
+use crypto::PublicKey;
+use node::{ExternalMessage, ApiSender};
 use blockchain::{Service, Blockchain, SharedNodeState};
 use api::{Api, ApiError};
 use messages::{TEST_NETWORK_ID, PROTOCOL_MAJOR_VERSION};
@@ -66,30 +65,29 @@ struct ReconnectInfo {
     delay: u64,
 }
 
-
 #[derive(Serialize)]
 #[serde(tag = "type")]
-enum IncommingConnectionState {
+enum IncomingConnectionState {
     Active,
     Reconnect(ReconnectInfo),
 }
 
-impl Default for IncommingConnectionState {
-    fn default() -> IncommingConnectionState {
-        IncommingConnectionState::Active
+impl Default for IncomingConnectionState {
+    fn default() -> IncomingConnectionState {
+        IncomingConnectionState::Active
     }
 }
 
 #[derive(Serialize, Default)]
-struct IncommingConnection {
+struct IncomingConnection {
     public_key: Option<PublicKey>,
-    state: IncommingConnectionState,
+    state: IncomingConnectionState,
 }
 
 #[derive(Serialize)]
 struct PeersInfo {
     incoming_connections: Vec<SocketAddr>,
-    outgoing_connections: HashMap<SocketAddr, IncommingConnection>,
+    outgoing_connections: HashMap<SocketAddr, IncomingConnection>,
 }
 
 /// Private system API.
@@ -118,7 +116,7 @@ impl SystemApi {
     }
 
     fn get_peers_info(&self) -> PeersInfo {
-        let mut outgoing_connections: HashMap<SocketAddr, IncommingConnection> = HashMap::new();
+        let mut outgoing_connections: HashMap<SocketAddr, IncomingConnection> = HashMap::new();
 
         for socket in self.shared_api_state.outgoing_connections() {
             outgoing_connections.insert(socket, Default::default());
@@ -128,7 +126,7 @@ impl SystemApi {
             outgoing_connections
                 .entry(s)
                 .or_insert_with(Default::default)
-                .state = IncommingConnectionState::Reconnect(ReconnectInfo { delay });
+                .state = IncomingConnectionState::Reconnect(ReconnectInfo { delay });
         }
 
         for (s, p) in self.shared_api_state.peers_info() {
@@ -148,9 +146,13 @@ impl SystemApi {
         self.info.clone()
     }
 
-    fn peer_add(&self, ip_str: &str) -> Result<(), ApiError> {
-        let addr: SocketAddr = ip_str.parse()?;
-        self.node_channel.peer_add(addr)?;
+    fn get_consensus_enabled_info(&self) -> bool {
+        self.shared_api_state.is_enabled()
+    }
+
+    fn set_consensus_enabled_info(&self, enabled: bool) -> Result<(), ApiError> {
+        let message = ExternalMessage::Enable(enabled);
+        self.node_channel.send_external_message(message)?;
         Ok(())
     }
 }
@@ -158,36 +160,50 @@ impl SystemApi {
 impl Api for SystemApi {
     fn wire(&self, router: &mut Router) {
 
-        let _self = self.clone();
+        let self_ = self.clone();
         let peer_add = move |req: &mut Request| -> IronResult<Response> {
-            let map = req.get_ref::<Params>().unwrap();
-            match map.find(&["ip"]) {
-                Some(&ParamsValue::String(ref ip_str)) => {
-                    _self.peer_add(ip_str)?;
-                    _self.ok_response(&::serde_json::to_value("Ok").unwrap())
-                }
-                _ => {
-                    Err(ApiError::IncorrectRequest(
-                        "Required parameter of peer 'ip' is missing".into(),
-                    ))?
-                }
-            }
+            let addr: SocketAddr = self_.required_param(req, "ip")?;
+            self_.node_channel.peer_add(addr).map_err(ApiError::from)?;
+            self_.ok_response(&::serde_json::to_value("Ok").unwrap())
         };
 
-        let _self = self.clone();
+        let self_ = self.clone();
         let peers_info = move |_: &mut Request| -> IronResult<Response> {
-            let info = _self.get_peers_info();
-            _self.ok_response(&::serde_json::to_value(info).unwrap())
+            let info = self_.get_peers_info();
+            self_.ok_response(&::serde_json::to_value(info).unwrap())
         };
 
-        let _self = self.clone();
+        let self_ = self.clone();
         let network = move |_: &mut Request| -> IronResult<Response> {
-            let info = _self.get_network_info();
-            _self.ok_response(&::serde_json::to_value(info).unwrap())
+            let info = self_.get_network_info();
+            self_.ok_response(&::serde_json::to_value(info).unwrap())
+        };
+
+        let self_ = self.clone();
+        let consensus_enabled_info = move |_: &mut Request| -> IronResult<Response> {
+            let info = self_.get_consensus_enabled_info();
+            self_.ok_response(&::serde_json::to_value(info).unwrap())
+        };
+
+        let self_ = self.clone();
+        let consensus_enabled_set = move |req: &mut Request| -> IronResult<Response> {
+            let enabled: bool = self_.required_param(req, "enabled")?;
+            self_.set_consensus_enabled_info(enabled)?;
+            self_.ok_response(&::serde_json::to_value("Ok").unwrap())
         };
 
         router.get("/v1/peers", peers_info, "peers_info");
         router.post("/v1/peers", peer_add, "peer_add");
         router.get("/v1/network", network, "network_info");
+        router.get(
+            "/v1/consensus_enabled",
+            consensus_enabled_info,
+            "consensus_enabled_info",
+        );
+        router.post(
+            "/v1/consensus_enabled",
+            consensus_enabled_set,
+            "consensus_enabled_set",
+        );
     }
 }

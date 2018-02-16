@@ -1,0 +1,9 @@
+[workspace]
+members = [
+    "exonum",
+    "sandbox",
+    "testkit",
+    "services/configuration",
+    "services/time",
+]
+exclude = [ "3rdparty", "exonum/fuzz" ]

@@ -11,21 +11,31 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 use std::collections::HashSet;
 
-use crypto::{Hash, PublicKey};
+use crypto::{Hash, CryptoHash, PublicKey};
 use blockchain::{Schema, Transaction};
 use messages::{BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote,
                PrevotesRequest, Propose, ProposeRequest, RawTransaction, TransactionsRequest};
 use helpers::{Height, Round, ValidatorId};
 use storage::Patch;
 use node::{NodeHandler, RequestData};
+use events::InternalRequest;
 
-// TODO reduce view invokations (ECR-171)
+// TODO reduce view invocations (ECR-171)
 impl NodeHandler {
     /// Validates consensus message, then redirects it to the corresponding `handle_...` function.
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_consensus(&mut self, msg: ConsensusMessage) {
+        if !self.is_enabled {
+            info!(
+                "Ignoring a consensus message {:?} because the node is disabled",
+                msg
+            );
+            return;
+        }
+
         // Ignore messages from previous and future height
         if msg.height() < self.state.height() || msg.height() > self.state.height().next() {
             warn!(
@@ -37,7 +47,7 @@ impl NodeHandler {
         }
 
         // Queued messages from next height or round
-        // TODO: shoud we ignore messages from far rounds (ECR-171)?
+        // TODO: should we ignore messages from far rounds (ECR-171)?
         if msg.height() == self.state.height().next() || msg.round() > self.state.round() {
             trace!(
                 "Received consensus message from future round: msg.height={}, msg.round={}, \
@@ -47,7 +57,15 @@ impl NodeHandler {
                 self.state.height(),
                 self.state.round()
             );
+            let validator = msg.validator();
+            let round = msg.round();
             self.state.add_queued(msg);
+            trace!("Trying to reach actual round.");
+            if let Some(r) = self.state.get_actual_round(validator, round) {
+                trace!("Scheduling jump to round.");
+                let height = self.state.height();
+                self.execute_later(InternalRequest::JumpToRound(height, r));
+            }
             return;
         }
 
@@ -141,7 +159,7 @@ impl NodeHandler {
     // TODO write helper function which returns Result (ECR-123)
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_block(&mut self, msg: &BlockResponse) {
-        // Request are sended to us
+        // Request are sent to us
         if msg.to() != self.state.consensus_public_key() {
             error!(
                 "Received block that intended for another peer, to={}, from={}",
@@ -441,7 +459,7 @@ impl NodeHandler {
         trace!("COMMIT {:?}", block_hash);
 
         // Merge changes into storage
-        let (commited_txs, proposer) = {
+        let (committed_txs, proposer) = {
             // FIXME Avoid of clone here.
             let block_state = self.state.block(&block_hash).unwrap().clone();
             self.blockchain
@@ -475,7 +493,7 @@ impl NodeHandler {
             round
                 .map(|x| format!("{}", x))
                 .unwrap_or_else(|| "?".into()),
-            commited_txs,
+            committed_txs,
             mempool_size,
             block_hash.to_hex(),
         );
@@ -582,6 +600,42 @@ impl NodeHandler {
         }
     }
 
+    /// Handle new round, after jump.
+    pub fn handle_new_round(&mut self, height: Height, round: Round) {
+        trace!("Handle new round");
+        if height != self.state.height() {
+            return;
+        }
+
+        if round <= self.state.round() {
+            return;
+        }
+
+        info!("Jump to a new round = {}", round);
+        self.state.jump_round(round);
+        self.process_new_round();
+    }
+
+    // Try to process consensus messages from the future round.
+    fn process_new_round(&mut self) {
+        if self.state.is_validator() {
+            // Send prevote if we are locked or propose if we are leader
+            if let Some(hash) = self.state.locked_propose() {
+                let round = self.state.round();
+                let has_majority_prevotes = self.broadcast_prevote(round, &hash);
+                if has_majority_prevotes {
+                    self.has_majority_prevotes(round, &hash);
+                }
+            } else if self.state.is_leader() {
+                self.add_propose_timeout();
+            }
+        }
+
+        // Handle queued messages
+        for msg in self.state.queued() {
+            self.handle_consensus(msg);
+        }
+    }
     /// Handles round timeout. As result node sends `Propose` if it is a leader or `Prevote` if it
     /// is locked to some round.
     pub fn handle_round_timeout(&mut self, height: Height, round: Round) {
@@ -600,25 +654,7 @@ impl NodeHandler {
         // Add timeout for this round
         self.add_round_timeout();
 
-        if !self.state.is_validator() {
-            return;
-        }
-
-        // Send prevote if we are locked or propose if we are leader
-        if let Some(hash) = self.state.locked_propose() {
-            let round = self.state.round();
-            let has_majority_prevotes = self.broadcast_prevote(round, &hash);
-            if has_majority_prevotes {
-                self.has_majority_prevotes(round, &hash);
-            }
-        } else if self.state.is_leader() {
-            self.add_propose_timeout();
-        }
-
-        // Handle queued messages
-        for msg in self.state.queued() {
-            self.handle_consensus(msg);
-        }
+        self.process_new_round();
     }
 
     /// Handles propose timeout. Node sends `Propose` and `Prevote` if it is a leader as result.
@@ -665,7 +701,7 @@ impl NodeHandler {
                 self.state.consensus_secret_key(),
             );
             trace!("Broadcast propose: {:?}", propose);
-            self.broadcast(&propose);
+            self.broadcast(propose.raw());
 
             // Save our propose into state
             let hash = self.state.add_self_propose(propose);
@@ -853,7 +889,7 @@ impl NodeHandler {
         );
         let has_majority_prevotes = self.state.add_prevote(&prevote);
         trace!("Broadcast prevote: {:?}", prevote);
-        self.broadcast(&prevote);
+        self.broadcast(prevote.raw());
         has_majority_prevotes
     }
 
@@ -873,7 +909,7 @@ impl NodeHandler {
         );
         self.state.add_precommit(&precommit);
         trace!("Broadcast precommit: {:?}", precommit);
-        self.broadcast(&precommit);
+        self.broadcast(precommit.raw());
     }
 
     /// Checks that pre-commits count is correct and calls `verify_precommit` for each of them.

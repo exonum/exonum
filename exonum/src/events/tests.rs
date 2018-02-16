@@ -11,15 +11,16 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+use std::net::SocketAddr;
+use std::thread;
+use std::time::{self, Duration};
+
 use futures::{Future, Sink, Stream};
 use futures::stream::Wait;
 use futures::sync::mpsc;
 use tokio_core::reactor::Core;
 use tokio_timer::{TimeoutStream, Timer};
-
-use std::net::SocketAddr;
-use std::thread;
-use std::time::{self, Duration};
 
 use crypto::{gen_keypair, PublicKey, Signature};
 use messages::{Connect, Message, MessageWriter, RawMessage};
@@ -27,6 +28,7 @@ use events::{NetworkEvent, NetworkRequest};
 use events::network::{NetworkConfiguration, NetworkPart};
 use events::error::log_error;
 use node::{EventsPoolCapacity, NodeChannel};
+use blockchain::ConsensusConfig;
 
 #[derive(Debug)]
 pub struct TestHandler {
@@ -86,7 +88,7 @@ impl TestHandler {
         match self.wait_for_event() {
             Ok(NetworkEvent::PeerConnected(_addr, connect)) => connect,
             Ok(other) => panic!("Unexpected connect received, {:?}", other),
-            Err(e) => panic!("An error during wait for connect occured, {:?}", e),
+            Err(e) => panic!("An error during wait for connect occurred, {:?}", e),
         }
     }
 
@@ -94,7 +96,7 @@ impl TestHandler {
         match self.wait_for_event() {
             Ok(NetworkEvent::PeerDisconnected(addr)) => addr,
             Ok(other) => panic!("Unexpected disconnect received, {:?}", other),
-            Err(e) => panic!("An error during wait for disconnect occured, {:?}", e),
+            Err(e) => panic!("An error during wait for disconnect occurred, {:?}", e),
         }
     }
 
@@ -102,7 +104,7 @@ impl TestHandler {
         match self.wait_for_event() {
             Ok(NetworkEvent::MessageReceived(_addr, msg)) => msg,
             Ok(other) => panic!("Unexpected message received, {:?}", other),
-            Err(e) => panic!("An error during wait for message occured, {:?}", e),
+            Err(e) => panic!("An error during wait for message occurred, {:?}", e),
         }
     }
 
@@ -161,6 +163,7 @@ impl TestEvents {
             our_connect_message: connect_message(self.listen_address),
             listen_address: self.listen_address,
             network_config,
+            max_message_len: ConsensusConfig::DEFAULT_MESSAGE_MAX_LEN,
             network_requests: channel.network_requests,
             network_tx: network_tx.clone(),
         };
@@ -256,6 +259,36 @@ fn test_network_big_message() {
 
     e2.disconnect_with(first);
     assert_eq!(e2.wait_for_disconnect(), first);
+}
+
+#[test]
+fn test_network_max_message_len() {
+    let first = "127.0.0.1:17202".parse().unwrap();
+    let second = "127.0.0.1:17303".parse().unwrap();
+
+    let max_message_length = ConsensusConfig::DEFAULT_MESSAGE_MAX_LEN as usize;
+    let max_payload_length = max_message_length - ::messages::HEADER_LENGTH -
+        ::crypto::SIGNATURE_LENGTH;
+    let acceptable_message = raw_message(15, max_payload_length);
+    let too_big_message = raw_message(16, max_payload_length + 1000);
+
+    let e1 = TestEvents::with_addr(first);
+    let e2 = TestEvents::with_addr(second);
+
+    let mut e1 = e1.spawn();
+    let mut e2 = e2.spawn();
+
+    e1.connect_with(second);
+    e2.wait_for_connect();
+
+    e2.connect_with(first);
+    e1.wait_for_connect();
+
+    e1.send_to(second, acceptable_message.clone());
+    assert_eq!(e2.wait_for_message(), acceptable_message);
+
+    e2.send_to(first, too_big_message.clone());
+    assert!(e1.wait_for_event().is_err());
 }
 
 #[test]

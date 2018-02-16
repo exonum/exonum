@@ -17,7 +17,6 @@ use bit_vec::BitVec;
 
 use messages::{RawMessage, HEADER_LENGTH, MessageBuffer};
 use crypto::Hash;
-
 use super::{Result, Error, Field, Offset, CheckedOffset};
 
 /// Trait for fields, that has unknown `compile-time` size.

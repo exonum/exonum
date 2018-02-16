@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate rand;
-
-use rand::Rng;
-
 use std::net::SocketAddr;
 use std::error::Error;
+
+use rand::{self, Rng};
 
 use messages::{Any, RawMessage, Connect, Status, Message, PeersRequest};
 use helpers::Height;
@@ -58,19 +56,24 @@ impl NodeHandler {
     /// in the validators list.
     pub fn handle_disconnected(&mut self, addr: SocketAddr) {
         info!("Disconnected from: {}", addr);
-        let need_reconnect = self.state.remove_peer_with_addr(&addr);
-        if need_reconnect {
-            self.connect(&addr);
-        }
+        self.remove_peer_with_addr(addr);
     }
+
     /// Handles the `UnableConnectToPeer` event. Node will try to connect to that address again
     /// if it was in the validators list.
     pub fn handle_unable_to_connect(&mut self, addr: SocketAddr) {
         info!("Could not connect to: {}", addr);
+        self.remove_peer_with_addr(addr);
+    }
+
+    /// Removes peer from the state and from the cache. Node will try to connect to that address
+    /// again if it was in the validators list.
+    fn remove_peer_with_addr(&mut self, addr: SocketAddr) {
         let need_reconnect = self.state.remove_peer_with_addr(&addr);
         if need_reconnect {
             self.connect(&addr);
         }
+        self.blockchain.remove_peer_with_addr(&addr);
     }
 
     /// Handles the `Connect` message and connects to a peer as result.
@@ -120,12 +123,13 @@ impl NodeHandler {
                 need_connect = false;
             }
         }
-        self.state.add_peer(public_key, message);
+        self.state.add_peer(public_key, message.clone());
         info!(
             "Received Connect message from {}, {}",
             address,
             need_connect,
         );
+        self.blockchain.save_peer(&public_key, message);
         if need_connect {
             // TODO: reduce double sending of connect message
             info!("Send Connect message to {}", address);
@@ -239,6 +243,6 @@ impl NodeHandler {
             self.state.consensus_secret_key(),
         );
         trace!("Broadcast status: {:?}", status);
-        self.broadcast(&status);
+        self.broadcast(status.raw());
     }
 }

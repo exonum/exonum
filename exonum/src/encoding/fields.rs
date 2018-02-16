@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use byteorder::{ByteOrder, LittleEndian};
-
 use std::mem;
 use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
+
+use byteorder::{ByteOrder, LittleEndian};
 
 use crypto::{Hash, PublicKey, Signature};
 use helpers::{Height, Round, ValidatorId};
@@ -87,7 +87,7 @@ macro_rules! implement_std_field {
     )
 }
 
-/// Implements `Field` for the tuple struct typedefs that contain simple types.
+/// Implements `Field` for the tuple struct type definitions that contain simple types.
 macro_rules! implement_std_typedef_field {
     ($name:ident ($t:ty) $fn_read:expr; $fn_write:expr) => (
         impl<'a> Field<'a> for $name {
@@ -172,7 +172,7 @@ impl<'a> Field<'a> for bool {
         1
     }
 
-    unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> bool {
+    unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> Self {
         buffer[from as usize] == 1
     }
 
@@ -205,7 +205,7 @@ impl<'a> Field<'a> for u8 {
         mem::size_of::<Self>() as Offset
     }
 
-    unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> u8 {
+    unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> Self {
         buffer[from as usize]
     }
 
@@ -224,13 +224,13 @@ impl<'a> Field<'a> for u8 {
     }
 }
 
-// TODO expect some codding of signed ints (ECR-156) ?
+// TODO expect some codding of signed integers (ECR-156) ?
 impl<'a> Field<'a> for i8 {
     fn field_size() -> Offset {
         mem::size_of::<Self>() as Offset
     }
 
-    unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> i8 {
+    unsafe fn read(buffer: &'a [u8], from: Offset, _: Offset) -> Self {
         buffer[from as usize] as i8
     }
 

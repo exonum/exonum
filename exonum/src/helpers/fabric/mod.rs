@@ -14,26 +14,28 @@
 
 //! Command line commands utilities.
 
+use std::str::FromStr;
+use std::collections::BTreeMap;
+
 use clap;
 use toml::Value;
 use serde::{Serialize, Deserialize};
-
-use std::str::FromStr;
-use std::error::Error;
-use std::collections::BTreeMap;
+use failure;
 
 use blockchain::Service;
-use self::internal::NotFoundInMap;
 
 pub use self::builder::NodeBuilder;
 pub use self::details::{Run, Finalize, GenerateNodeConfig, GenerateCommonConfig, GenerateTestnet};
 pub use self::shared::{AbstractConfig, NodePublicConfig, CommonConfigTemplate, NodePrivateConfig};
+pub use self::context_key::ContextKey;
 
 mod shared;
 mod builder;
 mod details;
 mod internal;
 mod clap_backend;
+#[macro_use]
+mod context_key;
 
 /// Default port value.
 pub const DEFAULT_EXONUM_LISTEN_PORT: u16 = 6333;
@@ -110,8 +112,67 @@ impl Argument {
     }
 }
 
+/// Keys describing various pieces of data one can get from `Context`.
+pub mod keys {
+    use std::collections::BTreeMap;
+
+    use toml;
+
+    use node::NodeConfig;
+    use super::shared::{AbstractConfig, CommonConfigTemplate, NodePublicConfig};
+    use super::ContextKey;
+
+    /// Configuration for this node.
+    /// Set by `finalize` and `run` commands.
+    pub const NODE_CONFIG: ContextKey<NodeConfig> = context_key!("node_config");
+
+    /// Configurations for all nodes.
+    /// Set by `generate-testnet` command.
+    pub const CONFIGS: ContextKey<Vec<NodeConfig>> = context_key!("configs");
+
+    /// Services configuration.
+    /// Set by `generate-testnet` command.
+    pub const SERVICES_CONFIG: ContextKey<AbstractConfig> = context_key!("services_config");
+
+    /// Common configuration.
+    /// Set by `generate-config` and `finalize` commands.
+    pub const COMMON_CONFIG: ContextKey<CommonConfigTemplate> = context_key!("common_config");
+
+    /// Services public configuration.
+    /// Set by `generate-config` command.
+    pub const SERVICES_PUBLIC_CONFIGS: ContextKey<BTreeMap<String, toml::Value>> =
+        context_key!("services_public_configs");
+
+    /// Services secret configuration.
+    /// Set by `generate-config` command.
+    pub const SERVICES_SECRET_CONFIGS: ContextKey<BTreeMap<String, toml::Value>> =
+        context_key!("services_secret_configs");
+
+    /// Public configurations for all nodes.
+    /// Set by `finalize` command.
+    pub const PUBLIC_CONFIG_LIST: ContextKey<Vec<NodePublicConfig>> =
+        context_key!("public_config_list");
+
+    /// Auditor mode.
+    /// Set by `finalize` command.
+    pub const AUDITOR_MODE: ContextKey<bool> = context_key!("auditor_mode");
+}
+
+
 /// `Context` is a type, used to keep some values from `Command` into
 /// `CommandExtension` and vice verse.
+/// To access values stored inside Context, use `ContextKey`.
+///
+/// # Examples
+///
+/// ```
+/// use exonum::node::NodeConfig;
+/// use exonum::helpers::fabric::{keys, Context};
+///
+/// fn get_node_config(context: &Context) -> NodeConfig {
+///     context.get(keys::NODE_CONFIG).unwrap()
+/// }
+/// ```
 #[derive(PartialEq, Debug, Clone, Default)]
 pub struct Context {
     args: BTreeMap<String, String>,
@@ -159,36 +220,40 @@ impl Context {
     }
 
     /// Gets value of the command line argument.
-    pub fn arg<T: FromStr>(&self, key: &str) -> Result<T, Box<Error>>
+    pub fn arg<T: FromStr>(&self, key: &str) -> Result<T, failure::Error>
     where
-        <T as FromStr>::Err: Error + 'static,
+        failure::Error: From<<T as FromStr>::Err>,
     {
-        if let Some(v) = self.args.get(key) {
-            Ok(v.parse()?)
-        } else {
-            Err(Box::new(NotFoundInMap))
+        match self.args.get(key) {
+            Some(v) => Ok(v.parse()?),
+            None => bail!("expected `{}` argument", key),
         }
+    }
+
+    /// Inserts value to the command line arguments map.
+    pub fn set_arg(&mut self, key: &str, value: String) {
+        self.args.insert(key.into(), value);
     }
 
     /// Gets multiple values of the command line argument.
-    pub fn arg_multiple<T: FromStr>(&self, key: &str) -> Result<Vec<T>, Box<Error>>
+    pub fn arg_multiple<T: FromStr>(&self, key: &str) -> Result<Vec<T>, failure::Error>
     where
-        <T as FromStr>::Err: Error + 'static,
+        failure::Error: From<<T as FromStr>::Err>,
     {
-        if let Some(values) = self.multiple_args.get(key) {
-            values.iter().map(|v| Ok(v.parse()?)).collect()
-        } else {
-            Err(Box::new(NotFoundInMap))
+        match self.multiple_args.get(key) {
+            Some(values) => values.iter().map(|v| Ok(v.parse()?)).collect(),
+            None => bail!("expected `{}` argument", key),
         }
     }
 
+    /// Inserts multiple values to the command line arguments map.
+    pub fn set_arg_multiple(&mut self, key: &str, values: Vec<String>) {
+        self.multiple_args.insert(key.into(), values);
+    }
+
     /// Gets the variable from the context.
-    pub fn get<'de, T: Deserialize<'de>>(&self, key: &str) -> Result<T, Box<Error>> {
-        if let Some(v) = self.variables.get(key) {
-            Ok(v.clone().try_into()?)
-        } else {
-            Err(Box::new(NotFoundInMap))
-        }
+    pub fn get<'de, T: Deserialize<'de>>(&self, key: ContextKey<T>) -> Result<T, failure::Error> {
+        self.get_raw(key.name())
     }
 
     /// Sets the variable in the context and returns the previous value.
@@ -196,7 +261,18 @@ impl Context {
     /// # Panic
     ///
     /// Panics if value could not be serialized as TOML.
-    pub fn set<T: Serialize>(&mut self, key: &'static str, value: T) -> Option<Value> {
+    pub fn set<T: Serialize>(&mut self, key: ContextKey<T>, value: T) -> Option<Value> {
+        self.set_raw(key.name(), value)
+    }
+
+    fn get_raw<'de, T: Deserialize<'de>>(&self, key: &str) -> Result<T, failure::Error> {
+        match self.variables.get(key) {
+            Some(v) => Ok(v.clone().try_into()?),
+            _ => bail!("key `{}` not found", key),
+        }
+    }
+
+    fn set_raw<T: Serialize>(&mut self, key: &str, value: T) -> Option<Value> {
         let value: Value = Value::try_from(value).expect("could not convert value into toml");
         self.variables.insert(key.to_owned(), value)
     }
@@ -207,7 +283,7 @@ pub trait CommandExtension {
     /// Returns arguments of the command.
     fn args(&self) -> Vec<Argument>;
     /// Executes command.
-    fn execute(&self, context: Context) -> Result<Context, Box<Error>>;
+    fn execute(&self, context: Context) -> Result<Context, failure::Error>;
 }
 
 /// Factory for service creation.

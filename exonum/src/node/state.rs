@@ -14,17 +14,17 @@
 
 //! State of the `NodeHandler`.
 
-use serde_json::Value;
-use bit_vec::BitVec;
-
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::collections::hash_map::Entry;
 use std::sync::{Arc, RwLock};
 use std::net::SocketAddr;
 use std::time::{SystemTime, Duration};
 
+use serde_json::Value;
+use bit_vec::BitVec;
+
 use messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect};
-use crypto::{PublicKey, SecretKey, Hash};
+use crypto::{CryptoHash, PublicKey, SecretKey, Hash};
 use storage::{Patch, Snapshot};
 use blockchain::{ValidatorKeys, ConsensusConfig, StoredConfiguration, Transaction,
                  TimeoutAdjusterConfig};
@@ -91,6 +91,8 @@ pub struct State {
 
     // maximum of node height in consensus messages
     nodes_max_height: BTreeMap<PublicKey, Height>,
+
+    validators_rounds: BTreeMap<ValidatorId, Round>,
 
     timeout_adjuster: Box<TimeoutAdjuster>,
     propose_timeout: Milliseconds,
@@ -359,6 +361,7 @@ impl State {
         whitelist: Whitelist,
         stored: StoredConfiguration,
         connect: Connect,
+        peers: HashMap<PublicKey, Connect>,
         last_hash: Hash,
         last_height: Height,
         height_start_time: SystemTime,
@@ -371,7 +374,7 @@ impl State {
             service_secret_key,
             tx_pool_capacity: tx_pool_capacity,
             whitelist: whitelist,
-            peers: HashMap::new(),
+            peers,
             connections: HashMap::new(),
             height: last_height,
             height_start_time,
@@ -393,6 +396,7 @@ impl State {
             unknown_proposes_with_precommits: HashMap::new(),
 
             nodes_max_height: BTreeMap::new(),
+            validators_rounds: BTreeMap::new(),
 
             our_connect_message: connect,
 
@@ -564,6 +568,42 @@ impl State {
         ValidatorId(((height + round) % (self.validators().len() as u64)) as u16)
     }
 
+    /// Updates known round for a validator and returns
+    /// a new actual round if at least one non byzantine validators are on a higher round.
+    /// Otherwise returns None.
+    pub fn get_actual_round(&mut self, id: ValidatorId, round: Round) -> Option<Round> {
+        {
+            let known_round = self.validators_rounds.entry(id).or_insert_with(Round::zero);
+            if round <= *known_round {
+                // keep only maximum round
+                trace!(
+                    "Received a message from a lower round than we know already,\
+                message_round = {},\
+                known_round = {}.",
+                    round,
+                    known_round
+                );
+                return None;
+            }
+            *known_round = round;
+        }
+        let max_byzantine_count = self.validators().len() / 3;
+        if self.validators_rounds.len() <= max_byzantine_count {
+            trace!("Count of validators, lower then max byzantine count.");
+            return None;
+        }
+
+        let mut rounds: Vec<_> = self.validators_rounds.iter().map(|(_, v)| v).collect();
+        rounds.sort_unstable_by(|a, b| b.cmp(a));
+
+        if rounds[max_byzantine_count] > &self.round {
+            Some(*rounds[max_byzantine_count])
+        } else {
+            None
+        }
+
+    }
+
     /// Returns the height for a validator identified by the public key.
     pub fn node_height(&self, key: &PublicKey) -> Height {
         *self.nodes_max_height.get(key).unwrap_or(&Height::zero())
@@ -638,7 +678,7 @@ impl State {
         self.locked_propose
     }
 
-    /// Returns muttable propose state identified by hash.
+    /// Returns mutable propose state identified by hash.
     pub fn propose_mut(&mut self, hash: &Hash) -> Option<&mut ProposeState> {
         self.proposes.get_mut(hash)
     }
@@ -686,6 +726,7 @@ impl State {
         self.proposes.clear();
         self.prevotes.clear();
         self.precommits.clear();
+        self.validators_rounds.clear();
         if let Some(ref mut validator_state) = self.validator_state {
             validator_state.clear();
         }
@@ -976,7 +1017,7 @@ impl State {
             match self.validator_state {
                 Some(ref validator_state) => {
                     if let Some(msg) = validator_state.our_prevotes.get(&round) {
-                        // TODO: unefficient (ECR-171)
+                        // TODO: inefficient (ECR-171)
                         if Some(*msg.propose_hash()) != self.locked_propose {
                             return true;
                         }

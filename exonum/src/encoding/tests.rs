@@ -12,17 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use bit_vec::BitVec;
-
 use std::net::SocketAddr;
 use std::time::SystemTime;
+
+use bit_vec::BitVec;
 
 use crypto::{hash, gen_keypair};
 use blockchain::{self, BlockProof, Block};
 use messages::{RawMessage, Message, Connect, Propose, Prevote, Precommit, Status, BlockResponse,
                BlockRequest};
 use helpers::{Height, Round, ValidatorId};
-
 use super::{Field, Offset};
 
 static VALIDATOR: ValidatorId = ValidatorId(65_123);
@@ -30,21 +29,19 @@ static HEIGHT: Height = Height(123_123_123);
 static ROUND: Round = Round(321_321_312);
 
 #[allow(dead_code)]
-// This structures used to test deserialize,
-// so we should ingore unused `new` method.
+// This structures used to test deserialization,
+// so we should ignore unused `new` method.
 mod ignore_new {
     use crypto::Hash;
     encoding_struct! {
         struct Parent {
-            const SIZE = 8;
-            field child: Child [0 => 8]
+            child: Child,
         }
     }
 
     encoding_struct! {
         struct Child {
-            const SIZE = 32;
-            field child: &Hash [0 => 32]
+            child: &Hash,
         }
     }
 }
@@ -81,7 +78,6 @@ fn test_read_overflow_arithmetic() {
 
 #[test]
 fn test_bitvec() {
-
     let mut b = BitVec::from_elem(14, false);
     b.set(11, true);
     b.set(4, true);
@@ -94,6 +90,7 @@ fn test_bitvec() {
 #[test]
 fn test_str_segment() {
     let mut buf = vec![0; 8];
+    // spell-checker:disable-next
     let s = "test юникодной строчки efw_adqq ss/adfq";
     Field::write(&s, &mut buf, 0, 8);
     <&str as Field>::check(&buf, 0.into(), 8.into(), 8.into()).unwrap();
@@ -117,8 +114,32 @@ fn test_u16_segment() {
 }
 
 #[test]
+fn test_i16_segment() {
+    let dat = vec![1i16, 3, 10, 15, 23, 4, 45];
+    assert_write_check_read(dat, 8);
+}
+
+#[test]
 fn test_u32_segment() {
     let dat = vec![1u32, 3, 10, 15, 23, 4, 45];
+    assert_write_check_read(dat, 8);
+}
+
+#[test]
+fn test_i32_segment() {
+    let dat = vec![1i32, 3, 10, 15, 23, 4, 45];
+    assert_write_check_read(dat, 8);
+}
+
+#[test]
+fn test_u64_segment() {
+    let dat = vec![1u64, 3, 10, 15, 23, 4, 45];
+    assert_write_check_read(dat, 8);
+}
+
+#[test]
+fn test_i64_segment() {
+    let dat = vec![1i64, 3, 10, 15, 23, 4, 45];
     assert_write_check_read(dat, 8);
 }
 
@@ -158,7 +179,6 @@ fn test_segments_of_arrays() {
     assert_eq!(buf.len(), 64 + v1.len() + v2.len() + v3.len() + 3 * 8);
 }
 
-
 fn assert_write_check_read<T>(input: T, header_size: Offset)
 where
     T: for<'r> Field<'r> + PartialEq + ::std::fmt::Debug,
@@ -181,7 +201,6 @@ where
     ).unwrap();
     let output = unsafe { Field::read(&new_buffer, 0, header_size) };
     assert_eq!(input, output);
-
 }
 
 #[test]
@@ -471,83 +490,34 @@ fn test_request_block() {
 fn test_correct_encoding_struct() {
     encoding_struct! {
         struct NoFields {
-            const SIZE = 0;
         }
     }
     drop(NoFields::new());
 
     encoding_struct! {
         struct OneField {
-            const SIZE = 8;
 
-            field one:   u64 [00 => 08]
+            one: u64,
         }
     }
     drop(OneField::new(0));
 
     encoding_struct! {
         struct TwoFields {
-            const SIZE = 8;
 
-            field one:   u32 [00 => 04]
-            field two:   u32 [04 => 08]
+            one: u32,
+            two: u32,
         }
     }
     drop(TwoFields::new(0, 0));
 
     encoding_struct! {
         struct ThreeFields {
-            const SIZE = 8;
 
-            field one:   u16 [00 => 02]
-            field two:   u16 [02 => 04]
-            field three: u32 [04 => 08]
+            one: u16,
+            two: u16,
+            three: u32,
         }
     }
     drop(ThreeFields::new(0, 0, 0));
-}
-
-#[test]
-#[should_panic(expected = "fields should be adjacent")]
-fn test_encoding_struct_with_hole() {
-    encoding_struct! {
-        struct MiddleHole {
-            const SIZE = 9;
-
-            field one:   u16 [00 => 02]
-            field two:   u16 [03 => 05] // start should be 2
-            field three: u32 [05 => 09]
-        }
-    }
-    drop(MiddleHole::new(0, 0, 0));
-}
-
-#[test]
-#[should_panic(expected = "fields should be adjacent")]
-fn test_encoding_struct_with_overlay() {
-    encoding_struct! {
-        struct FieldOverlay {
-            const SIZE = 7;
-
-            field one:   u16 [00 => 02]
-            field two:   u16 [01 => 03] // start should be 2
-            field three: u32 [03 => 07]
-        }
-    }
-    drop(FieldOverlay::new(0, 0, 0));
-}
-
-#[test]
-#[should_panic(expected = "wrong size of field")]
-fn test_encoding_struct_wrong_size() {
-    encoding_struct! {
-        struct WrongSize {
-            const SIZE = 7;
-
-            field one:   u16 [00 => 02]
-            field two:   u16 [02 => 03] // size should be 2
-            field three: u32 [03 => 07]
-        }
-    }
-    drop(WrongSize::new(0, 0, 0));
 }

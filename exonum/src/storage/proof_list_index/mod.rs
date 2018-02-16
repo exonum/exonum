@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! An implementation of a Merklized version of an array list (Merkle tree).
+//! An implementation of a Merkelized version of an array list (Merkle tree).
+
 use std::cell::Cell;
 use std::marker::PhantomData;
 
 use crypto::{Hash, hash, HashStream};
-
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
-
 use self::key::ProofListKey;
 
 pub use self::proof::{ListProof, ListProofError};
@@ -31,7 +30,7 @@ mod proof;
 
 // TODO: implement pop and truncate methods for Merkle tree (ECR-173)
 
-/// A Merkalized version of an array list that provides proofs of existence for the list items.
+/// A Merkelized version of an array list that provides proofs of existence for the list items.
 ///
 /// `ProofListIndex` implements a Merkle tree, storing elements as leaves and using `u64` as
 /// an index. `ProofListIndex` requires that the elements implement the [`StorageValue`] trait.

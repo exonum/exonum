@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// spell-checker:ignore precommiters, uncommented, uncomment, commited
+
+#[macro_use]
+extern crate pretty_assertions;
 extern crate rand;
 extern crate exonum;
 extern crate sandbox;
@@ -20,15 +24,14 @@ extern crate log;
 extern crate env_logger;
 extern crate bit_vec;
 
-use rand::{thread_rng, Rng};
-use bit_vec::BitVec;
-
 use std::time::Duration;
 use std::collections::BTreeMap;
 
+use rand::{thread_rng, Rng};
+use bit_vec::BitVec;
 use exonum::messages::{RawMessage, Message, Propose, Prevote, Precommit, ProposeRequest,
-                       TransactionsRequest, PrevotesRequest, CONSENSUS};
-use exonum::crypto::{Hash, Seed, gen_keypair, gen_keypair_from_seed};
+                       TransactionsRequest, PrevotesRequest, CONSENSUS, Connect, PeersRequest};
+use exonum::crypto::{CryptoHash, Hash, Seed, gen_keypair, gen_keypair_from_seed};
 use exonum::blockchain::{Blockchain, Schema};
 use exonum::node::state::{PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT,
                           TRANSACTIONS_REQUEST_TIMEOUT};
@@ -36,6 +39,8 @@ use exonum::helpers::{Height, Round};
 
 use sandbox::timestamping::{TimestampTx, TimestampingTxGenerator, TIMESTAMPING_SERVICE};
 use sandbox::timestamping_sandbox;
+use sandbox::sandbox::sandbox_with_services_uninitialized;
+use sandbox::sandbox::sandbox_restarted_uninitialized;
 use sandbox::sandbox_tests_helper::*;
 use sandbox::config_updater::TxConfig;
 
@@ -104,6 +109,45 @@ fn test_reach_one_height() {
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
 }
 
+/// Validator2,3,4 starts in 5th round
+/// Validator1 starts with delay
+/// Validator1 receive consensus messages, and reach actual round
+#[test]
+fn test_reach_actual_round() {
+    let sandbox = timestamping_sandbox();
+
+    // get some tx
+    let tx = gen_timestamping_tx();
+
+    let block_at_first_height = BlockBuilder::new(&sandbox)
+        .with_proposer_id(VALIDATOR_3)
+        .with_tx_hash(&tx.hash())
+        .build();
+
+    let future_propose = Propose::new(
+        VALIDATOR_3,
+        HEIGHT_ONE,
+        ROUND_FOUR,
+        &block_at_first_height.clone().hash(),
+        &[], // there are no transactions in future propose
+        sandbox.s(VALIDATOR_3),
+    );
+
+    sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
+    sandbox.recv(&future_propose);
+    sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
+    sandbox.recv(&Prevote::new(
+        VALIDATOR_2,
+        HEIGHT_ONE,
+        ROUND_FOUR,
+        &block_at_first_height.clone().hash(),
+        Round::zero(),
+        sandbox.s(VALIDATOR_2),
+    ));
+
+    sandbox.assert_state(HEIGHT_ONE, ROUND_FOUR);
+}
+
 /// idea of the test is to reach one height two times and compare block hash
 #[test]
 fn test_reach_one_height_repeatable() {
@@ -138,6 +182,54 @@ fn test_reach_thirteen_height() {
         add_one_height(&sandbox, &sandbox_state);
         sandbox.assert_state(Height(height), ROUND_ONE);
     }
+}
+
+#[test]
+fn test_disable_and_enable() {
+    let mut sandbox = timestamping_sandbox();
+    let sandbox_state = SandboxState::new();
+
+    sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
+    try_add_one_height(&sandbox, &sandbox_state).unwrap();
+    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+
+    // Disable the node.
+    let message = exonum::node::ExternalMessage::Enable(false);
+    sandbox
+        .node_handler_mut()
+        .channel
+        .api_requests
+        .send(message)
+        .unwrap();
+    sandbox.process_events();
+
+    // Save the current time to "rewind" sandbox to it later.
+    let time_saved = sandbox.time();
+
+    // A fail is expected here as the node is disabled.
+    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    let result = try_add_one_height(&sandbox, &sandbox_state);
+    assert!(result.is_err());
+
+    // Re-enable the node.
+    let message = exonum::node::ExternalMessage::Enable(true);
+    sandbox
+        .node_handler_mut()
+        .channel
+        .api_requests
+        .send(message)
+        .unwrap();
+    sandbox.process_events();
+
+    // Check if the node is still at the same height and round.
+    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+
+    // Reset the time.
+    sandbox.set_time(time_saved);
+
+    // The node should work fine now
+    try_add_one_height(&sandbox, &sandbox_state).unwrap();
+    sandbox.assert_state(HEIGHT_THREE, ROUND_ONE);
 }
 
 #[test]
@@ -203,6 +295,45 @@ fn test_retrieve_block_and_precommits() {
     }
     let bl_proof_option = sandbox.block_and_precommits(target_height);
     assert!(bl_proof_option.is_none());
+}
+
+/// Scenario:
+/// - Node 0 is not aware of Node 1
+/// - Node 0 receives `PeersRequest` from Node 1 and responds nothing
+/// - Node 0 receives `Connect` from Node 1, saves it and trying to connect
+/// - Node 0 restarts
+/// - Node 0 should connect to Node 1
+/// - Node 0 should be aware of Node 1 and send received `Connect` in response to `PeersRequest`
+#[test]
+fn should_restore_peers_after_restart() {
+    // create sandbox with nodes not aware about each other
+    let sandbox = sandbox_with_services_uninitialized(vec![]);
+
+    let (v0, v1) = (VALIDATOR_0, VALIDATOR_1);
+    let (p0, s0, a0) = (sandbox.p(v0), sandbox.s(v0).clone(), sandbox.a(v0));
+    let (p1, s1, a1) = (sandbox.p(v1), sandbox.s(v1).clone(), sandbox.a(v1));
+
+    let time = sandbox.time();
+    let connect_from_0 = Connect::new(&p0, a0, time, &s0);
+    let connect_from_1 = Connect::new(&p1, a1, time, &s1);
+    let peers_request = PeersRequest::new(&p1, &p0, &s1);
+
+    // check that peers are absent
+    sandbox.recv(&peers_request);
+
+    // receive a `Connect` message and the respond on it
+    sandbox.recv(&connect_from_1);
+    sandbox.send(a1, &connect_from_0);
+
+    // restart the node
+    let sandbox_restarted = sandbox_restarted_uninitialized(sandbox);
+
+    // check that the node is connecting with the peer
+    sandbox_restarted.send(a1, &connect_from_0);
+
+    // check that the peer is restored
+    sandbox_restarted.recv(&peers_request);
+    sandbox_restarted.send(a1, &connect_from_1);
 }
 
 #[test]
@@ -299,6 +430,7 @@ fn test_queue_propose_message_from_next_height() {
     let block_at_first_height = BlockBuilder::new(&sandbox)
         .with_proposer_id(VALIDATOR_0)
         .with_tx_hash(&tx.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
     let future_propose = Propose::new(VALIDATOR_0,
@@ -363,7 +495,6 @@ fn test_ignore_message_from_prev_height() {
 /// - send prevote when lock=0 for known propose
 #[test]
 fn positive_get_propose_send_prevote() {
-    let _ = env_logger::init();
 
     let sandbox = timestamping_sandbox();
 
@@ -488,8 +619,8 @@ fn ignore_propose_with_commited_transaction() {
 
 // TODO: ask Ivan how to test this scenario in terms of messages
 // - remove propose request when getting propose and request txs from known nodes
-//     - not only leader, also prevotes
-//     - not only leader, alto precommiters
+//     - not only leader, but also prevotes
+//     - not only leader, but also precommiters
 
 #[test]
 fn handle_propose_that_sends_before_than_propose_timeout_exceeded() {
@@ -556,7 +687,7 @@ fn request_propose_when_get_prevote() {
 
 /// idea of the test is to verify request transaction scenario: other node requests
 /// transaction from our node
-// TODO: add scenario as Alexey advised: with manually created and signed tx
+// TODO: add scenario with manually created and signed tx
 #[test]
 fn response_to_request_txs() {
     let sandbox = timestamping_sandbox();
@@ -583,7 +714,7 @@ fn response_to_request_txs() {
 ///  - receive requests for tx, propose, prevote & precommit
 ///   - send responses to above requests
 #[test]
-fn responde_to_request_tx_propose_prevotes_precommits() {
+fn respond_to_request_tx_propose_prevotes_precommits() {
     let sandbox = timestamping_sandbox();
 
     {
@@ -601,10 +732,13 @@ fn responde_to_request_tx_propose_prevotes_precommits() {
     sandbox.add_time(Duration::from_millis(sandbox.propose_timeout()));
 
     let propose = ProposeBuilder::new(&sandbox)
-        .with_tx_hashes(&[tx.hash()]) //ordinar propose, but with this unreceived tx
+        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
-    let block = BlockBuilder::new(&sandbox).with_tx_hash(&tx.hash()).build();
+    let block = BlockBuilder::new(&sandbox)
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_tx_hash(&tx.hash())
+        .build();
 
     let precommit_1 = Precommit::new(
         VALIDATOR_1,
@@ -766,7 +900,7 @@ fn not_request_txs_when_get_tx_and_propose() {
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
-        .with_tx_hashes(&[tx.hash()]) //ordinar propose, but with this unreceived tx
+        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     sandbox.recv(&propose);
@@ -789,13 +923,13 @@ fn handle_tx_verify_signature() {
     let (public_key1, _) = gen_keypair();
     let (_, secret_key2) = gen_keypair();
 
-    let data = vec![0; 64]; //todo find way how to get rid of hardcoded value
+    let data = vec![0; 64]; // todo find the way how to get rid of hard-coded value
     let tx = TimestampTx::new(&public_key1, &data, &secret_key2);
     sandbox.recv(&tx);
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
-        .with_tx_hashes(&[tx.hash()]) //ordinar propose, but with this unreceived tx
+        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     sandbox.recv(&propose);
@@ -803,7 +937,7 @@ fn handle_tx_verify_signature() {
 }
 
 /// - request txs when get propose
-/// - request tx from propose with unkwnown tx
+/// - request tx from propose with unknown tx
 /// - scenario 'request unknown txs when get prevote' is also covered in this test
 /// - idea of the test:
 ///   - receive Propose with unknown transaction
@@ -819,7 +953,7 @@ fn request_txs_when_get_propose_or_prevote() {
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
-        .with_tx_hashes(&[tx.hash()]) //ordinar propose, but with this unreceived tx
+        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     sandbox.recv(&propose);
@@ -1173,7 +1307,7 @@ fn handle_precommit_remove_request_prevotes() {
 ///    - broadcast Prevote for this empty Propose
 ///   - and real Propose from 2nd round with some tx
 ///   - and this tx
-///   - main consecuence: Prevote for real Propose is not broadcasted
+///   - main consequence: Prevote for real Propose is not broadcasted
 /// - then in 2nd round
 ///   - no Prevotes are sent because neither Proposes in this round nor lock in
 ///     previous rounds are present
@@ -1202,6 +1336,7 @@ fn lock_to_propose_and_send_prevote() {
     let block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.round_timeout() + sandbox.propose_timeout())
         .with_tx_hash(&tx.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
     sandbox.recv(&propose);
@@ -1350,7 +1485,7 @@ fn handle_precommit_different_block_hash() {
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
-        .with_tx_hashes(&[tx.hash()]) //ordinar propose, but with this unreceived tx
+        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     // precommits with this block will be received
@@ -1414,11 +1549,12 @@ fn handle_precommit_positive_scenario_commit() {
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
-        .with_tx_hashes(&[tx.hash()]) //ordinar propose, but with this unreceived tx
+        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
     let block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
         .with_tx_hash(&tx.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
     let precommit_1 = Precommit::new(
@@ -1487,13 +1623,13 @@ fn handle_precommit_positive_scenario_commit() {
 }
 
 /// LOCK
-/// - Send precommit when get lock   // covered in `lock_to_propose_when_get_2_3_prevote_positive`
-/// - if haven’t incompatible prevotes
-///     - if has +2/3 precommits
+/// - Send precommit during the lock   // covered in `lock_to_propose_when_get_2_3_prevote_positive`
+/// - if there aren't incompatible prevotes
+///     - if there're +2/3 precommits
 ///         - remove precommit request //todo this idea is unreachable because there are no
-///           any places in the code where `PrecommitRequest` is added
+///           other places in the code where `PrecommitRequest` is added
 ///         - COMMIT // covered in `test_reach_one_height`
-///         -> not send prevotes after commit
+///         -> do not send prevotes after the commit
 ///
 /// idea of the scenario:
 ///  - receive 2 precommits
@@ -1501,10 +1637,9 @@ fn handle_precommit_positive_scenario_commit() {
 ///    obtain majority precommits
 ///  - make commit
 ///  - increment round
-///  - observe absence of broadcast prevote(because lock is committed already) message
+///  - observe absence of broadcast prevote (because lock has been committed already) message
 /// idea of alternate scenario
-/// (this scenario will occur if comment block of code with `precommit_2` and uncomment
-/// last broadcast of Prevote):
+/// (which will occur with commented `precommit_2` and uncommented last broadcast of Prevote):
 ///  - receive single precommit
 ///  - receive prevotes => make lock
 ///  - but do not make commit (because only 2 precommits are collected)
@@ -1636,7 +1771,7 @@ fn do_not_commit_if_propose_is_unknown() {
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
-        .with_tx_hashes(&[tx.hash()]) //ordinar propose, but with this unreceived tx
+        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     // this block with transactions should be in real
@@ -1720,7 +1855,7 @@ fn do_not_commit_if_tx_is_unknown() {
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
-        .with_tx_hashes(&[tx.hash()]) //ordinar propose, but with this unreceived tx
+        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     // this block with transactions should be in real
@@ -1813,13 +1948,14 @@ fn commit_using_unknown_propose_with_precommits() {
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
-        .with_tx_hashes(&[tx.hash()]) //ordinar propose, but with this unreceived tx
+        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     // precommits with this block will be received
     let block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
         .with_tx_hash(&tx.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
     let precommit_1 = Precommit::new(
@@ -1927,7 +2063,7 @@ fn has_full_propose_wrong_state_hash() {
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
-        .with_tx_hashes(&[tx.hash()]) //ordinar propose, but with this unreceived tx
+        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     // precommits with this block will be received
@@ -2094,7 +2230,7 @@ fn do_not_send_precommit_if_has_incompatible_prevotes() {
 ///     - start from 1 height
 ///     - one precommit get from 0 round and queue it
 /// - code is based on `handle_precommit_positive_scenario_commit()`
-/// with folowing updates:
+/// with following updates:
 ///     - use manually created tx because we need to know which tx will be used
 ///       in `add_one_height()` function
 ///         - take into account that in `add_one_height()` tx will be generated
@@ -2112,7 +2248,6 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     // create some tx
     let tx = gen_timestamping_tx();
 
-
     // Precommits with this block will be received during get 1st height in
     // fn add_one_height_with_transaction()
     let first_block = BlockBuilder::new(&sandbox)
@@ -2121,6 +2256,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
         )
         .with_proposer_id(VALIDATOR_0)
         .with_tx_hash(&tx.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
     // this propose will be used during second commit
@@ -2142,6 +2278,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
             2 * sandbox.propose_timeout() + 2 * sandbox.round_timeout() + 1,
         )
         .with_prev_hash(&first_block.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
 
@@ -2260,7 +2397,7 @@ fn commit_as_leader_send_propose_round_timeout() {
     // this propose will be a valid one when 0 node will become a leader after last commit
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
-        .with_tx_hashes(&[tx.hash()]) //ordinar propose, but with this unreceived tx
+        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     // precommits with this block would be received if transaction will be received
@@ -2268,6 +2405,7 @@ fn commit_as_leader_send_propose_round_timeout() {
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
         .with_prev_hash(&sandbox_state.accepted_block_hash.borrow())
         .with_tx_hash(&tx.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
     let precommit_1 = Precommit::new(
@@ -2342,7 +2480,7 @@ fn commit_as_leader_send_propose_round_timeout() {
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
-        //        .with_tx_hashes(&[tx.hash()]) //ordinar propose, but with this unreceived tx
+        //        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     sandbox.add_time(Duration::from_millis(sandbox.propose_timeout()));
@@ -2371,7 +2509,7 @@ fn handle_tx_has_full_propose() {
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
-        .with_tx_hashes(&[tx.hash()]) //ordinar propose, but with this unreceived tx
+        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     sandbox.recv(&propose);
@@ -2412,7 +2550,7 @@ fn broadcast_prevote_with_tx_positive() {
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
-        .with_tx_hashes(&[tx.hash()]) //ordinar propose, but with this received tx
+        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this received tx
         .build();
     sandbox.recv(&propose);
 
@@ -2454,7 +2592,7 @@ fn handle_tx_ignore_existing_tx_in_blockchain() {
 
     sandbox.add_time(Duration::from_millis(sandbox.propose_timeout()));
     let propose = ProposeBuilder::new(&sandbox)
-        //.with_tx_hashes(&[tx.hash()]) //ordinar propose, but with this received tx
+        //.with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this received tx
         // !! note that here no tx are expected whereas old tx is received earlier
         .with_tx_hashes(&[])
         .build();
@@ -2477,13 +2615,14 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
-        .with_tx_hashes(&[tx.hash()]) //ordinar propose, but with this unreceived tx
+        .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
     // this block with transactions should be in real
     let block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
         .with_tx_hash(&tx.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
     let precommit_1 = Precommit::new(
@@ -2686,7 +2825,7 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
 #[cfg_attr(rustfmt, rustfmt_skip)]
 #[test]
 #[should_panic(expected = "Send unexpected message Request(ProposeRequest")]
-fn test_handle_round_timeut_queue_prevote_message_from_next_round() {
+fn test_handle_round_timeout_queue_prevote_message_from_next_round() {
     let sandbox = timestamping_sandbox();
 
     sandbox.recv(&Prevote::new(VALIDATOR_2,
@@ -2700,13 +2839,13 @@ fn test_handle_round_timeut_queue_prevote_message_from_next_round() {
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
     // trigger request_propose_timeout
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
-    // oberve requestPropose request
+    // observe requestPropose request
     sandbox.add_time(Duration::from_millis(0));
 }
 
 /// - exclude validator from consensus
 /// - idea of test is to exclude sandbox validator from consensus
-/// - node continues as `fullnode`
+/// - node continues as `full node`
 #[test]
 fn test_exclude_validator_from_consensus() {
     use exonum::storage::StorageValue;
@@ -2858,7 +2997,7 @@ fn test_schema_config_changes() {
 //   ?covered in handle_precommit_positive_scenario_commit_with_queued_precommit
 // - update blockchain
 //   covered in the end of handle_precommit_positive_scenario_commit_with_queued_precommit
-// - send proopose if is leader //covered in commit_as_leader_send_propose_round_timeout
+// - send propose if is leader //covered in commit_as_leader_send_propose_round_timeout
 // - add round timeout          //covered in commit_as_leader_send_propose_round_timeout
 // - request commits            //commit message is absent at the moment
 
@@ -2884,7 +3023,7 @@ fn test_schema_config_changes() {
 // - send propose if we are leader
 //   covered in test_send_propose_and_prevote_when_we_are_leader()
 // - handle queued messages
-//   covered in test_handle_round_timeut_queue_prevote_message_from_next_round()
+//   covered in test_handle_round_timeout_queue_prevote_message_from_next_round()
 
 // HANDLE REQUEST TIMEOUT:
 
@@ -2897,4 +3036,4 @@ fn test_schema_config_changes() {
 //     - send new request message//for RequestTransaction is covered in handle_tx_has_full_propose()
 //     - add timeout             //for RequestTransaction is covered in handle_tx_has_full_propose()
 
-// todo Alexey S asked to add scenario for single node network
+// todo add scenario for single node network

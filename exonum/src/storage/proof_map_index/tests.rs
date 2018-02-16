@@ -12,16 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate rand;
-
 use std::collections::HashSet;
-use rand::{thread_rng, Rng};
+
+use rand::{self, thread_rng, Rng};
 use crypto::{hash, Hash, HashStream};
 use storage::db::Database;
 use encoding::serialize::json::reexport::to_string;
 use encoding::serialize::reexport::{Serialize, Serializer};
-
-use super::{DBKey, ProofMapIndex};
+use super::{ProofMapIndex, ProofPath};
 use super::proof::MapProof;
 use super::key::{KEY_SIZE, LEAF_KEY_PREFIX};
 
@@ -155,7 +153,6 @@ fn insert_reverse(db1: Box<Database>, db2: Box<Database>) {
     index2.put(&[240; 32], vec![3]);
     index2.put(&[64; 32], vec![2]);
     index2.put(&[42; 32], vec![1]);
-
 
     assert!(index2.root_hash() != Hash::zero());
     assert_eq!(index2.root_hash(), index1.root_hash());
@@ -324,7 +321,7 @@ fn build_proof_in_leaf_tree(db: Box<Database>) {
 
     match proof_path {
         MapProof::LeafRootExclusive(key, hash_val) => {
-            assert_eq!(key, DBKey::leaf(&root_key));
+            assert_eq!(key, ProofPath::new(&root_key));
             assert_eq!(hash_val, hash(&root_val));
         }
         _ => assert!(false),
@@ -338,7 +335,7 @@ fn build_proof_in_leaf_tree(db: Box<Database>) {
     }
     match proof_path {
         MapProof::LeafRootInclusive(key, val) => {
-            assert_eq!(key, DBKey::leaf(&root_key));
+            assert_eq!(key, ProofPath::new(&root_key));
             assert_eq!(val, root_val);
         }
         _ => assert!(false),
@@ -372,8 +369,8 @@ fn fuzz_insert_build_proofs_in_table_filled_with_hashes(db: Box<Database>) {
         key_found: true,
     };
 
-    let json_repre = to_string(&proof_info).unwrap();
-    assert!(json_repre.len() > 0);
+    let json_representation = to_string(&proof_info).unwrap();
+    assert!(json_representation.len() > 0);
     let check_res = proof_path_to_key.validate(&item.0, table_root_hash);
     let proved_value: Option<&Hash> = check_res.unwrap();
     assert_eq!(proved_value.unwrap(), &item.1);
@@ -403,8 +400,8 @@ fn fuzz_insert_build_proofs(db: Box<Database>) {
             key_found: true,
         };
 
-        let json_repre = to_string(&proof_info).unwrap();
-        assert!(json_repre.len() > 0);
+        let json_representation = to_string(&proof_info).unwrap();
+        assert!(json_representation.len() > 0);
     }
 }
 
@@ -601,12 +598,12 @@ fn iter(db: Box<Database>) {
 }
 
 fn bytes_to_hex<T: AsRef<[u8]> + ?Sized>(bytes: &T) -> String {
-    let strs: Vec<String> = bytes
+    let strings: Vec<String> = bytes
         .as_ref()
         .iter()
         .map(|b| format!("{:02x}", b))
         .collect();
-    strs.join("")
+    strings.join("")
 }
 
 fn serialize_str_u8<S, A>(data: &A, serializer: S) -> Result<S::Ok, S::Error>

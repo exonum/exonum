@@ -14,12 +14,13 @@
 
 //! Serialize structure into specific format.
 //! Currently support only json.
-//! This module is a pack of superstructures over serde `Serializer's`\\`Deserializer's`
+//! This module is a pack of superstructures over serde `Serializer`\`Deserializer`
 
-pub use hex::{FromHexError, ToHex, FromHex, encode as encode_hex, decode as decode_hex};
 use encoding::Field;
 use messages::MessageWriter;
 use super::Offset;
+
+pub use hex::{FromHexError, ToHex, FromHex, encode as encode_hex, decode as decode_hex};
 
 /// implement exonum serialization\deserialization based on serde `Serialize`\ `Deserialize`
 ///
@@ -58,7 +59,7 @@ macro_rules! implement_exonum_serializer {
 
             fn serialize_field(&self) ->
                 Result<$crate::encoding::serialize::json::reexport::Value,
-                        Box<::std::error::Error>>
+                        Box<::std::error::Error + Send + Sync>>
             {
                 use $crate::encoding::serialize::json::reexport::to_value;
                 Ok(to_value(self)?)

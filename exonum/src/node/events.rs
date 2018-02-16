@@ -12,21 +12,39 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use events::{Event, EventHandler, NetworkEvent};
+use events::{Event, EventHandler, NetworkEvent, InternalEvent, InternalRequest};
 use super::{NodeHandler, ExternalMessage, NodeTimeout};
+use events::error::LogError;
 
 impl EventHandler for NodeHandler {
     fn handle_event(&mut self, event: Event) {
         match event {
             Event::Network(network) => self.handle_network_event(network),
-            Event::Timeout(timeout) => self.handle_timeout(timeout),
             Event::Api(api) => self.handle_api_event(api),
+            Event::Internal(internal) => self.handle_internal_event(internal),
         }
     }
 }
 
 impl NodeHandler {
+    // clippy sure that `InternalEvent` is not consumed in the body
+    // this is because of internal `Copy` types in `JumpToRound`.
+    #![cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
+    fn handle_internal_event(&mut self, event: InternalEvent) {
+        match event {
+            InternalEvent::Timeout(timeout) => self.handle_timeout(timeout),
+            InternalEvent::JumpToRound(height, round) => self.handle_new_round(height, round),
+        }
+    }
+
     fn handle_network_event(&mut self, event: NetworkEvent) {
+        if !self.is_enabled {
+            info!(
+                "Ignoring a network event {:?} because the node is disabled",
+                event
+            );
+            return;
+        }
         match event {
             NetworkEvent::PeerConnected(peer, connect) => self.handle_connected(peer, connect),
             NetworkEvent::PeerDisconnected(peer) => self.handle_disconnected(peer),
@@ -38,16 +56,50 @@ impl NodeHandler {
     fn handle_api_event(&mut self, event: ExternalMessage) {
         match event {
             ExternalMessage::Transaction(tx) => {
+                if !self.is_enabled {
+                    info!(
+                        "Ignoring a transaction {:?} because the node is disabled",
+                        tx
+                    );
+                    return;
+                }
                 self.handle_incoming_tx(tx);
             }
             ExternalMessage::PeerAdd(address) => {
+                if !self.is_enabled {
+                    info!(
+                        "Ignoring a connect message to {} because the node is disabled",
+                        address
+                    );
+                    return;
+                }
                 info!("Send Connect message to {}", address);
                 self.connect(&address);
+            }
+            ExternalMessage::Enable(value) => {
+                let s = if value { "enabled" } else { "disabled" };
+                if self.is_enabled == value {
+                    info!("Node is already {}", s);
+                } else {
+                    self.is_enabled = value;
+                    self.api_state().update_is_enabled(value);
+                    info!("The node is {} now", s);
+                    if self.is_enabled {
+                        self.add_round_timeout();
+                    }
+                }
             }
         }
     }
 
     fn handle_timeout(&mut self, timeout: NodeTimeout) {
+        if !self.is_enabled {
+            info!(
+                "Ignoring a timeout {:?} because the node is disabled",
+                timeout
+            );
+            return;
+        }
         match timeout {
             NodeTimeout::Round(height, round) => self.handle_round_timeout(height, round),
             NodeTimeout::Request(data, peer) => self.handle_request_timeout(&data, peer),
@@ -56,5 +108,10 @@ impl NodeHandler {
             NodeTimeout::UpdateApiState => self.handle_update_api_state_timeout(),
             NodeTimeout::Propose(height, round) => self.handle_propose_timeout(height, round),
         }
+    }
+
+    /// Schedule execution for later time
+    pub(crate) fn execute_later(&mut self, event: InternalRequest) {
+        self.channel.internal_requests.send(event).log_error();
     }
 }
