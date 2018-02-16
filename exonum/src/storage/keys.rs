@@ -399,7 +399,7 @@ mod tests {
 
         // Simple wrapper around a signed integer type with the `StorageKey` implementation,
         // which was used in Exonum <= 0.5.
-        #[derive(Debug, PartialEq)]
+        #[derive(Debug, PartialEq, Clone)]
         struct QuirkyI32Key(i32);
 
         impl StorageKey for QuirkyI32Key {
