@@ -20,7 +20,9 @@ use byteorder::{ByteOrder, LittleEndian};
 
 use crypto::{hash, sign, verify, CryptoHash, Hash, PublicKey, SecretKey, Signature,
              SIGNATURE_LENGTH};
-use encoding::{self, CheckedOffset, Field, Offset, Result as StreamStructResult};
+use encoding::{self, CheckedOffset, Field, Offset, Result as StreamStructResult,
+               Error as EncodingError};
+use encoding::serialize::json::reexport::{Value as JsonValue};
 
 /// Length of the message header.
 pub const HEADER_LENGTH: usize = 10;
@@ -334,20 +336,20 @@ impl ExonumJson for Vec<RawMessage> {
         let mut vec: Vec<_> = Vec::new();
         for el in bytes {
             let string = el.as_str().ok_or("Can't cast json as string")?;
-            let str_hex = <Vec<u8> as FromHex>::from_hex(string)?;
+            let str_hex = <Vec<u8> as encoding::FromHex>::from_hex(string)?;
             vec.push(RawMessage::new(MessageBuffer::from_vec(str_hex)));
         }
         buffer.write(from, to, vec);
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+    fn serialize_field(&self) -> Result<JsonValue, Box<Error + Send + Sync>> {
         let vec = self.iter()
             .map(|slice| {
-                Value::String(::serialize::encode_hex(slice))
+                JsonValue::String(encoding::serialize::encode_hex(slice))
             })
             .collect();
-        Ok(Value::Array(vec))
+        Ok(JsonValue::Array(vec))
     }
 }
 
@@ -381,7 +383,7 @@ impl<'a> SegmentField<'a> for RawMessage {
         let to: CheckedOffset = (from + size)?;
         let slice = &buffer[from.unchecked_offset() as usize..to.unchecked_offset() as usize];
         if slice.len() < HEADER_LENGTH {
-            return Err(Error::UnexpectedlyShortRawMessage {
+            return Err(EncodingError::UnexpectedlyShortRawMessage {
                 position: from.unchecked_offset(),
                 size: slice.len() as Offset,
             });
@@ -389,7 +391,7 @@ impl<'a> SegmentField<'a> for RawMessage {
         let actual_size = slice.len() as Offset;
         let declared_size: Offset = LittleEndian::read_u32(&slice[6..10]);
         if actual_size != declared_size {
-            return Err(Error::IncorrectSizeOfRawMessage {
+            return Err(EncodingError::IncorrectSizeOfRawMessage {
                 position: from.unchecked_offset(),
                 actual_size: slice.len() as Offset,
                 declared_size: declared_size,

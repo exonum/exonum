@@ -16,8 +16,11 @@
 
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 use encoding::ExonumJson;
+use encoding::serialize::json::reexport::Value as JsonValue;
+use byteorder::LittleEndian;
 
 use std::fmt;
+use std::mem;
 use std::str::FromStr;
 use std::num::ParseIntError;
 
@@ -372,7 +375,7 @@ impl ExonumJson for Height {
 
     fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
         let val: u64 = self.to_owned().into();
-        Ok(Value::String(val.to_string()))
+        Ok(JsonValue::String(val.to_string()))
     }
 }
 
@@ -390,7 +393,7 @@ impl ExonumJson for Round {
 
     fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
         let val: u32 = self.to_owned().into();
-        Ok(Value::Number(val.into()))
+        Ok(JsonValue::Number(val.into()))
     }
 }
 
@@ -408,7 +411,7 @@ impl ExonumJson for ValidatorId {
 
     fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
         let val: u16 = self.to_owned().into();
-        Ok(Value::Number(val.into()))
+        Ok(JsonValue::Number(val.into()))
     }
 }
 

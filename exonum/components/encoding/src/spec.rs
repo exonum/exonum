@@ -73,40 +73,40 @@ macro_rules! encoding_struct {
         // to write fields in place of another structure
         impl<'a> ::encoding::Field<'a> for $name {
             unsafe fn read(buffer: &'a [u8],
-                            from: $crate::encoding::Offset,
-                            to: $crate::encoding::Offset) -> Self {
-                let vec: Vec<u8> = $crate::encoding::Field::read(buffer, from, to);
+                            from: ::encoding::Offset,
+                            to: ::encoding::Offset) -> Self {
+                let vec: Vec<u8> = ::encoding::Field::read(buffer, from, to);
                 $crate::storage::StorageValue::from_bytes(::std::borrow::Cow::Owned(vec))
             }
 
             fn write(&self,
                             buffer: &mut Vec<u8>,
-                            from: $crate::encoding::Offset,
-                            to: $crate::encoding::Offset) {
+                            from: ::encoding::Offset,
+                            to: ::encoding::Offset) {
                 ::encoding::Field::write(&self.raw, buffer, from, to);
             }
 
             #[allow(unused_variables)]
             #[allow(unused_comparisons)]
             fn check(buffer: &'a [u8],
-                        from_st_val: $crate::encoding::CheckedOffset,
-                        to_st_val: $crate::encoding::CheckedOffset,
-                        latest_segment: $crate::encoding::CheckedOffset)
+                        from_st_val: ::encoding::CheckedOffset,
+                        to_st_val: ::encoding::CheckedOffset,
+                        latest_segment: ::encoding::CheckedOffset)
                 -> ::encoding::Result
             {
-                let latest_segment_origin = <&[u8] as $crate::encoding::Field>::check(
+                let latest_segment_origin = <&[u8] as ::encoding::Field>::check(
                     buffer, from_st_val, to_st_val, latest_segment)?;
-                let vec: &[u8] = unsafe{ $crate::encoding::Field::read(
+                let vec: &[u8] = unsafe{ ::encoding::Field::read(
                     buffer,
                     from_st_val.unchecked_offset(),
                     to_st_val.unchecked_offset())};
-                let latest_segment: $crate::encoding::CheckedOffset =
+                let latest_segment: ::encoding::CheckedOffset =
                     $name::__ex_header_size().into();
 
                 if vec.len() < $name::__ex_header_size() as usize {
-                    return Err($crate::encoding::Error::UnexpectedlyShortPayload{
-                        actual_size: vec.len() as $crate::encoding::Offset,
-                        minimum_size: $name::__ex_header_size() as $crate::encoding::Offset
+                    return Err(::encoding::Error::UnexpectedlyShortPayload{
+                        actual_size: vec.len() as ::encoding::Offset,
+                        minimum_size: $name::__ex_header_size() as ::encoding::Offset
                     })
                 }
 
@@ -117,26 +117,26 @@ macro_rules! encoding_struct {
                 Ok(latest_segment_origin)
             }
 
-            fn field_size() -> $crate::encoding::Offset {
+            fn field_size() -> ::encoding::Offset {
                 // We write `encoding_struct` as regular buffer,
                 // so real `field_size` is 8.
                 // TODO: maybe we should write it as sub structure in place?
                 // We could get benefit from it: we limit indirection
                 // in deserializing sub fields, by only one calculation (ECR-156).
 
-                // $body as $crate::encoding::Offset
+                // $body as ::encoding::Offset
 
-                8 as $crate::encoding::Offset
+                8 as ::encoding::Offset
             }
         }
 
-        impl $crate::crypto::CryptoHash for $name {
-            fn hash(&self) -> $crate::crypto::Hash {
+        impl ::crypto::CryptoHash for $name {
+            fn hash(&self) -> ::crypto::Hash {
                 $crate::crypto::hash(self.raw.as_ref())
             }
         }
 
-        impl $crate::storage::StorageValue for $name {
+        impl ::storage::StorageValue for $name {
             fn into_bytes(self) -> Vec<u8> {
                 self.raw
             }
@@ -168,7 +168,7 @@ macro_rules! encoding_struct {
                 $( ($(#[$field_attr])*, $field_name, $field_type) )*
             );
 
-            fn __ex_header_size() -> $crate::encoding::Offset {
+            fn __ex_header_size() -> ::encoding::Offset {
                 __ex_header_size!($($field_type),*)
             }
         }
@@ -182,16 +182,16 @@ macro_rules! encoding_struct {
             }
         }
 
-        impl $crate::encoding::serialize::json::ExonumJson for $name {
+        impl ::encoding::ExonumJson for $name {
             #[allow(unused_variables)]
-            fn deserialize_field<B> (value: &$crate::encoding::serialize::json::reexport::Value,
+            fn deserialize_field<B> (value: &::encoding::serialize::json::reexport::Value,
                                         buffer: & mut B,
-                                        from: $crate::encoding::Offset,
-                                        to: $crate::encoding::Offset )
+                                        from: ::encoding::Offset,
+                                        to: ::encoding::Offset )
                 -> Result<(), Box<::std::error::Error>>
-                where B: $crate::encoding::serialize::WriteBufferWrapper
+                where B: ::encoding::serialize::WriteBufferWrapper
             {
-                use $crate::encoding::serialize::json::ExonumJsonDeserialize;
+                use ::encoding::serialize::json::ExonumJsonDeserialize;
                 // deserialize full field
                 let structure = <Self as ExonumJsonDeserialize>::deserialize(value)?;
                 // then write it
@@ -203,11 +203,11 @@ macro_rules! encoding_struct {
 
             #[allow(unused_mut)]
             fn serialize_field(&self)
-                -> Result<$crate::encoding::serialize::json::reexport::Value,
+                -> Result<::encoding::serialize::json::reexport::Value,
                           Box<::std::error::Error + Send + Sync>>
             {
-                use $crate::encoding::serialize::json::reexport::Value;
-                let mut map = $crate::encoding::serialize::json::reexport::Map::new();
+                use ::encoding::serialize::json::reexport::Value;
+                let mut map = ::encoding::serialize::json::reexport::Map::new();
                 $(
                     map.insert(stringify!($field_name).to_string(),
                         self.$field_name().serialize_field()?);
@@ -215,11 +215,11 @@ macro_rules! encoding_struct {
                 Ok(Value::Object(map))
             }
         }
-        impl $crate::encoding::serialize::json::ExonumJsonDeserialize for $name {
+        impl ::encoding::serialize::json::ExonumJsonDeserialize for $name {
             #[allow(unused_imports, unused_mut)]
-            fn deserialize(value: &$crate::encoding::serialize::json::reexport::Value)
+            fn deserialize(value: &::encoding::serialize::json::reexport::Value)
                 -> Result<Self, Box<::std::error::Error>> {
-                use $crate::encoding::serialize::json::ExonumJson as ExonumJson;
+                use ::encoding::serialize::json::ExonumJson as ExonumJson;
                 let mut buf = vec![0; $name::__ex_header_size() as usize];
                 let _obj = value.as_object().ok_or("Can't cast json as object.")?;
                 __ex_for_each_field!(
@@ -231,24 +231,24 @@ macro_rules! encoding_struct {
         }
 
         // TODO: Rewrite Deserialize and Serialize implementation (ECR-156)
-        impl<'de> $crate::encoding::serialize::reexport::Deserialize<'de> for $name {
+        impl<'de> ::encoding::serialize::reexport::Deserialize<'de> for $name {
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-                where D: $crate::encoding::serialize::reexport::Deserializer<'de>
+                where D: ::encoding::serialize::reexport::Deserializer<'de>
             {
-                use $crate::encoding::serialize::json::reexport::Value;
-                use $crate::encoding::serialize::reexport::{DeError, Deserialize};
+                use ::encoding::serialize::json::reexport::Value;
+                use ::encoding::serialize::reexport::{DeError, Deserialize};
                 let value = <Value as Deserialize>::deserialize(deserializer)?;
-                <Self as $crate::encoding::serialize::json::ExonumJsonDeserialize>::deserialize(
+                <Self as ::encoding::serialize::json::ExonumJsonDeserialize>::deserialize(
                     &value).map_err(|_| D::Error::custom("Can not deserialize value."))
             }
         }
 
-        impl $crate::encoding::serialize::reexport::Serialize for $name {
+        impl ::encoding::serialize::reexport::Serialize for $name {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-                where S: $crate::encoding::serialize::reexport::Serializer
+                where S: ::encoding::serialize::reexport::Serializer
             {
-                use $crate::encoding::serialize::reexport::SerError;
-                use $crate::encoding::serialize::json::ExonumJson;
+                use ::encoding::serialize::reexport::SerError;
+                use ::encoding::serialize::json::ExonumJson;
                 self.serialize_field()
                     .map_err(|_| S::Error::custom(
                                 concat!("Can not serialize structure: ", stringify!($name))))?
@@ -282,7 +282,7 @@ macro_rules! check_bounds {
     ($size:expr,
      $first_name:ident : $first_type:ty [$first_from:expr => $first_to:expr],
      ) => {{
-        use $crate::encoding::Field;
+        use ::encoding::Field;
         debug_assert_eq!($first_from, 0, "first field should start from 0");
         debug_assert_eq!($first_to, $size, "last field should matches the size of struct");
         debug_assert_eq!($first_to - $first_from, <$first_type as Field>::field_size(),
@@ -292,7 +292,7 @@ macro_rules! check_bounds {
      $first_name:ident : $first_type:ty [$first_from:expr => $first_to:expr],
      $($next_name:ident : $next_type:ty [$next_from:expr => $next_to:expr],)+
      ) => {{
-        use $crate::encoding::Field;
+        use ::encoding::Field;
         debug_assert_eq!($first_from, 0, "first field should start from 0");
         debug_assert_eq!($first_to - $first_from, <$first_type as Field>::field_size(),
             "wrong size of field");
@@ -311,7 +311,7 @@ macro_rules! __ex_header_size {
         #[allow(unused_mut)]
         let mut acc = 0;
         $(
-            acc += <$field_type as $crate::encoding::Field>::field_size();
+            acc += <$field_type as ::encoding::Field>::field_size();
         )*
         acc
     }}
@@ -341,12 +341,12 @@ macro_rules! __ex_for_each_field {
             $field_name,
             $field_type,
             $start_offset,
-            $start_offset + <$field_type as $crate::encoding::Field>::field_size()
+            $start_offset + <$field_type as ::encoding::Field>::field_size()
         );
 
         __ex_for_each_field!(
             @inner $m ($($env)*)
-            ($start_offset + <$field_type as $crate::encoding::Field>::field_size());
+            ($start_offset + <$field_type as ::encoding::Field>::field_size());
             $($rest)*
         );
     };
@@ -361,7 +361,7 @@ macro_rules! __ex_struct_check_field {
         ($latest_segment:ident, $vec:ident),
         $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr
     ) => {
-        let $latest_segment = <$field_type as $crate::encoding::Field>::check(
+        let $latest_segment = <$field_type as ::encoding::Field>::check(
             &$vec,
             $from.into(),
             $to.into(),
@@ -377,7 +377,7 @@ macro_rules! __ex_struct_write_field {
         ($buf:ident),
         $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr
     ) => {
-        $crate::encoding::Field::write(&$field_name, &mut $buf, $from, $to);
+        ::encoding::Field::write(&$field_name, &mut $buf, $from, $to);
     }
 }
 
@@ -390,7 +390,7 @@ macro_rules! __ex_struct_mk_field {
     ) => {
         $(#[$field_attr])*
         pub fn $field_name(&self) -> $field_type {
-            use $crate::encoding::Field;
+            use ::encoding::Field;
             unsafe {
                 Field::read(&self.raw, $from, $to)
             }

@@ -28,12 +28,12 @@ use sodiumoxide;
 use serde::{Serialize, Serializer};
 use serde::de::{self, Deserialize, Deserializer, Visitor};
 use byteorder::{ByteOrder, LittleEndian};
-use encoding::{FromHex, Offset};
+use encoding::{FromHex, Offset, self};
+use encoding::serialize::json::reexport::Value as JsonValue;
 
 use std::default::Default;
 use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
 use std::fmt;
-use std::mem;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 // spell-checker:disable
@@ -716,7 +716,7 @@ impl<'a> ExonumJson for &'a [Hash] {
         for hash in self.iter() {
             vec.push(hash.serialize_field()?)
         }
-        Ok(Value::Array(vec))
+        Ok(JsonValue::Array(vec))
     }
 }
 
@@ -771,8 +771,8 @@ implement_pod_as_ref_field! {Hash}
 
 macro_rules! impl_default_deserialize_owned {
     (@impl $name:ty) => {
-        impl $crate::serialize::json::ExonumJsonDeserialize for $name {
-            fn deserialize(value: &$crate::serialize::json::reexport::Value)
+        impl encoding::serialize::json::ExonumJsonDeserialize for $name {
+            fn deserialize(value: &encoding::serialize::json::reexport::Value)
                 -> Result<Self, Box<::std::error::Error>> {
                 Ok(encoding::serialize::json::reexport::from_value(value.clone())?)
             }
@@ -798,8 +798,8 @@ macro_rules! impl_deserialize_hex_segment {
             }
 
             fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
-                let hex_str = $crate::serialize::encode_hex(&self[..]);
-                Ok(Value::String(hex_str))
+                let hex_str = encoding::serialize::encode_hex(&self[..]);
+                Ok(JsonValue::String(hex_str))
             }
         }
     };
