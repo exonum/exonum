@@ -183,13 +183,10 @@ where
     }
 
     fn get_root_node(&self) -> Option<(ProofPath, Node<V>)> {
-        match self.get_root_path() {
-            Some(key) => {
-                let node = self.get_node_unchecked(&key);
-                Some((key, node))
-            }
-            None => None,
-        }
+        self.get_root_path().map(|key| {
+            let node = self.get_node_unchecked(&key);
+            (key, node)
+        })
     }
 
     fn get_node_unchecked(&self, key: &ProofPath) -> Node<V> {
@@ -1014,14 +1011,13 @@ where
     }
 }
 
-impl<'a, T, K, OK, V> ::std::iter::IntoIterator for &'a ProofMapIndex<T, K, V>
+impl<'a, T, K, V> ::std::iter::IntoIterator for &'a ProofMapIndex<T, K, V>
 where
     T: AsRef<Snapshot>,
-    K: ProofMapKey<Output = OK>,
-    OK: ProofMapKey,
+    K: ProofMapKey,
     V: StorageValue,
 {
-    type Item = (OK, V);
+    type Item = (K::Output, V);
     type IntoIter = ProofMapIndexIter<'a, K, V>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -1029,13 +1025,12 @@ where
     }
 }
 
-impl<'a, K, OK, V> Iterator for ProofMapIndexIter<'a, K, V>
+impl<'a, K, V> Iterator for ProofMapIndexIter<'a, K, V>
 where
-    K: ProofMapKey<Output = OK>,
-    OK: ProofMapKey,
+    K: ProofMapKey,
     V: StorageValue,
 {
-    type Item = (OK, V);
+    type Item = (K::Output, V);
 
     fn next(&mut self) -> Option<Self::Item> {
         self.base_iter.next().map(
@@ -1045,12 +1040,11 @@ where
 }
 
 
-impl<'a, K, OK> Iterator for ProofMapIndexKeys<'a, K>
+impl<'a, K> Iterator for ProofMapIndexKeys<'a, K>
 where
-    K: ProofMapKey<Output = OK>,
-    OK: ProofMapKey,
+    K: ProofMapKey,
 {
-    type Item = OK;
+    type Item = K::Output;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.base_iter.next().map(|(k, _)| K::read_key(k.raw_key()))
