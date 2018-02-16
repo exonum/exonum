@@ -14,10 +14,10 @@
 
 // spell-checker:ignore lhash, rhash, lkey, rkey, bpath, repr
 
-use std::fmt;
-
 use serde::{Serialize, Serializer};
 use serde::ser::SerializeMap;
+
+use std::fmt;
 
 use crypto::{Hash, HashStream};
 use super::super::{Error, StorageValue};
