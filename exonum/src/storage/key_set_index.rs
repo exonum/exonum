@@ -121,9 +121,9 @@ where
     /// assert!(index.contains(&1));
     /// ```
     pub fn contains<Q>(&self, item: &Q) -> bool
-        where
-            K: Borrow<Q>,
-            Q: StorageKey + ToOwned<Owned = K> + ?Sized,
+    where
+        K: Borrow<Q>,
+        Q: StorageKey + ToOwned<Owned = K> + ?Sized,
     {
         self.base.contains(item)
     }
@@ -213,9 +213,9 @@ where
     /// assert!(!index.contains(&1));
     /// ```
     pub fn remove<Q>(&mut self, item: &Q)
-        where
-            K: Borrow<Q>,
-            Q: StorageKey + ToOwned<Owned = K> + ?Sized,
+    where
+        K: Borrow<Q>,
+        Q: StorageKey + ToOwned<Owned = K> + ?Sized,
     {
         self.base.remove(item)
     }

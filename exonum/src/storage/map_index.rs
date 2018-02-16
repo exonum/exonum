@@ -153,9 +153,9 @@ where
     /// assert_eq!(Some(2), index.get(&1));
     /// ```
     pub fn get<Q>(&self, key: &Q) -> Option<V>
-        where
-            K: Borrow<Q>,
-            Q: StorageKey + ToOwned<Owned = K> + ?Sized,
+    where
+        K: Borrow<Q>,
+        Q: StorageKey + ToOwned<Owned = K> + ?Sized,
     {
         self.base.get(key)
     }
@@ -176,9 +176,9 @@ where
     /// index.put(&1, 2);
     /// assert!(index.contains(&1));
     pub fn contains<Q>(&self, key: &Q) -> bool
-        where
-            K: Borrow<Q>,
-            Q: StorageKey + ToOwned<Owned = K> + ?Sized,
+    where
+        K: Borrow<Q>,
+        Q: StorageKey + ToOwned<Owned = K> + ?Sized,
     {
         self.base.contains(key)
     }
@@ -264,9 +264,9 @@ where
     /// }
     /// ```
     pub fn iter_from<Q>(&self, from: &Q) -> MapIndexIter<K, V>
-        where
-            K: Borrow<Q>,
-            Q: StorageKey + ToOwned<Owned = K> + ?Sized,
+    where
+        K: Borrow<Q>,
+        Q: StorageKey + ToOwned<Owned = K> + ?Sized,
     {
         MapIndexIter { base_iter: self.base.iter_from(&(), from) }
     }
@@ -289,9 +289,9 @@ where
     /// }
     /// ```
     pub fn keys_from<Q>(&self, from: &Q) -> MapIndexKeys<K>
-        where
-            K: Borrow<Q>,
-            Q: StorageKey + ToOwned<Owned = K> + ?Sized,
+    where
+        K: Borrow<Q>,
+        Q: StorageKey + ToOwned<Owned = K> + ?Sized,
     {
         MapIndexKeys { base_iter: self.base.iter_from(&(), from) }
     }
@@ -313,9 +313,9 @@ where
     /// }
     /// ```
     pub fn values_from<Q>(&self, from: &Q) -> MapIndexValues<V>
-        where
-            K: Borrow<Q>,
-            Q: StorageKey + ToOwned<Owned = K> + ?Sized,
+    where
+        K: Borrow<Q>,
+        Q: StorageKey + ToOwned<Owned = K> + ?Sized,
     {
         MapIndexValues { base_iter: self.base.iter_from(&(), from) }
     }
@@ -362,9 +362,9 @@ where
     /// index.remove(&1);
     /// assert!(!index.contains(&1));
     pub fn remove<Q>(&mut self, key: &Q)
-        where
-            K: Borrow<Q>,
-            Q: StorageKey + ToOwned<Owned = K> + ?Sized,
+    where
+        K: Borrow<Q>,
+        Q: StorageKey + ToOwned<Owned = K> + ?Sized,
     {
         self.base.remove(key)
     }
