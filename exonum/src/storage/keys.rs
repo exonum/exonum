@@ -35,6 +35,7 @@ use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 /// use std::mem;
 /// use exonum::storage::StorageKey;
 ///
+/// #[derive(Clone)]
 /// struct Key {
 ///     a: i16,
 ///     b: u32,
