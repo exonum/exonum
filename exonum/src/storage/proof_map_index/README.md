@@ -78,9 +78,11 @@ and "finalizing" them as we go along. The finalization procedure is as follows:
 
 Two last nodes in the contour `C` can be collapsed into a single node if
 and only if the common prefix of these nodes
+
 ```none
 cp_last := common_prefix(C[-2], C[-1])
 ```
+
 is longer than the common prefix between the last node in the contour
 and the node `V` currently being added to the contour, i.e.,
 
