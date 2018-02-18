@@ -14,6 +14,8 @@
 
 //! Transaction definitions for the configutation service.
 
+// spell-checker:ignore ZEROVOTE
+
 use exonum::blockchain::{ExecutionError, ExecutionResult, Schema as CoreSchema,
                          StoredConfiguration, Transaction};
 use exonum::crypto::{CryptoHash, Hash, PublicKey, Signature};
@@ -45,7 +47,7 @@ transactions! {
 lazy_static! {
     /// Specific [`Vote`](struct.Vote.html) with all bytes in message set to 0.
     /// Used as placeholder in database for votes of validators, which didn't cast votes.
-    pub static ref ZEROVOTE: Vote = Vote::new_with_signature(
+    static ref ZEROVOTE: Vote = Vote::new_with_signature(
         &PublicKey::zero(),
         &Hash::zero(),
         &Signature::zero(),
@@ -253,6 +255,21 @@ impl Transaction for Propose {
 }
 
 impl Vote {
+    /// Checks if this vote encodes a special "absence of vote" variant.
+    pub fn is_none(&self) -> bool {
+        ZEROVOTE.eq(self)
+    }
+
+    /// Maps the vote into an `Option`, where `None` corresponds to a special
+    /// "absence of vote" variant.
+    pub fn into_option(self) -> Option<Self> {
+        if self.is_none() {
+            None
+        } else {
+            Some(self)
+        }
+    }
+
     /// Checks context-dependent conditions for a `Vote` transaction.
     ///
     /// # Return value
@@ -270,7 +287,7 @@ impl Vote {
                 .votes_by_config_hash(self.cfg_hash())
                 .get(validator_id as u64)
                 .unwrap();
-            if vote != ZEROVOTE.clone() {
+            if !vote.is_none() {
                 return Err(AlreadyVoted);
             }
         } else {

@@ -19,7 +19,7 @@ use exonum::encoding::Field;
 use exonum::crypto::Hash;
 use exonum::storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot};
 
-use transactions::{Propose, Vote, ZEROVOTE};
+use transactions::{Propose, Vote};
 
 encoding_struct! {
     /// This structure logically contains 2 fields:
@@ -46,10 +46,7 @@ encoding_struct! {
 }
 
 impl ProposeData {
-    /// Method to mutate `votes_history_hash` field containing root hash of
-    /// [`votes_by_config_hash`](struct.ConfigurationSchema.html#method.votes_by_config_hash)
-    /// after replacing [empty
-    /// vote](struct.ZEROVOTE.html) with a real `Vote` cast by a validator.
+    /// Method to mutate `votes_history_hash` field.
     pub fn set_history_hash(mut self, hash: &Hash) -> Self {
         Field::write(&hash, &mut self.raw, 8, 40);
         self
@@ -144,11 +141,7 @@ where
         let votes_by_config_hash = self.votes_by_config_hash(cfg_hash);
         let votes = votes_by_config_hash
             .iter()
-            .map(|vote| if vote == ZEROVOTE.clone() {
-                None
-            } else {
-                Some(vote)
-            })
+            .map(Vote::into_option)
             .collect();
         votes
     }

@@ -80,8 +80,6 @@
 //! }
 //! ```
 
-// spell-checker:ignore ZEROVOTE
-
 #[macro_use]
 extern crate exonum;
 #[cfg(test)]
@@ -119,7 +117,7 @@ pub mod transactions;
 mod tests;
 
 pub use schema::{ConfigurationSchema, ProposeData};
-pub use transactions::{Propose, Vote, ZEROVOTE};
+pub use transactions::{Propose, Vote};
 
 /// Value of [`service_id`](struct.Service.html#method.service_id) of
 /// `ConfigurationService`.
