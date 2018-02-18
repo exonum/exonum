@@ -81,10 +81,10 @@ use exonum::messages::RawTransaction;
 use exonum::storage::Snapshot;
 use exonum::encoding::{Error as EncodingError};
 
-pub mod api;
 pub mod schema;
 pub mod transactions;
 
+mod api;
 #[cfg(test)]
 mod tests;
 
