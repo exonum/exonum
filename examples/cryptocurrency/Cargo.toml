@@ -6,6 +6,9 @@ repository = "https://github.com/exonum/exonum"
 readme = "README.md"
 license = "Apache-2.0"
 
+[badges]
+travis-ci = { repository = "exonum/exonum" }
+
 [dependencies]
 exonum = { version = "0.5.1", path = "../../exonum" }
 iron = "0.6.0"

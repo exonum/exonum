@@ -3,8 +3,8 @@
 [![Build status][travis-image]][travis-url]
 [![Gitter][gitter-image]][gitter-url]
 
-[travis-image]: https://img.shields.io/travis/exonum/cryptocurrency.svg?style=flat-square
-[travis-url]: https://travis-ci.org/exonum/cryptocurrency
+[travis-image]: https://travis-ci.org/exonum/exonum.svg?branch=master
+[travis-url]: https://travis-ci.org/exonum/exonum
 [gitter-image]: https://img.shields.io/gitter/room/exonum/exonum.svg?style=flat-square
 [gitter-url]: https://gitter.im/exonum/exonum
 

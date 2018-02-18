@@ -38,7 +38,7 @@ extern crate iron;
 
 // Import necessary types from crates.
 
-use exonum::blockchain::{Blockchain, Service, Transaction, ApiContext};
+use exonum::blockchain::{Blockchain, Service, Transaction, ApiContext, ExecutionResult};
 use exonum::encoding::serialize::FromHex;
 use exonum::node::{TransactionSend, ApiSender};
 use exonum::messages::{RawTransaction, Message};
@@ -55,10 +55,6 @@ use serde::Deserialize;
 
 /// Service ID for the `Service` trait.
 const SERVICE_ID: u16 = 1;
-
-// Constants for transaction types within the service.
-const TX_CREATE_WALLET_ID: u16 = 1;
-const TX_TRANSFER_ID: u16 = 2;
 
 /// Initial balance of a newly created wallet.
 const INIT_BALANCE: u64 = 100;
@@ -138,41 +134,37 @@ impl<'a> CurrencySchema<&'a mut Fork> {
 
 // // // // // // // // // // TRANSACTIONS // // // // // // // // // //
 
-message! {
-    /// Transaction type for creating a new wallet.
-    ///
-    /// See [the `Transaction` trait implementation](#impl-Transaction) for details how
-    /// `TxCreateWallet` transactions are processed.
-    struct TxCreateWallet {
-        const TYPE = SERVICE_ID;
-        const ID = TX_CREATE_WALLET_ID;
+transactions! {
+    CryptocurrencyTransactions {
+        const SERVICE_ID = SERVICE_ID;
 
-        /// Public key of the wallet's owner.
-        pub_key: &PublicKey,
-        /// UTF-8 string with the owner's name.
-        name: &str,
-    }
-}
-
-message! {
-    /// Transaction type for transferring tokens between two wallets.
-    ///
-    /// See [the `Transaction` trait implementation](#impl-Transaction) for details how
-    /// `TxTransfer` transactions are processed.
-    struct TxTransfer {
-        const TYPE = SERVICE_ID;
-        const ID = TX_TRANSFER_ID;
-
-        /// Public key of the sender.
-        from: &PublicKey,
-        /// Public key of the receiver.
-        to: &PublicKey,
-        /// Number of tokens to transfer from sender's account to receiver's account.
-        amount: u64,
-        /// Auxiliary number to guarantee [non-idempotence][idempotence] of transactions.
+        /// Transaction type for creating a new wallet.
         ///
-        /// [idempotence]: https://en.wikipedia.org/wiki/Idempotence
-        seed: u64,
+        /// See [the `Transaction` trait implementation](#impl-Transaction) for details how
+        /// `TxCreateWallet` transactions are processed.
+        struct TxCreateWallet {
+            /// Public key of the wallet's owner.
+            pub_key: &PublicKey,
+            /// UTF-8 string with the owner's name.
+            name: &str,
+        }
+
+        /// Transaction type for transferring tokens between two wallets.
+        ///
+        /// See [the `Transaction` trait implementation](#impl-Transaction) for details how
+        /// `TxTransfer` transactions are processed.
+        struct TxTransfer {
+            /// Public key of the sender.
+            from: &PublicKey,
+            /// Public key of the receiver.
+            to: &PublicKey,
+            /// Number of tokens to transfer from sender's account to receiver's account.
+            amount: u64,
+            /// Auxiliary number to guarantee [non-idempotence][idempotence] of transactions.
+            ///
+            /// [idempotence]: https://en.wikipedia.org/wiki/Idempotence
+            seed: u64,
+        }
     }
 }
 
@@ -188,13 +180,14 @@ impl Transaction for TxCreateWallet {
     /// If a wallet with the specified public key is not registered, then creates a new wallet
     /// with the specified public key and name, and an initial balance of 100.
     /// Otherwise, performs no op.
-    fn execute(&self, view: &mut Fork) {
+    fn execute(&self, view: &mut Fork) -> ExecutionResult {
         let mut schema = CurrencySchema::new(view);
         if schema.wallet(self.pub_key()).is_none() {
             let wallet = Wallet::new(self.pub_key(), self.name(), INIT_BALANCE);
             println!("Create the wallet: {:?}", wallet);
             schema.wallets_mut().put(self.pub_key(), wallet);
         }
+        Ok(())
     }
 }
 
@@ -211,7 +204,7 @@ impl Transaction for TxTransfer {
     /// is sufficient. Otherwise, performs no op.
     ///
     /// [`TxCreateWallet`]: struct.TxCreateWallet.html
-    fn execute(&self, view: &mut Fork) {
+    fn execute(&self, view: &mut Fork) -> ExecutionResult {
         let mut schema = CurrencySchema::new(view);
         let sender = schema.wallet(self.from());
         let receiver = schema.wallet(self.to());
@@ -226,6 +219,7 @@ impl Transaction for TxTransfer {
                 wallets.put(self.to(), receiver);
             }
         }
+        Ok(())
     }
 }
 
@@ -287,7 +281,6 @@ impl CryptocurrencyApi {
         }
     }
 }
-
 
 /// `Api` trait implementation.
 ///
@@ -367,16 +360,8 @@ impl Service for CurrencyService {
 
     // Implement a method to deserialize transactions coming to the node.
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
-        let trans: Box<Transaction> = match raw.message_type() {
-            TX_TRANSFER_ID => Box::new(TxTransfer::from_raw(raw)?),
-            TX_CREATE_WALLET_ID => Box::new(TxCreateWallet::from_raw(raw)?),
-            _ => {
-                return Err(encoding::Error::IncorrectMessageType {
-                    message_type: raw.message_type(),
-                });
-            }
-        };
-        Ok(trans)
+        let tx = CryptocurrencyTransactions::tx_from_raw(raw)?;
+        Ok(tx.into())
     }
 
     // Hashes for the service tables that will be included into the state hash.
