@@ -196,13 +196,13 @@ impl PublicApi {
         committed_configs
     }
 
-    fn retrieve_params(
-        &self,
-        request: &mut Request,
-    ) -> Result<(Option<Hash>, Option<Height>), ApiError> {
+    fn retrieve_filter(&self, request: &mut Request) -> Result<Filter, ApiError> {
         let previous_cfg_hash: Option<Hash> = self.optional_param(request, "previous_cfg_hash")?;
         let actual_from: Option<Height> = self.optional_param(request, "actual_from")?;
-        Ok((previous_cfg_hash, actual_from))
+        Ok(Filter {
+            previous_cfg_hash,
+            actual_from,
+        })
     }
 }
 
@@ -236,7 +236,6 @@ where
 
 impl Api for PublicApi {
     fn wire(&self, router: &mut Router) {
-
         let self_ = self.clone();
         let config_actual = move |_: &mut Request| -> IronResult<Response> {
             let info = self_.actual_config();
@@ -265,23 +264,16 @@ impl Api for PublicApi {
 
         let self_ = self.clone();
         let all_proposes = move |req: &mut Request| -> IronResult<Response> {
-            let (previous_cfg_hash, actual_from) = self_.retrieve_params(req)?;
-            let info = self_.all_proposes(&Filter {
-                previous_cfg_hash,
-                actual_from,
-            });
+            let info = self_.all_proposes(&self_.retrieve_filter(req)?);
             self_.ok_response(&serde_json::to_value(info).unwrap())
         };
 
         let self_ = self.clone();
         let all_committed = move |req: &mut Request| -> IronResult<Response> {
-            let (previous_cfg_hash, actual_from) = self_.retrieve_params(req)?;
-            let info = self_.all_committed(&Filter {
-                previous_cfg_hash,
-                actual_from,
-            });
+            let info = self_.all_committed(&self_.retrieve_filter(req)?);
             self_.ok_response(&serde_json::to_value(info).unwrap())
         };
+
         router.get("/v1/configs/actual", config_actual, "config_actual");
         router.get(
             "/v1/configs/following",
@@ -296,7 +288,6 @@ impl Api for PublicApi {
         );
         router.get("/v1/configs/proposed", all_proposes, "all_proposes");
         router.get("/v1/configs/committed", all_committed, "all_committed");
-
     }
 }
 
@@ -323,6 +314,7 @@ where
             let info = self_.put_config_vote(&propose_cfg_hash)?;
             self_.ok_response(&serde_json::to_value(info).unwrap())
         };
+
         router.post(
             "/v1/configs/postpropose",
             put_config_propose,
