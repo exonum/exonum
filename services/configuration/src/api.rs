@@ -71,6 +71,31 @@ pub struct PublicConfigApi {
     pub blockchain: Blockchain,
 }
 
+/// Filter for stored configurations.
+struct Filter {
+    previous_cfg_hash: Option<Hash>,
+    actual_from: Option<Height>,
+}
+
+impl Filter {
+    /// Checks if a supplied configuration satisfies this filter.
+    fn test(&self, cfg: &StoredConfiguration) -> bool {
+        if let Some(ref prev) = self.previous_cfg_hash {
+            if cfg.previous_cfg_hash != *prev {
+                return false;
+            }
+        }
+
+        if let Some(ref from_height) = self.actual_from {
+            if cfg.actual_from < *from_height {
+                return false;
+            }
+        }
+
+        true
+    }
+}
+
 impl PublicConfigApi {
     fn config_with_proofs(&self, config: StoredConfiguration) -> ConfigHashInfo {
         let propose = ConfigurationSchema::new(self.blockchain.snapshot())
@@ -121,29 +146,10 @@ impl PublicConfigApi {
         }
     }
 
-    fn filter_cfg_predicate(
-        cfg: &StoredConfiguration,
-        previous_cfg_hash_filter: Option<Hash>,
-        actual_from_filter: Option<Height>,
-    ) -> bool {
-        if let Some(prev_ref) = previous_cfg_hash_filter {
-            if cfg.previous_cfg_hash != prev_ref {
-                return false;
-            }
-        }
-        if let Some(from_height) = actual_from_filter {
-            if cfg.actual_from < from_height {
-                return false;
-            }
-        }
-        true
-    }
-
     #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
     fn all_proposes(
         &self,
-        previous_cfg_hash_filter: Option<Hash>,
-        actual_from_filter: Option<Height>,
+        filter: Filter,
     ) -> Vec<ProposeHashInfo> {
         let schema = ConfigurationSchema::new(self.blockchain.snapshot());
         let index = schema.config_hash_by_ordinal();
@@ -163,7 +169,7 @@ impl PublicConfigApi {
                 let cfg = <StoredConfiguration as StorageValue>::from_bytes(
                     propose_data.tx_propose().cfg().as_bytes().into(),
                 );
-                PublicConfigApi::filter_cfg_predicate(&cfg, previous_cfg_hash_filter, actual_from_filter)
+                filter.test(&cfg)
             })
             .map(|(hash, propose_data)| {
                 ProposeHashInfo { hash, propose_data }
@@ -175,8 +181,7 @@ impl PublicConfigApi {
     #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
     fn all_committed(
         &self,
-        previous_cfg_hash_filter: Option<Hash>,
-        actual_from_filter: Option<Height>,
+        filter: Filter,
     ) -> Vec<ConfigHashInfo> {
         let core_schema = Schema::new(self.blockchain.snapshot());
         let actual_from = core_schema.configs_actual_from();
@@ -191,13 +196,7 @@ impl PublicConfigApi {
                     config_hash
                 ))
             })
-            .filter(|config| {
-                PublicConfigApi::filter_cfg_predicate(
-                    config,
-                    previous_cfg_hash_filter,
-                    actual_from_filter,
-                )
-            })
+            .filter(|config| filter.test(config))
             .map(|config| self.config_with_proofs(config))
             .collect();
         committed_configs
@@ -207,9 +206,9 @@ impl PublicConfigApi {
         &self,
         request: &mut Request,
     ) -> Result<(Option<Hash>, Option<Height>), ApiError> {
-        let previous_cfg_hash: Option<Hash> = self.optional_param(request, "previous_cfg_hash")?;
+        let prev_cfg_hash: Option<Hash> = self.optional_param(request, "previous_cfg_hash")?;
         let actual_from: Option<Height> = self.optional_param(request, "actual_from")?;
-        Ok((previous_cfg_hash, actual_from))
+        Ok((prev_cfg_hash, actual_from))
     }
 }
 
@@ -273,14 +272,14 @@ impl Api for PublicConfigApi {
         let self_ = self.clone();
         let all_proposes = move |req: &mut Request| -> IronResult<Response> {
             let (previous_cfg_hash, actual_from) = self_.retrieve_params(req)?;
-            let info = self_.all_proposes(previous_cfg_hash, actual_from);
+            let info = self_.all_proposes(Filter { previous_cfg_hash, actual_from });
             self_.ok_response(&serde_json::to_value(info).unwrap())
         };
 
         let self_ = self.clone();
         let all_committed = move |req: &mut Request| -> IronResult<Response> {
             let (previous_cfg_hash, actual_from) = self_.retrieve_params(req)?;
-            let info = self_.all_committed(previous_cfg_hash, actual_from);
+            let info = self_.all_committed(Filter { previous_cfg_hash, actual_from });
             self_.ok_response(&serde_json::to_value(info).unwrap())
         };
         router.get("/v1/configs/actual", config_actual, "config_actual");
