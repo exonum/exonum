@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Transaction definitions for the configutation service.
+//! Transaction definitions for the configuration service.
 
 // spell-checker:ignore ZEROVOTE
 
@@ -32,21 +32,38 @@ transactions! {
 
         /// Propose a new configuration.
         struct Propose {
+            /// Sender of the transaction.
+            ///
+            /// Should be one of validators as per the active configuration.
             from: &PublicKey,
+
+            /// Configuration in JSON format.
+            ///
+            /// Should be parseable into `StoredConfiguration`.
             cfg: &str,
         }
 
         /// Vote for the new configuration.
+        ///
+        /// # Note
+        ///
+        /// The stored version of the transaction has a special variant with all bytes
+        /// in the payload set to 0. This variant denotes an absence of vote.
         struct Vote {
+            /// Sender of the transaction.
+            ///
+            /// Should be one of validators as per the active configuration.
             from: &PublicKey,
+
+            /// Hash of the configuration that this vote is for.
+            ///
+            /// See [crate docs](../index.html) for more details on how the hash is calculated.
             cfg_hash: &Hash,
         }
     }
 }
 
 lazy_static! {
-    /// Specific [`Vote`](struct.Vote.html) with all bytes in message set to 0.
-    /// Used as placeholder in database for votes of validators, which didn't cast votes.
     static ref ZEROVOTE: Vote = Vote::new_with_signature(
         &PublicKey::zero(),
         &Hash::zero(),
@@ -117,6 +134,11 @@ fn check_following_config(snapshot: &Snapshot, tx: &Transaction) -> bool {
 /// if it isn't.
 ///
 /// Transaction `tx` is used to obtain context for logging.
+///
+/// # Return value
+///
+/// The index of the validator authoring the transaction, or `None` if no validator matches
+/// the supplied public key.
 fn check_validator_authorship(
     snapshot: &Snapshot,
     key: &PublicKey,
@@ -132,7 +154,24 @@ fn check_validator_authorship(
     validator_id
 }
 
+/// Checks if there is enough votes for a particular configuration hash.
+fn enough_votes_to_commit(snapshot: &Snapshot, cfg_hash: &Hash) -> bool {
+    let actual_config = CoreSchema::new(snapshot).actual_configuration();
+
+    let schema = Schema::new(snapshot);
+    let votes = schema.votes_by_config_hash(cfg_hash);
+    let votes_count: usize = votes.iter()
+        .map(|vote| if !vote.is_none() { 1 } else { 0 })
+        .sum();
+    votes_count >= State::byzantine_majority_count(actual_config.validator_keys.len())
+}
+
 impl Propose {
+    /// Performs context-dependent checks on the proposal.
+    ///
+    /// # Return value
+    ///
+    /// Configuration parsed from the transaction together with its hash.
     fn precheck(&self, snapshot: &Snapshot) -> Result<(StoredConfiguration, Hash), ProposeError> {
         use exonum::storage::StorageValue;
         use self::ProposeError::*;
@@ -172,6 +211,7 @@ impl Propose {
         Ok((cfg, cfg_hash))
     }
 
+    /// Checks the consistency of a candidate next configuration.
     fn check_config_candidate(
         &self,
         candidate: &StoredConfiguration,
@@ -203,6 +243,7 @@ impl Propose {
         Ok(())
     }
 
+    /// Saves this proposal to the service schema.
     fn save(&self, fork: &mut Fork, cfg: &StoredConfiguration, cfg_hash: Hash) {
         let prev_cfg = CoreSchema::new(fork.as_ref())
             .configs()
@@ -210,7 +251,7 @@ impl Propose {
             .unwrap();
 
         // Start writing to storage.
-        // NB. DO NOT write to the service schema anywhere else during `Vote::execute`, it may
+        // NB. DO NOT write to the service schema anywhere else during `Propose::execute`, it may
         // break invariants.
         let mut schema = Schema::new(fork);
 
@@ -305,6 +346,7 @@ impl Vote {
         Ok(parsed)
     }
 
+    /// Saves this vote into the service schema.
     fn save(&self, fork: &mut Fork) {
         use exonum::storage::StorageValue;
 
@@ -343,21 +385,6 @@ impl Vote {
             propose_data,
         );
     }
-
-    fn enough_votes_to_commit(&self, snapshot: &Snapshot) -> bool {
-        let schema = Schema::new(snapshot);
-        let actual_config = CoreSchema::new(snapshot).actual_configuration();
-
-        let mut votes_count = 0;
-        {
-            for vote_option in schema.votes(self.cfg_hash()) {
-                if vote_option.is_some() {
-                    votes_count += 1;
-                }
-            }
-        }
-        votes_count >= State::byzantine_majority_count(actual_config.validator_keys.len())
-    }
 }
 
 impl Transaction for Vote {
@@ -374,14 +401,14 @@ impl Transaction for Vote {
             self
         );
 
-        if self.enough_votes_to_commit(fork.as_ref()) {
+        if enough_votes_to_commit(fork.as_ref(), self.cfg_hash()) {
             CoreSchema::new(fork).commit_configuration(parsed_config);
         }
         Ok(())
     }
 }
 
-/// Parses a trasaction from its raw represetation.
+/// Parses a transaction from its raw representation.
 pub(crate) fn tx_from_raw(raw: RawTransaction) -> Result<Box<Transaction>, EncodingError> {
     use exonum::blockchain::TransactionSet;
 

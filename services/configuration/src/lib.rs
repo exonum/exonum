@@ -12,57 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! # Introduction
-//! This crate implements the standalone configuration service of `Exonum` blockchain,
-//! which, upon being plugged in, allows modifying
-//! `Exonum` blockchain configuration by means of [propose config](struct.Propose.html)
-//! and [vote for proposed config](struct.Vote.html) transactions, signed by validators
-//! - actual blockchain participants.
+//! This crate implements a *configuration service* for Exonum blockchain framework.
 //!
-//! It also contains http api implementation for public queries (get actual/following
+//! Upon being plugged in, the service allows to modify Exonum blockchain configuration
+//! using [proposals](struct.Propose.html) and [voting for proposal](struct.Vote.html),
+//! both of which are implemented as transactions signed by blockchain validators.
+//!
+//! The service also provides HTTP API for public queries (get actual/following
 //! configuration, etc.) and private queries, intended for use only by validator nodes' maintainers
 //! (post configuration propose, post vote for a configuration propose).
 //!
-//! `Exonum` blockchain configuration is composed of:
+//! # Blockchain configuration
 //!
-//! - consensus algorithm parameters
-//! - list of validators' public keys - list of identities of consensus participants
-//! - list of services public keys
-//! - configuration of all services, plugged in for a specific blockchain instance.
+//! Blockchain configuration corresponds to [`StoredConfiguration`][sc]
+//! in the Exonum core library. The logic of the configuration service extensively uses
+//! hashes of configuration, which are calculated as follows:
 //!
-//! It also contains auxiliary fields:
-//!
-//! - `actual_from` - blockchain height, upon reaching which current config is to become actual.
-//! - `previous_cfg_hash` - hash of previous configuration, which validators' set is allowed to cast
-//! votes for current config.
-//!
-//! See [`StoredConfiguration`][sc] in exonum.
+//! 1. Parse a `StoredConfiguration` from JSON string if necessary.
+//! 2. Convert a `StoredConfiguration` into bytes as per its `StorageValue` implementation.
+//! 3. Use `exonum::crypto::hash()` on the obtained bytes.
 //!
 //! [sc]: https://docs.rs/exonum/0.3.0/exonum/blockchain/config/struct.StoredConfiguration.html
-//!
-//! While using the service's transactions and/or api, it's important to understand, how [hash of a
-//! configuration][sc] is calculated. It's calculated as a hash of normalized `String` bytes,
-//! containing configuration json representation.
-//! When a new propose is put via `Propose`:
-//!
-//! [sc]: https://docs.rs/exonum/0.3.0/exonum/blockchain/config/struct.StoredConfiguration.html
-//!
-//! 1. [bytes](struct.Propose.html#method.cfg) of a `String`, containing configuration
-//! json ->
-//! 2. `String` ->
-//! 3. `StoredConfiguration` ->
-//! 4. unique normalized `String` for a unique configuration ->
-//! 5. bytes ->
-//! 6. [hash](https://docs.rs/exonum/0.3.0/exonum/crypto/fn.hash.html)(bytes)
-//!
-//! The same hash of a configuration is referenced in
-//! `Vote` in [`cfg_hash`](struct.Vote.html#method.cfg_hash).
-//!
 //!
 //! # Examples
-//!
-//! Run `Exonum` blockchain testnet with single configuration service turned on for it in a
-//! single process (2 threads per node: 1 - for exonum node and 1 - for http api listener)
 //!
 //! ```rust,no_run
 //! extern crate exonum;
@@ -116,18 +88,15 @@ pub mod transactions;
 #[cfg(test)]
 mod tests;
 
+#[doc(no_inline)]
 pub use schema::{ConfigurationSchema, ProposeData};
+#[doc(no_inline)]
 pub use transactions::{Propose, Vote};
 
-/// Value of [`service_id`](struct.Service.html#method.service_id) of
-/// `ConfigurationService`.
+/// Service identifier for the configuration service.
 pub const CONFIGURATION_SERVICE_ID: u16 = 1;
 
-/// Structure, implementing [Service][1] trait template.
-/// Most of the actual business logic of modifying `Exonum` blockchain configuration is inside of
-/// [`Propose`](struct.Propose.html#method.execute) and
-/// [`Vote`](struct.Vote.html#method.execute).
-/// [1]: <https://docs.rs/exonum/0.3.0/exonum/blockchain/trait.Service.html>
+/// Configuration service.
 #[derive(Default)]
 pub struct ConfigurationService {}
 
@@ -146,30 +115,11 @@ impl Service for ConfigurationService {
         CONFIGURATION_SERVICE_ID
     }
 
-    /// `ConfigurationService` returns a vector, containing the single [root_hash][1]
-    /// of [all config proposes table]
-    /// (struct.ConfigurationSchema.html#method.propose_data_by_config_hash).
-    /// [1]: <https://docs.rs/exonum/0.3.0/exonum/storage/proof_list_index/
-    ///struct.ProofListIndex.html#method.root_hash>
-    ///
-    /// Thus, `state_hash` is affected by any new valid propose and indirectly by
-    /// any new vote for a propose.
-    ///
-    /// When a new vote for a config propose is added the [root_hash][1]
-    ///  of corresponding
-    /// [votes for a propose table](struct.ConfigurationSchema.html#method.votes_by_config_hash)
-    /// is modified. Such hash is stored in each entry of [all config proposes table]
-    /// (struct.ConfigurationSchema.html#method.propose_data_by_config_hash)
-    /// - `ProposeData`.
-    /// [1]: <https://docs.rs/exonum/0.3.0/exonum/storage/proof_map_index/
-    ///struct.ProofMapIndex.html#method.root_hash>
     fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash> {
         let schema = ConfigurationSchema::new(snapshot);
         schema.state_hash()
     }
 
-    /// Returns box ([Transaction][1]).
-    /// [1]: https://docs.rs/exonum/0.3.0/exonum/blockchain/trait.Transaction.html
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, EncodingError> {
         transactions::tx_from_raw(raw)
     }
