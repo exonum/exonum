@@ -7,7 +7,7 @@ readme = "README.md"
 license = "Apache-2.0"
 
 [dependencies]
-exonum = "0.5.0"
+exonum = { version = "0.5.1", path = "../../exonum" }
 iron = "0.6.0"
 bodyparser = "0.8.0"
 router = "0.6.0"
@@ -15,5 +15,5 @@ serde = "1.0"
 serde_json = "1.0"
 
 [dev-dependencies]
-exonum-testkit = "0.5.0"
+exonum-testkit = { version = "0.5.0", path = "../../testkit" }
 rand = "0.4"
