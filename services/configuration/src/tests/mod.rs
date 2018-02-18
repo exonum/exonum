@@ -56,7 +56,7 @@ impl ConfigurationTestKit for TestKit {
     fn configuration_default() -> Self {
         TestKitBuilder::validator()
             .with_validators(4)
-            .with_service(ConfigurationService::new())
+            .with_service(ConfigurationService {})
             .create()
     }
 
@@ -103,7 +103,7 @@ impl ConfigurationTestKit for TestKit {
 fn test_full_node_to_validator() {
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(3)
-        .with_service(ConfigurationService::new())
+        .with_service(ConfigurationService {})
         .create();
 
     let cfg_change_height = Height(5);
@@ -122,7 +122,7 @@ fn test_full_node_to_validator() {
 fn test_add_validators_to_config() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
-        .with_service(ConfigurationService::new())
+        .with_service(ConfigurationService {})
         .create();
 
     let cfg_change_height = Height(5);
@@ -141,7 +141,7 @@ fn test_add_validators_to_config() {
 fn test_exclude_sandbox_node_from_config() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
-        .with_service(ConfigurationService::new())
+        .with_service(ConfigurationService {})
         .create();
 
     let cfg_change_height = Height(5);
@@ -160,7 +160,7 @@ fn test_exclude_sandbox_node_from_config() {
 fn test_apply_second_configuration() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
-        .with_service(ConfigurationService::new())
+        .with_service(ConfigurationService {})
         .create();
     // First configuration.
     let cfg_change_height = Height(5);

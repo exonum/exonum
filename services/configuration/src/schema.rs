@@ -42,6 +42,7 @@ impl ProposeData {
 }
 
 /// Database schema used by the configuration service.
+#[derive(Debug)]
 pub struct ConfigurationSchema<T> {
     view: T,
 }
@@ -50,6 +51,7 @@ impl<T> ConfigurationSchema<T>
 where
     T: AsRef<Snapshot>,
 {
+    /// Creates a new schema.
     pub fn new(snapshot: T) -> ConfigurationSchema<T> {
         ConfigurationSchema { view: snapshot }
     }

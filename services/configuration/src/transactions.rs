@@ -71,6 +71,7 @@ lazy_static! {
     );
 }
 
+#[derive(Debug)]
 enum ProposeError {
     AlreadyScheduled,
     UnknownSender,
@@ -87,6 +88,7 @@ impl From<ProposeError> for ExecutionError {
     }
 }
 
+#[derive(Debug)]
 enum VoteError {
     UnknownSender,
     InvalidConfigRef,

@@ -52,6 +52,8 @@
 //! }
 //! ```
 
+#![deny(missing_debug_implementations, missing_docs)]
+
 #[macro_use]
 extern crate exonum;
 #[cfg(test)]
@@ -97,14 +99,8 @@ pub use transactions::{Propose, Vote};
 pub const CONFIGURATION_SERVICE_ID: u16 = 1;
 
 /// Configuration service.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct ConfigurationService {}
-
-impl ConfigurationService {
-    pub fn new() -> ConfigurationService {
-        ConfigurationService {}
-    }
-}
 
 impl Service for ConfigurationService {
     fn service_name(&self) -> &'static str {
@@ -148,6 +144,6 @@ pub struct ConfigurationServiceFactory;
 
 impl ServiceFactory for ConfigurationServiceFactory {
     fn make_service(&mut self, _: &Context) -> Box<Service> {
-        Box::new(ConfigurationService::new())
+        Box::new(ConfigurationService {})
     }
 }
