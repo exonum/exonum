@@ -20,7 +20,7 @@ use exonum::storage::StorageValue;
 use exonum::crypto::{CryptoHash, Hash, hash, HASH_SIZE};
 use exonum_testkit::{TestKit, TestKitBuilder, TestNode};
 
-use {ConfigurationSchema, ConfigurationService, TxConfigPropose, TxConfigVote};
+use {ConfigurationSchema, ConfigurationService, Propose, Vote};
 
 mod api;
 
@@ -28,21 +28,18 @@ pub fn to_boxed<T: Transaction>(tx: T) -> Box<Transaction> {
     Box::new(tx) as Box<Transaction>
 }
 
-pub fn new_tx_config_propose(
-    node: &TestNode,
-    cfg_proposal: StoredConfiguration,
-) -> TxConfigPropose {
+pub fn new_tx_config_propose(node: &TestNode, cfg_proposal: StoredConfiguration) -> Propose {
     let keypair = node.service_keypair();
-    TxConfigPropose::new(
+    Propose::new(
         keypair.0,
         str::from_utf8(cfg_proposal.into_bytes().as_slice()).unwrap(),
         keypair.1,
     )
 }
 
-pub fn new_tx_config_vote(node: &TestNode, cfg_proposal_hash: Hash) -> TxConfigVote {
+pub fn new_tx_config_vote(node: &TestNode, cfg_proposal_hash: Hash) -> Vote {
     let keypair = node.service_keypair();
-    TxConfigVote::new(keypair.0, &cfg_proposal_hash, keypair.1)
+    Vote::new(keypair.0, &cfg_proposal_hash, keypair.1)
 }
 
 pub trait ConfigurationTestKit {
@@ -50,9 +47,9 @@ pub trait ConfigurationTestKit {
 
     fn apply_configuration(&mut self, proposer: ValidatorId, cfg_proposal: StoredConfiguration);
 
-    fn votes_for_propose(&self, config_hash: Hash) -> Vec<Option<TxConfigVote>>;
+    fn votes_for_propose(&self, config_hash: Hash) -> Vec<Option<Vote>>;
 
-    fn find_propose(&self, config_hash: Hash) -> Option<TxConfigPropose>;
+    fn find_propose(&self, config_hash: Hash) -> Option<Propose>;
 }
 
 impl ConfigurationTestKit for TestKit {
@@ -89,13 +86,13 @@ impl ConfigurationTestKit for TestKit {
         );
     }
 
-    fn votes_for_propose(&self, config_hash: Hash) -> Vec<Option<TxConfigVote>> {
+    fn votes_for_propose(&self, config_hash: Hash) -> Vec<Option<Vote>> {
         let snapshot = self.snapshot();
         let schema = ConfigurationSchema::new(&snapshot);
         schema.get_votes(&config_hash)
     }
 
-    fn find_propose(&self, config_hash: Hash) -> Option<TxConfigPropose> {
+    fn find_propose(&self, config_hash: Hash) -> Option<Propose> {
         let snapshot = self.snapshot();
         let schema = ConfigurationSchema::new(&snapshot);
         schema.get_propose(&config_hash)
@@ -298,7 +295,7 @@ fn test_discard_invalid_config_json() {
 
     let propose_tx = {
         let keypair = testkit.network().validators()[1].service_keypair();
-        TxConfigPropose::new(&keypair.0, new_cfg, &keypair.1)
+        Propose::new(&keypair.0, new_cfg, &keypair.1)
     };
     testkit.create_block_with_transactions(txvec![propose_tx]);
     assert_eq!(None, testkit.find_propose(hash(new_cfg.as_bytes())));

@@ -25,9 +25,9 @@ use exonum::node::TransactionSend;
 use exonum::encoding::serialize::json::reexport as serde_json;
 use exonum::helpers::Height;
 
-use super::{ProposeData, TxConfigPropose, TxConfigVote, ConfigurationSchema};
+use super::{ProposeData, Propose, Vote, ConfigurationSchema};
 
-pub type VotesInfo = Option<Vec<Option<TxConfigVote>>>;
+pub type VotesInfo = Option<Vec<Option<Vote>>>;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ConfigHashInfo {
@@ -100,11 +100,11 @@ impl PublicConfigApi {
 
     fn get_config_by_hash(&self, hash: &Hash) -> ConfigInfo {
         let snapshot = self.blockchain.snapshot();
-        let general_schema = Schema::new(&snapshot);
-        let committed_config = general_schema.configs().get(hash);
+        let committed_config = Schema::new(&snapshot).configs().get(hash);
+        let propose = ConfigurationSchema::new(&snapshot).propose_data_by_config_hash().get(
+            hash,
+        );
 
-        let configuration_schema = ConfigurationSchema::new(&snapshot);
-        let propose = configuration_schema.propose_data_by_config_hash().get(hash);
         ConfigInfo {
             committed_config,
             propose,
@@ -112,13 +112,10 @@ impl PublicConfigApi {
     }
 
     fn get_votes_for_propose(&self, config_hash: &Hash) -> VotesInfo {
-        let snapshot = self.blockchain.snapshot();
-        let configuration_schema = ConfigurationSchema::new(&snapshot);
-        if configuration_schema
-            .propose_data_by_config_hash()
-            .contains(config_hash)
-        {
-            Some(configuration_schema.get_votes(config_hash))
+        let schema = ConfigurationSchema::new(self.blockchain.snapshot());
+
+        if schema.propose_data_by_config_hash().contains(config_hash) {
+            Some(schema.get_votes(config_hash))
         } else {
             None
         }
@@ -148,9 +145,9 @@ impl PublicConfigApi {
         previous_cfg_hash_filter: Option<Hash>,
         actual_from_filter: Option<Height>,
     ) -> Vec<ProposeHashInfo> {
-        let configuration_schema = ConfigurationSchema::new(self.blockchain.snapshot());
-        let index = configuration_schema.config_hash_by_ordinal();
-        let proposes_by_hash = configuration_schema.propose_data_by_config_hash();
+        let schema = ConfigurationSchema::new(self.blockchain.snapshot());
+        let index = schema.config_hash_by_ordinal();
+        let proposes_by_hash = schema.propose_data_by_config_hash();
 
         let proposes = index
             .iter()
@@ -166,11 +163,7 @@ impl PublicConfigApi {
                 let cfg = <StoredConfiguration as StorageValue>::from_bytes(
                     propose_data.tx_propose().cfg().as_bytes().into(),
                 );
-                PublicConfigApi::filter_cfg_predicate(
-                    &cfg,
-                    previous_cfg_hash_filter,
-                    actual_from_filter,
-                )
+                PublicConfigApi::filter_cfg_predicate(&cfg, previous_cfg_hash_filter, actual_from_filter)
             })
             .map(|(hash, propose_data)| {
                 ProposeHashInfo { hash, propose_data }
@@ -185,10 +178,9 @@ impl PublicConfigApi {
         previous_cfg_hash_filter: Option<Hash>,
         actual_from_filter: Option<Height>,
     ) -> Vec<ConfigHashInfo> {
-        let general_schema = Schema::new(self.blockchain.snapshot());
-
-        let actual_from = general_schema.configs_actual_from();
-        let configs = general_schema.configs();
+        let core_schema = Schema::new(self.blockchain.snapshot());
+        let actual_from = core_schema.configs_actual_from();
+        let configs = core_schema.configs();
 
         let committed_configs = actual_from
             .iter()
@@ -227,7 +219,7 @@ where
 {
     fn put_config_propose(&self, cfg: StoredConfiguration) -> Result<ProposeResponse, ApiError> {
         let cfg_hash = cfg.hash();
-        let config_propose = TxConfigPropose::new(
+        let config_propose = Propose::new(
             &self.config.0,
             str::from_utf8(cfg.into_bytes().as_slice()).unwrap(),
             &self.config.1,
@@ -240,7 +232,7 @@ where
     }
 
     fn put_config_vote(&self, cfg_hash: &Hash) -> Result<VoteResponse, ApiError> {
-        let config_vote = TxConfigVote::new(&self.config.0, cfg_hash, &self.config.1);
+        let config_vote = Vote::new(&self.config.0, cfg_hash, &self.config.1);
         let tx_hash = config_vote.hash();
         let ch = self.channel.clone();
         ch.send(Box::new(config_vote))?;
