@@ -79,7 +79,7 @@ use exonum::helpers::fabric::{ServiceFactory as FactoryTrait, Context};
 use exonum::crypto::Hash;
 use exonum::messages::RawTransaction;
 use exonum::storage::Snapshot;
-use exonum::encoding::{Error as EncodingError};
+use exonum::encoding::Error as EncodingError;
 
 mod api;
 mod schema;

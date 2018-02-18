@@ -162,7 +162,8 @@ fn enough_votes_to_commit(snapshot: &Snapshot, cfg_hash: &Hash) -> bool {
 
     let schema = Schema::new(snapshot);
     let votes = schema.votes_by_config_hash(cfg_hash);
-    let votes_count: usize = votes.iter()
+    let votes_count: usize = votes
+        .iter()
         .map(|vote| if !vote.is_none() { 1 } else { 0 })
         .sum();
     votes_count >= State::byzantine_majority_count(actual_config.validator_keys.len())
@@ -306,11 +307,7 @@ impl Vote {
     /// Maps the vote into an `Option`, where `None` corresponds to a special
     /// "absence of vote" variant.
     pub fn into_option(self) -> Option<Self> {
-        if self.is_none() {
-            None
-        } else {
-            Some(self)
-        }
+        if self.is_none() { None } else { Some(self) }
     }
 
     /// Checks context-dependent conditions for a `Vote` transaction.

@@ -147,10 +147,7 @@ impl PublicApi {
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
-    fn all_proposes(
-        &self,
-        filter: Filter,
-    ) -> Vec<ProposeHashInfo> {
+    fn all_proposes(&self, filter: &Filter) -> Vec<ProposeHashInfo> {
         let schema = Schema::new(self.blockchain.snapshot());
         let index = schema.config_hash_by_ordinal();
         let proposes_by_hash = schema.propose_data_by_config_hash();
@@ -179,10 +176,7 @@ impl PublicApi {
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
-    fn all_committed(
-        &self,
-        filter: Filter,
-    ) -> Vec<ConfigHashInfo> {
+    fn all_committed(&self, filter: &Filter) -> Vec<ConfigHashInfo> {
         let core_schema = CoreSchema::new(self.blockchain.snapshot());
         let actual_from = core_schema.configs_actual_from();
         let configs = core_schema.configs();
@@ -206,9 +200,9 @@ impl PublicApi {
         &self,
         request: &mut Request,
     ) -> Result<(Option<Hash>, Option<Height>), ApiError> {
-        let prev_cfg_hash: Option<Hash> = self.optional_param(request, "previous_cfg_hash")?;
+        let previous_cfg_hash: Option<Hash> = self.optional_param(request, "previous_cfg_hash")?;
         let actual_from: Option<Height> = self.optional_param(request, "actual_from")?;
-        Ok((prev_cfg_hash, actual_from))
+        Ok((previous_cfg_hash, actual_from))
     }
 }
 
@@ -272,14 +266,20 @@ impl Api for PublicApi {
         let self_ = self.clone();
         let all_proposes = move |req: &mut Request| -> IronResult<Response> {
             let (previous_cfg_hash, actual_from) = self_.retrieve_params(req)?;
-            let info = self_.all_proposes(Filter { previous_cfg_hash, actual_from });
+            let info = self_.all_proposes(&Filter {
+                previous_cfg_hash,
+                actual_from,
+            });
             self_.ok_response(&serde_json::to_value(info).unwrap())
         };
 
         let self_ = self.clone();
         let all_committed = move |req: &mut Request| -> IronResult<Response> {
             let (previous_cfg_hash, actual_from) = self_.retrieve_params(req)?;
-            let info = self_.all_committed(Filter { previous_cfg_hash, actual_from });
+            let info = self_.all_committed(&Filter {
+                previous_cfg_hash,
+                actual_from,
+            });
             self_.ok_response(&serde_json::to_value(info).unwrap())
         };
         router.get("/v1/configs/actual", config_actual, "config_actual");
@@ -295,11 +295,7 @@ impl Api for PublicApi {
             "votes_for_propose",
         );
         router.get("/v1/configs/proposed", all_proposes, "all_proposes");
-        router.get(
-            "/v1/configs/committed",
-            all_committed,
-            "all_committed",
-        );
+        router.get("/v1/configs/committed", all_committed, "all_committed");
 
     }
 }

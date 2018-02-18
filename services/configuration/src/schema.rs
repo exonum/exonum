@@ -86,11 +86,7 @@ where
     /// Returns a table of votes of validators for a particular proposal, referenced
     /// by its configuration hash.
     pub fn votes_by_config_hash(&self, config_hash: &Hash) -> ProofListIndex<&Snapshot, Vote> {
-        ProofListIndex::with_prefix(
-            VOTES,
-            gen_prefix(config_hash),
-            self.view.as_ref(),
-        )
+        ProofListIndex::with_prefix(VOTES, gen_prefix(config_hash), self.view.as_ref())
     }
 
     /// Returns a `Propose` transaction with a particular configuration hash.
@@ -104,10 +100,7 @@ where
     #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
     pub fn votes(&self, cfg_hash: &Hash) -> Vec<Option<Vote>> {
         let votes_by_config_hash = self.votes_by_config_hash(cfg_hash);
-        let votes = votes_by_config_hash
-            .iter()
-            .map(Vote::into_option)
-            .collect();
+        let votes = votes_by_config_hash.iter().map(Vote::into_option).collect();
         votes
     }
 
@@ -138,10 +131,6 @@ impl<'a> Schema<&'a mut Fork> {
         &mut self,
         config_hash: &Hash,
     ) -> ProofListIndex<&mut Fork, Vote> {
-        ProofListIndex::with_prefix(
-            VOTES,
-            gen_prefix(config_hash),
-            &mut self.view,
-        )
+        ProofListIndex::with_prefix(VOTES, gen_prefix(config_hash), &mut self.view)
     }
 }
