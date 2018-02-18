@@ -38,16 +38,14 @@
 //!
 //! ```rust,no_run
 //! extern crate exonum;
-//! extern crate exonum_configuration;
+//! extern crate exonum_configuration as configuration;
 //!
 //! use exonum::helpers::fabric::NodeBuilder;
-//!
-//! use exonum_configuration::ConfigurationServiceFactory;
 //!
 //! fn main() {
 //!     exonum::helpers::init_logger().unwrap();
 //!     NodeBuilder::new()
-//!         .with_service(Box::new(ConfigurationServiceFactory))
+//!         .with_service(Box::new(configuration::ServiceFactory))
 //!         .run();
 //! }
 //! ```
@@ -76,43 +74,40 @@ extern crate lazy_static;
 use router::Router;
 use iron::Handler;
 use exonum::api::Api;
-use exonum::blockchain::{Service, Transaction, ApiContext};
-use exonum::helpers::fabric::{ServiceFactory, Context};
+use exonum::blockchain::{Service as ServiceTrait, Transaction, ApiContext};
+use exonum::helpers::fabric::{ServiceFactory as FactoryTrait, Context};
 use exonum::crypto::Hash;
 use exonum::messages::RawTransaction;
 use exonum::storage::Snapshot;
 use exonum::encoding::{Error as EncodingError};
 
-pub mod schema;
-pub mod transactions;
-
 mod api;
+mod schema;
 #[cfg(test)]
 mod tests;
+mod transactions;
 
-#[doc(no_inline)]
-pub use schema::{ConfigurationSchema, ProposeData};
-#[doc(no_inline)]
+pub use schema::{Schema, ProposeData};
 pub use transactions::{Propose, Vote};
 
 /// Service identifier for the configuration service.
-pub const CONFIGURATION_SERVICE_ID: u16 = 1;
+pub const SERVICE_ID: u16 = 1;
 
 /// Configuration service.
 #[derive(Debug, Default)]
-pub struct ConfigurationService {}
+pub struct Service {}
 
-impl Service for ConfigurationService {
+impl ServiceTrait for Service {
     fn service_name(&self) -> &'static str {
         "configuration"
     }
 
     fn service_id(&self) -> u16 {
-        CONFIGURATION_SERVICE_ID
+        SERVICE_ID
     }
 
     fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash> {
-        let schema = ConfigurationSchema::new(snapshot);
+        let schema = Schema::new(snapshot);
         schema.state_hash()
     }
 
@@ -122,14 +117,14 @@ impl Service for ConfigurationService {
 
     fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
         let mut router = Router::new();
-        let api = api::PublicConfigApi { blockchain: ctx.blockchain().clone() };
+        let api = api::PublicApi { blockchain: ctx.blockchain().clone() };
         api.wire(&mut router);
         Some(Box::new(router))
     }
 
     fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
         let mut router = Router::new();
-        let api = api::PrivateConfigApi {
+        let api = api::PrivateApi {
             channel: ctx.node_channel().clone(),
             config: (*ctx.public_key(), ctx.secret_key().clone()),
         };
@@ -140,10 +135,10 @@ impl Service for ConfigurationService {
 
 /// A configuration service creator for the `NodeBuilder`.
 #[derive(Debug)]
-pub struct ConfigurationServiceFactory;
+pub struct ServiceFactory;
 
-impl ServiceFactory for ConfigurationServiceFactory {
-    fn make_service(&mut self, _: &Context) -> Box<Service> {
-        Box::new(ConfigurationService {})
+impl FactoryTrait for ServiceFactory {
+    fn make_service(&mut self, _: &Context) -> Box<ServiceTrait> {
+        Box::new(Service {})
     }
 }

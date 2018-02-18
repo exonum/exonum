@@ -19,13 +19,13 @@ use iron::prelude::*;
 use bodyparser;
 use exonum::api::{Api, ApiError};
 use exonum::crypto::{CryptoHash, PublicKey, SecretKey, Hash};
-use exonum::blockchain::{Blockchain, StoredConfiguration, Schema};
+use exonum::blockchain::{Blockchain, StoredConfiguration, Schema as CoreSchema};
 use exonum::storage::StorageValue;
 use exonum::node::TransactionSend;
 use exonum::encoding::serialize::json::reexport as serde_json;
 use exonum::helpers::Height;
 
-use super::{ProposeData, Propose, Vote, ConfigurationSchema};
+use super::{ProposeData, Propose, Vote, Schema};
 
 pub type VotesInfo = Option<Vec<Option<Vote>>>;
 
@@ -61,13 +61,13 @@ pub struct VoteResponse {
 }
 
 #[derive(Clone)]
-pub struct PrivateConfigApi<T: TransactionSend + Clone> {
+pub struct PrivateApi<T: TransactionSend + Clone> {
     pub channel: T,
     pub config: (PublicKey, SecretKey),
 }
 
 #[derive(Clone)]
-pub struct PublicConfigApi {
+pub struct PublicApi {
     pub blockchain: Blockchain,
 }
 
@@ -96,9 +96,9 @@ impl Filter {
     }
 }
 
-impl PublicConfigApi {
+impl PublicApi {
     fn config_with_proofs(&self, config: StoredConfiguration) -> ConfigHashInfo {
-        let propose = ConfigurationSchema::new(self.blockchain.snapshot())
+        let propose = Schema::new(self.blockchain.snapshot())
             .propose(&config.hash())
             .map(|p| p.hash());
         let votes = self.votes_for_propose(&config.hash());
@@ -112,21 +112,21 @@ impl PublicConfigApi {
 
     fn actual_config(&self) -> ConfigHashInfo {
         let snapshot = self.blockchain.snapshot();
-        let configuration_schema = Schema::new(&snapshot);
+        let configuration_schema = CoreSchema::new(&snapshot);
         let actual_cfg = configuration_schema.actual_configuration();
         self.config_with_proofs(actual_cfg)
     }
 
     fn following_config(&self) -> Option<ConfigHashInfo> {
-        Schema::new(self.blockchain.snapshot())
+        CoreSchema::new(self.blockchain.snapshot())
             .following_configuration()
             .map(|following_cfg| self.config_with_proofs(following_cfg))
     }
 
     fn config_by_hash(&self, hash: &Hash) -> ConfigInfo {
         let snapshot = self.blockchain.snapshot();
-        let committed_config = Schema::new(&snapshot).configs().get(hash);
-        let propose = ConfigurationSchema::new(&snapshot).propose_data_by_config_hash().get(
+        let committed_config = CoreSchema::new(&snapshot).configs().get(hash);
+        let propose = Schema::new(&snapshot).propose_data_by_config_hash().get(
             hash,
         );
 
@@ -137,7 +137,7 @@ impl PublicConfigApi {
     }
 
     fn votes_for_propose(&self, config_hash: &Hash) -> VotesInfo {
-        let schema = ConfigurationSchema::new(self.blockchain.snapshot());
+        let schema = Schema::new(self.blockchain.snapshot());
 
         if schema.propose_data_by_config_hash().contains(config_hash) {
             Some(schema.votes(config_hash))
@@ -151,7 +151,7 @@ impl PublicConfigApi {
         &self,
         filter: Filter,
     ) -> Vec<ProposeHashInfo> {
-        let schema = ConfigurationSchema::new(self.blockchain.snapshot());
+        let schema = Schema::new(self.blockchain.snapshot());
         let index = schema.config_hash_by_ordinal();
         let proposes_by_hash = schema.propose_data_by_config_hash();
 
@@ -183,7 +183,7 @@ impl PublicConfigApi {
         &self,
         filter: Filter,
     ) -> Vec<ConfigHashInfo> {
-        let core_schema = Schema::new(self.blockchain.snapshot());
+        let core_schema = CoreSchema::new(self.blockchain.snapshot());
         let actual_from = core_schema.configs_actual_from();
         let configs = core_schema.configs();
 
@@ -212,7 +212,7 @@ impl PublicConfigApi {
     }
 }
 
-impl<T> PrivateConfigApi<T>
+impl<T> PrivateApi<T>
 where
     T: TransactionSend + Clone,
 {
@@ -240,7 +240,7 @@ where
     }
 }
 
-impl Api for PublicConfigApi {
+impl Api for PublicApi {
     fn wire(&self, router: &mut Router) {
 
         let self_ = self.clone();
@@ -304,7 +304,7 @@ impl Api for PublicConfigApi {
     }
 }
 
-impl<T> Api for PrivateConfigApi<T>
+impl<T> Api for PrivateApi<T>
 where
     T: 'static + TransactionSend + Clone,
 {

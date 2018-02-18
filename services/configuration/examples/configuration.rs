@@ -13,14 +13,13 @@
 // limitations under the License.
 
 extern crate exonum;
-extern crate exonum_configuration;
+extern crate exonum_configuration as configuration;
 
 use exonum::helpers::fabric::NodeBuilder;
-use exonum_configuration::ConfigurationServiceFactory;
 
 fn main() {
     exonum::helpers::init_logger().unwrap();
     NodeBuilder::new()
-        .with_service(Box::new(ConfigurationServiceFactory))
+        .with_service(Box::new(configuration::ServiceFactory))
         .run();
 }

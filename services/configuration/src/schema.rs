@@ -43,23 +43,23 @@ impl ProposeData {
 
 /// Database schema used by the configuration service.
 #[derive(Debug)]
-pub struct ConfigurationSchema<T> {
+pub struct Schema<T> {
     view: T,
 }
 
-impl<T> ConfigurationSchema<T>
+impl<T> Schema<T>
 where
     T: AsRef<Snapshot>,
 {
     /// Creates a new schema.
-    pub fn new(snapshot: T) -> ConfigurationSchema<T> {
-        ConfigurationSchema { view: snapshot }
+    pub fn new(snapshot: T) -> Schema<T> {
+        Schema { view: snapshot }
     }
 
     /// Returns propose information indexed by the hash of the configuration corresponding
     /// to a proposal.
     ///
-    /// Consult [the crate-level docs](../index.html) for details how hashes of the configuration
+    /// Consult [the crate-level docs](index.html) for details how hashes of the configuration
     /// are calculated.
     pub fn propose_data_by_config_hash(&self) -> ProofMapIndex<&Snapshot, Hash, ProposeData> {
         ProofMapIndex::new("configuration.proposes", self.view.as_ref())
@@ -107,7 +107,7 @@ where
     }
 }
 
-impl<'a> ConfigurationSchema<&'a mut Fork> {
+impl<'a> Schema<&'a mut Fork> {
     /// Mutable version of the `propose_data_by_config_hash` index.
     pub(crate) fn propose_data_by_config_hash_mut(
         &mut self,

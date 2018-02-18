@@ -19,7 +19,7 @@ use exonum::helpers::{Height, ValidatorId};
 use exonum::crypto::{CryptoHash, Hash};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi};
 
-use ConfigurationSchema;
+use super::ConfigurationSchema;
 use api::{ConfigHashInfo, ConfigInfo, ProposeHashInfo, ProposeResponse, VoteResponse, VotesInfo};
 use super::{new_tx_config_propose, new_tx_config_vote, to_boxed, ConfigurationTestKit};
 

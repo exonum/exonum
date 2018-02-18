@@ -20,7 +20,7 @@ use exonum::storage::StorageValue;
 use exonum::crypto::{CryptoHash, Hash, hash, HASH_SIZE};
 use exonum_testkit::{TestKit, TestKitBuilder, TestNode};
 
-use {ConfigurationSchema, ConfigurationService, Propose, Vote};
+use {Schema as ConfigurationSchema, Service as ConfigurationService, Propose, Vote};
 
 mod api;
 

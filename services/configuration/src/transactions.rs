@@ -24,11 +24,11 @@ use exonum::messages::{Message, RawTransaction};
 use exonum::node::State;
 use exonum::storage::{Fork, Snapshot};
 
-use super::{ProposeData, ConfigurationSchema as Schema};
+use schema::{ProposeData, Schema};
 
 transactions! {
     Any {
-        const SERVICE_ID = super::CONFIGURATION_SERVICE_ID;
+        const SERVICE_ID = super::SERVICE_ID;
 
         /// Propose a new configuration.
         struct Propose {
@@ -57,7 +57,7 @@ transactions! {
 
             /// Hash of the configuration that this vote is for.
             ///
-            /// See [crate docs](../index.html) for more details on how the hash is calculated.
+            /// See [crate docs](index.html) for more details on how the hash is calculated.
             cfg_hash: &Hash,
         }
     }
