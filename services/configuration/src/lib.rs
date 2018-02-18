@@ -104,59 +104,26 @@ extern crate lazy_static;
 use router::Router;
 use iron::Handler;
 use exonum::api::Api;
-use exonum::blockchain::{Service, Transaction, ApiContext, gen_prefix};
+use exonum::blockchain::{Service, Transaction, ApiContext};
 use exonum::helpers::fabric::{ServiceFactory, Context};
 use exonum::crypto::Hash;
 use exonum::messages::RawTransaction;
-use exonum::storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot};
-use exonum::encoding::{Field, Error as EncodingError};
+use exonum::storage::Snapshot;
+use exonum::encoding::{Error as EncodingError};
 
 pub mod api;
+pub mod schema;
 pub mod transactions;
 
 #[cfg(test)]
 mod tests;
 
+pub use schema::{ConfigurationSchema, ProposeData};
 pub use transactions::{Propose, Vote, ZEROVOTE};
 
 /// Value of [`service_id`](struct.Service.html#method.service_id) of
 /// `ConfigurationService`.
 pub const CONFIGURATION_SERVICE_ID: u16 = 1;
-
-encoding_struct! {
-    struct ProposeData {
-        tx_propose: Propose,
-        votes_history_hash: &Hash,
-        num_validators: u64,
-    }
-}
-
-/// This structure logically contains 2 fields:
-///
-/// 1. `Propose` in `tx_propose` field.
-///
-/// 2. Reference to
-///   [`votes_by_config_hash`](struct.ConfigurationSchema.html#method.votes_by_config_hash) table.
-///   This reference is represented by 2 fields:
-///   - `votes_history_hash`
-///   - `num_validators`
-///
-/// Length of the table is stored in `num_validators` field, which isn't changed
-/// after table initialization, because number of possible vote slots for a config is determined by
-/// number of validators in its previous config.
-///
-/// Table's root hash - in `votes_history_hash` field, which is
-/// modified after a vote from validator is added.
-impl ProposeData {
-    /// Method to mutate `votes_history_hash` field containing root hash of
-    /// [`votes_by_config_hash`](struct.ConfigurationSchema.html#method.votes_by_config_hash)
-    /// after replacing [empty
-    /// vote](struct.ZEROVOTE.html) with a real `Vote` cast by a validator.
-    pub fn set_history_hash(mut self, hash: &Hash) -> Self {
-        Field::write(&hash, &mut self.raw, 8, 40);
-        self
-    }
-}
 
 /// Structure, implementing [Service][1] trait template.
 /// Most of the actual business logic of modifying `Exonum` blockchain configuration is inside of
@@ -165,135 +132,6 @@ impl ProposeData {
 /// [1]: <https://docs.rs/exonum/0.3.0/exonum/blockchain/trait.Service.html>
 #[derive(Default)]
 pub struct ConfigurationService {}
-
-/// `ConfigurationService` database schema: tables and logically atomic mutation methods.
-pub struct ConfigurationSchema<T> {
-    view: T,
-}
-
-impl<T> ConfigurationSchema<T>
-where
-    T: AsRef<Snapshot>,
-{
-    pub fn new(snapshot: T) -> ConfigurationSchema<T> {
-        ConfigurationSchema { view: snapshot }
-    }
-
-    /// Returns a `ProofMapIndex` table of all config proposes `Propose`, which are stored
-    /// within `ProposeData` along with votes' data.
-    ///
-    /// - Table **key** is [hash of a configuration][1].
-    /// This hash is normalized when a new propose is put via `put_propose`:
-    ///   1. [bytes](struct.Propose.html#method.cfg) of a `String`,
-    ///   containing configuration json ->
-    ///   2. `String` ->
-    ///   3. [StoredConfiguration]
-    ///   (https://docs.rs/exonum/0.3.0/exonum/blockchain/config/struct.StoredConfiguration.html) ->
-    ///   4. unique normalized `String` for a unique configuration ->
-    ///   5. bytes ->
-    ///   6. [hash](https://docs.rs/exonum/0.3.0/exonum/crypto/fn.hash.html)(bytes)
-    /// - Table **value** is `ProposeData`, containing
-    /// `Propose`,
-    /// which contains
-    /// [bytes](struct.Propose.html#method.cfg), corresponding to
-    /// **key**.
-    /// [1]: <https://docs.rs/exonum/0.3.0/exonum/blockchain/config/
-    ///struct.StoredConfiguration.html#method.hash>
-    pub fn propose_data_by_config_hash(&self) -> ProofMapIndex<&Snapshot, Hash, ProposeData> {
-        ProofMapIndex::new("configuration.proposes", self.view.as_ref())
-    }
-
-    /// Returns a `ProofListIndex` table of hashes of proposed configurations in propose
-    /// commit order.
-    ///
-    /// - Table **index** is propose_id - position of a proposed [hash of a configuration][1] in
-    /// the corresponding `Propose` commit order.
-    /// - Table **value** is [hash of a configuration][1] - **key** of
-    /// `propose_data_by_config_hash`.
-    /// [1]: <https://docs.rs/exonum/0.3.0/exonum/blockchain/config/
-    ///struct.StoredConfiguration.html#method.hash>
-    pub fn config_hash_by_ordinal(&self) -> ProofListIndex<&Snapshot, Hash> {
-        ProofListIndex::new("configuration.propose_hashes", self.view.as_ref())
-    }
-
-    /// Returns a `ProofListIndex` table of votes of validators for config, referenced by the
-    /// queried
-    /// `config_hash` - [hash of a configuration][1].
-    /// [1]: <https://docs.rs/exonum/0.3.0/exonum/blockchain/config/
-    ///struct.StoredConfiguration.html#method.hash>
-    ///
-    /// 1. The list of validators, who can vote for a config, is determined by
-    /// `validators` of previous [StoredConfiguration]
-    /// (https://docs.rs/exonum/0.3.0/exonum/blockchain/config/struct.StoredConfiguration.html).
-    /// 2. Config, previous to a `StoredConfiguration` is referenced by
-    /// `previous_cfg_hash` in `StoredConfiguration`.
-    ///
-    /// - Table **index** is validator_id - position of a validator's `PublicKey`
-    /// in validator list of config,
-    /// previous to config, referenced by the queried `config_hash`.
-    /// - Table **value** is `Vote`, cast by validator with
-    /// [PublicKey](struct.Vote.html#method.from), corresponding to **index**.
-    fn votes_by_config_hash(&self, config_hash: &Hash) -> ProofListIndex<&Snapshot, Vote> {
-        ProofListIndex::with_prefix(
-            "configuration.votes",
-            gen_prefix(config_hash),
-            self.view.as_ref(),
-        )
-    }
-
-    pub fn get_propose(&self, cfg_hash: &Hash) -> Option<Propose> {
-        self.propose_data_by_config_hash().get(cfg_hash).map(
-            |propose_data| propose_data.tx_propose(),
-        )
-    }
-
-    #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
-    pub fn get_votes(&self, cfg_hash: &Hash) -> Vec<Option<Vote>> {
-        let votes_by_config_hash = self.votes_by_config_hash(cfg_hash);
-        let votes = votes_by_config_hash
-            .iter()
-            .map(|vote| if vote == ZEROVOTE.clone() {
-                None
-            } else {
-                Some(vote)
-            })
-            .collect();
-        votes
-    }
-
-    pub fn state_hash(&self) -> Vec<Hash> {
-        vec![
-            self.propose_data_by_config_hash().root_hash(),
-            self.config_hash_by_ordinal().root_hash(),
-        ]
-    }
-}
-
-impl<'a> ConfigurationSchema<&'a mut Fork> {
-    /// Mutable version of `propose_data_by_config_hash` index.
-    pub(crate) fn propose_data_by_config_hash_mut(
-        &mut self,
-    ) -> ProofMapIndex<&mut Fork, Hash, ProposeData> {
-        ProofMapIndex::new("configuration.proposes", &mut self.view)
-    }
-
-    /// Mutable version of `config_hash_by_ordinal` index.
-    pub(crate) fn config_hash_by_ordinal_mut(&mut self) -> ProofListIndex<&mut Fork, Hash> {
-        ProofListIndex::new("configuration.propose_hashes", &mut self.view)
-    }
-
-    /// Mutable version of `votes_by_config_hash` index.
-    pub(crate) fn votes_by_config_hash_mut(
-        &mut self,
-        config_hash: &Hash,
-    ) -> ProofListIndex<&mut Fork, Vote> {
-        ProofListIndex::with_prefix(
-            "configuration.votes",
-            gen_prefix(config_hash),
-            &mut self.view,
-        )
-    }
-}
 
 impl ConfigurationService {
     pub fn new() -> ConfigurationService {
