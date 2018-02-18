@@ -256,7 +256,7 @@ impl Blockchain {
                     "BUG: Cannot find transaction in pool.",
                 );
 
-                execute_transaction(tx, height, index, &mut fork);
+                execute_transaction(tx.as_ref(), height, index, &mut fork);
             }
 
             // Get tx & state hash
@@ -458,7 +458,7 @@ impl Clone for Blockchain {
     }
 }
 
-fn execute_transaction(tx: &Box<Transaction>, height: Height, index: usize, fork: &mut Fork) {
+fn execute_transaction(tx: &Transaction, height: Height, index: usize, fork: &mut Fork) {
     fork.checkpoint();
 
     let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| tx.execute(fork)));
