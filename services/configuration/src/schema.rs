@@ -21,6 +21,19 @@ use exonum::storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot};
 
 use transactions::{Propose, Vote};
 
+// Defines `&str` constants with given name and value.
+macro_rules! define_names {
+    ($($name:ident => $value:expr;)+) => (
+        $(const $name: &str = concat!("configuration.", $value);)*
+    )
+}
+
+define_names! {
+    PROPOSES => "proposes";
+    PROPOSE_HASHES => "propose_hashes";
+    VOTES => "votes";
+}
+
 encoding_struct! {
     /// Extended information about a proposal used for the storage.
     struct ProposeData {
@@ -62,19 +75,19 @@ where
     /// Consult [the crate-level docs](index.html) for details how hashes of the configuration
     /// are calculated.
     pub fn propose_data_by_config_hash(&self) -> ProofMapIndex<&Snapshot, Hash, ProposeData> {
-        ProofMapIndex::new("configuration.proposes", self.view.as_ref())
+        ProofMapIndex::new(PROPOSES, self.view.as_ref())
     }
 
     /// Returns a table of hashes of proposed configurations in the commit order.
     pub fn config_hash_by_ordinal(&self) -> ProofListIndex<&Snapshot, Hash> {
-        ProofListIndex::new("configuration.propose_hashes", self.view.as_ref())
+        ProofListIndex::new(PROPOSE_HASHES, self.view.as_ref())
     }
 
     /// Returns a table of votes of validators for a particular proposal, referenced
     /// by its configuration hash.
     pub fn votes_by_config_hash(&self, config_hash: &Hash) -> ProofListIndex<&Snapshot, Vote> {
         ProofListIndex::with_prefix(
-            "configuration.votes",
+            VOTES,
             gen_prefix(config_hash),
             self.view.as_ref(),
         )
@@ -112,12 +125,12 @@ impl<'a> Schema<&'a mut Fork> {
     pub(crate) fn propose_data_by_config_hash_mut(
         &mut self,
     ) -> ProofMapIndex<&mut Fork, Hash, ProposeData> {
-        ProofMapIndex::new("configuration.proposes", &mut self.view)
+        ProofMapIndex::new(PROPOSES, &mut self.view)
     }
 
     /// Mutable version of the `config_hash_by_ordinal` index.
     pub(crate) fn config_hash_by_ordinal_mut(&mut self) -> ProofListIndex<&mut Fork, Hash> {
-        ProofListIndex::new("configuration.propose_hashes", &mut self.view)
+        ProofListIndex::new(PROPOSE_HASHES, &mut self.view)
     }
 
     /// Mutable version of the `votes_by_config_hash` index.
@@ -126,7 +139,7 @@ impl<'a> Schema<&'a mut Fork> {
         config_hash: &Hash,
     ) -> ProofListIndex<&mut Fork, Vote> {
         ProofListIndex::with_prefix(
-            "configuration.votes",
+            VOTES,
             gen_prefix(config_hash),
             &mut self.view,
         )
