@@ -246,6 +246,6 @@ fn test_fuzz_transfers() {
             BTreeSet::from_iter(vec![&alice_keys.0, &bob_keys.0])
         );
         // The total amount of funds should equal 200, no matter which transactions were executed
-        assert_eq!(wallets.iter().fold(0, |acc, w| acc + w.balance()), 200);
+        assert_eq!(wallets.iter().map(|w| w.balance()).sum::<u64>(), 200);
     }
 }
