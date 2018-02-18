@@ -157,7 +157,7 @@ impl Propose {
         let cfg = StoredConfiguration::from_bytes(self.cfg().as_bytes().into());
         let cfg_hash = CryptoHash::hash(&cfg);
 
-        if let Some(old_propose) = Schema::new(snapshot).get_propose(&cfg_hash) {
+        if let Some(old_propose) = Schema::new(snapshot).propose(&cfg_hash) {
             error!(
                 "Discarding propose {:?} which contains an already posted config. \
                     Previous propose: {:?}",
@@ -277,7 +277,7 @@ impl Vote {
             return Err(UnknownSender);
         }
 
-        let propose = Schema::new(snapshot).get_propose(self.cfg_hash());
+        let propose = Schema::new(snapshot).propose(self.cfg_hash());
         let propose = propose.ok_or_else(|| {
             error!("Discarding vote {:?} referencing unknown config hash", self);
             InvalidConfigRef
@@ -333,7 +333,7 @@ impl Vote {
 
         let mut votes_count = 0;
         {
-            for vote_option in schema.get_votes(self.cfg_hash()) {
+            for vote_option in schema.votes(self.cfg_hash()) {
                 if vote_option.is_some() {
                     votes_count += 1;
                 }

@@ -89,13 +89,13 @@ impl ConfigurationTestKit for TestKit {
     fn votes_for_propose(&self, config_hash: Hash) -> Vec<Option<Vote>> {
         let snapshot = self.snapshot();
         let schema = ConfigurationSchema::new(&snapshot);
-        schema.get_votes(&config_hash)
+        schema.votes(&config_hash)
     }
 
     fn find_propose(&self, config_hash: Hash) -> Option<Propose> {
         let snapshot = self.snapshot();
         let schema = ConfigurationSchema::new(&snapshot);
-        schema.get_propose(&config_hash)
+        schema.propose(&config_hash)
     }
 }
 

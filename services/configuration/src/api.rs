@@ -72,11 +72,11 @@ pub struct PublicConfigApi {
 }
 
 impl PublicConfigApi {
-    fn get_config_with_proofs(&self, config: StoredConfiguration) -> ConfigHashInfo {
+    fn config_with_proofs(&self, config: StoredConfiguration) -> ConfigHashInfo {
         let propose = ConfigurationSchema::new(self.blockchain.snapshot())
-            .get_propose(&config.hash())
+            .propose(&config.hash())
             .map(|p| p.hash());
-        let votes = self.get_votes_for_propose(&config.hash());
+        let votes = self.votes_for_propose(&config.hash());
         ConfigHashInfo {
             hash: config.hash(),
             config,
@@ -85,20 +85,20 @@ impl PublicConfigApi {
         }
     }
 
-    fn get_actual_config(&self) -> ConfigHashInfo {
+    fn actual_config(&self) -> ConfigHashInfo {
         let snapshot = self.blockchain.snapshot();
         let configuration_schema = Schema::new(&snapshot);
         let actual_cfg = configuration_schema.actual_configuration();
-        self.get_config_with_proofs(actual_cfg)
+        self.config_with_proofs(actual_cfg)
     }
 
-    fn get_following_config(&self) -> Option<ConfigHashInfo> {
+    fn following_config(&self) -> Option<ConfigHashInfo> {
         Schema::new(self.blockchain.snapshot())
             .following_configuration()
-            .map(|following_cfg| self.get_config_with_proofs(following_cfg))
+            .map(|following_cfg| self.config_with_proofs(following_cfg))
     }
 
-    fn get_config_by_hash(&self, hash: &Hash) -> ConfigInfo {
+    fn config_by_hash(&self, hash: &Hash) -> ConfigInfo {
         let snapshot = self.blockchain.snapshot();
         let committed_config = Schema::new(&snapshot).configs().get(hash);
         let propose = ConfigurationSchema::new(&snapshot).propose_data_by_config_hash().get(
@@ -111,11 +111,11 @@ impl PublicConfigApi {
         }
     }
 
-    fn get_votes_for_propose(&self, config_hash: &Hash) -> VotesInfo {
+    fn votes_for_propose(&self, config_hash: &Hash) -> VotesInfo {
         let schema = ConfigurationSchema::new(self.blockchain.snapshot());
 
         if schema.propose_data_by_config_hash().contains(config_hash) {
-            Some(schema.get_votes(config_hash))
+            Some(schema.votes(config_hash))
         } else {
             None
         }
@@ -140,7 +140,7 @@ impl PublicConfigApi {
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
-    fn get_all_proposes(
+    fn all_proposes(
         &self,
         previous_cfg_hash_filter: Option<Hash>,
         actual_from_filter: Option<Height>,
@@ -173,7 +173,7 @@ impl PublicConfigApi {
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
-    fn get_all_committed(
+    fn all_committed(
         &self,
         previous_cfg_hash_filter: Option<Hash>,
         actual_from_filter: Option<Height>,
@@ -198,7 +198,7 @@ impl PublicConfigApi {
                     actual_from_filter,
                 )
             })
-            .map(|config| self.get_config_with_proofs(config))
+            .map(|config| self.config_with_proofs(config))
             .collect();
         committed_configs
     }
@@ -246,41 +246,41 @@ impl Api for PublicConfigApi {
 
         let self_ = self.clone();
         let config_actual = move |_: &mut Request| -> IronResult<Response> {
-            let info = self_.get_actual_config();
+            let info = self_.actual_config();
             self_.ok_response(&serde_json::to_value(info).unwrap())
         };
 
         let self_ = self.clone();
         let config_following = move |_: &mut Request| -> IronResult<Response> {
-            let info = self_.get_following_config();
+            let info = self_.following_config();
             self_.ok_response(&serde_json::to_value(info).unwrap())
         };
 
         let self_ = self.clone();
         let config_by_hash = move |req: &mut Request| -> IronResult<Response> {
             let hash: Hash = self_.url_fragment(req, "hash")?;
-            let info = self_.get_config_by_hash(&hash);
+            let info = self_.config_by_hash(&hash);
             self_.ok_response(&serde_json::to_value(info).unwrap())
         };
 
         let self_ = self.clone();
-        let get_votes_for_propose = move |req: &mut Request| -> IronResult<Response> {
+        let votes_for_propose = move |req: &mut Request| -> IronResult<Response> {
             let propose_cfg_hash: Hash = self_.url_fragment(req, "hash")?;
-            let info = self_.get_votes_for_propose(&propose_cfg_hash);
+            let info = self_.votes_for_propose(&propose_cfg_hash);
             self_.ok_response(&serde_json::to_value(info).unwrap())
         };
 
         let self_ = self.clone();
-        let get_all_proposes = move |req: &mut Request| -> IronResult<Response> {
+        let all_proposes = move |req: &mut Request| -> IronResult<Response> {
             let (previous_cfg_hash, actual_from) = self_.retrieve_params(req)?;
-            let info = self_.get_all_proposes(previous_cfg_hash, actual_from);
+            let info = self_.all_proposes(previous_cfg_hash, actual_from);
             self_.ok_response(&serde_json::to_value(info).unwrap())
         };
 
         let self_ = self.clone();
-        let get_all_committed = move |req: &mut Request| -> IronResult<Response> {
+        let all_committed = move |req: &mut Request| -> IronResult<Response> {
             let (previous_cfg_hash, actual_from) = self_.retrieve_params(req)?;
-            let info = self_.get_all_committed(previous_cfg_hash, actual_from);
+            let info = self_.all_committed(previous_cfg_hash, actual_from);
             self_.ok_response(&serde_json::to_value(info).unwrap())
         };
         router.get("/v1/configs/actual", config_actual, "config_actual");
@@ -292,14 +292,14 @@ impl Api for PublicConfigApi {
         router.get("/v1/configs/:hash", config_by_hash, "config_by_hash");
         router.get(
             "/v1/configs/:hash/votes",
-            get_votes_for_propose,
-            "get_votes_for_propose",
+            votes_for_propose,
+            "votes_for_propose",
         );
-        router.get("/v1/configs/proposed", get_all_proposes, "get_all_proposes");
+        router.get("/v1/configs/proposed", all_proposes, "all_proposes");
         router.get(
             "/v1/configs/committed",
-            get_all_committed,
-            "get_all_committed",
+            all_committed,
+            "all_committed",
         );
 
     }

@@ -24,25 +24,25 @@ use api::{ConfigHashInfo, ConfigInfo, ProposeHashInfo, ProposeResponse, VoteResp
 use super::{new_tx_config_propose, new_tx_config_vote, to_boxed, ConfigurationTestKit};
 
 trait ConfigurationApiTest {
-    fn get_actual_config(&self) -> ConfigHashInfo;
+    fn actual_config(&self) -> ConfigHashInfo;
 
-    fn get_following_config(&self) -> Option<ConfigHashInfo>;
+    fn following_config(&self) -> Option<ConfigHashInfo>;
 
-    fn get_config_by_hash(&self, config_hash: Hash) -> ConfigInfo;
+    fn config_by_hash(&self, config_hash: Hash) -> ConfigInfo;
 
-    fn get_all_proposes(
+    fn all_proposes(
         &self,
         previous_cfg_hash_filter: Option<Hash>,
         actual_from_filter: Option<Height>,
     ) -> Vec<ProposeHashInfo>;
 
-    fn get_all_committed(
+    fn all_committed(
         &self,
         previous_cfg_hash_filter: Option<Hash>,
         actual_from_filter: Option<Height>,
     ) -> Vec<ConfigHashInfo>;
 
-    fn get_votes_for_propose(&self, cfg_hash: &Hash) -> VotesInfo;
+    fn votes_for_propose(&self, cfg_hash: &Hash) -> VotesInfo;
 
     fn post_config_propose(&self, cfg: &StoredConfiguration) -> ProposeResponse;
 
@@ -70,22 +70,22 @@ fn params_to_query(
 }
 
 impl ConfigurationApiTest for TestKitApi {
-    fn get_actual_config(&self) -> ConfigHashInfo {
+    fn actual_config(&self) -> ConfigHashInfo {
         self.get(ApiKind::Service("configuration"), "/v1/configs/actual")
     }
 
-    fn get_following_config(&self) -> Option<ConfigHashInfo> {
+    fn following_config(&self) -> Option<ConfigHashInfo> {
         self.get(ApiKind::Service("configuration"), "/v1/configs/following")
     }
 
-    fn get_config_by_hash(&self, config_hash: Hash) -> ConfigInfo {
+    fn config_by_hash(&self, config_hash: Hash) -> ConfigInfo {
         self.get(
             ApiKind::Service("configuration"),
             &format!("/v1/configs/{}", config_hash.to_string()),
         )
     }
 
-    fn get_all_proposes(
+    fn all_proposes(
         &self,
         previous_cfg_hash_filter: Option<Hash>,
         actual_from_filter: Option<Height>,
@@ -99,12 +99,12 @@ impl ConfigurationApiTest for TestKitApi {
         )
     }
 
-    fn get_votes_for_propose(&self, cfg_hash: &Hash) -> VotesInfo {
+    fn votes_for_propose(&self, cfg_hash: &Hash) -> VotesInfo {
         let endpoint = format!("/v1/configs/{}/votes", cfg_hash.to_string());
         self.get(ApiKind::Service("configuration"), &endpoint)
     }
 
-    fn get_all_committed(
+    fn all_committed(
         &self,
         previous_cfg_hash_filter: Option<Hash>,
         actual_from_filter: Option<Height>,
@@ -133,10 +133,10 @@ impl ConfigurationApiTest for TestKitApi {
 }
 
 #[test]
-fn test_get_actual_config() {
+fn test_actual_config() {
     let testkit: TestKit = TestKit::configuration_default();
 
-    let actual = testkit.api().get_actual_config();
+    let actual = testkit.api().actual_config();
     let expected = {
         let stored = Schema::new(&testkit.snapshot()).actual_configuration();
         ConfigHashInfo {
@@ -150,11 +150,11 @@ fn test_get_actual_config() {
 }
 
 #[test]
-fn test_get_following_config() {
+fn test_following_config() {
     let mut testkit: TestKit = TestKit::configuration_default();
     let api = testkit.api();
     // Checks that following config is absent.
-    assert_eq!(None, api.get_following_config());
+    assert_eq!(None, api.following_config());
     // Commits the following configuration.
     let cfg_proposal = {
         let mut cfg = testkit.configuration_change_proposal();
@@ -174,12 +174,12 @@ fn test_get_following_config() {
     testkit.commit_configuration_change(cfg_proposal);
     testkit.create_block();
 
-    let actual = api.get_following_config();
+    let actual = api.following_config();
     assert_eq!(Some(expected), actual);
 }
 
 #[test]
-fn test_get_config_by_hash1() {
+fn test_config_by_hash1() {
     let testkit: TestKit = TestKit::configuration_default();
     let initial_cfg = Schema::new(&testkit.snapshot()).actual_configuration();
 
@@ -187,12 +187,12 @@ fn test_get_config_by_hash1() {
         committed_config: Some(initial_cfg.clone()),
         propose: None,
     };
-    let actual = testkit.api().get_config_by_hash(initial_cfg.hash());
+    let actual = testkit.api().config_by_hash(initial_cfg.hash());
     assert_eq!(expected, actual);
 }
 
 #[test]
-fn test_get_config_by_hash2() {
+fn test_config_by_hash2() {
     let mut testkit: TestKit = TestKit::configuration_default();
     // Apply a new configuration.
     let new_cfg = {
@@ -212,12 +212,12 @@ fn test_get_config_by_hash2() {
                 .expect("Propose for configuration is absent."),
         ),
     };
-    let actual = testkit.api().get_config_by_hash(new_cfg.hash());
+    let actual = testkit.api().config_by_hash(new_cfg.hash());
     assert_eq!(expected, actual);
 }
 
 #[test]
-fn test_get_config_by_hash3() {
+fn test_config_by_hash3() {
     let mut testkit: TestKit = TestKit::configuration_default();
     // Apply a new configuration.
     let new_cfg = {
@@ -239,12 +239,12 @@ fn test_get_config_by_hash3() {
                 .expect("Propose for configuration is absent."),
         ),
     };
-    let actual = testkit.api().get_config_by_hash(new_cfg.hash());
+    let actual = testkit.api().config_by_hash(new_cfg.hash());
     assert_eq!(expected, actual);
 }
 
 #[test]
-fn test_get_votes_for_propose() {
+fn test_votes_for_propose() {
     let mut testkit: TestKit = TestKit::configuration_default();
     let api = testkit.api();
     // Apply a new configuration.
@@ -257,11 +257,11 @@ fn test_get_votes_for_propose() {
     };
     let tx_propose = new_tx_config_propose(&testkit.network().validators()[0], new_cfg.clone());
     let cfg_proposal_hash = new_cfg.hash();
-    assert_eq!(None, api.get_votes_for_propose(&new_cfg.hash()));
+    assert_eq!(None, api.votes_for_propose(&new_cfg.hash()));
     testkit.create_block_with_transactions(txvec![tx_propose]);
     assert_eq!(
         Some(vec![None; testkit.network().validators().len()]),
-        api.get_votes_for_propose(&new_cfg.hash())
+        api.votes_for_propose(&new_cfg.hash())
     );
     // Push votes
     let tx_votes = testkit
@@ -272,7 +272,7 @@ fn test_get_votes_for_propose() {
         .map(to_boxed)
         .collect::<Vec<_>>();
     testkit.create_block_with_transactions(tx_votes);
-    let response = api.get_votes_for_propose(&new_cfg.hash()).expect(
+    let response = api.votes_for_propose(&new_cfg.hash()).expect(
         "Votes for config is absent",
     );
     for entry in response.into_iter().take(testkit.majority_count()) {
@@ -288,7 +288,7 @@ fn test_get_votes_for_propose() {
 }
 
 #[test]
-fn test_get_all_proposes() {
+fn test_all_proposes() {
     let mut testkit: TestKit = TestKit::configuration_default();
     let api = testkit.api();
     // Create proposes
@@ -325,33 +325,33 @@ fn test_get_all_proposes() {
     };
     assert_eq!(
         vec![expected_response_1.clone(), expected_response_2.clone()],
-        api.get_all_proposes(None, None)
+        api.all_proposes(None, None)
     );
     assert_eq!(
         vec![expected_response_2.clone()],
-        api.get_all_proposes(None, Some(Height(11)))
+        api.all_proposes(None, Some(Height(11)))
     );
     assert_eq!(
         vec![expected_response_2.clone()],
-        api.get_all_proposes(None, Some(Height(15)))
+        api.all_proposes(None, Some(Height(15)))
     );
     assert_eq!(
         Vec::<ProposeHashInfo>::new(),
-        api.get_all_proposes(None, Some(Height(16)))
+        api.all_proposes(None, Some(Height(16)))
     );
     assert_eq!(
         Vec::<ProposeHashInfo>::new(),
-        api.get_all_proposes(Some(Hash::zero()), None)
+        api.all_proposes(Some(Hash::zero()), None)
     );
     let initial_cfg = Schema::new(&testkit.snapshot()).actual_configuration();
     assert_eq!(
         vec![expected_response_1.clone(), expected_response_2.clone()],
-        api.get_all_proposes(Some(initial_cfg.hash()), None)
+        api.all_proposes(Some(initial_cfg.hash()), None)
     );
 }
 
 #[test]
-fn test_get_all_committed() {
+fn test_all_committed() {
     let mut testkit: TestKit = TestKit::configuration_default();
     let api = testkit.api();
     let initial_cfg = Schema::new(&testkit.snapshot()).actual_configuration();
@@ -392,31 +392,31 @@ fn test_get_all_committed() {
     };
     assert_eq!(
         vec![expected_response_1.clone(), expected_response_2.clone(), expected_response_3.clone()],
-        api.get_all_committed(None, None)
+        api.all_committed(None, None)
     );
     assert_eq!(
         vec![expected_response_2.clone(), expected_response_3.clone()],
-        api.get_all_committed(None, Some(Height(1)))
+        api.all_committed(None, Some(Height(1)))
     );
     assert_eq!(
         vec![expected_response_3.clone()],
-        api.get_all_committed(None, Some(Height(11)))
+        api.all_committed(None, Some(Height(11)))
     );
     assert_eq!(
         vec![expected_response_3.clone()],
-        api.get_all_committed(None, Some(Height(15)))
+        api.all_committed(None, Some(Height(15)))
     );
     assert_eq!(
         Vec::<ConfigHashInfo>::new(),
-        api.get_all_committed(None, Some(Height(16)))
+        api.all_committed(None, Some(Height(16)))
     );
     assert_eq!(
         vec![expected_response_1.clone()],
-        api.get_all_committed(Some(Hash::zero()), None)
+        api.all_committed(Some(Hash::zero()), None)
     );
     assert_eq!(
         vec![expected_response_2.clone()],
-        api.get_all_committed(Some(initial_cfg.hash()), None)
+        api.all_committed(Some(initial_cfg.hash()), None)
     );
 }
 

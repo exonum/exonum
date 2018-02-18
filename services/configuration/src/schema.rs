@@ -131,14 +131,16 @@ where
         )
     }
 
-    pub fn get_propose(&self, cfg_hash: &Hash) -> Option<Propose> {
+    /// Returns a `Propose` transaction with a particular configuration hash.
+    pub fn propose(&self, cfg_hash: &Hash) -> Option<Propose> {
         self.propose_data_by_config_hash().get(cfg_hash).map(
             |propose_data| propose_data.tx_propose(),
         )
     }
 
+    /// Returns a list of votes for the proposal corresponding to the given configuration hash.
     #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
-    pub fn get_votes(&self, cfg_hash: &Hash) -> Vec<Option<Vote>> {
+    pub fn votes(&self, cfg_hash: &Hash) -> Vec<Option<Vote>> {
         let votes_by_config_hash = self.votes_by_config_hash(cfg_hash);
         let votes = votes_by_config_hash
             .iter()
@@ -151,6 +153,7 @@ where
         votes
     }
 
+    /// Returns state hash values used by the service.
     pub fn state_hash(&self) -> Vec<Hash> {
         vec![
             self.propose_data_by_config_hash().root_hash(),
