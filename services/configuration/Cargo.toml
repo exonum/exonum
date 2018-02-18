@@ -27,6 +27,7 @@ router = "0.6.0"
 iron = "0.6.0"
 bodyparser = "0.8.0"
 params = "0.8.0"
+failure = "0.1.1"
 
 [dev-dependencies]
 exonum-testkit = { version = "0.5.0", path = "../../testkit" }

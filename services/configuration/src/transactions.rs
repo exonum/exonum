@@ -16,14 +16,14 @@
 
 // spell-checker:ignore ZEROVOTE
 
-use exonum::blockchain::{ExecutionError, ExecutionResult, Schema as CoreSchema,
-                         StoredConfiguration, Transaction};
+use exonum::blockchain::{ExecutionResult, Schema as CoreSchema, StoredConfiguration, Transaction};
 use exonum::crypto::{CryptoHash, Hash, PublicKey, Signature};
 use exonum::encoding::Error as EncodingError;
 use exonum::messages::{Message, RawTransaction};
 use exonum::node::State;
 use exonum::storage::{Fork, Snapshot};
 
+use errors::{CommonError, ProposeError, VoteError};
 use schema::{ProposeData, Schema};
 
 transactions! {
@@ -31,6 +31,13 @@ transactions! {
         const SERVICE_ID = super::SERVICE_ID;
 
         /// Propose a new configuration.
+        ///
+        /// # Notes
+        ///
+        /// See [`ProposeErrorCode`] for the description of error codes emitted by the `execute()`
+        /// method.
+        ///
+        /// [`ProposeErrorCode`]: enum.ProposeErrorCode.html
         struct Propose {
             /// Sender of the transaction.
             ///
@@ -45,10 +52,15 @@ transactions! {
 
         /// Vote for the new configuration.
         ///
-        /// # Note
+        /// # Notes
         ///
         /// The stored version of the transaction has a special variant with all bytes
         /// in the payload set to 0. This variant denotes an absence of vote.
+        ///
+        /// See [`VoteErrorCode`] for the description of error codes emitted by the `execute()`
+        /// method.
+        ///
+        /// [`VoteErrorCode`]: enum.VoteErrorCode.html
         struct Vote {
             /// Sender of the transaction.
             ///
@@ -71,89 +83,16 @@ lazy_static! {
     );
 }
 
-#[derive(Debug)]
-enum ProposeError {
-    AlreadyScheduled,
-    UnknownSender,
-    UnparseableConfig,
-    InvalidConfigRef,
-    ActivationInPast,
-    AlreadyProposed,
-}
-
-impl From<ProposeError> for ExecutionError {
-    fn from(_: ProposeError) -> ExecutionError {
-        // FIXME: adequate impl
-        ExecutionError::new(0)
-    }
-}
-
-#[derive(Debug)]
-enum VoteError {
-    UnknownSender,
-    InvalidConfigRef,
-    AlreadyScheduled,
-    ActivationInPast,
-    AlreadyVoted,
-}
-
-impl From<ProposeError> for VoteError {
-    fn from(value: ProposeError) -> VoteError {
-        use self::ProposeError::*;
-
-        match value {
-            AlreadyScheduled => VoteError::AlreadyScheduled,
-            ActivationInPast => VoteError::ActivationInPast,
-            _ => panic!("Invalid variant"),
-        }
-    }
-}
-
-impl From<VoteError> for ExecutionError {
-    fn from(_: VoteError) -> ExecutionError {
-        // FIXME: adequate impl
-        ExecutionError::new(0)
-    }
-}
-
-/// Checks if there is a following configuration scheduled. Logs an error if it is.
-///
-/// Transaction `tx` is used to obtain context for logging.
-fn check_following_config(snapshot: &Snapshot, tx: &Transaction) -> bool {
-    let following_config = CoreSchema::new(snapshot).following_configuration();
-    if let Some(following) = following_config {
-        error!(
-            "Discarding {:?} as there is an already scheduled next config: {:?}",
-            tx,
-            following
-        );
-        return true;
-    }
-    false
-}
-
-/// Checks if a specified key belongs to one of the current validators. Logs an error
-/// if it isn't.
-///
-/// Transaction `tx` is used to obtain context for logging.
+/// Checks if a specified key belongs to one of the current validators.
 ///
 /// # Return value
 ///
 /// The index of the validator authoring the transaction, or `None` if no validator matches
 /// the supplied public key.
-fn check_validator_authorship(
-    snapshot: &Snapshot,
-    key: &PublicKey,
-    tx: &Transaction,
-) -> Option<usize> {
+fn validator_index(snapshot: &Snapshot, key: &PublicKey) -> Option<usize> {
     let actual_config = CoreSchema::new(snapshot).actual_configuration();
     let keys = actual_config.validator_keys;
-    let validator_id = keys.iter().position(|k| k.service_key == *key);
-
-    if validator_id.is_none() {
-        error!("Discarding {:?} from unknown validator.", tx);
-    }
-    validator_id
+    keys.iter().position(|k| k.service_key == *key)
 }
 
 /// Checks if there is enough votes for a particular configuration hash.
@@ -177,24 +116,19 @@ impl Propose {
     /// Configuration parsed from the transaction together with its hash.
     fn precheck(&self, snapshot: &Snapshot) -> Result<(StoredConfiguration, Hash), ProposeError> {
         use exonum::storage::StorageValue;
+        use self::CommonError::*;
         use self::ProposeError::*;
 
-        if check_following_config(snapshot, self) {
-            return Err(AlreadyScheduled);
+        let following_config = CoreSchema::new(snapshot).following_configuration();
+        if let Some(following) = following_config {
+            Err(AlreadyScheduled(following))?;
         }
-        if check_validator_authorship(snapshot, self.from(), self).is_none() {
-            return Err(UnknownSender);
+        if validator_index(snapshot, self.from()).is_none() {
+            Err(UnknownSender)?;
         }
 
         let config_candidate = StoredConfiguration::try_deserialize(self.cfg().as_bytes())
-            .map_err(|err| {
-                error!(
-                    "Discarding propose {:?} which contains unparseable config: {:?}",
-                    self,
-                    err
-                );
-                UnparseableConfig
-            })?;
+            .map_err(UnparseableConfig)?;
 
         self.check_config_candidate(&config_candidate, snapshot)?;
 
@@ -202,13 +136,7 @@ impl Propose {
         let cfg_hash = CryptoHash::hash(&cfg);
 
         if let Some(old_propose) = Schema::new(snapshot).propose(&cfg_hash) {
-            error!(
-                "Discarding propose {:?} which contains an already posted config. \
-                    Previous propose: {:?}",
-                self,
-                old_propose,
-            );
-            return Err(AlreadyProposed);
+            Err(AlreadyProposed(old_propose))?;
         }
 
         Ok((cfg, cfg_hash))
@@ -219,28 +147,17 @@ impl Propose {
         &self,
         candidate: &StoredConfiguration,
         snapshot: &Snapshot,
-    ) -> Result<(), ProposeError> {
-        use self::ProposeError::*;
+    ) -> Result<(), CommonError> {
+        use self::CommonError::*;
 
         let actual_config = CoreSchema::new(snapshot).actual_configuration();
         if candidate.previous_cfg_hash != actual_config.hash() {
-            error!(
-                "Discarding propose {:?} which does not reference actual config: {:?}",
-                self,
-                actual_config
-            );
-            return Err(InvalidConfigRef);
+            return Err(InvalidConfigRef(actual_config));
         }
 
         let current_height = CoreSchema::new(snapshot).height().next();
         if candidate.actual_from <= current_height {
-            error!(
-                "Discarding propose {:?} which has actual_from height less than or \
-                    equal to current: {:?}",
-                self,
-                current_height
-            );
-            return Err(ActivationInPast);
+            return Err(ActivationInPast(current_height));
         }
 
         Ok(())
@@ -289,8 +206,14 @@ impl Transaction for Propose {
         self.verify_signature(self.from())
     }
 
+    /// See [`ProposeErrorCode`] for the description of emitted error codes.
+    ///
+    /// [`ProposeErrorCode`]: enum.ProposeErrorCode.html
     fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-        let (cfg, cfg_hash) = self.precheck(fork.as_ref())?;
+        let (cfg, cfg_hash) = self.precheck(fork.as_ref()).map_err(|err| {
+            error!("Discarding propose {:?}: {}", self, err);
+            err
+        })?;
 
         self.save(fork, &cfg, cfg_hash);
         trace!("Put propose {:?} to config_proposes table", self);
@@ -316,29 +239,31 @@ impl Vote {
     ///
     /// Returns a configuration this vote is for on success, or an error (if any).
     fn precheck(&self, snapshot: &Snapshot) -> Result<StoredConfiguration, VoteError> {
+        use self::CommonError::*;
         use self::VoteError::*;
 
-        if check_following_config(snapshot, self) {
-            return Err(AlreadyScheduled);
+        let following_config = CoreSchema::new(snapshot).following_configuration();
+        if let Some(following) = following_config {
+            Err(AlreadyScheduled(following))?;
         }
 
-        if let Some(validator_id) = check_validator_authorship(snapshot, self.from(), self) {
+        if let Some(validator_id) = validator_index(snapshot, self.from()) {
             let vote = Schema::new(snapshot)
                 .votes_by_config_hash(self.cfg_hash())
                 .get(validator_id as u64)
                 .unwrap();
             if !vote.is_none() {
-                return Err(AlreadyVoted);
+                Err(AlreadyVoted)?;
             }
         } else {
-            return Err(UnknownSender);
+            Err(UnknownSender)?;
         }
 
-        let propose = Schema::new(snapshot).propose(self.cfg_hash());
-        let propose = propose.ok_or_else(|| {
-            error!("Discarding vote {:?} referencing unknown config hash", self);
-            InvalidConfigRef
-        })?;
+        let propose = Schema::new(snapshot).propose(self.cfg_hash()).ok_or_else(
+            || {
+                UnknownConfigRef(*self.cfg_hash())
+            },
+        )?;
 
         let parsed = StoredConfiguration::try_deserialize(propose.cfg().as_bytes()).unwrap();
         propose.check_config_candidate(&parsed, snapshot)?;
@@ -392,7 +317,10 @@ impl Transaction for Vote {
     }
 
     fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-        let parsed_config = self.precheck(fork.as_ref())?;
+        let parsed_config = self.precheck(fork.as_ref()).map_err(|err| {
+            error!("Discarding vote {:?}: {}", self, err);
+            err
+        })?;
 
         self.save(fork);
         trace!(

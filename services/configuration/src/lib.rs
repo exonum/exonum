@@ -52,24 +52,27 @@
 
 #![deny(missing_debug_implementations, missing_docs)]
 
+extern crate bodyparser;
 #[macro_use]
 extern crate exonum;
+#[macro_use]
+extern crate failure;
+extern crate iron;
+#[macro_use]
+extern crate lazy_static;
+#[macro_use]
+extern crate log;
+extern crate params;
+extern crate router;
+#[macro_use]
+extern crate serde_derive;
+
 #[cfg(test)]
 #[macro_use]
 extern crate exonum_testkit;
 #[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;
-#[macro_use]
-extern crate log;
-#[macro_use]
-extern crate serde_derive;
-extern crate iron;
-extern crate router;
-extern crate bodyparser;
-extern crate params;
-#[macro_use]
-extern crate lazy_static;
 
 use router::Router;
 use iron::Handler;
@@ -82,11 +85,13 @@ use exonum::storage::Snapshot;
 use exonum::encoding::Error as EncodingError;
 
 mod api;
+mod errors;
 mod schema;
 #[cfg(test)]
 mod tests;
 mod transactions;
 
+pub use errors::{ProposeErrorCode, VoteErrorCode};
 pub use schema::{Schema, ProposeData};
 pub use transactions::{Propose, Vote};
 
