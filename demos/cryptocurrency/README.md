@@ -34,7 +34,7 @@ cd cryptocurrency
 cargo run --example demo
 ```
 
-Now the node is listening to HTTP requests on http://localhost:8000.
+Now the node is listening to HTTP requests on <http://localhost:8000>.
 
 ### Sample Transactions & Read Requests
 
@@ -45,11 +45,13 @@ in the same directory (for Windows with PowerShell installed).
 The script creates two wallets, performs a transfer
 between them, and then verifies that the wallet status was correctly updated.
 
-Alternatively, you may use command-line utilities, such as `curl`, to manually POST transactions
-on [the transaction endpoint](http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets)
-and read data from wallet endpoints (the [`wallets_info.sh`](examples/wallets_info.sh) script
-provides a handy way to do this).
+Alternatively, you may use command-line utilities, such as `curl`, to manually
+POST transactions on [the transaction endpoint] and read data from wallet
+endpoints (the [`wallets_info.sh`](examples/wallets_info.sh) script provides a
+handy way to do this).
 
 ## License
 
 Cryptocurrency is licensed under the Apache License (Version 2.0). See [LICENSE](LICENSE) for details.
+
+[the transaction endpoint]: http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets

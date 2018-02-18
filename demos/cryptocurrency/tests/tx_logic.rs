@@ -28,7 +28,7 @@ use exonum::blockchain::Transaction;
 use exonum::crypto;
 use exonum_testkit::{TestKit, TestKitBuilder};
 
-// Import datatypes used in tests from the crate where the service is defined.
+// Import data types used in tests from the crate where the service is defined.
 use cryptocurrency::{CurrencySchema, CurrencyService, TxCreateWallet, TxTransfer, Wallet};
 
 fn init_testkit() -> TestKit {

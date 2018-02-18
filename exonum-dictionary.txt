@@ -35,6 +35,7 @@ fsync
 fuzzer
 gitter
 healthcheck
+idempotence
 keepalive
 keypair
 keypairs

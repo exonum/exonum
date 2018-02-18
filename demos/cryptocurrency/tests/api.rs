@@ -28,7 +28,7 @@ use exonum::crypto::{self, PublicKey, SecretKey};
 use exonum::messages::Message;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
-// Import datatypes used in tests from the crate where the service is defined.
+// Import data types used in tests from the crate where the service is defined.
 use cryptocurrency::{TxCreateWallet, TxTransfer, Wallet, CurrencyService};
 
 /// Wrapper for the cryptocurrency service API allowing to easily use it
@@ -45,7 +45,7 @@ impl CryptocurrencyApi {
     /// to the pool of unconfirmed transactions.
     fn create_wallet(&self, name: &str) -> (TxCreateWallet, SecretKey) {
         let (pubkey, key) = crypto::gen_keypair();
-        // Create a presigned transaction
+        // Create a pre-signed transaction
         let tx = TxCreateWallet::new(&pubkey, name, &key);
 
         let tx_info: serde_json::Value = self.inner.post(
