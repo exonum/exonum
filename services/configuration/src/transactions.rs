@@ -206,9 +206,6 @@ impl Transaction for Propose {
         self.verify_signature(self.from())
     }
 
-    /// See [`ProposeErrorCode`] for the description of emitted error codes.
-    ///
-    /// [`ProposeErrorCode`]: enum.ProposeErrorCode.html
     fn execute(&self, fork: &mut Fork) -> ExecutionResult {
         let (cfg, cfg_hash) = self.precheck(fork.as_ref()).map_err(|err| {
             error!("Discarding propose {:?}: {}", self, err);

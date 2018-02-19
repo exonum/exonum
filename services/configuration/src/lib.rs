@@ -22,6 +22,8 @@
 //! configuration, etc.) and private queries, intended for use only by validator nodes' maintainers
 //! (post configuration propose, post vote for a configuration propose).
 //!
+//! See [Exonum documentation][docs:config] for more details about the service.
+//!
 //! # Blockchain configuration
 //!
 //! Blockchain configuration corresponds to [`StoredConfiguration`][sc]
@@ -32,7 +34,8 @@
 //! 2. Convert a `StoredConfiguration` into bytes as per its `StorageValue` implementation.
 //! 3. Use `exonum::crypto::hash()` on the obtained bytes.
 //!
-//! [sc]: https://docs.rs/exonum/0.3.0/exonum/blockchain/config/struct.StoredConfiguration.html
+//! [sc]: https://docs.rs/exonum/0.5.1/exonum/blockchain/config/struct.StoredConfiguration.html
+//! [docs:config]: https://exonum.com/doc/advanced/configuration-updater/
 //!
 //! # Examples
 //!

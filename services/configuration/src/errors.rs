@@ -42,7 +42,7 @@ enum CommonErrorCode {
     ActivationInPast,
 }
 
-/// Error codes emitted by [`Propose`] transactions.
+/// Error codes emitted by [`Propose`] transactions during execution.
 ///
 /// [`Propose`]: struct.Propose.html
 #[derive(Debug)]
@@ -62,9 +62,9 @@ pub enum ProposeErrorCode {
     UnparseableConfig,
 }
 
-/// Error codes emitted by [`Vote`] transactions.
+/// Error codes emitted by [`Vote`] transactions during execution.
 ///
-/// [`Vote`]: struct.Propose.html
+/// [`Vote`]: struct.Vote.html
 #[derive(Debug)]
 #[repr(u8)]
 pub enum VoteErrorCode {
