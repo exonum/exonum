@@ -116,13 +116,11 @@ jobs:
   # Non-fatal checks
   - env: FEATURE=non-fatal-checks
     install:
-    - cargo-outdated -V | grep $OUTDATED_VERS || cargo install cargo-outdated --vers $OUTDATED_VERS --force
     - cargo-deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
     script:
     - cargo doc --no-deps
     - touch target/doc/exonum/encoding/serialize/trait.Serialize.html  # TODO: a tmp hack to ignore a warning about missing page [ECR-703]
     - cargo deadlinks --dir target/doc
-    - cargo outdated --exit-code 1
 
 notifications:
   slack:
