@@ -178,35 +178,48 @@ impl<'a> BlockchainExplorer<'a> {
         let hashes = schema.block_hashes_by_height();
         let blocks = schema.blocks();
         
-        // Length is at least one because of the genesis block.
+        // max_height >=0, as there is at least the genesis block.
         let max_height = hashes.len() - 1;
-        let upper = cmp::min(max_height, upper.unwrap_or(0));
         
-        let mut height = upper;
+        let upper = upper.map(|x| cmp::min(x, max_height)).unwrap_or(max_height);
+        
+        let mut height = upper + 1;
+        let mut genesis = false;
+        
         let mut v = Vec::new();
         let mut collected: u64 = 0;
 
-        while (height != 0) & (collected < count) {
+        // It is safe to do at least one iteration, because height >= 1.
+        loop {
+            if genesis || (collected == count)  {
+                break;
+            }
+            
+            height -= 1;
+            genesis = height == 0;
+  
             let block_txs = schema.block_txs(Height(height));
             if skip_empty_blocks && block_txs.is_empty() {
-                height -= 1;
                 continue;
             }
+            
             let block_hash = hashes.get(height).expect(&format!(
                 "Block not found, height:{:?}",
                 height
             ));
+            
             let block = blocks.get(&block_hash).expect(&format!(
                 "Block not found, hash:{:?}",
                 block_hash
             ));
+            
             v.push(block);
-            height -= 1;
             collected += 1;
         }
+        
         BlocksRange {
             range: Range {
-                from: if upper == 0 { 0 } else { height + 1 },
+                from: height,
                 to: upper,
             },
             blocks: v,
