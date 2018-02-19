@@ -24,8 +24,7 @@ extern crate exonum_testkit;
 #[macro_use]
 extern crate serde_json;
 
-use exonum::crypto::{self, PublicKey, SecretKey};
-use exonum::messages::Message;
+use exonum::crypto::{self, PublicKey, SecretKey, CryptoHash};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 // Import data types used in tests from the crate where the service is defined.
