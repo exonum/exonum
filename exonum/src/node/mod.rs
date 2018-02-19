@@ -500,7 +500,7 @@ impl NodeHandler {
         self.add_peer_exchange_timeout();
         self.add_update_api_state_timeout();
 
-        // Recover cached consensus messages if any. We do this after main initialisation and before
+        // Recover cached consensus messages if any. We do this after main initialization and before
         // the start of event processing.
         let messages = schema.consensus_messages_cache();
         for msg in messages.iter() {

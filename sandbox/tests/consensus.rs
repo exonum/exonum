@@ -323,14 +323,14 @@ fn should_not_send_propose_and_prevote_after_node_restart() {
     sandbox.broadcast(&propose);
     sandbox.broadcast(&prevote);
 
-    let curr_height = sandbox.current_height();
-    let curr_round = sandbox.current_round();
+    let current_height = sandbox.current_height();
+    let current_round = sandbox.current_round();
 
     let sandbox_restarted = sandbox.restart();
 
     sandbox_restarted.broadcast(&prevote);
     sandbox_restarted.assert_lock(LOCK_ZERO, None);
-    sandbox_restarted.assert_state(curr_height, curr_round);
+    sandbox_restarted.assert_state(current_height, current_round);
 
     // Now we should be sure that node recovered its state but didn't send any messages.
     // Here sandbox_restarted goes out of scope and sandbox_restarted.drop() will cause panic
@@ -391,15 +391,15 @@ fn should_not_vote_after_node_restart() {
     );
     sandbox.broadcast(&precommit);
     sandbox.assert_lock(LOCK_ONE, Some(propose.hash()));
-    let curr_height = sandbox.current_height();
-    let curr_round = sandbox.current_round();
+    let current_height = sandbox.current_height();
+    let current_round = sandbox.current_round();
 
     // Simulate node restart.
     let sandbox_restarted = sandbox.restart();
 
     // Assert that consensus messages were recovered and we're in locked state now.
     sandbox_restarted.assert_lock(LOCK_ONE, Some(propose.hash()));
-    sandbox_restarted.assert_state(curr_height, curr_round);
+    sandbox_restarted.assert_state(current_height, current_round);
     sandbox_restarted.broadcast(&prevote);
     sandbox_restarted.broadcast(&precommit);
 
@@ -574,7 +574,7 @@ fn test_recover_consensus_messages_in_other_round() {
     let second_propose = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
         .build();
-    let secod_block = BlockBuilder::new(&sandbox)
+    let second_block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
         .build();
 
@@ -616,7 +616,7 @@ fn test_recover_consensus_messages_in_other_round() {
         HEIGHT_ONE,
         ROUND_TWO,
         &second_propose.hash(),
-        &secod_block.hash(),
+        &second_block.hash(),
         sandbox.time(),
         sandbox.s(VALIDATOR_0),
     );

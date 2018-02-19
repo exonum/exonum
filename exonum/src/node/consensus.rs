@@ -400,12 +400,12 @@ impl NodeHandler {
 
                 // Put consensus messages for current Propose and this round to the cache.
                 self.check_propose_saved(round, &propose_hash);
-                let raw_msgs = self.state
+                let raw_messages = self.state
                     .prevotes(prevote_round, propose_hash)
                     .iter()
                     .map(|msg| msg.raw().clone())
                     .collect::<Vec<_>>();
-                self.blockchain.save_messages(round, raw_msgs);
+                self.blockchain.save_messages(round, raw_messages);
 
                 self.state.lock(round, propose_hash);
                 // Send precommit

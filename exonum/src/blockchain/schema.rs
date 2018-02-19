@@ -170,7 +170,9 @@ where
 
     /// Returns saved value of the consensus round. Returns first round if it wasn't saved.
     pub fn consensus_round(&self) -> Round {
-        Entry::new(CONSENSUS_ROUND, &self.view).get().unwrap_or_else(Round::first)
+        Entry::new(CONSENSUS_ROUND, &self.view)
+            .get()
+            .unwrap_or_else(Round::first)
     }
 
     /// Returns block hash for the given height.
@@ -433,7 +435,7 @@ impl<'a> Schema<&'a mut Fork> {
 
     /// Saves the given consensus round value into storage.
     pub fn set_consensus_round(&mut self, round: Round) {
-        let mut entry: Entry<& mut Fork, _> = Entry::new(CONSENSUS_ROUND, self.view);
+        let mut entry: Entry<&mut Fork, _> = Entry::new(CONSENSUS_ROUND, self.view);
         entry.set(round);
     }
 

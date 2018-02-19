@@ -576,12 +576,15 @@ impl Sandbox {
 
     /// Creates new sandbox with "restarted" node initialized by the given time.
     pub fn restart_with_time(self, time: SystemTime) -> Self {
-        let connect = self.connect().map(|c| Connect::new(
-            c.pub_key(),
-            c.addr(),
-            time,
-            self.s(VALIDATOR_0))
-        );
+        let connect = self.connect().map(|c| {
+            Connect::new(
+                c.pub_key(),
+                c.addr(),
+                time,
+                c.user_agent(),
+                self.s(VALIDATOR_0),
+            )
+        });
         let sandbox = self.restart_uninitialized_with_time(time);
         if let Some(connect) = connect {
             sandbox.broadcast(&connect);

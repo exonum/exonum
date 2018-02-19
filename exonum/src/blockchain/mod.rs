@@ -462,8 +462,8 @@ impl Blockchain {
     /// Saves a collection of RawMessage to the consensus messages cache with single access to the
     /// `Fork` instance.
     pub fn save_messages<I>(&mut self, round: Round, iter: I)
-        where
-            I: IntoIterator<Item = RawMessage>,
+    where
+        I: IntoIterator<Item = RawMessage>,
     {
         let mut fork = self.fork();
 
