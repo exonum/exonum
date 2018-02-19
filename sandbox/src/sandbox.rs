@@ -47,6 +47,8 @@ use sandbox_tests_helper::VALIDATOR_0;
 
 pub type SharedTime = Arc<Mutex<SystemTime>>;
 
+const INITIAL_TIME_IN_SECS: u64 = 1_486_720_340;
+
 #[derive(Debug)]
 pub struct SandboxSystemStateProvider {
     listen_address: SocketAddr,
@@ -565,10 +567,20 @@ impl Sandbox {
         assert_eq!(actual_hash, expected_hash);
     }
 
-    /// Creates new sandbox with "restarted" node. Old sandbox instance gets dropped.
+    /// Creates new sandbox with "restarted" node.
     pub fn restart(self) -> Self {
-        let connect = self.connect().map(|c| c.clone());
-        let sandbox = self.restart_uninitialized();
+        self.restart_with_time(UNIX_EPOCH + Duration::new(INITIAL_TIME_IN_SECS, 0))
+    }
+
+    /// Creates new sandbox with "restarted" node initialized by the given time.
+    pub fn restart_with_time(self, time: SystemTime) -> Self {
+        let connect = self.connect().map(|c| Connect::new(
+            c.pub_key(),
+            c.addr(),
+            time,
+            self.s(VALIDATOR_0))
+        );
+        let sandbox = self.restart_uninitialized_with_time(time);
         if let Some(connect) = connect {
             sandbox.broadcast(&connect);
         }
@@ -579,6 +591,12 @@ impl Sandbox {
     /// Constructs a new uninitialized instance of a `Sandbox` preserving database and
     /// configuration.
     pub fn restart_uninitialized(self) -> Sandbox {
+        self.restart_uninitialized_with_time(UNIX_EPOCH + Duration::new(INITIAL_TIME_IN_SECS, 0))
+    }
+
+    /// Constructs a new uninitialized instance of a `Sandbox` preserving database and
+    /// configuration.
+    pub fn restart_uninitialized_with_time(self, time: SystemTime) -> Sandbox {
         let network_channel = mpsc::channel(100);
         let internal_channel = mpsc::channel(100);
         let api_channel = mpsc::channel(100);
@@ -616,7 +634,7 @@ impl Sandbox {
 
         let system_state = SandboxSystemStateProvider {
             listen_address: address,
-            shared_time: SharedTime::new(Mutex::new(UNIX_EPOCH + Duration::new(1_486_720_340, 0))),
+            shared_time: SharedTime::new(Mutex::new(time)),
         };
 
         let mut handler = NodeHandler::new(
@@ -746,7 +764,9 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandb
     // TODO use factory or other solution like set_handler or run
     let system_state = SandboxSystemStateProvider {
         listen_address: addresses[0],
-        shared_time: SharedTime::new(Mutex::new(UNIX_EPOCH + Duration::new(1_486_720_340, 0))),
+        shared_time: SharedTime::new(Mutex::new(
+            UNIX_EPOCH + Duration::new(INITIAL_TIME_IN_SECS, 0),
+        )),
     };
     let shared_time = Arc::clone(&system_state.shared_time);
 

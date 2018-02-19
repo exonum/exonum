@@ -512,23 +512,23 @@ fn should_save_precommit_to_consensus_cache() {
 fn test_recover_consensus_messages_in_other_round() {
     let sandbox = timestamping_sandbox();
 
-    let propose = ProposeBuilder::new(&sandbox)
+    let first_propose = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
         .build();
-    let prevote = make_prevote_from_propose(&sandbox, &propose);
+    let first_prevote = make_prevote_from_propose(&sandbox, &first_propose);
     let block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
         .build();
 
-    sandbox.recv(&propose);
+    sandbox.recv(&first_propose);
 
-    sandbox.broadcast(&prevote);
+    sandbox.broadcast(&first_prevote);
 
     sandbox.recv(&Prevote::new(
         VALIDATOR_1,
         HEIGHT_ONE,
         ROUND_ONE,
-        &propose.hash(),
+        &first_propose.hash(),
         LOCK_ZERO,
         sandbox.s(VALIDATOR_1),
     ));
@@ -538,54 +538,53 @@ fn test_recover_consensus_messages_in_other_round() {
         VALIDATOR_2,
         HEIGHT_ONE,
         ROUND_ONE,
-        &propose.hash(),
+        &first_propose.hash(),
         LOCK_ZERO,
         sandbox.s(VALIDATOR_2),
     ));
-    sandbox.assert_lock(LOCK_ONE, Some(propose.hash()));
+    sandbox.assert_lock(LOCK_ONE, Some(first_propose.hash()));
 
-    let precommit = Precommit::new(
+    let first_precommit = Precommit::new(
         VALIDATOR_0,
         HEIGHT_ONE,
         ROUND_ONE,
-        &propose.hash(),
+        &first_propose.hash(),
         &block.hash(),
         sandbox.time(),
         sandbox.s(VALIDATOR_0),
     );
 
-    sandbox.broadcast(&precommit);
+    sandbox.broadcast(&first_precommit);
 
     sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
     sandbox.assert_state(HEIGHT_ONE, ROUND_TWO);
 
     // make sure we broadcasted same Prevote for second round
-    let updated_prevote = Prevote::new(
-        prevote.validator(),
-        prevote.height(),
+    let first_updated_prevote = Prevote::new(
+        first_prevote.validator(),
+        first_prevote.height(),
         ROUND_TWO,
-        prevote.propose_hash(),
+        first_prevote.propose_hash(),
         LOCK_ONE,
         sandbox.s(VALIDATOR_0),
     );
-    sandbox.broadcast(&updated_prevote);
+    sandbox.broadcast(&first_updated_prevote);
 
-    let propose_new = ProposeBuilder::new(&sandbox)
+    let second_propose = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
         .build();
-    let prevote_new = make_prevote_from_propose(&sandbox, &propose_new);
-    let block = BlockBuilder::new(&sandbox)
+    let secod_block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
         .build();
 
-    sandbox.recv(&propose_new);
+    sandbox.recv(&second_propose);
 
     sandbox.recv(&Prevote::new(
         VALIDATOR_1,
         HEIGHT_ONE,
         ROUND_TWO,
-        &propose_new.hash(),
+        &second_propose.hash(),
         LOCK_ZERO,
         sandbox.s(VALIDATOR_1),
     ));
@@ -594,42 +593,55 @@ fn test_recover_consensus_messages_in_other_round() {
         VALIDATOR_2,
         HEIGHT_ONE,
         ROUND_TWO,
-        &propose_new.hash(),
+        &second_propose.hash(),
         LOCK_ZERO,
         sandbox.s(VALIDATOR_2),
     ));
 
-    sandbox.assert_lock(LOCK_ONE, Some(propose.hash()));
+    sandbox.assert_lock(LOCK_ONE, Some(first_propose.hash()));
 
     sandbox.recv(&Prevote::new(
         VALIDATOR_3,
         HEIGHT_ONE,
         ROUND_TWO,
-        &propose_new.hash(),
+        &second_propose.hash(),
         LOCK_ZERO,
         sandbox.s(VALIDATOR_3),
     ));
 
-    sandbox.assert_lock(LOCK_TWO, Some(propose_new.hash()));
+    sandbox.assert_lock(LOCK_TWO, Some(second_propose.hash()));
 
-    sandbox.broadcast(&Precommit::new(
+    let second_precommit = Precommit::new(
         VALIDATOR_0,
         HEIGHT_ONE,
         ROUND_TWO,
-        &propose_new.hash(),
-        &block.hash(),
+        &second_propose.hash(),
+        &secod_block.hash(),
         sandbox.time(),
         sandbox.s(VALIDATOR_0),
-    ));
+    );
+    sandbox.broadcast(&second_precommit);
 
-    // restart node
-    let sandbox_new = sandbox.restart();
+    // Restart node.
+    let saved_time = sandbox.time();
+    let sandbox_new = sandbox.restart_with_time(saved_time);
 
-    sandbox_new.assert_lock(LOCK_TWO, Some(propose_new.hash()));
+    sandbox_new.assert_lock(LOCK_TWO, Some(second_propose.hash()));
     sandbox_new.assert_state(HEIGHT_ONE, ROUND_TWO);
-    sandbox_new.broadcast(&prevote);
-    sandbox_new.broadcast(&precommit);
-    sandbox_new.broadcast(&prevote_new);
+    sandbox_new.broadcast(&first_prevote);
+
+    let first_precommit_new_time = Precommit::new(
+        first_precommit.validator(),
+        first_precommit.height(),
+        first_precommit.round(),
+        first_precommit.propose_hash(),
+        first_precommit.block_hash(),
+        sandbox_new.time(),
+        sandbox_new.s(VALIDATOR_0),
+    );
+    sandbox_new.broadcast(&first_precommit_new_time);
+    sandbox_new.broadcast(&first_updated_prevote);
+    sandbox_new.broadcast(&second_precommit);
 }
 
 /// - Node 0 is not aware of Node 1
