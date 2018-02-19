@@ -77,7 +77,7 @@ pub enum TxStatus {
 }
 
 /// Range information. Range borders are included.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Range {
     /// Left border of the range, >=0.
     pub from: u64,
@@ -86,7 +86,7 @@ pub struct Range {
 }
 
 /// Information on blocks coupled with the corresponding range in the blockchain.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct BlocksRange {
     /// Range.
     pub range: Range,
