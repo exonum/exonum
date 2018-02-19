@@ -72,6 +72,7 @@ println
 pubkey
 pubkeys
 readonly
+reddit
 reimplemented
 RESTful
 roadmap
