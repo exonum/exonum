@@ -142,79 +142,72 @@ impl PublicConfigApi {
         true
     }
 
+    #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
     fn get_all_proposes(
         &self,
         previous_cfg_hash_filter: Option<Hash>,
         actual_from_filter: Option<Height>,
     ) -> Vec<ProposeHashInfo> {
-        let snapshot = self.blockchain.snapshot();
-        let configuration_schema = ConfigurationSchema::new(&snapshot);
+        let configuration_schema = ConfigurationSchema::new(self.blockchain.snapshot());
         let index = configuration_schema.config_hash_by_ordinal();
-        let proposes = {
-            index
-                .into_iter()
-                .map(|cfg_hash| {
-                    let propose_data = configuration_schema
-                        .propose_data_by_config_hash()
-                        .get(&cfg_hash)
-                        .expect(&format!(
-                            "Not found propose for following cfg_hash: {:?}",
-                            cfg_hash
-                        ));
+        let proposes_by_hash = configuration_schema.propose_data_by_config_hash();
 
-                    (cfg_hash, propose_data)
-                })
-                .filter(|&(_, ref propose_data)| {
-                    let cfg = <StoredConfiguration as StorageValue>::from_bytes(
-                        propose_data.tx_propose().cfg().as_bytes().into(),
-                    );
-                    PublicConfigApi::filter_cfg_predicate(
-                        &cfg,
-                        previous_cfg_hash_filter,
-                        actual_from_filter,
-                    )
-                })
-                .map(|(cfg_hash, propose_data)| {
-                    ProposeHashInfo {
-                        hash: cfg_hash,
-                        propose_data,
-                    }
-                })
-                .collect::<Vec<_>>()
-        };
+        let proposes = index
+            .iter()
+            .map(|cfg_hash| {
+                let propose_data = proposes_by_hash.get(&cfg_hash).expect(&format!(
+                    "Not found propose for following cfg_hash: {:?}",
+                    cfg_hash
+                ));
+
+                (cfg_hash, propose_data)
+            })
+            .filter(|&(_, ref propose_data)| {
+                let cfg = <StoredConfiguration as StorageValue>::from_bytes(
+                    propose_data.tx_propose().cfg().as_bytes().into(),
+                );
+                PublicConfigApi::filter_cfg_predicate(
+                    &cfg,
+                    previous_cfg_hash_filter,
+                    actual_from_filter,
+                )
+            })
+            .map(|(hash, propose_data)| {
+                ProposeHashInfo { hash, propose_data }
+            })
+            .collect();
         proposes
     }
 
+    #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
     fn get_all_committed(
         &self,
         previous_cfg_hash_filter: Option<Hash>,
         actual_from_filter: Option<Height>,
     ) -> Vec<ConfigHashInfo> {
-        let snapshot = self.blockchain.snapshot();
-        let general_schema = Schema::new(&snapshot);
+        let general_schema = Schema::new(self.blockchain.snapshot());
+
         let actual_from = general_schema.configs_actual_from();
         let configs = general_schema.configs();
 
-        let committed_configs = {
-            actual_from
-                .into_iter()
-                .map(|reference| {
-                    let config_hash = reference.cfg_hash();
-                    configs.get(config_hash).expect(&format!(
-                        "Config with hash {:?} is absent in configs table",
-                        config_hash
-                    ))
-                })
-                .filter(|config| {
-                    PublicConfigApi::filter_cfg_predicate(
-                        config,
-                        previous_cfg_hash_filter,
-                        actual_from_filter,
-                    )
-                })
-                .map(|config| self.get_config_with_proofs(config))
-                .collect::<Vec<_>>()
-        };
+        let committed_configs = actual_from
+            .iter()
+            .map(|config_ref| {
+                let config_hash = config_ref.cfg_hash();
+                configs.get(config_hash).expect(&format!(
+                    "Config with hash {:?} is absent in configs table",
+                    config_hash
+                ))
+            })
+            .filter(|config| {
+                PublicConfigApi::filter_cfg_predicate(
+                    config,
+                    previous_cfg_hash_filter,
+                    actual_from_filter,
+                )
+            })
+            .map(|config| self.get_config_with_proofs(config))
+            .collect();
         committed_configs
     }
 

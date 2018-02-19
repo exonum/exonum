@@ -56,7 +56,7 @@ pub use self::genesis::GenesisConfig;
 pub use self::config::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
 pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState};
 pub use self::transaction::{Transaction, TransactionSet, ExecutionResult, TransactionResult,
-                            ExecutionError, TransactionError};
+                            ExecutionError, TransactionError, TransactionErrorType};
 
 mod block;
 mod schema;
@@ -256,42 +256,7 @@ impl Blockchain {
                     "BUG: Cannot find transaction in pool.",
                 );
 
-                fork.checkpoint();
-
-                let catch_result =
-                    panic::catch_unwind(panic::AssertUnwindSafe(|| tx.execute(&mut fork)));
-
-                let transaction_result = match catch_result {
-                    Ok(execution_result) => {
-                        match execution_result {
-                            Ok(()) => fork.commit(),
-                            Err(ref e) => {
-                                info!("{:?} transaction execution failed: {:?}", tx, e);
-                                fork.rollback();
-                            }
-                        }
-                        execution_result.map_err(TransactionError::from)
-                    }
-                    Err(err) => {
-                        if err.is::<Error>() {
-                            // Continue panic unwind if the reason is StorageError.
-                            panic::resume_unwind(err);
-                        }
-                        fork.rollback();
-                        error!("{:?} transaction execution panicked: {:?}", tx, err);
-                        Err(TransactionError::from_panic(&err))
-                    }
-                };
-
-                let mut schema = Schema::new(&mut fork);
-                schema.transactions_mut().put(hash, tx.raw().clone());
-                schema.transaction_results_mut().put(
-                    hash,
-                    transaction_result,
-                );
-                schema.block_txs_mut(height).push(*hash);
-                let location = TxLocation::new(height, index as u64);
-                schema.tx_location_by_tx_hash_mut().put(hash, location);
+                execute_transaction(tx.as_ref(), height, index, &mut fork);
             }
 
             // Get tx & state hash
@@ -536,4 +501,42 @@ impl Clone for Blockchain {
             service_keypair: self.service_keypair.clone(),
         }
     }
+}
+
+fn execute_transaction(tx: &Transaction, height: Height, index: usize, fork: &mut Fork) {
+    fork.checkpoint();
+
+    let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| tx.execute(fork)));
+
+    let tx_hash = tx.hash();
+    let tx_result = match catch_result {
+        Ok(execution_result) => {
+            match execution_result {
+                Ok(()) => fork.commit(),
+                Err(ref e) => {
+                    // Unlike panic, transaction failure isn't that rare, so logging the
+                    // whole transaction body is an overkill: it can be relatively big.
+                    info!("{:?} transaction execution failed: {:?}", tx_hash, e);
+                    fork.rollback();
+                }
+            }
+            execution_result.map_err(TransactionError::from)
+        }
+        Err(err) => {
+            if err.is::<Error>() {
+                // Continue panic unwind if the reason is StorageError.
+                panic::resume_unwind(err);
+            }
+            fork.rollback();
+            error!("{:?} transaction execution panicked: {:?}", tx, err);
+            Err(TransactionError::from_panic(&err))
+        }
+    };
+
+    let mut schema = Schema::new(fork);
+    schema.transactions_mut().put(&tx_hash, tx.raw().clone());
+    schema.transaction_results_mut().put(&tx_hash, tx_result);
+    schema.block_txs_mut(height).push(tx_hash);
+    let location = TxLocation::new(height, index as u64);
+    schema.tx_location_by_tx_hash_mut().put(&tx_hash, location);
 }

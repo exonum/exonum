@@ -43,7 +43,7 @@ use messages::{Connect, Message, RawMessage};
 use events::{NetworkRequest, TimeoutRequest, NetworkEvent, InternalRequest, InternalEvent,
              SyncSender, HandlerPart, NetworkConfiguration, NetworkPart, InternalPart};
 use events::error::{into_other, other_error, LogError, log_error};
-use helpers::{Height, Milliseconds, Round, ValidatorId};
+use helpers::{Height, Milliseconds, Round, ValidatorId, user_agent};
 use storage::Database;
 
 pub use self::state::{RequestData, State, TxPool, ValidatorState};
@@ -404,6 +404,7 @@ impl NodeHandler {
             &config.listener.consensus_public_key,
             external_address,
             system_state.current_time(),
+            &user_agent::get(),
             &config.listener.consensus_secret_key,
         );
 
@@ -967,7 +968,7 @@ pub fn create_public_api_handler(
 
     if config.enable_blockchain_explorer {
         let mut router = Router::new();
-        let explorer_api = public::ExplorerApi::new(blockchain.clone());
+        let explorer_api = public::ExplorerApi::new(Arc::clone(&pool), blockchain.clone());
         explorer_api.wire(&mut router);
         mount.mount("api/explorer", router);
     }
