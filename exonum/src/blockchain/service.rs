@@ -149,6 +149,10 @@ pub trait Service: Send + Sync + 'static {
 
     /// Tries to create a `Transaction` from the given raw message.
     ///
+    /// Exonum framework only guarantees that `SERVICE_ID` of the message is equal to the
+    /// identifier of this service, therefore the implementation should be ready to handle invalid
+    /// transactions that may come from byzantine nodes.
+    ///
     /// Service should return an error in the following cases (see `MessageError` for more details):
     /// - Incorrect transaction identifier.
     /// - Incorrect data layout.
