@@ -76,6 +76,24 @@ pub enum TxStatus {
     },
 }
 
+/// Range information. Range borders are included.
+#[derive(Debug, Serialize)]
+pub struct Range {
+    /// Left border of the range, >=0.
+    pub from: u64,
+    /// Right border of the range.
+    pub to: u64,
+}
+
+/// Information on blocks coupled with the corresponding range in the blockchain.
+#[derive(Debug, Serialize)]
+pub struct BlocksRange {
+    /// Range.
+    pub range: Range,
+    /// Blocks in the range.
+    pub blocks: Vec<Block>,
+}
+
 impl<'a> BlockchainExplorer<'a> {
     /// Creates a new `BlockchainExplorer` instance.
     pub fn new(blockchain: &'a Blockchain) -> Self {
@@ -153,21 +171,25 @@ impl<'a> BlockchainExplorer<'a> {
     pub fn blocks_range(
         &self,
         count: u64,
-        upper: Option<u64>,
+        upper: Option<u64>, 
         skip_empty_blocks: bool,
-    ) -> Vec<Block> {
+    ) -> BlocksRange {
         let schema = Schema::new(self.blockchain.snapshot());
         let hashes = schema.block_hashes_by_height();
         let blocks = schema.blocks();
-
-        let max_len = hashes.len();
-        let upper = upper.map(|x| cmp::min(x, max_len)).unwrap_or(max_len);
-        let lower = upper.checked_sub(count).unwrap_or(0);
-
+        
+        // Length is at least one because of the genesis block.
+        let max_height = hashes.len() - 1;
+        let upper = cmp::min(max_height, upper.unwrap_or(0));
+        
+        let mut height = upper;
         let mut v = Vec::new();
-        for height in (lower..upper).rev() {
+        let mut collected: u64 = 0;
+
+        while (height != 0) & (collected < count) {
             let block_txs = schema.block_txs(Height(height));
             if skip_empty_blocks && block_txs.is_empty() {
+                height -= 1;
                 continue;
             }
             let block_hash = hashes.get(height).expect(&format!(
@@ -178,9 +200,17 @@ impl<'a> BlockchainExplorer<'a> {
                 "Block not found, hash:{:?}",
                 block_hash
             ));
-            v.push(block)
+            v.push(block);
+            height -= 1;
+            collected += 1;
         }
-        v
+        BlocksRange {
+            range: Range {
+                from: if upper == 0 { 0 } else { height + 1 },
+                to: upper,
+            },
+            blocks: v,
+        }
     }
 
     /// Returns transaction result.
