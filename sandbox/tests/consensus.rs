@@ -465,15 +465,15 @@ fn should_save_precommit_to_consensus_cache() {
 
     sandbox.broadcast(&precommit);
 
-    let curr_height = sandbox.current_height();
-    let curr_round = sandbox.current_round();
+    let current_height = sandbox.current_height();
+    let current_round = sandbox.current_round();
 
     // Simulate node restart
     let sandbox_restarted = sandbox.restart();
 
     // assert that consensus messages were recovered and we're in locked state now
     sandbox_restarted.assert_lock(LOCK_ONE, Some(propose.hash()));
-    sandbox_restarted.assert_state(curr_height, curr_round);
+    sandbox_restarted.assert_state(current_height, current_round);
     sandbox_restarted.broadcast(&prevote);
     sandbox_restarted.broadcast(&precommit);
 
