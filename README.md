@@ -5,7 +5,6 @@
 ![rust 1.23+ required](https://img.shields.io/badge/rust-1.23+-blue.svg) <!--sync << with .travis.yml-->
 [![dependency status](https://deps.rs/repo/github/exonum/exonum/status.svg)](https://deps.rs/repo/github/exonum/exonum)
 
-
 [Exonum](https://exonum.com/) is an extensible open-source framework for
 creating blockchain applications. Exonum can be used to create cryptographically
 powered distributed ledgers in virtually any problem domain, including FinTech,
