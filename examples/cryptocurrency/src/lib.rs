@@ -28,8 +28,9 @@
 // Import crates with necessary types into a new project.
 
 extern crate serde;
-#[macro_use]
 extern crate serde_json;
+#[macro_use]
+extern crate serde_derive;
 #[macro_use]
 extern crate exonum;
 extern crate router;
@@ -38,7 +39,8 @@ extern crate iron;
 
 // Import necessary types from crates.
 
-use exonum::blockchain::{Blockchain, Service, Transaction, ApiContext, ExecutionResult};
+use exonum::blockchain::{Blockchain, Service, Transaction, ApiContext, ExecutionResult,
+                         TransactionSet};
 use exonum::encoding::serialize::FromHex;
 use exonum::node::{TransactionSend, ApiSender};
 use exonum::messages::{RawTransaction, Message};
@@ -48,8 +50,10 @@ use exonum::encoding;
 use exonum::api::{Api, ApiError};
 use iron::prelude::*;
 use iron::Handler;
+use iron::status::Status;
+use iron::headers::ContentType;
+use iron::modifiers::Header;
 use router::Router;
-use serde::Deserialize;
 
 // // // // // // // // // // CONSTANTS // // // // // // // // // //
 
@@ -135,7 +139,7 @@ impl<'a> CurrencySchema<&'a mut Fork> {
 // // // // // // // // // // TRANSACTIONS // // // // // // // // // //
 
 transactions! {
-    CryptocurrencyTransactions {
+    CurrencyTransactions {
         const SERVICE_ID = SERVICE_ID;
 
         /// Transaction type for creating a new wallet.
@@ -232,12 +236,25 @@ struct CryptocurrencyApi {
     blockchain: Blockchain,
 }
 
+/// The structure returned by the REST API.
+#[derive(Serialize, Deserialize)]
+pub struct TransactionResponse {
+    /// Hash of the transaction.
+    pub tx_hash: Hash,
+}
+
 impl CryptocurrencyApi {
     /// Endpoint for getting a single wallet.
     fn get_wallet(&self, req: &mut Request) -> IronResult<Response> {
         let path = req.url.path();
         let wallet_key = path.last().unwrap();
-        let public_key = PublicKey::from_hex(wallet_key).map_err(ApiError::FromHex)?;
+        let public_key = PublicKey::from_hex(wallet_key).map_err(|e| {
+            IronError::new(e, (
+                Status::BadRequest,
+                Header(ContentType::json()),
+                "\"Invalid request param: `pub_key`\"",
+            ))
+        })?;
 
         let wallet = {
             let snapshot = self.blockchain.snapshot();
@@ -263,21 +280,17 @@ impl CryptocurrencyApi {
     }
 
     /// Common processing for transaction-accepting endpoints.
-    fn post_transaction<T>(&self, req: &mut Request) -> IronResult<Response>
-    where
-        T: Transaction + Clone + for<'de> Deserialize<'de>,
-    {
-        match req.get::<bodyparser::Struct<T>>() {
+    fn post_transaction(&self, req: &mut Request) -> IronResult<Response> {
+        match req.get::<bodyparser::Struct<CurrencyTransactions>>() {
             Ok(Some(transaction)) => {
-                let transaction: Box<Transaction> = Box::new(transaction);
+                let transaction: Box<Transaction> = transaction.into();
                 let tx_hash = transaction.hash();
                 self.channel.send(transaction).map_err(ApiError::from)?;
-                self.ok_response(&json!({
-                    "tx_hash": tx_hash
-                }))
+                let json = TransactionResponse { tx_hash };
+                self.ok_response(&serde_json::to_value(&json).unwrap())
             }
-            Ok(None) => Err(ApiError::IncorrectRequest("Empty request body".into()))?,
-            Err(e) => Err(ApiError::IncorrectRequest(Box::new(e)))?,
+            Ok(None) => Err(ApiError::BadRequest("Empty request body".into()))?,
+            Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
         }
     }
 }
@@ -290,10 +303,9 @@ impl CryptocurrencyApi {
 impl Api for CryptocurrencyApi {
     fn wire(&self, router: &mut Router) {
         let self_ = self.clone();
-        let post_create_wallet =
-            move |req: &mut Request| self_.post_transaction::<TxCreateWallet>(req);
+        let post_create_wallet = move |req: &mut Request| self_.post_transaction(req);
         let self_ = self.clone();
-        let post_transfer = move |req: &mut Request| self_.post_transaction::<TxTransfer>(req);
+        let post_transfer = move |req: &mut Request| self_.post_transaction(req);
         let self_ = self.clone();
         let get_wallets = move |req: &mut Request| self_.get_wallets(req);
         let self_ = self.clone();
@@ -360,7 +372,7 @@ impl Service for CurrencyService {
 
     // Implement a method to deserialize transactions coming to the node.
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
-        let tx = CryptocurrencyTransactions::tx_from_raw(raw)?;
+        let tx = CurrencyTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }
 
