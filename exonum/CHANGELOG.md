@@ -67,6 +67,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `StorageKey` trait now requires `ToOwned` implementation. (#392)
 
+- `Connect` message has been extended with a user agent string, which breaks
+  binary compatibility with previous versions. (#362)
+
 ### New features
 
 - `StorageKey` and `StorageValue` traits are implemented for `SystemTime`. (#456)

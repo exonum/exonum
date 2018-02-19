@@ -35,7 +35,7 @@ use exonum::crypto::{CryptoHash, Hash, Seed, gen_keypair, gen_keypair_from_seed}
 use exonum::blockchain::{Blockchain, Schema};
 use exonum::node::state::{PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT,
                           TRANSACTIONS_REQUEST_TIMEOUT};
-use exonum::helpers::{Height, Round};
+use exonum::helpers::{Height, Round, user_agent};
 
 use sandbox::timestamping::{TimestampTx, TimestampingTxGenerator, TIMESTAMPING_SERVICE};
 use sandbox::timestamping_sandbox;
@@ -314,8 +314,8 @@ fn should_restore_peers_after_restart() {
     let (p1, s1, a1) = (sandbox.p(v1), sandbox.s(v1).clone(), sandbox.a(v1));
 
     let time = sandbox.time();
-    let connect_from_0 = Connect::new(&p0, a0, time, &s0);
-    let connect_from_1 = Connect::new(&p1, a1, time, &s1);
+    let connect_from_0 = Connect::new(&p0, a0, time, &user_agent::get(), &s0);
+    let connect_from_1 = Connect::new(&p1, a1, time, &user_agent::get(), &s1);
     let peers_request = PeersRequest::new(&p1, &p0, &s1);
 
     // check that peers are absent

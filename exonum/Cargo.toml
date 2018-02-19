@@ -45,6 +45,7 @@ tokio-io = "0.1.2"
 tokio-retry = "0.1.0"
 tokio-timer = "0.1.2"
 failure = "0.1.1"
+os_info = "0.7.0"
 
 exonum_rocksdb = "0.7"
 exonum_sodiumoxide = "0.0.16"
