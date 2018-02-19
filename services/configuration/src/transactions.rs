@@ -14,17 +14,15 @@
 
 //! Transaction definitions for the configuration service.
 
-// spell-checker:ignore ZEROVOTE
-
 use exonum::blockchain::{ExecutionResult, Schema as CoreSchema, StoredConfiguration, Transaction};
-use exonum::crypto::{CryptoHash, Hash, PublicKey, Signature};
+use exonum::crypto::{CryptoHash, Hash, PublicKey};
 use exonum::encoding::Error as EncodingError;
 use exonum::messages::{Message, RawTransaction};
 use exonum::node::State;
 use exonum::storage::{Fork, Snapshot};
 
 use errors::{CommonError, ProposeError, VoteError};
-use schema::{ProposeData, Schema};
+use schema::{MaybeVote, ProposeData, Schema};
 
 transactions! {
     Any {
@@ -54,12 +52,13 @@ transactions! {
         ///
         /// # Notes
         ///
-        /// The stored version of the transaction has a special variant with all bytes
-        /// in the payload set to 0. This variant denotes an absence of vote.
+        /// The stored version of the transaction has a special variant corresponding to absence
+        /// of a vote. See [`MaybeVote`] for details.
         ///
         /// See [`VoteErrorCode`] for the description of error codes emitted by the `execute()`
         /// method.
         ///
+        /// [`MaybeVote`]: struct.MaybeVote.html
         /// [`VoteErrorCode`]: enum.VoteErrorCode.html
         struct Vote {
             /// Sender of the transaction.
@@ -73,14 +72,6 @@ transactions! {
             cfg_hash: &Hash,
         }
     }
-}
-
-lazy_static! {
-    static ref ZEROVOTE: Vote = Vote::new_with_signature(
-        &PublicKey::zero(),
-        &Hash::zero(),
-        &Signature::zero(),
-    );
 }
 
 /// Checks if a specified key belongs to one of the current validators.
@@ -181,7 +172,7 @@ impl Propose {
 
             let num_validators = prev_cfg.validator_keys.len();
             for _ in 0..num_validators {
-                votes_table.push(ZEROVOTE.clone());
+                votes_table.push(MaybeVote::none());
             }
 
             ProposeData::new(
@@ -219,17 +210,6 @@ impl Transaction for Propose {
 }
 
 impl Vote {
-    /// Checks if this vote encodes a special "absence of vote" variant.
-    pub fn is_none(&self) -> bool {
-        ZEROVOTE.eq(self)
-    }
-
-    /// Maps the vote into an `Option`, where `None` corresponds to a special
-    /// "absence of vote" variant.
-    pub fn into_option(self) -> Option<Self> {
-        if self.is_none() { None } else { Some(self) }
-    }
-
     /// Checks context-dependent conditions for a `Vote` transaction.
     ///
     /// # Return value
@@ -297,7 +277,7 @@ impl Vote {
 
         let propose_data = {
             let mut votes = schema.votes_by_config_hash_mut(cfg_hash);
-            votes.set(validator_id as u64, self.clone());
+            votes.set(validator_id as u64, MaybeVote::some(self.clone()));
             propose_data.set_history_hash(&votes.root_hash())
         };
 

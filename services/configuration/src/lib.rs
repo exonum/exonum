@@ -95,7 +95,7 @@ mod tests;
 mod transactions;
 
 pub use errors::{ProposeErrorCode, VoteErrorCode};
-pub use schema::{Schema, ProposeData};
+pub use schema::{MaybeVote, Schema, ProposeData};
 pub use transactions::{Propose, Vote};
 
 /// Service identifier for the configuration service.

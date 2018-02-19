@@ -14,10 +14,12 @@
 
 //! Storage schema for the configuration service.
 
+use std::borrow::Cow;
+
 use exonum::blockchain::gen_prefix;
 use exonum::encoding::Field;
-use exonum::crypto::Hash;
-use exonum::storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot};
+use exonum::crypto::{self, CryptoHash, Hash, PublicKey, Signature};
+use exonum::storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot, StorageValue};
 
 use transactions::{Propose, Vote};
 
@@ -54,6 +56,74 @@ impl ProposeData {
     }
 }
 
+lazy_static! {
+    static ref NO_VOTE_BYTES: Vec<u8> = Vote::new_with_signature(
+        &PublicKey::zero(),
+        &Hash::zero(),
+        &Signature::zero(),
+    ).into_bytes();
+}
+
+/// A functional equivalent to `Option<Vote>` used to store votes in the service schema.
+///
+/// # Notes
+///
+/// The `None` variant of the type is represented by a `Vote` with all bytes set to zero.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MaybeVote(Option<Vote>);
+
+impl MaybeVote {
+    /// Creates a `None` variant.
+    pub fn none() -> Self {
+        MaybeVote(None)
+    }
+
+    /// Creates a `Some` variant.
+    pub fn some(vote: Vote) -> Self {
+        MaybeVote(Some(vote))
+    }
+}
+
+impl From<MaybeVote> for Option<Vote> {
+    fn from(value: MaybeVote) -> Option<Vote> {
+        value.0
+    }
+}
+
+impl ::std::ops::Deref for MaybeVote {
+    type Target = Option<Vote>;
+
+    fn deref(&self) -> &Option<Vote> {
+        &self.0
+    }
+}
+
+impl CryptoHash for MaybeVote {
+    fn hash(&self) -> Hash {
+        match self.0 {
+            Some(ref vote) => vote.hash(),
+            None => crypto::hash(&NO_VOTE_BYTES),
+        }
+    }
+}
+
+impl StorageValue for MaybeVote {
+    fn into_bytes(self) -> Vec<u8> {
+        match self.0 {
+            Some(vote) => vote.into_bytes(),
+            None => NO_VOTE_BYTES.clone(),
+        }
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        if NO_VOTE_BYTES.as_slice().eq(bytes.as_ref()) {
+            MaybeVote::none()
+        } else {
+            MaybeVote::some(Vote::from_bytes(bytes))
+        }
+    }
+}
+
 /// Database schema used by the configuration service.
 #[derive(Debug)]
 pub struct Schema<T> {
@@ -85,7 +155,7 @@ where
 
     /// Returns a table of votes of validators for a particular proposal, referenced
     /// by its configuration hash.
-    pub fn votes_by_config_hash(&self, config_hash: &Hash) -> ProofListIndex<&Snapshot, Vote> {
+    pub fn votes_by_config_hash(&self, config_hash: &Hash) -> ProofListIndex<&Snapshot, MaybeVote> {
         ProofListIndex::with_prefix(VOTES, gen_prefix(config_hash), self.view.as_ref())
     }
 
@@ -100,7 +170,7 @@ where
     #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
     pub fn votes(&self, cfg_hash: &Hash) -> Vec<Option<Vote>> {
         let votes_by_config_hash = self.votes_by_config_hash(cfg_hash);
-        let votes = votes_by_config_hash.iter().map(Vote::into_option).collect();
+        let votes = votes_by_config_hash.iter().map(MaybeVote::into).collect();
         votes
     }
 
@@ -130,7 +200,73 @@ impl<'a> Schema<&'a mut Fork> {
     pub(crate) fn votes_by_config_hash_mut(
         &mut self,
         config_hash: &Hash,
-    ) -> ProofListIndex<&mut Fork, Vote> {
+    ) -> ProofListIndex<&mut Fork, MaybeVote> {
         ProofListIndex::with_prefix(VOTES, gen_prefix(config_hash), &mut self.view)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use exonum::storage::{Database, MemoryDB};
+    use super::*;
+
+    lazy_static! {
+        static ref NO_VOTE: Vote = Vote::new_with_signature(
+            &PublicKey::zero(),
+            &Hash::zero(),
+            &Signature::zero(),
+        );
+    }
+
+    /// Check compatibility of old and new implementations of "absence of vote" signaling.
+    #[test]
+    fn test_serialization_of_maybe_vote() {
+        const VALIDATORS: usize = 5;
+
+        assert_eq!(NO_VOTE.hash(), MaybeVote::none().hash());
+        assert_eq!(NO_VOTE.clone().into_bytes(), MaybeVote::none().into_bytes());
+
+        let (pubkey, key) = crypto::gen_keypair();
+        let vote = Vote::new(&pubkey, &Hash::new([1; 32]), &key);
+        assert_eq!(
+            vote.clone().into_bytes(),
+            MaybeVote::some(vote.clone()).into_bytes()
+        );
+        assert_eq!(vote.hash(), MaybeVote::some(vote.clone()).hash());
+
+        let db = MemoryDB::new();
+        let mut fork = db.fork();
+        let root_hash = {
+            let mut index: ProofListIndex<_, Vote> = ProofListIndex::new("index", &mut fork);
+            for _ in 0..VALIDATORS {
+                index.push(NO_VOTE.clone());
+            }
+            index.set(1, vote.clone());
+            index.root_hash()
+        };
+        db.merge(fork.into_patch()).unwrap();
+
+        let snapshot = db.snapshot();
+        let index: ProofListIndex<_, MaybeVote> = ProofListIndex::new("index", &snapshot);
+        for (i, stored_vote) in index.iter().enumerate() {
+            assert_eq!(
+                stored_vote,
+                if i == 1 {
+                    MaybeVote::some(vote.clone())
+                } else {
+                    MaybeVote::none()
+                }
+            );
+        }
+
+        // Touch the index in order to recalculate its root hash
+        let new_root_hash = {
+            let mut fork = db.fork();
+            let mut index: ProofListIndex<_, MaybeVote> = ProofListIndex::new("index", &mut fork);
+            index.set(2, MaybeVote::some(vote.clone()));
+            index.set(2, MaybeVote::none());
+            index.root_hash()
+        };
+        assert_eq!(root_hash, new_root_hash);
     }
 }
