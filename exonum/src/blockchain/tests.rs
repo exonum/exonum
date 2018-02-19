@@ -19,9 +19,9 @@ use std::collections::BTreeMap;
 use rand::{thread_rng, Rng};
 use serde_json;
 
-use blockchain::{Blockchain, Schema, Transaction};
-use crypto::{gen_keypair, Hash};
-use storage::{Database, Error, Fork, ListIndex};
+use blockchain::{Blockchain, Schema, Transaction, ExecutionResult};
+use crypto::{gen_keypair, CryptoHash, Hash};
+use storage::{Database, Fork, Error, ListIndex};
 use messages::Message;
 use helpers::{Height, ValidatorId};
 
@@ -31,15 +31,13 @@ const IDX_NAME: &'static str = "idx_name";
 fn test_encode_decode() {
     encoding_struct! {
         struct Parent {
-            const SIZE = 8;
-            field child:        Child     [00 => 08]
+            child: Child,
         }
     }
 
     encoding_struct! {
         struct Child {
-            const SIZE = 32;
-            field child:          &Hash       [00 => 32]
+            child: &Hash,
         }
     }
     let content = Child::new(&Hash::zero());
@@ -52,8 +50,7 @@ fn test_encode_decode() {
 fn test_u64() {
     encoding_struct! {
         struct Test {
-            const SIZE = 8;
-            field some_test:u64 [0 => 8]
+            some_test: u64,
         }
     }
     let test_data = r##"{"some_test":"1234"}"##;
@@ -67,8 +64,7 @@ fn test_system_time() {
     use std::time::{SystemTime, UNIX_EPOCH};
     encoding_struct! {
         struct Test {
-            const SIZE = 12;
-            field some_test:SystemTime [0 => 12]
+            some_test: SystemTime,
         }
     }
     let test_data = r##"{"some_test":{"nanos":0,"secs":"0"}}"##;
@@ -83,9 +79,8 @@ use encoding::Field;
 
 encoding_struct! {
     struct StructWithTwoSegments {
-        const SIZE = 16;
-        field first:  &[u8]     [0 => 8]
-        field second: &[u8]     [8 => 16]
+        first: &[u8],
+        second: &[u8],
     }
 }
 
@@ -98,9 +93,9 @@ fn test_correct_encoding_struct() {
     test.write(&mut buffer, 0, 8);
     assert_eq!(buffer, dat);
     <StructWithTwoSegments as Field>::check(&dat, 0.into(), 8.into(), 8.into()).unwrap();
-    let strukt = unsafe { <StructWithTwoSegments as Field>::read(&dat, 0, 8) };
-    assert_eq!(strukt.first(), &[1u8]);
-    assert_eq!(strukt.second(), &[2u8]);
+    let struct_ = unsafe { <StructWithTwoSegments as Field>::read(&dat, 0, 8) };
+    assert_eq!(struct_.first(), &[1u8]);
+    assert_eq!(struct_.second(), &[2u8]);
 }
 
 #[test]
@@ -147,13 +142,10 @@ fn gen_tempdir_name() -> String {
 }
 
 fn handling_tx_panic(blockchain: &Blockchain, db: &mut Box<Database>) {
-    message! {
+    messages! {
+        const SERVICE_ID = 1;
         struct Tx {
-            const TYPE = 1;
-            const ID = 0;
-            const SIZE = 8;
-
-            field value: u64 [0 => 8]
+            value: u64,
         }
     }
 
@@ -162,13 +154,16 @@ fn handling_tx_panic(blockchain: &Blockchain, db: &mut Box<Database>) {
             true
         }
 
-        fn execute(&self, view: &mut Fork) {
+        fn execute(&self, fork: &mut Fork) -> ExecutionResult {
             if self.value() == 42 {
                 panic!(Error::new("42"))
             }
-            let mut index = ListIndex::new(IDX_NAME, view);
+
+            let mut index = ListIndex::new(IDX_NAME, fork);
             index.push(self.value());
             index.push(42 / self.value());
+
+            Ok(())
         }
     }
 
@@ -227,13 +222,10 @@ fn handling_tx_panic(blockchain: &Blockchain, db: &mut Box<Database>) {
 }
 
 fn handling_tx_panic_storage_error(blockchain: &Blockchain) {
-    message! {
+    messages! {
+        const SERVICE_ID = 1;
         struct Tx {
-            const TYPE = 1;
-            const ID = 0;
-            const SIZE = 8;
-
-            field value: u64 [0 => 8]
+            value: u64,
         }
     }
 
@@ -242,13 +234,14 @@ fn handling_tx_panic_storage_error(blockchain: &Blockchain) {
             true
         }
 
-        fn execute(&self, view: &mut Fork) {
+        fn execute(&self, view: &mut Fork) -> ExecutionResult {
             if self.value() == 42 {
                 panic!(Error::new("42"))
             }
             let mut index = ListIndex::new(IDX_NAME, view);
             index.push(self.value());
             index.push(42 / self.value());
+            Ok(())
         }
     }
 
@@ -278,6 +271,100 @@ fn handling_tx_panic_storage_error(blockchain: &Blockchain) {
         &[tx_ok1.hash(), tx_storage_error.hash(), tx_ok2.hash()],
         &pool,
     );
+}
+
+mod transactions_tests {
+    use blockchain::{Transaction, TransactionSet, ExecutionResult};
+    use storage::Fork;
+    use crypto::gen_keypair;
+    use serde::Serialize;
+    use serde_json;
+
+    transactions! {
+        MyTransactions {
+            const SERVICE_ID = 92;
+
+            struct A {
+                a: u32
+            }
+
+            struct B {
+                b: u32,
+                c: u8
+            }
+
+            struct C {
+                a: u32
+            }
+        }
+    }
+
+    impl Transaction for A {
+        fn verify(&self) -> bool {
+            true
+        }
+
+        fn execute(&self, _: &mut Fork) -> ExecutionResult {
+            Ok(())
+        }
+    }
+
+    impl Transaction for B {
+        fn verify(&self) -> bool {
+            true
+        }
+
+        fn execute(&self, _: &mut Fork) -> ExecutionResult {
+            Ok(())
+        }
+    }
+
+    impl Transaction for C {
+        fn verify(&self) -> bool {
+            true
+        }
+
+        fn execute(&self, _: &mut Fork) -> ExecutionResult {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn deserialize_from_json() {
+        fn round_trip<T: Transaction + Serialize>(t: &T) {
+            let initial = serde_json::to_value(&t).unwrap();
+            let parsed: MyTransactions = serde_json::from_value(initial.clone()).unwrap();
+            let round_tripped = serde_json::to_value(&parsed).unwrap();
+            assert_eq!(initial, round_tripped);
+        }
+
+        let (_pub_key, sec_key) = gen_keypair();
+        let a = A::new(0, &sec_key);
+        let b = B::new(1, 2, &sec_key);
+        let c = C::new(0, &sec_key);
+        round_trip(&a);
+        round_trip(&b);
+        round_trip(&c);
+    }
+
+    #[test]
+    fn deserialize_from_raw() {
+        fn round_trip<T: Transaction + Serialize>(t: &T) {
+            let initial = serde_json::to_value(&t).unwrap();
+            let raw = t.raw();
+            let parsed: MyTransactions = TransactionSet::tx_from_raw(raw.clone()).unwrap();
+            let round_tripped = serde_json::to_value(&parsed).unwrap();
+            assert_eq!(initial, round_tripped);
+        }
+
+        let (_pub_key, sec_key) = gen_keypair();
+        let a = A::new(0, &sec_key);
+        let b = B::new(1, 2, &sec_key);
+        let c = C::new(0, &sec_key);
+        round_trip(&a);
+        round_trip(&b);
+        round_trip(&c);
+    }
 }
 
 mod memorydb_tests {

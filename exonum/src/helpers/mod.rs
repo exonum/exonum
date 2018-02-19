@@ -15,17 +15,18 @@
 //! Different assorted utilities.
 
 use std::env;
+use std::io::{self, Write};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use log::{LogRecord, LogLevel, SetLoggerError};
-use env_logger::LogBuilder;
+use log::{Level, Record, SetLoggerError};
+use env_logger::{Builder, Formatter};
 use colored::*;
 
 use blockchain::{GenesisConfig, ValidatorKeys};
 use node::NodeConfig;
 use crypto::gen_keypair;
 
-pub use self::types::{Height, Round, ValidatorId, Milliseconds};
+pub use self::types::{Height, Milliseconds, Round, ValidatorId};
 
 mod types;
 
@@ -37,14 +38,14 @@ pub mod metrics;
 
 /// Performs the logger initialization.
 pub fn init_logger() -> Result<(), SetLoggerError> {
-    let mut builder = LogBuilder::new();
+    let mut builder = Builder::new();
     builder.format(format_log_record);
 
     if env::var("RUST_LOG").is_ok() {
         builder.parse(&env::var("RUST_LOG").unwrap());
     }
 
-    builder.init()
+    builder.try_init()
 }
 
 /// Generates testnet configuration.
@@ -103,35 +104,35 @@ fn has_colors() -> bool {
     }
 }
 
-fn format_log_record(record: &LogRecord) -> String {
+fn format_log_record(buf: &mut Formatter, record: &Record) -> io::Result<()> {
     let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
     let secs = ts.as_secs().to_string();
     let millis = (u64::from(ts.subsec_nanos()) / 1_000_000).to_string();
 
-    let module = record.location().module_path();
-    let file = record.location().file();
-    let line = record.location().line();
-
-    let source_path;
     let verbose_src_path = match env::var("RUST_VERBOSE_PATH") {
         Ok(val) => val.parse::<bool>().unwrap_or(false),
         Err(_) => false,
     };
-    if verbose_src_path {
-        source_path = format!("{}:{}:{}", module, file, line);
+
+    let module = record.module_path().unwrap_or("unknown_module");
+    let source_path = if verbose_src_path {
+        let file = record.file().unwrap_or("unknown_file");
+        let line = record.line().unwrap_or(0);
+        format!("{}:{}:{}", module, file, line)
     } else {
-        source_path = module.to_string();
-    }
+        module.to_string()
+    };
 
     if has_colors() {
         let level = match record.level() {
-            LogLevel::Error => "ERROR".red(),
-            LogLevel::Warn => "WARN".yellow(),
-            LogLevel::Info => "INFO".green(),
-            LogLevel::Debug => "DEBUG".cyan(),
-            LogLevel::Trace => "TRACE".white(),
+            Level::Error => "ERROR".red(),
+            Level::Warn => "WARN".yellow(),
+            Level::Info => "INFO".green(),
+            Level::Debug => "DEBUG".cyan(),
+            Level::Trace => "TRACE".white(),
         };
-        format!(
+        writeln!(
+            buf,
             "[{} : {:03}] - [ {} ] - {} - {}",
             secs.bold(),
             millis.bold(),
@@ -141,13 +142,14 @@ fn format_log_record(record: &LogRecord) -> String {
         )
     } else {
         let level = match record.level() {
-            LogLevel::Error => "ERROR",
-            LogLevel::Warn => "WARN",
-            LogLevel::Info => "INFO",
-            LogLevel::Debug => "DEBUG",
-            LogLevel::Trace => "TRACE",
+            Level::Error => "ERROR",
+            Level::Warn => "WARN",
+            Level::Info => "INFO",
+            Level::Debug => "DEBUG",
+            Level::Trace => "TRACE",
         };
-        format!(
+        writeln!(
+            buf,
             "[{} : {:03}] - [ {} ] - {} - {}",
             secs,
             millis,

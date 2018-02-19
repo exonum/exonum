@@ -24,7 +24,7 @@ use serde_json::Value;
 use bit_vec::BitVec;
 
 use messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect};
-use crypto::{PublicKey, SecretKey, Hash};
+use crypto::{CryptoHash, PublicKey, SecretKey, Hash};
 use storage::{Patch, Snapshot};
 use blockchain::{ValidatorKeys, ConsensusConfig, StoredConfiguration, Transaction,
                  TimeoutAdjusterConfig};
@@ -361,6 +361,7 @@ impl State {
         whitelist: Whitelist,
         stored: StoredConfiguration,
         connect: Connect,
+        peers: HashMap<PublicKey, Connect>,
         last_hash: Hash,
         last_height: Height,
         height_start_time: SystemTime,
@@ -373,7 +374,7 @@ impl State {
             service_secret_key,
             tx_pool_capacity: tx_pool_capacity,
             whitelist: whitelist,
-            peers: HashMap::new(),
+            peers,
             connections: HashMap::new(),
             height: last_height,
             height_start_time,
@@ -586,17 +587,17 @@ impl State {
             }
             *known_round = round;
         }
-        let max_byzant_count = self.validators().len() / 3;
-        if self.validators_rounds.len() <= max_byzant_count {
-            trace!("Count of validators, lower then max byzant.");
+        let max_byzantine_count = self.validators().len() / 3;
+        if self.validators_rounds.len() <= max_byzantine_count {
+            trace!("Count of validators, lower then max byzantine count.");
             return None;
         }
 
         let mut rounds: Vec<_> = self.validators_rounds.iter().map(|(_, v)| v).collect();
         rounds.sort_unstable_by(|a, b| b.cmp(a));
 
-        if rounds[max_byzant_count] > &self.round {
-            Some(*rounds[max_byzant_count])
+        if rounds[max_byzantine_count] > &self.round {
+            Some(*rounds[max_byzantine_count])
         } else {
             None
         }
@@ -677,7 +678,7 @@ impl State {
         self.locked_propose
     }
 
-    /// Returns muttable propose state identified by hash.
+    /// Returns mutable propose state identified by hash.
     pub fn propose_mut(&mut self, hash: &Hash) -> Option<&mut ProposeState> {
         self.proposes.get_mut(hash)
     }
@@ -1016,7 +1017,7 @@ impl State {
             match self.validator_state {
                 Some(ref validator_state) => {
                     if let Some(msg) = validator_state.our_prevotes.get(&round) {
-                        // TODO: unefficient (ECR-171)
+                        // TODO: inefficient (ECR-171)
                         if Some(*msg.propose_hash()) != self.locked_propose {
                             return true;
                         }

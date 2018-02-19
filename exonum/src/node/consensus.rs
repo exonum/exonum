@@ -14,7 +14,7 @@
 
 use std::collections::HashSet;
 
-use crypto::{Hash, PublicKey};
+use crypto::{Hash, CryptoHash, PublicKey};
 use blockchain::{Schema, Transaction};
 use messages::{BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote,
                PrevotesRequest, Propose, ProposeRequest, RawTransaction, TransactionsRequest};
@@ -23,11 +23,19 @@ use storage::Patch;
 use node::{NodeHandler, RequestData};
 use events::InternalRequest;
 
-// TODO reduce view invokations (ECR-171)
+// TODO reduce view invocations (ECR-171)
 impl NodeHandler {
     /// Validates consensus message, then redirects it to the corresponding `handle_...` function.
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_consensus(&mut self, msg: ConsensusMessage) {
+        if !self.is_enabled {
+            info!(
+                "Ignoring a consensus message {:?} because the node is disabled",
+                msg
+            );
+            return;
+        }
+
         // Ignore messages from previous and future height
         if msg.height() < self.state.height() || msg.height() > self.state.height().next() {
             warn!(
@@ -39,7 +47,7 @@ impl NodeHandler {
         }
 
         // Queued messages from next height or round
-        // TODO: shoud we ignore messages from far rounds (ECR-171)?
+        // TODO: should we ignore messages from far rounds (ECR-171)?
         if msg.height() == self.state.height().next() || msg.round() > self.state.round() {
             trace!(
                 "Received consensus message from future round: msg.height={}, msg.round={}, \
@@ -151,7 +159,7 @@ impl NodeHandler {
     // TODO write helper function which returns Result (ECR-123)
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_block(&mut self, msg: &BlockResponse) {
-        // Request are sended to us
+        // Request are sent to us
         if msg.to() != self.state.consensus_public_key() {
             error!(
                 "Received block that intended for another peer, to={}, from={}",
@@ -451,7 +459,7 @@ impl NodeHandler {
         trace!("COMMIT {:?}", block_hash);
 
         // Merge changes into storage
-        let (commited_txs, proposer) = {
+        let (committed_txs, proposer) = {
             // FIXME Avoid of clone here.
             let block_state = self.state.block(&block_hash).unwrap().clone();
             self.blockchain
@@ -485,7 +493,7 @@ impl NodeHandler {
             round
                 .map(|x| format!("{}", x))
                 .unwrap_or_else(|| "?".into()),
-            commited_txs,
+            committed_txs,
             mempool_size,
             block_hash.to_hex(),
         );
@@ -693,7 +701,7 @@ impl NodeHandler {
                 self.state.consensus_secret_key(),
             );
             trace!("Broadcast propose: {:?}", propose);
-            self.broadcast(&propose);
+            self.broadcast(propose.raw());
 
             // Save our propose into state
             let hash = self.state.add_self_propose(propose);
@@ -881,7 +889,7 @@ impl NodeHandler {
         );
         let has_majority_prevotes = self.state.add_prevote(&prevote);
         trace!("Broadcast prevote: {:?}", prevote);
-        self.broadcast(&prevote);
+        self.broadcast(prevote.raw());
         has_majority_prevotes
     }
 
@@ -901,7 +909,7 @@ impl NodeHandler {
         );
         self.state.add_precommit(&precommit);
         trace!("Broadcast precommit: {:?}", precommit);
-        self.broadcast(&precommit);
+        self.broadcast(precommit.raw());
     }
 
     /// Checks that pre-commits count is correct and calls `verify_precommit` for each of them.

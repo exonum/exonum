@@ -14,7 +14,7 @@
 
 //! Serialize structure into specific format.
 //! Currently support only json.
-//! This module is a pack of superstructures over serde `Serializer's`\\`Deserializer's`
+//! This module is a pack of superstructures over serde `Serializer`\`Deserializer`
 
 use encoding::Field;
 use messages::MessageWriter;
@@ -59,7 +59,7 @@ macro_rules! implement_exonum_serializer {
 
             fn serialize_field(&self) ->
                 Result<$crate::encoding::serialize::json::reexport::Value,
-                        Box<::std::error::Error>>
+                        Box<::std::error::Error + Send + Sync>>
             {
                 use $crate::encoding::serialize::json::reexport::to_value;
                 Ok(to_value(self)?)

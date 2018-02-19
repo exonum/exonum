@@ -17,13 +17,13 @@
 // TODO: Remove when https://github.com/rust-lang-nursery/rust-clippy/issues/2190 is fixed.
 #![cfg_attr(feature="cargo-clippy", allow(doc_markdown))]
 
+use byteorder::{BigEndian, ByteOrder};
+
 use std::borrow::Cow;
 use std::cell::Cell;
 use std::marker::PhantomData;
 
-use byteorder::{BigEndian, ByteOrder};
-
-use crypto::{hash, Hash};
+use crypto::{hash, CryptoHash, Hash};
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -43,11 +43,13 @@ impl SparseListSize {
     }
 }
 
-impl StorageValue for SparseListSize {
+impl CryptoHash for SparseListSize {
     fn hash(&self) -> Hash {
         hash(&self.to_array())
     }
+}
 
+impl StorageValue for SparseListSize {
     fn into_bytes(self) -> Vec<u8> {
         self.to_array().to_vec()
     }
@@ -300,7 +302,7 @@ where
         SparseListIndexIter { base_iter: self.base.iter_from(&(), &0u64) }
     }
 
-    /// Returns an iterator over the indices of the 'SparceListIndex'.
+    /// Returns an iterator over the indices of the 'SparseListIndex'.
     ///
     /// # Examples
     ///
@@ -321,7 +323,7 @@ where
         SparseListIndexKeys { base_iter: self.base.iter_from(&(), &0u64) }
     }
 
-    /// Returns an iterator over the values of the 'SparceListIndex'. The iterator element type is
+    /// Returns an iterator over the values of the 'SparseListIndex'. The iterator element type is
     /// V.
     ///
     /// # Examples
@@ -377,7 +379,7 @@ where
         self.size.set(Some(size));
     }
 
-    /// Appends an element to the back of the 'SparceListIndex'.
+    /// Appends an element to the back of the 'SparseListIndex'.
     ///
     /// # Examples
     ///
@@ -531,7 +533,7 @@ where
         self.base.clear()
     }
 
-    /// Removes the first element from the 'SparceListIndex' and returns it, or None if it is empty.
+    /// Removes the first element from the 'SparseListIndex' and returns it, or None if it is empty.
     ///
     /// # Examples
     ///

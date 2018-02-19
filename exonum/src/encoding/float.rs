@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use std::mem;
-use std::num::FpCategory;
 use std::error::Error;
 
 use byteorder::{ByteOrder, LittleEndian};
@@ -23,9 +22,10 @@ use super::Result as EncodingResult;
 use super::Error as EncodingError;
 use encoding::{CheckedOffset, Field, Offset};
 use encoding::serialize::WriteBufferWrapper;
-use encoding::serialize::json::ExonumJson;
+use encoding::serialize::json::{ExonumJson, ExonumJsonDeserialize};
 
-/// Wrapper for the `f32` type that restricts non-finite (NaN and Infinity) values.
+/// Wrapper for the `f32` type that restricts non-finite
+/// (NaN, Infinity, negative zero and subnormal) values.
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub struct F32 {
     value: f32,
@@ -36,7 +36,7 @@ impl F32 {
     ///
     /// # Panics
     ///
-    /// Panics if given value isn't normal (either `NaN`, `Infinity` or `SubNormal`).
+    /// Panics if given value isn't normal (either `NaN`, `Infinity`, negative zero or `SubNormal`).
     ///
     /// # Examples
     ///
@@ -51,7 +51,7 @@ impl F32 {
     }
 
     /// Creates a new `F32` instance with the given `value`. Returns `None` if the given value
-    /// isn't normal.
+    /// isn't normal (either `NaN`, `Infinity`, negative zero or `SubNormal`).
     ///
     /// # Examples
     ///
@@ -66,9 +66,10 @@ impl F32 {
     /// assert!(val.is_none());
     /// ```
     pub fn try_from(value: f32) -> Option<Self> {
-        match value.classify() {
-            FpCategory::Normal | FpCategory::Zero => Some(Self { value }),
-            _ => None,
+        if value.is_normal() || (value == 0.0 && value.signum() == 1.0) {
+            Some(Self { value })
+        } else {
+            None
         }
     }
 
@@ -87,7 +88,8 @@ impl F32 {
     }
 }
 
-/// Wrapper for the `f64` type that restricts non-numeric (NaN and Infinity) values.
+/// Wrapper for the `f64` type that restricts non-finite
+/// (NaN, Infinity, negative zero and subnormal) values.
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub struct F64 {
     value: f64,
@@ -98,7 +100,7 @@ impl F64 {
     ///
     /// # Panics
     ///
-    /// Panics if given value isn't normal (either `NaN`, `Infinity` or `SubNormal`).
+    /// Panics if given value isn't normal (either `NaN`, `Infinity`, negative zero or `SubNormal`).
     ///
     /// # Examples
     ///
@@ -113,7 +115,7 @@ impl F64 {
     }
 
     /// Creates a new `F64` instance with the given `value`. Returns `None` if the given value
-    /// isn't normal.
+    /// isn't normal (either `NaN`, `Infinity`, negative zero or `SubNormal`).
     ///
     /// # Examples
     ///
@@ -128,9 +130,10 @@ impl F64 {
     /// assert!(val.is_none());
     /// ```
     pub fn try_from(value: f64) -> Option<Self> {
-        match value.classify() {
-            FpCategory::Normal | FpCategory::Zero => Some(Self { value }),
-            _ => None,
+        if value.is_normal() || (value == 0.0 && value.signum() == 1.0) {
+            Some(Self { value })
+        } else {
+            None
         }
     }
 
@@ -227,16 +230,31 @@ impl ExonumJson for F32 {
         to: Offset,
     ) -> Result<(), Box<Error>> {
         let number = value.as_f64().ok_or("Can't cast json as float")?;
-        buffer.write(from, to, Self::new(number as f32));
+        buffer.write(
+            from,
+            to,
+            Self::try_from(number as f32).ok_or(
+                "Invalid float value in json",
+            )?,
+        );
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
         Ok(Value::Number(
             Number::from_f64(f64::from(self.get())).ok_or(
                 "Can't cast float as json",
             )?,
         ))
+    }
+}
+
+impl ExonumJsonDeserialize for F32 {
+    fn deserialize(value: &Value) -> Result<Self, Box<Error>> {
+        let number = value.as_f64().ok_or("Can't cast json as float")?;
+        Ok(Self::try_from(number as f32).ok_or(
+            "Invalid float value in json",
+        )?)
     }
 }
 
@@ -248,14 +266,25 @@ impl ExonumJson for F64 {
         to: Offset,
     ) -> Result<(), Box<Error>> {
         let number = value.as_f64().ok_or("Can't cast json as float")?;
-        buffer.write(from, to, Self::new(number));
+        buffer.write(
+            from,
+            to,
+            Self::try_from(number).ok_or("Invalid float value in json")?,
+        );
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error>> {
+    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
         Ok(Value::Number(Number::from_f64(self.get()).ok_or(
             "Can't cast float as json",
         )?))
+    }
+}
+
+impl ExonumJsonDeserialize for F64 {
+    fn deserialize(value: &Value) -> Result<Self, Box<Error>> {
+        let number = value.as_f64().ok_or("Can't cast json as float")?;
+        Ok(Self::try_from(number).ok_or("Invalid float value in json")?)
     }
 }
 
@@ -287,8 +316,8 @@ mod tests {
             return false;
         } else if constructor_result.is_ok() && check_result.is_ok() {
             let constructed = constructor_result.unwrap();
-            let readed = unsafe { <T as Field>::read(&buffer, 0, header_size) };
-            assert_eq!(constructed, readed);
+            let read = unsafe { <T as Field>::read(&buffer, 0, header_size) };
+            assert_eq!(constructed, read);
             return true;
         } else {
             panic!("{:?} != {:?}", constructor_result, check_result);
@@ -300,7 +329,7 @@ mod tests {
         let sub: f32 = 1.1754942e-38;
         assert_eq!(sub.classify(), FpCategory::Subnormal);
         let valid_data = vec![0f32, 3.14, -1.0, 1.0, f32::MAX, f32::MIN];
-        let invalid_data = vec![f32::INFINITY, f32::NEG_INFINITY, f32::NAN, sub];
+        let invalid_data = vec![-0.0f32, f32::INFINITY, f32::NEG_INFINITY, f32::NAN, sub];
         let mut buf = vec![0; 4];
         for value in valid_data {
             LittleEndian::write_f32(&mut buf, value);
@@ -317,7 +346,7 @@ mod tests {
         let sub: f64 = 1.1754942e-315;
         assert_eq!(sub.classify(), FpCategory::Subnormal);
         let valid_data = vec![0f64, 3.14, -1.0, 1.0, f64::MAX, f64::MIN];
-        let invalid_data = vec![f64::INFINITY, f64::NEG_INFINITY, f64::NAN, sub];
+        let invalid_data = vec![-0.0f64, f64::INFINITY, f64::NEG_INFINITY, f64::NAN, sub];
         let mut buf = vec![0; 8];
         for value in valid_data {
             LittleEndian::write_f64(&mut buf, value);
@@ -327,5 +356,38 @@ mod tests {
             LittleEndian::write_f64(&mut buf, value);
             assert!(!validate_constructor(|v| F64::new(v), value, &buf, 8));
         }
+    }
+
+    #[test]
+    #[allow(dead_code)]
+    fn test_f32_struct() {
+        encoding_struct!(
+            struct Msg {
+                single_float: F32,
+                vec: Vec<F32>,
+            }
+        );
+        let test_vec = vec![F32::new(0.0), F32::new(3.14), F32::new(5.82)];
+
+        let msg = Msg::new(F32::new(0.0), test_vec.clone());
+        assert_eq!(msg.single_float().get(), 0.0);
+        assert_eq!(msg.vec(), test_vec);
+    }
+
+    #[test]
+    #[allow(dead_code)]
+    fn test_f64_struct() {
+        encoding_struct!(
+            struct Msg {
+                single_float: F64,
+                vec: Vec<F64>,
+            }
+        );
+
+        let test_vec = vec![F64::new(0.0), F64::new(3.14), F64::new(5.82)];
+
+        let msg = Msg::new(F64::new(0.0), test_vec.clone());
+        assert_eq!(msg.single_float().get(), 0.0);
+        assert_eq!(msg.vec(), test_vec);
     }
 }

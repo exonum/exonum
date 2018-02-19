@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::fmt;
-use std::error::Error;
+// spell-checker:ignore exts
 
-use super::{Context, CommandName, Argument, CommandExtension};
+use std::fmt;
+use std::collections::HashMap;
+
+use super::{Argument, CommandExtension, CommandName, Context};
 
 /// Used to take some additional information from executed command
 #[derive(Debug, PartialEq, Clone)]
@@ -25,27 +27,18 @@ pub enum Feedback {
     /// Do nothing
     None,
 }
-#[derive(Clone, Debug, Copy)]
-pub struct NotFoundInMap;
-
-impl Error for NotFoundInMap {
-    fn description(&self) -> &str {
-        "Expected Some in getting context."
-    }
-}
-
-impl fmt::Display for NotFoundInMap {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.description())
-    }
-}
 
 /// `Command` trait is used to create sub-command for `NodeBuilder`.
 pub trait Command {
     fn args(&self) -> Vec<Argument>;
     fn name(&self) -> CommandName;
     fn about(&self) -> &str;
-    fn execute(&self, context: Context, extension: &Fn(Context) -> Context) -> Feedback;
+    fn execute(
+        &self,
+        commands: &HashMap<CommandName, CollectedCommand>,
+        context: Context,
+        exts: &Fn(Context) -> Context,
+    ) -> Feedback;
 }
 
 /// We keep command internal state into `CollectedCommand`
@@ -53,7 +46,7 @@ pub trait Command {
 ///
 /// 1. `Command` by its nature should be stateless, but it's harder to make
 /// abstracted dynamic object without trait objects.
-/// 2. Additinaly this state is common for all commands.
+/// 2. Additionally this state is common for all commands.
 pub struct CollectedCommand {
     command: Box<Command>,
     args: Vec<Argument>,
@@ -89,8 +82,12 @@ impl CollectedCommand {
         }
     }
 
-    pub fn execute(&self, context: Context) -> Feedback {
-        self.command.execute(context, &|context| {
+    pub fn execute(
+        &self,
+        commands: &HashMap<CommandName, CollectedCommand>,
+        context: Context,
+    ) -> Feedback {
+        self.command.execute(commands, context, &|context| {
             // TODO: check duplicates, in services context keys (ECR-164)
             let mut new_context = context.clone();
             for ext in &self.exts {

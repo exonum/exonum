@@ -13,6 +13,7 @@
 // limitations under the License.
 
 //! An implementation of base index with most common features.
+// spell-checker:ignore subprefix
 
 use std::borrow::Cow;
 use std::marker::PhantomData;
@@ -89,7 +90,7 @@ impl<T> BaseIndex<T> {
         }
     }
 
-    fn prefixed_key<K: StorageKey>(&self, key: &K) -> Vec<u8> {
+    fn prefixed_key<K: StorageKey + ?Sized>(&self, key: &K) -> Vec<u8> {
         match self.prefix {
             Some(ref prefix) => {
                 let mut v = vec![0; prefix.len() + key.size()];
@@ -113,7 +114,7 @@ where
     /// Returns a value of *any* type corresponding to the key of *any* type.
     pub fn get<K, V>(&self, key: &K) -> Option<V>
     where
-        K: StorageKey,
+        K: StorageKey + ?Sized,
         V: StorageValue,
     {
         self.view
@@ -126,7 +127,7 @@ where
     /// *any* type.
     pub fn contains<K>(&self, key: &K) -> bool
     where
-        K: StorageKey,
+        K: StorageKey + ?Sized,
     {
         self.view.as_ref().contains(
             &self.name,
@@ -160,7 +161,7 @@ where
     pub fn iter_from<P, F, K, V>(&self, subprefix: &P, from: &F) -> BaseIndexIter<K, V>
     where
         P: StorageKey,
-        F: StorageKey,
+        F: StorageKey + ?Sized,
         K: StorageKey,
         V: StorageValue,
     {
@@ -191,7 +192,7 @@ impl<'a> BaseIndex<&'a mut Fork> {
     /// Removes the key of *any* type from the index.
     pub fn remove<K>(&mut self, key: &K)
     where
-        K: StorageKey,
+        K: StorageKey + ?Sized,
     {
         let key = self.prefixed_key(key);
         self.view.remove(&self.name, key);
@@ -215,7 +216,7 @@ where
     K: StorageKey,
     V: StorageValue,
 {
-    type Item = (K, V);
+    type Item = (K::Owned, V);
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.ended {
@@ -262,6 +263,7 @@ mod tests {
 
     #[test]
     fn test_index_name_validator() {
+        // spell-checker:disable
         assert!(is_valid_name("index_name"));
         assert!(is_valid_name("_index_name"));
         assert!(is_valid_name("AinDex_name_"));

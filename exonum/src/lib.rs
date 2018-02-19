@@ -15,23 +15,20 @@
 //! Exonum blockchain framework.
 //!
 //! For more information see the project readme.
+// spell-checker:ignore cors
 
-#![deny(missing_debug_implementations)]
-#![deny(missing_docs)]
-
-#![cfg_attr(feature="cargo-clippy", allow(zero_prefixed_literal))]
+#![deny(missing_debug_implementations, missing_docs)]
 
 #![cfg_attr(feature="flame_profile", feature(plugin, custom_attribute))]
 #![cfg_attr(feature="flame_profile", plugin(exonum_flamer))]
 
+extern crate exonum_sodiumoxide as sodiumoxide;
+extern crate exonum_rocksdb as rocksdb;
 #[macro_use]
 extern crate exonum_profiler;
 #[macro_use]
 extern crate log;
 extern crate byteorder;
-extern crate exonum_sodiumoxide as sodiumoxide;
-extern crate exonum_rocksdb as rocksdb;
-
 extern crate rand;
 extern crate serde;
 #[macro_use]
@@ -41,8 +38,6 @@ extern crate toml;
 extern crate hex;
 extern crate bit_vec;
 extern crate vec_map;
-#[cfg(test)]
-extern crate tempdir;
 extern crate env_logger;
 extern crate colored;
 extern crate term;
@@ -50,6 +45,7 @@ extern crate term;
 extern crate clap;
 extern crate hyper;
 extern crate iron;
+extern crate iron_cors;
 extern crate router;
 extern crate params;
 extern crate cookie;
@@ -63,6 +59,13 @@ extern crate tokio_core;
 extern crate tokio_io;
 extern crate tokio_retry;
 extern crate os_info;
+#[macro_use]
+extern crate failure;
+#[cfg(test)]
+#[macro_use]
+extern crate lazy_static;
+#[cfg(test)]
+extern crate tempdir;
 
 #[macro_use]
 pub mod encoding;
@@ -75,6 +78,7 @@ pub mod crypto;
 pub mod events;
 pub mod node;
 pub mod storage;
+#[macro_use]
 pub mod blockchain;
 pub mod explorer;
 pub mod api;

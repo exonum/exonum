@@ -30,7 +30,7 @@ use tokio_retry::strategy::{jitter, FixedInterval};
 
 use messages::{Any, Connect, RawMessage, Message};
 use helpers::Milliseconds;
-use super::tobox;
+use super::to_box;
 use super::error::{into_other, log_error, other_error, result_ok};
 use super::codec::MessagesCodec;
 
@@ -80,6 +80,7 @@ pub struct NetworkPart {
     pub our_connect_message: Connect,
     pub listen_address: SocketAddr,
     pub network_config: NetworkConfiguration,
+    pub max_message_len: u32,
     pub network_requests: (mpsc::Sender<NetworkRequest>, mpsc::Receiver<NetworkRequest>),
     pub network_tx: mpsc::Sender<NetworkEvent>,
 }
@@ -115,6 +116,7 @@ impl ConnectionsPool {
     fn connect_to_peer(
         self,
         network_config: NetworkConfiguration,
+        max_message_len: u32,
         peer: SocketAddr,
         network_tx: mpsc::Sender<NetworkEvent>,
         handle: &Handle,
@@ -155,7 +157,7 @@ impl ConnectionsPool {
             .and_then(move |sock| {
                 trace!("Established connection with peer={}", peer);
 
-                let stream = sock.framed(MessagesCodec);
+                let stream = sock.framed(MessagesCodec::new(max_message_len));
                 let (sink, stream) = stream.split();
 
                 let writer = conn_rx
@@ -198,20 +200,21 @@ impl ConnectionsPool {
                     .map_err(|_| other_error("can't send disconnect"))
             })
             .map(drop);
-        tobox(fut)
+        to_box(fut)
     }
 }
 
 impl NetworkPart {
     pub fn run(self, handle: &Handle) -> Box<Future<Item = (), Error = io::Error>> {
         let network_config = self.network_config;
-        // Cancelation token
+        // Cancellation token
         let (cancel_sender, cancel_handler) = unsync::oneshot::channel();
         let cancel_sender = Some(cancel_sender);
 
         let requests_handle = RequestHandler::new(
             self.our_connect_message,
             network_config,
+            self.max_message_len,
             self.network_tx.clone(),
             handle.clone(),
             self.network_requests.1,
@@ -220,6 +223,7 @@ impl NetworkPart {
         // TODO Don't use unwrap here!
         let server = Listener::bind(
             network_config,
+            self.max_message_len,
             self.listen_address,
             handle.clone(),
             &self.network_tx,
@@ -231,7 +235,7 @@ impl NetworkPart {
             .map(drop)
             .select(cancel_handler)
             .map_err(|(e, _)| e);
-        tobox(fut)
+        to_box(fut)
     }
 }
 
@@ -244,6 +248,7 @@ impl RequestHandler {
     fn new(
         connect_message: Connect,
         network_config: NetworkConfiguration,
+        max_message_len: u32,
         network_tx: mpsc::Sender<NetworkEvent>,
         handle: Handle,
         receiver: mpsc::Receiver<NetworkRequest>,
@@ -264,6 +269,7 @@ impl RequestHandler {
                                     .clone()
                                     .connect_to_peer(
                                         network_config,
+                                        max_message_len,
                                         peer,
                                         network_tx.clone(),
                                         &handle,
@@ -286,7 +292,7 @@ impl RequestHandler {
                                     other_error("can't send message to a connection")
                                 })
                             });
-                            tobox(fut)
+                            to_box(fut)
                         } else {
                             let event = NetworkEvent::UnableConnectToPeer(peer);
                             let fut = network_tx
@@ -294,7 +300,7 @@ impl RequestHandler {
                                 .send(event)
                                 .map_err(|_| other_error("can't send network event"))
                                 .into_future();
-                            tobox(fut)
+                            to_box(fut)
                         }
                     }
                     NetworkRequest::DisconnectWithPeer(peer) => {
@@ -311,11 +317,11 @@ impl RequestHandler {
                                 )
                             })
                             .into_future();
-                        tobox(fut)
+                        to_box(fut)
                     }
                 }
             });
-        RequestHandler(tobox(requests_handler))
+        RequestHandler(to_box(requests_handler))
     }
 }
 
@@ -334,6 +340,7 @@ struct Listener(Box<Future<Item = (), Error = io::Error>>);
 impl Listener {
     fn bind(
         network_config: NetworkConfiguration,
+        max_message_len: u32,
         listen_address: SocketAddr,
         handle: Handle,
         network_tx: &mpsc::Sender<NetworkEvent>,
@@ -355,10 +362,10 @@ impl Listener {
                      connections limit reached.",
                     addr
                 );
-                return tobox(future::ok(()));
+                return to_box(future::ok(()));
             }
             trace!("Accepted incoming connection with peer={}", addr);
-            let stream = sock.framed(MessagesCodec);
+            let stream = sock.framed(MessagesCodec::new(max_message_len));
             let (_, stream) = stream.split();
             let network_tx = network_tx.clone();
             let connection_handler = stream
@@ -392,11 +399,11 @@ impl Listener {
                     let _holder = holder;
                 })
                 .map_err(log_error);
-            handle.spawn(tobox(connection_handler));
-            tobox(future::ok(()))
+            handle.spawn(to_box(connection_handler));
+            to_box(future::ok(()))
         });
 
-        Ok(Listener(tobox(server)))
+        Ok(Listener(to_box(server)))
     }
 }
 

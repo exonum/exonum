@@ -29,11 +29,11 @@ pub fn result_ok<T, E: StdError>(_: T) -> Result<(), E> {
 }
 
 pub fn log_error<E: StdError>(err: E) {
-    error!("An error occured: {}", err)
+    error!("An error occurred: {}", err)
 }
 
 pub fn into_other<E: StdError>(err: E) -> io::Error {
-    other_error(&format!("An error occured, {}", err.description()))
+    other_error(&format!("An error occurred, {}", err.description()))
 }
 
 pub trait LogError {

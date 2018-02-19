@@ -17,21 +17,18 @@ addons:
     - librocksdb
 
 rust:
-  - stable
+  # Feel free to bump this version if you need features of newer Rust.
+  # Sync with badge in README.md
+  - 1.23.0
+
 matrix:
   allow_failures:
-    - env: FEATURE=non-fatal-checks
+  - env: FEATURE=non-fatal-checks
   fast_finish: true
-  include:
-    - rust: nightly-2017-12-11
-      env: FEATURE=benchmarks
-    - rust: nightly-2017-12-11
-      env: FEATURE=clippy-core
-    - rust: nightly-2017-12-11
-      env: FEATURE=clippy-sandbox
 
 cache:
   directories:
+  - node_modules
   - $HOME/.cargo
   - $HOME/.local
   - $TRAVIS_BUILD_DIR/target
@@ -42,24 +39,22 @@ sudo: required
 
 env:
   global:
-  - CLIPPY_VERS=0.0.175
+  - CLIPPY_VERS=0.0.181
   - RUSTFMT_VERS=0.9.0
   - DEADLINKS_VERS=0.3.0
   - OUTDATED_VERS=0.7.0
   - SODIUM_VERS=1.0.13
   - CARGO_INCREMENTAL=1
-  - RUSTFLAGS="-C link-dead-code"
+  - RUSTFLAGS="-C link-dead-code -D warnings"
   - CODECOV_TOKEN=90006bf6-e4b7-4825-b880-8d19c4e21c21
   - ROCKSDB_LIB_DIR=/usr/lib/x86_64-linux-gnu
   - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
   matrix:
-  - FEATURE=fmt
-  - FEATURE=test-core
-  - FEATURE=test-sandbox
-  - FEATURE=test-doc
-  - FEATURE=non-fatal-checks
+  - FEATURE=test
 
-install:
+# Separate jobs should use `install` hook in order not to override these common
+# instructions.
+before_install:
 - |
   if [ ! -f "$HOME/.local/lib/libsodium.a" ]; then
     wget "https://github.com/jedisct1/libsodium/releases/download/$SODIUM_VERS/libsodium-$SODIUM_VERS.tar.gz" -t 5 -O "libsodium.tar.gz"
@@ -72,76 +67,60 @@ install:
   fi
 - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.local/lib
 - export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$HOME/.local/lib/pkgconfig
-- |
-  if [[ "$FEATURE" == "non-fatal-checks" ]]; then
-    cargo-outdated -V | grep $OUTDATED_VERS || cargo install cargo-outdated --vers $OUTDATED_VERS --force
-    cargo-deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
-    fi
-- |
-  if [[ "$FEATURE" == "fmt" ]]; then
-    cargo-audit -V || cargo install cargo-audit --force
-    rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
-    fi
-- |
-  case "$FEATURE" in
-  clippy* )
-    cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
-  ;;
-  esac
-- cargo install --list
-script: |
-  case "$FEATURE" in
 
-  "fmt" )
-      cd exonum && cargo update && cd .. &&
-      cd sandbox && cargo update && cd .. &&
-      cd exonum && cargo audit && cd .. &&
-      cd exonum && cargo fmt -- --write-mode=diff && cd .. &&
-      cd sandbox && cargo fmt -- --write-mode=diff && cd ..
-  ;;
-  "clippy-core" )
-      cd exonum && cargo clippy --verbose --features long_benchmarks  -- -D warnings
-  ;;
-  "clippy-sandbox" )
-      cd sandbox && cargo clippy --verbose -- -D warnings
-  ;;
-  "test-core" )
-      cargo test --manifest-path exonum/Cargo.toml --verbose --tests --lib
-  ;;
-  "test-sandbox" )
-      cargo test --manifest-path sandbox/Cargo.toml  --verbose
-  ;;
-  "test-doc" )
-      cargo test --manifest-path sandbox/Cargo.toml  --verbose --doc  -- --test-threads=2
-  ;;
-  "non-fatal-checks" )
-      cd exonum &&
-      cargo doc --no-deps &&
-      cargo deadlinks --dir target/doc &&
-      cargo outdated --exit-code 1
-  ;;
-  "benchmarks" )
-        RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
-  ;;
+jobs:
+  include:
+  # Formatting & other lints that do not require compilation
+  - env: FEATURE=lints
+    install:
+    - cargo-audit -V || cargo install cargo-audit --force
+    - rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
+    - nvm install 8 && nvm use 8
+    - npm install cspell
+    - ./node_modules/.bin/cspell --version
+    - npm install markdownlint-cli
+    - ./node_modules/.bin/markdownlint --version
+    script:
+    - cargo fmt --all -- --write-mode=diff
+    - ./node_modules/.bin/cspell sandbox/{src,examples,tests}/**/*.rs
+    - ./node_modules/.bin/cspell exonum/{src,benches,tests}/**/*.rs
+    - ./node_modules/.bin/cspell exonum/fuzz/fuzz_targets/*.rs
+    - ./node_modules/.bin/cspell testkit/{src,examples,tests}/**/*.rs
+    - ./node_modules/.bin/cspell services/configuration/{src,examples}/**/*.rs
+    - ./node_modules/.bin/cspell services/time/{src,examples,tests}/**/*.rs
+    - find . -not -path "./3rdparty/*" -and -not -path "./node_modules/*" -name "*.md" | xargs ./node_modules/.bin/cspell
+    - find . -not -path "./3rdparty/*" -and -not -path "./node_modules/*" -name "*.md" | xargs ./node_modules/.bin/markdownlint --config .markdownlintrc
 
-  esac
+  # Clippy linting
+  - env: FEATURE=clippy
+    rust: nightly-2018-01-22
+    install:
+    - cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
+    script:
+    - cargo clippy --all -- -D warnings
 
-after_success: |
-  [ $TRAVIS_BRANCH = master ] &&
-  [ $TRAVIS_PULL_REQUEST = false ] &&
-  wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz &&
-  tar xzf master.tar.gz &&
-  cd kcov-master &&
-  mkdir build &&
-  cd build &&
-  cmake .. &&
-  make &&
-  make install &&
-  cd ../.. &&
-  rm -rf kcov-master &&
-  for file in target/debug/exonum-*[^\.d]; do mkdir -p "target/cov/$(basename $file)"; kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
-  bash <(curl -s https://codecov.io/bash) &&
-  echo "Uploaded code coverage"
+  # Tests
+  - env: FEATURE=test
+    script:
+    - cargo test --all
+    - cargo run -p exonum-testkit --example timestamping
+    - cargo run -p exonum-testkit --example configuration_change
+    - cargo run -p exonum-time --example simple_service
+
+  # Benchmarks (compilation only)
+  - env: FEATURE=benchmarks
+    rust: nightly-2018-01-22
+    script:
+    - RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
+
+  # Non-fatal checks
+  - env: FEATURE=non-fatal-checks
+    install:
+    - cargo-deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
+    script:
+    - cargo doc --no-deps
+    - touch target/doc/exonum/encoding/serialize/trait.Serialize.html  # TODO: a tmp hack to ignore a warning about missing page [ECR-703]
+    - cargo deadlinks --dir target/doc
 
 notifications:
   slack:
