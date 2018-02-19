@@ -92,10 +92,7 @@ fn enough_votes_to_commit(snapshot: &Snapshot, cfg_hash: &Hash) -> bool {
 
     let schema = Schema::new(snapshot);
     let votes = schema.votes_by_config_hash(cfg_hash);
-    let votes_count: usize = votes
-        .iter()
-        .map(|vote| if !vote.is_none() { 1 } else { 0 })
-        .sum();
+    let votes_count = votes.iter().filter(|vote| vote.is_some()).count();
     votes_count >= State::byzantine_majority_count(actual_config.validator_keys.len())
 }
 
@@ -120,12 +117,10 @@ impl Propose {
 
         let config_candidate = StoredConfiguration::try_deserialize(self.cfg().as_bytes())
             .map_err(UnparseableConfig)?;
-
         self.check_config_candidate(&config_candidate, snapshot)?;
 
         let cfg = StoredConfiguration::from_bytes(self.cfg().as_bytes().into());
         let cfg_hash = CryptoHash::hash(&cfg);
-
         if let Some(old_propose) = Schema::new(snapshot).propose(&cfg_hash) {
             Err(AlreadyProposed(old_propose))?;
         }
@@ -229,7 +224,7 @@ impl Vote {
                 .votes_by_config_hash(self.cfg_hash())
                 .get(validator_id as u64)
                 .unwrap();
-            if !vote.is_none() {
+            if vote.is_some() {
                 Err(AlreadyVoted)?;
             }
         } else {

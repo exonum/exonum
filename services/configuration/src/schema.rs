@@ -161,9 +161,10 @@ where
 
     /// Returns a `Propose` transaction with a particular configuration hash.
     pub fn propose(&self, cfg_hash: &Hash) -> Option<Propose> {
-        self.propose_data_by_config_hash().get(cfg_hash).map(
-            |propose_data| propose_data.tx_propose(),
-        )
+        self.propose_data_by_config_hash()
+            .get(cfg_hash)?
+            .tx_propose()
+            .into()
     }
 
     /// Returns a list of votes for the proposal corresponding to the given configuration hash.

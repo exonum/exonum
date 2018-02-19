@@ -80,8 +80,8 @@ extern crate pretty_assertions;
 use router::Router;
 use iron::Handler;
 use exonum::api::Api;
-use exonum::blockchain::{Service as ServiceTrait, Transaction, ApiContext};
-use exonum::helpers::fabric::{ServiceFactory as FactoryTrait, Context};
+use exonum::blockchain::{self, Transaction, ApiContext};
+use exonum::helpers::fabric::{self, Context};
 use exonum::crypto::Hash;
 use exonum::messages::RawTransaction;
 use exonum::storage::Snapshot;
@@ -105,7 +105,7 @@ pub const SERVICE_ID: u16 = 1;
 #[derive(Debug, Default)]
 pub struct Service {}
 
-impl ServiceTrait for Service {
+impl blockchain::Service for Service {
     fn service_name(&self) -> &'static str {
         "configuration"
     }
@@ -145,8 +145,8 @@ impl ServiceTrait for Service {
 #[derive(Debug)]
 pub struct ServiceFactory;
 
-impl FactoryTrait for ServiceFactory {
-    fn make_service(&mut self, _: &Context) -> Box<ServiceTrait> {
+impl fabric::ServiceFactory for ServiceFactory {
+    fn make_service(&mut self, _: &Context) -> Box<blockchain::Service> {
         Box::new(Service {})
     }
 }

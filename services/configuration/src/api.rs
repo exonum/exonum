@@ -79,15 +79,15 @@ struct Filter {
 
 impl Filter {
     /// Checks if a supplied configuration satisfies this filter.
-    fn test(&self, cfg: &StoredConfiguration) -> bool {
+    fn matches(&self, cfg: &StoredConfiguration) -> bool {
         if let Some(ref prev) = self.previous_cfg_hash {
             if cfg.previous_cfg_hash != *prev {
                 return false;
             }
         }
 
-        if let Some(ref from_height) = self.actual_from {
-            if cfg.actual_from < *from_height {
+        if let Some(from_height) = self.actual_from {
+            if cfg.actual_from < from_height {
                 return false;
             }
         }
@@ -166,7 +166,7 @@ impl PublicApi {
                 let cfg = <StoredConfiguration as StorageValue>::from_bytes(
                     propose_data.tx_propose().cfg().as_bytes().into(),
                 );
-                filter.test(&cfg)
+                filter.matches(&cfg)
             })
             .map(|(hash, propose_data)| {
                 ProposeHashInfo { hash, propose_data }
@@ -190,7 +190,7 @@ impl PublicApi {
                     config_hash
                 ))
             })
-            .filter(|config| filter.test(config))
+            .filter(|config| filter.matches(config))
             .map(|config| self.config_with_proofs(config))
             .collect();
         committed_configs
