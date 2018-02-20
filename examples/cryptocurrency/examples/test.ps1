@@ -39,7 +39,7 @@ function Transfer ($jsonFilename) {
 
 # Checks that a `CreateWallet` transaction is committed to the blockchain.
 function Check-CreateTx ($tx) {
-  $resp = Invoke-WebRequest "http://127.0.0.1:8000/api/system/v1/transactions/$($tx.hash)";
+  $resp = Invoke-WebRequest "http://127.0.0.1:8000/api/explorer/v1/transactions/$($tx.hash)";
   $error = False;
   if ($resp.StatusCode -eq 200) {
     $respJson = $resp.Content | ConvertFrom-Json;
@@ -49,7 +49,7 @@ function Check-CreateTx ($tx) {
   } else {
     $error = True;
   }
-  
+
   if ($error) {
     throw "Unexpected response: $($resp.Content)";
   } else {
@@ -78,14 +78,14 @@ function Main () {
   # Expected transaction hashes
   $txs = @(
     @{
-      name = 'Johnny Doe';
+      name = 'Alice';
       json = "$wd/create-wallet-1.json";
-      hash = '44c6c2c58eaab71f8d627d75ca72f244289bc84586a7fb42186a676b2ec4626b';
+      hash = '099d455ab563505cad55b7c6ec02e8a52bca86b0c4446d9879af70f5ceca5dd8';
     },
     @{
-      name = 'Janie Roe';
+      name = 'Bob';
       json = "$wd/create-wallet-2.json";
-      hash = '8714e90607afc05f43b82c475c883a484eecf2193df97b243b0d8630812863fd';
+      hash = '2fb289b9928f5a75acf261cc1e61fd654fcb63bf285688f0fc8e59f44dede048';
     }
   );
 
@@ -107,8 +107,8 @@ function Main () {
     Check-CreateTx $tx;
   }
 
-  echo 'Transferring tokens between Johnny and Janie...';
-  $transferHash = 'e63b28caa07adffb6e2453390a59509a1469e66698c75b4cfb2f0ae7a6887fdc';
+  echo 'Transferring tokens between Alice and Bob...';
+  $transferHash = '4d6de957f58c894db2dca577d4fdd0da1249a8dff1df5eb69d23458e43320ee2';
   $hash = Transfer("$wd/transfer-funds.json");
   if ($hash -ne $transferHash) {
     throw "Unexpected transaction hash: $hash";
@@ -120,15 +120,15 @@ function Main () {
   echo 'Retrieving info on all wallets...';
   $resp = (Invoke-WebRequest "$BASE_URL/wallets").Content | ConvertFrom-Json;
   # Wallet records in the response are deterministically ordered by increasing
-  # public key. As Johnny's pubkey is lexicographically lesser than Janie's, it is possible to
+  # public key. As Alice's pubkey is lexicographically lesser than Bob's, it is possible to
   # determine his wallet as .[0] and hers as .[1].
-  Check-Wallet $resp[0] 'Johnny Doe' '90';
-  Check-Wallet $resp[1] 'Janie Roe' '110';
+  Check-Wallet $resp[0] 'Alice' '85';
+  Check-Wallet $resp[1] 'Bob' '115';
 
-  echo "Retrieving info on Johnny's wallet...";
-  $pubkey = '03e657ae71e51be60a45b4bd20bcf79ff52f0c037ae6da0540a0e0066132b472';
+  echo "Retrieving info on Alice's wallet...";
+  $pubkey = '6ce29b2d3ecadc434107ce52c287001c968a1b6eca3e5a1eb62a2419e2924b85';
   $resp = (Invoke-WebRequest "$BASE_URL/wallet/$pubkey").Content | ConvertFrom-Json;
-  Check-Wallet $resp 'Johnny Doe' '90';
+  Check-Wallet $resp 'Alice' '85';
 }
 
 Compile-Server;

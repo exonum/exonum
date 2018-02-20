@@ -2,6 +2,9 @@
 
 set -e
 
+# Base URL for demo service endpoints
+BASE_URL=http://127.0.0.1:8000/api/services/cryptocurrency/v1
+
 # Exit status
 STATUS=0
 
@@ -35,7 +38,7 @@ function kill-server {
 # Arguments:
 # - $1: filename with the transaction data
 function create-wallet {
-    RESP=`curl -H "Content-Type: application/json" -X POST -d @$1 http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets 2>/dev/null`
+    RESP=`curl -H "Content-Type: application/json" -X POST -d @$1 $BASE_URL/wallets 2>/dev/null`
 }
 
 # Performs a transfer in the cryptocurrency demo.
@@ -43,7 +46,7 @@ function create-wallet {
 # Arguments:
 # - $1: filename with the transaction data
 function transfer {
-    RESP=`curl -H "Content-Type: application/json" -X POST -d @$1 http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets/transfer 2>/dev/null`
+    RESP=`curl -H "Content-Type: application/json" -X POST -d @$1 $BASE_URL/wallets/transfer 2>/dev/null`
 }
 
 # Checks a response to an Exonum transaction.
@@ -83,7 +86,7 @@ function check-request {
 # - $3: response JSON
 function check-create-tx {
     if [[ \
-      ( `echo $3 | jq .type` == \"Committed\" ) && \
+      ( `echo $3 | jq .type` == \"committed\" ) && \
       ( `echo $3 | jq .content.body.name` == "\"$1\"" ) && \
       ( `echo $3 | jq ".content == $2"` == "true" ) \
     ]]; then
@@ -101,7 +104,7 @@ function check-create-tx {
 # - $2: response JSON
 function check-transfer-tx {
     if [[ \
-      ( `echo $2 | jq .type` == \"Committed\" ) && \
+      ( `echo $2 | jq .type` == \"committed\" ) && \
       ( `echo $2 | jq ".content == $1"` == "true" ) \
     ]]; then
         echo "OK, got expected TxTransfer between wallets"
@@ -114,42 +117,42 @@ function check-transfer-tx {
 kill-server
 launch-server
 
-echo "Creating a wallet for Johnny..."
+echo "Creating a wallet for Alice..."
 create-wallet create-wallet-1.json
-check-transaction 44c6c2c5
+check-transaction 099d455a
 
-echo "Creating a wallet for Janie..."
+echo "Creating a wallet for Bob..."
 create-wallet create-wallet-2.json
-check-transaction 8714e906
+check-transaction 2fb289b9
 
-echo "Transferring funds from Johnny to Janie"
+echo "Transferring funds from Alice to Bob"
 transfer transfer-funds.json
-check-transaction e63b28ca
+check-transaction 4d6de957
 
 echo "Waiting until transactions are committed..."
 sleep 7
 
 echo "Retrieving info on all wallets..."
-RESP=`curl http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets 2>/dev/null`
+RESP=`curl $BASE_URL/wallets 2>/dev/null`
 # Wallet records in the response are deterministically ordered by increasing
-# public key. As Johnny's pubkey is lexicographically lesser than Janie's, it it possible to
+# public key. As Alice's pubkey is lexicographically lesser than Bob's, it it possible to
 # determine his wallet as .[0] and hers as .[1].
-check-request "Johnny Doe" 90 "`echo $RESP | jq .[0]`"
-check-request "Janie Roe" 110 "`echo $RESP | jq .[1]`"
+check-request "Alice" 85 "`echo $RESP | jq .[0]`"
+check-request "Bob" 115 "`echo $RESP | jq .[1]`"
 
-echo "Retrieving info on Johnny's wallet..."
-RESP=`curl http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallet/03e657ae71e51be60a45b4bd20bcf79ff52f0c037ae6da0540a0e0066132b472 2>/dev/null`
-check-request "Johnny Doe" 90 "$RESP"
+echo "Retrieving info on Alice's wallet..."
+RESP=`curl $BASE_URL/wallet/6ce29b2d3ecadc434107ce52c287001c968a1b6eca3e5a1eb62a2419e2924b85 2>/dev/null`
+check-request "Alice" 85 "$RESP"
 
-echo "Retrieving Johnny's transaction info..."
-TXID=44c6c2c58eaab71f8d627d75ca72f244289bc84586a7fb42186a676b2ec4626b
-RESP=`curl http://127.0.0.1:8000/api/system/v1/transactions/$TXID 2>/dev/null`
+echo "Retrieving Alice's transaction info..."
+TXID=099d455ab563505cad55b7c6ec02e8a52bca86b0c4446d9879af70f5ceca5dd8
+RESP=`curl http://127.0.0.1:8000/api/explorer/v1/transactions/$TXID 2>/dev/null`
 EXP=`cat create-wallet-1.json`
-check-create-tx "Johnny Doe" "$EXP" "$RESP"
+check-create-tx "Alice" "$EXP" "$RESP"
 
 echo "Retrieving transfer transaction info..."
-TXID=e63b28caa07adffb6e2453390a59509a1469e66698c75b4cfb2f0ae7a6887fdc
-RESP=`curl http://127.0.0.1:8000/api/system/v1/transactions/$TXID 2>/dev/null`
+TXID=4d6de957f58c894db2dca577d4fdd0da1249a8dff1df5eb69d23458e43320ee2
+RESP=`curl http://127.0.0.1:8000/api/explorer/v1/transactions/$TXID 2>/dev/null`
 EXP=`cat transfer-funds.json`
 check-transfer-tx "$EXP" "$RESP"
 
