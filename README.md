@@ -1,21 +1,36 @@
 # Exonum
 
-[![Build Status](https://travis-ci.org/exonum/exonum.svg?branch=master)](https://travis-ci.org/exonum/exonum)
-[![Join the chat at https://gitter.im/exonum/exonum](https://badges.gitter.im/exonum/exonum.svg)](https://gitter.im/exonum/exonum)
+**Status:**
+[![Travis Build Status](https://img.shields.io/travis/exonum/exonum/master.svg?label=Linux)](https://travis-ci.org/exonum/exonum)
+![CircleCI Build Status](https://img.shields.io/circleci/project/github/exonum/exonum.svg?label=MacOS)
+[![dependency status](https://deps.rs/repo/github/exonum/exonum/status.svg)](https://deps.rs/repo/github/exonum/exonum)
 
-[Exonum](https://exonum.com/) is an extensible open-source framework for creating blockchain
-applications. Exonum can be used to create cryptographically powered distributed ledgers in
-virtually any problem domain, including FinTech, GovTech, and LegalTech. The Exonum framework is
-oriented towards creating permissioned blockchains, that is, blockchains with the known set of
-blockchain infrastructure providers.
+**Project info:**
+[![Docs.rs](https://docs.rs/exonum/badge.svg)](https://docs.rs/exonum)
+[![License: Apache-2.0](https://img.shields.io/github/license/exonum/exonum.svg)](LICENSE.md)
+[![LoC](https://tokei.rs/b1/github/exonum/exonum)](https://github.com/exonum/exonum)
+![rust 1.23+ required](https://img.shields.io/badge/rust-1.23+-blue.svg?label=Required%20Rust)
+
+**Community:**
+[![Join the chat at https://gitter.im/exonum/exonum](https://img.shields.io/gitter/room/exonum/exonum.svg?label=Chat)](https://gitter.im/exonum/exonum)
+[![Join the chat at https://gitter.im/exonum/ruExonum](https://img.shields.io/gitter/room/exonum/ruExonum.svg?label=Russian%20chat)](https://gitter.im/exonum/ruExonum)
+[![Website](https://img.shields.io/website/http/exonum.com.svg?label=Website)](https://exonum.com)
+
+[Exonum](https://exonum.com/) is an extensible open-source framework for
+creating blockchain applications. Exonum can be used to create cryptographically
+powered distributed ledgers in virtually any problem domain, including FinTech,
+GovTech, and LegalTech. The Exonum framework is oriented towards creating
+permissioned blockchains, that is, blockchains with the known set of blockchain
+infrastructure providers.
 
 This is the main Exonum repository that includes
-* [Exonum core library](https://github.com/exonum/exonum/blob/master/exonum/README.md).
-* [Exonum testing framework](https://github.com/exonum/exonum/blob/master/testkit/README.md).
+
+* [Exonum core library](exonum/README.md).
+* [Exonum testing framework](testkit/README.md).
 * Services:
-  * Configuration service (currently in [exonum-configuration](https://github.com/exonum/exonum-configuration) repository).
-  * Time service (currently in [exonum-time](https://github.com/exonum/exonum-time) repository).
-* Demos
-  * Cryprocurrency (currently in [cryptocurrency](https://github.com/exonum/cryptocurrency) repository).
-  
-See individual projects' readme for the details.
+  * [Configuration service](services/configuration/README.md).
+  * [Time service](services/time/README.md).
+* Examples
+  * [Cryptocurrency](examples/cryptocurrency/README.md).
+
+See individual projects readme for the details.

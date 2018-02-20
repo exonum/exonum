@@ -15,13 +15,15 @@
 //! Common widely used type definitions.
 
 use std::fmt;
+use std::str::FromStr;
+use std::num::ParseIntError;
 
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 
 /// Number of milliseconds.
 pub type Milliseconds = u64;
 
-/// Blockchain's height (number of blocks).
+/// Blockchain height (number of blocks).
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Height(pub u64);
 
@@ -321,6 +323,14 @@ impl<'de> Deserialize<'de> for Height {
     {
 
         Ok(Height(u64::deserialize(deserializer)?))
+    }
+}
+
+impl FromStr for Height {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Height, ParseIntError> {
+        u64::from_str(s).map(Height)
     }
 }
 

@@ -22,8 +22,8 @@ use crypto::PublicKey;
 use encoding::Error;
 use helpers::{Height, Round, ValidatorId};
 
-pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, Message, HEADER_LENGTH,
-                    PROTOCOL_MAJOR_VERSION, TEST_NETWORK_ID};
+pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, ServiceMessage, Message,
+                    HEADER_LENGTH, PROTOCOL_MAJOR_VERSION, TEST_NETWORK_ID};
 pub use self::protocol::*;
 
 #[macro_use]

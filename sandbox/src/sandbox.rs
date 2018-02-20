@@ -33,10 +33,10 @@ use exonum::blockchain::{Block, BlockProof, Blockchain, ConsensusConfig, Genesis
                          Transaction, ValidatorKeys};
 use exonum::storage::{MapProof, MemoryDB};
 use exonum::messages::{Any, Connect, Message, RawMessage, RawTransaction, Status};
-use exonum::crypto::{gen_keypair_from_seed, CryptoHash, Hash, PublicKey, SecretKey, Seed};
+use exonum::crypto::{gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed};
 #[cfg(test)]
 use exonum::crypto::gen_keypair;
-use exonum::helpers::{Height, Milliseconds, Round, ValidatorId};
+use exonum::helpers::{Height, Milliseconds, Round, ValidatorId, user_agent};
 use exonum::events::{Event, InternalEvent, EventHandler, NetworkEvent, NetworkRequest,
                      TimeoutRequest, InternalRequest};
 use exonum::events::network::NetworkConfiguration;
@@ -147,6 +147,7 @@ impl Sandbox {
             &self.p(VALIDATOR_0),
             self.a(VALIDATOR_0),
             connect_message_time,
+            &user_agent::get(),
             self.s(VALIDATOR_0),
         );
 
@@ -156,6 +157,7 @@ impl Sandbox {
                 &self.p(validator),
                 self.a(validator),
                 self.time(),
+                &user_agent::get(),
                 self.s(validator),
             ));
             self.send(self.a(validator), &connect);
@@ -234,6 +236,11 @@ impl Sandbox {
         time
     }
 
+    pub fn set_time(&mut self, new_time: SystemTime) {
+        let mut inner = self.inner.borrow_mut();
+        *inner.time.lock().unwrap() = new_time;
+    }
+
     pub fn node_handler(&self) -> Ref<NodeHandler> {
         Ref::map(self.inner.borrow(), |inner| &inner.handler)
     }
@@ -265,7 +272,7 @@ impl Sandbox {
         self.inner.borrow_mut().handle_event(event);
     }
 
-    fn process_events(&self) {
+    pub fn process_events(&self) {
         self.inner.borrow_mut().process_events();
     }
 
@@ -297,8 +304,24 @@ impl Sandbox {
         self.broadcast_to_addrs(msg, self.addresses.iter().skip(1));
     }
 
+    pub fn try_broadcast<T: Message>(&self, msg: &T) -> Result<(), String> {
+        self.try_broadcast_to_addrs(msg, self.addresses.iter().skip(1))
+    }
+
     // TODO: add self-test for broadcasting?
     pub fn broadcast_to_addrs<'a, T: Message, I>(&self, msg: &T, addresses: I)
+    where
+        I: IntoIterator<Item = &'a SocketAddr>,
+    {
+        self.try_broadcast_to_addrs(msg, addresses).unwrap();
+    }
+
+    // TODO: add self-test for broadcasting?
+    pub fn try_broadcast_to_addrs<'a, T: Message, I>(
+        &self,
+        msg: &T,
+        addresses: I,
+    ) -> Result<(), String>
     where
         I: IntoIterator<Item = &'a SocketAddr>,
     {
@@ -313,12 +336,12 @@ impl Sandbox {
             if let Some((real_addr, real_msg)) = send {
                 let any_real_msg = Any::from_raw(real_msg.clone()).expect("Send incorrect message");
                 if any_real_msg != any_expected_msg {
-                    panic!(
+                    return Err(format!(
                         "Expected to broadcast the message {:?} instead sending {:?} to {}",
                         any_expected_msg,
                         any_real_msg,
                         real_addr
-                    )
+                    ));
                 }
                 if !expected_set.contains(&real_addr) {
                     panic!(
@@ -338,6 +361,7 @@ impl Sandbox {
                 );
             }
         }
+        Ok(())
     }
 
     pub fn check_broadcast_status(&self, height: Height, block_hash: &Hash) {
@@ -424,7 +448,7 @@ impl Sandbox {
             .collect()
     }
 
-    /// Extract state_hash from fake block
+    /// Extracts state_hash from the fake block.
     pub fn compute_state_hash<'a, I>(&self, txs: I) -> Hash
     where
         I: IntoIterator<Item = &'a RawTransaction>,
@@ -764,7 +788,7 @@ pub fn timestamping_sandbox() -> Sandbox {
 
 #[cfg(test)]
 mod tests {
-    use exonum::blockchain::ServiceContext;
+    use exonum::blockchain::{ServiceContext, ExecutionResult, TransactionSet};
     use exonum::messages::RawTransaction;
     use exonum::encoding;
     use exonum::crypto::{gen_keypair_from_seed, Seed};
@@ -775,14 +799,14 @@ mod tests {
     use super::*;
 
     const SERVICE_ID: u16 = 1;
-    const TX_AFTER_COMMIT_ID: u16 = 1;
 
-    message! {
-        struct TxAfterCommit {
-            const TYPE = SERVICE_ID;
-            const ID = TX_AFTER_COMMIT_ID;
+    transactions! {
+        HandleCommitTransactions {
+            const SERVICE_ID = SERVICE_ID;
 
-            height: Height,
+            struct TxAfterCommit {
+                height: Height,
+            }
         }
     }
 
@@ -798,13 +822,15 @@ mod tests {
             true
         }
 
-        fn execute(&self, _fork: &mut Fork) {}
+        fn execute(&self, _: &mut Fork) -> ExecutionResult {
+            Ok(())
+        }
     }
 
     struct HandleCommitService;
 
     impl Service for HandleCommitService {
-        fn service_name(&self) -> &'static str {
+        fn service_name(&self) -> &str {
             "handle_commit"
         }
 
@@ -817,15 +843,8 @@ mod tests {
         }
 
         fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
-            let tx: Box<Transaction> = match raw.message_type() {
-                TX_AFTER_COMMIT_ID => Box::new(TxAfterCommit::from_raw(raw)?),
-                _ => {
-                    return Err(encoding::Error::IncorrectMessageType {
-                        message_type: raw.message_type(),
-                    });
-                }
-            };
-            Ok(tx)
+            let tx = HandleCommitTransactions::tx_from_raw(raw)?;
+            Ok(tx.into())
         }
 
         fn handle_commit(&self, context: &ServiceContext) {
@@ -843,13 +862,20 @@ mod tests {
     fn test_sandbox_recv_and_send() {
         let s = timestamping_sandbox();
         let (public, secret) = gen_keypair();
-        s.recv(&Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
+        s.recv(&Connect::new(
+            &public,
+            s.a(VALIDATOR_2),
+            s.time(),
+            &user_agent::get(),
+            &secret,
+        ));
         s.send(
             s.a(VALIDATOR_2),
             &Connect::new(
                 &s.p(VALIDATOR_0),
                 s.a(VALIDATOR_0),
                 s.time(),
+                &user_agent::get(),
                 s.s(VALIDATOR_0),
             ),
         );
@@ -876,6 +902,7 @@ mod tests {
                 &s.p(VALIDATOR_0),
                 s.a(VALIDATOR_0),
                 s.time(),
+                &user_agent::get(),
                 s.s(VALIDATOR_0),
             ),
         );
@@ -886,13 +913,20 @@ mod tests {
     fn test_sandbox_expected_to_send_another_message() {
         let s = timestamping_sandbox();
         let (public, secret) = gen_keypair();
-        s.recv(&Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
+        s.recv(&Connect::new(
+            &public,
+            s.a(VALIDATOR_2),
+            s.time(),
+            &user_agent::get(),
+            &secret,
+        ));
         s.send(
             s.a(VALIDATOR_1),
             &Connect::new(
                 &s.p(VALIDATOR_0),
                 s.a(VALIDATOR_0),
                 s.time(),
+                &user_agent::get(),
                 s.s(VALIDATOR_0),
             ),
         );
@@ -903,7 +937,13 @@ mod tests {
     fn test_sandbox_unexpected_message_when_drop() {
         let s = timestamping_sandbox();
         let (public, secret) = gen_keypair();
-        s.recv(&Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
+        s.recv(&Connect::new(
+            &public,
+            s.a(VALIDATOR_2),
+            s.time(),
+            &user_agent::get(),
+            &secret,
+        ));
     }
 
     #[test]
@@ -911,8 +951,20 @@ mod tests {
     fn test_sandbox_unexpected_message_when_handle_another_message() {
         let s = timestamping_sandbox();
         let (public, secret) = gen_keypair();
-        s.recv(&Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
-        s.recv(&Connect::new(&public, s.a(VALIDATOR_3), s.time(), &secret));
+        s.recv(&Connect::new(
+            &public,
+            s.a(VALIDATOR_2),
+            s.time(),
+            &user_agent::get(),
+            &secret,
+        ));
+        s.recv(&Connect::new(
+            &public,
+            s.a(VALIDATOR_3),
+            s.time(),
+            &user_agent::get(),
+            &secret,
+        ));
         panic!("Oops! We don't catch unexpected message");
     }
 
@@ -921,7 +973,13 @@ mod tests {
     fn test_sandbox_unexpected_message_when_time_changed() {
         let s = timestamping_sandbox();
         let (public, secret) = gen_keypair();
-        s.recv(&Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
+        s.recv(&Connect::new(
+            &public,
+            s.a(VALIDATOR_2),
+            s.time(),
+            &user_agent::get(),
+            &secret,
+        ));
         s.add_time(Duration::from_millis(1000));
         panic!("Oops! We don't catch unexpected message");
     }

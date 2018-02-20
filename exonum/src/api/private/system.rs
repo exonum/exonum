@@ -17,10 +17,9 @@ use std::collections::HashMap;
 
 use router::Router;
 use iron::prelude::*;
-use params::{Params, Value as ParamsValue};
 
 use crypto::PublicKey;
-use node::ApiSender;
+use node::{ExternalMessage, ApiSender};
 use blockchain::{Service, Blockchain, SharedNodeState};
 use api::{Api, ApiError};
 use messages::{TEST_NETWORK_ID, PROTOCOL_MAJOR_VERSION};
@@ -65,7 +64,6 @@ impl NodeInfo {
 struct ReconnectInfo {
     delay: u64,
 }
-
 
 #[derive(Serialize)]
 #[serde(tag = "type")]
@@ -117,7 +115,7 @@ impl SystemApi {
         }
     }
 
-    fn get_peers_info(&self) -> PeersInfo {
+    fn peers_info(&self) -> PeersInfo {
         let mut outgoing_connections: HashMap<SocketAddr, IncomingConnection> = HashMap::new();
 
         for socket in self.shared_api_state.outgoing_connections() {
@@ -144,13 +142,17 @@ impl SystemApi {
         }
     }
 
-    fn get_network_info(&self) -> NodeInfo {
+    fn network_info(&self) -> NodeInfo {
         self.info.clone()
     }
 
-    fn peer_add(&self, ip_str: &str) -> Result<(), ApiError> {
-        let addr: SocketAddr = ip_str.parse()?;
-        self.node_channel.peer_add(addr)?;
+    fn is_consensus_enabled(&self) -> bool {
+        self.shared_api_state.is_enabled()
+    }
+
+    fn set_consensus_enabled(&self, enabled: bool) -> Result<(), ApiError> {
+        let message = ExternalMessage::Enable(enabled);
+        self.node_channel.send_external_message(message)?;
         Ok(())
     }
 }
@@ -160,34 +162,48 @@ impl Api for SystemApi {
 
         let self_ = self.clone();
         let peer_add = move |req: &mut Request| -> IronResult<Response> {
-            let map = req.get_ref::<Params>().unwrap();
-            match map.find(&["ip"]) {
-                Some(&ParamsValue::String(ref ip_str)) => {
-                    self_.peer_add(ip_str)?;
-                    self_.ok_response(&::serde_json::to_value("Ok").unwrap())
-                }
-                _ => {
-                    Err(ApiError::IncorrectRequest(
-                        "Required parameter of peer 'ip' is missing".into(),
-                    ))?
-                }
-            }
+            let addr: SocketAddr = self_.required_param(req, "ip")?;
+            self_.node_channel.peer_add(addr).map_err(ApiError::from)?;
+            self_.ok_response(&::serde_json::to_value("Ok").unwrap())
         };
 
         let self_ = self.clone();
         let peers_info = move |_: &mut Request| -> IronResult<Response> {
-            let info = self_.get_peers_info();
+            let info = self_.peers_info();
             self_.ok_response(&::serde_json::to_value(info).unwrap())
         };
 
         let self_ = self.clone();
         let network = move |_: &mut Request| -> IronResult<Response> {
-            let info = self_.get_network_info();
+            let info = self_.network_info();
             self_.ok_response(&::serde_json::to_value(info).unwrap())
+        };
+
+        let self_ = self.clone();
+        let consensus_enabled_info = move |_: &mut Request| -> IronResult<Response> {
+            let info = self_.is_consensus_enabled();
+            self_.ok_response(&::serde_json::to_value(info).unwrap())
+        };
+
+        let self_ = self.clone();
+        let consensus_enabled_set = move |req: &mut Request| -> IronResult<Response> {
+            let enabled: bool = self_.required_param(req, "enabled")?;
+            self_.set_consensus_enabled(enabled)?;
+            self_.ok_response(&::serde_json::to_value("Ok").unwrap())
         };
 
         router.get("/v1/peers", peers_info, "peers_info");
         router.post("/v1/peers", peer_add, "peer_add");
         router.get("/v1/network", network, "network_info");
+        router.get(
+            "/v1/consensus_enabled",
+            consensus_enabled_info,
+            "consensus_enabled_info",
+        );
+        router.post(
+            "/v1/consensus_enabled",
+            consensus_enabled_set,
+            "consensus_enabled_set",
+        );
     }
 }

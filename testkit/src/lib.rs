@@ -24,7 +24,7 @@
 //! extern crate serde_json;
 //!
 //! use exonum::crypto::{gen_keypair, Hash, PublicKey, CryptoHash};
-//! use exonum::blockchain::{Block, Schema, Service, Transaction};
+//! use exonum::blockchain::{Block, Schema, Service, Transaction, TransactionSet, ExecutionResult};
 //! use exonum::messages::{Message, RawTransaction};
 //! use exonum::storage::{Snapshot, Fork};
 //! use exonum::encoding;
@@ -33,15 +33,15 @@
 //! // Simple service implementation.
 //!
 //! const SERVICE_ID: u16 = 1;
-//! const TX_TIMESTAMP_ID: u16 = 1;
 //!
-//! message! {
-//!     struct TxTimestamp {
-//!         const TYPE = SERVICE_ID;
-//!         const ID = TX_TIMESTAMP_ID;
+//! transactions! {
+//!     TimestampingTransactions {
+//!         const SERVICE_ID = SERVICE_ID;
 //!
-//!         from: &PublicKey,
-//!         msg: &str,
+//!         struct TxTimestamp {
+//!             from: &PublicKey,
+//!             msg: &str,
+//!         }
 //!     }
 //! }
 //!
@@ -52,11 +52,13 @@
 //!         self.verify_signature(self.from())
 //!     }
 //!
-//!     fn execute(&self, _fork: &mut Fork) {}
+//!     fn execute(&self, _fork: &mut Fork) -> ExecutionResult {
+//!         Ok(())
+//!     }
 //! }
 //!
 //! impl Service for TimestampingService {
-//!     fn service_name(&self) -> &'static str {
+//!     fn service_name(&self) -> &str {
 //!         "timestamping"
 //!     }
 //!
@@ -69,15 +71,8 @@
 //!     }
 //!
 //!     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
-//!         let trans: Box<Transaction> = match raw.message_type() {
-//!             TX_TIMESTAMP_ID => Box::new(TxTimestamp::from_raw(raw)?),
-//!             _ => {
-//!                 return Err(encoding::Error::IncorrectMessageType {
-//!                     message_type: raw.message_type(),
-//!                 });
-//!             }
-//!         };
-//!         Ok(trans)
+//!         let tx = TimestampingTransactions::tx_from_raw(raw)?;
+//!         Ok(tx.into())
 //!     }
 //! }
 //!
@@ -115,7 +110,7 @@
 //!     let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10");
 //!     assert_eq!(blocks.len(), 3);
 //!     api.get::<serde_json::Value>(
-//!         ApiKind::System,
+//!         ApiKind::Explorer,
 //!         &format!("v1/transactions/{}", tx1.hash().to_string()),
 //!     );
 //! }
@@ -380,7 +375,7 @@ impl From<TestNode> for ValidatorKeys {
 /// # use exonum_testkit::TestKitBuilder;
 /// # pub struct MyService;
 /// # impl Service for MyService {
-/// #    fn service_name(&self) -> &'static str {
+/// #    fn service_name(&self) -> &str {
 /// #        "documentation"
 /// #    }
 /// #    fn state_hash(&self, _: &exonum::storage::Snapshot) -> Vec<exonum::crypto::Hash> {
@@ -595,7 +590,8 @@ impl TestKit {
                                 .insert(tx.hash(), tx);
                         }
                     }
-                    ExternalMessage::PeerAdd(_) => { /* Ignored */ }
+                    ExternalMessage::PeerAdd(_) |
+                    ExternalMessage::Enable(_) => { /* Ignored */ }
                 }
                 Ok(())
             }))
@@ -646,7 +642,7 @@ impl TestKit {
     /// ```
     /// # #[macro_use] extern crate exonum;
     /// # #[macro_use] extern crate exonum_testkit;
-    /// # use exonum::blockchain::{Service, Transaction};
+    /// # use exonum::blockchain::{Service, Transaction, ExecutionResult};
     /// # use exonum::messages::RawTransaction;
     /// # use exonum::encoding;
     /// # use exonum_testkit::{TestKit, TestKitBuilder};
@@ -654,7 +650,7 @@ impl TestKit {
     /// # type FromRawResult = Result<Box<Transaction>, encoding::Error>;
     /// # pub struct MyService;
     /// # impl Service for MyService {
-    /// #    fn service_name(&self) -> &'static str {
+    /// #    fn service_name(&self) -> &str {
     /// #        "documentation"
     /// #    }
     /// #    fn state_hash(&self, _: &exonum::storage::Snapshot) -> Vec<exonum::crypto::Hash> {
@@ -668,17 +664,19 @@ impl TestKit {
     /// #    }
     /// # }
     /// #
-    /// # message! {
-    /// #     struct MyTransaction {
-    /// #         const TYPE = 0;
-    /// #         const ID = 0;
-    /// #         from: &exonum::crypto::PublicKey,
-    /// #         msg: &str,
+    /// # transactions! {
+    /// #     Transactions {
+    /// #         const SERVICE_ID = 0;
+    /// #
+    /// #         struct MyTransaction {
+    /// #             from: &exonum::crypto::PublicKey,
+    /// #             msg: &str,
+    /// #         }
     /// #     }
     /// # }
     /// # impl Transaction for MyTransaction {
     /// #     fn verify(&self) -> bool { true }
-    /// #     fn execute(&self, _: &mut exonum::storage::Fork) {}
+    /// #     fn execute(&self, _: &mut exonum::storage::Fork) -> ExecutionResult { Ok(()) }
     /// # }
     /// #
     /// # fn expensive_setup(_: &mut TestKit) {}

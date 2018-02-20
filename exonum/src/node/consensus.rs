@@ -28,6 +28,14 @@ impl NodeHandler {
     /// Validates consensus message, then redirects it to the corresponding `handle_...` function.
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_consensus(&mut self, msg: ConsensusMessage) {
+        if !self.is_enabled {
+            info!(
+                "Ignoring a consensus message {:?} because the node is disabled",
+                msg
+            );
+            return;
+        }
+
         // Ignore messages from previous and future height
         if msg.height() < self.state.height() || msg.height() > self.state.height().next() {
             warn!(
@@ -693,7 +701,7 @@ impl NodeHandler {
                 self.state.consensus_secret_key(),
             );
             trace!("Broadcast propose: {:?}", propose);
-            self.broadcast(&propose);
+            self.broadcast(propose.raw());
 
             // Save our propose into state
             let hash = self.state.add_self_propose(propose);
@@ -881,7 +889,7 @@ impl NodeHandler {
         );
         let has_majority_prevotes = self.state.add_prevote(&prevote);
         trace!("Broadcast prevote: {:?}", prevote);
-        self.broadcast(&prevote);
+        self.broadcast(prevote.raw());
         has_majority_prevotes
     }
 
@@ -901,7 +909,7 @@ impl NodeHandler {
         );
         self.state.add_precommit(&precommit);
         trace!("Broadcast precommit: {:?}", precommit);
-        self.broadcast(&precommit);
+        self.broadcast(precommit.raw());
     }
 
     /// Checks that pre-commits count is correct and calls `verify_precommit` for each of them.

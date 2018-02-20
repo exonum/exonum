@@ -14,6 +14,8 @@
 
 // spell-checker:ignore precommiters, uncommented, uncomment, commited
 
+#[macro_use]
+extern crate pretty_assertions;
 extern crate rand;
 extern crate exonum;
 extern crate sandbox;
@@ -33,7 +35,7 @@ use exonum::crypto::{CryptoHash, Hash, Seed, gen_keypair, gen_keypair_from_seed}
 use exonum::blockchain::{Blockchain, Schema};
 use exonum::node::state::{PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT,
                           TRANSACTIONS_REQUEST_TIMEOUT};
-use exonum::helpers::{Height, Round};
+use exonum::helpers::{Height, Round, user_agent};
 
 use sandbox::timestamping::{TimestampTx, TimestampingTxGenerator, TIMESTAMPING_SERVICE};
 use sandbox::timestamping_sandbox;
@@ -183,6 +185,54 @@ fn test_reach_thirteen_height() {
 }
 
 #[test]
+fn test_disable_and_enable() {
+    let mut sandbox = timestamping_sandbox();
+    let sandbox_state = SandboxState::new();
+
+    sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
+    try_add_one_height(&sandbox, &sandbox_state).unwrap();
+    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+
+    // Disable the node.
+    let message = exonum::node::ExternalMessage::Enable(false);
+    sandbox
+        .node_handler_mut()
+        .channel
+        .api_requests
+        .send(message)
+        .unwrap();
+    sandbox.process_events();
+
+    // Save the current time to "rewind" sandbox to it later.
+    let time_saved = sandbox.time();
+
+    // A fail is expected here as the node is disabled.
+    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    let result = try_add_one_height(&sandbox, &sandbox_state);
+    assert!(result.is_err());
+
+    // Re-enable the node.
+    let message = exonum::node::ExternalMessage::Enable(true);
+    sandbox
+        .node_handler_mut()
+        .channel
+        .api_requests
+        .send(message)
+        .unwrap();
+    sandbox.process_events();
+
+    // Check if the node is still at the same height and round.
+    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+
+    // Reset the time.
+    sandbox.set_time(time_saved);
+
+    // The node should work fine now
+    try_add_one_height(&sandbox, &sandbox_state).unwrap();
+    sandbox.assert_state(HEIGHT_THREE, ROUND_ONE);
+}
+
+#[test]
 fn test_query_state_hash() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
@@ -264,8 +314,8 @@ fn should_restore_peers_after_restart() {
     let (p1, s1, a1) = (sandbox.p(v1), sandbox.s(v1).clone(), sandbox.a(v1));
 
     let time = sandbox.time();
-    let connect_from_0 = Connect::new(&p0, a0, time, &s0);
-    let connect_from_1 = Connect::new(&p1, a1, time, &s1);
+    let connect_from_0 = Connect::new(&p0, a0, time, &user_agent::get(), &s0);
+    let connect_from_1 = Connect::new(&p1, a1, time, &user_agent::get(), &s1);
     let peers_request = PeersRequest::new(&p1, &p0, &s1);
 
     // check that peers are absent
@@ -380,6 +430,7 @@ fn test_queue_propose_message_from_next_height() {
     let block_at_first_height = BlockBuilder::new(&sandbox)
         .with_proposer_id(VALIDATOR_0)
         .with_tx_hash(&tx.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
     let future_propose = Propose::new(VALIDATOR_0,
@@ -684,7 +735,10 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
         .with_tx_hashes(&[tx.hash()]) //ordinary propose, but with this unreceived tx
         .build();
 
-    let block = BlockBuilder::new(&sandbox).with_tx_hash(&tx.hash()).build();
+    let block = BlockBuilder::new(&sandbox)
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .with_tx_hash(&tx.hash())
+        .build();
 
     let precommit_1 = Precommit::new(
         VALIDATOR_1,
@@ -1282,6 +1336,7 @@ fn lock_to_propose_and_send_prevote() {
     let block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.round_timeout() + sandbox.propose_timeout())
         .with_tx_hash(&tx.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
     sandbox.recv(&propose);
@@ -1499,6 +1554,7 @@ fn handle_precommit_positive_scenario_commit() {
     let block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
         .with_tx_hash(&tx.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
     let precommit_1 = Precommit::new(
@@ -1899,6 +1955,7 @@ fn commit_using_unknown_propose_with_precommits() {
     let block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
         .with_tx_hash(&tx.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
     let precommit_1 = Precommit::new(
@@ -2191,7 +2248,6 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     // create some tx
     let tx = gen_timestamping_tx();
 
-
     // Precommits with this block will be received during get 1st height in
     // fn add_one_height_with_transaction()
     let first_block = BlockBuilder::new(&sandbox)
@@ -2200,6 +2256,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
         )
         .with_proposer_id(VALIDATOR_0)
         .with_tx_hash(&tx.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
     // this propose will be used during second commit
@@ -2221,6 +2278,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
             2 * sandbox.propose_timeout() + 2 * sandbox.round_timeout() + 1,
         )
         .with_prev_hash(&first_block.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
 
@@ -2347,6 +2405,7 @@ fn commit_as_leader_send_propose_round_timeout() {
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
         .with_prev_hash(&sandbox_state.accepted_block_hash.borrow())
         .with_tx_hash(&tx.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
     let precommit_1 = Precommit::new(
@@ -2563,6 +2622,7 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
     let block = BlockBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.propose_timeout())
         .with_tx_hash(&tx.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
 
     let precommit_1 = Precommit::new(

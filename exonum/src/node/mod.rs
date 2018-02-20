@@ -36,14 +36,14 @@ use futures::{Future, Sink};
 use futures::sync::mpsc;
 use tokio_core::reactor::Core;
 
-use crypto::{self, Hash, PublicKey, SecretKey};
+use crypto::{self, Hash, CryptoHash, PublicKey, SecretKey};
 use blockchain::{Blockchain, GenesisConfig, Schema, SharedNodeState, Transaction, Service};
 use api::{private, public, Api};
 use messages::{Connect, Message, RawMessage};
 use events::{NetworkRequest, TimeoutRequest, NetworkEvent, InternalRequest, InternalEvent,
              SyncSender, HandlerPart, NetworkConfiguration, NetworkPart, InternalPart};
 use events::error::{into_other, other_error, LogError, log_error};
-use helpers::{Height, Milliseconds, Round, ValidatorId};
+use helpers::{Height, Milliseconds, Round, ValidatorId, user_agent};
 use storage::Database;
 
 pub use self::state::{RequestData, State, TxPool, ValidatorState};
@@ -64,6 +64,8 @@ pub enum ExternalMessage {
     PeerAdd(SocketAddr),
     /// Transaction that implements the `Transaction` trait.
     Transaction(Box<Transaction>),
+    /// Enable or disable the node.
+    Enable(bool),
 }
 
 /// Node timeout types.
@@ -111,6 +113,8 @@ pub struct NodeHandler {
     /// Known peer addresses.
     // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
+    /// Does this node participate in the consensus?
+    is_enabled: bool,
 }
 
 /// Service configuration.
@@ -400,6 +404,7 @@ impl NodeHandler {
             &config.listener.consensus_public_key,
             external_address,
             system_state.current_time(),
+            &user_agent::get(),
             &config.listener.consensus_secret_key,
         );
 
@@ -431,6 +436,7 @@ impl NodeHandler {
             state,
             channel: sender,
             peer_discovery: config.peer_discovery,
+            is_enabled: true,
         }
     }
 
@@ -506,7 +512,7 @@ impl NodeHandler {
         if let Some(conn) = self.state.peers().get(&public_key) {
             let address = conn.addr();
             trace!("Send to address: {}", address);
-            let request = NetworkRequest::SendMessage(address, message.raw().clone());
+            let request = NetworkRequest::SendMessage(address, message.clone());
             self.channel.network_requests.send(request).log_error();
         } else {
             warn!("Hasn't connection with peer {:?}", public_key);
@@ -521,11 +527,11 @@ impl NodeHandler {
     }
 
     /// Broadcasts given message to all peers.
-    pub fn broadcast(&mut self, message: &Message) {
+    pub fn broadcast(&mut self, message: &RawMessage) {
         for conn in self.state.peers().values() {
             let address = conn.addr();
             trace!("Send to address: {}", address);
-            let request = NetworkRequest::SendMessage(address, message.raw().clone());
+            let request = NetworkRequest::SendMessage(address, message.clone());
             self.channel.network_requests.send(request).log_error();
         }
     }
@@ -650,7 +656,12 @@ impl ApiSender {
     /// Add peer to peer list
     pub fn peer_add(&self, addr: SocketAddr) -> io::Result<()> {
         let msg = ExternalMessage::PeerAdd(addr);
-        self.0.clone().send(msg).wait().map(drop).map_err(
+        self.send_external_message(msg)
+    }
+
+    /// Sends an external message.
+    pub fn send_external_message(&self, message: ExternalMessage) -> io::Result<()> {
+        self.0.clone().send(message).wait().map(drop).map_err(
             into_other,
         )
     }
@@ -663,9 +674,7 @@ impl TransactionSend for ApiSender {
             return Err(io::Error::new(io::ErrorKind::Other, msg));
         }
         let msg = ExternalMessage::Transaction(tx);
-        self.0.clone().send(msg).wait().map(drop).map_err(
-            into_other,
-        )
+        self.send_external_message(msg)
     }
 }
 
@@ -948,7 +957,7 @@ pub fn create_public_api_handler(
 
     if config.enable_blockchain_explorer {
         let mut router = Router::new();
-        let explorer_api = public::ExplorerApi::new(blockchain.clone());
+        let explorer_api = public::ExplorerApi::new(Arc::clone(&pool), blockchain.clone());
         explorer_api.wire(&mut router);
         mount.mount("api/explorer", router);
     }

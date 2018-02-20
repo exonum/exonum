@@ -18,7 +18,8 @@ extern crate bodyparser;
 extern crate iron;
 extern crate router;
 
-use exonum::blockchain::{ApiContext, Blockchain, Service, Transaction};
+use exonum::blockchain::{ApiContext, Blockchain, Service, Transaction, TransactionSet,
+                         ExecutionResult};
 use exonum::messages::{Message, RawTransaction};
 use exonum::node::{ApiSender, TransactionSend};
 use exonum::storage::{Entry, Fork, Snapshot};
@@ -31,7 +32,6 @@ use self::router::Router;
 use serde_json;
 
 const SERVICE_ID: u16 = 1;
-const TX_INCREMENT_ID: u16 = 1;
 
 // "correct horse battery staple" brainwallet pubkey in Ed25519 with SHA-256 digest
 pub const ADMIN_KEY: &str = "506f27b1b4c2403f2602d663a059b0262afd6a5bcda95a08dd96a4614a89f1b0";
@@ -74,13 +74,18 @@ impl<'a> CounterSchema<&'a mut Fork> {
 
 // // // // Transactions // // // //
 
-message! {
-    struct TxIncrement {
-        const TYPE = SERVICE_ID;
-        const ID = TX_INCREMENT_ID;
+transactions! {
+    CounterTransactions {
+        const SERVICE_ID = SERVICE_ID;
 
-        author: &PublicKey,
-        by: u64,
+        struct TxIncrement {
+            author: &PublicKey,
+            by: u64,
+        }
+
+        struct TxReset {
+            author: &PublicKey,
+        }
     }
 }
 
@@ -89,18 +94,10 @@ impl Transaction for TxIncrement {
         self.verify_signature(self.author())
     }
 
-    fn execute(&self, fork: &mut Fork) {
+    fn execute(&self, fork: &mut Fork) -> ExecutionResult {
         let mut schema = CounterSchema::new(fork);
         schema.inc_count(self.by());
-    }
-}
-
-message! {
-    struct TxReset {
-        const TYPE = SERVICE_ID;
-        const ID = TX_INCREMENT_ID;
-
-        author: &PublicKey,
+        Ok(())
     }
 }
 
@@ -116,9 +113,10 @@ impl Transaction for TxReset {
         self.verify_author() && self.verify_signature(self.author())
     }
 
-    fn execute(&self, fork: &mut Fork) {
+    fn execute(&self, fork: &mut Fork) -> ExecutionResult {
         let mut schema = CounterSchema::new(fork);
         schema.set_count(0);
+        Ok(())
     }
 }
 
@@ -145,8 +143,8 @@ impl CounterApi {
                 let json = TransactionResponse { tx_hash };
                 self.ok_response(&serde_json::to_value(&json).unwrap())
             }
-            Ok(None) => Err(ApiError::IncorrectRequest("Empty request body".into()))?,
-            Err(e) => Err(ApiError::IncorrectRequest(Box::new(e)))?,
+            Ok(None) => Err(ApiError::BadRequest("Empty request body".into()))?,
+            Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
         }
     }
 
@@ -170,8 +168,8 @@ impl CounterApi {
                 let json = TransactionResponse { tx_hash };
                 self.ok_response(&serde_json::to_value(&json).unwrap())
             }
-            Ok(None) => Err(ApiError::IncorrectRequest("Empty request body".into()))?,
-            Err(e) => Err(ApiError::IncorrectRequest(Box::new(e)))?,
+            Ok(None) => Err(ApiError::BadRequest("Empty request body".into()))?,
+            Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
         }
     }
 
@@ -205,7 +203,7 @@ impl Api for CounterApi {
 pub struct CounterService;
 
 impl Service for CounterService {
-    fn service_name(&self) -> &'static str {
+    fn service_name(&self) -> &str {
         "counter"
     }
 
@@ -219,15 +217,8 @@ impl Service for CounterService {
 
     /// Implement a method to deserialize transactions coming to the node.
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
-        let trans: Box<Transaction> = match raw.message_type() {
-            TX_INCREMENT_ID => Box::new(TxIncrement::from_raw(raw)?),
-            _ => {
-                return Err(encoding::Error::IncorrectMessageType {
-                    message_type: raw.message_type(),
-                });
-            }
-        };
-        Ok(trans)
+        let tx = CounterTransactions::tx_from_raw(raw)?;
+        Ok(tx.into())
     }
 
     /// Create a REST `Handler` to process web requests to the node.

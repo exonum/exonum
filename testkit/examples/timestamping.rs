@@ -19,7 +19,7 @@ extern crate exonum_testkit;
 extern crate serde_json;
 
 use exonum::crypto::{gen_keypair, Hash, PublicKey, CryptoHash};
-use exonum::blockchain::{Block, Schema, Service, Transaction};
+use exonum::blockchain::{Block, Schema, Service, Transaction, TransactionSet, ExecutionResult};
 use exonum::messages::{Message, RawTransaction};
 use exonum::storage::{Fork, Snapshot};
 use exonum::encoding;
@@ -28,15 +28,15 @@ use exonum_testkit::{ApiKind, TestKitBuilder};
 // Simple service implementation.
 
 const SERVICE_ID: u16 = 512;
-const TX_TIMESTAMP_ID: u16 = 0;
 
-message! {
-    struct TxTimestamp {
-        const TYPE = SERVICE_ID;
-        const ID = TX_TIMESTAMP_ID;
+transactions! {
+    TimestampingServiceTransactions {
+        const SERVICE_ID = SERVICE_ID;
 
-        from: &PublicKey,
-        msg: &str,
+        struct TxTimestamp {
+            from: &PublicKey,
+            msg: &str,
+        }
     }
 }
 
@@ -47,11 +47,13 @@ impl Transaction for TxTimestamp {
         self.verify_signature(self.from())
     }
 
-    fn execute(&self, _fork: &mut Fork) {}
+    fn execute(&self, _fork: &mut Fork) -> ExecutionResult {
+        Ok(())
+    }
 }
 
 impl Service for TimestampingService {
-    fn service_name(&self) -> &'static str {
+    fn service_name(&self) -> &str {
         "timestamping"
     }
 
@@ -64,15 +66,8 @@ impl Service for TimestampingService {
     }
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
-        let trans: Box<Transaction> = match raw.message_type() {
-            TX_TIMESTAMP_ID => Box::new(TxTimestamp::from_raw(raw)?),
-            _ => {
-                return Err(encoding::Error::IncorrectMessageType {
-                    message_type: raw.message_type(),
-                });
-            }
-        };
-        Ok(trans)
+        let tx = TimestampingServiceTransactions::tx_from_raw(raw)?;
+        Ok(tx.into())
     }
 }
 
@@ -100,7 +95,7 @@ fn main() {
     let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10");
     assert_eq!(blocks.len(), 2);
     api.get::<serde_json::Value>(
-        ApiKind::System,
+        ApiKind::Explorer,
         &format!("v1/transactions/{}", tx1.hash().to_string()),
     );
 }

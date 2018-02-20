@@ -15,10 +15,10 @@ synchronously.
 """
 
 [badges]
-travis-ci = { repository = "exonum/exonum-testkit" }
+travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-exonum = { version = "0.5", path = "../exonum" }
+exonum = { version = "0.5.1", path = "../exonum" }
 bodyparser = "0.8.0"
 futures = "0.1.14"
 log = "0.4.1"
@@ -35,3 +35,4 @@ router = "0.6.0"
 bodyparser = "0.8.0"
 serde_derive = "1.0.0"
 rand = "0.4.2"
+pretty_assertions = "0.5.0"

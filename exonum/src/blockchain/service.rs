@@ -25,43 +25,13 @@ use iron::Handler;
 
 use crypto::{Hash, PublicKey, SecretKey};
 use storage::{Fork, Snapshot};
-use messages::{Message, RawTransaction};
+use messages::RawTransaction;
 use encoding::Error as MessageError;
-use encoding::serialize::json::ExonumJson;
 use node::{ApiSender, Node, State, TransactionSend};
 use blockchain::{Blockchain, ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use helpers::{Height, Milliseconds, ValidatorId};
+use super::transaction::Transaction;
 
-/// Transaction processing functionality for `Message`s allowing to apply authenticated, atomic,
-/// constraint-preserving groups of changes to the blockchain storage.
-///
-/// See also [the documentation page on transactions][doc:transactions].
-///
-/// [doc:transactions]: https://exonum.com/doc/architecture/transactions/
-pub trait Transaction: Message + ExonumJson + 'static {
-    /// Verifies the internal consistency of the transaction. `verify` should usually include
-    /// checking the message signature (via [`verify_signature`]) and, possibly,
-    /// other internal constraints. `verify` has no access to the blockchain state;
-    /// checks involving the blockchains state must be preformed in [`execute`](#tymethod.execute).
-    ///
-    /// If a transaction fails `verify`, it is considered incorrect and cannot be included into
-    /// any correct block proposal. Incorrect transactions are never included into the blockchain.
-    ///
-    /// *This method should not use external data, that is, it must be a pure function.*
-    ///
-    /// [`verify_signature`]: ../messages/trait.Message.html#method.verify_signature
-    fn verify(&self) -> bool;
-    /// Receives a fork of the current blockchain state and can modify it depending on the contents
-    /// of the transaction.
-    ///
-    /// # Notes
-    ///
-    /// - When programming `execute`, you should perform state-related checks before any changes
-    ///   to the state and return early if these checks fail.
-    /// - If the execute method of a transaction raises a panic, the changes made by the
-    ///   transaction are discarded, but it is still considered committed.
-    fn execute(&self, fork: &mut Fork);
-}
 
 /// A trait that describes business logic of a concrete service.
 ///
@@ -74,16 +44,14 @@ pub trait Transaction: Message + ExonumJson + 'static {
 /// ```
 /// #[macro_use] extern crate exonum;
 /// // Exports from `exonum` crate skipped
-/// # use exonum::blockchain::Service;
+/// # use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
 /// # use exonum::crypto::Hash;
-/// # use exonum::blockchain::Transaction;
-/// # use exonum::messages::{Message, RawTransaction};
+/// # use exonum::messages::{ServiceMessage, Message, RawTransaction};
 /// # use exonum::storage::{Fork, Snapshot};
 /// use exonum::encoding::Error as EncError;
 ///
 /// // Reused constants
 /// const SERVICE_ID: u16 = 8000;
-/// const MY_TRANSACTION_ID: u16 = 1;
 ///
 /// // Service schema
 /// struct MyServiceSchema<T> {
@@ -107,18 +75,29 @@ pub trait Transaction: Message + ExonumJson + 'static {
 /// }
 ///
 /// // Transaction definitions
-/// message! {
-///     struct MyTransaction {
-///         const TYPE = SERVICE_ID;
-///         const ID = MY_TRANSACTION_ID;
-///         // Transaction fields
+/// transactions! {
+///     MyTransactions {
+///         const SERVICE_ID = SERVICE_ID;
+///
+///         struct TxA {
+///             // Transaction fields
+///         }
+///
+///         struct TxB {
+///             // ...
+///         }
 ///     }
 /// }
 ///
-/// impl Transaction for MyTransaction {
+/// impl Transaction for TxA {
 ///     // Business logic implementation
 /// #   fn verify(&self) -> bool { true }
-/// #   fn execute(&self, fork: &mut Fork) { }
+/// #   fn execute(&self, fork: &mut Fork) -> ExecutionResult { Ok(()) }
+/// }
+///
+/// impl Transaction for TxB {
+/// #   fn verify(&self) -> bool { true }
+/// #   fn execute(&self, fork: &mut Fork) -> ExecutionResult { Ok(()) }
 /// }
 ///
 /// // Service
@@ -138,13 +117,8 @@ pub trait Transaction: Message + ExonumJson + 'static {
 ///     }
 ///
 ///     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, EncError> {
-///         let tx: Box<Transaction> = match raw.message_type() {
-///             MY_TRANSACTION_ID => Box::new(MyTransaction::from_raw(raw)?),
-///             _ => Err(EncError::IncorrectMessageType {
-///                 message_type: raw.message_type(),
-///             })?,
-///         };
-///         Ok(tx)
+///         let tx = MyTransactions::tx_from_raw(raw)?;
+///         Ok(tx.into())
 ///     }
 /// }
 /// # fn main() { }
@@ -159,7 +133,7 @@ pub trait Service: Send + Sync + 'static {
 
     /// A comprehensive string service name. Must be unique within the
     /// blockchain.
-    fn service_name(&self) -> &'static str;
+    fn service_name(&self) -> &str;
 
     /// Returns a list of root hashes of tables that determine the current state
     /// of the service database. These hashes are collected from all the services in a common
@@ -174,6 +148,21 @@ pub trait Service: Send + Sync + 'static {
     fn state_hash(&self, snapshot: &Snapshot) -> Vec<Hash>;
 
     /// Tries to create a `Transaction` from the given raw message.
+    ///
+    /// Exonum framework only guarantees that `SERVICE_ID` of the message is equal to the
+    /// identifier of this service, therefore the implementation should be ready to handle invalid
+    /// transactions that may come from byzantine nodes.
+    ///
+    /// Service should return an error in the following cases (see `MessageError` for more details):
+    /// - Incorrect transaction identifier.
+    /// - Incorrect data layout.
+    ///
+    /// Service _shouldn't_ perform signature check or logical validation of the transaction: these
+    /// operations should be performed in the `Transaction::verify` and `Transaction::execute`
+    /// methods.
+    ///
+    /// `transactions!` macro generates code that allows simple implementation, see
+    /// [the `Service` example above](#examples).
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError>;
 
     /// Initializes the information schema of the service
@@ -314,6 +303,7 @@ pub struct ApiNodeState {
     reconnects_timeout: HashMap<SocketAddr, Milliseconds>,
     //TODO: update on event?
     peers_info: HashMap<SocketAddr, PublicKey>,
+    is_enabled: bool,
 }
 
 impl ApiNodeState {
@@ -388,6 +378,18 @@ impl SharedNodeState {
                 .peers_info
                 .insert(c.addr(), *p);
         }
+    }
+
+    /// Is the node enabled?
+    pub fn is_enabled(&self) -> bool {
+        let state = self.state.read().expect("Expected read lock.");
+        state.is_enabled
+    }
+
+    /// Informs internal state about node's halting.
+    pub fn update_is_enabled(&self, is_enabled: bool) {
+        let mut state = self.state.write().expect("Expected read lock.");
+        state.is_enabled = is_enabled;
     }
 
     /// Returns value of the `state_update_timeout`.
@@ -524,11 +526,5 @@ impl ::std::fmt::Debug for ApiContext {
 impl<'a, S: Service> From<S> for Box<Service + 'a> {
     fn from(s: S) -> Self {
         Box::new(s) as Box<Service>
-    }
-}
-
-impl<'a, T: Transaction> From<T> for Box<Transaction + 'a> {
-    fn from(tx: T) -> Self {
-        Box::new(tx) as Box<Transaction>
     }
 }

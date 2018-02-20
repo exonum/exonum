@@ -14,42 +14,14 @@
 
 //! Loading and saving TOML-encoded configurations.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::io::{Read, Write};
 use std::fs::{self, File};
-use std::error::Error;
-use std::fmt;
 
+use serde::de::DeserializeOwned;
 use serde::{Serialize, Deserialize};
 use toml;
-
-#[derive(Debug)]
-struct DeserializeError {
-    path: PathBuf,
-    inner: toml::de::Error,
-}
-
-impl DeserializeError {
-    pub fn new(path: PathBuf, inner: toml::de::Error) -> Self {
-        Self { path, inner }
-    }
-}
-
-impl fmt::Display for DeserializeError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Could not read {}: {}", self.path.display(), self.inner)
-    }
-}
-
-impl Error for DeserializeError {
-    fn description(&self) -> &str {
-        "Could not read toml config."
-    }
-
-    fn cause(&self) -> Option<&Error> {
-        Some(&self.inner)
-    }
-}
+use failure::{Error, ResultExt};
 
 /// Implements loading and saving TOML-encoded configurations.
 #[derive(Debug)]
@@ -57,33 +29,46 @@ pub struct ConfigFile {}
 
 impl ConfigFile {
     /// Loads TOML-encoded file.
-    pub fn load<P, T>(path: P) -> Result<T, Box<Error>>
+    pub fn load<P, T>(path: P) -> Result<T, Error>
     where
         T: for<'r> Deserialize<'r>,
         P: AsRef<Path>,
     {
-        let mut file = File::open(path.as_ref())?;
-        let mut toml = String::new();
-        file.read_to_string(&mut toml)?;
-        toml::de::from_str(&toml).map_err(|e| {
-            Box::new(DeserializeError::new(path.as_ref().to_owned(), e)) as Box<Error>
-        })
+        let path = path.as_ref();
+        let res = do_load(path).context(format!(
+            "loading config from {}",
+            path.display()
+        ))?;
+        Ok(res)
     }
 
     /// Saves TOML-encoded file.
-    pub fn save<P, T>(value: &T, path: P) -> Result<(), Box<Error>>
+    pub fn save<P, T>(value: &T, path: P) -> Result<(), Error>
     where
         T: Serialize,
         P: AsRef<Path>,
     {
-        if let Some(dir) = path.as_ref().parent() {
-            fs::create_dir_all(dir)?;
-        }
-
-        let mut file = File::create(path.as_ref())?;
-        let value_toml = toml::Value::try_from(value)?;
-        file.write_all(&format!("{}", value_toml).into_bytes())?;
-
+        let path = path.as_ref();
+        do_save(value, path).with_context(|_| {
+            format!("saving config to {}", path.display())
+        })?;
         Ok(())
     }
+}
+
+fn do_load<T: DeserializeOwned>(path: &Path) -> Result<T, Error> {
+    let mut file = File::open(path)?;
+    let mut toml = String::new();
+    file.read_to_string(&mut toml)?;
+    Ok(toml::de::from_str(&toml)?)
+}
+
+fn do_save<T: Serialize>(value: &T, path: &Path) -> Result<(), Error> {
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir)?;
+    }
+    let mut file = File::create(path)?;
+    let value_toml = toml::Value::try_from(value)?;
+    file.write_all(value_toml.to_string().as_bytes())?;
+    Ok(())
 }

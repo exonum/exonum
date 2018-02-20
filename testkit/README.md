@@ -1,13 +1,15 @@
 # exonum-testkit
 
-[![Version][crates-io-image]][crates-io-url]
-[![Build status][travis-image]][travis-url]
-[![Build status][appveyor-image]][appveyor-url]
-[![Gitter][gitter-image]][gitter-url]
+[![Travis Build Status](https://img.shields.io/travis/exonum/exonum/master.svg?label=Linux%20Build)](https://travis-ci.org/exonum/exonum)
+![CircleCI Build Status](https://img.shields.io/circleci/project/github/exonum/exonum.svg?label=MacOS%20Build)
+[![Docs.rs](https://docs.rs/exonum-testkit/badge.svg)](https://docs.rs/exonum-testkit)
+[![License: Apache-2.0](https://img.shields.io/github/license/exonum/exonum.svg)](https://github.com/exonum/exonum/blob/master/LICENSE)
+![rust 1.23+ required](https://img.shields.io/badge/rust-1.23+-blue.svg?label=Required%20Rust)
 
-Testkit for Exonum blockchain is a framework that allows to test operation of the whole service.
-Specifically, it allows to test transaction execution and APIs in the synchronous environment
-(without consensus algorithm) and in the same system process.
+Testkit for Exonum blockchain is a framework that allows to test operation
+of the whole service. Specifically, it allows to test transaction execution
+and APIs in the synchronous environment (without consensus algorithm)
+and in the same system process.
 
 ## Usage
 
@@ -22,19 +24,11 @@ exonum-testkit = "0.5.0"
 
 ## Examples
 
-See the [**tests**](tests) and [**examples**](examples) folders for examples of building a
-service and then testing it with the testkit.
+See the [**tests**](tests) and [**examples**](examples) folders for examples
+of building a service and then testing it with the testkit.
 
 ## License
 
 Licensed under the Apache License (Version 2.0). See [LICENSE](LICENSE) for details.
 
-[travis-image]: https://travis-ci.org/exonum/exonum-testkit.svg?branch=master
-[travis-url]: https://travis-ci.org/exonum/exonum-testkit
-[appveyor-image]: https://ci.appveyor.com/api/projects/status/lhu2aykh9nyti78p/branch/master?svg=true
-[appveyor-url]: https://ci.appveyor.com/project/alekseysidorov/exonum-testkit/branch/master
-[gitter-image]: https://img.shields.io/gitter/room/exonum/exonum.svg
-[gitter-url]: https://gitter.im/exonum/exonum
-[crates-io-image]: https://img.shields.io/crates/v/exonum-testkit.svg
-[crates-io-url]: https://crates.io/crates/exonum-testkit
 [documentation]: https://exonum.com/doc/advanced/service-testing/

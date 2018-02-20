@@ -20,6 +20,7 @@
 use std::default::Default;
 use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
 use std::fmt;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use sodiumoxide::crypto::sign::ed25519::{gen_keypair as gen_keypair_sodium, keypair_from_seed,
                                          sign_detached, verify_detached,
@@ -543,6 +544,12 @@ impl Default for Hash {
     }
 }
 
+impl CryptoHash for bool {
+    fn hash(&self) -> Hash {
+        hash(&[*self as u8])
+    }
+}
+
 impl CryptoHash for u8 {
     fn hash(&self) -> Hash {
         hash(&[*self])
@@ -603,12 +610,48 @@ impl CryptoHash for i64 {
     }
 }
 
+const EMPTY_SLICE_HASH: Hash = Hash(DigestSodium(
+    [
+        227,
+        176,
+        196,
+        66,
+        152,
+        252,
+        28,
+        20,
+        154,
+        251,
+        244,
+        200,
+        153,
+        111,
+        185,
+        36,
+        39,
+        174,
+        65,
+        228,
+        100,
+        155,
+        147,
+        76,
+        164,
+        149,
+        153,
+        27,
+        120,
+        82,
+        184,
+        85,
+    ],
+));
+
 impl CryptoHash for () {
     fn hash(&self) -> Hash {
-        Hash::zero()
+        EMPTY_SLICE_HASH
     }
 }
-
 
 impl CryptoHash for Hash {
     fn hash(&self) -> Hash {
@@ -634,12 +677,27 @@ impl CryptoHash for String {
     }
 }
 
+impl CryptoHash for SystemTime {
+    fn hash(&self) -> Hash {
+        let duration = self.duration_since(UNIX_EPOCH).expect(
+            "time value is later than 1970-01-01 00:00:00 UTC.",
+        );
+        let secs = duration.as_secs();
+        let nanos = duration.subsec_nanos();
+
+        let mut buffer = [0u8; 12];
+        LittleEndian::write_u64(&mut buffer[0..8], secs);
+        LittleEndian::write_u32(&mut buffer[8..12], nanos);
+        hash(&buffer)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json;
     use encoding::serialize::FromHex;
     use super::{gen_keypair, hash, Hash, HashStream, PublicKey, SecretKey, Seed, SignStream,
-                Signature};
+                Signature, EMPTY_SLICE_HASH};
 
     #[test]
     fn test_hash() {
@@ -753,5 +811,10 @@ mod tests {
         let sig = creation_stream.sign(&sk);
         let mut verified_stream = SignStream::new().update(&data[..5]).update(&data[5..]);
         assert!(verified_stream.verify(&sig, &pk));
+    }
+
+    #[test]
+    fn test_empty_slice_hash() {
+        assert_eq!(EMPTY_SLICE_HASH, hash(&[]));
     }
 }
