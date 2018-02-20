@@ -24,12 +24,14 @@ extern crate serde_json;
 #[macro_use]
 extern crate pretty_assertions;
 
+use exonum::blockchain::Transaction;
 use exonum::crypto::{self, PublicKey, CryptoHash};
 use exonum::helpers::Height;
 use exonum::messages::Message;
 use exonum::encoding::serialize::FromHex;
 use exonum::encoding::serialize::json::ExonumJson;
 use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};
+use serde_json::Value;
 
 mod counter;
 use counter::{CounterSchema, CounterService, TransactionResponse, TxIncrement, TxReset, ADMIN_KEY};
@@ -495,7 +497,6 @@ fn test_explorer_transaction() {
     use exonum::explorer::BlockInfo;
     use exonum::helpers::Height;
     use exonum::storage::ListProof;
-    use serde_json::Value;
 
     /// Asserts that all properties from `sub` are equal to the corresponding properties
     /// in `obj`.
@@ -538,7 +539,7 @@ fn test_explorer_transaction() {
     }));
 
     testkit.create_block();
-    let info: serde_json::Value = api.get(
+    let info: Value = api.get(
         ApiKind::Explorer,
         &format!("v1/transactions/{}", &tx.hash().to_string()),
     );
@@ -551,7 +552,7 @@ fn test_explorer_transaction() {
                 "block_height": Height(1).serialize_field().unwrap(),
                 "position_in_block": "0",
             },
-            "status": "Success",
+            "status": { "type": "success" },
         }),
     );
 
@@ -569,4 +570,57 @@ fn test_explorer_transaction() {
     } else {
         panic!("Invalid transaction info format, object expected");
     }
+}
+
+#[test]
+fn test_explorer_transaction_statuses() {
+    fn assert_status(api: &TestKitApi, tx: &Transaction, expected_status: &Value) {
+        let info: Value = api.get(
+            ApiKind::Explorer,
+            &format!("v1/transactions/{}", &tx.hash().to_string()),
+        );
+        if let Value::Object(mut info) = info {
+            let tx_status = info.remove("status").unwrap();
+            assert_eq!(tx_status, *expected_status);
+        } else {
+            panic!("Invalid transaction info format, object expected");
+        }
+    }
+
+    let mut testkit = TestKitBuilder::validator()
+        .with_validators(4)
+        .with_service(CounterService)
+        .create();
+
+    let tx = {
+        let (pubkey, key) = crypto::gen_keypair();
+        TxIncrement::new(&pubkey, 5, &key)
+    };
+    let error_tx = {
+        let (pubkey, key) = crypto::gen_keypair();
+        TxIncrement::new(&pubkey, 0, &key)
+    };
+    let panicking_tx = {
+        let (pubkey, key) = crypto::gen_keypair();
+        TxIncrement::new(&pubkey, u64::max_value() - 3, &key)
+    };
+
+    testkit.create_block_with_transactions(txvec![
+        tx.clone(),
+        error_tx.clone(),
+        panicking_tx.clone(),
+    ]);
+
+    let api = testkit.api();
+    assert_status(&api, &tx, &json!({"type": "success"}));
+    assert_status(
+        &api,
+        &error_tx,
+        &json!({"type": "error", "code": 0, "description": "Adding zero does nothing!"}),
+    );
+    assert_status(
+        &api,
+        &panicking_tx,
+        &json!({"type": "panic", "description": ""}),
+    );
 }

@@ -19,7 +19,7 @@ extern crate iron;
 extern crate router;
 
 use exonum::blockchain::{ApiContext, Blockchain, Service, Transaction, TransactionSet,
-                         ExecutionResult};
+                         ExecutionError, ExecutionResult};
 use exonum::messages::{Message, RawTransaction};
 use exonum::node::{ApiSender, TransactionSend};
 use exonum::storage::{Entry, Fork, Snapshot};
@@ -95,6 +95,13 @@ impl Transaction for TxIncrement {
     }
 
     fn execute(&self, fork: &mut Fork) -> ExecutionResult {
+        if self.by() == 0 {
+            Err(ExecutionError::with_description(
+                0,
+                "Adding zero does nothing!".to_string(),
+            ))?;
+        }
+
         let mut schema = CounterSchema::new(fork);
         schema.inc_count(self.by());
         Ok(())
