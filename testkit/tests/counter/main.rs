@@ -19,6 +19,7 @@ extern crate exonum_testkit;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
 extern crate serde_json;
 #[macro_use]
 extern crate pretty_assertions;
@@ -491,16 +492,21 @@ fn test_explorer_single_block() {
 
 #[test]
 fn test_explorer_transaction() {
-    use exonum::explorer::{BlockInfo, TxInfo as CommittedTxInfo, TxStatus};
+    use exonum::explorer::BlockInfo;
     use exonum::helpers::Height;
+    use exonum::storage::ListProof;
+    use serde_json::Value;
 
-    // Analog of the structure defined by the system API handler.
-    #[derive(Deserialize)]
-    #[serde(rename_all = "kebab-case")]
-    enum TxInfo {
-        Unknown,
-        InPool { content: serde_json::Value },
-        Committed(CommittedTxInfo),
+    /// Asserts that all properties from `subobj` are equal to the corresponding properties
+    /// in `obj`.
+    fn assert_contains_all(obj: &Value, subobj: &Value) {
+        if let (&Value::Object(ref obj), &Value::Object(ref subobj)) = (obj, subobj) {
+            for (key, value) in subobj {
+                assert_eq!(obj.get(key), Some(value));
+            }
+        } else {
+            panic!("Two objects expected");
+        }
     }
 
     let mut testkit = TestKitBuilder::validator()
@@ -513,48 +519,54 @@ fn test_explorer_transaction() {
         let (pubkey, key) = crypto::gen_keypair();
         TxIncrement::new(&pubkey, 5, &key)
     };
-
-    let info: TxInfo = api.get_err(
+    let info: serde_json::Value = api.get_err(
         ApiKind::Explorer,
         &format!("v1/transactions/{}", &tx.hash().to_string()),
     );
-    match info {
-        TxInfo::Unknown => {}
-        _ => panic!("Transaction should be unknown to the node"),
-    }
+    assert_eq!(info, json!({ "type": "unknown" }));
 
     api.send(tx.clone());
     testkit.poll_events();
 
-    let info: TxInfo = api.get(
+    let info: serde_json::Value = api.get(
         ApiKind::Explorer,
         &format!("v1/transactions/{}", &tx.hash().to_string()),
     );
-    if let TxInfo::InPool { content } = info {
-        assert_eq!(content, tx.serialize_field().unwrap());
-    } else {
-        panic!("Transaction should be in the pool");
-    }
+    assert_eq!(info, json!({
+        "type": "in-pool",
+        "content": tx.serialize_field().unwrap(),
+    }));
 
     testkit.create_block();
-    let info: TxInfo = api.get(
+    let info: serde_json::Value = api.get(
         ApiKind::Explorer,
         &format!("v1/transactions/{}", &tx.hash().to_string()),
     );
-    if let TxInfo::Committed(info) = info {
-        assert_eq!(info.content, tx.serialize_field().unwrap());
-        assert_eq!(info.location.block_height(), Height(1));
-        assert_eq!(info.location.position_in_block(), 0);
-        assert_eq!(info.status, TxStatus::Success);
+    assert_contains_all(
+        &info,
+        &json!({
+            "type": "committed",
+            "content": tx.serialize_field().unwrap(),
+            "location": {
+                "block_height": Height(1).serialize_field().unwrap(),
+                "position_in_block": "0",
+            },
+            "status": "Success",
+        }),
+    );
 
+    if let Value::Object(mut info) = info {
+        let location_proof = info.remove("location_proof").unwrap();
+        let location_proof: ListProof<crypto::Hash> = serde_json::from_value(location_proof)
+            .unwrap();
         let block: BlockInfo = api.get(ApiKind::Explorer, "v1/blocks/1");
         let block = block.block;
         assert!(
-            info.location_proof
+            location_proof
                 .validate(*block.tx_hash(), u64::from(block.tx_count()))
                 .is_ok()
         );
     } else {
-        panic!("Transaction should be committed");
+        // Already proven false by `assert_contains_all`
     }
 }
