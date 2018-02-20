@@ -114,7 +114,7 @@ impl TestKitHandler for TestKit {
         let req = match req.get::<bodyparser::Struct<CreateBlockRequest>>() {
             Ok(Some(req)) => req,
             Ok(None) => CreateBlockRequest { tx_hashes: None },
-            Err(e) => Err(ApiError::IncorrectRequest(Box::new(e)))?,
+            Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
         };
 
         if let Some(tx_hashes) = req.tx_hashes {
@@ -123,12 +123,10 @@ impl TestKitHandler for TestKit {
                 tx_hashes.iter().find(|h| !mempool.contains_key(h))
             };
             if let Some(missing_tx) = maybe_missing_tx {
-                Err(ApiError::IncorrectRequest(
-                    format!(
-                        "Transaction not in mempool: {}",
-                        missing_tx.to_string()
-                    ).into(),
-                ))?;
+                Err(ApiError::BadRequest(format!(
+                    "Transaction not in mempool: {}",
+                    missing_tx.to_string()
+                )))?;
             }
             self.create_block_with_tx_hashes(&tx_hashes);
         } else {
@@ -146,17 +144,17 @@ impl TestKitHandler for TestKit {
         let height: u64 = match params.find("height") {
             Some(height_str) => {
                 height_str.parse().map_err(|e: ParseIntError| {
-                    ApiError::IncorrectRequest(Box::new(e))
+                    ApiError::BadRequest(e.to_string())
                 })?
             }
             None => {
-                Err(ApiError::IncorrectRequest(
-                    "Required request parameter is missing: height".into(),
+                Err(ApiError::BadRequest(
+                    "Required request parameter is missing: height".to_string(),
                 ))?
             }
         };
         if height == 0 {
-            Err(ApiError::IncorrectRequest(
+            Err(ApiError::BadRequest(
                 "Cannot rollback past genesis block".into(),
             ))?;
         }
