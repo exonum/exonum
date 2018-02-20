@@ -24,6 +24,7 @@ extern crate serde_json;
 extern crate pretty_assertions;
 
 use exonum::crypto::{self, PublicKey, CryptoHash};
+use exonum::blockchain::Transaction;
 use exonum::helpers::Height;
 use exonum::messages::Message;
 use exonum::encoding::serialize::FromHex;
@@ -557,4 +558,18 @@ fn test_explorer_transaction() {
     } else {
         panic!("Transaction should be committed");
     }
+}
+
+// Make sure that boxed transaction can be used in the `TestKitApi::send`.
+#[test]
+fn test_boxed_tx() {
+    let (mut testkit, api) = init_testkit();
+
+    let tx = {
+        let (pubkey, key) = crypto::gen_keypair();
+        Box::new(TxIncrement::new(&pubkey, 5, &key)) as Box<Transaction>
+    };
+
+    api.send(tx);
+    testkit.create_block();
 }
