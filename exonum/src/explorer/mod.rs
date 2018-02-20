@@ -191,7 +191,7 @@ impl<'a> BlockchainExplorer<'a> {
 
         // It is safe to do at least one iteration, because height >= 1.
         loop {
-            if genesis || (collected == count)  {
+            if genesis || (collected == count) {
                 break;
             }
             
@@ -203,15 +203,13 @@ impl<'a> BlockchainExplorer<'a> {
                 continue;
             }
             
-            let block_hash = hashes.get(height).expect(&format!(
-                "Block not found, height:{:?}",
-                height
-            ));
+            let block_hash = hashes
+                .get(height)
+                .expect(&format!("Block not found, height:{:?}", height));
             
-            let block = blocks.get(&block_hash).expect(&format!(
-                "Block not found, hash:{:?}",
-                block_hash
-            ));
+            let block = blocks
+                .get(&block_hash)
+                .expect(&format!("Block not found, hash:{:?}", block_hash));
             
             v.push(block);
             collected += 1;
