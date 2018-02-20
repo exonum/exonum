@@ -510,11 +510,7 @@ fn test_explorer_transaction() {
         }
     }
 
-    let mut testkit = TestKitBuilder::validator()
-        .with_validators(4)
-        .with_service(CounterService)
-        .create();
-    let api = testkit.api();
+    let (mut testkit, api) = init_testkit();
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -587,10 +583,7 @@ fn test_explorer_transaction_statuses() {
         }
     }
 
-    let mut testkit = TestKitBuilder::validator()
-        .with_validators(4)
-        .with_service(CounterService)
-        .create();
+    let (mut testkit, api) = init_testkit();
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -611,16 +604,15 @@ fn test_explorer_transaction_statuses() {
         panicking_tx.clone(),
     ]);
 
-    let api = testkit.api();
-    assert_status(&api, &tx, &json!({"type": "success"}));
+    assert_status(&api, &tx, &json!({ "type": "success" }));
     assert_status(
         &api,
         &error_tx,
-        &json!({"type": "error", "code": 0, "description": "Adding zero does nothing!"}),
+        &json!({ "type": "error", "code": 0, "description": "Adding zero does nothing!" }),
     );
     assert_status(
         &api,
         &panicking_tx,
-        &json!({"type": "panic", "description": ""}),
+        &json!({ "type": "panic", "description": "" }),
     );
 }

@@ -94,6 +94,8 @@ impl Transaction for TxIncrement {
         self.verify_signature(self.author())
     }
 
+    // This method purposely does not check counter overflow in order to test
+    // behavior of panicking transactions.
     fn execute(&self, fork: &mut Fork) -> ExecutionResult {
         if self.by() == 0 {
             Err(ExecutionError::with_description(
