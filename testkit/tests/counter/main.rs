@@ -497,12 +497,12 @@ fn test_explorer_transaction() {
     use exonum::storage::ListProof;
     use serde_json::Value;
 
-    /// Asserts that all properties from `subobj` are equal to the corresponding properties
+    /// Asserts that all properties from `sub` are equal to the corresponding properties
     /// in `obj`.
-    fn assert_contains_all(obj: &Value, subobj: &Value) {
-        if let (&Value::Object(ref obj), &Value::Object(ref subobj)) = (obj, subobj) {
-            for (key, value) in subobj {
-                assert_eq!(obj.get(key), Some(value));
+    fn assert_contains_all(obj: &Value, sub: &Value) {
+        if let (&Value::Object(ref obj), &Value::Object(ref sub)) = (obj, sub) {
+            for (key, value) in sub {
+                assert_eq!(obj[key], *value);
             }
         } else {
             panic!("Two objects expected");
@@ -519,7 +519,7 @@ fn test_explorer_transaction() {
         let (pubkey, key) = crypto::gen_keypair();
         TxIncrement::new(&pubkey, 5, &key)
     };
-    let info: serde_json::Value = api.get_err(
+    let info: Value = api.get_err(
         ApiKind::Explorer,
         &format!("v1/transactions/{}", &tx.hash().to_string()),
     );
@@ -528,7 +528,7 @@ fn test_explorer_transaction() {
     api.send(tx.clone());
     testkit.poll_events();
 
-    let info: serde_json::Value = api.get(
+    let info: Value = api.get(
         ApiKind::Explorer,
         &format!("v1/transactions/{}", &tx.hash().to_string()),
     );
