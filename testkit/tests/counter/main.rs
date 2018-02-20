@@ -446,7 +446,7 @@ fn test_explorer_blocks() {
     assert_eq!(blocks[0].height(), Height(5));
     assert_eq!(range.from, 5);
     assert_eq!(range.to, 5);
-    
+
     let response: BlocksRange = api.get(
         ApiKind::Explorer,
         "v1/blocks?count=3&skip_empty_blocks=true",
