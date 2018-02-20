@@ -21,7 +21,7 @@ use exonum::messages::{Message, RawTransaction};
 use exonum::node::State;
 use exonum::storage::{Fork, Snapshot};
 
-use errors::{CommonError, ProposeError, VoteError};
+use errors::Error as ServiceError;
 use schema::{MaybeVote, ProposeData, Schema};
 
 transactions! {
@@ -102,10 +102,9 @@ impl Propose {
     /// # Return value
     ///
     /// Configuration parsed from the transaction together with its hash.
-    fn precheck(&self, snapshot: &Snapshot) -> Result<(StoredConfiguration, Hash), ProposeError> {
+    fn precheck(&self, snapshot: &Snapshot) -> Result<(StoredConfiguration, Hash), ServiceError> {
         use exonum::storage::StorageValue;
-        use self::CommonError::*;
-        use self::ProposeError::*;
+        use self::ServiceError::*;
 
         let following_config = CoreSchema::new(snapshot).following_configuration();
         if let Some(following) = following_config {
@@ -133,8 +132,8 @@ impl Propose {
         &self,
         candidate: &StoredConfiguration,
         snapshot: &Snapshot,
-    ) -> Result<(), CommonError> {
-        use self::CommonError::*;
+    ) -> Result<(), ServiceError> {
+        use self::ServiceError::*;
 
         let actual_config = CoreSchema::new(snapshot).actual_configuration();
         if candidate.previous_cfg_hash != actual_config.hash() {
@@ -210,9 +209,8 @@ impl Vote {
     /// # Return value
     ///
     /// Returns a configuration this vote is for on success, or an error (if any).
-    fn precheck(&self, snapshot: &Snapshot) -> Result<StoredConfiguration, VoteError> {
-        use self::CommonError::*;
-        use self::VoteError::*;
+    fn precheck(&self, snapshot: &Snapshot) -> Result<StoredConfiguration, ServiceError> {
+        use self::ServiceError::*;
 
         let following_config = CoreSchema::new(snapshot).following_configuration();
         if let Some(following) = following_config {

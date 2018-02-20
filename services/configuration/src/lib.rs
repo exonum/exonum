@@ -94,7 +94,7 @@ mod schema;
 mod tests;
 mod transactions;
 
-pub use errors::{ProposeErrorCode, VoteErrorCode};
+pub use errors::ErrorCode;
 pub use schema::{MaybeVote, Schema, ProposeData};
 pub use transactions::{Propose, Vote};
 
