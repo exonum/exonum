@@ -567,6 +567,6 @@ fn test_explorer_transaction() {
                 .is_ok()
         );
     } else {
-        // Already proven false by `assert_contains_all`
+        panic!("Invalid transaction info format, object expected");
     }
 }
