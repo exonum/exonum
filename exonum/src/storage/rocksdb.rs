@@ -145,7 +145,7 @@ impl Snapshot for RocksDBSnapshot {
     }
 }
 
-impl<'a> Iterator for RocksDBIterator {
+impl Iterator for RocksDBIterator {
     fn next(&mut self) -> Option<(&[u8], &[u8])> {
         let _p = ProfilerSpan::new("RocksDBIterator::next");
         if let Some((key, value)) = self.iter.next() {

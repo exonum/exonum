@@ -88,6 +88,7 @@ jobs:
     - ./node_modules/.bin/cspell testkit/{src,examples,tests}/**/*.rs
     - ./node_modules/.bin/cspell services/configuration/{src,examples}/**/*.rs
     - ./node_modules/.bin/cspell services/time/{src,examples,tests}/**/*.rs
+    - ./node_modules/.bin/cspell examples/cryptocurrency/{src,examples,tests}/**/*.rs
     - find . -not -path "./3rdparty/*" -and -not -path "./node_modules/*" -name "*.md" | xargs ./node_modules/.bin/cspell
     - find . -not -path "./3rdparty/*" -and -not -path "./node_modules/*" -name "*.md" | xargs ./node_modules/.bin/markdownlint --config .markdownlintrc
 
@@ -116,13 +117,11 @@ jobs:
   # Non-fatal checks
   - env: FEATURE=non-fatal-checks
     install:
-    - cargo-outdated -V | grep $OUTDATED_VERS || cargo install cargo-outdated --vers $OUTDATED_VERS --force
     - cargo-deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
     script:
     - cargo doc --no-deps
     - touch target/doc/exonum/encoding/serialize/trait.Serialize.html  # TODO: a tmp hack to ignore a warning about missing page [ECR-703]
     - cargo deadlinks --dir target/doc
-    - cargo outdated --exit-code 1
 
 notifications:
   slack:

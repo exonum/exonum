@@ -36,7 +36,7 @@ use exonum::messages::{Any, Connect, Message, RawMessage, RawTransaction, Status
 use exonum::crypto::{gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed};
 #[cfg(test)]
 use exonum::crypto::gen_keypair;
-use exonum::helpers::{Height, Milliseconds, Round, ValidatorId};
+use exonum::helpers::{Height, Milliseconds, Round, ValidatorId, user_agent};
 use exonum::events::{Event, InternalEvent, EventHandler, NetworkEvent, NetworkRequest,
                      TimeoutRequest, InternalRequest};
 use exonum::events::network::NetworkConfiguration;
@@ -147,6 +147,7 @@ impl Sandbox {
             &self.p(VALIDATOR_0),
             self.a(VALIDATOR_0),
             connect_message_time,
+            &user_agent::get(),
             self.s(VALIDATOR_0),
         );
 
@@ -156,6 +157,7 @@ impl Sandbox {
                 &self.p(validator),
                 self.a(validator),
                 self.time(),
+                &user_agent::get(),
                 self.s(validator),
             ));
             self.send(self.a(validator), &connect);
@@ -860,13 +862,20 @@ mod tests {
     fn test_sandbox_recv_and_send() {
         let s = timestamping_sandbox();
         let (public, secret) = gen_keypair();
-        s.recv(&Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
+        s.recv(&Connect::new(
+            &public,
+            s.a(VALIDATOR_2),
+            s.time(),
+            &user_agent::get(),
+            &secret,
+        ));
         s.send(
             s.a(VALIDATOR_2),
             &Connect::new(
                 &s.p(VALIDATOR_0),
                 s.a(VALIDATOR_0),
                 s.time(),
+                &user_agent::get(),
                 s.s(VALIDATOR_0),
             ),
         );
@@ -893,6 +902,7 @@ mod tests {
                 &s.p(VALIDATOR_0),
                 s.a(VALIDATOR_0),
                 s.time(),
+                &user_agent::get(),
                 s.s(VALIDATOR_0),
             ),
         );
@@ -903,13 +913,20 @@ mod tests {
     fn test_sandbox_expected_to_send_another_message() {
         let s = timestamping_sandbox();
         let (public, secret) = gen_keypair();
-        s.recv(&Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
+        s.recv(&Connect::new(
+            &public,
+            s.a(VALIDATOR_2),
+            s.time(),
+            &user_agent::get(),
+            &secret,
+        ));
         s.send(
             s.a(VALIDATOR_1),
             &Connect::new(
                 &s.p(VALIDATOR_0),
                 s.a(VALIDATOR_0),
                 s.time(),
+                &user_agent::get(),
                 s.s(VALIDATOR_0),
             ),
         );
@@ -920,7 +937,13 @@ mod tests {
     fn test_sandbox_unexpected_message_when_drop() {
         let s = timestamping_sandbox();
         let (public, secret) = gen_keypair();
-        s.recv(&Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
+        s.recv(&Connect::new(
+            &public,
+            s.a(VALIDATOR_2),
+            s.time(),
+            &user_agent::get(),
+            &secret,
+        ));
     }
 
     #[test]
@@ -928,8 +951,20 @@ mod tests {
     fn test_sandbox_unexpected_message_when_handle_another_message() {
         let s = timestamping_sandbox();
         let (public, secret) = gen_keypair();
-        s.recv(&Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
-        s.recv(&Connect::new(&public, s.a(VALIDATOR_3), s.time(), &secret));
+        s.recv(&Connect::new(
+            &public,
+            s.a(VALIDATOR_2),
+            s.time(),
+            &user_agent::get(),
+            &secret,
+        ));
+        s.recv(&Connect::new(
+            &public,
+            s.a(VALIDATOR_3),
+            s.time(),
+            &user_agent::get(),
+            &secret,
+        ));
         panic!("Oops! We don't catch unexpected message");
     }
 
@@ -938,7 +973,13 @@ mod tests {
     fn test_sandbox_unexpected_message_when_time_changed() {
         let s = timestamping_sandbox();
         let (public, secret) = gen_keypair();
-        s.recv(&Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
+        s.recv(&Connect::new(
+            &public,
+            s.a(VALIDATOR_2),
+            s.time(),
+            &user_agent::get(),
+            &secret,
+        ));
         s.add_time(Duration::from_millis(1000));
         panic!("Oops! We don't catch unexpected message");
     }
