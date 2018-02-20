@@ -1,5 +1,9 @@
 #!/bin/bash
 
+#
+# Bash script for testing the cryptocurrency demo.
+#
+
 set -e
 
 # Base URL for demo service endpoints
