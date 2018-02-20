@@ -115,7 +115,7 @@ impl SystemApi {
         }
     }
 
-    fn get_peers_info(&self) -> PeersInfo {
+    fn peers_info(&self) -> PeersInfo {
         let mut outgoing_connections: HashMap<SocketAddr, IncomingConnection> = HashMap::new();
 
         for socket in self.shared_api_state.outgoing_connections() {
@@ -142,15 +142,15 @@ impl SystemApi {
         }
     }
 
-    fn get_network_info(&self) -> NodeInfo {
+    fn network_info(&self) -> NodeInfo {
         self.info.clone()
     }
 
-    fn get_consensus_enabled_info(&self) -> bool {
+    fn is_consensus_enabled(&self) -> bool {
         self.shared_api_state.is_enabled()
     }
 
-    fn set_consensus_enabled_info(&self, enabled: bool) -> Result<(), ApiError> {
+    fn set_consensus_enabled(&self, enabled: bool) -> Result<(), ApiError> {
         let message = ExternalMessage::Enable(enabled);
         self.node_channel.send_external_message(message)?;
         Ok(())
@@ -169,26 +169,26 @@ impl Api for SystemApi {
 
         let self_ = self.clone();
         let peers_info = move |_: &mut Request| -> IronResult<Response> {
-            let info = self_.get_peers_info();
+            let info = self_.peers_info();
             self_.ok_response(&::serde_json::to_value(info).unwrap())
         };
 
         let self_ = self.clone();
         let network = move |_: &mut Request| -> IronResult<Response> {
-            let info = self_.get_network_info();
+            let info = self_.network_info();
             self_.ok_response(&::serde_json::to_value(info).unwrap())
         };
 
         let self_ = self.clone();
         let consensus_enabled_info = move |_: &mut Request| -> IronResult<Response> {
-            let info = self_.get_consensus_enabled_info();
+            let info = self_.is_consensus_enabled();
             self_.ok_response(&::serde_json::to_value(info).unwrap())
         };
 
         let self_ = self.clone();
         let consensus_enabled_set = move |req: &mut Request| -> IronResult<Response> {
             let enabled: bool = self_.required_param(req, "enabled")?;
-            self_.set_consensus_enabled_info(enabled)?;
+            self_.set_consensus_enabled(enabled)?;
             self_.ok_response(&::serde_json::to_value("Ok").unwrap())
         };
 
