@@ -171,7 +171,7 @@ impl TestKitHandler for TestKit {
 
 #[cfg(test)]
 mod tests {
-    use exonum::blockchain::{Service, Transaction};
+    use exonum::blockchain::{ExecutionResult, Service, Transaction};
     use exonum::crypto::{CryptoHash, Hash, PublicKey};
     use exonum::encoding::Error as EncodingError;
     use exonum::explorer::BlockInfo;
@@ -185,13 +185,14 @@ mod tests {
     use super::*;
     use TestKitBuilder;
 
-    message! {
-        struct TxTimestamp {
-            const TYPE = 1000;
-            const ID = 1;
+    transactions! {
+        Any {
+            const SERVICE_ID = 1000;
 
-            from: &PublicKey,
-            msg: &str,
+            struct TxTimestamp {
+                from: &PublicKey,
+                msg: &str,
+            }
         }
     }
 
@@ -207,8 +208,8 @@ mod tests {
             self.verify_signature(self.from())
         }
 
-        fn execute(&self, _: &mut Fork) {
-            /* no op */
+        fn execute(&self, _: &mut Fork) -> ExecutionResult {
+            Ok(())
         }
     }
 
