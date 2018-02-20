@@ -56,8 +56,8 @@ describe('CurrencyService', function () {
   // // // // Service constants // // // //
 
   const SERVICE_ID = 1
-  const TX_CREATE_WALLET_ID = 1
-  const TX_TRANSFER_ID = 2
+  const TX_CREATE_WALLET_ID = 0
+  const TX_TRANSFER_ID = 1
   const SERVICE_URL = 'http://127.0.0.1:8000/api/services/cryptocurrency'
 
   const TxCreateWallet = exonum.newMessage({

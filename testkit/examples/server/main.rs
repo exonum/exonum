@@ -12,23 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate bodyparser;
-#[macro_use]
-extern crate exonum;
+extern crate exonum_cryptocurrency as cryptocurrency;
 extern crate exonum_testkit;
-extern crate iron;
-extern crate router;
-extern crate serde;
-#[macro_use]
-extern crate serde_json;
 
-use exonum_testkit::TestKitBuilder;
-
-// TODO: replace with cryptocurrency crate
-mod cryptocurrency;
-// HACK: `pub use` is to shut up the `dead_code` lint.
-pub use cryptocurrency::{TxCreateWallet, TxTransfer};
 use cryptocurrency::CurrencyService;
+use exonum_testkit::TestKitBuilder;
 
 fn main() {
     let testkit = TestKitBuilder::validator()
