@@ -37,6 +37,7 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::mem;
 use std::fmt;
+use std::iter;
 use std::panic;
 use std::net::SocketAddr;
 
@@ -446,17 +447,7 @@ impl Blockchain {
 
     /// Saves the given raw message to the consensus messages cache.
     pub fn save_message(&mut self, round: Round, raw: &RawMessage) {
-        let mut fork = self.fork();
-
-        {
-            let mut schema = Schema::new(&mut fork);
-            schema.consensus_messages_cache_mut().push(raw.clone());
-            schema.set_consensus_round(round);
-        }
-
-        self.merge(fork.into_patch()).expect(
-            "Unable to save message to the consensus cache",
-        );
+        self.save_messages(round, iter::once(raw.clone()));
     }
 
     /// Saves a collection of RawMessage to the consensus messages cache with single access to the
@@ -469,14 +460,7 @@ impl Blockchain {
 
         {
             let mut schema = Schema::new(&mut fork);
-            let mut index = schema.consensus_messages_cache_mut();
-            for msg in iter {
-                index.push(msg);
-            }
-        }
-
-        {
-            let mut schema = Schema::new(&mut fork);
+            schema.consensus_messages_cache_mut().extend(iter);
             schema.set_consensus_round(round);
         }
 

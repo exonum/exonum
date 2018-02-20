@@ -158,18 +158,18 @@ where
 
     /// Returns peers that have to be recovered in case of process' restart
     /// after abnormal termination.
-    pub fn peers_cache(&self) -> MapIndex<&T, PublicKey, Connect> {
+    pub(crate) fn peers_cache(&self) -> MapIndex<&T, PublicKey, Connect> {
         MapIndex::new("core.peers_cache", &self.view)
     }
 
     /// Returns consensus messages that have to be recovered in case of process' restart
     /// after abnormal termination.
-    pub fn consensus_messages_cache(&self) -> ListIndex<&T, RawMessage> {
+    pub(crate) fn consensus_messages_cache(&self) -> ListIndex<&T, RawMessage> {
         ListIndex::new(CONSENSUS_MESSAGES_CACHE, &self.view)
     }
 
     /// Returns saved value of the consensus round. Returns first round if it wasn't saved.
-    pub fn consensus_round(&self) -> Round {
+    pub(crate) fn consensus_round(&self) -> Round {
         Entry::new(CONSENSUS_ROUND, &self.view)
             .get()
             .unwrap_or_else(Round::first)
@@ -344,49 +344,44 @@ impl<'a> Schema<&'a mut Fork> {
     /// Mutable reference to the [`transactions`][1] index.
     ///
     /// [1]: struct.Schema.html#method.transactions
-    pub fn transactions_mut(&mut self) -> MapIndex<&mut Fork, Hash, RawMessage> {
+    pub(crate) fn transactions_mut(&mut self) -> MapIndex<&mut Fork, Hash, RawMessage> {
         MapIndex::new(TRANSACTIONS, self.view)
     }
 
     /// Mutable reference to the [`transaction_results`][1] index.
     ///
     /// [1]: struct.Schema.html#method.transaction_results
-    pub fn transaction_results_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, TransactionResult> {
+    pub(crate) fn transaction_results_mut(
+        &mut self,
+    ) -> ProofMapIndex<&mut Fork, Hash, TransactionResult> {
         ProofMapIndex::new(TRANSACTION_RESULTS, self.view)
     }
 
     /// Mutable reference to the [`tx_location_by_tx_hash`][1] index.
     ///
     /// [1]: struct.Schema.html#method.tx_location_by_tx_hash
-    pub fn tx_location_by_tx_hash_mut(&mut self) -> MapIndex<&mut Fork, Hash, TxLocation> {
+    pub(crate) fn tx_location_by_tx_hash_mut(&mut self) -> MapIndex<&mut Fork, Hash, TxLocation> {
         MapIndex::new(TX_LOCATION_BY_TX_HASH, self.view)
     }
 
     /// Mutable reference to the [`blocks][1] index.
     ///
     /// [1]: struct.Schema.html#method.blocks
-    pub fn blocks_mut(&mut self) -> MapIndex<&mut Fork, Hash, Block> {
+    pub(crate) fn blocks_mut(&mut self) -> MapIndex<&mut Fork, Hash, Block> {
         MapIndex::new(BLOCKS, self.view)
     }
 
     /// Mutable reference to the [`block_hashes_by_height_mut`][1] index.
     ///
     /// [1]: struct.Schema.html#method.block_hashes_by_height_mut
-    pub fn block_hashes_by_height_mut(&mut self) -> ListIndex<&mut Fork, Hash> {
+    pub(crate) fn block_hashes_by_height_mut(&mut self) -> ListIndex<&mut Fork, Hash> {
         ListIndex::new(BLOCK_HASHES_BY_HEIGHT, self.view)
-    }
-
-    /// Mutable reference to the [`block_hash_by_height`][1] index.
-    ///
-    /// [1]: struct.Schema.html#method.block_hash_by_height
-    pub fn block_hash_by_height_mut(&mut self, height: Height) -> Option<Hash> {
-        self.block_hashes_by_height().get(height.into())
     }
 
     /// Mutable reference to the [`block_txs`][1] index.
     ///
     /// [1]: struct.Schema.html#method.block_txs
-    pub fn block_txs_mut(&mut self, height: Height) -> ProofListIndex<&mut Fork, Hash> {
+    pub(crate) fn block_txs_mut(&mut self, height: Height) -> ProofListIndex<&mut Fork, Hash> {
         let height: u64 = height.into();
         ProofListIndex::with_prefix(BLOCK_TXS, gen_prefix(&height), self.view)
     }
@@ -394,47 +389,47 @@ impl<'a> Schema<&'a mut Fork> {
     /// Mutable reference to the [`precommits`][1] index.
     ///
     /// [1]: struct.Schema.html#method.precommits
-    pub fn precommits_mut(&mut self, hash: &Hash) -> ListIndex<&mut Fork, Precommit> {
+    pub(crate) fn precommits_mut(&mut self, hash: &Hash) -> ListIndex<&mut Fork, Precommit> {
         ListIndex::with_prefix(PRECOMMITS, gen_prefix(hash), self.view)
     }
 
     /// Mutable reference to the [`configs`][1] index.
     ///
     /// [1]: struct.Schema.html#method.configs
-    pub fn configs_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, StoredConfiguration> {
+    pub(crate) fn configs_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, StoredConfiguration> {
         ProofMapIndex::new(CONFIGS, self.view)
     }
 
     /// Mutable reference to the [`configs_actual_from`][1] index.
     ///
     /// [1]: struct.Schema.html#method.configs_actual_from
-    pub fn configs_actual_from_mut(&mut self) -> ListIndex<&mut Fork, ConfigReference> {
+    pub(crate) fn configs_actual_from_mut(&mut self) -> ListIndex<&mut Fork, ConfigReference> {
         ListIndex::new(CONFIGS_ACTUAL_FROM, self.view)
     }
 
     /// Mutable reference to the [`state_hash_aggregator`][1] index.
     ///
     /// [1]: struct.Schema.html#method.state_hash_aggregator
-    pub fn state_hash_aggregator_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, Hash> {
+    pub(crate) fn state_hash_aggregator_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, Hash> {
         ProofMapIndex::new(STATE_HASH_AGGREGATOR, self.view)
     }
 
     /// Mutable reference to the [`peers_cache`][1] index.
     ///
     /// [1]: struct.Schema.html#method.peers_cache
-    pub fn peers_cache_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Connect> {
+    pub(crate) fn peers_cache_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Connect> {
         MapIndex::new("core.peers_cache", self.view)
     }
 
     /// Mutable reference to the [`consensus_messages_cache`][1] index.
     ///
     /// [1]: struct.Schema.html#method.consensus_messages
-    pub fn consensus_messages_cache_mut(&mut self) -> ListIndex<&mut Fork, RawMessage> {
+    pub(crate) fn consensus_messages_cache_mut(&mut self) -> ListIndex<&mut Fork, RawMessage> {
         ListIndex::new(CONSENSUS_MESSAGES_CACHE, self.view)
     }
 
     /// Saves the given consensus round value into storage.
-    pub fn set_consensus_round(&mut self, round: Round) {
+    pub(crate) fn set_consensus_round(&mut self, round: Round) {
         let mut entry: Entry<&mut Fork, _> = Entry::new(CONSENSUS_ROUND, self.view);
         entry.set(round);
     }
