@@ -26,7 +26,7 @@ use helpers::Height;
 const MAX_BLOCKS_PER_REQUEST: u64 = 1000;
 
 #[derive(Serialize)]
-#[serde(rename_all = "kebab-case")]
+#[serde(tag = "type", rename_all = "kebab-case")]
 enum TransactionInfo {
     Unknown,
     InPool { content: JsonValue },

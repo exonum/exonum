@@ -67,6 +67,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `StorageKey` trait now requires `ToOwned` implementation. (#392)
 
+- `Connect` message has been extended with a user agent string, which breaks
+  binary compatibility with previous versions. (#362)
+
 ### New features
 
 - `StorageKey` and `StorageValue` traits are implemented for `SystemTime`. (#456)
@@ -84,6 +87,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 ### Bug fixes
 
 - `ExonumJsonDeserialize` trait is implemented for `F32` and `F64`. (#461)
+
+### Internal improvements
+
+- Consensus messages are stored persistently (in the database), so restart will
+  not affect the node's behavior. (#322)
 
 ## 0.5.1 - 2018-02-01
 

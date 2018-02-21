@@ -397,6 +397,16 @@ impl NodeHandler {
 
             // Change lock
             if self.state.has_majority_prevotes(round, propose_hash) {
+
+                // Put consensus messages for current Propose and this round to the cache.
+                self.check_propose_saved(round, &propose_hash);
+                let raw_messages = self.state
+                    .prevotes(prevote_round, propose_hash)
+                    .iter()
+                    .map(|msg| msg.raw().clone())
+                    .collect::<Vec<_>>();
+                self.blockchain.save_messages(round, raw_messages);
+
                 self.state.lock(round, propose_hash);
                 // Send precommit
                 if self.state.is_validator() && !self.state.have_incompatible_prevotes() {
@@ -700,6 +710,10 @@ impl NodeHandler {
                 &txs,
                 self.state.consensus_secret_key(),
             );
+
+            // Put our propose to the consensus messages cache
+            self.blockchain.save_message(round, propose.raw());
+
             trace!("Broadcast propose: {:?}", propose);
             self.broadcast(propose.raw());
 
@@ -888,8 +902,14 @@ impl NodeHandler {
             self.state.consensus_secret_key(),
         );
         let has_majority_prevotes = self.state.add_prevote(&prevote);
+
+        // save outgoing Prevote to the consensus messages cache before broadcast
+        self.check_propose_saved(round, propose_hash);
+        self.blockchain.save_message(round, prevote.raw());
+
         trace!("Broadcast prevote: {:?}", prevote);
         self.broadcast(prevote.raw());
+
         has_majority_prevotes
     }
 
@@ -908,6 +928,10 @@ impl NodeHandler {
             self.state.consensus_secret_key(),
         );
         self.state.add_precommit(&precommit);
+
+        // Put our Precommit to the consensus cache before broadcast
+        self.blockchain.save_message(round, precommit.raw());
+
         trace!("Broadcast precommit: {:?}", precommit);
         self.broadcast(precommit.raw());
     }
@@ -986,5 +1010,18 @@ impl NodeHandler {
             return Err(e);
         }
         Ok(())
+    }
+
+    /// Checks whether Propose is saved to the consensus cache and saves it otherwise
+    fn check_propose_saved(&mut self, round: Round, propose_hash: &Hash) {
+        if let Some(propose_state) = self.state.propose_mut(propose_hash) {
+            if !propose_state.is_saved() {
+                self.blockchain.save_message(
+                    round,
+                    propose_state.message().raw(),
+                );
+                propose_state.set_saved(true);
+            }
+        }
     }
 }

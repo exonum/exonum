@@ -1187,8 +1187,11 @@ impl TestKitApi {
     }
 
     /// Sends a transaction to the node via `ApiSender`.
-    pub fn send<T: Transaction>(&self, transaction: T) {
-        self.api_sender.send(Box::new(transaction)).expect(
+    pub fn send<T>(&self, transaction: T)
+    where
+        T: Into<Box<Transaction>>,
+    {
+        self.api_sender.send(transaction.into()).expect(
             "Cannot send transaction",
         );
     }

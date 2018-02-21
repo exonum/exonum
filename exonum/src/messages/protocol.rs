@@ -86,6 +86,8 @@ messages! {
         addr: SocketAddr,
         /// Time when the message was created.
         time: SystemTime,
+        /// String containing information about this node including Exonum, Rust and OS versions.
+        user_agent: &str,
     }
 
 

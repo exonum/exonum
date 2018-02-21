@@ -60,6 +60,7 @@ pub struct TxInfo {
 
 /// Transaction execution status. Simplified version of `TransactionResult`.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "kebab-case")]
 pub enum TxStatus {
     /// Successful transaction execution.
     Success,

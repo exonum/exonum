@@ -35,6 +35,7 @@ fsync
 fuzzer
 gitter
 healthcheck
+idempotence
 keepalive
 keypair
 keypairs
@@ -71,6 +72,7 @@ println
 pubkey
 pubkeys
 readonly
+reddit
 reimplemented
 RESTful
 roadmap

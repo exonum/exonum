@@ -1,6 +1,10 @@
 # exonum-time
 
-[![Build Status](https://travis-ci.org/exonum/exonum.svg?branch=master)](https://travis-ci.org/exonum/exonum)
+[![Travis Build Status](https://img.shields.io/travis/exonum/exonum/master.svg?label=Linux%20Build)](https://travis-ci.org/exonum/exonum)
+![CircleCI Build Status](https://img.shields.io/circleci/project/github/exonum/exonum.svg?label=MacOS%20Build)
+[![Docs.rs](https://docs.rs/exonum-time/badge.svg)](https://docs.rs/exonum-time)
+[![License: Apache-2.0](https://img.shields.io/github/license/exonum/exonum.svg)](https://github.com/exonum/exonum/blob/master/LICENSE)
+![rust 1.23+ required](https://img.shields.io/badge/rust-1.23+-blue.svg?label=Required%20Rust)
 
 Exonum-time is a time oracle service for [Exonum blockchain framework](https://exonum.com/).
 This service allows to determine time,
