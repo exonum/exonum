@@ -487,7 +487,11 @@ impl NodeHandler {
             info!("Trying to connect with peer {}", address);
         }
 
-        let round = Round::first();
+        let snapshot = self.blockchain.snapshot();
+        let schema = Schema::new(&snapshot);
+
+        // Recover previous saved round if any
+        let round = schema.consensus_round();
         self.state.jump_round(round);
         info!("Jump to round {}", round);
 
@@ -495,6 +499,13 @@ impl NodeHandler {
         self.add_status_timeout();
         self.add_peer_exchange_timeout();
         self.add_update_api_state_timeout();
+
+        // Recover cached consensus messages if any. We do this after main initialization and before
+        // the start of event processing.
+        let messages = schema.consensus_messages_cache();
+        for msg in messages.iter() {
+            self.handle_message(msg);
+        }
     }
 
     /// Sends the given message to a peer by its id.

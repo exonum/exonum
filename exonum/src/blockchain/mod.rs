@@ -37,6 +37,7 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::mem;
 use std::fmt;
+use std::iter;
 use std::panic;
 use std::net::SocketAddr;
 
@@ -47,7 +48,7 @@ use mount::Mount;
 use crypto::{self, Hash, CryptoHash, PublicKey, SecretKey};
 use messages::{CONSENSUS as CORE_SERVICE, Precommit, RawMessage, Connect};
 use storage::{Database, Error, Fork, Patch, Snapshot};
-use helpers::{Height, ValidatorId};
+use helpers::{Height, ValidatorId, Round};
 use node::ApiSender;
 
 pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
@@ -326,7 +327,7 @@ impl Blockchain {
 
     /// Commits to the storage block that proposes by node `State`.
     /// After that invokes `handle_commit` for each service in order of their identifiers
-    /// and returns the list of transactions which which were created by the `handle_commit` event.
+    /// and returns the list of transactions which were created by the `handle_commit` event.
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn commit<'a, I>(
         &mut self,
@@ -349,6 +350,10 @@ impl Blockchain {
                 for precommit in precommits {
                     schema.precommits_mut(&block_hash).push(precommit.clone());
                 }
+
+                // Consensus messages cache is useful only during one height, so it should be
+                // cleared when a new height is achieved.
+                schema.consensus_messages_cache_mut().clear();
             }
             fork.into_patch()
         };
@@ -438,6 +443,30 @@ impl Blockchain {
         let peers_cache = schema.peers_cache();
         let it = peers_cache.iter().map(|(k, v)| (k, v.clone()));
         it.collect()
+    }
+
+    /// Saves the given raw message to the consensus messages cache.
+    pub fn save_message(&mut self, round: Round, raw: &RawMessage) {
+        self.save_messages(round, iter::once(raw.clone()));
+    }
+
+    /// Saves a collection of RawMessage to the consensus messages cache with single access to the
+    /// `Fork` instance.
+    pub fn save_messages<I>(&mut self, round: Round, iter: I)
+    where
+        I: IntoIterator<Item = RawMessage>,
+    {
+        let mut fork = self.fork();
+
+        {
+            let mut schema = Schema::new(&mut fork);
+            schema.consensus_messages_cache_mut().extend(iter);
+            schema.set_consensus_round(round);
+        }
+
+        self.merge(fork.into_patch()).expect(
+            "Unable to save messages to the consensus cache",
+        );
     }
 }
 
