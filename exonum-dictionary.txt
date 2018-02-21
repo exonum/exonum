@@ -59,7 +59,6 @@ nanos
 nodelay
 oneshot
 openssl
-parseable
 peekable
 permissioned
 postcondition
@@ -115,7 +114,6 @@ toolchain
 txvec
 tymethod
 unboxed
-unparseable
 unreceived
 unsync
 untagged

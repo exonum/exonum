@@ -47,7 +47,7 @@ pub enum ErrorCode {
     /// The configuration in the transaction cannot be parsed.
     ///
     /// Specific for `Propose`.
-    UnparseableConfig = 33,
+    InvalidConfig = 33,
 
     /// The transaction references an unknown configuration.
     ///
@@ -78,7 +78,7 @@ pub(crate) enum Error {
     AlreadyProposed(Propose),
 
     #[fail(display = "Cannot parse configuration: {}", _0)]
-    UnparseableConfig(
+    InvalidConfig(
         #[cause]
         JsonError
     ),
@@ -100,7 +100,7 @@ impl Error {
             InvalidConfigRef(..) => ErrorCode::InvalidConfigRef,
             ActivationInPast(..) => ErrorCode::ActivationInPast,
             AlreadyProposed(..) => ErrorCode::AlreadyProposed,
-            UnparseableConfig(..) => ErrorCode::UnparseableConfig,
+            InvalidConfig(..) => ErrorCode::InvalidConfig,
             UnknownConfigRef(..) => ErrorCode::UnknownConfigRef,
             AlreadyVoted => ErrorCode::AlreadyVoted,
         }

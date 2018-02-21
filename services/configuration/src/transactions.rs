@@ -44,7 +44,7 @@ transactions! {
 
             /// Configuration in JSON format.
             ///
-            /// Should be parseable into `StoredConfiguration`.
+            /// Should be convertible into `StoredConfiguration`.
             cfg: &str,
         }
 
@@ -115,7 +115,7 @@ impl Propose {
         }
 
         let config_candidate = StoredConfiguration::try_deserialize(self.cfg().as_bytes())
-            .map_err(UnparseableConfig)?;
+            .map_err(InvalidConfig)?;
         self.check_config_candidate(&config_candidate, snapshot)?;
 
         let cfg = StoredConfiguration::from_bytes(self.cfg().as_bytes().into());
