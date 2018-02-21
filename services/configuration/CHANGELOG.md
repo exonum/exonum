@@ -7,10 +7,35 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Breaking changes
 
-- `CONFIG_SERVICE` constant has been renamed to `CONFIGURATION_SERVICE_ID`.
+- Most types renamed to avoid [stuttering] (#496):
 
-- `CONFIG_PROPOSE_MESSAGE_ID` and `CONFIG_VOTE_MESSAGE_ID` constants are no
-  longer public.
+  - `ConfigurationService` to `Service`
+  - `ConfigurationServiceFactory` to `ServiceFactory`
+  - `TxConfigPropose` to `Propose`
+  - `TxConfigVote` to `Vote`
+  - `ConfigurationSchema` to `Schema`
+  - `StorageValueConfigProposeData` to `ProposeData`
+  - `CONFIG_SERVICE` constant to `SERVICE_ID`
+
+  Check the crate documentation for more details.
+
+[stuttering]: https://doc.rust-lang.org/1.0.0/style/style/naming/README.html#avoid-redundant-prefixes-[rfc-356]
+
+- Multiple APIs are no longer public (#496):
+
+  - Message identifiers
+  - Mutating methods of the service schema
+  - Module implementing HTTP API of the service
+
+  Check the crate documentation for more details.
+
+- `ZEROVOTE` structure is replaced with the `MaybeVote` type, which is now used
+  instead of `Vote` in the schema method signatures. The storage format itself
+  is unchanged (#496).
+
+### New features
+
+- Implemented error handling based on error codes (#496).
 
 ## 0.5 - 2018-01-30
 
