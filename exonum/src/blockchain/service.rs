@@ -387,7 +387,7 @@ impl SharedNodeState {
     }
 
     /// Informs internal state about node's halting.
-    pub fn update_is_enabled(&self, is_enabled: bool) {
+    pub fn set_enabled(&self, is_enabled: bool) {
         let mut state = self.state.write().expect("Expected read lock.");
         state.is_enabled = is_enabled;
     }

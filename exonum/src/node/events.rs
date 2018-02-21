@@ -82,7 +82,7 @@ impl NodeHandler {
                     info!("Node is already {}", s);
                 } else {
                     self.is_enabled = value;
-                    self.api_state().update_is_enabled(value);
+                    self.api_state().set_enabled(value);
                     info!("The node is {} now", s);
                     if self.is_enabled {
                         self.add_round_timeout();
