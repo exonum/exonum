@@ -356,32 +356,41 @@ fn test_snapshot_comparison_panic() {
 
 #[test]
 fn test_explorer_blocks() {
-    use exonum::blockchain::Block;
+    use exonum::explorer::BlocksRange;
     use exonum::helpers::Height;
 
     let (mut testkit, api) = init_testkit();
 
-    let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+    let response: BlocksRange = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+    let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(0));
     assert_eq!(*blocks[0].prev_hash(), crypto::Hash::default());
+    assert_eq!(range.from, 0);
+    assert_eq!(range.to, 0);
 
     // Check empty block creation
     testkit.create_block();
 
-    let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+    let response: BlocksRange = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+    let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 2);
     assert_eq!(blocks[0].height(), Height(1));
     assert_eq!(*blocks[0].prev_hash(), blocks[1].hash());
     assert_eq!(blocks[0].tx_count(), 0);
     assert_eq!(blocks[1].height(), Height(0));
     assert_eq!(*blocks[1].prev_hash(), crypto::Hash::default());
+    assert_eq!(range.from, 0);
+    assert_eq!(range.to, 1);
 
-    let blocks: Vec<Block> = api.get(
+    let response: BlocksRange = api.get(
         ApiKind::Explorer,
         "v1/blocks?count=10&skip_empty_blocks=true",
     );
+    let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 0);
+    assert_eq!(range.from, 0);
+    assert_eq!(range.to, 1);
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -390,29 +399,38 @@ fn test_explorer_blocks() {
     testkit.api().send(tx.clone());
     testkit.create_block(); // height == 2
 
-    let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+    let response: BlocksRange = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+    let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 3);
     assert_eq!(blocks[0].height(), Height(2));
     assert_eq!(*blocks[0].prev_hash(), blocks[1].hash());
     assert_eq!(blocks[0].tx_count(), 1);
     assert_eq!(*blocks[0].tx_hash(), tx.hash());
+    assert_eq!(range.from, 0);
+    assert_eq!(range.to, 2);
 
-    let blocks: Vec<Block> = api.get(
+    let response: BlocksRange = api.get(
         ApiKind::Explorer,
         "v1/blocks?count=10&skip_empty_blocks=true",
     );
+    let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(2));
+    assert_eq!(range.from, 0);
+    assert_eq!(range.to, 2);
 
     testkit.create_block(); // height == 3
     testkit.create_block(); // height == 4
 
-    let blocks: Vec<Block> = api.get(
+    let response: BlocksRange = api.get(
         ApiKind::Explorer,
         "v1/blocks?count=10&skip_empty_blocks=true",
     );
+    let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(2));
+    assert_eq!(range.from, 0);
+    assert_eq!(range.to, 4);
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -422,27 +440,37 @@ fn test_explorer_blocks() {
     testkit.create_block(); // height == 5
 
     // Check block filtering
-    let blocks: Vec<Block> = api.get(
+    let response: BlocksRange = api.get(
+        ApiKind::Explorer,
+        "v1/blocks?count=1&skip_empty_blocks=true",
+    );
+    let (blocks, range) = (response.blocks, response.range);
+    assert_eq!(blocks.len(), 1);
+    assert_eq!(blocks[0].height(), Height(5));
+    assert_eq!(range.from, 5);
+    assert_eq!(range.to, 5);
+
+    let response: BlocksRange = api.get(
         ApiKind::Explorer,
         "v1/blocks?count=3&skip_empty_blocks=true",
     );
-    assert_eq!(blocks.len(), 1);
-    assert_eq!(blocks[0].height(), Height(5));
-    let blocks: Vec<Block> = api.get(
-        ApiKind::Explorer,
-        "v1/blocks?count=4&skip_empty_blocks=true",
-    );
+    let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 2);
     assert_eq!(blocks[0].height(), Height(5));
     assert_eq!(blocks[1].height(), Height(2));
+    assert_eq!(range.from, 0);
+    assert_eq!(range.to, 5);
 
     // Check `latest` param
-    let blocks: Vec<Block> = api.get(
+    let response: BlocksRange = api.get(
         ApiKind::Explorer,
         "v1/blocks?count=10&skip_empty_blocks=true&latest=4",
     );
+    let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(2));
+    assert_eq!(range.from, 0);
+    assert_eq!(range.to, 4);
 }
 
 #[test]
