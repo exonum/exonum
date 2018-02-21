@@ -42,6 +42,7 @@ define_names!(
     CONFIGS => "configs";
     CONFIGS_ACTUAL_FROM => "configs_actual_from";
     STATE_HASH_AGGREGATOR => "state_hash_aggregator";
+    PEERS_CACHE => "peers_cache";
     CONSENSUS_MESSAGES_CACHE => "consensus_messages_cache";
     CONSENSUS_ROUND => "consensus_round";
 );
@@ -159,7 +160,7 @@ where
     /// Returns peers that have to be recovered in case of process' restart
     /// after abnormal termination.
     pub(crate) fn peers_cache(&self) -> MapIndex<&T, PublicKey, Connect> {
-        MapIndex::new("core.peers_cache", &self.view)
+        MapIndex::new(PEERS_CACHE, &self.view)
     }
 
     /// Returns consensus messages that have to be recovered in case of process' restart
@@ -418,7 +419,7 @@ impl<'a> Schema<&'a mut Fork> {
     ///
     /// [1]: struct.Schema.html#method.peers_cache
     pub(crate) fn peers_cache_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Connect> {
-        MapIndex::new("core.peers_cache", self.view)
+        MapIndex::new(PEERS_CACHE, self.view)
     }
 
     /// Mutable reference to the [`consensus_messages_cache`][1] index.
