@@ -113,7 +113,7 @@
 //!     assert_eq!(blocks.len(), 3);
 //!     assert_eq!(range.from, 0);
 //!     assert_eq!(range.to, 2);
-//! 
+//!
 //!     api.get::<serde_json::Value>(
 //!         ApiKind::Explorer,
 //!         &format!("v1/transactions/{}", tx1.hash().to_string()),

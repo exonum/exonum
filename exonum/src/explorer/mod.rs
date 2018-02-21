@@ -171,52 +171,52 @@ impl<'a> BlockchainExplorer<'a> {
     pub fn blocks_range(
         &self,
         count: u64,
-        upper: Option<u64>, 
+        upper: Option<u64>,
         skip_empty_blocks: bool,
     ) -> BlocksRange {
         let schema = Schema::new(self.blockchain.snapshot());
         let hashes = schema.block_hashes_by_height();
         let blocks = schema.blocks();
-        
+
         // max_height >=0, as there is at least the genesis block.
         let max_height = hashes.len() - 1;
-        
+
         let upper = upper.map(|x| cmp::min(x, max_height)).unwrap_or(max_height);
-        
+
         let mut height = upper + 1;
         let mut genesis = false;
-        
+
         let mut v = Vec::new();
         let mut collected: u64 = 0;
 
         // It is safe to do at least one iteration, because height >= 1.
         loop {
-            if genesis || (collected == count)  {
+            if genesis || (collected == count) {
                 break;
             }
-            
+
             height -= 1;
             genesis = height == 0;
-  
+
             let block_txs = schema.block_txs(Height(height));
             if skip_empty_blocks && block_txs.is_empty() {
                 continue;
             }
-            
+
             let block_hash = hashes.get(height).expect(&format!(
                 "Block not found, height:{:?}",
                 height
             ));
-            
+
             let block = blocks.get(&block_hash).expect(&format!(
                 "Block not found, hash:{:?}",
                 block_hash
             ));
-            
+
             v.push(block);
             collected += 1;
         }
-        
+
         BlocksRange {
             range: Range {
                 from: height,

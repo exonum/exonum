@@ -396,7 +396,7 @@ fn test_explorer_blocks() {
     testkit.api().send(tx.clone());
     testkit.create_block(); // height == 2
 
-    let response: BlocksRange= api.get(ApiKind::Explorer, "v1/blocks?count=10");
+    let response: BlocksRange = api.get(ApiKind::Explorer, "v1/blocks?count=10");
     let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 3);
     assert_eq!(blocks[0].height(), Height(2));
@@ -406,7 +406,7 @@ fn test_explorer_blocks() {
     assert_eq!(range.from, 0);
     assert_eq!(range.to, 2);
 
-    let response: BlocksRange= api.get(
+    let response: BlocksRange = api.get(
         ApiKind::Explorer,
         "v1/blocks?count=10&skip_empty_blocks=true",
     );
@@ -446,7 +446,7 @@ fn test_explorer_blocks() {
     assert_eq!(blocks[0].height(), Height(5));
     assert_eq!(range.from, 5);
     assert_eq!(range.to, 5);
-    
+
     let response: BlocksRange = api.get(
         ApiKind::Explorer,
         "v1/blocks?count=3&skip_empty_blocks=true",
