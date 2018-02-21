@@ -308,6 +308,6 @@ impl_default_deserialize_owned!{u8; u16; u32; i8; i16; i32; u64; i64; bool}
 /// Reexport of `serde` specific traits, this reexports
 /// provide compatibility layer with important `serde_json` version.
 pub mod reexport {
-    pub use serde_json::{from_str, from_value, to_string, to_value, Value};
+    pub use serde_json::{from_str, from_value, to_string, to_value, Value, Error};
     pub use serde_json::map::Map;
 }

@@ -64,6 +64,7 @@ permissioned
 postcondition
 postpropose
 postvote
+precheck
 precommit
 precommits
 prevote
