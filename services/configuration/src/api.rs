@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use router::Router;
-use iron::prelude::*;
 use bodyparser;
 use exonum::api::{Api, ApiError};
 use exonum::crypto::{CryptoHash, PublicKey, SecretKey, Hash};
 use exonum::blockchain::{ApiContext, Blockchain, StoredConfiguration, Schema as CoreSchema};
-use exonum::node::{ApiSender, TransactionSend};
-use exonum::storage::StorageValue;
 use exonum::encoding::serialize::json::reexport as serde_json;
 use exonum::helpers::Height;
+use exonum::node::{ApiSender, TransactionSend};
+use exonum::storage::StorageValue;
+use iron::prelude::*;
+use router::Router;
 
 use super::{ProposeData, Propose, Vote, Schema};
 

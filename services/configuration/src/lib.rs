@@ -77,15 +77,15 @@ extern crate exonum_testkit;
 #[macro_use]
 extern crate pretty_assertions;
 
-use router::Router;
-use iron::Handler;
 use exonum::api::Api;
 use exonum::blockchain::{self, Transaction, ApiContext};
-use exonum::helpers::fabric::{self, Context};
 use exonum::crypto::Hash;
+use exonum::encoding::Error as EncodingError;
+use exonum::helpers::fabric::{self, Context};
 use exonum::messages::RawTransaction;
 use exonum::storage::Snapshot;
-use exonum::encoding::Error as EncodingError;
+use iron::Handler;
+use router::Router;
 
 mod api;
 mod errors;

@@ -14,12 +14,12 @@
 
 //! Storage schema for the configuration service.
 
-use std::borrow::Cow;
-
 use exonum::blockchain::gen_prefix;
-use exonum::encoding::Field;
 use exonum::crypto::{self, CryptoHash, Hash, PublicKey, Signature};
+use exonum::encoding::Field;
 use exonum::storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot, StorageValue};
+
+use std::borrow::Cow;
 
 use transactions::{Propose, Vote};
 
