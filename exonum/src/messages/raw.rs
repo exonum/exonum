@@ -325,32 +325,22 @@ impl WriteBufferWrapper for MessageWriter {
     }
 }
 
-impl ExonumJson for Vec<RawMessage> {
+impl ExonumJson for RawMessage {
     fn deserialize_field<B: WriteBufferWrapper>(
         value: &JsonValue,
         buffer: &mut B,
         from: Offset,
         to: Offset,
     ) -> Result<(), Box<Error>> {
-        use messages::MessageBuffer;
-        let bytes = value.as_array().ok_or("Can't cast json as array")?;
-        let mut vec: Vec<_> = Vec::new();
-        for el in bytes {
-            let string = el.as_str().ok_or("Can't cast json as string")?;
-            let str_hex = <Vec<u8> as encoding::FromHex>::from_hex(string)?;
-            vec.push(RawMessage::new(MessageBuffer::from_vec(str_hex)));
-        }
-        buffer.write(from, to, vec);
+        let string = value.as_str().ok_or("Can't cast json as string")?;
+        let str_hex = <Vec<u8> as encoding::FromHex>::from_hex(string)?;
+        let message = RawMessage::new(MessageBuffer::from_vec(str_hex));
+        buffer.write(from, to, message);
         Ok(())
     }
 
     fn serialize_field(&self) -> Result<JsonValue, Box<Error + Send + Sync>> {
-        let vec = self.iter()
-            .map(|slice| {
-                JsonValue::String(encoding::serialize::encode_hex(slice))
-            })
-            .collect();
-        Ok(JsonValue::Array(vec))
+        JsonValue::String(encoding::serialize::encode_hex(self))
     }
 }
 

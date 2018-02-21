@@ -27,15 +27,14 @@ use std::error::Error;
 
 use serde_json::value::{Value, from_value};
 use bit_vec::BitVec;
-use hex::FromHex;
+use hex::{FromHex};
 
 use super::{Field, Offset, WriteBufferWrapper};
 
-/// `ExonumJson` is trait for object
-/// that can be serialized and deserialize "in-place".
+/// `ExonumJson` is trait for object that can be serialized and deserialize "in-place".
 ///
-/// This trait is important for field types that could not be
-/// deserialized directly, for example: borrowed array.
+/// This trait is important for field types that could not be deserialized directly,
+/// for example: borrowed array.
 pub trait ExonumJson {
     /// write deserialized field in buffer on place.
     fn deserialize_field<B: WriteBufferWrapper>(
