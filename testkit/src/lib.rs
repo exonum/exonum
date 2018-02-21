@@ -25,6 +25,7 @@
 //!
 //! use exonum::crypto::{gen_keypair, Hash, PublicKey, CryptoHash};
 //! use exonum::blockchain::{Block, Schema, Service, Transaction, TransactionSet, ExecutionResult};
+//! use exonum::explorer::BlocksRange;
 //! use exonum::messages::{Message, RawTransaction};
 //! use exonum::storage::{Snapshot, Fork};
 //! use exonum::encoding;
@@ -107,8 +108,12 @@
 //!
 //!     // Check results with api.
 //!     let api = testkit.api();
-//!     let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+//!     let response: BlocksRange = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+//!     let (blocks, range) = (response.blocks, response.range);
 //!     assert_eq!(blocks.len(), 3);
+//!     assert_eq!(range.start, 0);
+//!     assert_eq!(range.end, 3);
+//!
 //!     api.get::<serde_json::Value>(
 //!         ApiKind::Explorer,
 //!         &format!("v1/transactions/{}", tx1.hash().to_string()),

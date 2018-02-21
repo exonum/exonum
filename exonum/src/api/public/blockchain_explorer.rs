@@ -16,8 +16,8 @@ use router::Router;
 use serde_json::Value as JsonValue;
 use iron::prelude::*;
 
-use blockchain::{Blockchain, Block};
-use explorer::{BlockInfo, BlockchainExplorer, TxInfo};
+use blockchain::Blockchain;
+use explorer::{BlockInfo, BlockchainExplorer, BlocksRange, TxInfo};
 use node::state::TxPool;
 use api::{Api, ApiError};
 use crypto::Hash;
@@ -55,7 +55,7 @@ impl ExplorerApi {
         count: u64,
         from: Option<u64>,
         skip_empty_blocks: bool,
-    ) -> Result<Vec<Block>, ApiError> {
+    ) -> Result<BlocksRange, ApiError> {
         if count > MAX_BLOCKS_PER_REQUEST {
             return Err(ApiError::BadRequest(format!(
                 "Max block count per request exceeded ({})",
