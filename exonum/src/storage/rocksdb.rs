@@ -14,16 +14,16 @@
 
 //! An implementation of `RocksDB` database.
 
+use exonum_profiler::ProfilerSpan;
+use rocksdb::{self, WriteBatch, DBIterator};
+use rocksdb::utils::get_cf_names;
+
 use std::mem;
 use std::sync::Arc;
 use std::path::Path;
 use std::fmt;
 use std::error::Error;
 use std::iter::Peekable;
-
-use exonum_profiler::ProfilerSpan;
-use rocksdb::{self, WriteBatch, DBIterator};
-use rocksdb::utils::get_cf_names;
 
 use storage::{self, Database, Iterator, Iter, Snapshot, Patch};
 use storage::db::Change;
@@ -145,7 +145,7 @@ impl Snapshot for RocksDBSnapshot {
     }
 }
 
-impl<'a> Iterator for RocksDBIterator {
+impl Iterator for RocksDBIterator {
     fn next(&mut self) -> Option<(&[u8], &[u8])> {
         let _p = ProfilerSpan::new("RocksDBIterator::next");
         if let Some((key, value)) = self.iter.next() {

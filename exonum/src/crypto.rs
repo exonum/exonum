@@ -36,6 +36,13 @@ use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
 use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use std::default::Default;
+use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
+use std::fmt;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use helpers::Round;
+
 // spell-checker:disable
 pub use sodiumoxide::crypto::sign::ed25519::{PUBLICKEYBYTES as PUBLIC_KEY_LENGTH,
                                              SECRETKEYBYTES as SECRET_KEY_LENGTH,
@@ -690,6 +697,12 @@ impl CryptoHash for SystemTime {
         LittleEndian::write_u64(&mut buffer[0..8], secs);
         LittleEndian::write_u32(&mut buffer[8..12], nanos);
         hash(&buffer)
+    }
+}
+
+impl CryptoHash for Round {
+    fn hash(&self) -> Hash {
+        self.0.hash()
     }
 }
 

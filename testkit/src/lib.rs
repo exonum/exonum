@@ -110,7 +110,7 @@
 //!     let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10");
 //!     assert_eq!(blocks.len(), 3);
 //!     api.get::<serde_json::Value>(
-//!         ApiKind::System,
+//!         ApiKind::Explorer,
 //!         &format!("v1/transactions/{}", tx1.hash().to_string()),
 //!     );
 //! }
@@ -1182,8 +1182,11 @@ impl TestKitApi {
     }
 
     /// Sends a transaction to the node via `ApiSender`.
-    pub fn send<T: Transaction>(&self, transaction: T) {
-        self.api_sender.send(Box::new(transaction)).expect(
+    pub fn send<T>(&self, transaction: T)
+    where
+        T: Into<Box<Transaction>>,
+    {
+        self.api_sender.send(transaction.into()).expect(
             "Cannot send transaction",
         );
     }

@@ -14,14 +14,15 @@
 
 //! A definition of `StorageValue` trait and implementations for common types.
 
+use byteorder::{ByteOrder, LittleEndian};
+
 use std::mem;
 use std::borrow::Cow;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use byteorder::{ByteOrder, LittleEndian};
-
 use crypto::{CryptoHash, Hash, PublicKey};
 use messages::{RawMessage, MessageBuffer};
+use helpers::Round;
 
 /// A type that can be (de)serialized as a value in the blockchain storage.
 ///
@@ -285,6 +286,16 @@ impl StorageValue for SystemTime {
     }
 }
 
+impl StorageValue for Round {
+    fn into_bytes(self) -> Vec<u8> {
+        self.0.into_bytes()
+    }
+
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        Round(u32::from_bytes(value))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -411,6 +422,15 @@ mod tests {
         for time in times.iter() {
             let buffer = time.into_bytes();
             assert_eq!(*time, SystemTime::from_bytes(Cow::Borrowed(&buffer)));
+        }
+    }
+
+    #[test]
+    fn round_round_trip() {
+        let values = [Round::zero(), Round::first(), Round(100), Round(u32::max_value())];
+        for value in values.iter() {
+            let bytes = value.clone().into_bytes();
+            assert_eq!(*value, Round::from_bytes(Cow::Borrowed(&bytes)));
         }
     }
 }

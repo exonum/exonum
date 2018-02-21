@@ -45,7 +45,7 @@ env:
   - OUTDATED_VERS=0.7.0
   - SODIUM_VERS=1.0.13
   - CARGO_INCREMENTAL=1
-  - RUSTFLAGS="-C link-dead-code"
+  - RUSTFLAGS="-C link-dead-code -D warnings"
   - CODECOV_TOKEN=90006bf6-e4b7-4825-b880-8d19c4e21c21
   - ROCKSDB_LIB_DIR=/usr/lib/x86_64-linux-gnu
   - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
@@ -88,6 +88,7 @@ jobs:
     - ./node_modules/.bin/cspell testkit/{src,examples,tests}/**/*.rs
     - ./node_modules/.bin/cspell services/configuration/{src,examples}/**/*.rs
     - ./node_modules/.bin/cspell services/time/{src,examples,tests}/**/*.rs
+    - ./node_modules/.bin/cspell examples/cryptocurrency/{src,examples,tests}/**/*.rs
     - find . -not -path "./3rdparty/*" -and -not -path "./node_modules/*" -name "*.md" | xargs ./node_modules/.bin/cspell
     - find . -not -path "./3rdparty/*" -and -not -path "./node_modules/*" -name "*.md" | xargs ./node_modules/.bin/markdownlint --config .markdownlintrc
 
@@ -97,15 +98,35 @@ jobs:
     install:
     - cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
     script:
-    - cargo clippy --all
+    - cargo clippy --all -- -D warnings
 
   # Tests
   - env: FEATURE=test
+    addons:
+      apt:
+        sources:
+        - sourceline: 'ppa:giskou/librocksdb'
+        - sourceline: 'deb [arch=amd64] https://packages.microsoft.com/ubuntu/14.04/prod trusty main'
+          key_url: https://packages.microsoft.com/keys/microsoft.asc
+        packages:
+        - gcc
+        - g++
+        - libssl-dev
+        - libcurl4-openssl-dev
+        - libelf-dev
+        - libdw-dev
+        - binutils-dev
+        - libiberty-dev
+        - libsnappy-dev
+        - librocksdb
+        - powershell
     script:
     - cargo test --all
     - cargo run -p exonum-testkit --example timestamping
     - cargo run -p exonum-testkit --example configuration_change
     - cargo run -p exonum-time --example simple_service
+    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
+    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
 
   # Benchmarks (compilation only)
   - env: FEATURE=benchmarks
@@ -116,30 +137,11 @@ jobs:
   # Non-fatal checks
   - env: FEATURE=non-fatal-checks
     install:
-    - cargo-outdated -V | grep $OUTDATED_VERS || cargo install cargo-outdated --vers $OUTDATED_VERS --force
     - cargo-deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
     script:
     - cargo doc --no-deps
     - touch target/doc/exonum/encoding/serialize/trait.Serialize.html  # TODO: a tmp hack to ignore a warning about missing page [ECR-703]
     - cargo deadlinks --dir target/doc
-    - cargo outdated --exit-code 1
-
-after_success: |
-  [ $TRAVIS_BRANCH = master ] &&
-  [ $TRAVIS_PULL_REQUEST = false ] &&
-  wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz &&
-  tar xzf master.tar.gz &&
-  cd kcov-master &&
-  mkdir build &&
-  cd build &&
-  cmake .. &&
-  make &&
-  make install &&
-  cd ../.. &&
-  rm -rf kcov-master &&
-  for file in target/debug/exonum-*[^\.d]; do mkdir -p "target/cov/$(basename $file)"; kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done &&
-  bash <(curl -s https://codecov.io/bash) &&
-  echo "Uploaded code coverage"
 
 notifications:
   slack:

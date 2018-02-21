@@ -6,5 +6,6 @@ members = [
     "testkit",
     "services/configuration",
     "services/time",
+    "examples/cryptocurrency",
 ]
 exclude = [ "3rdparty", "exonum/fuzz" ]

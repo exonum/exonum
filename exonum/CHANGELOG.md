@@ -65,15 +65,33 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Removed the `'static` bound from the return value of the
   `blockchain::Service::service_name()` method. (#485)
 
+- `StorageKey` trait now requires `ToOwned` implementation. (#392)
+
+- `Connect` message has been extended with a user agent string, which breaks
+  binary compatibility with previous versions. (#362)
+
 ### New features
 
 - `StorageKey` and `StorageValue` traits are implemented for `SystemTime`. (#456)
+
 - `StorageValue` and `CryptoHash` traits are implemented for `bool`. (#385)
+
 - `Height` implements `std::str::FromStr`. (#474)
+
+- `v1/transactions` endpoint has been extended with the transaction execution
+  status. (#488)
+
+- Key-indexes interface now allows to use borrowed types for the search
+  operations. (#392)
 
 ### Bug fixes
 
 - `ExonumJsonDeserialize` trait is implemented for `F32` and `F64`. (#461)
+
+### Internal improvements
+
+- Consensus messages are stored persistently (in the database), so restart will
+  not affect the node's behavior. (#322)
 
 ## 0.5.1 - 2018-02-01
 
