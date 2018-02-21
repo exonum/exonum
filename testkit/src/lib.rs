@@ -111,8 +111,8 @@
 //!     let response: BlocksRange = api.get(ApiKind::Explorer, "v1/blocks?count=10");
 //!     let (blocks, range) = (response.blocks, response.range);
 //!     assert_eq!(blocks.len(), 3);
-//!     assert_eq!(range.from, 0);
-//!     assert_eq!(range.to, 2);
+//!     assert_eq!(range.start, 0);
+//!     assert_eq!(range.end, 3);
 //!
 //!     api.get::<serde_json::Value>(
 //!         ApiKind::Explorer,

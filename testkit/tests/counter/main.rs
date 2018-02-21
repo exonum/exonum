@@ -363,8 +363,8 @@ fn test_explorer_blocks() {
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(0));
     assert_eq!(*blocks[0].prev_hash(), crypto::Hash::default());
-    assert_eq!(range.from, 0);
-    assert_eq!(range.to, 0);
+    assert_eq!(range.start, 0);
+    assert_eq!(range.end, 1);
 
     // Check empty block creation
     testkit.create_block();
@@ -377,8 +377,8 @@ fn test_explorer_blocks() {
     assert_eq!(blocks[0].tx_count(), 0);
     assert_eq!(blocks[1].height(), Height(0));
     assert_eq!(*blocks[1].prev_hash(), crypto::Hash::default());
-    assert_eq!(range.from, 0);
-    assert_eq!(range.to, 1);
+    assert_eq!(range.start, 0);
+    assert_eq!(range.end, 2);
 
     let response: BlocksRange = api.get(
         ApiKind::Explorer,
@@ -386,8 +386,8 @@ fn test_explorer_blocks() {
     );
     let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 0);
-    assert_eq!(range.from, 0);
-    assert_eq!(range.to, 1);
+    assert_eq!(range.start, 0);
+    assert_eq!(range.end, 2);
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -403,8 +403,8 @@ fn test_explorer_blocks() {
     assert_eq!(*blocks[0].prev_hash(), blocks[1].hash());
     assert_eq!(blocks[0].tx_count(), 1);
     assert_eq!(*blocks[0].tx_hash(), tx.hash());
-    assert_eq!(range.from, 0);
-    assert_eq!(range.to, 2);
+    assert_eq!(range.start, 0);
+    assert_eq!(range.end, 3);
 
     let response: BlocksRange = api.get(
         ApiKind::Explorer,
@@ -413,8 +413,8 @@ fn test_explorer_blocks() {
     let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(2));
-    assert_eq!(range.from, 0);
-    assert_eq!(range.to, 2);
+    assert_eq!(range.start, 0);
+    assert_eq!(range.end, 3);
 
     testkit.create_block(); // height == 3
     testkit.create_block(); // height == 4
@@ -426,8 +426,8 @@ fn test_explorer_blocks() {
     let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(2));
-    assert_eq!(range.from, 0);
-    assert_eq!(range.to, 4);
+    assert_eq!(range.start, 0);
+    assert_eq!(range.end, 5);
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -444,8 +444,8 @@ fn test_explorer_blocks() {
     let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(5));
-    assert_eq!(range.from, 5);
-    assert_eq!(range.to, 5);
+    assert_eq!(range.start, 5);
+    assert_eq!(range.end, 6);
 
     let response: BlocksRange = api.get(
         ApiKind::Explorer,
@@ -455,8 +455,8 @@ fn test_explorer_blocks() {
     assert_eq!(blocks.len(), 2);
     assert_eq!(blocks[0].height(), Height(5));
     assert_eq!(blocks[1].height(), Height(2));
-    assert_eq!(range.from, 0);
-    assert_eq!(range.to, 5);
+    assert_eq!(range.start, 0);
+    assert_eq!(range.end, 6);
 
     // Check `latest` param
     let response: BlocksRange = api.get(
@@ -466,8 +466,8 @@ fn test_explorer_blocks() {
     let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(2));
-    assert_eq!(range.from, 0);
-    assert_eq!(range.to, 4);
+    assert_eq!(range.start, 0);
+    assert_eq!(range.end, 5);
 }
 
 #[test]

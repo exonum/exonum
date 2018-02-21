@@ -16,6 +16,7 @@
 //! from the blockchain.
 
 use std::cmp;
+use std::ops::Range;
 
 use serde_json::Value;
 
@@ -76,20 +77,11 @@ pub enum TxStatus {
     },
 }
 
-/// Range information. Range borders are included.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Range {
-    /// Left border of the range, >=0.
-    pub from: u64,
-    /// Right border of the range.
-    pub to: u64,
-}
-
 /// Information on blocks coupled with the corresponding range in the blockchain.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BlocksRange {
-    /// Range.
-    pub range: Range,
+    /// Exclusive range of blocks.
+    pub range: Range<u64>,
     /// Blocks in the range.
     pub blocks: Vec<Block>,
 }
@@ -218,10 +210,7 @@ impl<'a> BlockchainExplorer<'a> {
         }
 
         BlocksRange {
-            range: Range {
-                from: height,
-                to: upper,
-            },
+            range: height..upper + 1,
             blocks: v,
         }
     }
