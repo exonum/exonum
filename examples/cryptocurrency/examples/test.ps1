@@ -1,3 +1,5 @@
+#!/usr/bin/env pwsh
+
 #
 # PowerShell script for testing the cryptocurrency demo.
 #
@@ -40,14 +42,14 @@ function Transfer ($jsonFilename) {
 # Checks that a `CreateWallet` transaction is committed to the blockchain.
 function Check-CreateTx ($tx) {
   $resp = Invoke-WebRequest "http://127.0.0.1:8000/api/explorer/v1/transactions/$($tx.hash)";
-  $error = False;
+  $error = false;
   if ($resp.StatusCode -eq 200) {
     $respJson = $resp.Content | ConvertFrom-Json;
     if (($respJson.type -ne 'Committed') -or ($respJson.content.body.name -ne $tx.name)) {
-      $error = True;
+      $error = true;
     }
   } else {
-    $error = True;
+    $error = true;
   }
 
   if ($error) {
@@ -136,10 +138,18 @@ $server = Start-Server;
 
 # Wait until the service is started. As we have compiled the server previously,
 # starting it shouldn't take long.
-sleep 5;
+sleep 12;
 
 try {
   Main;
 } finally {
   kill $server.id;
+
+  # A hack: on *NIX, the command above does not kill the demo server
+  if ($myinvocation.UnboundArguments[0] -eq 'unix') {
+    $cpid = (bash -c 'lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null | awk ''{ if ($9 == \"*:8000\") { print $2 } }''');
+    if ($cpid -ne '') {
+      kill $cpid;
+    }
+  }
 }
