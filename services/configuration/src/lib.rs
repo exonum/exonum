@@ -125,17 +125,14 @@ impl blockchain::Service for Service {
 
     fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
         let mut router = Router::new();
-        let api = api::PublicApi { blockchain: ctx.blockchain().clone() };
+        let api = api::PublicApi::new(ctx);
         api.wire(&mut router);
         Some(Box::new(router))
     }
 
     fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
         let mut router = Router::new();
-        let api = api::PrivateApi {
-            channel: ctx.node_channel().clone(),
-            config: (*ctx.public_key(), ctx.secret_key().clone()),
-        };
+        let api = api::PrivateApi::new(ctx);
         api.wire(&mut router);
         Some(Box::new(router))
     }

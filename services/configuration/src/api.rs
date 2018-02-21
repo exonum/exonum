@@ -12,16 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::str;
-
 use router::Router;
 use iron::prelude::*;
 use bodyparser;
 use exonum::api::{Api, ApiError};
 use exonum::crypto::{CryptoHash, PublicKey, SecretKey, Hash};
-use exonum::blockchain::{Blockchain, StoredConfiguration, Schema as CoreSchema};
+use exonum::blockchain::{ApiContext, Blockchain, StoredConfiguration, Schema as CoreSchema};
+use exonum::node::{ApiSender, TransactionSend};
 use exonum::storage::StorageValue;
-use exonum::node::TransactionSend;
 use exonum::encoding::serialize::json::reexport as serde_json;
 use exonum::helpers::Height;
 
@@ -61,14 +59,14 @@ pub struct VoteResponse {
 }
 
 #[derive(Clone)]
-pub struct PrivateApi<T: TransactionSend + Clone> {
-    pub channel: T,
-    pub config: (PublicKey, SecretKey),
+pub struct PrivateApi {
+    channel: ApiSender,
+    service_keys: (PublicKey, SecretKey),
 }
 
 #[derive(Clone)]
 pub struct PublicApi {
-    pub blockchain: Blockchain,
+    blockchain: Blockchain,
 }
 
 /// Filter for stored configurations.
@@ -97,6 +95,10 @@ impl Filter {
 }
 
 impl PublicApi {
+    pub fn new(context: &ApiContext) -> Self {
+        PublicApi { blockchain: context.blockchain().clone() }
+    }
+
     fn config_with_proofs(&self, config: StoredConfiguration) -> ConfigHashInfo {
         let propose = Schema::new(self.blockchain.snapshot())
             .propose(&config.hash())
@@ -110,35 +112,8 @@ impl PublicApi {
         }
     }
 
-    fn actual_config(&self) -> ConfigHashInfo {
-        let snapshot = self.blockchain.snapshot();
-        let configuration_schema = CoreSchema::new(&snapshot);
-        let actual_cfg = configuration_schema.actual_configuration();
-        self.config_with_proofs(actual_cfg)
-    }
-
-    fn following_config(&self) -> Option<ConfigHashInfo> {
-        CoreSchema::new(self.blockchain.snapshot())
-            .following_configuration()
-            .map(|following_cfg| self.config_with_proofs(following_cfg))
-    }
-
-    fn config_by_hash(&self, hash: &Hash) -> ConfigInfo {
-        let snapshot = self.blockchain.snapshot();
-        let committed_config = CoreSchema::new(&snapshot).configs().get(hash);
-        let propose = Schema::new(&snapshot).propose_data_by_config_hash().get(
-            hash,
-        );
-
-        ConfigInfo {
-            committed_config,
-            propose,
-        }
-    }
-
     fn votes_for_propose(&self, config_hash: &Hash) -> VotesInfo {
         let schema = Schema::new(self.blockchain.snapshot());
-
         if schema.propose_data_by_config_hash().contains(config_hash) {
             Some(schema.votes(config_hash))
         } else {
@@ -147,7 +122,7 @@ impl PublicApi {
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
-    fn all_proposes(&self, filter: &Filter) -> Vec<ProposeHashInfo> {
+    fn proposed_configs(&self, filter: &Filter) -> Vec<ProposeHashInfo> {
         let schema = Schema::new(self.blockchain.snapshot());
         let index = schema.config_hash_by_ordinal();
         let proposes_by_hash = schema.propose_data_by_config_hash();
@@ -176,7 +151,7 @@ impl PublicApi {
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
-    fn all_committed(&self, filter: &Filter) -> Vec<ConfigHashInfo> {
+    fn committed_configs(&self, filter: &Filter) -> Vec<ConfigHashInfo> {
         let core_schema = CoreSchema::new(self.blockchain.snapshot());
         let actual_from = core_schema.configs_actual_from();
         let configs = core_schema.configs();
@@ -196,6 +171,64 @@ impl PublicApi {
         committed_configs
     }
 
+    fn handle_actual_config(self, router: &mut Router) {
+        let actual_config = move |_: &mut Request| -> IronResult<Response> {
+            let config = CoreSchema::new(self.blockchain.snapshot()).actual_configuration();
+            let config = self.config_with_proofs(config);
+            self.ok_response(&serde_json::to_value(config).unwrap())
+        };
+
+        router.get("/v1/configs/actual", actual_config, "actual_config");
+    }
+
+    fn handle_following_config(self, router: &mut Router) {
+        let following_config = move |_: &mut Request| -> IronResult<Response> {
+            let config = CoreSchema::new(self.blockchain.snapshot())
+                .following_configuration()
+                .map(|cfg| self.config_with_proofs(cfg));
+            self.ok_response(&serde_json::to_value(config).unwrap())
+        };
+
+        router.get(
+            "/v1/configs/following",
+            following_config,
+            "following_config",
+        );
+    }
+
+    fn handle_config_by_hash(self, router: &mut Router) {
+        let config_by_hash = move |req: &mut Request| -> IronResult<Response> {
+            let hash: Hash = self.url_fragment(req, "hash")?;
+
+            let snapshot = self.blockchain.snapshot();
+            let committed_config = CoreSchema::new(&snapshot).configs().get(&hash);
+            let propose = Schema::new(&snapshot).propose_data_by_config_hash().get(
+                &hash,
+            );
+
+            self.ok_response(&serde_json::to_value(ConfigInfo {
+                committed_config,
+                propose,
+            }).unwrap())
+        };
+
+        router.get("/v1/configs/:hash", config_by_hash, "config_by_hash");
+    }
+
+    fn handle_votes_for_propose(self, router: &mut Router) {
+        let votes_for_propose = move |req: &mut Request| -> IronResult<Response> {
+            let config_hash: Hash = self.url_fragment(req, "hash")?;
+            let votes = self.votes_for_propose(&config_hash);
+            self.ok_response(&serde_json::to_value(votes).unwrap())
+        };
+
+        router.get(
+            "/v1/configs/:hash/votes",
+            votes_for_propose,
+            "votes_for_propose",
+        );
+    }
+
     fn retrieve_filter(&self, request: &mut Request) -> Result<Filter, ApiError> {
         let previous_cfg_hash: Option<Hash> = self.optional_param(request, "previous_cfg_hash")?;
         let actual_from: Option<Height> = self.optional_param(request, "actual_from")?;
@@ -204,126 +237,94 @@ impl PublicApi {
             actual_from,
         })
     }
-}
 
-impl<T> PrivateApi<T>
-where
-    T: TransactionSend + Clone,
-{
-    fn put_config_propose(&self, cfg: StoredConfiguration) -> Result<ProposeResponse, ApiError> {
-        let cfg_hash = cfg.hash();
-        let config_propose = Propose::new(
-            &self.config.0,
-            str::from_utf8(cfg.into_bytes().as_slice()).unwrap(),
-            &self.config.1,
-        );
-        let tx_hash = config_propose.hash();
-        let ch = self.channel.clone();
-        ch.send(Box::new(config_propose))?;
-        let res = ProposeResponse { tx_hash, cfg_hash };
-        Ok(res)
+    fn handle_proposed_configs(self, router: &mut Router) {
+        let proposed_configs = move |req: &mut Request| -> IronResult<Response> {
+            let proposes = self.proposed_configs(&self.retrieve_filter(req)?);
+            self.ok_response(&serde_json::to_value(proposes).unwrap())
+        };
+
+        router.get("/v1/configs/proposed", proposed_configs, "proposed_configs");
     }
 
-    fn put_config_vote(&self, cfg_hash: &Hash) -> Result<VoteResponse, ApiError> {
-        let config_vote = Vote::new(&self.config.0, cfg_hash, &self.config.1);
-        let tx_hash = config_vote.hash();
-        let ch = self.channel.clone();
-        ch.send(Box::new(config_vote))?;
-        let res = VoteResponse { tx_hash };
-        Ok(res)
+    fn handle_committed_configs(self, router: &mut Router) {
+        let committed_configs = move |req: &mut Request| -> IronResult<Response> {
+            let configs = self.committed_configs(&self.retrieve_filter(req)?);
+            self.ok_response(&serde_json::to_value(configs).unwrap())
+        };
+
+        router.get(
+            "/v1/configs/committed",
+            committed_configs,
+            "committed_configs",
+        );
+    }
+}
+
+impl PrivateApi {
+    pub fn new(context: &ApiContext) -> Self {
+        PrivateApi {
+            channel: context.node_channel().clone(),
+            service_keys: (*context.public_key(), context.secret_key().clone()),
+        }
+    }
+
+    fn handle_propose(self, router: &mut Router) {
+        let post_propose = move |req: &mut Request| -> IronResult<Response> {
+            let config = match req.get::<bodyparser::Struct<StoredConfiguration>>() {
+                Ok(Some(config)) => config,
+                Ok(None) => Err(ApiError::BadRequest("Empty request body".into()))?,
+                Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
+            };
+
+            let cfg_hash = config.hash();
+            let propose = Propose::new(
+                &self.service_keys.0,
+                ::std::str::from_utf8(config.into_bytes().as_slice()).unwrap(),
+                &self.service_keys.1,
+            );
+            let tx_hash = propose.hash();
+
+            self.channel.send(propose.into()).map_err(ApiError::from)?;
+
+            let response = ProposeResponse { tx_hash, cfg_hash };
+            self.ok_response(&serde_json::to_value(response).unwrap())
+        };
+
+        router.post("/v1/configs/postpropose", post_propose, "post_propose");
+    }
+
+    fn handle_vote(self, router: &mut Router) {
+        let post_vote = move |req: &mut Request| -> IronResult<Response> {
+            let cfg_hash: Hash = self.url_fragment(req, "hash")?;
+
+            let vote = Vote::new(&self.service_keys.0, &cfg_hash, &self.service_keys.1);
+            let tx_hash = vote.hash();
+
+            self.channel.send(vote.into()).map_err(ApiError::from)?;
+
+            let response = VoteResponse { tx_hash };
+            self.ok_response(&serde_json::to_value(response).unwrap())
+        };
+
+        router.post("/v1/configs/:hash/postvote", post_vote, "post_vote");
     }
 }
 
 impl Api for PublicApi {
     fn wire(&self, router: &mut Router) {
-        let self_ = self.clone();
-        let config_actual = move |_: &mut Request| -> IronResult<Response> {
-            let info = self_.actual_config();
-            self_.ok_response(&serde_json::to_value(info).unwrap())
-        };
-
-        let self_ = self.clone();
-        let config_following = move |_: &mut Request| -> IronResult<Response> {
-            let info = self_.following_config();
-            self_.ok_response(&serde_json::to_value(info).unwrap())
-        };
-
-        let self_ = self.clone();
-        let config_by_hash = move |req: &mut Request| -> IronResult<Response> {
-            let hash: Hash = self_.url_fragment(req, "hash")?;
-            let info = self_.config_by_hash(&hash);
-            self_.ok_response(&serde_json::to_value(info).unwrap())
-        };
-
-        let self_ = self.clone();
-        let votes_for_propose = move |req: &mut Request| -> IronResult<Response> {
-            let propose_cfg_hash: Hash = self_.url_fragment(req, "hash")?;
-            let info = self_.votes_for_propose(&propose_cfg_hash);
-            self_.ok_response(&serde_json::to_value(info).unwrap())
-        };
-
-        let self_ = self.clone();
-        let all_proposes = move |req: &mut Request| -> IronResult<Response> {
-            let info = self_.all_proposes(&self_.retrieve_filter(req)?);
-            self_.ok_response(&serde_json::to_value(info).unwrap())
-        };
-
-        let self_ = self.clone();
-        let all_committed = move |req: &mut Request| -> IronResult<Response> {
-            let info = self_.all_committed(&self_.retrieve_filter(req)?);
-            self_.ok_response(&serde_json::to_value(info).unwrap())
-        };
-
-        router.get("/v1/configs/actual", config_actual, "config_actual");
-        router.get(
-            "/v1/configs/following",
-            config_following,
-            "config_following",
-        );
-        router.get("/v1/configs/:hash", config_by_hash, "config_by_hash");
-        router.get(
-            "/v1/configs/:hash/votes",
-            votes_for_propose,
-            "votes_for_propose",
-        );
-        router.get("/v1/configs/proposed", all_proposes, "all_proposes");
-        router.get("/v1/configs/committed", all_committed, "all_committed");
+        self.clone().handle_actual_config(router);
+        self.clone().handle_following_config(router);
+        self.clone().handle_config_by_hash(router);
+        self.clone().handle_votes_for_propose(router);
+        self.clone().handle_proposed_configs(router);
+        self.clone().handle_committed_configs(router);
     }
 }
 
-impl<T> Api for PrivateApi<T>
-where
-    T: 'static + TransactionSend + Clone,
-{
+impl Api for PrivateApi {
     fn wire(&self, router: &mut Router) {
-        let self_ = self.clone();
-        let put_config_propose = move |req: &mut Request| -> IronResult<Response> {
-            match req.get::<bodyparser::Struct<StoredConfiguration>>() {
-                Ok(Some(cfg)) => {
-                    let info = self_.put_config_propose(cfg)?;
-                    self_.ok_response(&serde_json::to_value(info).unwrap())
-                }
-                Ok(None) => Err(ApiError::BadRequest("Empty request body".into()))?,
-                Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
-            }
-        };
-
-        let self_ = self.clone();
-        let put_config_vote = move |req: &mut Request| -> IronResult<Response> {
-            let propose_cfg_hash = self_.url_fragment(req, "hash")?;
-            let info = self_.put_config_vote(&propose_cfg_hash)?;
-            self_.ok_response(&serde_json::to_value(info).unwrap())
-        };
-
-        router.post(
-            "/v1/configs/postpropose",
-            put_config_propose,
-            "put_config_propose",
-        );
-        router.post(
-            "/v1/configs/:hash/postvote",
-            put_config_vote,
-            "put_config_vote",
-        );
+        self.clone().handle_propose(router);
+        self.clone().handle_vote(router);
     }
 }
