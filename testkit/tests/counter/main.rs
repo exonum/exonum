@@ -19,17 +19,19 @@ extern crate exonum_testkit;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
+#[macro_use]
 extern crate serde_json;
 #[macro_use]
 extern crate pretty_assertions;
 
-use exonum::crypto::{self, PublicKey, CryptoHash};
 use exonum::blockchain::Transaction;
+use exonum::crypto::{self, PublicKey, CryptoHash};
 use exonum::helpers::Height;
 use exonum::messages::Message;
 use exonum::encoding::serialize::FromHex;
 use exonum::encoding::serialize::json::ExonumJson;
 use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};
+use serde_json::Value;
 
 mod counter;
 use counter::{CounterSchema, CounterService, TransactionResponse, TxIncrement, TxReset, ADMIN_KEY};
@@ -492,72 +494,127 @@ fn test_explorer_single_block() {
 
 #[test]
 fn test_explorer_transaction() {
-    use exonum::explorer::{BlockInfo, TxInfo as CommittedTxInfo, TxStatus};
+    use exonum::explorer::BlockInfo;
     use exonum::helpers::Height;
+    use exonum::storage::ListProof;
 
-    // Analog of the structure defined by the system API handler.
-    #[derive(Deserialize)]
-    #[serde(rename_all = "kebab-case")]
-    enum TxInfo {
-        Unknown,
-        InPool { content: serde_json::Value },
-        Committed(CommittedTxInfo),
+    /// Asserts that all properties from `sub` are equal to the corresponding properties
+    /// in `obj`.
+    fn assert_contains_all(obj: &Value, sub: &Value) {
+        if let (&Value::Object(ref obj), &Value::Object(ref sub)) = (obj, sub) {
+            for (key, value) in sub {
+                assert_eq!(obj[key], *value);
+            }
+        } else {
+            panic!("Two objects expected");
+        }
     }
 
-    let mut testkit = TestKitBuilder::validator()
-        .with_validators(4)
-        .with_service(CounterService)
-        .create();
-    let api = testkit.api();
+    let (mut testkit, api) = init_testkit();
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
         TxIncrement::new(&pubkey, 5, &key)
     };
-
-    let info: TxInfo = api.get_err(
+    let info: Value = api.get_err(
         ApiKind::Explorer,
         &format!("v1/transactions/{}", &tx.hash().to_string()),
     );
-    match info {
-        TxInfo::Unknown => {}
-        _ => panic!("Transaction should be unknown to the node"),
-    }
+    assert_eq!(info, json!({ "type": "unknown" }));
 
     api.send(tx.clone());
     testkit.poll_events();
 
-    let info: TxInfo = api.get(
+    let info: Value = api.get(
         ApiKind::Explorer,
         &format!("v1/transactions/{}", &tx.hash().to_string()),
     );
-    if let TxInfo::InPool { content } = info {
-        assert_eq!(content, tx.serialize_field().unwrap());
-    } else {
-        panic!("Transaction should be in the pool");
-    }
+    assert_eq!(info, json!({
+        "type": "in-pool",
+        "content": tx.serialize_field().unwrap(),
+    }));
 
     testkit.create_block();
-    let info: TxInfo = api.get(
+    let info: Value = api.get(
         ApiKind::Explorer,
         &format!("v1/transactions/{}", &tx.hash().to_string()),
     );
-    if let TxInfo::Committed(info) = info {
-        assert_eq!(info.content, tx.serialize_field().unwrap());
-        assert_eq!(info.location.block_height(), Height(1));
-        assert_eq!(info.location.position_in_block(), 0);
-        assert_eq!(info.status, TxStatus::Success);
+    assert_contains_all(
+        &info,
+        &json!({
+            "type": "committed",
+            "content": tx.serialize_field().unwrap(),
+            "location": {
+                "block_height": Height(1).serialize_field().unwrap(),
+                "position_in_block": "0",
+            },
+            "status": { "type": "success" },
+        }),
+    );
 
+    if let Value::Object(mut info) = info {
+        let location_proof = info.remove("location_proof").unwrap();
+        let location_proof: ListProof<crypto::Hash> = serde_json::from_value(location_proof)
+            .unwrap();
         let block: BlockInfo = api.get(ApiKind::Explorer, "v1/blocks/1");
         let block = block.block;
         assert!(
-            info.location_proof
+            location_proof
                 .validate(*block.tx_hash(), u64::from(block.tx_count()))
                 .is_ok()
         );
     } else {
-        panic!("Transaction should be committed");
+        panic!("Invalid transaction info format, object expected");
     }
+}
+
+#[test]
+fn test_explorer_transaction_statuses() {
+    fn assert_status(api: &TestKitApi, tx: &Transaction, expected_status: &Value) {
+        let info: Value = api.get(
+            ApiKind::Explorer,
+            &format!("v1/transactions/{}", &tx.hash().to_string()),
+        );
+        if let Value::Object(mut info) = info {
+            let tx_status = info.remove("status").unwrap();
+            assert_eq!(tx_status, *expected_status);
+        } else {
+            panic!("Invalid transaction info format, object expected");
+        }
+    }
+
+    let (mut testkit, api) = init_testkit();
+
+    let tx = {
+        let (pubkey, key) = crypto::gen_keypair();
+        TxIncrement::new(&pubkey, 5, &key)
+    };
+    let error_tx = {
+        let (pubkey, key) = crypto::gen_keypair();
+        TxIncrement::new(&pubkey, 0, &key)
+    };
+    let panicking_tx = {
+        let (pubkey, key) = crypto::gen_keypair();
+        TxIncrement::new(&pubkey, u64::max_value() - 3, &key)
+    };
+
+    testkit.create_block_with_transactions(txvec![
+        tx.clone(),
+        error_tx.clone(),
+        panicking_tx.clone(),
+    ]);
+
+    assert_status(&api, &tx, &json!({ "type": "success" }));
+    assert_status(
+        &api,
+        &error_tx,
+        &json!({ "type": "error", "code": 0, "description": "Adding zero does nothing!" }),
+    );
+    assert_status(
+        &api,
+        &panicking_tx,
+        &json!({ "type": "panic", "description": "" }),
+    );
 }
 
 // Make sure that boxed transaction can be used in the `TestKitApi::send`.
