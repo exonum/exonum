@@ -15,13 +15,15 @@
 //! Common widely used type definitions.
 
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
-use encoding::ExonumJson;
+use encoding::{ExonumJson, Offset, CheckedOffset, Field, Result as EncodingResult};
+use encoding::serialize::WriteBufferWrapper;
 use encoding::serialize::json::reexport::Value as JsonValue;
 use byteorder::LittleEndian;
 
 use std::fmt;
 use std::mem;
 use std::str::FromStr;
+use std::error::Error;
 use std::num::ParseIntError;
 
 /// Number of milliseconds.
@@ -363,7 +365,7 @@ impl Iterator for RoundRangeIter {
 // TODO: Make a macro for tuple struct type definitions (ECR-154)?
 impl ExonumJson for Height {
     fn deserialize_field<B: WriteBufferWrapper>(
-        value: &Value,
+        value: &JsonValue,
         buffer: &mut B,
         from: Offset,
         to: Offset,
@@ -373,7 +375,7 @@ impl ExonumJson for Height {
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+    fn serialize_field(&self) -> Result<JsonValue, Box<Error + Send + Sync>> {
         let val: u64 = self.to_owned().into();
         Ok(JsonValue::String(val.to_string()))
     }
@@ -381,7 +383,7 @@ impl ExonumJson for Height {
 
 impl ExonumJson for Round {
     fn deserialize_field<B: WriteBufferWrapper>(
-        value: &Value,
+        value: &JsonValue,
         buffer: &mut B,
         from: Offset,
         to: Offset,
@@ -391,7 +393,7 @@ impl ExonumJson for Round {
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+    fn serialize_field(&self) -> Result<JsonValue, Box<Error + Send + Sync>> {
         let val: u32 = self.to_owned().into();
         Ok(JsonValue::Number(val.into()))
     }
@@ -399,7 +401,7 @@ impl ExonumJson for Round {
 
 impl ExonumJson for ValidatorId {
     fn deserialize_field<B: WriteBufferWrapper>(
-        value: &Value,
+        value: &JsonValue,
         buffer: &mut B,
         from: Offset,
         to: Offset,
@@ -409,7 +411,7 @@ impl ExonumJson for ValidatorId {
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+    fn serialize_field(&self) -> Result<JsonValue, Box<Error + Send + Sync>> {
         let val: u16 = self.to_owned().into();
         Ok(JsonValue::Number(val.into()))
     }
@@ -420,28 +422,28 @@ impl ExonumJson for ValidatorId {
 macro_rules! implement_std_typedef_field {
     ($name:ident ($t:ty) $fn_read:expr; $fn_write:expr) => (
         impl<'a> Field<'a> for $name {
-            fn field_size() -> $crate::Offset {
-                mem::size_of::<$t>() as $crate::Offset
+            fn field_size() -> Offset {
+                mem::size_of::<$t>() as Offset
             }
 
             unsafe fn read(buffer: &'a [u8],
-                           from: $crate::Offset,
-                           to: $crate::Offset) -> $name {
+                           from: Offset,
+                           to: Offset) -> $name {
                 $name($fn_read(&buffer[from as usize..to as usize]))
             }
 
             fn write(&self,
                         buffer: &mut Vec<u8>,
-                        from: $crate::Offset,
-                        to: $crate::Offset) {
+                        from: Offset,
+                        to: Offset) {
                 $fn_write(&mut buffer[from as usize..to as usize], self.to_owned().into())
             }
 
             fn check(_: &'a [u8],
-                        from: $crate::CheckedOffset,
-                        to: $crate::CheckedOffset,
+                        from: CheckedOffset,
+                        to: CheckedOffset,
                         latest_segment: CheckedOffset)
-            ->  $crate::Result
+            ->  EncodingResult
             {
                 debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
                 Ok(latest_segment)

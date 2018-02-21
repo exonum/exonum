@@ -76,7 +76,7 @@ macro_rules! encoding_struct {
                             from: ::encoding::Offset,
                             to: ::encoding::Offset) -> Self {
                 let vec: Vec<u8> = ::encoding::Field::read(buffer, from, to);
-                $crate::storage::StorageValue::from_bytes(::std::borrow::Cow::Owned(vec))
+                ::storage::StorageValue::from_bytes(::std::borrow::Cow::Owned(vec))
             }
 
             fn write(&self,
@@ -132,7 +132,7 @@ macro_rules! encoding_struct {
 
         impl ::crypto::CryptoHash for $name {
             fn hash(&self) -> ::crypto::Hash {
-                $crate::crypto::hash(self.raw.as_ref())
+                ::crypto::hash(self.raw.as_ref())
             }
         }
 

@@ -15,13 +15,14 @@
 use std::{convert, mem, sync};
 use std::fmt::Debug;
 use std::ops::Deref;
+use std::error::Error;
 
 use byteorder::{ByteOrder, LittleEndian};
 
 use crypto::{hash, sign, verify, CryptoHash, Hash, PublicKey, SecretKey, Signature,
              SIGNATURE_LENGTH};
-use encoding::{self, CheckedOffset, Field, Offset, Result as StreamStructResult,
-               Error as EncodingError};
+use encoding::{CheckedOffset, Field, Offset, ExonumJson, self};
+use encoding::serialize::WriteBufferWrapper;
 use encoding::serialize::json::reexport::{Value as JsonValue};
 
 /// Length of the message header.
@@ -93,7 +94,7 @@ impl MessageBuffer {
         // TODO: check that size >= HEADER_LENGTH
         // TODO: check that payload_length == raw.len()
         // ECR-166
-        MessageBuffer { raw: raw }
+        MessageBuffer { raw }
     }
 
     /// Returns the length of the message in bytes.
@@ -162,7 +163,7 @@ impl MessageBuffer {
         from: CheckedOffset,
         to: CheckedOffset,
         latest_segment: CheckedOffset,
-    ) -> StreamStructResult {
+    ) -> encoding::Result {
         F::check(
             self.body(),
             (from + HEADER_LENGTH as u32)?,
@@ -326,7 +327,7 @@ impl WriteBufferWrapper for MessageWriter {
 
 impl ExonumJson for Vec<RawMessage> {
     fn deserialize_field<B: WriteBufferWrapper>(
-        value: &Value,
+        value: &JsonValue,
         buffer: &mut B,
         from: Offset,
         to: Offset,
@@ -353,7 +354,7 @@ impl ExonumJson for Vec<RawMessage> {
     }
 }
 
-impl<'a> SegmentField<'a> for RawMessage {
+impl<'a> encoding::SegmentField<'a> for RawMessage {
     fn item_size() -> Offset {
         1
     }
@@ -378,12 +379,12 @@ impl<'a> SegmentField<'a> for RawMessage {
         from: CheckedOffset,
         count: CheckedOffset,
         latest_segment: CheckedOffset,
-    ) -> Result {
+    ) -> encoding::Result {
         let size: CheckedOffset = (count * Self::item_size())?;
         let to: CheckedOffset = (from + size)?;
         let slice = &buffer[from.unchecked_offset() as usize..to.unchecked_offset() as usize];
         if slice.len() < HEADER_LENGTH {
-            return Err(EncodingError::UnexpectedlyShortRawMessage {
+            return Err(encoding::Error::UnexpectedlyShortRawMessage {
                 position: from.unchecked_offset(),
                 size: slice.len() as Offset,
             });
@@ -391,7 +392,7 @@ impl<'a> SegmentField<'a> for RawMessage {
         let actual_size = slice.len() as Offset;
         let declared_size: Offset = LittleEndian::read_u32(&slice[6..10]);
         if actual_size != declared_size {
-            return Err(EncodingError::IncorrectSizeOfRawMessage {
+            return Err(encoding::Error::IncorrectSizeOfRawMessage {
                 position: from.unchecked_offset(),
                 actual_size: slice.len() as Offset,
                 declared_size: declared_size,

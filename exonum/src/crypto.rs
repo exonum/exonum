@@ -28,17 +28,14 @@ use sodiumoxide;
 use serde::{Serialize, Serializer};
 use serde::de::{self, Deserialize, Deserializer, Visitor};
 use byteorder::{ByteOrder, LittleEndian};
-use encoding::{FromHex, Offset, self};
+use encoding::{FromHex, Offset, CheckedOffset, ExonumJson, Field, self};
+use encoding::serialize::WriteBufferWrapper;
 use encoding::serialize::json::reexport::Value as JsonValue;
 
 use std::default::Default;
 use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
 use std::fmt;
-use std::time::{SystemTime, UNIX_EPOCH};
-
-use std::default::Default;
-use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
-use std::fmt;
+use std::error::Error;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use helpers::Round;
@@ -708,7 +705,7 @@ impl CryptoHash for Round {
 
 impl<'a> ExonumJson for &'a [Hash] {
     fn deserialize_field<B: WriteBufferWrapper>(
-        value: &Value,
+        value: &JsonValue,
         buffer: &mut B,
         from: Offset,
         to: Offset,
@@ -724,7 +721,7 @@ impl<'a> ExonumJson for &'a [Hash] {
         Ok(())
     }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+    fn serialize_field(&self) -> Result<JsonValue, Box<Error + Send + Sync>> {
         let mut vec = Vec::new();
         for hash in self.iter() {
             vec.push(hash.serialize_field()?)
@@ -740,21 +737,21 @@ impl<'a> ExonumJson for &'a [Hash] {
 macro_rules! implement_pod_as_ref_field {
     ($name:ident) => (
         impl<'a> Field<'a> for &'a $name {
-            fn field_size() ->  $crate::Offset {
-                ::std::mem::size_of::<$name>() as $crate::Offset
+            fn field_size() ->  Offset {
+                ::std::mem::size_of::<$name>() as Offset
             }
 
             unsafe fn read(buffer: &'a [u8],
-                            from: $crate::Offset,
-                            _: $crate::Offset) -> &'a $name
+                            from: Offset,
+                            _: Offset) -> &'a $name
             {
                 ::std::mem::transmute(&buffer[from as usize])
             }
 
             fn write(&self,
                         buffer: &mut Vec<u8>,
-                        from: $crate::Offset,
-                        to: $crate::Offset)
+                        from: Offset,
+                        to: Offset)
             {
                 let ptr: *const $name = *self as *const $name;
                 let slice = unsafe {
@@ -764,10 +761,10 @@ macro_rules! implement_pod_as_ref_field {
             }
 
             fn check(_: &'a [u8],
-                        from:  $crate::CheckedOffset,
-                        to:  $crate::CheckedOffset,
-                        latest_segment: $crate::CheckedOffset)
-            ->  $crate::Result
+                        from: CheckedOffset,
+                        to: CheckedOffset,
+                        latest_segment: CheckedOffset)
+            ->  encoding::Result
             {
                 debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
                 Ok(latest_segment)
@@ -798,7 +795,7 @@ macro_rules! impl_default_deserialize_owned {
 macro_rules! impl_deserialize_hex_segment {
     (@impl $typename:ty) => {
         impl<'a> ExonumJson for &'a $typename {
-            fn deserialize_field<B: WriteBufferWrapper>(value: &Value,
+            fn deserialize_field<B: WriteBufferWrapper>(value: &JsonValue,
                                                         buffer: & mut B,
                                                         from: Offset,
                                                         to: Offset)
@@ -810,7 +807,7 @@ macro_rules! impl_deserialize_hex_segment {
                 Ok(())
             }
 
-            fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+            fn serialize_field(&self) -> Result<JsonValue, Box<Error + Send + Sync>> {
                 let hex_str = encoding::serialize::encode_hex(&self[..]);
                 Ok(JsonValue::String(hex_str))
             }
