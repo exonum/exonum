@@ -125,8 +125,8 @@ jobs:
     - cargo run -p exonum-testkit --example timestamping
     - cargo run -p exonum-testkit --example configuration_change
     - cargo run -p exonum-time --example simple_service
-    - cd examples/cryptocurrency/examples && ./test.sh && cd ../../..
-    - cd examples/cryptocurrency/examples && ./test.ps1 unix && cd ../../..
+    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
+    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
 
   # Benchmarks (compilation only)
   - env: FEATURE=benchmarks

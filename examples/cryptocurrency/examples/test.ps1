@@ -144,12 +144,4 @@ try {
   Main;
 } finally {
   kill $server.id;
-
-  # A hack: on *NIX, the command above does not kill the demo server
-  if ($myinvocation.UnboundArguments[0] -eq 'unix') {
-    $cpid = (bash -c 'lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null | awk ''{ if ($9 == \"*:8000\") { print $2 } }''');
-    if ($cpid -ne '') {
-      kill $cpid;
-    }
-  }
 }
