@@ -25,7 +25,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::net::SocketAddr;
 use std::error::Error;
 
-use serde_json::value::Value;
+use serde_json::value::{Value, from_value};
 use bit_vec::BitVec;
 use hex::FromHex;
 
@@ -289,6 +289,21 @@ impl ExonumJson for BitVec {
         Ok(Value::String(out))
     }
 }
+
+macro_rules! impl_default_deserialize_owned {
+    (@impl $name:ty) => {
+        impl ExonumJsonDeserialize for $name {
+            fn deserialize(value: &Value)
+                -> Result<Self, Box<Error>> {
+                Ok(from_value(value.clone())?)
+            }
+        }
+    };
+    ($($name:ty);*) =>
+        ($(impl_default_deserialize_owned!{@impl $name})*);
+}
+
+impl_default_deserialize_owned!{u8; u16; u32; i8; i16; i32; u64; i64; bool}
 
 /// Reexport of `serde` specific traits, this reexports
 /// provide compatibility layer with important `serde_json` version.

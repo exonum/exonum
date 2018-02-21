@@ -817,8 +817,7 @@ macro_rules! impl_deserialize_hex_segment {
 }
 
 impl_deserialize_hex_segment!{Hash; PublicKey; Signature}
-impl_default_deserialize_owned!{u8; u16; u32; i8; i16; i32; u64; i64;
-                                Hash; PublicKey; Signature; bool}
+impl_default_deserialize_owned!{Hash; PublicKey; Signature}
 
 #[cfg(test)]
 mod tests {
