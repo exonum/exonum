@@ -16,6 +16,8 @@
 
 #![deny(missing_debug_implementations, missing_docs)]
 
+#[macro_use]
+extern crate failure;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
@@ -35,7 +37,7 @@ use std::sync::{Arc, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use exonum::blockchain::{Blockchain, Service, ServiceContext, Schema, ApiContext, Transaction,
-                         TransactionSet, ExecutionResult};
+                         TransactionSet, ExecutionResult, ExecutionError};
 use exonum::messages::{RawTransaction, Message};
 use exonum::encoding::serialize::json::reexport::Value;
 use exonum::storage::{Fork, Snapshot, ProofMapIndex, Entry};
@@ -111,36 +113,83 @@ transactions! {
     }
 }
 
+#[derive(Debug)]
+#[repr(u8)]
+enum ErrorCode {
+    UnknownSender = 0,
+    ValidatorTimeIsLonger = 1,
+}
+
+#[derive(Debug, Fail)]
+enum Error {
+    #[fail(display = "Not authored by a validator")]
+    UnknownSender,
+
+    #[fail(display = "The validator time is longer than the proposed one")]
+    ValidatorTimeIsLonger,
+}
+
+impl Error {
+    fn code(&self) -> ErrorCode {
+        use self::Error::*;
+
+        match *self {
+            UnknownSender => ErrorCode::UnknownSender,
+            ValidatorTimeIsLonger => ErrorCode::ValidatorTimeIsLonger,
+        }
+    }
+}
+
+impl From<Error> for ExecutionError {
+    fn from(value: Error) -> ExecutionError {
+        ExecutionError::new(value.code() as u8)
+    }
+}
+
+impl TxTime {
+    fn signed_by_validator(&self, snapshot: &Snapshot, key: &PublicKey) -> ExecutionResult {
+        let keys = Schema::new(&snapshot).actual_configuration().validator_keys;
+        let signed = keys.iter().any(|k| k.service_key == *key);
+        if !signed {
+            Err(Error::UnknownSender)?;
+        }
+        Ok(())
+    }
+
+    fn update_validator_time(
+        &self,
+        fork: &mut Fork,
+        key: &PublicKey,
+        proposed_time: SystemTime,
+    ) -> ExecutionResult {
+        let mut schema = TimeSchema::new(fork);
+        match schema.validators_times().get(key) {
+            // The validator time in the storage should be less than in the transaction.
+            Some(time) if time >= proposed_time => {
+                Err(Error::ValidatorTimeIsLonger)?;
+            }
+            // Write the time for the validator.
+            _ => schema.validators_times_mut().put(key, proposed_time),
+        }
+        Ok(())
+    }
+}
+
 impl Transaction for TxTime {
     fn verify(&self) -> bool {
         self.verify_signature(self.pub_key())
     }
 
     fn execute(&self, view: &mut Fork) -> ExecutionResult {
-        let validator_keys = Schema::new(&view).actual_configuration().validator_keys;
-
         // The transaction must be signed by the validator.
-        let signed = validator_keys.iter().any(|&validator| {
-            validator.service_key == *self.pub_key()
-        });
-        if !signed {
-            return Ok(());
-        }
+        self.signed_by_validator(view.as_ref(), self.pub_key())
+            .map_err(|err| err)?;
 
+        self.update_validator_time(view, self.pub_key(), self.time())
+            .map_err(|err| err)?;
+
+        let keys = Schema::new(&view).actual_configuration().validator_keys;
         let mut schema = TimeSchema::new(view);
-        match schema.validators_times().get(self.pub_key()) {
-            // The validator time in the storage should be less than in the transaction.
-            Some(storage_time) if storage_time >= self.time() => {
-                return Ok(());
-            }
-            // Write the time for the validator.
-            _ => {
-                schema.validators_times_mut().put(
-                    self.pub_key(),
-                    self.time(),
-                )
-            }
-        }
 
         // Find all known times for the validators.
         let mut validator_times: Vec<SystemTime>;
@@ -148,8 +197,7 @@ impl Transaction for TxTime {
             let idx = schema.validators_times();
             validator_times = idx.iter()
                 .filter_map(|(public_key, time)| {
-                    validator_keys
-                        .iter()
+                    keys.iter()
                         .find(|validator| validator.service_key == public_key)
                         .map(|_| time)
                 })
@@ -157,16 +205,22 @@ impl Transaction for TxTime {
         }
 
         // The largest number of Byzantine nodes.
-        let max_byzantine_nodes = (validator_keys.len() - 1) / 3;
+        let max_byzantine_nodes = (keys.len() - 1) / 3;
         if validator_times.len() <= 2 * max_byzantine_nodes {
+            // The consolidated time does not change, but we need to stop the transaction
+            // with the result `Ok(())` to save the changes for the validator time.
             return Ok(());
         }
+
         // Ordering time from highest to lowest.
         validator_times.sort_by(|a, b| b.cmp(a));
 
         match schema.time().get() {
             // Selected time should be longer than the time in the storage.
-            Some(current_time) if current_time >= validator_times[max_byzantine_nodes] => {}
+            Some(current_time) if current_time >= validator_times[max_byzantine_nodes] => {
+                // The consolidated time does not change, but we need to return `Ok(())`
+                // to save the changes for the validator time.
+            }
             _ => {
                 // Change the time in the storage.
                 schema.time_mut().set(validator_times[max_byzantine_nodes]);
