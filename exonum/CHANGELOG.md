@@ -70,6 +70,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `Connect` message has been extended with a user agent string, which breaks
   binary compatibility with previous versions. (#362)
 
+- Log output becomed more human readable. Now it uses `rfc2822` for time formatting.
+  It will break scripts that analyze the log output.  
+  (#514)
+
 ### New features
 
 - `StorageKey` and `StorageValue` traits are implemented for `SystemTime`. (#456)
