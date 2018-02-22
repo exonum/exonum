@@ -113,36 +113,19 @@ transactions! {
     }
 }
 
-#[derive(Debug)]
-#[repr(u8)]
-enum ErrorCode {
-    UnknownSender = 0,
-    ValidatorTimeIsLonger = 1,
-}
-
 #[derive(Debug, Fail)]
+#[repr(u8)]
 enum Error {
     #[fail(display = "Not authored by a validator")]
-    UnknownSender,
+    UnknownSender = 0,
 
     #[fail(display = "The validator time is longer than the proposed one")]
-    ValidatorTimeIsLonger,
-}
-
-impl Error {
-    fn code(&self) -> ErrorCode {
-        use self::Error::*;
-
-        match *self {
-            UnknownSender => ErrorCode::UnknownSender,
-            ValidatorTimeIsLonger => ErrorCode::ValidatorTimeIsLonger,
-        }
-    }
+    ValidatorTimeIsLonger = 1,
 }
 
 impl From<Error> for ExecutionError {
     fn from(value: Error) -> ExecutionError {
-        ExecutionError::new(value.code() as u8)
+        ExecutionError::new(value as u8)
     }
 }
 
@@ -151,9 +134,10 @@ impl TxTime {
         let keys = Schema::new(&snapshot).actual_configuration().validator_keys;
         let signed = keys.iter().any(|k| k.service_key == *key);
         if !signed {
-            Err(Error::UnknownSender)?;
+            Err(Error::UnknownSender)?
+        } else {
+            Ok(())
         }
-        Ok(())
     }
 
     fn update_validator_time(
@@ -165,13 +149,13 @@ impl TxTime {
         let mut schema = TimeSchema::new(fork);
         match schema.validators_times().get(key) {
             // The validator time in the storage should be less than in the transaction.
-            Some(time) if time >= proposed_time => {
-                Err(Error::ValidatorTimeIsLonger)?;
-            }
+            Some(time) if time >= proposed_time => Err(Error::ValidatorTimeIsLonger)?,
             // Write the time for the validator.
-            _ => schema.validators_times_mut().put(key, proposed_time),
+            _ => {
+                schema.validators_times_mut().put(key, proposed_time);
+                Ok(())
+            }
         }
-        Ok(())
     }
 }
 
@@ -182,11 +166,13 @@ impl Transaction for TxTime {
 
     fn execute(&self, view: &mut Fork) -> ExecutionResult {
         // The transaction must be signed by the validator.
-        self.signed_by_validator(view.as_ref(), self.pub_key())
-            .map_err(|err| err)?;
+        self.signed_by_validator(view.as_ref(), self.pub_key())?;
 
-        self.update_validator_time(view, self.pub_key(), self.time())
-            .map_err(|err| err)?;
+        self.update_validator_time(
+            view,
+            self.pub_key(),
+            self.time(),
+        )?;
 
         let keys = Schema::new(&view).actual_configuration().validator_keys;
         let mut schema = TimeSchema::new(view);
