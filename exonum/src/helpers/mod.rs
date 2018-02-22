@@ -150,13 +150,6 @@ fn format_log_record(buf: &mut Formatter, record: &Record) -> io::Result<()> {
             Level::Debug => "DEBUG",
             Level::Trace => "TRACE",
         };
-        writeln!(
-            buf,
-            "{} {} {} {}",
-            time,
-            level,
-            &source_path,
-            record.args()
-        )
+        writeln!(buf, "{} {} {} {}", time, level, &source_path, record.args())
     }
 }
