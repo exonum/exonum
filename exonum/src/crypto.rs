@@ -703,33 +703,6 @@ impl CryptoHash for Round {
     }
 }
 
-impl<'a> ExonumJson for &'a [Hash] {
-    fn deserialize_field<B: WriteBufferWrapper>(
-        value: &JsonValue,
-        buffer: &mut B,
-        from: Offset,
-        to: Offset,
-    ) -> Result<(), Box<Error>> {
-        let arr = value.as_array().ok_or("Can't cast json as array")?;
-        let mut vec: Vec<Hash> = Vec::new();
-        for el in arr {
-            let string = el.as_str().ok_or("Can't cast json as string")?;
-            let hash = <Hash as FromHex>::from_hex(string)?;
-            vec.push(hash)
-        }
-        buffer.write(from, to, vec.as_slice());
-        Ok(())
-    }
-
-    fn serialize_field(&self) -> Result<JsonValue, Box<Error + Send + Sync>> {
-        let mut vec = Vec::new();
-        for hash in self.iter() {
-            vec.push(hash.serialize_field()?)
-        }
-        Ok(JsonValue::Array(vec))
-    }
-}
-
 /// Implement field helper for all POD types. It writes POD type as byte array in place.
 ///
 /// **Beware of platform specific data representation.**

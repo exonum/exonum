@@ -27,7 +27,7 @@ use std::error::Error;
 
 use serde_json::value::{Value, from_value};
 use bit_vec::BitVec;
-use hex::{FromHex};
+use hex::FromHex;
 
 use super::{Field, Offset, WriteBufferWrapper};
 
@@ -252,6 +252,37 @@ where
         Ok(Value::Array(vec))
     }
 }
+
+// TODO: FIXME.
+//impl<'a, T: 'a> ExonumJson for &'a [T]
+//    where
+//        T: ExonumJsonDeserialize + ExonumJson,
+//        for<'b> &'a [T]: Field<'b>,
+//{
+//    fn deserialize_field<B: WriteBufferWrapper>(
+//        value: &Value,
+//        buffer: &mut B,
+//        from: Offset,
+//        to: Offset,
+//    ) -> Result<(), Box<Error>> {
+//        let bytes = value.as_array().ok_or("Can't cast json as array")?;
+//        let mut vec: Vec<_> = Vec::new();
+//        for el in bytes {
+//            let obj = T::deserialize(el)?;
+//            vec.push(obj);
+//        }
+//        buffer.write(from, to, vec.as_slice());
+//        Ok(())
+//    }
+//
+//    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+//        let mut vec = Vec::new();
+//        for item in self.iter() {
+//            vec.push(item.serialize_field()?);
+//        }
+//        Ok(Value::Array(vec))
+//    }
+//}
 
 impl ExonumJson for BitVec {
     fn deserialize_field<B: WriteBufferWrapper>(
