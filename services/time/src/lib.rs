@@ -119,7 +119,7 @@ enum Error {
     #[fail(display = "Not authored by a validator")]
     UnknownSender = 0,
 
-    #[fail(display = "The validator time is longer than the proposed one")]
+    #[fail(display = "The validator time is greater than the proposed one")]
     ValidatorTimeIsLonger = 1,
 }
 
@@ -130,9 +130,9 @@ impl From<Error> for ExecutionError {
 }
 
 impl TxTime {
-    fn signed_by_validator(&self, snapshot: &Snapshot, key: &PublicKey) -> ExecutionResult {
+    fn check_signed_by_validator(&self, snapshot: &Snapshot) -> ExecutionResult {
         let keys = Schema::new(&snapshot).actual_configuration().validator_keys;
-        let signed = keys.iter().any(|k| k.service_key == *key);
+        let signed = keys.iter().any(|k| k.service_key == *self.pub_key());
         if !signed {
             Err(Error::UnknownSender)?
         } else {
@@ -140,19 +140,17 @@ impl TxTime {
         }
     }
 
-    fn update_validator_time(
-        &self,
-        fork: &mut Fork,
-        key: &PublicKey,
-        proposed_time: SystemTime,
-    ) -> ExecutionResult {
+    fn update_validator_time(&self, fork: &mut Fork) -> ExecutionResult {
         let mut schema = TimeSchema::new(fork);
-        match schema.validators_times().get(key) {
+        match schema.validators_times().get(self.pub_key()) {
             // The validator time in the storage should be less than in the transaction.
-            Some(time) if time >= proposed_time => Err(Error::ValidatorTimeIsLonger)?,
+            Some(time) if time >= self.time() => Err(Error::ValidatorTimeIsLonger)?,
             // Write the time for the validator.
             _ => {
-                schema.validators_times_mut().put(key, proposed_time);
+                schema.validators_times_mut().put(
+                    self.pub_key(),
+                    self.time(),
+                );
                 Ok(())
             }
         }
@@ -166,13 +164,9 @@ impl Transaction for TxTime {
 
     fn execute(&self, view: &mut Fork) -> ExecutionResult {
         // The transaction must be signed by the validator.
-        self.signed_by_validator(view.as_ref(), self.pub_key())?;
+        self.check_signed_by_validator(view.as_ref())?;
 
-        self.update_validator_time(
-            view,
-            self.pub_key(),
-            self.time(),
-        )?;
+        self.update_validator_time(view)?;
 
         let keys = Schema::new(&view).actual_configuration().validator_keys;
         let mut schema = TimeSchema::new(view);
