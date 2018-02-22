@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use byteorder::{ByteOrder, LittleEndian};
+
 use std::mem;
 use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
-use byteorder::{ByteOrder, LittleEndian};
-
-use crypto::{Hash, PublicKey, Signature};
-use helpers::{Height, Round, ValidatorId};
 use super::{Error, CheckedOffset, Offset, Result};
 
 /// Trait for all types that could be a field in `encoding`.
@@ -57,113 +55,33 @@ pub trait Field<'a> {
 macro_rules! implement_std_field {
     ($name:ident $fn_read:expr; $fn_write:expr) => (
         impl<'a> Field<'a> for $name {
-            fn field_size() -> $crate::encoding::Offset {
-                mem::size_of::<$name>() as $crate::encoding::Offset
+            fn field_size() -> $crate::Offset {
+                mem::size_of::<$name>() as $crate::Offset
             }
 
             unsafe fn read(buffer: &'a [u8],
-                           from: $crate::encoding::Offset,
-                           to: $crate::encoding::Offset) -> $name {
+                           from: $crate::Offset,
+                           to: $crate::Offset) -> $name {
                 $fn_read(&buffer[from as usize..to as usize])
             }
 
             fn write(&self,
                         buffer: &mut Vec<u8>,
-                        from: $crate::encoding::Offset,
-                        to: $crate::encoding::Offset) {
+                        from: $crate::Offset,
+                        to: $crate::Offset) {
                 $fn_write(&mut buffer[from as usize..to as usize], *self)
             }
 
             fn check(_: &'a [u8],
-                        from: $crate::encoding::CheckedOffset,
-                        to: $crate::encoding::CheckedOffset,
+                        from: $crate::CheckedOffset,
+                        to: $crate::CheckedOffset,
                         latest_segment: CheckedOffset)
-            ->  $crate::encoding::Result
+            ->  $crate::Result
             {
                 debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
                 Ok(latest_segment)
             }
         }
-    )
-}
-
-/// Implements `Field` for the tuple struct type definitions that contain simple types.
-macro_rules! implement_std_typedef_field {
-    ($name:ident ($t:ty) $fn_read:expr; $fn_write:expr) => (
-        impl<'a> Field<'a> for $name {
-            fn field_size() -> $crate::encoding::Offset {
-                mem::size_of::<$t>() as $crate::encoding::Offset
-            }
-
-            unsafe fn read(buffer: &'a [u8],
-                           from: $crate::encoding::Offset,
-                           to: $crate::encoding::Offset) -> $name {
-                $name($fn_read(&buffer[from as usize..to as usize]))
-            }
-
-            fn write(&self,
-                        buffer: &mut Vec<u8>,
-                        from: $crate::encoding::Offset,
-                        to: $crate::encoding::Offset) {
-                $fn_write(&mut buffer[from as usize..to as usize], self.to_owned().into())
-            }
-
-            fn check(_: &'a [u8],
-                        from: $crate::encoding::CheckedOffset,
-                        to: $crate::encoding::CheckedOffset,
-                        latest_segment: CheckedOffset)
-            ->  $crate::encoding::Result
-            {
-                debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
-                Ok(latest_segment)
-            }
-        }
-    )
-}
-
-/// Implement field helper for all POD types
-/// it writes POD type as byte array in place.
-///
-/// **Beware of platform specific data representation.**
-#[macro_export]
-macro_rules! implement_pod_as_ref_field {
-    ($name:ident) => (
-        impl<'a> Field<'a> for &'a $name {
-            fn field_size() ->  $crate::encoding::Offset {
-                ::std::mem::size_of::<$name>() as $crate::encoding::Offset
-            }
-
-            unsafe fn read(buffer: &'a [u8],
-                            from: $crate::encoding::Offset,
-                            _: $crate::encoding::Offset) -> &'a $name
-            {
-                ::std::mem::transmute(&buffer[from as usize])
-            }
-
-            fn write(&self,
-                        buffer: &mut Vec<u8>,
-                        from: $crate::encoding::Offset,
-                        to: $crate::encoding::Offset)
-            {
-                let ptr: *const $name = *self as *const $name;
-                let slice = unsafe {
-                    ::std::slice::from_raw_parts(ptr as * const u8,
-                                                        ::std::mem::size_of::<$name>())};
-                buffer[from as usize..to as usize].copy_from_slice(slice);
-            }
-
-            fn check(_: &'a [u8],
-                        from:  $crate::encoding::CheckedOffset,
-                        to:  $crate::encoding::CheckedOffset,
-                        latest_segment: $crate::encoding::CheckedOffset)
-            ->  $crate::encoding::Result
-            {
-                debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
-                Ok(latest_segment)
-            }
-        }
-
-
     )
 }
 
@@ -255,14 +173,6 @@ implement_std_field!{u32 LittleEndian::read_u32; LittleEndian::write_u32}
 implement_std_field!{i32 LittleEndian::read_i32; LittleEndian::write_i32}
 implement_std_field!{u64 LittleEndian::read_u64; LittleEndian::write_u64}
 implement_std_field!{i64 LittleEndian::read_i64; LittleEndian::write_i64}
-
-implement_std_typedef_field!{Height(u64) LittleEndian::read_u64; LittleEndian::write_u64}
-implement_std_typedef_field!{Round(u32) LittleEndian::read_u32; LittleEndian::write_u32}
-implement_std_typedef_field!{ValidatorId(u16) LittleEndian::read_u16; LittleEndian::write_u16}
-
-implement_pod_as_ref_field! {Signature}
-implement_pod_as_ref_field! {PublicKey}
-implement_pod_as_ref_field! {Hash}
 
 // TODO should we check `SystemTime` validity in check (ECR-157)?
 impl<'a> Field<'a> for SystemTime {

@@ -28,13 +28,16 @@ use sodiumoxide;
 use serde::{Serialize, Serializer};
 use serde::de::{self, Deserialize, Deserializer, Visitor};
 use byteorder::{ByteOrder, LittleEndian};
+use encoding::{FromHex, Offset, CheckedOffset, ExonumJson, Field, self};
+use encoding::serialize::WriteBufferWrapper;
+use encoding::serialize::json::reexport::Value as JsonValue;
 
 use std::default::Default;
 use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
 use std::fmt;
+use std::error::Error;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use encoding::serialize::FromHex;
 use helpers::Round;
 
 // spell-checker:disable
@@ -699,6 +702,95 @@ impl CryptoHash for Round {
         self.0.hash()
     }
 }
+
+/// Implement field helper for all POD types. It writes POD type as byte array in place.
+///
+/// **Beware of platform specific data representation.**
+#[macro_export]
+macro_rules! implement_pod_as_ref_field {
+    ($name:ident) => (
+        impl<'a> Field<'a> for &'a $name {
+            fn field_size() ->  Offset {
+                ::std::mem::size_of::<$name>() as Offset
+            }
+
+            unsafe fn read(buffer: &'a [u8],
+                            from: Offset,
+                            _: Offset) -> &'a $name
+            {
+                ::std::mem::transmute(&buffer[from as usize])
+            }
+
+            fn write(&self,
+                        buffer: &mut Vec<u8>,
+                        from: Offset,
+                        to: Offset)
+            {
+                let ptr: *const $name = *self as *const $name;
+                let slice = unsafe {
+                    ::std::slice::from_raw_parts(ptr as * const u8,
+                                                        ::std::mem::size_of::<$name>())};
+                buffer[from as usize..to as usize].copy_from_slice(slice);
+            }
+
+            fn check(_: &'a [u8],
+                        from: CheckedOffset,
+                        to: CheckedOffset,
+                        latest_segment: CheckedOffset)
+            ->  encoding::Result
+            {
+                debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
+                Ok(latest_segment)
+            }
+        }
+
+
+    )
+}
+
+implement_pod_as_ref_field! {Signature}
+implement_pod_as_ref_field! {PublicKey}
+implement_pod_as_ref_field! {Hash}
+
+macro_rules! impl_default_deserialize_owned {
+    (@impl $name:ty) => {
+        impl encoding::serialize::json::ExonumJsonDeserialize for $name {
+            fn deserialize(value: &encoding::serialize::json::reexport::Value)
+                -> Result<Self, Box<::std::error::Error>> {
+                Ok(encoding::serialize::json::reexport::from_value(value.clone())?)
+            }
+        }
+    };
+    ($($name:ty);*) =>
+        ($(impl_default_deserialize_owned!{@impl $name})*);
+}
+
+macro_rules! impl_deserialize_hex_segment {
+    (@impl $typename:ty) => {
+        impl<'a> ExonumJson for &'a $typename {
+            fn deserialize_field<B: WriteBufferWrapper>(value: &JsonValue,
+                                                        buffer: & mut B,
+                                                        from: Offset,
+                                                        to: Offset)
+                -> Result<(), Box<Error>>
+            {
+                let string = value.as_str().ok_or("Can't cast json as string")?;
+                let val = <$typename as FromHex>:: from_hex(string)?;
+                buffer.write(from, to, &val);
+                Ok(())
+            }
+
+            fn serialize_field(&self) -> Result<JsonValue, Box<Error + Send + Sync>> {
+                let hex_str = encoding::serialize::encode_hex(&self[..]);
+                Ok(JsonValue::String(hex_str))
+            }
+        }
+    };
+    ($($name:ty);*) => ($(impl_deserialize_hex_segment!{@impl $name})*);
+}
+
+impl_deserialize_hex_segment!{Hash; PublicKey; Signature}
+impl_default_deserialize_owned!{Hash; PublicKey; Signature}
 
 #[cfg(test)]
 mod tests {

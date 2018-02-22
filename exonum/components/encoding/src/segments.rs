@@ -15,8 +15,6 @@
 use byteorder::{ByteOrder, LittleEndian};
 use bit_vec::BitVec;
 
-use messages::{RawMessage, HEADER_LENGTH, MessageBuffer};
-use crypto::Hash;
 use super::{Result, Error, Field, Offset, CheckedOffset};
 
 /// Trait for fields, that has unknown `compile-time` size.
@@ -151,54 +149,6 @@ impl<'a> SegmentField<'a> for &'a str {
     }
 }
 
-impl<'a> SegmentField<'a> for RawMessage {
-    fn item_size() -> Offset {
-        1
-    }
-
-    fn count(&self) -> Offset {
-        self.as_ref().len() as Offset
-    }
-
-    unsafe fn from_buffer(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
-        let to = from + to * Self::item_size();
-        let slice = &buffer[from as usize..to as usize];
-        RawMessage::new(MessageBuffer::from_vec(Vec::from(slice)))
-    }
-
-    fn extend_buffer(&self, buffer: &mut Vec<u8>) {
-
-        buffer.extend_from_slice(self.as_ref())
-    }
-
-    fn check_data(
-        buffer: &'a [u8],
-        from: CheckedOffset,
-        count: CheckedOffset,
-        latest_segment: CheckedOffset,
-    ) -> Result {
-        let size: CheckedOffset = (count * Self::item_size())?;
-        let to: CheckedOffset = (from + size)?;
-        let slice = &buffer[from.unchecked_offset() as usize..to.unchecked_offset() as usize];
-        if slice.len() < HEADER_LENGTH {
-            return Err(Error::UnexpectedlyShortRawMessage {
-                position: from.unchecked_offset(),
-                size: slice.len() as Offset,
-            });
-        }
-        let actual_size = slice.len() as Offset;
-        let declared_size: Offset = LittleEndian::read_u32(&slice[6..10]);
-        if actual_size != declared_size {
-            return Err(Error::IncorrectSizeOfRawMessage {
-                position: from.unchecked_offset(),
-                actual_size: slice.len() as Offset,
-                declared_size: declared_size,
-            });
-        }
-        Ok(latest_segment)
-    }
-}
-
 impl<'a, T> SegmentField<'a> for Vec<T>
 where
     T: Field<'a>,
@@ -312,48 +262,3 @@ impl<'a> SegmentField<'a> for &'a [u8] {
         Ok(latest_segment)
     }
 }
-
-
-/// Implement field helper for all array of POD types
-/// it writes POD type as bytearray in place.
-///
-/// **Beware of platform specific data representation.**
-#[macro_export]
-macro_rules! implement_pod_array_field {
-    ($name:ident) => (
-
-        impl<'a> SegmentField<'a> for &'a [$name] {
-            fn item_size() -> Offset {
-                ::std::mem::size_of::<$name>() as Offset
-            }
-
-            fn count(&self) -> Offset {
-                self.len() as Offset
-            }
-
-            unsafe fn from_buffer(buffer: &'a [u8], from: Offset, count: Offset) -> Self {
-                let to = from + count * Self::item_size();
-                let slice = &buffer[(from as usize)..(to as usize)];
-                ::std::slice::from_raw_parts(slice.as_ptr() as *const Hash,
-                                            slice.len() / Self::item_size() as usize)
-            }
-
-            fn extend_buffer(&self, buffer: &mut Vec<u8>) {
-                let slice = unsafe {
-                    ::std::slice::from_raw_parts(self.as_ptr() as *const u8,
-                                                self.len() * Self::item_size() as usize)
-                };
-                buffer.extend_from_slice(slice)
-            }
-
-            fn check_data(_: &'a [u8],
-                        _: CheckedOffset,
-                        _: CheckedOffset,
-                        latest_segment: CheckedOffset) -> Result {
-                Ok(latest_segment)
-            }
-        }
-    )
-}
-
-implement_pod_array_field!{Hash}

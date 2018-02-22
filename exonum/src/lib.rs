@@ -68,7 +68,8 @@ extern crate lazy_static;
 extern crate tempdir;
 
 #[macro_use]
-pub mod encoding;
+pub extern crate exonum_encoding as encoding;
+
 #[macro_use]
 pub mod messages;
 #[macro_use]

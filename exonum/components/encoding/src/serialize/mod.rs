@@ -16,9 +16,7 @@
 //! Currently support only json.
 //! This module is a pack of superstructures over serde `Serializer`\`Deserializer`
 
-use encoding::Field;
-use messages::MessageWriter;
-use super::Offset;
+use super::{Offset, Field};
 
 pub use hex::{FromHexError, ToHex, FromHex, encode as encode_hex, decode as decode_hex};
 
@@ -78,12 +76,6 @@ pub mod json;
 #[doc(hidden)]
 pub trait WriteBufferWrapper {
     fn write<'a, T: Field<'a>>(&'a mut self, from: Offset, to: Offset, val: T);
-}
-
-impl WriteBufferWrapper for MessageWriter {
-    fn write<'a, T: Field<'a>>(&'a mut self, from: Offset, to: Offset, val: T) {
-        self.write(val, from, to)
-    }
 }
 
 impl WriteBufferWrapper for Vec<u8> {

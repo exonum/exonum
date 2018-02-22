@@ -15,12 +15,15 @@
 use std::{convert, mem, sync};
 use std::fmt::Debug;
 use std::ops::Deref;
+use std::error::Error;
 
 use byteorder::{ByteOrder, LittleEndian};
 
 use crypto::{hash, sign, verify, CryptoHash, Hash, PublicKey, SecretKey, Signature,
              SIGNATURE_LENGTH};
-use encoding::{self, CheckedOffset, Field, Offset, Result as StreamStructResult};
+use encoding::{CheckedOffset, Field, Offset, ExonumJson, self};
+use encoding::serialize::WriteBufferWrapper;
+use encoding::serialize::json::reexport::{Value as JsonValue};
 
 /// Length of the message header.
 pub const HEADER_LENGTH: usize = 10;
@@ -91,7 +94,7 @@ impl MessageBuffer {
         // TODO: check that size >= HEADER_LENGTH
         // TODO: check that payload_length == raw.len()
         // ECR-166
-        MessageBuffer { raw: raw }
+        MessageBuffer { raw }
     }
 
     /// Returns the length of the message in bytes.
@@ -160,7 +163,7 @@ impl MessageBuffer {
         from: CheckedOffset,
         to: CheckedOffset,
         latest_segment: CheckedOffset,
-    ) -> StreamStructResult {
+    ) -> encoding::Result {
         F::check(
             self.body(),
             (from + HEADER_LENGTH as u32)?,
@@ -313,5 +316,78 @@ impl Message for RawMessage {
 
     fn verify_signature(&self, pub_key: &PublicKey) -> bool {
         verify(self.signature(), self.body(), pub_key)
+    }
+}
+
+impl WriteBufferWrapper for MessageWriter {
+    fn write<'a, T: Field<'a>>(&'a mut self, from: Offset, to: Offset, val: T) {
+        self.write(val, from, to)
+    }
+}
+
+impl ExonumJson for RawMessage {
+    fn deserialize_field<B: WriteBufferWrapper>(
+        value: &JsonValue,
+        buffer: &mut B,
+        from: Offset,
+        to: Offset,
+    ) -> Result<(), Box<Error>> {
+        let string = value.as_str().ok_or("Can't cast json as string")?;
+        let str_hex = <Vec<u8> as encoding::FromHex>::from_hex(string)?;
+        let message = RawMessage::new(MessageBuffer::from_vec(str_hex));
+        buffer.write(from, to, message);
+        Ok(())
+    }
+
+    fn serialize_field(&self) -> Result<JsonValue, Box<Error + Send + Sync>> {
+        JsonValue::String(encoding::serialize::encode_hex(self))
+    }
+}
+
+impl<'a> encoding::SegmentField<'a> for RawMessage {
+    fn item_size() -> Offset {
+        1
+    }
+
+    fn count(&self) -> Offset {
+        self.as_ref().len() as Offset
+    }
+
+    unsafe fn from_buffer(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
+        let to = from + to * Self::item_size();
+        let slice = &buffer[from as usize..to as usize];
+        RawMessage::new(MessageBuffer::from_vec(Vec::from(slice)))
+    }
+
+    fn extend_buffer(&self, buffer: &mut Vec<u8>) {
+
+        buffer.extend_from_slice(self.as_ref())
+    }
+
+    fn check_data(
+        buffer: &'a [u8],
+        from: CheckedOffset,
+        count: CheckedOffset,
+        latest_segment: CheckedOffset,
+    ) -> encoding::Result {
+        let size: CheckedOffset = (count * Self::item_size())?;
+        let to: CheckedOffset = (from + size)?;
+        let slice = &buffer[from.unchecked_offset() as usize..to.unchecked_offset() as usize];
+        if slice.len() < HEADER_LENGTH {
+            return Err(encoding::Error::UnexpectedlyShortRawMessage {
+                position: from.unchecked_offset(),
+                size: slice.len() as Offset,
+            });
+        }
+        let actual_size = slice.len() as Offset;
+        let declared_size: Offset = LittleEndian::read_u32(&slice[6..10]);
+        if actual_size != declared_size {
+            return Err(encoding::Error::IncorrectSizeOfRawMessage {
+                position: from.unchecked_offset(),
+                actual_size: slice.len() as Offset,
+                declared_size: declared_size,
+            });
+        }
+        Ok(latest_segment)
     }
 }

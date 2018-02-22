@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "exonum/components/encoding",
     "exonum",
     "sandbox",
     "testkit",
