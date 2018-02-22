@@ -21,7 +21,7 @@ use std::time::SystemTime;
 use log::{Level, Record, SetLoggerError};
 use env_logger::{Builder, Formatter};
 use colored::*;
-use chrono::prelude::*;
+use chrono::{DateTime, Local};
 
 use blockchain::{GenesisConfig, ValidatorKeys};
 use node::NodeConfig;
