@@ -40,6 +40,7 @@ mod proof;
 ///
 /// **The size of the proof map keys must be exactly 32 bytes and the keys must have a uniform
 /// distribution.** Usually [`Hash`] and [`PublicKey`] are used as types of proof map keys.
+///
 /// [`ProofMapKey`]: trait.ProofMapKey.html
 /// [`StorageValue`]: ../trait.StorageValue.html
 /// [`Hash`]: ../../crypto/struct.Hash.html
@@ -104,6 +105,7 @@ impl<T, K, V> ProofMapIndex<T, K, V> {
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     ///
@@ -137,6 +139,7 @@ impl<T, K, V> ProofMapIndex<T, K, V> {
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     ///

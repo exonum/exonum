@@ -23,6 +23,7 @@ use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
 ///
 /// `ValueSetIndex` implements a set, storing the element as values using its hash as a key.
 /// `ValueSetIndex` requires that the elements implement the [`StorageValue`] trait.
+///
 /// [`StorageValue`]: ../trait.StorageValue.html
 #[derive(Debug)]
 pub struct ValueSetIndex<T, V> {
@@ -62,6 +63,7 @@ impl<T, V> ValueSetIndex<T, V> {
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     ///
@@ -89,6 +91,7 @@ impl<T, V> ValueSetIndex<T, V> {
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     ///

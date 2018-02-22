@@ -23,6 +23,7 @@ use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageKey, StorageValue};
 ///
 /// `MapIndex` requires that the keys implement the [`StorageKey`] trait and the values implement
 /// [`StorageValue`] trait.
+///
 /// [`StorageKey`]: ../trait.StorageKey.html
 /// [`StorageValue`]: ../trait.StorageValue.html
 #[derive(Debug)]
@@ -77,6 +78,7 @@ impl<T, K, V> MapIndex<T, K, V> {
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     ///
@@ -105,6 +107,7 @@ impl<T, K, V> MapIndex<T, K, V> {
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     ///
