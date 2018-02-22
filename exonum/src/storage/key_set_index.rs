@@ -23,6 +23,7 @@ use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageKey};
 ///
 /// `KeySetIndex` implements a set, storing the elements as keys with empty values.
 /// `KeySetIndex` requires that the elements implement the [`StorageKey`] trait.
+///
 /// [`StorageKey`]: ../trait.StorageKey.html
 #[derive(Debug)]
 pub struct KeySetIndex<T, K> {
@@ -49,6 +50,7 @@ impl<T, K> KeySetIndex<T, K> {
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     ///
@@ -76,6 +78,7 @@ impl<T, K> KeySetIndex<T, K> {
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     ///

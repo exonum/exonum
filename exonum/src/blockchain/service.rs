@@ -154,6 +154,7 @@ pub trait Service: Send + Sync + 'static {
     /// transactions that may come from byzantine nodes.
     ///
     /// Service should return an error in the following cases (see `MessageError` for more details):
+    ///
     /// - Incorrect transaction identifier.
     /// - Incorrect data layout.
     ///

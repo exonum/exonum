@@ -23,6 +23,7 @@ use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
 ///
 /// `ListIndex` implements an array list, storing the element as values and using `u64` as an index.
 /// `ListIndex` requires that the elements implement the [`StorageValue`] trait.
+///
 /// [`StorageValue`]: ../trait.StorageValue.html
 #[derive(Debug)]
 pub struct ListIndex<T, V> {
@@ -50,6 +51,7 @@ impl<T, V> ListIndex<T, V> {
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     ///
@@ -78,6 +80,7 @@ impl<T, V> ListIndex<T, V> {
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     ///
