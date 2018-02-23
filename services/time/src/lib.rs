@@ -13,6 +13,11 @@
 // limitations under the License.
 
 //! The time oracle service for Exonum.
+//!
+//! See [the Exonum documentation][docs:time] for a high-level overview of the service,
+//! in particular, its design rationale and the proof of correctness.
+//!
+//! [docs:time]: https://exonum.com/doc/advanced/time
 
 #![deny(missing_debug_implementations, missing_docs)]
 

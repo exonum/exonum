@@ -12,6 +12,7 @@ btree
 bytearray
 byteorder
 checkpointed
+chrono
 clippy
 clonned
 compat
@@ -45,8 +46,8 @@ librocksdb
 libsnappy
 libsodium
 libssl
-markdownlint
 maintainer's
+markdownlint
 memorydb
 mempool
 Merkelized
@@ -120,7 +121,7 @@ unsync
 untagged
 usize
 validator
-validators
 validator's
+validators
 whitelisted
 writeln
