@@ -1,7 +1,5 @@
 # Changelog
 
-<!-- cspell:ignore ZEROVOTE -->
-
 All notable changes to this project will be documented in this file.
 The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
@@ -38,15 +36,20 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   **Migration path:** The restrictions are security-based and should not
   influence intended service use.
 
+<!-- cspell:disable -->
+
 - `ZEROVOTE` is replaced with the `MaybeVote` type, which is now used
   instead of `Vote` in the schema method signatures. The storage format itself
   is unchanged (#496).
+
+<!-- cspell:enable -->
 
 ### New features
 
 - Information about configurations by `/v1/configs/actual`, `/v1/configs/following`
   and `/v1/configs/committed` endpoints is extended with the hash of the corresponding
   proposal and votes for the proposal (#481).
+
 - Implemented error handling based on error codes (#496).
 
 ## 0.5 - 2018-01-30
