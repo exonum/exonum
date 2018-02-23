@@ -32,10 +32,10 @@ transactions! {
         ///
         /// # Notes
         ///
-        /// See [`ProposeErrorCode`] for the description of error codes emitted by the `execute()`
+        /// See [`ErrorCode`] for the description of error codes emitted by the `execute()`
         /// method.
         ///
-        /// [`ProposeErrorCode`]: enum.ProposeErrorCode.html
+        /// [`ErrorCode`]: enum.ErrorCode.html
         struct Propose {
             /// Sender of the transaction.
             ///
@@ -55,11 +55,11 @@ transactions! {
         /// The stored version of the transaction has a special variant corresponding to absence
         /// of a vote. See [`MaybeVote`] for details.
         ///
-        /// See [`VoteErrorCode`] for the description of error codes emitted by the `execute()`
+        /// See [`ErrorCode`] for the description of error codes emitted by the `execute()`
         /// method.
         ///
         /// [`MaybeVote`]: struct.MaybeVote.html
-        /// [`VoteErrorCode`]: enum.VoteErrorCode.html
+        /// [`ErrorCode`]: enum.ErrorCode.html
         struct Vote {
             /// Sender of the transaction.
             ///
