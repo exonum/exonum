@@ -44,6 +44,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### New features
 
+- Information about configurations by `/v1/configs/actual`, `/v1/configs/following`
+  and `/v1/configs/committed` endpoints is extended with the hash of the corresponding
+  proposal and votes for the proposal (#481).
 - Implemented error handling based on error codes (#496).
 
 ## 0.5 - 2018-01-30
