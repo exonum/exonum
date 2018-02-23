@@ -120,7 +120,7 @@ enum Error {
     UnknownSender = 0,
 
     #[fail(display = "The validator time is greater than the proposed one")]
-    ValidatorTimeIsLonger = 1,
+    ValidatorTimeIsGreater = 1,
 }
 
 impl From<Error> for ExecutionError {
@@ -144,7 +144,7 @@ impl TxTime {
         let mut schema = TimeSchema::new(fork);
         match schema.validators_times().get(self.pub_key()) {
             // The validator time in the storage should be less than in the transaction.
-            Some(time) if time >= self.time() => Err(Error::ValidatorTimeIsLonger)?,
+            Some(time) if time >= self.time() => Err(Error::ValidatorTimeIsGreater)?,
             // Write the time for the validator.
             _ => {
                 schema.validators_times_mut().put(
@@ -155,7 +155,45 @@ impl TxTime {
             }
         }
     }
+
+    fn update_consolidated_time(fork: &mut Fork) {
+        let keys = Schema::new(&fork).actual_configuration().validator_keys;
+        let mut schema = TimeSchema::new(fork);
+
+        // Find all known times for the validators.
+        let validator_times = {
+            let idx = schema.validators_times();
+            let mut times = idx.iter()
+                .filter_map(|(public_key, time)| {
+                    keys.iter()
+                        .find(|validator| validator.service_key == public_key)
+                        .map(|_| time)
+                })
+                .collect::<Vec<_>>();
+            // Ordering time from highest to lowest.
+            times.sort_by(|a, b| b.cmp(a));
+            times
+        };
+
+        // The largest number of Byzantine nodes.
+        let max_byzantine_nodes = (keys.len() - 1) / 3;
+        if validator_times.len() <= 2 * max_byzantine_nodes {
+            return;
+        }
+
+        match schema.time().get() {
+            // Selected time should be greater than the time in the storage.
+            Some(current_time) if current_time >= validator_times[max_byzantine_nodes] => {
+                return;
+            }
+            _ => {
+                // Change the time in the storage.
+                schema.time_mut().set(validator_times[max_byzantine_nodes]);
+            }
+        }
+    }
 }
+
 
 impl Transaction for TxTime {
     fn verify(&self) -> bool {
@@ -163,50 +201,9 @@ impl Transaction for TxTime {
     }
 
     fn execute(&self, view: &mut Fork) -> ExecutionResult {
-        // The transaction must be signed by the validator.
         self.check_signed_by_validator(view.as_ref())?;
-
         self.update_validator_time(view)?;
-
-        let keys = Schema::new(&view).actual_configuration().validator_keys;
-        let mut schema = TimeSchema::new(view);
-
-        // Find all known times for the validators.
-        let mut validator_times: Vec<SystemTime>;
-        {
-            let idx = schema.validators_times();
-            validator_times = idx.iter()
-                .filter_map(|(public_key, time)| {
-                    keys.iter()
-                        .find(|validator| validator.service_key == public_key)
-                        .map(|_| time)
-                })
-                .collect();
-        }
-
-        // The largest number of Byzantine nodes.
-        let max_byzantine_nodes = (keys.len() - 1) / 3;
-        if validator_times.len() <= 2 * max_byzantine_nodes {
-            // The consolidated time does not change, but we need to stop the transaction
-            // with the result `Ok(())` to save the changes for the validator time.
-            return Ok(());
-        }
-
-        // Ordering time from highest to lowest.
-        validator_times.sort_by(|a, b| b.cmp(a));
-
-        match schema.time().get() {
-            // Selected time should be longer than the time in the storage.
-            Some(current_time) if current_time >= validator_times[max_byzantine_nodes] => {
-                // The consolidated time does not change, but we need to return `Ok(())`
-                // to save the changes for the validator time.
-            }
-            _ => {
-                // Change the time in the storage.
-                schema.time_mut().set(validator_times[max_byzantine_nodes]);
-            }
-        }
-
+        Self::update_consolidated_time(view);
         Ok(())
     }
 }
