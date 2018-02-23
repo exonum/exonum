@@ -76,6 +76,7 @@ pubkeys
 readonly
 reddit
 reimplemented
+repr
 RESTful
 roadmap
 rocksdb
