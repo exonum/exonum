@@ -1,5 +1,7 @@
 # Changelog
 
+<!-- cspell:ignore ZEROVOTE -->
+
 All notable changes to this project will be documented in this file.
 The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
@@ -7,7 +9,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Breaking changes
 
-- Most types renamed to avoid [stuttering] (#496):
+- Most types renamed to avoid stuttering (see [here][stuttering] for
+  an explanation of the term) (#496):
 
   - `ConfigurationService` to `Service`
   - `ConfigurationServiceFactory` to `ServiceFactory`
@@ -19,6 +22,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
   Check the crate documentation for more details.
 
+  **Migration path:** Rename imported types from the crate, using aliases
+  or qualified names if necessary: `use exonum_configuration::Service as ConfigService`.
+
 [stuttering]: https://doc.rust-lang.org/1.0.0/style/style/naming/README.html#avoid-redundant-prefixes-[rfc-356]
 
 - Multiple APIs are no longer public (#496):
@@ -29,7 +35,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
   Check the crate documentation for more details.
 
-- `ZEROVOTE` structure is replaced with the `MaybeVote` type, which is now used
+  **Migration path:** The restrictions are security-based and should not
+  influence intended service use.
+
+- `ZEROVOTE` is replaced with the `MaybeVote` type, which is now used
   instead of `Vote` in the schema method signatures. The storage format itself
   is unchanged (#496).
 
