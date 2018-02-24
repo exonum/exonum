@@ -641,7 +641,7 @@ fn test_explorer_transaction_statuses() {
     assert_status(
         &api,
         &panicking_tx,
-        &json!({ "type": "panic", "description": "" }),
+        &json!({ "type": "panic", "description": "attempt to add with overflow" }),
     );
 }
 
