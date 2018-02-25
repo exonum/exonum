@@ -30,10 +30,28 @@ use std::sync::Arc;
 
 use super::ext::{ApiError, BoxedEndpoint, EndpointHolder, Method, ServiceApi};
 
+/// Response returned by the Iron adapter in case an endpoint
+/// raises an error.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ErrorResponse {
+    /// Error description.
+    pub description: String,
+    /// Debug information associated with the error.
+    pub debug: String,
+}
+
+impl ErrorResponse {
+    fn from_error(e: &ApiError) -> Self {
+        ErrorResponse {
+            description: e.to_string(),
+            debug: format!("{:?}", e),
+        }
+    }
+}
+
 impl From<ApiError> for IronError {
     fn from(e: ApiError) -> IronError {
         use self::ApiError::*;
-        use std::collections::BTreeMap;
 
         let code = match e {
             UnknownId(..) | NotFound => status::NotFound,
@@ -41,12 +59,7 @@ impl From<ApiError> for IronError {
             TransactionNotSent(..) |
             InternalError(..) => status::InternalServerError,
         };
-        let body = {
-            let mut map = BTreeMap::new();
-            map.insert("debug", format!("{:?}", e));
-            map.insert("description", e.to_string());
-            serde_json::to_string_pretty(&map).unwrap()
-        };
+        let body = serde_json::to_string_pretty(&ErrorResponse::from_error(&e)).unwrap();
         IronError::new(e.compat(), (code, body))
     }
 }

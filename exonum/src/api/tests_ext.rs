@@ -12,12 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+extern crate iron_test;
+
 use futures::Stream;
 use futures::sync::mpsc;
 use serde_json;
 
+use failure;
+use iron::{IronError, Response};
+use iron::headers::{ContentType, Headers};
+use iron::status;
+use iron::url::Url;
+use self::iron_test::request::{get as test_get, post as test_post};
+
 use api::ext::{ApiError, ApiResult, ApiBuilder, Endpoint, EndpointBuilder, EndpointSpec,
                ServiceApi, TRANSACTIONS_ID};
+use api::iron::{into_handler, ErrorResponse};
 use blockchain::{Blockchain, ExecutionResult, Transaction};
 use crypto::{self, CryptoHash, Hash};
 use node::{ApiSender, ExternalMessage};
@@ -325,17 +335,6 @@ fn test_unknown_id() {
 
 // // // Iron-related tests // // //
 
-extern crate iron_test;
-
-use failure;
-use iron::{IronError, Response};
-use iron::headers::{ContentType, Headers};
-use iron::status;
-use iron::url::Url;
-
-use self::iron_test::request::{get as test_get, post as test_post};
-use super::iron::into_handler;
-
 fn create_url(endpoint_id: &str, q: &str) -> String {
     let mut url = Url::parse(&format!("http://localhost:3000/{}", endpoint_id)).unwrap();
     url.query_pairs_mut().append_pair("q", q);
@@ -426,6 +425,9 @@ fn test_iron_transactions_no_get() {
     let url = create_url("transactions", &serde_json::to_string(&tx).unwrap());
     let IronError { error, response } = test_get(&url, Headers::new(), &handler).unwrap_err();
     assert_eq!(response.status, Some(status::NotFound));
+    let response: ErrorResponse = serde_json::from_value(json_from_response(response)).unwrap();
+    assert!(response.description.contains("Unknown endpoint"));
+
     let error = error
         .downcast::<failure::Compat<ApiError>>()
         .unwrap()
