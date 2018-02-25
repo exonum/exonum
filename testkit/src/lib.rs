@@ -1208,9 +1208,10 @@ impl TestKitApi {
     where
         T: Into<Box<Transaction>>,
     {
-        self.api_context.node_channel().send(transaction.into()).expect(
-            "Cannot send transaction",
-        );
+        self.api_context
+            .node_channel()
+            .send(transaction.into())
+            .expect("Cannot send transaction");
     }
 
     /// Tests that an invocation of the specified endpoint lead to an expected response.
