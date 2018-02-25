@@ -64,13 +64,13 @@ read_request! {
     /// # extern crate exonum_time;
     /// #[macro_use] extern crate serde_json;
     /// use exonum_testkit::TestKit;
-    /// # use exonum_time::{ConsolidatedTime, TimeService, TxTime};
+    /// # use exonum_time::{GetTime, TimeService, TxTime};
     /// use std::time::{self, Duration};
     ///
     /// # fn main() {
     /// let mut testkit = TestKit::for_service(TimeService::new());
     /// // Consolidated time is not set yet
-    /// testkit.api().test::<ConsolidatedTime>(json!(null), &json!(null));
+    /// testkit.api().test::<GetTime>(json!(null), &json!(null));
     ///
     /// let tx = {
     ///     let t = time::UNIX_EPOCH + Duration::new(1_400_000_000, 0);
@@ -80,7 +80,7 @@ read_request! {
     /// testkit.create_block_with_transaction(tx);
     /// // As the network contains only one validator, a single transaction
     /// // is enough to set the time.
-    /// testkit.api().test::<ConsolidatedTime>(
+    /// testkit.api().test::<GetTime>(
     ///     json!(null),
     ///     &json!({
     ///         "secs_since_epoch": 1400000000,
@@ -90,10 +90,10 @@ read_request! {
     /// # }
     /// ```
     @(ID = "current_time")
-    pub ConsolidatedTime(()) -> Option<SystemTime>;
+    pub GetTime(()) -> Option<SystemTime>;
 }
 
-impl Endpoint for ConsolidatedTime {
+impl Endpoint for GetTime {
     fn handle(&self, _: ()) -> Result<Option<SystemTime>, ApiError> {
         Ok(TimeSchema::new(self.as_ref().snapshot()).time().get())
     }
@@ -102,10 +102,10 @@ impl Endpoint for ConsolidatedTime {
 read_request! {
     /// Endpoint returning an array of timestamps for the actual validators.
     @(ID = "validators_times")
-    pub ValidatorsTimes(()) -> Vec<ValidatorTime>;
+    pub GetValidatorsTimes(()) -> Vec<ValidatorTime>;
 }
 
-impl Endpoint for ValidatorsTimes {
+impl Endpoint for GetValidatorsTimes {
     fn handle(&self, _: ()) -> Result<Vec<ValidatorTime>, ApiError> {
         let view = self.as_ref().snapshot();
         let validator_keys = CoreSchema::new(&view).actual_configuration().validator_keys;
@@ -130,10 +130,10 @@ impl Endpoint for ValidatorsTimes {
 read_request! {
     /// Endpoint returning an array of current timestamps for actual and past validators.
     @(ID = "all_validators_times")
-    pub AllValidatorsTimes(()) -> Vec<ValidatorTime>;
+    pub GetAllTimes(()) -> Vec<ValidatorTime>;
 }
 
-impl Endpoint for AllValidatorsTimes {
+impl Endpoint for GetAllTimes {
     fn handle(&self, _: ()) -> Result<Vec<ValidatorTime>, ApiError> {
         let view = self.as_ref().snapshot();
         let schema = TimeSchema::new(&view);

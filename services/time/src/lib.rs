@@ -43,7 +43,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 mod api;
 
-pub use api::{AllValidatorsTimes, ConsolidatedTime, ValidatorTime, ValidatorsTimes};
+pub use api::{GetTime, GetAllTimes, GetValidatorsTimes, ValidatorTime};
 
 /// Time service id.
 pub const SERVICE_ID: u16 = 4;
@@ -346,7 +346,7 @@ impl Service for TimeService {
 
     fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<iron::Handler>> {
         let api = ApiBuilder::new(ctx)
-            .add::<ConsolidatedTime>()
+            .add::<GetTime>()
             .add_transactions::<TimeTransactions>()
             .create();
         Some(iron::into_handler(api))
@@ -354,8 +354,8 @@ impl Service for TimeService {
 
     fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<iron::Handler>> {
         let api = ApiBuilder::new(ctx)
-            .add::<ValidatorsTimes>()
-            .add::<AllValidatorsTimes>()
+            .add::<GetValidatorsTimes>()
+            .add::<GetAllTimes>()
             .create();
         Some(iron::into_handler(api))
     }
