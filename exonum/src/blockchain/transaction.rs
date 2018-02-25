@@ -16,6 +16,7 @@
 
 use std::borrow::Cow;
 use std::any::Any;
+use std::error::Error;
 use std::fmt;
 use std::u8;
 
@@ -245,9 +246,8 @@ impl TransactionError {
     }
 
     /// Creates a new `TransactionError` instance from `std::thread::Result`'s `Err`.
-    pub(crate) fn from_panic(_panic: &Box<Any + Send>) -> Self {
-        // TODO: Try to get description from panic.
-        Self::panic(None)
+    pub(crate) fn from_panic(panic: &Box<Any + Send>) -> Self {
+        Self::panic(panic_description(panic))
     }
 
     /// Returns error type of this `TransactionError` instance.
@@ -343,7 +343,6 @@ fn status_as_u16(status: &TransactionResult) -> u16 {
     }
 }
 
-
 /// `TransactionSet` trait describes a type which is an `enum` of several transactions.
 /// The implementation of this trait is generated automatically by the `transactions!`
 /// macro.
@@ -352,7 +351,6 @@ pub trait TransactionSet
     /// Parse a transaction from this set from a `RawMessage`.
     fn tx_from_raw(raw: RawTransaction) -> Result<Self, encoding::Error>;
 }
-
 
 /// `transactions!` is used to declare a set of transactions of a particular service.
 ///
@@ -540,6 +538,18 @@ macro_rules! transactions {
     };
 }
 
+/// Tries to get a meaningful description from the given panic.
+fn panic_description(any: &Box<Any + Send>) -> Option<String> {
+    if let Some(s) = any.downcast_ref::<&str>() {
+        Some(s.to_string())
+    } else if let Some(s) = any.downcast_ref::<String>() {
+        Some(s.clone())
+    } else if let Some(error) = any.downcast_ref::<Box<Error + Send>>() {
+        Some(error.description().to_string())
+    } else {
+        None
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -547,6 +557,7 @@ mod tests {
 
     use std::collections::BTreeMap;
     use std::sync::Mutex;
+    use std::panic;
 
     use super::*;
     use crypto;
@@ -702,6 +713,38 @@ mod tests {
                 assert_eq!(Some(index), entry.get());
             }
         }
+    }
+
+    #[test]
+    fn str_panic() {
+        let static_str = "Static string (&str)";
+        let panic = make_panic(static_str);
+        assert_eq!(Some(static_str.to_string()), panic_description(&panic));
+    }
+
+    #[test]
+    fn string_panic() {
+        let string = "Owned string (String)".to_owned();
+        let error = make_panic(string.clone());
+        assert_eq!(Some(string), panic_description(&error));
+    }
+
+    #[test]
+    fn box_error_panic() {
+        let error: Box<Error + Send> = Box::new("e".parse::<i32>().unwrap_err());
+        let description = error.description().to_owned();
+        let error = make_panic(error);
+        assert_eq!(Some(description), panic_description(&error));
+    }
+
+    #[test]
+    fn unknown_panic() {
+        let error = make_panic(1);
+        assert_eq!(None, panic_description(&error));
+    }
+
+    fn make_panic<T: Send + 'static>(val: T) -> Box<Any + Send> {
+        panic::catch_unwind(panic::AssertUnwindSafe(|| panic!(val))).unwrap_err()
     }
 
     fn create_blockchain() -> (Blockchain, BTreeMap<Hash, Box<Transaction>>) {
