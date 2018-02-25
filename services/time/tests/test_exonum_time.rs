@@ -395,15 +395,15 @@ fn test_transaction_time_less_than_validator_time_in_storage() {
 }
 
 fn get_current_time(api: &TestKitApi) -> Option<SystemTime> {
-    api.get(ApiKind::Service("exonum_time"), "v1/current_time")
+    api.get(ApiKind::Service("exonum_time"), "current_time")
 }
 
 fn get_current_validators_times(api: &TestKitApi) -> Vec<ValidatorTime> {
-    api.get_private(ApiKind::Service("exonum_time"), "v1/validators_times")
+    api.get_private(ApiKind::Service("exonum_time"), "validators_times")
 }
 
 fn get_all_validators_times(api: &TestKitApi) -> Vec<ValidatorTime> {
-    api.get_private(ApiKind::Service("exonum_time"), "v1/validators_times/all")
+    api.get_private(ApiKind::Service("exonum_time"), "all_validators_times")
 }
 
 fn assert_current_time_eq(api: &TestKitApi, expected_time: Option<SystemTime>) {
