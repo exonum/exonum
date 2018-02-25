@@ -57,7 +57,7 @@
 //! Then the internal buffer of `student` is as follows:
 //!
 //! | Position | Stored data | Hexadecimal form | Comment |
-//! |:--------|:------:|:---------------------|:------------------------------------------|
+//! |--------|------|---------------------|------------------------------------------|
 //! | `0  => 4`  | 16    | `10 00 00 00`            | LE-encoded segment pointer to the data |
 //! | `4  => 8`  | 6     | `06 00 00 00`            | LE-encoded segment size |
 //! | `8  => 16` | 23    | `17 00 00 00 00 00 00 00` | number in little endian |
@@ -70,7 +70,7 @@
 //! Primitive types are all fixed-sized, and located fully in the header.
 //!
 //! | Type name | Size in Header | Info |
-//! |:--------|:---------------------|:--------------------------------------------------|
+//! |--------|---------------------|--------------------------------------------------|
 //! | `u8`     | 1    | Regular byte  |
 //! | `i8`     | 1    | Signed byte  |
 //! | `u16`    | 2    | Short unsigned integer stored in little endian  |

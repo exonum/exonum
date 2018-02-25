@@ -12,6 +12,7 @@ btree
 bytearray
 byteorder
 checkpointed
+chrono
 clippy
 clonned
 compat
@@ -45,8 +46,8 @@ librocksdb
 libsnappy
 libsodium
 libssl
-markdownlint
 maintainer's
+markdownlint
 memorydb
 mempool
 Merkelized
@@ -64,6 +65,7 @@ permissioned
 postcondition
 postpropose
 postvote
+precheck
 precommit
 precommits
 prevote
@@ -74,6 +76,7 @@ pubkeys
 readonly
 reddit
 reimplemented
+repr
 RESTful
 roadmap
 rocksdb
@@ -118,7 +121,7 @@ unsync
 untagged
 usize
 validator
-validators
 validator's
+validators
 whitelisted
 writeln

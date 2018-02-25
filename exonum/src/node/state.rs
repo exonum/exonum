@@ -766,6 +766,7 @@ impl State {
     /// transactions now.
     ///
     /// Transaction is ignored if the following criteria are fulfilled:
+    ///
     /// - transactions pool size is exceeded
     /// - transaction isn't contained in unknown transaction list of any propose
     /// - transaction isn't a part of block

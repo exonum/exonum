@@ -115,7 +115,7 @@ impl MessageBuffer {
     ///
     /// ```
     /// use exonum::messages::MessageBuffer;
-    ///;
+    ///
     /// let message_buffer = MessageBuffer::from_vec(vec![]);
     /// assert!(message_buffer.is_empty());
     /// ```

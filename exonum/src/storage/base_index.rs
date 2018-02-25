@@ -28,6 +28,7 @@ use super::{StorageKey, StorageValue, Snapshot, Fork, Iter};
 /// `BaseIndex` requires that the keys implement the [`StorageKey`] trait and the values implement
 /// [`StorageValue`] trait. However, this structure is not bound to specific types and allows the
 /// use of *any* types as keys or values.
+///
 /// [`StorageKey`]: ../trait.StorageKey.html
 /// [`StorageValue`]: ../trait.StorageValue.html
 #[derive(Debug)]
@@ -60,6 +61,7 @@ impl<T> BaseIndex<T> {
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
@@ -78,6 +80,7 @@ impl<T> BaseIndex<T> {
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
