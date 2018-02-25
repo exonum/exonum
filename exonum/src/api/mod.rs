@@ -44,6 +44,8 @@ pub mod ext;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_ext;
 
 /// List of possible Api errors.
 #[derive(Fail, Debug)]
