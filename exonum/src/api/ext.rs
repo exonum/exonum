@@ -519,7 +519,7 @@ macro_rules! read_request {
             type Response = $resp;
 
             const METHOD: $crate::api::ext::Method = $crate::api::ext::Method::Get;
-            const ID: &str = $id;
+            const ID: &'static str = $id;
         }
 
         impl AsRef<$crate::blockchain::Blockchain> for $name {
