@@ -146,8 +146,10 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock, RwLockReadGuard};
 use std::fmt;
 
-use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Schema as CoreSchema,
-                         Service, SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys};
+use exonum::api::ext::{BoxedEndpoint, Endpoint, FromContext};
+use exonum::blockchain::{ApiContext, Blockchain, ConsensusConfig, GenesisConfig,
+                         Schema as CoreSchema, Service, SharedNodeState, StoredConfiguration,
+                         Transaction, ValidatorKeys};
 use exonum::crypto::{self, CryptoHash};
 use exonum::helpers::{Height, Round, ValidatorId};
 use exonum::messages::{Precommit, Propose};
@@ -558,6 +560,21 @@ impl TestKit {
     /// Creates an instance of `TestKitApi` to test the API provided by services.
     pub fn api(&self) -> TestKitApi {
         TestKitApi::new(self)
+    }
+
+    /// Creates an API context for the testkit.
+    pub fn api_context(&self) -> ApiContext {
+        // Unlike "real" nodes, leaking the service secret key is not so harmful,
+        // so this method can be public.
+
+        let service_keys = self.us().service_keypair();
+
+        ApiContext::from_parts(
+            &self.blockchain,
+            self.api_sender.clone(),
+            service_keys.0,
+            service_keys.1,
+        )
     }
 
     /// Polls the *existing* events from the event loop until exhaustion. Does not wait
@@ -1139,7 +1156,7 @@ impl ApiKind {
 pub struct TestKitApi {
     public_handler: Chain,
     private_handler: Chain,
-    api_sender: ApiSender,
+    api_context: ApiContext,
 }
 
 impl fmt::Debug for TestKitApi {
@@ -1170,7 +1187,7 @@ impl TestKitApi {
                 testkit.api_sender.clone(),
             ),
 
-            api_sender: testkit.api_sender.clone(),
+            api_context: testkit.api_context(),
         }
     }
 
@@ -1191,9 +1208,38 @@ impl TestKitApi {
     where
         T: Into<Box<Transaction>>,
     {
-        self.api_sender.send(transaction.into()).expect(
+        self.api_context.node_channel().send(transaction.into()).expect(
             "Cannot send transaction",
         );
+    }
+
+    /// Tests that an invocation of the specified endpoint lead to an expected response.
+    pub fn test<T>(&self, request: serde_json::Value, expected: &serde_json::Value)
+    where
+        T: Into<BoxedEndpoint> + FromContext,
+    {
+        let endpoint = T::from_context(&self.api_context).into();
+        let response = match endpoint.handle(request) {
+            Ok(response) => response,
+            Err(e) => panic!("Unexpected endpoint error: {:?}", e),
+        };
+        assert_eq!(response, *expected);
+    }
+
+    /// Tests that an invocation of the specified endpoint lead to an expected response.
+    ///
+    /// Compared to the `test()` method, this one is more strongly typed.
+    pub fn test_typed<T>(&self, request: T::Request, expected: &T::Response)
+    where
+        T: Endpoint + FromContext,
+        T::Response: fmt::Debug + PartialEq,
+    {
+        let endpoint = T::from_context(&self.api_context);
+        let response = match endpoint.handle(request) {
+            Ok(response) => response,
+            Err(e) => panic!("Unexpected endpoint error: {:?}", e),
+        };
+        assert_eq!(response, *expected);
     }
 
     fn get_internal<H, D>(handler: &H, endpoint: &str, expect_error: bool, is_public: bool) -> D
