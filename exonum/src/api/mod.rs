@@ -36,6 +36,7 @@ use crypto::{PublicKey, SecretKey};
 use encoding::serialize::{FromHex, FromHexError, ToHex, encode_hex};
 use storage;
 
+pub mod iron;
 pub mod public;
 pub mod private;
 #[macro_use]
