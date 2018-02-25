@@ -237,7 +237,7 @@ pub trait Endpoint: EndpointSpec + Send + Sync {
 
 /// Internally used version of `Endpoint`.
 ///
-/// The type rarely is needed to be used directly; the preferrable way
+/// The type rarely is needed to be used directly; the preferable way
 /// of implementing endpoints is to implement the [`Endpoint`] trait.
 ///
 /// [`Endpoint`]: trait.Endpoint.html
@@ -495,7 +495,7 @@ macro_rules! read_request {
     };
 
     // `pub(..)` visibility specifier
-    // XXX: `pub(in ..)` processing is hacky
+    // XXX: `pub(in ..)` processing is essentially a hack
     (
         $(#[$attr:meta])*
         @(ID = $id:expr) pub($(in)* $vis:path) $name:ident($req:ty) -> $resp:ty;
