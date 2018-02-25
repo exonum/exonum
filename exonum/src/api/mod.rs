@@ -17,11 +17,10 @@
 use std::ops::Deref;
 use std::marker::PhantomData;
 use std::io;
-use std::collections::BTreeMap;
 use std::fmt;
 use std::str::FromStr;
 
-use iron::IronError;
+use failure::Fail;
 use iron::prelude::*;
 use iron::status;
 use iron::headers::Cookie;
@@ -32,7 +31,6 @@ use params;
 use serde_json;
 use serde::{Serialize, Serializer};
 use serde::de::{self, Visitor, Deserialize, Deserializer};
-use failure::Fail;
 
 use crypto::{PublicKey, SecretKey};
 use encoding::serialize::{FromHex, FromHexError, ToHex, encode_hex};
@@ -87,6 +85,8 @@ impl From<storage::Error> for ApiError {
 
 impl From<ApiError> for IronError {
     fn from(e: ApiError) -> IronError {
+        use std::collections::BTreeMap;
+
         let code = match e {
             // Note that `status::Unauthorized` does not fit here, because
             //
