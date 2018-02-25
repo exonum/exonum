@@ -211,7 +211,7 @@ pub trait EndpointSpec {
 ///     type Request = (u64, String);
 ///     type Response = Hash;
 ///     const METHOD: Method = Method::Post;
-///     const ID: &str = "send-transaction";
+///     const ID: &'static str = "send-transaction";
 /// }
 ///
 /// impl Endpoint for SendTransaction {
