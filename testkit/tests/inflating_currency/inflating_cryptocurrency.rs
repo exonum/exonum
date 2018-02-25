@@ -12,27 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate bodyparser;
-extern crate iron;
-extern crate router;
-extern crate serde;
-extern crate serde_json;
-
-use exonum::blockchain::{ApiContext, Blockchain, Schema as CoreSchema, Service, Transaction,
-                         TransactionSet, ExecutionResult};
-use exonum::node::{ApiSender, TransactionSend};
+use exonum::blockchain::{ApiContext, Schema as CoreSchema, Service, Transaction, TransactionSet,
+                         ExecutionResult};
 use exonum::messages::{Message, RawTransaction};
 use exonum::storage::{Fork, MapIndex, Snapshot};
 use exonum::crypto::{Hash, PublicKey};
 use exonum::encoding;
-use exonum::encoding::serialize::FromHex;
-use exonum::api::{Api, ApiError};
+use exonum::api::ext::{ApiBuilder, ApiError, Endpoint};
+use exonum::api::iron;
 use exonum::helpers::Height;
-use self::iron::prelude::*;
-use self::iron::headers::ContentType;
-use self::iron::{Handler, IronError};
-use self::iron::status::Status;
-use self::router::Router;
 
 // // // // // // // // // // CONSTANTS // // // // // // // // // //
 
@@ -121,13 +109,10 @@ transactions! {
 // // // // // // // // // // CONTRACTS // // // // // // // // // //
 
 impl Transaction for TxCreateWallet {
-    /// Verify integrity of the transaction by checking the transaction
-    /// signature.
     fn verify(&self) -> bool {
         self.verify_signature(self.pub_key())
     }
 
-    /// Apply logic to the storage when executing the transaction.
     fn execute(&self, view: &mut Fork) -> ExecutionResult {
         let height = CoreSchema::new(&view).height();
         let mut schema = CurrencySchema { view };
@@ -140,14 +125,10 @@ impl Transaction for TxCreateWallet {
 }
 
 impl Transaction for TxTransfer {
-    /// Check if the sender is not the receiver. Check correctness of the
-    /// sender's signature.
     fn verify(&self) -> bool {
         (*self.from() != *self.to()) && self.verify_signature(self.from())
     }
 
-    /// Retrieve two wallets to apply the transfer. Check the sender's
-    /// balance and apply changes to the balances of the wallets.
     fn execute(&self, view: &mut Fork) -> ExecutionResult {
         let height = CoreSchema::new(&view).height();
         let mut schema = CurrencySchema { view };
@@ -169,78 +150,19 @@ impl Transaction for TxTransfer {
 
 // // // // // // // // // // REST API // // // // // // // // // //
 
-#[derive(Clone)]
-struct CryptocurrencyApi {
-    channel: ApiSender,
-    blockchain: Blockchain,
+read_request! {
+    @(ID = "balance")
+    GetBalance(PublicKey) -> u64;
 }
 
-/// The structure returned by the REST API.
-#[derive(Serialize, Deserialize)]
-pub struct TransactionResponse {
-    pub tx_hash: Hash,
-}
+impl Endpoint for GetBalance {
+    fn handle(&self, pubkey: PublicKey) -> Result<u64, ApiError> {
+        let snapshot = self.as_ref().snapshot();
+        let schema = CurrencySchema::new(&snapshot);
+        let wallet = schema.wallet(&pubkey).ok_or(ApiError::NotFound)?;
 
-/// Shortcut to get data on wallets.
-impl CryptocurrencyApi {
-    fn wallet(&self, pub_key: &PublicKey) -> Option<Wallet> {
-        let view = self.blockchain.snapshot();
-        let schema = CurrencySchema::new(view);
-        schema.wallet(pub_key)
-    }
-
-    /// Endpoint for transactions.
-    fn post_transaction(&self, req: &mut Request) -> IronResult<Response> {
-        match req.get::<bodyparser::Struct<CurrencyTransactions>>() {
-            Ok(Some(transaction)) => {
-                let transaction: Box<Transaction> = transaction.into();
-                let tx_hash = transaction.hash();
-                self.channel.send(transaction).map_err(ApiError::from)?;
-                let json = TransactionResponse { tx_hash };
-                self.ok_response(&serde_json::to_value(&json).unwrap())
-            }
-            Ok(None) => Err(ApiError::BadRequest("Empty request body".into()))?,
-            Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
-        }
-    }
-
-    /// Endpoint for retrieving a single wallet.
-    fn balance(&self, req: &mut Request) -> IronResult<Response> {
-        use self::iron::modifiers::Header;
-
-        let path = req.url.path();
-        let wallet_key = path.last().unwrap();
-        let public_key = PublicKey::from_hex(wallet_key).map_err(|e| {
-            IronError::new(e, (
-                Status::BadRequest,
-                Header(ContentType::json()),
-                "\"Invalid request param: `pub_key`\"",
-            ))
-        })?;
-        if let Some(wallet) = self.wallet(&public_key) {
-            let height = CoreSchema::new(self.blockchain.snapshot()).height();
-            self.ok_response(&serde_json::to_value(wallet.actual_balance(height))
-                .unwrap())
-        } else {
-            self.not_found_response(&serde_json::to_value("Wallet not found").unwrap())
-        }
-    }
-}
-
-impl Api for CryptocurrencyApi {
-    fn wire(&self, router: &mut Router) {
-        let self_ = self.clone();
-        let post_transaction = move |req: &mut Request| self_.post_transaction(req);
-        let self_ = self.clone();
-        let balance = move |req: &mut Request| self_.balance(req);
-
-        // Bind the transaction handler to a specific route.
-        router.post(
-            "/v1/wallets/transaction",
-            post_transaction,
-            "post_transaction",
-        );
-        router.get("/v1/balance/:pub_key", balance, "balance");
+        let height = CoreSchema::new(&snapshot).height();
+        Ok(wallet.actual_balance(height))
     }
 }
 
@@ -270,13 +192,11 @@ impl Service for CurrencyService {
     }
 
     /// Create a REST `Handler` to process web requests to the node.
-    fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
-        let mut router = Router::new();
-        let api = CryptocurrencyApi {
-            channel: ctx.node_channel().clone(),
-            blockchain: ctx.blockchain().clone(),
-        };
-        api.wire(&mut router);
-        Some(Box::new(router))
+    fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<iron::Handler>> {
+        let api = ApiBuilder::new(ctx)
+            .add_transactions::<CurrencyTransactions>()
+            .add::<GetBalance>()
+            .create();
+        Some(iron::into_handler(api))
     }
 }

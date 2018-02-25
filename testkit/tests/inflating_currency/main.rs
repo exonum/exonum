@@ -22,10 +22,9 @@ extern crate exonum;
 extern crate exonum_testkit;
 extern crate rand;
 #[macro_use]
-extern crate serde_derive;
-#[macro_use]
 extern crate pretty_assertions;
 
+use exonum::api::ext::{TRANSACTIONS_ID, TransactionResponse};
 use exonum::blockchain::Transaction;
 use exonum::crypto::{self, PublicKey, SecretKey, CryptoHash};
 use exonum::helpers::Height;
@@ -33,7 +32,7 @@ use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use rand::Rng;
 
 mod inflating_cryptocurrency;
-use inflating_cryptocurrency::{CurrencyService, TransactionResponse, TxCreateWallet, TxTransfer};
+use inflating_cryptocurrency::{CurrencyService, TxCreateWallet, TxTransfer};
 
 fn init_testkit() -> TestKit {
     TestKitBuilder::validator()
@@ -47,11 +46,8 @@ fn create_wallet(api: &TestKitApi, name: &str) -> (TxCreateWallet, SecretKey) {
     // Create a pre-signed transaction
     let tx = TxCreateWallet::new(&pubkey, name, &key);
 
-    let tx_info: TransactionResponse = api.post(
-        ApiKind::Service("cryptocurrency"),
-        "v1/wallets/transaction",
-        &tx,
-    );
+    let tx_info: TransactionResponse =
+        api.post(ApiKind::Service("cryptocurrency"), TRANSACTIONS_ID, &tx);
     assert_eq!(tx_info.tx_hash, tx.hash());
 
     (tx, key)
@@ -60,7 +56,7 @@ fn create_wallet(api: &TestKitApi, name: &str) -> (TxCreateWallet, SecretKey) {
 fn get_balance(api: &TestKitApi, pubkey: &PublicKey) -> u64 {
     api.get(
         ApiKind::Service("cryptocurrency"),
-        &format!("v1/balance/{}", pubkey.to_string()),
+        &format!("balance?q=%22{}%22", pubkey.to_string()),
     )
 }
 
