@@ -216,7 +216,7 @@ impl Transaction for TxTransfer {
 // // // // // // // // // // REST API // // // // // // // // // //
 
 read_request! {
-    /// Retrieval of a single wallet from the database.
+    /// Endpoint retrieving a single wallet from the database.
     ///
     /// # Examples
     ///
@@ -256,7 +256,7 @@ impl Endpoint for GetWallet {
 }
 
 read_request! {
-    /// Dumps all wallets from the storage.
+    /// Endpoint dumping all wallets from the storage.
     ///
     /// # Examples
     ///
