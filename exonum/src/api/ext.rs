@@ -531,7 +531,7 @@ macro_rules! read_request {
 }
 
 /// The response returned by `TransactionSink`s.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TransactionResponse {
     /// Hash of the transaction.
     pub tx_hash: Hash,
