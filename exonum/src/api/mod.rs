@@ -38,6 +38,9 @@ use storage;
 
 pub mod public;
 pub mod private;
+#[macro_use]
+pub mod ext;
+
 #[cfg(test)]
 mod tests;
 
