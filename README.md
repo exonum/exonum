@@ -121,9 +121,7 @@ cryptocurrency run --node-config node_3_cfg.toml --rocksdb /path/to/db3 --public
 cryptocurrency run --node-config node_4_cfg.toml --rocksdb /path/to/db4 --public-api-address 0.0.0.0:8203
 ```
 
-Next step is to install frontend application.
-
-Start with install of frontend dependencies:
+Now install frontend dependencies:
 
 ```sh
 cd ../frontend
@@ -131,30 +129,21 @@ cd ../frontend
 npm install
 ```
 
-Clone configuration file [config-example.json](frontend/config-example.json) as `config.json`.
+Build sources:
 
-Fill the list of validators with validators which can be found in `consensus_public_key` field in toml config of each file.
-
-```json
-{
-  "endpoint": "http://127.0.0.1:8200",
-  "network_id": 0,
-  "protocol_version": 0,
-  "service_id": 128,
-  "validators": [
-    "756f0bb877333e4059e785e38d72b716a2ae9981011563cf21e60ab16bec1fbc",
-    "59e785e38d72b716a2ae9981011563cf21e60a7333e40b16bec1fbc756f0bb87",
-    "e99810115756f0bb877333e4059e785e38d72b716aab16bec1fbc2a63cf21e60",
-    "e4059e7fbc85e38d72b716a2756f0bb877333ae9981011563cf21e60ab16bec1"
-  ]
-}
+```sh
+npm run build
 ```
 
 Run the application:
 
 ```sh
-npm start
+npm start -- --port=8280 --api-root=http://127.0.0.1:8200
 ```
+
+`--port` is a port for Node.JS app.
+
+`--api-root` is a root URL of public API address of one of nodes, e.g `http://0.0.0.0:8200`.
 
 Ready! Find demo at [http://127.0.0.1:8280](http://127.0.0.1:8280).
 

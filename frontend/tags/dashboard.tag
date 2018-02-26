@@ -1,7 +1,7 @@
 <dashboard>
     <div class="panel-heading">
         <div class="panel-title page-title text-center">
-            <div class="h4">Bank demo <span class="hidden-xs">application</span></div>
+            <div class="h4">Cryptocurrency demo <span class="hidden-xs">application</span></div>
         </div>
     </div>
     <div class="panel-body text-center">

@@ -6,7 +6,7 @@ router.get('/*', function(req, res, next) {
     var query = req.params[0];
 
     request.get({
-        url: req.app.get('config').endpoint + '/api/' + query,
+        url: req.app.get('apiRoot').endpoint + '/api/' + query,
         qs: req.query
     }, function(err, response, body) {
         if (err) {
@@ -24,7 +24,7 @@ router.post('/*', function(req, res, next) {
     var query = req.params[0];
 
     request.post({
-            url: req.app.get('config').endpoint + '/api/' + query,
+            url: req.app.get('apiRoot').endpoint + '/api/' + query,
             json: req.body
         },
         function(err, response, body) {
