@@ -279,7 +279,7 @@ impl BoxedEndpoint {
 ///
 /// Consider using [`Endpoint`] for more user-friendly interface.
 ///
-/// [`Endpoint`]: struct.Endpoint.html
+/// [`Endpoint`]: trait.Endpoint.html
 ///
 /// # Examples
 ///
@@ -372,7 +372,7 @@ impl EndpointBuilder {
 impl fmt::Debug for EndpointBuilder {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         formatter
-            .debug_struct("BoxedEndpoint")
+            .debug_struct("EndpointBuilder")
             .field("method", &self.method)
             .field("id", &self.id)
             .field("handler", &self.handler.as_ref().map(|_| ".."))
@@ -433,7 +433,7 @@ pub enum Method {
 /// The macro implements all that is necessary for working with the endpoint
 /// with the exception of the [`Endpoint`] trait itself.
 ///
-/// [`Endpoint`]: api/ext/struct.Endpoint.html
+/// [`Endpoint`]: api/ext/trait.Endpoint.html
 ///
 /// # Examples
 ///
@@ -626,7 +626,7 @@ impl<'a> ApiBuilder<'a> {
     ///
     /// Panics if the builder already contains an endpoint with the same identifier.
     ///
-    /// [`Endpoint`]: struct.Endpoint.html
+    /// [`Endpoint`]: trait.Endpoint.html
     /// [`read_request!`]: ../../macro.read_request.html
     pub fn add<T>(self) -> Self
     where

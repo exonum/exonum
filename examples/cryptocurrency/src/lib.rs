@@ -32,8 +32,7 @@ extern crate exonum;
 
 // Import necessary types from crates.
 
-use exonum::blockchain::{Service, Transaction, ApiContext, ExecutionResult,
-                         TransactionSet};
+use exonum::blockchain::{Service, Transaction, ApiContext, ExecutionResult, TransactionSet};
 use exonum::messages::{RawTransaction, Message};
 use exonum::storage::{Fork, MapIndex, Snapshot};
 use exonum::crypto::{Hash, PublicKey};
