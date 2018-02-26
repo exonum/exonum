@@ -27,9 +27,9 @@ use iron::status;
 use iron::url::Url;
 use self::iron_test::request::{get as test_get, post as test_post};
 
-use api::ext::{ApiError, ApiResult, ApiBuilder, Endpoint, EndpointBuilder, EndpointSpec,
-               ServiceApi, TRANSACTIONS_ID};
-use api::iron::{into_handler, ErrorResponse};
+use api::ext::{ApiError, ApiResult, BoxedEndpoint, Endpoint, EndpointContext, EndpointSpec,
+               MutatingEndpoint, ServiceApi, TRANSACTIONS_ID};
+use api::iron::{ErrorResponse, IronAdapter};
 use blockchain::{Blockchain, ExecutionResult, Transaction};
 use crypto::{self, CryptoHash, Hash};
 use node::{ApiSender, ExternalMessage};
@@ -89,27 +89,31 @@ impl Transaction for Flop {
     }
 }
 
-read_request! {
-    /// Sample read request.
-    @(ID = "flop")
-    GetFlop(()) -> Option<String>;
+enum GetFlop {}
+
+impl EndpointSpec for GetFlop {
+    type Request = ();
+    type Response = Option<String>;
+    const ID: &'static str = "flop";
 }
 
 impl Endpoint for GetFlop {
-    fn handle(&self, _: ()) -> ApiResult<Option<String>> {
-        let schema = Schema::new(self.as_ref().snapshot());
+    fn handle(context: &EndpointContext, _: ()) -> ApiResult<Option<String>> {
+        let schema = Schema::new(context.snapshot());
         Ok(schema.flop().get())
     }
 }
 
-read_request! {
-    /// Sample read request.
-    @(ID = "sum")
-    GetSum(Vec<u32>) -> u32;
+enum GetSum {}
+
+impl EndpointSpec for GetSum {
+    type Request = Vec<u32>;
+    type Response = u32;
+    const ID: &'static str = "sum";
 }
 
 impl Endpoint for GetSum {
-    fn handle(&self, numbers: Vec<u32>) -> ApiResult<u32> {
+    fn handle(_: &EndpointContext, numbers: Vec<u32>) -> ApiResult<u32> {
         let mut sum: u32 = 0;
         for x in numbers {
             sum = sum.checked_add(x).ok_or_else(|| {
@@ -121,11 +125,35 @@ impl Endpoint for GetSum {
 }
 
 fn create_blockchain() -> (Blockchain, mpsc::Receiver<ExternalMessage>) {
+    use blockchain::{Service, TransactionSet};
+    use encoding::Error as EncodingError;
+    use messages::RawMessage;
+
+    struct MyService;
+
+    impl Service for MyService {
+        fn service_id(&self) -> u16 {
+            1000
+        }
+
+        fn service_name(&self) -> &str {
+            "my-service"
+        }
+
+        fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+            vec![]
+        }
+
+        fn tx_from_raw(&self, message: RawMessage) -> Result<Box<Transaction>, EncodingError> {
+            Ok(Any::tx_from_raw(message)?.into())
+        }
+    }
+
     let (pubkey, key) = crypto::gen_keypair();
     let api_channel = mpsc::channel(4);
     let blockchain = Blockchain::new(
         Box::new(MemoryDB::new()),
-        vec![],
+        vec![Box::new(MyService)],
         pubkey,
         key.clone(),
         ApiSender::new(api_channel.0.clone()),
@@ -134,13 +162,12 @@ fn create_blockchain() -> (Blockchain, mpsc::Receiver<ExternalMessage>) {
     (blockchain, api_channel.1)
 }
 
-fn create_api(blockchain: &Blockchain) -> ServiceApi {
-    ApiBuilder::new(&blockchain.api_context())
+fn create_api() -> ServiceApi {
+    ServiceApi::new()
         .add_transactions::<Any>()
         .add::<GetFlop>()
         .add::<sub::GetFlopOrDefault>()
         .add::<GetSum>()
-        .create()
 }
 
 fn assert_channel_state(receiver: &mut mpsc::Receiver<ExternalMessage>, tx_hash: &Hash) {
@@ -159,12 +186,12 @@ fn test_single_transaction_sink() {
     let (_, key) = crypto::gen_keypair();
     let (blockchain, mut receiver) = create_blockchain();
 
-    let api = ApiBuilder::new(&blockchain.api_context())
-        .add_transactions::<Flip>()
-        .create();
+    let api = ServiceApi::new().add_transactions::<Flip>();
+    let ctx = blockchain.api_context();
 
     let tx = Flip::new(100, &key);
     let response = api[TRANSACTIONS_ID]
+        .with_context(&ctx)
         .handle(serde_json::to_value(&tx).unwrap())
         .unwrap();
     assert_eq!(response, json!({ "tx_hash": tx.hash() }));
@@ -172,6 +199,7 @@ fn test_single_transaction_sink() {
 
     let tx = Flop::new("foobar", &key);
     let err = api[TRANSACTIONS_ID]
+        .with_context(&ctx)
         .handle(serde_json::to_value(&tx).unwrap())
         .unwrap_err();
     match err {
@@ -185,12 +213,12 @@ fn test_full_transaction_sink() {
     let (_, key) = crypto::gen_keypair();
     let (blockchain, mut receiver) = create_blockchain();
 
-    let api = ApiBuilder::new(&blockchain.api_context())
-        .add_transactions::<Any>()
-        .create();
+    let api = ServiceApi::new().add_transactions::<Any>();
+    let ctx = blockchain.api_context();
 
     let tx = Flip::new(100, &key);
     let response = api[TRANSACTIONS_ID]
+        .with_context(&ctx)
         .handle(serde_json::to_value(&tx).unwrap())
         .unwrap();
     assert_eq!(response, json!({ "tx_hash": tx.hash() }));
@@ -198,12 +226,14 @@ fn test_full_transaction_sink() {
 
     let tx = Flop::new("foobar", &key);
     let response = api[TRANSACTIONS_ID]
+        .with_context(&ctx)
         .handle(serde_json::to_value(&tx).unwrap())
         .unwrap();
     assert_eq!(response, json!({ "tx_hash": tx.hash() }));
     assert_channel_state(receiver.by_ref(), &tx.hash());
 
     let err = api[TRANSACTIONS_ID]
+        .with_context(&ctx)
         .handle(json!({ "garbage": 123 }))
         .unwrap_err();
     match err {
@@ -213,16 +243,19 @@ fn test_full_transaction_sink() {
 }
 
 mod sub {
-    use super::{ApiResult, Endpoint, Schema};
+    use super::*;
 
-    read_request! {
-        @(ID = "flop-default")
-        pub(super) GetFlopOrDefault(String) -> String;
+    pub(super) struct GetFlopOrDefault;
+
+    impl EndpointSpec for GetFlopOrDefault {
+        type Request = String;
+        type Response = String;
+        const ID: &'static str = "flop-default";
     }
 
     impl Endpoint for GetFlopOrDefault {
-        fn handle(&self, def: String) -> ApiResult<String> {
-            let schema = Schema::new(self.as_ref().snapshot());
+        fn handle(ctx: &EndpointContext, def: String) -> ApiResult<String> {
+            let schema = Schema::new(ctx.snapshot());
             Ok(schema.flop().get().unwrap_or(def))
         }
     }
@@ -233,11 +266,16 @@ fn test_read_requests() {
     use self::sub::GetFlopOrDefault;
 
     let (mut blockchain, _) = create_blockchain();
-    let api = create_api(&blockchain);
+    let api = create_api();
+    let ctx = blockchain.api_context();
 
-    let response = api[GetFlop::ID].handle(json!(null)).unwrap();
+    let response = api[GetFlop::ID]
+        .with_context(&ctx)
+        .handle(json!(null))
+        .unwrap();
     assert_eq!(response, json!(null));
     let response = api[GetFlopOrDefault::ID]
+        .with_context(&ctx)
         .handle(json!("Ghostbusters (2016)"))
         .unwrap();
     assert_eq!(response, json!("Ghostbusters (2016)"));
@@ -248,9 +286,13 @@ fn test_read_requests() {
     );
     blockchain.merge(fork.into_patch()).unwrap();
 
-    let response = api[GetFlop::ID].handle(json!(null)).unwrap();
+    let response = api[GetFlop::ID]
+        .with_context(&ctx)
+        .handle(json!(null))
+        .unwrap();
     assert_eq!(response, json!("The Happening"));
     let response = api[GetFlopOrDefault::ID]
+        .with_context(&ctx)
         .handle(json!("Ghostbusters (2016)"))
         .unwrap();
     assert_eq!(response, json!("The Happening"));
@@ -258,55 +300,35 @@ fn test_read_requests() {
 
 #[test]
 fn test_custom_transaction_send() {
-    use api::ext::{FromContext, Method};
-    use blockchain::ApiContext;
-    use crypto::SecretKey;
     use messages::Message;
-    use node::TransactionSend;
 
-    struct SendTransaction {
-        channel: ApiSender,
-        secret_key: SecretKey,
-    }
-
-    impl FromContext for SendTransaction {
-        fn from_context(context: &ApiContext) -> Self {
-            SendTransaction {
-                channel: context.node_channel().clone(),
-                secret_key: context.secret_key().clone(),
-            }
-        }
-    }
+    enum SendTransaction {}
 
     impl EndpointSpec for SendTransaction {
         type Request = (u64, String);
         type Response = Hash;
-        const METHOD: Method = Method::Post;
         const ID: &'static str = "send-transaction";
     }
 
-    impl Endpoint for SendTransaction {
-        fn handle(&self, req: (u64, String)) -> Result<Hash, ApiError> {
-            let tx = Flip::new(req.0, &self.secret_key);
+    impl MutatingEndpoint for SendTransaction {
+        fn handle(ctx: &mut EndpointContext, req: (u64, String)) -> Result<Hash, ApiError> {
+            let tx = Flip::new_with_signature(req.0, &crypto::Signature::zero());
             let tx_hash = tx.hash();
-            self.channel.send(tx.into()).map_err(
-                ApiError::TransactionNotSent,
-            )?;
+            ctx.sign_and_send(tx)?;
             Ok(tx_hash)
         }
     }
 
     let (blockchain, mut receiver) = create_blockchain();
-    let api = ApiBuilder::new(&blockchain.api_context())
-        .add::<SendTransaction>()
-        .create();
+    let api = ServiceApi::new().add_mut::<SendTransaction>();
+    let ctx = blockchain.api_context();
 
     let secret_key = blockchain.api_context().secret_key().clone();
     let tx = Flip::new(500, &secret_key);
-    let response = api[SendTransaction::ID]
+    api[SendTransaction::ID]
+        .with_context(&ctx)
         .handle(json!([tx.field(), "Garbage"]))
         .unwrap();
-    assert_eq!(response, json!(tx.hash()));
     assert!(tx.verify_signature(blockchain.api_context().public_key()));
     assert_channel_state(receiver.by_ref(), &tx.hash());
 }
@@ -314,16 +336,9 @@ fn test_custom_transaction_send() {
 #[test]
 #[should_panic(expected = "Duplicate endpoint ID")]
 fn test_duplicate_ids() {
-    let (blockchain, _) = create_blockchain();
-
-    let api = ApiBuilder::new(&blockchain.api_context())
-        .add_transactions::<Any>()
-        .add_endpoint(
-            EndpointBuilder::read_request(TRANSACTIONS_ID)
-                .handler(|_| Ok(json!("Gotcha!")))
-                .create(),
-        )
-        .create();
+    let api = ServiceApi::new().add_transactions::<Any>().add_endpoint(
+        BoxedEndpoint::read_request(TRANSACTIONS_ID, |_, _| Ok(json!("Gotcha!"))),
+    );
     drop(api);
 }
 
@@ -331,8 +346,11 @@ fn test_duplicate_ids() {
 #[should_panic(expected = "Unknown endpoint ID")]
 fn test_unknown_id() {
     let (blockchain, _) = create_blockchain();
-    let api = create_api(&blockchain);
-    api["foobar"].handle(json!(null)).unwrap();
+    let api = create_api();
+    api["foobar"]
+        .with_context(&blockchain.api_context())
+        .handle(json!(null))
+        .unwrap();
 }
 
 // // // Iron-related tests // // //
@@ -357,8 +375,8 @@ fn post_headers() -> Headers {
 #[test]
 fn test_iron_read_requests_normal() {
     let (blockchain, _) = create_blockchain();
-    let api = create_api(&blockchain);
-    let handler = into_handler(api);
+    let api = create_api();
+    let handler = IronAdapter::new(blockchain.api_context()).create_handler(api);
 
     let resp = test_get("http://localhost:3000/flop", Headers::new(), &handler).unwrap();
     assert_eq!(resp.status, Some(status::Ok));
@@ -394,8 +412,8 @@ fn test_iron_read_requests_normal() {
 #[test]
 fn test_iron_transactions_normal() {
     let (blockchain, mut receiver) = create_blockchain();
-    let api = create_api(&blockchain);
-    let handler = into_handler(api);
+    let api = create_api();
+    let handler = IronAdapter::new(blockchain.api_context()).create_handler(api);
 
     let tx = {
         let (_, key) = crypto::gen_keypair();
@@ -416,8 +434,8 @@ fn test_iron_transactions_normal() {
 #[test]
 fn test_iron_transactions_no_get() {
     let (blockchain, receiver) = create_blockchain();
-    let api = create_api(&blockchain);
-    let handler = into_handler(api);
+    let api = create_api();
+    let handler = IronAdapter::new(blockchain.api_context()).create_handler(api);
 
     let tx = {
         let (_, key) = crypto::gen_keypair();
@@ -447,8 +465,8 @@ fn test_iron_transactions_no_get() {
 #[test]
 fn test_iron_read_requests_malformed() {
     let (blockchain, _) = create_blockchain();
-    let api = create_api(&blockchain);
-    let handler = into_handler(api);
+    let api = create_api();
+    let handler = IronAdapter::new(blockchain.api_context()).create_handler(api);
 
     let malformed_requests = [
         "1, 2, 3", // not correct JSON
@@ -501,9 +519,11 @@ fn test_iron_read_requests_malformed() {
 #[test]
 fn test_read_request_user_generated_internal_error() {
     let (blockchain, _) = create_blockchain();
-    let api = create_api(&blockchain);
+    let api = create_api();
+    let ctx = blockchain.api_context();
 
     let error = api[GetSum::ID]
+        .with_context(&ctx)
         .handle(json!([2000000000, 2000000000, 2000000000]))
         .unwrap_err();
     match error {
@@ -512,7 +532,7 @@ fn test_read_request_user_generated_internal_error() {
     }
 
     // Now, with the Iron engine
-    let handler = into_handler(api);
+    let handler = IronAdapter::new(ctx).create_handler(api);
 
     let url = create_url("sum", "[2000000000, 2000000000, 2000000000]");
     let IronError { error, response } = test_get(&url, Headers::new(), &handler).unwrap_err();
@@ -529,11 +549,9 @@ fn test_read_request_user_generated_internal_error() {
 
 #[test]
 fn test_iron_transaction_verification_failure() {
-    use std::error::Error;
-
     let (blockchain, receiver) = create_blockchain();
-    let api = create_api(&blockchain);
-    let handler = into_handler(api);
+    let api = create_api();
+    let handler = IronAdapter::new(blockchain.api_context()).create_handler(api);
 
     let tx = {
         let (_, key) = crypto::gen_keypair();
@@ -552,10 +570,8 @@ fn test_iron_transaction_verification_failure() {
         .unwrap()
         .into_inner();
     match error {
-        ApiError::TransactionNotSent(ref e) => {
-            assert!(e.description().contains("Unable to verify"))
-        }
-        _ => panic!("Unexpected API error"),
+        ApiError::VerificationFail(..) => {}
+        e => panic!("Unexpected API error: {:?}", e),
     }
 
     drop(receiver);
@@ -566,8 +582,8 @@ fn test_iron_transaction_send_failure() {
     use std::error::Error;
 
     let (blockchain, receiver) = create_blockchain();
-    let api = create_api(&blockchain);
-    let handler = into_handler(api);
+    let api = create_api();
+    let handler = IronAdapter::new(blockchain.api_context()).create_handler(api);
     drop(receiver);
 
     let tx = {
@@ -597,31 +613,36 @@ fn test_iron_transaction_send_failure() {
 
 #[test]
 fn test_not_found_error() {
-    read_request! {
-        @(ID = "flop-or-fail")
-        GetFlopOrFail(()) -> String;
+    enum GetFlopOrFail {}
+
+    impl EndpointSpec for GetFlopOrFail {
+        type Request = ();
+        type Response = String;
+        const ID: &'static str = "flop-or-fail";
     }
 
     impl Endpoint for GetFlopOrFail {
-        fn handle(&self, _: ()) -> Result<String, ApiError> {
-            let schema = Schema::new(self.as_ref().snapshot());
+        fn handle(ctx: &EndpointContext, _: ()) -> Result<String, ApiError> {
+            let schema = Schema::new(ctx.snapshot());
             schema.flop().get().ok_or(ApiError::NotFound)
         }
     }
 
     let (mut blockchain, _) = create_blockchain();
-    let api = ApiBuilder::new(&blockchain.api_context())
-        .add::<GetFlopOrFail>()
-        .create();
+    let api = ServiceApi::new().add::<GetFlopOrFail>();
+    let ctx = blockchain.api_context();
 
     // Initially, the entry is not set, so we should get an error.
-    let error = api[GetFlopOrFail::ID].handle(json!(null)).unwrap_err();
+    let error = api[GetFlopOrFail::ID]
+        .with_context(&ctx)
+        .handle(json!(null))
+        .unwrap_err();
     match error {
         ApiError::NotFound => {}
         _ => panic!("Unexpected API error"),
     }
 
-    let handler = into_handler(api);
+    let handler = IronAdapter::new(blockchain.api_context()).create_handler(api);
     let IronError { response, .. } = test_get(
         "http://localhost:3000/flop-or-fail",
         Headers::new(),

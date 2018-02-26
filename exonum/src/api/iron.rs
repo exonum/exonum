@@ -28,7 +28,8 @@ use serde_json;
 
 use std::sync::Arc;
 
-use super::ext::{ApiError, BoxedEndpoint, EndpointHolder, Method, ServiceApi};
+use blockchain::ApiContext;
+use super::ext::{ApiError, BoxedEndpoint, EndpointHolder, ServiceApi};
 
 /// Response returned by the Iron adapter in case an endpoint
 /// raises an error.
@@ -56,6 +57,7 @@ impl From<ApiError> for IronError {
         let code = match e {
             UnknownId(..) | NotFound => status::NotFound,
             BadRequest(..) => status::BadRequest,
+            VerificationFail(..) |
             TransactionNotSent(..) |
             InternalError(..) => status::InternalServerError,
         };
@@ -76,73 +78,92 @@ fn ok_response(response: &serde_json::Value) -> IronResult<Response> {
     Ok(resp)
 }
 
-/// TODO
-pub fn into_handler(api: ServiceApi) -> Box<Handler> {
-    // Can an endpoint be used in `GET` HTTP requests?
-    fn can_get(e: &BoxedEndpoint) -> bool {
-        e.method() == Method::Get
+/// Transport adapter for HTTP that uses Iron framework.
+#[derive(Debug)]
+pub struct IronAdapter {
+    context: ApiContext,
+}
+
+impl IronAdapter {
+    /// Creates a new adapter.
+    pub fn new(context: ApiContext) -> Self {
+        IronAdapter { context }
     }
 
-    // Can an endpoint be used in `POST` HTTP requests?
-    fn can_post(_: &BoxedEndpoint) -> bool {
-        true
-    }
+    /// Creates a handler.
+    pub fn create_handler(&self, api: ServiceApi) -> Box<Handler> {
+        // Can an endpoint be used in `GET` HTTP requests?
+        fn can_get(e: &BoxedEndpoint) -> bool {
+            e.readonly()
+        }
 
-    fn endpoint_from_req<'a, T: 'a>(api: &'a T, req: &mut Request) -> IronResult<&'a BoxedEndpoint>
-    where
-        T: EndpointHolder,
-    {
-        let params = req.extensions.get::<Router>().unwrap();
-        let id = params.find("id").ok_or_else(
-            || ApiError::UnknownId("".to_string()),
-        )?;
-        api.endpoint(id).ok_or_else(|| {
-            ApiError::UnknownId(id.to_string()).into()
-        })
-    }
+        // Can an endpoint be used in `POST` HTTP requests?
+        fn can_post(_: &BoxedEndpoint) -> bool {
+            true
+        }
 
-    let mut router = Router::new();
-    let api = Arc::new(api);
+        fn endpoint_from_req<'a, T: 'a>(
+            api: &'a T,
+            req: &mut Request,
+        ) -> IronResult<&'a BoxedEndpoint>
+        where
+            T: EndpointHolder,
+        {
+            let params = req.extensions.get::<Router>().unwrap();
+            let id = params.find("id").ok_or_else(
+                || ApiError::UnknownId("".to_string()),
+            )?;
+            api.endpoint(id).ok_or_else(|| {
+                ApiError::UnknownId(id.to_string()).into()
+            })
+        }
 
-    let get_api = Arc::clone(&api);
-    let get_handler = move |req: &mut Request| {
-        let get_api = get_api.filter(can_get);
-        let endpoint = endpoint_from_req(&get_api, req)?;
+        let mut router = Router::new();
+        let api = Arc::new(api);
 
-        let map = req.get_ref::<params::Params>().unwrap();
-        let query = match map.find(&["q"]) {
-            None => serde_json::Value::Null,
-            Some(&params::Value::String(ref query)) => {
-                serde_json::from_str(query).map_err(|e| {
-                    ApiError::BadRequest(e.into())
-                })?
-            }
-            _ => {
-                return Err(ApiError::BadRequest("Request data is malformed".into()))?;
-            }
+        let get_api = Arc::clone(&api);
+        let context = self.context.clone();
+        let get_handler = move |req: &mut Request| {
+            let get_api = get_api.filter(can_get);
+            let endpoint = endpoint_from_req(&get_api, req)?;
+
+            let map = req.get_ref::<params::Params>().unwrap();
+            let query = match map.find(&["q"]) {
+                None => serde_json::Value::Null,
+                Some(&params::Value::String(ref query)) => {
+                    serde_json::from_str(query).map_err(|e| {
+                        ApiError::BadRequest(e.into())
+                    })?
+                }
+                _ => {
+                    return Err(ApiError::BadRequest("Request data is malformed".into()))?;
+                }
+            };
+
+            let response = endpoint.with_context(&context).handle(query)?;
+            ok_response(&response)
         };
 
-        let response = endpoint.handle(query)?;
-        ok_response(&response)
-    };
+        let post_api = Arc::clone(&api);
+        let context = self.context.clone();
+        let post_handler = move |req: &mut Request| {
+            let post_api = post_api.filter(can_post);
+            let endpoint = endpoint_from_req(&post_api, req)?;
 
-    let post_api = Arc::clone(&api);
-    let post_handler = move |req: &mut Request| {
-        let post_api = post_api.filter(can_post);
-        let endpoint = endpoint_from_req(&post_api, req)?;
+            let query = match req.get::<bodyparser::Json>() {
+                Ok(Some(body)) => body,
+                _ => {
+                    return Err(ApiError::BadRequest("Request body is malformed".into()))?;
+                }
+            };
 
-        let query = match req.get::<bodyparser::Json>() {
-            Ok(Some(body)) => body,
-            _ => {
-                return Err(ApiError::BadRequest("Request body is malformed".into()))?;
-            }
+            let response = endpoint.with_context(&context).handle(query)?;
+            ok_response(&response)
         };
-        let response = endpoint.handle(query)?;
-        ok_response(&response)
-    };
 
-    router.get(":id", get_handler, "get_handler");
-    router.post(":id", post_handler, "post_handler");
+        router.get(":id", get_handler, "get_handler");
+        router.post(":id", post_handler, "post_handler");
 
-    Box::new(router)
+        Box::new(router)
+    }
 }

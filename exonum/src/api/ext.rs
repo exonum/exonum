@@ -18,8 +18,8 @@
 //!
 //! ```
 //! # #[macro_use] extern crate exonum;
-//! use exonum::api::ext::{ApiBuilder, ApiResult, Endpoint};
-//! use exonum::api::iron;
+//! use exonum::api::ext::{ApiResult, Endpoint, EndpointContext, EndpointSpec, ServiceApi};
+//! use exonum::api::iron::{self, IronAdapter};
 //! # use exonum::blockchain::{ApiContext, Blockchain, ExecutionResult, Service, Transaction};
 //! # use exonum::crypto::Hash;
 //! # use exonum::encoding;
@@ -55,13 +55,16 @@
 //! }
 //!
 //! // Read requests
-//! read_request! {
-//!     @(ID = "read")
-//!     pub Read(()) -> u64;
+//! enum Read {}
+//!
+//! impl EndpointSpec for Read {
+//!     type Request = ();
+//!     type Response = u64;
+//!     const ID: &'static str = "read";
 //! }
 //!
 //! impl Endpoint for Read {
-//!     fn handle(&self, _: ()) -> ApiResult<u64> { Ok(42) }
+//!     fn handle(_: &EndpointContext, _: ()) -> ApiResult<u64> { Ok(42) }
 //! }
 //!
 //! // In `Service` implementation:
@@ -76,11 +79,10 @@
 //! #   }
 //!
 //!     fn public_api_handler(&self, context: &ApiContext) -> Option<Box<iron::Handler>> {
-//!         let api = ApiBuilder::new(&context)
+//!         let api = ServiceApi::new()
 //!             .add::<Read>()
-//!             .add_transactions::<Any>()
-//!             .create();
-//!         Some(iron::into_handler(api))
+//!             .add_transactions::<Any>();
+//!         Some(IronAdapter::new(context.clone()).create_handler(api))
 //!     }
 //! }
 //! # fn main() { }
@@ -93,16 +95,17 @@ use serde_json::{self, Value};
 use std::collections::HashMap;
 use std::{fmt, io};
 
-use blockchain::{ApiContext, Transaction};
-use crypto::Hash;
-use node::{ApiSender, TransactionSend};
+use blockchain::{ApiContext, Blockchain, Transaction};
+use crypto::{Hash, SecretKey};
+use node::TransactionSend;
+use storage::Snapshot;
 
 /// The identifier for the "standard" transaction sink.
 ///
 /// Transaction sinks can be added to service APIs using the [`add_transactions`]
-/// method in `ApiBuilder`; see it for more details
+/// method in `ServiceApi`; see it for more details.
 ///
-/// [`add_transactions`]: struct.ApiBuilder.html#method.add_transactions
+/// [`add_transactions`]: struct.ServiceApi.html#method.add_transactions
 pub const TRANSACTIONS_ID: &str = "transactions";
 
 /// API-related errors.
@@ -121,7 +124,10 @@ pub enum ApiError {
     #[fail(display = "Not found")]
     NotFound,
 
-    // TODO: split `VerificationFail` / others?
+    /// Transaction verification has failed.
+    #[fail(display = "Transaction not verified: {:?}", _0)]
+    VerificationFail(Box<Transaction>),
+
     /// A transaction processed by API has failed to be sent.
     #[fail(display = "Failed to send transaction: {}", _0)]
     TransactionNotSent(
@@ -144,23 +150,151 @@ pub trait EndpointSpec {
     /// Response type accepted by the endpoint.
     type Response: Serialize + DeserializeOwned;
 
-    /// Retrieval style for the endpoint.
-    const METHOD: Method;
     /// Endpoint identifier. Must be unique within the service.
     const ID: &'static str;
 }
 
-/// Service endpoint.
+/// Context supplied to endpoints.
+#[derive(Debug)]
+pub struct EndpointContext {
+    blockchain: Blockchain,
+    queue: Vec<Box<Transaction>>,
+    unsigned_queue: Vec<Box<Transaction>>,
+}
+
+impl EndpointContext {
+    fn new(blockchain: Blockchain) -> Self {
+        EndpointContext {
+            blockchain,
+            queue: vec![],
+            unsigned_queue: vec![],
+        }
+    }
+
+    /// Gets a snapshot of the current blockchain state.
+    pub fn snapshot(&self) -> Box<Snapshot> {
+        self.blockchain.snapshot()
+    }
+
+    /// Queues a transaction for sending over the network and including into the blockchain.
+    ///
+    /// The transaction should already be signed.
+    pub fn send<T>(&mut self, transaction: T) -> Result<(), ApiError>
+    where
+        T: Into<Box<Transaction>>,
+    {
+        let transaction = transaction.into();
+        if !transaction.verify() {
+            return Err(ApiError::VerificationFail(transaction));
+        }
+        self.queue.push(transaction);
+        Ok(())
+    }
+
+    /// Queues a transaction for signing, sending over the network and including
+    /// into the blockchain.
+    ///
+    /// The transaction is signed with the service secret key.
+    pub fn sign_and_send<T>(&mut self, transaction: T) -> Result<(), ApiError>
+    where
+        T: Into<Box<Transaction>>,
+    {
+        let transaction = transaction.into();
+
+        debug_assert_eq!(*transaction.raw().signature(), ::crypto::Signature::zero());
+        self.unsigned_queue.push(transaction);
+        Ok(())
+    }
+
+    fn finalize(self, context: &ApiContext) -> Result<(), ApiError> {
+        use messages::{MessageBuffer, RawMessage};
+
+        // XXX: Unbelievable hacks
+        fn sign_transaction(
+            tx: Box<Transaction>,
+            secret_key: &SecretKey,
+            blockchain: &Blockchain,
+        ) -> Box<Transaction> {
+            let buffer = tx.raw().as_ref().to_vec();
+            let mut buffer = MessageBuffer::from_vec(buffer);
+            buffer.sign(secret_key);
+            blockchain.tx_from_raw(RawMessage::new(buffer)).unwrap()
+        }
+
+        for tx in self.queue {
+            context.node_channel().send_unchecked(tx).map_err(
+                ApiError::TransactionNotSent,
+            )?;
+        }
+
+        let signed_txs = self.unsigned_queue.into_iter().map(|tx| {
+            sign_transaction(tx, context.secret_key(), context.blockchain())
+        });
+        for tx in signed_txs {
+            context.node_channel().send_unchecked(tx).map_err(
+                ApiError::TransactionNotSent,
+            )?;
+        }
+        Ok(())
+    }
+}
+
+/// Endpoint used to read information from the blockchain.
 ///
 /// This is the main trait intended to be used by service developers.
 /// Due to reliance on [`EndpointSpec`], the information about the endpoint
 /// will be displayed in crate docs in the easily digestible form.
 ///
-/// Note that [`read_request!`] macro provides an even more convenient way for
-/// implementing read requests.
-///
 /// [`EndpointSpec`]: trait.EndpointSpec.html
-/// [`read_request!`]: ../../macro.read_request.html
+///
+/// # Examples
+///
+/// ```
+/// # #[macro_use] extern crate exonum;
+/// use exonum::api::ext::{ApiResult, Endpoint, EndpointContext, EndpointSpec};
+/// # use exonum::crypto::PublicKey;
+/// # use exonum::storage::Snapshot;
+///
+/// pub enum GetBalance {}
+///
+/// impl EndpointSpec for GetBalance {
+///     type Request = PublicKey;
+///     type Response = Option<u64>;
+///     const ID: &'static str = "balance";
+/// }
+///
+/// // Service schema containing balances.
+/// struct Schema { /* ... */ }
+///
+/// impl Schema {
+/// #  fn new<S: AsRef<Snapshot>>(snapshot: S) -> Self { Schema { } }
+///    pub fn balance(&self, key: &PublicKey) -> Option<u64> {
+///       // ...
+/// #     Some(42)
+///   }
+/// }
+///
+/// impl Endpoint for GetBalance {
+///     fn handle(ctx: &EndpointContext, key: PublicKey) -> ApiResult<Option<u64>> {
+///         let schema = Schema::new(ctx.snapshot());
+///         Ok(schema.balance(&key))
+///     }
+/// }
+/// # fn main() {}
+/// ```
+pub trait Endpoint: EndpointSpec + Send + Sync {
+    /// Handles a request to the endpoint.
+    ///
+    /// # Important note
+    ///
+    /// Unlike with transaction handling, the core does not catch panics during
+    /// the execution of `handle()`. Thus, any panic will lead to stopping
+    /// the entire request processing thread.
+    fn handle(context: &EndpointContext, request: Self::Request) -> ApiResult<Self::Response>;
+}
+
+/// Endpoint that receives a mutable reference to the `EndpointContext`,
+/// allowing it to perform more actions.
 ///
 /// # Examples
 ///
@@ -169,9 +303,9 @@ pub trait EndpointSpec {
 ///
 /// ```
 /// # #[macro_use] extern crate exonum;
-/// # use exonum::api::ext::{ApiError, Endpoint, EndpointSpec, FromContext, Method};
+/// # use exonum::api::ext::{ApiError, EndpointContext, EndpointSpec, MutatingEndpoint};
 /// # use exonum::blockchain::{ApiContext, ExecutionResult, Transaction};
-/// # use exonum::crypto::{CryptoHash, Hash, SecretKey};
+/// # use exonum::crypto::{CryptoHash, Hash, Signature};
 /// # use exonum::node::{ApiSender, TransactionSend};
 /// # use exonum::storage::Fork;
 /// // Suppose we have this transaction spec.
@@ -193,38 +327,25 @@ pub trait EndpointSpec {
 /// # }
 ///
 /// // Sender for `MyTransaction`s.
-/// pub struct SendTransaction {
-///     channel: ApiSender,
-///     secret_key: SecretKey,
-/// }
-///
-/// impl FromContext for SendTransaction {
-///     fn from_context(context: &ApiContext) -> Self {
-///         SendTransaction {
-///             channel: context.node_channel().clone(),
-///             secret_key: context.secret_key().clone(),
-///         }
-///     }
-/// }
+/// pub enum SendTransaction {}
 ///
 /// impl EndpointSpec for SendTransaction {
 ///     type Request = (u64, String);
 ///     type Response = Hash;
-///     const METHOD: Method = Method::Post;
 ///     const ID: &'static str = "send-transaction";
 /// }
 ///
-/// impl Endpoint for SendTransaction {
-///     fn handle(&self, req: (u64, String)) -> Result<Hash, ApiError> {
-///         let tx = MyTransaction::new(req.0, &req.1, &self.secret_key);
+/// impl MutatingEndpoint for SendTransaction {
+///     fn handle(context: &mut EndpointContext, req: (u64, String)) -> Result<Hash, ApiError> {
+///         let tx = MyTransaction::new_with_signature(req.0, &req.1, &Signature::zero());
 ///         let tx_hash = tx.hash();
-///         self.channel.send(tx.into()).map_err(ApiError::TransactionNotSent)?;
+///         context.sign_and_send(tx)?;
 ///         Ok(tx_hash)
 ///     }
 /// }
 /// # fn main() { }
 /// ```
-pub trait Endpoint: EndpointSpec + Send + Sync {
+pub trait MutatingEndpoint: EndpointSpec + Send + Sync {
     /// Handles a request to the endpoint.
     ///
     /// # Important note
@@ -232,7 +353,7 @@ pub trait Endpoint: EndpointSpec + Send + Sync {
     /// Unlike with transaction handling, the core does not catch panics during
     /// the execution of `handle()`. Thus, any panic will lead to stopping
     /// the entire request processing thread.
-    fn handle(&self, request: Self::Request) -> ApiResult<Self::Response>;
+    fn handle(context: &mut EndpointContext, request: Self::Request) -> ApiResult<Self::Response>;
 }
 
 /// Internally used version of `Endpoint`.
@@ -241,58 +362,16 @@ pub trait Endpoint: EndpointSpec + Send + Sync {
 /// of implementing endpoints is to implement the [`Endpoint`] trait.
 ///
 /// [`Endpoint`]: trait.Endpoint.html
-pub struct BoxedEndpoint {
-    method: Method,
-    id: String,
-    handler: Box<Fn(Value) -> ApiResult<Value> + Send + Sync>,
-}
-
-impl fmt::Debug for BoxedEndpoint {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        formatter
-            .debug_struct("BoxedEndpoint")
-            .field("method", &self.method)
-            .field("id", &self.id)
-            .finish()
-    }
-}
-
-impl BoxedEndpoint {
-    /// Returns the retrieval style of this endpoint.
-    pub fn method(&self) -> Method {
-        self.method
-    }
-
-    /// Returns the identifier of this endpoint.
-    pub fn id(&self) -> &str {
-        &self.id
-    }
-
-    /// Handles a request.
-    pub fn handle(&self, request: Value) -> ApiResult<Value> {
-        (self.handler)(request)
-    }
-}
-
-/// Builder for `BoxedEndpoint`s, allowing to achieve more fine-grained control over endpoint
-/// creation.
-///
-/// Consider using [`Endpoint`] for more user-friendly interface.
-///
-/// [`Endpoint`]: trait.Endpoint.html
 ///
 /// # Examples
 ///
 /// ```
 /// # extern crate exonum;
-/// # extern crate futures;
 /// #[macro_use] extern crate serde_json;
-/// # use exonum::api::ext::{EndpointBuilder, Method};
+/// # use exonum::api::ext::BoxedEndpoint;
 /// # use exonum::blockchain::{Blockchain, ExecutionResult, Transaction};
 /// # use exonum::crypto::{self, PublicKey};
-/// # use exonum::node::ApiSender;
-/// # use exonum::storage::{Fork, MemoryDB, Snapshot};
-/// # use futures::sync::mpsc;
+/// # use exonum::storage::Snapshot;
 /// use serde_json::Value;
 ///
 /// // Service schema containing balances.
@@ -307,226 +386,148 @@ impl BoxedEndpoint {
 /// }
 ///
 /// # fn main() {
-/// # let (pubkey, key) = crypto::gen_keypair();
-/// # let api_channel = mpsc::channel(4);
 /// let alice_key: PublicKey = // ...
 /// #   PublicKey::new([0; 32]);
-/// let blockchain = // ...
-/// #   Blockchain::new(
-/// #       Box::new(MemoryDB::new()),
-/// #       vec![],
-/// #       pubkey,
-/// #       key,
-/// #       ApiSender::new(api_channel.0.clone()),
-/// #   );
-/// let endpoint = EndpointBuilder::read_request("wallet")
-///     .handler(move |req: Value| {
+/// let endpoint = BoxedEndpoint::read_request(
+///     "wallet",
+///     move |context, req| {
 ///         let pubkey: PublicKey = serde_json::from_value(req)
 ///             .unwrap_or(alice_key);
-///         let balance: Option<u64> = Schema::new(blockchain.snapshot())
+///         let balance: Option<u64> = Schema::new(context.snapshot())
 ///             .balance(&pubkey);
 ///         Ok(json!(balance))
-///     })
-///     .create();
+///     },
+/// );
 ///
 /// assert_eq!(endpoint.id(), "wallet");
-/// assert_eq!(endpoint.method(), Method::Get);
-/// assert_eq!(endpoint.handle(json!("garbage")).unwrap(), json!(42));
+/// assert!(endpoint.readonly());
 /// # }
 /// ```
-pub struct EndpointBuilder {
-    method: Method,
+pub struct BoxedEndpoint {
     id: String,
-    handler: Option<Box<Fn(Value) -> ApiResult<Value> + Send + Sync>>,
+    handler: BoxedHandler,
 }
 
-impl EndpointBuilder {
-    /// Sets up the builder for a read request.
-    pub fn read_request<S: AsRef<str>>(id: S) -> Self {
-        EndpointBuilder {
-            method: Method::Get,
-            id: id.as_ref().to_owned(),
-            handler: None,
-        }
-    }
-
-    /// Sets the endpoint handler.
-    pub fn handler<F>(mut self, handler: F) -> Self
-    where
-        F: 'static + Fn(Value) -> ApiResult<Value> + Send + Sync,
-    {
-        self.handler = Some(Box::new(handler));
-        self
-    }
-
-    /// Creates the endpoint.
-    pub fn create(self) -> BoxedEndpoint {
-        BoxedEndpoint {
-            method: self.method,
-            id: self.id,
-            handler: self.handler.expect("Endpoint handler not set"),
-        }
-    }
-}
-
-impl fmt::Debug for EndpointBuilder {
+impl fmt::Debug for BoxedEndpoint {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         formatter
-            .debug_struct("EndpointBuilder")
-            .field("method", &self.method)
+            .debug_struct("BoxedEndpoint")
+            .field("readonly", &self.readonly())
             .field("id", &self.id)
-            .field("handler", &self.handler.as_ref().map(|_| ".."))
             .finish()
     }
 }
 
-impl<T: Endpoint + 'static> From<T> for BoxedEndpoint {
-    fn from(endpoint: T) -> Self {
-        BoxedEndpoint {
-            method: T::METHOD,
-            id: T::ID.to_owned(),
-            handler: Box::new(move |req: Value| {
-                let request: T::Request = serde_json::from_value(req).map_err(|e| {
-                    ApiError::BadRequest(e.into())
-                })?;
-                let response = endpoint.handle(request)?;
-                let response = serde_json::to_value(response).map_err(|e| {
-                    ApiError::InternalError(e.into())
-                })?;
-                Ok(response)
-            }),
+enum BoxedHandler {
+    Mutating(Box<Fn(&mut EndpointContext, Value) -> ApiResult<Value> + Send + Sync>),
+    Readonly(Box<Fn(&EndpointContext, Value) -> ApiResult<Value> + Send + Sync>),
+}
+
+impl BoxedHandler {
+    fn invoke(&self, context: &mut EndpointContext, request: Value) -> ApiResult<Value> {
+        use self::BoxedHandler::*;
+
+        match *self {
+            Mutating(ref handler) => (handler)(context, request),
+            Readonly(ref handler) => (handler)(&*context, request),
         }
     }
 }
 
-/// Type that can be instantiated from an `ApiContext` reference.
-///
-/// # Notes
-///
-/// This trait is used by [`ApiBuilder`]; it allows to add [`Endpoint`]s
-/// just by mentioning a type.
-///
-/// [`ApiBuilder`]: struct.ApiBuilder.html
-/// [`Endpoint`]: trait.Endpoint.html
-pub trait FromContext {
-    /// Creates an instance from the API context.
-    fn from_context(context: &ApiContext) -> Self;
+impl BoxedEndpoint {
+    /// Creates a read request from a given closure.
+    pub fn read_request<S, F>(id: S, handler: F) -> Self
+    where
+        S: AsRef<str>,
+        F: 'static + Fn(&EndpointContext, Value) -> ApiResult<Value> + Send + Sync,
+    {
+        BoxedEndpoint {
+            id: id.as_ref().to_owned(),
+            handler: BoxedHandler::Readonly(Box::new(handler)),
+        }
+    }
+
+    /// Creates a full-access endpoint from a given closure.
+    pub fn new<S, F>(id: S, handler: F) -> Self
+    where
+        S: AsRef<str>,
+        F: 'static + Fn(&mut EndpointContext, Value) -> ApiResult<Value> + Send + Sync,
+    {
+        BoxedEndpoint {
+            id: id.as_ref().to_owned(),
+            handler: BoxedHandler::Mutating(Box::new(handler)),
+        }
+    }
+
+    fn wrap<T, C, F>(context: C, req: Value, handler: F) -> ApiResult<Value>
+    where
+        T: EndpointSpec,
+        F: Fn(C, T::Request) -> ApiResult<T::Response>,
+    {
+        let request: T::Request = serde_json::from_value(req).map_err(|e| {
+            ApiError::BadRequest(e.into())
+        })?;
+        let response = handler(context, request)?;
+        let response = serde_json::to_value(response).map_err(|e| {
+            ApiError::InternalError(e.into())
+        })?;
+        Ok(response)
+    }
+
+    fn from_endpoint<T: Endpoint>() -> Self {
+        BoxedEndpoint::read_request(T::ID.to_owned(), |context, req| {
+            BoxedEndpoint::wrap::<T, _, _>(context, req, T::handle)
+        })
+    }
+
+    fn from_mut_endpoint<T: MutatingEndpoint>() -> Self {
+        BoxedEndpoint::new(T::ID.to_owned(), |context, req| {
+            BoxedEndpoint::wrap::<T, _, _>(context, req, T::handle)
+        })
+    }
+
+    /// Returns the retrieval style of this endpoint.
+    pub fn readonly(&self) -> bool {
+        match self.handler {
+            BoxedHandler::Mutating(..) => false,
+            BoxedHandler::Readonly(..) => true,
+        }
+    }
+
+    /// Returns the identifier of this endpoint.
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    /// Handles a request.
+    pub fn handle(&self, context: &mut EndpointContext, request: Value) -> ApiResult<Value> {
+        self.handler.invoke(context, request)
+    }
+
+    /// Adds an `ApiContext` to this transaction, allowing it to be executed
+    /// given a request.
+    pub fn with_context<'a, 'b>(&'a self, context: &'b ApiContext) -> EndpointWithContext<'a, 'b> {
+        EndpointWithContext {
+            endpoint: self,
+            context,
+        }
+    }
 }
 
-/// Supported subset of HTTP methods.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Method {
-    /// Marker for a safe endpoint, i.e., an endpoint without noticeable side effects.
-    ///
-    /// Named by analogy with HTTP `GET` method.
-    Get,
-
-    /// Marker for an unsafe endpoint, which is mainly called for side effects
-    /// (e.g., pushing a transaction into the memory pool).
-    ///
-    /// Named by analogy with HTTP `POST` method.
-    Post,
+/// An endpoint coupled with the `ApiContext`.
+#[derive(Debug)]
+pub struct EndpointWithContext<'a, 'b> {
+    endpoint: &'a BoxedEndpoint,
+    context: &'b ApiContext,
 }
 
-/// Definition of an `Endpoint` used to read information from the blockchain.
-///
-/// The macro implements all that is necessary for working with the endpoint
-/// with the exception of the [`Endpoint`] trait itself.
-///
-/// [`Endpoint`]: api/ext/trait.Endpoint.html
-///
-/// # Examples
-///
-/// ```
-/// # #[macro_use] extern crate exonum;
-/// use exonum::api::ext::{ApiResult, Endpoint};
-/// # use exonum::crypto::PublicKey;
-/// # use exonum::storage::Snapshot;
-///
-/// read_request! {
-///     /// Gets the balance of a particular wallet.
-///     @(ID = "balance")
-///     pub GetBalance(PublicKey) -> Option<u64>;
-/// }
-///
-/// // Service schema containing balances.
-/// struct Schema { /* ... */ }
-///
-/// impl Schema {
-/// #  fn new<S: AsRef<Snapshot>>(snapshot: S) -> Self { Schema { } }
-///    pub fn balance(&self, key: &PublicKey) -> Option<u64> {
-///       // ...
-/// #     Some(42)
-///   }
-/// }
-///
-/// impl Endpoint for GetBalance {
-///     fn handle(&self, key: PublicKey) -> ApiResult<Option<u64>> {
-///         let schema = Schema::new(self.as_ref().snapshot());
-///         Ok(schema.balance(&key))
-///     }
-/// }
-/// # fn main() {}
-/// ```
-#[macro_export]
-macro_rules! read_request {
-    // No visibility specifier
-    (
-        $(#[$attr:meta])*
-        @(ID = $id:expr) $name:ident($req:ty) -> $resp:ty;
-    ) => {
-        $(#[$attr])*
-        #[derive(Debug, Clone)]
-        pub struct $name($crate::blockchain::Blockchain);
-
-        read_request!(@implement ($id), $name, $req, $resp);
-    };
-
-    // `pub` visibility specifier
-    (
-        $(#[$attr:meta])*
-        @(ID = $id:expr) pub $name:ident($req:ty) -> $resp:ty;
-    ) => {
-        $(#[$attr])*
-        #[derive(Debug, Clone)]
-        pub struct $name($crate::blockchain::Blockchain);
-
-        read_request!(@implement ($id), $name, $req, $resp);
-    };
-
-    // `pub(..)` visibility specifier
-    // XXX: `pub(in ..)` processing is essentially a hack
-    (
-        $(#[$attr:meta])*
-        @(ID = $id:expr) pub($(in)* $vis:path) $name:ident($req:ty) -> $resp:ty;
-    ) => {
-        $(#[$attr])*
-        #[derive(Debug, Clone)]
-        pub(in $vis) struct $name($crate::blockchain::Blockchain);
-
-        read_request!(@implement ($id), $name, $req, $resp);
-    };
-
-    (@implement ($id:expr), $name:ident, $req:ty, $resp:ty) => {
-        impl $crate::api::ext::FromContext for $name {
-            fn from_context(context: &$crate::blockchain::ApiContext) -> Self {
-                $name(context.blockchain().clone())
-            }
-        }
-
-        impl $crate::api::ext::EndpointSpec for $name {
-            type Request = $req;
-            type Response = $resp;
-
-            const METHOD: $crate::api::ext::Method = $crate::api::ext::Method::Get;
-            const ID: &'static str = $id;
-        }
-
-        impl AsRef<$crate::blockchain::Blockchain> for $name {
-            fn as_ref(&self) -> &$crate::blockchain::Blockchain {
-                &self.0
-            }
-        }
+impl<'a, 'b> EndpointWithContext<'a, 'b> {
+    /// Handles a request.
+    pub fn handle(&self, request: Value) -> ApiResult<Value> {
+        let mut ep_context = EndpointContext::new(self.context.blockchain().clone());
+        let response = self.endpoint.handle(&mut ep_context, request)?;
+        ep_context.finalize(&self.context)?;
+        Ok(response)
     }
 }
 
@@ -539,7 +540,6 @@ pub struct TransactionResponse {
 
 #[derive(Debug)]
 struct TransactionSink<T> {
-    channel: ApiSender,
     _marker: ::std::marker::PhantomData<T>,
 }
 
@@ -554,11 +554,10 @@ where
     type Request = T;
     type Response = TransactionResponse;
 
-    const METHOD: Method = Method::Post;
     const ID: &'static str = TRANSACTIONS_ID;
 }
 
-impl<T> Endpoint for TransactionSink<T>
+impl<T> MutatingEndpoint for TransactionSink<T>
 where
     T: Into<Box<Transaction>>
         + Serialize
@@ -566,39 +565,24 @@ where
         + Send
         + Sync,
 {
-    fn handle(&self, transaction: T) -> ApiResult<TransactionResponse> {
-        let transaction: Box<Transaction> = transaction.into();
+    fn handle(context: &mut EndpointContext, transaction: T) -> ApiResult<TransactionResponse> {
+        let transaction = transaction.into();
         let tx_hash = transaction.hash();
-        self.channel.send(transaction).map_err(
-            ApiError::TransactionNotSent,
-        )?;
+        context.send(transaction)?;
         Ok(TransactionResponse { tx_hash })
     }
 }
 
-impl<T> FromContext for TransactionSink<T> {
-    fn from_context(context: &ApiContext) -> Self {
-        TransactionSink {
-            channel: context.node_channel().clone(),
-            _marker: ::std::marker::PhantomData,
-        }
-    }
-}
-
-/// Builder for service APIs.
+/// Full collection of endpoints for a particular service.
 #[derive(Debug)]
-pub struct ApiBuilder<'a> {
-    context: &'a ApiContext,
+pub struct ServiceApi {
     endpoints: HashMap<String, BoxedEndpoint>,
 }
 
-impl<'a> ApiBuilder<'a> {
-    /// Creates a builder.
-    pub fn new(context: &'a ApiContext) -> Self {
-        ApiBuilder {
-            context,
-            endpoints: HashMap::new(),
-        }
+impl ServiceApi {
+    /// Creates a new instance of service API with no endpoints.
+    pub fn new() -> Self {
+        ServiceApi { endpoints: HashMap::new() }
     }
 
     /// Adds an instantiated endpoint.
@@ -619,20 +603,27 @@ impl<'a> ApiBuilder<'a> {
 
     /// Adds an endpoint by its type `T`.
     ///
-    /// Primarily intended to be used with [`Endpoint`]s, for example,
-    /// read requests defined with the [`read_request!`] macro.
+    /// # Panics
+    ///
+    /// Panics if the builder already contains an endpoint with the same identifier.
+    pub fn add<T>(self) -> Self
+    where
+        T: Endpoint,
+    {
+        let endpoint = BoxedEndpoint::from_endpoint::<T>();
+        self.add_endpoint(endpoint)
+    }
+
+    /// Adds a mutating endpoint by its type.
     ///
     /// # Panics
     ///
     /// Panics if the builder already contains an endpoint with the same identifier.
-    ///
-    /// [`Endpoint`]: trait.Endpoint.html
-    /// [`read_request!`]: ../../macro.read_request.html
-    pub fn add<T>(self) -> Self
+    pub fn add_mut<T>(self) -> Self
     where
-        T: FromContext + Into<BoxedEndpoint>,
+        T: MutatingEndpoint,
     {
-        let endpoint = T::from_context(self.context);
+        let endpoint = BoxedEndpoint::from_mut_endpoint::<T>();
         self.add_endpoint(endpoint)
     }
 
@@ -652,13 +643,7 @@ impl<'a> ApiBuilder<'a> {
     where
         T: 'static + Into<Box<Transaction>> + Serialize + DeserializeOwned + Send + Sync,
     {
-        let endpoint = TransactionSink::<T>::from_context(self.context);
-        self.add_endpoint(endpoint)
-    }
-
-    /// Creates the service API.
-    pub fn create(self) -> ServiceApi {
-        ServiceApi { endpoints: self.endpoints }
+        self.add_mut::<TransactionSink<T>>()
     }
 }
 
@@ -666,21 +651,9 @@ impl<'a> ApiBuilder<'a> {
 pub trait EndpointHolder {
     /// Tries to retrieve a reference to an endpoint with the specified identifier.
     fn endpoint(&self, id: &str) -> Option<&BoxedEndpoint>;
-}
 
-/// Full collection of endpoints for a particular service.
-///
-/// Use [`ApiBuilder`] to build instances.
-///
-/// [`ApiBuilder`]: struct.ApiBuilder.html
-#[derive(Debug)]
-pub struct ServiceApi {
-    endpoints: HashMap<String, BoxedEndpoint>,
-}
-
-impl ServiceApi {
     /// Introduces a filter for this API.
-    pub fn filter<F>(&self, predicate: F) -> Filter<F>
+    fn filter<F>(&self, predicate: F) -> Filter<Self, F>
     where
         F: Fn(&BoxedEndpoint) -> bool,
     {
@@ -699,13 +672,14 @@ impl EndpointHolder for ServiceApi {
 
 /// Lazily filtered collection of endpoints.
 #[derive(Debug)]
-pub struct Filter<'a, F> {
-    base: &'a ServiceApi,
+pub struct Filter<'a, T: 'a + ?Sized, F> {
+    base: &'a T,
     predicate: F,
 }
 
-impl<'a, F> EndpointHolder for Filter<'a, F>
+impl<'a, T, F> EndpointHolder for Filter<'a, T, F>
 where
+    T: EndpointHolder,
     F: Fn(&BoxedEndpoint) -> bool,
 {
     fn endpoint(&self, id: &str) -> Option<&BoxedEndpoint> {
@@ -729,8 +703,9 @@ impl<'a> ::std::ops::Index<&'a str> for ServiceApi {
     }
 }
 
-impl<'a, 's, F> ::std::ops::Index<&'s str> for Filter<'a, F>
+impl<'a, 's, T, F> ::std::ops::Index<&'s str> for Filter<'a, T, F>
 where
+    T: EndpointHolder,
     F: Fn(&BoxedEndpoint) -> bool,
 {
     type Output = BoxedEndpoint;
