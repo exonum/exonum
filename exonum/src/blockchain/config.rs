@@ -157,8 +157,7 @@ impl StoredConfiguration {
 
         if config.consensus.round_timeout <= propose_timeout {
             return Err(JsonError::custom(format!(
-                "consensus.round_timeout({}) must be strictly larger than \
-                consensus.timeout_adjuster.timeout({})",
+                "round_timeout({}) must be strictly larger than propose_timeout({})",
                 config.consensus.round_timeout,
                 propose_timeout
             )));
@@ -166,8 +165,8 @@ impl StoredConfiguration {
 
         if config.consensus.round_timeout <= 2 * propose_timeout {
             warn!(
-                "It is recommended that consensus.round_timeout({})  \
-                be at least twice as large as consensus.timeout_adjuster.timeout({})",
+                "It is recommended that round_timeout({}) be at least twice as large \
+                as propose_timeout({})",
                 config.consensus.round_timeout,
                 propose_timeout
             );
@@ -373,6 +372,42 @@ mod tests {
             max: 20,
             adjustment_speed: 0.7,
             optimal_block_load: 2.0,
+        };
+        serialize_deserialize(&configuration);
+    }
+
+    #[test]
+    #[should_panic(expected = "round_timeout(50) must be strictly larger than propose_timeout(50)")]
+    fn constant_adjuster_invalid_timeout() {
+        let mut configuration = create_test_configuration();
+        configuration.consensus.round_timeout = 50;
+        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::Constant { timeout: 50 };
+        serialize_deserialize(&configuration);
+    }
+
+    #[test]
+    #[should_panic(expected = "round_timeout(50) must be strictly larger than propose_timeout(50)")]
+    fn dynamic_adjuster_invalid_timeout() {
+        let mut configuration = create_test_configuration();
+        configuration.consensus.round_timeout = 50;
+        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::Dynamic {
+            min: 10,
+            max: 50,
+            threshold: 1,
+        };
+        serialize_deserialize(&configuration);
+    }
+
+    #[test]
+    #[should_panic(expected = "round_timeout(50) must be strictly larger than propose_timeout(50)")]
+    fn moving_average_adjuster_invalid_timeout() {
+        let mut configuration = create_test_configuration();
+        configuration.consensus.round_timeout = 50;
+        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::MovingAverage {
+            min: 10,
+            max: 50,
+            adjustment_speed: 0.7,
+            optimal_block_load: 0.2,
         };
         serialize_deserialize(&configuration);
     }
