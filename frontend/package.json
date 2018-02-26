@@ -1,10 +1,9 @@
 {
   "name": "cryptocurrency-demo",
   "version": "1.0.0",
-  "main": "app.js",
-  "description": "Cryptocurrency solution on Exonum private blockchain",
+  "description": "Cryptocurrency demo",
+  "author": "Exonum Team <exonum@bitfury.com>",
   "license": "Apache-2.0",
-  "author": "BitFury Group Limited",
   "scripts": {
     "lint": "eslint './js/cryptocurrency.js'",
     "start": "node app.js"
