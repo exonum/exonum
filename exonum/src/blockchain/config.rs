@@ -111,9 +111,9 @@ impl StoredConfiguration {
         }
 
         // Check timeout adjuster.
-        match config.consensus.timeout_adjuster {
+        let propose_timeout = match config.consensus.timeout_adjuster {
             // There is no need to validate `Constant` timeout adjuster.
-            TimeoutAdjusterConfig::Constant { .. } => (),
+            TimeoutAdjusterConfig::Constant { timeout } => timeout,
             TimeoutAdjusterConfig::Dynamic { min, max, .. } => {
                 if min >= max {
                     return Err(JsonError::custom(format!(
@@ -123,6 +123,7 @@ impl StoredConfiguration {
                         max
                     )));
                 }
+                max
             }
             TimeoutAdjusterConfig::MovingAverage {
                 min,
@@ -150,7 +151,26 @@ impl StoredConfiguration {
                         adjustment_speed,
                     )));
                 }
+                max
             }
+        };
+
+        if config.consensus.round_timeout <= propose_timeout {
+            return Err(JsonError::custom(format!(
+                "consensus.round_timeout({}) must be strictly larger than \
+                consensus.timeout_adjuster.timeout({})",
+                config.consensus.round_timeout,
+                propose_timeout
+            )));
+        }
+
+        if config.consensus.round_timeout <= 2 * propose_timeout {
+            warn!(
+                "It is recommended that consensus.round_timeout({})  \
+                be at least twice as large as consensus.timeout_adjuster.timeout({})",
+                config.consensus.round_timeout,
+                propose_timeout
+            );
         }
 
         Ok(config)
