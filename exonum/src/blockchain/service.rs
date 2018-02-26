@@ -457,6 +457,7 @@ impl SharedNodeState {
 }
 
 /// Provides the current node state to api handlers.
+#[derive(Clone)]
 pub struct ApiContext {
     blockchain: Blockchain,
     node_channel: ApiSender,
