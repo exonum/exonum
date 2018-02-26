@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - Modified signature of the `TestKitApi::send` method, which previously did not
   accept `Box<Transaction>`. (#505)
+  
 - Added possibility to init a logger in `TestKitBuilder`. (#524)
 
 ## 0.5.0 - 2018-01-30
@@ -31,7 +32,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - Added missing documentation for `ApiKind` and improved documentation quality. (#15)
 - Fixed `TestKitApi::get_private` method, which wrongly used public API
-    previously. (#25)
+  previously. (#25)
 
 ## 0.1.1 - 2017-12-14
 
