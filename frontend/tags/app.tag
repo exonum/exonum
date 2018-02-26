@@ -18,9 +18,13 @@
 
             $.ajax({
                 method: 'GET',
-                url: 'configuration',
+                url: '/api/services/configuration/v1/configs/actual',
+                dataType: 'json',
                 success: function(response) {
-                    var service = new CryptocurrencyService(response);
+                    var validators = response.config.validator_keys.map(function(validator) {
+                        return validator.consensus_key;
+                    });
+                    var service = new CryptocurrencyService(validators);
 
                     // global mixin with common functions and constants
                     riot.mixin({

@@ -7,6 +7,9 @@
 
 (function (window) {
 
+    var NETWORK_ID = 0;
+    var PROTOCOL_VERSION = 0;
+    var SERVICE_ID = 128;
     var TX_TRANSFER_FUNDS_ID = 128;
     var TX_ADD_FUNDS_ID = 129;
     var TX_CREATE_WALLET_ID = 130;
@@ -83,9 +86,9 @@
 
     function createTransactionType(spec, configuration) {
         var txConfiguration = {
-            network_id: configuration.network_id,
-            protocol_version: configuration.protocol_version,
-            service_id: configuration.service_id
+            network_id: NETWORK_ID,
+            protocol_version: PROTOCOL_VERSION,
+            service_id: SERVICE_ID
         };
         return Exonum.newMessage(Object.assign({}, txConfiguration, spec));
     }
@@ -121,7 +124,7 @@
 
     function submitTransaction(id, data, publicKey, secretKey, callback) {
         var self = this;
-        var type = getTransaction(this.configuration, id);
+        var type = getTransaction(this.validators, id);
 
         type.signature = type.sign(secretKey, data);
 
@@ -157,9 +160,9 @@
             contentType: 'application/json; charset=utf-8',
             data: JSON.stringify({
                 body: data,
-                network_id: self.configuration.network_id,
-                protocol_version: self.configuration.protocol_version,
-                service_id: self.configuration.service_id,
+                network_id: NETWORK_ID,
+                protocol_version: PROTOCOL_VERSION,
+                service_id: SERVICE_ID,
                 message_id: type.message_id,
                 signature: type.signature
             }),
@@ -195,7 +198,7 @@
     }
 
     function parseWalletProof(publicKey, data) {
-        if (!Exonum.verifyBlock(data.block_info, this.configuration.validators, this.configuration.network_id)) {
+        if (!Exonum.verifyBlock(data.block_info, this.validators, NETWORK_ID)) {
             return;
         }
 
@@ -204,7 +207,7 @@
 
         // find root hash of table with wallets in the tree of all tables
         var tableKeyData = {
-            service_id: this.configuration.service_id,
+            service_id: SERVICE_ID,
             table_index: 0
         };
         var tableKey = TableKey.hash(tableKeyData);
@@ -239,7 +242,7 @@
         var transactions = [];
         for (var i = 0; i < data.wallet_history.values.length; i++) {
             var transaction = data.wallet_history.values[i];
-            var type = getTransaction(this.configuration, transaction.message_id);
+            var type = getTransaction(this.validators, transaction.message_id);
             var publicKeyOfTransaction = getPublicKeyOfTransaction(transaction.body, transaction.message_id);
 
             type.signature = transaction.signature;
@@ -281,8 +284,8 @@
         });
     }
 
-    function CryptocurrencyService(configuration) {
-        this.configuration = configuration;
+    function CryptocurrencyService(validators) {
+        this.validators = validators;
     }
 
     CryptocurrencyService.prototype.getWallet = function(publicKey, callback) {
