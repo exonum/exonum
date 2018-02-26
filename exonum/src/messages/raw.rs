@@ -154,6 +154,19 @@ impl MessageBuffer {
         unsafe { mem::transmute(&self.raw[sign_idx]) }
     }
 
+    /// Sets the signature of the message.
+    pub(crate) fn set_signature(&mut self, signature: &Signature) {
+        let sign_idx = self.raw.len() - SIGNATURE_LENGTH;
+        self.raw[sign_idx..].copy_from_slice(signature.as_ref());
+    }
+
+    /// Signs the message with the given secret key.
+    pub(crate) fn sign(&mut self, secret_key: &SecretKey) {
+        let sign_idx = self.raw.len() - SIGNATURE_LENGTH;
+        let signature = sign(&self.raw[..sign_idx], secret_key);
+        self.set_signature(&signature);
+    }
+
     /// Checks that `Field` can be safely got with specified `from` and `to` offsets.
     pub fn check<'a, F: Field<'a>>(
         &'a self,
@@ -314,4 +327,26 @@ impl Message for RawMessage {
     fn verify_signature(&self, pub_key: &PublicKey) -> bool {
         verify(self.signature(), self.body(), pub_key)
     }
+}
+
+#[test]
+fn test_message_buffer_sign() {
+    use crypto;
+
+    let (pubkey, key) = crypto::gen_keypair();
+
+    let mut buffer = MessageWriter::new(
+        PROTOCOL_MAJOR_VERSION,
+        TEST_NETWORK_ID,
+        0, // service_id
+        0, // message_id
+        8, // payload_length
+    );
+    buffer.write(1u64, 0 as Offset, 8 as Offset);
+    let message = RawMessage::new(buffer.sign(&key));
+    assert!(message.verify_signature(&pubkey));
+
+    let mut buffer = MessageBuffer::from_vec(message.raw().as_ref().to_vec());
+    buffer.sign(&key);
+    assert_eq!(RawMessage::new(buffer), message);
 }
