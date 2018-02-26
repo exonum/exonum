@@ -211,7 +211,7 @@ impl EndpointContext {
 
         // XXX: Unbelievable hacks
         fn sign_transaction(
-            tx: Box<Transaction>,
+            tx: &Transaction,
             secret_key: &SecretKey,
             blockchain: &Blockchain,
         ) -> Box<Transaction> {
@@ -228,7 +228,7 @@ impl EndpointContext {
         }
 
         let signed_txs = self.unsigned_queue.into_iter().map(|tx| {
-            sign_transaction(tx, context.secret_key(), context.blockchain())
+            sign_transaction(tx.as_ref(), context.secret_key(), context.blockchain())
         });
         for tx in signed_txs {
             context.node_channel().send_unchecked(tx).map_err(
@@ -526,7 +526,7 @@ impl<'a, 'b> EndpointWithContext<'a, 'b> {
     pub fn handle(&self, request: Value) -> ApiResult<Value> {
         let mut ep_context = EndpointContext::new(self.context.blockchain().clone());
         let response = self.endpoint.handle(&mut ep_context, request)?;
-        ep_context.finalize(&self.context)?;
+        ep_context.finalize(self.context)?;
         Ok(response)
     }
 }
@@ -574,7 +574,7 @@ where
 }
 
 /// Full collection of endpoints for a particular service.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ServiceApi {
     endpoints: HashMap<String, BoxedEndpoint>,
 }
@@ -582,7 +582,7 @@ pub struct ServiceApi {
 impl ServiceApi {
     /// Creates a new instance of service API with no endpoints.
     pub fn new() -> Self {
-        ServiceApi { endpoints: HashMap::new() }
+        ServiceApi::default()
     }
 
     /// Adds an instantiated endpoint.
