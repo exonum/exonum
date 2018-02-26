@@ -656,6 +656,9 @@ impl fmt::Debug for NodeHandler {
 pub trait TransactionSend: Send + Sync {
     /// Sends transaction. This can include transaction verification.
     fn send(&self, tx: Box<Transaction>) -> io::Result<()>;
+
+    /// Sends transaction. Does not include transaction verification.
+    fn send_unchecked(&self, tx: Box<Transaction>) -> io::Result<()>;
 }
 
 impl ApiSender {
@@ -684,6 +687,10 @@ impl TransactionSend for ApiSender {
             let msg = "Unable to verify transaction";
             return Err(io::Error::new(io::ErrorKind::Other, msg));
         }
+        self.send_unchecked(tx)
+    }
+
+    fn send_unchecked(&self, tx: Box<Transaction>) -> io::Result<()> {
         let msg = ExternalMessage::Transaction(tx);
         self.send_external_message(msg)
     }
