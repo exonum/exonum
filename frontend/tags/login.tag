@@ -1,6 +1,6 @@
 <login>
     <div class="panel-heading">
-        <a class="btn btn-default pull-left page-nav" href="#dashboard">
+        <a class="btn btn-default pull-left page-nav" href="#">
             <i class="glyphicon glyphicon-arrow-left"></i>
             <span class="hidden-xs">Back</span>
         </a>
@@ -8,55 +8,43 @@
             <div class="h4">Login</div>
         </div>
     </div>
+
     <div class="panel-body">
         <form onsubmit={ submit }>
             <div class="form-group">
-                <label class="control-label">Login:</label>
-                <input type="text" class="form-control" onkeyup="{ editLogin }">
+                <label class="control-label">Public key:</label>
+                <input type="text" class="form-control" onkeyup={ editPublicKey }>
             </div>
             <div class="form-group">
-                <label class="control-label">Password:</label>
-                <input type="password" class="form-control" onkeyup="{ editPassword }">
+                <label class="control-label">Secret key:</label>
+                <input type="password" class="form-control" onkeyup={ editSecretKey }>
             </div>
             <div class="form-group">
-                <button type="submit" class="btn btn-lg btn-block btn-primary" disabled={ !login || !password }>Login</button>
+                <button type="submit" class="btn btn-lg btn-block btn-primary" disabled={ !publicKey || !secretKey }>Login</button>
             </div>
         </form>
     </div>
 
     <script>
-        var self = this;
-
-        editLogin(e) {
-            this.login = e.target.value;
+        editPublicKey(e) {
+            this.publicKey = e.target.value;
         }
 
-        editPassword(e) {
-            this.password = e.target.value;
+        editSecretKey(e) {
+            this.secretKey = e.target.value;
         }
 
         submit(e) {
             e.preventDefault();
 
-            self.toggleLoading(true);
-            self.service.login(self.login, self.password, function(error, publicKey, secretKey) {
-                self.toggleLoading(false);
+            this.toggleLoading(true);
 
-                if (error) {
-                    self.notify('error', error.message);
-                    return;
-                }
-
-                self.auth.setUser({
-                    publicKey: publicKey,
-                    secretKey: secretKey
-                });
-
-                route('/user');
-            }, function() {
-                self.toggleLoading(false);
-                self.notify('error', 'Wrong login or password has been passed.');
+            this.auth.setUser({
+                publicKey: this.publicKey,
+                secretKey: this.secretKey
             });
+
+            route('/user');
         }
     </script>
 </login>

@@ -1,12 +1,13 @@
-<wallet-summary>
+<summary>
     <p class="text-center">Here is your wallet's details:</p>
+
     <div class="custom-dd">
         <div class="row">
             <div class="col-xs-6 custom-dd-column">
-                <strong>Login</strong>
+                <strong>Name</strong>
             </div>
             <div class="col-xs-6 custom-dd-column">
-                { opts.wallet.login }
+                { opts.wallet.name }
             </div>
         </div>
         <div class="row">
@@ -38,8 +39,8 @@
                 <strong>Block</strong>
             </div>
             <div class="col-xs-6 custom-dd-column">
-                <a href="#blockchain/block/{ opts.block.height }">{ opts.block.height }</a>
+                { opts.block.height }
             </div>
         </div>
     </div>
-</wallet-summary>
+</summary>

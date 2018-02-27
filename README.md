@@ -112,13 +112,13 @@ cryptocurrency finalize --public-api-address 0.0.0.0:8203 --private-api-address 
 Run nodes:
 
 ```sh
-cryptocurrency run --node-config node_1_cfg.toml --rocksdb /path/to/db1 --public-api-address 0.0.0.0:8200
+cryptocurrency run --node-config node_1_cfg.toml --db-path /path/to/db1 --public-api-address 0.0.0.0:8200
 
-cryptocurrency run --node-config node_2_cfg.toml --rocksdb /path/to/db2 --public-api-address 0.0.0.0:8201
+cryptocurrency run --node-config node_2_cfg.toml --db-path /path/to/db2 --public-api-address 0.0.0.0:8201
 
-cryptocurrency run --node-config node_3_cfg.toml --rocksdb /path/to/db3 --public-api-address 0.0.0.0:8202
+cryptocurrency run --node-config node_3_cfg.toml --db-path /path/to/db3 --public-api-address 0.0.0.0:8202
 
-cryptocurrency run --node-config node_4_cfg.toml --rocksdb /path/to/db4 --public-api-address 0.0.0.0:8203
+cryptocurrency run --node-config node_4_cfg.toml --db-path /path/to/db4 --public-api-address 0.0.0.0:8203
 ```
 
 Now install frontend dependencies:

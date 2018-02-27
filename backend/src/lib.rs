@@ -31,60 +31,22 @@ use std::error::Error;
 
 use exonum::messages::{RawMessage, RawTransaction, Message};
 use exonum::crypto::{PublicKey, Hash};
-use exonum::storage::{Snapshot, Fork, MapIndex, ProofListIndex, ProofMapIndex};
+use exonum::storage::{Snapshot, Fork, ProofListIndex, ProofMapIndex};
 use exonum::blockchain::{Service, Transaction, ApiContext, gen_prefix};
 use exonum::encoding::serialize::json::reexport as serde_json;
-use exonum::encoding::{Offset, Field, Error as StreamStructError};
+use exonum::encoding::{Offset, Error as StreamStructError};
 use exonum::helpers::fabric::{ServiceFactory, Context};
 use serde_json::Value;
 use exonum::encoding::serialize::json::ExonumJson;
-use exonum::encoding::serialize::{WriteBufferWrapper, FromHex, ToHex};
+use exonum::encoding::serialize::{WriteBufferWrapper};
 
-use wallet::{Wallet, WalletAccess};
+use wallet::{Wallet};
 use tx_metarecord::TxMetaRecord;
 
 mod tx_metarecord;
 
 pub mod api;
 pub mod wallet;
-
-#[derive(Clone)]
-pub struct KeyBox(pub [u8; 128]);
-
-impl fmt::Debug for KeyBox {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "KeyBox {:?}...", &self.0[0..10])
-    }
-}
-
-implement_pod_as_ref_field! { KeyBox }
-
-impl<'a> ExonumJson for &'a KeyBox {
-    fn deserialize_field<B: WriteBufferWrapper>(
-        value: &Value,
-        buffer: &mut B,
-        from: Offset,
-        to: Offset,
-    ) -> Result<(), Box<Error>> {
-        let v = value.as_str().ok_or("Can't cast json as string")?;
-        let bytes = Vec::<u8>::from_hex(v)?;
-        if bytes.len() != 128 {
-            return Err("wrong length".into());
-        }
-        let mut array: [u8; 128] = [0; 128];
-        for (element, value) in array.iter_mut().zip(bytes.iter()) {
-            *element = *value;
-        }
-        buffer.write(from, to, &KeyBox(array));
-        Ok(())
-    }
-
-    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
-        let mut s = String::new();
-        self.0.as_ref().write_hex(&mut s)?;
-        Ok(Value::String(s))
-    }
-}
 
 /// Id for our cryptocurrency messages.
 pub const CRYPTOCURRENCY_SERVICE_ID: u16 = 128;
@@ -122,14 +84,13 @@ message! {
 }
 
 message! {
-/// Create wallet with the given `login`.
+/// Create wallet with the given `name`.
     struct TxCreateWallet {
         const TYPE = CRYPTOCURRENCY_SERVICE_ID;
         const ID = TX_WALLET_ID;
 
         pub_key:     &PublicKey,
-        login:       &str,
-        key_box:     &KeyBox,
+        name:        &str
     }
 }
 
@@ -141,7 +102,7 @@ pub enum CurrencyTx {
     Transfer(TxTransfer),
     /// Issue currency to some wallet.
     Issue(TxIssue),
-    /// Create wallet with given login.
+    /// Create wallet with given name.
     CreateWallet(TxCreateWallet),
 }
 
@@ -249,21 +210,12 @@ impl<'a> CurrencySchema<&'a mut Fork> {
         self.wallets().get(pub_key)
     }
 
-    /// Returns Map with keyboxes.
-    pub fn key_boxes(&mut self) -> MapIndex<&mut Fork, String, WalletAccess> {
-        MapIndex::new("cryptocurrency.keys_boxes", self.view)
-    }
-
     /// Returns history for the wallet by the given public key.
     pub fn wallet_history(
         &mut self,
         public_key: &PublicKey,
     ) -> ProofListIndex<&mut Fork, TxMetaRecord> {
-        ProofListIndex::with_prefix(
-            "cryptocurrency.wallet_history",
-            gen_prefix(public_key),
-            self.view,
-        )
+        ProofListIndex::with_prefix("wallet_history", gen_prefix(public_key), self.view)
     }
 
     /// Adds transaction record to the walled by the given public key.
@@ -351,12 +303,9 @@ impl TxCreateWallet {
                 wallet.grow_length_set_history_hash(&root_hash);
                 wallet
             } else {
-                let login = self.login().to_owned();
-                let access = WalletAccess::new(self.pub_key(), self.key_box());
-                schema.key_boxes().put(&login, access);
                 Wallet::new(
                     self.pub_key(),
-                    self.login(),
+                    self.name(),
                     0,
                     1, // history_len
                     &root_hash,
@@ -472,8 +421,7 @@ mod tests {
 
     use exonum_testkit::TestKitBuilder;
 
-    use super::{CurrencyTx, CurrencyService, CurrencySchema, TxCreateWallet, TxIssue, TxTransfer,
-                KeyBox};
+    use super::{CurrencyTx, CurrencyService, CurrencySchema, TxCreateWallet, TxIssue, TxTransfer};
     use super::tx_metarecord::TxMetaRecord;
     use super::wallet::{Wallet, assert_wallet};
 
@@ -528,14 +476,13 @@ mod tests {
         let generator = move |_| {
             let (p, s) = gen_keypair();
             let string_len = rng.gen_range(20u8, 255u8);
-            let login: String = rng.gen_ascii_chars().take(string_len as usize).collect();
-            TxCreateWallet::new(&p, &login, &KeyBox([0; 128]), &s)
+            let name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
+            TxCreateWallet::new(&p, &name, &s)
         };
         let (p, s) = gen_keypair();
         let non_ascii_create = TxCreateWallet::new(
             &p,
             "babd, Юникод еще работает",
-            &KeyBox([0; 128]),
             &s,
         );
         let mut create_txs = (0..50).map(generator).collect::<Vec<_>>();
@@ -560,10 +507,9 @@ mod tests {
         let tx_create_1 = TxCreateWallet::new(
             &p1,
             "Василий Васильевич",
-            &KeyBox([0; 128]),
             &s1,
         );
-        let tx_create_2 = TxCreateWallet::new(&p2, "Name", &KeyBox([0; 128]), &s2);
+        let tx_create_2 = TxCreateWallet::new(&p2, "Name", &s2);
         let tx_issue_1 = TxIssue::new(&p1, 6000, rng.next_u64(), &s1);
         let tx_transfer_1 = TxTransfer::new(&p1, &p2, 3000, rng.next_u64(), &s1);
         let tx_transfer_2 = TxTransfer::new(&p2, &p1, 1000, rng.next_u64(), &s2);
@@ -588,13 +534,13 @@ mod tests {
         let (p, s) = gen_keypair();
         let n = "babd, Юникод еще работает";
 
-        let tx = TxCreateWallet::new(&p, n, &KeyBox([0; 128]), &s);
+        let tx = TxCreateWallet::new(&p, n, &s);
         assert_eq!(tx.pub_key(), &p);
-        assert_eq!(tx.login(), n);
+        assert_eq!(tx.name(), n);
 
         let tx2 = TxCreateWallet::from_raw(tx.raw().clone()).unwrap();
         assert_eq!(tx2.pub_key(), &p);
-        assert_eq!(tx2.login(), n);
+        assert_eq!(tx2.name(), n);
         let expected_hash;
         {
             let slice = (&tx).raw().as_ref().as_ref();
@@ -622,7 +568,7 @@ mod tests {
         let (p1, s1) = gen_keypair();
         let (p2, _) = gen_keypair();
 
-        let cw1 = TxCreateWallet::new(&p1, "login_wallet1", &KeyBox([0; 128]), &s1);
+        let cw1 = TxCreateWallet::new(&p1, "name_wallet1", &s1);
         CurrencyTx::from(cw1.clone()).execute(schema.as_mut());
 
         let iw1 = TxIssue::new(&p1, 1000, 1, &s1);
@@ -633,7 +579,7 @@ mod tests {
 
         let (w1, rh1) = get_wallet_and_history(&mut schema, &p1);
         let (w2, _) = get_wallet_and_history(&mut schema, &p2);
-        assert_wallet(&w1.unwrap(), &p1, "login_wallet1", 1000, 3, &rh1);
+        assert_wallet(&w1.unwrap(), &p1, "name_wallet1", 1000, 3, &rh1);
         assert_eq!(w2, None);
         let h1 = schema.collect_history(&p1);
         let h2 = schema.collect_history(&p2);
@@ -655,8 +601,8 @@ mod tests {
         let (p1, s1) = gen_keypair();
         let (p2, s2) = gen_keypair();
 
-        let cw1 = TxCreateWallet::new(&p1, "login_wallet1", &KeyBox([0; 128]), &s1);
-        let cw2 = TxCreateWallet::new(&p2, "login_wallet2", &KeyBox([0; 128]), &s2);
+        let cw1 = TxCreateWallet::new(&p1, "name_wallet1", &s1);
+        let cw2 = TxCreateWallet::new(&p2, "name_wallet2", &s2);
         CurrencyTx::from(cw1.clone()).execute(schema.as_mut());
         CurrencyTx::from(cw2.clone()).execute(schema.as_mut());
 
@@ -668,8 +614,8 @@ mod tests {
 
         let (w1, rh1) = get_wallet_and_history(&mut schema, &p1);
         let (w2, rh2) = get_wallet_and_history(&mut schema, &p2);
-        assert_wallet(&w1.unwrap(), &p1, "login_wallet1", 1000, 3, &rh1);
-        assert_wallet(&w2.unwrap(), &p2, "login_wallet2", 0, 1, &rh2);
+        assert_wallet(&w1.unwrap(), &p1, "name_wallet1", 1000, 3, &rh1);
+        assert_wallet(&w2.unwrap(), &p2, "name_wallet2", 0, 1, &rh2);
         let h1 = schema.collect_history(&p1);
         let h2 = schema.collect_history(&p2);
         let meta_create1 = TxMetaRecord::new(&cw1.hash(), true);
@@ -689,16 +635,16 @@ mod tests {
         let mut schema = CurrencySchema::new(&mut fork);
 
         let (p1, s1) = gen_keypair();
-        let cw1 = TxCreateWallet::new(&p1, "login_wallet1", &KeyBox([0; 128]), &s1);
+        let cw1 = TxCreateWallet::new(&p1, "name_wallet1", &s1);
         let meta_create1 = TxMetaRecord::new(&cw1.hash(), true);
-        let cw2 = TxCreateWallet::new(&p1, "login_wallet2", &KeyBox([0; 128]), &s1);
+        let cw2 = TxCreateWallet::new(&p1, "name_wallet2", &s1);
         let meta_create2 = TxMetaRecord::new(&cw2.hash(), false);
 
         CurrencyTx::from(cw1.clone()).execute(schema.as_mut());
         CurrencyTx::from(cw2.clone()).execute(schema.as_mut());
 
         let (w, rh) = get_wallet_and_history(&mut schema, &p1);
-        assert_wallet(&w.unwrap(), &p1, "login_wallet1", 0, 2, &rh);
+        assert_wallet(&w.unwrap(), &p1, "name_wallet1", 0, 2, &rh);
         let h1 = schema.collect_history(&p1);
         assert_eq!(h1, vec![meta_create1, meta_create2]);
     }
@@ -714,15 +660,15 @@ mod tests {
         let (p1, s1) = gen_keypair();
         let (p2, s2) = gen_keypair();
 
-        let cw1 = TxCreateWallet::new(&p1, "login_wallet1", &KeyBox([0; 128]), &s1);
-        let cw2 = TxCreateWallet::new(&p2, "login_wallet2", &KeyBox([0; 128]), &s2);
+        let cw1 = TxCreateWallet::new(&p1, "name_wallet1", &s1);
+        let cw2 = TxCreateWallet::new(&p2, "name_wallet2", &s2);
         CurrencyTx::from(cw1.clone()).execute(schema.as_mut());
         CurrencyTx::from(cw2.clone()).execute(schema.as_mut());
 
         let (w1, rh1) = get_wallet_and_history(&mut schema, &p1);
         let (w2, rh2) = get_wallet_and_history(&mut schema, &p2);
-        assert_wallet(&w1.unwrap(), &p1, "login_wallet1", 0, 1, &rh1);
-        assert_wallet(&w2.unwrap(), &p2, "login_wallet2", 0, 1, &rh2);
+        assert_wallet(&w1.unwrap(), &p1, "name_wallet1", 0, 1, &rh1);
+        assert_wallet(&w2.unwrap(), &p2, "name_wallet2", 0, 1, &rh2);
 
         let iw1 = TxIssue::new(&p1, 1000, 1, &s1);
         let iw2 = TxIssue::new(&p2, 100, 2, &s2);
@@ -731,16 +677,16 @@ mod tests {
 
         let (w1, rh1) = get_wallet_and_history(&mut schema, &p1);
         let (w2, rh2) = get_wallet_and_history(&mut schema, &p2);
-        assert_wallet(&w1.unwrap(), &p1, "login_wallet1", 1000, 2, &rh1);
-        assert_wallet(&w2.unwrap(), &p2, "login_wallet2", 100, 2, &rh2);
+        assert_wallet(&w1.unwrap(), &p1, "name_wallet1", 1000, 2, &rh1);
+        assert_wallet(&w2.unwrap(), &p2, "name_wallet2", 100, 2, &rh2);
 
         let tw = TxTransfer::new(&p1, &p2, 400, 3, &s1);
         CurrencyTx::from(tw.clone()).execute(schema.as_mut());
 
         let (w1, rh1) = get_wallet_and_history(&mut schema, &p1);
         let (w2, rh2) = get_wallet_and_history(&mut schema, &p2);
-        assert_wallet(&w1.unwrap(), &p1, "login_wallet1", 600, 3, &rh1);
-        assert_wallet(&w2.unwrap(), &p2, "login_wallet2", 500, 3, &rh2);
+        assert_wallet(&w1.unwrap(), &p1, "name_wallet1", 600, 3, &rh1);
+        assert_wallet(&w2.unwrap(), &p2, "name_wallet2", 500, 3, &rh2);
 
         let h1 = schema.collect_history(&p1);
         let h2 = schema.collect_history(&p2);

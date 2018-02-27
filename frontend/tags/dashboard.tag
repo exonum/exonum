@@ -5,6 +5,8 @@
         </div>
     </div>
     <div class="panel-body text-center">
+        <p>Welcome! This application is used to demonstrate how easy to set up you own service on Exonum blockchain.</p>
+
         <div class="form-group">
             <p>Create a new wallet:</p>
             <a href="#register" class="btn btn-lg btn-block btn-success">Register</a>
@@ -13,11 +15,6 @@
         <div class="form-group">
             <p>Login into existed wallet:</p>
             <a href="#login" class="btn btn-lg btn-block btn-primary">Login</a>
-        </div>
-
-        <div class="form-group">
-            <p>Explore blockchain:</p>
-            <a href="#blockchain" class="btn btn-lg btn-block btn-default">Blockchain Explorer</a>
         </div>
     </div>
 </dashboard>

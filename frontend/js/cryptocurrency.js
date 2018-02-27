@@ -33,19 +33,18 @@
         }
     };
     var CreateWalletTransaction = {
-        size: 168,
+        size: 40,
         message_id: TX_CREATE_WALLET_ID,
         fields: {
             pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-            login: {type: Exonum.String, size: 8, from: 32, to: 40},
-            key_box: {type: Exonum.FixedBuffer, size: 128, from: 40, to: 168}
+            name: {type: Exonum.String, size: 8, from: 32, to: 40}
         }
     };
     var Wallet = Exonum.newType({
         size: 88,
         fields: {
             pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-            login: {type: Exonum.String, size: 8, from: 32, to: 40},
+            name: {type: Exonum.String, size: 8, from: 32, to: 40},
             balance: {type: Exonum.Uint64, size: 8, from: 40, to: 48},
             history_len: {type: Exonum.Uint64, size: 8, from: 48, to: 56},
             history_hash: {type: Exonum.Hash, size: 32, from: 56, to: 88}
@@ -198,7 +197,10 @@
     }
 
     function parseWalletProof(publicKey, data) {
+        console.log(publicKey, data);
+        console.log(this.validators);
         if (!Exonum.verifyBlock(data.block_info, this.validators, NETWORK_ID)) {
+            console.log('exit #1');
             return;
         }
 
@@ -213,6 +215,7 @@
         var tableKey = TableKey.hash(tableKeyData);
         var walletsHash = Exonum.merklePatriciaProof(block.state_hash, data.wallet.mpt_proof, tableKey);
         if (walletsHash === null) {
+            console.log('exit #2');
             return;
         }
 
@@ -220,6 +223,7 @@
         var wallet = Exonum.merklePatriciaProof(walletsHash, data.wallet.value, publicKey, Wallet);
         if (wallet === null) {
             // wallet is not found
+            console.log('exit #3');
             return [data.block_info.block];
         }
 
@@ -235,6 +239,7 @@
         if (data.wallet_history.values.length !== transactionsMetaData.length) {
             // number of transactions in wallet history is not equal
             // to number of transactions in array with transactions meta data
+            console.log('exit #4');
             return;
         }
 
@@ -251,9 +256,11 @@
 
             if (transaction.hash !== transactionsMetaData[i].tx_hash) {
                 // wrong transaction hash
+                console.log('exit #5');
                 return;
             } else if (!type.verifySignature(transaction.signature, publicKeyOfTransaction, transaction.body)) {
                 // wrong transaction signature
+                console.log('exit #6');
                 return;
             }
 
@@ -303,8 +310,11 @@
                 return;
             }
 
+            console.log(Exonum.uint8ArrayToHexadecimal(box));
+            console.log(Exonum.uint8ArrayToHexadecimal(box).length);
+
             var data = {
-                login: login,
+                name: name,
                 pub_key: pair.publicKey,
                 key_box: Exonum.uint8ArrayToHexadecimal(box)
             };
