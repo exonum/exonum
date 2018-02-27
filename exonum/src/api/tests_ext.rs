@@ -317,7 +317,7 @@ fn test_custom_transaction_sign_and_send() {
         fn handle(&self, ctx: &mut EndpointContext, req: (u64, String)) -> Result<Hash, ApiError> {
             let tx = Flip::new_with_signature(req.0, &crypto::Signature::zero());
             let tx_hash = tx.hash();
-            ctx.sign_and_send(tx)?;
+            ctx.sign_and_send(&tx.raw().cut_signature())?;
             Ok(tx_hash)
         }
     }

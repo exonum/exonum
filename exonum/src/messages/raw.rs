@@ -49,6 +49,42 @@ impl RawMessage {
     pub fn hash(&self) -> Hash {
         hash(self.as_ref())
     }
+
+    /// Cuts the signature bytes from this message.
+    ///
+    /// Note that the method produces a new message; the original message is not modified.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the length of the message is less than the signature length.
+    pub fn cut_signature(&self) -> Self {
+        assert_eq!(
+            self.len(),
+            self.payload_length(),
+            "Cannot cut a signature from a non-finalized message"
+        );
+
+        let body_len = self.len() - SIGNATURE_LENGTH;
+        let mut clone = self.clone();
+        sync::Arc::make_mut(&mut clone.0).raw.truncate(body_len);
+        clone
+    }
+
+    /// Signs the message with the given secret key.
+    /// The signature is appended to the message.
+    ///
+    /// Note that the method produces a new message; the original message is not modified.
+    pub fn sign_append(&self, secret_key: &SecretKey) -> Self {
+        assert_eq!(
+            self.len() + SIGNATURE_LENGTH,
+            self.payload_length(),
+            "Cannot sign a non-finalized message"
+        );
+        let mut clone = self.clone();
+        let signature = sign(clone.as_ref(), secret_key);
+        sync::Arc::make_mut(&mut clone.0).append_signature(&signature);
+        clone
+    }
 }
 
 impl Deref for RawMessage {
@@ -71,7 +107,7 @@ impl AsRef<[u8]> for RawMessage {
 // (ECR-166)
 
 /// A raw message represented by the bytes buffer.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MessageBuffer {
     raw: Vec<u8>,
 }
@@ -143,6 +179,11 @@ impl MessageBuffer {
         LittleEndian::read_u16(&self.raw[2..4])
     }
 
+    /// Sets the length of the payload.
+    fn payload_length(&self) -> usize {
+        LittleEndian::read_u32(&self.raw[6..10]) as usize
+    }
+
     /// Returns message body without signature.
     pub fn body(&self) -> &[u8] {
         &self.raw[..self.raw.len() - SIGNATURE_LENGTH]
@@ -154,17 +195,9 @@ impl MessageBuffer {
         unsafe { mem::transmute(&self.raw[sign_idx]) }
     }
 
-    /// Sets the signature of the message.
-    pub(crate) fn set_signature(&mut self, signature: &Signature) {
-        let sign_idx = self.raw.len() - SIGNATURE_LENGTH;
-        self.raw[sign_idx..].copy_from_slice(signature.as_ref());
-    }
-
-    /// Signs the message with the given secret key.
-    pub(crate) fn sign(&mut self, secret_key: &SecretKey) {
-        let sign_idx = self.raw.len() - SIGNATURE_LENGTH;
-        let signature = sign(&self.raw[..sign_idx], secret_key);
-        self.set_signature(&signature);
+    /// Appends the signature to the message.
+    fn append_signature(&mut self, signature: &Signature) {
+        self.raw.extend_from_slice(signature.as_ref());
     }
 
     /// Checks that `Field` can be safely got with specified `from` and `to` offsets.
@@ -330,7 +363,7 @@ impl Message for RawMessage {
 }
 
 #[test]
-fn test_message_buffer_sign() {
+fn test_cut_signature_and_sign() {
     use crypto;
 
     let (pubkey, key) = crypto::gen_keypair();
@@ -344,9 +377,53 @@ fn test_message_buffer_sign() {
     );
     buffer.write(1u64, 0 as Offset, 8 as Offset);
     let message = RawMessage::new(buffer.sign(&key));
-    assert!(message.verify_signature(&pubkey));
 
-    let mut buffer = MessageBuffer::from_vec(message.raw().as_ref().to_vec());
-    buffer.sign(&key);
-    assert_eq!(RawMessage::new(buffer), message);
+    let cut = message.cut_signature();
+    assert!(message.verify_signature(&pubkey));
+    assert_eq!(cut.len(), message.len() - SIGNATURE_LENGTH);
+    assert_eq!(cut.as_ref(), message.body());
+
+    let signed = cut.sign_append(&key);
+    assert_eq!(signed, message);
+}
+
+#[test]
+#[should_panic(expected = "Cannot cut a signature")]
+fn test_cut_short_message() {
+    use crypto;
+
+    let (_, key) = crypto::gen_keypair();
+
+    let mut buffer = MessageWriter::new(
+        PROTOCOL_MAJOR_VERSION,
+        TEST_NETWORK_ID,
+        0, // service_id
+        0, // message_id
+        8, // payload_length
+    );
+    buffer.write(1u64, 0 as Offset, 8 as Offset);
+    let message = RawMessage::new(buffer.sign(&key));
+
+    let cut = message.cut_signature();
+    cut.cut_signature();
+}
+
+#[test]
+#[should_panic(expected = "Cannot sign a non-finalized message")]
+fn test_sign_signed_message() {
+    use crypto;
+
+    let (_, key) = crypto::gen_keypair();
+
+    let mut buffer = MessageWriter::new(
+        PROTOCOL_MAJOR_VERSION,
+        TEST_NETWORK_ID,
+        0, // service_id
+        0, // message_id
+        8, // payload_length
+    );
+    buffer.write(1u64, 0 as Offset, 8 as Offset);
+    let message = RawMessage::new(buffer.sign(&key));
+
+    message.sign_append(&key);
 }

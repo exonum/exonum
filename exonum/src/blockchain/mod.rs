@@ -104,10 +104,8 @@ impl ApiSender {
     }
 
     /// Signs a transaction with the service secret key and sends it to the node.
-    #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
-    pub fn sign_and_send(&self, tx: Box<Transaction>) -> Result<Hash, SendError> {
-        debug_assert_eq!(*tx.raw().signature(), ::crypto::Signature::zero());
-        let signed_tx = self.signer.sign(tx.as_ref());
+    pub fn sign_and_send(&self, tx: &RawMessage) -> Result<Hash, SendError> {
+        let signed_tx = self.signer.sign(tx);
 
         let hash = signed_tx.hash();
         self.send(signed_tx)?;
@@ -155,13 +153,9 @@ impl fmt::Debug for TransactionSigner {
 }
 
 impl TransactionSigner {
-    pub fn sign(&self, transaction: &Transaction) -> Box<Transaction> {
-        use messages::MessageBuffer;
-
-        let buffer = transaction.raw().as_ref().to_vec();
-        let mut buffer = MessageBuffer::from_vec(buffer);
-        buffer.sign(&self.secret_key);
-        tx_from_raw(self.service_map.as_ref(), RawMessage::new(buffer)).unwrap()
+    pub fn sign(&self, message: &RawMessage) -> Box<Transaction> {
+        let signed = message.sign_append(&self.secret_key);
+        tx_from_raw(self.service_map.as_ref(), signed).unwrap()
     }
 }
 

@@ -99,6 +99,7 @@ use std::{fmt, io};
 
 use blockchain::{ApiContext, ApiSender, Blockchain, SendError, Transaction};
 use crypto::Hash;
+use messages::RawMessage;
 use storage::Snapshot;
 
 /// The identifier for the "standard" transaction sink.
@@ -202,13 +203,8 @@ impl<'a> EndpointContext<'a> {
     /// into the blockchain.
     ///
     /// The transaction is signed with the service secret key and returned.
-    pub fn sign_and_send<T>(&mut self, transaction: T) -> Result<Hash, ApiError>
-    where
-        T: Into<Box<Transaction>>,
-    {
-        self.channel.sign_and_send(transaction.into()).map_err(
-            ApiError::from,
-        )
+    pub fn sign_and_send(&mut self, message: &RawMessage) -> Result<Hash, ApiError> {
+        self.channel.sign_and_send(message).map_err(ApiError::from)
     }
 }
 
