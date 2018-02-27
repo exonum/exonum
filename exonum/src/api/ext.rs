@@ -18,7 +18,7 @@
 //!
 //! ```
 //! # #[macro_use] extern crate exonum;
-//! use exonum::api::ext::{ApiResult, Endpoint, EndpointContext, EndpointSpec, ServiceApi};
+//! use exonum::api::ext::{ApiResult, EndpointContext, EndpointSpec, ReadRequest, ServiceApi};
 //! use exonum::api::iron::{self, IronAdapter};
 //! # use exonum::blockchain::{ApiContext, Blockchain, ExecutionResult, Service, Transaction};
 //! # use exonum::crypto::Hash;
@@ -55,7 +55,7 @@
 //! }
 //!
 //! // Read requests
-//! enum Read {}
+//! struct Read;
 //!
 //! impl EndpointSpec for Read {
 //!     type Request = ();
@@ -63,8 +63,10 @@
 //!     const ID: &'static str = "read";
 //! }
 //!
-//! impl Endpoint for Read {
-//!     fn handle(_: &EndpointContext, _: ()) -> ApiResult<u64> { Ok(42) }
+//! impl ReadRequest for Read {
+//!     fn handle(&self, _: &EndpointContext, _: ()) -> ApiResult<u64> {
+//!         Ok(42)
+//!     }
 //! }
 //!
 //! // In `Service` implementation:
@@ -80,7 +82,7 @@
 //!
 //!     fn public_api_handler(&self, context: &ApiContext) -> Option<Box<iron::Handler>> {
 //!         let api = ServiceApi::new()
-//!             .add::<Read>()
+//!             .add_read(Read)
 //!             .add_transactions::<Any>();
 //!         Some(IronAdapter::new(context.clone()).create_handler(api))
 //!     }
@@ -251,11 +253,11 @@ impl EndpointContext {
 ///
 /// ```
 /// # #[macro_use] extern crate exonum;
-/// use exonum::api::ext::{ApiResult, Endpoint, EndpointContext, EndpointSpec};
+/// use exonum::api::ext::{ApiResult, EndpointContext, EndpointSpec, ReadRequest};
 /// # use exonum::crypto::PublicKey;
 /// # use exonum::storage::Snapshot;
 ///
-/// pub enum GetBalance {}
+/// pub struct GetBalance;
 ///
 /// impl EndpointSpec for GetBalance {
 ///     type Request = PublicKey;
@@ -274,15 +276,15 @@ impl EndpointContext {
 ///   }
 /// }
 ///
-/// impl Endpoint for GetBalance {
-///     fn handle(ctx: &EndpointContext, key: PublicKey) -> ApiResult<Option<u64>> {
+/// impl ReadRequest for GetBalance {
+///     fn handle(&self, ctx: &EndpointContext, key: PublicKey) -> ApiResult<Option<u64>> {
 ///         let schema = Schema::new(ctx.snapshot());
 ///         Ok(schema.balance(&key))
 ///     }
 /// }
 /// # fn main() {}
 /// ```
-pub trait Endpoint: EndpointSpec + Send + Sync {
+pub trait ReadRequest: EndpointSpec + Send + Sync {
     /// Handles a request to the endpoint.
     ///
     /// # Important note
@@ -290,7 +292,11 @@ pub trait Endpoint: EndpointSpec + Send + Sync {
     /// Unlike with transaction handling, the core does not catch panics during
     /// the execution of `handle()`. Thus, any panic will lead to stopping
     /// the entire request processing thread.
-    fn handle(context: &EndpointContext, request: Self::Request) -> ApiResult<Self::Response>;
+    fn handle(
+        &self,
+        context: &EndpointContext,
+        request: Self::Request,
+    ) -> ApiResult<Self::Response>;
 }
 
 /// Endpoint that receives a mutable reference to the `EndpointContext`,
@@ -303,7 +309,7 @@ pub trait Endpoint: EndpointSpec + Send + Sync {
 ///
 /// ```
 /// # #[macro_use] extern crate exonum;
-/// # use exonum::api::ext::{ApiError, EndpointContext, EndpointSpec, MutatingEndpoint};
+/// # use exonum::api::ext::{ApiError, Endpoint, EndpointContext, EndpointSpec};
 /// # use exonum::blockchain::{ApiContext, ExecutionResult, Transaction};
 /// # use exonum::crypto::{CryptoHash, Hash, Signature};
 /// # use exonum::node::{ApiSender, TransactionSend};
@@ -327,7 +333,7 @@ pub trait Endpoint: EndpointSpec + Send + Sync {
 /// # }
 ///
 /// // Sender for `MyTransaction`s.
-/// pub enum SendTransaction {}
+/// pub struct SendTransaction;
 ///
 /// impl EndpointSpec for SendTransaction {
 ///     type Request = (u64, String);
@@ -335,8 +341,12 @@ pub trait Endpoint: EndpointSpec + Send + Sync {
 ///     const ID: &'static str = "send-transaction";
 /// }
 ///
-/// impl MutatingEndpoint for SendTransaction {
-///     fn handle(context: &mut EndpointContext, req: (u64, String)) -> Result<Hash, ApiError> {
+/// impl Endpoint for SendTransaction {
+///     fn handle(
+///         &self,
+///         context: &mut EndpointContext,
+///         req: (u64, String),
+///     ) -> Result<Hash, ApiError> {
 ///         let tx = MyTransaction::new_with_signature(req.0, &req.1, &Signature::zero());
 ///         let tx_hash = tx.hash();
 ///         context.sign_and_send(tx)?;
@@ -345,7 +355,7 @@ pub trait Endpoint: EndpointSpec + Send + Sync {
 /// }
 /// # fn main() { }
 /// ```
-pub trait MutatingEndpoint: EndpointSpec + Send + Sync {
+pub trait Endpoint: EndpointSpec + Send + Sync {
     /// Handles a request to the endpoint.
     ///
     /// # Important note
@@ -353,13 +363,17 @@ pub trait MutatingEndpoint: EndpointSpec + Send + Sync {
     /// Unlike with transaction handling, the core does not catch panics during
     /// the execution of `handle()`. Thus, any panic will lead to stopping
     /// the entire request processing thread.
-    fn handle(context: &mut EndpointContext, request: Self::Request) -> ApiResult<Self::Response>;
+    fn handle(
+        &self,
+        context: &mut EndpointContext,
+        request: Self::Request,
+    ) -> ApiResult<Self::Response>;
 }
 
-/// Internally used version of `Endpoint`.
+/// Internally used version of endpoints.
 ///
 /// The type rarely is needed to be used directly; the preferable way
-/// of implementing endpoints is to implement the [`Endpoint`] trait.
+/// of implementing endpoints is to implement the [`ReadRequest`] or [`Endpoint`] traits.
 ///
 /// [`Endpoint`]: trait.Endpoint.html
 ///
@@ -388,14 +402,14 @@ pub trait MutatingEndpoint: EndpointSpec + Send + Sync {
 /// # fn main() {
 /// let alice_key: PublicKey = // ...
 /// #   PublicKey::new([0; 32]);
-/// let endpoint = BoxedEndpoint::read_request(
+/// let endpoint = BoxedEndpoint::read_request_fn(
 ///     "wallet",
-///     move |context, req| {
+///     move |context, req: serde_json::Value| {
 ///         let pubkey: PublicKey = serde_json::from_value(req)
 ///             .unwrap_or(alice_key);
-///         let balance: Option<u64> = Schema::new(context.snapshot())
+///         let balance = Schema::new(context.snapshot())
 ///             .balance(&pubkey);
-///         Ok(json!(balance))
+///         Ok(balance)
 ///     },
 /// );
 ///
@@ -436,54 +450,59 @@ impl BoxedHandler {
 
 impl BoxedEndpoint {
     /// Creates a read request from a given closure.
-    pub fn read_request<S, F>(id: S, handler: F) -> Self
+    pub fn read_request_fn<T, U, F>(id: &str, handler: F) -> Self
     where
-        S: AsRef<str>,
-        F: 'static + Fn(&EndpointContext, Value) -> ApiResult<Value> + Send + Sync,
+        T: DeserializeOwned,
+        U: Serialize,
+        F: 'static + Fn(&EndpointContext, T) -> ApiResult<U> + Send + Sync,
     {
         BoxedEndpoint {
-            id: id.as_ref().to_owned(),
-            handler: BoxedHandler::Readonly(Box::new(handler)),
+            id: id.to_owned(),
+            handler: BoxedHandler::Readonly(Box::new(move |ctx, req| {
+                BoxedEndpoint::wrap(req, |typed_req| handler(ctx, typed_req))
+            })),
         }
+    }
+
+    /// Converts a read request into a boxed endpoint.
+    pub fn read_request<T: 'static + ReadRequest>(read: T) -> Self {
+        BoxedEndpoint::read_request_fn(T::ID, move |ctx, req| read.handle(ctx, req))
     }
 
     /// Creates a full-access endpoint from a given closure.
-    pub fn new<S, F>(id: S, handler: F) -> Self
+    pub fn endpoint_fn<T, U, F>(id: &str, handler: F) -> Self
     where
-        S: AsRef<str>,
-        F: 'static + Fn(&mut EndpointContext, Value) -> ApiResult<Value> + Send + Sync,
+        T: DeserializeOwned,
+        U: Serialize,
+        F: 'static + Fn(&mut EndpointContext, T) -> ApiResult<U> + Send + Sync,
     {
         BoxedEndpoint {
-            id: id.as_ref().to_owned(),
-            handler: BoxedHandler::Mutating(Box::new(handler)),
+            id: id.to_owned(),
+            handler: BoxedHandler::Mutating(Box::new(move |ctx, req| {
+                BoxedEndpoint::wrap(req, |typed_req| handler(ctx, typed_req))
+            })),
         }
     }
 
-    fn wrap<T, C, F>(context: C, req: Value, handler: F) -> ApiResult<Value>
+    /// Converts a full-access endpoint into a boxed endpoint.
+    pub fn endpoint<T: 'static + Endpoint>(endpoint: T) -> BoxedEndpoint {
+        BoxedEndpoint::endpoint_fn(T::ID, move |ctx, req| endpoint.handle(ctx, req))
+    }
+
+    fn wrap<T, U, F>(req: Value, handler: F) -> ApiResult<Value>
     where
-        T: EndpointSpec,
-        F: Fn(C, T::Request) -> ApiResult<T::Response>,
+        T: DeserializeOwned,
+        U: Serialize,
+        F: FnOnce(T) -> ApiResult<U>,
     {
-        let request: T::Request = serde_json::from_value(req).map_err(|e| {
+        let request: T = serde_json::from_value(req).map_err(|e| {
             ApiError::BadRequest(e.into())
         })?;
-        let response = handler(context, request)?;
+        let response = handler(request)?;
         let response = serde_json::to_value(response).map_err(|e| {
             ApiError::InternalError(e.into())
         })?;
         Ok(response)
-    }
-
-    fn from_endpoint<T: Endpoint>() -> Self {
-        BoxedEndpoint::read_request(T::ID.to_owned(), |context, req| {
-            BoxedEndpoint::wrap::<T, _, _>(context, req, T::handle)
-        })
-    }
-
-    fn from_mut_endpoint<T: MutatingEndpoint>() -> Self {
-        BoxedEndpoint::new(T::ID.to_owned(), |context, req| {
-            BoxedEndpoint::wrap::<T, _, _>(context, req, T::handle)
-        })
     }
 
     /// Returns the retrieval style of this endpoint.
@@ -504,7 +523,7 @@ impl BoxedEndpoint {
         self.handler.invoke(context, request)
     }
 
-    /// Adds an `ApiContext` to this transaction, allowing it to be executed
+    /// Adds an `ApiContext` to this endpoint, allowing it to be executed
     /// given a request.
     pub fn with_context<'a, 'b>(&'a self, context: &'b ApiContext) -> EndpointWithContext<'a, 'b> {
         EndpointWithContext {
@@ -543,6 +562,12 @@ struct TransactionSink<T> {
     _marker: ::std::marker::PhantomData<T>,
 }
 
+impl<T> TransactionSink<T> {
+    fn new() -> Self {
+        TransactionSink { _marker: ::std::marker::PhantomData }
+    }
+}
+
 impl<T> EndpointSpec for TransactionSink<T>
 where
     T: Into<Box<Transaction>>
@@ -557,7 +582,7 @@ where
     const ID: &'static str = TRANSACTIONS_ID;
 }
 
-impl<T> MutatingEndpoint for TransactionSink<T>
+impl<T> Endpoint for TransactionSink<T>
 where
     T: Into<Box<Transaction>>
         + Serialize
@@ -565,10 +590,10 @@ where
         + Send
         + Sync,
 {
-    fn handle(context: &mut EndpointContext, transaction: T) -> ApiResult<TransactionResponse> {
-        let transaction = transaction.into();
-        let tx_hash = transaction.hash();
-        context.send(transaction)?;
+    fn handle(&self, context: &mut EndpointContext, tx: T) -> ApiResult<TransactionResponse> {
+        let tx = tx.into();
+        let tx_hash = tx.hash();
+        context.send(tx)?;
         Ok(TransactionResponse { tx_hash })
     }
 }
@@ -589,42 +614,38 @@ impl ServiceApi {
     ///
     /// # Panics
     ///
-    /// Panics if the builder already contains an endpoint with the same identifier.
-    pub fn add_endpoint<T>(mut self, endpoint: T) -> Self
-    where
-        T: Into<BoxedEndpoint>,
-    {
-        let endpoint = endpoint.into();
+    /// Panics if the API already contains an endpoint with the same identifier.
+    pub fn add(mut self, endpoint: BoxedEndpoint) -> Self {
         let endpoint_id = endpoint.id().to_string();
         let old = self.endpoints.insert(endpoint_id.clone(), endpoint);
         assert!(old.is_none(), "Duplicate endpoint ID: {}", endpoint_id);
         self
     }
 
-    /// Adds an endpoint by its type `T`.
+    /// Adds a read request by its type `T`.
     ///
     /// # Panics
     ///
-    /// Panics if the builder already contains an endpoint with the same identifier.
-    pub fn add<T>(self) -> Self
+    /// Panics if the API already contains an endpoint with the same identifier.
+    pub fn add_read<T>(self, read: T) -> Self
     where
-        T: Endpoint,
+        T: 'static + ReadRequest,
     {
-        let endpoint = BoxedEndpoint::from_endpoint::<T>();
-        self.add_endpoint(endpoint)
+        let endpoint = BoxedEndpoint::read_request(read);
+        self.add(endpoint)
     }
 
-    /// Adds a mutating endpoint by its type.
+    /// Adds an endpoint by its type.
     ///
     /// # Panics
     ///
-    /// Panics if the builder already contains an endpoint with the same identifier.
-    pub fn add_mut<T>(self) -> Self
+    /// Panics if the API already contains an endpoint with the same identifier.
+    pub fn add_endpoint<T>(self, endpoint: T) -> Self
     where
-        T: MutatingEndpoint,
+        T: 'static + Endpoint,
     {
-        let endpoint = BoxedEndpoint::from_mut_endpoint::<T>();
-        self.add_endpoint(endpoint)
+        let endpoint = BoxedEndpoint::endpoint(endpoint);
+        self.add(endpoint)
     }
 
     /// Add a sink for transactions.
@@ -635,7 +656,7 @@ impl ServiceApi {
     ///
     /// # Panics
     ///
-    /// Panics if the builder already contains an endpoint with the same identifier.
+    /// Panics if the API already contains an endpoint with the same identifier.
     ///
     /// [`Transaction`]: ../../blockchain/trait.Transaction.html
     /// [`TransactionSet`]: ../../blockchain/trait.TransactionSet.html
@@ -643,7 +664,7 @@ impl ServiceApi {
     where
         T: 'static + Into<Box<Transaction>> + Serialize + DeserializeOwned + Send + Sync,
     {
-        self.add_mut::<TransactionSink<T>>()
+        self.add_endpoint(TransactionSink::<T>::new())
     }
 }
 
