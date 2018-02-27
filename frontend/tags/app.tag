@@ -35,7 +35,15 @@
 
                 auth: {
                     getUser: function() {
-                        return JSON.parse(window.localStorage.getItem('user'));
+                        return new Promise(function(resolve, reject) {
+                            var keyPair = JSON.parse(window.localStorage.getItem('user'));
+
+                            if (keyPair === null) {
+                                return reject(new Error('User not found in local storage'));
+                            }
+
+                            resolve(keyPair);
+                        })
                     },
                     setUser: function(user) {
                         window.localStorage.setItem('user', JSON.stringify(user));

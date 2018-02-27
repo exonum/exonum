@@ -97,12 +97,12 @@
                 success: function() {
                     self.toggleLoading(false);
 
-                    self.update();
-
                     $('#proceedModal').modal('show');
                 },
                 error: function(jqXHR, textStatus, errorThrown) {
-                    callback(errorThrown);
+                    self.toggleLoading(false);
+
+                    self.notify('error', errorThrown);
                 }
             });
         }

@@ -33,7 +33,6 @@
 
     <script>
         var self = this;
-        var keyPair = this.auth.getUser();
         var attempts = 10;
         var TableKey = Exonum.newType({
             size: 4,
@@ -137,11 +136,11 @@
             }
         }
 
-        function loadWallet(validators) {
+        function loadWallet(publicKey, validators) {
             return new Promise(function(resolve, reject) {
                 $.ajax({
                     method: 'GET',
-                    url: '/api/services/cryptocurrency/v1/wallets/info?pubkey=' + keyPair.publicKey,
+                    url: '/api/services/cryptocurrency/v1/wallets/info?pubkey=' + publicKey,
                     dataType: 'json',
                     success: function(data) {
                         if (!Exonum.verifyBlock(data.block_info, validators, self.NETWORK_ID)) {
@@ -168,7 +167,7 @@
                         }
 
                         // find wallet in the tree of all wallets
-                        var wallet = Exonum.merklePatriciaProof(walletsHash, data.wallet.value, keyPair.publicKey, Wallet);
+                        var wallet = Exonum.merklePatriciaProof(walletsHash, data.wallet.value, publicKey, Wallet);
                         if (wallet === null) {
                             if (attempts > 0) {
                                 attempts--;
@@ -230,30 +229,37 @@
 
         this.toggleLoading(true);
 
-        $.ajax({
-            method: 'GET',
-            url: '/api/services/configuration/v1/configs/actual',
-            dataType: 'json',
-            success: function(response) {
-                var validators = response.config.validator_keys.map(function(validator) {
-                    return validator.consensus_key;
-                });
+        this.auth.getUser().then(function(keyPair) {
+            $.ajax({
+                method: 'GET',
+                url: '/api/services/configuration/v1/configs/actual',
+                dataType: 'json',
+                success: function(response) {
+                    var validators = response.config.validator_keys.map(function(validator) {
+                        return validator.consensus_key;
+                    });
 
-                loadWallet(validators).then(function(data) {
-                    self.toggleLoading(false);
-                    self.publicKey = keyPair.publicKey;
-                    self.block = data.block;
-                    self.wallet = data.wallet;
-                    self.transactions = data.transactions;
-                    self.update();
-                }).catch(function(error) {
-                    self.notify('error', error);
-                });
+                    loadWallet(keyPair.publicKey, validators).then(function(data) {
+                        self.toggleLoading(false);
 
-            },
-            error: function(jqXHR, textStatus, errorThrown) {
-                self.notify('error', errorThrown);
-            }
+                        self.publicKey = keyPair.publicKey;
+                        self.block = data.block;
+                        self.wallet = data.wallet;
+                        self.transactions = data.transactions;
+                        self.update();
+                    }).catch(function(error) {
+                        self.notify('error', error);
+                    });
+
+                },
+                error: function(jqXHR, textStatus, errorThrown) {
+                    self.notify('error', errorThrown);
+                }
+            });
+        }).catch(function(error) {
+            self.toggleLoading(true);
+
+            self.notify('error', error);
         });
 
         transfer(e) {

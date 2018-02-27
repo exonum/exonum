@@ -50,53 +50,57 @@
 
             this.toggleLoading(true);
 
-            var keyPair = this.auth.getUser();
+            this.auth.getUser().then(function(keyPair) {
+                var TxTransfer = Exonum.newMessage({
+                    size: 80,
+                    network_id: self.NETWORK_ID,
+                    protocol_version: self.PROTOCOL_VERSION,
+                    service_id: self.SERVICE_ID,
+                    message_id: self.TX_TRANSFER_ID,
+                    fields: {
+                        from: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
+                        to: {type: Exonum.PublicKey, size: 32, from: 32, to: 64},
+                        amount: {type: Exonum.Int64, size: 8, from: 64, to: 72},
+                        seed: {type: Exonum.Uint64, size: 8, from: 72, to: 80}
+                    }
+                });
 
-            var TxTransfer = Exonum.newMessage({
-                size: 80,
-                network_id: this.NETWORK_ID,
-                protocol_version: this.PROTOCOL_VERSION,
-                service_id: this.SERVICE_ID,
-                message_id: this.TX_TRANSFER_ID,
-                fields: {
-                    from: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-                    to: {type: Exonum.PublicKey, size: 32, from: 32, to: 64},
-                    amount: {type: Exonum.Int64, size: 8, from: 64, to: 72},
-                    seed: {type: Exonum.Uint64, size: 8, from: 72, to: 80}
-                }
-            });
+                var data = {
+                    from: keyPair.publicKey,
+                    to: self.receiver,
+                    amount: self.amount.toString(),
+                    seed: Exonum.randomUint64()
+                };
 
-            var data = {
-                from: keyPair.publicKey,
-                to: this.receiver,
-                amount: this.amount.toString(),
-                seed: Exonum.randomUint64()
-            };
+                var signature = TxTransfer.sign(keyPair.secretKey, data);
 
-            var signature = TxTransfer.sign(keyPair.secretKey, data);
+                $.ajax({
+                    method: 'POST',
+                    url: '/api/services/cryptocurrency/v1/wallets/transaction',
+                    contentType: 'application/json; charset=utf-8',
+                    data: JSON.stringify({
+                        body: data,
+                        network_id: self.NETWORK_ID,
+                        protocol_version: self.PROTOCOL_VERSION,
+                        service_id: self.SERVICE_ID,
+                        message_id: self.TX_TRANSFER_ID,
+                        signature: signature
+                    }),
+                    success: function() {
+                        self.toggleLoading(true);
 
-            $.ajax({
-                method: 'POST',
-                url: '/api/services/cryptocurrency/v1/wallets/transaction',
-                contentType: 'application/json; charset=utf-8',
-                data: JSON.stringify({
-                    body: data,
-                    network_id: this.NETWORK_ID,
-                    protocol_version: this.PROTOCOL_VERSION,
-                    service_id: this.SERVICE_ID,
-                    message_id: this.TX_TRANSFER_ID,
-                    signature: signature
-                }),
-                success: function() {
-                    self.toggleLoading(true);
+                        self.notify('success', 'Funds has been transferred');
 
-                    self.notify('success', 'Funds has been transferred');
+                        route('/user');
+                    },
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        throw errorThrown;
+                    }
+                });
+            }).catch(function(error) {
+                self.toggleLoading(true);
 
-                    route('/user');
-                },
-                error: function(jqXHR, textStatus, errorThrown) {
-                    callback(errorThrown);
-                }
+                self.notify('error', error);
             });
         }
     </script>
