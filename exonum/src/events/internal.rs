@@ -15,13 +15,10 @@
 
 use futures::{Future, Sink, Stream, IntoFuture};
 use futures::sync::mpsc;
-
-use tokio_core::reactor::Handle;
-use tokio_core::reactor::Timeout;
+use tokio_core::reactor::{Handle, Timeout};
 
 use std::io;
 use std::time::{Duration, SystemTime};
-
 
 use super::error::{into_other, other_error};
 use super::{InternalRequest, TimeoutRequest, InternalEvent, to_box};
@@ -66,6 +63,19 @@ impl InternalPart {
                                     .map_err(into_other)
                             })
                             .map_err(|_| panic!("Can't execute jump to round"));
+                        to_box(fut)
+                    }
+                    InternalRequest::Shutdown => {
+                        let internal_tx = internal_tx.clone();
+                        let fut = Ok(())
+                            .into_future()
+                            .and_then(move |_| {
+                                internal_tx
+                                    .send(InternalEvent::Shutdown)
+                                    .map(drop)
+                                    .map_err(into_other)
+                            })
+                            .map_err(|_| panic!("Can't execute shutdown"));
                         to_box(fut)
                     }
                 };

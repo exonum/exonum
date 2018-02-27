@@ -87,9 +87,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Key-indexes interface now allows to use borrowed types for the search
   operations. (#392)
 
+- Added `v1/shutdown` endpoint for graceful node termination. (#526)
+
 ### Bug fixes
 
 - `ExonumJsonDeserialize` trait is implemented for `F32` and `F64`. (#461)
+
+- Added round and propose timeouts validation. (#523)
 
 ### Internal improvements
 
@@ -100,7 +104,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Bug fixes
 
-- Fixed logger output (#451)
+- Fixed logger output. (#451)
 
 ## 0.5 - 2018-01-30
 

@@ -537,7 +537,8 @@ impl TestKit {
                         }
                     }
                     ExternalMessage::PeerAdd(_) |
-                    ExternalMessage::Enable(_) => { /* Ignored */ }
+                    ExternalMessage::Enable(_) |
+                    ExternalMessage::Shutdown => { /* Ignored */ }
                 }
             }))
         };
