@@ -18,6 +18,7 @@ use std::marker::PhantomData;
 use std::borrow::Borrow;
 
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageKey};
+use super::indexes_metadata::IndexType;
 
 /// A set of items that implement `StorageKey` trait.
 ///
@@ -44,7 +45,11 @@ pub struct KeySetIndexIter<'a, K> {
     base_iter: BaseIndexIter<'a, K, ()>,
 }
 
-impl<T, K> KeySetIndex<T, K> {
+impl<T, K> KeySetIndex<T, K>
+where
+    T: AsRef<Snapshot>,
+    K: StorageKey,
+{
     /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
@@ -67,7 +72,7 @@ impl<T, K> KeySetIndex<T, K> {
     /// ```
     pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
         KeySetIndex {
-            base: BaseIndex::new(name, view),
+            base: BaseIndex::new(name, IndexType::KeySet, view),
             _k: PhantomData,
         }
     }
@@ -96,17 +101,11 @@ impl<T, K> KeySetIndex<T, K> {
     /// ```
     pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
         KeySetIndex {
-            base: BaseIndex::with_prefix(name, prefix, view),
+            base: BaseIndex::with_prefix(name, prefix, IndexType::KeySet, view),
             _k: PhantomData,
         }
     }
-}
 
-impl<T, K> KeySetIndex<T, K>
-where
-    T: AsRef<Snapshot>,
-    K: StorageKey,
-{
     /// Returns `true` if the set contains a value.
     ///
     /// # Examples

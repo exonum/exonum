@@ -144,6 +144,7 @@ mod values;
 mod entry;
 
 pub mod base_index;
+mod indexes_metadata;
 
 pub mod map_index;
 pub mod list_index;
