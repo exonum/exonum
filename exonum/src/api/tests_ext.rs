@@ -163,11 +163,12 @@ fn create_blockchain() -> (Blockchain, mpsc::Receiver<ExternalMessage>) {
 }
 
 fn create_api() -> ServiceApi {
-    ServiceApi::new()
-        .add_transactions::<Any>()
-        .add_read(GetFlop)
-        .add_read(sub::GetFlopOrDefault)
-        .add_read(GetSum)
+    let mut api = ServiceApi::new();
+    api.set_transactions::<Any>();
+    api.insert_read(GetFlop);
+    api.insert_read(sub::GetFlopOrDefault);
+    api.insert_read(GetSum);
+    api
 }
 
 fn assert_channel_state(receiver: &mut mpsc::Receiver<ExternalMessage>, tx_hash: &Hash) {
@@ -186,7 +187,8 @@ fn test_single_transaction_sink() {
     let (_, key) = crypto::gen_keypair();
     let (blockchain, mut receiver) = create_blockchain();
 
-    let api = ServiceApi::new().add_transactions::<Flip>();
+    let mut api = ServiceApi::new();
+    api.set_transactions::<Flip>();
     let ctx = blockchain.api_context();
 
     let tx = Flip::new(100, &key);
@@ -213,7 +215,8 @@ fn test_full_transaction_sink() {
     let (_, key) = crypto::gen_keypair();
     let (blockchain, mut receiver) = create_blockchain();
 
-    let api = ServiceApi::new().add_transactions::<Any>();
+    let mut api = ServiceApi::new();
+    api.set_transactions::<Any>();
     let ctx = blockchain.api_context();
 
     let tx = Flip::new(100, &key);
@@ -320,7 +323,8 @@ fn test_custom_transaction_sign_and_send() {
     }
 
     let (blockchain, mut receiver) = create_blockchain();
-    let api = ServiceApi::new().add_endpoint(SendTransaction);
+    let mut api = ServiceApi::new();
+    api.insert_endpoint(SendTransaction);
     let ctx = blockchain.api_context();
 
     let secret_key = blockchain.api_context().secret_key().clone();
@@ -337,7 +341,8 @@ fn test_custom_transaction_sign_and_send() {
 fn test_custom_transaction_send() {
     let (_, key) = crypto::gen_keypair();
     let key_clone = key.clone();
-    let api = ServiceApi::new().add(BoxedEndpoint::endpoint_fn("send", move |context, data| {
+    let mut api = ServiceApi::new();
+    api.insert(BoxedEndpoint::endpoint_fn("send", move |context, data| {
         let tx = Flip::new(data, &key_clone);
         let tx_hash = tx.hash();
         context.send(tx)?;
@@ -359,9 +364,12 @@ fn test_custom_transaction_send() {
 #[test]
 #[should_panic(expected = "Duplicate endpoint ID")]
 fn test_duplicate_ids() {
-    let api = ServiceApi::new().add_transactions::<Any>().add(
-        BoxedEndpoint::read_request_fn(TRANSACTIONS_ID, |_, _: ()| Ok("Gotcha!".to_owned())),
-    );
+    let mut api = ServiceApi::new();
+    api.set_transactions::<Any>();
+    api.insert(BoxedEndpoint::read_request_fn(
+        TRANSACTIONS_ID,
+        |_, _: ()| Ok("Gotcha!".to_owned()),
+    ));
     drop(api);
 }
 
@@ -652,7 +660,8 @@ fn test_not_found_error() {
     }
 
     let (mut blockchain, _) = create_blockchain();
-    let api = ServiceApi::new().add_read(GetFlopOrFail);
+    let mut api = ServiceApi::new();
+    api.insert_read(GetFlopOrFail);
     let ctx = blockchain.api_context();
 
     // Initially, the entry is not set, so we should get an error.

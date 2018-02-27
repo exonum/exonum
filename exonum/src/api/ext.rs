@@ -81,9 +81,9 @@
 //! #   }
 //!
 //!     fn public_api_handler(&self, context: &ApiContext) -> Option<Box<iron::Handler>> {
-//!         let api = ServiceApi::new()
-//!             .add_read(Read)
-//!             .add_transactions::<Any>();
+//!         let mut api = ServiceApi::new();
+//!         api.insert_read(Read);
+//!         api.set_transactions::<Any>();
 //!         Some(IronAdapter::new(context.clone()).create_handler(api))
 //!     }
 //! }
@@ -615,11 +615,10 @@ impl ServiceApi {
     /// # Panics
     ///
     /// Panics if the API already contains an endpoint with the same identifier.
-    pub fn add(mut self, endpoint: BoxedEndpoint) -> Self {
+    pub fn insert(&mut self, endpoint: BoxedEndpoint) {
         let endpoint_id = endpoint.id().to_string();
         let old = self.endpoints.insert(endpoint_id.clone(), endpoint);
         assert!(old.is_none(), "Duplicate endpoint ID: {}", endpoint_id);
-        self
     }
 
     /// Adds a read request by its type `T`.
@@ -627,12 +626,12 @@ impl ServiceApi {
     /// # Panics
     ///
     /// Panics if the API already contains an endpoint with the same identifier.
-    pub fn add_read<T>(self, read: T) -> Self
+    pub fn insert_read<T>(&mut self, read: T)
     where
         T: 'static + ReadRequest,
     {
         let endpoint = BoxedEndpoint::read_request(read);
-        self.add(endpoint)
+        self.insert(endpoint);
     }
 
     /// Adds an endpoint by its type.
@@ -640,12 +639,12 @@ impl ServiceApi {
     /// # Panics
     ///
     /// Panics if the API already contains an endpoint with the same identifier.
-    pub fn add_endpoint<T>(self, endpoint: T) -> Self
+    pub fn insert_endpoint<T>(&mut self, endpoint: T)
     where
         T: 'static + Endpoint,
     {
         let endpoint = BoxedEndpoint::endpoint(endpoint);
-        self.add(endpoint)
+        self.insert(endpoint);
     }
 
     /// Add a sink for transactions.
@@ -657,14 +656,15 @@ impl ServiceApi {
     /// # Panics
     ///
     /// Panics if the API already contains an endpoint with the same identifier.
+    /// This in particular means that the method can only be called once on an API instance.
     ///
     /// [`Transaction`]: ../../blockchain/trait.Transaction.html
     /// [`TransactionSet`]: ../../blockchain/trait.TransactionSet.html
-    pub fn add_transactions<T>(self) -> Self
+    pub fn set_transactions<T>(&mut self)
     where
         T: 'static + Into<Box<Transaction>> + Serialize + DeserializeOwned + Send + Sync,
     {
-        self.add_endpoint(TransactionSink::<T>::new())
+        self.insert_endpoint(TransactionSink::<T>::new());
     }
 }
 
@@ -718,20 +718,6 @@ impl<'a> ::std::ops::Index<&'a str> for ServiceApi {
     type Output = BoxedEndpoint;
 
     fn index(&self, idx: &'a str) -> &BoxedEndpoint {
-        self.endpoint(idx).expect(
-            &format!("Unknown endpoint ID: {}", idx),
-        )
-    }
-}
-
-impl<'a, 's, T, F> ::std::ops::Index<&'s str> for Filter<'a, T, F>
-where
-    T: EndpointHolder,
-    F: Fn(&BoxedEndpoint) -> bool,
-{
-    type Output = BoxedEndpoint;
-
-    fn index(&self, idx: &'s str) -> &BoxedEndpoint {
         self.endpoint(idx).expect(
             &format!("Unknown endpoint ID: {}", idx),
         )
