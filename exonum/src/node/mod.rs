@@ -42,7 +42,7 @@ use api::{private, public, Api};
 use messages::{Connect, Message, RawMessage};
 use events::{NetworkRequest, TimeoutRequest, NetworkEvent, InternalRequest, InternalEvent,
              SyncSender, HandlerPart, NetworkConfiguration, NetworkPart, InternalPart};
-use events::error::{into_other, other_error, LogError, log_error};
+use events::error::{other_error, LogError, log_error};
 use helpers::{Height, Milliseconds, Round, ValidatorId, user_agent};
 use storage::Database;
 
@@ -57,12 +57,13 @@ mod whitelist;
 pub mod state; // TODO: temporary solution to get access to WAIT constants (ECR-167)
 pub mod timeout_adjuster;
 
-/// External messages.
+/// Messages received from the external environment.
+#[doc(hidden)]
 #[derive(Debug)]
 pub enum ExternalMessage {
-    /// Add new connection
+    /// Add new connection.
     PeerAdd(SocketAddr),
-    /// Transaction that implements the `Transaction` trait.
+    /// Push a transaction to the mempool.
     Transaction(Box<Transaction>),
     /// Enable or disable the node.
     Enable(bool),
@@ -94,9 +95,9 @@ pub trait SystemStateProvider: ::std::fmt::Debug {
     fn current_time(&self) -> SystemTime;
 }
 
-/// Transactions sender.
-#[derive(Clone)]
-pub struct ApiSender(pub mpsc::Sender<ExternalMessage>);
+/// Low-level interface for interaction between the node and the external message producers.
+#[derive(Clone, Debug)]
+pub struct ExternalMessageSender(mpsc::Sender<ExternalMessage>);
 
 /// Handler that that performs consensus algorithm.
 pub struct NodeHandler {
@@ -651,54 +652,40 @@ impl fmt::Debug for NodeHandler {
     }
 }
 
-/// `TransactionSend` represents interface for sending transactions. For details see `ApiSender`
-/// implementation.
-pub trait TransactionSend: Send + Sync {
-    /// Sends transaction. This can include transaction verification.
-    fn send(&self, tx: Box<Transaction>) -> io::Result<()>;
-
-    /// Sends transaction. Does not include transaction verification.
-    fn send_unchecked(&self, tx: Box<Transaction>) -> io::Result<()>;
-}
-
-impl ApiSender {
-    /// Creates new `ApiSender` with given channel.
-    pub fn new(inner: mpsc::Sender<ExternalMessage>) -> ApiSender {
-        ApiSender(inner)
-    }
-
-    /// Add peer to peer list
+impl ExternalMessageSender {
+    /// Adds a peer to the peer list.
     pub fn peer_add(&self, addr: SocketAddr) -> io::Result<()> {
         let msg = ExternalMessage::PeerAdd(addr);
         self.send_external_message(msg)
     }
 
+    /// Sends a message to enable or disable consensus.
+    pub fn send_enable_consensus(&self, enabled: bool) -> io::Result<()> {
+        let msg = ExternalMessage::Enable(enabled);
+        self.send_external_message(msg)
+    }
+
+    /// Sends a transaction to the node.
+    pub fn send_transaction(&self, tx: Box<Transaction>) -> io::Result<()> {
+        let msg = ExternalMessage::Transaction(tx);
+        self.send_external_message(msg)
+    }
+
     /// Sends an external message.
-    pub fn send_external_message(&self, message: ExternalMessage) -> io::Result<()> {
+    fn send_external_message(&self, message: ExternalMessage) -> io::Result<()> {
+        use events::error::into_other;
+        use futures::{Future, Sink};
+
         self.0.clone().send(message).wait().map(drop).map_err(
             into_other,
         )
     }
 }
 
-impl TransactionSend for ApiSender {
-    fn send(&self, tx: Box<Transaction>) -> io::Result<()> {
-        if !tx.verify() {
-            let msg = "Unable to verify transaction";
-            return Err(io::Error::new(io::ErrorKind::Other, msg));
-        }
-        self.send_unchecked(tx)
-    }
-
-    fn send_unchecked(&self, tx: Box<Transaction>) -> io::Result<()> {
-        let msg = ExternalMessage::Transaction(tx);
-        self.send_external_message(msg)
-    }
-}
-
-impl fmt::Debug for ApiSender {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.pad("ApiSender { .. }")
+#[doc(hidden)]
+impl From<mpsc::Sender<ExternalMessage>> for ExternalMessageSender {
+    fn from(sender: mpsc::Sender<ExternalMessage>) -> Self {
+        ExternalMessageSender(sender)
     }
 }
 
@@ -785,7 +772,7 @@ impl Node {
             services,
             node_cfg.service_public_key,
             node_cfg.service_secret_key.clone(),
-            ApiSender::new(channel.api_requests.0.clone()),
+            channel.api_requests.0.clone().into(),
         );
         blockchain
             .create_genesis_block(node_cfg.genesis.clone())
@@ -867,14 +854,14 @@ impl Node {
     /// Private api prefix is `/api/services/{service_name}`
     pub fn run(self) -> io::Result<()> {
         let blockchain = self.handler().blockchain.clone();
-        let api_sender = self.channel();
+        let sender = self.external_message_sender();
 
         let private_config_api_thread = match self.api_options.private_api_address {
             Some(listen_address) => {
                 let handler = create_private_api_handler(
                     blockchain.clone(),
                     self.handler().api_state().clone(),
-                    api_sender,
+                    sender,
                 );
                 let thread = thread::spawn(move || {
                     info!("Private exonum api started on {}", listen_address);
@@ -956,9 +943,9 @@ impl Node {
         &self.handler
     }
 
-    /// Returns channel.
-    pub fn channel(&self) -> ApiSender {
-        ApiSender::new(self.channel.api_requests.0.clone())
+    /// Returns sender of external messages.
+    pub fn external_message_sender(&self) -> ExternalMessageSender {
+        self.channel.api_requests.0.clone().into()
     }
 }
 
@@ -997,14 +984,14 @@ pub fn create_public_api_handler(
 pub fn create_private_api_handler(
     blockchain: Blockchain,
     shared_api_state: SharedNodeState,
-    api_sender: ApiSender,
+    sender: ExternalMessageSender,
 ) -> Chain {
     let mut mount = Mount::new();
     mount.mount("api/services", blockchain.mount_private_api());
 
     let mut router = Router::new();
     let node_info = private::NodeInfo::new(blockchain.service_map().iter().map(|(_, s)| s));
-    let system_api = private::SystemApi::new(node_info, blockchain, shared_api_state, api_sender);
+    let system_api = private::SystemApi::new(node_info, blockchain, shared_api_state, sender);
     system_api.wire(&mut router);
     mount.mount("api/system", router);
 

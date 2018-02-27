@@ -32,7 +32,7 @@ use api::ext::{ApiError, ApiResult, BoxedEndpoint, Endpoint, EndpointContext, En
 use api::iron::{ErrorResponse, IronAdapter};
 use blockchain::{Blockchain, ExecutionResult, Transaction};
 use crypto::{self, CryptoHash, Hash};
-use node::{ApiSender, ExternalMessage};
+use node::ExternalMessage;
 use storage::{Entry, Fork, MemoryDB, Snapshot};
 
 struct Schema<T> {
@@ -156,7 +156,7 @@ fn create_blockchain() -> (Blockchain, mpsc::Receiver<ExternalMessage>) {
         vec![Box::new(MyService)],
         pubkey,
         key.clone(),
-        ApiSender::new(api_channel.0.clone()),
+        api_channel.0.into(),
     );
 
     (blockchain, api_channel.1)

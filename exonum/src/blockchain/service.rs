@@ -27,11 +27,11 @@ use crypto::{Hash, PublicKey, SecretKey};
 use storage::{Fork, Snapshot};
 use messages::RawTransaction;
 use encoding::Error as MessageError;
-use node::{ApiSender, Node, State, TransactionSend};
+use node::{Node, State};
 use blockchain::{Blockchain, ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use helpers::{Height, Milliseconds, ValidatorId};
 use super::transaction::Transaction;
-
+use super::ApiSender;
 
 /// A trait that describes business logic of a concrete service.
 ///
@@ -287,7 +287,7 @@ impl ServiceContext {
     }
 
     /// Returns reference to the transaction sender.
-    pub fn transaction_sender(&self) -> &TransactionSend {
+    pub fn api_sender(&self) -> &ApiSender {
         &self.api_sender
     }
 
@@ -472,7 +472,7 @@ impl ApiContext {
         let handler = node.handler();
         ApiContext {
             blockchain: handler.blockchain.clone(),
-            node_channel: node.channel(),
+            node_channel: handler.blockchain.api_sender().clone(),
             public_key: *node.state().service_public_key(),
             secret_key: node.state().service_secret_key().clone(),
         }

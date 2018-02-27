@@ -97,9 +97,8 @@ use serde_json::{self, Value};
 use std::collections::HashMap;
 use std::{fmt, io};
 
-use blockchain::{ApiContext, Blockchain, Transaction};
-use crypto::{Hash, SecretKey};
-use node::TransactionSend;
+use blockchain::{ApiContext, ApiSender, Blockchain, SendError, Transaction};
+use crypto::Hash;
 use storage::Snapshot;
 
 /// The identifier for the "standard" transaction sink.
@@ -142,6 +141,17 @@ pub enum ApiError {
     InternalError(Box<::std::error::Error + Send + Sync>),
 }
 
+impl From<SendError> for ApiError {
+    fn from(err: SendError) -> ApiError {
+        use self::SendError::*;
+
+        match err {
+            VerificationFail(tx) => ApiError::VerificationFail(tx),
+            Io(e) => ApiError::TransactionNotSent(e),
+        }
+    }
+}
+
 /// Alias for the result type used within the `api` module.
 pub type ApiResult<T> = Result<T, ApiError>;
 
@@ -158,18 +168,16 @@ pub trait EndpointSpec {
 
 /// Context supplied to endpoints.
 #[derive(Debug)]
-pub struct EndpointContext {
-    blockchain: Blockchain,
-    queue: Vec<Box<Transaction>>,
-    unsigned_queue: Vec<Box<Transaction>>,
+pub struct EndpointContext<'a> {
+    blockchain: &'a Blockchain,
+    channel: &'a ApiSender,
 }
 
-impl EndpointContext {
-    fn new(blockchain: Blockchain) -> Self {
+impl<'a> EndpointContext<'a> {
+    fn new(api_context: &'a ApiContext) -> Self {
         EndpointContext {
-            blockchain,
-            queue: vec![],
-            unsigned_queue: vec![],
+            blockchain: api_context.blockchain(),
+            channel: api_context.node_channel(),
         }
     }
 
@@ -185,59 +193,22 @@ impl EndpointContext {
     where
         T: Into<Box<Transaction>>,
     {
-        let transaction = transaction.into();
-        if !transaction.verify() {
-            return Err(ApiError::VerificationFail(transaction));
-        }
-        self.queue.push(transaction);
-        Ok(())
+        self.channel.send(transaction.into()).map_err(
+            ApiError::from,
+        )
     }
 
     /// Queues a transaction for signing, sending over the network and including
     /// into the blockchain.
     ///
-    /// The transaction is signed with the service secret key.
-    pub fn sign_and_send<T>(&mut self, transaction: T) -> Result<(), ApiError>
+    /// The transaction is signed with the service secret key and returned.
+    pub fn sign_and_send<T>(&mut self, transaction: T) -> Result<Hash, ApiError>
     where
         T: Into<Box<Transaction>>,
     {
-        let transaction = transaction.into();
-
-        debug_assert_eq!(*transaction.raw().signature(), ::crypto::Signature::zero());
-        self.unsigned_queue.push(transaction);
-        Ok(())
-    }
-
-    fn finalize(self, context: &ApiContext) -> Result<(), ApiError> {
-        use messages::{MessageBuffer, RawMessage};
-
-        // XXX: Unbelievable hacks
-        fn sign_transaction(
-            tx: &Transaction,
-            secret_key: &SecretKey,
-            blockchain: &Blockchain,
-        ) -> Box<Transaction> {
-            let buffer = tx.raw().as_ref().to_vec();
-            let mut buffer = MessageBuffer::from_vec(buffer);
-            buffer.sign(secret_key);
-            blockchain.tx_from_raw(RawMessage::new(buffer)).unwrap()
-        }
-
-        for tx in self.queue {
-            context.node_channel().send_unchecked(tx).map_err(
-                ApiError::TransactionNotSent,
-            )?;
-        }
-
-        let signed_txs = self.unsigned_queue.into_iter().map(|tx| {
-            sign_transaction(tx.as_ref(), context.secret_key(), context.blockchain())
-        });
-        for tx in signed_txs {
-            context.node_channel().send_unchecked(tx).map_err(
-                ApiError::TransactionNotSent,
-            )?;
-        }
-        Ok(())
+        self.channel.sign_and_send(transaction.into()).map_err(
+            ApiError::from,
+        )
     }
 }
 
@@ -312,7 +283,6 @@ pub trait ReadRequest: EndpointSpec + Send + Sync {
 /// # use exonum::api::ext::{ApiError, Endpoint, EndpointContext, EndpointSpec};
 /// # use exonum::blockchain::{ApiContext, ExecutionResult, Transaction};
 /// # use exonum::crypto::{CryptoHash, Hash, Signature};
-/// # use exonum::node::{ApiSender, TransactionSend};
 /// # use exonum::storage::Fork;
 /// // Suppose we have this transaction spec.
 /// transactions! {
@@ -348,9 +318,7 @@ pub trait ReadRequest: EndpointSpec + Send + Sync {
 ///         req: (u64, String),
 ///     ) -> Result<Hash, ApiError> {
 ///         let tx = MyTransaction::new_with_signature(req.0, &req.1, &Signature::zero());
-///         let tx_hash = tx.hash();
-///         context.sign_and_send(tx)?;
-///         Ok(tx_hash)
+///         Ok(context.sign_and_send(tx)?)
 ///     }
 /// }
 /// # fn main() { }
@@ -543,9 +511,8 @@ pub struct EndpointWithContext<'a, 'b> {
 impl<'a, 'b> EndpointWithContext<'a, 'b> {
     /// Handles a request.
     pub fn handle(&self, request: Value) -> ApiResult<Value> {
-        let mut ep_context = EndpointContext::new(self.context.blockchain().clone());
+        let mut ep_context = EndpointContext::new(self.context);
         let response = self.endpoint.handle(&mut ep_context, request)?;
-        ep_context.finalize(self.context)?;
         Ok(response)
     }
 }

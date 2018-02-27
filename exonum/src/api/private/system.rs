@@ -19,7 +19,7 @@ use router::Router;
 use iron::prelude::*;
 
 use crypto::PublicKey;
-use node::{ExternalMessage, ApiSender};
+use node::ExternalMessageSender;
 use blockchain::{Service, Blockchain, SharedNodeState};
 use api::{Api, ApiError};
 use messages::{TEST_NETWORK_ID, PROTOCOL_MAJOR_VERSION};
@@ -96,7 +96,7 @@ pub struct SystemApi {
     blockchain: Blockchain,
     info: NodeInfo,
     shared_api_state: SharedNodeState,
-    node_channel: ApiSender,
+    node_channel: ExternalMessageSender,
 }
 
 impl SystemApi {
@@ -105,7 +105,7 @@ impl SystemApi {
         info: NodeInfo,
         blockchain: Blockchain,
         shared_api_state: SharedNodeState,
-        node_channel: ApiSender,
+        node_channel: ExternalMessageSender,
     ) -> SystemApi {
         SystemApi {
             info,
@@ -151,8 +151,7 @@ impl SystemApi {
     }
 
     fn set_consensus_enabled(&self, enabled: bool) -> Result<(), ApiError> {
-        let message = ExternalMessage::Enable(enabled);
-        self.node_channel.send_external_message(message)?;
+        self.node_channel.send_enable_consensus(enabled)?;
         Ok(())
     }
 }
