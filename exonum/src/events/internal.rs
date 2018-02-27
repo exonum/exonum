@@ -13,7 +13,7 @@
 // limitations under the License.
 
 
-use futures::{Future, Sink, Stream, IntoFuture};
+use futures::{self, Future, Sink, Stream};
 use futures::sync::mpsc;
 use tokio_core::reactor::{Handle, Timeout};
 
@@ -54,29 +54,23 @@ impl InternalPart {
                     }
                     InternalRequest::JumpToRound(height, round) => {
                         let internal_tx = internal_tx.clone();
-                        let fut = Ok(())
-                            .into_future()
-                            .and_then(move |_| {
-                                internal_tx
-                                    .send(InternalEvent::JumpToRound(height, round))
-                                    .map(drop)
-                                    .map_err(into_other)
-                            })
-                            .map_err(|_| panic!("Can't execute jump to round"));
-                        to_box(fut)
+                        let f = futures::lazy(move || {
+                            internal_tx
+                                .send(InternalEvent::JumpToRound(height, round))
+                                .map(drop)
+                                .map_err(into_other)
+                        }).map_err(|_| panic!("Can't execute jump to round"));
+                        to_box(f)
                     }
                     InternalRequest::Shutdown => {
                         let internal_tx = internal_tx.clone();
-                        let fut = Ok(())
-                            .into_future()
-                            .and_then(move |_| {
-                                internal_tx
-                                    .send(InternalEvent::Shutdown)
-                                    .map(drop)
-                                    .map_err(into_other)
-                            })
-                            .map_err(|_| panic!("Can't execute shutdown"));
-                        to_box(fut)
+                        let f = futures::lazy(move || {
+                            internal_tx
+                                .send(InternalEvent::Shutdown)
+                                .map(drop)
+                                .map_err(into_other)
+                        }).map_err(|_| panic!("Can't execute shutdown"));
+                        to_box(f)
                     }
                 };
 
