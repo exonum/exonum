@@ -38,9 +38,9 @@ use exonum::encoding::{Offset, Error as StreamStructError};
 use exonum::helpers::fabric::{ServiceFactory, Context};
 use serde_json::Value;
 use exonum::encoding::serialize::json::ExonumJson;
-use exonum::encoding::serialize::{WriteBufferWrapper};
+use exonum::encoding::serialize::WriteBufferWrapper;
 
-use wallet::{Wallet};
+use wallet::Wallet;
 use tx_metarecord::TxMetaRecord;
 
 mod tx_metarecord;
@@ -480,11 +480,8 @@ mod tests {
             TxCreateWallet::new(&p, &name, &s)
         };
         let (p, s) = gen_keypair();
-        let non_ascii_create = TxCreateWallet::new(
-            &p,
-            "babd, Юникод еще работает",
-            &s,
-        );
+        let non_ascii_create =
+            TxCreateWallet::new(&p, "babd, Юникод еще работает", &s);
         let mut create_txs = (0..50).map(generator).collect::<Vec<_>>();
         create_txs.push(non_ascii_create);
         for tx in create_txs {
@@ -504,11 +501,7 @@ mod tests {
         let mut rng = thread_rng();
         let (p1, s1) = gen_keypair();
         let (p2, s2) = gen_keypair();
-        let tx_create_1 = TxCreateWallet::new(
-            &p1,
-            "Василий Васильевич",
-            &s1,
-        );
+        let tx_create_1 = TxCreateWallet::new(&p1, "Василий Васильевич", &s1);
         let tx_create_2 = TxCreateWallet::new(&p2, "Name", &s2);
         let tx_issue_1 = TxIssue::new(&p1, 6000, rng.next_u64(), &s1);
         let tx_transfer_1 = TxTransfer::new(&p1, &p2, 3000, rng.next_u64(), &s1);

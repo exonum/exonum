@@ -21,7 +21,7 @@ use exonum::storage::proof_map_index::{BranchProofNode, ProofNode};
 use exonum::encoding::serialize::FromHex;
 
 use super::tx_metarecord::TxMetaRecord;
-use super::wallet::{Wallet};
+use super::wallet::Wallet;
 use super::{CRYPTOCURRENCY_SERVICE_ID, CurrencySchema, CurrencyTx};
 
 /// TODO: Add documentation.
