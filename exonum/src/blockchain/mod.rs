@@ -45,10 +45,10 @@ use vec_map::VecMap;
 use byteorder::{ByteOrder, LittleEndian};
 use mount::Mount;
 
-use crypto::{self, Hash, CryptoHash, PublicKey, SecretKey};
-use messages::{CONSENSUS as CORE_SERVICE, Precommit, RawMessage, Connect};
+use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
+use messages::{CONSENSUS as CORE_SERVICE, Connect, Precommit, RawMessage};
 use storage::{Database, Error, Fork, Patch, Snapshot};
-use helpers::{Height, ValidatorId, Round};
+use helpers::{Height, Round, ValidatorId};
 use node::ApiSender;
 
 pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
@@ -56,8 +56,8 @@ pub use self::schema::{gen_prefix, Schema, TxLocation};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
 pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState};
-pub use self::transaction::{Transaction, TransactionSet, ExecutionResult, TransactionResult,
-                            ExecutionError, TransactionError, TransactionErrorType};
+pub use self::transaction::{ExecutionError, ExecutionResult, Transaction, TransactionError,
+                            TransactionErrorType, TransactionResult, TransactionSet};
 
 mod block;
 mod schema;
@@ -174,8 +174,18 @@ impl Blockchain {
         Schema::new(&self.snapshot()).last_block()
     }
 
+    /// This method checks whether the genesis block has already been created.
+    pub fn is_initialized(&self) -> bool {
+        Schema::new(&self.snapshot()).block_hashes_by_height().len() == 0
+    }
+
     /// Creates and commits the genesis block for the given genesis configuration.
     pub fn create_genesis_block(&mut self, cfg: GenesisConfig) -> Result<(), Error> {
+        debug_assert!(
+            !self.is_initialized(),
+            "An attempt to invoke `create_genesis_block` on the already initialized blockchain"
+        );
+
         let mut config_propose = StoredConfiguration {
             previous_cfg_hash: Hash::zero(),
             actual_from: Height::zero(),
