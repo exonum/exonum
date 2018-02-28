@@ -20,8 +20,8 @@ use exonum::messages::{Message, RawTransaction};
 use exonum::storage::{Entry, Fork, Snapshot};
 use exonum::crypto::{Hash, PublicKey};
 use exonum::encoding;
-use exonum::api::iron;
-use exonum::api::ext::{ApiBuilder, ApiError, Endpoint};
+use exonum::api::iron::{self, IronAdapter};
+use exonum::api::ext::{ApiError, Endpoint, ReadContext, Spec, ServiceApi};
 
 const SERVICE_ID: u16 = 1;
 
@@ -123,16 +123,11 @@ impl Transaction for TxReset {
 
 // // // // API // // // //
 
-read_request! {
-    @(ID = "count")
-    pub GetCount(()) -> u64;
-}
+const COUNT_SPEC: Spec = Spec { id: "count" };
 
-impl Endpoint for GetCount {
-    fn handle(&self, _: ()) -> Result<u64, ApiError> {
-        let counter = CounterSchema::new(self.0.snapshot()).count().unwrap_or(0);
-        Ok(counter)
-    }
+fn count(ctx: &ReadContext, _: ()) -> Result<u64, ApiError> {
+    let counter = CounterSchema::new(ctx.snapshot()).count().unwrap_or(0);
+    Ok(counter)
 }
 
 // // // // Service // // // //
@@ -158,18 +153,16 @@ impl Service for CounterService {
     }
 
     fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<iron::Handler>> {
-        let api = ApiBuilder::new(ctx)
-            .add::<GetCount>()
-            .add_transactions::<CounterTransactions>()
-            .create();
-        Some(iron::into_handler(api))
+        let mut api = ServiceApi::new();
+        api.insert(COUNT_SPEC, Endpoint::new(count));
+        api.set_transactions::<CounterTransactions>();
+        Some(IronAdapter::new(ctx.clone()).create_handler(api))
     }
 
     fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<iron::Handler>> {
-        let api = ApiBuilder::new(ctx)
-            .add::<GetCount>()
-            .add_transactions::<TxReset>()
-            .create();
-        Some(iron::into_handler(api))
+        let mut api = ServiceApi::new();
+        api.insert(COUNT_SPEC, Endpoint::new(count));
+        api.set_transactions::<TxReset>();
+        Some(IronAdapter::new(ctx.clone()).create_handler(api))
     }
 }

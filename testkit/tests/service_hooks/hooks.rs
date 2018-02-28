@@ -65,6 +65,6 @@ impl Service for HandleCommitService {
 
     fn handle_commit(&self, context: &ServiceContext) {
         let tx = TxAfterCommit::new_with_signature(context.height(), &Signature::zero());
-        context.transaction_sender().send(Box::new(tx)).unwrap();
+        context.api_sender().send(Box::new(tx)).unwrap();
     }
 }

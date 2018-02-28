@@ -18,8 +18,8 @@ use exonum::messages::{Message, RawTransaction};
 use exonum::storage::{Fork, MapIndex, Snapshot};
 use exonum::crypto::{Hash, PublicKey};
 use exonum::encoding;
-use exonum::api::ext::{ApiBuilder, ApiError, Endpoint};
-use exonum::api::iron;
+use exonum::api::ext::{ApiError, Endpoint, ReadContext, ServiceApi, Spec};
+use exonum::api::iron::{self, IronAdapter};
 use exonum::helpers::Height;
 
 // // // // // // // // // // CONSTANTS // // // // // // // // // //
@@ -150,20 +150,15 @@ impl Transaction for TxTransfer {
 
 // // // // // // // // // // REST API // // // // // // // // // //
 
-read_request! {
-    @(ID = "balance")
-    GetBalance(PublicKey) -> u64;
-}
+const BALANCE_SPEC: Spec = Spec { id: "balance" };
 
-impl Endpoint for GetBalance {
-    fn handle(&self, pubkey: PublicKey) -> Result<u64, ApiError> {
-        let snapshot = self.as_ref().snapshot();
-        let schema = CurrencySchema::new(&snapshot);
-        let wallet = schema.wallet(&pubkey).ok_or(ApiError::NotFound)?;
+fn balance(ctx: &ReadContext, pubkey: PublicKey) -> Result<u64, ApiError> {
+    let snapshot = ctx.snapshot();
+    let schema = CurrencySchema::new(&snapshot);
+    let wallet = schema.wallet(&pubkey).ok_or(ApiError::NotFound)?;
 
-        let height = CoreSchema::new(&snapshot).height();
-        Ok(wallet.actual_balance(height))
-    }
+    let height = CoreSchema::new(&snapshot).height();
+    Ok(wallet.actual_balance(height))
 }
 
 // // // // // // // // // // SERVICE DECLARATION // // // // // // // // // //
@@ -185,18 +180,15 @@ impl Service for CurrencyService {
         SERVICE_ID
     }
 
-    /// Implement a method to deserialize transactions coming to the node.
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
         let tx = CurrencyTransactions::tx_from_raw(raw)?;
         Ok(tx.into())
     }
 
-    /// Create a REST `Handler` to process web requests to the node.
     fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<iron::Handler>> {
-        let api = ApiBuilder::new(ctx)
-            .add_transactions::<CurrencyTransactions>()
-            .add::<GetBalance>()
-            .create();
-        Some(iron::into_handler(api))
+        let mut api = ServiceApi::new();
+        api.set_transactions::<CurrencyTransactions>();
+        api.insert(BALANCE_SPEC, Endpoint::new(balance));
+        Some(IronAdapter::new(ctx.clone()).create_handler(api))
     }
 }

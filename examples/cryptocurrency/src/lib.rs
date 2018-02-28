@@ -37,8 +37,8 @@ use exonum::messages::{RawTransaction, Message};
 use exonum::storage::{Fork, MapIndex, Snapshot};
 use exonum::crypto::{Hash, PublicKey};
 use exonum::encoding;
-use exonum::api::ext::{ApiBuilder, ApiError, Endpoint};
-use exonum::api::iron;
+use exonum::api::ext::{ApiError, Endpoint, ReadContext, Spec, ServiceApi};
+use exonum::api::iron::{self, IronAdapter};
 
 // // // // // // // // // // CONSTANTS // // // // // // // // // //
 
@@ -214,98 +214,94 @@ impl Transaction for TxTransfer {
 
 // // // // // // // // // // REST API // // // // // // // // // //
 
-read_request! {
-    /// Endpoint retrieving a single wallet from the database.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # extern crate exonum;
-    /// # extern crate exonum_cryptocurrency;
-    /// extern crate exonum_testkit;
-    /// #[macro_use] extern crate serde_json;
-    /// # use exonum_cryptocurrency::{CurrencyService, TxCreateWallet, GetWallet};
-    /// use exonum_testkit::TestKit;
-    ///
-    /// # fn main() {
-    /// let mut testkit = TestKit::for_service(CurrencyService);
-    /// let (pubkey, key) = exonum::crypto::gen_keypair();
-    /// let tx = TxCreateWallet::new(&pubkey, "Alice", &key);
-    /// testkit.create_block_with_transaction(tx);
-    ///
-    /// testkit.api().test::<GetWallet>(
-    ///     json!(pubkey),
-    ///     &json!({
-    ///         "pub_key": pubkey,
-    ///         "name": "Alice",
-    ///         "balance": "100",
-    ///     })
-    /// );
-    /// # }
-    /// ```
-    @(ID = "wallet")
-    pub GetWallet(PublicKey) -> Wallet;
+/// Specification for the `wallet` endpoint.
+pub const WALLET_SPEC: Spec = Spec { id: "wallet" };
+
+/// Endpoint retrieving a single wallet from the database.
+///
+/// # Examples
+///
+/// ```
+/// # extern crate exonum;
+/// # extern crate exonum_cryptocurrency;
+/// extern crate exonum_testkit;
+/// #[macro_use] extern crate serde_json;
+/// # use exonum::api::ext::Endpoint;
+/// # use exonum_cryptocurrency::{CurrencyService, TxCreateWallet, get_wallet};
+/// use exonum_testkit::TestKit;
+///
+/// # fn main() {
+/// let mut testkit = TestKit::for_service(CurrencyService);
+/// let (pubkey, key) = exonum::crypto::gen_keypair();
+/// let tx = TxCreateWallet::new(&pubkey, "Alice", &key);
+/// testkit.create_block_with_transaction(tx);
+///
+/// testkit.api().test(
+///     &Endpoint::new(get_wallet),
+///     json!(pubkey),
+///     &json!({
+///         "pub_key": pubkey,
+///         "name": "Alice",
+///         "balance": "100",
+///     })
+/// );
+/// # }
+/// ```
+pub fn get_wallet(context: &ReadContext, pubkey: PublicKey) -> Result<Wallet, ApiError> {
+    let schema = CurrencySchema::new(context.snapshot());
+    schema.wallet(&pubkey).ok_or(ApiError::NotFound)
 }
 
-impl Endpoint for GetWallet {
-    fn handle(&self, pubkey: PublicKey) -> Result<Wallet, ApiError> {
-        let schema = CurrencySchema::new(self.as_ref().snapshot());
-        schema.wallet(&pubkey).ok_or(ApiError::NotFound)
-    }
-}
+/// Specification for the wallets endpoint.
+pub const WALLETS_SPEC: Spec = Spec { id: "wallets" };
 
-read_request! {
-    /// Endpoint dumping all wallets from the storage.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # extern crate exonum;
-    /// # extern crate exonum_cryptocurrency;
-    /// #[macro_use] extern crate exonum_testkit;
-    /// #[macro_use] extern crate serde_json;
-    /// # use exonum::crypto;
-    /// # use exonum_cryptocurrency::{CurrencyService, TxCreateWallet, GetWallets};
-    /// use exonum_testkit::TestKit;
-    ///
-    /// # fn main() {
-    /// let mut testkit = TestKit::for_service(CurrencyService);
-    // We need to ensure that Alice's pubkey is lexicographically lesser than Bob's
-    // in order to assert the output of the endpoint.
-    /// # let mut keys: Vec<_> = (0..2).into_iter().map(|_| crypto::gen_keypair()).collect();
-    /// # keys.sort_by(|&(a, _), &(b, _)| a.cmp(&b));
-    /// # let (alice_pubkey, alice_key) = keys.swap_remove(0);
-    /// # let (bob_pubkey, bob_key) = keys.swap_remove(0);
-    /// # assert!(alice_pubkey <= bob_pubkey);
-    /// let tx_alice = TxCreateWallet::new(&alice_pubkey, "Alice", &alice_key);
-    /// let tx_bob = TxCreateWallet::new(&bob_pubkey, "Bob", &bob_key);
-    /// testkit.create_block_with_transactions(txvec![tx_alice, tx_bob]);
-    ///
-    /// testkit.api().test::<GetWallets>(
-    ///     json!(null),
-    ///     &json!([{
-    ///         "pub_key": alice_pubkey,
-    ///         "name": "Alice",
-    ///         "balance": "100",
-    ///     }, {
-    ///         "pub_key": bob_pubkey,
-    ///         "name": "Bob",
-    ///         "balance": "100",
-    ///     }])
-    /// );
-    /// # }
-    /// ```
-    @(ID = "wallets")
-    pub GetWallets(()) -> Vec<Wallet>;
-}
-
-impl Endpoint for GetWallets {
-    fn handle(&self, _: ()) -> Result<Vec<Wallet>, ApiError> {
-        let schema = CurrencySchema::new(self.as_ref().snapshot());
-        let wallets = schema.wallets();
-        let wallets: Vec<_> = wallets.values().collect();
-        Ok(wallets)
-    }
+/// Endpoint dumping all wallets from the storage.
+///
+/// # Examples
+///
+/// ```
+/// # extern crate exonum;
+/// # extern crate exonum_cryptocurrency;
+/// #[macro_use] extern crate exonum_testkit;
+/// #[macro_use] extern crate serde_json;
+/// # use exonum::api::ext::Endpoint;
+/// # use exonum::crypto;
+/// # use exonum_cryptocurrency::{CurrencyService, TxCreateWallet, get_wallets};
+/// use exonum_testkit::TestKit;
+///
+/// # fn main() {
+/// let mut testkit = TestKit::for_service(CurrencyService);
+// We need to ensure that Alice's pubkey is lexicographically lesser than Bob's
+// in order to assert the output of the endpoint.
+/// # let mut keys: Vec<_> = (0..2).into_iter().map(|_| crypto::gen_keypair()).collect();
+/// # keys.sort_by(|&(a, _), &(b, _)| a.cmp(&b));
+/// # let (alice_pubkey, alice_key) = keys.swap_remove(0);
+/// # let (bob_pubkey, bob_key) = keys.swap_remove(0);
+/// # assert!(alice_pubkey <= bob_pubkey);
+/// let tx_alice = TxCreateWallet::new(&alice_pubkey, "Alice", &alice_key);
+/// let tx_bob = TxCreateWallet::new(&bob_pubkey, "Bob", &bob_key);
+/// testkit.create_block_with_transactions(txvec![tx_alice, tx_bob]);
+///
+/// testkit.api().test(
+///     &Endpoint::new(get_wallets),
+///     json!(null),
+///     &json!([{
+///         "pub_key": alice_pubkey,
+///         "name": "Alice",
+///         "balance": "100",
+///     }, {
+///         "pub_key": bob_pubkey,
+///         "name": "Bob",
+///         "balance": "100",
+///     }])
+/// );
+/// # }
+/// ```
+pub fn get_wallets(ctx: &ReadContext, _: ()) -> Result<Vec<Wallet>, ApiError> {
+    let schema = CurrencySchema::new(ctx.snapshot());
+    let wallets = schema.wallets();
+    let wallets: Vec<_> = wallets.values().collect();
+    Ok(wallets)
 }
 
 // // // // // // // // // // SERVICE DECLARATION // // // // // // // // // //
@@ -341,11 +337,10 @@ impl Service for CurrencyService {
 
     // Create a REST `Handler` to process web requests to the node.
     fn public_api_handler(&self, context: &ApiContext) -> Option<Box<iron::Handler>> {
-        let api = ApiBuilder::new(context)
-            .add_transactions::<CurrencyTransactions>()
-            .add::<GetWallet>()
-            .add::<GetWallets>()
-            .create();
-        Some(iron::into_handler(api))
+        let mut api = ServiceApi::new();
+        api.set_transactions::<CurrencyTransactions>();
+        api.insert(WALLET_SPEC, Endpoint::new(get_wallet));
+        api.insert(WALLETS_SPEC, Endpoint::new(get_wallets));
+        Some(IronAdapter::new(context.clone()).create_handler(api))
     }
 }

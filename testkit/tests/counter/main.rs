@@ -21,7 +21,7 @@ extern crate serde_json;
 #[macro_use]
 extern crate pretty_assertions;
 
-use exonum::api::ext::{TRANSACTIONS_ID, TransactionResponse};
+use exonum::api::ext::{TRANSACTIONS, TransactionResponse};
 use exonum::blockchain::Transaction;
 use exonum::crypto::{self, PublicKey, CryptoHash};
 use exonum::helpers::Height;
@@ -45,7 +45,7 @@ fn inc_count(api: &TestKitApi, by: u64) -> TxIncrement {
     // Create a pre-signed transaction
     let tx = TxIncrement::new(&pubkey, by, &key);
 
-    let tx_info: TransactionResponse = api.post(ApiKind::Service("counter"), TRANSACTIONS_ID, &tx);
+    let tx_info: TransactionResponse = api.post(ApiKind::Service("counter"), TRANSACTIONS.id, &tx);
     assert_eq!(tx_info.tx_hash, tx.hash());
     tx
 }
@@ -148,7 +148,7 @@ fn test_private_api() {
 
     let tx = TxReset::new(&pubkey, &key);
     let tx_info: TransactionResponse =
-        api.post_private(ApiKind::Service("counter"), TRANSACTIONS_ID, &tx);
+        api.post_private(ApiKind::Service("counter"), TRANSACTIONS.id, &tx);
     assert_eq!(tx_info.tx_hash, tx.hash());
 
     testkit.create_block();
@@ -182,7 +182,7 @@ fn test_probe() {
     assert_eq!(schema.count(), Some(8));
 
     // Posting a transaction is not enough to change the blockchain!
-    let _: TransactionResponse = api.post(ApiKind::Service("counter"), TRANSACTIONS_ID, &tx);
+    let _: TransactionResponse = api.post(ApiKind::Service("counter"), TRANSACTIONS.id, &tx);
     let snapshot = testkit.probe(other_tx.clone());
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(3));
@@ -199,8 +199,8 @@ fn test_duplicate_tx() {
 
     let tx = inc_count(&api, 5);
     testkit.create_block();
-    let _: TransactionResponse = api.post(ApiKind::Service("counter"), TRANSACTIONS_ID, &tx);
-    let _: TransactionResponse = api.post(ApiKind::Service("counter"), TRANSACTIONS_ID, &tx);
+    let _: TransactionResponse = api.post(ApiKind::Service("counter"), TRANSACTIONS.id, &tx);
+    let _: TransactionResponse = api.post(ApiKind::Service("counter"), TRANSACTIONS.id, &tx);
     testkit.create_block();
     let counter: u64 = api.get(ApiKind::Service("counter"), "count");
     assert_eq!(counter, 5);

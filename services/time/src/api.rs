@@ -14,7 +14,7 @@
 
 //! HTTP API interfaces of the time oracle service.
 
-use exonum::api::ext::{ApiError, Endpoint};
+use exonum::api::ext::{ApiError, ReadContext, Spec};
 use exonum::blockchain::Schema as CoreSchema;
 use exonum::crypto::PublicKey;
 
@@ -51,102 +51,95 @@ pub struct ValidatorTime {
     pub time: Option<SystemTime>,
 }
 
-read_request! {
-    /// Endpoint returning the current consolidated time.
-    ///
-    /// If there is no consolidated time value yet, returns `None`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # extern crate exonum;
-    /// # extern crate exonum_testkit;
-    /// # extern crate exonum_time;
-    /// #[macro_use] extern crate serde_json;
-    /// use exonum_testkit::TestKit;
-    /// # use exonum_time::{GetTime, TimeService, TxTime};
-    /// use std::time::{self, Duration};
-    ///
-    /// # fn main() {
-    /// let mut testkit = TestKit::for_service(TimeService::new());
-    /// // Consolidated time is not set yet
-    /// testkit.api().test::<GetTime>(json!(null), &json!(null));
-    ///
-    /// let tx = {
-    ///     let t = time::UNIX_EPOCH + Duration::new(1_400_000_000, 0);
-    ///     let (pubkey, key) = testkit.us().service_keypair();
-    ///     TxTime::new(t, pubkey, key)
-    /// };
-    /// testkit.create_block_with_transaction(tx);
-    /// // As the network contains only one validator, a single transaction
-    /// // is enough to set the time.
-    /// testkit.api().test::<GetTime>(
-    ///     json!(null),
-    ///     &json!({
-    ///         "secs_since_epoch": 1400000000,
-    ///         "nanos_since_epoch": 0
-    ///     }),
-    /// );
-    /// # }
-    /// ```
-    @(ID = "current_time")
-    pub GetTime(()) -> Option<SystemTime>;
+/// Specification of the `get_time` endpoint.
+pub const CURRENT_TIME_SPEC: Spec = Spec { id: "current_time" };
+
+/// Endpoint returning the current consolidated time.
+///
+/// If there is no consolidated time value yet, returns `None`.
+///
+/// # Examples
+///
+/// ```
+/// # extern crate exonum;
+/// # extern crate exonum_testkit;
+/// # extern crate exonum_time;
+/// #[macro_use] extern crate serde_json;
+/// use exonum::api::ext::Endpoint;
+/// use exonum_testkit::TestKit;
+/// # use exonum_time::{TimeService, TxTime};
+/// # use exonum_time::api::get_time;
+/// use std::time::{self, Duration};
+///
+/// # fn main() {
+/// let mut testkit = TestKit::for_service(TimeService::new());
+/// let endpoint = Endpoint::new(get_time);
+///
+/// // Consolidated time is not set yet
+/// testkit.api().test(&endpoint, json!(null), &json!(null));
+///
+/// // As the network contains only one validator, a single transaction
+/// // is enough to set the time.
+/// let tx = {
+///     let t = time::UNIX_EPOCH + Duration::new(1_400_000_000, 0);
+///     let (pubkey, key) = testkit.us().service_keypair();
+///     TxTime::new(t, pubkey, key)
+/// };
+/// testkit.create_block_with_transaction(tx);
+/// testkit.api().test(
+///     &endpoint,
+///     json!(null),
+///     &json!({
+///         "secs_since_epoch": 1400000000,
+///         "nanos_since_epoch": 0
+///     }),
+/// );
+/// # }
+/// ```
+pub fn get_time(ctx: &ReadContext, _: ()) -> Result<Option<SystemTime>, ApiError> {
+    Ok(TimeSchema::new(ctx.snapshot()).time().get())
 }
 
-impl Endpoint for GetTime {
-    fn handle(&self, _: ()) -> Result<Option<SystemTime>, ApiError> {
-        Ok(TimeSchema::new(self.as_ref().snapshot()).time().get())
-    }
+/// Specification of the `get_validators_times` endpoint.
+pub const VALIDATORS_TIMES_SPEC: Spec = Spec { id: "validators_times" };
+
+/// Endpoint returning an array of timestamps for the actual validators.
+pub fn get_validators_times(ctx: &ReadContext, _: ()) -> Result<Vec<ValidatorTime>, ApiError> {
+    let view = ctx.snapshot();
+    let validator_keys = CoreSchema::new(&view).actual_configuration().validator_keys;
+    let schema = TimeSchema::new(&view);
+    let idx = schema.validators_times();
+
+    // The times of current validators.
+    // `None` if the time of the validator is unknown.
+    let validators_times = validator_keys
+        .iter()
+        .map(|validator| {
+            ValidatorTime {
+                public_key: validator.service_key,
+                time: idx.get(&validator.service_key),
+            }
+        })
+        .collect();
+    Ok(validators_times)
 }
 
-read_request! {
-    /// Endpoint returning an array of timestamps for the actual validators.
-    @(ID = "validators_times")
-    pub GetValidatorsTimes(()) -> Vec<ValidatorTime>;
-}
+/// Specification of the `get_validators_times` endpoint.
+pub const ALL_TIMES_SPEC: Spec = Spec { id: "all_validators_times" };
 
-impl Endpoint for GetValidatorsTimes {
-    fn handle(&self, _: ()) -> Result<Vec<ValidatorTime>, ApiError> {
-        let view = self.as_ref().snapshot();
-        let validator_keys = CoreSchema::new(&view).actual_configuration().validator_keys;
-        let schema = TimeSchema::new(&view);
-        let idx = schema.validators_times();
+/// Endpoint returning an array of current timestamps for actual and past validators.
+pub fn get_all_times(ctx: &ReadContext, _: ()) -> Result<Vec<ValidatorTime>, ApiError> {
+    let view = ctx.snapshot();
+    let schema = TimeSchema::new(&view);
+    let idx = schema.validators_times();
 
-        // The times of current validators.
-        // `None` if the time of the validator is unknown.
-        let validators_times = validator_keys
-            .iter()
-            .map(|validator| {
-                ValidatorTime {
-                    public_key: validator.service_key,
-                    time: idx.get(&validator.service_key),
-                }
-            })
-            .collect();
-        Ok(validators_times)
-    }
-}
-
-read_request! {
-    /// Endpoint returning an array of current timestamps for actual and past validators.
-    @(ID = "all_validators_times")
-    pub GetAllTimes(()) -> Vec<ValidatorTime>;
-}
-
-impl Endpoint for GetAllTimes {
-    fn handle(&self, _: ()) -> Result<Vec<ValidatorTime>, ApiError> {
-        let view = self.as_ref().snapshot();
-        let schema = TimeSchema::new(&view);
-        let idx = schema.validators_times();
-
-        let validators_times = idx.iter()
-            .map(|(public_key, time)| {
-                ValidatorTime {
-                    public_key,
-                    time: Some(time),
-                }
-            })
-            .collect();
-        Ok(validators_times)
-    }
+    let validators_times = idx.iter()
+        .map(|(public_key, time)| {
+            ValidatorTime {
+                public_key,
+                time: Some(time),
+            }
+        })
+        .collect();
+    Ok(validators_times)
 }

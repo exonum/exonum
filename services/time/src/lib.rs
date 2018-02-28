@@ -29,23 +29,23 @@ extern crate serde_derive;
 #[macro_use]
 extern crate exonum;
 
-use exonum::api::ext::ApiBuilder;
-use exonum::api::iron;
+use exonum::api::ext::{Endpoint, ServiceApi};
+use exonum::api::iron::{self, IronAdapter};
 use exonum::blockchain::{Service, ServiceContext, Schema, ApiContext, Transaction, TransactionSet,
                          ExecutionError, ExecutionResult};
 use exonum::messages::{RawTransaction, Message};
 use exonum::encoding::serialize::json::reexport::Value;
 use exonum::storage::{Fork, Snapshot, ProofMapIndex, Entry};
-use exonum::crypto::{Hash, PublicKey};
+use exonum::crypto::{Hash, PublicKey, Signature};
 use exonum::encoding;
 use exonum::helpers::fabric::{ServiceFactory, Context};
 
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-mod api;
+pub mod api;
 
-pub use api::{GetTime, GetAllTimes, GetValidatorsTimes, ValidatorTime};
+pub use api::ValidatorTime;
 
 /// Time service id.
 pub const SERVICE_ID: u16 = 4;
@@ -366,29 +366,31 @@ impl Service for TimeService {
         if context.validator_id().is_none() {
             return;
         }
-        let (pub_key, sec_key) = (*context.public_key(), context.secret_key().clone());
-        context
-            .transaction_sender()
-            .send(Box::new(
-                TxTime::new(self.time.current_time(), &pub_key, &sec_key),
-            ))
-            .unwrap();
+
+        let pub_key = context.public_key();
+        let message =
+            TxTime::new_with_signature(self.time.current_time(), pub_key, &Signature::zero());
+        let message = message.raw().cut_signature();
+
+        context.api_sender().sign_and_send(&message).unwrap();
     }
 
     fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<iron::Handler>> {
-        let api = ApiBuilder::new(ctx)
-            .add::<GetTime>()
-            .add_transactions::<TimeTransactions>()
-            .create();
-        Some(iron::into_handler(api))
+        use api::*;
+
+        let mut api = ServiceApi::new();
+        api.insert(CURRENT_TIME_SPEC, Endpoint::new(get_time));
+        api.set_transactions::<TimeTransactions>();
+        Some(IronAdapter::new(ctx.clone()).create_handler(api))
     }
 
     fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<iron::Handler>> {
-        let api = ApiBuilder::new(ctx)
-            .add::<GetValidatorsTimes>()
-            .add::<GetAllTimes>()
-            .create();
-        Some(iron::into_handler(api))
+        use api::*;
+
+        let mut api = ServiceApi::new();
+        api.insert(VALIDATORS_TIMES_SPEC, Endpoint::new(get_validators_times));
+        api.insert(ALL_TIMES_SPEC, Endpoint::new(get_all_times));
+        Some(IronAdapter::new(ctx.clone()).create_handler(api))
     }
 }
 

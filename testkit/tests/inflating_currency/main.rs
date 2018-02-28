@@ -24,7 +24,7 @@ extern crate rand;
 #[macro_use]
 extern crate pretty_assertions;
 
-use exonum::api::ext::{TRANSACTIONS_ID, TransactionResponse};
+use exonum::api::ext::{TRANSACTIONS, TransactionResponse};
 use exonum::blockchain::Transaction;
 use exonum::crypto::{self, PublicKey, SecretKey, CryptoHash};
 use exonum::helpers::Height;
@@ -47,7 +47,7 @@ fn create_wallet(api: &TestKitApi, name: &str) -> (TxCreateWallet, SecretKey) {
     let tx = TxCreateWallet::new(&pubkey, name, &key);
 
     let tx_info: TransactionResponse =
-        api.post(ApiKind::Service("cryptocurrency"), TRANSACTIONS_ID, &tx);
+        api.post(ApiKind::Service("cryptocurrency"), TRANSACTIONS.id, &tx);
     assert_eq!(tx_info.tx_hash, tx.hash());
 
     (tx, key)
