@@ -6,7 +6,7 @@
 
                 <ul class="nav nav-tabs mb-4">
                     <li class="nav-item">
-                        <a class="nav-link active" href="#login" data-toggle="tab">Log In</a>
+                        <a class="nav-link active" href="#login" data-toggle="tab">Log in</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="#register" data-toggle="tab">Register</a>
@@ -53,7 +53,7 @@
                 </div>
 
                 <div class="modal-body" if={ keyPair }>
-                    <div class="alert alert-warning" role="alert">Save the key pair in a safe place. You will need it to log into the demo next time.</div>
+                    <div class="alert alert-warning" role="alert">Save the key pair in a safe place. You will need it to log in to the demo next time.</div>
                     <div class="form-group">
                         <label>Public key:</label>
                         <code>{ keyPair.publicKey }</code>
