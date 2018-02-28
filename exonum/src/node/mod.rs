@@ -60,12 +60,14 @@ pub mod timeout_adjuster;
 /// External messages.
 #[derive(Debug)]
 pub enum ExternalMessage {
-    /// Add new connection
+    /// Add a new connection.
     PeerAdd(SocketAddr),
     /// Transaction that implements the `Transaction` trait.
     Transaction(Box<Transaction>),
     /// Enable or disable the node.
     Enable(bool),
+    /// Shutdown the node.
+    Shutdown,
 }
 
 /// Node timeout types.
@@ -102,9 +104,9 @@ pub struct ApiSender(pub mpsc::Sender<ExternalMessage>);
 pub struct NodeHandler {
     /// State of the `NodeHandler`.
     pub state: State,
-    /// Shared api state
+    /// Shared api state.
     pub api_state: SharedNodeState,
-    /// System state
+    /// System state.
     pub system_state: Box<SystemStateProvider>,
     /// Channel for messages and timeouts.
     pub channel: NodeSender,
