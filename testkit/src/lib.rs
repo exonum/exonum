@@ -394,6 +394,7 @@ pub struct TestKitBuilder {
     us: TestNode,
     validators: Vec<TestNode>,
     services: Vec<Box<Service>>,
+    logger: bool,
 }
 
 impl fmt::Debug for TestKitBuilder {
@@ -420,6 +421,7 @@ impl TestKitBuilder {
             validators: vec![us.clone()],
             services: Vec::new(),
             us,
+            logger: false,
         }
     }
 
@@ -430,6 +432,7 @@ impl TestKitBuilder {
             validators: vec![TestNode::new_validator(ValidatorId(0))],
             services: Vec::new(),
             us,
+            logger: false,
         }
     }
 
@@ -455,8 +458,17 @@ impl TestKitBuilder {
         self
     }
 
+    /// Enables a logger inside the testkit.
+    pub fn with_logger(mut self) -> Self {
+        self.logger = true;
+        self
+    }
+
     /// Creates the testkit.
     pub fn create(self) -> TestKit {
+        if self.logger {
+            exonum::helpers::init_logger().unwrap();
+        }
         crypto::init();
         TestKit::assemble(
             self.services,
@@ -517,7 +529,7 @@ impl TestKit {
         );
 
         let genesis = network.genesis_config();
-        blockchain.create_genesis_block(genesis.clone()).unwrap();
+        blockchain.initialize(genesis.clone()).unwrap();
 
         let mempool = Arc::new(RwLock::new(BTreeMap::new()));
         let event_stream: Box<Stream<Item = (), Error = ()>> = {
