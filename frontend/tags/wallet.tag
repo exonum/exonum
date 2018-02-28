@@ -1,34 +1,157 @@
 <wallet>
-    <div class="panel-heading">
-        <button class="btn btn-default pull-right page-nav" onclick={ refresh }>
-            <i class="glyphicon glyphicon-refresh"></i>
-            <span class="hidden-xs">Refresh</span>
-        </button>
-        <button class="btn btn-default pull-left page-nav" onclick={ logout }>
-            <i class="glyphicon glyphicon-log-out"></i>
-            <span class="hidden-xs">Logout</span>
-        </button>
-        <div class="panel-title page-title text-center">
-            <div class="h4">Wallet</div>
+    <div class="container" if={ wallet }>
+        <div class="row">
+            <div class="col-sm-12">
+                <div class="card mt-5">
+                    <div class="card-header">User summary</div>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item">
+                            <div class="row">
+                                <div class="col-sm-3"><strong>Name:</strong></div>
+                                <div class="col-sm-9">
+                                    { wallet.name }
+                                    <button class="btn btn-sm btn-outline-secondary ml-1" onclick={ logout }>Logout</button>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="list-group-item">
+                            <div class="row">
+                                <div class="col-sm-3"><strong>Public key:</strong></div>
+                                <div class="col-sm-9"><code>{ wallet.pub_key }</code></div>
+                            </div>
+                        </li>
+                        <li class="list-group-item">
+                            <div class="row">
+                                <div class="col-sm-3"><strong>Balance:</strong></div>
+                                <div class="col-sm-9">
+                                    { numeral(wallet.balance).format('$0,0') }
+                                    <button class="btn btn-sm btn-outline-success ml-1" data-toggle="modal" data-target="#addFundsModal">Add Funds</button>
+                                    <button class="btn btn-sm btn-outline-primary ml-1" disabled={ wallet.balance == 0 } data-toggle="modal" data-target="#transferModal">Transfer Funds</button>
+                                </div>
+                            </div>
+                        </li>
+                        <li class="list-group-item">
+                            <div class="row">
+                                <div class="col-sm-3"><strong>Updated:</strong></div>
+                                <div class="col-sm-9">{ moment(block.time / 1000000).fromNow() }</div>
+                            </div>
+                        </li>
+                        <li class="list-group-item">
+                            <div class="row">
+                                <div class="col-sm-3"><strong>Block:</strong></div>
+                                <div class="col-sm-9">{ block.height }</div>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="card mt-5">
+                    <div class="card-header">Transactions</div>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item font-weight-bold">
+                            <div class="row">
+                                <div class="col-sm-4">Hash</div>
+                                <div class="col-sm-5">Description</div>
+                                <div class="col-sm-3">Status</div>
+                            </div>
+                        </li>
+                        <li class="list-group-item" each={ transactions }>
+                            <div class="row">
+                                <div class="col-sm-4"><code>{ hash }</code></div>
+                                <div class="col-sm-5" if={ message_id === 130 }>Wallet created</div>
+                                <div class="col-sm-5" if={ message_id === 129 }>
+                                    <strong>{ numeral(body.amount).format('$0,0') }</strong> funds added
+                                </div>
+                                <div class="col-sm-5" if={ message_id === 128 && body.from === publicKey }>
+                                    <strong>{ numeral(body.amount).format('$0,0') }</strong> sent to <code>{ body.to }</code>
+                                </div>
+                                <div class="col-sm-5" if={ message_id === 128 && body.to === publicKey }>
+                                    <strong>{ numeral(body.amount).format('$0,0') }</strong> received from <code>{ body.from }</code>
+                                </div>
+                                <div class="col-sm-3">
+                                    <span if={ status } class="badge badge-success">executed</span>
+                                    <span if={ !status } class="badge badge-danger">failed</span>
+                                </div>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div if={ wallet } class="panel-body">
-        <summary wallet={ wallet } block={ block }/>
+    <div id="addFundsModal" class="modal" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <form onsubmit={ addFunds }>
+                    <div class="modal-header">
+                        <h5 class="modal-title">Add Funds</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
 
-        <div class="form-group">
-            <p class="text-center">Transfer your funds to another account:</p>
-            <button class="btn btn-lg btn-block btn-primary" disabled={ wallet.balance == 0 } onclick={ transfer }>
-                Transfer Funds
-            </button>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label class="d-block">Select amount to be added:</label>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="sumToAdd" id="addFundsOne" value="10" checked>
+                                <label class="form-check-label" for="addFundsOne">$10</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="sumToAdd" id="addFundsTwo" value="50">
+                                <label class="form-check-label" for="addFundsTwo">$50</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="sumToAdd" id="addFundsThree" value="100">
+                                <label class="form-check-label" for="addFundsThree">$100</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-success">Add funds</button>
+                    </div>
+                </form>
+            </div>
         </div>
+    </div>
 
-        <div class="form-group">
-            <p class="text-center">Add more funds to your account:</p>
-            <a href="#user/add-funds" class="btn btn-lg btn-block btn-success">Add Funds</a>
+    <div id="transferModal" class="modal" tabindex="-1" role="dialog">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <form onsubmit={ transfer }>
+                    <div class="modal-header">
+                        <h5 class="modal-title">Transfer Funds</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label>Receiver:</label>
+                            <input type="text" class="form-control" placeholder="Enter public key" onkeyup={ editReceiver }>
+                        </div>
+                        <div class="form-group">
+                            <label>Amount:</label>
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <div class="input-group-text">$</div>
+                                </div>
+                                <input type="number" class="form-control" placeholder="Enter amount" onkeyup={ editAmount }>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-primary">Transfer</button>
+                    </div>
+                </form>
+            </div>
         </div>
-
-        <history transactions={ transactions } public_key={ publicKey }/>
     </div>
 
     <script>
@@ -248,34 +371,156 @@
                         self.transactions = data.transactions;
                         self.update();
                     }).catch(function(error) {
-                        self.notify('error', error);
+                        self.notify('error', error.toString());
+
+                        self.logout();
                     });
 
                 },
                 error: function(jqXHR, textStatus, errorThrown) {
-                    self.notify('error', errorThrown);
+                    self.notify('error', errorThrown.toString());
                 }
             });
         }).catch(function(error) {
-            self.toggleLoading(true);
+            self.toggleLoading(false);
 
-            self.notify('error', error);
+            self.notify('error', error.toString());
+
+            route('/');
         });
+
+        addFunds(e) {
+            e.preventDefault();
+
+            this.toggleLoading(true);
+
+            this.auth.getUser().then(function(keyPair) {
+                var TxIssue = Exonum.newMessage({
+                    size: 48,
+                    network_id: self.NETWORK_ID,
+                    protocol_version: self.PROTOCOL_VERSION,
+                    service_id: self.SERVICE_ID,
+                    message_id: self.TX_ISSUE_ID,
+                    fields: {
+                        wallet: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
+                        amount: {type: Exonum.Uint64, size: 8, from: 32, to: 40},
+                        seed: {type: Exonum.Uint64, size: 8, from: 40, to: 48}
+                    }
+                });
+
+                var data = {
+                    wallet: keyPair.publicKey,
+                    amount: $('[name="sumToAdd"]:checked').val(),
+                    seed: Exonum.randomUint64()
+                };
+
+                var signature = TxIssue.sign(keyPair.secretKey, data);
+
+                $.ajax({
+                    method: 'POST',
+                    url: '/api/services/cryptocurrency/v1/wallets/transaction',
+                    contentType: 'application/json; charset=utf-8',
+                    data: JSON.stringify({
+                        body: data,
+                        network_id: self.NETWORK_ID,
+                        protocol_version: self.PROTOCOL_VERSION,
+                        service_id: self.SERVICE_ID,
+                        message_id: self.TX_ISSUE_ID,
+                        signature: signature
+                    }),
+                    success: function() {
+                        self.toggleLoading(false);
+
+                        self.notify('success', 'Add funds transaction has been sent');
+
+                        $('#addFundsModal').modal('hide');
+                    },
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        throw errorThrown;
+                    }
+                });
+            }).catch(function(error) {
+                self.toggleLoading(false);
+
+                self.notify('error', error.toString());
+            });
+        }
+
+        editReceiver(e) {
+            this.receiver = e.target.value;
+        }
+
+        editAmount(e) {
+            if (e.target.value > 0 && e.target.value.toLowerCase().indexOf('e') === -1) {
+                this.amount = e.target.value;
+            } else {
+                this.amount = 0;
+            }
+        }
 
         transfer(e) {
             e.preventDefault();
 
-            route('/user/transfer');
-        }
+            this.toggleLoading(true);
 
-        refresh(e) {
-            e.preventDefault();
+            this.auth.getUser().then(function(keyPair) {
+                var TxTransfer = Exonum.newMessage({
+                    size: 80,
+                    network_id: self.NETWORK_ID,
+                    protocol_version: self.PROTOCOL_VERSION,
+                    service_id: self.SERVICE_ID,
+                    message_id: self.TX_TRANSFER_ID,
+                    fields: {
+                        from: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
+                        to: {type: Exonum.PublicKey, size: 32, from: 32, to: 64},
+                        amount: {type: Exonum.Int64, size: 8, from: 64, to: 72},
+                        seed: {type: Exonum.Uint64, size: 8, from: 72, to: 80}
+                    }
+                });
 
-            window.location.reload();
+                var data = {
+                    from: keyPair.publicKey,
+                    to: self.receiver,
+                    amount: self.amount.toString(),
+                    seed: Exonum.randomUint64()
+                };
+
+                var signature = TxTransfer.sign(keyPair.secretKey, data);
+
+                $.ajax({
+                    method: 'POST',
+                    url: '/api/services/cryptocurrency/v1/wallets/transaction',
+                    contentType: 'application/json; charset=utf-8',
+                    data: JSON.stringify({
+                        body: data,
+                        network_id: self.NETWORK_ID,
+                        protocol_version: self.PROTOCOL_VERSION,
+                        service_id: self.SERVICE_ID,
+                        message_id: self.TX_TRANSFER_ID,
+                        signature: signature
+                    }),
+                    success: function() {
+                        self.toggleLoading(false);
+
+                        self.notify('success', 'Transfer transaction has been sent');
+
+                        $('#transferModal').modal('hide');
+                    },
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        throw errorThrown;
+                    }
+                });
+            }).catch(function(error) {
+                self.toggleLoading(false);
+
+                self.notify('error', error.toString());
+            });
         }
 
         logout(e) {
-            e.preventDefault();
+            if (typeof e !== 'undefined') {
+                e.preventDefault();
+            }
 
             self.auth.removeUser();
 
