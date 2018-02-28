@@ -27,7 +27,7 @@ use futures::{self, Async, Future, Stream};
 use futures::Sink;
 use futures::sync::mpsc;
 use exonum::node::{Configuration, ExternalMessage, ListenerConfig, NodeHandler, NodeSender,
-                   ServiceConfig, State, SystemStateProvider, ExternalMessageSender};
+                   ServiceConfig, State, SystemStateProvider};
 use exonum::blockchain::{Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema,
                          Service, SharedNodeState, StoredConfiguration, TimeoutAdjusterConfig,
                          Transaction, ValidatorKeys};
