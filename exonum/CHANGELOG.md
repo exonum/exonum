@@ -91,6 +91,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `ExonumJsonDeserialize` trait is implemented for `F32` and `F64`. (#461)
 
+- Fixed bug with the extra creation of the genesis configuration. (#527)
+
 ### Internal improvements
 
 - Consensus messages are stored persistently (in the database), so restart will

@@ -174,18 +174,20 @@ impl Blockchain {
         Schema::new(&self.snapshot()).last_block()
     }
 
-    /// This method checks whether the genesis block has already been created.
-    pub fn is_initialized(&self) -> bool {
-        Schema::new(&self.snapshot()).block_hashes_by_height().len() == 0
+    /// Creates and commits the genesis block for the given genesis configuration
+    /// if the blockchain was not initialized.
+    pub fn initialize(&mut self, cfg: GenesisConfig) -> Result<(), Error> {
+        let has_genesis_block = !Schema::new(&self.snapshot())
+            .block_hashes_by_height()
+            .is_empty();
+        if !has_genesis_block {
+            self.create_genesis_block(cfg)?;
+        }
+        Ok(())
     }
 
     /// Creates and commits the genesis block for the given genesis configuration.
-    pub fn create_genesis_block(&mut self, cfg: GenesisConfig) -> Result<(), Error> {
-        debug_assert!(
-            !self.is_initialized(),
-            "An attempt to invoke `create_genesis_block` on the already initialized blockchain"
-        );
-
+    fn create_genesis_block(&mut self, cfg: GenesisConfig) -> Result<(), Error> {
         let mut config_propose = StoredConfiguration {
             previous_cfg_hash: Hash::zero(),
             actual_from: Height::zero(),
