@@ -77,7 +77,7 @@ pub mod config;
 pub struct Blockchain {
     db: Arc<Database>,
     service_map: Arc<VecMap<Box<Service>>>,
-    service_keypair: (PublicKey, SecretKey),
+    service_public_key: PublicKey,
     api_sender: ApiSender,
 }
 
@@ -189,14 +189,14 @@ impl Blockchain {
 
         let service_map = Arc::new(service_map);
         let signer = TransactionSigner {
-            secret_key: service_secret_key.clone(),
+            secret_key: service_secret_key,
             service_map: Arc::clone(&service_map),
         };
 
         Blockchain {
             db: storage.into(),
             service_map,
-            service_keypair: (service_public_key, service_secret_key),
+            service_public_key,
             api_sender: ApiSender::new(api_channel, signer),
         }
     }
@@ -215,6 +215,11 @@ impl Blockchain {
     /// Returns service `VecMap` for all our services.
     pub fn service_map(&self) -> &Arc<VecMap<Box<Service>>> {
         &self.service_map
+    }
+
+    /// Returns the service public key.
+    pub fn service_public_key(&self) -> &PublicKey {
+        &self.service_public_key
     }
 
     /// Returns the sender of transactions.
@@ -456,8 +461,7 @@ impl Blockchain {
         self.merge(patch)?;
         // Initializes the context after merge.
         let context = ServiceContext::new(
-            self.service_keypair.0,
-            self.service_keypair.1.clone(),
+            self.service_public_key,
             self.api_sender.clone(),
             self.fork(),
         );
@@ -494,12 +498,7 @@ impl Blockchain {
 
     /// Creates an API context for use with this blockchain.
     pub(crate) fn api_context(&self) -> ApiContext {
-        ApiContext::from_parts(
-            self,
-            self.api_sender.clone(),
-            &self.service_keypair.0,
-            &self.service_keypair.1,
-        )
+        ApiContext::new(self)
     }
 
     /// Saves peer to the peers cache
@@ -579,7 +578,7 @@ impl Clone for Blockchain {
             db: Arc::clone(&self.db),
             service_map: Arc::clone(&self.service_map),
             api_sender: self.api_sender.clone(),
-            service_keypair: self.service_keypair.clone(),
+            service_public_key: self.service_public_key,
         }
     }
 }
