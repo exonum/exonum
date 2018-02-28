@@ -20,7 +20,6 @@ extern crate serde_json;
 
 use exonum::blockchain::{ApiContext, Blockchain, Service, Transaction, TransactionSet,
                          ExecutionResult};
-use exonum::node::{ApiSender, TransactionSend};
 use exonum::messages::{Message, RawTransaction};
 use exonum::storage::{Fork, MapIndex, Snapshot};
 use exonum::crypto::{Hash, PublicKey};
@@ -162,7 +161,6 @@ impl Transaction for TxTransfer {
 
 #[derive(Clone)]
 struct CryptocurrencyApi {
-    channel: ApiSender,
     blockchain: Blockchain,
 }
 
@@ -194,7 +192,9 @@ impl CryptocurrencyApi {
             Ok(Some(transaction)) => {
                 let transaction: Box<Transaction> = transaction.into();
                 let tx_hash = transaction.hash();
-                self.channel.send(transaction).map_err(ApiError::from)?;
+                self.blockchain.api_sender().send(transaction).map_err(
+                    ApiError::from,
+                )?;
                 let json = TransactionResponse { tx_hash };
                 self.ok_response(&serde_json::to_value(&json).unwrap())
             }
@@ -277,10 +277,7 @@ impl Service for CurrencyService {
     /// Create a REST `Handler` to process web requests to the node.
     fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
         let mut router = Router::new();
-        let api = CryptocurrencyApi {
-            channel: ctx.node_channel().clone(),
-            blockchain: ctx.blockchain().clone(),
-        };
+        let api = CryptocurrencyApi { blockchain: ctx.blockchain().clone() };
         api.wire(&mut router);
         Some(Box::new(router))
     }

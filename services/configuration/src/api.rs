@@ -14,11 +14,12 @@
 
 use bodyparser;
 use exonum::api::{Api, ApiError};
-use exonum::crypto::{CryptoHash, PublicKey, SecretKey, Hash};
-use exonum::blockchain::{ApiContext, Blockchain, StoredConfiguration, Schema as CoreSchema};
+use exonum::crypto::{CryptoHash, PublicKey, Signature, Hash};
+use exonum::blockchain::{ApiContext, ApiSender, Blockchain, StoredConfiguration,
+                         Schema as CoreSchema};
 use exonum::encoding::serialize::json::reexport as serde_json;
 use exonum::helpers::Height;
-use exonum::node::{ApiSender, TransactionSend};
+use exonum::messages::Message;
 use exonum::storage::StorageValue;
 use iron::prelude::*;
 use router::Router;
@@ -61,7 +62,7 @@ pub struct VoteResponse {
 #[derive(Clone)]
 pub struct PrivateApi {
     channel: ApiSender,
-    service_keys: (PublicKey, SecretKey),
+    service_key: PublicKey,
 }
 
 #[derive(Clone)]
@@ -265,7 +266,7 @@ impl PrivateApi {
     pub fn new(context: &ApiContext) -> Self {
         PrivateApi {
             channel: context.node_channel().clone(),
-            service_keys: (*context.public_key(), context.secret_key().clone()),
+            service_key: *context.public_key(),
         }
     }
 
@@ -278,14 +279,14 @@ impl PrivateApi {
             };
 
             let cfg_hash = config.hash();
-            let propose = Propose::new(
-                &self.service_keys.0,
+            let propose = Propose::new_with_signature(
+                &self.service_key,
                 ::std::str::from_utf8(config.into_bytes().as_slice()).unwrap(),
-                &self.service_keys.1,
+                &Signature::zero(),
             );
-            let tx_hash = propose.hash();
+            let propose = propose.raw().cut_signature();
 
-            self.channel.send(propose.into()).map_err(ApiError::from)?;
+            let tx_hash = self.channel.sign_and_send(&propose).map_err(ApiError::from)?;
 
             let response = ProposeResponse { tx_hash, cfg_hash };
             self.ok_response(&serde_json::to_value(response).unwrap())
@@ -298,10 +299,11 @@ impl PrivateApi {
         let post_vote = move |req: &mut Request| -> IronResult<Response> {
             let cfg_hash: Hash = self.url_fragment(req, "hash")?;
 
-            let vote = Vote::new(&self.service_keys.0, &cfg_hash, &self.service_keys.1);
-            let tx_hash = vote.hash();
+            let vote = Vote::new_with_signature(&self.service_key, &cfg_hash, &Signature::zero())
+                .raw()
+                .cut_signature();
 
-            self.channel.send(vote.into()).map_err(ApiError::from)?;
+            let tx_hash = self.channel.sign_and_send(&vote).map_err(ApiError::from)?;
 
             let response = VoteResponse { tx_hash };
             self.ok_response(&serde_json::to_value(response).unwrap())
