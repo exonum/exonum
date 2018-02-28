@@ -83,6 +83,21 @@ impl From<io::Error> for ApiError {
     }
 }
 
+impl From<::blockchain::SendError> for ApiError {
+    fn from(e: ::blockchain::SendError) -> ApiError {
+        use ::blockchain::SendError::*;
+
+        let e: io::Error = match e {
+            VerificationFail(..) => {
+                let msg = "Unable to verify transaction";
+                io::Error::new(io::ErrorKind::Other, msg)
+            }
+            Io(e) => e,
+        };
+        ApiError::Io(e)
+    }
+}
+
 impl From<storage::Error> for ApiError {
     fn from(e: storage::Error) -> ApiError {
         ApiError::Storage(e)
