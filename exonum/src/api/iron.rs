@@ -29,7 +29,7 @@ use serde_json;
 use std::sync::Arc;
 
 use blockchain::ApiContext;
-use super::ext::{ApiError, BoxedEndpoint, EndpointHolder, ServiceApi};
+use super::ext::{ApiError, Endpoint, EndpointHolder, ServiceApi};
 
 /// Response returned by the Iron adapter in case an endpoint
 /// raises an error.
@@ -93,19 +93,16 @@ impl IronAdapter {
     /// Creates a handler.
     pub fn create_handler(&self, api: ServiceApi) -> Box<Handler> {
         // Can an endpoint be used in `GET` HTTP requests?
-        fn can_get(e: &BoxedEndpoint) -> bool {
+        fn can_get(e: &Endpoint) -> bool {
             e.readonly()
         }
 
         // Can an endpoint be used in `POST` HTTP requests?
-        fn can_post(_: &BoxedEndpoint) -> bool {
+        fn can_post(_: &Endpoint) -> bool {
             true
         }
 
-        fn endpoint_from_req<'a, T: 'a>(
-            api: &'a T,
-            req: &mut Request,
-        ) -> IronResult<&'a BoxedEndpoint>
+        fn endpoint_from_req<'a, T: 'a>(api: &'a T, req: &mut Request) -> IronResult<&'a Endpoint>
         where
             T: EndpointHolder,
         {
@@ -140,7 +137,7 @@ impl IronAdapter {
                 }
             };
 
-            let response = endpoint.with_context(&context).handle(query)?;
+            let response = endpoint.handle(&context, query)?;
             ok_response(&response)
         };
 
@@ -157,7 +154,7 @@ impl IronAdapter {
                 }
             };
 
-            let response = endpoint.with_context(&context).handle(query)?;
+            let response = endpoint.handle(&context, query)?;
             ok_response(&response)
         };
 
