@@ -18,6 +18,7 @@ use std::marker::PhantomData;
 use std::borrow::Borrow;
 
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageKey, StorageValue};
+use super::indexes_metadata::IndexType;
 
 /// A map of keys and values.
 ///
@@ -72,7 +73,12 @@ pub struct MapIndexValues<'a, V> {
     base_iter: BaseIndexIter<'a, (), V>,
 }
 
-impl<T, K, V> MapIndex<T, K, V> {
+impl<T, K, V> MapIndex<T, K, V>
+where
+    T: AsRef<Snapshot>,
+    K: StorageKey,
+    V: StorageValue,
+{
     /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
@@ -95,7 +101,7 @@ impl<T, K, V> MapIndex<T, K, V> {
     /// ```
     pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
         MapIndex {
-            base: BaseIndex::new(name, view),
+            base: BaseIndex::new(name, IndexType::Map, view),
             _k: PhantomData,
             _v: PhantomData,
         }
@@ -126,19 +132,12 @@ impl<T, K, V> MapIndex<T, K, V> {
     /// ```
     pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
         MapIndex {
-            base: BaseIndex::with_prefix(name, prefix, view),
+            base: BaseIndex::with_prefix(name, prefix, IndexType::Map, view),
             _k: PhantomData,
             _v: PhantomData,
         }
     }
-}
 
-impl<T, K, V> MapIndex<T, K, V>
-where
-    T: AsRef<Snapshot>,
-    K: StorageKey,
-    V: StorageValue,
-{
     /// Returns a value corresponding to the key.
     ///
     /// # Examples

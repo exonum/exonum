@@ -19,6 +19,7 @@ use std::marker::PhantomData;
 
 use crypto::{Hash, hash, HashStream};
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
+use super::indexes_metadata::IndexType;
 use self::key::ProofListKey;
 
 pub use self::proof::{ListProof, ListProofError};
@@ -56,7 +57,18 @@ pub struct ProofListIndexIter<'a, V> {
     base_iter: BaseIndexIter<'a, ProofListKey, V>,
 }
 
-impl<T, V> ProofListIndex<T, V> {
+fn pair_hash(h1: &Hash, h2: &Hash) -> Hash {
+    HashStream::new()
+        .update(h1.as_ref())
+        .update(h2.as_ref())
+        .hash()
+}
+
+impl<T, V> ProofListIndex<T, V>
+where
+    T: AsRef<Snapshot>,
+    V: StorageValue,
+{
     /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
@@ -84,7 +96,7 @@ impl<T, V> ProofListIndex<T, V> {
     /// ```
     pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
         ProofListIndex {
-            base: BaseIndex::new(name, view),
+            base: BaseIndex::new(name, IndexType::ProofList, view),
             length: Cell::new(None),
             _v: PhantomData,
         }
@@ -121,25 +133,12 @@ impl<T, V> ProofListIndex<T, V> {
     /// ```
     pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
         ProofListIndex {
-            base: BaseIndex::with_prefix(name, prefix, view),
+            base: BaseIndex::with_prefix(name, prefix, IndexType::ProofList, view),
             length: Cell::new(None),
             _v: PhantomData,
         }
     }
-}
 
-fn pair_hash(h1: &Hash, h2: &Hash) -> Hash {
-    HashStream::new()
-        .update(h1.as_ref())
-        .update(h2.as_ref())
-        .hash()
-}
-
-impl<T, V> ProofListIndex<T, V>
-where
-    T: AsRef<Snapshot>,
-    V: StorageValue,
-{
     fn has_branch(&self, key: ProofListKey) -> bool {
         debug_assert!(key.height() > 0);
 

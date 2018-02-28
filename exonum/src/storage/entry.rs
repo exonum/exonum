@@ -18,6 +18,7 @@ use std::marker::PhantomData;
 
 use crypto::Hash;
 use super::{BaseIndex, Snapshot, Fork, StorageValue};
+use super::indexes_metadata::IndexType;
 
 /// An index that may only contain one element.
 ///
@@ -30,7 +31,11 @@ pub struct Entry<T, V> {
     _v: PhantomData<V>,
 }
 
-impl<T, V> Entry<T, V> {
+impl<T, V> Entry<T, V>
+where
+    T: AsRef<Snapshot>,
+    V: StorageValue,
+{
     /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
@@ -53,17 +58,11 @@ impl<T, V> Entry<T, V> {
     /// ```
     pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
         Entry {
-            base: BaseIndex::new(name, view),
+            base: BaseIndex::new(name.as_ref(), IndexType::Entry, view),
             _v: PhantomData,
         }
     }
-}
 
-impl<T, V> Entry<T, V>
-where
-    T: AsRef<Snapshot>,
-    V: StorageValue,
-{
     /// Returns a value of the entry or `None` if does not exist.
     ///
     /// # Examples

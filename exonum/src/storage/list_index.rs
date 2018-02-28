@@ -18,6 +18,7 @@ use std::cell::Cell;
 use std::marker::PhantomData;
 
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
+use super::indexes_metadata::IndexType;
 
 /// A list of items that implement `StorageValue` trait.
 ///
@@ -45,7 +46,11 @@ pub struct ListIndexIter<'a, V> {
     base_iter: BaseIndexIter<'a, u64, V>,
 }
 
-impl<T, V> ListIndex<T, V> {
+impl<T, V> ListIndex<T, V>
+where
+    T: AsRef<Snapshot>,
+    V: StorageValue,
+{
     /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
@@ -68,7 +73,7 @@ impl<T, V> ListIndex<T, V> {
     /// ```
     pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
         ListIndex {
-            base: BaseIndex::new(name, view),
+            base: BaseIndex::new(name, IndexType::List, view),
             length: Cell::new(None),
             _v: PhantomData,
         }
@@ -98,18 +103,12 @@ impl<T, V> ListIndex<T, V> {
     /// ```
     pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
         ListIndex {
-            base: BaseIndex::with_prefix(name, prefix, view),
+            base: BaseIndex::with_prefix(name, prefix, IndexType::List, view),
             length: Cell::new(None),
             _v: PhantomData,
         }
     }
-}
 
-impl<T, V> ListIndex<T, V>
-where
-    T: AsRef<Snapshot>,
-    V: StorageValue,
-{
     /// Returns an element at that position or `None` if out of bounds.
     ///
     /// # Examples

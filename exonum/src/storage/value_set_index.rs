@@ -18,6 +18,7 @@ use std::marker::PhantomData;
 
 use crypto::Hash;
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
+use super::indexes_metadata::IndexType;
 
 /// A set of items that implement `StorageValue` trait.
 ///
@@ -57,7 +58,11 @@ pub struct ValueSetIndexHashes<'a> {
     base_iter: BaseIndexIter<'a, Hash, ()>,
 }
 
-impl<T, V> ValueSetIndex<T, V> {
+impl<T, V> ValueSetIndex<T, V>
+where
+    T: AsRef<Snapshot>,
+    V: StorageValue,
+{
     /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
@@ -80,7 +85,7 @@ impl<T, V> ValueSetIndex<T, V> {
     /// ```
     pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
         ValueSetIndex {
-            base: BaseIndex::new(name, view),
+            base: BaseIndex::new(name, IndexType::ValueSet, view),
             _v: PhantomData,
         }
     }
@@ -109,17 +114,11 @@ impl<T, V> ValueSetIndex<T, V> {
     /// ```
     pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
         ValueSetIndex {
-            base: BaseIndex::with_prefix(name, prefix, view),
+            base: BaseIndex::with_prefix(name, prefix, IndexType::ValueSet, view),
             _v: PhantomData,
         }
     }
-}
 
-impl<T, V> ValueSetIndex<T, V>
-where
-    T: AsRef<Snapshot>,
-    V: StorageValue,
-{
     /// Returns `true` if the set contains a value.
     ///
     /// # Examples
