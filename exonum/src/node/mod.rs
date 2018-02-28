@@ -774,9 +774,7 @@ impl Node {
             node_cfg.service_secret_key.clone(),
             channel.api_requests.0.clone().into(),
         );
-        blockchain
-            .create_genesis_block(node_cfg.genesis.clone())
-            .unwrap();
+        blockchain.initialize(node_cfg.genesis.clone()).unwrap();
 
 
         let config = Configuration {

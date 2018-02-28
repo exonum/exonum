@@ -746,7 +746,7 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandb
             }
         }),
     );
-    blockchain.create_genesis_block(genesis).unwrap();
+    blockchain.initialize(genesis).unwrap();
 
     let config = Configuration {
         listener: ListenerConfig {

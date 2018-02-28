@@ -85,7 +85,7 @@ impl From<io::Error> for ApiError {
 
 impl From<::blockchain::SendError> for ApiError {
     fn from(e: ::blockchain::SendError) -> ApiError {
-        use ::blockchain::SendError::*;
+        use blockchain::SendError::*;
 
         let e: io::Error = match e {
             VerificationFail(..) => {

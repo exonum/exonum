@@ -1,9 +1,35 @@
 # Configuration service tutorial
 
-## Build instructions
+## Running testnet
 
-To build an [example binary](examples/configuration.rs) of exonum blockchain
-with the single configuration service mounted, run:
+### Using Docker
+
+<!-- spell-checker:ignore vitvakatu -->
+
+Simply run the following command to configure and launch testnet with 4 nodes:
+
+```bash
+docker run -p 8000-8007:8000-8007 vitvakatu/exonum-configuration-example 4
+```
+
+Docker will automatically pull image from the repository and run 4 nodes with
+public endpoints at `127.0.0.1:8000`, ..., `127.0.0.1:8003` and
+private ones at `127.0.0.1:8004`, ..., `127.0.0.1:8007`.
+
+You can also use helper [script](../docker/example-start.sh):
+
+```bash
+./docker/example-start.sh <number of nodes>
+```
+
+To stop docker container, use `docker stop <container id>` command.
+
+### Manually
+
+#### Build example binary
+
+To build an [example binary](../examples/configuration.rs) of exonum
+blockchain with the single configuration service mounted, run:
 
 ```bash
 cargo install --example configuration
@@ -12,106 +38,48 @@ cargo install --example configuration
 `exonum` crate system dependencies and rust toolchain configuration -
 [exonum install instructions](https://github.com/exonum/exonum/blob/master/INSTALL.md).
 
-## Running testnet
+#### Generate testnet directory and config
 
-- Generate testnet dir and testnet config.
+`4` is a required indexed parameter and stands for the number of nodes in
+testnet:
 
-  - `4` is a required indexed parameter and stands for the number of nodes in
-    testnet:
+```bash
+mkdir -p testnet/configuration_service
+cd testnet/configuration_service
+configuration generate-testnet --start 5400 4 --output_dir .
+cd ..
+```
 
-    ```bash
-    mkdir -p testnet/configuration_service
-    cd testnet/configuration_service
-    configuration generate-testnet --start 5400 4 --output_dir .
-    cd ..
-    ```
+This should create the following config for testnet:
 
-  - This should create following config for testnet:
+```bash
+$ tree configuration_service/
+configuration_service/
+└── validators
+  ├── 0.toml
+  ├── 1.toml
+  ├── 2.toml
+  └── 3.toml
+```
 
-    ```bash
-    $ tree configuration_service/
-    configuration_service/
-    └── validators
-      ├── 0.toml
-      ├── 1.toml
-      ├── 2.toml
-      └── 3.toml
-    ```
+#### Run `4` nodes
 
-- Run `4` nodes:
+<!-- markdownlint-disable MD013 -->
 
-  - manually for the each node's process:
+```bash
+configuration run --node-config configuration_service/validators/0.toml --db-path configuration_service/db/0 --public-api-address 127.0.0.1:8000 --private-api-address 127.0.0.1:8010
+...
+configuration run --node-config configuration_service/validators/3.toml --db-path configuration_service/db/3 --public-api-address 127.0.0.1:8003 --private-api-address 127.0.0.1:8013
+```
 
-    <!-- markdownlint-disable MD013 -->
-    ```bash
-    configuration run --node-config configuration_service/validators/0.toml --db-path configuration_service/db/0 --public-api-address 127.0.0.1:8000 --private-api-address 127.0.0.1:8010
-    ...
-    configuration run --node-config configuration_service/validators/3.toml --db-path configuration_service/db/3 --public-api-address 127.0.0.1:8003 --private-api-address 127.0.0.1:8013
-    ```
-    <!-- markdownlint-enable MD013 -->
+<!-- markdownlint-enable MD013 -->
 
-    - parameters
-      - `--public-api-address` is for Exonum [public http api endpoints](#public-endpoints)
-      - `--private-api-address` is for Exonum [private http api endpoints](#private-endpoints)
-      - `--node-config` path to the node config
-      - `--db-path` path to the database
+##### Parameters
 
-  - automatically via the [supervisord](http://supervisord.org/) utility.
-
-    1. set the `TESTNET_DESTDIR` environment variable to the `testnet` dir
-        created above:
-
-        ```bash
-        $ pwd
-        /Users/user/Exonum/testnet
-        $ export TESTNET_DESTDIR=/Users/user/Exonum/testnet
-        ```
-
-    1. run [helper script](../testnet/testnetctl.sh) for initializing
-       `supervisor` and `configuration_service` process group
-       [config](../testnet/supervisord) to `$TESTNET_DESTDIR` directory.
-
-       ```bash
-       ./testnet/testnetctl.sh enable
-       ```
-
-    1. go to `$TESTNET_DESTDIR`. It contains new `etc`, `run`, `log` folders.
-
-       ```bash
-       $ cd $TESTNET_DESTDIR
-       $ tree .
-       .
-       ├── configuration_service
-       │   └── validators
-       │       ├── 0.toml
-       │       ├── 1.toml
-       │       ├── 2.toml
-       │       └── 3.toml
-       ├── etc
-       │   ├── conf.d
-       │   │   └── configuration_service.conf
-       │   └── supervisord.conf
-       ├── log
-       │   ├── supervisor
-       │   │   ├── configuration_service_00-stderr---supervisor-rMqmIy.log
-       │   │   ... ...
-       │   │   └── configuration_service_03-stdout---supervisor-s29Fd_.log
-       │   └── supervisord.log
-       └── run
-           └── supervisord.pid
-
-       7 directories, 16 files
-       ```
-
-    1. launch `configuration_service` process group.
-
-       ```bash
-       $ supervisorctl start configuration_service:*
-       configuration_service:configuration_service_01: started
-       configuration_service:configuration_service_00: started
-       configuration_service:configuration_service_03: started
-       configuration_service:configuration_service_02: started
-       ```
+- `--public-api-address` is for Exonum [public http api endpoints](#public-endpoints)
+- `--private-api-address` is for Exonum [private http api endpoints](#private-endpoints)
+- `--node-config` path to the node config
+- `--db-path` path to the database
 
 ## Global variable service http api
 
@@ -204,7 +172,7 @@ endpoint.
 
     1. no vote from the same node public key has been submitted previously.
 
-[Examples](response-samples.md#private-response-samples)
+[Examples](response-samples.md#private-endpoints-response-samples)
 
 <!-- markdownlint-disable MD013 MD033 -->
 | Endpoint                                                                 | HTTP method   | Description                                   | Response template                                                                                 |
@@ -213,4 +181,4 @@ endpoint.
 | `/api/services/configuration/v1/configs/<config-hash-vote-for>/postvote` | POST          | Vote for a configuration having specific hash | {<br> &emsp;"tx\_hash": **transaction-hash**<br> }                                                |
 <!-- markdownlint-enable MD013 MD033 -->
 
-[exonum config]: http://exonum.com/doc/crates/exonum/blockchain/config/struct.StoredConfiguration.html
+[exonum config]: https://docs.rs/exonum/0.5.1/exonum/blockchain/config/struct.StoredConfiguration.html

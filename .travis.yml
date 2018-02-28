@@ -32,7 +32,6 @@ cache:
   - $HOME/.cargo
   - $HOME/.local
   - $TRAVIS_BUILD_DIR/target
-  - $TRAVIS_BUILD_DIR/sandbox/target
 
 dist: trusty
 sudo: required
