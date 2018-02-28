@@ -38,7 +38,7 @@ mod tests {
     use exonum::messages::{Message, RawMessage};
     use exonum::api::Api;
     use exonum::helpers::init_logger;
-    use cryptocurrency::{CurrencyService, CurrencyTx, TxCreateWallet, TxIssue, TxTransfer, KeyBox};
+    use cryptocurrency::{CurrencyService, CurrencyTx, TxCreateWallet, TxIssue, TxTransfer};
     use cryptocurrency::api::CryptocurrencyApi;
     use sandbox::sandbox::{sandbox_with_services, Sandbox};
     use sandbox::sandbox_tests_helper::{add_one_height_with_transactions, SandboxState};
@@ -62,17 +62,13 @@ mod tests {
         let generator_create = move |ind| {
             if ind == 0 {
                 let (p, s) = gen_keypair_from_seed(&Seed::new([255; 32]));
-                return TxCreateWallet::new(
-                    &p,
-                    "babd, Юникод еще работает",
-                    &KeyBox([0; 128]),
-                    &s,
-                ).into();
+                return TxCreateWallet::new(&p, "babd, Юникод еще работает", &s)
+                    .into();
             }
             let (p, s) = gen_keypair();
             let string_len = rng.gen_range(20u8, 255u8);
-            let login: String = rng.gen_ascii_chars().take(string_len as usize).collect();
-            TxCreateWallet::new(&p, &login, &KeyBox([0; 128]), &s).into()
+            let name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
+            TxCreateWallet::new(&p, &name, &s).into()
         };
 
         test_txs_post(&sandbox, generator_create);
@@ -118,7 +114,7 @@ mod tests {
         let (p1, _) = gen_keypair();
         let (_, s2) = gen_keypair();
 
-        let invalid_tx = TxCreateWallet::new(&p1, "Incorrect_signature", &KeyBox([0; 128]), &s2);
+        let invalid_tx = TxCreateWallet::new(&p1, "Incorrect_signature", &s2);
         let invalid_tx: CurrencyTx = invalid_tx.into();
         let resp = sandbox.post_transaction(invalid_tx);
         assert_response_status(resp, Status::Conflict, "Unable to verify transaction");
@@ -215,15 +211,15 @@ mod tests {
         let (p4, s4) = gen_keypair_from_seed(&Seed::new([14; 32]));
         let (p5, s5) = gen_keypair_from_seed(&Seed::new([15; 32]));
         let (p6, s6) = gen_keypair_from_seed(&Seed::new([16; 32]));
-        let txs: Vec<CurrencyTx> =
-            vec![
-                TxCreateWallet::new(&p1, "Jane Doe", &KeyBox([0; 128]), &s1).into(),
-                TxCreateWallet::new(&p2, "Dillinger Escape Plan", &KeyBox([0; 128]), &s2).into(),
-                TxCreateWallet::new(&p3, "wallet3", &KeyBox([0; 128]), &s3).into(),
-                TxCreateWallet::new(&p4, "walet4", &KeyBox([0; 128]), &s4).into(),
-                TxCreateWallet::new(&p5, "wallet5", &KeyBox([0; 128]), &s5).into(),
-                TxCreateWallet::new(&p6, "wallet6", &KeyBox([0; 128]), &s6).into(),
-            ];
+        let txs: Vec<CurrencyTx> = vec![
+            TxCreateWallet::new(&p1, "Jane Doe", &s1).into(),
+            TxCreateWallet::new(&p2, "Dillinger Escape Plan", &s2)
+                .into(),
+            TxCreateWallet::new(&p3, "wallet3", &s3).into(),
+            TxCreateWallet::new(&p4, "walet4", &s4).into(),
+            TxCreateWallet::new(&p5, "wallet5", &s5).into(),
+            TxCreateWallet::new(&p6, "wallet6", &s6).into(),
+        ];
         txs.iter()
             .inspect(|tx| { sandbox.post_transaction((*tx).clone()).unwrap(); })
             .collect::<Vec<_>>();
@@ -245,15 +241,15 @@ mod tests {
         let (p4, s4) = gen_keypair_from_seed(&Seed::new([14; 32]));
         let (p5, s5) = gen_keypair_from_seed(&Seed::new([15; 32]));
         let (p6, s6) = gen_keypair_from_seed(&Seed::new([16; 32]));
-        let txs: Vec<CurrencyTx> =
-            vec![
-                TxCreateWallet::new(&p1, "Jane Doe", &KeyBox([0; 128]), &s1).into(),
-                TxCreateWallet::new(&p2, "Dillinger Escape Plan", &KeyBox([0; 128]), &s2).into(),
-                TxCreateWallet::new(&p3, "wallet3", &KeyBox([0; 128]), &s3).into(),
-                TxCreateWallet::new(&p4, "walet4", &KeyBox([0; 128]), &s4).into(),
-                TxCreateWallet::new(&p5, "wallet5", &KeyBox([0; 128]), &s5).into(),
-                TxCreateWallet::new(&p6, "wallet6", &KeyBox([0; 128]), &s6).into(),
-            ];
+        let txs: Vec<CurrencyTx> = vec![
+            TxCreateWallet::new(&p1, "Jane Doe", &s1).into(),
+            TxCreateWallet::new(&p2, "Dillinger Escape Plan", &s2)
+                .into(),
+            TxCreateWallet::new(&p3, "wallet3", &s3).into(),
+            TxCreateWallet::new(&p4, "walet4", &s4).into(),
+            TxCreateWallet::new(&p5, "wallet5", &s5).into(),
+            TxCreateWallet::new(&p6, "wallet6", &s6).into(),
+        ];
         txs.iter()
             .inspect(|tx| { sandbox.post_transaction((*tx).clone()).unwrap(); })
             .collect::<Vec<_>>();
@@ -295,15 +291,15 @@ mod tests {
         let (p4, s4) = gen_keypair_from_seed(&Seed::new([14; 32]));
         let (p5, s5) = gen_keypair_from_seed(&Seed::new([15; 32]));
         let (p6, s6) = gen_keypair_from_seed(&Seed::new([16; 32]));
-        let txs: Vec<CurrencyTx> =
-            vec![
-                TxCreateWallet::new(&p1, "Jane Doe", &KeyBox([0; 128]), &s1).into(),
-                TxCreateWallet::new(&p2, "Dillinger Escape Plan", &KeyBox([0; 128]), &s2).into(),
-                TxCreateWallet::new(&p3, "wallet3", &KeyBox([0; 128]), &s3).into(),
-                TxCreateWallet::new(&p4, "walet4", &KeyBox([0; 128]), &s4).into(),
-                TxCreateWallet::new(&p5, "wallet5", &KeyBox([0; 128]), &s5).into(),
-                TxCreateWallet::new(&p6, "wallet6", &KeyBox([0; 128]), &s6).into(),
-            ];
+        let txs: Vec<CurrencyTx> = vec![
+            TxCreateWallet::new(&p1, "Jane Doe", &s1).into(),
+            TxCreateWallet::new(&p2, "Dillinger Escape Plan", &s2)
+                .into(),
+            TxCreateWallet::new(&p3, "wallet3", &s3).into(),
+            TxCreateWallet::new(&p4, "walet4", &s4).into(),
+            TxCreateWallet::new(&p5, "wallet5", &s5).into(),
+            TxCreateWallet::new(&p6, "wallet6", &s6).into(),
+        ];
         txs.iter()
             .inspect(|tx| { sandbox.post_transaction((*tx).clone()).unwrap(); })
             .collect::<Vec<_>>();
@@ -334,7 +330,6 @@ mod tests {
                 &p1,
                 "Change name of existing \
                                                                     wallet",
-                &KeyBox([0; 128]),
                 &s1,
             )))
             .unwrap();
@@ -389,15 +384,15 @@ mod tests {
         let (p4, s4) = gen_keypair_from_seed(&Seed::new([14; 32]));
         let (p5, s5) = gen_keypair_from_seed(&Seed::new([15; 32]));
         let (p6, s6) = gen_keypair_from_seed(&Seed::new([16; 32]));
-        let txs: Vec<CurrencyTx> =
-            vec![
-                TxCreateWallet::new(&p1, "Jane Doe", &KeyBox([0; 128]), &s1).into(),
-                TxCreateWallet::new(&p2, "Dillinger Escape Plan", &KeyBox([0; 128]), &s2).into(),
-                TxCreateWallet::new(&p3, "wallet3", &KeyBox([0; 128]), &s3).into(),
-                TxCreateWallet::new(&p4, "walet4", &KeyBox([0; 128]), &s4).into(),
-                TxCreateWallet::new(&p5, "wallet5", &KeyBox([0; 128]), &s5).into(),
-                TxCreateWallet::new(&p6, "wallet6", &KeyBox([0; 128]), &s6).into(),
-            ];
+        let txs: Vec<CurrencyTx> = vec![
+            TxCreateWallet::new(&p1, "Jane Doe", &s1).into(),
+            TxCreateWallet::new(&p2, "Dillinger Escape Plan", &s2)
+                .into(),
+            TxCreateWallet::new(&p3, "wallet3", &s3).into(),
+            TxCreateWallet::new(&p4, "walet4", &s4).into(),
+            TxCreateWallet::new(&p5, "wallet5", &s5).into(),
+            TxCreateWallet::new(&p6, "wallet6", &s6).into(),
+        ];
         txs.iter()
             .inspect(|tx| { sandbox.post_transaction((*tx).clone()).unwrap(); })
             .collect::<Vec<_>>();

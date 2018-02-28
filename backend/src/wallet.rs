@@ -2,13 +2,12 @@
 
 use exonum::encoding::Field;
 use exonum::crypto::{PublicKey, Hash};
-use KeyBox;
 
 encoding_struct! {
 /// Wallet information stored in the database.
     struct Wallet {
         pub_key:            &PublicKey,
-        login:              &str,
+        name:               &str,
         balance:            u64,
         history_len:        u64,
         history_hash:       &Hash,
@@ -46,25 +45,17 @@ impl Wallet {
     }
 }
 
-encoding_struct! {
-/// Wallet information stored in the database.
-    struct WalletAccess {
-        pub_key:            &PublicKey,
-        key_box:            &KeyBox,
-    }
-}
-
 #[cfg(test)]
 pub fn assert_wallet(
     wallet: &Wallet,
     pub_key: &PublicKey,
-    login: &str,
+    name: &str,
     balance: u64,
     history_len: u64,
     history_hash: &Hash,
 ) {
     assert_eq!(wallet.pub_key(), pub_key);
-    assert_eq!(wallet.login(), login);
+    assert_eq!(wallet.name(), name);
     assert_eq!(wallet.balance(), balance);
     assert_eq!(wallet.history_hash(), history_hash);
     assert_eq!(wallet.history_len(), history_len);
@@ -78,12 +69,12 @@ mod tests {
     #[test]
     fn test_wallet() {
         let hash = Hash::new([2; 32]);
-        let login = "foobar abacaba Юникод всяуи";
+        let name = "foobar abacaba Юникод всяуи";
         let pub_key = PublicKey::from_slice([1u8; 32].as_ref()).unwrap();
-        let wallet = Wallet::new(&pub_key, login, 100500, 0, &hash);
+        let wallet = Wallet::new(&pub_key, name, 100500, 0, &hash);
 
         let wallet = wallet.clone();
-        assert_wallet(&wallet, &pub_key, login, 100500, 0, &hash);
+        assert_wallet(&wallet, &pub_key, name, 100500, 0, &hash);
     }
 
     #[test]
@@ -98,12 +89,12 @@ mod tests {
             let mut hash_bytes = [0; HASH_SIZE];
 
             let (pub_key, _) = gen_keypair();
-            let login: String = rng.gen_ascii_chars().take(string_len as usize).collect();
+            let name: String = rng.gen_ascii_chars().take(string_len as usize).collect();
             let balance = rng.next_u64();
             let history_len = rng.next_u64();
             rng.fill_bytes(&mut hash_bytes);
             let hash = Hash::new(hash_bytes);
-            Wallet::new(&pub_key, &login, balance, history_len, &hash)
+            Wallet::new(&pub_key, &name, balance, history_len, &hash)
         };
         let wallet_non_ascii = Wallet::new(
             &gen_keypair().0,
