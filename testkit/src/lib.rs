@@ -146,14 +146,14 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock, RwLockReadGuard};
 use std::fmt;
 
-use exonum::api::ext::{BoxedEndpoint, Endpoint, FromContext};
+use exonum::api::ext::Endpoint;
 use exonum::blockchain::{ApiContext, Blockchain, ConsensusConfig, GenesisConfig,
                          Schema as CoreSchema, Service, SharedNodeState, StoredConfiguration,
                          Transaction, ValidatorKeys};
 use exonum::crypto::{self, CryptoHash};
 use exonum::helpers::{Height, Round, ValidatorId};
 use exonum::messages::{Precommit, Propose};
-use exonum::node::{ApiSender, ExternalMessage, State as NodeState, TransactionSend, TxPool,
+use exonum::node::{ExternalMessage, ExternalMessageSender, State as NodeState, TxPool,
                    NodeApiConfig, create_public_api_handler, create_private_api_handler};
 use exonum::storage::{MemoryDB, Snapshot};
 
@@ -477,7 +477,7 @@ pub struct TestKit {
     db_handler: CheckpointDbHandler<MemoryDB>,
     events_stream: Spawn<Box<Stream<Item = (), Error = ()>>>,
     network: TestNetwork,
-    api_sender: ApiSender,
+    external_message_sender: ExternalMessageSender,
     mempool: TxPool,
     cfg_proposal: Option<ConfigurationProposalState>,
     api_config: NodeApiConfig,
@@ -505,7 +505,7 @@ impl TestKit {
 
     fn assemble(services: Vec<Box<Service>>, network: TestNetwork) -> Self {
         let api_channel = mpsc::channel(1_000);
-        let api_sender = ApiSender::new(api_channel.0.clone());
+        let external_message_sender = ExternalMessageSender::from(api_channel.0);
 
         let db = CheckpointDb::new(MemoryDB::new());
         let db_handler = db.handler();
@@ -515,7 +515,7 @@ impl TestKit {
             services,
             *network.us().service_keypair().0,
             network.us().service_keypair().1.clone(),
-            api_sender.clone(),
+            external_message_sender.clone(),
         );
 
         let genesis = network.genesis_config();
@@ -548,7 +548,7 @@ impl TestKit {
         TestKit {
             blockchain,
             db_handler,
-            api_sender,
+            external_message_sender,
             events_stream,
             network,
             mempool: Arc::clone(&mempool),
@@ -564,17 +564,7 @@ impl TestKit {
 
     /// Creates an API context for the testkit.
     pub fn api_context(&self) -> ApiContext {
-        // Unlike "real" nodes, leaking the service secret key is not so harmful,
-        // so this method can be public.
-
-        let service_keys = self.us().service_keypair();
-
-        ApiContext::from_parts(
-            &self.blockchain,
-            self.api_sender.clone(),
-            service_keys.0,
-            service_keys.1,
-        )
+        ApiContext::new(&self.blockchain)
     }
 
     /// Polls the *existing* events from the event loop until exhaustion. Does not wait
@@ -1184,7 +1174,7 @@ impl TestKitApi {
             private_handler: create_private_api_handler(
                 blockchain.clone(),
                 api_state,
-                testkit.api_sender.clone(),
+                testkit.external_message_sender.clone(),
             ),
 
             api_context: testkit.api_context(),
@@ -1215,28 +1205,13 @@ impl TestKitApi {
     }
 
     /// Tests that an invocation of the specified endpoint lead to an expected response.
-    pub fn test<T>(&self, request: serde_json::Value, expected: &serde_json::Value)
-    where
-        T: Into<BoxedEndpoint> + FromContext,
-    {
-        let endpoint = T::from_context(&self.api_context).into();
-        let response = match endpoint.handle(request) {
-            Ok(response) => response,
-            Err(e) => panic!("Unexpected endpoint error: {:?}", e),
-        };
-        assert_eq!(response, *expected);
-    }
-
-    /// Tests that an invocation of the specified endpoint lead to an expected response.
-    ///
-    /// Compared to the `test()` method, this one is more strongly typed.
-    pub fn test_typed<T>(&self, request: T::Request, expected: &T::Response)
-    where
-        T: Endpoint + FromContext,
-        T::Response: fmt::Debug + PartialEq,
-    {
-        let endpoint = T::from_context(&self.api_context);
-        let response = match endpoint.handle(request) {
+    pub fn test(
+        &self,
+        endpoint: &Endpoint,
+        request: serde_json::Value,
+        expected: &serde_json::Value,
+    ) {
+        let response = match endpoint.handle(&self.api_context, request) {
             Ok(response) => response,
             Err(e) => panic!("Unexpected endpoint error: {:?}", e),
         };
