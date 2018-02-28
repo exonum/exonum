@@ -104,6 +104,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Consensus messages are stored persistently (in the database), so restart will
   not affect the node's behavior. (#322)
 
+- Runtime index type checks have been implemented for every index. (#525)
+
 ## 0.5.1 - 2018-02-01
 
 ### Bug fixes

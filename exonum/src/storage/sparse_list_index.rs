@@ -25,6 +25,7 @@ use std::marker::PhantomData;
 
 use crypto::{hash, CryptoHash, Hash};
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
+use super::indexes_metadata::IndexType;
 
 #[derive(Debug, Default, Clone, Copy)]
 struct SparseListSize {
@@ -117,7 +118,11 @@ pub struct SparseListIndexValues<'a, V> {
     base_iter: BaseIndexIter<'a, (), V>,
 }
 
-impl<T, V> SparseListIndex<T, V> {
+impl<T, V> SparseListIndex<T, V>
+where
+    T: AsRef<Snapshot>,
+    V: StorageValue,
+{
     /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
@@ -140,7 +145,7 @@ impl<T, V> SparseListIndex<T, V> {
     /// ```
     pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
         SparseListIndex {
-            base: BaseIndex::new(name, view),
+            base: BaseIndex::new(name, IndexType::SparseList, view),
             size: Cell::new(None),
             _v: PhantomData,
         }
@@ -170,18 +175,12 @@ impl<T, V> SparseListIndex<T, V> {
     /// ```
     pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
         SparseListIndex {
-            base: BaseIndex::with_prefix(name, prefix, view),
+            base: BaseIndex::with_prefix(name, prefix, IndexType::SparseList, view),
             size: Cell::new(None),
             _v: PhantomData,
         }
     }
-}
 
-impl<T, V> SparseListIndex<T, V>
-where
-    T: AsRef<Snapshot>,
-    V: StorageValue,
-{
     fn size(&self) -> SparseListSize {
         if let Some(size) = self.size.get() {
             return size;

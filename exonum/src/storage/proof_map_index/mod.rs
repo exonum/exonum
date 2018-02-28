@@ -19,6 +19,7 @@ use std::fmt;
 
 use crypto::{Hash, CryptoHash, HashStream};
 use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageValue};
+use super::indexes_metadata::IndexType;
 use self::key::{BitsRange, ChildKind, LEAF_KEY_PREFIX};
 use self::node::{BranchNode, Node};
 
@@ -99,7 +100,12 @@ enum RemoveResult {
     UpdateHash(Hash),
 }
 
-impl<T, K, V> ProofMapIndex<T, K, V> {
+impl<T, K, V> ProofMapIndex<T, K, V>
+where
+    T: AsRef<Snapshot>,
+    K: ProofMapKey,
+    V: StorageValue,
+{
     /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
@@ -127,7 +133,7 @@ impl<T, K, V> ProofMapIndex<T, K, V> {
     /// ```
     pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
         ProofMapIndex {
-            base: BaseIndex::new(name, view),
+            base: BaseIndex::new(name, IndexType::ProofMap, view),
             _k: PhantomData,
             _v: PhantomData,
         }
@@ -165,19 +171,12 @@ impl<T, K, V> ProofMapIndex<T, K, V> {
     /// ```
     pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
         ProofMapIndex {
-            base: BaseIndex::with_prefix(name, prefix, view),
+            base: BaseIndex::with_prefix(name, prefix, IndexType::ProofMap, view),
             _k: PhantomData,
             _v: PhantomData,
         }
     }
-}
 
-impl<T, K, V> ProofMapIndex<T, K, V>
-where
-    T: AsRef<Snapshot>,
-    K: ProofMapKey,
-    V: StorageValue,
-{
     fn get_root_key(&self) -> Option<ProofPath> {
         self.base.iter::<_, ProofPath, _>(&()).next().map(
             |(k, _): (ProofPath, ())| k,

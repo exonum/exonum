@@ -19,6 +19,7 @@ use std::borrow::Cow;
 use std::marker::PhantomData;
 
 use super::{StorageKey, StorageValue, Snapshot, Fork, Iter};
+use storage::indexes_metadata::{self, IndexType, INDEXES_METADATA_TABLE_NAME};
 
 /// Basic struct for all indices that implements common features.
 ///
@@ -35,6 +36,8 @@ use super::{StorageKey, StorageValue, Snapshot, Fork, Iter};
 pub struct BaseIndex<T> {
     name: String,
     prefix: Option<Vec<u8>>,
+    is_mutable: bool,
+    index_type: IndexType,
     view: T,
 }
 
@@ -55,7 +58,10 @@ pub struct BaseIndexIter<'a, K, V> {
     _v: PhantomData<V>,
 }
 
-impl<T> BaseIndex<T> {
+impl<T> BaseIndex<T>
+where
+    T: AsRef<Snapshot>,
+{
     /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
@@ -64,12 +70,16 @@ impl<T> BaseIndex<T> {
     ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
-    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(name: S, index_type: IndexType, view: T) -> Self {
         assert_valid_name(&name);
+
+        indexes_metadata::assert_index_type(name.as_ref(), index_type, view.as_ref());
 
         BaseIndex {
             name: name.as_ref().to_string(),
             prefix: None,
+            is_mutable: false,
+            index_type,
             view,
         }
     }
@@ -83,12 +93,31 @@ impl<T> BaseIndex<T> {
     ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
-    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
+    pub fn with_prefix<S: AsRef<str>>(
+        name: S,
+        prefix: Vec<u8>,
+        index_type: IndexType,
+        view: T,
+    ) -> Self {
         assert_valid_name(&name);
+
+        indexes_metadata::assert_index_type(name.as_ref(), index_type, view.as_ref());
 
         BaseIndex {
             name: name.as_ref().to_string(),
             prefix: Some(prefix),
+            is_mutable: false,
+            index_type,
+            view,
+        }
+    }
+
+    pub(crate) fn indexes_metadata(view: T) -> Self {
+        BaseIndex {
+            name: INDEXES_METADATA_TABLE_NAME.to_string(),
+            prefix: None,
+            is_mutable: true,
+            index_type: IndexType::Map,
             view,
         }
     }
@@ -108,12 +137,7 @@ impl<T> BaseIndex<T> {
             }
         }
     }
-}
 
-impl<T> BaseIndex<T>
-where
-    T: AsRef<Snapshot>,
-{
     /// Returns a value of *any* type corresponding to the key of *any* type.
     pub fn get<K, V>(&self, key: &K) -> Option<V>
     where
@@ -182,12 +206,20 @@ where
 }
 
 impl<'a> BaseIndex<&'a mut Fork> {
+    fn set_index_type(&mut self) {
+        if !self.is_mutable {
+            indexes_metadata::set_index_type(&self.name, self.index_type, &mut self.view);
+            self.is_mutable = true;
+        }
+    }
+
     /// Inserts the key-value pair into the index. Both key and value may be of *any* types.
     pub fn put<K, V>(&mut self, key: &K, value: V)
     where
         K: StorageKey,
         V: StorageValue,
     {
+        self.set_index_type();
         let key = self.prefixed_key(key);
         self.view.put(&self.name, key, value.into_bytes());
     }
@@ -197,6 +229,7 @@ impl<'a> BaseIndex<&'a mut Fork> {
     where
         K: StorageKey + ?Sized,
     {
+        self.set_index_type();
         let key = self.prefixed_key(key);
         self.view.remove(&self.name, key);
     }
@@ -210,6 +243,7 @@ impl<'a> BaseIndex<&'a mut Fork> {
     /// this method the amount of allocated memory is linearly dependent on the number of elements
     /// in the index.
     pub fn clear(&mut self) {
+        self.set_index_type();
         self.view.remove_by_prefix(&self.name, self.prefix.as_ref());
     }
 }
