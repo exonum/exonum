@@ -73,6 +73,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Log output become more human-readable. Now it uses `rfc2822` for time formatting.
   This change can break scripts that analyze the log output. (#514)
 
+- `output_dir` argument of the `generate-testnet` command has been renamed to
+  `output-dir`. (#528)
+
+- `peer_addr` argument of the `generate-config` command has been renamed to
+  `peer-address`. (#528)
+
 ### New features
 
 - `StorageKey` and `StorageValue` traits are implemented for `SystemTime`. (#456)
@@ -90,6 +96,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 ### Bug fixes
 
 - `ExonumJsonDeserialize` trait is implemented for `F32` and `F64`. (#461)
+
+- Fixed bug with the extra creation of the genesis configuration. (#527)
 
 ### Internal improvements
 

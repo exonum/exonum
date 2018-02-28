@@ -39,6 +39,8 @@ use super::DEFAULT_EXONUM_LISTEN_PORT;
 use super::keys;
 
 const DATABASE_PATH: &str = "DATABASE_PATH";
+const OUTPUT_DIR: &str = "OUTPUT_DIR";
+const PEER_ADDRESS: &str = "PEER_ADDRESS";
 
 /// Run command.
 pub struct Run;
@@ -194,7 +196,7 @@ impl RunDev {
         node_config_ctx.set_arg("COMMON_CONFIG", common_config_path.clone());
         node_config_ctx.set_arg("PUB_CONFIG", pub_config_path.clone());
         node_config_ctx.set_arg("SEC_CONFIG", sec_config_path.clone());
-        node_config_ctx.set_arg("PEER_ADDR", peer_addr.into());
+        node_config_ctx.set_arg(PEER_ADDRESS, peer_addr.into());
         let node_config_command = commands.get(GenerateNodeConfig::name()).expect(
             "Expected GenerateNodeConfig in the commands list.",
         );
@@ -325,19 +327,22 @@ impl GenerateNodeConfig {
     }
 
     fn addr(context: &Context) -> (SocketAddr, SocketAddr) {
-        let addr = context.arg::<String>("PEER_ADDR").unwrap_or_default();
+        let addr = context.arg::<String>(PEER_ADDRESS).unwrap_or_default();
 
         let mut addr_parts = addr.split(':');
         let ip = addr_parts.next().expect("Expected ip address");
         if ip.len() < 8 {
-            panic!("Expected ip address in PEER_ADDR.")
+            panic!("Expected ip address in {}.", PEER_ADDRESS);
         }
         let port = addr_parts.next().map_or(DEFAULT_EXONUM_LISTEN_PORT, |s| {
             s.parse().expect("could not parse port")
         });
-        let external_addr = format!("{}:{}", ip, port);
-        let listen_addr = format!("0.0.0.0:{}", port);
-        (external_addr.parse().unwrap(), listen_addr.parse().unwrap())
+        let external_address = format!("{}:{}", ip, port);
+        let listen_address = format!("0.0.0.0:{}", port);
+        (
+            external_address.parse().unwrap(),
+            listen_address.parse().unwrap(),
+        )
     }
 }
 
@@ -348,11 +353,11 @@ impl Command for GenerateNodeConfig {
             Argument::new_positional("PUB_CONFIG", true, "Path where save public config."),
             Argument::new_positional("SEC_CONFIG", true, "Path where save private config."),
             Argument::new_named(
-                "PEER_ADDR",
+                PEER_ADDRESS,
                 true,
                 "Remote peer address",
                 "a",
-                "peer-addr",
+                "peer-address",
                 false
             ),
         ]
@@ -616,11 +621,11 @@ impl Command for GenerateTestnet {
     fn args(&self) -> Vec<Argument> {
         vec![
             Argument::new_named(
-                "OUTPUT_DIR",
+                OUTPUT_DIR,
                 true,
                 "Path to directory where save configs.",
                 "o",
-                "output_dir",
+                "output-dir",
                 false
             ),
             Argument::new_named(
@@ -649,7 +654,7 @@ impl Command for GenerateTestnet {
         mut context: Context,
         exts: &Fn(Context) -> Context,
     ) -> Feedback {
-        let dir = context.arg::<String>("OUTPUT_DIR").expect("output dir");
+        let dir = context.arg::<String>(OUTPUT_DIR).expect("output dir");
         let count: u8 = context.arg("COUNT").expect("count as int");
         let start_port = context.arg::<u16>("START_PORT").unwrap_or(
             DEFAULT_EXONUM_LISTEN_PORT,

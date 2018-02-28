@@ -529,7 +529,7 @@ impl TestKit {
         );
 
         let genesis = network.genesis_config();
-        blockchain.create_genesis_block(genesis.clone()).unwrap();
+        blockchain.initialize(genesis.clone()).unwrap();
 
         let mempool = Arc::new(RwLock::new(BTreeMap::new()));
         let event_stream: Box<Stream<Item = (), Error = ()>> = {
