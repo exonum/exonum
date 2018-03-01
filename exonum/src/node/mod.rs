@@ -760,7 +760,11 @@ impl NodeChannel {
 
 impl Node {
     /// Creates node for the given services and node configuration.
-    pub fn new(db: Box<Database>, services: Vec<Box<Service>>, node_cfg: NodeConfig) -> Self {
+    pub fn new<D: Into<Arc<Database>>>(
+        db: D,
+        services: Vec<Box<Service>>,
+        node_cfg: NodeConfig,
+    ) -> Self {
         crypto::init();
 
         if cfg!(feature = "flame_profile") {

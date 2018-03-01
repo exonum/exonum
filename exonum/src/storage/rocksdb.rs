@@ -167,6 +167,12 @@ impl Iterator for RocksDBIterator {
     }
 }
 
+impl From<RocksDB> for Arc<Database> {
+    fn from(db: RocksDB) -> Arc<Database> {
+        Arc::from(Box::new(db) as Box<Database>)
+    }
+}
+
 impl fmt::Debug for RocksDB {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "RocksDB(..)")

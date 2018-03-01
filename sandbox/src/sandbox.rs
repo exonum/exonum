@@ -724,7 +724,7 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandb
     let addresses: Vec<SocketAddr> = (1..5).map(gen_primitive_socket_addr).collect::<Vec<_>>();
 
     let api_channel = mpsc::channel(100);
-    let db = Box::new(MemoryDB::new());
+    let db = MemoryDB::new();
     let mut blockchain = Blockchain::new(
         db,
         services,
