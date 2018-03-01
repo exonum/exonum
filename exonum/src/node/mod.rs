@@ -61,12 +61,14 @@ pub mod timeout_adjuster;
 #[doc(hidden)]
 #[derive(Debug)]
 pub enum ExternalMessage {
-    /// Add new connection.
+    /// Add a new connection.
     PeerAdd(SocketAddr),
     /// Push a transaction to the mempool.
     Transaction(Box<Transaction>),
     /// Enable or disable the node.
     Enable(bool),
+    /// Shutdown the node.
+    Shutdown,
 }
 
 /// Node timeout types.
@@ -103,9 +105,9 @@ pub struct ExternalMessageSender(mpsc::Sender<ExternalMessage>);
 pub struct NodeHandler {
     /// State of the `NodeHandler`.
     pub state: State,
-    /// Shared api state
+    /// Shared api state.
     pub api_state: SharedNodeState,
-    /// System state
+    /// System state.
     pub system_state: Box<SystemStateProvider>,
     /// Channel for messages and timeouts.
     pub channel: NodeSender,
@@ -668,6 +670,12 @@ impl ExternalMessageSender {
     /// Sends a transaction to the node.
     pub fn send_transaction(&self, tx: Box<Transaction>) -> io::Result<()> {
         let msg = ExternalMessage::Transaction(tx);
+        self.send_external_message(msg)
+    }
+
+    /// Sends the shutdown signal to the node.
+    pub fn send_shutdown(&self) -> io::Result<()> {
+        let msg = ExternalMessage::Shutdown;
         self.send_external_message(msg)
     }
 

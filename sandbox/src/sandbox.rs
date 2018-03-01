@@ -103,6 +103,7 @@ impl SandboxInner {
         });
         network_getter.wait().unwrap();
     }
+
     fn process_internal_requests(&mut self) {
         let internal_getter = futures::lazy(|| -> Result<(), ()> {
             while let Async::Ready(Some(internal)) = self.internal_requests_rx.poll()? {
@@ -113,6 +114,7 @@ impl SandboxInner {
                             InternalEvent::JumpToRound(height, round).into(),
                         )
                     }
+                    InternalRequest::Shutdown => unimplemented!(),
                 }
 
             }
