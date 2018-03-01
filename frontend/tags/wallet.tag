@@ -371,6 +371,8 @@
                         self.transactions = data.transactions;
                         self.update();
                     }).catch(function(error) {
+                        self.toggleLoading(false);
+
                         self.notify('error', error.toString());
 
                         self.logout();
