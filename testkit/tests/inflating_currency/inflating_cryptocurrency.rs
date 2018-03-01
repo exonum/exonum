@@ -18,8 +18,8 @@ use exonum::messages::{Message, RawTransaction};
 use exonum::storage::{Fork, MapIndex, Snapshot};
 use exonum::crypto::{Hash, PublicKey};
 use exonum::encoding;
-use exonum::api::ext::{ApiError, Endpoint, ReadContext, ServiceApi, Spec};
-use exonum::api::iron::{self, IronAdapter};
+use exonum::api::ext::{ApiError, Endpoint, Context, ServiceApi, Spec, Visibility};
+use exonum::api::iron::{Handler, IronAdapter};
 use exonum::helpers::Height;
 
 // // // // // // // // // // CONSTANTS // // // // // // // // // //
@@ -150,9 +150,12 @@ impl Transaction for TxTransfer {
 
 // // // // // // // // // // REST API // // // // // // // // // //
 
-const BALANCE_SPEC: Spec = Spec { id: "balance" };
+const BALANCE_SPEC: Spec = Spec {
+    id: "balance",
+    visibility: Visibility::Public,
+};
 
-fn balance(ctx: &ReadContext, pubkey: PublicKey) -> Result<u64, ApiError> {
+fn balance(ctx: &Context, pubkey: PublicKey) -> Result<u64, ApiError> {
     let snapshot = ctx.snapshot();
     let schema = CurrencySchema::new(&snapshot);
     let wallet = schema.wallet(&pubkey).ok_or(ApiError::NotFound)?;
@@ -185,10 +188,10 @@ impl Service for CurrencyService {
         Ok(tx.into())
     }
 
-    fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<iron::Handler>> {
+    fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
         let mut api = ServiceApi::new();
         api.set_transactions::<CurrencyTransactions>();
         api.insert(BALANCE_SPEC, Endpoint::new(balance));
-        Some(IronAdapter::new(ctx.clone()).create_handler(api))
+        Some(IronAdapter::with_context(ctx).create_handler(api))
     }
 }

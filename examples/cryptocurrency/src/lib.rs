@@ -37,8 +37,8 @@ use exonum::messages::{RawTransaction, Message};
 use exonum::storage::{Fork, MapIndex, Snapshot};
 use exonum::crypto::{Hash, PublicKey};
 use exonum::encoding;
-use exonum::api::ext::{ApiError, Endpoint, ReadContext, Spec, ServiceApi};
-use exonum::api::iron::{self, IronAdapter};
+use exonum::api::ext::{ApiError, TypedEndpoint, Context, ServiceApi, Visibility};
+use exonum::api::iron::{Handler, IronAdapter};
 
 // // // // // // // // // // CONSTANTS // // // // // // // // // //
 
@@ -214,9 +214,6 @@ impl Transaction for TxTransfer {
 
 // // // // // // // // // // REST API // // // // // // // // // //
 
-/// Specification for the `wallet` endpoint.
-pub const WALLET_SPEC: Spec = Spec { id: "wallet" };
-
 /// Endpoint retrieving a single wallet from the database.
 ///
 /// # Examples
@@ -227,7 +224,7 @@ pub const WALLET_SPEC: Spec = Spec { id: "wallet" };
 /// extern crate exonum_testkit;
 /// #[macro_use] extern crate serde_json;
 /// # use exonum::api::ext::Endpoint;
-/// # use exonum_cryptocurrency::{CurrencyService, TxCreateWallet, get_wallet};
+/// # use exonum_cryptocurrency::{CurrencyService, TxCreateWallet, GetWallet};
 /// use exonum_testkit::TestKit;
 ///
 /// # fn main() {
@@ -237,7 +234,7 @@ pub const WALLET_SPEC: Spec = Spec { id: "wallet" };
 /// testkit.create_block_with_transaction(tx);
 ///
 /// testkit.api().test(
-///     &Endpoint::new(get_wallet),
+///     &Endpoint::from(GetWallet),
 ///     json!(pubkey),
 ///     &json!({
 ///         "pub_key": pubkey,
@@ -247,13 +244,19 @@ pub const WALLET_SPEC: Spec = Spec { id: "wallet" };
 /// );
 /// # }
 /// ```
-pub fn get_wallet(context: &ReadContext, pubkey: PublicKey) -> Result<Wallet, ApiError> {
-    let schema = CurrencySchema::new(context.snapshot());
-    schema.wallet(&pubkey).ok_or(ApiError::NotFound)
-}
+pub struct GetWallet;
 
-/// Specification for the wallets endpoint.
-pub const WALLETS_SPEC: Spec = Spec { id: "wallets" };
+impl TypedEndpoint for GetWallet {
+    type Arg = PublicKey;
+    type Output = Wallet;
+    const ID: &'static str = "wallet";
+    const VIS: Visibility = Visibility::Public;
+
+    fn call(&self, context: &Context, pubkey: PublicKey) -> Result<Wallet, ApiError> {
+        let schema = CurrencySchema::new(context.snapshot());
+        schema.wallet(&pubkey).ok_or(ApiError::NotFound)
+    }
+}
 
 /// Endpoint dumping all wallets from the storage.
 ///
@@ -266,7 +269,7 @@ pub const WALLETS_SPEC: Spec = Spec { id: "wallets" };
 /// #[macro_use] extern crate serde_json;
 /// # use exonum::api::ext::Endpoint;
 /// # use exonum::crypto;
-/// # use exonum_cryptocurrency::{CurrencyService, TxCreateWallet, get_wallets};
+/// # use exonum_cryptocurrency::{CurrencyService, TxCreateWallet, GetWallets};
 /// use exonum_testkit::TestKit;
 ///
 /// # fn main() {
@@ -283,7 +286,7 @@ pub const WALLETS_SPEC: Spec = Spec { id: "wallets" };
 /// testkit.create_block_with_transactions(txvec![tx_alice, tx_bob]);
 ///
 /// testkit.api().test(
-///     &Endpoint::new(get_wallets),
+///     &Endpoint::from(GetWallets),
 ///     json!(null),
 ///     &json!([{
 ///         "pub_key": alice_pubkey,
@@ -297,11 +300,29 @@ pub const WALLETS_SPEC: Spec = Spec { id: "wallets" };
 /// );
 /// # }
 /// ```
-pub fn get_wallets(ctx: &ReadContext, _: ()) -> Result<Vec<Wallet>, ApiError> {
-    let schema = CurrencySchema::new(ctx.snapshot());
-    let wallets = schema.wallets();
-    let wallets: Vec<_> = wallets.values().collect();
-    Ok(wallets)
+pub struct GetWallets;
+
+impl TypedEndpoint for GetWallets {
+    type Arg = ();
+    type Output = Vec<Wallet>;
+    const ID: &'static str = "wallets";
+    const VIS: Visibility = Visibility::Public;
+
+    fn call(&self, ctx: &Context, _: ()) -> Result<Vec<Wallet>, ApiError> {
+        let schema = CurrencySchema::new(ctx.snapshot());
+        let wallets = schema.wallets();
+        let wallets: Vec<_> = wallets.values().collect();
+        Ok(wallets)
+    }
+}
+
+/// Service API constructor.
+fn create_api() -> ServiceApi {
+    let mut api = ServiceApi::new();
+    api.set_transactions::<CurrencyTransactions>();
+    GetWallet.wire(&mut api);
+    GetWallets.wire(&mut api);
+    api
 }
 
 // // // // // // // // // // SERVICE DECLARATION // // // // // // // // // //
@@ -336,11 +357,8 @@ impl Service for CurrencyService {
     }
 
     // Create a REST `Handler` to process web requests to the node.
-    fn public_api_handler(&self, context: &ApiContext) -> Option<Box<iron::Handler>> {
-        let mut api = ServiceApi::new();
-        api.set_transactions::<CurrencyTransactions>();
-        api.insert(WALLET_SPEC, Endpoint::new(get_wallet));
-        api.insert(WALLETS_SPEC, Endpoint::new(get_wallets));
-        Some(IronAdapter::new(context.clone()).create_handler(api))
+    fn public_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
+        let api = create_api().public();
+        Some(IronAdapter::with_context(context).create_handler(api))
     }
 }

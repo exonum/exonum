@@ -20,8 +20,8 @@ use exonum::messages::{Message, RawTransaction};
 use exonum::storage::{Entry, Fork, Snapshot};
 use exonum::crypto::{Hash, PublicKey};
 use exonum::encoding;
-use exonum::api::iron::{self, IronAdapter};
-use exonum::api::ext::{ApiError, Endpoint, ReadContext, Spec, ServiceApi};
+use exonum::api::iron::{Handler, IronAdapter};
+use exonum::api::ext::{ApiError, Endpoint, Context, Spec, ServiceApi, Visibility};
 
 const SERVICE_ID: u16 = 1;
 
@@ -123,9 +123,12 @@ impl Transaction for TxReset {
 
 // // // // API // // // //
 
-const COUNT_SPEC: Spec = Spec { id: "count" };
+const COUNT_SPEC: Spec = Spec {
+    id: "count",
+    visibility: Visibility::Public,
+};
 
-fn count(ctx: &ReadContext, _: ()) -> Result<u64, ApiError> {
+fn count(ctx: &Context, _: ()) -> Result<u64, ApiError> {
     let counter = CounterSchema::new(ctx.snapshot()).count().unwrap_or(0);
     Ok(counter)
 }
@@ -152,17 +155,23 @@ impl Service for CounterService {
         Ok(tx.into())
     }
 
-    fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<iron::Handler>> {
+    fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
         let mut api = ServiceApi::new();
         api.insert(COUNT_SPEC, Endpoint::new(count));
         api.set_transactions::<CounterTransactions>();
-        Some(IronAdapter::new(ctx.clone()).create_handler(api))
+        Some(IronAdapter::with_context(ctx).create_handler(api))
     }
 
-    fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<iron::Handler>> {
+    fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
         let mut api = ServiceApi::new();
-        api.insert(COUNT_SPEC, Endpoint::new(count));
+        api.insert(
+            Spec {
+                visibility: Visibility::Private,
+                ..COUNT_SPEC
+            },
+            Endpoint::new(count),
+        );
         api.set_transactions::<TxReset>();
-        Some(IronAdapter::new(ctx.clone()).create_handler(api))
+        Some(IronAdapter::with_context(ctx).create_handler(api))
     }
 }

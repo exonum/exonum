@@ -29,8 +29,7 @@ extern crate serde_derive;
 #[macro_use]
 extern crate exonum;
 
-use exonum::api::ext::{Endpoint, ServiceApi};
-use exonum::api::iron::{self, IronAdapter};
+use exonum::api::iron::{Handler, IronAdapter};
 use exonum::blockchain::{Service, ServiceContext, Schema, ApiContext, Transaction, TransactionSet,
                          ExecutionError, ExecutionResult};
 use exonum::messages::{RawTransaction, Message};
@@ -375,22 +374,14 @@ impl Service for TimeService {
         context.api_sender().sign_and_send(&message).unwrap();
     }
 
-    fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<iron::Handler>> {
-        use api::*;
-
-        let mut api = ServiceApi::new();
-        api.insert(CURRENT_TIME_SPEC, Endpoint::new(get_time));
-        api.set_transactions::<TimeTransactions>();
-        Some(IronAdapter::new(ctx.clone()).create_handler(api))
+    fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
+        let api = api::create_api().public();
+        Some(IronAdapter::with_context(ctx).create_handler(api))
     }
 
-    fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<iron::Handler>> {
-        use api::*;
-
-        let mut api = ServiceApi::new();
-        api.insert(VALIDATORS_TIMES_SPEC, Endpoint::new(get_validators_times));
-        api.insert(ALL_TIMES_SPEC, Endpoint::new(get_all_times));
-        Some(IronAdapter::new(ctx.clone()).create_handler(api))
+    fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
+        let api = api::create_api().private();
+        Some(IronAdapter::with_context(ctx).create_handler(api))
     }
 }
 

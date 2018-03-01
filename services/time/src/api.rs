@@ -14,7 +14,7 @@
 
 //! HTTP API interfaces of the time oracle service.
 
-use exonum::api::ext::{ApiError, ReadContext, Spec};
+use exonum::api::ext::{ApiError, Context, ServiceApi, TypedEndpoint, Visibility};
 use exonum::blockchain::Schema as CoreSchema;
 use exonum::crypto::PublicKey;
 
@@ -51,9 +51,6 @@ pub struct ValidatorTime {
     pub time: Option<SystemTime>,
 }
 
-/// Specification of the `get_time` endpoint.
-pub const CURRENT_TIME_SPEC: Spec = Spec { id: "current_time" };
-
 /// Endpoint returning the current consolidated time.
 ///
 /// If there is no consolidated time value yet, returns `None`.
@@ -68,12 +65,12 @@ pub const CURRENT_TIME_SPEC: Spec = Spec { id: "current_time" };
 /// use exonum::api::ext::Endpoint;
 /// use exonum_testkit::TestKit;
 /// # use exonum_time::{TimeService, TxTime};
-/// # use exonum_time::api::get_time;
+/// # use exonum_time::api::GetTime;
 /// use std::time::{self, Duration};
 ///
 /// # fn main() {
 /// let mut testkit = TestKit::for_service(TimeService::new());
-/// let endpoint = Endpoint::new(get_time);
+/// let endpoint = Endpoint::from(GetTime);
 ///
 /// // Consolidated time is not set yet
 /// testkit.api().test(&endpoint, json!(null), &json!(null));
@@ -96,50 +93,82 @@ pub const CURRENT_TIME_SPEC: Spec = Spec { id: "current_time" };
 /// );
 /// # }
 /// ```
-pub fn get_time(ctx: &ReadContext, _: ()) -> Result<Option<SystemTime>, ApiError> {
-    Ok(TimeSchema::new(ctx.snapshot()).time().get())
-}
+#[derive(Debug)]
+pub struct GetTime;
 
-/// Specification of the `get_validators_times` endpoint.
-pub const VALIDATORS_TIMES_SPEC: Spec = Spec { id: "validators_times" };
+impl TypedEndpoint for GetTime {
+    type Arg = ();
+    type Output = Option<SystemTime>;
+    const ID: &'static str = "current_time";
+    const VIS: Visibility = Visibility::Public;
+
+    fn call(&self, ctx: &Context, _: ()) -> Result<Option<SystemTime>, ApiError> {
+        Ok(TimeSchema::new(ctx.snapshot()).time().get())
+    }
+}
 
 /// Endpoint returning an array of timestamps for the actual validators.
-pub fn get_validators_times(ctx: &ReadContext, _: ()) -> Result<Vec<ValidatorTime>, ApiError> {
-    let view = ctx.snapshot();
-    let validator_keys = CoreSchema::new(&view).actual_configuration().validator_keys;
-    let schema = TimeSchema::new(&view);
-    let idx = schema.validators_times();
+#[derive(Debug)]
+pub struct GetValidatorsTimes;
 
-    // The times of current validators.
-    // `None` if the time of the validator is unknown.
-    let validators_times = validator_keys
-        .iter()
-        .map(|validator| {
-            ValidatorTime {
-                public_key: validator.service_key,
-                time: idx.get(&validator.service_key),
-            }
-        })
-        .collect();
-    Ok(validators_times)
+impl TypedEndpoint for GetValidatorsTimes {
+    type Arg = ();
+    type Output = Vec<ValidatorTime>;
+    const ID: &'static str = "validators_times";
+    const VIS: Visibility = Visibility::Private;
+
+    fn call(&self, ctx: &Context, _: ()) -> Result<Vec<ValidatorTime>, ApiError> {
+        let view = ctx.snapshot();
+        let validator_keys = CoreSchema::new(&view).actual_configuration().validator_keys;
+        let schema = TimeSchema::new(&view);
+        let idx = schema.validators_times();
+
+        // The times of current validators.
+        // `None` if the time of the validator is unknown.
+        let validators_times = validator_keys
+            .iter()
+            .map(|validator| {
+                ValidatorTime {
+                    public_key: validator.service_key,
+                    time: idx.get(&validator.service_key),
+                }
+            })
+            .collect();
+        Ok(validators_times)
+    }
 }
 
-/// Specification of the `get_validators_times` endpoint.
-pub const ALL_TIMES_SPEC: Spec = Spec { id: "all_validators_times" };
-
 /// Endpoint returning an array of current timestamps for actual and past validators.
-pub fn get_all_times(ctx: &ReadContext, _: ()) -> Result<Vec<ValidatorTime>, ApiError> {
-    let view = ctx.snapshot();
-    let schema = TimeSchema::new(&view);
-    let idx = schema.validators_times();
+#[derive(Debug)]
+pub struct GetAllTimes;
 
-    let validators_times = idx.iter()
-        .map(|(public_key, time)| {
-            ValidatorTime {
-                public_key,
-                time: Some(time),
-            }
-        })
-        .collect();
-    Ok(validators_times)
+impl TypedEndpoint for GetAllTimes {
+    type Arg = ();
+    type Output = Vec<ValidatorTime>;
+    const ID: &'static str = "all_validators_times";
+    const VIS: Visibility = Visibility::Private;
+
+    fn call(&self, ctx: &Context, _: ()) -> Result<Vec<ValidatorTime>, ApiError> {
+        let view = ctx.snapshot();
+        let schema = TimeSchema::new(&view);
+        let idx = schema.validators_times();
+
+        let validators_times = idx.iter()
+            .map(|(public_key, time)| {
+                ValidatorTime {
+                    public_key,
+                    time: Some(time),
+                }
+            })
+            .collect();
+        Ok(validators_times)
+    }
+}
+
+pub(crate) fn create_api() -> ServiceApi {
+    let mut api = ServiceApi::new();
+    GetTime.wire(&mut api);
+    GetValidatorsTimes.wire(&mut api);
+    GetAllTimes.wire(&mut api);
+    api
 }
