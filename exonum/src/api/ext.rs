@@ -31,27 +31,18 @@
 //!     Any {
 //!         const SERVICE_ID = 1000;
 //!
-//!         struct CreateWallet {
-//!             // ...
-//!         }
-//!
-//!         struct Transfer {
-//!             // ...
-//!         }
+//!         struct CreateWallet { /* ... */ }
+//!         struct Transfer { /* ... */ }
 //!     }
 //! }
-//!
-//! impl Transaction for CreateWallet {
-//!     // ...
-//! #   fn verify(&self) -> bool { true }
-//! #   fn execute(&self, _: &mut Fork) -> ExecutionResult { Ok(()) }
-//! }
-//!
-//! impl Transaction for Transfer {
-//!     // ...
-//! #   fn verify(&self) -> bool { true }
-//! #   fn execute(&self, _: &mut Fork) -> ExecutionResult { Ok(()) }
-//! }
+//! # impl Transaction for CreateWallet {
+//! #     fn verify(&self) -> bool { true }
+//! #     fn execute(&self, _: &mut Fork) -> ExecutionResult { Ok(()) }
+//! # }
+//! # impl Transaction for Transfer {
+//! #     fn verify(&self) -> bool { true }
+//! #     fn execute(&self, _: &mut Fork) -> ExecutionResult { Ok(()) }
+//! # }
 //!
 //! // Service schema containing wallet balances
 //! struct Schema { /* ... */ }
@@ -65,7 +56,10 @@
 //! }
 //!
 //! // Read request: get the balance of a specific wallet.
-//! pub const BALANCE_SPEC: Spec = Spec { id: "balance" };
+//! pub const BALANCE_SPEC: Spec = Spec {
+//!     id: "balance",
+//!     visibility: Visibility::Public,
+//! };
 //!
 //! pub fn balance(ctx: &ReadContext, key: PublicKey) -> ApiResult<Option<u64>> {
 //!     let schema = Schema::new(ctx.snapshot());
@@ -111,8 +105,11 @@ use storage::Snapshot;
 /// Transaction sinks can be added to service APIs using the [`set_transactions`]
 /// method in `ServiceApi`; see it for more details.
 ///
-/// [`add_transactions`]: struct.ServiceApi.html#method.set_transactions
-pub const TRANSACTIONS: Spec = Spec { id: "transactions" };
+/// [`set_transactions`]: struct.ServiceApi.html#method.set_transactions
+pub const TRANSACTIONS: Spec = Spec {
+    id: "transactions",
+    visibility: Visibility::Public,
+};
 
 /// API-related errors.
 #[derive(Debug, Fail)]
@@ -165,6 +162,21 @@ pub type ApiResult<T> = Result<T, ApiError>;
 pub struct Spec {
     /// Endpoint identifier.
     pub id: &'static str,
+
+    /// Visibility level of the endpoint.
+    ///
+    /// Endpoint with lesser visibility may be hidden by the transport adapters;
+    /// e.g., an HTTP may serve them on a different port behind a firewall.
+    pub visibility: Visibility,
+}
+
+/// Possible visibility levels of service endpoints.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Visibility {
+    /// Endpoint should be available to the general audience.
+    Public,
+    /// The access to the endpoint should be restricted.
+    Private,
 }
 
 /// Context supplied to read-only endpoints.
@@ -225,7 +237,8 @@ impl<'a> MutContext<'a> {
     /// Queues a transaction for signing, sending over the network and including
     /// into the blockchain.
     ///
-    /// The transaction is signed with the service secret key and returned.
+    /// The transaction is signed with the service secret key; the hash of the signed
+    /// transaction is returned.
     pub fn sign_and_send(&self, message: &RawMessage) -> Result<Hash, ApiError> {
         self.inner
             .blockchain
@@ -467,6 +480,28 @@ impl ServiceApi {
         T: 'static + Into<Box<Transaction>> + Serialize + DeserializeOwned + Send + Sync,
     {
         self.insert(TRANSACTIONS, Endpoint::create_mut(transaction_sink::<T>));
+    }
+
+    /// Splits this API into two parts according to the given predicate.
+    ///
+    /// The endpoints satisfying the predicate go to the first struct returned by the method,
+    /// and the ones not satisfying it to the second one.
+    pub fn split_by<F>(self, mut predicate: F) -> (Self, Self)
+    where
+        F: FnMut(Spec) -> bool,
+    {
+        let mut matches = ServiceApi::new();
+        let mut non_matches = ServiceApi::new();
+
+        for (id, (spec, endpoint)) in self.endpoints.into_iter() {
+            if predicate(spec) {
+                matches.endpoints.insert(id, (spec, endpoint));
+            } else {
+                non_matches.endpoints.insert(id, (spec, endpoint));
+            }
+        }
+
+        (matches, non_matches)
     }
 }
 

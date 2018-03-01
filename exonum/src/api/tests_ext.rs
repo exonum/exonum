@@ -27,8 +27,8 @@ use iron::status;
 use iron::url::Url;
 use self::iron_test::request::{get as test_get, post as test_post};
 
-use api::ext::{ApiError, ApiResult, Endpoint, MutContext, ReadContext, Spec, ServiceApi,
-               TRANSACTIONS};
+use api::ext::{ApiError, ApiResult, Endpoint, EndpointHolder, MutContext, ReadContext, Spec,
+               ServiceApi, Visibility, TRANSACTIONS};
 use api::iron::{ErrorResponse, IronAdapter};
 use blockchain::{Blockchain, ExecutionResult, Transaction};
 use crypto::{self, CryptoHash, Hash};
@@ -150,11 +150,13 @@ fn create_blockchain() -> (Blockchain, mpsc::Receiver<ExternalMessage>) {
 }
 
 fn create_api() -> ServiceApi {
+    use self::Visibility::*;
+
     let mut api = ServiceApi::new();
     api.set_transactions::<Any>();
-    api.insert(Spec { id: "flop" }, Endpoint::new(get_flop));
-    api.insert(FlopOrDefault::SPEC, Endpoint::new(FlopOrDefault::call));
-    api.insert(Spec { id: "sum" }, Endpoint::new(get_sum));
+    api.insert(Spec { id: "flop", visibility: Public }, Endpoint::new(get_flop));
+    api.insert(Spec { id: "sum", visibility: Private }, Endpoint::new(get_sum));
+    FlopOrDefault::wire(&mut api);
     api
 }
 
@@ -228,11 +230,17 @@ fn test_full_transaction_sink() {
 enum FlopOrDefault {}
 
 impl FlopOrDefault {
-    const SPEC: Spec = Spec { id: "flop-or-default" };
+    const ID: &'static str = "flop-or-default";
+    const VISIBILITY: Visibility = Visibility::Public;
 
     fn call(ctx: &ReadContext, def: String) -> ApiResult<String> {
         let schema = Schema::new(ctx.snapshot());
         Ok(schema.flop().get().unwrap_or(def))
+    }
+
+    fn wire(api: &mut ServiceApi) {
+        let spec = Spec { id: Self::ID, visibility: Self::VISIBILITY };
+        api.insert(spec, Endpoint::new(Self::call));
     }
 }
 
@@ -243,7 +251,7 @@ fn test_read_requests() {
 
     let response = api["flop"].handle(&blockchain, json!(null)).unwrap();
     assert_eq!(response, json!(null));
-    let response = api[FlopOrDefault::SPEC.id]
+    let response = api[FlopOrDefault::ID]
         .handle(&blockchain, json!("Ghostbusters (2016)"))
         .unwrap();
     assert_eq!(response, json!("Ghostbusters (2016)"));
@@ -256,7 +264,7 @@ fn test_read_requests() {
 
     let response = api["flop"].handle(&blockchain, json!(null)).unwrap();
     assert_eq!(response, json!("The Happening"));
-    let response = api[FlopOrDefault::SPEC.id]
+    let response = api[FlopOrDefault::ID]
         .handle(&blockchain, json!("Ghostbusters (2016)"))
         .unwrap();
     assert_eq!(response, json!("The Happening"));
@@ -266,7 +274,10 @@ fn test_read_requests() {
 fn test_custom_transaction_sign_and_send() {
     use messages::Message;
 
-    const SPEC: Spec = Spec { id: "send-transaction" };
+    const SPEC: Spec = Spec {
+        id: "send-transaction",
+        visibility: Visibility::Private,
+    };
 
     fn send(ctx: &MutContext, req: (u64, String)) -> Result<Hash, ApiError> {
         let tx = Flip::new_with_signature(req.0, &crypto::Signature::zero());
@@ -294,7 +305,7 @@ fn test_custom_transaction_send() {
     let key_clone = key.clone();
     let mut api = ServiceApi::new();
     api.insert(
-        Spec { id: "send" },
+        Spec { id: "send", visibility: Visibility::Private },
         Endpoint::create_mut(move |context, data| {
             let tx = Flip::new(data, &key_clone);
             let tx_hash = tx.hash();
@@ -324,11 +335,42 @@ fn test_duplicate_ids() {
 }
 
 #[test]
+#[should_panic(expected = "Duplicate endpoint ID")]
+fn test_duplicate_ids_with_different_spec() {
+    let mut api = ServiceApi::new();
+    api.set_transactions::<Any>();
+    api.insert(
+        Spec { id: "transactions", visibility: Visibility::Private },
+        Endpoint::new(|_, _: ()| Ok("Gotcha!".to_owned())),
+    );
+    drop(api);
+}
+
+#[test]
 #[should_panic(expected = "Unknown endpoint ID")]
 fn test_unknown_id() {
     let (blockchain, _) = create_blockchain();
     let api = create_api();
     api["foobar"].handle(&blockchain, json!(null)).unwrap();
+}
+
+#[test]
+#[should_panic(expected = "Unknown endpoint spec")]
+fn test_unknown_id_with_spec() {
+    let (blockchain, _) = create_blockchain();
+    let api = create_api();
+    let spec = Spec { visibility: Visibility::Private, ..TRANSACTIONS };
+    api[spec].handle(&blockchain, json!(null)).unwrap();
+}
+
+#[test]
+fn test_split() {
+    let api = create_api();
+    let (public_api, private_api) = api.split_by(|spec| spec.visibility == Visibility::Public);
+    assert!(public_api.endpoint("flop").is_some());
+    assert!(private_api.endpoint("flop").is_none());
+    assert!(public_api.endpoint("sum").is_none());
+    assert!(private_api.endpoint("sum").is_some());
 }
 
 // // // Iron-related tests // // //
@@ -590,7 +632,10 @@ fn test_iron_transaction_send_failure() {
 
 #[test]
 fn test_not_found_error() {
-    const SPEC: Spec = Spec { id: "flop-or-fail" };
+    const SPEC: Spec = Spec {
+        id: "flop-or-fail",
+        visibility: Visibility::Public,
+    };
 
     fn flop_or_fail(ctx: &ReadContext, _: ()) -> Result<String, ApiError> {
         let schema = Schema::new(ctx.snapshot());
