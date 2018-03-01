@@ -27,8 +27,8 @@ use iron::status;
 use iron::url::Url;
 use self::iron_test::request::{get as test_get, post as test_post};
 
-use api::ext::{ApiError, ApiResult, Endpoint, EndpointHolder, MutContext, ReadContext, Spec,
-               ServiceApi, Visibility, TRANSACTIONS};
+use api::ext::{ApiError, ApiResult, Endpoint, EndpointHolder, MutContext, Context, Spec,
+               ServiceApi, Visibility, TRANSACTIONS, TypedEndpoint};
 use api::iron::{ErrorResponse, IronAdapter};
 use blockchain::{Blockchain, ExecutionResult, Transaction};
 use crypto::{self, CryptoHash, Hash};
@@ -89,12 +89,12 @@ impl Transaction for Flop {
     }
 }
 
-fn get_flop(context: &ReadContext, _: ()) -> ApiResult<Option<String>> {
+fn get_flop(context: &Context, _: ()) -> ApiResult<Option<String>> {
     let schema = Schema::new(context.snapshot());
     Ok(schema.flop().get())
 }
 
-fn get_sum(_: &ReadContext, numbers: Vec<u32>) -> ApiResult<u32> {
+fn get_sum(_: &Context, numbers: Vec<u32>) -> ApiResult<u32> {
     let mut sum: u32 = 0;
     for x in numbers {
         sum = sum.checked_add(x).ok_or_else(|| {
@@ -102,6 +102,20 @@ fn get_sum(_: &ReadContext, numbers: Vec<u32>) -> ApiResult<u32> {
         })?;
     }
     Ok(sum)
+}
+
+struct FlopOrDefault;
+
+impl TypedEndpoint for FlopOrDefault {
+    type Arg = String;
+    type Output = String;
+    const ID: &'static str = "flop-or-default";
+    const VIS: Visibility = Visibility::Public;
+
+    fn call(&self, ctx: &Context, def: String) -> ApiResult<String> {
+        let schema = Schema::new(ctx.snapshot());
+        Ok(schema.flop().get().unwrap_or(def))
+    }
 }
 
 fn create_blockchain_with_keypair(
@@ -154,9 +168,21 @@ fn create_api() -> ServiceApi {
 
     let mut api = ServiceApi::new();
     api.set_transactions::<Any>();
-    api.insert(Spec { id: "flop", visibility: Public }, Endpoint::new(get_flop));
-    api.insert(Spec { id: "sum", visibility: Private }, Endpoint::new(get_sum));
-    FlopOrDefault::wire(&mut api);
+    api.insert(
+        Spec {
+            id: "flop",
+            visibility: Public,
+        },
+        Endpoint::new(get_flop),
+    );
+    api.insert(
+        Spec {
+            id: "sum",
+            visibility: Private,
+        },
+        Endpoint::new(get_sum),
+    );
+    api.insert(FlopOrDefault::spec(), FlopOrDefault);
     api
 }
 
@@ -227,23 +253,6 @@ fn test_full_transaction_sink() {
     }
 }
 
-enum FlopOrDefault {}
-
-impl FlopOrDefault {
-    const ID: &'static str = "flop-or-default";
-    const VISIBILITY: Visibility = Visibility::Public;
-
-    fn call(ctx: &ReadContext, def: String) -> ApiResult<String> {
-        let schema = Schema::new(ctx.snapshot());
-        Ok(schema.flop().get().unwrap_or(def))
-    }
-
-    fn wire(api: &mut ServiceApi) {
-        let spec = Spec { id: Self::ID, visibility: Self::VISIBILITY };
-        api.insert(spec, Endpoint::new(Self::call));
-    }
-}
-
 #[test]
 fn test_read_requests() {
     let (mut blockchain, _) = create_blockchain();
@@ -305,7 +314,10 @@ fn test_custom_transaction_send() {
     let key_clone = key.clone();
     let mut api = ServiceApi::new();
     api.insert(
-        Spec { id: "send", visibility: Visibility::Private },
+        Spec {
+            id: "send",
+            visibility: Visibility::Private,
+        },
         Endpoint::create_mut(move |context, data| {
             let tx = Flip::new(data, &key_clone);
             let tx_hash = tx.hash();
@@ -320,6 +332,72 @@ fn test_custom_transaction_send() {
     let response = api["send"].handle(&blockchain, json!(tx.field())).unwrap();
     assert_eq!(response, json!(tx.hash()));
     assert_channel_state(receiver.by_ref(), &tx.hash());
+}
+
+#[test]
+fn test_custom_transaction_send_struct() {
+    use crypto::SecretKey;
+
+    struct Signer {
+        secret_key: SecretKey,
+    }
+
+    impl TypedEndpoint for Signer {
+        type Arg = u64;
+        type Output = Hash;
+
+        const ID: &'static str = "send";
+        const VIS: Visibility = Visibility::Private;
+        const CONSTANT: bool = false;
+
+        fn call(&self, ctx: &Context, arg: u64) -> ApiResult<Hash> {
+            let tx = Flip::new(arg, &self.secret_key);
+            let tx_hash = tx.hash();
+            ctx.as_mut().send(tx)?;
+            Ok(tx_hash)
+        }
+    }
+
+    let (_, key) = crypto::gen_keypair();
+    let mut api = ServiceApi::new();
+    Signer { secret_key: key.clone() }.wire(&mut api);
+    let (blockchain, mut receiver) = create_blockchain();
+
+    let tx = Flip::new(500, &key);
+    let response = api[Signer::ID]
+        .handle(&blockchain, json!(tx.field()))
+        .unwrap();
+    assert_eq!(response, json!(tx.hash()));
+    assert_channel_state(receiver.by_ref(), &tx.hash());
+}
+
+#[test]
+#[should_panic(expected = "Cannot mutate context")]
+fn test_const_endpoint_trying_to_mutate_node() {
+    struct Misconfigured;
+
+    impl TypedEndpoint for Misconfigured {
+        type Arg = u64;
+        type Output = Hash;
+
+        const ID: &'static str = "send";
+        const VIS: Visibility = Visibility::Private;
+        // Note the absence of the `CONSTANT` specifier.
+
+        fn call(&self, ctx: &Context, arg: u64) -> ApiResult<Hash> {
+            let tx = Flip::new(arg, &crypto::gen_keypair().1);
+            let tx_hash = tx.hash();
+            ctx.as_mut().send(tx)?;
+            Ok(tx_hash)
+        }
+    }
+
+    let mut api = ServiceApi::new();
+    Misconfigured.wire(&mut api);
+    let (blockchain, _) = create_blockchain();
+    api[Misconfigured::ID]
+        .handle(&blockchain, json!(399))
+        .unwrap();
 }
 
 #[test]
@@ -340,7 +418,10 @@ fn test_duplicate_ids_with_different_spec() {
     let mut api = ServiceApi::new();
     api.set_transactions::<Any>();
     api.insert(
-        Spec { id: "transactions", visibility: Visibility::Private },
+        Spec {
+            id: "transactions",
+            visibility: Visibility::Private,
+        },
         Endpoint::new(|_, _: ()| Ok("Gotcha!".to_owned())),
     );
     drop(api);
@@ -359,7 +440,10 @@ fn test_unknown_id() {
 fn test_unknown_id_with_spec() {
     let (blockchain, _) = create_blockchain();
     let api = create_api();
-    let spec = Spec { visibility: Visibility::Private, ..TRANSACTIONS };
+    let spec = Spec {
+        visibility: Visibility::Private,
+        ..TRANSACTIONS
+    };
     api[spec].handle(&blockchain, json!(null)).unwrap();
 }
 
@@ -637,7 +721,7 @@ fn test_not_found_error() {
         visibility: Visibility::Public,
     };
 
-    fn flop_or_fail(ctx: &ReadContext, _: ()) -> Result<String, ApiError> {
+    fn flop_or_fail(ctx: &Context, _: ()) -> Result<String, ApiError> {
         let schema = Schema::new(ctx.snapshot());
         schema.flop().get().ok_or(ApiError::NotFound)
     }

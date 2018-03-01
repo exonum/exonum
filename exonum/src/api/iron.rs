@@ -94,7 +94,7 @@ impl IronAdapter {
     pub fn create_handler(&self, api: ServiceApi) -> Box<Handler> {
         // Can an endpoint be used in `GET` HTTP requests?
         fn can_get(e: &Endpoint) -> bool {
-            e.readonly()
+            e.constant()
         }
 
         // Can an endpoint be used in `POST` HTTP requests?
