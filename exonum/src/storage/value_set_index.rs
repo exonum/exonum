@@ -17,7 +17,7 @@
 use std::marker::PhantomData;
 
 use crypto::Hash;
-use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
+use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue, StorageKey};
 use super::indexes_metadata::IndexType;
 
 /// A set of items that implement `StorageValue` trait.
@@ -109,10 +109,10 @@ where
     /// let snapshot = db.snapshot();
     /// let name = "name";
     /// let prefix = vec![123];
-    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::with_prefix(name, prefix, &snapshot);
+    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::with_prefix(name, &prefix, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
+    pub fn with_prefix<S: AsRef<str>, P: StorageKey>(name: S, prefix: &P, view: T) -> Self {
         ValueSetIndex {
             base: BaseIndex::with_prefix(name, prefix, IndexType::ValueSet, view),
             _v: PhantomData,

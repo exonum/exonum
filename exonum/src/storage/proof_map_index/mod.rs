@@ -18,7 +18,7 @@ use std::marker::PhantomData;
 use std::fmt;
 
 use crypto::{Hash, CryptoHash, HashStream};
-use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageValue};
+use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageValue, StorageKey};
 use super::indexes_metadata::IndexType;
 use self::key::{BitsRange, ChildKind, LEAF_KEY_PREFIX};
 use self::node::{BranchNode, Node};
@@ -161,15 +161,15 @@ where
     ///
     /// let snapshot = db.snapshot();
     /// let index: ProofMapIndex<_, Hash, u8> =
-    ///                             ProofMapIndex::with_prefix(name, prefix.clone(), &snapshot);
+    ///                             ProofMapIndex::with_prefix(name, &prefix, &snapshot);
     ///
     /// let mut fork = db.fork();
     /// let mut mut_index : ProofMapIndex<_, Hash, u8> =
-    ///                                     ProofMapIndex::with_prefix(name, prefix, &mut fork);
+    ///                                     ProofMapIndex::with_prefix(name, &prefix, &mut fork);
     /// # drop(index);
     /// # drop(mut_index);
     /// ```
-    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
+    pub fn with_prefix<S: AsRef<str>, P: StorageKey>(name: S, prefix: &P, view: T) -> Self {
         ProofMapIndex {
             base: BaseIndex::with_prefix(name, prefix, IndexType::ProofMap, view),
             _k: PhantomData,

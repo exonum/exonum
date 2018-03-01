@@ -127,10 +127,10 @@ where
     /// let prefix = vec![01];
     ///
     /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::with_prefix(name, prefix, &snapshot);
+    /// let index: MapIndex<_, u8, u8> = MapIndex::with_prefix(name, &prefix, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
+    pub fn with_prefix<S: AsRef<str>, P: StorageKey>(name: S, prefix: &P, view: T) -> Self {
         MapIndex {
             base: BaseIndex::with_prefix(name, prefix, IndexType::Map, view),
             _k: PhantomData,

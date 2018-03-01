@@ -14,8 +14,7 @@
 
 use crypto::{PublicKey, Hash, CryptoHash};
 use messages::{Precommit, RawMessage, Connect};
-use storage::{Entry, Fork, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex, Snapshot,
-              StorageKey};
+use storage::{Entry, Fork, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex, Snapshot};
 use helpers::{Height, Round};
 use super::{Block, BlockProof, Blockchain, TransactionResult};
 use super::config::StoredConfiguration;
@@ -46,13 +45,6 @@ define_names!(
     CONSENSUS_MESSAGES_CACHE => "consensus_messages_cache";
     CONSENSUS_ROUND => "consensus_round";
 );
-
-/// Generates an array of bytes from the `prefix`.
-pub fn gen_prefix<K: StorageKey>(prefix: &K) -> Vec<u8> {
-    let mut res = vec![0; prefix.size()];
-    prefix.write(&mut res[..]);
-    res
-}
 
 encoding_struct! (
     /// Configuration index.
@@ -118,12 +110,12 @@ where
     /// Returns table that keeps a list of transactions for the each block.
     pub fn block_txs(&self, height: Height) -> ProofListIndex<&T, Hash> {
         let height: u64 = height.into();
-        ProofListIndex::with_prefix(BLOCK_TXS, gen_prefix(&height), &self.view)
+        ProofListIndex::with_prefix(BLOCK_TXS, &height, &self.view)
     }
 
     /// Returns table that saves a list of precommits for block with given hash.
     pub fn precommits(&self, hash: &Hash) -> ListIndex<&T, Precommit> {
-        ListIndex::with_prefix(PRECOMMITS, gen_prefix(hash), &self.view)
+        ListIndex::with_prefix(PRECOMMITS, hash, &self.view)
     }
 
     /// Returns table that represents a map from configuration hash into contents.
@@ -384,14 +376,14 @@ impl<'a> Schema<&'a mut Fork> {
     /// [1]: struct.Schema.html#method.block_txs
     pub(crate) fn block_txs_mut(&mut self, height: Height) -> ProofListIndex<&mut Fork, Hash> {
         let height: u64 = height.into();
-        ProofListIndex::with_prefix(BLOCK_TXS, gen_prefix(&height), self.view)
+        ProofListIndex::with_prefix(BLOCK_TXS, &height, self.view)
     }
 
     /// Mutable reference to the [`precommits`][1] index.
     ///
     /// [1]: struct.Schema.html#method.precommits
     pub(crate) fn precommits_mut(&mut self, hash: &Hash) -> ListIndex<&mut Fork, Precommit> {
-        ListIndex::with_prefix(PRECOMMITS, gen_prefix(hash), self.view)
+        ListIndex::with_prefix(PRECOMMITS, hash, self.view)
     }
 
     /// Mutable reference to the [`configs`][1] index.

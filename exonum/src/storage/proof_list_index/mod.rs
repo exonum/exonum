@@ -18,7 +18,7 @@ use std::cell::Cell;
 use std::marker::PhantomData;
 
 use crypto::{Hash, hash, HashStream};
-use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
+use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue, StorageKey};
 use super::indexes_metadata::IndexType;
 use self::key::ProofListKey;
 
@@ -123,15 +123,15 @@ where
     ///
     /// let snapshot = db.snapshot();
     /// let index: ProofListIndex<_, u8> =
-    ///                             ProofListIndex::with_prefix(name, prefix.clone(), &snapshot);
+    ///                             ProofListIndex::with_prefix(name, &prefix, &snapshot);
     ///
     /// let mut fork = db.fork();
     /// let mut mut_index : ProofListIndex<_, u8> =
-    ///                                     ProofListIndex::with_prefix(name, prefix, &mut fork);
+    ///                                     ProofListIndex::with_prefix(name, &prefix, &mut fork);
     /// # drop(index);
     /// # drop(mut_index);
     /// ```
-    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
+    pub fn with_prefix<S: AsRef<str>, P: StorageKey>(name: S, prefix: &P, view: T) -> Self {
         ProofListIndex {
             base: BaseIndex::with_prefix(name, prefix, IndexType::ProofList, view),
             length: Cell::new(None),

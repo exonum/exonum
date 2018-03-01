@@ -24,7 +24,7 @@ use std::cell::Cell;
 use std::marker::PhantomData;
 
 use crypto::{hash, CryptoHash, Hash};
-use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
+use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue, StorageKey};
 use super::indexes_metadata::IndexType;
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -170,10 +170,10 @@ where
     /// let snapshot = db.snapshot();
     /// let name = "name";
     /// let prefix = vec![123];
-    /// let index: SparseListIndex<_, u8> = SparseListIndex::with_prefix(name, prefix, &snapshot);
+    /// let index: SparseListIndex<_, u8> = SparseListIndex::with_prefix(name, &prefix, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
+    pub fn with_prefix<S: AsRef<str>, P: StorageKey>(name: S, prefix: &P, view: T) -> Self {
         SparseListIndex {
             base: BaseIndex::with_prefix(name, prefix, IndexType::SparseList, view),
             size: Cell::new(None),

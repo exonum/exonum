@@ -171,6 +171,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Renamed methods `validators_time`/`validators_time_mut` to
   `validators_times`/`validators_times_mut` in `Schema`. (#20)
+- `blockchain::gen_prefix` function has been removed. Instead, now any type that
+  implements `StorageKey` can serve as a prefix.
 
 ### New features
 

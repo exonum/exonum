@@ -93,9 +93,9 @@ where
     ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
-    pub fn with_prefix<S: AsRef<str>>(
+    pub fn with_prefix<S: AsRef<str>, P: StorageKey>(
         name: S,
-        prefix: Vec<u8>,
+        prefix: &P,
         index_type: IndexType,
         view: T,
     ) -> Self {
@@ -105,7 +105,11 @@ where
 
         BaseIndex {
             name: name.as_ref().to_string(),
-            prefix: Some(prefix),
+            prefix: {
+                let mut buf = vec![0; prefix.size()];
+                prefix.write(&mut buf);
+                Some(buf)
+            },
             is_mutable: false,
             index_type,
             view,

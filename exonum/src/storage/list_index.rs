@@ -17,7 +17,7 @@
 use std::cell::Cell;
 use std::marker::PhantomData;
 
-use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
+use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue, StorageKey};
 use super::indexes_metadata::IndexType;
 
 /// A list of items that implement `StorageValue` trait.
@@ -98,10 +98,10 @@ where
     /// let name = "name";
     /// let prefix = vec![01];
     /// let snapshot = db.snapshot();
-    /// let index: ListIndex<_, u8> = ListIndex::with_prefix(name, prefix, &snapshot);
+    /// let index: ListIndex<_, u8> = ListIndex::with_prefix(name, &prefix, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
+    pub fn with_prefix<S: AsRef<str>, P: StorageKey>(name: S, prefix: &P, view: T) -> Self {
         ListIndex {
             base: BaseIndex::with_prefix(name, prefix, IndexType::List, view),
             length: Cell::new(None),
@@ -537,7 +537,7 @@ mod tests {
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
-            let mut list_index = ListIndex::with_prefix(IDX_NAME, vec![01], &mut fork);
+            let mut list_index = ListIndex::with_prefix(IDX_NAME, &vec![01], &mut fork);
             super::list_index_methods(&mut list_index);
         }
 
@@ -557,7 +557,7 @@ mod tests {
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
-            let mut list_index = ListIndex::with_prefix(IDX_NAME, vec![01], &mut fork);
+            let mut list_index = ListIndex::with_prefix(IDX_NAME, &vec![01], &mut fork);
             super::list_index_iter(&mut list_index);
         }
     }
@@ -590,7 +590,7 @@ mod tests {
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
-            let mut list_index = ListIndex::with_prefix(IDX_NAME, vec![01], &mut fork);
+            let mut list_index = ListIndex::with_prefix(IDX_NAME, &vec![01], &mut fork);
             super::list_index_methods(&mut list_index);
         }
 
@@ -610,7 +610,7 @@ mod tests {
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
-            let mut list_index = ListIndex::with_prefix(IDX_NAME, vec![01], &mut fork);
+            let mut list_index = ListIndex::with_prefix(IDX_NAME, &vec![01], &mut fork);
             super::list_index_iter(&mut list_index);
         }
     }
