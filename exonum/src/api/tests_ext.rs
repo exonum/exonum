@@ -457,6 +457,19 @@ fn test_split() {
     assert!(private_api.endpoint("sum").is_some());
 }
 
+#[test]
+fn test_public_private() {
+    let api = create_api();
+    let public_api = api.public();
+    assert!(public_api.endpoint("flop").is_some());
+    assert!(public_api.endpoint("sum").is_none());
+
+    let api = create_api();
+    let private_api = api.private();
+    assert!(private_api.endpoint("flop").is_none());
+    assert!(private_api.endpoint("sum").is_some());
+}
+
 // // // Iron-related tests // // //
 
 fn create_url(endpoint_id: &str, q: &str) -> String {
@@ -480,7 +493,7 @@ fn post_headers() -> Headers {
 fn test_iron_read_requests_normal() {
     let (blockchain, _) = create_blockchain();
     let api = create_api();
-    let handler = IronAdapter::new(blockchain.api_context()).create_handler(api);
+    let handler = IronAdapter::new(blockchain).create_handler(api);
 
     let resp = test_get("http://localhost:3000/flop", Headers::new(), &handler).unwrap();
     assert_eq!(resp.status, Some(status::Ok));
@@ -517,7 +530,7 @@ fn test_iron_read_requests_normal() {
 fn test_iron_transactions_normal() {
     let (blockchain, mut receiver) = create_blockchain();
     let api = create_api();
-    let handler = IronAdapter::new(blockchain.api_context()).create_handler(api);
+    let handler = IronAdapter::new(blockchain).create_handler(api);
 
     let tx = {
         let (_, key) = crypto::gen_keypair();
@@ -539,7 +552,7 @@ fn test_iron_transactions_normal() {
 fn test_iron_transactions_no_get() {
     let (blockchain, receiver) = create_blockchain();
     let api = create_api();
-    let handler = IronAdapter::new(blockchain.api_context()).create_handler(api);
+    let handler = IronAdapter::new(blockchain).create_handler(api);
 
     let tx = {
         let (_, key) = crypto::gen_keypair();
@@ -570,7 +583,7 @@ fn test_iron_transactions_no_get() {
 fn test_iron_read_requests_malformed() {
     let (blockchain, _) = create_blockchain();
     let api = create_api();
-    let handler = IronAdapter::new(blockchain.api_context()).create_handler(api);
+    let handler = IronAdapter::new(blockchain).create_handler(api);
 
     let malformed_requests = [
         "1, 2, 3", // not correct JSON
@@ -624,7 +637,6 @@ fn test_iron_read_requests_malformed() {
 fn test_read_request_user_generated_internal_error() {
     let (blockchain, _) = create_blockchain();
     let api = create_api();
-    let ctx = blockchain.api_context();
 
     let error = api["sum"]
         .handle(&blockchain, json!([2000000000, 2000000000, 2000000000]))
@@ -635,7 +647,7 @@ fn test_read_request_user_generated_internal_error() {
     }
 
     // Now, with the Iron engine
-    let handler = IronAdapter::new(ctx).create_handler(api);
+    let handler = IronAdapter::new(blockchain).create_handler(api);
 
     let url = create_url("sum", "[2000000000, 2000000000, 2000000000]");
     let IronError { error, response } = test_get(&url, Headers::new(), &handler).unwrap_err();
@@ -654,7 +666,7 @@ fn test_read_request_user_generated_internal_error() {
 fn test_iron_transaction_verification_failure() {
     let (blockchain, receiver) = create_blockchain();
     let api = create_api();
-    let handler = IronAdapter::new(blockchain.api_context()).create_handler(api);
+    let handler = IronAdapter::new(blockchain).create_handler(api);
 
     let tx = {
         let (_, key) = crypto::gen_keypair();
@@ -686,7 +698,7 @@ fn test_iron_transaction_send_failure() {
 
     let (blockchain, receiver) = create_blockchain();
     let api = create_api();
-    let handler = IronAdapter::new(blockchain.api_context()).create_handler(api);
+    let handler = IronAdapter::new(blockchain).create_handler(api);
     drop(receiver);
 
     let tx = {
@@ -737,7 +749,7 @@ fn test_not_found_error() {
         _ => panic!("Unexpected API error"),
     }
 
-    let handler = IronAdapter::new(blockchain.api_context()).create_handler(api);
+    let handler = IronAdapter::new(blockchain.clone()).create_handler(api);
     let IronError { response, .. } = test_get(
         "http://localhost:3000/flop-or-fail",
         Headers::new(),

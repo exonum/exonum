@@ -95,7 +95,7 @@
 //!         let mut api = ServiceApi::new();
 //!         api.set_transactions::<Any>();
 //!         api.insert(BALANCE_SPEC, Endpoint::new(balance));
-//!         Some(IronAdapter::new(context.clone()).create_handler(api))
+//!         Some(IronAdapter::with_context(context).create_handler(api))
 //!     }
 //! }
 //! # fn main() { }
@@ -660,6 +660,22 @@ impl ServiceApi {
         }
 
         (matches, non_matches)
+    }
+
+    /// Returns the public part of the service API.
+    pub fn public(mut self) -> Self {
+        self.endpoints.retain(|_, &mut (spec, _)| {
+            spec.visibility == Visibility::Public
+        });
+        self
+    }
+
+    /// Returns the private part of the service API.
+    pub fn private(mut self) -> Self {
+        self.endpoints.retain(|_, &mut (spec, _)| {
+            spec.visibility == Visibility::Private
+        });
+        self
     }
 }
 
