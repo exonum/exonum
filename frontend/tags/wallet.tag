@@ -371,6 +371,8 @@
                         self.transactions = data.transactions;
                         self.update();
                     }).catch(function(error) {
+                        self.toggleLoading(false);
+
                         self.notify('error', error.toString());
 
                         self.logout();
@@ -464,6 +466,14 @@
             this.toggleLoading(true);
 
             this.auth.getUser().then(function(keyPair) {
+                if (self.receiver === keyPair.publicKey) {
+                    self.toggleLoading(false);
+
+                    self.notify('error', 'Сan not transfer funds to yourself');
+
+                    return;
+                }
+
                 var TxTransfer = Exonum.newMessage({
                     size: 80,
                     network_id: self.NETWORK_ID,

@@ -32,7 +32,7 @@
                         <form onsubmit={ register }>
                             <div class="form-group">
                                 <label class="control-label">Name:</label>
-                                <input type="text" class="form-control" placeholder="Enter name" onkeyup={ editName }>
+                                <input type="text" class="form-control" placeholder="Enter name" onkeyup={ editName } maxlength="260">
                             </div>
                             <button type="submit" class="btn btn-lg btn-block btn-primary" disabled={ !name }>Register</button>
                         </form>

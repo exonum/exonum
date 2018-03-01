@@ -8,9 +8,6 @@ target
 */target
 *.rs.bk
 
-# frontend
-frontend/config.json
-
 # bootstrap and temporary directories
 currency_root
 etc
