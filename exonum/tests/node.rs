@@ -27,7 +27,7 @@ use tokio_timer::Timer;
 use exonum::blockchain::{Service, ServiceContext, Transaction};
 use exonum::encoding::Error as EncodingError;
 use exonum::messages::RawTransaction;
-use exonum::node::Node;
+use exonum::node::{Node, ApiSender, ExternalMessage};
 use exonum::storage::{MemoryDB, Snapshot};
 use exonum::helpers;
 use exonum::crypto::Hash;
@@ -58,17 +58,16 @@ impl Service for CommitWatcherService {
     }
 }
 
-fn run_nodes(count: u8) -> (Vec<JoinHandle<()>>, Vec<oneshot::Receiver<()>>) {
+fn run_nodes(count: u8) -> (Vec<(JoinHandle<()>, ApiSender)>, Vec<oneshot::Receiver<()>>) {
     let mut node_threads = Vec::new();
     let mut commit_rxs = Vec::new();
     for node_cfg in helpers::generate_testnet_config(count, 16_300) {
         let (commit_tx, commit_rx) = oneshot::channel();
-        let node_thread = thread::spawn(move || {
-            let service = Box::new(CommitWatcherService(Mutex::new(Some(commit_tx))));
-            let node = Node::new(Box::new(MemoryDB::new()), vec![service], node_cfg);
-            node.run().unwrap();
-        });
-        node_threads.push(node_thread);
+        let service = Box::new(CommitWatcherService(Mutex::new(Some(commit_tx))));
+        let node = Node::new(Box::new(MemoryDB::new()), vec![service], node_cfg);
+        let api_tx = node.channel();
+        let node_thread = thread::spawn(move || { node.run().unwrap(); });
+        node_threads.push((node_thread, api_tx));
         commit_rxs.push(commit_rx);
     }
     (node_threads, commit_rxs)
@@ -76,12 +75,19 @@ fn run_nodes(count: u8) -> (Vec<JoinHandle<()>>, Vec<oneshot::Receiver<()>>) {
 
 #[test]
 fn test_node_run() {
-    let (_, commit_rxs) = run_nodes(4);
+    let (nodes, commit_rxs) = run_nodes(4);
 
     let timer = Timer::default();
     let duration = Duration::from_secs(60);
     for rx in commit_rxs {
         let rx = timer.timeout(rx.map_err(drop), duration);
         rx.wait().unwrap();
+    }
+
+    for (handle, api_tx) in nodes {
+        api_tx
+            .send_external_message(ExternalMessage::Shutdown)
+            .unwrap();
+        handle.join().unwrap();
     }
 }

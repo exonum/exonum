@@ -31,19 +31,19 @@ use router::Router;
 use mount::Mount;
 use iron::{Chain, Iron};
 use iron_cors::CorsMiddleware;
-use serde::{ser, de};
+use serde::{de, ser};
 use futures::{Future, Sink};
 use futures::sync::mpsc;
 use tokio_core::reactor::Core;
 
-use crypto::{self, Hash, CryptoHash, PublicKey, SecretKey};
-use blockchain::{Blockchain, GenesisConfig, Schema, SharedNodeState, Transaction, Service};
+use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
+use blockchain::{Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction};
 use api::{private, public, Api};
 use messages::{Connect, Message, RawMessage};
-use events::{NetworkRequest, TimeoutRequest, NetworkEvent, InternalRequest, InternalEvent,
-             SyncSender, HandlerPart, NetworkConfiguration, NetworkPart, InternalPart};
-use events::error::{into_other, other_error, LogError, log_error};
-use helpers::{Height, Milliseconds, Round, ValidatorId, user_agent};
+use events::{HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkConfiguration,
+             NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest};
+use events::error::{into_other, log_error, other_error, LogError};
+use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
 use storage::Database;
 
 pub use self::state::{RequestData, State, TxPool, ValidatorState};
@@ -89,7 +89,7 @@ pub enum NodeTimeout {
 
 /// A helper trait that provides the node with information about the state of the system such
 /// as current time or listen address.
-pub trait SystemStateProvider: ::std::fmt::Debug {
+pub trait SystemStateProvider: ::std::fmt::Debug + Send + 'static {
     /// Returns the current address that the node listens on.
     fn listen_address(&self) -> SocketAddr;
     /// Return the current system time.
@@ -184,9 +184,9 @@ impl From<AllowOrigin> for CorsMiddleware {
     fn from(allow_origin: AllowOrigin) -> CorsMiddleware {
         match allow_origin {
             AllowOrigin::Any => CorsMiddleware::with_allow_any(),
-            AllowOrigin::Whitelist(hosts) => CorsMiddleware::with_whitelist(
-                hosts.into_iter().collect(),
-            ),
+            AllowOrigin::Whitelist(hosts) => {
+                CorsMiddleware::with_whitelist(hosts.into_iter().collect())
+            }
         }
     }
 }
@@ -271,7 +271,6 @@ fn allow_origin_serde() {
     );
 }
 
-
 /// Events pool capacities.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EventsPoolCapacity {
@@ -295,7 +294,6 @@ impl Default for EventsPoolCapacity {
         }
     }
 }
-
 
 /// Memory pool configuration parameters.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -783,7 +781,6 @@ impl Node {
             ApiSender::new(channel.api_requests.0.clone()),
         );
         blockchain.initialize(node_cfg.genesis.clone()).unwrap();
-
 
         let config = Configuration {
             listener: ListenerConfig {
