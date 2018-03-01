@@ -14,7 +14,7 @@
 
 //! HTTP API interfaces of the time oracle service.
 
-use exonum::api::ext::{ApiError, Context, ServiceApi, TypedEndpoint, Visibility};
+use exonum::api::ext::{ApiError, ConstEndpoint, Context, ServiceApi, TypedEndpoint, Visibility};
 use exonum::blockchain::Schema as CoreSchema;
 use exonum::crypto::PublicKey;
 
@@ -101,7 +101,9 @@ impl TypedEndpoint for GetTime {
     type Output = Option<SystemTime>;
     const ID: &'static str = "current_time";
     const VIS: Visibility = Visibility::Public;
+}
 
+impl ConstEndpoint for GetTime {
     fn call(&self, ctx: &Context, _: ()) -> Result<Option<SystemTime>, ApiError> {
         Ok(TimeSchema::new(ctx.snapshot()).time().get())
     }
@@ -116,7 +118,9 @@ impl TypedEndpoint for GetValidatorsTimes {
     type Output = Vec<ValidatorTime>;
     const ID: &'static str = "validators_times";
     const VIS: Visibility = Visibility::Private;
+}
 
+impl ConstEndpoint for GetValidatorsTimes {
     fn call(&self, ctx: &Context, _: ()) -> Result<Vec<ValidatorTime>, ApiError> {
         let view = ctx.snapshot();
         let validator_keys = CoreSchema::new(&view).actual_configuration().validator_keys;
@@ -147,7 +151,9 @@ impl TypedEndpoint for GetAllTimes {
     type Output = Vec<ValidatorTime>;
     const ID: &'static str = "all_validators_times";
     const VIS: Visibility = Visibility::Private;
+}
 
+impl ConstEndpoint for GetAllTimes {
     fn call(&self, ctx: &Context, _: ()) -> Result<Vec<ValidatorTime>, ApiError> {
         let view = ctx.snapshot();
         let schema = TimeSchema::new(&view);

@@ -27,8 +27,8 @@ use iron::status;
 use iron::url::Url;
 use self::iron_test::request::{get as test_get, post as test_post};
 
-use api::ext::{ApiError, ApiResult, Endpoint, EndpointHolder, MutContext, Context, Spec,
-               ServiceApi, Visibility, TRANSACTIONS, TypedEndpoint};
+use api::ext::{ApiError, ApiResult, Endpoint, EndpointHolder, Context, Spec, ServiceApi,
+               Visibility, TRANSACTIONS, TypedEndpoint, ConstEndpoint, MutEndpoint};
 use api::iron::{ErrorResponse, IronAdapter};
 use blockchain::{Blockchain, ExecutionResult, Transaction};
 use crypto::{self, CryptoHash, Hash};
@@ -111,7 +111,9 @@ impl TypedEndpoint for FlopOrDefault {
     type Output = String;
     const ID: &'static str = "flop-or-default";
     const VIS: Visibility = Visibility::Public;
+}
 
+impl ConstEndpoint for FlopOrDefault {
     fn call(&self, ctx: &Context, def: String) -> ApiResult<String> {
         let schema = Schema::new(ctx.snapshot());
         Ok(schema.flop().get().unwrap_or(def))
@@ -288,7 +290,7 @@ fn test_custom_transaction_sign_and_send() {
         visibility: Visibility::Private,
     };
 
-    fn send(ctx: &MutContext, req: (u64, String)) -> Result<Hash, ApiError> {
+    fn send(ctx: &mut Context, req: (u64, String)) -> Result<Hash, ApiError> {
         let tx = Flip::new_with_signature(req.0, &crypto::Signature::zero());
         let tx_hash = tx.hash();
         ctx.sign_and_send(&tx.raw().cut_signature())?;
@@ -345,15 +347,15 @@ fn test_custom_transaction_send_struct() {
     impl TypedEndpoint for Signer {
         type Arg = u64;
         type Output = Hash;
-
         const ID: &'static str = "send";
         const VIS: Visibility = Visibility::Private;
-        const CONSTANT: bool = false;
+    }
 
-        fn call(&self, ctx: &Context, arg: u64) -> ApiResult<Hash> {
+    impl MutEndpoint for Signer {
+        fn call_mut(&self, ctx: &mut Context, arg: u64) -> ApiResult<Hash> {
             let tx = Flip::new(arg, &self.secret_key);
             let tx_hash = tx.hash();
-            ctx.as_mut().send(tx)?;
+            ctx.send(tx)?;
             Ok(tx_hash)
         }
     }
@@ -369,35 +371,6 @@ fn test_custom_transaction_send_struct() {
         .unwrap();
     assert_eq!(response, json!(tx.hash()));
     assert_channel_state(receiver.by_ref(), &tx.hash());
-}
-
-#[test]
-#[should_panic(expected = "Cannot mutate context")]
-fn test_const_endpoint_trying_to_mutate_node() {
-    struct Misconfigured;
-
-    impl TypedEndpoint for Misconfigured {
-        type Arg = u64;
-        type Output = Hash;
-
-        const ID: &'static str = "send";
-        const VIS: Visibility = Visibility::Private;
-        // Note the absence of the `CONSTANT` specifier.
-
-        fn call(&self, ctx: &Context, arg: u64) -> ApiResult<Hash> {
-            let tx = Flip::new(arg, &crypto::gen_keypair().1);
-            let tx_hash = tx.hash();
-            ctx.as_mut().send(tx)?;
-            Ok(tx_hash)
-        }
-    }
-
-    let mut api = ServiceApi::new();
-    Misconfigured.wire(&mut api);
-    let (blockchain, _) = create_blockchain();
-    api[Misconfigured::ID]
-        .handle(&blockchain, json!(399))
-        .unwrap();
 }
 
 #[test]

@@ -37,7 +37,7 @@ use exonum::messages::{RawTransaction, Message};
 use exonum::storage::{Fork, MapIndex, Snapshot};
 use exonum::crypto::{Hash, PublicKey};
 use exonum::encoding;
-use exonum::api::ext::{ApiError, TypedEndpoint, Context, ServiceApi, Visibility};
+use exonum::api::ext::{ApiError, TypedEndpoint, ConstEndpoint, Context, ServiceApi, Visibility};
 use exonum::api::iron::{Handler, IronAdapter};
 
 // // // // // // // // // // CONSTANTS // // // // // // // // // //
@@ -251,7 +251,9 @@ impl TypedEndpoint for GetWallet {
     type Output = Wallet;
     const ID: &'static str = "wallet";
     const VIS: Visibility = Visibility::Public;
+}
 
+impl ConstEndpoint for GetWallet {
     fn call(&self, context: &Context, pubkey: PublicKey) -> Result<Wallet, ApiError> {
         let schema = CurrencySchema::new(context.snapshot());
         schema.wallet(&pubkey).ok_or(ApiError::NotFound)
@@ -274,8 +276,10 @@ impl TypedEndpoint for GetWallet {
 ///
 /// # fn main() {
 /// let mut testkit = TestKit::for_service(CurrencyService);
-// We need to ensure that Alice's pubkey is lexicographically lesser than Bob's
-// in order to assert the output of the endpoint.
+//
+//  We need to ensure that Alice's pubkey is lexicographically lesser than Bob's
+//  in order to assert the output of the endpoint.
+//
 /// # let mut keys: Vec<_> = (0..2).into_iter().map(|_| crypto::gen_keypair()).collect();
 /// # keys.sort_by(|&(a, _), &(b, _)| a.cmp(&b));
 /// # let (alice_pubkey, alice_key) = keys.swap_remove(0);
@@ -307,7 +311,9 @@ impl TypedEndpoint for GetWallets {
     type Output = Vec<Wallet>;
     const ID: &'static str = "wallets";
     const VIS: Visibility = Visibility::Public;
+}
 
+impl ConstEndpoint for GetWallets {
     fn call(&self, ctx: &Context, _: ()) -> Result<Vec<Wallet>, ApiError> {
         let schema = CurrencySchema::new(ctx.snapshot());
         let wallets = schema.wallets();
