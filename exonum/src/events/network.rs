@@ -309,8 +309,12 @@ impl RequestHandler {
                     }
                     // Immediately stop the event loop.
                     NetworkRequest::Shutdown => {
-                        drop(cancel_sender.take());
-                        to_box(Ok(()).into_future())
+                        to_box(
+                            cancel_sender
+                                .take()
+                                .ok_or_else(|| other_error("shutdown twice"))
+                                .into_future(),
+                        )
                     }
                 }
             });

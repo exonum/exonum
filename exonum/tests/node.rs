@@ -91,10 +91,10 @@ struct RunHandle {
     api_tx: ApiSender,
 }
 
-fn run_nodes(count: u8) -> (Vec<RunHandle>, Vec<oneshot::Receiver<()>>) {
+fn run_nodes(count: u8, start_port: u16) -> (Vec<RunHandle>, Vec<oneshot::Receiver<()>>) {
     let mut node_threads = Vec::new();
     let mut commit_rxs = Vec::new();
-    for node_cfg in helpers::generate_testnet_config(count, 16_300) {
+    for node_cfg in helpers::generate_testnet_config(count, start_port) {
         let (commit_tx, commit_rx) = oneshot::channel();
         let service = Box::new(CommitWatcherService(Mutex::new(Some(commit_tx))));
         let node = Node::new(MemoryDB::new(), vec![service], node_cfg);
@@ -110,7 +110,7 @@ fn run_nodes(count: u8) -> (Vec<RunHandle>, Vec<oneshot::Receiver<()>>) {
 
 #[test]
 fn test_node_run() {
-    let (nodes, commit_rxs) = run_nodes(4);
+    let (nodes, commit_rxs) = run_nodes(4, 16_300);
 
     let timer = Timer::default();
     let duration = Duration::from_secs(60);
@@ -120,6 +120,30 @@ fn test_node_run() {
     }
 
     for handle in nodes {
+        handle
+            .api_tx
+            .send_external_message(ExternalMessage::Shutdown)
+            .unwrap();
+        handle.node_thread.join().unwrap();
+    }
+}
+
+#[test]
+fn test_node_shutdown_twice() {
+    let (nodes, commit_rxs) = run_nodes(1, 16_400);
+
+    let timer = Timer::default();
+    let duration = Duration::from_secs(60);
+    for rx in commit_rxs {
+        let rx = timer.timeout(rx.map_err(drop), duration);
+        rx.wait().unwrap();
+    }
+
+    for handle in nodes {
+        handle
+            .api_tx
+            .send_external_message(ExternalMessage::Shutdown)
+            .unwrap();
         handle
             .api_tx
             .send_external_message(ExternalMessage::Shutdown)
