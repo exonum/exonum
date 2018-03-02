@@ -33,7 +33,6 @@ mod tests {
     use exonum::crypto::{gen_keypair, CryptoHash, Hash, PublicKey, SecretKey};
     use exonum::messages::Message;
     use exonum::helpers::{Height, ValidatorId};
-    use exonum::node::ApiSender;
 
     fn create_blockchain(db: Box<Database>) -> Blockchain {
         let dummy_channel = mpsc::channel(1);
@@ -43,7 +42,7 @@ mod tests {
             Vec::new(),
             dummy_keypair.0,
             dummy_keypair.1,
-            ApiSender::new(dummy_channel.0),
+            dummy_channel.0.into(),
         )
     }
 

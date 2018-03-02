@@ -17,11 +17,10 @@
 use std::ops::Deref;
 use std::marker::PhantomData;
 use std::io;
-use std::collections::BTreeMap;
 use std::fmt;
 use std::str::FromStr;
 
-use iron::IronError;
+use failure::Fail;
 use iron::prelude::*;
 use iron::status;
 use iron::headers::Cookie;
@@ -32,16 +31,21 @@ use params;
 use serde_json;
 use serde::{Serialize, Serializer};
 use serde::de::{self, Visitor, Deserialize, Deserializer};
-use failure::Fail;
 
 use crypto::{PublicKey, SecretKey};
 use encoding::serialize::{FromHex, FromHexError, ToHex, encode_hex};
 use storage;
 
+pub mod iron;
 pub mod public;
 pub mod private;
+#[macro_use]
+pub mod ext;
+
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_ext;
 
 /// List of possible Api errors.
 #[derive(Fail, Debug)]
@@ -79,6 +83,21 @@ impl From<io::Error> for ApiError {
     }
 }
 
+impl From<::blockchain::SendError> for ApiError {
+    fn from(e: ::blockchain::SendError) -> ApiError {
+        use blockchain::SendError::*;
+
+        let e: io::Error = match e {
+            VerificationFail(..) => {
+                let msg = "Unable to verify transaction";
+                io::Error::new(io::ErrorKind::Other, msg)
+            }
+            Io(e) => e,
+        };
+        ApiError::Io(e)
+    }
+}
+
 impl From<storage::Error> for ApiError {
     fn from(e: storage::Error) -> ApiError {
         ApiError::Storage(e)
@@ -87,6 +106,8 @@ impl From<storage::Error> for ApiError {
 
 impl From<ApiError> for IronError {
     fn from(e: ApiError) -> IronError {
+        use std::collections::BTreeMap;
+
         let code = match e {
             // Note that `status::Unauthorized` does not fit here, because
             //

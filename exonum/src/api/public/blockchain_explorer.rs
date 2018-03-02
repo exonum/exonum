@@ -70,7 +70,7 @@ impl ExplorerApi {
     }
 
     fn transaction_info(&self, hash: &Hash) -> Result<TransactionInfo, ApiError> {
-        if let Some(tx) = self.pool.read().expect("Uanble to read pool").get(hash) {
+        if let Some(tx) = self.pool.read().expect("Unable to read pool").get(hash) {
             Ok(TransactionInfo::InPool {
                 content: tx.serialize_field().map_err(ApiError::InternalError)?,
             })

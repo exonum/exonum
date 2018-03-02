@@ -37,6 +37,7 @@ use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::mem;
 use std::fmt;
+use std::io;
 use std::iter;
 use std::panic;
 use std::net::SocketAddr;
@@ -49,7 +50,7 @@ use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use messages::{CONSENSUS as CORE_SERVICE, Connect, Precommit, RawMessage};
 use storage::{Database, Error, Fork, Patch, Snapshot};
 use helpers::{Height, Round, ValidatorId};
-use node::ApiSender;
+use node::ExternalMessageSender;
 
 pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
 pub use self::schema::{gen_prefix, Schema, TxLocation};
@@ -76,8 +77,93 @@ pub mod config;
 pub struct Blockchain {
     db: Arc<Database>,
     service_map: Arc<VecMap<Box<Service>>>,
-    service_keypair: (PublicKey, SecretKey),
+    service_public_key: PublicKey,
     api_sender: ApiSender,
+}
+
+/// Transactions sender.
+#[derive(Clone)]
+pub struct ApiSender {
+    inner: ExternalMessageSender,
+    signer: TransactionSigner,
+}
+
+impl ApiSender {
+    /// Creates new `ApiSender` with given channel.
+    fn new(inner: ExternalMessageSender, signer: TransactionSigner) -> Self {
+        ApiSender { inner, signer }
+    }
+
+    /// Sends a transaction to the node.
+    pub fn send(&self, tx: Box<Transaction>) -> Result<(), SendError> {
+        if !tx.verify() {
+            return Err(SendError::VerificationFail(tx));
+        }
+
+        self.inner.send_transaction(tx).map_err(SendError::Io)
+    }
+
+    /// Signs a transaction with the service secret key and sends it to the node.
+    pub fn sign_and_send(&self, tx: &RawMessage) -> Result<Hash, SendError> {
+        let signed_tx = self.signer.sign(tx);
+
+        let hash = signed_tx.hash();
+        self.send(signed_tx)?;
+        Ok(hash)
+    }
+}
+
+impl fmt::Debug for ApiSender {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.pad("ApiSender { .. }")
+    }
+}
+
+/// Errors returned during sending transaction to the node.
+#[derive(Debug, Fail)]
+pub enum SendError {
+    /// A transaction failed to be verified.
+    #[fail(display = "Verification failed for transaction {:?}", _0)]
+    VerificationFail(Box<Transaction>),
+
+    /// I/O error during sending a transaction.
+    #[fail(display = "I/O error: {:?}", _0)]
+    Io(
+        #[cause]
+        io::Error
+    ),
+}
+
+/// Signer of transactions.
+// The current implementation is shoddy at best because of the absence of the concept
+// of *unsigned transactions* in core.
+#[derive(Clone)]
+struct TransactionSigner {
+    secret_key: SecretKey,
+    service_map: Arc<VecMap<Box<Service>>>,
+}
+
+impl fmt::Debug for TransactionSigner {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        formatter
+            .debug_struct("TransactionSigner")
+            .field("services", &self.service_map.keys().collect::<Vec<_>>())
+            .finish()
+    }
+}
+
+impl TransactionSigner {
+    pub fn sign(&self, message: &RawMessage) -> Box<Transaction> {
+        let signed = message.sign_append(&self.secret_key);
+        tx_from_raw(self.service_map.as_ref(), signed).unwrap()
+    }
+}
+
+fn tx_from_raw(service_map: &VecMap<Box<Service>>, raw: RawMessage) -> Option<Box<Transaction>> {
+    let id = raw.service_id() as usize;
+    service_map.get(id).and_then(
+        |service| service.tx_from_raw(raw).ok(),
+    )
 }
 
 impl Blockchain {
@@ -87,7 +173,7 @@ impl Blockchain {
         services: Vec<Box<Service>>,
         service_public_key: PublicKey,
         service_secret_key: SecretKey,
-        api_sender: ApiSender,
+        api_channel: ExternalMessageSender,
     ) -> Blockchain {
         let mut service_map = VecMap::new();
         for service in services {
@@ -101,17 +187,25 @@ impl Blockchain {
             service_map.insert(id, service);
         }
 
+        let service_map = Arc::new(service_map);
+        let signer = TransactionSigner {
+            secret_key: service_secret_key,
+            service_map: Arc::clone(&service_map),
+        };
+
         Blockchain {
             db: storage.into(),
-            service_map: Arc::new(service_map),
-            service_keypair: (service_public_key, service_secret_key),
-            api_sender,
+            service_map,
+            service_public_key,
+            api_sender: ApiSender::new(api_channel, signer),
         }
     }
 
-    /// Recreates the blockchain to reuse with a sandbox.
+    /// Recreates the blockchain replacing its sender of external messages.
     #[doc(hidden)]
-    pub fn clone_with_api_sender(&self, api_sender: ApiSender) -> Blockchain {
+    pub fn clone_with_api_channel(&self, api_channel: ExternalMessageSender) -> Self {
+        let api_sender = ApiSender::new(api_channel, self.api_sender.signer.clone());
+
         Blockchain {
             api_sender,
             ..self.clone()
@@ -121,6 +215,16 @@ impl Blockchain {
     /// Returns service `VecMap` for all our services.
     pub fn service_map(&self) -> &Arc<VecMap<Box<Service>>> {
         &self.service_map
+    }
+
+    /// Returns the service public key.
+    pub fn service_public_key(&self) -> &PublicKey {
+        &self.service_public_key
+    }
+
+    /// Returns the sender of transactions.
+    pub fn api_sender(&self) -> &ApiSender {
+        &self.api_sender
     }
 
     /// Creates a readonly snapshot of the current storage state.
@@ -141,10 +245,7 @@ impl Blockchain {
     /// - Blockchain has service with the `service_id` of given raw message.
     /// - Service can deserialize given raw message.
     pub fn tx_from_raw(&self, raw: RawMessage) -> Option<Box<Transaction>> {
-        let id = raw.service_id() as usize;
-        self.service_map.get(id).and_then(|service| {
-            service.tx_from_raw(raw).ok()
-        })
+        tx_from_raw(self.service_map.as_ref(), raw)
     }
 
     /// Commits changes from the patch to the blockchain storage.
@@ -372,8 +473,7 @@ impl Blockchain {
         self.merge(patch)?;
         // Initializes the context after merge.
         let context = ServiceContext::new(
-            self.service_keypair.0,
-            self.service_keypair.1.clone(),
+            self.service_public_key,
             self.api_sender.clone(),
             self.fork(),
         );
@@ -408,13 +508,9 @@ impl Blockchain {
         mount
     }
 
+    /// Creates an API context for use with this blockchain.
     fn api_context(&self) -> ApiContext {
-        ApiContext::from_parts(
-            self,
-            self.api_sender.clone(),
-            &self.service_keypair.0,
-            &self.service_keypair.1,
-        )
+        ApiContext::new(self)
     }
 
     /// Saves peer to the peers cache
@@ -494,7 +590,7 @@ impl Clone for Blockchain {
             db: Arc::clone(&self.db),
             service_map: Arc::clone(&self.service_map),
             api_sender: self.api_sender.clone(),
-            service_keypair: self.service_keypair.clone(),
+            service_public_key: self.service_public_key,
         }
     }
 }

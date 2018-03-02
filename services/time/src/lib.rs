@@ -27,34 +27,29 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
-extern crate serde_json;
-#[macro_use]
 extern crate exonum;
-extern crate router;
-extern crate bodyparser;
-extern crate iron;
 
-use iron::prelude::*;
-use iron::Handler;
-use router::Router;
+use exonum::api::iron::{Handler, IronAdapter};
+use exonum::blockchain::{Service, ServiceContext, Schema, ApiContext, Transaction, TransactionSet,
+                         ExecutionError, ExecutionResult};
+use exonum::messages::{RawTransaction, Message};
+use exonum::encoding::serialize::json::reexport::Value;
+use exonum::storage::{Fork, Snapshot, ProofMapIndex, Entry};
+use exonum::crypto::{Hash, PublicKey, Signature};
+use exonum::encoding;
+use exonum::helpers::fabric::{ServiceFactory, Context};
 
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use exonum::blockchain::{Blockchain, Service, ServiceContext, Schema, ApiContext, Transaction,
-                         TransactionSet, ExecutionResult, ExecutionError};
-use exonum::messages::{RawTransaction, Message};
-use exonum::encoding::serialize::json::reexport::Value;
-use exonum::storage::{Fork, Snapshot, ProofMapIndex, Entry};
-use exonum::crypto::{Hash, PublicKey};
-use exonum::encoding;
-use exonum::helpers::fabric::{ServiceFactory, Context};
-use exonum::api::Api;
+pub mod api;
+
+pub use api::ValidatorTime;
 
 /// Time service id.
-const SERVICE_ID: u16 = 4;
+pub const SERVICE_ID: u16 = 4;
 /// Time service name.
-const SERVICE_NAME: &str = "exonum_time";
+pub const SERVICE_NAME: &str = "exonum_time";
 
 /// `Exonum-time` service database schema.
 #[derive(Debug)]
@@ -210,101 +205,6 @@ impl Transaction for TxTime {
         self.update_validator_time(view)?;
         Self::update_consolidated_time(view);
         Ok(())
-    }
-}
-
-/// Implements the node API.
-#[derive(Clone)]
-struct TimeApi {
-    blockchain: Blockchain,
-}
-
-/// Structure for saving public key of the validator and last known local time.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ValidatorTime {
-    /// Public key of the validator.
-    pub public_key: PublicKey,
-    /// Time of the validator.
-    pub time: Option<SystemTime>,
-}
-
-/// Shortcut to get data from storage.
-impl TimeApi {
-    /// Endpoint for getting value of the time that is saved in storage.
-    fn get_current_time(&self, _: &mut Request) -> IronResult<Response> {
-        let view = self.blockchain.snapshot();
-        let schema = TimeSchema::new(&view);
-        self.ok_response(&json!(schema.time().get()))
-    }
-
-    /// Endpoint for getting time values for all validators.
-    fn get_all_validators_times(&self, _: &mut Request) -> IronResult<Response> {
-        let view = self.blockchain.snapshot();
-        let schema = TimeSchema::new(&view);
-        let idx = schema.validators_times();
-
-        // The times of all validators for which time is known.
-        let validators_times = idx.iter()
-            .map(|(public_key, time)| {
-                ValidatorTime {
-                    public_key,
-                    time: Some(time),
-                }
-            })
-            .collect::<Vec<_>>();
-
-        self.ok_response(&serde_json::to_value(validators_times).unwrap())
-    }
-
-    /// Endpoint for getting time values for current validators.
-    fn get_current_validators_times(&self, _: &mut Request) -> IronResult<Response> {
-        let view = self.blockchain.snapshot();
-        let validator_keys = Schema::new(&view).actual_configuration().validator_keys;
-        let schema = TimeSchema::new(&view);
-        let idx = schema.validators_times();
-
-        // The times of current validators.
-        // `None` if the time of the validator is unknown.
-        let validators_times = validator_keys
-            .iter()
-            .map(|validator| {
-                ValidatorTime {
-                    public_key: validator.service_key,
-                    time: idx.get(&validator.service_key),
-                }
-            })
-            .collect::<Vec<_>>();
-
-        self.ok_response(&serde_json::to_value(validators_times).unwrap())
-    }
-
-    fn wire_private(&self, router: &mut Router) {
-        let self_ = self.clone();
-        let get_current_validators_times =
-            move |req: &mut Request| self_.get_current_validators_times(req);
-
-        let self_ = self.clone();
-        let get_all_validators_times = move |req: &mut Request| self_.get_all_validators_times(req);
-
-        router.get(
-            "v1/validators_times",
-            get_current_validators_times,
-            "get_current_validators_times",
-        );
-
-        router.get(
-            "v1/validators_times/all",
-            get_all_validators_times,
-            "get_all_validators_times",
-        );
-    }
-}
-
-impl Api for TimeApi {
-    fn wire(&self, router: &mut Router) {
-        let self_ = self.clone();
-        let get_current_time = move |req: &mut Request| self_.get_current_time(req);
-        router.get("v1/current_time", get_current_time, "get_current_time");
     }
 }
 
@@ -465,27 +365,23 @@ impl Service for TimeService {
         if context.validator_id().is_none() {
             return;
         }
-        let (pub_key, sec_key) = (*context.public_key(), context.secret_key().clone());
-        context
-            .transaction_sender()
-            .send(Box::new(
-                TxTime::new(self.time.current_time(), &pub_key, &sec_key),
-            ))
-            .unwrap();
-    }
 
-    fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
-        let mut router = Router::new();
-        let api = TimeApi { blockchain: ctx.blockchain().clone() };
-        api.wire_private(&mut router);
-        Some(Box::new(router))
+        let pub_key = context.public_key();
+        let message =
+            TxTime::new_with_signature(self.time.current_time(), pub_key, &Signature::zero());
+        let message = message.raw().cut_signature();
+
+        context.api_sender().sign_and_send(&message).unwrap();
     }
 
     fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
-        let mut router = Router::new();
-        let api = TimeApi { blockchain: ctx.blockchain().clone() };
-        api.wire(&mut router);
-        Some(Box::new(router))
+        let api = api::create_api().public();
+        Some(IronAdapter::new(ctx.clone()).create_handler(api))
+    }
+
+    fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
+        let api = api::create_api().private();
+        Some(IronAdapter::new(ctx.clone()).create_handler(api))
     }
 }
 

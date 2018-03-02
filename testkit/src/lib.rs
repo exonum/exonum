@@ -146,12 +146,13 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock, RwLockReadGuard};
 use std::fmt;
 
+use exonum::api::ext::{Endpoint, Environment};
 use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Schema as CoreSchema,
                          Service, SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys};
 use exonum::crypto::{self, CryptoHash};
 use exonum::helpers::{Height, Round, ValidatorId};
 use exonum::messages::{Precommit, Propose};
-use exonum::node::{ApiSender, ExternalMessage, State as NodeState, TransactionSend, TxPool,
+use exonum::node::{ExternalMessage, ExternalMessageSender, State as NodeState, TxPool,
                    NodeApiConfig, create_public_api_handler, create_private_api_handler};
 use exonum::storage::{MemoryDB, Snapshot};
 
@@ -487,7 +488,7 @@ pub struct TestKit {
     db_handler: CheckpointDbHandler<MemoryDB>,
     events_stream: Spawn<Box<Stream<Item = (), Error = ()>>>,
     network: TestNetwork,
-    api_sender: ApiSender,
+    external_message_sender: ExternalMessageSender,
     mempool: TxPool,
     cfg_proposal: Option<ConfigurationProposalState>,
     api_config: NodeApiConfig,
@@ -515,7 +516,7 @@ impl TestKit {
 
     fn assemble(services: Vec<Box<Service>>, network: TestNetwork) -> Self {
         let api_channel = mpsc::channel(1_000);
-        let api_sender = ApiSender::new(api_channel.0.clone());
+        let external_message_sender = ExternalMessageSender::from(api_channel.0);
 
         let db = CheckpointDb::new(MemoryDB::new());
         let db_handler = db.handler();
@@ -525,7 +526,7 @@ impl TestKit {
             services,
             *network.us().service_keypair().0,
             network.us().service_keypair().1.clone(),
-            api_sender.clone(),
+            external_message_sender.clone(),
         );
 
         let genesis = network.genesis_config();
@@ -559,7 +560,7 @@ impl TestKit {
         TestKit {
             blockchain,
             db_handler,
-            api_sender,
+            external_message_sender,
             events_stream,
             network,
             mempool: Arc::clone(&mempool),
@@ -1152,7 +1153,7 @@ impl ApiKind {
 pub struct TestKitApi {
     public_handler: Chain,
     private_handler: Chain,
-    api_sender: ApiSender,
+    api_env: Environment,
 }
 
 impl fmt::Debug for TestKitApi {
@@ -1180,10 +1181,10 @@ impl TestKitApi {
             private_handler: create_private_api_handler(
                 blockchain.clone(),
                 api_state,
-                testkit.api_sender.clone(),
+                testkit.external_message_sender.clone(),
             ),
 
-            api_sender: testkit.api_sender.clone(),
+            api_env: Environment::new(blockchain),
         }
     }
 
@@ -1204,9 +1205,24 @@ impl TestKitApi {
     where
         T: Into<Box<Transaction>>,
     {
-        self.api_sender.send(transaction.into()).expect(
-            "Cannot send transaction",
-        );
+        self.api_env
+            .node_channel()
+            .send(transaction.into())
+            .expect("Cannot send transaction");
+    }
+
+    /// Tests that an invocation of the specified endpoint lead to an expected response.
+    pub fn test(
+        &self,
+        endpoint: &Endpoint,
+        request: serde_json::Value,
+        expected: &serde_json::Value,
+    ) {
+        let response = match endpoint.handle(&self.api_env, request) {
+            Ok(response) => response,
+            Err(e) => panic!("Unexpected endpoint error: {:?}", e),
+        };
+        assert_eq!(response, *expected);
     }
 
     fn get_internal<H, D>(handler: &H, endpoint: &str, expect_error: bool, is_public: bool) -> D

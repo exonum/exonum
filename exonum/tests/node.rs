@@ -30,7 +30,7 @@ use serde_json::Value;
 use exonum::blockchain::{Service, ServiceContext, Transaction};
 use exonum::encoding::Error as EncodingError;
 use exonum::messages::RawTransaction;
-use exonum::node::{ApiSender, ExternalMessage, Node};
+use exonum::node::{ExternalMessageSender, Node};
 use exonum::storage::{Database, Fork, MemoryDB, Snapshot};
 use exonum::helpers;
 use exonum::crypto::Hash;
@@ -88,7 +88,7 @@ impl Service for InitializeCheckerService {
 
 struct RunHandle {
     node_thread: JoinHandle<()>,
-    api_tx: ApiSender,
+    api_tx: ExternalMessageSender,
 }
 
 fn run_nodes(count: u8, start_port: u16) -> (Vec<RunHandle>, Vec<oneshot::Receiver<()>>) {
@@ -98,7 +98,7 @@ fn run_nodes(count: u8, start_port: u16) -> (Vec<RunHandle>, Vec<oneshot::Receiv
         let (commit_tx, commit_rx) = oneshot::channel();
         let service = Box::new(CommitWatcherService(Mutex::new(Some(commit_tx))));
         let node = Node::new(MemoryDB::new(), vec![service], node_cfg);
-        let api_tx = node.channel();
+        let api_tx = node.external_message_sender();
         node_threads.push(RunHandle {
             node_thread: thread::spawn(move || { node.run().unwrap(); }),
             api_tx,
@@ -120,10 +120,7 @@ fn test_node_run() {
     }
 
     for handle in nodes {
-        handle
-            .api_tx
-            .send_external_message(ExternalMessage::Shutdown)
-            .unwrap();
+        handle.api_tx.send_shutdown().unwrap();
         handle.node_thread.join().unwrap();
     }
 }
@@ -140,14 +137,8 @@ fn test_node_shutdown_twice() {
     }
 
     for handle in nodes {
-        handle
-            .api_tx
-            .send_external_message(ExternalMessage::Shutdown)
-            .unwrap();
-        handle
-            .api_tx
-            .send_external_message(ExternalMessage::Shutdown)
-            .unwrap();
+        handle.api_tx.send_shutdown().unwrap();
+        handle.api_tx.send_shutdown().unwrap();
         handle.node_thread.join().unwrap();
     }
 }
@@ -157,12 +148,10 @@ fn test_node_restart_regression() {
     let start_node = |node_cfg, db, init_times| {
         let service = Box::new(InitializeCheckerService(init_times));
         let node = Node::new(db, vec![service], node_cfg);
-        let api_tx = node.channel();
+        let api_tx = node.external_message_sender();
         let node_thread = thread::spawn(move || { node.run().unwrap(); });
         // Wait for shutdown
-        api_tx
-            .send_external_message(ExternalMessage::Shutdown)
-            .unwrap();
+        api_tx.send_shutdown().unwrap();
         node_thread.join().unwrap();
     };
 

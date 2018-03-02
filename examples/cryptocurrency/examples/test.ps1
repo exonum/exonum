@@ -5,14 +5,14 @@
 #
 
 # Base URL for demo service endpoints
-$BASE_URL = 'http://127.0.0.1:8000/api/services/cryptocurrency/v1';
+$BASE_URL = 'http://127.0.0.1:8000/api/services/cryptocurrency';
 # Directory with the current script
 $wd = $myinvocation.mycommand.path | Split-Path;
 
 # Creates a wallet using a transaction stored in the specified file.
 function Create-Wallet ($jsonFilename) {
   $body = cat $jsonFilename;
-  $resp = Invoke-WebRequest "$BASE_URL/wallets" `
+  $resp = Invoke-WebRequest "$BASE_URL/transactions" `
     -Method POST `
     -ContentType 'application/json' `
     -Body $body;
@@ -27,7 +27,7 @@ function Create-Wallet ($jsonFilename) {
 # Performs a transfer using a transaction stored in the specified file.
 function Transfer ($jsonFilename) {
   $body = cat $jsonFilename;
-  $resp = Invoke-WebRequest "$BASE_URL/wallets/transfer" `
+  $resp = Invoke-WebRequest "$BASE_URL/transactions" `
     -Method POST `
     -ContentType 'application/json' `
     -Body $body;
@@ -129,7 +129,7 @@ function Main () {
 
   echo "Retrieving info on Alice's wallet...";
   $pubkey = '6ce29b2d3ecadc434107ce52c287001c968a1b6eca3e5a1eb62a2419e2924b85';
-  $resp = (Invoke-WebRequest "$BASE_URL/wallet/$pubkey").Content | ConvertFrom-Json;
+  $resp = (Invoke-WebRequest "$BASE_URL/wallet?q=%22$pubkey%22").Content | ConvertFrom-Json;
   Check-Wallet $resp 'Alice' '85';
 }
 

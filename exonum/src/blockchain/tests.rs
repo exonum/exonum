@@ -374,7 +374,6 @@ mod memorydb_tests {
     use storage::{Database, MemoryDB};
     use blockchain::Blockchain;
     use crypto::gen_keypair;
-    use node::ApiSender;
 
     fn create_database(_: &Path) -> Box<Database> {
         Box::new(MemoryDB::new())
@@ -388,7 +387,7 @@ mod memorydb_tests {
             Vec::new(),
             service_keypair.0,
             service_keypair.1,
-            ApiSender::new(api_channel.0),
+            api_channel.0.into(),
         )
     }
 
@@ -420,7 +419,6 @@ mod rocksdb_tests {
     use storage::{Database, RocksDB, RocksDBOptions};
     use blockchain::Blockchain;
     use crypto::gen_keypair;
-    use node::ApiSender;
 
     fn create_database(path: &Path) -> Box<Database> {
         let mut opts = RocksDBOptions::default();
@@ -437,7 +435,7 @@ mod rocksdb_tests {
             Vec::new(),
             service_keypair.0,
             service_keypair.1,
-            ApiSender::new(api_channel.0),
+            api_channel.0.into(),
         )
     }
 

@@ -7,7 +7,7 @@
 set -e
 
 # Base URL for demo service endpoints
-BASE_URL=http://127.0.0.1:8000/api/services/cryptocurrency/v1
+BASE_URL=http://127.0.0.1:8000/api/services/cryptocurrency
 
 # Exit status
 STATUS=0
@@ -42,7 +42,7 @@ function kill-server {
 # Arguments:
 # - $1: filename with the transaction data
 function create-wallet {
-    RESP=`curl -H "Content-Type: application/json" -X POST -d @$1 $BASE_URL/wallets 2>/dev/null`
+    RESP=`curl -H "Content-Type: application/json" -X POST -d @$1 $BASE_URL/transactions 2>/dev/null`
 }
 
 # Performs a transfer in the cryptocurrency demo.
@@ -50,7 +50,7 @@ function create-wallet {
 # Arguments:
 # - $1: filename with the transaction data
 function transfer {
-    RESP=`curl -H "Content-Type: application/json" -X POST -d @$1 $BASE_URL/wallets/transfer 2>/dev/null`
+    RESP=`curl -H "Content-Type: application/json" -X POST -d @$1 $BASE_URL/transactions 2>/dev/null`
 }
 
 # Checks a response to an Exonum transaction.
@@ -145,7 +145,8 @@ check-request "Alice" 85 "`echo $RESP | jq .[0]`"
 check-request "Bob" 115 "`echo $RESP | jq .[1]`"
 
 echo "Retrieving info on Alice's wallet..."
-RESP=`curl $BASE_URL/wallet/6ce29b2d3ecadc434107ce52c287001c968a1b6eca3e5a1eb62a2419e2924b85 2>/dev/null`
+PUBKEY=6ce29b2d3ecadc434107ce52c287001c968a1b6eca3e5a1eb62a2419e2924b85
+RESP=`curl $BASE_URL/wallet?q=%22$PUBKEY%22 2>/dev/null`
 check-request "Alice" 85 "$RESP"
 
 echo "Retrieving Alice's transaction info..."

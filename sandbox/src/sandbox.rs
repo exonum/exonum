@@ -27,7 +27,7 @@ use futures::{self, Async, Future, Stream};
 use futures::Sink;
 use futures::sync::mpsc;
 use exonum::node::{Configuration, ExternalMessage, ListenerConfig, NodeHandler, NodeSender,
-                   ServiceConfig, State, SystemStateProvider, ApiSender};
+                   ServiceConfig, State, SystemStateProvider};
 use exonum::blockchain::{Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema,
                          Service, SharedNodeState, StoredConfiguration, TimeoutAdjusterConfig,
                          Transaction, ValidatorKeys};
@@ -611,10 +611,8 @@ impl Sandbox {
         let address = self.a(VALIDATOR_0);
         let inner = self.inner.borrow();
 
-        let blockchain = inner.handler.blockchain.clone_with_api_sender(
-            ApiSender::new(
-                api_channel.0.clone(),
-            ),
+        let blockchain = inner.handler.blockchain.clone_with_api_channel(
+            api_channel.0.clone().into(),
         );
 
         let node_sender = NodeSender {
@@ -730,7 +728,7 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandb
         services,
         service_keys[0].0,
         service_keys[0].1.clone(),
-        ApiSender::new(api_channel.0.clone()),
+        api_channel.0.clone().into(),
     );
 
     let consensus = ConsensusConfig {
@@ -889,7 +887,7 @@ mod tests {
 
         fn handle_commit(&self, context: &ServiceContext) {
             let tx = TxAfterCommit::new_with_height(context.height());
-            context.transaction_sender().send(Box::new(tx)).unwrap();
+            context.api_sender().send(Box::new(tx)).unwrap();
         }
     }
 

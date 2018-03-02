@@ -24,6 +24,7 @@ extern crate exonum_testkit;
 #[macro_use]
 extern crate serde_json;
 
+use exonum::api::iron::ErrorResponse;
 use exonum::crypto::{self, PublicKey, SecretKey, CryptoHash};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
@@ -49,7 +50,7 @@ impl CryptocurrencyApi {
 
         let tx_info: serde_json::Value = self.inner.post(
             ApiKind::Service("cryptocurrency"),
-            "v1/wallets",
+            "transactions",
             &tx,
         );
         assert_eq!(tx_info, json!({ "tx_hash": tx.hash() }));
@@ -60,7 +61,7 @@ impl CryptocurrencyApi {
     fn transfer(&self, tx: &TxTransfer) {
         let tx_info: serde_json::Value = self.inner.post(
             ApiKind::Service("cryptocurrency"),
-            "v1/wallets/transfer",
+            "transactions",
             tx,
         );
         assert_eq!(tx_info, json!({ "tx_hash": tx.hash() }));
@@ -70,17 +71,17 @@ impl CryptocurrencyApi {
     fn get_wallet(&self, pubkey: &PublicKey) -> Wallet {
         self.inner.get(
             ApiKind::Service("cryptocurrency"),
-            &format!("v1/wallet/{}", pubkey.to_string()),
+            &format!("wallet?q=%22{}%22", pubkey.to_string()),
         )
     }
 
     /// Asserts that a wallet with the specified public key is not known to the blockchain.
     fn assert_no_wallet(&self, pubkey: &PublicKey) {
-        let err: String = self.inner.get_err(
+        let err: ErrorResponse = self.inner.get_err(
             ApiKind::Service("cryptocurrency"),
-            &format!("v1/wallet/{}", pubkey.to_string()),
+            &format!("wallet?q=%22{}%22", pubkey.to_string()),
         );
-        assert_eq!(err, "Wallet not found".to_string());
+        assert!(err.description.contains("Not found"));
     }
 }
 

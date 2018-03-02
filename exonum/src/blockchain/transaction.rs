@@ -563,7 +563,6 @@ mod tests {
     use crypto;
     use blockchain::Blockchain;
     use storage::{Database, MemoryDB, Entry};
-    use node::ApiSender;
     use helpers::{ValidatorId, Height};
 
     lazy_static! {
@@ -756,7 +755,7 @@ mod tests {
                 Vec::new(),
                 service_keypair.0,
                 service_keypair.1,
-                ApiSender::new(api_channel.0),
+                api_channel.0.into(),
             ),
             BTreeMap::new(),
         )

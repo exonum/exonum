@@ -20,7 +20,7 @@ use std::net::SocketAddr;
 use std::collections::HashMap;
 
 use crypto::PublicKey;
-use node::{ExternalMessage, ApiSender};
+use node::ExternalMessageSender;
 use blockchain::{Service, Blockchain, SharedNodeState};
 use api::{Api, ApiError};
 use messages::{TEST_NETWORK_ID, PROTOCOL_MAJOR_VERSION};
@@ -97,7 +97,7 @@ pub struct SystemApi {
     blockchain: Blockchain,
     info: NodeInfo,
     shared_api_state: SharedNodeState,
-    node_channel: ApiSender,
+    node_channel: ExternalMessageSender,
 }
 
 impl SystemApi {
@@ -106,7 +106,7 @@ impl SystemApi {
         info: NodeInfo,
         blockchain: Blockchain,
         shared_api_state: SharedNodeState,
-        node_channel: ApiSender,
+        node_channel: ExternalMessageSender,
     ) -> SystemApi {
         SystemApi {
             info,
@@ -187,8 +187,7 @@ impl SystemApi {
     fn handle_set_consensus_enabled(self, router: &mut Router) {
         let consensus_enabled_set = move |request: &mut Request| -> IronResult<Response> {
             let enabled: bool = self.required_param(request, "enabled")?;
-            let message = ExternalMessage::Enable(enabled);
-            self.node_channel.send_external_message(message).map_err(
+            self.node_channel.send_enable_consensus(enabled).map_err(
                 ApiError::from,
             )?;
             self.ok_response(&serde_json::to_value("Ok").unwrap())
@@ -203,9 +202,7 @@ impl SystemApi {
 
     fn handle_shutdown(self, router: &mut Router) {
         let shutdown = move |_: &mut Request| -> IronResult<Response> {
-            self.node_channel
-                .send_external_message(ExternalMessage::Shutdown)
-                .map_err(ApiError::from)?;
+            self.node_channel.send_shutdown().map_err(ApiError::from)?;
             self.ok_response(&serde_json::to_value("Ok").unwrap())
         };
 

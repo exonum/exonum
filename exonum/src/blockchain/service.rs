@@ -15,7 +15,6 @@
 //! This module defines the Exonum services interfaces. Like smart contracts in some other
 //! blockchain platforms, Exonum services encapsulate business logic of the blockchain application.
 
-use std::fmt;
 use std::sync::{Arc, RwLock};
 use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
@@ -23,15 +22,17 @@ use std::net::SocketAddr;
 use serde_json::Value;
 use iron::Handler;
 
-use crypto::{Hash, PublicKey, SecretKey};
+pub use api::ext::Environment as ApiContext;
+
+use crypto::{Hash, PublicKey};
 use storage::{Fork, Snapshot};
 use messages::RawTransaction;
 use encoding::Error as MessageError;
-use node::{ApiSender, Node, State, TransactionSend};
-use blockchain::{Blockchain, ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
+use node::State;
+use blockchain::{ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use helpers::{Height, Milliseconds, ValidatorId};
 use super::transaction::Transaction;
-
+use super::ApiSender;
 
 /// A trait that describes business logic of a concrete service.
 ///
@@ -204,7 +205,7 @@ pub trait Service: Send + Sync + 'static {
 #[derive(Debug)]
 pub struct ServiceContext {
     validator_id: Option<ValidatorId>,
-    service_keypair: (PublicKey, SecretKey),
+    service_public_key: PublicKey,
     api_sender: ApiSender,
     fork: Fork,
     stored_configuration: StoredConfiguration,
@@ -217,12 +218,7 @@ impl ServiceContext {
     /// This method is necessary if you want to implement an alternative exonum node.
     /// For example, you can implement special node without consensus for regression
     /// testing of services business logic.
-    pub fn new(
-        service_public_key: PublicKey,
-        service_secret_key: SecretKey,
-        api_sender: ApiSender,
-        fork: Fork,
-    ) -> ServiceContext {
+    pub fn new(service_public_key: PublicKey, api_sender: ApiSender, fork: Fork) -> ServiceContext {
         let (stored_configuration, height) = {
             let schema = Schema::new(fork.as_ref());
             let stored_configuration = schema.actual_configuration();
@@ -237,7 +233,7 @@ impl ServiceContext {
 
         ServiceContext {
             validator_id,
-            service_keypair: (service_public_key, service_secret_key),
+            service_public_key,
             api_sender,
             fork,
             stored_configuration,
@@ -268,12 +264,7 @@ impl ServiceContext {
 
     /// Returns current node's public key.
     pub fn public_key(&self) -> &PublicKey {
-        &self.service_keypair.0
-    }
-
-    /// Returns current node's secret key.
-    pub fn secret_key(&self) -> &SecretKey {
-        &self.service_keypair.1
+        &self.service_public_key
     }
 
     /// Returns the actual consensus configuration.
@@ -287,7 +278,7 @@ impl ServiceContext {
     }
 
     /// Returns reference to the transaction sender.
-    pub fn transaction_sender(&self) -> &TransactionSend {
+    pub fn api_sender(&self) -> &ApiSender {
         &self.api_sender
     }
 
@@ -453,74 +444,6 @@ impl SharedNodeState {
             .expect("Expected write lock")
             .reconnects_timeout
             .remove(addr)
-    }
-}
-
-/// Provides the current node state to api handlers.
-pub struct ApiContext {
-    blockchain: Blockchain,
-    node_channel: ApiSender,
-    public_key: PublicKey,
-    secret_key: SecretKey,
-}
-
-/// Provides the current node state to api handlers.
-impl ApiContext {
-    /// Constructs context for the given `Node`.
-    pub fn new(node: &Node) -> ApiContext {
-        let handler = node.handler();
-        ApiContext {
-            blockchain: handler.blockchain.clone(),
-            node_channel: node.channel(),
-            public_key: *node.state().service_public_key(),
-            secret_key: node.state().service_secret_key().clone(),
-        }
-    }
-
-    /// Constructs context from raw parts.
-    pub fn from_parts(
-        blockchain: &Blockchain,
-        node_channel: ApiSender,
-        public_key: &PublicKey,
-        secret_key: &SecretKey,
-    ) -> ApiContext {
-        ApiContext {
-            blockchain: blockchain.clone(),
-            node_channel,
-            public_key: *public_key,
-            secret_key: secret_key.clone(),
-        }
-    }
-
-    /// Returns reference to the node's blockchain.
-    pub fn blockchain(&self) -> &Blockchain {
-        &self.blockchain
-    }
-
-    /// Returns reference to the transaction sender.
-    pub fn node_channel(&self) -> &ApiSender {
-        &self.node_channel
-    }
-
-    /// Returns the public key of current node.
-    pub fn public_key(&self) -> &PublicKey {
-        &self.public_key
-    }
-
-    /// Returns the secret key of current node.
-    pub fn secret_key(&self) -> &SecretKey {
-        &self.secret_key
-    }
-}
-
-impl ::std::fmt::Debug for ApiContext {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "ApiContext(blockchain: {:?}, public_key: {:?})",
-            self.blockchain,
-            self.public_key
-        )
     }
 }
 
