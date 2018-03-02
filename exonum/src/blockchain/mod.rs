@@ -168,8 +168,8 @@ fn tx_from_raw(service_map: &VecMap<Box<Service>>, raw: RawMessage) -> Option<Bo
 
 impl Blockchain {
     /// Constructs a blockchain for the given `storage` and list of `services`.
-    pub fn new(
-        storage: Box<Database>,
+    pub fn new<D: Into<Arc<Database>>>(
+        storage: D,
         services: Vec<Box<Service>>,
         service_public_key: PublicKey,
         service_secret_key: SecretKey,

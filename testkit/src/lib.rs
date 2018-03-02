@@ -522,7 +522,7 @@ impl TestKit {
         let db_handler = db.handler();
 
         let mut blockchain = Blockchain::new(
-            Box::new(db),
+            db,
             services,
             *network.us().service_keypair().0,
             network.us().service_keypair().1.clone(),

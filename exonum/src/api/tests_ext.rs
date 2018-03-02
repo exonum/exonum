@@ -150,7 +150,7 @@ fn create_blockchain_with_keypair(
 
     let api_channel = mpsc::channel(4);
     let blockchain = Blockchain::new(
-        Box::new(MemoryDB::new()),
+        MemoryDB::new(),
         vec![Box::new(MyService)],
         public_key,
         secret_key,

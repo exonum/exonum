@@ -751,7 +751,7 @@ mod tests {
         let api_channel = mpsc::channel(1);
         (
             Blockchain::new(
-                Box::new(MemoryDB::new()),
+                MemoryDB::new(),
                 Vec::new(),
                 service_keypair.0,
                 service_keypair.1,

@@ -625,3 +625,9 @@ impl<'a> Iterator for ForkIter<'a> {
         }
     }
 }
+
+impl<T: Database> From<T> for Box<Database> {
+    fn from(db: T) -> Self {
+        Box::new(db) as Box<Database>
+    }
+}

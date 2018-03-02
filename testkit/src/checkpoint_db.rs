@@ -59,6 +59,12 @@ impl<T: Database> Database for CheckpointDb<T> {
     }
 }
 
+impl<T: Database> From<CheckpointDb<T>> for Arc<Database> {
+    fn from(db: CheckpointDb<T>) -> Arc<Database> {
+        Arc::from(Box::new(db) as Box<Database>)
+    }
+}
+
 /// Handler to a checkpointed database, which
 /// allows rollback of transactions.
 #[derive(Debug)]
