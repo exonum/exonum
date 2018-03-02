@@ -140,7 +140,7 @@
                                 <div class="input-group-prepend">
                                     <div class="input-group-text">$</div>
                                 </div>
-                                <input type="number" class="form-control" placeholder="Enter amount" onkeyup={ editAmount }>
+                                <input type="number" class="form-control" placeholder="Enter amount" onkeyup={ editAmount } min="1">
                             </div>
                         </div>
                     </div>
