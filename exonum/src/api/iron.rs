@@ -30,6 +30,19 @@ use std::sync::Arc;
 
 use super::ext::{ApiError, Endpoint, EndpointHolder, Environment, ServiceApi};
 
+/// Errors raised during handling requests by the `IronAdapter`.
+#[derive(Debug, Fail)]
+pub enum ParseError {
+    /// The body of a POST request is malformed, not allowing to parse it to JSON.
+    #[fail(display = "Malformed POST request body")]
+    MalformedBody,
+
+    /// The `q` query param is inappropriately specified in a GET request
+    /// (e.g., has an incorrect format).
+    #[fail(display = "Malformed GET request query")]
+    MalformedQuery,
+}
+
 /// Response returned by the Iron adapter in case an endpoint
 /// raises an error.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -132,7 +145,8 @@ impl IronAdapter {
                     })?
                 }
                 _ => {
-                    return Err(ApiError::BadRequest("Request data is malformed".into()))?;
+                    let e = ParseError::MalformedQuery;
+                    return Err(ApiError::BadRequest(e.into()))?;
                 }
             };
 
@@ -149,7 +163,8 @@ impl IronAdapter {
             let query = match req.get::<bodyparser::Json>() {
                 Ok(Some(body)) => body,
                 _ => {
-                    return Err(ApiError::BadRequest("Request body is malformed".into()))?;
+                    let e = ParseError::MalformedBody;
+                    return Err(ApiError::BadRequest(e.into()))?;
                 }
             };
 

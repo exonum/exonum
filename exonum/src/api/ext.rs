@@ -102,6 +102,7 @@
 //! # fn main() { }
 //! ```
 
+use failure;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::{self, Value};
@@ -135,7 +136,7 @@ pub enum ApiError {
     // TODO: split `serde::Error` / others?
     /// A request is malformed or otherwise cannot be processed.
     #[fail(display = "Bad request: {}", _0)]
-    BadRequest(Box<::std::error::Error + Send + Sync>),
+    BadRequest(failure::Error),
 
     /// Requested resource is not found.
     #[fail(display = "Not found")]
@@ -154,7 +155,7 @@ pub enum ApiError {
 
     /// Generic server-side error.
     #[fail(display = "Internal server error: {}", _0)]
-    InternalError(Box<::std::error::Error + Send + Sync>),
+    InternalError(failure::Error),
 }
 
 impl From<SendError> for ApiError {

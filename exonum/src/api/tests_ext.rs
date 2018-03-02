@@ -29,7 +29,7 @@ use self::iron_test::request::{get as test_get, post as test_post};
 
 use api::ext::{ApiError, ApiResult, ConstEndpoint, Context, Endpoint, EndpointHolder, Environment,
                MutEndpoint, Spec, ServiceApi, TypedEndpoint, Visibility, TRANSACTIONS};
-use api::iron::{ErrorResponse, IronAdapter};
+use api::iron::{ErrorResponse, IronAdapter, ParseError};
 use blockchain::{Blockchain, ExecutionResult, Transaction};
 use crypto::{self, CryptoHash, Hash};
 use node::ExternalMessage;
@@ -98,7 +98,7 @@ fn get_sum(_: &Context, numbers: Vec<u32>) -> ApiResult<u32> {
     let mut sum: u32 = 0;
     for x in numbers {
         sum = sum.checked_add(x).ok_or_else(|| {
-            ApiError::InternalError("integer overflow".into())
+            ApiError::InternalError(failure::err_msg("integer overflow"))
         })?;
     }
     Ok(sum)
@@ -220,7 +220,7 @@ fn test_single_transaction_sink() {
         .handle(&env, serde_json::to_value(&tx).unwrap())
         .unwrap_err();
     match err {
-        ApiError::BadRequest(e) => assert!(e.is::<serde_json::Error>()),
+        ApiError::BadRequest(ref e) => assert!(e.downcast_ref::<serde_json::Error>().is_some()),
         _ => panic!("Incorrect type of API error"),
     }
 }
@@ -252,7 +252,7 @@ fn test_full_transaction_sink() {
         .handle(&env, json!({ "garbage": 123 }))
         .unwrap_err();
     match err {
-        ApiError::BadRequest(e) => assert!(e.is::<serde_json::Error>()),
+        ApiError::BadRequest(ref e) => assert!(e.downcast_ref::<serde_json::Error>().is_some()),
         _ => panic!("Incorrect type of API error"),
     }
 }
@@ -584,7 +584,7 @@ fn test_iron_read_requests_malformed() {
             .unwrap()
             .into_inner();
         match error {
-            ApiError::BadRequest(ref e) => assert!(e.is::<serde_json::Error>()),
+            ApiError::BadRequest(ref e) => assert!(e.downcast_ref::<serde_json::Error>().is_some()),
             _ => panic!("Unexpected API error"),
         }
 
@@ -597,11 +597,12 @@ fn test_iron_read_requests_malformed() {
             .into_inner();
         match error {
             ApiError::BadRequest(ref e) => {
-                assert!(
-                e.is::<serde_json::Error>() || e.description().contains("malformed"),
-                "Unexpected API error: {:?}",
-                e
-            )
+                let expected = e.downcast_ref::<serde_json::Error>().is_some() ||
+                    e.downcast_ref::<ParseError>().map_or(false, |e| match *e {
+                        ParseError::MalformedBody => true,
+                        _ => false,
+                    });
+                assert!(expected, "Unexpected API error: {:?}", e);
             }
             e => panic!("Unexpected API error: {:?}", e),
         }
@@ -622,7 +623,7 @@ fn test_read_request_user_generated_internal_error() {
         .handle(&env, json!([2000000000, 2000000000, 2000000000]))
         .unwrap_err();
     match error {
-        ApiError::InternalError(ref e) => assert_eq!(e.description(), "integer overflow"),
+        ApiError::InternalError(ref e) => assert!(format!("{}", e).contains("integer overflow")),
         _ => panic!("Unexpected API error"),
     }
 
@@ -637,7 +638,7 @@ fn test_read_request_user_generated_internal_error() {
         .unwrap()
         .into_inner();
     match error {
-        ApiError::InternalError(ref e) => assert_eq!(e.description(), "integer overflow"),
+        ApiError::InternalError(ref e) => assert!(format!("{}", e).contains("integer overflow")),
         _ => panic!("Unexpected API error"),
     }
 }
@@ -674,7 +675,9 @@ fn test_iron_transaction_verification_failure() {
 
 #[test]
 fn test_iron_transaction_send_failure() {
+    use failure::Fail;
     use std::error::Error;
+    use std::io;
 
     let (blockchain, receiver) = create_blockchain();
     let api = create_api();
@@ -698,11 +701,17 @@ fn test_iron_transaction_send_failure() {
         .downcast::<failure::Compat<ApiError>>()
         .unwrap()
         .into_inner();
+
+    assert!(
+        error.cause().map_or(false, |e| e.downcast_ref::<io::Error>().is_some()),
+        "Unexpected error: {:?}",
+        error
+    );
     match error {
         ApiError::TransactionNotSent(ref e) => {
             assert!(e.description().contains("receiver is gone"), "{:?}", e)
         }
-        _ => panic!("Unexpected API error"),
+        e => panic!("Unexpected error: {:?}", e),
     }
 }
 
