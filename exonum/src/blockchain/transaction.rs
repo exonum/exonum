@@ -462,7 +462,7 @@ macro_rules! transactions {
         }
 
         #[derive(Clone, Debug)]
-        enum $transaction_set {
+        pub enum $transaction_set {
             $($name($name),)*
         }
 
