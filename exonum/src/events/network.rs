@@ -208,7 +208,6 @@ impl NetworkPart {
         let network_config = self.network_config;
         // Cancellation token
         let (cancel_sender, cancel_handler) = unsync::oneshot::channel();
-        let cancel_sender = Some(cancel_sender);
 
         let requests_handle = RequestHandler::new(
             self.our_connect_message,
@@ -254,8 +253,9 @@ impl RequestHandler {
         network_tx: mpsc::Sender<NetworkEvent>,
         handle: Handle,
         receiver: mpsc::Receiver<NetworkRequest>,
-        mut cancel_sender: Option<unsync::oneshot::Sender<()>>,
+        cancel_sender: unsync::oneshot::Sender<()>,
     ) -> RequestHandler {
+        let mut cancel_sender = Some(cancel_sender);
         let outgoing_connections = ConnectionsPool::new();
         let requests_handler = receiver
             .map_err(|_| other_error("no network requests"))
@@ -309,11 +309,8 @@ impl RequestHandler {
                     }
                     // Immediately stop the event loop.
                     NetworkRequest::Shutdown => {
-                        let fut = cancel_sender
-                            .take()
-                            .ok_or_else(|| other_error("shutdown twice"))
-                            .into_future();
-                        to_box(fut)
+                        drop(cancel_sender.take());
+                        to_box(Ok(()).into_future())
                     }
                 }
             });

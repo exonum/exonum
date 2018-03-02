@@ -79,6 +79,14 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `peer_addr` argument of the `generate-config` command has been renamed to
   `peer-address`. (#528)
 
+- `Blockchain::new` and `Node::new` now accept `Into<Arc<Database>>` instead
+  of `Box<Database>`. (#530)
+
+  Migration path:
+
+  - Just pass database argument as is, for example instead of
+    `Box::new(MemoryDb::new())` use `MemoryDb::new()`.
+
 ### New features
 
 - `StorageKey` and `StorageValue` traits are implemented for `SystemTime`. (#456)
@@ -102,6 +110,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added round and propose timeouts validation. (#523)
 
 - Fixed bug with the extra creation of the genesis configuration. (#527)
+
+- Fixed panic "can't cancel routine" during node shutdown. (#530)
 
 ### Internal improvements
 
