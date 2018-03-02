@@ -509,7 +509,7 @@ impl Blockchain {
     }
 
     /// Creates an API context for use with this blockchain.
-    pub(crate) fn api_context(&self) -> ApiContext {
+    fn api_context(&self) -> ApiContext {
         ApiContext::new(self)
     }
 

@@ -192,6 +192,6 @@ impl Service for CurrencyService {
         let mut api = ServiceApi::new();
         api.set_transactions::<CurrencyTransactions>();
         api.insert(BALANCE_SPEC, Endpoint::new(balance));
-        Some(IronAdapter::with_context(ctx).create_handler(api))
+        Some(IronAdapter::new(ctx.clone()).create_handler(api))
     }
 }

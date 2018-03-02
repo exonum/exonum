@@ -159,7 +159,7 @@ impl Service for CounterService {
         let mut api = ServiceApi::new();
         api.insert(COUNT_SPEC, Endpoint::new(count));
         api.set_transactions::<CounterTransactions>();
-        Some(IronAdapter::with_context(ctx).create_handler(api))
+        Some(IronAdapter::new(ctx.clone()).create_handler(api))
     }
 
     fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
@@ -172,6 +172,6 @@ impl Service for CounterService {
             Endpoint::new(count),
         );
         api.set_transactions::<TxReset>();
-        Some(IronAdapter::with_context(ctx).create_handler(api))
+        Some(IronAdapter::new(ctx.clone()).create_handler(api))
     }
 }

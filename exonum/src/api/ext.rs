@@ -34,7 +34,7 @@
 //! ```
 //! # #[macro_use] extern crate exonum;
 //! use exonum::api::ext::*;
-//! use exonum::api::iron::{self, IronAdapter};
+//! use exonum::api::iron::{Handler, IronAdapter};
 //! # use exonum::blockchain::{ApiContext, Blockchain, ExecutionResult, Service, Transaction};
 //! # use exonum::crypto::{Hash, PublicKey};
 //! # use exonum::encoding;
@@ -92,11 +92,11 @@
 //! #       unimplemented!()
 //! #   }
 //!
-//!     fn public_api_handler(&self, context: &ApiContext) -> Option<Box<iron::Handler>> {
+//!     fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
 //!         let mut api = ServiceApi::new();
 //!         api.set_transactions::<Any>();
 //!         api.insert(BALANCE_SPEC, Endpoint::new(balance));
-//!         Some(IronAdapter::with_context(context).create_handler(api))
+//!         Some(IronAdapter::new(ctx.clone()).create_handler(api))
 //!     }
 //! }
 //! # fn main() { }
@@ -106,11 +106,10 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::{self, Value};
 
-use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::{fmt, io};
 
-use blockchain::{Blockchain, SendError, Transaction};
+use blockchain::{ApiSender, Blockchain, SendError, Transaction};
 use crypto::{Hash, PublicKey};
 use messages::RawMessage;
 use storage::Snapshot;
@@ -194,25 +193,77 @@ pub enum Visibility {
     Private,
 }
 
-/// Context supplied to endpoints.
-#[derive(Debug)]
-pub struct Context<'a> {
-    blockchain: &'a Blockchain,
+/// Environment in which the endpoint handlers are run.
+///
+/// Note the difference with [`Context`]: `Context` is what is *exposed* to endpoints,
+/// while `Environment` is what is used by the core to *produce* the said context.
+///
+/// [`Context`]: struct.Context.html
+#[derive(Debug, Clone)]
+pub struct Environment {
+    blockchain: Blockchain,
 }
 
+impl Environment {
+    /// Constructs the environment given the blockchain.
+    // Implementation note: the signature of the constructor is unstable
+    // and likely to change in the future.
+    #[doc(hidden)]
+    pub fn new(blockchain: &Blockchain) -> Self {
+        Environment { blockchain: blockchain.clone() }
+    }
+
+    /// Returns a reference to the blockchain of the node.
+    pub fn blockchain(&self) -> &Blockchain {
+        &self.blockchain
+    }
+
+    /// Returns a reference to the transaction sender of the node.
+    pub fn node_channel(&self) -> &ApiSender {
+        self.blockchain.api_sender()
+    }
+
+    /// Returns the service public key of the node.
+    pub fn public_key(&self) -> &PublicKey {
+        self.blockchain.service_public_key()
+    }
+}
+
+/// Context supplied to endpoints.
+pub struct Context<'a> {
+    snapshot: Box<Snapshot>,
+    service_public_key: &'a PublicKey,
+    api_sender: &'a ApiSender,
+}
+
+impl<'a> fmt::Debug for Context<'a> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        formatter
+            .debug_struct("Context")
+            .field("service_public_key", &self.service_public_key)
+            .field("api_sender", &self.api_sender)
+            .finish()
+    }
+}
+
+
 impl<'a> Context<'a> {
-    fn new(blockchain: &'a Blockchain) -> Self {
-        Context { blockchain }
+    fn new(env: &'a Environment) -> Self {
+        Context {
+            snapshot: env.blockchain.snapshot(),
+            service_public_key: env.blockchain.service_public_key(),
+            api_sender: env.blockchain.api_sender(),
+        }
     }
 
     /// Gets a snapshot of the current blockchain state.
-    pub fn snapshot(&self) -> Box<Snapshot> {
-        self.blockchain.snapshot()
+    pub fn snapshot(&self) -> &Snapshot {
+        self.snapshot.as_ref()
     }
 
     /// Gets the public key used for signing operations by services.
     pub fn service_public_key(&self) -> &PublicKey {
-        self.blockchain.service_public_key()
+        self.service_public_key
     }
 
     /// Queues a transaction for sending over the network and including into the blockchain.
@@ -222,10 +273,9 @@ impl<'a> Context<'a> {
     where
         T: Into<Box<Transaction>>,
     {
-        self.blockchain
-            .api_sender()
-            .send(transaction.into())
-            .map_err(ApiError::from)
+        self.api_sender.send(transaction.into()).map_err(
+            ApiError::from,
+        )
     }
 
     /// Queues a transaction for signing, sending over the network and including
@@ -234,10 +284,9 @@ impl<'a> Context<'a> {
     /// The transaction is signed with the service secret key; the hash of the signed
     /// transaction is returned.
     pub fn sign_and_send(&mut self, message: &RawMessage) -> Result<Hash, ApiError> {
-        self.blockchain
-            .api_sender()
-            .sign_and_send(message)
-            .map_err(ApiError::from)
+        self.api_sender.sign_and_send(message).map_err(
+            ApiError::from,
+        )
     }
 }
 
@@ -392,12 +441,8 @@ impl Endpoint {
     }
 
     /// Handles a request.
-    pub fn handle<T: Borrow<Blockchain>>(
-        &self,
-        blockchain: &T,
-        request: Value,
-    ) -> ApiResult<Value> {
-        let mut context = Context::new(blockchain.borrow());
+    pub fn handle(&self, env: &Environment, request: Value) -> ApiResult<Value> {
+        let mut context = Context::new(env);
 
         match self.handler {
             EndpointHandler::Constant(ref handler) => handler(&context, request),

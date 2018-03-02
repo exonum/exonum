@@ -376,12 +376,12 @@ impl Service for TimeService {
 
     fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
         let api = api::create_api().public();
-        Some(IronAdapter::with_context(ctx).create_handler(api))
+        Some(IronAdapter::new(ctx.clone()).create_handler(api))
     }
 
     fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
         let api = api::create_api().private();
-        Some(IronAdapter::with_context(ctx).create_handler(api))
+        Some(IronAdapter::new(ctx.clone()).create_handler(api))
     }
 }
 

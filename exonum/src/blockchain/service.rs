@@ -15,7 +15,6 @@
 //! This module defines the Exonum services interfaces. Like smart contracts in some other
 //! blockchain platforms, Exonum services encapsulate business logic of the blockchain application.
 
-use std::borrow::Borrow;
 use std::sync::{Arc, RwLock};
 use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
@@ -23,12 +22,14 @@ use std::net::SocketAddr;
 use serde_json::Value;
 use iron::Handler;
 
+pub use api::ext::Environment as ApiContext;
+
 use crypto::{Hash, PublicKey};
 use storage::{Fork, Snapshot};
 use messages::RawTransaction;
 use encoding::Error as MessageError;
 use node::State;
-use blockchain::{Blockchain, ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
+use blockchain::{ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use helpers::{Height, Milliseconds, ValidatorId};
 use super::transaction::Transaction;
 use super::ApiSender;
@@ -443,41 +444,6 @@ impl SharedNodeState {
             .expect("Expected write lock")
             .reconnects_timeout
             .remove(addr)
-    }
-}
-
-/// Provides the current node state to api handlers.
-#[derive(Debug, Clone)]
-pub struct ApiContext {
-    blockchain: Blockchain,
-}
-
-/// Provides the current node state to api handlers.
-impl ApiContext {
-    /// Constructs context for the blockchain.
-    pub fn new(blockchain: &Blockchain) -> ApiContext {
-        ApiContext { blockchain: blockchain.clone() }
-    }
-
-    /// Returns reference to the node's blockchain.
-    pub fn blockchain(&self) -> &Blockchain {
-        &self.blockchain
-    }
-
-    /// Returns reference to the transaction sender.
-    pub fn node_channel(&self) -> &ApiSender {
-        &self.blockchain.api_sender
-    }
-
-    /// Returns the public key of current node.
-    pub fn public_key(&self) -> &PublicKey {
-        self.blockchain.service_public_key()
-    }
-}
-
-impl Borrow<Blockchain> for ApiContext {
-    fn borrow(&self) -> &Blockchain {
-        self.blockchain()
     }
 }
 

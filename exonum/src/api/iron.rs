@@ -28,8 +28,7 @@ use serde_json;
 
 use std::sync::Arc;
 
-use blockchain::{ApiContext, Blockchain};
-use super::ext::{ApiError, Endpoint, EndpointHolder, ServiceApi};
+use super::ext::{ApiError, Endpoint, EndpointHolder, Environment, ServiceApi};
 
 /// Response returned by the Iron adapter in case an endpoint
 /// raises an error.
@@ -81,18 +80,13 @@ fn ok_response(response: &serde_json::Value) -> IronResult<Response> {
 /// Transport adapter for HTTP that uses Iron framework.
 #[derive(Debug)]
 pub struct IronAdapter {
-    blockchain: Blockchain,
+    environment: Environment,
 }
 
 impl IronAdapter {
     /// Creates a new adapter.
-    pub fn new(blockchain: Blockchain) -> Self {
-        IronAdapter { blockchain }
-    }
-
-    /// Creates a new adapter from the API context.
-    pub fn with_context(context: &ApiContext) -> Self {
-        IronAdapter { blockchain: context.blockchain().clone() }
+    pub fn new(environment: Environment) -> Self {
+        IronAdapter { environment }
     }
 
     /// Creates a handler.
@@ -124,7 +118,7 @@ impl IronAdapter {
         let api = Arc::new(api);
 
         let get_api = Arc::clone(&api);
-        let blockchain = self.blockchain.clone();
+        let env = self.environment.clone();
         let get_handler = move |req: &mut Request| {
             let get_api = get_api.filter(can_get);
             let endpoint = endpoint_from_req(&get_api, req)?;
@@ -142,12 +136,12 @@ impl IronAdapter {
                 }
             };
 
-            let response = endpoint.handle(&blockchain, query)?;
+            let response = endpoint.handle(&env, query)?;
             ok_response(&response)
         };
 
         let post_api = Arc::clone(&api);
-        let blockchain = self.blockchain.clone();
+        let env = self.environment.clone();
         let post_handler = move |req: &mut Request| {
             let post_api = post_api.filter(can_post);
             let endpoint = endpoint_from_req(&post_api, req)?;
@@ -159,7 +153,7 @@ impl IronAdapter {
                 }
             };
 
-            let response = endpoint.handle(&blockchain, query)?;
+            let response = endpoint.handle(&env, query)?;
             ok_response(&response)
         };
 

@@ -365,6 +365,6 @@ impl Service for CurrencyService {
     // Create a REST `Handler` to process web requests to the node.
     fn public_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
         let api = create_api().public();
-        Some(IronAdapter::with_context(context).create_handler(api))
+        Some(IronAdapter::new(context.clone()).create_handler(api))
     }
 }

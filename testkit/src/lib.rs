@@ -146,10 +146,9 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock, RwLockReadGuard};
 use std::fmt;
 
-use exonum::api::ext::Endpoint;
-use exonum::blockchain::{ApiContext, Blockchain, ConsensusConfig, GenesisConfig,
-                         Schema as CoreSchema, Service, SharedNodeState, StoredConfiguration,
-                         Transaction, ValidatorKeys};
+use exonum::api::ext::{Endpoint, Environment};
+use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Schema as CoreSchema,
+                         Service, SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys};
 use exonum::crypto::{self, CryptoHash};
 use exonum::helpers::{Height, Round, ValidatorId};
 use exonum::messages::{Precommit, Propose};
@@ -573,11 +572,6 @@ impl TestKit {
     /// Creates an instance of `TestKitApi` to test the API provided by services.
     pub fn api(&self) -> TestKitApi {
         TestKitApi::new(self)
-    }
-
-    /// Creates an API context for the testkit.
-    pub fn api_context(&self) -> ApiContext {
-        ApiContext::new(&self.blockchain)
     }
 
     /// Polls the *existing* events from the event loop until exhaustion. Does not wait
@@ -1159,7 +1153,7 @@ impl ApiKind {
 pub struct TestKitApi {
     public_handler: Chain,
     private_handler: Chain,
-    api_context: ApiContext,
+    api_env: Environment,
 }
 
 impl fmt::Debug for TestKitApi {
@@ -1190,7 +1184,7 @@ impl TestKitApi {
                 testkit.external_message_sender.clone(),
             ),
 
-            api_context: testkit.api_context(),
+            api_env: Environment::new(blockchain),
         }
     }
 
@@ -1211,7 +1205,7 @@ impl TestKitApi {
     where
         T: Into<Box<Transaction>>,
     {
-        self.api_context
+        self.api_env
             .node_channel()
             .send(transaction.into())
             .expect("Cannot send transaction");
@@ -1224,7 +1218,7 @@ impl TestKitApi {
         request: serde_json::Value,
         expected: &serde_json::Value,
     ) {
-        let response = match endpoint.handle(&self.api_context, request) {
+        let response = match endpoint.handle(&self.api_env, request) {
             Ok(response) => response,
             Err(e) => panic!("Unexpected endpoint error: {:?}", e),
         };
