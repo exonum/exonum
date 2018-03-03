@@ -27,6 +27,9 @@ use blockchain::{Schema, Blockchain, Block, TxLocation, Transaction, Transaction
 use messages::Precommit;
 use helpers::Height;
 
+#[cfg(test)]
+mod tests;
+
 /// Block information.
 #[derive(Debug, Serialize)]
 pub struct BlockInfo<'a> {
