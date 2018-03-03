@@ -134,7 +134,6 @@ extern crate serde_json;
 extern crate log;
 
 use futures::Stream;
-use futures::executor::{self, Spawn};
 use futures::sync::mpsc;
 
 use std::collections::BTreeMap;
@@ -153,15 +152,15 @@ mod macros;
 mod api;
 mod checkpoint_db;
 pub mod compare;
-mod greedy_fold;
 mod network;
+mod poll_events;
 
 pub use api::{ApiKind, TestKitApi};
 pub use compare::ComparableSnapshot;
 pub use network::{TestNetwork, TestNode, TestNetworkConfiguration};
 
 use checkpoint_db::{CheckpointDb, CheckpointDbHandler};
-use greedy_fold::GreedilyFoldable;
+use poll_events::poll_events;
 
 /// Builder for `TestKit`.
 ///
@@ -291,7 +290,7 @@ impl TestKitBuilder {
 pub struct TestKit {
     blockchain: Blockchain,
     db_handler: CheckpointDbHandler<MemoryDB>,
-    events_stream: Spawn<Box<Stream<Item = (), Error = ()>>>,
+    events_stream: Box<Stream<Item = (), Error = ()> + Send + Sync>,
     network: TestNetwork,
     api_sender: ApiSender,
     mempool: TxPool,
@@ -338,12 +337,14 @@ impl TestKit {
         blockchain.initialize(genesis.clone()).unwrap();
 
         let mempool = Arc::new(RwLock::new(BTreeMap::new()));
-        let event_stream: Box<Stream<Item = (), Error = ()>> = {
+        let events_stream: Box<Stream<Item = (), Error = ()> + Send + Sync> = {
             let blockchain = blockchain.clone();
             let mempool = Arc::clone(&mempool);
-            Box::new(api_channel.1.greedy_fold((), move |_, event| {
+
+            Box::new(api_channel.1.and_then(move |event| {
                 let snapshot = blockchain.snapshot();
                 let schema = CoreSchema::new(&snapshot);
+
                 match event {
                     ExternalMessage::Transaction(tx) => {
                         let hash = tx.hash();
@@ -358,9 +359,9 @@ impl TestKit {
                     ExternalMessage::Enable(_) |
                     ExternalMessage::Shutdown => { /* Ignored */ }
                 }
+                Ok(())
             }))
         };
-        let events_stream = executor::spawn(event_stream);
 
         TestKit {
             blockchain,
@@ -381,8 +382,8 @@ impl TestKit {
 
     /// Polls the *existing* events from the event loop until exhaustion. Does not wait
     /// until new events arrive.
-    pub fn poll_events(&mut self) -> Option<Result<(), ()>> {
-        self.events_stream.wait_stream()
+    pub fn poll_events(&mut self) {
+        poll_events(&mut self.events_stream);
     }
 
     /// Returns a snapshot of the current blockchain state.
