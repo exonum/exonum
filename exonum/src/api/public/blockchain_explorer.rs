@@ -17,13 +17,13 @@ use serde_json::Value as JsonValue;
 use iron::prelude::*;
 
 use blockchain::Blockchain;
-use explorer::{BlockInfo, BlockchainExplorer, BlocksRange, TxInfo};
+use explorer::{BlockchainExplorer, BlocksRange, TransactionInfo as TxInfo};
 use node::state::TxPool;
 use api::{Api, ApiError};
 use crypto::Hash;
 use helpers::Height;
 
-const MAX_BLOCKS_PER_REQUEST: u64 = 1000;
+const MAX_BLOCKS_PER_REQUEST: usize = 1000;
 
 #[derive(Serialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
@@ -36,24 +36,27 @@ enum TransactionInfo {
 /// Public explorer API.
 #[derive(Clone, Debug)]
 pub struct ExplorerApi {
-    blockchain: Blockchain,
+    explorer: BlockchainExplorer,
     pool: TxPool,
 }
 
 impl ExplorerApi {
     /// Creates a new `ExplorerApi` instance.
     pub fn new(pool: TxPool, blockchain: Blockchain) -> Self {
-        ExplorerApi { pool, blockchain }
+        ExplorerApi {
+            pool,
+            explorer: BlockchainExplorer::new(blockchain),
+        }
     }
 
-    fn explorer(&self) -> BlockchainExplorer {
-        BlockchainExplorer::new(&self.blockchain)
+    fn explorer(&self) -> &BlockchainExplorer {
+        &self.explorer
     }
 
     fn blocks(
         &self,
-        count: u64,
-        from: Option<u64>,
+        count: usize,
+        from: Option<Height>,
         skip_empty_blocks: bool,
     ) -> Result<BlocksRange, ApiError> {
         if count > MAX_BLOCKS_PER_REQUEST {
@@ -65,16 +68,12 @@ impl ExplorerApi {
         Ok(self.explorer().blocks_range(count, from, skip_empty_blocks))
     }
 
-    fn block(&self, height: Height) -> Option<BlockInfo> {
-        self.explorer().block_info(height)
-    }
-
     fn transaction_info(&self, hash: &Hash) -> Result<TransactionInfo, ApiError> {
         if let Some(tx) = self.pool.read().expect("Uanble to read pool").get(hash) {
             Ok(TransactionInfo::InPool {
                 content: tx.serialize_field().map_err(ApiError::InternalError)?,
             })
-        } else if let Some(tx_info) = self.explorer().tx_info(hash)? {
+        } else if let Some(tx_info) = self.explorer().transaction(hash) {
             Ok(TransactionInfo::Committed(tx_info))
         } else {
             Ok(TransactionInfo::Unknown)
@@ -83,11 +82,11 @@ impl ExplorerApi {
 
     fn set_blocks_response(self, router: &mut Router) {
         let blocks = move |req: &mut Request| -> IronResult<Response> {
-            let count: u64 = self.required_param(req, "count")?;
+            let count: usize = self.required_param(req, "count")?;
             let latest: Option<u64> = self.optional_param(req, "latest")?;
             let skip_empty_blocks: bool = self.optional_param(req, "skip_empty_blocks")?
                 .unwrap_or(false);
-            let info = self.blocks(count, latest, skip_empty_blocks)?;
+            let info = self.blocks(count, latest.map(Height), skip_empty_blocks)?;
             self.ok_response(&::serde_json::to_value(info).unwrap())
         };
 
@@ -97,7 +96,7 @@ impl ExplorerApi {
     fn set_block_response(self, router: &mut Router) {
         let block = move |req: &mut Request| -> IronResult<Response> {
             let height: Height = self.url_fragment(req, "height")?;
-            let info = self.block(height);
+            let info = self.explorer().block(height);
             self.ok_response(&::serde_json::to_value(info).unwrap())
         };
 

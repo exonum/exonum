@@ -366,8 +366,8 @@ fn test_explorer_blocks() {
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(0));
     assert_eq!(*blocks[0].prev_hash(), crypto::Hash::default());
-    assert_eq!(range.start, 0);
-    assert_eq!(range.end, 1);
+    assert_eq!(range.start, Height(0));
+    assert_eq!(range.end, Height(1));
 
     // Check empty block creation
     testkit.create_block();
@@ -380,8 +380,8 @@ fn test_explorer_blocks() {
     assert_eq!(blocks[0].tx_count(), 0);
     assert_eq!(blocks[1].height(), Height(0));
     assert_eq!(*blocks[1].prev_hash(), crypto::Hash::default());
-    assert_eq!(range.start, 0);
-    assert_eq!(range.end, 2);
+    assert_eq!(range.start, Height(0));
+    assert_eq!(range.end, Height(2));
 
     let response: BlocksRange = api.get(
         ApiKind::Explorer,
@@ -389,8 +389,8 @@ fn test_explorer_blocks() {
     );
     let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 0);
-    assert_eq!(range.start, 0);
-    assert_eq!(range.end, 2);
+    assert_eq!(range.start, Height(0));
+    assert_eq!(range.end, Height(2));
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -406,8 +406,8 @@ fn test_explorer_blocks() {
     assert_eq!(*blocks[0].prev_hash(), blocks[1].hash());
     assert_eq!(blocks[0].tx_count(), 1);
     assert_eq!(*blocks[0].tx_hash(), tx.hash());
-    assert_eq!(range.start, 0);
-    assert_eq!(range.end, 3);
+    assert_eq!(range.start, Height(0));
+    assert_eq!(range.end, Height(3));
 
     let response: BlocksRange = api.get(
         ApiKind::Explorer,
@@ -416,8 +416,8 @@ fn test_explorer_blocks() {
     let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(2));
-    assert_eq!(range.start, 0);
-    assert_eq!(range.end, 3);
+    assert_eq!(range.start, Height(0));
+    assert_eq!(range.end, Height(3));
 
     testkit.create_block(); // height == 3
     testkit.create_block(); // height == 4
@@ -429,8 +429,8 @@ fn test_explorer_blocks() {
     let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(2));
-    assert_eq!(range.start, 0);
-    assert_eq!(range.end, 5);
+    assert_eq!(range.start, Height(0));
+    assert_eq!(range.end, Height(5));
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -447,8 +447,8 @@ fn test_explorer_blocks() {
     let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(5));
-    assert_eq!(range.start, 5);
-    assert_eq!(range.end, 6);
+    assert_eq!(range.start, Height(5));
+    assert_eq!(range.end, Height(6));
 
     let response: BlocksRange = api.get(
         ApiKind::Explorer,
@@ -458,8 +458,8 @@ fn test_explorer_blocks() {
     assert_eq!(blocks.len(), 2);
     assert_eq!(blocks[0].height(), Height(5));
     assert_eq!(blocks[1].height(), Height(2));
-    assert_eq!(range.start, 0);
-    assert_eq!(range.end, 6);
+    assert_eq!(range.start, Height(0));
+    assert_eq!(range.end, Height(6));
 
     // Check `latest` param
     let response: BlocksRange = api.get(
@@ -469,28 +469,28 @@ fn test_explorer_blocks() {
     let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(2));
-    assert_eq!(range.start, 0);
-    assert_eq!(range.end, 5);
+    assert_eq!(range.start, Height(0));
+    assert_eq!(range.end, Height(5));
 }
 
 #[test]
 fn test_explorer_single_block() {
     use std::collections::HashSet;
-    use exonum::explorer::BlockInfo;
+    use exonum::explorer::{BlockchainExplorer, BlockInfo};
     use exonum::helpers::Height;
 
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
         .with_service(CounterService)
         .create();
-    let api = testkit.api();
+    let explorer = BlockchainExplorer::new(testkit.blockchain().clone());
 
     assert_eq!(testkit.majority_count(), 3);
 
-    let info: BlockInfo = api.get(ApiKind::Explorer, "v1/blocks/0");
-    assert_eq!(info.block.height(), Height(0));
-    assert_eq!(*info.block.prev_hash(), crypto::Hash::default());
-    assert_eq!(info.txs, vec![]);
+    let info: BlockInfo = explorer.block(Height(0)).unwrap();
+    assert_eq!(info.block().height(), Height(0));
+    assert_eq!(*info.block().prev_hash(), crypto::Hash::default());
+    assert_eq!(info.transaction_hashes(), &[]);
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -499,16 +499,16 @@ fn test_explorer_single_block() {
     testkit.api().send(tx.clone());
     testkit.create_block(); // height == 1
 
-    let info: BlockInfo = api.get(ApiKind::Explorer, "v1/blocks/1");
-    assert_eq!(info.block.height(), Height(1));
-    assert_eq!(info.block.tx_count(), 1);
-    assert_eq!(*info.block.tx_hash(), tx.hash());
-    assert_eq!(info.txs, vec![tx.hash()]);
+    let info: BlockInfo = explorer.block(Height(1)).unwrap();
+    assert_eq!(info.block().height(), Height(1));
+    assert_eq!(info.block().tx_count(), 1);
+    assert_eq!(*info.block().tx_hash(), tx.hash());
+    assert_eq!(info.transaction_hashes(), &[tx.hash()]);
 
     let mut validators = HashSet::new();
-    for precommit in &info.precommits {
+    for precommit in info.precommits() {
         assert_eq!(precommit.height(), Height(1));
-        assert_eq!(*precommit.block_hash(), info.block.hash());
+        assert_eq!(*precommit.block_hash(), info.block().hash());
         let pk = testkit
             .network()
             .consensus_public_key_of(precommit.validator())
@@ -522,7 +522,7 @@ fn test_explorer_single_block() {
 
 #[test]
 fn test_explorer_transaction() {
-    use exonum::explorer::BlockInfo;
+    use exonum::explorer::{BlockchainExplorer, BlockInfo};
     use exonum::helpers::Height;
     use exonum::storage::ListProof;
 
@@ -539,6 +539,7 @@ fn test_explorer_transaction() {
     }
 
     let (mut testkit, api) = init_testkit();
+    let explorer = BlockchainExplorer::new(testkit.blockchain().clone());
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -584,8 +585,8 @@ fn test_explorer_transaction() {
         let location_proof = info.remove("location_proof").unwrap();
         let location_proof: ListProof<crypto::Hash> = serde_json::from_value(location_proof)
             .unwrap();
-        let block: BlockInfo = api.get(ApiKind::Explorer, "v1/blocks/1");
-        let block = block.block;
+        let block: BlockInfo = explorer.block(Height(1)).unwrap();
+        let block = block.block();
         assert!(
             location_proof
                 .validate(*block.tx_hash(), u64::from(block.tx_count()))

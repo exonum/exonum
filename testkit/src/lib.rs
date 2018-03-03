@@ -584,6 +584,11 @@ impl TestKit {
         self.blockchain.snapshot()
     }
 
+    /// Returns a reference to the blockchain used by the testkit.
+    pub fn blockchain(&self) -> &Blockchain {
+        &self.blockchain
+    }
+
     /// Returns a blockchain instance for low level manipulations with storage.
     pub fn blockchain_mut(&mut self) -> &mut Blockchain {
         &mut self.blockchain
