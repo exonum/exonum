@@ -815,3 +815,40 @@ fn test_create_block_heights() {
     testkit.create_blocks_until(Height(6));
     assert_eq!(Height(6), testkit.height());
 }
+
+#[test]
+fn test_number_of_validators_in_builder() {
+    let testkit = TestKitBuilder::auditor().create();
+    assert_eq!(testkit.network().validators().len(), 1);
+    assert_ne!(testkit.validator(ValidatorId(0)), testkit.us());
+
+    let testkit = TestKitBuilder::validator().create();
+    assert_eq!(testkit.network().validators().len(), 1);
+    assert_eq!(testkit.validator(ValidatorId(0)), testkit.us());
+
+    let testkit = TestKitBuilder::auditor().with_validators(3).create();
+    assert_eq!(testkit.network().validators().len(), 3);
+    let us = testkit.us();
+    assert!(!testkit.network().validators().iter().any(|v| v == us));
+
+    let testkit = TestKitBuilder::validator().with_validators(5).create();
+    assert_eq!(testkit.network().validators().len(), 5);
+    assert_eq!(testkit.validator(ValidatorId(0)), testkit.us());
+}
+
+#[test]
+#[should_panic(expected = "validator should be present")]
+fn test_zero_validators_in_builder() {
+    let testkit = TestKitBuilder::auditor().with_validators(0).create();
+    drop(testkit);
+}
+
+#[test]
+#[should_panic(expected = "Number of validators is already specified")]
+fn test_multiple_spec_of_validators_in_builder() {
+    let testkit = TestKitBuilder::auditor()
+        .with_validators(5)
+        .with_validators(2)
+        .create();
+    drop(testkit);
+}
