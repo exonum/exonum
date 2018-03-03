@@ -15,101 +15,173 @@
 //! Blockchain explorer module provides api for getting information about blocks and transactions
 //! from the blockchain.
 
-use std::cmp;
+use serde::{Serialize, Serializer};
+
+use std::fmt;
 use std::ops::Range;
 
-use serde_json::Value;
-
-use storage::ListProof;
+use storage::{ListProof, Snapshot};
 use crypto::Hash;
-use blockchain::{Schema, Blockchain, Block, TxLocation, TransactionResult, TransactionErrorType};
+use blockchain::{Schema, Blockchain, Block, TxLocation, Transaction, TransactionResult,
+                 TransactionErrorType};
 use messages::Precommit;
-// TODO: if explorer is usable anywhere else, remove `ApiError` dependencies (ECR-163).
-use api::ApiError;
 use helpers::Height;
 
-/// Blockchain explorer.
-#[derive(Debug)]
-pub struct BlockchainExplorer<'a> {
-    blockchain: &'a Blockchain,
+/// Block information.
+#[derive(Debug, Serialize)]
+pub struct BlockInfo<'a> {
+    #[serde(skip)]
+    explorer: &'a BlockchainExplorer,
+    block: Block,
+    precommits: Vec<Precommit>,
+    txs: Vec<Hash>,
 }
 
-/// Block information.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct BlockInfo {
+impl<'a> BlockInfo<'a> {
     /// Block header from blockchain.
-    pub block: Block,
+    pub fn block(&self) -> &Block {
+        &self.block
+    }
+
+    /// Returns the number of transactions in this block.
+    pub fn len(&self) -> usize {
+        self.txs.len()
+    }
+
+    /// Is this block empty (i.e., contains no transactions)?
+    pub fn is_empty(&self) -> bool {
+        self.txs.is_empty()
+    }
+
     /// List of precommit for this block.
-    pub precommits: Vec<Precommit>,
+    pub fn precommits(&self) -> &[Precommit] {
+        &self.precommits
+    }
+
     /// List of hashes for transactions that was executed into this block.
-    pub txs: Vec<Hash>,
+    pub fn transaction_hashes(&self) -> &[Hash] {
+        &self.txs
+    }
+
+    /// Returns a transaction with the specified index in the block.
+    pub fn transaction(&self, index: usize) -> Option<TransactionInfo> {
+        self.txs.get(index).map(|hash| {
+            self.explorer.transaction(hash).unwrap()
+        })
+    }
 }
 
 /// Transaction information.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct TxInfo {
-    /// `JSON` serialized transaction.
-    pub content: Value,
-    /// Transaction location in block.
-    pub location: TxLocation,
-    /// Proof that transaction really exist in the database.
-    pub location_proof: ListProof<Hash>,
-    /// Status of the transaction execution.
-    pub status: TxStatus,
+#[derive(Debug, Serialize)]
+pub struct TransactionInfo {
+    #[serde(serialize_with = "TransactionInfo::serialize_content")]
+    content: Box<Transaction>,
+    location: TxLocation,
+    location_proof: ListProof<Hash>,
+    #[serde(serialize_with = "TransactionInfo::serialize_status")]
+    status: TransactionResult,
 }
 
-/// Transaction execution status. Simplified version of `TransactionResult`.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "kebab-case")]
-pub enum TxStatus {
-    /// Successful transaction execution.
-    Success,
-    /// Panic during transaction execution.
-    Panic {
-        /// Panic description.
-        description: String,
-    },
-    /// Error during transaction execution.
-    Error {
-        /// User-defined error code.
-        code: u8,
-        /// Error description.
-        description: String,
-    },
+impl TransactionInfo {
+    /// The content of transaction.
+    pub fn content(&self) -> &Transaction {
+        self.content.as_ref()
+    }
+
+    fn serialize_content<S, T>(tx: &T, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+        T: AsRef<Transaction>,
+    {
+        use serde::ser::Error;
+
+        let value = tx.as_ref().serialize_field().map_err(|err| {
+            S::Error::custom(err.description())
+        })?;
+        value.serialize(serializer)
+    }
+
+    fn serialize_status<S>(result: &TransactionResult, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        /// Transaction execution status. Simplified version of `TransactionResult`.
+        #[serde(tag = "type", rename_all = "kebab-case")]
+        #[derive(Debug, Serialize)]
+        enum TxStatus<'a> {
+            Success,
+            Panic { description: &'a str },
+            Error { code: u8, description: &'a str },
+        }
+
+        fn from(result: &TransactionResult) -> TxStatus {
+            use self::TransactionErrorType::*;
+
+            match *result {
+                Ok(()) => TxStatus::Success,
+                Err(ref e) => {
+                    let description = e.description().unwrap_or_default();
+                    match e.error_type() {
+                        Panic => TxStatus::Panic { description },
+                        Code(code) => TxStatus::Error { code, description },
+                    }
+                }
+            }
+        }
+
+        let status = from(result);
+        status.serialize(serializer)
+    }
+
+    /// Transaction location in block.
+    pub fn location(&self) -> &TxLocation {
+        &self.location
+    }
+
+    /// Proof that transaction really exist in the database.
+    pub fn location_proof(&self) -> &ListProof<Hash> {
+        &self.location_proof
+    }
+
+    /// Status of the transaction execution.
+    pub fn status(&self) -> &TransactionResult {
+        &self.status
+    }
 }
+
 
 /// Information on blocks coupled with the corresponding range in the blockchain.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BlocksRange {
     /// Exclusive range of blocks.
-    pub range: Range<u64>,
+    pub range: Range<Height>,
     /// Blocks in the range.
     pub blocks: Vec<Block>,
 }
 
-impl<'a> BlockchainExplorer<'a> {
+/// Blockchain explorer.
+#[derive(Debug, Clone)]
+pub struct BlockchainExplorer {
+    blockchain: Blockchain,
+}
+
+impl BlockchainExplorer {
     /// Creates a new `BlockchainExplorer` instance.
-    pub fn new(blockchain: &'a Blockchain) -> Self {
+    pub fn new(blockchain: Blockchain) -> Self {
         BlockchainExplorer { blockchain }
     }
 
     /// Returns information about the transaction identified by the hash.
-    pub fn tx_info(&self, tx_hash: &Hash) -> Result<Option<TxInfo>, ApiError> {
+    pub fn transaction(&self, tx_hash: &Hash) -> Option<TransactionInfo> {
         let schema = Schema::new(self.blockchain.snapshot());
-        let raw_tx = match schema.transactions().get(tx_hash) {
-            Some(val) => val,
-            None => {
-                return Ok(None);
-            }
-        };
+        let raw_tx = schema.transactions().get(tx_hash)?;
 
-        let box_transaction = self.blockchain.tx_from_raw(raw_tx.clone()).ok_or_else(|| {
-            ApiError::InternalError(format!("Service not found for tx: {:?}", raw_tx).into())
-        })?;
-
-        let content = box_transaction.serialize_field().map_err(
-            ApiError::InternalError,
-        )?;
+        let content = self.blockchain.tx_from_raw(raw_tx.clone());
+        if content.is_none() {
+            error!("Service not found for tx: {:?}", raw_tx);
+            return None;
+        }
+        let content = content.unwrap();
 
         let location = schema.tx_location_by_tx_hash().get(tx_hash).expect(
             &format!(
@@ -123,96 +195,64 @@ impl<'a> BlockchainExplorer<'a> {
         );
 
         // Unwrap is OK here, because we already know that transaction is committed.
-        let status = match schema.transaction_results().get(tx_hash).unwrap() {
-            Ok(()) => TxStatus::Success,
-            Err(e) => {
-                let description = e.description().unwrap_or_default().to_owned();
-                match e.error_type() {
-                    TransactionErrorType::Panic => TxStatus::Panic { description },
-                    TransactionErrorType::Code(code) => TxStatus::Error { code, description },
-                }
-            }
-        };
-
-        Ok(Some(TxInfo {
+        let status = schema.transaction_results().get(tx_hash).unwrap();
+        Some(TransactionInfo {
             content,
             location,
             location_proof,
             status,
-        }))
+        })
     }
 
     /// Returns block information for the specified height or `None` if there is no such block.
-    pub fn block_info(&self, height: Height) -> Option<BlockInfo> {
+    pub fn block(&self, height: Height) -> Option<BlockInfo> {
         let schema = Schema::new(self.blockchain.snapshot());
         let txs_table = schema.block_txs(height);
         let block_proof = schema.block_and_precommits(height);
-        match block_proof {
-            None => None,
-            Some(proof) => {
-                let bl = BlockInfo {
-                    block: proof.block,
-                    precommits: proof.precommits,
-                    txs: txs_table.iter().collect(),
-                };
-                Some(bl)
+
+        block_proof.map(|proof| {
+            BlockInfo {
+                explorer: self,
+                block: proof.block,
+                precommits: proof.precommits,
+                txs: txs_table.iter().collect(),
             }
-        }
+        })
     }
 
     /// Returns the list of blocks in the given range.
     pub fn blocks_range(
         &self,
-        count: u64,
-        upper: Option<u64>,
+        count: usize,
+        upper: Option<Height>,
         skip_empty_blocks: bool,
     ) -> BlocksRange {
-        let schema = Schema::new(self.blockchain.snapshot());
-        let hashes = schema.block_hashes_by_height();
-        let blocks = schema.blocks();
-
-        // max_height >=0, as there is at least the genesis block.
-        let max_height = hashes.len() - 1;
-
-        let upper = upper.map(|x| cmp::min(x, max_height)).unwrap_or(max_height);
-
-        let mut height = upper + 1;
-        let mut genesis = false;
-
-        let mut v = Vec::new();
-        let mut collected: u64 = 0;
-
-        // It is safe to do at least one iteration, because height >= 1.
-        loop {
-            if genesis || (collected == count) {
-                break;
-            }
-
-            height -= 1;
-            genesis = height == 0;
-
-            let block_txs = schema.block_txs(Height(height));
-            if skip_empty_blocks && block_txs.is_empty() {
-                continue;
-            }
-
-            let block_hash = hashes.get(height).expect(&format!(
-                "Block not found, height:{:?}",
-                height
-            ));
-
-            let block = blocks.get(&block_hash).expect(&format!(
-                "Block not found, hash:{:?}",
-                block_hash
-            ));
-
-            v.push(block);
-            collected += 1;
+        let mut blocks_iter = self.blocks_rev(skip_empty_blocks);
+        if let Some(upper) = upper {
+            blocks_iter.skip_to(upper);
         }
 
+        // Safe: we haven't iterated yet, and there is at least the genesis block.
+        let upper = blocks_iter.height.unwrap();
+
+        let blocks: Vec<_> = blocks_iter.by_ref().take(count).collect();
+        let height = blocks_iter.last_seen_height();
+
         BlocksRange {
-            range: height..upper + 1,
-            blocks: v,
+            range: height..upper.next(),
+            blocks,
+        }
+    }
+
+    /// Iterator over blocks in the descending order.
+    pub fn blocks_rev(&self, skip_empty: bool) -> BlocksIter {
+        let schema = Schema::new(self.blockchain.snapshot());
+        let height = schema.height();
+
+        BlocksIter {
+            schema,
+            skip_empty,
+            height: Some(height),
         }
     }
 
@@ -221,6 +261,86 @@ impl<'a> BlockchainExplorer<'a> {
         let schema = Schema::new(self.blockchain.snapshot());
         schema.transaction_results().get(hash)
     }
+}
 
-    //pub fn transaction_
+/// Iterator over blocks in descending order.
+pub struct BlocksIter {
+    skip_empty: bool,
+    schema: Schema<Box<Snapshot>>,
+    height: Option<Height>,
+}
+
+impl fmt::Debug for BlocksIter {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        formatter
+            .debug_struct("BlocksIter")
+            .field("skip_empty", &self.skip_empty)
+            .field("height", &self.height)
+            .finish()
+    }
+}
+
+impl BlocksIter {
+    /// Skips the iterator to the specified height.
+    /// Has no effect if the specified height is greater or equal than the current height
+    /// of the iterator.
+    pub fn skip_to(&mut self, height: Height) -> &mut Self {
+        match self.height {
+            Some(ref mut self_height) if *self_height > height => {
+                *self_height = height;
+            }
+            _ => {}
+        }
+
+        self
+    }
+
+    fn decrease_height(&mut self) {
+        self.height = match self.height {
+            Some(Height(0)) => None,
+            Some(height) => Some(height.previous()),
+            None => unreachable!(),
+        }
+    }
+
+    fn last_seen_height(&self) -> Height {
+        self.height.map(|h| h.next()).unwrap_or(Height(0))
+    }
+}
+
+impl Iterator for BlocksIter {
+    type Item = Block;
+
+    fn next(&mut self) -> Option<Block> {
+        if self.height.is_none() {
+            return None;
+        }
+
+        while let Some(height) = self.height {
+            let is_empty = self.schema.block_txs(height).is_empty();
+
+            if !self.skip_empty || !is_empty {
+                let block = {
+                    let hashes = self.schema.block_hashes_by_height();
+                    let blocks = self.schema.blocks();
+
+                    let block_hash = hashes.get(height.0).expect(&format!(
+                        "Block not found, height:{:?}",
+                        height
+                    ));
+                    blocks.get(&block_hash).expect(&format!(
+                        "Block not found, hash:{:?}",
+                        block_hash
+                    ))
+                };
+
+                self.decrease_height();
+                return Some(block);
+            }
+
+            self.decrease_height();
+        }
+
+        None
+    }
 }
