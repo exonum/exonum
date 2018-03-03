@@ -5,6 +5,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## 0.6 - 2018-03-04
+
 ### Breaking changes
 
 - Most types renamed to avoid stuttering (see [here][stuttering] for
@@ -52,6 +54,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Implemented error handling based on error codes (#496).
 
+- Update to the [Exonum 0.6.0] release (#533).
+
 ## 0.5 - 2018-01-30
 
 - Update to the [Exonum 0.5.0] release (#82).
@@ -77,9 +81,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## 0.1 - 2017-07-17
 
-The first release of Exonum.
+The first release of Exonum configuration.
 
 [Exonum 0.2.0]: https://github.com/exonum/exonum/releases/tag/v0.2
 [Exonum 0.3.0]: https://github.com/exonum/exonum/releases/tag/v0.3
 [Exonum 0.4.0]: https://github.com/exonum/exonum/releases/tag/v0.4
 [Exonum 0.5.0]: https://github.com/exonum/exonum/releases/tag/v0.5
+[Exonum 0.6.0]: https://github.com/exonum/exonum/releases/tag/v0.6

@@ -5,6 +5,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## 0.6 - 2018-03-04
+
 ### Breaking changes
 
 - `exonum::crypto::CryptoHash` trait is introduced, and `StorageValue::hash`

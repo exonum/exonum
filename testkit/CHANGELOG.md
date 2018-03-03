@@ -7,10 +7,16 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## 0.6 - 2018-03-04
+
 - Modified signature of the `TestKitApi::send` method, which previously did not
   accept `Box<Transaction>`. (#505)
 
 - Added possibility to init a logger in `TestKitBuilder`. (#524)
+
+### New features
+
+- Update to the [Exonum 0.6.0] release (#533).
 
 ## 0.5.0 - 2018-01-30
 
@@ -48,3 +54,5 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## 0.1 - 2017-12-08
 
 The first release of Exonum testkit.
+
+[Exonum 0.6.0]: https://github.com/exonum/exonum/releases/tag/v0.6
