@@ -145,7 +145,7 @@ use exonum::blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfig
 use exonum::crypto;
 use exonum::helpers::{Height, ValidatorId};
 use exonum::node::{ApiSender, ExternalMessage, State as NodeState, TxPool, NodeApiConfig};
-use exonum::storage::{MemoryDB, Snapshot};
+use exonum::storage::{MemoryDB, Patch, Snapshot};
 
 #[macro_use]
 mod macros;
@@ -504,7 +504,7 @@ impl TestKit {
         let new_block_height = self.height().next();
         let last_hash = self.last_block_hash();
 
-        self.update_configuration(new_block_height);
+        let config_patch = self.update_configuration(new_block_height);
         let (block_hash, patch) = {
             let validator_id = self.leader().validator_id().unwrap();
             let transactions = self.mempool();
@@ -514,6 +514,15 @@ impl TestKit {
                 tx_hashes,
                 &transactions,
             )
+        };
+
+        let patch = if let Some(config_patch) = config_patch {
+            let mut fork = self.blockchain.fork();
+            fork.merge(config_patch);
+            fork.merge(patch);
+            fork.into_patch()
+        } else {
+            patch
         };
 
         // Remove txs from mempool
@@ -546,7 +555,7 @@ impl TestKit {
 
     /// Update test network configuration if such an update has been scheduled
     /// with `commit_configuration_change`.
-    fn update_configuration(&mut self, new_block_height: Height) {
+    fn update_configuration(&mut self, new_block_height: Height) -> Option<Patch> {
         use ConfigurationProposalState::*;
 
         let actual_from = new_block_height.next();
@@ -555,11 +564,12 @@ impl TestKit {
                 Uncommitted(cfg_proposal) => {
                     // Commit configuration proposal
                     let stored = cfg_proposal.stored_configuration().clone();
+
                     let mut fork = self.blockchain.fork();
                     CoreSchema::new(&mut fork).commit_configuration(stored);
-                    let changes = fork.into_patch();
-                    self.blockchain.merge(changes).unwrap();
                     self.cfg_proposal = Some(Committed(cfg_proposal));
+
+                    return Some(fork.into_patch());
                 }
                 Committed(cfg_proposal) => {
                     if cfg_proposal.actual_from() == actual_from {
@@ -571,6 +581,8 @@ impl TestKit {
                 }
             }
         }
+
+        None
     }
 
     /// Creates a block with the given transactions.
