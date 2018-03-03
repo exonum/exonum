@@ -35,21 +35,6 @@ impl<S, F, A> fmt::Debug for GreedyFold<S, F, A> {
 /// Stream that folds all immediately available items from the underlying stream, yielding a single
 /// resulting value. If there is no currently ready values in the stream, returns the initial value
 /// of the accumulator. Once the stream is exhausted, greedy folding also stops yielding values.
-///
-/// # Example
-///
-/// ```
-/// # extern crate futures;
-/// # extern crate exonum_testkit;
-/// use futures::{stream, Stream};
-/// use exonum_testkit::GreedilyFoldable;
-/// # fn main() {
-/// let stream = stream::iter_ok::<_, ()>(vec![1, 2, 3, 4])
-///     .greedy_fold(0, |acc, item| acc + item);
-/// let values: Vec<_> = stream.wait().into_iter().collect();
-/// assert_eq!(values, vec![Ok(10)]);
-/// # }
-/// ```
 pub trait GreedilyFoldable: Stream {
     /// Performs greedy folding.
     fn greedy_fold<F, A>(self, acc: A, fold_fn: F) -> GreedyFold<Self, F, A>

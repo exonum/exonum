@@ -156,13 +156,12 @@ pub mod compare;
 mod greedy_fold;
 mod network;
 
-#[doc(hidden)]
-pub use greedy_fold::GreedilyFoldable;
 pub use api::{ApiKind, TestKitApi};
 pub use compare::ComparableSnapshot;
 pub use network::{TestNetwork, TestNode, TestNetworkConfiguration};
 
 use checkpoint_db::{CheckpointDb, CheckpointDbHandler};
+use greedy_fold::GreedilyFoldable;
 
 /// Builder for `TestKit`.
 ///
