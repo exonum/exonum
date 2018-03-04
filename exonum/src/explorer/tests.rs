@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![cfg_attr(feature = "doctests", allow(unused_imports))]
+
 use futures::sync::mpsc;
 use serde_json;
 
@@ -57,7 +59,7 @@ impl Transaction for CreateWallet {
         } else {
             Err(ExecutionError::with_description(
                 1,
-                format!("{} is not allowed", self.name()),
+                "Not allowed".to_string(),
             ))
         }
     }
@@ -156,6 +158,22 @@ fn create_block(blockchain: &mut Blockchain, transactions: Vec<Box<Transaction>>
         .unwrap();
 }
 
+/// Creates a sample blockchain for doc tests.
+#[cfg(feature = "doctests")]
+pub fn sample_blockchain() -> Blockchain {
+    let mut blockchain = create_blockchain();
+    let (pk_alice, key_alice) = crypto::gen_keypair();
+    let (pk_bob, key_bob) = crypto::gen_keypair();
+    let tx_alice = CreateWallet::new(&pk_alice, "Alice", &key_alice);
+    let tx_bob = CreateWallet::new(&pk_bob, "Bob", &key_bob);
+    let tx_transfer = Transfer::new(&pk_alice, &pk_bob, 100, &key_alice);
+    create_block(
+        &mut blockchain,
+        vec![tx_alice.into(), tx_bob.into(), tx_transfer.into()],
+    );
+    blockchain
+}
+
 #[test]
 fn test_explorer_basics() {
     let mut blockchain = create_blockchain();
@@ -211,7 +229,7 @@ fn test_explorer_basics() {
     let tx_info = block.transaction(0).unwrap();
     let err = tx_info.status().unwrap_err();
     assert_eq!(err.error_type(), TransactionErrorType::Code(1));
-    assert_eq!(err.description(), Some("Bob is not allowed"));
+    assert_eq!(err.description(), Some("Not allowed"));
     assert_eq!(
         serde_json::to_value(&tx_info).unwrap(),
         json!({
@@ -224,7 +242,7 @@ fn test_explorer_basics() {
             "status": {
                 "type": "error",
                 "code": 1,
-                "description": "Bob is not allowed",
+                "description": "Not allowed",
             },
         })
     );

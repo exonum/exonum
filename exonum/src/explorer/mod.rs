@@ -27,10 +27,57 @@ use blockchain::{Schema, Blockchain, Block, TxLocation, Transaction, Transaction
 use messages::Precommit;
 use helpers::Height;
 
-#[cfg(test)]
-mod tests;
+#[cfg(any(test, feature = "doctests"))]
+#[doc(hidden)]
+pub mod tests;
 
-/// Block information.
+/// Information about a block in the blockchain.
+///
+/// # Examples
+///
+/// ```ignore
+/// # use exonum::explorer::{BlockchainExplorer, BlockInfo};
+/// # use exonum::explorer::tests::sample_blockchain;
+/// # use exonum::helpers::Height;
+/// let blockchain = // ...
+/// #                sample_blockchain();
+/// let explorer = BlockchainExplorer::new(blockchain);
+/// let block: BlockInfo = explorer.block(Height(1)).unwrap();
+/// assert_eq!(block.block().height(), Height(1));
+/// assert_eq!(block.len(), 3);
+///
+/// // Iterate over transactions in the block
+/// for tx in &block {
+///     println!("{:?}: {:?}", tx.location(), tx.content());
+/// }
+/// ```
+///
+/// # JSON presentation
+///
+/// ```ignore
+/// # #[macro_use] extern crate serde_json;
+/// # extern crate exonum;
+/// # use exonum::explorer::{BlockchainExplorer, BlockInfo};
+/// # use exonum::explorer::tests::sample_blockchain;
+/// # use exonum::helpers::Height;
+/// # fn main() {
+/// # let blockchain = sample_blockchain();
+/// # let explorer = BlockchainExplorer::new(blockchain);
+/// let block: BlockInfo = // ...
+/// #                      explorer.block(Height(1)).unwrap();
+/// assert_eq!(
+///     serde_json::to_value(&block).unwrap(),
+///     json!({
+///         // `Block` representation
+///         "block": block.block(),
+///         // Array of `Precommit`s
+///         "precommits": block.precommits(),
+///         // Array of transaction hashes
+///         "txs": block.transaction_hashes(),
+///     })
+/// );
+/// # }
+/// ```
 #[derive(Debug, Serialize)]
 pub struct BlockInfo<'a> {
     #[serde(skip)]
@@ -41,7 +88,7 @@ pub struct BlockInfo<'a> {
 }
 
 impl<'a> BlockInfo<'a> {
-    /// Block header from blockchain.
+    /// Returns the block header as recorded in the blockchain.
     pub fn block(&self) -> &Block {
         &self.block
     }
@@ -56,7 +103,7 @@ impl<'a> BlockInfo<'a> {
         self.txs.is_empty()
     }
 
-    /// List of precommit for this block.
+    /// Returns a list of precommits for this block.
     pub fn precommits(&self) -> &[Precommit] {
         &self.precommits
     }
@@ -108,7 +155,131 @@ impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
     }
 }
 
-/// Transaction information.
+/// Information about a particular transaction in the blockchain.
+///
+/// # Examples
+///
+/// ```ignore
+/// use exonum::blockchain::{Transaction, TransactionError};
+/// # use exonum::explorer::{BlockchainExplorer, TransactionInfo};
+/// # use exonum::explorer::tests::sample_blockchain;
+/// # use exonum::helpers::Height;
+///
+/// let blockchain = // ...
+/// #                sample_blockchain();
+/// let explorer = BlockchainExplorer::new(blockchain);
+/// let tx = explorer.block(Height(1)).unwrap().transaction(0).unwrap();
+/// assert_eq!(tx.location().block_height(), Height(1));
+/// assert_eq!(tx.location().position_in_block(), 0);
+///
+/// // It is possible to access transaction content
+/// let content: &Transaction = tx.content();
+/// println!("{:?}", content);
+///
+/// // ...and transaction status as well
+/// let status: Result<(), &TransactionError> = tx.status();
+/// assert!(status.is_ok());
+/// ```
+///
+/// # JSON presentation
+///
+/// ```ignore
+/// # #[macro_use] extern crate serde_json;
+/// # extern crate exonum;
+/// # use exonum::explorer::{BlockchainExplorer, TransactionInfo};
+/// # use exonum::explorer::tests::sample_blockchain;
+/// # use exonum::helpers::Height;
+/// use exonum::encoding::serialize::json::ExonumJson;
+///
+/// # fn main() {
+/// let blockchain = // ...
+/// #                sample_blockchain();
+/// let explorer = BlockchainExplorer::new(blockchain);
+/// let tx = explorer.block(Height(1)).unwrap().transaction(0).unwrap();
+/// assert_eq!(
+///     serde_json::to_value(&tx).unwrap(),
+///     json!({
+///         // `Transaction` JSON presentation
+///         "content": tx.content().serialize_field().unwrap(),
+///         // Position in block
+///         "location": {
+///             "block_height": "1",
+///             "position_in_block": "0",
+///         },
+///         // `ListProof` of the transaction inclusion in block
+///         "location_proof": tx.location_proof(),
+///         // Execution status
+///         "status": { "type": "success" },
+///     })
+/// );
+/// # }
+/// ```
+///
+/// ## Erroneous transactions
+///
+/// Transactions which execution has resulted in a user-defined error
+/// (i.e., one returned as `Err(..)` from `Transaction::execute`)
+/// have `code` and `description` fields in `status` and have `type` set to `"error"`:
+///
+/// ```ignore
+/// # #[macro_use] extern crate serde_json;
+/// # extern crate exonum;
+/// # use exonum::encoding::serialize::json::ExonumJson;
+/// # use exonum::explorer::{BlockchainExplorer, TransactionInfo};
+/// # use exonum::explorer::tests::sample_blockchain;
+/// # use exonum::helpers::Height;
+/// #
+/// # fn main() {
+/// # let blockchain = sample_blockchain();
+/// # let explorer = BlockchainExplorer::new(blockchain);
+/// let erroneous_tx: TransactionInfo = // ...
+/// #   explorer.block(Height(1)).unwrap().transaction(1).unwrap();
+/// assert_eq!(
+///     serde_json::to_value(&erroneous_tx).unwrap(),
+///     json!({
+///         "status": {
+///             "type": "error",
+///             "code": 1,
+///             "description": "Not allowed",
+///         },
+///         // Other fields...
+/// #       "content": erroneous_tx.content().serialize_field().unwrap(),
+/// #       "location": erroneous_tx.location(),
+/// #       "location_proof": erroneous_tx.location_proof(),
+///     })
+/// );
+/// # }
+/// ```
+///
+/// ## Panicking transactions
+///
+/// If transaction execution resulted in panic, it has `type` set to `"panic"`:
+///
+/// ```ignore
+/// # #[macro_use] extern crate serde_json;
+/// # extern crate exonum;
+/// # use exonum::encoding::serialize::json::ExonumJson;
+/// # use exonum::explorer::{BlockchainExplorer, TransactionInfo};
+/// # use exonum::explorer::tests::sample_blockchain;
+/// # use exonum::helpers::Height;
+/// #
+/// # fn main() {
+/// # let blockchain = sample_blockchain();
+/// # let explorer = BlockchainExplorer::new(blockchain);
+/// let panicked_tx: TransactionInfo = // ...
+/// #   explorer.block(Height(1)).unwrap().transaction(2).unwrap();
+/// assert_eq!(
+///     serde_json::to_value(&panicked_tx).unwrap(),
+///     json!({
+///         "status": { "type": "panic", "description": "oops" },
+///         // Other fields...
+/// #       "content": panicked_tx.content().serialize_field().unwrap(),
+/// #       "location": panicked_tx.location(),
+/// #       "location_proof": panicked_tx.location_proof(),
+///     })
+/// );
+/// # }
+/// ```
 #[derive(Debug, Serialize)]
 pub struct TransactionInfo {
     #[serde(serialize_with = "TransactionInfo::serialize_content")]
@@ -120,7 +291,7 @@ pub struct TransactionInfo {
 }
 
 impl TransactionInfo {
-    /// The content of transaction.
+    /// Returns the content of the transaction.
     pub fn content(&self) -> &Transaction {
         self.content.as_ref()
     }
@@ -170,12 +341,12 @@ impl TransactionInfo {
         status.serialize(serializer)
     }
 
-    /// Transaction location in block.
+    /// Returns the transaction location in block.
     pub fn location(&self) -> &TxLocation {
         &self.location
     }
 
-    /// Proof that transaction really exist in the database.
+    /// Returns a proof that transaction is recorded in the blockchain.
     pub fn location_proof(&self) -> &ListProof<Hash> {
         &self.location_proof
     }
@@ -281,7 +452,7 @@ impl BlockchainExplorer {
         }
     }
 
-    /// Iterator over blocks in the descending order.
+    /// Iterates over blocks in the descending order, optionally skipping empty blocks.
     pub fn blocks_rev(&self, skip_empty: bool) -> BlocksIter {
         let schema = Schema::new(self.blockchain.snapshot());
         let height = schema.height();
@@ -293,7 +464,7 @@ impl BlockchainExplorer {
         }
     }
 
-    /// Returns transaction result.
+    /// Returns transaction result for a certain transaction.
     pub fn transaction_result(&self, hash: &Hash) -> Option<TransactionResult> {
         let schema = Schema::new(self.blockchain.snapshot());
         schema.transaction_results().get(hash)

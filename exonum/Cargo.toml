@@ -47,6 +47,7 @@ tokio-timer = "0.1.2"
 failure = "0.1.1"
 os_info = "0.7.0"
 chrono = "0.4.0"
+lazy_static = { version = "1.0.0", optional = true }
 
 exonum_rocksdb = "0.7"
 exonum_sodiumoxide = "0.0.16"
@@ -64,3 +65,4 @@ float_serialize = []
 long_benchmarks = []
 flame_profile = ["exonum_profiler/nomock", "exonum_flamer"]
 metrics-log = []
+doctests = ["lazy_static"]
