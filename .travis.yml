@@ -127,6 +127,11 @@ jobs:
     - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
     - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
 
+  # Additional tests
+  - env: FEATURE=test-aux
+    script:
+    - cd $TRAVIS_BUILD_DIR/exonum && cargo test --features doctests --doc -- --ignored
+
   # Benchmarks (compilation only)
   - env: FEATURE=benchmarks
     rust: nightly-2018-01-22
