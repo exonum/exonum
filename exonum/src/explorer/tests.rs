@@ -335,3 +335,56 @@ fn test_explorer_block_iter() {
     assert_eq!(iter.skip_to(Height(3)).next().unwrap().height(), Height(2));
     assert!(iter.skip_to(Height(1000)).next().is_none());
 }
+
+#[test]
+fn test_transaction_iterator() {
+    use messages::ServiceMessage;
+
+    let mut blockchain = create_blockchain();
+    let mut tx_gen = (0..).map(|i| {
+        let (pk, key) = crypto::gen_keypair();
+        let tx = CreateWallet::new(&pk, &format!("Alice #{}", i), &key);
+        Box::new(tx) as Box<Transaction>
+    });
+    let txs = tx_gen.by_ref();
+    create_block(&mut blockchain, txs.take(5).collect());
+
+    let explorer = BlockchainExplorer::new(blockchain.clone());
+    let block = explorer.block(Height(1)).unwrap();
+    for tx in &block {
+        assert_eq!(tx.status(), Ok(()));
+    }
+    for (i, tx) in block.iter().enumerate() {
+        let parsed_tx = CreateWallet::from_raw(tx.content().raw().clone()).unwrap();
+        assert_eq!(parsed_tx.name(), &format!("Alice #{}", i));
+    }
+
+    // Test filtering and other nice stuff.
+
+    let (pk_alice, key_alice) = crypto::gen_keypair();
+    let (pk_bob, key_bob) = crypto::gen_keypair();
+    let tx_alice = CreateWallet::new(&pk_alice, "Alice", &key_alice);
+    let tx_bob = CreateWallet::new(&pk_bob, "Bob", &key_bob);
+    let tx_transfer = Transfer::new(&pk_alice, &pk_bob, 100, &key_alice);
+    create_block(
+        &mut blockchain,
+        vec![tx_alice.clone().into(), tx_bob.clone().into(), tx_transfer.clone().into()],
+    );
+
+    let block = explorer.block(Height(2)).unwrap();
+    let failed_tx_hashes: Vec<_> = block
+        .iter()
+        .filter(|tx| tx.status.is_err())
+        .map(|tx| tx.content().hash())
+        .collect();
+    assert_eq!(failed_tx_hashes, vec![tx_bob.hash(), tx_transfer.hash()]);
+
+    let create_wallet_positions: Vec<_> = block
+        .iter()
+        .filter(|tx| {
+            tx.content().raw().message_type() == CreateWallet::MESSAGE_ID
+        })
+        .map(|tx| tx.location().position_in_block())
+        .collect();
+    assert_eq!(create_wallet_positions, vec![0, 1]);
+}

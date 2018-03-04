@@ -23,7 +23,7 @@ use std::ops::Range;
 use storage::{ListProof, Snapshot};
 use crypto::Hash;
 use blockchain::{Schema, Blockchain, Block, TxLocation, Transaction, TransactionResult,
-                 TransactionErrorType};
+                 TransactionError, TransactionErrorType};
 use messages::Precommit;
 use helpers::Height;
 
@@ -71,6 +71,40 @@ impl<'a> BlockInfo<'a> {
         self.txs.get(index).map(|hash| {
             self.explorer.transaction(hash).unwrap()
         })
+    }
+
+    /// Iterates over transactions in the block.
+    pub fn iter(&self) -> TransactionsIter {
+        TransactionsIter {
+            explorer: self.explorer,
+            inner: self.txs.iter(),
+        }
+    }
+}
+
+/// Iterator over transactions in a block.
+#[derive(Debug)]
+pub struct TransactionsIter<'a> {
+    explorer: &'a BlockchainExplorer,
+    inner: ::std::slice::Iter<'a, Hash>,
+}
+
+impl<'a> Iterator for TransactionsIter<'a> {
+    type Item = TransactionInfo;
+
+    fn next(&mut self) -> Option<TransactionInfo> {
+        self.inner.next().map(|hash| {
+            self.explorer.transaction(hash).unwrap()
+        })
+    }
+}
+
+impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
+    type Item = TransactionInfo;
+    type IntoIter = TransactionsIter<'a>;
+
+    fn into_iter(self) -> TransactionsIter<'a> {
+        self.iter()
     }
 }
 
