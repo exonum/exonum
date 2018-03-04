@@ -181,7 +181,7 @@ fn test_explorer_basics() {
     assert_eq!(block.len(), 1);
     let tx_info = block.transaction(0).unwrap();
     assert_eq!(*tx_info.location(), TxLocation::new(Height(1), 0));
-    assert_eq!(*tx_info.status(), Ok(()));
+    assert_eq!(tx_info.status(), Ok(()));
     assert_eq!(tx_info.content().raw(), tx_alice.raw());
 
     let tx_info = explorer.transaction(&tx_alice.hash()).unwrap();
@@ -209,7 +209,7 @@ fn test_explorer_basics() {
     assert_eq!(block.len(), 2);
 
     let tx_info = block.transaction(0).unwrap();
-    let err = tx_info.status().as_ref().unwrap_err();
+    let err = tx_info.status().unwrap_err();
     assert_eq!(err.error_type(), TransactionErrorType::Code(1));
     assert_eq!(err.description(), Some("Bob is not allowed"));
     assert_eq!(
@@ -230,7 +230,7 @@ fn test_explorer_basics() {
     );
 
     let tx_info = block.transaction(1).unwrap();
-    let err = tx_info.status().as_ref().unwrap_err();
+    let err = tx_info.status().unwrap_err();
     assert_eq!(err.error_type(), TransactionErrorType::Panic);
     assert_eq!(err.description(), Some("oops"));
     assert_eq!(

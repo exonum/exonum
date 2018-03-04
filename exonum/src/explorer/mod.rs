@@ -180,9 +180,9 @@ impl TransactionInfo {
         &self.location_proof
     }
 
-    /// Status of the transaction execution.
-    pub fn status(&self) -> &TransactionResult {
-        &self.status
+    /// Returns the status of the transaction execution.
+    pub fn status(&self) -> Result<(), &TransactionError> {
+        self.status.as_ref().map(|_| ())
     }
 }
 
