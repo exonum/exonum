@@ -32,9 +32,9 @@ pub enum TransactionInfo {
     /// Transaction with the given id is absent in the blockchain.
     Unknown,
     /// Transaction in the memory pool but not yet committed to the blockchain.
-    InPool { 
+    InPool {
         /// Json representation of the given transaction.
-        content: JsonValue 
+        content: JsonValue,
     },
     /// Transaction is already committed to the blockchain.
     Committed(TxInfo),
