@@ -25,11 +25,18 @@ use helpers::Height;
 
 const MAX_BLOCKS_PER_REQUEST: u64 = 1000;
 
-#[derive(Serialize)]
+/// Information about the transaction.
+#[derive(Debug, Serialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
-enum TransactionInfo {
+pub enum TransactionInfo {
+    /// Transaction with the given id is absent in the blockchain.
     Unknown,
-    InPool { content: JsonValue },
+    /// Transaction is in the memory pool, but not yet committed to the blockchain.
+    InPool {
+        /// Json representation of the given transaction.
+        content: JsonValue,
+    },
+    /// Transaction is already committed to the blockchain.
     Committed(TxInfo),
 }
 
@@ -70,7 +77,7 @@ impl ExplorerApi {
     }
 
     fn transaction_info(&self, hash: &Hash) -> Result<TransactionInfo, ApiError> {
-        if let Some(tx) = self.pool.read().expect("Uanble to read pool").get(hash) {
+        if let Some(tx) = self.pool.read().expect("Unable to read pool").get(hash) {
             Ok(TransactionInfo::InPool {
                 content: tx.serialize_field().map_err(ApiError::InternalError)?,
             })
