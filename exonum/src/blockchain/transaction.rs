@@ -473,6 +473,49 @@ macro_rules! transactions {
 
     {
         $(#[$tx_set_attr:meta])*
+        pub $transaction_set:ident {
+            const SERVICE_ID = $service_id:expr;
+
+            $(
+                $(#[$tx_attr:meta])*
+                struct $name:ident {
+                $(
+                    $(#[$field_attr:meta])*
+                    $field_name:ident : $field_type:ty
+                ),*
+                $(,)* // optional trailing comma
+                }
+            )*
+        }
+    }
+
+    =>
+
+    {
+        messages! {
+            const SERVICE_ID = $service_id;
+            $(
+                $(#[$tx_attr])*
+                struct $name {
+                $(
+                    $(#[$field_attr])*
+                    $field_name : $field_type
+                ),*
+                }
+            )*
+        }
+
+        #[derive(Clone, Debug)]
+        $($tx_set_attr)*
+        pub enum $transaction_set {
+            $($name($name),)*
+        }
+
+        transactions!(@implement $transaction_set, $($name)*);
+    };
+
+    {
+        $(#[$tx_set_attr:meta])*
         pub($($vis:tt)+) $transaction_set:ident {
             const SERVICE_ID = $service_id:expr;
 

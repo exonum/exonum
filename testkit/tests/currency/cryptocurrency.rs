@@ -92,7 +92,7 @@ impl<'a> CurrencySchema<&'a mut Fork> {
 // // // // // // // // // // TRANSACTIONS // // // // // // // // // //
 
 transactions! {
-    CurrencyTransactions {
+    pub(crate) CurrencyTransactions {
         const SERVICE_ID = SERVICE_ID;
 
         /// Create a new wallet.
