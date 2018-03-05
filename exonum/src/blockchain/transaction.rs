@@ -437,11 +437,7 @@ macro_rules! transactions {
             $(
                 $(#[$tx_attr:meta])*
                 struct $name:ident {
-                $(
-                    $(#[$field_attr:meta])*
-                    $field_name:ident : $field_type:ty
-                ),*
-                $(,)* // optional trailing comma
+                    $($def:tt)*
                 }
             )*
         }
@@ -451,10 +447,7 @@ macro_rules! transactions {
             $(
                 $(#[$tx_attr])*
                 struct $name {
-                $(
-                    $(#[$field_attr])*
-                    $field_name : $field_type
-                ),*
+                    $($def)*
                 }
             )*
         }
@@ -476,11 +469,7 @@ macro_rules! transactions {
             $(
                 $(#[$tx_attr:meta])*
                 struct $name:ident {
-                $(
-                    $(#[$field_attr:meta])*
-                    $field_name:ident : $field_type:ty
-                ),*
-                $(,)* // optional trailing comma
+                    $($def:tt)*
                 }
             )*
         }
@@ -490,10 +479,7 @@ macro_rules! transactions {
             $(
                 $(#[$tx_attr])*
                 struct $name {
-                $(
-                    $(#[$field_attr])*
-                    $field_name : $field_type
-                ),*
+                    $($def)*
                 }
             )*
         }
@@ -515,11 +501,7 @@ macro_rules! transactions {
             $(
                 $(#[$tx_attr:meta])*
                 struct $name:ident {
-                $(
-                    $(#[$field_attr:meta])*
-                    $field_name:ident : $field_type:ty
-                ),*
-                $(,)* // optional trailing comma
+                    $($def:tt)*
                 }
             )*
         }
@@ -529,10 +511,7 @@ macro_rules! transactions {
             $(
                 $(#[$tx_attr])*
                 struct $name {
-                $(
-                    $(#[$field_attr])*
-                    $field_name : $field_type
-                ),*
+                    $($def)*
                 }
             )*
         }
