@@ -428,6 +428,7 @@ pub trait TransactionSet
 /// ```
 #[macro_export]
 macro_rules! transactions {
+    // Variant with the private enum.
     {
         $(#[$tx_set_attr:meta])*
         $transaction_set:ident {
@@ -444,11 +445,7 @@ macro_rules! transactions {
                 }
             )*
         }
-    }
-
-    =>
-
-    {
+    } => {
         messages! {
             const SERVICE_ID = $service_id;
             $(
@@ -470,7 +467,7 @@ macro_rules! transactions {
 
         transactions!(@implement $transaction_set, $($name)*);
     };
-
+    // Variant with the public enum without restrictions.
     {
         $(#[$tx_set_attr:meta])*
         pub $transaction_set:ident {
@@ -487,11 +484,7 @@ macro_rules! transactions {
                 }
             )*
         }
-    }
-
-    =>
-
-    {
+    } => {
         messages! {
             const SERVICE_ID = $service_id;
             $(
@@ -513,7 +506,7 @@ macro_rules! transactions {
 
         transactions!(@implement $transaction_set, $($name)*);
     };
-
+    // Variant with the public enum with visibility restrictions.
     {
         $(#[$tx_set_attr:meta])*
         pub($($vis:tt)+) $transaction_set:ident {
@@ -530,11 +523,7 @@ macro_rules! transactions {
                 }
             )*
         }
-    }
-
-    =>
-
-    {
+    } => {
         messages! {
             const SERVICE_ID = $service_id;
             $(
@@ -556,7 +545,7 @@ macro_rules! transactions {
 
         transactions!(@implement $transaction_set, $($name)*);
     };
-
+    // Implementation details
     (@implement $transaction_set:ident, $($name:ident)*) => {
 
         impl $crate::blockchain::TransactionSet for $transaction_set {
