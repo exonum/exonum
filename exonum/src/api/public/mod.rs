@@ -19,3 +19,5 @@ pub use self::blockchain_explorer::ExplorerApi;
 
 mod system;
 mod blockchain_explorer;
+
+pub use self::blockchain_explorer::TransactionInfo;

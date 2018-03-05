@@ -25,11 +25,18 @@ use helpers::Height;
 
 const MAX_BLOCKS_PER_REQUEST: u64 = 1000;
 
-#[derive(Serialize)]
+/// Information about the transaction.
+#[derive(Debug, Serialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
-enum TransactionInfo {
+pub enum TransactionInfo {
+    /// Transaction with the given id is absent in the blockchain.
     Unknown,
-    InPool { content: JsonValue },
+    /// Transaction in the memory pool but not yet committed to the blockchain.
+    InPool { 
+        /// Json representation of the given transaction.
+        content: JsonValue 
+    },
+    /// Transaction is already committed to the blockchain.
     Committed(TxInfo),
 }
 
