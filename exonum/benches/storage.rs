@@ -27,7 +27,7 @@ mod tests {
     use rand::{Rng, thread_rng, XorShiftRng, SeedableRng};
     use tempdir::TempDir;
     use exonum::storage::{Database, MemoryDB};
-    use exonum::storage::{RocksDB, RocksDBOptions};
+    use exonum::storage::{RocksDB, DbOptions};
     use exonum::storage::{ProofMapIndex, ProofListIndex};
     use exonum::storage::proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE;
 
@@ -121,8 +121,7 @@ mod tests {
     }
 
     fn create_rocksdb(tempdir: &TempDir) -> RocksDB {
-        let mut options = RocksDBOptions::default();
-        options.create_if_missing(true);
+        let options = DbOptions::default();
         RocksDB::open(tempdir.path(), &options).unwrap()
     }
 

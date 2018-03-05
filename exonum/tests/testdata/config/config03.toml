@@ -48,6 +48,10 @@ tcp_connect_max_retries = 10
 
 [services_configs]
 
+[database]
+create_if_missing = true
+max_open_files = -1
+
 [whitelist]
 whitelist_enabled = false
 whitelisted_peers = []
