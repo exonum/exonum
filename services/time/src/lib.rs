@@ -118,12 +118,15 @@ transactions! {
     }
 }
 
+/// Common errors emitted by transactions during execution.
 #[derive(Debug, Fail)]
 #[repr(u8)]
-enum Error {
+pub enum Error {
+    /// The sender of the transaction is not among the active validators.
     #[fail(display = "Not authored by a validator")]
     UnknownSender = 0,
 
+    /// The validator time that is stored in storage is greater than the proposed one.
     #[fail(display = "The validator time is greater than the proposed one")]
     ValidatorTimeIsGreater = 1,
 }
