@@ -463,6 +463,10 @@
         transfer(e) {
             e.preventDefault();
 
+            if (!this.validateHash(this.receiver)) {
+                return this.notify('error', 'Invalid public key is passed');
+            }
+
             this.toggleLoading(true);
 
             this.auth.getUser().then(function(keyPair) {

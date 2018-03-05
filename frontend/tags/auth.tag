@@ -56,11 +56,11 @@
                     <div class="alert alert-warning" role="alert">Save the key pair in a safe place. You will need it to log in to the demo next time.</div>
                     <div class="form-group">
                         <label>Public key:</label>
-                        <code>{ keyPair.publicKey }</code>
+                        <div><code>{ keyPair.publicKey }</code></div>
                     </div>
                     <div class="form-group">
                         <label>Secret key:</label>
-                        <code>{ keyPair.secretKey }</code>
+                        <div><code>{ keyPair.secretKey }</code></div>
                     </div>
                 </div>
 
@@ -89,6 +89,12 @@
 
         login(e) {
             e.preventDefault();
+
+            if (!this.validateHash(this.publicKey)) {
+                return this.notify('error', 'Invalid public key is passed');
+            } else if (!this.validateHash(this.secretKey, 64)) {
+                return this.notify('error', 'Invalid secret key is passed');
+            }
 
             this.toggleLoading(true);
 
