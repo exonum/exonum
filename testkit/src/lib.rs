@@ -584,11 +584,6 @@ impl TestKit {
         self.blockchain.snapshot()
     }
 
-    /// Returns the information schema for core.
-    pub fn core_schema(&self) -> CoreSchema<Box<Snapshot>> {
-        CoreSchema::new(self.snapshot())
-    }
-
     /// Returns a blockchain instance for low level manipulations with storage.
     pub fn blockchain_mut(&mut self) -> &mut Blockchain {
         &mut self.blockchain
