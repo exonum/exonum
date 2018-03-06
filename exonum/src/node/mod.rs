@@ -915,7 +915,7 @@ impl Node {
             our_connect_message: connect_message,
             listen_address: self.handler.system_state.listen_address(),
             network_requests: self.channel.network_requests,
-            network_tx: network_tx,
+            network_tx,
             network_config: self.network_config,
             max_message_len: self.max_message_len,
         };
