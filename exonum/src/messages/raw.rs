@@ -91,7 +91,7 @@ impl MessageBuffer {
         // TODO: check that size >= HEADER_LENGTH
         // TODO: check that payload_length == raw.len()
         // ECR-166
-        MessageBuffer { raw: raw }
+        MessageBuffer { raw }
     }
 
     /// Returns the length of the message in bytes.
