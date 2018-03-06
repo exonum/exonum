@@ -12,7 +12,52 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Macros.
+//! Procedural macros for custom derivation in Exonum applications.
+//!
+//! # Deriving `TransactionSet`
+//!
+//! Define an enum with variants being 1-member tuples, like `Foo(Foo)`, where each tuple type
+//! implements `Transaction`, and use `derive(TransactionSet)` on it:
+//!
+//! ```
+//! #[macro_use] extern crate exonum;
+//! #[macro_use] extern crate exonum_derive;
+//! # use exonum::blockchain::{ExecutionResult, Transaction, TransactionSet};
+//! # use exonum::storage::Fork;
+//!
+//! messages! {
+//!     const SERVICE_ID = // ...
+//! #                      1000;
+//!     struct CreateWallet { /* ... */ }
+//!     struct Transfer { /* ... */ }
+//! }
+//!
+//! impl Transaction for CreateWallet {
+//!     // ...
+//! #   fn verify(&self) -> bool { true }
+//! #   fn execute(&self, _: &mut Fork) -> ExecutionResult { Ok(()) }
+//! }
+//!
+//! impl Transaction for Transfer {
+//!     // ...
+//! #   fn verify(&self) -> bool { true }
+//! #   fn execute(&self, _: &mut Fork) -> ExecutionResult { Ok(()) }
+//! }
+//!
+//! #[derive(Debug, Clone, TransactionSet)]
+//! pub enum Transactions {
+//!     Create(CreateWallet),
+//!     Transfer(Transfer),
+//! }
+//! # fn main() {}
+//! ```
+//!
+//! The macro will derive the following traits for the enum:
+//!
+//! - `TransactionSet`
+//! - `serde::Serialize`
+//! - `serde::Deserialize`
+//! - `Into<Box<Transaction>>`
 
 #![recursion_limit = "256"]
 
