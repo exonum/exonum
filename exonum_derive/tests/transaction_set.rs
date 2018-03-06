@@ -58,10 +58,14 @@ impl Transaction for Transfer {
     }
 }
 
+mod sub {
+    pub use super::Transfer;
+}
+
 #[derive(Clone, TransactionSet)]
 pub enum Transactions {
     CreateWallet(CreateWallet),
-    Transfer(Transfer),
+    Transfer(sub::Transfer),
 }
 
 #[test]
