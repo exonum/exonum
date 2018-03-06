@@ -105,6 +105,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Added `v1/shutdown` endpoint for graceful node termination. (#526)
 
+- `TransactionInfo` from the public api module became public. (#537)
+
 ### Bug fixes
 
 - `ExonumJsonDeserialize` trait is implemented for `F32` and `F64`. (#461)

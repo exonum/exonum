@@ -428,43 +428,104 @@ pub trait TransactionSet
 /// ```
 #[macro_export]
 macro_rules! transactions {
+    // Variant with the private enum.
     {
+        $(#[$tx_set_attr:meta])*
         $transaction_set:ident {
             const SERVICE_ID = $service_id:expr;
 
             $(
                 $(#[$tx_attr:meta])*
                 struct $name:ident {
-                $(
-                    $(#[$field_attr:meta])*
-                    $field_name:ident : $field_type:ty
-                ),*
-                $(,)* // optional trailing comma
+                    $($def:tt)*
                 }
             )*
         }
-    }
-
-    =>
-
-    {
+    } => {
         messages! {
             const SERVICE_ID = $service_id;
             $(
                 $(#[$tx_attr])*
                 struct $name {
-                $(
-                    $(#[$field_attr])*
-                    $field_name : $field_type
-                ),*
+                    $($def)*
                 }
             )*
         }
 
         #[derive(Clone, Debug)]
+        $($tx_set_attr)*
         enum $transaction_set {
             $($name($name),)*
         }
+
+        transactions!(@implement $transaction_set, $($name)*);
+    };
+    // Variant with the public enum without restrictions.
+    {
+        $(#[$tx_set_attr:meta])*
+        pub $transaction_set:ident {
+            const SERVICE_ID = $service_id:expr;
+
+            $(
+                $(#[$tx_attr:meta])*
+                struct $name:ident {
+                    $($def:tt)*
+                }
+            )*
+        }
+    } => {
+        messages! {
+            const SERVICE_ID = $service_id;
+            $(
+                $(#[$tx_attr])*
+                struct $name {
+                    $($def)*
+                }
+            )*
+        }
+
+        #[derive(Clone, Debug)]
+        $($tx_set_attr)*
+        pub enum $transaction_set {
+            $($name($name),)*
+        }
+
+        transactions!(@implement $transaction_set, $($name)*);
+    };
+    // Variant with the public enum with visibility restrictions.
+    {
+        $(#[$tx_set_attr:meta])*
+        pub($($vis:tt)+) $transaction_set:ident {
+            const SERVICE_ID = $service_id:expr;
+
+            $(
+                $(#[$tx_attr:meta])*
+                struct $name:ident {
+                    $($def:tt)*
+                }
+            )*
+        }
+    } => {
+        messages! {
+            const SERVICE_ID = $service_id;
+            $(
+                $(#[$tx_attr])*
+                struct $name {
+                    $($def)*
+                }
+            )*
+        }
+
+        #[derive(Clone, Debug)]
+        $($tx_set_attr)*
+        pub($($vis)+) enum $transaction_set {
+            $($name($name),)*
+        }
+
+        transactions!(@implement $transaction_set, $($name)*);
+    };
+    // Implementation details
+    (@implement $transaction_set:ident, $($name:ident)*) => {
 
         impl $crate::blockchain::TransactionSet for $transaction_set {
             fn tx_from_raw(
