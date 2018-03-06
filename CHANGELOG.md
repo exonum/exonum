@@ -5,6 +5,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Breaking changes
+
+#### Exonum core
+
+- POST-requests are now handled with `bodyparser` crate,
+  so all the parameters must be passed in the body.
+
 ## 0.6 - 2018-03-06
 
 ### Breaking changes

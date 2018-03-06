@@ -67,6 +67,7 @@ extern crate failure;
 extern crate lazy_static;
 #[cfg(test)]
 extern crate tempdir;
+extern crate bodyparser;
 
 #[macro_use]
 pub mod encoding;

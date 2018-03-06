@@ -154,8 +154,13 @@ impl SystemApi {
 
     fn handle_peer_add(self, router: &mut Router) {
         let peer_add = move |request: &mut Request| -> IronResult<Response> {
-            let address: SocketAddr = self.required_param(request, "ip")?;
-            self.node_channel.peer_add(address).map_err(ApiError::from)?;
+            #[derive(Serialize, Deserialize, Clone, Debug)]
+            struct PeerAddInfo {
+                ip: SocketAddr,
+            }
+
+            let PeerAddInfo { ip } = self.parse_body(request)?;
+            self.node_channel.peer_add(ip).map_err(ApiError::from)?;
             self.ok_response(&serde_json::to_value("Ok").unwrap())
         };
 
@@ -186,7 +191,12 @@ impl SystemApi {
 
     fn handle_set_consensus_enabled(self, router: &mut Router) {
         let consensus_enabled_set = move |request: &mut Request| -> IronResult<Response> {
-            let enabled: bool = self.required_param(request, "enabled")?;
+            #[derive(Serialize, Deserialize, Clone, Debug)]
+            struct EnabledInfo {
+                enabled: bool,
+            }
+
+            let EnabledInfo { enabled } = self.parse_body(request)?;
             let message = ExternalMessage::Enable(enabled);
             self.node_channel.send_external_message(message).map_err(
                 ApiError::from,
