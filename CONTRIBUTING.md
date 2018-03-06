@@ -43,6 +43,12 @@ You can set up and run these tools locally (see [Travis script] for the details)
 Generally, we follow common best practices established in the Rust community,
 but we have several additional conventions:
 
+- Create as minimal pull request as possible: they are easier to review and
+  integrate. 
+
+  Additionally, we merge pull request using the "squash and merge" strategy, so
+  don't waste your time on detailed commits history.
+
 - Don't use `debug!` log level.
 
   It is convenient to use `debug!` when you develop some feature and are only
