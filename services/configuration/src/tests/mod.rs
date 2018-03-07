@@ -252,8 +252,9 @@ fn test_discard_proposes_with_too_big_majority_count() {
     let cfg_change_height = Height(5);
     let new_cfg = {
         let mut cfg = testkit.configuration_change_proposal();
+        let excessive_majority_count = (&testkit.network().validators().len() + 100) as u16;
         cfg.set_service_config("dummy", "First cfg");
-        cfg.set_majority_count(Some(&testkit.network().validators().len() + 100 ));
+        cfg.set_majority_count(Some(excessive_majority_count));
         cfg.set_actual_from(cfg_change_height);
         cfg.stored_configuration().clone()
     };
@@ -270,8 +271,9 @@ fn test_discard_proposes_with_too_small_majority_count() {
     let cfg_change_height = Height(5);
     let new_cfg = {
         let mut cfg = testkit.configuration_change_proposal();
+        let insufficient_majority_count = (&testkit.network().validators().len() / 2) as u16;
         cfg.set_service_config("dummy", "First cfg");
-        cfg.set_majority_count(Some(&testkit.network().validators().len() / 2));
+        cfg.set_majority_count(Some(insufficient_majority_count));
         cfg.set_actual_from(cfg_change_height);
         cfg.stored_configuration().clone()
     };

@@ -282,7 +282,7 @@ impl TestNetworkConfiguration {
     }
 
     /// Modifies the majority_count.
-    pub fn set_majority_count(&mut self, majority_count: Option<usize>) {
+    pub fn set_majority_count(&mut self, majority_count: Option<u16>) {
         self.stored_configuration.majority_count = majority_count;
     }
 

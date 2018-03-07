@@ -95,7 +95,7 @@ fn enough_votes_to_commit(snapshot: &Snapshot, cfg_hash: &Hash) -> bool {
     let votes_count = votes.iter().filter(|vote| vote.is_some()).count();
 
     votes_count >= match actual_config.majority_count {
-        Some(majority_count) => majority_count,
+        Some(majority_count) => majority_count as usize,
         _ => State::byzantine_majority_count(actual_config.validator_keys.len())
     }
 }
@@ -150,6 +150,7 @@ impl Propose {
         }
 
         if let Some(proposed_majority_count) = candidate.majority_count {
+            let proposed_majority_count = proposed_majority_count as usize;
             let validators_num = candidate.validator_keys.len();
             let min_votes_count = State::byzantine_majority_count(validators_num);
 
