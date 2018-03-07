@@ -25,14 +25,14 @@ use blockchain::{Service, Blockchain, SharedNodeState};
 use api::{Api, ApiError};
 use messages::{TEST_NETWORK_ID, PROTOCOL_MAJOR_VERSION};
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 struct ServiceInfo {
     name: String,
     id: u16,
 }
 
 /// `DTO` is used to transfer information about node.
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NodeInfo {
     network_id: u8,
     protocol_version: u8,
