@@ -20,7 +20,7 @@
 /// The macro also implements [`Field`], [`ExonumJson`] and [`StorageValue`] traits
 /// for the declared datatype.
 ///
-/// Unlike types created with [`message!`], the datatype is mapped to a byte buffer
+/// Unlike types created with [`transactions!`], the datatype is mapped to a byte buffer
 /// without any checks; it is assumed that the relevant checks have been performed
 /// when persisting the structure to the blockchain storage.
 ///
@@ -33,7 +33,7 @@
 /// [`Field`]: ./encoding/trait.Field.html
 /// [`ExonumJson`]: ./encoding/serialize/json/trait.ExonumJson.html
 /// [`StorageValue`]: ./storage/trait.StorageValue.html
-/// [`message!`]: macro.message.html
+/// [`transactions!`]: macro.transactions.html
 ///
 /// # Examples
 ///

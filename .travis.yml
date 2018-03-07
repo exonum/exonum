@@ -22,8 +22,6 @@ rust:
   - 1.23.0
 
 matrix:
-  allow_failures:
-  - env: FEATURE=non-fatal-checks
   fast_finish: true
 
 cache:
@@ -73,6 +71,7 @@ jobs:
   - env: FEATURE=lints
     install:
     - cargo-audit -V || cargo install cargo-audit --force
+    - cargo-deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
     - rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
     - nvm install 8 && nvm use 8
     - npm install cspell
@@ -90,6 +89,15 @@ jobs:
     - ./node_modules/.bin/cspell examples/cryptocurrency/{src,examples,tests}/**/*.rs
     - find . -not -path "./3rdparty/*" -and -not -path "./node_modules/*" -name "*.md" | xargs ./node_modules/.bin/cspell
     - find . -not -path "./3rdparty/*" -and -not -path "./node_modules/*" -name "*.md" | xargs ./node_modules/.bin/markdownlint --config .markdownlintrc
+    - cargo doc --no-deps
+    # TODO: a tmp hack to ignore warnings about missing pages [ECR-703]
+    - mkdir -p target/std/string
+    - touch target/std/primitive.usize.html
+    - touch target/std/string/struct.String.html
+    - touch target/doc/exonum/encoding/serialize/trait.Serialize.html
+    - touch target/doc/exonum_configuration/enum.Option.html
+    - cargo deadlinks --dir target/doc
+
 
   # Clippy linting
   - env: FEATURE=clippy
@@ -132,15 +140,6 @@ jobs:
     rust: nightly-2018-03-06
     script:
     - RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
-
-  # Non-fatal checks
-  - env: FEATURE=non-fatal-checks
-    install:
-    - cargo-deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
-    script:
-    - cargo doc --no-deps
-    - touch target/doc/exonum/encoding/serialize/trait.Serialize.html  # TODO: a tmp hack to ignore a warning about missing page [ECR-703]
-    - cargo deadlinks --dir target/doc
 
 notifications:
   slack:
