@@ -193,7 +193,7 @@ fn test_apply_with_increased_majority() {
         .with_service(ConfigurationService {})
         .create();
 
-    // first
+    // Applying first configuration with custom majority count
     let cfg_change_height = Height(5);
     let new_cfg = {
         let mut cfg = testkit.configuration_change_proposal();
@@ -204,7 +204,8 @@ fn test_apply_with_increased_majority() {
     };
     testkit.apply_configuration(ValidatorId(0), new_cfg);
 
-    //second
+    // Applying second configuration.
+    // Number of votes equals to the number of validators.
     let cfg_change_height = Height(10);
     let new_cfg = {
         let mut cfg = testkit.configuration_change_proposal();
@@ -214,7 +215,8 @@ fn test_apply_with_increased_majority() {
     };
     testkit.apply_configuration(ValidatorId(0), new_cfg);
 
-    //third
+    // Trying to apply third configuration.
+    // Number is greater than byzantine_majority_count but less than configured majority count.
     let cfg_change_height = Height(15);
     let new_cfg = {
         let mut cfg = testkit.configuration_change_proposal();
