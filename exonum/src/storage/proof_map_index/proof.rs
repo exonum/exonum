@@ -276,7 +276,11 @@ impl<V: fmt::Debug + StorageValue> MapProof<V> {
     /// If the proof is valid and the requested key exists, `Ok(Some(&V))` is returned.
     /// If the proof is valid and the requested key does not exists, `Ok(None)` is returned.
     /// If the proof is invalid, `Err` is returned.
-    pub fn validate<K: ProofMapKey>(&self, key: &K, merkle_root: Hash) -> Result<Option<&V>, Error> {
+    pub fn validate<K: ProofMapKey>(
+        &self,
+        key: &K,
+        merkle_root: Hash,
+    ) -> Result<Option<&V>, Error> {
         let searched_key = ProofPath::new(key);
         use self::MapProof::*;
 
