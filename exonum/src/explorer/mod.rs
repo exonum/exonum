@@ -15,10 +15,13 @@
 //! Blockchain explorer module provides api for getting information about blocks and transactions
 //! from the blockchain.
 
+extern crate linked_hash_map;
+
+use self::linked_hash_map::LinkedHashMap;
 use serde::{Serialize, Serializer};
 
 use std::fmt;
-use std::ops::Range;
+use std::ops::{Index, Range};
 
 use storage::{ListProof, Snapshot};
 use crypto::Hash;
@@ -154,6 +157,113 @@ impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
         self.iter()
     }
 }
+
+/// Information about a block in the blockchain with info on transactions eagerly loaded.
+///
+/// # Examples
+///
+/// ```ignore
+/// # use exonum::explorer::{BlockchainExplorer, BlockWithTransactions, TransactionInfo};
+/// # use exonum::explorer::tests::sample_blockchain;
+/// # use exonum::helpers::Height;
+/// let blockchain = // ...
+/// #                sample_blockchain();
+/// let explorer = BlockchainExplorer::new(blockchain);
+/// let block: BlockWithTransactions = explorer.block_with_txs(Height(1)).unwrap();
+/// assert_eq!(block.block().height(), Height(1));
+/// assert_eq!(block.len(), 3);
+///
+/// // Iterate over transactions in the block
+/// for tx in &block {
+///     println!("{:?}: {:?}", tx.location(), tx.content());
+/// }
+///
+/// // Compared to `BlockInfo`, you can access transactions in a block using indexes
+/// let tx: &TransactionInfo = &block[1];
+/// assert_eq!(tx.location().position_in_block(), 1);
+/// let tx_copy = &block[&tx.content().hash()];
+/// assert_eq!(tx.content().raw(), tx_copy.content().raw());
+/// ```
+#[derive(Debug)]
+pub struct BlockWithTransactions {
+    block: Block,
+    precommits: Vec<Precommit>,
+    txs: LinkedHashMap<Hash, TransactionInfo>,
+}
+
+impl BlockWithTransactions {
+    /// Returns the block header as recorded in the blockchain.
+    pub fn block(&self) -> &Block {
+        &self.block
+    }
+
+    /// Returns the number of transactions in this block.
+    pub fn len(&self) -> usize {
+        self.txs.len()
+    }
+
+    /// Is this block empty (i.e., contains no transactions)?
+    pub fn is_empty(&self) -> bool {
+        self.txs.is_empty()
+    }
+
+    /// Returns a list of precommits for this block.
+    pub fn precommits(&self) -> &[Precommit] {
+        &self.precommits
+    }
+
+    /// Returns a transaction with the specified index in the block.
+    pub fn transaction(&self, index: usize) -> Option<&TransactionInfo> {
+        self.txs.values().nth(index)
+    }
+
+    /// Returns a transaction with the specified hash in the block.
+    pub fn transaction_by_hash(&self, hash: &Hash) -> Option<&TransactionInfo> {
+        self.txs.get(hash)
+    }
+
+    /// Iterates over transactions in the block.
+    pub fn iter(&self) -> EagerTransactionsIter {
+        self.txs.values()
+    }
+}
+
+/// Iterator over transactions in [`BlockWithTransactions`].
+///
+/// [`BlockWithTransactions`]: struct.BlockWithTransactions.html
+pub type EagerTransactionsIter<'a> = self::linked_hash_map::Values<'a, Hash, TransactionInfo>;
+
+impl Index<usize> for BlockWithTransactions {
+    type Output = TransactionInfo;
+
+    fn index(&self, index: usize) -> &TransactionInfo {
+        self.transaction(index).expect(&format!(
+            "Index exceeds number of transactions in block {}",
+            self.len()
+        ))
+    }
+}
+
+impl<'a> Index<&'a Hash> for BlockWithTransactions {
+    type Output = TransactionInfo;
+
+    fn index(&self, tx_hash: &'a Hash) -> &TransactionInfo {
+        self.transaction_by_hash(tx_hash).expect(&format!(
+            "Transaction with hash {:?} not in block",
+            tx_hash
+        ))
+    }
+}
+
+impl<'a> IntoIterator for &'a BlockWithTransactions {
+    type Item = &'a TransactionInfo;
+    type IntoIter = EagerTransactionsIter<'a>;
+
+    fn into_iter(self) -> EagerTransactionsIter<'a> {
+        self.iter()
+    }
+}
+
 
 /// Information about a particular transaction in the blockchain.
 ///
@@ -424,6 +534,24 @@ impl BlockchainExplorer {
                 block: proof.block,
                 precommits: proof.precommits,
                 txs: txs_table.iter().collect(),
+            }
+        })
+    }
+
+    /// Returns block information for the specified height or `None` if there is no such block.
+    pub fn block_with_txs(&self, height: Height) -> Option<BlockWithTransactions> {
+        let schema = Schema::new(self.blockchain.snapshot());
+        let txs_table = schema.block_txs(height);
+        let block_proof = schema.block_and_precommits(height);
+
+        block_proof.map(|proof| {
+            BlockWithTransactions {
+                block: proof.block,
+                precommits: proof.precommits,
+                txs: txs_table
+                    .iter()
+                    .map(|tx_hash| (tx_hash, self.transaction(&tx_hash).unwrap()))
+                    .collect(),
             }
         })
     }

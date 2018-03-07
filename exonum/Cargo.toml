@@ -47,6 +47,7 @@ tokio-timer = "0.1.2"
 failure = "0.1.1"
 os_info = "0.7.0"
 chrono = "0.4.0"
+linked-hash-map = "0.5.1"
 
 exonum_rocksdb = "0.7"
 exonum_sodiumoxide = "0.0.16"

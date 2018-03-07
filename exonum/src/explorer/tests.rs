@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![cfg_attr(feature = "doctests", allow(unused_imports))]
+#![cfg_attr(feature = "doctests", allow(unused_imports, dead_code))]
 
 use futures::sync::mpsc;
 use serde_json;
@@ -20,7 +20,7 @@ use serde_json;
 use blockchain::{ExecutionError, ExecutionResult, Service, TransactionSet};
 use crypto::{self, CryptoHash, PublicKey, SecretKey};
 use encoding::Error as EncodingError;
-use messages::{Message, RawTransaction};
+use messages::{Message, RawTransaction, ServiceMessage};
 use node::ApiSender;
 use storage::{Fork, MemoryDB, Snapshot};
 use super::*;
@@ -272,14 +272,18 @@ fn test_explorer_basics() {
     );
 }
 
-#[test]
-fn test_explorer_block_iter() {
-    let mut blockchain = create_blockchain();
-    let mut tx_gen = (0..).map(|i| {
+fn tx_generator() -> Box<Iterator<Item = Box<Transaction>>> {
+    Box::new((0..).map(|i| {
         let (pk, key) = crypto::gen_keypair();
         let tx = CreateWallet::new(&pk, &format!("Alice #{}", i), &key);
         Box::new(tx) as Box<Transaction>
-    });
+    }))
+}
+
+#[test]
+fn test_explorer_block_iter() {
+    let mut blockchain = create_blockchain();
+    let mut tx_gen = tx_generator();
     let txs = tx_gen.by_ref();
 
     create_block(&mut blockchain, vec![]); // Height(1)
@@ -360,15 +364,8 @@ fn test_explorer_block_iter() {
 
 #[test]
 fn test_transaction_iterator() {
-    use messages::ServiceMessage;
-
     let mut blockchain = create_blockchain();
-    let mut tx_gen = (0..).map(|i| {
-        let (pk, key) = crypto::gen_keypair();
-        let tx = CreateWallet::new(&pk, &format!("Alice #{}", i), &key);
-        Box::new(tx) as Box<Transaction>
-    });
-    let txs = tx_gen.by_ref();
+    let txs = tx_generator();
     create_block(&mut blockchain, txs.take(5).collect());
 
     let explorer = BlockchainExplorer::new(blockchain.clone());
@@ -409,4 +406,45 @@ fn test_transaction_iterator() {
         .map(|tx| tx.location().position_in_block())
         .collect();
     assert_eq!(create_wallet_positions, vec![0, 1]);
+}
+
+#[test]
+fn test_block_with_transactions() {
+    let mut blockchain = create_blockchain();
+    let txs: Vec<_> = tx_generator().take(5).collect();
+    let tx_hashes: Vec<_> = txs.iter().map(|tx| tx.hash()).collect();
+    create_block(&mut blockchain, txs);
+
+    let explorer = BlockchainExplorer::new(blockchain);
+    let block = explorer.block_with_txs(Height(1)).unwrap();
+    assert_eq!(block.len(), 5);
+    assert!(!block.is_empty());
+    assert!(block[1].status().is_ok());
+    assert_eq!(block[&tx_hashes[3]].location().position_in_block(), 3);
+
+    assert!(block.iter().all(|tx| tx.content().raw().message_type() == CreateWallet::MESSAGE_ID));
+}
+
+#[test]
+#[should_panic(expected = "Index exceeds number of transactions")]
+fn test_block_with_transactions_index_overflow() {
+    let mut blockchain = create_blockchain();
+    let txs: Vec<_> = tx_generator().take(5).collect();
+    create_block(&mut blockchain, txs);
+
+    let explorer = BlockchainExplorer::new(blockchain);
+    let block = explorer.block_with_txs(Height(1)).unwrap();
+    assert!(block[6].status().is_ok());
+}
+
+#[test]
+#[should_panic(expected = "not in block")]
+fn test_block_with_transactions_nonexisting_hash() {
+    let mut blockchain = create_blockchain();
+    let txs: Vec<_> = tx_generator().take(5).collect();
+    create_block(&mut blockchain, txs);
+
+    let explorer = BlockchainExplorer::new(blockchain);
+    let block = explorer.block_with_txs(Height(1)).unwrap();
+    assert!(block[&Hash::zero()].status().is_ok());
 }
