@@ -44,10 +44,10 @@ Generally, we follow common best practices established in the Rust community,
 but we have several additional conventions:
 
 - Create as minimal pull request as possible: they are easier to review and
-  integrate. 
+  integrate.
 
-  Additionally, we merge pull request using the "squash and merge" strategy, so
-  don't waste your time on detailed commits history.
+  Additionally, we merge pull requests using the "squash and merge" strategy, so
+  feel free to merge `master` branch instead of rebasing.
 
 - Don't use `debug!` log level.
 
