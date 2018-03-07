@@ -35,7 +35,7 @@ pub struct BlockchainExplorer<'a> {
 }
 
 /// Block information.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct BlockInfo {
     /// Block header from blockchain.
     pub block: Block,
@@ -46,7 +46,7 @@ pub struct BlockInfo {
 }
 
 /// Transaction information.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct TxInfo {
     /// `JSON` serialized transaction.
     pub content: Value,
@@ -79,7 +79,7 @@ pub enum TxStatus {
 }
 
 /// Information on blocks coupled with the corresponding range in the blockchain.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct BlocksRange {
     /// Exclusive range of blocks.
     pub range: Range<u64>,

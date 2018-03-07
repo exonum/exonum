@@ -417,7 +417,7 @@ impl Command for GenerateNodeConfig {
         };
         let shared_config = SharedConfig {
             node: node_pub_config,
-            common: common,
+            common,
         };
         // Save public config separately.
         ConfigFile::save(&shared_config, &pub_config_path).expect(
@@ -572,12 +572,12 @@ impl Command for Finalize {
                 external_address: our.map(|o| o.addr),
                 network: Default::default(),
                 whitelist: Default::default(),
-                peers: peers,
+                peers,
                 consensus_public_key: secret_config.consensus_public_key,
                 consensus_secret_key: secret_config.consensus_secret_key,
                 service_public_key: secret_config.service_public_key,
                 service_secret_key: secret_config.service_secret_key,
-                genesis: genesis,
+                genesis,
                 api: NodeApiConfig {
                     public_api_address: public_addr,
                     private_api_address: private_addr,

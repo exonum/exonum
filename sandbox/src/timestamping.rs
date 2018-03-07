@@ -68,8 +68,8 @@ impl TimestampingTxGenerator {
         let rand = XorShiftRng::from_seed([192, 168, 56, 1]);
 
         TimestampingTxGenerator {
-            rand: rand,
-            data_size: data_size,
+            rand,
+            data_size,
             public_key: keypair.0,
             secret_key: keypair.1,
         }

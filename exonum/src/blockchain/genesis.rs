@@ -35,7 +35,7 @@ impl GenesisConfig {
         I: Iterator<Item = ValidatorKeys>,
     {
         GenesisConfig {
-            consensus: consensus,
+            consensus,
             validator_keys: validator_keys.collect(),
         }
     }

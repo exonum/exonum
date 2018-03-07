@@ -20,9 +20,9 @@ use blockchain::{Blockchain, SharedNodeState};
 use api::Api;
 use helpers::user_agent;
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, PartialEq)]
 struct MemPoolInfo {
-    size: usize,
+    pub size: usize,
 }
 
 #[doc(hidden)]

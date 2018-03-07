@@ -192,7 +192,7 @@ impl<'a> SegmentField<'a> for RawMessage {
             return Err(Error::IncorrectSizeOfRawMessage {
                 position: from.unchecked_offset(),
                 actual_size: slice.len() as Offset,
-                declared_size: declared_size,
+                declared_size,
             });
         }
         Ok(latest_segment)
