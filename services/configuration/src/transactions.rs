@@ -97,7 +97,7 @@ fn enough_votes_to_commit(snapshot: &Snapshot, cfg_hash: &Hash) -> bool {
     votes_count >=
         match actual_config.majority_count {
             Some(majority_count) => majority_count as usize,
-            _ => State::byzantine_majority_count(actual_config.validator_keys.len())
+            _ => State::byzantine_majority_count(actual_config.validator_keys.len()),
         }
 }
 
