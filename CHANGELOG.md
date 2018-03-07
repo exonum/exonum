@@ -11,6 +11,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - POST-requests are now handled with `bodyparser` crate,
   so all the parameters must be passed in the body.
+  
+### New features
+
+#### Exonum core
+
+- Added `v1/user_agent` endpoint with information about Exonum, Rust and OS versions.
 
 ## 0.6 - 2018-03-06
 
