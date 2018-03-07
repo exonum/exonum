@@ -25,10 +25,6 @@ use node::ApiSender;
 use storage::{Fork, MemoryDB, Snapshot};
 use super::*;
 
-lazy_static! {
-    static ref KEYS: (PublicKey, SecretKey) = crypto::gen_keypair();
-}
-
 // // // Transactions // // //
 
 transactions! {
@@ -97,9 +93,16 @@ impl Service for MyService {
     }
 }
 
+fn consensus_keys() -> (PublicKey, SecretKey) {
+    const SEED_PHRASE: &[u8] = b"correct horse battery staple";
+    let seed = crypto::Seed::from_slice(crypto::hash(SEED_PHRASE).as_ref()).unwrap();
+    crypto::gen_keypair_from_seed(&seed)
+}
+
 fn create_blockchain() -> Blockchain {
     use blockchain::{GenesisConfig, ValidatorKeys};
 
+    let (consensus_key, _) = consensus_keys();
     let service_keys = crypto::gen_keypair();
 
     let api_channel = mpsc::channel(10);
@@ -112,7 +115,7 @@ fn create_blockchain() -> Blockchain {
     );
 
     let keys = ValidatorKeys {
-        consensus_key: KEYS.0,
+        consensus_key,
         service_key: service_keys.0,
     };
     blockchain
@@ -134,6 +137,7 @@ fn create_block(blockchain: &mut Blockchain, transactions: Vec<Box<Transaction>>
     let height = blockchain.last_block().height().next();
 
     let (block_hash, patch) = blockchain.create_patch(ValidatorId(0), height, &tx_hashes, &pool);
+    let (_, consensus_secret_key) = consensus_keys();
 
     let propose = Propose::new(
         ValidatorId(0),
@@ -141,7 +145,7 @@ fn create_block(blockchain: &mut Blockchain, transactions: Vec<Box<Transaction>>
         Round::first(),
         &blockchain.last_hash(),
         &tx_hashes,
-        &KEYS.1,
+        &consensus_secret_key,
     );
     let precommit = Precommit::new(
         ValidatorId(0),
@@ -150,7 +154,7 @@ fn create_block(blockchain: &mut Blockchain, transactions: Vec<Box<Transaction>>
         &propose.hash(),
         &block_hash,
         SystemTime::now(),
-        &KEYS.1,
+        &consensus_secret_key,
     );
 
     blockchain

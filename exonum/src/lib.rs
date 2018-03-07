@@ -63,7 +63,7 @@ extern crate tokio_retry;
 extern crate os_info;
 #[macro_use]
 extern crate failure;
-#[cfg(any(test, feature = "doctests"))]
+#[cfg(test)]
 #[macro_use]
 extern crate lazy_static;
 #[cfg(test)]
