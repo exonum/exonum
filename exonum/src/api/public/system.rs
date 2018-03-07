@@ -19,9 +19,9 @@ use node::state::TxPool;
 use blockchain::{Blockchain, SharedNodeState};
 use api::Api;
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, PartialEq)]
 struct MemPoolInfo {
-    size: usize,
+    pub size: usize,
 }
 
 #[doc(hidden)]

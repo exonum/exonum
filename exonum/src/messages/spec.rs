@@ -120,7 +120,7 @@ macro_rules! __ex_message {
                     return Err("Incorrect raw message length.".into())
                 }
 
-                Ok($name { raw: raw })
+                Ok($name { raw })
             }
 
 

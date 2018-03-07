@@ -26,7 +26,7 @@ use helpers::Height;
 const MAX_BLOCKS_PER_REQUEST: u64 = 1000;
 
 /// Information about the transaction.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum TransactionInfo {
     /// Transaction with the given id is absent in the blockchain.

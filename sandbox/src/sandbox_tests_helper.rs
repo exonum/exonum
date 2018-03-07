@@ -75,7 +75,7 @@ impl<'a> BlockBuilder<'a> {
             state_hash: None,
             tx_count: None,
 
-            sandbox: sandbox,
+            sandbox,
         }
     }
 
@@ -160,7 +160,7 @@ impl<'a> ProposeBuilder<'a> {
             duration_since_sandbox_time: None,
             prev_hash: None,
             tx_hashes: None,
-            sandbox: sandbox,
+            sandbox,
         }
     }
 
