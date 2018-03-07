@@ -18,6 +18,7 @@ use iron::prelude::*;
 use node::state::TxPool;
 use blockchain::{Blockchain, SharedNodeState};
 use api::Api;
+use helpers::user_agent;
 
 #[derive(Serialize)]
 struct MemPoolInfo {
@@ -75,7 +76,14 @@ impl Api for SystemApi {
             self_.ok_response(&::serde_json::to_value(info).unwrap())
         };
 
+        let self_ = self.clone();
+        let user_agent = move |_: &mut Request| {
+            let info = user_agent::get();
+            self_.ok_response(&::serde_json::to_value(info).unwrap())
+        };
+
         router.get("/v1/mempool", mempool_info, "mempool");
         router.get("/v1/healthcheck", healthcheck, "healthcheck_info");
+        router.get("/v1/user_agent", user_agent, "user_agent");
     }
 }
