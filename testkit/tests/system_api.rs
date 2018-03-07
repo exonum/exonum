@@ -19,6 +19,7 @@ extern crate pretty_assertions;
 
 use exonum_testkit::{ApiKind, TestKitBuilder};
 use exonum::api::public::HealthCheckInfo;
+use exonum::helpers::user_agent;
 
 #[test]
 fn test_healthcheck_connectivity_false() {
@@ -26,5 +27,14 @@ fn test_healthcheck_connectivity_false() {
     let api = testkit.api();
     let info: HealthCheckInfo = api.get(ApiKind::System, "v1/healthcheck");
     let expected = HealthCheckInfo { connectivity: false };
+    assert_eq!(info, expected);
+}
+
+#[test]
+fn test_user_agent_info() {
+    let testkit = TestKitBuilder::validator().with_validators(2).create();
+    let api = testkit.api();
+    let info: String = api.get(ApiKind::System, "v1/user_agent");
+    let expected = user_agent::get();
     assert_eq!(info, expected);
 }
