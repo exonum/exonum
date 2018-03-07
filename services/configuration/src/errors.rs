@@ -49,6 +49,11 @@ pub enum ErrorCode {
     /// Specific for `Propose`.
     InvalidConfig = 33,
 
+    /// The configuration has invalid majority_count
+    ///
+    /// Specific for `Propose`.
+    InvalidMajorityCount = 34,
+
     /// The transaction references an unknown configuration.
     ///
     /// Specific for `Vote`.
@@ -83,6 +88,13 @@ pub(crate) enum Error {
         JsonError
     ),
 
+    #[fail(display = "Invalid majority count: {}, it should be >= {} and <= {}", proposed, min, max)]
+    InvalidMajorityCount {
+        min: usize,
+        max: usize,
+        proposed: usize,
+    },
+
     #[fail(display = "Does not reference known config with hash {:?}", _0)]
     UnknownConfigRef(Hash),
 
@@ -101,6 +113,7 @@ impl Error {
             ActivationInPast(..) => ErrorCode::ActivationInPast,
             AlreadyProposed(..) => ErrorCode::AlreadyProposed,
             InvalidConfig(..) => ErrorCode::InvalidConfig,
+            InvalidMajorityCount { .. } => ErrorCode::InvalidMajorityCount,
             UnknownConfigRef(..) => ErrorCode::UnknownConfigRef,
             AlreadyVoted => ErrorCode::AlreadyVoted,
         }

@@ -187,6 +187,103 @@ fn test_apply_second_configuration() {
 }
 
 #[test]
+fn test_apply_with_increased_majority() {
+    let mut testkit = TestKitBuilder::validator()
+        .with_validators(6)
+        .with_service(ConfigurationService {})
+        .create();
+
+    // first
+    let cfg_change_height = Height(5);
+    let new_cfg = {
+        let mut cfg = testkit.configuration_change_proposal();
+        cfg.set_service_config("dummy", "First cfg");
+        cfg.set_majority_count(Some(6));
+        cfg.set_actual_from(cfg_change_height);
+        cfg.stored_configuration().clone()
+    };
+    testkit.apply_configuration(ValidatorId(0), new_cfg);
+
+    //second
+    let cfg_change_height = Height(10);
+    let new_cfg = {
+        let mut cfg = testkit.configuration_change_proposal();
+        cfg.set_service_config("dummy", "Second cfg");
+        cfg.set_actual_from(cfg_change_height);
+        cfg.stored_configuration().clone()
+    };
+    testkit.apply_configuration(ValidatorId(0), new_cfg);
+
+    //third
+    let cfg_change_height = Height(15);
+    let new_cfg = {
+        let mut cfg = testkit.configuration_change_proposal();
+        cfg.set_service_config("dummy", "Second cfg");
+        cfg.set_actual_from(cfg_change_height);
+        cfg.stored_configuration().clone()
+    };
+
+    let validators = testkit.network().validators().to_vec();
+    let tx_propose = new_tx_config_propose(&validators[1], new_cfg.clone());
+    testkit.create_block_with_transactions(txvec![tx_propose]);
+
+    let cfg_proposal_hash = new_cfg.hash();
+
+    let tx_votes = validators[0..5] // not enough validators
+        .iter()
+        .map(|validator| new_tx_config_vote(validator, cfg_proposal_hash))
+        .map(to_boxed)
+        .collect::<Vec<_>>();
+
+    testkit.create_block_with_transactions(tx_votes);
+    testkit.create_blocks_until(cfg_change_height);
+
+    assert_ne!(
+        Schema::new(&testkit.snapshot()).actual_configuration(),
+        new_cfg
+    );
+
+}
+
+#[test]
+fn test_discard_proposes_with_too_big_majority_count() {
+    let mut testkit: TestKit = TestKit::configuration_default();
+
+    let cfg_change_height = Height(5);
+    let new_cfg = {
+        let mut cfg = testkit.configuration_change_proposal();
+        cfg.set_service_config("dummy", "First cfg");
+        cfg.set_majority_count(Some(&testkit.network().validators().len() + 100 ));
+        cfg.set_actual_from(cfg_change_height);
+        cfg.stored_configuration().clone()
+    };
+
+    let propose_tx = new_tx_config_propose(&testkit.network().validators()[1], new_cfg.clone());
+    testkit.create_block_with_transactions(txvec![propose_tx]);
+    assert_eq!(None, testkit.find_propose(new_cfg.hash()));
+}
+
+#[test]
+fn test_discard_proposes_with_too_small_majority_count() {
+    let mut testkit: TestKit = TestKit::configuration_default();
+
+    let cfg_change_height = Height(5);
+    let new_cfg = {
+        let mut cfg = testkit.configuration_change_proposal();
+        cfg.set_service_config("dummy", "First cfg");
+        cfg.set_majority_count(Some(&testkit.network().validators().len() / 2));
+        cfg.set_actual_from(cfg_change_height);
+        cfg.stored_configuration().clone()
+    };
+
+    let propose_tx = new_tx_config_propose(&testkit.network().validators()[1], new_cfg.clone());
+    testkit.create_block_with_transactions(txvec![propose_tx]);
+    assert_eq!(None, testkit.find_propose(new_cfg.hash()));
+}
+
+
+
+#[test]
 fn test_discard_propose_for_same_cfg() {
     let mut testkit: TestKit = TestKit::configuration_default();
 

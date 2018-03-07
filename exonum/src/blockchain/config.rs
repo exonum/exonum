@@ -46,6 +46,9 @@ pub struct StoredConfiguration {
     pub validator_keys: Vec<ValidatorKeys>,
     /// Consensus algorithm parameters.
     pub consensus: ConsensusConfig,
+    /// Number of votes to commit configuration
+    /// Should be greater or equal to 2/3 of validators count
+    pub majority_count: Option<usize>,
     /// Services specific variables.
     /// Keys are `service_name` from `Service` trait and values are the serialized json.
     pub services: BTreeMap<String, serde_json::Value>,
@@ -428,6 +431,7 @@ mod tests {
             validator_keys,
             consensus: ConsensusConfig::default(),
             services: BTreeMap::new(),
+            majority_count: None,
         }
     }
 

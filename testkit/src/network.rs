@@ -281,6 +281,11 @@ impl TestNetworkConfiguration {
         self.stored_configuration.actual_from = actual_from;
     }
 
+    /// Modifies the majority_count.
+    pub fn set_majority_count(&mut self, majority_count: Option<usize>) {
+        self.stored_configuration.majority_count = majority_count;
+    }
+
     /// Modifies the current consensus configuration.
     pub fn set_consensus_configuration(&mut self, consensus: ConsensusConfig) {
         self.stored_configuration.consensus = consensus;
