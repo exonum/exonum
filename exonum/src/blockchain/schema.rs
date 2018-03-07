@@ -290,7 +290,7 @@ where
 
     /// Returns the `state_hash` table for core tables.
     pub fn core_state_hash(&self) -> Vec<Hash> {
-        vec![self.configs().root_hash(), self.transaction_results().root_hash()]
+        vec![self.configs().merkle_root(), self.transaction_results().merkle_root()]
     }
 
     /// Constructs a proof of inclusion of root hash of a specific service
