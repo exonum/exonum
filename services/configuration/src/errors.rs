@@ -49,7 +49,7 @@ pub enum ErrorCode {
     /// Specific for `Propose`.
     InvalidConfig = 33,
 
-    /// The configuration has invalid majority_count
+    /// The configuration has invalid majority_count.
     ///
     /// Specific for `Propose`.
     InvalidMajorityCount = 34,
