@@ -93,12 +93,12 @@ fn enough_votes_to_commit(snapshot: &Snapshot, cfg_hash: &Hash) -> bool {
     let schema = Schema::new(snapshot);
     let votes = schema.votes_by_config_hash(cfg_hash);
     let votes_count = votes.iter().filter(|vote| vote.is_some()).count();
+    let majority_count = match actual_config.majority_count {
+        Some(majority_count) => majority_count as usize,
+        _ => State::byzantine_majority_count(actual_config.validator_keys.len()),
+    };
 
-    votes_count >=
-        match actual_config.majority_count {
-            Some(majority_count) => majority_count as usize,
-            _ => State::byzantine_majority_count(actual_config.validator_keys.len()),
-        }
+    votes_count >= majority_count
 }
 
 impl Propose {
