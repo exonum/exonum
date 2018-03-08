@@ -263,7 +263,7 @@ fn test_discard_proposes_with_too_big_majority_count() {
 
     let propose_tx = new_tx_config_propose(&testkit.network().validators()[1], new_cfg.clone());
     testkit.create_block_with_transactions(txvec![propose_tx]);
-    assert_eq!(None, testkit.find_propose(new_cfg.hash()));
+    assert!(testkit.find_propose(new_cfg.hash()).is_none());
 }
 
 #[test]
@@ -282,10 +282,8 @@ fn test_discard_proposes_with_too_small_majority_count() {
 
     let propose_tx = new_tx_config_propose(&testkit.network().validators()[1], new_cfg.clone());
     testkit.create_block_with_transactions(txvec![propose_tx]);
-    assert_eq!(None, testkit.find_propose(new_cfg.hash()));
+    assert!(testkit.find_propose(new_cfg.hash()).is_none());
 }
-
-
 
 #[test]
 fn test_discard_propose_for_same_cfg() {
