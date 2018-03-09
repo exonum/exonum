@@ -77,15 +77,15 @@ impl<V: StorageValue> ListProof<V> {
         Ok(hash)
     }
 
-    /// Verifies the correctness of the proof by the trusted root hash and the number of elements
-    /// in the tree.
+    /// Verifies the correctness of the proof by the trusted Merkle root hash and the number of
+    /// elements in the tree.
     ///
     /// If the proof is valid, a vector with indices and references to elements is returned.
     /// Otherwise, `Err` is returned.
-    pub fn validate(&self, root_hash: Hash, len: u64) -> Result<Vec<(u64, &V)>, ListProofError> {
+    pub fn validate(&self, merkle_root: Hash, len: u64) -> Result<Vec<(u64, &V)>, ListProofError> {
         let mut vec = Vec::new();
         let height = len.next_power_of_two().trailing_zeros() as u8 + 1;
-        if self.collect(ProofListKey::new(height, 0), &mut vec)? != root_hash {
+        if self.collect(ProofListKey::new(height, 0), &mut vec)? != merkle_root {
             return Err(ListProofError::UnmatchedRootHash);
         }
         Ok(vec)
