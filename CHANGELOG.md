@@ -18,9 +18,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum-configuration
 
 - `majority_count: Option<u16>` configuration parameter is introduced.
-  Allows to increase the threshold amount of votes required to commit a new configuration proposal.
-  By default the number of votes is calculated as 2/3 + 1 of total validators count.
-  
+  Allows to increase the threshold amount of votes required to commit a new configuration
+  proposal. By default the number of votes is calculated as 2/3 + 1 of total validators
+  count.
+
 ## 0.6 - 2018-03-06
 
 ### Breaking changes
