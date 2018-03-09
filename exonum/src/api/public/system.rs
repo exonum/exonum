@@ -14,6 +14,7 @@
 
 use router::Router;
 use iron::prelude::*;
+use serde_json;
 
 use node::state::TxPool;
 use blockchain::{Blockchain, SharedNodeState};
@@ -56,7 +57,7 @@ impl SystemApi {
     fn mempool_info(self, router: &mut Router) {
         let mempool = move |_: &mut Request| -> IronResult<Response> {
             let info = MemPoolInfo { size: self.pool.read().expect("Expected read lock").len() };
-            self.ok_response(&::serde_json::to_value(info).unwrap())
+            self.ok_response(&serde_json::to_value(info).unwrap())
         };
         router.get("/v1/mempool", mempool, "mempool");
     }
@@ -65,7 +66,7 @@ impl SystemApi {
         let healthcheck = move |_: &mut Request| -> IronResult<Response> {
             let info =
                 HealthCheckInfo { connectivity: !self.shared_api_state.peers_info().is_empty() };
-            self.ok_response(&::serde_json::to_value(info).unwrap())
+            self.ok_response(&serde_json::to_value(info).unwrap())
         };
         router.get("/v1/healthcheck", healthcheck, "healthcheck");
     }
@@ -73,7 +74,7 @@ impl SystemApi {
     fn user_agent_info(self, router: &mut Router) {
         let user_agent = move |_: &mut Request| -> IronResult<Response> {
             let info = user_agent::get();
-            self.ok_response(&::serde_json::to_value(info).unwrap())
+            self.ok_response(&serde_json::to_value(info).unwrap())
         };
         router.get("/v1/user_agent", user_agent, "user_agent");
     }
