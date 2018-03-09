@@ -30,7 +30,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   This optional setting adjusts database-specific settings,
   like number of simultaneously opened files. (#538)
 
-- `exonum::explorer` module moved to the `exonum::api::public` (#550)
+- `exonum::explorer` module moved to the `exonum::api::public`. (#550)
 
   Migration Path:
 
