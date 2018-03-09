@@ -356,7 +356,7 @@ fn test_snapshot_comparison_panic() {
 
 #[test]
 fn test_explorer_blocks() {
-    use exonum::explorer::BlocksRange;
+    use exonum::api::public::BlocksRange;
     use exonum::helpers::Height;
 
     let (mut testkit, api) = init_testkit();
@@ -476,7 +476,7 @@ fn test_explorer_blocks() {
 #[test]
 fn test_explorer_single_block() {
     use std::collections::HashSet;
-    use exonum::explorer::BlockInfo;
+    use exonum::api::public::BlockInfo;
     use exonum::helpers::Height;
 
     let mut testkit = TestKitBuilder::validator()
@@ -522,7 +522,7 @@ fn test_explorer_single_block() {
 
 #[test]
 fn test_explorer_transaction() {
-    use exonum::explorer::BlockInfo;
+    use exonum::api::public::BlockInfo;
     use exonum::helpers::Height;
     use exonum::storage::ListProof;
 
