@@ -26,9 +26,7 @@ mod tests {
     use test::Bencher;
     use rand::{Rng, thread_rng, XorShiftRng, SeedableRng};
     use tempdir::TempDir;
-    use exonum::storage::{Database, MemoryDB};
-    use exonum::storage::{RocksDB, DbOptions};
-    use exonum::storage::{ProofMapIndex, ProofListIndex};
+    use exonum::storage::{Database, MemoryDB, RocksDB, DbOptions, ProofMapIndex, ProofListIndex};
     use exonum::storage::proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE;
 
     const NAME: &str = "name";
