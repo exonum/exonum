@@ -118,27 +118,27 @@ fn list_index_proof(db: Box<Database>) {
     let h22 = hash(h2.as_ref());
     let h012 = pair_hash(&h01, &h22);
 
-    assert_eq!(index.root_hash(), Hash::default());
+    assert_eq!(index.merkle_root(), Hash::default());
 
     index.push(2u64);
 
-    assert_eq!(index.root_hash(), h0);
+    assert_eq!(index.merkle_root(), h0);
     assert_eq!(index.get_proof(0), Leaf(2));
     assert_eq!(
         index
             .get_proof(0)
-            .validate(index.root_hash(), index.len())
+            .validate(index.merkle_root(), index.len())
             .unwrap(),
         [(0, &2)]
     );
 
     index.push(4u64);
-    assert_eq!(index.root_hash(), h01);
+    assert_eq!(index.merkle_root(), h01);
     assert_eq!(index.get_proof(0), Left(Box::new(Leaf(2)), Some(h1)));
     assert_eq!(
         index
             .get_proof(0)
-            .validate(index.root_hash(), index.len())
+            .validate(index.merkle_root(), index.len())
             .unwrap(),
         [(0, &2)]
     );
@@ -146,7 +146,7 @@ fn list_index_proof(db: Box<Database>) {
     assert_eq!(
         index
             .get_proof(1)
-            .validate(index.root_hash(), index.len())
+            .validate(index.merkle_root(), index.len())
             .unwrap(),
         [(1, &4)]
     );
@@ -158,13 +158,13 @@ fn list_index_proof(db: Box<Database>) {
     assert_eq!(
         index
             .get_range_proof(0, 2)
-            .validate(index.root_hash(), index.len())
+            .validate(index.merkle_root(), index.len())
             .unwrap(),
         [(0, &2), (1, &4)]
     );
 
     index.push(6u64);
-    assert_eq!(index.root_hash(), h012);
+    assert_eq!(index.merkle_root(), h012);
     assert_eq!(
         index.get_proof(0),
         Left(Box::new(Left(Box::new(Leaf(2)), Some(h1))), Some(h22))
@@ -172,7 +172,7 @@ fn list_index_proof(db: Box<Database>) {
     assert_eq!(
         index
             .get_proof(0)
-            .validate(index.root_hash(), index.len())
+            .validate(index.merkle_root(), index.len())
             .unwrap(),
         [(0, &2)]
     );
@@ -183,7 +183,7 @@ fn list_index_proof(db: Box<Database>) {
     assert_eq!(
         index
             .get_proof(1)
-            .validate(index.root_hash(), index.len())
+            .validate(index.merkle_root(), index.len())
             .unwrap(),
         [(1, &4)]
     );
@@ -194,7 +194,7 @@ fn list_index_proof(db: Box<Database>) {
     assert_eq!(
         index
             .get_proof(2)
-            .validate(index.root_hash(), index.len())
+            .validate(index.merkle_root(), index.len())
             .unwrap(),
         [(2, &6)]
     );
@@ -210,7 +210,7 @@ fn list_index_proof(db: Box<Database>) {
     assert_eq!(
         index
             .get_range_proof(0, 2)
-            .validate(index.root_hash(), index.len())
+            .validate(index.merkle_root(), index.len())
             .unwrap(),
         [(0, &2), (1, &4)]
     );
@@ -225,7 +225,7 @@ fn list_index_proof(db: Box<Database>) {
     assert_eq!(
         index
             .get_range_proof(1, 3)
-            .validate(index.root_hash(), index.len())
+            .validate(index.merkle_root(), index.len())
             .unwrap(),
         [(1, &4), (2, &6)]
     );
@@ -240,7 +240,7 @@ fn list_index_proof(db: Box<Database>) {
     assert_eq!(
         index
             .get_range_proof(0, 3)
-            .validate(index.root_hash(), index.len())
+            .validate(index.merkle_root(), index.len())
             .unwrap(),
         [(0, &2), (1, &4), (2, &6)]
     );
@@ -256,7 +256,7 @@ fn randomly_generate_proofs(db: Box<Database>) {
         index.push(value.clone());
     }
     index.get(0);
-    let table_root_hash = index.root_hash();
+    let table_merkle_root = index.merkle_root();
 
     for _ in 0..50 {
         let start_range = rng.gen_range(0, num_values);
@@ -264,7 +264,7 @@ fn randomly_generate_proofs(db: Box<Database>) {
         let range_proof = index.get_range_proof(start_range, end_range);
         {
             let (indices, actual_values): (Vec<_>, Vec<_>) = range_proof
-                .validate(table_root_hash, index.len())
+                .validate(table_merkle_root, index.len())
                 .unwrap()
                 .into_iter()
                 .unzip();
@@ -277,7 +277,7 @@ fn randomly_generate_proofs(db: Box<Database>) {
         }
 
         let _proof_info = ProofInfo {
-            root_hash: table_root_hash,
+            merkle_root: table_merkle_root,
             list_length: index.len(),
             proof: &range_proof,
             range_st: start_range,
@@ -293,7 +293,7 @@ fn randomly_generate_proofs(db: Box<Database>) {
 fn index_and_proof_roots(db: Box<Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
-    assert_eq!(index.root_hash(), Hash::zero());
+    assert_eq!(index.merkle_root(), Hash::zero());
 
     let h1 = hash(&[1, 2]);
     let h2 = hash(&[2, 3]);
@@ -341,11 +341,11 @@ fn index_and_proof_roots(db: Box<Database>) {
     for (inserted, exp_root, proof_ind) in expected_hash_comb {
         index.push(inserted);
 
-        assert_eq!(index.root_hash(), exp_root);
+        assert_eq!(index.merkle_root(), exp_root);
         let range_proof = index.get_range_proof(proof_ind, proof_ind + 1);
         assert_eq!(
             range_proof
-                .validate(index.root_hash(), index.len())
+                .validate(index.merkle_root(), index.len())
                 .unwrap()
                 .len(),
             1
@@ -356,7 +356,7 @@ fn index_and_proof_roots(db: Box<Database>) {
         let range_proof = index.get_range_proof(0, proof_ind + 1);
         assert_eq!(
             range_proof
-                .validate(index.root_hash(), index.len())
+                .validate(index.merkle_root(), index.len())
                 .unwrap()
                 .len(),
             (proof_ind + 1) as usize
@@ -367,7 +367,7 @@ fn index_and_proof_roots(db: Box<Database>) {
         let range_proof = index.get_range_proof(0, 1);
         assert_eq!(
             range_proof
-                .validate(index.root_hash(), index.len())
+                .validate(index.merkle_root(), index.len())
                 .unwrap()
                 .len(),
             1
@@ -379,7 +379,7 @@ fn index_and_proof_roots(db: Box<Database>) {
 
     let range_proof = index.get_range_proof(0, 8);
     let (indices, val_refs): (Vec<_>, Vec<_>) = range_proof
-        .validate(index.root_hash(), index.len())
+        .validate(index.merkle_root(), index.len())
         .unwrap()
         .into_iter()
         .unzip();
@@ -402,7 +402,7 @@ fn index_and_proof_roots(db: Box<Database>) {
     let mut range_proof = index.get_range_proof(3, 5);
     assert_eq!(
         range_proof
-            .validate(index.root_hash(), index.len())
+            .validate(index.merkle_root(), index.len())
             .unwrap()
             .len(),
         2
@@ -410,7 +410,7 @@ fn index_and_proof_roots(db: Box<Database>) {
     range_proof = index.get_range_proof(2, 6);
     assert_eq!(
         range_proof
-            .validate(index.root_hash(), index.len())
+            .validate(index.merkle_root(), index.len())
             .unwrap()
             .len(),
         4
@@ -446,7 +446,7 @@ fn proof_illegal_range(db: Box<Database>) {
 fn proof_structure(db: Box<Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
-    assert_eq!(index.root_hash(), Hash::zero());
+    assert_eq!(index.merkle_root(), Hash::zero());
 
     // spell-checker:ignore upup
 
@@ -466,7 +466,7 @@ fn proof_structure(db: Box<Database>) {
         index.push(vec![i, i + 1, i + 2]);
     }
 
-    assert_eq!(index.root_hash(), h12345);
+    assert_eq!(index.merkle_root(), h12345);
     let range_proof = index.get_range_proof(4, 5);
 
     assert_eq!(
@@ -494,7 +494,7 @@ fn proof_structure(db: Box<Database>) {
     }
 }
 
-fn simple_root_hash(db: Box<Database>) {
+fn simple_merkle_root(db: Box<Database>) {
     let h1 = hash(&[1]);
     let h2 = hash(&[2]);
 
@@ -502,13 +502,13 @@ fn simple_root_hash(db: Box<Database>) {
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
     assert_eq!(index.get(0), None);
     index.push(vec![1]);
-    assert_eq!(index.root_hash(), h1);
+    assert_eq!(index.merkle_root(), h1);
 
     index.set(0, vec![2]);
-    assert_eq!(index.root_hash(), h2);
+    assert_eq!(index.merkle_root(), h2);
 }
 
-fn same_root_hash(db1: Box<Database>, db2: Box<Database>) {
+fn same_merkle_root(db1: Box<Database>, db2: Box<Database>) {
     let mut fork1 = db1.fork();
 
     let mut i1 = ProofListIndex::new(IDX_NAME, &mut fork1);
@@ -530,12 +530,12 @@ fn same_root_hash(db1: Box<Database>, db2: Box<Database>) {
     i2.push(vec![5]);
     i2.push(vec![1]);
 
-    assert_eq!(i1.root_hash(), i2.root_hash());
+    assert_eq!(i1.merkle_root(), i2.merkle_root());
 }
 
 #[derive(Serialize)]
 struct ProofInfo<'a, V: Serialize + 'a> {
-    root_hash: Hash,
+    merkle_root: Hash,
     list_length: u64,
     proof: &'a ListProof<V>,
     range_st: u64,
@@ -635,22 +635,22 @@ mod memorydb_tests {
     }
 
     #[test]
-    fn test_simple_root_hash() {
+    fn test_simple_merkle_root() {
         let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
         let path = dir.path();
         let db = create_database(path);
-        super::simple_root_hash(db);
+        super::simple_merkle_root(db);
     }
 
     #[test]
-    fn test_same_root_hash() {
+    fn test_same_merkle_root() {
         let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
         let path1 = dir1.path();
         let db1 = create_database(path1);
         let dir2 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
         let path2 = dir2.path();
         let db2 = create_database(path2);
-        super::same_root_hash(db1, db2);
+        super::same_merkle_root(db1, db2);
     }
 }
 
@@ -749,21 +749,21 @@ mod rocksdb_tests {
     }
 
     #[test]
-    fn test_simple_root_hash() {
+    fn test_simple_merkle_root() {
         let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
         let path = dir.path();
         let db = create_database(path);
-        super::simple_root_hash(db);
+        super::simple_merkle_root(db);
     }
 
     #[test]
-    fn test_same_root_hash() {
+    fn test_same_merkle_root() {
         let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
         let path1 = dir1.path();
         let db1 = create_database(path1);
         let dir2 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
         let path2 = dir2.path();
         let db2 = create_database(path2);
-        super::same_root_hash(db1, db2);
+        super::same_merkle_root(db1, db2);
     }
 }

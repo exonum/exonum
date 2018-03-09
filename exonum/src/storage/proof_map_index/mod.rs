@@ -260,7 +260,7 @@ where
         Some(res)
     }
 
-    /// Returns the root hash of the proof map or default hash value if it is empty.
+    /// Returns the Merkle root hash of the proof map or default hash value if it is empty.
     ///
     /// # Examples
     ///
@@ -273,14 +273,14 @@ where
     /// let mut fork = db.fork();
     /// let mut index = ProofMapIndex::new(name, &mut fork);
     ///
-    /// let default_hash = index.root_hash();
+    /// let default_hash = index.merkle_root();
     /// assert_eq!(Hash::default(), default_hash);
     ///
     /// index.put(&default_hash, 100);
-    /// let hash = index.root_hash();
+    /// let hash = index.merkle_root();
     /// assert_ne!(hash, default_hash);
     /// ```
-    pub fn root_hash(&self) -> Hash {
+    pub fn merkle_root(&self) -> Hash {
         match self.get_root_node() {
             Some((k, Node::Leaf(v))) => {
                 HashStream::new()
@@ -926,18 +926,18 @@ impl<V: StorageValue + fmt::Debug> ProofMapIndexEntry<V> {
         T: AsRef<Snapshot>,
         K: ProofMapKey,
     {
-        let root_hash = index.root_hash();
+        let merkle_root = index.merkle_root();
         match root_node {
             Node::Leaf(value) => ProofMapIndexEntry::Leaf {
                 key: root_prefix,
-                hash: root_hash,
+                hash: merkle_root,
                 value,
             },
             Node::Branch(branch) => {
                 let left = Box::new(Self::child_node(index, &branch, ChildKind::Left));
                 let right = Box::new(Self::child_node(index, &branch, ChildKind::Right));
                 ProofMapIndexEntry::Branch {
-                    hash: root_hash,
+                    hash: merkle_root,
                     prefix: root_prefix,
                     left,
                     right,

@@ -102,8 +102,8 @@ pub enum BranchProofNode<V> {
 }
 
 impl<V: StorageValue> MapProof<V> {
-    /// Returns root hash of the map proof.
-    pub fn root_hash(&self) -> Hash {
+    /// Returns Merkle root hash of the map proof.
+    pub fn merkle_root(&self) -> Hash {
         use self::MapProof::*;
         match *self {
             Empty => Hash::zero(),
@@ -119,22 +119,22 @@ impl<V: StorageValue> MapProof<V> {
                     .update(root_val_hash.as_ref())
                     .hash()
             }
-            Branch(ref branch) => branch.root_hash(),
+            Branch(ref branch) => branch.merkle_root(),
         }
     }
 }
 impl<V: StorageValue> ProofNode<V> {
-    fn root_hash(&self) -> Hash {
+    fn merkle_root(&self) -> Hash {
         use self::ProofNode::*;
         match *self {
             Leaf(ref val) => val.hash(),
-            Branch(ref branch) => branch.root_hash(),
+            Branch(ref branch) => branch.merkle_root(),
         }
     }
 }
 
 impl<V: StorageValue> BranchProofNode<V> {
-    fn root_hash(&self) -> Hash {
+    fn merkle_root(&self) -> Hash {
         use self::BranchProofNode::*;
         match *self {
             BranchKeyNotFound {
@@ -157,7 +157,7 @@ impl<V: StorageValue> BranchProofNode<V> {
                 ref right_key,
             } => {
                 HashStream::new()
-                    .update(left_node.root_hash().as_ref())
+                    .update(left_node.merkle_root().as_ref())
                     .update(right_hash.as_ref())
                     .update(left_key.as_bytes())
                     .update(right_key.as_bytes())
@@ -171,7 +171,7 @@ impl<V: StorageValue> BranchProofNode<V> {
             } => {
                 HashStream::new()
                     .update(left_hash.as_ref())
-                    .update(right_node.root_hash().as_ref())
+                    .update(right_node.merkle_root().as_ref())
                     .update(left_key.as_bytes())
                     .update(right_key.as_bytes())
                     .hash()
@@ -276,7 +276,11 @@ impl<V: fmt::Debug + StorageValue> MapProof<V> {
     /// If the proof is valid and the requested key exists, `Ok(Some(&V))` is returned.
     /// If the proof is valid and the requested key does not exists, `Ok(None)` is returned.
     /// If the proof is invalid, `Err` is returned.
-    pub fn validate<K: ProofMapKey>(&self, key: &K, root_hash: Hash) -> Result<Option<&V>, Error> {
+    pub fn validate<K: ProofMapKey>(
+        &self,
+        key: &K,
+        merkle_root: Hash,
+    ) -> Result<Option<&V>, Error> {
         let searched_key = ProofPath::new(key);
         use self::MapProof::*;
 
@@ -309,12 +313,12 @@ impl<V: fmt::Debug + StorageValue> MapProof<V> {
             }
             Branch(ref branch) => branch.validate(&searched_key)?,
         };
-        let proof_hash = self.root_hash();
-        if proof_hash != root_hash {
+        let proof_hash = self.merkle_root();
+        if proof_hash != merkle_root {
             return Err(Error::new(format!(
                 "The proof doesn't match the expected hash! \
                  Expected: {:?} , from proof: {:?}",
-                root_hash,
+                merkle_root,
                 proof_hash
             )));
         }
