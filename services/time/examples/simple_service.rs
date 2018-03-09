@@ -56,7 +56,7 @@ impl<T: AsRef<Snapshot>> MarkerSchema<T> {
 
     /// Returns hashes for stored table.
     pub fn state_hash(&self) -> Vec<Hash> {
-        vec![self.marks().root_hash()]
+        vec![self.marks().merkle_root()]
     }
 }
 

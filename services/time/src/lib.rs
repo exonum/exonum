@@ -83,7 +83,7 @@ impl<T: AsRef<Snapshot>> TimeSchema<T> {
 
     /// Returns hashes for stored tables.
     pub fn state_hash(&self) -> Vec<Hash> {
-        vec![self.validators_times().root_hash(), self.time().hash()]
+        vec![self.validators_times().merkle_root(), self.time().hash()]
     }
 }
 

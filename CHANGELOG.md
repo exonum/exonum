@@ -12,6 +12,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - POST-requests are now handled with `bodyparser` crate,
   so all the parameters must be passed in the body.
 
+- `ProofListIndex` and `ProofMapIndex` `root_hash` method has been renamed to
+  `merkle_root`.
+
 ### New features
 
 #### Exonum core

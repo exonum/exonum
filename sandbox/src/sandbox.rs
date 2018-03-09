@@ -494,10 +494,10 @@ impl Sandbox {
         schema.get_proof_to_service_table(service_id, table_idx)
     }
 
-    pub fn get_configs_root_hash(&self) -> Hash {
+    pub fn get_configs_merkle_root(&self) -> Hash {
         let snapshot = self.blockchain_ref().snapshot();
         let schema = Schema::new(&snapshot);
-        schema.configs().root_hash()
+        schema.configs().merkle_root()
     }
 
     pub fn cfg(&self) -> StoredConfiguration {
