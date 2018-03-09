@@ -82,10 +82,10 @@
 
                 this.isSpinnerVisible = true;
 
-                // this.auth.setUser({
-                //     publicKey: this.publicKey,
-                //     secretKey: this.secretKey
-                // });
+                Vue.storage.set({
+                    publicKey: this.publicKey,
+                    secretKey: this.secretKey
+                });
 
                 this.$router.push({name: 'user'});
             },
@@ -138,7 +138,7 @@
                 this.isModalVisible = false;
             },
             proceed: function() {
-                // this.auth.setUser(this.keyPair);
+                Vue.storage.set(this.keyPair);
 
                 this.$router.push({name: 'user'});
             }

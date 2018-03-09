@@ -1,6 +1,15 @@
 const Vue = require('vue');
 const router = require('./router');
+const Storage = require('./plugins/storage');
+const Validate = require('./plugins/validate');
+const Notify = require('./plugins/notify');
+const axios = require('./plugins/axios');
 const App = require('./App.vue');
+
+Vue.use(Storage);
+Vue.use(Validate);
+Vue.use(Notify);
+Vue.use(axios);
 
 Vue.mixin({
     data: function() {
