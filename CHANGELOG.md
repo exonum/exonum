@@ -18,16 +18,17 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum-configuration
 
 - `majority_count: Option<u16>` configuration parameter is introduced.
-  Allows to increase the threshold amount of votes required to commit a new configuration
-  proposal. By default the number of votes is calculated as 2/3 + 1 of total validators
-  count.
+  Allows to increase the threshold amount of votes required to commit
+  a new configuration proposal. By default the number of votes is calculated
+  as 2/3 + 1 of total validators count. (#546)
 
 ### New features
 
 #### Exonum core
 
-- New `database` field added to the `NodeConfig`. This optional setting adjusts
-  database-specific settings, like number of simultaneously opened files. (#538)
+- New `database` field added to the `NodeConfig`.
+  This optional setting adjusts database-specific settings,
+  like number of simultaneously opened files. (#538)
 
 - `exonum::explorer` module moved to the `exonum::api::public` (#550)
 
@@ -35,7 +36,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
   - Rename imports like `exonum::explorer::*` to the `exonum::api::public::*`.
 
-- Added `v1/user_agent` endpoint with information about Exonum, Rust and OS versions. (#548)
+- Added `v1/user_agent` endpoint with information about Exonum, Rust
+  and OS versions. (#548)
 
 ## 0.6 - 2018-03-06
 
