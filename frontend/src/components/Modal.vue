@@ -55,3 +55,9 @@
         }
     };
 </script>
+
+<style>
+    .modal-backdrop {
+        opacity: 0.25;
+    }
+</style>

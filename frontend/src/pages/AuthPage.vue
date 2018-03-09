@@ -36,11 +36,11 @@
             <div class="alert alert-warning" role="alert">Save the key pair in a safe place. You will need it to log in to the demo next time.</div>
             <div class="form-group">
                 <label>Public key:</label>
-                <div><code>{{ publicKey }}</code></div>
+                <div><code>{{ keyPair.publicKey }}</code></div>
             </div>
             <div class="form-group">
                 <label>Secret key:</label>
-                <div><code>{{ secretKey }}</code></div>
+                <div><code>{{ keyPair.secretKey }}</code></div>
             </div>
         </modal>
 
@@ -50,6 +50,7 @@
 
 <script>
     const Vue = require('vue');
+    const Exonum = require('exonum-client');
     const Tab = require('../components/Tab.vue');
     const Tabs = require('../components/Tabs.vue');
     const Modal = require('../components/Modal.vue');
@@ -65,7 +66,8 @@
         data: function() {
             return {
                 isModalVisible: false,
-                isSpinnerVisible: false
+                isSpinnerVisible: false,
+                keyPair: {}
             }
         },
         methods: {
@@ -88,52 +90,49 @@
                 this.$router.push({name: 'user'});
             },
             register: function() {
-                // this.keyPair = Exonum.keyPair();
-                //
-                // this.toggleLoading(true);
-                //
-                // var TxCreateWallet = Exonum.newMessage({
-                //     size: 40,
-                //     network_id: this.NETWORK_ID,
-                //     protocol_version: this.PROTOCOL_VERSION,
-                //     service_id: this.SERVICE_ID,
-                //     message_id: this.TX_WALLET_ID,
-                //     fields: {
-                //         pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-                //         name: {type: Exonum.String, size: 8, from: 32, to: 40}
-                //     }
-                // });
-                //
-                // var data = {
-                //     pub_key: this.keyPair.publicKey,
-                //     name: this.name
-                // };
-                //
-                // var signature = TxCreateWallet.sign(this.keyPair.secretKey, data);
-                //
-                // $.ajax({
-                //     method: 'POST',
-                //     url: '/api/services/cryptocurrency/v1/wallets/transaction',
-                //     contentType: 'application/json; charset=utf-8',
-                //     data: JSON.stringify({
-                //         body: data,
-                //         network_id: 0,
-                //         protocol_version: 0,
-                //         service_id: 128,
-                //         message_id: 130,
-                //         signature: signature
-                //     }),
-                //     success: function() {
-                //         self.toggleLoading(false);
-                //
-                //         $('#proceedModal').modal('show');
-                //     },
-                //     error: function(jqXHR, textStatus, errorThrown) {
-                //         self.toggleLoading(false);
-                //
-                //         self.notify('error', errorThrown.toString());
-                //     }
-                // });
+                const self = this;
+
+                if (!this.name) {
+                    return Vue.notify('error', 'The name is a required field');
+                }
+
+                this.keyPair = Exonum.keyPair();
+
+                this.isSpinnerVisible = true;
+
+                const TxCreateWallet = Exonum.newMessage({
+                    size: 40,
+                    network_id: this.NETWORK_ID,
+                    protocol_version: this.PROTOCOL_VERSION,
+                    service_id: this.SERVICE_ID,
+                    message_id: this.TX_WALLET_ID,
+                    fields: {
+                        pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
+                        name: {type: Exonum.String, size: 8, from: 32, to: 40}
+                    }
+                });
+
+                const data = {
+                    pub_key: this.keyPair.publicKey,
+                    name: this.name
+                };
+
+                const signature = TxCreateWallet.sign(this.keyPair.secretKey, data);
+
+                this.$http.post('/api/services/cryptocurrency/v1/wallets/transaction', {
+                    body: data,
+                    network_id: 0,
+                    protocol_version: 0,
+                    service_id: 128,
+                    message_id: 130,
+                    signature: signature
+                }).then(function() {
+                    self.isSpinnerVisible = false;
+                    self.isModalVisible = true;
+                }).catch(function(error) {
+                    self.isSpinnerVisible = false;
+                    Vue.notify('error', error.toString());
+                });
             },
             closeModal: function() {
                 this.isModalVisible = false;
