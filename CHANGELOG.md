@@ -15,6 +15,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `ProofListIndex` and `ProofMapIndex` `root_hash` method has been renamed to
   `merkle_root`.
 
+- `exonum::explorer` module moved to the `exonum::api::public` (#550)
+
+  Migration Path:
+
+  - Rename imports like `exonum::explorer::*` to the `exonum::api::public::*`.
+
 ## 0.6 - 2018-03-06
 
 ### Breaking changes
