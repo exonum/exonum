@@ -9,23 +9,26 @@ module.exports = function(grunt) {
         },
         watch: {
             scripts: {
-                files: ['./tags/**/*.tag'],
-                tasks: ['riot'],
+                files: ['./src/**/*.*'],
+                tasks: ['browserify'],
                 options: {
                     spawn: false
                 }
             }
         },
-        riot: {
+        browserify: {
             options: {
-                concat: true
+                transform: [
+                    ['vueify'],
+                    ['babelify', {presets: 'es2015'}]
+                ]
             },
             dist: {
-                src: 'tags/*.tag',
-                dest: 'dist/app.js'
+                src: './src/app.js',
+                dest: './dist/build.js'
             }
         }
     });
 
-    grunt.registerTask('default', ['clean', 'riot']);
+    grunt.registerTask('default', ['clean', 'browserify']);
 };
