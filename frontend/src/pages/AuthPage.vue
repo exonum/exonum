@@ -89,6 +89,7 @@
 
                 this.$router.push({name: 'user'});
             },
+
             register: function() {
                 const self = this;
 
@@ -120,12 +121,12 @@
                 const signature = TxCreateWallet.sign(this.keyPair.secretKey, data);
 
                 this.$http.post('/api/services/cryptocurrency/v1/wallets/transaction', {
-                    body: data,
-                    network_id: 0,
-                    protocol_version: 0,
-                    service_id: 128,
-                    message_id: 130,
-                    signature: signature
+                    network_id: this.NETWORK_ID,
+                    protocol_version: this.PROTOCOL_VERSION,
+                    service_id: this.SERVICE_ID,
+                    message_id: this.TX_WALLET_ID,
+                    signature: signature,
+                    body: data
                 }).then(function() {
                     self.isSpinnerVisible = false;
                     self.isModalVisible = true;
@@ -134,9 +135,11 @@
                     Vue.notify('error', error.toString());
                 });
             },
+
             closeModal: function() {
                 this.isModalVisible = false;
             },
+
             proceed: function() {
                 Vue.storage.set(this.keyPair);
 
