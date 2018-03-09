@@ -46,7 +46,7 @@ pub struct StoredConfiguration {
     pub validator_keys: Vec<ValidatorKeys>,
     /// Consensus algorithm parameters.
     pub consensus: ConsensusConfig,
-    /// Number of votes to commit configuration.
+    /// Number of votes required to commit new configuration.
     /// Should be greater than 2/3 and less or equal to the validators count.
     pub majority_count: Option<u16>,
     /// Services specific variables.
