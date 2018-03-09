@@ -4,18 +4,8 @@
             <div class="row justify-content-sm-center">
                 <div class="col-md-6 col-md-offset-3">
                     <h1 class="mt-5 mb-4">Authorization</h1>
-
-                    <ul class="nav nav-tabs mb-4">
-                        <li class="nav-item">
-                            <a class="nav-link active" href="#login" data-toggle="tab">Log in</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="#register" data-toggle="tab">Register</a>
-                        </li>
-                    </ul>
-
-                    <div class="tab-content">
-                        <div class="tab-pane fade show active" id="login">
+                    <tabs>
+                        <tab title="Log in" v-bind:isActive="true">
                             <form v-on:submit.prevent="login">
                                 <div class="form-group">
                                     <label class="control-label">Public key:</label>
@@ -27,9 +17,8 @@
                                 </div>
                                 <button type="submit" class="btn btn-lg btn-block btn-primary">Log in</button>
                             </form>
-                        </div>
-
-                        <div class="tab-pane fade" id="register">
+                        </tab>
+                        <tab title="Register">
                             <form v-on:submit.prevent="register">
                                 <div class="form-group">
                                     <label class="control-label">Name:</label>
@@ -37,8 +26,8 @@
                                 </div>
                                 <button type="submit" class="btn btn-lg btn-block btn-primary">Register</button>
                             </form>
-                        </div>
-                    </div>
+                        </tab>
+                    </tabs>
                 </div>
             </div>
         </div>
@@ -61,11 +50,15 @@
 
 <script>
     const Vue = require('vue');
+    const Tab = require('../components/Tab.vue');
+    const Tabs = require('../components/Tabs.vue');
     const Modal = require('../components/Modal.vue');
     const Spinner = require('../components/Spinner.vue');
 
     module.exports = {
         components: {
+            Tab,
+            Tabs,
             Modal,
             Spinner
         },
