@@ -46,7 +46,7 @@ impl DbOptions {
     fn to_rocksdb(&self) -> RocksDbOptions {
         let mut defaults = RocksDbOptions::default();
         defaults.create_if_missing(self.create_if_missing);
-        defaults.set_max_open_files(self.max_open_files);
+        defaults.set_max_open_files(self.max_open_files.unwrap_or(-1));
         defaults
     }
 }

@@ -47,7 +47,6 @@ tcp_connect_max_retries = 10
 
 [database]
 create_if_missing = true
-max_open_files = -1
 
 [whitelist]
 whitelist_enabled = false

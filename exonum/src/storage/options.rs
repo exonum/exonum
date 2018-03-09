@@ -19,8 +19,8 @@
 pub struct DbOptions {
     /// Number of open files that can be used by the DB.
     ///
-    /// Defaults to `-1`, which means opened files are always kept open.
-    pub max_open_files: i32,
+    /// Defaults to `None`, which means opened files are always kept open.
+    pub max_open_files: Option<i32>,
     /// Whether create database or not, if it's missing.
     ///
     /// Defaults to `true`.
@@ -30,7 +30,7 @@ pub struct DbOptions {
 impl Default for DbOptions {
     fn default() -> Self {
         Self {
-            max_open_files: -1,
+            max_open_files: None,
             create_if_missing: true,
         }
     }
