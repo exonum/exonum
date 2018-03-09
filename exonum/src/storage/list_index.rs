@@ -565,13 +565,12 @@ mod tests {
     mod rocksdb_tests {
         use std::path::Path;
         use tempdir::TempDir;
-        use storage::{Database, ListIndex, RocksDB, RocksDBOptions};
+        use storage::{Database, ListIndex, RocksDB, DbOptions};
 
         const IDX_NAME: &'static str = "idx_name";
 
         fn create_database(path: &Path) -> Box<Database> {
-            let mut opts = RocksDBOptions::default();
-            opts.create_if_missing(true);
+            let opts = DbOptions::default();
             Box::new(RocksDB::open(path, &opts).unwrap())
         }
 

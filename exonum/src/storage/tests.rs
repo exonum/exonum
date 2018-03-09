@@ -194,11 +194,10 @@ mod memorydb_tests {
 mod rocksdb_tests {
     use std::path::Path;
     use tempdir::TempDir;
-    use super::super::{RocksDB, RocksDBOptions};
+    use super::super::{RocksDB, DbOptions};
 
     fn rocksdb_database(path: &Path) -> RocksDB {
-        let mut options = RocksDBOptions::default();
-        options.create_if_missing(true);
+        let options = DbOptions::default();
         RocksDB::open(path, &options).unwrap()
     }
 
