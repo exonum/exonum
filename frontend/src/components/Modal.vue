@@ -22,7 +22,7 @@
             </div>
         </div>
 
-        <div v-if="visible" class="modal-backdrop fade show"/>
+        <div v-if="visible" class="modal-backdrop fade show"></div>
     </div>
 </template>
 

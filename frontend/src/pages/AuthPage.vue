@@ -54,26 +54,29 @@
                 <div><code>{{ secretKey }}</code></div>
             </div>
         </modal>
+
+        <spinner v-bind:visible="isSpinnerVisible"></spinner>
     </div>
 </template>
 
 <script>
     const Vue = require('vue');
     const Modal = require('../components/Modal.vue');
+    const Spinner = require('../components/Spinner.vue');
 
     module.exports = {
         components: {
-            Modal
+            Modal,
+            Spinner
         },
         data: function() {
             return {
-                isModalVisible: false
+                isModalVisible: false,
+                isSpinnerVisible: false
             }
         },
         methods: {
             login: function() {
-                this.isModalVisible = true;
-
                 if (!Vue.validateHexString(this.publicKey)) {
                     return Vue.notify('error', 'Invalid public key is passed');
                 }
@@ -82,8 +85,8 @@
                     return Vue.notify('error', 'Invalid secret key is passed');
                 }
 
-                // this.toggleLoading(true);
-                //
+                this.isSpinnerVisible = true;
+
                 // this.auth.setUser({
                 //     publicKey: this.publicKey,
                 //     secretKey: this.secretKey
