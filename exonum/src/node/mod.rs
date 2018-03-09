@@ -44,7 +44,7 @@ use events::{HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkC
              NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest};
 use events::error::{into_other, log_error, other_error, LogError};
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
-use storage::Database;
+use storage::{Database, DbOptions};
 
 pub use self::state::{RequestData, State, TxPool, ValidatorState};
 pub use self::whitelist::Whitelist;
@@ -343,6 +343,8 @@ pub struct NodeConfig {
     pub mempool: MemoryPoolConfig,
     /// Additional config, usable for services.
     pub services_configs: BTreeMap<String, Value>,
+    /// Optional database configuration.
+    pub database: Option<DbOptions>,
 }
 
 /// Configuration for the `NodeHandler`.

@@ -788,11 +788,10 @@ mod memorydb_tests {
 mod rocksdb_tests {
     use std::path::Path;
     use tempdir::TempDir;
-    use storage::{Database, RocksDB, RocksDBOptions};
+    use storage::{Database, RocksDB, DbOptions};
 
     fn create_database(path: &Path) -> Box<Database> {
-        let mut opts = RocksDBOptions::default();
-        opts.create_if_missing(true);
+        let opts = DbOptions::default();
         Box::new(RocksDB::open(path, &opts).unwrap())
     }
 

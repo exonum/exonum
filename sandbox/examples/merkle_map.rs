@@ -37,8 +37,8 @@ fn create_database(path: &str) -> Box<Database> {
 #[cfg(feature = "rocksdb")]
 fn create_database(path: &str) -> Box<Database> {
     use std::path::Path;
-    use exonum::storage::{RocksDB, RocksDBOptions};
-    let mut opts = RocksDBOptions::default();
+    use exonum::storage::{RocksDB, DbOptions};
+    let mut opts = DbOptions::default();
     opts.create_if_missing(true);
     Box::new(RocksDB::open(Path::new(path), opts).unwrap())
 }

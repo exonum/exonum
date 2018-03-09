@@ -29,7 +29,7 @@ use blockchain::config::ValidatorKeys;
 use helpers::generate_testnet_config;
 use helpers::config::ConfigFile;
 use node::{NodeApiConfig, NodeConfig};
-use storage::Database;
+use storage::{Database, RocksDB, DbOptions};
 use crypto;
 use super::internal::{CollectedCommand, Command, Feedback};
 use super::{Argument, CommandName, Context};
@@ -52,16 +52,12 @@ impl Run {
     }
 
     /// Returns created database instance.
-    pub fn db_helper(ctx: &Context) -> Box<Database> {
-        use storage::{RocksDB, RocksDBOptions};
-
+    pub fn db_helper(ctx: &Context, options: &DbOptions) -> Box<Database> {
         let path = ctx.arg::<String>(DATABASE_PATH).expect(&format!(
             "{} not found.",
             DATABASE_PATH
         ));
-        let mut options = RocksDBOptions::default();
-        options.create_if_missing(true);
-        Box::new(RocksDB::open(Path::new(&path), &options).unwrap())
+        Box::new(RocksDB::open(Path::new(&path), options).unwrap())
     }
 
     fn node_config(ctx: &Context) -> NodeConfig {
@@ -585,6 +581,7 @@ impl Command for Finalize {
                 },
                 mempool: Default::default(),
                 services_configs: Default::default(),
+                database: Some(Default::default()),
             }
         };
 

@@ -19,6 +19,15 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### Exonum core
 
+- New `database` field added to the `NodeConfig`. This optional setting adjusts
+  database-specific settings, like number of simultaneously opened files.
+
+- `exonum::explorer` module moved to the `exonum::api::public` (#550)
+
+  Migration Path:
+
+  - Rename imports like `exonum::explorer::*` to the `exonum::api::public::*`.
+
 - Added `v1/user_agent` endpoint with information about Exonum, Rust and OS versions.
 
 ## 0.6 - 2018-03-06
