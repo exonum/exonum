@@ -15,6 +15,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `ProofListIndex` and `ProofMapIndex` `root_hash` method has been renamed to
   `merkle_root`.
 
+#### exonum-configuration
+
+- `majority_count: Option<u16>` configuration parameter is introduced.
+  It allows increasing the number of votes for configuration proposal necessary for commit.
+
 ## 0.6 - 2018-03-06
 
 ### Breaking changes
