@@ -70,10 +70,10 @@ impl NodeBuilder {
     pub fn parse_cmd(self) -> Option<Node> {
         match ClapBackend::execute(&self.commands) {
             Feedback::RunNode(ref ctx) => {
-                let db = Run::db_helper(ctx);
                 let config = ctx.get(keys::NODE_CONFIG).expect(
                     "could not find node_config",
                 );
+                let db = Run::db_helper(ctx, &config.database.unwrap_or_default());
                 let services: Vec<Box<Service>> = self.service_factories
                     .into_iter()
                     .map(|mut factory| factory.make_service(ctx))

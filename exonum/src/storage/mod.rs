@@ -113,7 +113,8 @@ pub use self::error::Error;
 pub use self::db::{Database, Snapshot, Fork, Patch, PatchIterator, Change, Changes,
                    ChangesIterator, Iterator, Iter};
 
-pub use self::rocksdb::{RocksDB, RocksDBOptions};
+pub use self::options::DbOptions;
+pub use self::rocksdb::RocksDB;
 pub use self::memorydb::MemoryDB;
 
 pub use self::keys::StorageKey;
@@ -135,6 +136,7 @@ pub type Result<T> = ::std::result::Result<T, Error>;
 
 mod error;
 mod db;
+mod options;
 mod rocksdb;
 mod memorydb;
 

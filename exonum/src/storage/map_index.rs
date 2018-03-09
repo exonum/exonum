@@ -584,9 +584,8 @@ mod tests {
         use tempdir::TempDir;
 
         fn create_database(path: &Path) -> Box<Database> {
-            use storage::{RocksDB, RocksDBOptions};
-            let mut opts = RocksDBOptions::default();
-            opts.create_if_missing(true);
+            use storage::{RocksDB, DbOptions};
+            let opts = DbOptions::default();
             Box::new(RocksDB::open(path, &opts).unwrap())
         }
 
