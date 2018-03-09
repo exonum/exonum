@@ -194,6 +194,7 @@ impl Blockchain {
             validator_keys: cfg.validator_keys,
             consensus: cfg.consensus,
             services: BTreeMap::new(),
+            majority_count: None,
         };
 
         let patch = {
