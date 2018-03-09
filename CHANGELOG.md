@@ -19,6 +19,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   `new_in_family`. Now it uses `index_id` instead of prefixes. Moreover,
   `blockchain::gen_prefix` method has been removed. Instead, any type that
   implements `StorageKey` trait, can serve as an `index_id`. (#531)
+  
+- Transaction pool are now collected in storage instead of memory. (#549)
 
 #### exonum-configuration
 

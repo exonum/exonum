@@ -616,14 +616,13 @@ fn panic_description(any: &Box<Any + Send>) -> Option<String> {
 mod tests {
     use futures::sync::mpsc;
 
-    use std::collections::BTreeMap;
     use std::sync::Mutex;
     use std::panic;
 
     use super::*;
     use crypto;
-    use blockchain::Blockchain;
-    use storage::{Database, MemoryDB, Entry};
+    use blockchain::{Service, Schema, Blockchain};
+    use storage::{Snapshot, Database, MemoryDB, Entry};
     use node::ApiSender;
     use helpers::{ValidatorId, Height};
 
@@ -743,7 +742,7 @@ mod tests {
         ];
 
         let (_, sec_key) = crypto::gen_keypair();
-        let (blockchain, mut pool) = create_blockchain();
+        let mut blockchain = create_blockchain();
         let db = Box::new(MemoryDB::new());
 
         for (index, status) in statuses.iter().enumerate() {
@@ -752,17 +751,21 @@ mod tests {
             *EXECUTION_STATUS.lock().unwrap() = status.clone();
 
             let transaction = TxResult::new(index, &sec_key);
-            pool.insert(
-                transaction.hash(),
-                Box::new(transaction.clone()) as Box<Transaction>,
-            );
+            let hash = transaction.hash();
+            {
+                let mut fork = blockchain.fork();
+                {
+                    let mut schema = Schema::new(&mut fork);
+                    schema.transactions_mut().put(
+                        &hash,
+                        transaction.raw().clone(),
+                    );
+                    schema.transactions_pool_mut().insert(hash);
+                }
+                blockchain.merge(fork.into_patch()).unwrap();
+            }
 
-            let (_, patch) = blockchain.create_patch(
-                ValidatorId::zero(),
-                Height(index),
-                &[transaction.hash()],
-                &pool,
-            );
+            let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(index), &[hash]);
 
             db.merge(patch).unwrap();
 
@@ -808,23 +811,41 @@ mod tests {
         panic::catch_unwind(panic::AssertUnwindSafe(|| panic!(val))).unwrap_err()
     }
 
-    fn create_blockchain() -> (Blockchain, BTreeMap<Hash, Box<Transaction>>) {
+    fn create_blockchain() -> Blockchain {
         let service_keypair = crypto::gen_keypair();
         let api_channel = mpsc::channel(1);
-        (
-            Blockchain::new(
-                MemoryDB::new(),
-                Vec::new(),
-                service_keypair.0,
-                service_keypair.1,
-                ApiSender::new(api_channel.0),
-            ),
-            BTreeMap::new(),
+        Blockchain::new(
+            MemoryDB::new(),
+            vec![Box::new(TxResultService) as Box<Service>],
+            service_keypair.0,
+            service_keypair.1,
+            ApiSender::new(api_channel.0),
         )
+
+    }
+
+    struct TxResultService;
+    impl Service for TxResultService {
+        fn service_id(&self) -> u16 {
+            1
+        }
+
+        fn service_name(&self) -> &'static str {
+            "test service"
+        }
+
+
+        fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+            vec![]
+        }
+
+        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, ::encoding::Error> {
+            Ok(Box::new(TxResult::from_raw(raw)?))
+        }
     }
 
     transactions! {
-        Transactions {
+        TestTx {
             const SERVICE_ID = 1;
 
             struct TxResult {

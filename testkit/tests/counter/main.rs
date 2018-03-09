@@ -23,6 +23,8 @@ extern crate serde_derive;
 extern crate serde_json;
 #[macro_use]
 extern crate pretty_assertions;
+#[macro_use]
+extern crate log;
 
 use exonum::blockchain::Transaction;
 use exonum::crypto::{self, PublicKey, CryptoHash};
@@ -187,7 +189,6 @@ fn test_probe() {
     let snapshot = testkit.probe(other_tx.clone());
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(3));
-
     testkit.create_block();
     let snapshot = testkit.probe(other_tx.clone());
     let schema = CounterSchema::new(&snapshot);

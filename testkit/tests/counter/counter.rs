@@ -13,7 +13,6 @@
 // limitations under the License.
 
 //! Sample counter service.
-
 extern crate bodyparser;
 extern crate iron;
 extern crate router;
@@ -97,6 +96,7 @@ impl Transaction for TxIncrement {
     // This method purposely does not check counter overflow in order to test
     // behavior of panicking transactions.
     fn execute(&self, fork: &mut Fork) -> ExecutionResult {
+        trace!("execute tx {}", self.by());
         if self.by() == 0 {
             Err(ExecutionError::with_description(
                 0,
@@ -144,6 +144,7 @@ struct CounterApi {
 
 impl CounterApi {
     fn increment(&self, req: &mut Request) -> IronResult<Response> {
+        trace!("received increment tx");
         match req.get::<bodyparser::Struct<TxIncrement>>() {
             Ok(Some(transaction)) => {
                 let transaction: Box<Transaction> = Box::new(transaction);

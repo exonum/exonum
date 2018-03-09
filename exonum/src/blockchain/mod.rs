@@ -221,7 +221,7 @@ impl Blockchain {
                 schema.commit_configuration(config_propose);
             };
             self.merge(fork.into_patch())?;
-            self.create_patch(ValidatorId::zero(), Height::zero(), &[], &BTreeMap::new())
+            self.create_patch(ValidatorId::zero(), Height::zero(), &[])
                 .1
         };
         self.merge(patch)?;
@@ -256,7 +256,6 @@ impl Blockchain {
         proposer_id: ValidatorId,
         height: Height,
         tx_hashes: &[Hash],
-        pool: &BTreeMap<Hash, Box<Transaction>>,
     ) -> (Hash, Patch) {
         // Create fork
         let mut fork = self.fork();
@@ -266,11 +265,8 @@ impl Blockchain {
             let last_hash = self.last_hash();
             // Save & execute transactions
             for (index, hash) in tx_hashes.iter().enumerate() {
-                let tx = pool.get(hash).expect(
-                    "BUG: Cannot find transaction in pool.",
-                );
-
-                execute_transaction(tx.as_ref(), height, index, &mut fork);
+                self.execute_transaction(*hash, height, index, &mut fork)
+                    .expect("Transaction not found in database."); // Some trouble with invariants
             }
 
             // Get tx & state hash
@@ -336,6 +332,65 @@ impl Blockchain {
         };
 
         (block_hash, fork.into_patch())
+    }
+
+
+    fn execute_transaction(
+        &self,
+        tx_hash: Hash,
+        height: Height,
+        index: usize,
+        fork: &mut Fork,
+    ) -> Result<(), ::failure::Error> {
+        let tx = {
+            let schema = Schema::new(&fork);
+
+            let tx = schema.transactions().get(&tx_hash).ok_or(format_err!(
+                "BUG: Cannot find transaction in database."
+            ))?;
+
+            self.tx_from_raw(tx).ok_or(format_err!(
+                "BUG: couldn't create tx from raw message"
+            ))?
+        };
+
+        fork.checkpoint();
+
+        let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| tx.execute(fork)));
+
+        let tx_result = match catch_result {
+            Ok(execution_result) => {
+                match execution_result {
+                    Ok(()) => {
+                        fork.commit();
+                    }
+                    Err(ref e) => {
+                        // Unlike panic, transaction failure isn't that rare, so logging the
+                        // whole transaction body is an overkill: it can be relatively big.
+                        info!("{:?} transaction execution failed: {:?}", tx_hash, e);
+                        fork.rollback();
+                    }
+                }
+                execution_result.map_err(TransactionError::from)
+            }
+            Err(err) => {
+                if err.is::<Error>() {
+                    // Continue panic unwind if the reason is StorageError.
+                    panic::resume_unwind(err);
+                }
+                fork.rollback();
+                error!("{:?} transaction execution panicked: {:?}", tx, err);
+                Err(TransactionError::from_panic(&err))
+            }
+        };
+
+        let mut schema = Schema::new(fork);
+        schema.transaction_results_mut().put(&tx_hash, tx_result);
+        schema.transactions_pool_mut().remove(&tx_hash);
+        schema.block_txs_mut(height).push(tx_hash);
+        let location = TxLocation::new(height, index as u64);
+        schema.tx_location_by_tx_hash_mut().put(&tx_hash, location);
+        Ok(())
     }
 
     /// Commits to the storage block that proposes by node `State`.
@@ -498,42 +553,4 @@ impl Clone for Blockchain {
             service_keypair: self.service_keypair.clone(),
         }
     }
-}
-
-fn execute_transaction(tx: &Transaction, height: Height, index: usize, fork: &mut Fork) {
-    fork.checkpoint();
-
-    let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| tx.execute(fork)));
-
-    let tx_hash = tx.hash();
-    let tx_result = match catch_result {
-        Ok(execution_result) => {
-            match execution_result {
-                Ok(()) => fork.commit(),
-                Err(ref e) => {
-                    // Unlike panic, transaction failure isn't that rare, so logging the
-                    // whole transaction body is an overkill: it can be relatively big.
-                    info!("{:?} transaction execution failed: {:?}", tx_hash, e);
-                    fork.rollback();
-                }
-            }
-            execution_result.map_err(TransactionError::from)
-        }
-        Err(err) => {
-            if err.is::<Error>() {
-                // Continue panic unwind if the reason is StorageError.
-                panic::resume_unwind(err);
-            }
-            fork.rollback();
-            error!("{:?} transaction execution panicked: {:?}", tx, err);
-            Err(TransactionError::from_panic(&err))
-        }
-    };
-
-    let mut schema = Schema::new(fork);
-    schema.transactions_mut().put(&tx_hash, tx.raw().clone());
-    schema.transaction_results_mut().put(&tx_hash, tx_result);
-    schema.block_txs_mut(height).push(tx_hash);
-    let location = TxLocation::new(height, index as u64);
-    schema.tx_location_by_tx_hash_mut().put(&tx_hash, location);
 }

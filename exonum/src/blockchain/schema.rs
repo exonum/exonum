@@ -14,7 +14,8 @@
 
 use crypto::{PublicKey, Hash, CryptoHash};
 use messages::{Precommit, RawMessage, Connect};
-use storage::{Entry, Fork, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex, Snapshot};
+use storage::{Entry, Fork, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex, Snapshot,
+              KeySetIndex};
 use helpers::{Height, Round};
 use super::{Block, BlockProof, Blockchain, TransactionResult};
 use super::config::StoredConfiguration;
@@ -33,6 +34,7 @@ macro_rules! define_names {
 define_names!(
     TRANSACTIONS => "transactions";
     TRANSACTION_RESULTS => "transaction_results";
+    TRANSACTIONS_POOL => "transactions_pool";
     TX_LOCATION_BY_TX_HASH => "tx_location_by_tx_hash";
     BLOCKS => "blocks";
     BLOCK_HASHES_BY_HEIGHT => "block_hashes_by_height";
@@ -89,6 +91,11 @@ where
     /// Returns table that represents a map from transaction hash into execution result.
     pub fn transaction_results(&self) -> ProofMapIndex<&T, Hash, TransactionResult> {
         ProofMapIndex::new(TRANSACTION_RESULTS, &self.view)
+    }
+
+    /// Returns table that represents a set of uncommitted transactions hashes.
+    pub fn transactions_pool(&self) -> KeySetIndex<&T, Hash> {
+        KeySetIndex::new(TRANSACTIONS_POOL, &self.view)
     }
 
     /// Returns table that keeps the block height and tx position inside block for every
@@ -337,17 +344,24 @@ impl<'a> Schema<&'a mut Fork> {
     /// Mutable reference to the [`transactions`][1] index.
     ///
     /// [1]: struct.Schema.html#method.transactions
-    pub(crate) fn transactions_mut(&mut self) -> MapIndex<&mut Fork, Hash, RawMessage> {
+    #[doc(hidden)]
+    pub fn transactions_mut(&mut self) -> MapIndex<&mut Fork, Hash, RawMessage> {
         MapIndex::new(TRANSACTIONS, self.view)
     }
 
     /// Mutable reference to the [`transaction_results`][1] index.
     ///
     /// [1]: struct.Schema.html#method.transaction_results
-    pub(crate) fn transaction_results_mut(
-        &mut self,
-    ) -> ProofMapIndex<&mut Fork, Hash, TransactionResult> {
+    pub fn transaction_results_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, TransactionResult> {
         ProofMapIndex::new(TRANSACTION_RESULTS, self.view)
+    }
+
+    /// Mutable reference to the [`transactions_pool`][1] index.
+    ///
+    /// [1]: struct.Schema.html#method.transactions_pool
+    #[doc(hidden)]
+    pub fn transactions_pool_mut(&mut self) -> KeySetIndex<&mut Fork, Hash> {
+        KeySetIndex::new(TRANSACTIONS_POOL, self.view)
     }
 
     /// Mutable reference to the [`tx_location_by_tx_hash`][1] index.
@@ -463,5 +477,12 @@ impl<'a> Schema<&'a mut Fork> {
         let cfg_ref = ConfigReference::new(actual_from, &cfg_hash);
         self.configs_actual_from_mut().push(cfg_ref);
         // TODO: clear storages
+    }
+
+    /// add transaction into persistent pool
+    #[doc(hidden)]
+    pub fn add_transaction_into_pool(&mut self, tx: RawMessage) {
+        self.transactions_pool_mut().insert(tx.hash());
+        self.transactions_mut().put(&tx.hash(), tx);
     }
 }

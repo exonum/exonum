@@ -19,7 +19,9 @@ extern crate serde;
 extern crate serde_json;
 
 use exonum::crypto::{Signature, CryptoHash};
+use exonum::blockchain::Schema;
 use exonum::helpers::Height;
+use exonum::messages::Message;
 use exonum_testkit::TestKitBuilder;
 
 mod hooks;
@@ -35,6 +37,10 @@ fn test_handle_commit() {
     for i in 1..5 {
         testkit.create_block();
         let tx = TxAfterCommit::new_with_signature(Height(i), &Signature::zero());
-        assert!(testkit.mempool().contains_key(&tx.hash()));
+        testkit.add_tx(tx.raw().clone());
+        let snapshot = testkit.blockchain_mut().snapshot();
+        let schema = Schema::new(&snapshot);
+        assert!(schema.transactions().contains(&tx.hash()));
+        assert!(schema.transactions_pool().contains(&tx.hash()));
     }
 }
