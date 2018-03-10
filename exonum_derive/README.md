@@ -20,20 +20,38 @@ extern crate exonum;
 extern crate exonum_derive;
 ```
 
-### Deriving `TransactionSet`
+### Deriving `MessageSet`
 
 Declare an enum with variants corresponding to transaction types in your
-service, and use `#[derive(TransactionSet)]` attribute on it:
+service, and use `#[derive(MessageSet)]` attribute on it:
 
 ```rust
-// Suppose `CreateWallet` and `Transfer` are transaction types defined
-// in your service.
+#[derive(Debug, MessageSet)]
+#[exonum(service_id = "100")]
+pub enum Transactions<'a> {
+    CreateWallet {
+        public_key: &'a PublicKey,
+        name: &'a str,
+    },
 
-#[derive(Debug, Clone, TransactionSet)]
-pub enum Transactions {
-    CreateWallet(CreateWallet),
-    Transfer(Transfer),
+    Transfer {
+        from: &'a PublicKey,
+        to: &'a PublicKey,
+        amount: u64,
+        seed: u64,
+    },
 }
+```
+
+### Deriving `Message`
+
+Declare a newtype wrapping `exonum::messages::RawMessage`, and use
+`#[derive(Message)]` attribute on it:
+
+```rust
+#[derive(Clone, Message)]
+#[exonum(payload = "Transactions")]
+struct MyMessage(RawMessage);
 ```
 
 ## License
