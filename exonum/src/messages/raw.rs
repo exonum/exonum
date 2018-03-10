@@ -20,7 +20,8 @@ use byteorder::{ByteOrder, LittleEndian};
 
 use crypto::{hash, sign, verify, CryptoHash, Hash, PublicKey, SecretKey, Signature,
              SIGNATURE_LENGTH};
-use encoding::{self, CheckedOffset, Field, Offset, Result as StreamStructResult};
+use encoding::{self, CheckedOffset, Field, MeasureHeader, Offset, SegmentField,
+               Result as StreamStructResult};
 
 /// Length of the message header.
 pub const HEADER_LENGTH: usize = 10;
@@ -315,3 +316,87 @@ impl Message for RawMessage {
         verify(self.signature(), self.body(), pub_key)
     }
 }
+
+
+/// Object that can check the validity of a raw message according to a certain schema.
+pub trait Check {
+    /// Checks the raw message validity.
+    fn check(raw: &RawMessage) -> Result<(), encoding::Error>;
+}
+
+/// Object that can be constructed from a raw message.
+pub trait Read<'a>: Sized + Check {
+    /// Reads a raw message from a trusted source.
+    ///
+    /// It is assumed that the validity of the message has been previously verified with
+    /// [`Check::check`], so checks should not be performed by this method.
+    ///
+    /// [`Check::check`]: trait.Check#tymethod.check
+    unsafe fn unchecked_read(raw: &'a RawMessage) -> Self;
+
+    /// Reads a raw message from an untrusted source.
+    fn read(raw: &'a RawMessage) -> Result<Self, encoding::Error> {
+        <Self as Check>::check(raw)?;
+        Ok(unsafe { Self::unchecked_read(raw) })
+    }
+}
+
+impl Check for RawMessage {
+    fn check(_: &RawMessage) -> Result<(), encoding::Error> {
+        Ok(())
+    }
+}
+
+impl<'a> Read<'a> for RawMessage {
+    unsafe fn unchecked_read(raw: &'a RawMessage) -> Self {
+        raw.clone()
+    }
+}
+
+/// Object that can be converted to a message.
+pub trait Write<T>
+where
+    T: Message + for<'a> Read<'a>,
+{
+    /// Writes a payload of the message to the writer.
+    fn write_payload(&self, writer: &mut MessageWriter);
+
+    /// Signs a message with the specified secret key.
+    fn sign(&self, secret_key: &SecretKey) -> T
+    where
+        Self: MessageSet,
+    {
+        let message_id = self.message_id();
+
+        let mut writer = MessageWriter::new(
+            PROTOCOL_MAJOR_VERSION,
+            TEST_NETWORK_ID,
+            Self::SERVICE_ID,
+            message_id.into(),
+            message_id.header_size() as usize,
+        );
+        self.write_payload(&mut writer);
+
+        unsafe { T::unchecked_read(&RawMessage::new(writer.sign(secret_key))) }
+    }
+
+    /// Constructs a message with the specified signature.
+    fn with_signature(&self, signature: &Signature) -> T
+    where
+        Self: MessageSet,
+    {
+        let message_id = self.message_id();
+
+        let mut writer = MessageWriter::new(
+            PROTOCOL_MAJOR_VERSION,
+            TEST_NETWORK_ID,
+            Self::SERVICE_ID,
+            message_id.into(),
+            message_id.header_size() as usize,
+        );
+        self.write_payload(&mut writer);
+
+        unsafe { T::unchecked_read(&RawMessage::new(writer.append_signature(signature))) }
+    }
+}
+
