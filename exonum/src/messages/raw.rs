@@ -400,6 +400,17 @@ where
     }
 }
 
+/// Set of messages sharing a common `service_id`.
+pub trait MessageSet {
+    /// Enum of all allowed `message_id`s.
+    type MessageId: Copy + Into<u16> + MeasureHeader;
+    /// Service identifier for messages.
+    const SERVICE_ID: u16;
+
+    /// Determines the message identifier for the message.
+    fn message_id(&self) -> Self::MessageId;
+}
+
 impl<'a, T: Message + Check> SegmentField<'a> for T {
     fn item_size() -> Offset {
         1
