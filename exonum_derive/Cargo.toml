@@ -14,12 +14,16 @@ travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
 quote = "0.4.2"
-syn = "0.12.13"
+syn = { version = "0.12.13", features = [ "default", "visit-mut" ] }
 synstructure = "0.7.0"
+failure = "0.1.1"
+failure_derive = "0.1.1"
+proc-macro2 = "0.2.3"
 
 [dev-dependencies]
 exonum = { version = "0.5.1", path = "../exonum" }
 serde_json = "1.0"
 
 [lib]
+name = "exonum_derive"
 proc-macro = true

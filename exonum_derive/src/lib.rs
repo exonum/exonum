@@ -14,214 +14,100 @@
 
 //! Procedural macros for custom derivation in Exonum applications.
 //!
-//! # Deriving `TransactionSet`
+//! # Deriving `MessageSet`
 //!
-//! Define an enum with variants being 1-member tuples, like `Foo(Foo)`, where each tuple type
-//! implements `Transaction`, and use `derive(TransactionSet)` on it:
+//! Define an enum with variants representing borrowed message payloads,
+//! and use `derive(MessageSet)` on it:
 //!
 //! ```
-//! #[macro_use] extern crate exonum;
+//! extern crate exonum;
 //! #[macro_use] extern crate exonum_derive;
-//! # use exonum::blockchain::{ExecutionResult, Transaction, TransactionSet};
-//! # use exonum::storage::Fork;
+//! use exonum::crypto::PublicKey;
 //!
-//! messages! {
-//!     const SERVICE_ID = // ...
-//! #                      1000;
-//!     struct CreateWallet { /* ... */ }
-//!     struct Transfer { /* ... */ }
-//! }
+//! #[derive(Debug, MessageSet)]
+//! #[exonum(service_id = "100")]
+//! pub enum Transactions<'a> {
+//!     CreateWallet {
+//!         public_key: &'a PublicKey,
+//!         name: &'a str,
+//!     },
 //!
-//! impl Transaction for CreateWallet {
-//!     // ...
-//! #   fn verify(&self) -> bool { true }
-//! #   fn execute(&self, _: &mut Fork) -> ExecutionResult { Ok(()) }
-//! }
-//!
-//! impl Transaction for Transfer {
-//!     // ...
-//! #   fn verify(&self) -> bool { true }
-//! #   fn execute(&self, _: &mut Fork) -> ExecutionResult { Ok(()) }
-//! }
-//!
-//! #[derive(Debug, Clone, TransactionSet)]
-//! pub enum Transactions {
-//!     Create(CreateWallet),
-//!     Transfer(Transfer),
+//!     Transfer {
+//!         from: &'a PublicKey,
+//!         to: &'a PublicKey,
+//!         amount: u64,
+//!         seed: u64,
+//!     },
 //! }
 //! # fn main() {}
 //! ```
 //!
 //! The macro will derive the following traits for the enum:
 //!
-//! - `TransactionSet`
+//! - `MessageSet`
+//! - `Check`, `Read` and `Write`
+//! - `serde::Serialize`
+//! - `ExonumJsonDeserialize<RawMessage>`
+//!
+//! It will also create an enum `{derived_type}Ids` containing message IDs for the messages
+//! in the derived type.
+//!
+//! # Deriving `Message`
+//!
+//! Declare a newtype wrapping `exonum::messages::RawMessage`, and call `derive(Message)` on it,
+//! referencing the payload type:
+//!
+//! ```
+//! extern crate exonum;
+//! #[macro_use] extern crate exonum_derive;
+//! use exonum::crypto::PublicKey;
+//! use exonum::messages::RawMessage;
+//!
+//! #[derive(Debug, MessageSet)]
+//! #[exonum(service_id = "100")]
+//! pub enum Transactions<'a> {
+//!     Create { public_key: &'a PublicKey, name: &'a str },
+//!     Transfer { from: &'a PublicKey, to: &'a PublicKey, amount: u64 },
+//! }
+//!
+//! #[derive(Clone, Message)]
+//! #[exonum(payload = "Transactions")]
+//! struct Messages(RawMessage);
+//! # fn main() {}
+//! ```
+//!
+//! The macro will derive the following traits for the enum:
+//!
+//! - `Message`
+//! - `Check` and `Read`
+//! - `Debug`
+//! - `AsRef<RawMessage>`
+//! - `FromHex<Error = encoding::Error>`
+//! - `ExonumJson`
+//! - `ExonumJsonDeserialize`
 //! - `serde::Serialize`
 //! - `serde::Deserialize`
-//! - `Into<Box<Transaction>>`
 
 #![recursion_limit = "256"]
 
-extern crate proc_macro;
+extern crate failure;
+#[macro_use]
+extern crate failure_derive;
+extern crate proc_macro2;
+#[macro_use]
+extern crate quote;
+#[cfg_attr(test, macro_use)]
 extern crate syn;
+#[macro_use]
+extern crate synstructure;
 
-#[macro_use] extern crate synstructure;
-#[macro_use] extern crate quote;
+mod base;
+mod message;
+mod structure;
+mod utils;
 
-use syn::{Fields, FieldsUnnamed};
-use synstructure::{BindStyle, Structure, VariantInfo};
+use base::base_derive;
+use message::message_derive;
 
-decl_derive!([TransactionSet] => transaction_set_derive);
-
-fn transaction_set_derive(mut s: Structure) -> quote::Tokens {
-    let tx_set = impl_transaction_set(&s);
-    let into_box = impl_into_box(&mut s);
-    let deserialize = impl_deserialize(&s);
-    let serialize = impl_serialize(&mut s);
-
-    quote!{
-        #tx_set
-        #into_box
-        #deserialize
-        #serialize
-    }
-}
-
-/// Implements `TransactionSet`.
-fn impl_transaction_set(s: &Structure) -> quote::Tokens {
-    let match_body = s.variants().iter().fold(quote!(), |acc, v| {
-        let tx_type = tx_type(v);
-        let constructor = v.construct(|_, _| quote!(tx));
-        let match_hand = quote! {
-            <#tx_type as ::exonum::messages::ServiceMessage>::MESSAGE_ID => {
-                let tx = ::exonum::messages::Message::from_raw(raw)?;
-                Ok(#constructor)
-            }
-        };
-        quote!(#acc #match_hand)
-    });
-
-    s.unbound_impl(
-        quote!(::exonum::blockchain::TransactionSet),
-        quote! {
-            fn tx_from_raw(
-                raw: ::exonum::messages::RawTransaction
-            ) -> ::std::result::Result<Self, ::exonum::encoding::Error> {
-                let message_type = raw.message_type();
-                match message_type {
-                    #match_body
-                    _ => return Err(::exonum::encoding::Error::IncorrectMessageType {
-                        message_type,
-                    })
-                }
-            }
-        }
-    )
-}
-
-/// Implements `Into<Box<Transaction>>`.
-fn impl_into_box(s: &mut Structure) -> quote::Tokens {
-    for v in s.variants_mut() {
-        v.bind_with(|_| BindStyle::Move);
-    }
-    let match_body = s.each_variant(|v| {
-        let ident = &v.bindings()[0].binding;
-        quote!(::std::boxed::Box::new(#ident))
-    });
-
-    s.unbound_impl(
-        quote!(::std::convert::Into<::std::boxed::Box<::exonum::blockchain::Transaction>>),
-        quote! {
-            fn into(self) -> ::std::boxed::Box<::exonum::blockchain::Transaction> {
-                match self {
-                    #match_body,
-                }
-            }
-        },
-    )
-}
-
-/// Implements `serde::DeserializeOwned`.
-fn impl_deserialize(s: &Structure) -> quote::Tokens {
-    let name = &s.ast().ident;
-
-    let match_body = s.variants().iter().fold(quote!(), |acc, v| {
-        let tx_type = tx_type(v);
-        let variant_name = &v.ast().ident;
-
-        let match_hand = quote! {
-            <#tx_type as ::exonum::messages::ServiceMessage>::MESSAGE_ID => {
-                <#tx_type as ::exonum::encoding::serialize::json::ExonumJsonDeserialize>
-                    ::deserialize(&value)
-                    .map_err(|e| D::Error::custom(
-                        format!("Can't deserialize a value: {}", e.description())
-                    ))
-                    .map(#name::#variant_name)
-            }
-        };
-        quote!(#acc #match_hand)
-    });
-
-    quote! {
-        impl<'de> ::exonum::encoding::serialize::reexport::Deserialize<'de> for #name {
-            fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
-            where
-                D: ::exonum::encoding::serialize::reexport::Deserializer<'de>,
-            {
-                use ::exonum::encoding::serialize::json::reexport::{Value, from_value};
-                use ::exonum::encoding::serialize::reexport::{DeError, Deserialize};
-
-                let value = <Value as Deserialize>::deserialize(deserializer)?;
-                let message_id: Value = value.get("message_id")
-                    .ok_or(D::Error::custom("Can't get message_id from json"))?
-                    .clone();
-                let message_id: u16 = from_value(message_id)
-                    .map_err(|e| D::Error::custom(
-                        format!("Can't deserialize message_id: {}", e)
-                    ))?;
-
-                match message_id {
-                    #match_body
-                    _ => Err(D::Error::custom(format!("invalid message_id: {}", message_id))),
-                }
-            }
-        }
-    }
-}
-
-/// Implements `serde::Serialize`.
-fn impl_serialize(s: &mut Structure) -> quote::Tokens {
-    for v in s.variants_mut() {
-        v.bind_with(|_| BindStyle::Ref);
-    }
-    let match_body = s.each_variant(|v| {
-        let ident = &v.bindings()[0].binding;
-        quote!(Serialize::serialize(#ident, serializer))
-    });
-
-    s.unbound_impl(
-        quote!(::exonum::encoding::serialize::reexport::Serialize),
-        quote! {
-            fn serialize<S>(&self, serializer: S) -> ::std::result::Result<S::Ok, S::Error>
-            where
-                S: ::exonum::encoding::serialize::reexport::Serializer,
-            {
-                use ::exonum::encoding::serialize::reexport::Serialize;
-
-                match *self {
-                    #match_body
-                }
-            }
-        }
-    )
-}
-
-fn tx_type<'a, 'r: 'a>(variant: &'r VariantInfo<'a>) -> &'r syn::Type {
-    match *variant.ast().fields {
-        Fields::Unnamed(FieldsUnnamed { ref unnamed, .. }) => {
-            assert_eq!(unnamed.len(), 1, "Incorrect enum variant");
-            let field = unnamed.first().unwrap();
-            &field.value().ty
-        }
-        _ => panic!("Incorrect enum variant"),
-    }
-}
+decl_derive!([MessageSet, attributes(exonum)] => base_derive);
+decl_derive!([Message, attributes(exonum)] => message_derive);
