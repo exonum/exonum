@@ -400,3 +400,75 @@ where
     }
 }
 
+impl<'a, T: Message + Check> SegmentField<'a> for T {
+    fn item_size() -> Offset {
+        1
+    }
+
+    fn count(&self) -> Offset {
+        self.raw().len() as Offset
+    }
+
+    fn extend_buffer(&self, buffer: &mut Vec<u8>) {
+        buffer.extend_from_slice(self.raw().as_ref())
+    }
+
+    unsafe fn from_buffer(buffer: &'a [u8], from: Offset, count: Offset) -> Self {
+        let to = from + count * Self::item_size();
+        let slice = &buffer[from as usize..to as usize];
+        let raw = RawMessage::new(MessageBuffer::from_vec(Vec::from(slice)));
+        // TODO: should this use `Read::unchecked_read`?
+        Message::from_raw(raw).unwrap()
+    }
+
+    fn check_data(
+        buffer: &'a [u8],
+        from: CheckedOffset,
+        count: CheckedOffset,
+        latest_segment: CheckedOffset,
+    ) -> encoding::Result {
+        // `RawMessage` checks
+        let size: CheckedOffset = (count * Self::item_size())?;
+        let to: CheckedOffset = (from + size)?;
+        let slice = &buffer[from.unchecked_offset() as usize..to.unchecked_offset() as usize];
+
+        if slice.len() < HEADER_LENGTH {
+            return Err(encoding::Error::UnexpectedlyShortRawMessage {
+                position: from.unchecked_offset(),
+                size: slice.len() as Offset,
+            });
+        }
+
+        let actual_size = slice.len() as Offset;
+        let declared_size: Offset = LittleEndian::read_u32(&slice[6..10]);
+        if actual_size != declared_size {
+            return Err(encoding::Error::IncorrectSizeOfRawMessage {
+                position: from.unchecked_offset(),
+                actual_size: slice.len() as Offset,
+                declared_size: declared_size,
+            });
+        }
+
+        let raw_message: RawMessage = unsafe {
+            SegmentField::from_buffer(buffer, from.unchecked_offset(), count.unchecked_offset())
+        };
+        Self::check(&raw_message)?;
+        Ok(latest_segment)
+    }
+}
+
+impl<T: Message + for<'a> Read<'a>> ::storage::StorageValue for T {
+    fn into_bytes(self) -> Vec<u8> {
+        self.raw().as_ref().to_vec()
+    }
+
+    fn from_bytes(value: ::std::borrow::Cow<[u8]>) -> Self {
+        unsafe {
+            // We assume that the messages in the storage have been previously verified,
+            // so this should be safe.
+            T::unchecked_read(&RawMessage::new(
+                MessageBuffer::from_vec(value.into_owned()),
+            ))
+        }
+    }
+}
