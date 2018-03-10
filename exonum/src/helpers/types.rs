@@ -114,7 +114,7 @@ impl Height {
 }
 
 /// Consensus round index.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 pub struct Round(pub u32);
 
 impl Round {
@@ -238,7 +238,7 @@ impl Round {
 }
 
 /// Validators identifier.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 pub struct ValidatorId(pub u16);
 
 impl ValidatorId {

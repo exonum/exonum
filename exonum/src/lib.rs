@@ -67,6 +67,7 @@ extern crate failure;
 extern crate lazy_static;
 #[cfg(test)]
 extern crate tempdir;
+extern crate bodyparser;
 
 #[macro_use]
 pub mod encoding;
@@ -81,5 +82,4 @@ pub mod node;
 pub mod storage;
 #[macro_use]
 pub mod blockchain;
-pub mod explorer;
 pub mod api;

@@ -7,6 +7,44 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Breaking changes
 
+#### Exonum core
+
+- POST-requests are now handled with `bodyparser` crate,
+  so all the parameters must be passed in the body. (#529)
+
+- `ProofListIndex` and `ProofMapIndex` `root_hash` method has been renamed to
+  `merkle_root`. (#547)
+
+#### exonum-configuration
+
+- `majority_count: Option<u16>` configuration parameter is introduced.
+  Allows to increase the threshold amount of votes required to commit
+  a new configuration proposal. By default the number of votes is calculated
+  as 2/3 + 1 of total validators count. (#546)
+
+### New features
+
+#### Exonum core
+
+- New `database` field added to the `NodeConfig`.
+  This optional setting adjusts database-specific settings,
+  like number of simultaneously opened files. (#538)
+
+- `exonum::explorer` module moved to the `exonum::api::public`. (#550)
+
+  Migration Path:
+
+  - Rename imports like `exonum::explorer::*` to the `exonum::api::public::*`.
+
+- Added `v1/user_agent` endpoint with information about Exonum, Rust
+  and OS versions. (#548)
+
+## 0.6 - 2018-03-06
+
+### Breaking changes
+
+#### Exonum core
+
 - `exonum::crypto::CryptoHash` trait is introduced, and `StorageValue::hash`
   and `Message::hash` methods are removed. (#442)
 
@@ -87,7 +125,56 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - Just pass database argument as is, for example instead of
     `Box::new(MemoryDb::new())` use `MemoryDb::new()`.
 
+#### exonum-configuration
+
+- Most types renamed to avoid stuttering (see [here][stuttering] for
+  an explanation of the term) (#496):
+
+  - `ConfigurationService` to `Service`
+  - `ConfigurationServiceFactory` to `ServiceFactory`
+  - `TxConfigPropose` to `Propose`
+  - `TxConfigVote` to `Vote`
+  - `ConfigurationSchema` to `Schema`
+  - `StorageValueConfigProposeData` to `ProposeData`
+  - `CONFIG_SERVICE` constant to `SERVICE_ID`
+
+  Check the crate documentation for more details.
+
+  **Migration path:** Rename imported types from the crate, using aliases
+  or qualified names if necessary: `use exonum_configuration::Service as ConfigService`.
+
+[stuttering]: https://doc.rust-lang.org/1.0.0/style/style/naming/README.html#avoid-redundant-prefixes-[rfc-356]
+
+- Multiple APIs are no longer public (#496):
+
+  - Message identifiers
+  - Mutating methods of the service schema
+  - Module implementing HTTP API of the service
+
+  Check the crate documentation for more details.
+
+  **Migration path:** The restrictions are security-based and should not
+  influence intended service use.
+
+<!-- cspell:disable -->
+
+- `ZEROVOTE` is replaced with the `MaybeVote` type, which is now used
+  instead of `Vote` in the schema method signatures. The storage format itself
+  is unchanged (#496).
+
+<!-- cspell:enable -->
+
+#### exonum-time
+
+- The structure `Time` is removed, use `SystemTime`
+  for saving validators time in `ProofMapIndex` instead. (#20)
+
+- Renamed methods `validators_time`/`validators_time_mut` to
+  `validators_times`/`validators_times_mut` in `Schema`. (#20)
+
 ### New features
+
+#### Exonum core
 
 - `StorageKey` and `StorageValue` traits are implemented for `SystemTime`. (#456)
 
@@ -105,7 +192,24 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `TransactionInfo` from the public api module became public. (#537)
 
+#### exonum-testkit
+
+- Modified signature of the `TestKitApi::send` method, which previously did not
+  accept `Box<Transaction>`. (#505)
+
+- Added possibility to init a logger in `TestKitBuilder`. (#524)
+
+#### exonum-configuration
+
+- Information about configurations by `/v1/configs/actual`, `/v1/configs/following`
+  and `/v1/configs/committed` endpoints is extended with the hash of the corresponding
+  proposal and votes for the proposal (#481).
+
+- Implemented error handling based on error codes (#496).
+
 ### Bug fixes
+
+#### Exonum core
 
 - `ExonumJsonDeserialize` trait is implemented for `F32` and `F64`. (#461)
 
@@ -116,6 +220,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Fixed panic "can't cancel routine" during node shutdown. (#530)
 
 ### Internal improvements
+
+#### Exonum core
 
 - Consensus messages are stored persistently (in the database), so restart will
   not affect the node's behavior. (#322)

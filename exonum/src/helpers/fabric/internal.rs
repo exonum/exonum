@@ -57,7 +57,7 @@ impl CollectedCommand {
     pub fn new(command: Box<Command>) -> CollectedCommand {
         CollectedCommand {
             args: command.args(),
-            command: command,
+            command,
             exts: Vec::new(),
         }
     }

@@ -238,24 +238,24 @@ fn test_query_state_hash() {
     //we do not change the state hash in between blocks for TimestampingService for now
     for _ in 0..2 {
         let state_hash = sandbox.last_state_hash();
-        let configs_rh = sandbox.get_configs_root_hash();
+        let configs_rh = sandbox.get_configs_merkle_root();
         let configs_key = Blockchain::service_table_unique_key(CONSENSUS, 0);
         let timestamp_t1_key = Blockchain::service_table_unique_key(TIMESTAMPING_SERVICE, 0);
         let timestamp_t2_key = Blockchain::service_table_unique_key(TIMESTAMPING_SERVICE, 1);
 
         let proof_configs = sandbox.get_proof_to_service_table(CONSENSUS, 0);
-        assert_eq!(state_hash, proof_configs.root_hash());
+        assert_eq!(state_hash, proof_configs.merkle_root());
         assert_ne!(configs_rh, Hash::zero());
         let opt_configs_h = proof_configs.validate(&configs_key, state_hash).unwrap();
         assert_eq!(configs_rh, *opt_configs_h.unwrap());
 
         let proof_configs = sandbox.get_proof_to_service_table(TIMESTAMPING_SERVICE, 0);
-        assert_eq!(state_hash, proof_configs.root_hash());
+        assert_eq!(state_hash, proof_configs.merkle_root());
         let opt_configs_h = proof_configs.validate(&timestamp_t1_key, state_hash);
         assert_eq!(&[127; 32], opt_configs_h.unwrap().unwrap().as_ref());
 
         let proof_configs = sandbox.get_proof_to_service_table(TIMESTAMPING_SERVICE, 1);
-        assert_eq!(state_hash, proof_configs.root_hash());
+        assert_eq!(state_hash, proof_configs.merkle_root());
         let opt_configs_h = proof_configs.validate(&timestamp_t2_key, state_hash);
         assert_eq!(&[128; 32], opt_configs_h.unwrap().unwrap().as_ref());
 

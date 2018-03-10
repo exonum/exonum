@@ -53,6 +53,7 @@ fn node_config() -> NodeConfig {
         api: api_cfg,
         mempool: Default::default(),
         services_configs: Default::default(),
+        database: None,
     }
 }
 

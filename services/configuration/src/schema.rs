@@ -178,8 +178,8 @@ where
     /// Returns state hash values used by the configuration service.
     pub fn state_hash(&self) -> Vec<Hash> {
         vec![
-            self.propose_data_by_config_hash().root_hash(),
-            self.config_hash_by_ordinal().root_hash(),
+            self.propose_data_by_config_hash().merkle_root(),
+            self.config_hash_by_ordinal().merkle_root(),
         ]
     }
 }
@@ -237,13 +237,13 @@ mod tests {
 
         let db = MemoryDB::new();
         let mut fork = db.fork();
-        let root_hash = {
+        let merkle_root = {
             let mut index: ProofListIndex<_, Vote> = ProofListIndex::new("index", &mut fork);
             for _ in 0..VALIDATORS {
                 index.push(NO_VOTE.clone());
             }
             index.set(1, vote.clone());
-            index.root_hash()
+            index.merkle_root()
         };
         db.merge(fork.into_patch()).unwrap();
 
@@ -261,13 +261,13 @@ mod tests {
         }
 
         // Touch the index in order to recalculate its root hash
-        let new_root_hash = {
+        let new_merkle_root = {
             let mut fork = db.fork();
             let mut index: ProofListIndex<_, MaybeVote> = ProofListIndex::new("index", &mut fork);
             index.set(2, MaybeVote::some(vote.clone()));
             index.set(2, MaybeVote::none());
-            index.root_hash()
+            index.merkle_root()
         };
-        assert_eq!(root_hash, new_root_hash);
+        assert_eq!(merkle_root, new_merkle_root);
     }
 }

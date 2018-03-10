@@ -74,6 +74,7 @@ println
 pubkey
 pubkeys
 readonly
+rebasing
 reddit
 reimplemented
 repr

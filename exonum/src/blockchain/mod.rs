@@ -194,6 +194,7 @@ impl Blockchain {
             validator_keys: cfg.validator_keys,
             consensus: cfg.consensus,
             services: BTreeMap::new(),
+            majority_count: None,
         };
 
         let patch = {
@@ -304,10 +305,10 @@ impl Blockchain {
                     for (key, hash) in state_hashes {
                         sum_table.put(&key, hash)
                     }
-                    sum_table.root_hash()
+                    sum_table.merkle_root()
                 };
 
-                let tx_hash = schema.block_txs(height).root_hash();
+                let tx_hash = schema.block_txs(height).merkle_root();
 
                 (tx_hash, state_hash)
             };

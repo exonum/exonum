@@ -46,6 +46,9 @@ pub struct StoredConfiguration {
     pub validator_keys: Vec<ValidatorKeys>,
     /// Consensus algorithm parameters.
     pub consensus: ConsensusConfig,
+    /// Number of votes required to commit new configuration.
+    /// Should be greater than 2/3 and less or equal to the validators count.
+    pub majority_count: Option<u16>,
     /// Services specific variables.
     /// Keys are `service_name` from `Service` trait and values are the serialized json.
     pub services: BTreeMap<String, serde_json::Value>,
@@ -70,7 +73,7 @@ pub struct ConsensusConfig {
 
 impl ConsensusConfig {
     /// Default value for max_message_len.
-    pub const DEFAULT_MESSAGE_MAX_LEN: u32 = 1024 * 1024; // 1 MB
+    pub const DEFAULT_MAX_MESSAGE_LEN: u32 = 1024 * 1024; // 1 MB
 }
 
 impl Default for ConsensusConfig {
@@ -80,7 +83,7 @@ impl Default for ConsensusConfig {
             status_timeout: 5000,
             peers_timeout: 10_000,
             txs_block_limit: 1000,
-            max_message_len: Self::DEFAULT_MESSAGE_MAX_LEN,
+            max_message_len: Self::DEFAULT_MAX_MESSAGE_LEN,
             timeout_adjuster: TimeoutAdjusterConfig::Constant { timeout: 500 },
         }
     }
@@ -428,6 +431,7 @@ mod tests {
             validator_keys,
             consensus: ConsensusConfig::default(),
             services: BTreeMap::new(),
+            majority_count: None,
         }
     }
 

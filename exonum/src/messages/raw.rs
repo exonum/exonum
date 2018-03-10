@@ -92,7 +92,7 @@ impl MessageBuffer {
         // TODO: check that size >= HEADER_LENGTH
         // TODO: check that payload_length == raw.len()
         // ECR-166
-        MessageBuffer { raw: raw }
+        MessageBuffer { raw }
     }
 
     /// Returns the length of the message in bytes.
@@ -456,7 +456,7 @@ impl<'a, T: Message + Check> SegmentField<'a> for T {
             return Err(encoding::Error::IncorrectSizeOfRawMessage {
                 position: from.unchecked_offset(),
                 actual_size: slice.len() as Offset,
-                declared_size: declared_size,
+                declared_size,
             });
         }
 

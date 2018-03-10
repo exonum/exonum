@@ -148,7 +148,7 @@ pub struct CheckedOffset {
 impl CheckedOffset {
     /// create checked value
     pub fn new(offset: Offset) -> CheckedOffset {
-        CheckedOffset { offset: offset }
+        CheckedOffset { offset }
     }
 
     /// return unchecked offset

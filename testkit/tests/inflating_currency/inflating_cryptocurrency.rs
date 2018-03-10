@@ -99,7 +99,7 @@ impl<'a> CurrencySchema<&'a mut Fork> {
 // // // // // // // // // // TRANSACTIONS // // // // // // // // // //
 
 transactions! {
-    CurrencyTransactions {
+    pub(in inflating_cryptocurrency) CurrencyTransactions {
         const SERVICE_ID = SERVICE_ID;
 
         /// Create a new wallet.

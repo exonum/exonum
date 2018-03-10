@@ -23,12 +23,12 @@
 //! extern crate exonum_testkit;
 //! extern crate serde_json;
 //!
-//! use exonum::crypto::{gen_keypair, Hash, PublicKey, CryptoHash};
+//! use exonum::api::public::BlocksRange;
 //! use exonum::blockchain::{Block, Schema, Service, Transaction, TransactionSet, ExecutionResult};
-//! use exonum::explorer::BlocksRange;
+//! use exonum::crypto::{gen_keypair, Hash, PublicKey, CryptoHash};
+//! use exonum::encoding;
 //! use exonum::messages::{Message, RawTransaction};
 //! use exonum::storage::{Snapshot, Fork};
-//! use exonum::encoding;
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! // Simple service implementation.

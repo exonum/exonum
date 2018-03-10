@@ -297,7 +297,7 @@ where
         self.len().next_power_of_two().trailing_zeros() as u8 + 1
     }
 
-    /// Returns the root hash of the proof list or default hash value if it is empty.
+    /// Returns the Merkle root hash of the proof list or default hash value if it is empty.
     ///
     /// # Examples
     ///
@@ -310,14 +310,14 @@ where
     /// let mut fork = db.fork();
     /// let mut index = ProofListIndex::new(name, &mut fork);
     ///
-    /// let default_hash = index.root_hash();
+    /// let default_hash = index.merkle_root();
     /// assert_eq!(Hash::default(), default_hash);
     ///
     /// index.push(1);
-    /// let hash = index.root_hash();
+    /// let hash = index.merkle_root();
     /// assert_ne!(hash, default_hash);
     /// ```
-    pub fn root_hash(&self) -> Hash {
+    pub fn merkle_root(&self) -> Hash {
         self.get_branch(self.root_key()).unwrap_or_default()
     }
 

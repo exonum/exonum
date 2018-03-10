@@ -179,7 +179,7 @@ impl ValidatorState {
     /// Creates new `ValidatorState` with given validator id.
     pub fn new(id: ValidatorId) -> Self {
         ValidatorState {
-            id: id,
+            id,
             our_precommits: HashMap::new(),
             our_prevotes: HashMap::new(),
         }
@@ -384,8 +384,8 @@ impl State {
             consensus_secret_key,
             service_public_key,
             service_secret_key,
-            tx_pool_capacity: tx_pool_capacity,
-            whitelist: whitelist,
+            tx_pool_capacity,
+            whitelist,
             peers,
             connections: HashMap::new(),
             height: last_height,
