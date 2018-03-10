@@ -69,12 +69,12 @@ pub trait ExonumJson {
     fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>>;
 }
 
-/// `ExonumJsonDeserialize` is trait for objects that could be constructed from exonum json.
-pub trait ExonumJsonDeserialize {
-    /// deserialize `json` value.
-    fn deserialize(value: &Value) -> Result<Self, Box<Error>>
+/// Object that can be constructed from the JSON representation.
+pub trait ExonumJsonDeserialize<Target = Self> {
+    /// Deserializes a JSON value.
+    fn deserialize(value: &Value) -> Result<Target, Box<Error>>
     where
-        Self: Sized;
+        Target: Sized;
 }
 
 #[derive(Serialize, Deserialize, Debug)]
