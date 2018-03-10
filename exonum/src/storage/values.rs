@@ -21,7 +21,6 @@ use std::borrow::Cow;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crypto::{CryptoHash, Hash, PublicKey};
-use messages::{RawMessage, MessageBuffer};
 use helpers::Round;
 
 /// A type that can be (de)serialized as a value in the blockchain storage.
@@ -227,16 +226,6 @@ impl StorageValue for PublicKey {
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
         PublicKey::from_slice(value.as_ref()).unwrap()
-    }
-}
-
-impl StorageValue for RawMessage {
-    fn into_bytes(self) -> Vec<u8> {
-        self.as_ref().to_vec()
-    }
-
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        Self::new(MessageBuffer::from_vec(value.into_owned()))
     }
 }
 

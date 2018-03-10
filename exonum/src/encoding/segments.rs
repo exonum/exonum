@@ -15,7 +15,6 @@
 use byteorder::{ByteOrder, LittleEndian};
 use bit_vec::BitVec;
 
-use messages::{RawMessage, HEADER_LENGTH, MessageBuffer};
 use crypto::Hash;
 use super::{Result, Error, Field, Offset, CheckedOffset};
 
@@ -145,54 +144,6 @@ impl<'a> SegmentField<'a> for &'a str {
             return Err(Error::Utf8 {
                 position: from.unchecked_offset(),
                 error: e,
-            });
-        }
-        Ok(latest_segment)
-    }
-}
-
-impl<'a> SegmentField<'a> for RawMessage {
-    fn item_size() -> Offset {
-        1
-    }
-
-    fn count(&self) -> Offset {
-        self.as_ref().len() as Offset
-    }
-
-    unsafe fn from_buffer(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
-        let to = from + to * Self::item_size();
-        let slice = &buffer[from as usize..to as usize];
-        RawMessage::new(MessageBuffer::from_vec(Vec::from(slice)))
-    }
-
-    fn extend_buffer(&self, buffer: &mut Vec<u8>) {
-
-        buffer.extend_from_slice(self.as_ref())
-    }
-
-    fn check_data(
-        buffer: &'a [u8],
-        from: CheckedOffset,
-        count: CheckedOffset,
-        latest_segment: CheckedOffset,
-    ) -> Result {
-        let size: CheckedOffset = (count * Self::item_size())?;
-        let to: CheckedOffset = (from + size)?;
-        let slice = &buffer[from.unchecked_offset() as usize..to.unchecked_offset() as usize];
-        if slice.len() < HEADER_LENGTH {
-            return Err(Error::UnexpectedlyShortRawMessage {
-                position: from.unchecked_offset(),
-                size: slice.len() as Offset,
-            });
-        }
-        let actual_size = slice.len() as Offset;
-        let declared_size: Offset = LittleEndian::read_u32(&slice[6..10]);
-        if actual_size != declared_size {
-            return Err(Error::IncorrectSizeOfRawMessage {
-                position: from.unchecked_offset(),
-                actual_size: slice.len() as Offset,
-                declared_size: declared_size,
             });
         }
         Ok(latest_segment)
