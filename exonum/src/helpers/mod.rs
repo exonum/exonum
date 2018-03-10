@@ -31,6 +31,7 @@ pub use self::types::{Height, Milliseconds, Round, ValidatorId};
 
 mod types;
 
+pub mod derive;
 pub mod fabric;
 pub mod config;
 pub mod user_agent;
