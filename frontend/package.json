@@ -14,7 +14,6 @@
     "bootstrap": "^4.0.0",
     "exonum-client": "^0.4.1",
     "noty": "^3.2.0-beta",
-    "numeral": "^2.0.6",
     "vue": "^2.5.13",
     "vue-router": "^3.0.1"
   },

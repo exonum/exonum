@@ -25,7 +25,7 @@
                                 <div class="row">
                                     <div class="col-sm-3"><strong>Balance:</strong></div>
                                     <div class="col-sm-9">
-                                        {{ balance | numeral('arg1').format('$0,0') }}
+                                        {{ balance }}
                                         <button class="btn btn-sm btn-outline-success ml-1" v-on:click="openAddFundsModal">Add Funds</button>
                                         <button class="btn btn-sm btn-outline-primary ml-1" v-bind:disabled="!balance" v-on:click="openTransferModal">Transfer Funds</button>
                                     </div>
@@ -54,13 +54,13 @@
                                     <div class="col-sm-4"><code>{{ tx.hash }}</code></div>
                                     <div class="col-sm-5" v-if="tx.message_id == 130">Wallet created</div>
                                     <div class="col-sm-5" v-else-if="tx.message_id == 129">
-                                        <strong>{{ tx.body.amount | numeral('arg1').format('$0,0') }}</strong> funds added
+                                        <strong>{{ tx.body.amount }}</strong> funds added
                                     </div>
                                     <div class="col-sm-5" v-else-if="tx.message_id == 128 && tx.body.from == publicKey">
-                                        <strong>{{ tx.body.amount | numeral('arg1').format('$0,0') }}</strong> sent to <code>{{ tx.body.to }}</code>
+                                        <strong>{{ tx.body.amount }}</strong> sent to <code>{{ tx.body.to }}</code>
                                     </div>
                                     <div class="col-sm-5" v-else-if="tx.message_id == 128 && tx.body.to == publicKey">
-                                        <strong>{{ tx.body.amount | numeral('arg1').format('$0,0') }}</strong> received from <code>{{ tx.body.from }}</code>
+                                        <strong>{{ tx.body.amount }}</strong> received from <code>{{ tx.body.from }}</code>
                                     </div>
                                     <div class="col-sm-3">
                                         <span v-if="tx.status" class="badge badge-success">executed</span>
@@ -103,7 +103,6 @@
 </template>
 
 <script>
-    const Vue = require('vue');
     const Exonum = require('exonum-client');
     const Modal = require('../components/Modal.vue');
     const Spinner = require('../components/Spinner.vue');
@@ -140,9 +139,7 @@
             addFunds: function() {
                 const self = this;
 
-                this.isSpinnerVisible = true;
-
-                Vue.storage.get().then(function(keyPair) {
+                this.$storage.get().then(function(keyPair) {
                     const TxIssue = Exonum.newMessage({
                         size: 48,
                         network_id: self.NETWORK_ID,
@@ -164,6 +161,8 @@
 
                     const signature = TxIssue.sign(keyPair.secretKey, data);
 
+                    self.isSpinnerVisible = true;
+
                     self.$http.post('/api/services/cryptocurrency/v1/wallets/transaction', {
                         network_id: self.NETWORK_ID,
                         protocol_version: self.PROTOCOL_VERSION,
@@ -174,14 +173,15 @@
                     }).then(function() {
                         self.isSpinnerVisible = false;
                         self.isAddFundsModalVisible = false;
-                        Vue.notify('success', 'Add funds transaction has been sent');
+                        self.$notify('success', 'Add funds transaction has been sent');
                     }).catch(function(error) {
                         self.isSpinnerVisible = false;
-                        Vue.notify('error', error.toString());
+                        self.$notify('error', error.toString());
                     });
                 }).catch(function(error) {
-                    self.isSpinnerVisible = false;
-                    Vue.notify('error', error.toString());
+                    self.isAddFundsModalVisible = false;
+                    self.$notify('error', error.toString());
+                    self.logout();
                 });
             },
 
@@ -196,13 +196,11 @@
             transfer: function() {
                 const self = this;
 
-                if (!Vue.validateHexString(this.receiver)) {
-                    return Vue.notify('error', 'Invalid public key is passed');
+                if (!this.$validateHex(this.receiver)) {
+                    return this.$notify('error', 'Invalid public key is passed');
                 }
 
-                this.isSpinnerVisible = true;
-
-                Vue.storage.get().then(function(keyPair) {
+                this.$storage.get().then(function(keyPair) {
                     const TxTransfer = Exonum.newMessage({
                         size: 80,
                         network_id: self.NETWORK_ID,
@@ -226,6 +224,8 @@
 
                     const signature = TxTransfer.sign(keyPair.secretKey, data);
 
+                    self.isSpinnerVisible = true;
+
                     self.$http.post('/api/services/cryptocurrency/v1/wallets/transaction', {
                         network_id: self.NETWORK_ID,
                         protocol_version: self.PROTOCOL_VERSION,
@@ -236,21 +236,50 @@
                     }).then(function() {
                         self.isSpinnerVisible = false;
                         self.isTransferModalVisible = false;
-                        Vue.notify('success', 'Transfer transaction has been sent');
+                        self.$notify('success', 'Transfer transaction has been sent');
                     }).catch(function(error) {
                         self.isSpinnerVisible = false;
-                        Vue.notify('error', error.toString());
+                        self.$notify('error', error.toString());
                     });
                 }).catch(function(error) {
-                    self.isSpinnerVisible = false;
-                    Vue.notify('error', error.toString());
+                    self.isTransferModalVisible = false;
+                    self.$notify('error', error.toString());
+                    self.logout();
                 });
             },
 
             logout: function() {
-                Vue.storage.remove();
+                this.$storage.remove();
                 this.$router.push({name: 'home'});
             }
+        },
+        mounted: function() {
+            this.$nextTick(function () {
+                const self = this;
+
+                this.$storage.get().then(function(keyPair) {
+                    self.isSpinnerVisible = true;
+
+                    self.$http.get('/api/services/configuration/v1/configs/actual').then(function(response) {
+                        const validators = response.data.config.validator_keys.map(function(validator) {
+                            return validator.consensus_key;
+                        });
+
+                        self.$http.get('/api/services/cryptocurrency/v1/wallets/info?pubkey=' + keyPair.publicKey).then(function(response) {
+                            // TODO verify proof response.data
+                        }).catch(function(error) {
+                            self.isSpinnerVisible = false;
+                            self.$notify('error', error.toString());
+                        });
+                    }).catch(function(error) {
+                        self.isSpinnerVisible = false;
+                        self.$notify('error', error.toString());
+                    });
+                }).catch(function(error) {
+                    self.$notify('error', error.toString());
+                    self.logout();
+                });
+            })
         }
     }
 </script>

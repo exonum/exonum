@@ -1,6 +1,6 @@
 module.exports = {
     install: function(Vue) {
-        Vue.storage = {
+        Vue.prototype.$storage = {
             set: function(keyPair) {
                 localStorage.setItem('user', JSON.stringify(keyPair));
             },

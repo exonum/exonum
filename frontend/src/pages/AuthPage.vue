@@ -49,7 +49,6 @@
 </template>
 
 <script>
-    const Vue = require('vue');
     const Exonum = require('exonum-client');
     const Tab = require('../components/Tab.vue');
     const Tabs = require('../components/Tabs.vue');
@@ -72,17 +71,17 @@
         },
         methods: {
             login: function() {
-                if (!Vue.validateHexString(this.publicKey)) {
-                    return Vue.notify('error', 'Invalid public key is passed');
+                if (!this.$validateHex(this.publicKey)) {
+                    return this.$notify('error', 'Invalid public key is passed');
                 }
 
-                if (!Vue.validateHexString(this.secretKey, 64)) {
-                    return Vue.notify('error', 'Invalid secret key is passed');
+                if (!this.$validateHex(this.secretKey, 64)) {
+                    return this.$notify('error', 'Invalid secret key is passed');
                 }
 
                 this.isSpinnerVisible = true;
 
-                Vue.storage.set({
+                this.$storage.set({
                     publicKey: this.publicKey,
                     secretKey: this.secretKey
                 });
@@ -94,7 +93,7 @@
                 const self = this;
 
                 if (!this.name) {
-                    return Vue.notify('error', 'The name is a required field');
+                    return this.$notify('error', 'The name is a required field');
                 }
 
                 this.keyPair = Exonum.keyPair();
@@ -132,7 +131,7 @@
                     self.isModalVisible = true;
                 }).catch(function(error) {
                     self.isSpinnerVisible = false;
-                    Vue.notify('error', error.toString());
+                    self.$notify('error', error.toString());
                 });
             },
 
@@ -141,7 +140,7 @@
             },
 
             proceed: function() {
-                Vue.storage.set(this.keyPair);
+                this.$storage.set(this.keyPair);
 
                 this.$router.push({name: 'user'});
             }

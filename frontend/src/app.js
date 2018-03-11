@@ -1,5 +1,4 @@
 const Vue = require('vue');
-const numeral = require('numeral');
 const router = require('./router');
 const Storage = require('./plugins/storage');
 const Validate = require('./plugins/validate');
@@ -11,10 +10,6 @@ Vue.use(Storage);
 Vue.use(Validate);
 Vue.use(Notify);
 Vue.use(axios);
-
-Vue.filter('numeral', function(value) {
-    return numeral(value);
-});
 
 Vue.mixin({
     data: function() {
