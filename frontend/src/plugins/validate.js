@@ -1,23 +1,23 @@
-module.exports = {
-    install: function(Vue) {
-        Vue.prototype.$validateHex = function(hash, bytes) {
-            bytes = bytes || 32;
+export default {
+  install: function(Vue) {
+    Vue.prototype.$validateHex = function(hash, bytes) {
+      bytes = bytes || 32
 
-            if (typeof hash !== 'string') {
-                return false;
-            } else if (hash.length !== bytes * 2) {
-                // hexadecimal string is of wrong length
-                return false;
-            }
+      if (typeof hash !== 'string') {
+        return false
+      } else if (hash.length !== bytes * 2) {
+        // hexadecimal string is of wrong length
+        return false
+      }
 
-            for (let i = 0; i < hash.length; i++) {
-                if (isNaN(parseInt(hash[i], 16))) {
-                    // invalid symbol in hexadecimal string
-                    return false;
-                }
-            }
-
-            return true;
+      for (let i = 0; i < hash.length; i++) {
+        if (isNaN(parseInt(hash[i], 16))) {
+          // invalid symbol in hexadecimal string
+          return false
         }
+      }
+
+      return true
     }
-};
+  }
+}

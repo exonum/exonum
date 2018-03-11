@@ -2,18 +2,14 @@ module.exports = function(grunt) {
     require('load-grunt-tasks')(grunt);
 
     grunt.initConfig({
+        eslint: {
+            dist: {
+                src: ['./src/**/*.*']
+            }
+        },
         clean: {
             build: {
                 src: ['dist']
-            }
-        },
-        watch: {
-            scripts: {
-                files: ['./src/**/*.*'],
-                tasks: ['browserify'],
-                options: {
-                    spawn: false
-                }
             }
         },
         browserify: {
@@ -26,6 +22,15 @@ module.exports = function(grunt) {
             dist: {
                 src: './src/app.js',
                 dest: './dist/build.js'
+            }
+        },
+        watch: {
+            scripts: {
+                files: ['./src/**/*.*'],
+                tasks: ['browserify'],
+                options: {
+                    spawn: false
+                }
             }
         }
     });

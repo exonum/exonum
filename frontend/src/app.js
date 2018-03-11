@@ -1,20 +1,20 @@
-const Vue = require('vue');
-const router = require('./router');
-const numeral = require('./directives/numeral');
-const Storage = require('./plugins/storage');
-const Validate = require('./plugins/validate');
-const Notify = require('./plugins/notify');
-const Blockchain = require('./plugins/blockchain');
-const App = require('./App.vue');
+import Vue from 'vue'
+import router from './router'
+import numeral from './directives/numeral'
+import Storage from './plugins/storage'
+import Validate from './plugins/validate'
+import Notify from './plugins/notify'
+import Blockchain from './plugins/blockchain'
+import App from './App.vue'
 
-Vue.use(numeral);
-Vue.use(Storage);
-Vue.use(Validate);
-Vue.use(Notify);
-Vue.use(Blockchain);
+Vue.use(numeral)
+Vue.use(Storage)
+Vue.use(Validate)
+Vue.use(Notify)
+Vue.use(Blockchain)
 
 new Vue({
-    el: '#app',
-    router,
-    render: (createElement) => createElement(App)
-});
+  el: '#app',
+  router,
+  render: (createElement) => createElement(App)
+})

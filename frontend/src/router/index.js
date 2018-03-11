@@ -1,21 +1,21 @@
-const Vue = require('vue');
-const Router = require('vue-router');
-const AuthPage = require('../pages/AuthPage.vue');
-const WalletPage = require('../pages/WalletPage.vue');
+import Vue from 'vue'
+import Router from 'vue-router'
+import AuthPage from '../pages/AuthPage.vue'
+import WalletPage from '../pages/WalletPage.vue'
 
-Vue.use(Router);
+Vue.use(Router)
 
-module.exports = new Router({
-    routes: [
-        {
-            path: '/',
-            name: 'home',
-            component: AuthPage
-        },
-        {
-            path: '/user',
-            name: 'user',
-            component: WalletPage
-        }
-    ]
-});
+export default new Router({
+  routes: [
+    {
+      path: '/',
+      name: 'home',
+      component: AuthPage
+    },
+    {
+      path: '/user',
+      name: 'user',
+      component: WalletPage
+    }
+  ]
+})

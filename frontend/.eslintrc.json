@@ -1,0 +1,6 @@
+{
+  "extends": "plugin:vue/recommended",
+  "rules": {
+    "vue/max-attributes-per-line": false
+  }
+}
