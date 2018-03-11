@@ -25,7 +25,7 @@
                                 <div class="row">
                                     <div class="col-sm-3"><strong>Balance:</strong></div>
                                     <div class="col-sm-9">
-                                        {{ balance }}
+                                        <span v-numeral="balance"></span>
                                         <button class="btn btn-sm btn-outline-success ml-1" v-on:click="openAddFundsModal">Add Funds</button>
                                         <button class="btn btn-sm btn-outline-primary ml-1" v-bind:disabled="!balance" v-on:click="openTransferModal">Transfer Funds</button>
                                     </div>
@@ -54,13 +54,13 @@
                                     <div class="col-sm-4"><code>{{ transaction.hash }}</code></div>
                                     <div class="col-sm-5" v-if="transaction.message_id == 130">Wallet created</div>
                                     <div class="col-sm-5" v-else-if="transaction.message_id == 129">
-                                        <strong>{{ transaction.body.amount }}</strong> funds added
+                                        <strong v-numeral="transaction.body.amount"></strong> funds added
                                     </div>
                                     <div class="col-sm-5" v-else-if="transaction.message_id == 128 && transaction.body.from == publicKey">
-                                        <strong>{{ transaction.body.amount }}</strong> sent to <code>{{ transaction.body.to }}</code>
+                                        <strong v-numeral="transaction.body.amount"></strong> sent to <code>{{ transaction.body.to }}</code>
                                     </div>
                                     <div class="col-sm-5" v-else-if="transaction.message_id == 128 && transaction.body.to == publicKey">
-                                        <strong>{{ transaction.body.amount }}</strong> received from <code>{{ transaction.body.from }}</code>
+                                        <strong v-numeral="transaction.body.amount"></strong> received from <code>{{ transaction.body.from }}</code>
                                     </div>
                                     <div class="col-sm-3">
                                         <span v-if="transaction.status" class="badge badge-success">executed</span>
