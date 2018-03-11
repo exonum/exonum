@@ -49,7 +49,6 @@
 </template>
 
 <script>
-    const Exonum = require('exonum-client');
     const Tab = require('../components/Tab.vue');
     const Tabs = require('../components/Tabs.vue');
     const Modal = require('../components/Modal.vue');
@@ -96,37 +95,10 @@
                     return this.$notify('error', 'The name is a required field');
                 }
 
-                this.keyPair = Exonum.keyPair();
-
                 this.isSpinnerVisible = true;
 
-                const TxCreateWallet = Exonum.newMessage({
-                    size: 40,
-                    network_id: this.NETWORK_ID,
-                    protocol_version: this.PROTOCOL_VERSION,
-                    service_id: this.SERVICE_ID,
-                    message_id: this.TX_WALLET_ID,
-                    fields: {
-                        pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-                        name: {type: Exonum.String, size: 8, from: 32, to: 40}
-                    }
-                });
-
-                const data = {
-                    pub_key: this.keyPair.publicKey,
-                    name: this.name
-                };
-
-                const signature = TxCreateWallet.sign(this.keyPair.secretKey, data);
-
-                this.$http.post('/api/services/cryptocurrency/v1/wallets/transaction', {
-                    network_id: this.NETWORK_ID,
-                    protocol_version: this.PROTOCOL_VERSION,
-                    service_id: this.SERVICE_ID,
-                    message_id: this.TX_WALLET_ID,
-                    signature: signature,
-                    body: data
-                }).then(function() {
+                this.$blockchain.createWallet(this.name).then(function(keyPair) {
+                    self.keyPair = keyPair;
                     self.isSpinnerVisible = false;
                     self.isModalVisible = true;
                 }).catch(function(error) {
@@ -140,6 +112,8 @@
             },
 
             proceed: function() {
+                this.isModalVisible = false;
+
                 this.$storage.set(this.keyPair);
 
                 this.$router.push({name: 'user'});

@@ -49,21 +49,21 @@
                                     <div class="col-sm-3">Status</div>
                                 </div>
                             </li>
-                            <li class="list-group-item" v-for="tx in txs">
+                            <li class="list-group-item" v-for="transaction in transactions">
                                 <div class="row">
-                                    <div class="col-sm-4"><code>{{ tx.hash }}</code></div>
-                                    <div class="col-sm-5" v-if="tx.message_id == 130">Wallet created</div>
-                                    <div class="col-sm-5" v-else-if="tx.message_id == 129">
-                                        <strong>{{ tx.body.amount }}</strong> funds added
+                                    <div class="col-sm-4"><code>{{ transaction.hash }}</code></div>
+                                    <div class="col-sm-5" v-if="transaction.message_id == 130">Wallet created</div>
+                                    <div class="col-sm-5" v-else-if="transaction.message_id == 129">
+                                        <strong>{{ transaction.body.amount }}</strong> funds added
                                     </div>
-                                    <div class="col-sm-5" v-else-if="tx.message_id == 128 && tx.body.from == publicKey">
-                                        <strong>{{ tx.body.amount }}</strong> sent to <code>{{ tx.body.to }}</code>
+                                    <div class="col-sm-5" v-else-if="transaction.message_id == 128 && transaction.body.from == publicKey">
+                                        <strong>{{ transaction.body.amount }}</strong> sent to <code>{{ transaction.body.to }}</code>
                                     </div>
-                                    <div class="col-sm-5" v-else-if="tx.message_id == 128 && tx.body.to == publicKey">
-                                        <strong>{{ tx.body.amount }}</strong> received from <code>{{ tx.body.from }}</code>
+                                    <div class="col-sm-5" v-else-if="transaction.message_id == 128 && transaction.body.to == publicKey">
+                                        <strong>{{ transaction.body.amount }}</strong> received from <code>{{ transaction.body.from }}</code>
                                     </div>
                                     <div class="col-sm-3">
-                                        <span v-if="tx.status" class="badge badge-success">executed</span>
+                                        <span v-if="transaction.status" class="badge badge-success">executed</span>
                                         <span v-else class="badge badge-danger">failed</span>
                                     </div>
                                 </div>
@@ -103,7 +103,6 @@
 </template>
 
 <script>
-    const Exonum = require('exonum-client');
     const Modal = require('../components/Modal.vue');
     const Spinner = require('../components/Spinner.vue');
 
@@ -114,9 +113,13 @@
         },
         data: function() {
             return {
+                name: undefined,
+                publicKey: undefined,
+                balance: undefined,
+                height: undefined,
                 amountToAdd: 10,
-                receiver: '',
-                amountToTransfer: '',
+                receiver: undefined,
+                amountToTransfer: undefined,
                 isAddFundsModalVisible: false,
                 isTransferModalVisible: false,
                 isSpinnerVisible: false,
@@ -140,37 +143,9 @@
                 const self = this;
 
                 this.$storage.get().then(function(keyPair) {
-                    const TxIssue = Exonum.newMessage({
-                        size: 48,
-                        network_id: self.NETWORK_ID,
-                        protocol_version: self.PROTOCOL_VERSION,
-                        service_id: self.SERVICE_ID,
-                        message_id: self.TX_ISSUE_ID,
-                        fields: {
-                            wallet: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-                            amount: {type: Exonum.Uint64, size: 8, from: 32, to: 40},
-                            seed: {type: Exonum.Uint64, size: 8, from: 40, to: 48}
-                        }
-                    });
-
-                    const data = {
-                        wallet: keyPair.publicKey,
-                        amount: self.amountToAdd.toString(),
-                        seed: Exonum.randomUint64()
-                    };
-
-                    const signature = TxIssue.sign(keyPair.secretKey, data);
-
                     self.isSpinnerVisible = true;
 
-                    self.$http.post('/api/services/cryptocurrency/v1/wallets/transaction', {
-                        network_id: self.NETWORK_ID,
-                        protocol_version: self.PROTOCOL_VERSION,
-                        service_id: self.SERVICE_ID,
-                        message_id: self.TX_ISSUE_ID,
-                        signature: signature,
-                        body: data
-                    }).then(function() {
+                    self.$blockchain.addFunds(keyPair, self.amountToAdd).then(function() {
                         self.isSpinnerVisible = false;
                         self.isAddFundsModalVisible = false;
                         self.$notify('success', 'Add funds transaction has been sent');
@@ -201,39 +176,9 @@
                 }
 
                 this.$storage.get().then(function(keyPair) {
-                    const TxTransfer = Exonum.newMessage({
-                        size: 80,
-                        network_id: self.NETWORK_ID,
-                        protocol_version: self.PROTOCOL_VERSION,
-                        service_id: self.SERVICE_ID,
-                        message_id: self.TX_TRANSFER_ID,
-                        fields: {
-                            from: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-                            to: {type: Exonum.PublicKey, size: 32, from: 32, to: 64},
-                            amount: {type: Exonum.Int64, size: 8, from: 64, to: 72},
-                            seed: {type: Exonum.Uint64, size: 8, from: 72, to: 80}
-                        }
-                    });
-
-                    const data = {
-                        from: keyPair.publicKey,
-                        to: self.receiver,
-                        amount: self.amountToTransfer.toString(),
-                        seed: Exonum.randomUint64()
-                    };
-
-                    const signature = TxTransfer.sign(keyPair.secretKey, data);
-
                     self.isSpinnerVisible = true;
 
-                    self.$http.post('/api/services/cryptocurrency/v1/wallets/transaction', {
-                        network_id: self.NETWORK_ID,
-                        protocol_version: self.PROTOCOL_VERSION,
-                        service_id: self.SERVICE_ID,
-                        message_id: self.TX_TRANSFER_ID,
-                        signature: signature,
-                        body: data
-                    }).then(function() {
+                    self.$blockchain.transfer(keyPair, self.receiver, self.amountToTransfer).then(function() {
                         self.isSpinnerVisible = false;
                         self.isTransferModalVisible = false;
                         self.$notify('success', 'Transfer transaction has been sent');
@@ -260,17 +205,13 @@
                 this.$storage.get().then(function(keyPair) {
                     self.isSpinnerVisible = true;
 
-                    self.$http.get('/api/services/configuration/v1/configs/actual').then(function(response) {
-                        const validators = response.data.config.validator_keys.map(function(validator) {
-                            return validator.consensus_key;
-                        });
-
-                        self.$http.get('/api/services/cryptocurrency/v1/wallets/info?pubkey=' + keyPair.publicKey).then(function(response) {
-                            // TODO verify proof response.data
-                        }).catch(function(error) {
-                            self.isSpinnerVisible = false;
-                            self.$notify('error', error.toString());
-                        });
+                    self.$blockchain.getWallet(keyPair).then(function(data) {
+                        self.isSpinnerVisible = false;
+                        self.name = data.wallet.name;
+                        self.publicKey = keyPair.publicKey;
+                        self.balance = data.wallet.balance;
+                        self.height = data.block.height;
+                        self.transactions = data.transactions;
                     }).catch(function(error) {
                         self.isSpinnerVisible = false;
                         self.$notify('error', error.toString());
