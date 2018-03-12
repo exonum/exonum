@@ -112,7 +112,11 @@ where
     /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new_in_family(name, &index_id, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(family_name: S, index_id: &I, view: T) -> Self {
+    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
+        family_name: S,
+        index_id: &I,
+        view: T,
+    ) -> Self {
         ValueSetIndex {
             base: BaseIndex::new_in_family(family_name, index_id, IndexType::ValueSet, view),
             _v: PhantomData,

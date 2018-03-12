@@ -248,7 +248,10 @@ impl<'a> BaseIndex<&'a mut Fork> {
     /// in the index.
     pub fn clear(&mut self) {
         self.set_index_type();
-        self.view.remove_by_prefix(&self.name, self.index_id.as_ref());
+        self.view.remove_by_prefix(
+            &self.name,
+            self.index_id.as_ref(),
+        );
     }
 }
 

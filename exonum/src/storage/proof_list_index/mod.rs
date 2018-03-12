@@ -127,11 +127,15 @@ where
     ///
     /// let mut fork = db.fork();
     /// let mut mut_index : ProofListIndex<_, u8> =
-    ///                                     ProofListIndex::new_in_family(name, &index_id, &mut fork);
+    ///                                 ProofListIndex::new_in_family(name, &index_id, &mut fork);
     /// # drop(index);
     /// # drop(mut_index);
     /// ```
-    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(family_name: S, index_id: &I, view: T) -> Self {
+    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
+        family_name: S,
+        index_id: &I,
+        view: T,
+    ) -> Self {
         ProofListIndex {
             base: BaseIndex::new_in_family(family_name, index_id, IndexType::ProofList, view),
             length: Cell::new(None),

@@ -130,7 +130,11 @@ where
     /// let index: MapIndex<_, u8, u8> = MapIndex::new_in_family(name, &index_id, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(family_name: S, index_id: &I, view: T) -> Self {
+    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
+        family_name: S,
+        index_id: &I,
+        view: T,
+    ) -> Self {
         MapIndex {
             base: BaseIndex::new_in_family(family_name, index_id, IndexType::Map, view),
             _k: PhantomData,

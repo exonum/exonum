@@ -99,7 +99,11 @@ where
     /// let index: KeySetIndex<_, u8> = KeySetIndex::new_in_family(name, &index_id, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(family_name: S, index_id: &I, view: T) -> Self {
+    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
+        family_name: S,
+        index_id: &I,
+        view: T,
+    ) -> Self {
         KeySetIndex {
             base: BaseIndex::new_in_family(family_name, index_id, IndexType::KeySet, view),
             _k: PhantomData,

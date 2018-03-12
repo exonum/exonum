@@ -170,10 +170,15 @@ where
     /// let snapshot = db.snapshot();
     /// let name = "name";
     /// let index_id = vec![123];
-    /// let index: SparseListIndex<_, u8> = SparseListIndex::new_in_family(name, &index_id, &snapshot);
+    /// let index: SparseListIndex<_, u8> =
+    ///                             SparseListIndex::new_in_family(name, &index_id, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(family_name: S, index_id: &I, view: T) -> Self {
+    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
+        family_name: S,
+        index_id: &I,
+        view: T,
+    ) -> Self {
         SparseListIndex {
             base: BaseIndex::new_in_family(family_name, index_id, IndexType::SparseList, view),
             size: Cell::new(None),

@@ -15,7 +15,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `ProofListIndex` and `ProofMapIndex` `root_hash` method has been renamed to
   `merkle_root`. (#547)
 
-- `with_prefix` constructor of all index types has been renamed to 
+- `with_prefix` constructor of all index types has been renamed to
   `new_in_family`. Now it uses `index_id` instead of prefixes. Moreover,
   `blockchain::gen_prefix` method has been removed. Instead, any type that
   implements `StorageKey` trait, can serve as an `index_id`. (#531)
