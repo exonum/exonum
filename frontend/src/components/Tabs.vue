@@ -26,17 +26,17 @@
     },
     methods: {
       addTab: function(tab) {
-        this.tabs.push(tab);
+        this.tabs.push(tab)
         if (tab.active === true) {
-          this.current = tab;
+          this.current = tab
         }
       },
       changeTab: function(tab) {
-        this.current = tab;
-        this.tabs.forEach(function(value) {
-          value.active = value === tab;
-        });
+        this.current = tab
+        this.tabs.forEach(value => {
+          value.active = value === tab
+        })
       }
     }
-  };
+  }
 </script>

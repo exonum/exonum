@@ -10,7 +10,7 @@
     data: function() {
       return {
         active: false
-      };
+      }
     },
     props: {
       title: String,
@@ -21,10 +21,10 @@
       }
     },
     created: function() {
-      this.active = this.isActive;
+      this.active = this.isActive
     },
     mounted: function() {
-      this.$parent.addTab(this);
+      this.$parent.addTab(this)
     }
-  };
+  }
 </script>

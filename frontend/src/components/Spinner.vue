@@ -8,7 +8,7 @@
     props: {
       visible: Boolean
     }
-  };
+  }
 </script>
 
 <style>

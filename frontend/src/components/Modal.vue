@@ -36,24 +36,24 @@
     },
     watch: {
       visible: function(state) {
-        const className = 'modal-open';
+        const className = 'modal-open'
 
         if (state) {
-          document.body.classList.add(className);
+          document.body.classList.add(className)
         } else {
-          document.body.classList.remove(className);
+          document.body.classList.remove(className)
         }
       }
     },
     methods: {
       close: function() {
-        this.$emit('close');
+        this.$emit('close')
       },
       action: function() {
-        this.$emit('submit');
+        this.$emit('submit')
       }
     }
-  };
+  }
 </script>
 
 <style>

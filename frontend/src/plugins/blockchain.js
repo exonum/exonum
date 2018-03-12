@@ -99,7 +99,7 @@ function getPublicKeyOfTransaction(transactionId, transaction) {
 module.exports = {
   install: function(Vue) {
     Vue.prototype.$blockchain = {
-      createWallet: function(name) {
+      createWallet: name => {
         const keyPair = Exonum.keyPair()
 
         const TxCreateWallet = getTransaction(TX_WALLET_ID)
@@ -118,12 +118,12 @@ module.exports = {
           message_id: TX_WALLET_ID,
           signature: signature,
           body: data
-        }).then(function() {
+        }).then(() => {
           return keyPair
         })
       },
 
-      addFunds: function(keyPair, amountToAdd) {
+      addFunds: (keyPair, amountToAdd) => {
         const TxIssue = getTransaction(TX_ISSUE_ID)
 
         const data = {
@@ -144,7 +144,7 @@ module.exports = {
         })
       },
 
-      transfer: function(keyPair, receiver, amountToTransfer) {
+      transfer: (keyPair, receiver, amountToTransfer) => {
         const TxTransfer = getTransaction(TX_TRANSFER_ID)
 
         const data = {
@@ -166,15 +166,15 @@ module.exports = {
         })
       },
 
-      getWallet: function(keyPair) {
-        return axios.get(CONFIG_URL).then(function(response) {
-          const validators = response.data.config.validator_keys.map(function(validator) {
+      getWallet: keyPair => {
+        return axios.get(CONFIG_URL).then(response => {
+          const validators = response.data.config.validator_keys.map(validator => {
             return validator.consensus_key
           })
 
-          return axios.get(WALLET_URL + keyPair.publicKey).then(function(response) {
+          return axios.get(WALLET_URL + keyPair.publicKey).then(response => {
             return response.data
-          }).then(function(data) {
+          }).then((data) => {
             if (!Exonum.verifyBlock(data.block_info, validators, NETWORK_ID)) {
               throw new Error('Block can not be verified')
             }

@@ -105,8 +105,8 @@
 </template>
 
 <script>
-  const Modal = require('../components/Modal.vue');
-  const Spinner = require('../components/Spinner.vue');
+  const Modal = require('../components/Modal.vue')
+  const Spinner = require('../components/Spinner.vue')
 
   module.exports = {
     components: {
@@ -134,94 +134,94 @@
     },
     methods: {
       openAddFundsModal: function() {
-        this.isAddFundsModalVisible = true;
+        this.isAddFundsModalVisible = true
       },
 
       closeAddFundsModal: function() {
-        this.isAddFundsModalVisible = false;
+        this.isAddFundsModalVisible = false
       },
 
       addFunds: function() {
-        const self = this;
+        const self = this
 
         this.$storage.get().then(function(keyPair) {
-          self.isSpinnerVisible = true;
+          self.isSpinnerVisible = true
 
           self.$blockchain.addFunds(keyPair, self.amountToAdd).then(function() {
-            self.isSpinnerVisible = false;
-            self.isAddFundsModalVisible = false;
-            self.$notify('success', 'Add funds transaction has been sent');
+            self.isSpinnerVisible = false
+            self.isAddFundsModalVisible = false
+            self.$notify('success', 'Add funds transaction has been sent')
           }).catch(function(error) {
-            self.isSpinnerVisible = false;
-            self.$notify('error', error.toString());
-          });
+            self.isSpinnerVisible = false
+            self.$notify('error', error.toString())
+          })
         }).catch(function(error) {
-          self.isAddFundsModalVisible = false;
-          self.$notify('error', error.toString());
-          self.logout();
-        });
+          self.isAddFundsModalVisible = false
+          self.$notify('error', error.toString())
+          self.logout()
+        })
       },
 
       openTransferModal: function() {
-        this.isTransferModalVisible = true;
+        this.isTransferModalVisible = true
       },
 
       closeTransferModal: function() {
-        this.isTransferModalVisible = false;
+        this.isTransferModalVisible = false
       },
 
       transfer: function() {
-        const self = this;
+        const self = this
 
         if (!this.$validateHex(this.receiver)) {
-          return this.$notify('error', 'Invalid public key is passed');
+          return this.$notify('error', 'Invalid public key is passed')
         }
 
         this.$storage.get().then(function(keyPair) {
-          self.isSpinnerVisible = true;
+          self.isSpinnerVisible = true
 
           self.$blockchain.transfer(keyPair, self.receiver, self.amountToTransfer).then(function() {
-            self.isSpinnerVisible = false;
-            self.isTransferModalVisible = false;
-            self.$notify('success', 'Transfer transaction has been sent');
+            self.isSpinnerVisible = false
+            self.isTransferModalVisible = false
+            self.$notify('success', 'Transfer transaction has been sent')
           }).catch(function(error) {
-            self.isSpinnerVisible = false;
-            self.$notify('error', error.toString());
-          });
+            self.isSpinnerVisible = false
+            self.$notify('error', error.toString())
+          })
         }).catch(function(error) {
-          self.isTransferModalVisible = false;
-          self.$notify('error', error.toString());
-          self.logout();
-        });
+          self.isTransferModalVisible = false
+          self.$notify('error', error.toString())
+          self.logout()
+        })
       },
 
       logout: function() {
-        this.$storage.remove();
-        this.$router.push({name: 'home'});
+        this.$storage.remove()
+        this.$router.push({name: 'home'})
       }
     },
     mounted: function() {
       this.$nextTick(function() {
-        const self = this;
+        const self = this
 
         this.$storage.get().then(function(keyPair) {
-          self.isSpinnerVisible = true;
+          self.isSpinnerVisible = true
 
           self.$blockchain.getWallet(keyPair).then(function(data) {
-            self.isSpinnerVisible = false;
-            self.name = data.wallet.name;
-            self.publicKey = keyPair.publicKey;
-            self.balance = data.wallet.balance;
-            self.height = data.block.height;
-            self.transactions = data.transactions;
+            self.isSpinnerVisible = false
+            self.name = data.wallet.name
+            self.publicKey = keyPair.publicKey
+            self.balance = data.wallet.balance
+            self.height = data.block.height
+            self.transactions = data.transactions
           }).catch(function(error) {
-            self.isSpinnerVisible = false;
-            self.$notify('error', error.toString());
-          });
+            self.isSpinnerVisible = false
+            self.$notify('error', error.toString())
+          })
         }).catch(function(error) {
-          self.$notify('error', error.toString());
-          self.logout();
-        });
+          self.$notify('error', error.toString())
+          self.logout()
+        })
       })
     }
   }

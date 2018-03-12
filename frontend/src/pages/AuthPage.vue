@@ -13,7 +13,7 @@
                 </div>
                 <div class="form-group">
                   <label class="control-label">Secret key:</label>
-                  <input v-model="secretKey" type="password" class="form-control" placeholder="Enter secret key">
+                  <input v-model="secretKey" type="text" class="form-control" placeholder="Enter secret key">
                 </div>
                 <button type="submit" class="btn btn-lg btn-block btn-primary">Log in</button>
               </form>
@@ -49,10 +49,10 @@
 </template>
 
 <script>
-  const Tab = require('../components/Tab.vue');
-  const Tabs = require('../components/Tabs.vue');
-  const Modal = require('../components/Modal.vue');
-  const Spinner = require('../components/Spinner.vue');
+  const Tab = require('../components/Tab.vue')
+  const Tabs = require('../components/Tabs.vue')
+  const Modal = require('../components/Modal.vue')
+  const Spinner = require('../components/Spinner.vue')
 
   module.exports = {
     components: {
@@ -71,53 +71,53 @@
     methods: {
       login: function() {
         if (!this.$validateHex(this.publicKey)) {
-          return this.$notify('error', 'Invalid public key is passed');
+          return this.$notify('error', 'Invalid public key is passed')
         }
 
         if (!this.$validateHex(this.secretKey, 64)) {
-          return this.$notify('error', 'Invalid secret key is passed');
+          return this.$notify('error', 'Invalid secret key is passed')
         }
 
-        this.isSpinnerVisible = true;
+        this.isSpinnerVisible = true
 
         this.$storage.set({
           publicKey: this.publicKey,
           secretKey: this.secretKey
-        });
+        })
 
-        this.$router.push({name: 'user'});
+        this.$router.push({name: 'user'})
       },
 
       register: function() {
-        const self = this;
+        const self = this
 
         if (!this.name) {
-          return this.$notify('error', 'The name is a required field');
+          return this.$notify('error', 'The name is a required field')
         }
 
-        this.isSpinnerVisible = true;
+        this.isSpinnerVisible = true
 
         this.$blockchain.createWallet(this.name).then(function(keyPair) {
-          self.name = '';
-          self.keyPair = keyPair;
-          self.isSpinnerVisible = false;
-          self.isModalVisible = true;
+          self.name = ''
+          self.keyPair = keyPair
+          self.isSpinnerVisible = false
+          self.isModalVisible = true
         }).catch(function(error) {
-          self.isSpinnerVisible = false;
-          self.$notify('error', error.toString());
-        });
+          self.isSpinnerVisible = false
+          self.$notify('error', error.toString())
+        })
       },
 
       closeModal: function() {
-        this.isModalVisible = false;
+        this.isModalVisible = false
       },
 
       proceed: function() {
-        this.isModalVisible = false;
+        this.isModalVisible = false
 
-        this.$storage.set(this.keyPair);
+        this.$storage.set(this.keyPair)
 
-        this.$router.push({name: 'user'});
+        this.$router.push({name: 'user'})
       }
     }
   }
