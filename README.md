@@ -1,14 +1,10 @@
 # Cryptocurrency demo
 
-* [Getting started](#getting-started)
-* [Quick installation](#quick-installation)
-* [Blockchain monitoring](#blockchain-monitoring)
-* [Complete installation](#complete-installation)
-* [License](#license)
+This project demonstrates how to bootstrap own cryptocurrency
+with [Exonum blockchain](https://github.com/exonum/exonum).
 
-This project demonstrates how to bootstrap own cryptocurrency with [Exonum blockchain](https://github.com/exonum/exonum).
-
-Exonum blockchain keeps balances of users and handles secure transactions between them.
+Exonum blockchain keeps balances of users and handles secure
+transactions between them.
 
 It implements most basic operations:
 - Create a new user;
@@ -17,55 +13,16 @@ It implements most basic operations:
 
 ## Getting started
 
-We prepared a minimal configuration that helps you start.
-
 Be sure you installed necessary packages:
+
 * [git](https://git-scm.com/downloads)
-* [supervisord](http://supervisord.org/installing.html)
 * [Node.js with npm](https://nodejs.org/en/download/)
 * [Rust compiler](https://rustup.rs/)
-* [gnu-sed](https://stackoverflow.com/questions/30003570/how-to-use-gnu-sed-on-mac-os-x) on Mac OS X
-* [build-essential](https://askubuntu.com/questions/398489/how-to-install-build-essential) on Ubuntu
 
-## Quick installation
+## Installation
 
-Clone the project to a local folder, bootstrap and start it:
-
-```sh
-git clone https://github.com/exonum/cryptocurrency-advanced
-
-cd cryptocurrency-advanced
-
-export SERVICE_ROOT=$(pwd)/currency_root
-
-./service/bootstrap.sh install
-
-./service/bootstrap.sh enable
-
-./service/bootstrap.sh start cryptocurrency
-```
-
-Ready! Find demo at [http://127.0.0.1:8280](http://127.0.0.1:8280).
-
-To stop the service:
-
-```sh
-./service/bootstrap.sh stop cryptocurrency
-
-./service/bootstrap.sh disable
-
-./service/bootstrap.sh clear
-```
-
-## Blockchain monitoring
-
-Use the official [blockchain explorer](https://github.com/exonum/blockchain-explorer) to monitor blocks and transactions in the blockchain.
-
-Use root URL of public API address of one of nodes as `--api-root` parameter, e.g `http://0.0.0.0:8200`.
-
-## Complete installation
-
-Below you will find a step-by-step guide to getting started with cryptocurrency service.
+Below you will find a step-by-step guide to starting the cryptocurrency
+service on 4 nodes on the local machine.
 
 Clone the project and build it:
 
@@ -112,13 +69,13 @@ cryptocurrency finalize --public-api-address 0.0.0.0:8203 --private-api-address 
 Run nodes:
 
 ```sh
-cryptocurrency run --node-config node_1_cfg.toml --db-path /path/to/db1 --public-api-address 0.0.0.0:8200
+cryptocurrency run --node-config node_1_cfg.toml --db-path db1 --public-api-address 0.0.0.0:8200
 
-cryptocurrency run --node-config node_2_cfg.toml --db-path /path/to/db2 --public-api-address 0.0.0.0:8201
+cryptocurrency run --node-config node_2_cfg.toml --db-path db2 --public-api-address 0.0.0.0:8201
 
-cryptocurrency run --node-config node_3_cfg.toml --db-path /path/to/db3 --public-api-address 0.0.0.0:8202
+cryptocurrency run --node-config node_3_cfg.toml --db-path db3 --public-api-address 0.0.0.0:8202
 
-cryptocurrency run --node-config node_4_cfg.toml --db-path /path/to/db4 --public-api-address 0.0.0.0:8203
+cryptocurrency run --node-config node_4_cfg.toml --db-path db4 --public-api-address 0.0.0.0:8203
 ```
 
 Now install frontend dependencies:
@@ -143,9 +100,16 @@ npm start -- --port=8280 --api-root=http://127.0.0.1:8200
 
 `--port` is a port for Node.JS app.
 
-`--api-root` is a root URL of public API address of one of nodes, e.g `http://0.0.0.0:8200`.
+`--api-root` is a root URL of public API address of one of nodes.
 
 Ready! Find demo at [http://127.0.0.1:8280](http://127.0.0.1:8280).
+
+## Blockchain monitoring
+
+Use the official [blockchain explorer](https://github.com/exonum/blockchain-explorer)
+to monitor blocks and transactions in the blockchain.
+
+Use root URL of public API address of one of nodes as `--api-root` parameter, e.g `http://127.0.0.1:8200`.
 
 ## License
 
