@@ -15,6 +15,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `ProofListIndex` and `ProofMapIndex` `root_hash` method has been renamed to
   `merkle_root`. (#547)
 
+- `with_prefix` constructor of all index types has been renamed to 
+  `new_in_family`. Now it uses `index_id` instead of prefixes. Moreover,
+  `blockchain::gen_prefix` method has been removed. Instead, any type that
+  implements `StorageKey` trait, can serve as an `index_id`. (#531)
+
 #### exonum-configuration
 
 - `majority_count: Option<u16>` configuration parameter is introduced.
@@ -171,8 +176,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Renamed methods `validators_time`/`validators_time_mut` to
   `validators_times`/`validators_times_mut` in `Schema`. (#20)
-- `blockchain::gen_prefix` function has been removed. Instead, now any type that
-  implements `StorageKey` can serve as a prefix.
 
 ### New features
 
