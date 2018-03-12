@@ -71,15 +71,15 @@ where
     /// let index: ListIndex<_, u8> = ListIndex::new(name, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         ListIndex {
-            base: BaseIndex::new(name, IndexType::List, view),
+            base: BaseIndex::new(index_name, IndexType::List, view),
             length: Cell::new(None),
             _v: PhantomData,
         }
     }
 
-    /// Creates a new index representation based on the name, common prefix of its keys
+    /// Creates a new index representation based on the name, index id in family
     /// and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
@@ -96,14 +96,14 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";
-    /// let prefix = vec![01];
+    /// let index_id = vec![01];
     /// let snapshot = db.snapshot();
-    /// let index: ListIndex<_, u8> = ListIndex::with_prefix(name, &prefix, &snapshot);
+    /// let index: ListIndex<_, u8> = ListIndex::new_in_family(name, &index_id, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn with_prefix<S: AsRef<str>, P: StorageKey>(name: S, prefix: &P, view: T) -> Self {
+    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(family_name: S, index_id: &I, view: T) -> Self {
         ListIndex {
-            base: BaseIndex::with_prefix(name, prefix, IndexType::List, view),
+            base: BaseIndex::new_in_family(family_name, index_id, IndexType::List, view),
             length: Cell::new(None),
             _v: PhantomData,
         }
@@ -532,12 +532,12 @@ mod tests {
         }
 
         #[test]
-        fn test_list_index_with_prefix_methods() {
+        fn test_list_index_in_family_methods() {
             let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
-            let mut list_index = ListIndex::with_prefix(IDX_NAME, &vec![01], &mut fork);
+            let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![01], &mut fork);
             super::list_index_methods(&mut list_index);
         }
 
@@ -552,12 +552,12 @@ mod tests {
         }
 
         #[test]
-        fn test_list_index_with_prefix_iter() {
+        fn test_list_index_in_family_iter() {
             let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
-            let mut list_index = ListIndex::with_prefix(IDX_NAME, &vec![01], &mut fork);
+            let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![01], &mut fork);
             super::list_index_iter(&mut list_index);
         }
     }
@@ -585,12 +585,12 @@ mod tests {
         }
 
         #[test]
-        fn test_list_index_with_prefix_methods() {
+        fn test_list_index_in_family_methods() {
             let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
-            let mut list_index = ListIndex::with_prefix(IDX_NAME, &vec![01], &mut fork);
+            let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![01], &mut fork);
             super::list_index_methods(&mut list_index);
         }
 
@@ -605,12 +605,12 @@ mod tests {
         }
 
         #[test]
-        fn test_list_index_with_prefix_iter() {
+        fn test_list_index_in_family_iter() {
             let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
-            let mut list_index = ListIndex::with_prefix(IDX_NAME, &vec![01], &mut fork);
+            let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![01], &mut fork);
             super::list_index_iter(&mut list_index);
         }
     }

@@ -35,7 +35,7 @@ use storage::indexes_metadata::{self, IndexType, INDEXES_METADATA_TABLE_NAME};
 #[derive(Debug)]
 pub struct BaseIndex<T> {
     name: String,
-    prefix: Option<Vec<u8>>,
+    index_id: Option<Vec<u8>>,
     is_mutable: bool,
     index_type: IndexType,
     view: T,
@@ -52,7 +52,7 @@ pub struct BaseIndex<T> {
 pub struct BaseIndexIter<'a, K, V> {
     base_iter: Iter<'a>,
     base_prefix_len: usize,
-    prefix: Vec<u8>,
+    index_id: Vec<u8>,
     ended: bool,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
@@ -70,21 +70,21 @@ where
     ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
-    pub fn new<S: AsRef<str>>(name: S, index_type: IndexType, view: T) -> Self {
-        assert_valid_name(&name);
+    pub fn new<S: AsRef<str>>(index_name: S, index_type: IndexType, view: T) -> Self {
+        assert_valid_name(&index_name);
 
-        indexes_metadata::assert_index_type(name.as_ref(), index_type, view.as_ref());
+        indexes_metadata::assert_index_type(index_name.as_ref(), index_type, view.as_ref());
 
         BaseIndex {
-            name: name.as_ref().to_string(),
-            prefix: None,
+            name: index_name.as_ref().to_string(),
+            index_id: None,
             is_mutable: false,
             index_type,
             view,
         }
     }
 
-    /// Creates a new index representation based on the name, common prefix of its keys
+    /// Creates a new index representation based on the family name, index id inside family
     /// and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
@@ -93,21 +93,21 @@ where
     ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
-    pub fn with_prefix<S: AsRef<str>, P: StorageKey>(
-        name: S,
-        prefix: &P,
+    pub fn new_in_family<S: AsRef<str>, P: StorageKey>(
+        family_name: S,
+        index_id: &P,
         index_type: IndexType,
         view: T,
     ) -> Self {
-        assert_valid_name(&name);
+        assert_valid_name(&family_name);
 
-        indexes_metadata::assert_index_type(name.as_ref(), index_type, view.as_ref());
+        indexes_metadata::assert_index_type(family_name.as_ref(), index_type, view.as_ref());
 
         BaseIndex {
-            name: name.as_ref().to_string(),
-            prefix: {
-                let mut buf = vec![0; prefix.size()];
-                prefix.write(&mut buf);
+            name: family_name.as_ref().to_string(),
+            index_id: {
+                let mut buf = vec![0; index_id.size()];
+                index_id.write(&mut buf);
                 Some(buf)
             },
             is_mutable: false,
@@ -119,7 +119,7 @@ where
     pub(crate) fn indexes_metadata(view: T) -> Self {
         BaseIndex {
             name: INDEXES_METADATA_TABLE_NAME.to_string(),
-            prefix: None,
+            index_id: None,
             is_mutable: true,
             index_type: IndexType::Map,
             view,
@@ -127,7 +127,7 @@ where
     }
 
     fn prefixed_key<K: StorageKey + ?Sized>(&self, key: &K) -> Vec<u8> {
-        match self.prefix {
+        match self.index_id {
             Some(ref prefix) => {
                 let mut v = vec![0; prefix.len() + key.size()];
                 v[..prefix.len()].copy_from_slice(prefix);
@@ -178,8 +178,8 @@ where
         let iter_prefix = self.prefixed_key(subprefix);
         BaseIndexIter {
             base_iter: self.view.as_ref().iter(&self.name, &iter_prefix),
-            base_prefix_len: self.prefix.as_ref().map_or(0, |p| p.len()),
-            prefix: iter_prefix,
+            base_prefix_len: self.index_id.as_ref().map_or(0, |p| p.len()),
+            index_id: iter_prefix,
             ended: false,
             _k: PhantomData,
             _v: PhantomData,
@@ -200,8 +200,8 @@ where
         let iter_from = self.prefixed_key(from);
         BaseIndexIter {
             base_iter: self.view.as_ref().iter(&self.name, &iter_from),
-            base_prefix_len: self.prefix.as_ref().map_or(0, |p| p.len()),
-            prefix: iter_prefix,
+            base_prefix_len: self.index_id.as_ref().map_or(0, |p| p.len()),
+            index_id: iter_prefix,
             ended: false,
             _k: PhantomData,
             _v: PhantomData,
@@ -248,7 +248,7 @@ impl<'a> BaseIndex<&'a mut Fork> {
     /// in the index.
     pub fn clear(&mut self) {
         self.set_index_type();
-        self.view.remove_by_prefix(&self.name, self.prefix.as_ref());
+        self.view.remove_by_prefix(&self.name, self.index_id.as_ref());
     }
 }
 
@@ -264,7 +264,7 @@ where
             return None;
         }
         if let Some((k, v)) = self.base_iter.next() {
-            if k.starts_with(&self.prefix) {
+            if k.starts_with(&self.index_id) {
                 return Some((
                     K::read(&k[self.base_prefix_len..]),
                     V::from_bytes(Cow::Borrowed(v)),

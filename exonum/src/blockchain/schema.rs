@@ -110,12 +110,12 @@ where
     /// Returns table that keeps a list of transactions for the each block.
     pub fn block_txs(&self, height: Height) -> ProofListIndex<&T, Hash> {
         let height: u64 = height.into();
-        ProofListIndex::with_prefix(BLOCK_TXS, &height, &self.view)
+        ProofListIndex::new_in_family(BLOCK_TXS, &height, &self.view)
     }
 
     /// Returns table that saves a list of precommits for block with given hash.
     pub fn precommits(&self, hash: &Hash) -> ListIndex<&T, Precommit> {
-        ListIndex::with_prefix(PRECOMMITS, hash, &self.view)
+        ListIndex::new_in_family(PRECOMMITS, hash, &self.view)
     }
 
     /// Returns table that represents a map from configuration hash into contents.
@@ -376,14 +376,14 @@ impl<'a> Schema<&'a mut Fork> {
     /// [1]: struct.Schema.html#method.block_txs
     pub(crate) fn block_txs_mut(&mut self, height: Height) -> ProofListIndex<&mut Fork, Hash> {
         let height: u64 = height.into();
-        ProofListIndex::with_prefix(BLOCK_TXS, &height, self.view)
+        ProofListIndex::new_in_family(BLOCK_TXS, &height, self.view)
     }
 
     /// Mutable reference to the [`precommits`][1] index.
     ///
     /// [1]: struct.Schema.html#method.precommits
     pub(crate) fn precommits_mut(&mut self, hash: &Hash) -> ListIndex<&mut Fork, Precommit> {
-        ListIndex::with_prefix(PRECOMMITS, hash, self.view)
+        ListIndex::new_in_family(PRECOMMITS, hash, self.view)
     }
 
     /// Mutable reference to the [`configs`][1] index.

@@ -131,9 +131,9 @@ where
     /// # drop(index);
     /// # drop(mut_index);
     /// ```
-    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         ProofMapIndex {
-            base: BaseIndex::new(name, IndexType::ProofMap, view),
+            base: BaseIndex::new(index_name, IndexType::ProofMap, view),
             _k: PhantomData,
             _v: PhantomData,
         }
@@ -157,21 +157,21 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";
-    /// let prefix = vec![01];
+    /// let index_id = vec![01];
     ///
     /// let snapshot = db.snapshot();
     /// let index: ProofMapIndex<_, Hash, u8> =
-    ///                             ProofMapIndex::with_prefix(name, &prefix, &snapshot);
+    ///                             ProofMapIndex::new_in_family(name, &index_id, &snapshot);
     ///
     /// let mut fork = db.fork();
     /// let mut mut_index : ProofMapIndex<_, Hash, u8> =
-    ///                                     ProofMapIndex::with_prefix(name, &prefix, &mut fork);
+    ///                                     ProofMapIndex::new_in_family(name, &index_id, &mut fork);
     /// # drop(index);
     /// # drop(mut_index);
     /// ```
-    pub fn with_prefix<S: AsRef<str>, P: StorageKey>(name: S, prefix: &P, view: T) -> Self {
+    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(family_name: S, index_id: &I, view: T) -> Self {
         ProofMapIndex {
-            base: BaseIndex::with_prefix(name, prefix, IndexType::ProofMap, view),
+            base: BaseIndex::new_in_family(family_name, index_id, IndexType::ProofMap, view),
             _k: PhantomData,
             _v: PhantomData,
         }
