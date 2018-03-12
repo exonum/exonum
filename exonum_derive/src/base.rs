@@ -121,13 +121,10 @@ fn test_impl_message_ids_enum() {
 }
 
 fn write_for_variant(variant: &VariantInfo) -> quote::Tokens {
-    let mut variant = variant.clone();
-    variant.bind_with(|_| BindStyle::Move);
-
     let code = execute_shifts(&variant, |_, binding| {
         let field_name = &binding.binding;
         quote!(
-            writer.write(#field_name, __from, __from + __size);
+            writer.write_ref(#field_name, __from, __from + __size);
         )
     });
     let pat = variant.pat();
@@ -148,15 +145,15 @@ fn test_write_for_variant() {
         write_for_variant(&s.variants()[0]),
         quote!(
             Transaction::Create {
-                public_key: __binding_0,
-                name: __binding_1,
+                public_key: ref __binding_0,
+                name: ref __binding_1,
             } => {
                 let __from = 0 as ::exonum::encoding::Offset;
                 let __size = <&PublicKey as ::exonum::encoding::Field>::field_size();
-                writer.write(__binding_0, __from, __from + __size);
+                writer.write_ref(__binding_0, __from, __from + __size);
                 let __from = __from + __size;
                 let __size = <&str as ::exonum::encoding::Field>::field_size();
-                writer.write(__binding_1, __from, __from + __size);
+                writer.write_ref(__binding_1, __from, __from + __size);
             }
         )
     );
