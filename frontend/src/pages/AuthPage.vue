@@ -98,6 +98,7 @@
         this.isSpinnerVisible = true;
 
         this.$blockchain.createWallet(this.name).then(function(keyPair) {
+          self.name = '';
           self.keyPair = keyPair;
           self.isSpinnerVisible = false;
           self.isModalVisible = true;
