@@ -559,8 +559,8 @@ fn serialize_for_variant(variant: &VariantInfo) -> quote::Tokens {
     let ident = &variant.ast().ident.to_string();
     let fields_number = variant.bindings().len();
     let bindings = variant.bindings();
-    let field_name_strs = variant.bindings().iter().map(|b| {
-        b.ast().ident.as_ref().unwrap().to_string()
+    let field_name_strs = variant.bindings().iter().enumerate().map(|(i, binding)| {
+        binding.ast().ident.as_ref().map_or_else(|| format!("{}", i), Ident::to_string)
     });
 
     let code = quote!(
@@ -642,14 +642,13 @@ fn deserialize_json_code(s: &Payload, variant: &VariantInfo) -> quote::Tokens {
         let obj = stub.body.as_object().ok_or("Can't cast body as object.")?;
     );
 
-    let code = execute_shifts(variant, |_, binding| {
+    let code = execute_shifts(variant, |i, binding| {
         let field_type = strip_lifetimes(&binding.ast().ty);
         let field_name = binding
             .ast()
             .ident
             .as_ref()
-            .expect("Unnamed fields not supported")
-            .to_string();
+            .map_or_else(|| format!("{}", i), Ident::to_string);
         let field_name_err = format!("Cannot access field `{}`", field_name);
 
         quote!(
