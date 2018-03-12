@@ -21,9 +21,6 @@ rust:
   # Sync with badge in README.md
   - 1.23.0
 
-matrix:
-  fast_finish: true
-
 cache:
   directories:
   - node_modules
