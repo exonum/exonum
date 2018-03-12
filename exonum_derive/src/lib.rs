@@ -105,6 +105,8 @@ mod base;
 mod message;
 mod structure;
 mod utils;
+#[cfg(test)]
+mod error_tests;
 
 use base::base_derive;
 use message::message_derive;
