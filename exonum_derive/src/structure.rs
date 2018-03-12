@@ -24,7 +24,8 @@ use utils::{literal_to_path, literal_to_tokens, named_attr, AttrValue};
 pub enum ParseError {
     #[fail(display = "missing `#[exonum(service_id)]` attribute")]
     NoServiceId,
-    #[fail(display = "malformed `#[exonum(service_id)]` attribute (should be a `u16` value or expression)")]
+    #[fail(display = "malformed `#[exonum(service_id)]` attribute (should be \
+        a `u16` value or expression)")]
     MalformedServiceId,
     #[fail(display = "duplicate `#[exonum(service_id)]` attribute")]
     DuplicateServiceId,
@@ -33,8 +34,9 @@ pub enum ParseError {
         at most one lifetime param is supported")]
     UnsupportedGenerics,
 
-    #[fail(display = "invalid type for `Message` derivation. Use a newtype wrapping `RawMessage`: \
-        `struct {}(RawMessage)`", _0)]
+    #[cfg_attr(rustfmt, rustfmt_skip)]
+    #[fail(display = "invalid type for `Message` derivation. Use a newtype \
+        wrapping `RawMessage`: `struct {}(RawMessage)`", _0)]
     InvalidMessageStruct(String),
 
     #[fail(display = "`#[exonum(payload = \"path::to::Payload\")]` attribute not specified")]
@@ -254,9 +256,8 @@ pub fn check_message_struct(s: &Structure) -> Result<(), ParseError> {
 
     match s.ast().data {
         Data::Struct(DataStruct {
-            fields: Fields::Unnamed(FieldsUnnamed { ref unnamed, .. }),
-            ..
-        }) if unnamed.len() == 1 => Ok(()),
+                         fields: Fields::Unnamed(FieldsUnnamed { ref unnamed, .. }), ..
+                     }) if unnamed.len() == 1 => Ok(()),
         _ => {
             return Err(ParseError::InvalidMessageStruct(s.ast().ident.to_string()));
         }

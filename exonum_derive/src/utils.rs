@@ -89,7 +89,7 @@ fn test_is_exonum_attr() {
     }
 
     let non_exonum_attrs: [Attribute; 3] = [
-        parse_quote!(#[exonu = "foo"]),
+        parse_quote!(#[exonum_foo = "foo"]),
         parse_quote!(#[exonum::Message("foo")]),
         parse_quote!(#[exonum_derive]),
     ];

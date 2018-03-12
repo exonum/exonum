@@ -322,7 +322,6 @@ impl Message for RawMessage {
     }
 }
 
-
 /// Object that can check the validity of a raw message according to a certain schema.
 pub trait Check {
     /// Checks the raw message validity.
