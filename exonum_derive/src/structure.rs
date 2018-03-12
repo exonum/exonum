@@ -22,23 +22,41 @@ use utils::{literal_to_path, literal_to_tokens, named_attr, AttrValue};
 
 #[derive(Debug, Fail, PartialEq)]
 pub enum ParseError {
-    #[fail(display = "`service_id` attribute is not specified")]
+    #[fail(display = "missing `#[exonum(service_id)]` attribute")]
     NoServiceId,
-    #[fail(display = "malformed `service_id` attribute (should be a `u16` value or expression)")]
+    #[fail(display = "malformed `#[exonum(service_id)]` attribute (should be a `u16` value or expression)")]
     MalformedServiceId,
-    #[fail(display = "`service_id` specified multiple times")]
+    #[fail(display = "duplicate `#[exonum(service_id)]` attribute")]
     DuplicateServiceId,
 
     #[fail(display = "unsupported generic params in messages declaration; \
         at most one lifetime param is supported")]
     UnsupportedGenerics,
 
-    #[fail(display = "`payload` attribute not specified")]
+    #[fail(display = "invalid type for `Message` derivation. Use a newtype wrapping `RawMessage`: \
+        `struct {}(RawMessage)`", _0)]
+    InvalidMessageStruct(String),
+
+    #[fail(display = "`#[exonum(payload = \"path::to::Payload\")]` attribute not specified")]
     NoPayload,
-    #[fail(display = "malformed `payload` attribute (should be a path)")]
+    #[fail(display = "malformed `#[exonum(payload)]` attribute (should have the form \
+        `#[exonum(payload = \"path::to::Payload\")]`)")]
     MalformedPayload,
-    #[fail(display = "`payload` specified multiple times")]
+    #[fail(display = "`#[exonum(payload)]` attribute specified multiple times")]
     DuplicatePayload,
+}
+
+pub trait UnwrapOrEmit<T> {
+    fn unwrap_or_emit(self) -> T;
+}
+
+impl<T> UnwrapOrEmit<T> for Result<T, ParseError> {
+    fn unwrap_or_emit(self) -> T {
+        match self {
+            Ok(value) => value,
+            Err(error) => panic!("{}", error),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -229,6 +247,20 @@ fn test_extract_service_id() {
         extract_service_id(&s.ast().attrs),
         Err(ParseError::MalformedServiceId)
     );
+}
+
+pub fn check_message_struct(s: &Structure) -> Result<(), ParseError> {
+    use syn::{Data, DataStruct, Fields, FieldsUnnamed};
+
+    match s.ast().data {
+        Data::Struct(DataStruct {
+            fields: Fields::Unnamed(FieldsUnnamed { ref unnamed, .. }),
+            ..
+        }) if unnamed.len() == 1 => Ok(()),
+        _ => {
+            return Err(ParseError::InvalidMessageStruct(s.ast().ident.to_string()));
+        }
+    }
 }
 
 pub fn extract_payload(attrs: &[Attribute]) -> Result<Path, ParseError> {

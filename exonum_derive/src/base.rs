@@ -16,13 +16,13 @@
 
 use quote;
 use syn::{Ident, Lifetime};
-use synstructure::{BindStyle, Structure, VariantInfo};
+use synstructure::{Structure, VariantInfo};
 
-use structure::Payload;
+use structure::{Payload, UnwrapOrEmit};
 use utils::{execute_shifts, strip_lifetimes};
 
 pub fn base_derive(s: Structure) -> quote::Tokens {
-    let s = Payload::try_from(s).unwrap();
+    let s = Payload::try_from(s).unwrap_or_emit();
 
     let ids_enum = impl_message_ids_enum(&s);
     let message_set = impl_message_set(&s);

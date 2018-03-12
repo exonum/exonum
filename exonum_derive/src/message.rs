@@ -18,10 +18,11 @@ use quote;
 use syn::Path;
 use synstructure::Structure;
 
-use structure::extract_payload;
+use structure::{extract_payload, check_message_struct, UnwrapOrEmit};
 
 pub fn message_derive(s: Structure) -> quote::Tokens {
-    let payload = extract_payload(&s.ast().attrs).unwrap();
+    let payload = extract_payload(&s.ast().attrs).unwrap_or_emit();
+    check_message_struct(&s).unwrap_or_emit();
 
     let wrapper = define_message_wrapper(&s, &payload);
     let debug = impl_debug(&s);
