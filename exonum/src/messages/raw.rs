@@ -237,6 +237,11 @@ impl MessageWriter {
     /// Writes given field to the given offset.
     #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
     pub fn write<'a, F: Field<'a>>(&'a mut self, field: F, from: Offset, to: Offset) {
+        self.write_ref(&field, from, to);
+    }
+
+    /// Writes given field taken by a shared reference to the given offset.
+    pub fn write_ref<'a, F: Field<'a>>(&'a mut self, field: &F, from: Offset, to: Offset) {
         field.write(
             &mut self.raw,
             from + HEADER_LENGTH as Offset,
