@@ -218,7 +218,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "Attempt to access index family 'test_index' \
     while it's an ordinary index")]
-    fn invalid_index_type_in_family() {
+    fn ordinary_index_as_index_family() {
         let database = MemoryDB::new();
         let mut fork = database.fork();
         let index_id: i32 = 42;
@@ -234,7 +234,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "Attempt to access an ordinary index 'test_index' \
     while it's index family")]
-    fn invalid_index_type_in_family2() {
+    fn index_family_as_ordinary_index() {
         let database = MemoryDB::new();
         let mut fork = database.fork();
         let index_id: i32 = 42;
