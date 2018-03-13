@@ -18,7 +18,7 @@ use byteorder::{ByteOrder, BigEndian};
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
+use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH, EntryHash};
 
 /// A type that can be (de)serialized as a key in the blockchain storage.
 ///
@@ -186,6 +186,20 @@ impl StorageKey for Hash {
 
     fn read(buffer: &[u8]) -> Self::Owned {
         Hash::from_slice(buffer).unwrap()
+    }
+}
+
+impl StorageKey for EntryHash {
+    fn size(&self) -> usize {
+        HASH_SIZE
+    }
+
+    fn write(&self, buffer: &mut [u8]) {
+        buffer.copy_from_slice(self.0.as_ref())
+    }
+
+    fn read(buffer: &[u8]) -> Self::Owned {
+        EntryHash(Hash::from_slice(buffer).unwrap())
     }
 }
 

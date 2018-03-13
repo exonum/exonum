@@ -19,7 +19,7 @@ use serde::ser::SerializeMap;
 
 use std::fmt;
 
-use crypto::{Hash, HashStream};
+use crypto::{Hash, HashStream, EntryHash, CryptoHash};
 use super::super::{Error, StorageValue};
 use super::key::{BitsRange, ChildKind, ProofMapKey, ProofPath, KEY_SIZE};
 
@@ -49,7 +49,7 @@ pub enum MapProof<V> {
     /// A boundary case with a single element tree and a matching key.
     LeafRootInclusive(ProofPath, V),
     /// A boundary case with a single element tree and a non-matching key
-    LeafRootExclusive(ProofPath, Hash),
+    LeafRootExclusive(ProofPath, EntryHash),
     /// A boundary case with empty tree.
     Empty,
     /// A root branch of the tree.
@@ -69,9 +69,9 @@ pub enum BranchProofNode<V> {
     /// A branch of proof in which both children do not contain the requested key.
     BranchKeyNotFound {
         /// A hash of the left child.
-        left_hash: Hash,
+        left_hash: EntryHash,
         /// A hash of the right child.
-        right_hash: Hash,
+        right_hash: EntryHash,
         /// A key of the left child.
         left_key: ProofPath,
         /// A key of the right child.
@@ -82,7 +82,7 @@ pub enum BranchProofNode<V> {
         /// A left child node.
         left_node: Box<ProofNode<V>>,
         /// A hash of the right child.
-        right_hash: Hash,
+        right_hash: EntryHash,
         /// A key of the left child.
         left_key: ProofPath,
         /// A key of the right child.
@@ -91,7 +91,7 @@ pub enum BranchProofNode<V> {
     /// A branch of proof in which right child may contain the requested key.
     RightBranch {
         /// A hash of the left child.
-        left_hash: Hash,
+        left_hash: EntryHash,
         /// A right child node.
         right_node: Box<ProofNode<V>>,
         /// A key of the left child.
@@ -103,38 +103,42 @@ pub enum BranchProofNode<V> {
 
 impl<V: StorageValue> MapProof<V> {
     /// Returns Merkle root hash of the map proof.
-    pub fn merkle_root(&self) -> Hash {
+    pub fn merkle_root(&self) -> EntryHash {
         use self::MapProof::*;
         match *self {
-            Empty => Hash::zero(),
+            Empty => EntryHash(Hash::zero()),
             LeafRootInclusive(ref root_key, ref root_val) => {
-                HashStream::new()
-                    .update(root_key.as_bytes())
-                    .update(root_val.hash().as_ref())
-                    .hash()
+                EntryHash(
+                    HashStream::new()
+                        .update(root_key.as_bytes())
+                        .update(root_val.hash().as_ref())
+                        .hash(),
+                )
             }
             LeafRootExclusive(ref root_key, ref root_val_hash) => {
-                HashStream::new()
-                    .update(root_key.as_bytes())
-                    .update(root_val_hash.as_ref())
-                    .hash()
+                EntryHash(
+                    HashStream::new()
+                        .update(root_key.as_bytes())
+                        .update(root_val_hash.hash().as_ref())
+                        .hash(),
+                )
             }
             Branch(ref branch) => branch.merkle_root(),
         }
     }
 }
 impl<V: StorageValue> ProofNode<V> {
-    fn merkle_root(&self) -> Hash {
+    fn merkle_root(&self) -> EntryHash {
         use self::ProofNode::*;
         match *self {
-            Leaf(ref val) => val.hash(),
+            Leaf(ref val) => EntryHash(val.hash()),
             Branch(ref branch) => branch.merkle_root(),
         }
     }
 }
 
 impl<V: StorageValue> BranchProofNode<V> {
-    fn merkle_root(&self) -> Hash {
+    fn merkle_root(&self) -> EntryHash {
         use self::BranchProofNode::*;
         match *self {
             BranchKeyNotFound {
@@ -143,12 +147,14 @@ impl<V: StorageValue> BranchProofNode<V> {
                 ref left_key,
                 ref right_key,
             } => {
-                HashStream::new()
-                    .update(left_hash.as_ref())
-                    .update(right_hash.as_ref())
-                    .update(left_key.as_bytes())
-                    .update(right_key.as_bytes())
-                    .hash()
+                EntryHash(
+                    HashStream::new()
+                        .update(left_hash.hash().as_ref())
+                        .update(right_hash.hash().as_ref())
+                        .update(left_key.as_bytes())
+                        .update(right_key.as_bytes())
+                        .hash(),
+                )
             }
             LeftBranch {
                 ref left_node,
@@ -156,12 +162,14 @@ impl<V: StorageValue> BranchProofNode<V> {
                 ref left_key,
                 ref right_key,
             } => {
-                HashStream::new()
-                    .update(left_node.merkle_root().as_ref())
-                    .update(right_hash.as_ref())
-                    .update(left_key.as_bytes())
-                    .update(right_key.as_bytes())
-                    .hash()
+                EntryHash(
+                    HashStream::new()
+                        .update(left_node.merkle_root().hash().as_ref())
+                        .update(right_hash.hash().as_ref())
+                        .update(left_key.as_bytes())
+                        .update(right_key.as_bytes())
+                        .hash(),
+                )
             }
             RightBranch {
                 ref left_hash,
@@ -169,12 +177,14 @@ impl<V: StorageValue> BranchProofNode<V> {
                 ref left_key,
                 ref right_key,
             } => {
-                HashStream::new()
-                    .update(left_hash.as_ref())
-                    .update(right_node.merkle_root().as_ref())
-                    .update(left_key.as_bytes())
-                    .update(right_key.as_bytes())
-                    .hash()
+                EntryHash(
+                    HashStream::new()
+                        .update(left_hash.hash().as_ref())
+                        .update(right_node.merkle_root().hash().as_ref())
+                        .update(left_key.as_bytes())
+                        .update(right_key.as_bytes())
+                        .hash(),
+                )
             }
         }
     }
@@ -279,7 +289,7 @@ impl<V: fmt::Debug + StorageValue> MapProof<V> {
     pub fn validate<K: ProofMapKey>(
         &self,
         key: &K,
-        merkle_root: Hash,
+        merkle_root: EntryHash,
     ) -> Result<Option<&V>, Error> {
         let searched_key = ProofPath::new(key);
         use self::MapProof::*;

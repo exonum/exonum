@@ -21,7 +21,7 @@ use std::cmp;
 
 use api::{Api, ApiError};
 use blockchain::{Block, Blockchain, TxLocation, Schema, TransactionErrorType, TransactionResult};
-use crypto::Hash;
+use crypto::{Hash, EntryHash};
 use helpers::Height;
 use node::state::TxPool;
 use messages::Precommit;
@@ -37,7 +37,7 @@ pub struct BlockInfo {
     /// List of precommit for this block.
     pub precommits: Vec<Precommit>,
     /// List of hashes for transactions that was executed into this block.
-    pub txs: Vec<Hash>,
+    pub txs: Vec<EntryHash>,
 }
 
 /// Transaction information.
@@ -48,7 +48,7 @@ pub struct TxInfo {
     /// Transaction location in block.
     pub location: TxLocation,
     /// Proof that transaction really exist in the database.
-    pub location_proof: ListProof<Hash>,
+    pub location_proof: ListProof<EntryHash>,
     /// Status of the transaction execution.
     pub status: TxStatus,
 }
@@ -233,7 +233,10 @@ impl<'a> BlockchainExplorer<'a> {
         );
 
         // Unwrap is OK here, because we already know that transaction is committed.
-        let status = match schema.transaction_results().get(tx_hash).unwrap() {
+        let status = match schema
+            .transaction_results()
+            .get(&EntryHash(*tx_hash))
+            .unwrap() {
             Ok(()) => TxStatus::Success,
             Err(e) => {
                 let description = e.description().unwrap_or_default().to_owned();
@@ -329,6 +332,6 @@ impl<'a> BlockchainExplorer<'a> {
     /// Returns transaction result.
     pub fn transaction_result(&self, hash: &Hash) -> Option<TransactionResult> {
         let schema = Schema::new(self.blockchain.snapshot());
-        schema.transaction_results().get(hash)
+        schema.transaction_results().get(&EntryHash(*hash))
     }
 }

@@ -200,7 +200,7 @@ pub enum TransactionErrorType {
 ///
 /// ```
 /// # use exonum::storage::{MemoryDB, Database};
-/// # use exonum::crypto::Hash;
+/// # use exonum::crypto::{Hash, EntryHash};
 /// use exonum::blockchain::Schema;
 ///
 /// # let db = MemoryDB::new();
@@ -208,7 +208,7 @@ pub enum TransactionErrorType {
 /// # let transaction_hash = Hash::zero();
 /// let schema = Schema::new(&snapshot);
 ///
-/// if let Some(result) = schema.transaction_results().get(&transaction_hash) {
+/// if let Some(result) = schema.transaction_results().get(&EntryHash(transaction_hash)) {
 ///     match result {
 ///         Ok(()) => println!("Successful transaction execution"),
 ///         Err(transaction_error) => {

@@ -15,6 +15,7 @@
 use messages::{RequestMessage, Message, ProposeRequest, TransactionsRequest, PrevotesRequest,
                BlockRequest, BlockResponse};
 use blockchain::Schema;
+use crypto::CryptoHash;
 use super::NodeHandler;
 
 // TODO: height should be updated after any message, not only after status (if signature is correct)
@@ -141,7 +142,9 @@ impl NodeHandler {
             precommits.iter().collect(),
             transactions
                 .iter()
-                .map(|tx_hash| schema.transactions().get(&tx_hash).unwrap())
+                .map(|tx_hash| {
+                    schema.transactions().get(&tx_hash.hash()).unwrap()
+                })
                 .collect(),
             self.state.consensus_secret_key(),
         );

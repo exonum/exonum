@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crypto::{PublicKey, Hash, CryptoHash};
+use crypto::{PublicKey, Hash, CryptoHash, EntryHash};
 use messages::{Precommit, RawMessage, Connect};
 use storage::{Entry, Fork, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex, Snapshot,
               StorageKey};
@@ -95,7 +95,7 @@ where
     }
 
     /// Returns table that represents a map from transaction hash into execution result.
-    pub fn transaction_results(&self) -> ProofMapIndex<&T, Hash, TransactionResult> {
+    pub fn transaction_results(&self) -> ProofMapIndex<&T, EntryHash, TransactionResult> {
         ProofMapIndex::new(TRANSACTION_RESULTS, &self.view)
     }
 
@@ -116,7 +116,7 @@ where
     }
 
     /// Returns table that keeps a list of transactions for the each block.
-    pub fn block_txs(&self, height: Height) -> ProofListIndex<&T, Hash> {
+    pub fn block_txs(&self, height: Height) -> ProofListIndex<&T, EntryHash> {
         let height: u64 = height.into();
         ProofListIndex::with_prefix(BLOCK_TXS, gen_prefix(&height), &self.view)
     }
@@ -127,7 +127,7 @@ where
     }
 
     /// Returns table that represents a map from configuration hash into contents.
-    pub fn configs(&self) -> ProofMapIndex<&T, Hash, StoredConfiguration> {
+    pub fn configs(&self) -> ProofMapIndex<&T, EntryHash, StoredConfiguration> {
         // configs patricia merkle tree <block height> json
         ProofMapIndex::new(CONFIGS, &self.view)
     }
@@ -153,7 +153,7 @@ where
     ///
     /// Core tables participate in resulting state_hash with `CORE_SERVICE`
     /// service_id. Their vector is returned by `core_state_hash` method.
-    pub fn state_hash_aggregator(&self) -> ProofMapIndex<&T, Hash, Hash> {
+    pub fn state_hash_aggregator(&self) -> ProofMapIndex<&T, EntryHash, EntryHash> {
         ProofMapIndex::new(STATE_HASH_AGGREGATOR, &self.view)
     }
 
@@ -285,12 +285,12 @@ where
 
     /// Returns configuration for given configuration hash.
     pub fn configuration_by_hash(&self, hash: &Hash) -> Option<StoredConfiguration> {
-        self.configs().get(hash)
+        self.configs().get(&EntryHash(*hash))
     }
 
     /// Returns the `state_hash` table for core tables.
     pub fn core_state_hash(&self) -> Vec<Hash> {
-        vec![self.configs().merkle_root(), self.transaction_results().merkle_root()]
+        vec![self.configs().merkle_root().hash(), self.transaction_results().merkle_root().hash()]
     }
 
     /// Constructs a proof of inclusion of root hash of a specific service
@@ -314,10 +314,14 @@ where
     /// `Service` trait
     /// * `table_idx` - index of service table in `Vec`, returned by
     /// `state_hash` method of instance of type of `Service` trait
-    pub fn get_proof_to_service_table(&self, service_id: u16, table_idx: usize) -> MapProof<Hash> {
+    pub fn get_proof_to_service_table(
+        &self,
+        service_id: u16,
+        table_idx: usize,
+    ) -> MapProof<EntryHash> {
         let key = Blockchain::service_table_unique_key(service_id, table_idx);
         let sum_table = self.state_hash_aggregator();
-        sum_table.get_proof(&key)
+        sum_table.get_proof(&EntryHash(key))
     }
 
     fn find_configurations_index_by_height(&self, height: Height) -> u64 {
@@ -354,7 +358,7 @@ impl<'a> Schema<&'a mut Fork> {
     /// [1]: struct.Schema.html#method.transaction_results
     pub(crate) fn transaction_results_mut(
         &mut self,
-    ) -> ProofMapIndex<&mut Fork, Hash, TransactionResult> {
+    ) -> ProofMapIndex<&mut Fork, EntryHash, TransactionResult> {
         ProofMapIndex::new(TRANSACTION_RESULTS, self.view)
     }
 
@@ -382,7 +386,7 @@ impl<'a> Schema<&'a mut Fork> {
     /// Mutable reference to the [`block_txs`][1] index.
     ///
     /// [1]: struct.Schema.html#method.block_txs
-    pub(crate) fn block_txs_mut(&mut self, height: Height) -> ProofListIndex<&mut Fork, Hash> {
+    pub(crate) fn block_txs_mut(&mut self, height: Height) -> ProofListIndex<&mut Fork, EntryHash> {
         let height: u64 = height.into();
         ProofListIndex::with_prefix(BLOCK_TXS, gen_prefix(&height), self.view)
     }
@@ -397,7 +401,9 @@ impl<'a> Schema<&'a mut Fork> {
     /// Mutable reference to the [`configs`][1] index.
     ///
     /// [1]: struct.Schema.html#method.configs
-    pub(crate) fn configs_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, StoredConfiguration> {
+    pub(crate) fn configs_mut(
+        &mut self,
+    ) -> ProofMapIndex<&mut Fork, EntryHash, StoredConfiguration> {
         ProofMapIndex::new(CONFIGS, self.view)
     }
 
@@ -411,7 +417,9 @@ impl<'a> Schema<&'a mut Fork> {
     /// Mutable reference to the [`state_hash_aggregator`][1] index.
     ///
     /// [1]: struct.Schema.html#method.state_hash_aggregator
-    pub(crate) fn state_hash_aggregator_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, Hash> {
+    pub(crate) fn state_hash_aggregator_mut(
+        &mut self,
+    ) -> ProofMapIndex<&mut Fork, EntryHash, EntryHash> {
         ProofMapIndex::new(STATE_HASH_AGGREGATOR, self.view)
     }
 
@@ -466,7 +474,7 @@ impl<'a> Schema<&'a mut Fork> {
         );
 
         let cfg_hash = config_data.hash();
-        self.configs_mut().put(&cfg_hash, config_data);
+        self.configs_mut().put(&EntryHash(cfg_hash), config_data);
 
         let cfg_ref = ConfigReference::new(actual_from, &cfg_hash);
         self.configs_actual_from_mut().push(cfg_ref);

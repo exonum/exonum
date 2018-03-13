@@ -657,7 +657,19 @@ impl CryptoHash for () {
 
 impl CryptoHash for Hash {
     fn hash(&self) -> Hash {
-        *self
+        hash(self.as_ref())
+    }
+}
+
+/// Denotes a value type for `ProofListIndex` / `ProofMapIndex` representing
+/// a hash of the "real" value. The real value is stored elsewhere
+/// (e.g., in a `MapIndex` indexed by this hash).
+#[derive(Debug, Default, Serialize, Deserialize, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub struct EntryHash(pub Hash);
+
+impl CryptoHash for EntryHash {
+    fn hash(&self) -> Hash {
+        self.0
     }
 }
 

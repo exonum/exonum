@@ -31,7 +31,7 @@ use rand::{thread_rng, Rng};
 use bit_vec::BitVec;
 use exonum::messages::{RawMessage, Message, Propose, Prevote, Precommit, ProposeRequest,
                        TransactionsRequest, PrevotesRequest, CONSENSUS, Connect, PeersRequest};
-use exonum::crypto::{CryptoHash, Hash, Seed, gen_keypair, gen_keypair_from_seed};
+use exonum::crypto::{CryptoHash, Hash, Seed, gen_keypair, gen_keypair_from_seed, EntryHash};
 use exonum::blockchain::{Blockchain, Schema};
 use exonum::node::state::{PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT,
                           TRANSACTIONS_REQUEST_TIMEOUT};
@@ -244,20 +244,22 @@ fn test_query_state_hash() {
         let timestamp_t2_key = Blockchain::service_table_unique_key(TIMESTAMPING_SERVICE, 1);
 
         let proof_configs = sandbox.get_proof_to_service_table(CONSENSUS, 0);
-        assert_eq!(state_hash, proof_configs.merkle_root());
+        assert_eq!(state_hash, proof_configs.merkle_root().hash());
         assert_ne!(configs_rh, Hash::zero());
-        let opt_configs_h = proof_configs.validate(&configs_key, state_hash).unwrap();
-        assert_eq!(configs_rh, *opt_configs_h.unwrap());
+        let opt_configs_h = proof_configs
+            .validate(&configs_key, EntryHash(state_hash))
+            .unwrap();
+        assert_eq!(configs_rh, opt_configs_h.unwrap().hash());
 
         let proof_configs = sandbox.get_proof_to_service_table(TIMESTAMPING_SERVICE, 0);
-        assert_eq!(state_hash, proof_configs.merkle_root());
-        let opt_configs_h = proof_configs.validate(&timestamp_t1_key, state_hash);
-        assert_eq!(&[127; 32], opt_configs_h.unwrap().unwrap().as_ref());
+        assert_eq!(state_hash, proof_configs.merkle_root().hash());
+        let opt_configs_h = proof_configs.validate(&timestamp_t1_key, EntryHash(state_hash));
+        assert_eq!(&[127; 32], opt_configs_h.unwrap().unwrap().hash().as_ref());
 
         let proof_configs = sandbox.get_proof_to_service_table(TIMESTAMPING_SERVICE, 1);
-        assert_eq!(state_hash, proof_configs.merkle_root());
-        let opt_configs_h = proof_configs.validate(&timestamp_t2_key, state_hash);
-        assert_eq!(&[128; 32], opt_configs_h.unwrap().unwrap().as_ref());
+        assert_eq!(state_hash, proof_configs.merkle_root().hash());
+        let opt_configs_h = proof_configs.validate(&timestamp_t2_key, EntryHash(state_hash));
+        assert_eq!(&[128; 32], opt_configs_h.unwrap().unwrap().hash().as_ref());
 
         add_one_height(&sandbox, &sandbox_state)
     }

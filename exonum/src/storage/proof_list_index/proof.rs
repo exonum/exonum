@@ -17,7 +17,7 @@ use serde::ser::SerializeStruct;
 use serde::de::Error;
 use serde_json::{Error as SerdeJsonError, Value, from_value};
 
-use crypto::{Hash, hash};
+use crypto::{hash, CryptoHash, EntryHash};
 use super::pair_hash;
 use super::super::StorageValue;
 use super::key::ProofListKey;
@@ -29,9 +29,9 @@ pub enum ListProof<V> {
     /// A branch of proof in which both children contain requested elements.
     Full(Box<ListProof<V>>, Box<ListProof<V>>),
     /// A branch of proof in which only left child contains requested elements.
-    Left(Box<ListProof<V>>, Option<Hash>),
+    Left(Box<ListProof<V>>, Option<EntryHash>),
     /// A branch of proof in which only right child contains requested elements.
-    Right(Hash, Box<ListProof<V>>),
+    Right(EntryHash, Box<ListProof<V>>),
     /// A leaf of proof with requested element.
     Leaf(V),
 }
@@ -52,7 +52,7 @@ impl<V: StorageValue> ListProof<V> {
         &'a self,
         key: ProofListKey,
         vec: &mut Vec<(u64, &'a V)>,
-    ) -> Result<Hash, ListProofError> {
+    ) -> Result<EntryHash, ListProofError> {
         if key.height() == 0 {
             return Err(ListProofError::UnexpectedBranch);
         }
@@ -64,14 +64,14 @@ impl<V: StorageValue> ListProof<V> {
                 )
             }
             Left(ref left, Some(ref right)) => pair_hash(&left.collect(key.left(), vec)?, right),
-            Left(ref left, None) => hash(left.collect(key.left(), vec)?.as_ref()),
+            Left(ref left, None) => EntryHash(hash(left.collect(key.left(), vec)?.hash().as_ref())),
             Right(ref left, ref right) => pair_hash(left, &right.collect(key.right(), vec)?),
             Leaf(ref value) => {
                 if key.height() > 1 {
                     return Err(ListProofError::UnexpectedLeaf);
                 }
                 vec.push((key.index(), value));
-                value.hash()
+                EntryHash(value.hash())
             }
         };
         Ok(hash)
@@ -82,7 +82,11 @@ impl<V: StorageValue> ListProof<V> {
     ///
     /// If the proof is valid, a vector with indices and references to elements is returned.
     /// Otherwise, `Err` is returned.
-    pub fn validate(&self, merkle_root: Hash, len: u64) -> Result<Vec<(u64, &V)>, ListProofError> {
+    pub fn validate(
+        &self,
+        merkle_root: EntryHash,
+        len: u64,
+    ) -> Result<Vec<(u64, &V)>, ListProofError> {
         let mut vec = Vec::new();
         let height = len.next_power_of_two().trailing_zeros() as u8 + 1;
         if self.collect(ProofListKey::new(height, 0), &mut vec)? != merkle_root {
@@ -182,7 +186,7 @@ where
                     let left_proof: ListProof<V> = from_value(left_value.clone()).map_err(|err| {
                         D::Error::custom(format_err_string("ListProof", left_value, &err))
                     })?;
-                    let right_hash: Hash = from_value(right_value.clone()).map_err(|err| {
+                    let right_hash: EntryHash = from_value(right_value.clone()).map_err(|err| {
                         D::Error::custom(format_err_string("Hash", right_value, &err))
                     })?;
                     Left(Box::new(left_proof), Some(right_hash))
@@ -191,7 +195,7 @@ where
                         from_value(right_value.clone()).map_err(|err| {
                             D::Error::custom(format_err_string("ListProof", right_value, &err))
                         })?;
-                    let left_hash: Hash = from_value(left_value.clone()).map_err(|err| {
+                    let left_hash: EntryHash = from_value(left_value.clone()).map_err(|err| {
                         D::Error::custom(format_err_string("Hash", left_value, &err))
                     })?;
                     Right(left_hash, Box::new(right_proof))

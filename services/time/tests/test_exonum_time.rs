@@ -11,7 +11,7 @@ use std::time::{SystemTime, Duration, UNIX_EPOCH};
 
 use exonum::blockchain::{Schema, Transaction, TransactionErrorType};
 use exonum::helpers::{Height, ValidatorId};
-use exonum::crypto::{gen_keypair, CryptoHash, PublicKey};
+use exonum::crypto::{gen_keypair, CryptoHash, PublicKey, EntryHash};
 use exonum::storage::Snapshot;
 
 use exonum_time::{MockTimeProvider, TimeService, TimeSchema, TxTime, ValidatorTime, Error};
@@ -43,10 +43,10 @@ fn assert_transaction_result<S: AsRef<Snapshot>, T: Transaction>(
     transaction: &T,
     expected_code: u8,
 ) -> Option<String> {
-    let result = Schema::new(snapshot).transaction_results().get(
-        &transaction
+    let result = Schema::new(snapshot).transaction_results().get(&EntryHash(
+        transaction
             .hash(),
-    );
+    ));
     match result {
         Some(Err(e)) => {
             assert_eq!(e.error_type(), TransactionErrorType::Code(expected_code));
@@ -258,7 +258,7 @@ fn test_exonum_time_service_with_7_validators() {
         testkit.create_block_with_transactions(txvec![tx.clone()]);
         assert_eq!(
             Schema::new(testkit.snapshot()).transaction_results().get(
-                &tx.hash(),
+                &EntryHash(tx.hash()),
             ),
             Some(Ok(()))
         );
@@ -360,7 +360,7 @@ fn test_selected_time_less_than_time_in_storage() {
         testkit.create_block_with_transactions(txvec![tx.clone()]);
         assert_eq!(
             Schema::new(testkit.snapshot()).transaction_results().get(
-                &tx.hash(),
+                &EntryHash(tx.hash()),
             ),
             Some(Ok(()))
         );
@@ -411,7 +411,7 @@ fn test_transaction_time_less_than_validator_time_in_storage() {
     testkit.create_block_with_transactions(txvec![tx0.clone()]);
     assert_eq!(
         Schema::new(testkit.snapshot()).transaction_results().get(
-            &tx0.hash(),
+            &EntryHash(tx0.hash()),
         ),
         Some(Ok(()))
     );

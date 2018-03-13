@@ -33,7 +33,8 @@ use exonum::blockchain::{Block, BlockProof, Blockchain, ConsensusConfig, Genesis
                          Transaction, ValidatorKeys};
 use exonum::storage::{MapProof, MemoryDB};
 use exonum::messages::{Any, Connect, Message, RawMessage, RawTransaction, Status};
-use exonum::crypto::{gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed};
+use exonum::crypto::{gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed, CryptoHash,
+                     EntryHash};
 #[cfg(test)]
 use exonum::crypto::gen_keypair;
 use exonum::helpers::{Height, Milliseconds, Round, ValidatorId, user_agent};
@@ -488,7 +489,11 @@ impl Sandbox {
         *Schema::new(&fork).last_block().state_hash()
     }
 
-    pub fn get_proof_to_service_table(&self, service_id: u16, table_idx: usize) -> MapProof<Hash> {
+    pub fn get_proof_to_service_table(
+        &self,
+        service_id: u16,
+        table_idx: usize,
+    ) -> MapProof<EntryHash> {
         let snapshot = self.blockchain_ref().snapshot();
         let schema = Schema::new(&snapshot);
         schema.get_proof_to_service_table(service_id, table_idx)
@@ -497,7 +502,7 @@ impl Sandbox {
     pub fn get_configs_merkle_root(&self) -> Hash {
         let snapshot = self.blockchain_ref().snapshot();
         let schema = Schema::new(&snapshot);
-        schema.configs().merkle_root()
+        schema.configs().merkle_root().hash()
     }
 
     pub fn cfg(&self) -> StoredConfiguration {

@@ -14,7 +14,7 @@
 
 use std::borrow::Cow;
 
-use crypto::{hash, CryptoHash, Hash, HASH_SIZE};
+use crypto::{hash, CryptoHash, Hash, HASH_SIZE, EntryHash};
 
 use super::super::{StorageKey, StorageValue};
 use super::key::{ChildKind, ProofPath, PROOF_PATH_SIZE};
@@ -39,7 +39,7 @@ impl BranchNode {
         BranchNode { raw: vec![0; BRANCH_NODE_SIZE] }
     }
 
-    pub fn child_hash(&self, kind: ChildKind) -> &Hash {
+    pub fn child_hash(&self, kind: ChildKind) -> &EntryHash {
         unsafe {
             let from = match kind {
                 ChildKind::Right => HASH_SIZE,
@@ -119,8 +119,8 @@ fn test_branch_node() {
     branch.set_child(ChildKind::Left, &ls, &lh);
     branch.set_child(ChildKind::Right, &rs, &rh);
 
-    assert_eq!(branch.child_hash(ChildKind::Left), &lh);
-    assert_eq!(branch.child_hash(ChildKind::Right), &rh);
+    assert_eq!(branch.child_hash(ChildKind::Left), &EntryHash(lh));
+    assert_eq!(branch.child_hash(ChildKind::Right), &EntryHash(rh));
     assert_eq!(branch.child_path(ChildKind::Left), ls);
     assert_eq!(branch.child_path(ChildKind::Right), rs);
 }

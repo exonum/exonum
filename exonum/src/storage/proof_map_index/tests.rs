@@ -15,7 +15,7 @@
 use std::collections::HashSet;
 
 use rand::{self, thread_rng, Rng};
-use crypto::{hash, Hash, HashStream};
+use crypto::{hash, Hash, HashStream, EntryHash, CryptoHash};
 use storage::db::Database;
 use encoding::serialize::json::reexport::to_string;
 use encoding::serialize::reexport::{Serialize, Serializer};
@@ -95,19 +95,21 @@ fn insert_trivial(db1: Box<Database>, db2: Box<Database>) {
     assert_eq!(index2.get(&[255; 32]), Some(vec![1]));
     assert_eq!(index2.get(&[254; 32]), Some(vec![2]));
 
-    assert_ne!(index1.merkle_root(), Hash::zero());
+    assert_ne!(index1.merkle_root(), EntryHash(Hash::zero()));
     assert_eq!(index1.merkle_root(), index2.merkle_root());
 }
 
 fn insert_same_key(db: Box<Database>) {
     let mut storage = db.fork();
     let mut table = ProofMapIndex::new(IDX_NAME, &mut storage);
-    assert_eq!(table.merkle_root(), Hash::zero());
+    assert_eq!(table.merkle_root(), EntryHash(Hash::zero()));
     let root_prefix = &[&[LEAF_KEY_PREFIX], vec![255; 32].as_slice(), &[0u8]].concat();
-    let hash = HashStream::new()
-        .update(root_prefix)
-        .update(hash(&[2]).as_ref())
-        .hash();
+    let hash = EntryHash(
+        HashStream::new()
+            .update(root_prefix)
+            .update(hash(&[2]).as_ref())
+            .hash(),
+    );
 
     table.put(&[255; 32], vec![1]);
     table.put(&[255; 32], vec![2]);
@@ -131,7 +133,7 @@ fn insert_simple(db1: Box<Database>, db2: Box<Database>) {
     index2.put(&[255; 32], vec![3]);
     index2.put(&[254; 32], vec![5]);
 
-    assert!(index1.merkle_root() != Hash::zero());
+    assert!(index1.merkle_root() != EntryHash(Hash::zero()));
     assert_eq!(index1.merkle_root(), index2.merkle_root());
 }
 
@@ -154,7 +156,7 @@ fn insert_reverse(db1: Box<Database>, db2: Box<Database>) {
     index2.put(&[64; 32], vec![2]);
     index2.put(&[42; 32], vec![1]);
 
-    assert!(index2.merkle_root() != Hash::zero());
+    assert!(index2.merkle_root() != EntryHash(Hash::zero()));
     assert_eq!(index2.merkle_root(), index1.merkle_root());
 }
 
@@ -169,8 +171,8 @@ fn remove_trivial(db1: Box<Database>, db2: Box<Database>) {
     index2.put(&[255; 32], vec![6]);
     index2.remove(&[255; 32]);
 
-    assert_eq!(index1.merkle_root(), Hash::zero());
-    assert_eq!(index2.merkle_root(), Hash::zero());
+    assert_eq!(index1.merkle_root(), EntryHash(Hash::zero()));
+    assert_eq!(index2.merkle_root(), EntryHash(Hash::zero()));
 }
 
 fn remove_simple(db1: Box<Database>, db2: Box<Database>) {
@@ -262,7 +264,7 @@ fn fuzz_insert(db1: Box<Database>, db2: Box<Database>) {
         assert_eq!(v2.as_ref(), Some(&item.1));
     }
 
-    assert!(index2.merkle_root() != Hash::zero());
+    assert!(index2.merkle_root() != EntryHash(Hash::zero()));
     assert_eq!(index2.merkle_root(), index1.merkle_root());
 
     // Test same keys
@@ -322,7 +324,7 @@ fn build_proof_in_leaf_tree(db: Box<Database>) {
     match proof_path {
         MapProof::LeafRootExclusive(key, hash_val) => {
             assert_eq!(key, ProofPath::new(&root_key));
-            assert_eq!(hash_val, hash(&root_val));
+            assert_eq!(hash_val, EntryHash(hash(&root_val)));
         }
         _ => assert!(false),
     }
@@ -363,7 +365,7 @@ fn fuzz_insert_build_proofs_in_table_filled_with_hashes(db: Box<Database>) {
     assert_eq!(proof_path_to_key.merkle_root(), table_merkle_root);
 
     let proof_info = ProofInfo {
-        merkle_root: table_merkle_root,
+        merkle_root: table_merkle_root.hash(),
         searched_key: &item.0,
         proof: &proof_path_to_key,
         key_found: true,
@@ -394,7 +396,7 @@ fn fuzz_insert_build_proofs(db: Box<Database>) {
         assert_eq!(proved_value.unwrap(), &item.1);
 
         let proof_info = ProofInfo {
-            merkle_root: table_merkle_root,
+            merkle_root: table_merkle_root.hash(),
             searched_key: &item.0,
             proof: &proof_path_to_key,
             key_found: true,
@@ -473,7 +475,7 @@ fn fuzz_delete(db1: Box<Database>, db2: Box<Database>) {
         assert!(index2.get(key).is_none());
     }
 
-    assert!(index2.merkle_root() != Hash::zero());
+    assert!(index2.merkle_root() != EntryHash(Hash::zero()));
     assert_eq!(index2.merkle_root(), index1.merkle_root());
 
     for item in &data {
