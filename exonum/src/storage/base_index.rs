@@ -35,6 +35,7 @@ use storage::indexes_metadata::{self, IndexType, INDEXES_METADATA_TABLE_NAME};
 #[derive(Debug)]
 pub struct BaseIndex<T> {
     name: String,
+    is_family: bool,
     index_id: Option<Vec<u8>>,
     is_mutable: bool,
     index_type: IndexType,
@@ -73,10 +74,17 @@ where
     pub fn new<S: AsRef<str>>(index_name: S, index_type: IndexType, view: T) -> Self {
         assert_valid_name(&index_name);
 
-        indexes_metadata::assert_index_type(index_name.as_ref(), index_type, view.as_ref());
+        let is_family = false;
+        indexes_metadata::assert_index_type(
+            index_name.as_ref(),
+            index_type,
+            is_family,
+            view.as_ref(),
+        );
 
         BaseIndex {
             name: index_name.as_ref().to_string(),
+            is_family,
             index_id: None,
             is_mutable: false,
             index_type,
@@ -101,10 +109,17 @@ where
     ) -> Self {
         assert_valid_name(&family_name);
 
-        indexes_metadata::assert_index_type(family_name.as_ref(), index_type, view.as_ref());
+        let is_family = true;
+        indexes_metadata::assert_index_type(
+            family_name.as_ref(),
+            index_type,
+            is_family,
+            view.as_ref(),
+        );
 
         BaseIndex {
             name: family_name.as_ref().to_string(),
+            is_family,
             index_id: {
                 let mut buf = vec![0; index_id.size()];
                 index_id.write(&mut buf);
@@ -119,6 +134,7 @@ where
     pub(crate) fn indexes_metadata(view: T) -> Self {
         BaseIndex {
             name: INDEXES_METADATA_TABLE_NAME.to_string(),
+            is_family: false,
             index_id: None,
             is_mutable: true,
             index_type: IndexType::Map,
@@ -212,7 +228,12 @@ where
 impl<'a> BaseIndex<&'a mut Fork> {
     fn set_index_type(&mut self) {
         if !self.is_mutable {
-            indexes_metadata::set_index_type(&self.name, self.index_type, &mut self.view);
+            indexes_metadata::set_index_type(
+                &self.name,
+                self.index_type,
+                self.is_family,
+                &mut self.view,
+            );
             self.is_mutable = true;
         }
     }
