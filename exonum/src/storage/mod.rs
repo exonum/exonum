@@ -57,7 +57,7 @@
 //! Each index occupies a certain set of keys in a single column family of the [`Database`].
 //! On the other hand, multiple indices can be stored in the same column family, provided
 //! that their key spaces do not intersect. Isolation is commonly achieved with the help
-//! of prefixes; see `with_prefix` constructor in the built-in index types.
+//! of column families; see `new_in_family` constructor in the built-in index types.
 //!
 //! Merkelized indices can generate cryptographic proofs about inclusion
 //! of entries. Having such a proof, an external client may verify locally that the received data

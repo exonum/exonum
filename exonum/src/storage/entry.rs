@@ -56,9 +56,9 @@ where
     /// let index: Entry<_, u8> = Entry::new(name, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         Entry {
-            base: BaseIndex::new(name.as_ref(), IndexType::Entry, view),
+            base: BaseIndex::new(index_name.as_ref(), IndexType::Entry, view),
             _v: PhantomData,
         }
     }

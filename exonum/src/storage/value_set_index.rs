@@ -17,7 +17,7 @@
 use std::marker::PhantomData;
 
 use crypto::Hash;
-use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
+use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue, StorageKey};
 use super::indexes_metadata::IndexType;
 
 /// A set of items that implement `StorageValue` trait.
@@ -83,14 +83,14 @@ where
     /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(name, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         ValueSetIndex {
-            base: BaseIndex::new(name, IndexType::ValueSet, view),
+            base: BaseIndex::new(index_name, IndexType::ValueSet, view),
             _v: PhantomData,
         }
     }
 
-    /// Creates a new index representation based on the name, common prefix of its keys
+    /// Creates a new index representation based on the name, index id in family
     /// and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
@@ -108,13 +108,17 @@ where
     /// let db = MemoryDB::new();
     /// let snapshot = db.snapshot();
     /// let name = "name";
-    /// let prefix = vec![123];
-    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::with_prefix(name, prefix, &snapshot);
+    /// let index_id = vec![123];
+    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new_in_family(name, &index_id, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
+    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
+        family_name: S,
+        index_id: &I,
+        view: T,
+    ) -> Self {
         ValueSetIndex {
-            base: BaseIndex::with_prefix(name, prefix, IndexType::ValueSet, view),
+            base: BaseIndex::new_in_family(family_name, index_id, IndexType::ValueSet, view),
             _v: PhantomData,
         }
     }
