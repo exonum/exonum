@@ -190,13 +190,13 @@ pub enum Error {
     ///
     /// Can be emitted by `TxTransfer`.
     #[fail(display = "Sender doesn't exist")]
-    SenderDoesntExist = 1,
+    SenderNotExist = 1,
 
     /// Receiver doesn't exist.
     ///
     /// Can be emitted by `TxTransfer`.
     #[fail(display = "Receiver doesn't exist")]
-    ReceiverDoesntExist = 2,
+    ReceiverNotExist = 2,
 
     /// Insufficient currency amount.
     ///
@@ -254,12 +254,12 @@ impl Transaction for TxTransfer {
 
         let sender = match schema.wallet(self.from()) {
             Some(val) => val,
-            None => Err(Error::SenderDoesntExist)?,
+            None => Err(Error::SenderNotExist)?,
         };
 
         let receiver = match schema.wallet(self.to()) {
             Some(val) => val,
-            None => Err(Error::ReceiverDoesntExist)?,
+            None => Err(Error::ReceiverNotExist)?,
         };
 
         let amount = self.amount();

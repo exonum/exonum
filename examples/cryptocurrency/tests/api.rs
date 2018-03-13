@@ -188,7 +188,7 @@ fn test_transfer_overcharge() {
 
 #[test]
 fn test_malformed_wallet_request() {
-    let (_, api) = create_testkit();
+    let (_testkit, api) = create_testkit();
 
     let info: String = api.inner.get_err(
         ApiKind::Service("cryptocurrency"),
@@ -199,7 +199,7 @@ fn test_malformed_wallet_request() {
 
 #[test]
 fn test_unknown_wallet_request() {
-    let (_, api) = create_testkit();
+    let (_testkit, api) = create_testkit();
 
     // Transaction is sent by API, but isn't committed.
     let (tx, _) = api.create_wallet(ALICE_NAME);
