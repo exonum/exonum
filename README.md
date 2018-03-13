@@ -9,7 +9,7 @@ transactions between them.
 It implements most basic operations:
 - Create a new user;
 - Add funds to the user's balance;
-- Transfer funds between users;
+- Transfer funds between users.
 
 ## Getting started
 
@@ -19,7 +19,7 @@ Be sure you installed necessary packages:
 * [Node.js with npm](https://nodejs.org/en/download/)
 * [Rust compiler](https://rustup.rs/)
 
-## Installation
+## Install and run
 
 Below you will find a step-by-step guide to starting the cryptocurrency
 service on 4 nodes on the local machine.
@@ -78,7 +78,7 @@ cryptocurrency run --node-config node_3_cfg.toml --db-path db3 --public-api-addr
 cryptocurrency run --node-config node_4_cfg.toml --db-path db4 --public-api-address 0.0.0.0:8203
 ```
 
-Now install frontend dependencies:
+Install frontend dependencies:
 
 ```sh
 cd ../frontend
@@ -110,6 +110,10 @@ Use the official [blockchain explorer](https://github.com/exonum/blockchain-expl
 to monitor blocks and transactions in the blockchain.
 
 Use root URL of public API address of one of nodes as `--api-root` parameter, e.g `http://127.0.0.1:8200`.
+
+## Step by step tutorials
+
+* [Frontend tutorial](tutorial/frontend/getting-started.md)
 
 ## License
 

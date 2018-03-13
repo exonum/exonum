@@ -1,3 +1,97 @@
+# List of Transactions
+
+Create list of transactions `src/pages/AuthPage.vue`:
+
+```html
+<template>
+  <div>
+    <div class="container">
+      <div class="row">
+        <div class="col-sm-12">
+
+          <div class="card mt-5">...</div>
+
+          <div class="card mt-5">
+            <div class="card-header">Transactions</div>
+            <ul class="list-group list-group-flush">
+
+              <li class="list-group-item font-weight-bold">
+                <div class="row">
+                  <div class="col-sm-4">Hash</div>
+                  <div class="col-sm-5">Description</div>
+                  <div class="col-sm-3">Status</div>
+                </div>
+              </li>
+
+              <li v-for="transaction in transactions" class="list-group-item">
+                <div class="row">
+
+                  <div class="col-sm-4"><code>{{ transaction.hash }}</code></div>
+
+                  <div v-if="transaction.message_id == 130" class="col-sm-5">Wallet created</div>
+                  <div v-else-if="transaction.message_id == 129" class="col-sm-5">
+                    <strong v-numeral="transaction.body.amount"/> funds added
+                  </div>
+                  <div v-else-if="transaction.message_id == 128 && transaction.body.from == publicKey" class="col-sm-5">
+                    <strong v-numeral="transaction.body.amount"/> sent to <code>{{ transaction.body.to }}</code>
+                  </div>
+                  <div v-else-if="transaction.message_id == 128 && transaction.body.to == publicKey" class="col-sm-5">
+                    <strong v-numeral="transaction.body.amount"/> received from <code>{{ transaction.body.from }}</code>
+                  </div>
+
+                  <div class="col-sm-3">
+                    <span v-if="transaction.status" class="badge badge-success">executed</span>
+                    <span v-else class="badge badge-danger">failed</span>
+                  </div>
+
+                </div>
+              </li>
+
+            </ul>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <modal :visible="isAddFundsModalVisible" title="Add Funds" action-btn="Add funds" @close="closeAddFundsModal" @submit="addFunds">...</modal>
+
+    <modal :visible="isTransferModalVisible" title="Transfer Funds" action-btn="Transfer" @close="closeTransferModal" @submit="transfer">...</modal>
+
+  </div>
+</template>
+
+<script>
+  const Modal = require('../components/Modal.vue')
+
+  module.exports = {
+    components: {
+      Modal
+    },
+    data: function() {...},
+    methods: {...},
+    mounted: function() {
+      this.$nextTick(function() {
+        const self = this
+
+        this.$storage.get().then(function(keyPair) {
+          self.$blockchain.getWallet(keyPair).then(function(data) {
+            self.name = data.wallet.name
+            self.publicKey = keyPair.publicKey
+            self.balance = data.wallet.balance
+            self.height = data.block.height
+            self.transactions = data.transactions
+          })
+        })
+      })
+    }
+  }
+</script>
+```
+
+Modify `getWallet` method at `src/plugins/blockchain.js` plugin:
+
+```javascript
 import * as Exonum from 'exonum-client'
 import axios from 'axios'
 
@@ -12,23 +106,8 @@ const TX_WALLET_ID = 130
 const TX_ISSUE_ID = 129
 const TX_TRANSFER_ID = 128
 
-const TableKey = Exonum.newType({
-  size: 4,
-  fields: {
-    service_id: {type: Exonum.Uint16, size: 2, from: 0, to: 2},
-    table_index: {type: Exonum.Uint16, size: 2, from: 2, to: 4}
-  }
-})
-const Wallet = Exonum.newType({
-  size: 88,
-  fields: {
-    pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-    name: {type: Exonum.String, size: 8, from: 32, to: 40},
-    balance: {type: Exonum.Uint64, size: 8, from: 40, to: 48},
-    history_len: {type: Exonum.Uint64, size: 8, from: 48, to: 56},
-    history_hash: {type: Exonum.Hash, size: 32, from: 56, to: 88}
-  }
-})
+const TableKey = Exonum.newType({...})
+const Wallet = Exonum.newType({...})
 const TransactionMetaData = Exonum.newType({
   size: 33,
   fields: {
@@ -99,72 +178,8 @@ function getPublicKeyOfTransaction(transactionId, transaction) {
 module.exports = {
   install: function(Vue) {
     Vue.prototype.$blockchain = {
-      createWallet: name => {
-        const keyPair = Exonum.keyPair()
 
-        const TxCreateWallet = getTransaction(TX_WALLET_ID)
-
-        const data = {
-          pub_key: keyPair.publicKey,
-          name: name
-        }
-
-        const signature = TxCreateWallet.sign(keyPair.secretKey, data)
-
-        return axios.post(TX_URL, {
-          network_id: NETWORK_ID,
-          protocol_version: PROTOCOL_VERSION,
-          service_id: SERVICE_ID,
-          message_id: TX_WALLET_ID,
-          signature: signature,
-          body: data
-        }).then(() => {
-          return keyPair
-        })
-      },
-
-      addFunds: (keyPair, amountToAdd) => {
-        const TxIssue = getTransaction(TX_ISSUE_ID)
-
-        const data = {
-          wallet: keyPair.publicKey,
-          amount: amountToAdd.toString(),
-          seed: Exonum.randomUint64()
-        }
-
-        const signature = TxIssue.sign(keyPair.secretKey, data)
-
-        return axios.post(TX_URL, {
-          network_id: NETWORK_ID,
-          protocol_version: PROTOCOL_VERSION,
-          service_id: SERVICE_ID,
-          message_id: TX_ISSUE_ID,
-          signature: signature,
-          body: data
-        })
-      },
-
-      transfer: (keyPair, receiver, amountToTransfer) => {
-        const TxTransfer = getTransaction(TX_TRANSFER_ID)
-
-        const data = {
-          from: keyPair.publicKey,
-          to: receiver,
-          amount: amountToTransfer,
-          seed: Exonum.randomUint64()
-        }
-
-        const signature = TxTransfer.sign(keyPair.secretKey, data)
-
-        return axios.post(TX_URL, {
-          network_id: NETWORK_ID,
-          protocol_version: PROTOCOL_VERSION,
-          service_id: SERVICE_ID,
-          message_id: TX_TRANSFER_ID,
-          signature: signature,
-          body: data
-        })
-      },
+      createWallet: name => {...},
 
       getWallet: keyPair => {
         return axios.get(CONFIG_URL).then(response => {
@@ -238,7 +253,13 @@ module.exports = {
             }
           })
         })
-      }
+      },
+
+      addFunds: (keyPair, amountToAdd) => {...},
+
+      transfer: (keyPair, receiver, amountToTransfer) => {...}
+
     }
   }
 }
+```
