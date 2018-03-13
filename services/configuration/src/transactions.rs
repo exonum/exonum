@@ -93,7 +93,12 @@ fn enough_votes_to_commit(snapshot: &Snapshot, cfg_hash: &Hash) -> bool {
     let schema = Schema::new(snapshot);
     let votes = schema.votes_by_config_hash(cfg_hash);
     let votes_count = votes.iter().filter(|vote| vote.is_some()).count();
-    votes_count >= State::byzantine_majority_count(actual_config.validator_keys.len())
+    let majority_count = match actual_config.majority_count {
+        Some(majority_count) => majority_count as usize,
+        _ => State::byzantine_majority_count(actual_config.validator_keys.len()),
+    };
+
+    votes_count >= majority_count
 }
 
 impl Propose {
@@ -143,6 +148,22 @@ impl Propose {
         let current_height = CoreSchema::new(snapshot).height().next();
         if candidate.actual_from <= current_height {
             return Err(ActivationInPast(current_height));
+        }
+
+        if let Some(proposed_majority_count) = candidate.majority_count {
+            let proposed_majority_count = proposed_majority_count as usize;
+            let validators_num = candidate.validator_keys.len();
+            let min_votes_count = State::byzantine_majority_count(validators_num);
+
+            if proposed_majority_count < min_votes_count ||
+                proposed_majority_count > validators_num
+            {
+                return Err(InvalidMajorityCount {
+                    min: min_votes_count,
+                    max: validators_num,
+                    proposed: proposed_majority_count,
+                });
+            }
         }
 
         Ok(())
