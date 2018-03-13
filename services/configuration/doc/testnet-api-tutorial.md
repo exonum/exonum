@@ -36,7 +36,7 @@ cargo install --example configuration
 ```
 
 `exonum` crate system dependencies and rust toolchain configuration -
-[exonum install instructions](https://github.com/exonum/exonum/blob/master/INSTALL.md).
+[exonum install instructions](https://exonum.com/doc/get-started/install/).
 
 #### Generate testnet directory and config
 

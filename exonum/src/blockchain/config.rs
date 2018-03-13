@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -46,6 +46,9 @@ pub struct StoredConfiguration {
     pub validator_keys: Vec<ValidatorKeys>,
     /// Consensus algorithm parameters.
     pub consensus: ConsensusConfig,
+    /// Number of votes required to commit new configuration.
+    /// Should be greater than 2/3 and less or equal to the validators count.
+    pub majority_count: Option<u16>,
     /// Services specific variables.
     /// Keys are `service_name` from `Service` trait and values are the serialized json.
     pub services: BTreeMap<String, serde_json::Value>,
@@ -428,6 +431,7 @@ mod tests {
             validator_keys,
             consensus: ConsensusConfig::default(),
             services: BTreeMap::new(),
+            majority_count: None,
         }
     }
 

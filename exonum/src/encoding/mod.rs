@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,10 +25,10 @@
 //! - **Header:** a fixed-sized part
 //! - **Body:** dynamically sized part, known only after parsing the header
 //!
-//! To create a structure type, you can use [`message!`] and [`encoding_struct!`] macros.
+//! To create a structure type, you can use [`transactions!`] and [`encoding_struct!`] macros.
 //!
 //! [doc:serialization]: https://exonum.com/doc/architecture/serialization/
-//! [`message!`]: ../macro.message.html
+//! [`transactions!`]: ../macro.transactions.html
 //! [`encoding_struct!`]: ../macro.encoding_struct.html
 //!
 //! # Examples
