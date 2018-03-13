@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 //! your service on top of Exonum blockchain you need to do the following:
 //!
 //! - Define your own information schema.
-//! - Create one or more transaction types using the [`message!`] macro and
+//! - Create one or more transaction types using the [`transactions!`] macro and
 //!   implement the [`Transaction`] trait for them.
 //! - Create a data structure implementing the [`Service`] trait.
 //! - Write API handlers for the service, if required.
@@ -27,7 +27,7 @@
 //! You may consult [the service creation tutorial][doc:create-service] for a more detailed
 //! manual on how to create services.
 //!
-//! [`message!`]: ../macro.message.html
+//! [`transactions!`]: ../macro.transactions.html
 //! [`Transaction`]: ./trait.Transaction.html
 //! [`Service`]: ./trait.Service.html
 //! [doc:create-service]: https://exonum.com/doc/get-started/create-service
