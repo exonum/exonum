@@ -89,7 +89,7 @@
     <modal :visible="isTransferModalVisible" title="Transfer Funds" action-btn="Transfer" @close="closeTransferModal" @submit="transfer">
       <div class="form-group">
         <label>Receiver:</label>
-        <input v-model="receiver" type="text" class="form-control" placeholder="Enter public key">
+        <input v-model="receiver" type="text" class="form-control" placeholder="Enter public key" required>
       </div>
       <div class="form-group">
         <label>Amount:</label>
@@ -97,7 +97,7 @@
           <div class="input-group-prepend">
             <div class="input-group-text">$</div>
           </div>
-          <input v-model="amountToTransfer" type="number" class="form-control" placeholder="Enter amount" min="1">
+          <input v-model="amountToTransfer" type="number" class="form-control" placeholder="Enter amount" min="0" required>
         </div>
       </div>
     </modal>

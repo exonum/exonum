@@ -9,11 +9,11 @@
               <form @submit.prevent="login">
                 <div class="form-group">
                   <label class="control-label">Public key:</label>
-                  <input v-model="publicKey" type="text" class="form-control" placeholder="Enter public key">
+                  <input v-model="publicKey" type="text" class="form-control" placeholder="Enter public key" required>
                 </div>
                 <div class="form-group">
                   <label class="control-label">Secret key:</label>
-                  <input v-model="secretKey" type="text" class="form-control" placeholder="Enter secret key">
+                  <input v-model="secretKey" type="text" class="form-control" placeholder="Enter secret key" required>
                 </div>
                 <button type="submit" class="btn btn-lg btn-block btn-primary">Log in</button>
               </form>
@@ -22,7 +22,7 @@
               <form @submit.prevent="register">
                 <div class="form-group">
                   <label class="control-label">Name:</label>
-                  <input v-model="name" type="text" class="form-control" placeholder="Enter name" maxlength="260">
+                  <input v-model="name" type="text" class="form-control" placeholder="Enter name" maxlength="260" required>
                 </div>
                 <button type="submit" class="btn btn-lg btn-block btn-primary">Register</button>
               </form>
@@ -113,13 +113,16 @@
       },
 
       proceed: function() {
+        const self = this
+
         this.isModalVisible = false
 
         this.$storage.set(this.keyPair)
 
-        this.$nextTick(function() {
-          this.$router.push({name: 'user'})
-        })
+        // let modal time to hide
+        setTimeout(function() {
+          self.$router.push({name: 'user'})
+        }, 100)
       }
     }
   }
