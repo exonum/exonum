@@ -16,6 +16,7 @@
 
 use rand::{thread_rng, Rng};
 use serde_json;
+use chrono::{DateTime, Utc};
 
 use blockchain::{Blockchain, Service, Snapshot, Schema, Transaction, ExecutionResult};
 use crypto::{gen_keypair, Hash, CryptoHash};
@@ -107,16 +108,16 @@ fn test_u64() {
 
 #[test]
 fn test_system_time() {
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::time::UNIX_EPOCH;
     encoding_struct! {
         struct Test {
-            some_test: SystemTime,
+            some_test: DateTime<Utc>,
         }
     }
     let test_data = r##"{"some_test":{"nanos":0,"secs":"0"}}"##;
 
 
-    let test = Test::new(UNIX_EPOCH);
+    let test = Test::new(UNIX_EPOCH.into());
     let data = ::serde_json::to_string(&test).unwrap();
     assert_eq!(data, test_data);
 }

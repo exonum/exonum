@@ -21,8 +21,10 @@ extern crate exonum_time;
 extern crate exonum_testkit;
 extern crate serde_json;
 extern crate serde;
+extern crate chrono;
 
-use std::time::{UNIX_EPOCH, SystemTime, Duration};
+use chrono::{DateTime, Utc, Duration, TimeZone};
+
 use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
 use exonum::crypto::{gen_keypair, Hash, PublicKey};
 use exonum::encoding;
@@ -78,7 +80,7 @@ transactions! {
         struct TxMarker {
             from: &PublicKey,
             mark: i32,
-            time: SystemTime,
+            time: DateTime<Utc>,
         }
     }
 }
@@ -131,7 +133,7 @@ fn main() {
         .with_service(TimeService::with_provider(mock_provider.clone()))
         .create();
 
-    mock_provider.set_time(UNIX_EPOCH + Duration::new(10, 0));
+    mock_provider.set_time(Utc.timestamp(10, 0));
     testkit.create_blocks_until(Height(2));
 
     let snapshot = testkit.snapshot();
@@ -148,13 +150,13 @@ fn main() {
     let tx2 = TxMarker::new(
         &keypair2.0,
         2,
-        mock_provider.time() + Duration::new(10, 0),
+        mock_provider.time() + Duration::seconds(10),
         &keypair2.1,
     );
     let tx3 = TxMarker::new(
         &keypair3.0,
         3,
-        mock_provider.time() - Duration::new(5, 0),
+        mock_provider.time() - Duration::seconds(5),
         &keypair3.1,
     );
     testkit.create_block_with_transactions(txvec![tx1, tx2, tx3]);
@@ -168,7 +170,7 @@ fn main() {
     let tx4 = TxMarker::new(
         &keypair3.0,
         4,
-        UNIX_EPOCH + Duration::new(15, 0),
+        Utc.timestamp(15, 0),
         &keypair3.1,
     );
     testkit.create_block_with_transactions(txvec![tx4]);

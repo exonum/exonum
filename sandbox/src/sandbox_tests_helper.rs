@@ -416,7 +416,7 @@ where
                 round,
                 &propose.hash(),
                 &block.hash(),
-                sandbox.time(),
+                sandbox.time().into(),
                 sandbox.s(VALIDATOR_0),
             ));
             sandbox.assert_lock(round, Some(propose.hash()));
@@ -429,7 +429,7 @@ where
                     round,
                     &propose.hash(),
                     &block.hash(),
-                    sandbox.time(),
+                    sandbox.time().into(),
                     sandbox.s(val_idx),
                 ));
 
@@ -530,7 +530,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
                     round,
                     &propose.hash(),
                     &block.hash(),
-                    sandbox.time(),
+                    sandbox.time().into(),
                     sandbox.s(val_idx),
                 ));
             }

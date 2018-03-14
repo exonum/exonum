@@ -179,7 +179,7 @@ pub fn connect_message(addr: SocketAddr) -> Connect {
     Connect::new_with_signature(
         &PublicKey::zero(),
         addr,
-        time,
+        time.into(),
         &user_agent::get(),
         &Signature::zero(),
     )

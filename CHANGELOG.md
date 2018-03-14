@@ -34,6 +34,15 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
   - Instead of calling `mempool()`, one should use `is_tx_in_pool`
   or `add_tx` methods.
+- `SystemTime` can't serve as storage key or value anymore, it has been replaced
+  with `chrono::DateTime<Utc>`.
+
+  Migration path:
+
+  - Replace all `SystemTime` fields with `chrono::DateTime<Utc>` ones.
+  - Use `DateTime::from` and `into()` methods to convert your existing
+  `SystemTime` instances into suitable type when constructing transactions or
+  working with database.
 
 #### exonum-configuration
 
@@ -41,6 +50,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   Allows to increase the threshold amount of votes required to commit
   a new configuration proposal. By default the number of votes is calculated
   as 2/3 + 1 of total validators count. (#546)
+
+#### exonum-time
+
+- `SystemTime` has been replaced with `chrono::DateTime<Utc>`, as it provides
+more predictable behavior on all systems.
 
 ### New features
 

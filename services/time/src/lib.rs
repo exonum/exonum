@@ -33,13 +33,14 @@ extern crate exonum;
 extern crate router;
 extern crate bodyparser;
 extern crate iron;
+extern crate chrono;
 
 use iron::prelude::*;
 use iron::Handler;
 use router::Router;
+use chrono::{DateTime, Utc, TimeZone, Duration};
 
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use exonum::blockchain::{Blockchain, Service, ServiceContext, Schema, ApiContext, Transaction,
                          TransactionSet, ExecutionResult, ExecutionError};
@@ -69,7 +70,7 @@ impl<T: AsRef<Snapshot>> TimeSchema<T> {
     }
 
     /// Returns the table that stores `SystemTime` for every validator.
-    pub fn validators_times(&self) -> ProofMapIndex<&Snapshot, PublicKey, SystemTime> {
+    pub fn validators_times(&self) -> ProofMapIndex<&Snapshot, PublicKey, DateTime<Utc>> {
         ProofMapIndex::new(
             format!("{}.validators_times", SERVICE_NAME),
             self.view.as_ref(),
@@ -77,7 +78,7 @@ impl<T: AsRef<Snapshot>> TimeSchema<T> {
     }
 
     /// Returns stored time.
-    pub fn time(&self) -> Entry<&Snapshot, SystemTime> {
+    pub fn time(&self) -> Entry<&Snapshot, DateTime<Utc>> {
         Entry::new(format!("{}.time", SERVICE_NAME), self.view.as_ref())
     }
 
@@ -92,14 +93,14 @@ impl<'a> TimeSchema<&'a mut Fork> {
     /// Mutable reference to the ['validators_times'][1] index.
     ///
     /// [1]: struct.TimeSchema.html#method.validators_times
-    pub fn validators_times_mut(&mut self) -> ProofMapIndex<&mut Fork, PublicKey, SystemTime> {
+    pub fn validators_times_mut(&mut self) -> ProofMapIndex<&mut Fork, PublicKey, DateTime<Utc>> {
         ProofMapIndex::new(format!("{}.validators_times", SERVICE_NAME), self.view)
     }
 
     /// Mutable reference to the ['time'][1] index.
     ///
     /// [1]: struct.TimeSchema.html#method.time
-    pub fn time_mut(&mut self) -> Entry<&mut Fork, SystemTime> {
+    pub fn time_mut(&mut self) -> Entry<&mut Fork, DateTime<Utc>> {
         Entry::new(format!("{}.time", SERVICE_NAME), self.view)
     }
 }
@@ -111,7 +112,7 @@ transactions! {
         /// Transaction that is sent by the validator after the commit of the block.
         struct TxTime {
             /// Time of the validator.
-            time: SystemTime,
+            time: DateTime<Utc>,
             /// Public key of the validator.
             pub_key: &PublicKey,
         }
@@ -228,7 +229,7 @@ pub struct ValidatorTime {
     /// Public key of the validator.
     pub public_key: PublicKey,
     /// Time of the validator.
-    pub time: Option<SystemTime>,
+    pub time: Option<DateTime<Utc>>,
 }
 
 /// Shortcut to get data from storage.
@@ -314,15 +315,15 @@ impl Api for TimeApi {
 /// A helper trait that provides the node with a current time.
 pub trait TimeProvider: Send + Sync + ::std::fmt::Debug {
     /// Returns the current time.
-    fn current_time(&self) -> SystemTime;
+    fn current_time(&self) -> DateTime<Utc>;
 }
 
 #[derive(Debug)]
 struct SystemTimeProvider;
 
 impl TimeProvider for SystemTimeProvider {
-    fn current_time(&self) -> SystemTime {
-        SystemTime::now()
+    fn current_time(&self) -> DateTime<Utc> {
+        Utc::now()
     }
 }
 
@@ -368,29 +369,29 @@ impl TimeProvider for SystemTimeProvider {
 #[derive(Debug, Clone)]
 pub struct MockTimeProvider {
     /// Local time value.
-    time: Arc<RwLock<SystemTime>>,
+    time: Arc<RwLock<DateTime<Utc>>>,
 }
 
 impl Default for MockTimeProvider {
     /// Initializes the provider with the time set to the Unix epoch start.
     fn default() -> Self {
-        Self::new(UNIX_EPOCH)
+        Self::new(Utc.timestamp(0, 0))
     }
 }
 
 impl MockTimeProvider {
     /// Creates a new `MockTimeProvider` with time value equal to `time`.
-    pub fn new(time: SystemTime) -> Self {
+    pub fn new(time: DateTime<Utc>) -> Self {
         Self { time: Arc::new(RwLock::new(time)) }
     }
 
     /// Gets the time value currently reported by the provider.
-    pub fn time(&self) -> SystemTime {
+    pub fn time(&self) -> DateTime<Utc> {
         *self.time.read().unwrap()
     }
 
     /// Sets the time value to `new_time`.
-    pub fn set_time(&self, new_time: SystemTime) {
+    pub fn set_time(&self, new_time: DateTime<Utc>) {
         let mut time = self.time.write().unwrap();
         *time = new_time;
     }
@@ -398,12 +399,12 @@ impl MockTimeProvider {
     /// Adds `duration` to the value of `time`.
     pub fn add_time(&self, duration: Duration) {
         let mut time = self.time.write().unwrap();
-        *time += duration;
+        *time = *time + duration;
     }
 }
 
 impl TimeProvider for MockTimeProvider {
-    fn current_time(&self) -> SystemTime {
+    fn current_time(&self) -> DateTime<Utc> {
         self.time()
     }
 }
