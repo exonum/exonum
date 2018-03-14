@@ -109,12 +109,15 @@ Ready! Find demo at [http://127.0.0.1:8280](http://127.0.0.1:8280).
 Use the official [blockchain explorer](https://github.com/exonum/blockchain-explorer)
 to monitor blocks and transactions in the blockchain.
 
-Use root URL of public API address of one of nodes as `--api-root` parameter, e.g `http://127.0.0.1:8200`.
+Use root URL of public API address of one of nodes as `--api-root`
+parameter, e.g `http://127.0.0.1:8200`.
 
 ## Tutorials
 
-* [Frontend tutorial](tutorial/frontend.md)
+* Read the [frontend tutorial](tutorial/frontend.md) to get detailed
+information about the interaction of the client with Exonum blockchain.
 
 ## License
 
-Cryptocurrency demo is licensed under the Apache License (Version 2.0). See [LICENSE](LICENSE) for details.
+Cryptocurrency demo is licensed under the Apache License (Version 2.0).
+See [LICENSE](LICENSE) for details.

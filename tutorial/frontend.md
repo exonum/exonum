@@ -3,7 +3,7 @@
 Cryptocurrency demo application is built on [Vue.js](https://vuejs.org)
 framework together with [Bootstrap](https://getbootstrap.com/).
 
-This tutorial covers next client's interaction with Exonum blockchain:
+This tutorial covers the interaction of the client with Exonum blockchain:
 - [Create a new user in the blockchain](#create-a-new-user)
 - [Add funds to the user's balance](#add-funds)
 - [Transfer funds between users](#transfer-funds)
@@ -194,7 +194,7 @@ const data = {
 }
 ```
 
-Verify block and its precommits:
+Verify the block and its precommits:
 
 ```javascript
 if (Exonum.verifyBlock(data.block_info, validators, 0)) {...}
@@ -230,7 +230,7 @@ const walletsHash = Exonum.merklePatriciaProof(data.block_info.block.state_hash,
 ```
 
 Extracted value is a root hash of the wallets Merkle Patricia tree (`data.wallet.value`).
-Find wallet in the tree:
+Extract wallet from the tree:
 
 ```javascript
 const Wallet = Exonum.newType({
