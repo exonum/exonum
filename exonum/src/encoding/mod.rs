@@ -107,7 +107,7 @@
 //! [`field_size()`]: ./trait.Field.html#tymethod.field_size
 
 use std::convert::From;
-use std::ops::{Add, Sub, Mul, Div};
+use std::ops::{Add, Div, Mul, Sub};
 
 pub use self::fields::Field;
 pub use self::segments::SegmentField;

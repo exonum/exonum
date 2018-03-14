@@ -15,7 +15,7 @@
 //! An implementation of `RocksDB` database.
 
 use exonum_profiler::ProfilerSpan;
-use rocksdb::{self, Options as RocksDbOptions, WriteBatch, DBIterator};
+use rocksdb::{self, DBIterator, Options as RocksDbOptions, WriteBatch};
 use rocksdb::utils::get_cf_names;
 
 use std::mem;
@@ -25,7 +25,7 @@ use std::fmt;
 use std::error::Error;
 use std::iter::Peekable;
 
-use storage::{self, DbOptions, Database, Iterator, Iter, Snapshot, Patch};
+use storage::{self, Database, DbOptions, Iter, Iterator, Patch, Snapshot};
 use storage::db::Change;
 
 pub use rocksdb::WriteOptions as RocksDBWriteOptions;
@@ -84,11 +84,9 @@ impl RocksDB {
         for (cf_name, changes) in patch {
             let cf = match self.db.cf_handle(&cf_name) {
                 Some(cf) => cf,
-                None => {
-                    self.db
-                        .create_cf(&cf_name, &DbOptions::default().to_rocksdb())
-                        .unwrap()
-                }
+                None => self.db
+                    .create_cf(&cf_name, &DbOptions::default().to_rocksdb())
+                    .unwrap(),
             };
             for (key, change) in changes {
                 match change {
@@ -136,14 +134,12 @@ impl Snapshot for RocksDBSnapshot {
     }
 
     fn iter<'a>(&'a self, name: &str, from: &[u8]) -> Iter<'a> {
-        use rocksdb::{IteratorMode, Direction};
+        use rocksdb::{Direction, IteratorMode};
         let _p = ProfilerSpan::new("RocksDBSnapshot::iter");
         let iter = match self._db.cf_handle(name) {
-            Some(cf) => {
-                self.snapshot
-                    .iterator_cf(cf, IteratorMode::From(from, Direction::Forward))
-                    .unwrap()
-            }
+            Some(cf) => self.snapshot
+                .iterator_cf(cf, IteratorMode::From(from, Direction::Forward))
+                .unwrap(),
             None => self.snapshot.iterator(IteratorMode::Start),
         };
         Box::new(RocksDBIterator {

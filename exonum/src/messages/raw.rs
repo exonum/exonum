@@ -200,7 +200,9 @@ impl MessageWriter {
         message_type: u16,
         payload_length: usize,
     ) -> Self {
-        let mut raw = MessageWriter { raw: vec![0; HEADER_LENGTH + payload_length] };
+        let mut raw = MessageWriter {
+            raw: vec![0; HEADER_LENGTH + payload_length],
+        };
         raw.set_network_id(network_id);
         raw.set_version(protocol_version);
         raw.set_service_id(service_id);

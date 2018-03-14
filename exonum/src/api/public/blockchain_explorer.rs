@@ -20,7 +20,7 @@ use std::ops::Range;
 use std::cmp;
 
 use api::{Api, ApiError};
-use blockchain::{Block, Blockchain, TxLocation, Schema, TransactionErrorType, TransactionResult};
+use blockchain::{Block, Blockchain, Schema, TransactionErrorType, TransactionResult, TxLocation};
 use crypto::Hash;
 use helpers::Height;
 use node::state::TxPool;
@@ -217,20 +217,18 @@ impl<'a> BlockchainExplorer<'a> {
             ApiError::InternalError(format!("Service not found for tx: {:?}", raw_tx).into())
         })?;
 
-        let content = box_transaction.serialize_field().map_err(
-            ApiError::InternalError,
-        )?;
+        let content = box_transaction
+            .serialize_field()
+            .map_err(ApiError::InternalError)?;
 
-        let location = schema.tx_location_by_tx_hash().get(tx_hash).expect(
-            &format!(
-                "Not found tx_hash location: {:?}",
-                tx_hash
-            ),
-        );
+        let location = schema
+            .tx_location_by_tx_hash()
+            .get(tx_hash)
+            .expect(&format!("Not found tx_hash location: {:?}", tx_hash));
 
-        let location_proof = schema.block_txs(location.block_height()).get_proof(
-            location.position_in_block(),
-        );
+        let location_proof = schema
+            .block_txs(location.block_height())
+            .get_proof(location.position_in_block());
 
         // Unwrap is OK here, because we already know that transaction is committed.
         let status = match schema.transaction_results().get(tx_hash).unwrap() {
@@ -306,15 +304,13 @@ impl<'a> BlockchainExplorer<'a> {
                 continue;
             }
 
-            let block_hash = hashes.get(height).expect(&format!(
-                "Block not found, height:{:?}",
-                height
-            ));
+            let block_hash = hashes
+                .get(height)
+                .expect(&format!("Block not found, height:{:?}", height));
 
-            let block = blocks.get(&block_hash).expect(&format!(
-                "Block not found, hash:{:?}",
-                block_hash
-            ));
+            let block = blocks
+                .get(&block_hash)
+                .expect(&format!("Block not found, hash:{:?}", block_hash));
 
             v.push(block);
             collected += 1;

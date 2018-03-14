@@ -14,7 +14,7 @@
 
 use std::collections::HashSet;
 
-use crypto::{Hash, CryptoHash, PublicKey};
+use crypto::{CryptoHash, Hash, PublicKey};
 use blockchain::{Schema, Transaction};
 use messages::{BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote,
                PrevotesRequest, Propose, ProposeRequest, RawTransaction, TransactionsRequest};
@@ -250,12 +250,8 @@ impl NodeHandler {
             }
 
             // Commit block
-            self.state.add_block(
-                block_hash,
-                patch,
-                tx_hashes,
-                block.proposer_id(),
-            );
+            self.state
+                .add_block(block_hash, patch, tx_hashes, block.proposer_id());
         }
         self.commit(block_hash, msg.precommits().iter(), None);
         self.request_next_block();
@@ -347,11 +343,8 @@ impl NodeHandler {
     ) {
         // Check if propose is known.
         if self.state.propose(propose_hash).is_none() {
-            self.state.add_unknown_propose_with_precommits(
-                round,
-                *propose_hash,
-                *block_hash,
-            );
+            self.state
+                .add_unknown_propose_with_precommits(round, *propose_hash, *block_hash);
             return;
         }
 
@@ -397,7 +390,6 @@ impl NodeHandler {
 
             // Change lock
             if self.state.has_majority_prevotes(round, propose_hash) {
-
                 // Put consensus messages for current Propose and this round to the cache.
                 self.check_propose_saved(round, &propose_hash);
                 let raw_messages = self.state
@@ -476,15 +468,12 @@ impl NodeHandler {
                 .commit(block_state.patch(), block_hash, precommits)
                 .unwrap();
             // Update node state
-            self.state.update_config(
-                Schema::new(&self.blockchain.snapshot()).actual_configuration(),
-            );
+            self.state
+                .update_config(Schema::new(&self.blockchain.snapshot()).actual_configuration());
             // Update state to new height
             let block_hash = self.blockchain.last_hash();
-            self.state.new_height(
-                &block_hash,
-                self.system_state.current_time(),
-            );
+            self.state
+                .new_height(&block_hash, self.system_state.current_time());
             (block_state.txs().len(), block_state.proposer_id())
         };
 
@@ -736,16 +725,14 @@ impl NodeHandler {
             self.add_request_timeout(data.clone(), Some(peer));
 
             let message = match *data {
-                RequestData::Propose(ref propose_hash) => {
-                    ProposeRequest::new(
-                        self.state.consensus_public_key(),
-                        &peer,
-                        self.state.height(),
-                        propose_hash,
-                        self.state.consensus_secret_key(),
-                    ).raw()
-                        .clone()
-                }
+                RequestData::Propose(ref propose_hash) => ProposeRequest::new(
+                    self.state.consensus_public_key(),
+                    &peer,
+                    self.state.height(),
+                    propose_hash,
+                    self.state.consensus_secret_key(),
+                ).raw()
+                    .clone(),
                 RequestData::Transactions(ref propose_hash) => {
                     let txs: Vec<_> = self.state
                         .propose(propose_hash)
@@ -762,27 +749,23 @@ impl NodeHandler {
                     ).raw()
                         .clone()
                 }
-                RequestData::Prevotes(round, ref propose_hash) => {
-                    PrevotesRequest::new(
-                        self.state.consensus_public_key(),
-                        &peer,
-                        self.state.height(),
-                        round,
-                        propose_hash,
-                        self.state.known_prevotes(round, propose_hash),
-                        self.state.consensus_secret_key(),
-                    ).raw()
-                        .clone()
-                }
-                RequestData::Block(height) => {
-                    BlockRequest::new(
-                        self.state.consensus_public_key(),
-                        &peer,
-                        height,
-                        self.state.consensus_secret_key(),
-                    ).raw()
-                        .clone()
-                }
+                RequestData::Prevotes(round, ref propose_hash) => PrevotesRequest::new(
+                    self.state.consensus_public_key(),
+                    &peer,
+                    self.state.height(),
+                    round,
+                    propose_hash,
+                    self.state.known_prevotes(round, propose_hash),
+                    self.state.consensus_secret_key(),
+                ).raw()
+                    .clone(),
+                RequestData::Block(height) => BlockRequest::new(
+                    self.state.consensus_public_key(),
+                    &peer,
+                    height,
+                    self.state.consensus_secret_key(),
+                ).raw()
+                    .clone(),
             };
             trace!("Send request {:?} to peer {:?}", data, peer);
             self.send_to_peer(peer, &message);
@@ -800,9 +783,10 @@ impl NodeHandler {
             proposer_id,
             height,
             tx_hashes,
-            &self.state.transactions().read().expect(
-                "Expected read lock",
-            ),
+            &self.state
+                .transactions()
+                .read()
+                .expect("Expected read lock"),
         )
     }
 
@@ -822,12 +806,8 @@ impl NodeHandler {
         let (block_hash, patch) =
             self.create_block(propose.validator(), propose.height(), tx_hashes.as_slice());
         // Save patch
-        self.state.add_block(
-            block_hash,
-            patch,
-            tx_hashes,
-            propose.validator(),
-        );
+        self.state
+            .add_block(block_hash, patch, tx_hashes, propose.validator());
         self.state
             .propose_mut(propose_hash)
             .unwrap()
@@ -889,9 +869,9 @@ impl NodeHandler {
 
     /// Broadcasts the `Prevote` message to all peers.
     pub fn broadcast_prevote(&mut self, round: Round, propose_hash: &Hash) -> bool {
-        let validator_id = self.state.validator_id().expect(
-            "called broadcast_prevote in Auditor node.",
-        );
+        let validator_id = self.state
+            .validator_id()
+            .expect("called broadcast_prevote in Auditor node.");
         let locked_round = self.state.locked_round();
         let prevote = Prevote::new(
             validator_id,
@@ -915,9 +895,9 @@ impl NodeHandler {
 
     /// Broadcasts the `Precommit` message to all peers.
     pub fn broadcast_precommit(&mut self, round: Round, propose_hash: &Hash, block_hash: &Hash) {
-        let validator_id = self.state.validator_id().expect(
-            "called broadcast_precommit in Auditor node.",
-        );
+        let validator_id = self.state
+            .validator_id()
+            .expect("called broadcast_precommit in Auditor node.");
         let precommit = Precommit::new(
             validator_id,
             self.state.height(),
@@ -956,12 +936,7 @@ impl NodeHandler {
                 return Err("Several precommits from one validator in block".to_string());
             }
 
-            self.verify_precommit(
-                block_hash,
-                block_height,
-                round,
-                precommit,
-            )?;
+            self.verify_precommit(block_hash, block_height, round, precommit)?;
         }
 
         Ok(())
@@ -1016,10 +991,8 @@ impl NodeHandler {
     fn check_propose_saved(&mut self, round: Round, propose_hash: &Hash) {
         if let Some(propose_state) = self.state.propose_mut(propose_hash) {
             if !propose_state.is_saved() {
-                self.blockchain.save_message(
-                    round,
-                    propose_state.message().raw(),
-                );
+                self.blockchain
+                    .save_message(round, propose_state.message().raw());
                 propose_state.set_saved(true);
             }
         }

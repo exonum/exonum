@@ -32,7 +32,7 @@ use std::time::SystemTime;
 use crypto::{Hash, PublicKey};
 use blockchain;
 use helpers::{Height, Round, ValidatorId};
-use super::{ServiceMessage, RawMessage, BitVec};
+use super::{BitVec, RawMessage, ServiceMessage};
 
 /// Consensus message type.
 pub const CONSENSUS: u16 = 0;
@@ -61,7 +61,6 @@ pub const PREVOTES_REQUEST_MESSAGE_ID: u16 = PrevotesRequest::MESSAGE_ID;
 pub const PEERS_REQUEST_MESSAGE_ID: u16 = PeersRequest::MESSAGE_ID;
 /// `BlockRequest` message id.
 pub const BLOCK_REQUEST_MESSAGE_ID: u16 = BlockRequest::MESSAGE_ID;
-
 
 messages! {
     const SERVICE_ID = CONSENSUS;

@@ -29,13 +29,17 @@ impl<T: Database> CheckpointDb<T> {
     /// Creates a new checkpointed database that uses the specified `db` as the underlying
     /// data storage.
     pub fn new(db: T) -> Self {
-        CheckpointDb { inner: Arc::new(RwLock::new(CheckpointDbInner::new(db))) }
+        CheckpointDb {
+            inner: Arc::new(RwLock::new(CheckpointDbInner::new(db))),
+        }
     }
 
     /// Returns a handler to the database. The handler could be used to roll the database back
     /// without having the ownership to it.
     pub fn handler(&self) -> CheckpointDbHandler<T> {
-        CheckpointDbHandler { inner: Arc::clone(&self.inner) }
+        CheckpointDbHandler {
+            inner: Arc::clone(&self.inner),
+        }
     }
 }
 
@@ -188,9 +192,11 @@ mod tests {
                 patch_set.insert((name, key.clone(), OrdChange::from(value)));
             }
         }
-        let expected_set = BTreeSet::from_iter(changes.into_iter().map(|(name, key, value)| {
-            (name, key, OrdChange::from(value))
-        }));
+        let expected_set = BTreeSet::from_iter(
+            changes
+                .into_iter()
+                .map(|(name, key, value)| (name, key, OrdChange::from(value))),
+        );
         assert_eq!(patch_set, expected_set);
     }
 
@@ -221,7 +227,10 @@ mod tests {
             check_patch(&journal[0], vec![("foo", vec![], Change::Delete)]);
             check_patch(
                 &journal[1],
-                vec![("foo", vec![], Change::Put(vec![2])), ("bar", vec![1], Change::Delete)],
+                vec![
+                    ("foo", vec![], Change::Put(vec![2])),
+                    ("bar", vec![1], Change::Delete),
+                ],
             );
         }
 

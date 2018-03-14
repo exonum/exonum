@@ -617,8 +617,7 @@ where
 #[derive(Serialize)]
 struct ProofInfo<'a, A: AsRef<[u8]>, V: Serialize + 'a> {
     merkle_root: Hash,
-    #[serde(serialize_with = "serialize_str_u8")]
-    searched_key: A,
+    #[serde(serialize_with = "serialize_str_u8")] searched_key: A,
     proof: &'a MapProof<V>,
     key_found: bool,
 }
@@ -788,7 +787,7 @@ mod memorydb_tests {
 mod rocksdb_tests {
     use std::path::Path;
     use tempdir::TempDir;
-    use storage::{Database, RocksDB, DbOptions};
+    use storage::{Database, DbOptions, RocksDB};
 
     fn create_database(path: &Path) -> Box<Database> {
         let opts = DbOptions::default();

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crypto::{PublicKey, Hash, CryptoHash};
-use messages::{Precommit, RawMessage, Connect};
+use crypto::{CryptoHash, Hash, PublicKey};
+use messages::{Connect, Precommit, RawMessage};
 use storage::{Entry, Fork, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex, Snapshot};
 use helpers::{Height, Round};
 use super::{Block, BlockProof, Blockchain, TransactionResult};
@@ -192,9 +192,9 @@ where
     ///
     /// Panics if the "genesis block" was not created.
     pub fn last_block(&self) -> Block {
-        let hash = self.block_hashes_by_height().last().expect(
-            "An attempt to get the `last_block` during creating the genesis block.",
-        );
+        let hash = self.block_hashes_by_height()
+            .last()
+            .expect("An attempt to get the `last_block` during creating the genesis block.");
         self.blocks().get(&hash).unwrap()
     }
 
@@ -246,10 +246,9 @@ where
         let next_height = self.next_height();
         let idx = self.find_configurations_index_by_height(next_height);
         if idx > 0 {
-            let cfg_ref = self.configs_actual_from().get(idx - 1).expect(&format!(
-                "Configuration at index {} not found",
-                idx
-            ));
+            let cfg_ref = self.configs_actual_from()
+                .get(idx - 1)
+                .expect(&format!("Configuration at index {} not found", idx));
             let cfg_hash = cfg_ref.cfg_hash();
             let cfg = self.configuration_by_hash(cfg_hash).expect(&format!(
                 "Config with hash {:?} is absent in configs table",
@@ -264,10 +263,9 @@ where
     /// Returns the configuration that is the actual for the given height.
     pub fn configuration_by_height(&self, height: Height) -> StoredConfiguration {
         let idx = self.find_configurations_index_by_height(height);
-        let cfg_ref = self.configs_actual_from().get(idx).expect(&format!(
-            "Configuration at index {} not found",
-            idx
-        ));
+        let cfg_ref = self.configs_actual_from()
+            .get(idx)
+            .expect(&format!("Configuration at index {} not found", idx));
         let cfg_hash = cfg_ref.cfg_hash();
         self.configuration_by_hash(cfg_hash).expect(&format!(
             "Config with hash {:?} is absent in configs table",
@@ -282,7 +280,10 @@ where
 
     /// Returns the `state_hash` table for core tables.
     pub fn core_state_hash(&self) -> Vec<Hash> {
-        vec![self.configs().merkle_root(), self.transaction_results().merkle_root()]
+        vec![
+            self.configs().merkle_root(),
+            self.transaction_results().merkle_root(),
+        ]
     }
 
     /// Constructs a proof of inclusion of root hash of a specific service

@@ -107,18 +107,14 @@ impl<V: StorageValue> MapProof<V> {
         use self::MapProof::*;
         match *self {
             Empty => Hash::zero(),
-            LeafRootInclusive(ref root_key, ref root_val) => {
-                HashStream::new()
-                    .update(root_key.as_bytes())
-                    .update(root_val.hash().as_ref())
-                    .hash()
-            }
-            LeafRootExclusive(ref root_key, ref root_val_hash) => {
-                HashStream::new()
-                    .update(root_key.as_bytes())
-                    .update(root_val_hash.as_ref())
-                    .hash()
-            }
+            LeafRootInclusive(ref root_key, ref root_val) => HashStream::new()
+                .update(root_key.as_bytes())
+                .update(root_val.hash().as_ref())
+                .hash(),
+            LeafRootExclusive(ref root_key, ref root_val_hash) => HashStream::new()
+                .update(root_key.as_bytes())
+                .update(root_val_hash.as_ref())
+                .hash(),
             Branch(ref branch) => branch.merkle_root(),
         }
     }
@@ -142,40 +138,34 @@ impl<V: StorageValue> BranchProofNode<V> {
                 ref right_hash,
                 ref left_key,
                 ref right_key,
-            } => {
-                HashStream::new()
-                    .update(left_hash.as_ref())
-                    .update(right_hash.as_ref())
-                    .update(left_key.as_bytes())
-                    .update(right_key.as_bytes())
-                    .hash()
-            }
+            } => HashStream::new()
+                .update(left_hash.as_ref())
+                .update(right_hash.as_ref())
+                .update(left_key.as_bytes())
+                .update(right_key.as_bytes())
+                .hash(),
             LeftBranch {
                 ref left_node,
                 ref right_hash,
                 ref left_key,
                 ref right_key,
-            } => {
-                HashStream::new()
-                    .update(left_node.merkle_root().as_ref())
-                    .update(right_hash.as_ref())
-                    .update(left_key.as_bytes())
-                    .update(right_key.as_bytes())
-                    .hash()
-            }
+            } => HashStream::new()
+                .update(left_node.merkle_root().as_ref())
+                .update(right_hash.as_ref())
+                .update(left_key.as_bytes())
+                .update(right_key.as_bytes())
+                .hash(),
             RightBranch {
                 ref left_hash,
                 ref right_node,
                 ref left_key,
                 ref right_key,
-            } => {
-                HashStream::new()
-                    .update(left_hash.as_ref())
-                    .update(right_node.merkle_root().as_ref())
-                    .update(left_key.as_bytes())
-                    .update(right_key.as_bytes())
-                    .hash()
-            }
+            } => HashStream::new()
+                .update(left_hash.as_ref())
+                .update(right_node.merkle_root().as_ref())
+                .update(left_key.as_bytes())
+                .update(right_key.as_bytes())
+                .hash(),
         }
     }
 }
@@ -293,8 +283,7 @@ impl<V: fmt::Debug + StorageValue> MapProof<V> {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with searched key: \
                          {:?}. Proof: {:?}. ",
-                        searched_key,
-                        self
+                        searched_key, self
                     )));
                 }
                 Some(val)
@@ -305,8 +294,7 @@ impl<V: fmt::Debug + StorageValue> MapProof<V> {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with searched key: \
                          {:?}. Proof: {:?} ",
-                        searched_key,
-                        self
+                        searched_key, self
                     )));
                 }
                 None
@@ -318,8 +306,7 @@ impl<V: fmt::Debug + StorageValue> MapProof<V> {
             return Err(Error::new(format!(
                 "The proof doesn't match the expected hash! \
                  Expected: {:?} , from proof: {:?}",
-                merkle_root,
-                proof_hash
+                merkle_root, proof_hash
             )));
         }
         Ok(res)
@@ -342,8 +329,7 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with searched_key: \
                          {:?}. Proof: {:?}",
-                        searched_key,
-                        self
+                        searched_key, self
                     )));
                 }
                 proof.validate_consistency(left_path, searched_key)?
@@ -358,8 +344,7 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with searched_key: \
                          {:?}. Proof: {:?}",
-                        searched_key,
-                        self
+                        searched_key, self
                     )));
                 }
                 proof.validate_consistency(right_path, searched_key)?
@@ -375,8 +360,7 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with searched_key: \
                          {:?}. Proof: {:?}",
-                        searched_key,
-                        self
+                        searched_key, self
                     )));
                 }
                 None
@@ -406,16 +390,14 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with itself: Proof: \
                          {:?} . Parent path: {:?}",
-                        self,
-                        parent_path
+                        self, parent_path
                     )));
                 }
                 if !searched_key.starts_with(&left_path) {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with searched_key: \
                          {:?}. Proof: {:?}",
-                        searched_key,
-                        self
+                        searched_key, self
                     )));
                 }
                 proof.validate_consistency(&left_path, searched_key)?
@@ -432,16 +414,14 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with itself: Proof: \
                          {:?} . Parent path: {:?}",
-                        self,
-                        parent_path
+                        self, parent_path
                     )));
                 }
                 if !searched_key.starts_with(&right_path) {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with searched_key: \
                          {:?}. Proof: {:?}",
-                        searched_key,
-                        self
+                        searched_key, self
                     )));
                 }
                 proof.validate_consistency(&right_path, searched_key)?
@@ -457,16 +437,14 @@ impl<V: fmt::Debug> BranchProofNode<V> {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with itself: Proof: \
                          {:?} . Parent path: {:?}",
-                        self,
-                        parent_path
+                        self, parent_path
                     )));
                 }
                 if searched_key.starts_with(&left_path) || searched_key.starts_with(&right_path) {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with searched_key: \
                          {:?}. Proof: {:?}",
-                        searched_key,
-                        self
+                        searched_key, self
                     )));
                 }
                 None
@@ -490,8 +468,7 @@ impl<V: fmt::Debug> ProofNode<V> {
                     return Err(Error::new(format!(
                         "Proof is inconsistent with searched_key: \
                          {:?}. Parent path: {:?} ",
-                        searched_key,
-                        parent_key
+                        searched_key, parent_key
                     )));
                 }
                 Some(val)
@@ -536,46 +513,31 @@ impl<V: fmt::Debug> fmt::Debug for BranchProofNode<V> {
                 ref right_hash,
                 ref left_key,
                 ref right_key,
-            } => {
-                write!(
-                    f,
-                    "{{\"left\":{:?},\"right\":{:?},\"left_path\":{:?},\"right_path\":{:?}}}",
-                    left_node,
-                    right_hash,
-                    left_key,
-                    right_key
-                )
-            }
+            } => write!(
+                f,
+                "{{\"left\":{:?},\"right\":{:?},\"left_path\":{:?},\"right_path\":{:?}}}",
+                left_node, right_hash, left_key, right_key
+            ),
             RightBranch {
                 ref left_hash,
                 ref right_node,
                 ref left_key,
                 ref right_key,
-            } => {
-                write!(
-                    f,
-                    "{{\"left\":{:?},\"right\":{:?},\"left_path\":{:?},\"right_path\":{:?}}}",
-                    left_hash,
-                    right_node,
-                    left_key,
-                    right_key
-                )
-            }
+            } => write!(
+                f,
+                "{{\"left\":{:?},\"right\":{:?},\"left_path\":{:?},\"right_path\":{:?}}}",
+                left_hash, right_node, left_key, right_key
+            ),
             BranchKeyNotFound {
                 ref left_hash,
                 ref right_hash,
                 ref left_key,
                 ref right_key,
-            } => {
-                write!(
-                    f,
-                    "{{\"left\":{:?},\"right\":{:?},\"left_path\":{:?},\"right_path\":{:?}}}",
-                    left_hash,
-                    right_hash,
-                    left_key,
-                    right_key
-                )
-            }
+            } => write!(
+                f,
+                "{{\"left\":{:?},\"right\":{:?},\"left_path\":{:?},\"right_path\":{:?}}}",
+                left_hash, right_hash, left_key, right_key
+            ),
         }
     }
 }

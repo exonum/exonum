@@ -27,25 +27,25 @@
 
 // Import crates with necessary types into a new project.
 
-#[macro_use]
-extern crate failure;
-extern crate serde;
-extern crate serde_json;
-#[macro_use]
-extern crate serde_derive;
+extern crate bodyparser;
 #[macro_use]
 extern crate exonum;
-extern crate router;
-extern crate bodyparser;
+#[macro_use]
+extern crate failure;
 extern crate iron;
+extern crate router;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde_json;
 
 // Import necessary types from crates.
 
-use exonum::blockchain::{Blockchain, Service, Transaction, ApiContext, ExecutionResult,
-                         TransactionSet, ExecutionError};
+use exonum::blockchain::{ApiContext, Blockchain, ExecutionError, ExecutionResult, Service,
+                         Transaction, TransactionSet};
 use exonum::encoding::serialize::FromHex;
-use exonum::node::{TransactionSend, ApiSender};
-use exonum::messages::{RawTransaction, Message};
+use exonum::node::{ApiSender, TransactionSend};
+use exonum::messages::{Message, RawTransaction};
 use exonum::storage::{Fork, MapIndex, Snapshot};
 use exonum::crypto::{Hash, PublicKey};
 use exonum::encoding;
@@ -299,11 +299,14 @@ impl CryptocurrencyApi {
         let path = req.url.path();
         let wallet_key = path.last().unwrap();
         let public_key = PublicKey::from_hex(wallet_key).map_err(|e| {
-            IronError::new(e, (
-                Status::BadRequest,
-                Header(ContentType::json()),
-                "\"Invalid request param: `pub_key`\"",
-            ))
+            IronError::new(
+                e,
+                (
+                    Status::BadRequest,
+                    Header(ContentType::json()),
+                    "\"Invalid request param: `pub_key`\"",
+                ),
+            )
         })?;
 
         let wallet = {

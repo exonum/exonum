@@ -142,9 +142,9 @@ impl Blockchain {
     /// - Service can deserialize given raw message.
     pub fn tx_from_raw(&self, raw: RawMessage) -> Option<Box<Transaction>> {
         let id = raw.service_id() as usize;
-        self.service_map.get(id).and_then(|service| {
-            service.tx_from_raw(raw).ok()
-        })
+        self.service_map
+            .get(id)
+            .and_then(|service| service.tx_from_raw(raw).ok())
     }
 
     /// Commits changes from the patch to the blockchain storage.
@@ -266,9 +266,8 @@ impl Blockchain {
             let last_hash = self.last_hash();
             // Save & execute transactions
             for (index, hash) in tx_hashes.iter().enumerate() {
-                let tx = pool.get(hash).expect(
-                    "BUG: Cannot find transaction in pool.",
-                );
+                let tx = pool.get(hash)
+                    .expect("BUG: Cannot find transaction in pool.");
 
                 execute_transaction(tx.as_ref(), height, index, &mut fork);
             }
@@ -427,9 +426,8 @@ impl Blockchain {
             schema.peers_cache_mut().put(pubkey, peer);
         }
 
-        self.merge(fork.into_patch()).expect(
-            "Unable to save peer to the peers cache",
-        );
+        self.merge(fork.into_patch())
+            .expect("Unable to save peer to the peers cache");
     }
 
     /// Removes peer from the peers cache
@@ -445,9 +443,8 @@ impl Blockchain {
             }
         }
 
-        self.merge(fork.into_patch()).expect(
-            "Unable to remove peer from the peers cache",
-        );
+        self.merge(fork.into_patch())
+            .expect("Unable to remove peer from the peers cache");
     }
 
     /// Recover cached peers if any.
@@ -477,9 +474,8 @@ impl Blockchain {
             schema.set_consensus_round(round);
         }
 
-        self.merge(fork.into_patch()).expect(
-            "Unable to save messages to the consensus cache",
-        );
+        self.merge(fork.into_patch())
+            .expect("Unable to save messages to the consensus cache");
     }
 }
 

@@ -17,10 +17,10 @@ use std::str;
 use exonum::blockchain::{Schema, StoredConfiguration, Transaction};
 use exonum::helpers::{Height, ValidatorId};
 use exonum::storage::StorageValue;
-use exonum::crypto::{CryptoHash, Hash, hash, HASH_SIZE};
+use exonum::crypto::{hash, CryptoHash, Hash, HASH_SIZE};
 use exonum_testkit::{TestKit, TestKitBuilder, TestNode};
 
-use {Schema as ConfigurationSchema, Service as ConfigurationService, Propose, Vote};
+use {Propose, Schema as ConfigurationSchema, Service as ConfigurationService, Vote};
 
 mod api;
 
@@ -244,7 +244,6 @@ fn test_apply_with_increased_majority() {
         Schema::new(&testkit.snapshot()).actual_configuration(),
         new_cfg
     );
-
 }
 
 #[test]
@@ -380,9 +379,9 @@ fn test_discard_votes_with_expired_actual_from() {
     testkit.create_blocks_until(Height(10));
     let illegal_vote = new_tx_config_vote(&testkit.network().validators()[0], new_cfg.hash());
     testkit.create_block_with_transactions(txvec![illegal_vote.clone()]);
-    assert!(!testkit.votes_for_propose(new_cfg.hash()).contains(&Some(
-        illegal_vote,
-    )));
+    assert!(!testkit
+        .votes_for_propose(new_cfg.hash())
+        .contains(&Some(illegal_vote,)));
 }
 
 #[test]
@@ -497,9 +496,7 @@ fn test_config_txs_discarded_when_not_referencing_actual_config_or_sent_by_illeg
     }
     {
         let votes = (0..3)
-            .map(|id| {
-                new_tx_config_vote(&testkit.network().validators()[id], new_cfg.hash())
-            })
+            .map(|id| new_tx_config_vote(&testkit.network().validators()[id], new_cfg.hash()))
             .map(to_boxed)
             .collect::<Vec<_>>();
         testkit.create_block_with_transactions(votes);

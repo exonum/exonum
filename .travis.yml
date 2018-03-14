@@ -34,7 +34,6 @@ sudo: required
 env:
   global:
   - CLIPPY_VERS=0.0.187
-  - RUSTFMT_VERS=0.9.0
   - DEADLINKS_VERS=0.3.0
   - SODIUM_VERS=1.0.13
   - CARGO_INCREMENTAL=1
@@ -64,10 +63,12 @@ jobs:
   include:
   # Formatting & other lints that do not require compilation
   - env: FEATURE=lints
+    rust: 1.24.1
     install:
     - cargo-audit -V || cargo install cargo-audit --force
     - cargo-deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
-    - rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
+    - rustup component add rustfmt-preview
+    - rustfmt --version
     - nvm install 8 && nvm use 8
     - npm install cspell
     - ./node_modules/.bin/cspell --version

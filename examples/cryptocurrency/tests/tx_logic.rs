@@ -56,7 +56,13 @@ fn test_transfer() {
     testkit.create_block_with_transactions(txvec![
         TxCreateWallet::new(&alice_pubkey, ALICE_NAME, &alice_key),
         TxCreateWallet::new(&bob_pubkey, BOB_NAME, &bob_key),
-        TxTransfer::new(&alice_pubkey, &bob_pubkey, /* amount */ 10, /* seed */ 0, &alice_key),
+        TxTransfer::new(
+            &alice_pubkey,
+            &bob_pubkey,
+            /* amount */ 10,
+            /* seed */ 0,
+            &alice_key
+        ),
     ]);
 
     let alice_wallet = get_wallet(&testkit, &alice_pubkey);
@@ -73,7 +79,13 @@ fn test_transfer_from_nonexisting_wallet() {
     let (bob_pubkey, bob_key) = crypto::gen_keypair();
     testkit.create_block_with_transactions(txvec![
         TxCreateWallet::new(&bob_pubkey, BOB_NAME, &bob_key),
-        TxTransfer::new(&alice_pubkey, &bob_pubkey, /* amount */ 10, /* seed */ 0, &alice_key),
+        TxTransfer::new(
+            &alice_pubkey,
+            &bob_pubkey,
+            /* amount */ 10,
+            /* seed */ 0,
+            &alice_key
+        ),
     ]);
 
     assert!(try_get_wallet(&testkit, &alice_pubkey).is_none());
@@ -89,7 +101,13 @@ fn test_transfer_to_nonexisting_wallet() {
     let (bob_pubkey, bob_key) = crypto::gen_keypair();
     testkit.create_block_with_transactions(txvec![
         TxCreateWallet::new(&alice_pubkey, ALICE_NAME, &alice_key),
-        TxTransfer::new(&alice_pubkey, &bob_pubkey, /* amount */ 10, /* seed */ 0, &alice_key),
+        TxTransfer::new(
+            &alice_pubkey,
+            &bob_pubkey,
+            /* amount */ 10,
+            /* seed */ 0,
+            &alice_key
+        ),
         // Although Bob's wallet is created, this occurs after the transfer is executed.
         TxCreateWallet::new(&bob_pubkey, BOB_NAME, &bob_key),
     ]);
@@ -109,7 +127,13 @@ fn test_transfer_overcharge() {
     testkit.create_block_with_transactions(txvec![
         TxCreateWallet::new(&alice_pubkey, ALICE_NAME, &alice_key),
         TxCreateWallet::new(&bob_pubkey, BOB_NAME, &bob_key),
-        TxTransfer::new(&alice_pubkey, &bob_pubkey, /* amount */ 150, /* seed */ 0, &alice_key),
+        TxTransfer::new(
+            &alice_pubkey,
+            &bob_pubkey,
+            /* amount */ 150,
+            /* seed */ 0,
+            &alice_key
+        ),
     ]);
 
     // The transfer amount is greater than what Alice has at her disposal, so
@@ -135,14 +159,14 @@ fn test_transfers_in_single_block() {
         &alice_pubkey,
         &bob_pubkey,
         90, // amount
-        0, // seed
+        0,  // seed
         &alice_key,
     );
     let tx_b_to_a = TxTransfer::new(
         &bob_pubkey,
         &alice_pubkey,
         120, // amount
-        0, // seed
+        0,   // seed
         &bob_key,
     );
 

@@ -100,9 +100,10 @@ impl ConnectionsPool {
     }
 
     fn remove(&self, peer: &SocketAddr) -> Result<mpsc::Sender<RawMessage>, &'static str> {
-        self.inner.borrow_mut().remove(peer).ok_or(
-            "there is no sender in the connection pool",
-        )
+        self.inner
+            .borrow_mut()
+            .remove(peer)
+            .ok_or("there is no sender in the connection pool")
     }
 
     fn get(&self, peer: SocketAddr) -> Option<mpsc::Sender<RawMessage>> {
@@ -136,9 +137,9 @@ impl ConnectionsPool {
         // Enable retry feature for outgoing connection.
         let timeout = network_config.tcp_connect_retry_timeout;
         let max_tries = network_config.tcp_connect_max_retries as usize;
-        let strategy = FixedInterval::from_millis(timeout).map(jitter).take(
-            max_tries,
-        );
+        let strategy = FixedInterval::from_millis(timeout)
+            .map(jitter)
+            .take(max_tries);
         let handle_clonned = handle.clone();
 
         let action = move || TcpStream::connect(&peer, &handle_clonned);
@@ -242,7 +243,7 @@ impl NetworkPart {
 
 struct RequestHandler(
     // TODO: Replace with concrete type
-    Box<Future<Item = (), Error = io::Error>>
+    Box<Future<Item = (), Error = io::Error>>,
 );
 
 impl RequestHandler {
@@ -289,9 +290,9 @@ impl RequestHandler {
                             });
                         if let Some(conn_tx) = conn_tx {
                             let fut = conn_tx.and_then(|conn_tx| {
-                                conn_tx.send(msg).map_err(|_| {
-                                    other_error("can't send message to a connection")
-                                })
+                                conn_tx
+                                    .send(msg)
+                                    .map_err(|_| other_error("can't send message to a connection"))
                             });
                             to_box(fut)
                         } else {
@@ -308,14 +309,12 @@ impl RequestHandler {
                         outgoing_connections.disconnect_with_peer(peer, network_tx.clone())
                     }
                     // Immediately stop the event loop.
-                    NetworkRequest::Shutdown => {
-                        to_box(
-                            cancel_sender
-                                .take()
-                                .ok_or_else(|| other_error("shutdown twice"))
-                                .into_future(),
-                        )
-                    }
+                    NetworkRequest::Shutdown => to_box(
+                        cancel_sender
+                            .take()
+                            .ok_or_else(|| other_error("shutdown twice"))
+                            .into_future(),
+                    ),
                 }
             });
         RequestHandler(to_box(requests_handler))
@@ -369,9 +368,10 @@ impl Listener {
                 .map_err(|e| e.0)
                 .and_then(move |(raw, stream)| match raw.map(Any::from_raw) {
                     Some(Ok(Any::Connect(msg))) => Ok((msg, stream)),
-                    Some(Ok(other)) => Err(other_error(
-                        &format!("First message is not Connect, got={:?}", other),
-                    )),
+                    Some(Ok(other)) => Err(other_error(&format!(
+                        "First message is not Connect, got={:?}",
+                        other
+                    ))),
                     Some(Err(e)) => Err(into_other(e)),
                     None => Err(other_error("Incoming socket closed")),
                 })

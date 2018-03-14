@@ -397,9 +397,7 @@ impl NodeHandler {
         let validator_id = stored
             .validator_keys
             .iter()
-            .position(|pk| {
-                pk.consensus_key == config.listener.consensus_public_key
-            })
+            .position(|pk| pk.consensus_key == config.listener.consensus_public_key)
             .map(|id| ValidatorId(id as u16));
         info!("Validator id = '{:?}'", validator_id);
         let connect = Connect::new(
@@ -588,8 +586,8 @@ impl NodeHandler {
     /// Adds `NodeTimeout::Propose` timeout to the channel.
     pub fn add_propose_timeout(&mut self) {
         let adjusted_timeout = self.state.propose_timeout();
-        let time = self.round_start_time(self.state.round()) +
-            Duration::from_millis(adjusted_timeout);
+        let time =
+            self.round_start_time(self.state.round()) + Duration::from_millis(adjusted_timeout);
 
         trace!(
             "ADD PROPOSE TIMEOUT: time={:?}, height={}, round={}",
@@ -624,8 +622,8 @@ impl NodeHandler {
 
     /// Adds `NodeTimeout::UpdateApiState` timeout to the channel.
     pub fn add_update_api_state_timeout(&mut self) {
-        let time = self.system_state.current_time() +
-            Duration::from_millis(self.api_state().state_update_timeout());
+        let time = self.system_state.current_time()
+            + Duration::from_millis(self.api_state().state_update_timeout());
         self.add_timeout(NodeTimeout::UpdateApiState, time);
     }
 
@@ -647,8 +645,7 @@ impl fmt::Debug for NodeHandler {
         write!(
             f,
             "NodeHandler {{ channel: Channel {{ .. }}, blockchain: {:?}, peer_discovery: {:?} }}",
-            self.blockchain,
-            self.peer_discovery
+            self.blockchain, self.peer_discovery
         )
     }
 }
@@ -674,9 +671,12 @@ impl ApiSender {
 
     /// Sends an external message.
     pub fn send_external_message(&self, message: ExternalMessage) -> io::Result<()> {
-        self.0.clone().send(message).wait().map(drop).map_err(
-            into_other,
-        )
+        self.0
+            .clone()
+            .send(message)
+            .wait()
+            .map(drop)
+            .map_err(into_other)
     }
 }
 
@@ -717,9 +717,15 @@ pub struct NodeChannel {
     /// Channel for network requests.
     pub network_requests: (mpsc::Sender<NetworkRequest>, mpsc::Receiver<NetworkRequest>),
     /// Channel for timeout requests.
-    pub internal_requests: (mpsc::Sender<InternalRequest>, mpsc::Receiver<InternalRequest>),
+    pub internal_requests: (
+        mpsc::Sender<InternalRequest>,
+        mpsc::Receiver<InternalRequest>,
+    ),
     /// Channel for api requests.
-    pub api_requests: (mpsc::Sender<ExternalMessage>, mpsc::Receiver<ExternalMessage>),
+    pub api_requests: (
+        mpsc::Sender<ExternalMessage>,
+        mpsc::Receiver<ExternalMessage>,
+    ),
     /// Channel for network events.
     pub network_events: (mpsc::Sender<NetworkEvent>, mpsc::Receiver<NetworkEvent>),
     /// Channel for internal events.
@@ -770,12 +776,12 @@ impl Node {
         crypto::init();
 
         if cfg!(feature = "flame_profile") {
-            ::exonum_profiler::init_handler(
-                ::std::env::var(PROFILE_ENV_VARIABLE_NAME).expect(&format!(
+            ::exonum_profiler::init_handler(::std::env::var(PROFILE_ENV_VARIABLE_NAME).expect(
+                &format!(
                     "You compiled exonum with profiling support, but {}",
                     PROFILE_ENV_VARIABLE_NAME
-                )),
-            )
+                ),
+            ))
         };
 
         let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
@@ -840,9 +846,8 @@ impl Node {
         let network_thread = thread::spawn(move || {
             let mut core = Core::new()?;
             let handle = core.handle();
-            core.handle().spawn(
-                timeouts_part.run(handle).map_err(log_error),
-            );
+            core.handle()
+                .spawn(timeouts_part.run(handle).map_err(log_error));
             let network_handler = network_part.run(&core.handle());
             core.run(network_handler).map(drop).map_err(|e| {
                 other_error(&format!("An error in the `Network` thread occurred: {}", e))
@@ -850,9 +855,8 @@ impl Node {
         });
 
         let mut core = Core::new()?;
-        core.run(handler_part.run()).map_err(|_| {
-            other_error("An error in the `Handler` thread occurred")
-        })?;
+        core.run(handler_part.run())
+            .map_err(|_| other_error("An error in the `Handler` thread occurred"))?;
         network_thread.join().unwrap()
     }
 

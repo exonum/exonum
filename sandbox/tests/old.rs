@@ -17,15 +17,15 @@ extern crate sandbox;
 
 use std::time::Duration;
 
-use exonum::messages::{Propose, Prevote, Precommit};
+use exonum::messages::{Precommit, Prevote, Propose};
 use exonum::blockchain::{Block, SCHEMA_MAJOR_VERSION};
 use exonum::crypto::{CryptoHash, Hash};
 use exonum::helpers::{Height, Round};
 
 use sandbox::timestamping_sandbox;
 use sandbox::sandbox_tests_helper::gen_timestamping_tx;
-use sandbox::sandbox_tests_helper::{HEIGHT_ONE, ROUND_ONE, ROUND_THREE, VALIDATOR_0, VALIDATOR_1,
-                                    VALIDATOR_2, VALIDATOR_3};
+use sandbox::sandbox_tests_helper::{VALIDATOR_0, VALIDATOR_1, VALIDATOR_2, VALIDATOR_3,
+                                    HEIGHT_ONE, ROUND_ONE, ROUND_THREE};
 
 #[test]
 fn test_send_propose_and_prevote() {

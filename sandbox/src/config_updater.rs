@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::crypto::{PublicKey, Hash};
-use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult, Schema};
-use exonum::messages::{RawTransaction, Message};
+use exonum::crypto::{Hash, PublicKey};
+use exonum::blockchain::{ExecutionResult, Schema, Service, Transaction, TransactionSet};
+use exonum::messages::{Message, RawTransaction};
 use exonum::storage::{Fork, Snapshot};
 use exonum::encoding::Error as MessageError;
 use exonum::blockchain::StoredConfiguration;

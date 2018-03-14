@@ -56,7 +56,9 @@ impl SystemApi {
 
     fn mempool_info(self, router: &mut Router) {
         let mempool = move |_: &mut Request| -> IronResult<Response> {
-            let info = MemPoolInfo { size: self.pool.read().expect("Expected read lock").len() };
+            let info = MemPoolInfo {
+                size: self.pool.read().expect("Expected read lock").len(),
+            };
             self.ok_response(&serde_json::to_value(info).unwrap())
         };
         router.get("/v1/mempool", mempool, "mempool");
@@ -64,8 +66,9 @@ impl SystemApi {
 
     fn healthcheck_info(self, router: &mut Router) {
         let healthcheck = move |_: &mut Request| -> IronResult<Response> {
-            let info =
-                HealthCheckInfo { connectivity: !self.shared_api_state.peers_info().is_empty() };
+            let info = HealthCheckInfo {
+                connectivity: !self.shared_api_state.peers_info().is_empty(),
+            };
             self.ok_response(&serde_json::to_value(info).unwrap())
         };
         router.get("/v1/healthcheck", healthcheck, "healthcheck");

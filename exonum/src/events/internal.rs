@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 use futures::{self, Future, Sink, Stream};
 use futures::sync::mpsc;
 use tokio_core::reactor::{Handle, Timeout};
@@ -21,7 +20,7 @@ use std::io;
 use std::time::{Duration, SystemTime};
 
 use super::error::{into_other, other_error};
-use super::{InternalRequest, TimeoutRequest, InternalEvent, to_box};
+use super::{to_box, InternalEvent, InternalRequest, TimeoutRequest};
 
 #[derive(Debug)]
 pub struct InternalPart {
@@ -36,9 +35,8 @@ impl InternalPart {
             .for_each(move |request| {
                 let event = match request {
                     InternalRequest::Timeout(TimeoutRequest(time, timeout)) => {
-                        let duration = time.duration_since(SystemTime::now()).unwrap_or_else(|_| {
-                            Duration::from_millis(0)
-                        });
+                        let duration = time.duration_since(SystemTime::now())
+                            .unwrap_or_else(|_| Duration::from_millis(0));
                         let internal_tx = internal_tx.clone();
                         let fut = Timeout::new(duration, &handle)
                             .expect("Unable to create timeout")

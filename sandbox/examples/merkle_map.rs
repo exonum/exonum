@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate exonum;
-extern crate rand;
 #[macro_use]
 extern crate clap;
+extern crate exonum;
+extern crate rand;
 
-use rand::{SeedableRng, XorShiftRng, Rng};
+use rand::{Rng, SeedableRng, XorShiftRng};
 use exonum::storage::{Database, ProofMapIndex};
 
 /// usage
@@ -37,7 +37,7 @@ fn create_database(path: &str) -> Box<Database> {
 #[cfg(feature = "rocksdb")]
 fn create_database(path: &str) -> Box<Database> {
     use std::path::Path;
-    use exonum::storage::{RocksDB, DbOptions};
+    use exonum::storage::{DbOptions, RocksDB};
     let mut opts = DbOptions::default();
     opts.create_if_missing(true);
     Box::new(RocksDB::open(Path::new(path), opts).unwrap())

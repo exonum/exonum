@@ -21,10 +21,8 @@ pub struct ContextKey<T> {
     // These fields are public so that `context_key`
     // macro works outside of this crate. It should be
     // replaced with `const fn`, once it is stable.
-    #[doc(hidden)]
-    pub __name: &'static str,
-    #[doc(hidden)]
-    pub __phantom: PhantomData<T>,
+    #[doc(hidden)] pub __name: &'static str,
+    #[doc(hidden)] pub __phantom: PhantomData<T>,
 }
 
 // We need explicit `impl Copy` because derive won't work if `T: !Copy`.

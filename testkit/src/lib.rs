@@ -127,11 +127,11 @@ extern crate exonum;
 extern crate futures;
 extern crate iron;
 extern crate iron_test;
+#[macro_use]
+extern crate log;
 extern crate router;
 extern crate serde;
 extern crate serde_json;
-#[macro_use]
-extern crate log;
 
 use futures::Stream;
 use futures::sync::mpsc;
@@ -144,7 +144,7 @@ use exonum::blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfig
                          Transaction};
 use exonum::crypto;
 use exonum::helpers::{Height, ValidatorId};
-use exonum::node::{ApiSender, ExternalMessage, State as NodeState, TxPool, NodeApiConfig};
+use exonum::node::{ApiSender, ExternalMessage, NodeApiConfig, State as NodeState, TxPool};
 use exonum::storage::{MemoryDB, Patch, Snapshot};
 
 #[macro_use]
@@ -157,7 +157,7 @@ mod poll_events;
 
 pub use api::{ApiKind, TestKitApi};
 pub use compare::ComparableSnapshot;
-pub use network::{TestNetwork, TestNode, TestNetworkConfiguration};
+pub use network::{TestNetwork, TestNetworkConfiguration, TestNode};
 
 use checkpoint_db::{CheckpointDb, CheckpointDbHandler};
 use poll_events::poll_events;
@@ -209,9 +209,8 @@ impl fmt::Debug for TestKitBuilder {
         f.debug_struct("TestKitBuilder")
             .field(
                 "us",
-                &self.our_validator_id.map_or("Auditor".to_string(), |id| {
-                    format!("Validator #{}", id.0)
-                }),
+                &self.our_validator_id
+                    .map_or("Auditor".to_string(), |id| format!("Validator #{}", id.0)),
             )
             .field("validator_count", &self.validator_count)
             .field(
@@ -355,9 +354,9 @@ impl TestKit {
                                 .insert(tx.hash(), tx);
                         }
                     }
-                    ExternalMessage::PeerAdd(_) |
-                    ExternalMessage::Enable(_) |
-                    ExternalMessage::Shutdown => { /* Ignored */ }
+                    ExternalMessage::PeerAdd(_)
+                    | ExternalMessage::Enable(_)
+                    | ExternalMessage::Shutdown => { /* Ignored */ }
                 }
                 Ok(())
             }))
@@ -482,9 +481,9 @@ impl TestKit {
         // Filter out already committed transactions; otherwise,
         // `create_block_with_transactions()` will panic.
         let schema = CoreSchema::new(self.snapshot());
-        let uncommitted_txs = transactions.into_iter().filter(|tx| {
-            !schema.transactions().contains(&tx.hash())
-        });
+        let uncommitted_txs = transactions
+            .into_iter()
+            .filter(|tx| !schema.transactions().contains(&tx.hash()));
 
         self.create_block_with_transactions(uncommitted_txs);
         let snapshot = self.snapshot();
@@ -508,12 +507,8 @@ impl TestKit {
         let (block_hash, patch) = {
             let validator_id = self.leader().validator_id().unwrap();
             let transactions = self.mempool();
-            self.blockchain.create_patch(
-                validator_id,
-                new_block_height,
-                tx_hashes,
-                &transactions,
-            )
+            self.blockchain
+                .create_patch(validator_id, new_block_height, tx_hashes, &transactions)
         };
 
         let patch = if let Some(config_patch) = config_patch {
@@ -527,19 +522,16 @@ impl TestKit {
 
         // Remove txs from mempool
         {
-            let mut transactions = self.mempool.write().expect(
-                "Cannot modify transactions in mempool",
-            );
+            let mut transactions = self.mempool
+                .write()
+                .expect("Cannot modify transactions in mempool");
             for hash in tx_hashes {
                 transactions.remove(hash);
             }
         }
 
-        let propose = self.leader().create_propose(
-            new_block_height,
-            &last_hash,
-            tx_hashes,
-        );
+        let propose = self.leader()
+            .create_propose(new_block_height, &last_hash, tx_hashes);
         let precommits: Vec<_> = self.network()
             .validators()
             .iter()
@@ -596,9 +588,9 @@ impl TestKit {
         I: IntoIterator<Item = Box<Transaction>>,
     {
         let tx_hashes: Vec<_> = {
-            let mut mempool = self.mempool.write().expect(
-                "Cannot write transactions to mempool",
-            );
+            let mut mempool = self.mempool
+                .write()
+                .expect("Cannot write transactions to mempool");
 
             let snapshot = self.snapshot();
             let schema = CoreSchema::new(&snapshot);
@@ -708,9 +700,9 @@ impl TestKit {
 
     /// Returns the test node memory pool handle.
     pub fn mempool(&self) -> RwLockReadGuard<BTreeMap<crypto::Hash, Box<Transaction>>> {
-        self.mempool.read().expect(
-            "Can't read transactions from the mempool.",
-        )
+        self.mempool
+            .read()
+            .expect("Can't read transactions from the mempool.")
     }
 
     /// Returns the leader on the current height. At the moment first validator.

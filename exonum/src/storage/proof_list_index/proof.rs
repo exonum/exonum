@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::ser::SerializeStruct;
 use serde::de::Error;
-use serde_json::{Error as SerdeJsonError, Value, from_value};
+use serde_json::{from_value, Error as SerdeJsonError, Value};
 
-use crypto::{Hash, hash};
+use crypto::{hash, Hash};
 use super::pair_hash;
 use super::super::StorageValue;
 use super::key::ProofListKey;
@@ -57,12 +57,10 @@ impl<V: StorageValue> ListProof<V> {
             return Err(ListProofError::UnexpectedBranch);
         }
         let hash = match *self {
-            Full(ref left, ref right) => {
-                pair_hash(
-                    &left.collect(key.left(), vec)?,
-                    &right.collect(key.right(), vec)?,
-                )
-            }
+            Full(ref left, ref right) => pair_hash(
+                &left.collect(key.left(), vec)?,
+                &right.collect(key.right(), vec)?,
+            ),
             Left(ref left, Some(ref right)) => pair_hash(&left.collect(key.left(), vec)?, right),
             Left(ref left, None) => hash(left.collect(key.left(), vec)?.as_ref()),
             Right(ref left, ref right) => pair_hash(left, &right.collect(key.right(), vec)?),
@@ -139,9 +137,7 @@ where
         fn format_err_string(type_str: &str, value: &Value, err: &SerdeJsonError) -> String {
             format!(
                 "Couldn't deserialize {} from serde_json::Value: {}, error: {}",
-                type_str,
-                value,
-                err
+                type_str, value, err
             )
         }
 
@@ -149,7 +145,7 @@ where
         if !json.is_object() {
             return Err(D::Error::custom(format!(
                 "Invalid json: it is expected to be json \
-                                                 Object. json: {:?}",
+                 Object. json: {:?}",
                 json
             )));
         }
@@ -160,9 +156,8 @@ where
                     None => {
                         return Err(D::Error::custom(format!(
                             "Invalid json: Key {} not found. \
-                                                             Value: {:?}",
-                            "left",
-                            json
+                             Value: {:?}",
+                            "left", json
                         )))
                     }
                     Some(left) => left,
@@ -171,9 +166,8 @@ where
                     None => {
                         return Err(D::Error::custom(format!(
                             "Invalid json: Key {} not found. \
-                                                          Value: {:?}",
-                            "right",
-                            json
+                             Value: {:?}",
+                            "right", json
                         )))
                     }
                     Some(right) => right,
@@ -187,10 +181,9 @@ where
                     })?;
                     Left(Box::new(left_proof), Some(right_hash))
                 } else if left_value.is_string() {
-                    let right_proof: ListProof<V> =
-                        from_value(right_value.clone()).map_err(|err| {
-                            D::Error::custom(format_err_string("ListProof", right_value, &err))
-                        })?;
+                    let right_proof: ListProof<V> = from_value(right_value.clone()).map_err(
+                        |err| D::Error::custom(format_err_string("ListProof", right_value, &err)),
+                    )?;
                     let left_hash: Hash = from_value(left_value.clone()).map_err(|err| {
                         D::Error::custom(format_err_string("Hash", left_value, &err))
                     })?;
@@ -209,16 +202,13 @@ where
                 if map_key_value.get("val").is_none() && map_key_value.get("left").is_none() {
                     return Err(D::Error::custom(format!(
                         "Invalid json: unknown key met. \
-                                                         Expected: {} or {}. json: {:?}",
-                        "val",
-                        "left",
-                        json
+                         Expected: {} or {}. json: {:?}",
+                        "val", "left", json
                     )));
                 }
                 if let Some(leaf_value) = map_key_value.get("val") {
-                    let val: V = from_value(leaf_value.clone()).map_err(|err| {
-                        D::Error::custom(format_err_string("V", leaf_value, &err))
-                    })?;
+                    let val: V = from_value(leaf_value.clone())
+                        .map_err(|err| D::Error::custom(format_err_string("V", leaf_value, &err)))?;
                     Leaf(val)
                 } else {
                     // "left" is present
@@ -232,7 +222,7 @@ where
             _ => {
                 return Err(D::Error::custom(format!(
                     "Invalid json: Number of keys should be \
-                                                     either 1 or 2. json: {:?}",
+                     either 1 or 2. json: {:?}",
                     json
                 )))
             }

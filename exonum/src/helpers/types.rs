@@ -18,7 +18,7 @@ use std::fmt;
 use std::str::FromStr;
 use std::num::ParseIntError;
 
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Number of milliseconds.
 pub type Milliseconds = u64;
@@ -321,7 +321,6 @@ impl<'de> Deserialize<'de> for Height {
     where
         D: Deserializer<'de>,
     {
-
         Ok(Height(u64::deserialize(deserializer)?))
     }
 }

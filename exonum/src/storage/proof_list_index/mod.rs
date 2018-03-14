@@ -17,8 +17,8 @@
 use std::cell::Cell;
 use std::marker::PhantomData;
 
-use crypto::{Hash, hash, HashStream};
-use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue, StorageKey};
+use crypto::{hash, Hash, HashStream};
+use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey, StorageValue};
 use super::indexes_metadata::IndexType;
 use self::key::ProofListKey;
 
@@ -389,8 +389,7 @@ where
         if to <= from {
             panic!(
                 "Illegal range boundaries: the range start is {:?}, but the range end is {:?}",
-                from,
-                to
+                from, to
             )
         }
 
@@ -414,7 +413,9 @@ where
     /// }
     /// ```
     pub fn iter(&self) -> ProofListIndexIter<V> {
-        ProofListIndexIter { base_iter: self.base.iter(&0u8) }
+        ProofListIndexIter {
+            base_iter: self.base.iter(&0u8),
+        }
     }
 
     /// Returns an iterator over the list starting from the specified position. The iterator
@@ -435,7 +436,9 @@ where
     /// }
     /// ```
     pub fn iter_from(&self, from: u64) -> ProofListIndexIter<V> {
-        ProofListIndexIter { base_iter: self.base.iter_from(&0u8, &ProofListKey::leaf(from)) }
+        ProofListIndexIter {
+            base_iter: self.base.iter_from(&0u8, &ProofListKey::leaf(from)),
+        }
     }
 }
 

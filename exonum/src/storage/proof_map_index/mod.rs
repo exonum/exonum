@@ -17,8 +17,8 @@
 use std::marker::PhantomData;
 use std::fmt;
 
-use crypto::{Hash, CryptoHash, HashStream};
-use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageValue, StorageKey};
+use crypto::{CryptoHash, Hash, HashStream};
+use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey, StorageValue};
 use super::indexes_metadata::IndexType;
 use self::key::{BitsRange, ChildKind, LEAF_KEY_PREFIX};
 use self::node::{BranchNode, Node};
@@ -182,9 +182,10 @@ where
     }
 
     fn get_root_key(&self) -> Option<ProofPath> {
-        self.base.iter::<_, ProofPath, _>(&()).next().map(
-            |(k, _): (ProofPath, ())| k,
-        )
+        self.base
+            .iter::<_, ProofPath, _>(&())
+            .next()
+            .map(|(k, _): (ProofPath, ())| k)
     }
 
     fn get_root_node(&self) -> Option<(ProofPath, Node<V>)> {
@@ -211,10 +212,9 @@ where
         current_branch: &BranchNode,
         searched_path: &ProofPath,
     ) -> Option<ProofNode<V>> {
-        let child_path = current_branch.child_path(searched_path.bit(0)).start_from(
-            searched_path
-                .start(),
-        );
+        let child_path = current_branch
+            .child_path(searched_path.bit(0))
+            .start_from(searched_path.start());
         let c_pr_l = child_path.common_prefix_len(searched_path);
         debug_assert!(c_pr_l > 0);
         if c_pr_l < child_path.len() {
@@ -286,12 +286,10 @@ where
     /// ```
     pub fn merkle_root(&self) -> Hash {
         match self.get_root_node() {
-            Some((k, Node::Leaf(v))) => {
-                HashStream::new()
-                    .update(k.as_bytes())
-                    .update(v.hash().as_ref())
-                    .hash()
-            }
+            Some((k, Node::Leaf(v))) => HashStream::new()
+                .update(k.as_bytes())
+                .update(v.hash().as_ref())
+                .hash(),
             Some((_, Node::Branch(branch))) => branch.hash(),
             None => Hash::zero(),
         }
@@ -497,7 +495,9 @@ where
     /// }
     /// ```
     pub fn values(&self) -> ProofMapIndexValues<V> {
-        ProofMapIndexValues { base_iter: self.base.iter(&LEAF_KEY_PREFIX) }
+        ProofMapIndexValues {
+            base_iter: self.base.iter(&LEAF_KEY_PREFIX),
+        }
     }
 
     /// Returns an iterator over the entries of the map in ascending order starting from the
@@ -598,9 +598,9 @@ where
         proof_path: &ProofPath,
         value: V,
     ) -> (Option<u16>, Hash) {
-        let child_path = parent.child_path(proof_path.bit(0)).start_from(
-            proof_path.start(),
-        );
+        let child_path = parent
+            .child_path(proof_path.bit(0))
+            .start_from(proof_path.start());
         // If the path is fully fit in key then there is a two cases
         let i = child_path.common_prefix_len(proof_path);
         if child_path.len() == i {
@@ -725,9 +725,9 @@ where
     }
 
     fn remove_node(&mut self, parent: &BranchNode, proof_path: &ProofPath) -> RemoveResult {
-        let child_path = parent.child_path(proof_path.bit(0)).start_from(
-            proof_path.start(),
-        );
+        let child_path = parent
+            .child_path(proof_path.bit(0))
+            .start_from(proof_path.start());
         let i = child_path.common_prefix_len(proof_path);
 
         if i == child_path.len() {
@@ -877,9 +877,9 @@ where
     type Item = (K::Owned, V);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.base_iter.next().map(
-            |(k, v)| (K::read(k.raw_key()), v),
-        )
+        self.base_iter
+            .next()
+            .map(|(k, v)| (K::read(k.raw_key()), v))
     }
 }
 

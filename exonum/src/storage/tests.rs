@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::{Database, Snapshot, Fork};
+use super::{Database, Fork, Snapshot};
 
 const IDX_NAME: &'static str = "idx_name";
 
@@ -71,7 +71,15 @@ fn fork_iter<T: Database>(db: T) {
     assert_iter(
         &fork,
         0,
-        &[(5, 5), (10, 10), (20, 20), (25, 23), (26, 26), (30, 30), (35, 35)],
+        &[
+            (5, 5),
+            (10, 10),
+            (20, 20),
+            (25, 23),
+            (26, 26),
+            (30, 30),
+            (35, 35),
+        ],
     );
 
     // Replaced
@@ -107,7 +115,6 @@ fn fork_iter<T: Database>(db: T) {
 
 fn changelog<T: Database>(db: T) {
     let mut fork = db.fork();
-
 
     fork.put(IDX_NAME, vec![1], vec![1]);
     fork.put(IDX_NAME, vec![2], vec![2]);
@@ -172,7 +179,6 @@ fn changelog<T: Database>(db: T) {
     assert_eq!(fork.get(IDX_NAME, &[4]), None);
 }
 
-
 mod memorydb_tests {
     use super::super::MemoryDB;
 
@@ -194,7 +200,7 @@ mod memorydb_tests {
 mod rocksdb_tests {
     use std::path::Path;
     use tempdir::TempDir;
-    use super::super::{RocksDB, DbOptions};
+    use super::super::{DbOptions, RocksDB};
 
     fn rocksdb_database(path: &Path) -> RocksDB {
         let options = DbOptions::default();

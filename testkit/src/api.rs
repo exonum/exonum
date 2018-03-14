@@ -13,9 +13,9 @@
 // limitations under the License.
 
 use exonum::blockchain::{SharedNodeState, Transaction};
-use exonum::node::{ApiSender, TransactionSend, create_public_api_handler,
-                   create_private_api_handler};
-use iron::{IronError, Handler, Chain};
+use exonum::node::{create_private_api_handler, create_public_api_handler, ApiSender,
+                   TransactionSend};
+use iron::{Chain, Handler, IronError};
 use iron::headers::{ContentType, Headers};
 use iron::status::StatusClass;
 use iron_test::{request, response};
@@ -108,9 +108,9 @@ impl TestKitApi {
     where
         T: Into<Box<Transaction>>,
     {
-        self.api_sender.send(transaction.into()).expect(
-            "Cannot send transaction",
-        );
+        self.api_sender
+            .send(transaction.into())
+            .expect("Cannot send transaction");
     }
 
     fn get_internal<H, D>(handler: &H, endpoint: &str, expect_error: bool, is_public: bool) -> D

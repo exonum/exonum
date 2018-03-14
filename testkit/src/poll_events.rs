@@ -56,8 +56,7 @@ where
         }
 
         match self.stream.poll()? {
-            Async::Ready(None) |
-            Async::NotReady => {
+            Async::Ready(None) | Async::NotReady => {
                 self.exhausted = true;
                 Ok(Async::Ready(None))
             }
@@ -82,7 +81,7 @@ mod tests {
     #[test]
     fn test_take_while_ready() {
         use futures::Async;
-        use futures::stream::{poll_fn, iter_ok};
+        use futures::stream::{iter_ok, poll_fn};
 
         let mut waiting = false;
         let stream = iter_ok::<_, ()>(1..4).chain(poll_fn(move || {

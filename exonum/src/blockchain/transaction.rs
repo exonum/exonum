@@ -25,7 +25,7 @@ use serde::de::DeserializeOwned;
 
 use messages::{Message, RawTransaction};
 use storage::{Fork, StorageValue};
-use crypto::{Hash, CryptoHash};
+use crypto::{CryptoHash, Hash};
 use encoding;
 use encoding::serialize::json::ExonumJson;
 
@@ -334,12 +334,10 @@ impl StorageValue for TransactionResult {
 fn status_as_u16(status: &TransactionResult) -> u16 {
     match *status {
         Ok(()) => TRANSACTION_STATUS_OK,
-        Err(ref e) => {
-            match e.error_type {
-                TransactionErrorType::Panic => TRANSACTION_STATUS_PANIC,
-                TransactionErrorType::Code(c) => u16::from(c),
-            }
-        }
+        Err(ref e) => match e.error_type {
+            TransactionErrorType::Panic => TRANSACTION_STATUS_PANIC,
+            TransactionErrorType::Code(c) => u16::from(c),
+        },
     }
 }
 
@@ -623,9 +621,9 @@ mod tests {
     use super::*;
     use crypto;
     use blockchain::Blockchain;
-    use storage::{Database, MemoryDB, Entry};
+    use storage::{Database, Entry, MemoryDB};
     use node::ApiSender;
-    use helpers::{ValidatorId, Height};
+    use helpers::{Height, ValidatorId};
 
     lazy_static! {
         static ref EXECUTION_STATUS: Mutex<ExecutionResult> = Mutex::new(Ok(()));
@@ -698,9 +696,9 @@ mod tests {
             Ok(()),
             Err(TransactionError::panic(None)),
             Err(TransactionError::panic(Some("".to_owned()))),
-            Err(TransactionError::panic(
-                Some("Panic error description".to_owned()),
-            )),
+            Err(TransactionError::panic(Some(
+                "Panic error description".to_owned(),
+            ))),
             Err(TransactionError::code(0, None)),
             Err(TransactionError::code(
                 0,

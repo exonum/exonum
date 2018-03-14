@@ -103,7 +103,10 @@ mod tests {
             len: 100,
             times: 100,
         };
-        let addrs = ["127.0.0.1:6990".parse().unwrap(), "127.0.0.1:6991".parse().unwrap()];
+        let addrs = [
+            "127.0.0.1:6990".parse().unwrap(),
+            "127.0.0.1:6991".parse().unwrap(),
+        ];
         bench_network(b, addrs, &cfg);
     }
 
@@ -114,7 +117,10 @@ mod tests {
             len: 1000,
             times: 1000,
         };
-        let addrs = ["127.0.0.1:9792".parse().unwrap(), "127.0.0.1:9793".parse().unwrap()];
+        let addrs = [
+            "127.0.0.1:9792".parse().unwrap(),
+            "127.0.0.1:9793".parse().unwrap(),
+        ];
         bench_network(b, addrs, &cfg);
     }
 
@@ -125,7 +131,10 @@ mod tests {
             len: 1000,
             times: 10_000,
         };
-        let addrs = ["127.0.0.1:9792".parse().unwrap(), "127.0.0.1:9793".parse().unwrap()];
+        let addrs = [
+            "127.0.0.1:9792".parse().unwrap(),
+            "127.0.0.1:9793".parse().unwrap(),
+        ];
         bench_network(b, addrs, &cfg);
     }
 
@@ -136,7 +145,10 @@ mod tests {
             len: 100,
             times: 100,
         };
-        let addrs = ["127.0.0.1:4990".parse().unwrap(), "127.0.0.1:4991".parse().unwrap()];
+        let addrs = [
+            "127.0.0.1:4990".parse().unwrap(),
+            "127.0.0.1:4991".parse().unwrap(),
+        ];
         bench_network(b, addrs, &cfg);
     }
 
@@ -147,7 +159,10 @@ mod tests {
             len: 100,
             times: 1000,
         };
-        let addrs = ["127.0.0.1:5990".parse().unwrap(), "127.0.0.1:5991".parse().unwrap()];
+        let addrs = [
+            "127.0.0.1:5990".parse().unwrap(),
+            "127.0.0.1:5991".parse().unwrap(),
+        ];
         bench_network(b, addrs, &cfg);
     }
 
@@ -158,7 +173,10 @@ mod tests {
             len: 100,
             times: 10_000,
         };
-        let addrs = ["127.0.0.1:5990".parse().unwrap(), "127.0.0.1:5991".parse().unwrap()];
+        let addrs = [
+            "127.0.0.1:5990".parse().unwrap(),
+            "127.0.0.1:5991".parse().unwrap(),
+        ];
         bench_network(b, addrs, &cfg);
     }
 
@@ -169,7 +187,10 @@ mod tests {
             len: 100_000,
             times: 10,
         };
-        let addrs = ["127.0.0.1:9984".parse().unwrap(), "127.0.0.1:9985".parse().unwrap()];
+        let addrs = [
+            "127.0.0.1:9984".parse().unwrap(),
+            "127.0.0.1:9985".parse().unwrap(),
+        ];
         bench_network(b, addrs, &cfg);
     }
 
@@ -180,7 +201,10 @@ mod tests {
             len: 100_000,
             times: 100,
         };
-        let addrs = ["127.0.0.1:9946".parse().unwrap(), "127.0.0.1:9947".parse().unwrap()];
+        let addrs = [
+            "127.0.0.1:9946".parse().unwrap(),
+            "127.0.0.1:9947".parse().unwrap(),
+        ];
         bench_network(b, addrs, &cfg);
     }
 
@@ -191,7 +215,10 @@ mod tests {
             len: 100_000,
             times: 10,
         };
-        let addrs = ["127.0.0.1:9198".parse().unwrap(), "127.0.0.1:9199".parse().unwrap()];
+        let addrs = [
+            "127.0.0.1:9198".parse().unwrap(),
+            "127.0.0.1:9199".parse().unwrap(),
+        ];
         bench_network(b, addrs, &cfg);
     }
 
@@ -202,7 +229,10 @@ mod tests {
             len: 100_000,
             times: 100,
         };
-        let addrs = ["127.0.0.1:9198".parse().unwrap(), "127.0.0.1:9199".parse().unwrap()];
+        let addrs = [
+            "127.0.0.1:9198".parse().unwrap(),
+            "127.0.0.1:9199".parse().unwrap(),
+        ];
         bench_network(b, addrs, &cfg);
     }
 }

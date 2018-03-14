@@ -274,8 +274,8 @@ fn test_network_max_message_len() {
     let second = "127.0.0.1:17303".parse().unwrap();
 
     let max_message_length = ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN as usize;
-    let max_payload_length = max_message_length - ::messages::HEADER_LENGTH -
-        ::crypto::SIGNATURE_LENGTH;
+    let max_payload_length =
+        max_message_length - ::messages::HEADER_LENGTH - ::crypto::SIGNATURE_LENGTH;
     let acceptable_message = raw_message(15, max_payload_length);
     let too_big_message = raw_message(16, max_payload_length + 1000);
 
