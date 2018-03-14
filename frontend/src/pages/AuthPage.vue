@@ -113,16 +113,11 @@
       },
 
       proceed: function() {
-        const self = this
-
         this.isModalVisible = false
 
         this.$storage.set(this.keyPair)
 
-        // let modal time to hide
-        setTimeout(function() {
-          self.$router.push({name: 'user'})
-        }, 100)
+        this.$router.push({name: 'user'})
       }
     }
   }
