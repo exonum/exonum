@@ -457,10 +457,13 @@ impl TestKit {
     /// # }
     /// ```
     pub fn rollback(&mut self, blocks: usize) {
-        assert!(self.height().0 >= blocks, "Cannot rollback past genesis block");
-        // each block contain at least two phases:
-        // 1. add tx into pool
-        // 2. commit tx from pool to block
+        assert!(
+            self.height().0 >= blocks as u64,
+            "Cannot rollback past genesis block"
+        );
+        // Each block contain at least two phases:
+        // 1. add tx into pool;
+        // 2. commit tx from pool into next block.
         self.db_handler.rollback(blocks * 2);
     }
 
@@ -482,7 +485,6 @@ impl TestKit {
         });
         self.create_block_with_transactions(uncommitted_txs);
         let snapshot = self.snapshot();
-        // rollback commit, and pool update phases.
         self.rollback(1);
         snapshot
     }

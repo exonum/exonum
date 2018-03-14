@@ -120,12 +120,12 @@ impl NodeHandler {
         trace!("Handle propose");
 
         let snapshot = self.blockchain.snapshot();
-        let schema = Schema::new(snapshot);
+        let schema = Schema::new(&*snapshot);
         //TODO: remove this match after errors refactor.
         let has_unknown_txs = match self.state.add_propose(
             msg,
-            schema.transactions(),
-            schema.transactions_pool(),
+            &schema.transactions(),
+            &schema.transactions_pool(),
         ) {
             Ok(state) => state.has_unknown_txs(),
             Err(err) => {
@@ -207,7 +207,6 @@ impl NodeHandler {
 
         if self.state.block(&block_hash).is_none() {
 
-
             // Verify transactions
             let mut tx_hashes = Vec::new();
             let mut fork = self.blockchain.fork();
@@ -230,8 +229,7 @@ impl NodeHandler {
                                 return;
                             }
                         });
-                        schema.transactions_pool_mut().insert(hash);
-                        schema.transactions_mut().put(&hash, tx.raw().clone());
+                        schema.add_transaction_into_pool(tx.raw().clone());
                         tx_hashes.push(hash);
                     } else {
                         error!("Unknown transaction in block detected, block={:?}", msg);
@@ -494,10 +492,9 @@ impl NodeHandler {
         };
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
-        let pool = schema.transactions_pool();
-        let mempool_size = pool.iter().count();
+        let pool = schema.pool_len();
 
-        metric!("node.mempool", mempool_size);
+        metric!("node.mempool", pool);
 
         let height = self.state.height();
         info!(
@@ -508,7 +505,7 @@ impl NodeHandler {
                 .map(|x| format!("{}", x))
                 .unwrap_or_else(|| "?".into()),
             committed_txs,
-            mempool_size,
+            pool,
             block_hash.to_hex(),
         );
 
@@ -566,14 +563,13 @@ impl NodeHandler {
         let mut fork = self.blockchain.fork();
         {
             let mut schema = Schema::new(&mut fork);
-            schema.transactions_pool_mut().insert(hash);
-            schema.transactions_mut().put(&hash, msg.raw().clone());
+            schema.add_transaction_into_pool(msg);
         }
         self.blockchain.merge(fork.into_patch()).expect(
             "Unable to save transaction to persistent pool.",
         );
 
-        let full_proposes = self.state.transaction_validated(hash);
+        let full_proposes = self.state.check_incomplete_proposes(hash);
         // Go to has full propose if we get last transaction
         for (hash, round) in full_proposes {
             self.remove_request(&RequestData::Transactions(hash));
@@ -583,14 +579,14 @@ impl NodeHandler {
 
     /// Handles external boxed transaction. Additionally transaction will be broadcast to the
     /// Node's peers.
+    #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
     pub fn handle_incoming_tx(&mut self, msg: Box<Transaction>) {
         trace!("Handle incoming transaction");
         let hash = msg.hash();
         let mut fork = self.blockchain.fork();
         {
             let mut schema = Schema::new(&mut fork);
-            schema.transactions_pool_mut().insert(hash);
-            schema.transactions_mut().put(&hash, msg.raw().clone());
+            schema.add_transaction_into_pool(msg.raw().clone());
         }
         self.blockchain.merge(fork.into_patch()).expect(
             "Unable to save transaction to persistent pool.",
@@ -599,7 +595,7 @@ impl NodeHandler {
         trace!("Broadcast transactions: {:?}", msg.raw());
         self.broadcast(msg.raw());
 
-        let full_proposes = self.state.transaction_validated(hash);
+        let full_proposes = self.state.check_incomplete_proposes(hash);
         // Go to has full propose if we get last transaction
         for (hash, round) in full_proposes {
             self.remove_request(&RequestData::Transactions(hash));
@@ -684,7 +680,7 @@ impl NodeHandler {
             let snapshot = self.blockchain.snapshot();
             let schema = Schema::new(&snapshot);
             let pool = schema.transactions_pool();
-            let pool_len = pool.iter().count();
+            let pool_len = schema.pool_len();
 
             info!("LEADER: pool = {}", pool_len);
 

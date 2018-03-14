@@ -146,7 +146,7 @@ impl ExplorerApi {
             let content = box_transaction.serialize_field().map_err(
                 ApiError::InternalError,
             )?;
-            Ok(TransactionInfo::InPool { content: content })
+            Ok(TransactionInfo::InPool { content })
         } else if let Some(tx_info) = self.explorer().tx_info(hash)? {
             Ok(TransactionInfo::Committed(tx_info))
         } else {

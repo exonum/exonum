@@ -621,10 +621,13 @@ mod tests {
 
     use super::*;
     use crypto;
+    use encoding;
     use blockchain::{Service, Schema, Blockchain};
     use storage::{Snapshot, Database, MemoryDB, Entry};
     use node::ApiSender;
     use helpers::{ValidatorId, Height};
+
+    const TX_RESULT_SERVICE_ID: u16 = 255;
 
     lazy_static! {
         static ref EXECUTION_STATUS: Mutex<ExecutionResult> = Mutex::new(Ok(()));
@@ -825,28 +828,28 @@ mod tests {
     }
 
     struct TxResultService;
+
     impl Service for TxResultService {
         fn service_id(&self) -> u16 {
-            1
+            TX_RESULT_SERVICE_ID
         }
 
         fn service_name(&self) -> &'static str {
             "test service"
         }
 
-
         fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
             vec![]
         }
 
-        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, ::encoding::Error> {
+        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
             Ok(Box::new(TxResult::from_raw(raw)?))
         }
     }
 
     transactions! {
-        TestTx {
-            const SERVICE_ID = 1;
+        TestTxs {
+            const SERVICE_ID = TX_RESULT_SERVICE_ID;
 
             struct TxResult {
                 index: u64,

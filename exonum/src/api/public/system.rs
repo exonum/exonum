@@ -51,9 +51,7 @@ impl SystemApi {
         let mempool = move |_: &mut Request| -> IronResult<Response> {
             let snapshot = self.blockchain.snapshot();
             let schema = Schema::new(&snapshot);
-            let pool = schema.transactions_pool();
-            let count = pool.iter().count();
-            let info = MemPoolInfo { size: count };
+            let info = MemPoolInfo { size: schema.pool_len() };
             self.ok_response(&serde_json::to_value(info).unwrap())
         };
         router.get("/v1/mempool", mempool, "mempool");

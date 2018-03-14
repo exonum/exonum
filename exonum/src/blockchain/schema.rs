@@ -338,6 +338,14 @@ where
     fn next_height(&self) -> Height {
         Height(self.block_hashes_by_height().len())
     }
+
+    /// Count txs in pool
+    #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
+    pub fn pool_len(&self) -> usize {
+        let pool = self.transactions_pool();
+        let count = pool.iter().count();
+        count
+    }
 }
 
 impl<'a> Schema<&'a mut Fork> {
@@ -352,7 +360,9 @@ impl<'a> Schema<&'a mut Fork> {
     /// Mutable reference to the [`transaction_results`][1] index.
     ///
     /// [1]: struct.Schema.html#method.transaction_results
-    pub fn transaction_results_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, TransactionResult> {
+    pub(crate) fn transaction_results_mut(
+        &mut self,
+    ) -> ProofMapIndex<&mut Fork, Hash, TransactionResult> {
         ProofMapIndex::new(TRANSACTION_RESULTS, self.view)
     }
 
@@ -479,7 +489,7 @@ impl<'a> Schema<&'a mut Fork> {
         // TODO: clear storages
     }
 
-    /// add transaction into persistent pool
+    /// Adds transaction into persistent pool
     #[doc(hidden)]
     pub fn add_transaction_into_pool(&mut self, tx: RawMessage) {
         self.transactions_pool_mut().insert(tx.hash());

@@ -23,19 +23,19 @@ extern crate test;
 
 #[cfg(test)]
 mod tests {
-
     use tempdir::TempDir;
     use futures::sync::mpsc;
     use test::Bencher;
     use exonum::storage::{Database, Fork, Patch, ProofMapIndex, RocksDB, DbOptions, Snapshot};
     use exonum::blockchain::{ExecutionResult, Blockchain, Transaction, Schema, Service};
-    use exonum::storage::{Database, Fork, Patch, ProofMapIndex, RocksDB, DbOptions};
-    use exonum::blockchain::{Blockchain, Transaction, ExecutionResult};
     use exonum::crypto::{gen_keypair, CryptoHash, Hash, PublicKey, SecretKey};
     use exonum::messages::{Message, RawTransaction};
     use exonum::encoding::Error as EncodingError;
     use exonum::helpers::{Height, ValidatorId};
     use exonum::node::ApiSender;
+
+    const TIMESTAMPING_SERVICE_ID: u16 = 1;
+    const CRYPTOCURRENCY_SERVICE_ID: u16 = 1;
 
     fn create_blockchain(db: Box<Database>, services: Vec<Box<Service>>) -> Blockchain {
         let dummy_channel = mpsc::channel(1);
@@ -53,15 +53,15 @@ mod tests {
         blockchain
             .create_patch(ValidatorId::zero(), Height(height), txs)
             .1
-
     }
 
     fn execute_timestamping(db: Box<Database>, b: &mut Bencher) {
 
         struct Timestamping;
+
         impl Service for Timestamping {
             fn service_id(&self) -> u16 {
-                255
+                TIMESTAMPING_SERVICE_ID
             }
 
             fn service_name(&self) -> &'static str {
@@ -77,8 +77,8 @@ mod tests {
             }
         }
         transactions! {
-            Transactions {
-                const SERVICE_ID = 1;
+            TimestampingTransactions {
+                const SERVICE_ID = TIMESTAMPING_SERVICE_ID;
                 struct Tx {
                     from: &PublicKey,
                     data: &Hash,
@@ -115,17 +115,18 @@ mod tests {
         let mut blockchain = create_blockchain(db, vec![Box::new(Timestamping)]);
         for i in 0..100 {
             let txs = prepare_txs(&mut blockchain, i, 1000);
-            let patch = execute_block(&mut blockchain, i, &txs);
+            let patch = execute_block(&blockchain, i, &txs);
             blockchain.merge(patch).unwrap();
         }
 
         let txs = prepare_txs(&mut blockchain, 100, 1000);
 
-        b.iter(|| execute_block(&mut blockchain, 100, &txs));
+        b.iter(|| execute_block(&blockchain, 100, &txs));
     }
 
     fn execute_cryptocurrency(db: Box<Database>, b: &mut Bencher) {
         struct Cryptocurrency;
+
         impl Service for Cryptocurrency {
             fn service_id(&self) -> u16 {
                 255
@@ -144,11 +145,13 @@ mod tests {
             }
         }
 
-        messages! {
-            const SERVICE_ID = 255;
-            struct Tx {
-                from: &PublicKey,
-                to: &PublicKey,
+        transactions! {
+            CryptocurrencyTransactions {
+                const SERVICE_ID = CRYPTOCURRENCY_SERVICE_ID;
+                struct Tx {
+                    from: &PublicKey,
+                    to: &PublicKey,
+                }
             }
         }
 
@@ -201,13 +204,13 @@ mod tests {
         }
         for i in 0..100 {
             let txs = prepare_txs(&mut blockchain, i, 1000, &keys);
-            let patch = execute_block(&mut blockchain, i, &txs);
+            let patch = execute_block(&blockchain, i, &txs);
             blockchain.merge(patch).unwrap();
         }
 
         let txs = prepare_txs(&mut blockchain, 100, 1000, &keys);
 
-        b.iter(|| execute_block(&mut blockchain, 100, &txs));
+        b.iter(|| execute_block(&blockchain, 100, &txs));
     }
 
     fn create_rocksdb(tempdir: &TempDir) -> Box<Database> {

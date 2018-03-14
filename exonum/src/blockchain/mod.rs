@@ -40,6 +40,7 @@ use std::fmt;
 use std::iter;
 use std::panic;
 use std::net::SocketAddr;
+use failure;
 
 use vec_map::VecMap;
 use byteorder::{ByteOrder, LittleEndian};
@@ -261,15 +262,17 @@ impl Blockchain {
         let mut fork = self.fork();
 
         let block_hash = {
-            // Get last hash
+            // Get last hash.
             let last_hash = self.last_hash();
-            // Save & execute transactions
+            // Save & execute transactions.
             for (index, hash) in tx_hashes.iter().enumerate() {
                 self.execute_transaction(*hash, height, index, &mut fork)
-                    .expect("Transaction not found in database."); // Some trouble with invariants
+                    // execute_transaction could fail,with invalid
+                    // Transaction that cannot be deserialized, or not found in pool.
+                    .expect("Transaction not found in the database.");
             }
 
-            // Get tx & state hash
+            // Get tx & state hash.
             let (tx_hash, state_hash) = {
                 let state_hashes = {
                     let schema = Schema::new(&fork);
@@ -309,7 +312,7 @@ impl Blockchain {
                 (tx_hash, state_hash)
             };
 
-            // Create block
+            // Create block.
             let block = Block::new(
                 SCHEMA_MAJOR_VERSION,
                 proposer_id,
@@ -320,12 +323,12 @@ impl Blockchain {
                 &state_hash,
             );
             trace!("execute block = {:?}", block);
-            // Calculate block hash
+            // Calculate block hash.
             let block_hash = block.hash();
-            // Update height
+            // Update height.
             let mut schema = Schema::new(&mut fork);
             schema.block_hashes_by_height_mut().push(block_hash);
-            // Save block
+            // Save block.
             schema.blocks_mut().put(&block_hash, block);
 
             block_hash
@@ -341,17 +344,17 @@ impl Blockchain {
         height: Height,
         index: usize,
         fork: &mut Fork,
-    ) -> Result<(), ::failure::Error> {
+    ) -> Result<(), failure::Error> {
         let tx = {
             let schema = Schema::new(&fork);
 
-            let tx = schema.transactions().get(&tx_hash).ok_or(format_err!(
-                "BUG: Cannot find transaction in database."
-            ))?;
+            let tx = schema.transactions().get(&tx_hash).ok_or_else(|| {
+                failure::err_msg("BUG: Cannot find transaction in database.")
+            })?;
 
-            self.tx_from_raw(tx).ok_or(format_err!(
-                "BUG: couldn't create tx from raw message"
-            ))?
+            self.tx_from_raw(tx).ok_or_else(|| {
+                failure::err_msg("BUG: couldn't create tx from raw message")
+            })?
         };
 
         fork.checkpoint();

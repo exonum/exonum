@@ -18,6 +18,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::collections::hash_map::Entry;
 use std::net::SocketAddr;
 use std::time::{SystemTime, Duration};
+use failure;
 
 use serde_json::Value;
 use bit_vec::BitVec;
@@ -743,10 +744,9 @@ impl State {
     ///
     /// Transaction is ignored if the following criteria are fulfilled:
     ///
-    /// - transactions pool size is exceeded
     /// - transaction isn't contained in unknown transaction list of any propose
     /// - transaction isn't a part of block
-    pub fn transaction_validated(&mut self, tx_hash: Hash) -> Vec<(Hash, Round)> {
+    pub fn check_incomplete_proposes(&mut self, tx_hash: Hash) -> Vec<(Hash, Round)> {
         let mut full_proposes = Vec::new();
         for (propose_hash, propose_state) in &mut self.proposes {
             propose_state.unknown_txs.remove(&tx_hash);
@@ -811,21 +811,20 @@ impl State {
     pub fn add_propose(
         &mut self,
         msg: &Propose,
-        transactions: MapIndex<&Box<Snapshot>, Hash, RawMessage>,
-        transaction_pool: KeySetIndex<&Box<Snapshot>, Hash>,
-    ) -> Result<&ProposeState, ::failure::Error> {
+        transactions: &MapIndex<&&Snapshot, Hash, RawMessage>,
+        transaction_pool: &KeySetIndex<&&Snapshot, Hash>,
+    ) -> Result<&ProposeState, failure::Error> {
         let propose_hash = msg.hash();
         match self.proposes.entry(propose_hash) {
-            Entry::Occupied(..) => bail!("Propose already found."),
+            Entry::Occupied(..) => bail!("Propose already found"),
             Entry::Vacant(e) => {
-
                 let mut unknown_txs = HashSet::new();
                 for hash in msg.transactions() {
                     if transactions.get(hash).is_some() {
                         if !transaction_pool.contains(hash) {
                             bail!(
                                 "Received propose with already\
-                                                committed transaction."
+                                                committed transaction"
                             )
                         }
                     } else {
@@ -841,7 +840,7 @@ impl State {
 
                 Ok(e.insert(ProposeState {
                     propose: msg.clone(),
-                    unknown_txs: unknown_txs,
+                    unknown_txs,
                     block_hash: None,
                     is_saved: false,
                 }))
