@@ -5,6 +5,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Internal improvements
+
+#### Exonum core
+
+- Non-committed transactions are now stored persistently in the storage
+  instead of memory pool. (#549)
+
 ### Breaking changes
 
 #### Exonum core
@@ -19,8 +26,18 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   `new_in_family`. Now it uses `index_id` instead of prefixes. Moreover,
   `blockchain::gen_prefix` method has been removed. Instead, any type that
   implements `StorageKey` trait, can serve as an `index_id`. (#531)
+
+#### exonum-testkit
+
+- Testkit api now contain two methods to work with transaction pool:
+  - `is_tx_in_pool` - for checking transaction existence in pool;
+  - `add_tx` - for adding new transaction into pool.
   
-- Transaction pool are now collected in storage instead of memory. (#549)
+  Migration path:
+  
+  - Instead of calling `mempool()`, one should use `is_tx_in_pool`
+  or `add_tx` methods.
+
 
 #### exonum-configuration
 

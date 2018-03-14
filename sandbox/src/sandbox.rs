@@ -498,7 +498,7 @@ impl Sandbox {
             let mut fork = blockchain.fork();
             {
                 let mut schema = Schema::new(&mut fork);
-                for hash in recover.into_iter() {
+                for hash in recover {
                     schema.transactions_mut().remove(&hash);
                     schema.transactions_pool_mut().remove(&hash);
                 }

@@ -261,7 +261,6 @@ impl NodeHandler {
         }
         self.commit(block_hash, msg.precommits().iter(), None);
         self.request_next_block();
-
     }
 
     /// Executes and commits block. This function is called when node has full propose information.

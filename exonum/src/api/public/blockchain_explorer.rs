@@ -20,11 +20,12 @@ use std::ops::Range;
 use std::cmp;
 
 use api::{Api, ApiError};
-use blockchain::{Block, Blockchain, TxLocation, Schema, TransactionErrorType, TransactionResult};
+use blockchain::{Transaction, Block, Blockchain, TxLocation, Schema, TransactionErrorType,
+                 TransactionResult};
 use crypto::Hash;
 use helpers::Height;
 use messages::Precommit;
-use storage::ListProof;
+use storage::{ListProof, Snapshot};
 
 const MAX_BLOCKS_PER_REQUEST: u64 = 1000;
 
@@ -131,19 +132,25 @@ impl ExplorerApi {
         self.explorer().block_info(height)
     }
 
+    fn tx_from_raw(
+        &self,
+        schema: &Schema<Box<Snapshot>>,
+        hash: &Hash,
+    ) -> Result<Box<Transaction>, ApiError> {
+        let raw_tx = schema.transactions().get(hash).expect(
+            "Expected tx in database",
+        );
+
+        Ok(self.blockchain.tx_from_raw(raw_tx.clone()).ok_or_else(|| {
+            ApiError::InternalError(format!("Service not found for tx: {:?}", raw_tx).into())
+        })?)
+    }
+
     fn transaction_info(&self, hash: &Hash) -> Result<TransactionInfo, ApiError> {
         let snapshot = self.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
+        let schema = Schema::new(snapshot);
         if schema.transactions_pool().contains(hash) {
-            let raw_tx = schema.transactions().get(hash).expect(
-                "Expected tx in database",
-            );
-
-            let box_transaction = self.blockchain.tx_from_raw(raw_tx.clone()).ok_or_else(|| {
-                ApiError::InternalError(format!("Service not found for tx: {:?}", raw_tx).into())
-            })?;
-
-            let content = box_transaction.serialize_field().map_err(
+            let content = self.tx_from_raw(&schema, hash)?.serialize_field().map_err(
                 ApiError::InternalError,
             )?;
             Ok(TransactionInfo::InPool { content })
