@@ -3,21 +3,23 @@
     <div :class="{ 'show d-block': visible }" class="modal" tabindex="-1" role="dialog">
       <div class="modal-dialog" role="document">
         <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">{{ title }}</h5>
-            <button type="button" class="close" @click="close">
-              <span aria-hidden="true">&times;</span>
-            </button>
-          </div>
+          <form @submit="submit">
+            <div class="modal-header">
+              <h5 class="modal-title">{{ title }}</h5>
+              <button type="button" class="close" @click="close">
+                <span aria-hidden="true">&times;</span>
+              </button>
+            </div>
 
-          <div class="modal-body">
-            <slot/>
-          </div>
+            <div class="modal-body">
+              <slot/>
+            </div>
 
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" @click="close">Close</button>
-            <button type="button" class="btn btn-primary" @click="action">{{ actionBtn }}</button>
-          </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" @click="close">Close</button>
+              <button type="submit" class="btn btn-primary">{{ actionBtn }}</button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
@@ -38,6 +40,7 @@
       visible: function(state) {
         const className = 'modal-open'
 
+        console.log(state);
         if (state) {
           document.body.classList.add(className)
         } else {
@@ -49,7 +52,7 @@
       close: function() {
         this.$emit('close')
       },
-      action: function() {
+      submit: function() {
         this.$emit('submit')
       }
     }
