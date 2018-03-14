@@ -117,7 +117,9 @@
 
         this.$storage.set(this.keyPair)
 
-        this.$router.push({name: 'user'})
+        this.$nextTick(function() {
+          this.$router.push({name: 'user'})
+        })
       }
     }
   }

@@ -168,7 +168,7 @@ module.exports = {
 
       getWallet: keyPair => {
         return axios.get(CONFIG_URL).then(response => {
-          // actual list of validators
+          // actual list of public keys of validators
           const validators = response.data.config.validator_keys.map(validator => {
             return validator.consensus_key
           })

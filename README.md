@@ -7,9 +7,9 @@ Exonum blockchain keeps balances of users and handles secure
 transactions between them.
 
 It implements most basic operations:
-- Create a new user;
-- Add funds to the user's balance;
-- Transfer funds between users.
+- Create a new user
+- Add funds to the user's balance
+- Transfer funds between users
 
 ## Getting started
 
@@ -111,9 +111,9 @@ to monitor blocks and transactions in the blockchain.
 
 Use root URL of public API address of one of nodes as `--api-root` parameter, e.g `http://127.0.0.1:8200`.
 
-## Step by step tutorials
+## Tutorials
 
-* [Frontend tutorial](tutorial/frontend/getting-started.md)
+* [Frontend tutorial](tutorial/frontend.md)
 
 ## License
 
