@@ -13,14 +13,14 @@
 // limitations under the License.
 
 use std::mem;
-use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
-use std::time::{SystemTime, Duration, UNIX_EPOCH};
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use byteorder::{ByteOrder, LittleEndian};
 
 use crypto::{Hash, PublicKey, Signature};
 use helpers::{Height, Round, ValidatorId};
-use super::{Error, CheckedOffset, Offset, Result};
+use super::{CheckedOffset, Error, Offset, Result};
 
 /// Trait for all types that could be a field in `encoding`.
 pub trait Field<'a> {

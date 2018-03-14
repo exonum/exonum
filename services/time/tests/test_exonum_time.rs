@@ -13,22 +13,22 @@
 // limitations under the License.
 
 extern crate exonum;
-extern crate exonum_time;
 #[macro_use]
 extern crate exonum_testkit;
+extern crate exonum_time;
 #[macro_use]
 extern crate pretty_assertions;
 
 use std::collections::HashMap;
 use std::iter::FromIterator;
-use std::time::{SystemTime, Duration, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use exonum::blockchain::{Schema, Transaction, TransactionErrorType};
 use exonum::helpers::{Height, ValidatorId};
 use exonum::crypto::{gen_keypair, CryptoHash, PublicKey};
 use exonum::storage::Snapshot;
 
-use exonum_time::{MockTimeProvider, TimeService, TimeSchema, TxTime, ValidatorTime, Error};
+use exonum_time::{Error, MockTimeProvider, TimeSchema, TimeService, TxTime, ValidatorTime};
 use exonum_testkit::{ApiKind, TestKitApi, TestKitBuilder, TestNode};
 
 fn assert_storage_times_eq<T: AsRef<Snapshot>>(
@@ -57,10 +57,9 @@ fn assert_transaction_result<S: AsRef<Snapshot>, T: Transaction>(
     transaction: &T,
     expected_code: u8,
 ) -> Option<String> {
-    let result = Schema::new(snapshot).transaction_results().get(
-        &transaction
-            .hash(),
-    );
+    let result = Schema::new(snapshot)
+        .transaction_results()
+        .get(&transaction.hash());
     match result {
         Some(Err(e)) => {
             assert_eq!(e.error_type(), TransactionErrorType::Code(expected_code));
@@ -261,8 +260,15 @@ fn test_exonum_time_service_with_7_validators() {
     let times = (0..7)
         .map(|x| time + Duration::new(x * 10, 0))
         .collect::<Vec<_>>();
-    let expected_storage_times =
-        vec![None, None, None, None, Some(times[2]), Some(times[3]), Some(times[4])];
+    let expected_storage_times = vec![
+        None,
+        None,
+        None,
+        None,
+        Some(times[2]),
+        Some(times[3]),
+        Some(times[4]),
+    ];
 
     for (i, validator) in validators.iter().enumerate() {
         let tx = {
@@ -271,9 +277,9 @@ fn test_exonum_time_service_with_7_validators() {
         };
         testkit.create_block_with_transactions(txvec![tx.clone()]);
         assert_eq!(
-            Schema::new(testkit.snapshot()).transaction_results().get(
-                &tx.hash(),
-            ),
+            Schema::new(testkit.snapshot())
+                .transaction_results()
+                .get(&tx.hash(),),
             Some(Ok(()))
         );
 
@@ -368,14 +374,12 @@ fn test_selected_time_less_than_time_in_storage() {
 
     if let Some(time_in_storage) = schema.time().get() {
         let time_tx = time_in_storage - Duration::new(10, 0);
-        let tx = {
-            TxTime::new(time_tx, pub_key_1, sec_key_1)
-        };
+        let tx = { TxTime::new(time_tx, pub_key_1, sec_key_1) };
         testkit.create_block_with_transactions(txvec![tx.clone()]);
         assert_eq!(
-            Schema::new(testkit.snapshot()).transaction_results().get(
-                &tx.hash(),
-            ),
+            Schema::new(testkit.snapshot())
+                .transaction_results()
+                .get(&tx.hash(),),
             Some(Ok(()))
         );
     }
@@ -424,9 +428,9 @@ fn test_transaction_time_less_than_validator_time_in_storage() {
 
     testkit.create_block_with_transactions(txvec![tx0.clone()]);
     assert_eq!(
-        Schema::new(testkit.snapshot()).transaction_results().get(
-            &tx0.hash(),
-        ),
+        Schema::new(testkit.snapshot())
+            .transaction_results()
+            .get(&tx0.hash(),),
         Some(Ok(()))
     );
 
@@ -474,10 +478,11 @@ fn assert_current_validators_times_eq(
     api: &TestKitApi,
     expected_times: &HashMap<PublicKey, Option<SystemTime>>,
 ) {
-    let validators_times =
-        HashMap::from_iter(get_current_validators_times(api).iter().map(|validator| {
-            (validator.public_key, validator.time)
-        }));
+    let validators_times = HashMap::from_iter(
+        get_current_validators_times(api)
+            .iter()
+            .map(|validator| (validator.public_key, validator.time)),
+    );
 
     assert_eq!(*expected_times, validators_times);
 }
@@ -486,10 +491,11 @@ fn assert_all_validators_times_eq(
     api: &TestKitApi,
     expected_validators_times: &HashMap<PublicKey, Option<SystemTime>>,
 ) {
-    let validators_times =
-        HashMap::from_iter(get_all_validators_times(api).iter().map(|validator| {
-            (validator.public_key, validator.time)
-        }));
+    let validators_times = HashMap::from_iter(
+        get_all_validators_times(api)
+            .iter()
+            .map(|validator| (validator.public_key, validator.time)),
+    );
 
     assert_eq!(*expected_validators_times, validators_times);
 }
@@ -503,10 +509,11 @@ fn test_endpoint_api() {
 
     let api = testkit.api();
     let validators = testkit.network().validators().to_vec();
-    let mut current_validators_times: HashMap<PublicKey, Option<SystemTime>> =
-        HashMap::from_iter(validators.iter().map(|validator| {
-            (*validator.service_keypair().0, None)
-        }));
+    let mut current_validators_times: HashMap<PublicKey, Option<SystemTime>> = HashMap::from_iter(
+        validators
+            .iter()
+            .map(|validator| (*validator.service_keypair().0, None)),
+    );
     let mut all_validators_times = HashMap::new();
 
     assert_current_time_eq(&api, None);

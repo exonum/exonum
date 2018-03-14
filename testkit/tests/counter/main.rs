@@ -16,16 +16,16 @@
 extern crate exonum;
 #[macro_use]
 extern crate exonum_testkit;
+#[macro_use]
+extern crate pretty_assertions;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
-#[macro_use]
-extern crate pretty_assertions;
 
 use exonum::blockchain::Transaction;
-use exonum::crypto::{self, PublicKey, CryptoHash};
+use exonum::crypto::{self, CryptoHash, PublicKey};
 use exonum::helpers::Height;
 use exonum::messages::Message;
 use exonum::encoding::serialize::FromHex;
@@ -351,7 +351,9 @@ fn test_snapshot_comparison_panic() {
         .map(CounterSchema::new)
         .map(CounterSchema::count)
         .map(|&c| c.unwrap())
-        .assert("Counter has increased", |&old, &new| new == old + tx.by());
+        .assert("Counter has increased", |&old, &new| {
+            new == old + tx.by()
+        });
 }
 
 #[test]
@@ -557,10 +559,13 @@ fn test_explorer_transaction() {
         ApiKind::Explorer,
         &format!("v1/transactions/{}", &tx.hash().to_string()),
     );
-    assert_eq!(info, json!({
+    assert_eq!(
+        info,
+        json!({
         "type": "in-pool",
         "content": tx.serialize_field().unwrap(),
-    }));
+    })
+    );
 
     testkit.create_block();
     let info: Value = api.get(
@@ -582,8 +587,8 @@ fn test_explorer_transaction() {
 
     if let Value::Object(mut info) = info {
         let location_proof = info.remove("location_proof").unwrap();
-        let location_proof: ListProof<crypto::Hash> = serde_json::from_value(location_proof)
-            .unwrap();
+        let location_proof: ListProof<crypto::Hash> =
+            serde_json::from_value(location_proof).unwrap();
         let block: BlockInfo = api.get(ApiKind::Explorer, "v1/blocks/1");
         let block = block.block;
         assert!(

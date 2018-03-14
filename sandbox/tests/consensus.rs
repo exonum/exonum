@@ -14,28 +14,28 @@
 
 // spell-checker:ignore precommiters, uncommented, uncomment, commited
 
+extern crate bit_vec;
+extern crate env_logger;
+extern crate exonum;
+#[macro_use]
+extern crate log;
 #[macro_use]
 extern crate pretty_assertions;
 extern crate rand;
-extern crate exonum;
 extern crate sandbox;
-#[macro_use]
-extern crate log;
-extern crate env_logger;
-extern crate bit_vec;
 
 use std::time::Duration;
 use std::collections::BTreeMap;
 
 use rand::{thread_rng, Rng};
 use bit_vec::BitVec;
-use exonum::messages::{RawMessage, Message, Propose, Prevote, Precommit, ProposeRequest,
-                       TransactionsRequest, PrevotesRequest, CONSENSUS, Connect, PeersRequest};
-use exonum::crypto::{CryptoHash, Hash, Seed, gen_keypair, gen_keypair_from_seed};
+use exonum::messages::{Connect, Message, PeersRequest, Precommit, Prevote, PrevotesRequest,
+                       Propose, ProposeRequest, RawMessage, TransactionsRequest, CONSENSUS};
+use exonum::crypto::{gen_keypair, gen_keypair_from_seed, CryptoHash, Hash, Seed};
 use exonum::blockchain::{Blockchain, Schema};
 use exonum::node::state::{PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT,
                           TRANSACTIONS_REQUEST_TIMEOUT};
-use exonum::helpers::{Height, Round, user_agent};
+use exonum::helpers::{user_agent, Height, Round};
 
 use sandbox::timestamping::{TimestampTx, TimestampingTxGenerator, TIMESTAMPING_SERVICE};
 use sandbox::timestamping_sandbox;
@@ -87,8 +87,7 @@ fn test_check_leader() {
     // TODO would be nice to check also for RequestPeers message which will appear
     // after 10 time units (at 11th round)
     let n_rounds_without_request_peers = Round(
-        (sandbox.cfg().consensus.peers_timeout /
-             sandbox.cfg().consensus.round_timeout) as u32,
+        (sandbox.cfg().consensus.peers_timeout / sandbox.cfg().consensus.round_timeout) as u32,
     );
 
     for round in Round::first().iter_to(n_rounds_without_request_peers) {
@@ -288,9 +287,11 @@ fn test_retrieve_block_and_precommits() {
     for precommit in precommits {
         assert_eq!(expected_height, precommit.height());
         assert_eq!(expected_block_hash, *precommit.block_hash());
-        assert!(precommit.raw().verify_signature(
-            &sandbox.p(precommit.validator()),
-        ));
+        assert!(
+            precommit
+                .raw()
+                .verify_signature(&sandbox.p(precommit.validator()),)
+        );
     }
     let bl_proof_option = sandbox.block_and_precommits(target_height);
     assert!(bl_proof_option.is_none());
@@ -747,7 +748,6 @@ fn test_queue_prevote_message_from_next_height() {
     sandbox.add_time(Duration::from_millis(0));
 }
 
-
 /// idea of the scenario is to:
 /// - receive correct Propose for some next height (first one) at 0 time (and respectively 1 height)
 /// - queue it
@@ -841,7 +841,6 @@ fn test_ignore_message_from_prev_height() {
 /// - send prevote when lock=0 for known propose
 #[test]
 fn positive_get_propose_send_prevote() {
-
     let sandbox = timestamping_sandbox();
 
     let propose = ProposeBuilder::new(&sandbox)
@@ -1643,7 +1642,6 @@ fn handle_precommit_remove_request_prevotes() {
     sandbox.add_time(Duration::from_millis(PREVOTES_REQUEST_TIMEOUT));
 }
 
-
 /// get lock and send prevote
 /// LOCK
 /// - Send prevote
@@ -1674,7 +1672,6 @@ fn lock_to_propose_and_send_prevote() {
     let tx = gen_timestamping_tx();
     sandbox.recv(&tx);
 
-
     let propose = ProposeBuilder::new(&sandbox)
         .with_duration_since_sandbox_time(sandbox.round_timeout() + sandbox.propose_timeout())
         .with_tx_hashes(&[tx.hash()])
@@ -1689,8 +1686,6 @@ fn lock_to_propose_and_send_prevote() {
 
     // inc round
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
-
-
 
     sandbox.recv(&Prevote::new(
         VALIDATOR_1,
@@ -1942,7 +1937,6 @@ fn handle_precommit_positive_scenario_commit() {
         &make_request_prevote_from_precommit(&sandbox, &precommit_1),
     );
 
-
     sandbox.recv(&precommit_2);
     // second addition is required in order to make sandbox time >= propose time because
     // this condition is checked at node/mod.rs->actual_round()
@@ -2053,7 +2047,6 @@ fn lock_not_send_prevotes_after_commit() {
         );
     }
 
-
     {
         // this block will make lock, and, hence, one additional precommit
         sandbox.recv(&propose);
@@ -2089,7 +2082,6 @@ fn lock_not_send_prevotes_after_commit() {
         ));
         sandbox.check_broadcast_status(HEIGHT_TWO, &block.hash());
     }
-
 
     //    add rounds to become a leader to observe broadcast messages
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
@@ -2164,7 +2156,6 @@ fn do_not_commit_if_propose_is_unknown() {
         sandbox.a(VALIDATOR_1),
         &make_request_prevote_from_precommit(&sandbox, &precommit_1),
     );
-
 
     sandbox.recv(&precommit_2);
     // Second addition is required in order to make sandbox time >= propose time because
@@ -2248,7 +2239,6 @@ fn do_not_commit_if_tx_is_unknown() {
         sandbox.a(VALIDATOR_1),
         &make_request_prevote_from_precommit(&sandbox, &precommit_1),
     );
-
 
     sandbox.recv(&precommit_2);
     // Second addition is required in order to make sandbox time >= propose time because
@@ -2342,7 +2332,6 @@ fn commit_using_unknown_propose_with_precommits() {
         sandbox.a(VALIDATOR_1),
         &make_request_prevote_from_precommit(&sandbox, &precommit_1),
     );
-
 
     sandbox.recv(&precommit_2);
     // Second addition is required in order to make sandbox time >= propose time because
@@ -2458,7 +2447,6 @@ fn has_full_propose_wrong_state_hash() {
         &make_request_prevote_from_precommit(&sandbox, &precommit_1),
     );
 
-
     sandbox.recv(&precommit_2);
     // Second addition is required in order to make sandbox time >= propose time because
     // this condition is checked at node/mod.rs->actual_round()
@@ -2499,7 +2487,6 @@ fn has_full_propose_wrong_state_hash() {
         LOCK_ZERO,
         sandbox.s(VALIDATOR_0),
     ));
-
 
     sandbox.add_time(Duration::from_millis(0));
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
@@ -2568,7 +2555,6 @@ fn do_not_send_precommit_if_has_incompatible_prevotes() {
     sandbox.add_time(Duration::from_millis(0));
 }
 
-
 /// scenario: // COMMIT:
 /// // - handle queued messages
 /// idea:
@@ -2615,7 +2601,6 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
         .with_prev_hash(&first_block.hash())
         .build();
 
-
     // this block will be created during second commit while manually creating precommits
     let second_block = BlockBuilder::new(&sandbox)
         .with_proposer_id(VALIDATOR_3)
@@ -2626,7 +2611,6 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
         .with_prev_hash(&first_block.hash())
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
-
 
     let precommit_1 = Precommit::new(
         VALIDATOR_1,
@@ -2674,7 +2658,6 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
         sandbox.a(VALIDATOR_1),
         &make_request_prevote_from_precommit(&sandbox, &precommit_1),
     );
-
 
     sandbox.recv(&precommit_2);
     // second addition is required in order to make sandbox time >= propose time because
@@ -2933,7 +2916,6 @@ fn handle_tx_ignore_existing_tx_in_blockchain() {
     sandbox.add_time(Duration::from_millis(sandbox.round_timeout()));
     assert!(sandbox.is_leader());
 
-
     sandbox.recv(&tx);
 
     sandbox.add_time(Duration::from_millis(sandbox.propose_timeout()));
@@ -3009,7 +2991,6 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
         sandbox.a(VALIDATOR_1),
         &make_request_prevote_from_precommit(&sandbox, &precommit_1),
     );
-
 
     sandbox.recv(&precommit_2);
     // second addition is required in order to make sandbox time >= propose time because

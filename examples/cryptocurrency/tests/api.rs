@@ -24,11 +24,11 @@ extern crate exonum_testkit;
 #[macro_use]
 extern crate serde_json;
 
-use exonum::crypto::{self, PublicKey, SecretKey, CryptoHash, Hash};
+use exonum::crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 // Import data types used in tests from the crate where the service is defined.
-use cryptocurrency::{TxCreateWallet, TxTransfer, Wallet, CurrencyService};
+use cryptocurrency::{CurrencyService, TxCreateWallet, TxTransfer, Wallet};
 
 // Imports shared test constants.
 use constants::{ALICE_NAME, BOB_NAME};
@@ -73,7 +73,7 @@ fn test_transfer() {
         tx_alice.pub_key(),
         tx_bob.pub_key(),
         10, // transferred amount
-        0, // seed
+        0,  // seed
         &key_alice,
     );
     api.transfer(&tx);
@@ -107,7 +107,7 @@ fn test_transfer_from_nonexisting_wallet() {
         tx_alice.pub_key(),
         tx_bob.pub_key(),
         10, // transfer amount
-        0, // seed
+        0,  // seed
         &key_alice,
     );
     api.transfer(&tx);
@@ -141,7 +141,7 @@ fn test_transfer_to_nonexisting_wallet() {
         tx_alice.pub_key(),
         tx_bob.pub_key(),
         10, // transfer amount
-        0, // seed
+        0,  // seed
         &key_alice,
     );
     api.transfer(&tx);
@@ -170,7 +170,7 @@ fn test_transfer_overcharge() {
         tx_alice.pub_key(),
         tx_bob.pub_key(),
         110, // transfer amount
-        0, // seed
+        0,   // seed
         &key_alice,
     );
     api.transfer(&tx);
@@ -190,10 +190,8 @@ fn test_transfer_overcharge() {
 fn test_malformed_wallet_request() {
     let (_testkit, api) = create_testkit();
 
-    let info: String = api.inner.get_err(
-        ApiKind::Service("cryptocurrency"),
-        "v1/wallet/c0ffee",
-    );
+    let info: String = api.inner
+        .get_err(ApiKind::Service("cryptocurrency"), "v1/wallet/c0ffee");
     assert!(info.starts_with("Invalid request param"));
 }
 
@@ -228,11 +226,9 @@ impl CryptocurrencyApi {
         // Create a pre-signed transaction
         let tx = TxCreateWallet::new(&pubkey, name, &key);
 
-        let tx_info: serde_json::Value = self.inner.post(
-            ApiKind::Service("cryptocurrency"),
-            "v1/wallets",
-            &tx,
-        );
+        let tx_info: serde_json::Value =
+            self.inner
+                .post(ApiKind::Service("cryptocurrency"), "v1/wallets", &tx);
         assert_eq!(tx_info, json!({ "tx_hash": tx.hash() }));
         (tx, key)
     }
@@ -284,6 +280,8 @@ fn create_testkit() -> (TestKit, CryptocurrencyApi) {
     let testkit = TestKitBuilder::validator()
         .with_service(CurrencyService)
         .create();
-    let api = CryptocurrencyApi { inner: testkit.api() };
+    let api = CryptocurrencyApi {
+        inner: testkit.api(),
+    };
     (testkit, api)
 }

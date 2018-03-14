@@ -18,8 +18,8 @@ extern crate bodyparser;
 extern crate iron;
 extern crate router;
 
-use exonum::blockchain::{ApiContext, Blockchain, Service, Transaction, TransactionSet,
-                         ExecutionError, ExecutionResult};
+use exonum::blockchain::{ApiContext, Blockchain, ExecutionError, ExecutionResult, Service,
+                         Transaction, TransactionSet};
 use exonum::messages::{Message, RawTransaction};
 use exonum::node::{ApiSender, TransactionSend};
 use exonum::storage::{Entry, Fork, Snapshot};

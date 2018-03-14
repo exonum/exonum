@@ -17,11 +17,11 @@ use std::time::SystemTime;
 
 use bit_vec::BitVec;
 
-use crypto::{hash, gen_keypair};
-use blockchain::{self, BlockProof, Block};
-use messages::{RawMessage, Message, Connect, Propose, Prevote, Precommit, Status, BlockResponse,
-               BlockRequest};
-use helpers::{Height, Round, ValidatorId, user_agent};
+use crypto::{gen_keypair, hash};
+use blockchain::{self, Block, BlockProof};
+use messages::{BlockRequest, BlockResponse, Connect, Message, Precommit, Prevote, Propose,
+               RawMessage, Status};
+use helpers::{user_agent, Height, Round, ValidatorId};
 use super::{Field, Offset};
 
 static VALIDATOR: ValidatorId = ValidatorId(65_123);
@@ -378,7 +378,7 @@ fn test_block() {
             &hash(&[1, 2, 3]),
             &hash(&[3, 2, 1]),
             ts,
-            &secret_key
+            &secret_key,
         ),
         Precommit::new(
             ValidatorId(13),
@@ -387,7 +387,7 @@ fn test_block() {
             &hash(&[4, 2, 3]),
             &hash(&[3, 3, 1]),
             ts,
-            &secret_key
+            &secret_key,
         ),
         Precommit::new(
             ValidatorId(323),
@@ -396,7 +396,7 @@ fn test_block() {
             &hash(&[1, 1, 3]),
             &hash(&[5, 2, 1]),
             ts,
-            &secret_key
+            &secret_key,
         ),
     ];
     let transactions = vec![

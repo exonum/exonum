@@ -26,8 +26,8 @@ use std::iter::FromIterator;
 use futures::{self, Async, Future, Stream};
 use futures::Sink;
 use futures::sync::mpsc;
-use exonum::node::{Configuration, ExternalMessage, ListenerConfig, NodeHandler, NodeSender,
-                   ServiceConfig, State, SystemStateProvider, ApiSender};
+use exonum::node::{ApiSender, Configuration, ExternalMessage, ListenerConfig, NodeHandler,
+                   NodeSender, ServiceConfig, State, SystemStateProvider};
 use exonum::blockchain::{Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema,
                          Service, SharedNodeState, StoredConfiguration, TimeoutAdjusterConfig,
                          Transaction, ValidatorKeys};
@@ -36,9 +36,9 @@ use exonum::messages::{Any, Connect, Message, RawMessage, RawTransaction, Status
 use exonum::crypto::{gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed};
 #[cfg(test)]
 use exonum::crypto::gen_keypair;
-use exonum::helpers::{Height, Milliseconds, Round, ValidatorId, user_agent};
-use exonum::events::{Event, InternalEvent, EventHandler, NetworkEvent, NetworkRequest,
-                     TimeoutRequest, InternalRequest};
+use exonum::helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
+use exonum::events::{Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent,
+                     NetworkRequest, TimeoutRequest};
 use exonum::events::network::NetworkConfiguration;
 
 use timestamping::TimestampingService;
@@ -95,8 +95,7 @@ impl SandboxInner {
             while let Async::Ready(Some(network)) = self.network_requests_rx.poll()? {
                 match network {
                     NetworkRequest::SendMessage(peer, msg) => self.sent.push_back((peer, msg)),
-                    NetworkRequest::DisconnectWithPeer(_) |
-                    NetworkRequest::Shutdown => {}
+                    NetworkRequest::DisconnectWithPeer(_) | NetworkRequest::Shutdown => {}
                 }
             }
             Ok(())
@@ -109,14 +108,10 @@ impl SandboxInner {
             while let Async::Ready(Some(internal)) = self.internal_requests_rx.poll()? {
                 match internal {
                     InternalRequest::Timeout(t) => self.timers.push(t),
-                    InternalRequest::JumpToRound(height, round) => {
-                        self.handler.handle_event(
-                            InternalEvent::JumpToRound(height, round).into(),
-                        )
-                    }
+                    InternalRequest::JumpToRound(height, round) => self.handler
+                        .handle_event(InternalEvent::JumpToRound(height, round).into()),
                     InternalRequest::Shutdown => unimplemented!(),
                 }
-
             }
             Ok(())
         });
@@ -265,10 +260,9 @@ impl Sandbox {
     }
 
     pub fn blockchain_mut(&self) -> RefMut<Blockchain> {
-        RefMut::map(
-            self.inner.borrow_mut(),
-            |inner| &mut inner.handler.blockchain,
-        )
+        RefMut::map(self.inner.borrow_mut(), |inner| {
+            &mut inner.handler.blockchain
+        })
     }
 
     /// Returns connect message used during initialization.
@@ -297,17 +291,13 @@ impl Sandbox {
             if real_addr != addr || any_real_msg != any_expected_msg {
                 panic!(
                     "Expected to send the message {:?} to {} instead sending {:?} to {}",
-                    any_expected_msg,
-                    addr,
-                    any_real_msg,
-                    real_addr
+                    any_expected_msg, addr, any_real_msg, real_addr
                 )
             }
         } else {
             panic!(
                 "Expected to send the message {:?} to {} but nothing happened",
-                any_expected_msg,
-                addr
+                any_expected_msg, addr
             );
         }
     }
@@ -350,16 +340,13 @@ impl Sandbox {
                 if any_real_msg != any_expected_msg {
                     return Err(format!(
                         "Expected to broadcast the message {:?} instead sending {:?} to {}",
-                        any_expected_msg,
-                        any_real_msg,
-                        real_addr
+                        any_expected_msg, any_real_msg, real_addr
                     ));
                 }
                 if !expected_set.contains(&real_addr) {
                     panic!(
                         "Double send the same message {:?} to {:?} during broadcasting",
-                        any_expected_msg,
-                        real_addr
+                        any_expected_msg, real_addr
                     )
                 } else {
                     expected_set.remove(&real_addr);
@@ -368,8 +355,7 @@ impl Sandbox {
                 panic!(
                     "Expected to broadcast the message {:?} but someone don't receive \
                      messages: {:?}",
-                    any_expected_msg,
-                    expected_set
+                    any_expected_msg, expected_set
                 );
             }
         }
@@ -529,9 +515,10 @@ impl Sandbox {
 
     pub fn transactions_hashes(&self) -> Vec<Hash> {
         let node_state = self.node_state();
-        let read_lock = node_state.transactions().read().expect(
-            "Expected read lock",
-        );
+        let read_lock = node_state
+            .transactions()
+            .read()
+            .expect("Expected read lock");
         read_lock.keys().cloned().collect()
     }
 
@@ -611,11 +598,10 @@ impl Sandbox {
         let address = self.a(VALIDATOR_0);
         let inner = self.inner.borrow();
 
-        let blockchain = inner.handler.blockchain.clone_with_api_sender(
-            ApiSender::new(
-                api_channel.0.clone(),
-            ),
-        );
+        let blockchain = inner
+            .handler
+            .blockchain
+            .clone_with_api_sender(ApiSender::new(api_channel.0.clone()));
 
         let node_sender = NodeSender {
             network_requests: network_channel.0.clone().wait(),
@@ -743,12 +729,13 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandb
     };
     let genesis = GenesisConfig::new_with_consensus(
         consensus,
-        validators.iter().zip(service_keys.iter()).map(|x| {
-            ValidatorKeys {
+        validators
+            .iter()
+            .zip(service_keys.iter())
+            .map(|x| ValidatorKeys {
                 consensus_key: (x.0).0,
                 service_key: (x.1).0,
-            }
-        }),
+            }),
     );
     blockchain.initialize(genesis).unwrap();
 
@@ -828,7 +815,7 @@ pub fn timestamping_sandbox() -> Sandbox {
 
 #[cfg(test)]
 mod tests {
-    use exonum::blockchain::{ServiceContext, ExecutionResult, TransactionSet};
+    use exonum::blockchain::{ExecutionResult, ServiceContext, TransactionSet};
     use exonum::messages::RawTransaction;
     use exonum::encoding;
     use exonum::crypto::{gen_keypair_from_seed, Seed};

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crypto::{PublicKey, SecretKey, Signature, gen_keypair};
+use crypto::{gen_keypair, PublicKey, SecretKey, Signature};
 use messages::raw::MessageBuffer;
 use messages::{Message, RawMessage};
 use encoding::serialize::FromHex;

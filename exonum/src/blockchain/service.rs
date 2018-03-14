@@ -32,7 +32,6 @@ use blockchain::{Blockchain, ConsensusConfig, Schema, StoredConfiguration, Valid
 use helpers::{Height, Milliseconds, ValidatorId};
 use super::transaction::Transaction;
 
-
 /// A trait that describes business logic of a concrete service.
 ///
 /// See also [the documentation page on services][doc:services].
@@ -518,8 +517,7 @@ impl ::std::fmt::Debug for ApiContext {
         write!(
             f,
             "ApiContext(blockchain: {:?}, public_key: {:?})",
-            self.blockchain,
-            self.public_key
+            self.blockchain, self.public_key
         )
     }
 }

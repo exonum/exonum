@@ -14,7 +14,7 @@
 
 //! A definition of `StorageKey` trait and implementations for common types.
 
-use byteorder::{ByteOrder, BigEndian};
+use byteorder::{BigEndian, ByteOrder};
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -272,9 +272,8 @@ impl StorageKey for SystemTime {
     }
 
     fn write(&self, buffer: &mut [u8]) {
-        let duration = self.duration_since(UNIX_EPOCH).expect(
-            "time value is later than 1970-01-01 00:00:00 UTC.",
-        );
+        let duration = self.duration_since(UNIX_EPOCH)
+            .expect("time value is later than 1970-01-01 00:00:00 UTC.");
         let secs = duration.as_secs();
         let nanos = duration.subsec_nanos();
         secs.write(&mut buffer[0..8]);
@@ -479,20 +478,20 @@ mod tests {
 
     #[test]
     fn test_storage_key_for_system_time_ordering() {
-        use rand::{Rng, thread_rng};
+        use rand::{thread_rng, Rng};
         use std::time::Duration;
 
         let mut rng = thread_rng();
 
         let (mut buffer1, mut buffer2) = ([0u8; 12], [0u8; 12]);
         for _ in 0..FUZZ_SAMPLES {
-            let time1 = UNIX_EPOCH +
-                Duration::new(
+            let time1 = UNIX_EPOCH
+                + Duration::new(
                     rng.gen::<u64>() % (i32::max_value() as u64),
                     rng.gen::<u32>() % 1_000_000_000,
                 );
-            let time2 = UNIX_EPOCH +
-                Duration::new(
+            let time2 = UNIX_EPOCH
+                + Duration::new(
                     rng.gen::<u64>() % (i32::max_value() as u64),
                     rng.gen::<u32>() % 1_000_000_000,
                 );

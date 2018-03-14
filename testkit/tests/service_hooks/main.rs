@@ -18,7 +18,7 @@ extern crate exonum_testkit;
 extern crate serde;
 extern crate serde_json;
 
-use exonum::crypto::{Signature, CryptoHash};
+use exonum::crypto::{CryptoHash, Signature};
 use exonum::helpers::Height;
 use exonum_testkit::TestKitBuilder;
 

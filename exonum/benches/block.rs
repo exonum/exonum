@@ -28,8 +28,8 @@ mod tests {
     use tempdir::TempDir;
     use futures::sync::mpsc;
     use test::Bencher;
-    use exonum::storage::{Database, Fork, Patch, ProofMapIndex, RocksDB, DbOptions};
-    use exonum::blockchain::{Blockchain, Transaction, ExecutionResult};
+    use exonum::storage::{Database, DbOptions, Fork, Patch, ProofMapIndex, RocksDB};
+    use exonum::blockchain::{Blockchain, ExecutionResult, Transaction};
     use exonum::crypto::{gen_keypair, CryptoHash, Hash, PublicKey, SecretKey};
     use exonum::messages::Message;
     use exonum::helpers::{Height, ValidatorId};

@@ -612,42 +612,10 @@ impl CryptoHash for i64 {
     }
 }
 
-const EMPTY_SLICE_HASH: Hash = Hash(DigestSodium(
-    [
-        227,
-        176,
-        196,
-        66,
-        152,
-        252,
-        28,
-        20,
-        154,
-        251,
-        244,
-        200,
-        153,
-        111,
-        185,
-        36,
-        39,
-        174,
-        65,
-        228,
-        100,
-        155,
-        147,
-        76,
-        164,
-        149,
-        153,
-        27,
-        120,
-        82,
-        184,
-        85,
-    ],
-));
+const EMPTY_SLICE_HASH: Hash = Hash(DigestSodium([
+    227, 176, 196, 66, 152, 252, 28, 20, 154, 251, 244, 200, 153, 111, 185, 36, 39, 174, 65, 228,
+    100, 155, 147, 76, 164, 149, 153, 27, 120, 82, 184, 85,
+]));
 
 impl CryptoHash for () {
     fn hash(&self) -> Hash {
@@ -681,9 +649,8 @@ impl CryptoHash for String {
 
 impl CryptoHash for SystemTime {
     fn hash(&self) -> Hash {
-        let duration = self.duration_since(UNIX_EPOCH).expect(
-            "time value is later than 1970-01-01 00:00:00 UTC.",
-        );
+        let duration = self.duration_since(UNIX_EPOCH)
+            .expect("time value is later than 1970-01-01 00:00:00 UTC.");
         let secs = duration.as_secs();
         let nanos = duration.subsec_nanos();
 

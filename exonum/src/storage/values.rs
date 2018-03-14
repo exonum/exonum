@@ -21,7 +21,7 @@ use std::borrow::Cow;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crypto::{CryptoHash, Hash, PublicKey};
-use messages::{RawMessage, MessageBuffer};
+use messages::{MessageBuffer, RawMessage};
 use helpers::Round;
 
 /// A type that can be (de)serialized as a value in the blockchain storage.
@@ -264,9 +264,8 @@ impl StorageValue for String {
 /// Uses little-endian encoding.
 impl StorageValue for SystemTime {
     fn into_bytes(self) -> Vec<u8> {
-        let duration = self.duration_since(UNIX_EPOCH).expect(
-            "time value is later than 1970-01-01 00:00:00 UTC.",
-        );
+        let duration = self.duration_since(UNIX_EPOCH)
+            .expect("time value is later than 1970-01-01 00:00:00 UTC.");
         let secs = duration.as_secs();
         let nanos = duration.subsec_nanos();
 
@@ -427,7 +426,12 @@ mod tests {
 
     #[test]
     fn round_round_trip() {
-        let values = [Round::zero(), Round::first(), Round(100), Round(u32::max_value())];
+        let values = [
+            Round::zero(),
+            Round::first(),
+            Round(100),
+            Round(u32::max_value()),
+        ];
         for value in values.iter() {
             let bytes = value.clone().into_bytes();
             assert_eq!(*value, Round::from_bytes(Cow::Borrowed(&bytes)));

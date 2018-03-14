@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use rand::{Rng, XorShiftRng, SeedableRng};
+use rand::{Rng, SeedableRng, XorShiftRng};
 
 use exonum::messages::{Message, RawTransaction};
 use exonum::encoding::Error as MessageError;
-use exonum::crypto::{PublicKey, SecretKey, Hash, gen_keypair};
+use exonum::crypto::{gen_keypair, Hash, PublicKey, SecretKey};
 use exonum::storage::{Fork, Snapshot};
-use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
+use exonum::blockchain::{ExecutionResult, Service, Transaction, TransactionSet};
 
 pub const TIMESTAMPING_SERVICE: u16 = 129;
 pub const TIMESTAMPING_TRANSACTION_MESSAGE_ID: u16 = 128;
@@ -43,7 +43,6 @@ impl Transaction for TimestampTx {
         Ok(())
     }
 }
-
 
 #[derive(Default)]
 pub struct TimestampingService {}

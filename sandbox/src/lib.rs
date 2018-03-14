@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate rand;
-#[macro_use]
-extern crate log;
-extern crate futures;
+extern crate bit_vec;
 #[macro_use]
 extern crate exonum;
-extern crate bit_vec;
+extern crate futures;
+#[macro_use]
+extern crate log;
+extern crate rand;
 
-pub use self::sandbox::{timestamping_sandbox, sandbox_with_services};
+pub use self::sandbox::{sandbox_with_services, timestamping_sandbox};
 
 pub mod timestamping;
 pub mod sandbox;

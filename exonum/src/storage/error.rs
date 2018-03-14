@@ -32,6 +32,8 @@ impl Error {
     /// let error = Error::new("Oh no!");
     /// ```
     pub fn new<T: Into<String>>(message: T) -> Error {
-        Error { message: message.into() }
+        Error {
+            message: message.into(),
+        }
     }
 }

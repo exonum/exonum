@@ -13,10 +13,10 @@
 // limitations under the License.
 
 // This is a regression test for exonum configuration.
+extern crate exonum;
 #[macro_use]
 extern crate pretty_assertions;
 extern crate toml;
-extern crate exonum;
 
 use std::ffi::OsString;
 use std::fs::{File, OpenOptions};
@@ -32,11 +32,19 @@ const CONFIG_TESTDATA_FOLDER: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests
 
 const GENERATED_TEMPLATE: &str = "template.toml";
 
-const SEC_CONFIG: [&str; 4] =
-    ["config0_sec.toml", "config1_sec.toml", "config2_sec.toml", "config3_sec.toml"];
+const SEC_CONFIG: [&str; 4] = [
+    "config0_sec.toml",
+    "config1_sec.toml",
+    "config2_sec.toml",
+    "config3_sec.toml",
+];
 
-const PUB_CONFIG: [&str; 4] =
-    ["config0_pub.toml", "config1_pub.toml", "config2_pub.toml", "config3_pub.toml"];
+const PUB_CONFIG: [&str; 4] = [
+    "config0_pub.toml",
+    "config1_pub.toml",
+    "config2_pub.toml",
+    "config3_pub.toml",
+];
 
 fn full_tmp_folder(folder: &str) -> String {
     format!("{}exonum-test-{}/", CONFIG_TMP_FOLDER, folder)
@@ -92,7 +100,6 @@ fn generate_template(folder: &str) {
         "generate-template",
         &full_tmp_name(GENERATED_TEMPLATE, folder),
     ]));
-
 }
 
 fn generate_config(folder: &str, i: usize) {
@@ -109,7 +116,6 @@ fn generate_config(folder: &str, i: usize) {
 
 #[cfg_attr(feature = "cargo-clippy", allow(needless_range_loop))]
 fn finalize_config(folder: &str, config: &str, i: usize, count: usize) {
-
     let mut variables = vec![
         "exonum-config-test".to_owned(),
         "finalize".to_owned(),
@@ -165,8 +171,10 @@ fn test_generate_template() {
 fn test_generate_config() {
     let command = "generate-config";
 
-    let result = panic::catch_unwind(|| for i in 0..PUB_CONFIG.len() {
-        generate_config(command, i);
+    let result = panic::catch_unwind(|| {
+        for i in 0..PUB_CONFIG.len() {
+            generate_config(command, i);
+        }
     });
 
     fs::remove_dir_all(full_tmp_folder(command)).unwrap();
@@ -199,7 +207,6 @@ fn test_generate_full_config_run() {
                     assert!(result.is_ok());
                 }
             }
-
         }
     });
 

@@ -94,16 +94,16 @@ impl TestNetwork {
 
     /// Returns service public key of the validator with given id.
     pub fn service_public_key_of(&self, id: ValidatorId) -> Option<&crypto::PublicKey> {
-        self.validators().get(id.0 as usize).map(|x| {
-            &x.service_public_key
-        })
+        self.validators()
+            .get(id.0 as usize)
+            .map(|x| &x.service_public_key)
     }
 
     /// Returns consensus public key of the validator with given id.
     pub fn consensus_public_key_of(&self, id: ValidatorId) -> Option<&crypto::PublicKey> {
-        self.validators().get(id.0 as usize).map(|x| {
-            &x.consensus_public_key
-        })
+        self.validators()
+            .get(id.0 as usize)
+            .map(|x| &x.consensus_public_key)
     }
 }
 
@@ -169,9 +169,8 @@ impl TestNode {
         tx_hashes: &[crypto::Hash],
     ) -> Propose {
         Propose::new(
-            self.validator_id.expect(
-                "An attempt to create propose from a non-validator node.",
-            ),
+            self.validator_id
+                .expect("An attempt to create propose from a non-validator node."),
             height,
             Round::first(),
             last_hash,
@@ -185,9 +184,8 @@ impl TestNode {
         use std::time::SystemTime;
 
         Precommit::new(
-            self.validator_id.expect(
-                "An attempt to create propose from a non-validator node.",
-            ),
+            self.validator_id
+                .expect("An attempt to create propose from a non-validator node."),
             propose.height(),
             propose.round(),
             &propose.hash(),
@@ -318,9 +316,10 @@ impl TestNetworkConfiguration {
     where
         for<'de> D: Deserialize<'de>,
     {
-        let value = self.stored_configuration.services.get(id).expect(
-            "Unable to find configuration for service",
-        );
+        let value = self.stored_configuration
+            .services
+            .get(id)
+            .expect("Unable to find configuration for service");
         serde_json::from_value(value.clone()).unwrap()
     }
 
@@ -341,9 +340,7 @@ impl TestNetworkConfiguration {
     fn update_our_role(&mut self) {
         let validator_id = self.validators
             .iter()
-            .position(|x| {
-                x.public_keys().service_key == self.us.service_public_key
-            })
+            .position(|x| x.public_keys().service_key == self.us.service_public_key)
             .map(|x| ValidatorId(x as u16));
         self.us.validator_id = validator_id;
     }

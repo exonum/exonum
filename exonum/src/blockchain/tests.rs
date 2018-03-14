@@ -19,9 +19,9 @@ use std::collections::BTreeMap;
 use rand::{thread_rng, Rng};
 use serde_json;
 
-use blockchain::{Blockchain, Schema, Transaction, ExecutionResult};
+use blockchain::{Blockchain, ExecutionResult, Schema, Transaction};
 use crypto::{gen_keypair, CryptoHash, Hash};
-use storage::{Database, Fork, Error, ListIndex};
+use storage::{Database, Error, Fork, ListIndex};
 use messages::Message;
 use helpers::{Height, ValidatorId};
 
@@ -69,7 +69,6 @@ fn test_system_time() {
     }
     let test_data = r##"{"some_test":{"nanos":0,"secs":"0"}}"##;
 
-
     let test = Test::new(UNIX_EPOCH);
     let data = ::serde_json::to_string(&test).unwrap();
     assert_eq!(data, test_data);
@@ -86,8 +85,9 @@ encoding_struct! {
 
 #[test]
 fn test_correct_encoding_struct() {
-    let dat: Vec<u8> =
-        vec![8u8, 0, 0, 0, 18, 0, 0, 0, 16, 0, 0, 0, 1, 0, 0, 0, 17, 0, 0, 0, 1, 0, 0, 0, 1, 2];
+    let dat: Vec<u8> = vec![
+        8u8, 0, 0, 0, 18, 0, 0, 0, 16, 0, 0, 0, 1, 0, 0, 0, 17, 0, 0, 0, 1, 0, 0, 0, 1, 2
+    ];
     let test = vec![16u8, 0, 0, 0, 1, 0, 0, 0, 17, 0, 0, 0, 1, 0, 0, 0, 1, 2];
     let mut buffer = vec![0; 8];
     test.write(&mut buffer, 0, 8);
@@ -106,7 +106,6 @@ fn test_overlap_segments() {
     test.write(&mut buffer, 0, 8);
     <StructWithTwoSegments as Field>::check(&buffer, 0.into(), 8.into(), 8.into()).unwrap();
 }
-
 
 #[test]
 #[should_panic(expected = "SpaceBetweenSegments")]
@@ -274,7 +273,7 @@ fn handling_tx_panic_storage_error(blockchain: &Blockchain) {
 }
 
 mod transactions_tests {
-    use blockchain::{Transaction, TransactionSet, ExecutionResult};
+    use blockchain::{ExecutionResult, Transaction, TransactionSet};
     use storage::Fork;
     use crypto::gen_keypair;
     use serde::Serialize;
@@ -417,7 +416,7 @@ mod rocksdb_tests {
     use futures::sync::mpsc;
     use std::path::Path;
     use tempdir::TempDir;
-    use storage::{Database, RocksDB, DbOptions};
+    use storage::{Database, DbOptions, RocksDB};
     use blockchain::Blockchain;
     use crypto::gen_keypair;
     use node::ApiSender;

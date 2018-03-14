@@ -14,8 +14,8 @@
 
 use bodyparser;
 use exonum::api::{Api, ApiError};
-use exonum::crypto::{CryptoHash, PublicKey, SecretKey, Hash};
-use exonum::blockchain::{ApiContext, Blockchain, StoredConfiguration, Schema as CoreSchema};
+use exonum::crypto::{CryptoHash, Hash, PublicKey, SecretKey};
+use exonum::blockchain::{ApiContext, Blockchain, Schema as CoreSchema, StoredConfiguration};
 use exonum::encoding::serialize::json::reexport as serde_json;
 use exonum::helpers::Height;
 use exonum::node::{ApiSender, TransactionSend};
@@ -23,7 +23,7 @@ use exonum::storage::StorageValue;
 use iron::prelude::*;
 use router::Router;
 
-use super::{ProposeData, Propose, Vote, Schema};
+use super::{Propose, ProposeData, Schema, Vote};
 
 pub type VotesInfo = Option<Vec<Option<Vote>>>;
 
@@ -96,7 +96,9 @@ impl Filter {
 
 impl PublicApi {
     pub fn new(context: &ApiContext) -> Self {
-        PublicApi { blockchain: context.blockchain().clone() }
+        PublicApi {
+            blockchain: context.blockchain().clone(),
+        }
     }
 
     fn config_with_proofs(&self, config: StoredConfiguration) -> ConfigHashInfo {
@@ -143,9 +145,7 @@ impl PublicApi {
                 );
                 filter.matches(&cfg)
             })
-            .map(|(hash, propose_data)| {
-                ProposeHashInfo { hash, propose_data }
-            })
+            .map(|(hash, propose_data)| ProposeHashInfo { hash, propose_data })
             .collect();
         proposes
     }
@@ -202,9 +202,9 @@ impl PublicApi {
 
             let snapshot = self.blockchain.snapshot();
             let committed_config = CoreSchema::new(&snapshot).configs().get(&hash);
-            let propose = Schema::new(&snapshot).propose_data_by_config_hash().get(
-                &hash,
-            );
+            let propose = Schema::new(&snapshot)
+                .propose_data_by_config_hash()
+                .get(&hash);
 
             self.ok_response(&serde_json::to_value(ConfigInfo {
                 committed_config,

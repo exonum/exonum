@@ -91,9 +91,8 @@ impl CollectedCommand {
             // TODO: check duplicates, in services context keys (ECR-164)
             let mut new_context = context.clone();
             for ext in &self.exts {
-                new_context = ext.execute(new_context).expect(
-                    "Could not execute extension.",
-                );
+                new_context = ext.execute(new_context)
+                    .expect("Could not execute extension.");
             }
             new_context
         })

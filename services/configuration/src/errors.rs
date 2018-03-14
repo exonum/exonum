@@ -70,8 +70,7 @@ pub(crate) enum Error {
     #[fail(display = "Next configuration is already scheduled: {:?}", _0)]
     AlreadyScheduled(StoredConfiguration),
 
-    #[fail(display = "Not authored by a validator")]
-    UnknownSender,
+    #[fail(display = "Not authored by a validator")] UnknownSender,
 
     #[fail(display = "Does not reference actual config {:?}", _0)]
     InvalidConfigRef(StoredConfiguration),
@@ -79,14 +78,9 @@ pub(crate) enum Error {
     #[fail(display = "Current height {:?} greater or equal than `actual_from`", _0)]
     ActivationInPast(Height),
 
-    #[fail(display = "Already proposed; old proposal: {:?}", _0)]
-    AlreadyProposed(Propose),
+    #[fail(display = "Already proposed; old proposal: {:?}", _0)] AlreadyProposed(Propose),
 
-    #[fail(display = "Cannot parse configuration: {}", _0)]
-    InvalidConfig(
-        #[cause]
-        JsonError
-    ),
+    #[fail(display = "Cannot parse configuration: {}", _0)] InvalidConfig(#[cause] JsonError),
 
     #[fail(display = "Invalid majority count: {}, it should be >= {} and <= {}", proposed, min,
            max)]
@@ -96,11 +90,9 @@ pub(crate) enum Error {
         proposed: usize,
     },
 
-    #[fail(display = "Does not reference known config with hash {:?}", _0)]
-    UnknownConfigRef(Hash),
+    #[fail(display = "Does not reference known config with hash {:?}", _0)] UnknownConfigRef(Hash),
 
-    #[fail(display = "Validator already voted for a referenced proposal")]
-    AlreadyVoted,
+    #[fail(display = "Validator already voted for a referenced proposal")] AlreadyVoted,
 }
 
 impl Error {
