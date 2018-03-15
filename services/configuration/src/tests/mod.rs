@@ -45,8 +45,6 @@ pub fn new_tx_config_vote(node: &TestNode, cfg_proposal_hash: Hash) -> Vote {
 pub trait ConfigurationTestKit {
     fn configuration_default() -> Self;
 
-    fn configuration_default_with_logger() -> Self;
-
     fn apply_configuration(&mut self, proposer: ValidatorId, cfg_proposal: StoredConfiguration);
 
     fn votes_for_propose(&self, config_hash: Hash) -> Vec<Option<Vote>>;
@@ -59,14 +57,6 @@ impl ConfigurationTestKit for TestKit {
         TestKitBuilder::validator()
             .with_validators(4)
             .with_service(ConfigurationService {})
-            .create()
-    }
-
-    fn configuration_default_with_logger() -> Self {
-        TestKitBuilder::validator()
-            .with_validators(4)
-            .with_service(ConfigurationService {})
-            .with_logger()
             .create()
     }
 

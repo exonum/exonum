@@ -440,29 +440,6 @@ fn test_post_propose_tx() {
 }
 
 #[test]
-fn test_timeout_recommendation_warning() {
-    use exonum::blockchain::{ConsensusConfig, TimeoutAdjusterConfig};
-
-    let testkit = TestKit::configuration_default_with_logger();
-    let api = testkit.api();
-    // Config that should trigger recommendation warning.
-    let cfg = {
-        let mut cfg = testkit.configuration_change_proposal();
-        cfg.set_actual_from(Height(10));
-        cfg.set_service_config("message", "Config with unrecommended timeouts");
-        cfg.set_consensus_configuration({
-            let mut default = ConsensusConfig::default();
-            default.timeout_adjuster = TimeoutAdjusterConfig::Constant { timeout: 2000 };
-            default.round_timeout = 3000;
-            default
-        });
-        cfg.stored_configuration().clone()
-    };
-    api.post_config_propose(&cfg);
-    assert!(true);
-}
-
-#[test]
 fn test_post_vote_tx() {
     let mut testkit: TestKit = TestKit::configuration_default();
     let api = testkit.api();
