@@ -14,7 +14,8 @@
 
 //! A special service which generates transactions on `handle_commit` events.
 
-use exonum::blockchain::{ServiceContext, Transaction, TransactionSet, ExecutionResult};
+use exonum::blockchain::{Service, ServiceContext, Transaction, TransactionSet, ExecutionResult};
+use exonum::messages::RawTransaction;
 use exonum::storage::{Fork, Snapshot};
 use exonum::crypto::{Hash, Signature};
 use exonum::encoding;
