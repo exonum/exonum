@@ -96,8 +96,8 @@ pub struct ProofMapIndexValues<'a, V> {
 enum RemoveResult {
     KeyNotFound,
     Leaf,
-    Branch((ProofPath, Hash)),
-    UpdateHash(Hash),
+    Branch((ProofPath, EntryHash)),
+    UpdateHash(EntryHash),
 }
 
 impl<T, K, V> ProofMapIndex<T, K, V>
@@ -624,10 +624,10 @@ where
                                 branch.set_child(
                                     proof_path.bit(i),
                                     &proof_path.suffix(i).prefix(j),
-                                    &h.hash(),
+                                    &h,
                                 );
                             }
-                            None => branch.set_child_hash(proof_path.bit(i), &h.hash()),
+                            None => branch.set_child_hash(proof_path.bit(i), &h),
                         };
                         let hash = branch.hash();
                         self.base.put(&child_path, branch);
@@ -641,12 +641,12 @@ where
             let mut new_branch = BranchNode::empty();
             // Add a new leaf
             let hash = self.insert_leaf(&suffix_path, value);
-            new_branch.set_child(suffix_path.bit(0), &suffix_path, &hash.hash());
+            new_branch.set_child(suffix_path.bit(0), &suffix_path, &hash);
             // Move current branch
             new_branch.set_child(
                 child_path.bit(i),
                 &child_path.suffix(i),
-                &parent.child_hash(proof_path.bit(0)).hash(),
+                parent.child_hash(proof_path.bit(0)),
             );
 
             let hash = new_branch.hash();
@@ -682,11 +682,11 @@ where
                 let leaf_hash = self.insert_leaf(&proof_path, value);
                 if i < proof_path.len() {
                     let mut branch = BranchNode::empty();
-                    branch.set_child(proof_path.bit(i), &proof_path.suffix(i), &leaf_hash.hash());
+                    branch.set_child(proof_path.bit(i), &proof_path.suffix(i), &leaf_hash);
                     branch.set_child(
                         prefix_path.bit(i),
                         &prefix_path.suffix(i),
-                        &prefix_data.hash(),
+                        &EntryHash(prefix_data.hash()),
                     );
                     let new_prefix = proof_path.prefix(i);
                     self.base.put(&new_prefix, branch);
@@ -701,10 +701,8 @@ where
                     // Just cut the prefix and recursively descent on.
                     let (j, h) = self.insert_branch(&branch, &suffix_path, value);
                     match j {
-                        Some(j) => {
-                            branch.set_child(suffix_path.bit(0), &suffix_path.prefix(j), &h.hash())
-                        }
-                        None => branch.set_child_hash(suffix_path.bit(0), &h.hash()),
+                        Some(j) => branch.set_child(suffix_path.bit(0), &suffix_path.prefix(j), &h),
+                        None => branch.set_child_hash(suffix_path.bit(0), &h),
                     };
                     self.base.put(&prefix_path, branch);
                 } else {
@@ -714,9 +712,9 @@ where
                     new_branch.set_child(
                         prefix_path.bit(i),
                         &prefix_path.suffix(i),
-                        &branch.hash(),
+                        &EntryHash(branch.hash()),
                     );
-                    new_branch.set_child(proof_path.bit(i), &proof_path.suffix(i), &hash.hash());
+                    new_branch.set_child(proof_path.bit(i), &proof_path.suffix(i), &hash);
                     // Saves a new branch
                     let new_prefix = prefix_path.prefix(i);
                     self.base.put(&new_prefix, new_branch);
@@ -750,7 +748,7 @@ where
 
                             self.base.remove(&child_path);
 
-                            return RemoveResult::Branch((key, hash.hash()));
+                            return RemoveResult::Branch((key, *hash));
                         }
                         RemoveResult::Branch((key, hash)) => {
                             let new_child_path = key.start_from(suffix_path.start());
@@ -758,13 +756,13 @@ where
                             branch.set_child(suffix_path.bit(0), &new_child_path, &hash);
                             let h = branch.hash();
                             self.base.put(&child_path, branch);
-                            return RemoveResult::UpdateHash(h);
+                            return RemoveResult::UpdateHash(EntryHash(h));
                         }
                         RemoveResult::UpdateHash(hash) => {
                             branch.set_child_hash(suffix_path.bit(0), &hash);
                             let h = branch.hash();
                             self.base.put(&child_path, branch);
-                            return RemoveResult::UpdateHash(h);
+                            return RemoveResult::UpdateHash(EntryHash(h));
                         }
                         RemoveResult::KeyNotFound => return RemoveResult::KeyNotFound,
                     }

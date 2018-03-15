@@ -65,15 +65,15 @@ impl BranchNode {
         prefix.write(&mut self.raw[from..from + PROOF_PATH_SIZE]);
     }
 
-    pub fn set_child_hash(&mut self, kind: ChildKind, hash: &Hash) {
+    pub fn set_child_hash(&mut self, kind: ChildKind, hash: &EntryHash) {
         let from = match kind {
             ChildKind::Right => HASH_SIZE,
             ChildKind::Left => 0,
         };
-        self.raw[from..from + HASH_SIZE].copy_from_slice(hash.as_ref());
+        self.raw[from..from + HASH_SIZE].copy_from_slice(hash.hash().as_ref());
     }
 
-    pub fn set_child(&mut self, kind: ChildKind, prefix: &ProofPath, hash: &Hash) {
+    pub fn set_child(&mut self, kind: ChildKind, prefix: &ProofPath, hash: &EntryHash) {
         self.set_child_path(kind, prefix);
         self.set_child_hash(kind, hash);
     }
@@ -111,16 +111,16 @@ impl ::std::fmt::Debug for BranchNode {
 fn test_branch_node() {
     let mut branch = BranchNode::empty();
 
-    let lh = hash(&[1, 2]);
-    let rh = hash(&[3, 4]);
+    let lh = EntryHash(hash(&[1, 2]));
+    let rh = EntryHash(hash(&[3, 4]));
     let ls = ProofPath::new(&[253; 32]);
     let rs = ProofPath::new(&[244; 32]);
 
     branch.set_child(ChildKind::Left, &ls, &lh);
     branch.set_child(ChildKind::Right, &rs, &rh);
 
-    assert_eq!(branch.child_hash(ChildKind::Left), &EntryHash(lh));
-    assert_eq!(branch.child_hash(ChildKind::Right), &EntryHash(rh));
+    assert_eq!(branch.child_hash(ChildKind::Left), &lh);
+    assert_eq!(branch.child_hash(ChildKind::Right), &rh);
     assert_eq!(branch.child_path(ChildKind::Left), ls);
     assert_eq!(branch.child_path(ChildKind::Right), rs);
 }
