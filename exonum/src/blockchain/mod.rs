@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -52,7 +52,7 @@ use helpers::{Height, Round, ValidatorId};
 use node::ApiSender;
 
 pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
-pub use self::schema::{gen_prefix, Schema, TxLocation};
+pub use self::schema::{Schema, TxLocation};
 pub use self::genesis::GenesisConfig;
 pub use self::config::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
 pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState};

@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ use std::cell::Cell;
 use std::marker::PhantomData;
 
 use crypto::{hash, HashStream, EntryHash, CryptoHash};
-use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
+use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue, StorageKey};
 use super::indexes_metadata::IndexType;
 use self::key::ProofListKey;
 
@@ -96,9 +96,9 @@ where
     /// # drop(index);
     /// # drop(mut_index);
     /// ```
-    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         ProofListIndex {
-            base: BaseIndex::new(name, IndexType::ProofList, view),
+            base: BaseIndex::new(index_name, IndexType::ProofList, view),
             length: Cell::new(None),
             _v: PhantomData,
         }
@@ -121,21 +121,25 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";
-    /// let prefix = vec![01];
+    /// let index_id = vec![01];
     ///
     /// let snapshot = db.snapshot();
     /// let index: ProofListIndex<_, u8> =
-    ///                             ProofListIndex::with_prefix(name, prefix.clone(), &snapshot);
+    ///                             ProofListIndex::new_in_family(name, &index_id, &snapshot);
     ///
     /// let mut fork = db.fork();
     /// let mut mut_index : ProofListIndex<_, u8> =
-    ///                                     ProofListIndex::with_prefix(name, prefix, &mut fork);
+    ///                                 ProofListIndex::new_in_family(name, &index_id, &mut fork);
     /// # drop(index);
     /// # drop(mut_index);
     /// ```
-    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
+    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
+        family_name: S,
+        index_id: &I,
+        view: T,
+    ) -> Self {
         ProofListIndex {
-            base: BaseIndex::with_prefix(name, prefix, IndexType::ProofList, view),
+            base: BaseIndex::new_in_family(family_name, index_id, IndexType::ProofList, view),
             length: Cell::new(None),
             _v: PhantomData,
         }

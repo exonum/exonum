@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ use std::marker::PhantomData;
 use std::fmt;
 
 use crypto::{Hash, CryptoHash, HashStream, EntryHash};
-use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageValue};
+use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageValue, StorageKey};
 use super::indexes_metadata::IndexType;
 use self::key::{BitsRange, ChildKind, LEAF_KEY_PREFIX};
 use self::node::{BranchNode, Node};
@@ -131,9 +131,9 @@ where
     /// # drop(index);
     /// # drop(mut_index);
     /// ```
-    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         ProofMapIndex {
-            base: BaseIndex::new(name, IndexType::ProofMap, view),
+            base: BaseIndex::new(index_name, IndexType::ProofMap, view),
             _k: PhantomData,
             _v: PhantomData,
         }
@@ -157,21 +157,25 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";
-    /// let prefix = vec![01];
+    /// let index_id = vec![01];
     ///
     /// let snapshot = db.snapshot();
     /// let index: ProofMapIndex<_, Hash, u8> =
-    ///                             ProofMapIndex::with_prefix(name, prefix.clone(), &snapshot);
+    ///                             ProofMapIndex::new_in_family(name, &index_id, &snapshot);
     ///
     /// let mut fork = db.fork();
     /// let mut mut_index : ProofMapIndex<_, Hash, u8> =
-    ///                                     ProofMapIndex::with_prefix(name, prefix, &mut fork);
+    ///                                ProofMapIndex::new_in_family(name, &index_id, &mut fork);
     /// # drop(index);
     /// # drop(mut_index);
     /// ```
-    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
+    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
+        family_name: S,
+        index_id: &I,
+        view: T,
+    ) -> Self {
         ProofMapIndex {
-            base: BaseIndex::with_prefix(name, prefix, IndexType::ProofMap, view),
+            base: BaseIndex::new_in_family(family_name, index_id, IndexType::ProofMap, view),
             _k: PhantomData,
             _v: PhantomData,
         }
