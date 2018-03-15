@@ -97,7 +97,7 @@
 
         this.isSpinnerVisible = true
 
-        this.$blockchain.createWallet(this.name).then(function(keyPair) {
+        this.$blockchain.createWallet(this.name).then(keyPair => {
           self.name = ''
           self.keyPair = keyPair
           self.isSpinnerVisible = false

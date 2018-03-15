@@ -64,8 +64,8 @@
                     <strong v-numeral="transaction.body.amount"/> received from <code>{{ transaction.body.from }}</code>
                   </div>
                   <div class="col-sm-3">
-                    <span v-if="transaction.status" class="badge badge-success">executed</span>
-                    <span v-else class="badge badge-danger">failed</span>
+                    <span v-if="transaction.status" class="badge badge-success">accepted</span>
+                    <span v-else class="badge badge-danger">rejected</span>
                   </div>
                 </div>
               </li>
@@ -101,6 +101,8 @@
         </div>
       </div>
     </modal>
+
+    <spinner :visible="isSpinnerVisible"/>
   </div>
 </template>
 
@@ -147,10 +149,13 @@
         this.$storage.get().then(function(keyPair) {
           self.isSpinnerVisible = true
 
-          self.$blockchain.addFunds(keyPair, self.amountToAdd).then(function() {
+          self.$blockchain.addFunds(keyPair, self.amountToAdd).then(data => {
             self.isSpinnerVisible = false
             self.isAddFundsModalVisible = false
-            self.$notify('success', 'Add funds transaction has been sent')
+            self.balance = data.wallet.balance
+            self.height = data.block.height
+            self.transactions = data.transactions
+            self.$notify('success', 'Add funds transaction has been written into the blockchain')
           }).catch(function(error) {
             self.isSpinnerVisible = false
             self.$notify('error', error.toString())
@@ -184,10 +189,13 @@
 
           self.isSpinnerVisible = true
 
-          self.$blockchain.transfer(keyPair, self.receiver, self.amountToTransfer).then(function() {
+          self.$blockchain.transfer(keyPair, self.receiver, self.amountToTransfer).then(data => {
             self.isSpinnerVisible = false
             self.isTransferModalVisible = false
-            self.$notify('success', 'Transfer transaction has been sent')
+            self.balance = data.wallet.balance
+            self.height = data.block.height
+            self.transactions = data.transactions
+            self.$notify('success', 'Transfer transaction has been written into the blockchain')
           }).catch(function(error) {
             self.isSpinnerVisible = false
             self.$notify('error', error.toString())
@@ -211,7 +219,7 @@
         this.$storage.get().then(function(keyPair) {
           self.isSpinnerVisible = true
 
-          self.$blockchain.getWallet(keyPair).then(function(data) {
+          self.$blockchain.getWallet(keyPair).then(data => {
             self.isSpinnerVisible = false
             self.name = data.wallet.name
             self.publicKey = keyPair.publicKey
