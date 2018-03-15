@@ -14,7 +14,7 @@
 
 use bodyparser;
 use exonum::api::{Api, ApiError};
-use exonum::crypto::{CryptoHash, PublicKey, SecretKey, Hash};
+use exonum::crypto::{CryptoHash, PublicKey, SecretKey, Hash, EntryHash};
 use exonum::blockchain::{ApiContext, Blockchain, StoredConfiguration, Schema as CoreSchema};
 use exonum::encoding::serialize::json::reexport as serde_json;
 use exonum::helpers::Height;
@@ -160,7 +160,7 @@ impl PublicApi {
             .iter()
             .map(|config_ref| {
                 let config_hash = config_ref.cfg_hash();
-                configs.get(config_hash).expect(&format!(
+                configs.get(&EntryHash(*config_hash)).expect(&format!(
                     "Config with hash {:?} is absent in configs table",
                     config_hash
                 ))
@@ -201,7 +201,7 @@ impl PublicApi {
             let hash: Hash = self.url_fragment(req, "hash")?;
 
             let snapshot = self.blockchain.snapshot();
-            let committed_config = CoreSchema::new(&snapshot).configs().get(&hash);
+            let committed_config = CoreSchema::new(&snapshot).configs().get(&EntryHash(hash));
             let propose = Schema::new(&snapshot).propose_data_by_config_hash().get(
                 &hash,
             );

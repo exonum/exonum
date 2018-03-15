@@ -14,7 +14,7 @@
 
 use std::borrow::Cow;
 
-use crypto::{hash, CryptoHash, Hash, HASH_SIZE};
+use crypto::{hash, CryptoHash, Hash, HASH_SIZE, EntryHash};
 
 use super::super::{StorageKey, StorageValue};
 use super::key::{ChildKind, ProofPath, PROOF_PATH_SIZE};
@@ -39,7 +39,7 @@ impl BranchNode {
         BranchNode { raw: vec![0; BRANCH_NODE_SIZE] }
     }
 
-    pub fn child_hash(&self, kind: ChildKind) -> &Hash {
+    pub fn child_hash(&self, kind: ChildKind) -> &EntryHash {
         unsafe {
             let from = match kind {
                 ChildKind::Right => HASH_SIZE,
@@ -65,15 +65,15 @@ impl BranchNode {
         prefix.write(&mut self.raw[from..from + PROOF_PATH_SIZE]);
     }
 
-    pub fn set_child_hash(&mut self, kind: ChildKind, hash: &Hash) {
+    pub fn set_child_hash(&mut self, kind: ChildKind, hash: &EntryHash) {
         let from = match kind {
             ChildKind::Right => HASH_SIZE,
             ChildKind::Left => 0,
         };
-        self.raw[from..from + HASH_SIZE].copy_from_slice(hash.as_ref());
+        self.raw[from..from + HASH_SIZE].copy_from_slice(hash.hash().as_ref());
     }
 
-    pub fn set_child(&mut self, kind: ChildKind, prefix: &ProofPath, hash: &Hash) {
+    pub fn set_child(&mut self, kind: ChildKind, prefix: &ProofPath, hash: &EntryHash) {
         self.set_child_path(kind, prefix);
         self.set_child_hash(kind, hash);
     }
@@ -111,8 +111,8 @@ impl ::std::fmt::Debug for BranchNode {
 fn test_branch_node() {
     let mut branch = BranchNode::empty();
 
-    let lh = hash(&[1, 2]);
-    let rh = hash(&[3, 4]);
+    let lh = EntryHash(hash(&[1, 2]));
+    let rh = EntryHash(hash(&[3, 4]));
     let ls = ProofPath::new(&[253; 32]);
     let rs = ProofPath::new(&[244; 32]);
 

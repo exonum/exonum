@@ -25,7 +25,7 @@ extern crate serde_json;
 extern crate pretty_assertions;
 
 use exonum::blockchain::Transaction;
-use exonum::crypto::{self, PublicKey, CryptoHash};
+use exonum::crypto::{self, PublicKey, CryptoHash, EntryHash};
 use exonum::helpers::Height;
 use exonum::messages::Message;
 use exonum::encoding::serialize::FromHex;
@@ -503,7 +503,7 @@ fn test_explorer_single_block() {
     assert_eq!(info.block.height(), Height(1));
     assert_eq!(info.block.tx_count(), 1);
     assert_eq!(*info.block.tx_hash(), tx.hash());
-    assert_eq!(info.txs, vec![tx.hash()]);
+    assert_eq!(info.txs, vec![EntryHash(tx.hash())]);
 
     let mut validators = HashSet::new();
     for precommit in &info.precommits {
@@ -582,13 +582,13 @@ fn test_explorer_transaction() {
 
     if let Value::Object(mut info) = info {
         let location_proof = info.remove("location_proof").unwrap();
-        let location_proof: ListProof<crypto::Hash> = serde_json::from_value(location_proof)
+        let location_proof: ListProof<crypto::EntryHash> = serde_json::from_value(location_proof)
             .unwrap();
         let block: BlockInfo = api.get(ApiKind::Explorer, "v1/blocks/1");
         let block = block.block;
         assert!(
             location_proof
-                .validate(*block.tx_hash(), u64::from(block.tx_count()))
+                .validate(EntryHash(*block.tx_hash()), u64::from(block.tx_count()))
                 .is_ok()
         );
     } else {

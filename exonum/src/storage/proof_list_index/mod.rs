@@ -17,7 +17,7 @@
 use std::cell::Cell;
 use std::marker::PhantomData;
 
-use crypto::{Hash, hash, HashStream};
+use crypto::{hash, HashStream, EntryHash, CryptoHash};
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue, StorageKey};
 use super::indexes_metadata::IndexType;
 use self::key::ProofListKey;
@@ -57,11 +57,13 @@ pub struct ProofListIndexIter<'a, V> {
     base_iter: BaseIndexIter<'a, ProofListKey, V>,
 }
 
-fn pair_hash(h1: &Hash, h2: &Hash) -> Hash {
-    HashStream::new()
-        .update(h1.as_ref())
-        .update(h2.as_ref())
-        .hash()
+fn pair_hash(h1: &EntryHash, h2: &EntryHash) -> EntryHash {
+    EntryHash(
+        HashStream::new()
+            .update(h1.hash().as_ref())
+            .update(h2.hash().as_ref())
+            .hash(),
+    )
 }
 
 impl<T, V> ProofListIndex<T, V>
@@ -149,7 +151,7 @@ where
         key.first_left_leaf_index() < self.len()
     }
 
-    fn get_branch(&self, key: ProofListKey) -> Option<Hash> {
+    fn get_branch(&self, key: ProofListKey) -> Option<EntryHash> {
         if self.has_branch(key) {
             self.base.get(&key)
         } else {
@@ -157,7 +159,7 @@ where
         }
     }
 
-    fn get_branch_unchecked(&self, key: ProofListKey) -> Hash {
+    fn get_branch_unchecked(&self, key: ProofListKey) -> EntryHash {
         debug_assert!(self.has_branch(key));
 
         self.base.get(&key).unwrap()
@@ -307,7 +309,7 @@ where
     ///
     /// ```
     /// use exonum::storage::{MemoryDB, Database, ProofListIndex};
-    /// use exonum::crypto::Hash;
+    /// use exonum::crypto::{Hash, EntryHash};
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";
@@ -315,13 +317,13 @@ where
     /// let mut index = ProofListIndex::new(name, &mut fork);
     ///
     /// let default_hash = index.merkle_root();
-    /// assert_eq!(Hash::default(), default_hash);
+    /// assert_eq!(EntryHash(Hash::default()), default_hash);
     ///
     /// index.push(1);
     /// let hash = index.merkle_root();
     /// assert_ne!(hash, default_hash);
     /// ```
-    pub fn merkle_root(&self) -> Hash {
+    pub fn merkle_root(&self) -> EntryHash {
         self.get_branch(self.root_key()).unwrap_or_default()
     }
 
@@ -448,7 +450,7 @@ where
         self.length.set(Some(len));
     }
 
-    fn set_branch(&mut self, key: ProofListKey, hash: Hash) {
+    fn set_branch(&mut self, key: ProofListKey, hash: EntryHash) {
         debug_assert!(key.height() > 0);
 
         self.base.put(&key, hash)
@@ -477,7 +479,7 @@ where
         self.base.put(&ProofListKey::leaf(len), value);
         while key.height() < self.height() {
             let hash = if key.is_left() {
-                hash(self.get_branch_unchecked(key).as_ref())
+                EntryHash(hash(self.get_branch_unchecked(key).hash().as_ref()))
             } else {
                 pair_hash(
                     &self.get_branch_unchecked(key.as_left()),
@@ -554,7 +556,7 @@ where
                     &self.get_branch_unchecked(right),
                 )
             } else {
-                hash(self.get_branch_unchecked(left).as_ref())
+                EntryHash(hash(self.get_branch_unchecked(left).hash().as_ref()))
             };
             key = key.parent();
             self.set_branch(key, hash);

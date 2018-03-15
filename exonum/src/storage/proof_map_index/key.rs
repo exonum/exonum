@@ -14,7 +14,7 @@
 
 use std::cmp::min;
 
-use crypto::{Hash, PublicKey, HASH_SIZE};
+use crypto::{Hash, PublicKey, HASH_SIZE, EntryHash};
 use super::super::StorageKey;
 
 pub const BRANCH_KEY_PREFIX: u8 = 0;
@@ -36,6 +36,7 @@ pub const PROOF_PATH_LEN_POS: usize = KEY_SIZE + 1;
 pub trait ProofMapKey: StorageKey {}
 
 impl ProofMapKey for Hash {}
+impl ProofMapKey for EntryHash {}
 impl ProofMapKey for PublicKey {}
 impl ProofMapKey for [u8; KEY_SIZE] {}
 

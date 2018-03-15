@@ -45,7 +45,7 @@ use vec_map::VecMap;
 use byteorder::{ByteOrder, LittleEndian};
 use mount::Mount;
 
-use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
+use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey, EntryHash};
 use messages::{CONSENSUS as CORE_SERVICE, Connect, Precommit, RawMessage};
 use storage::{Database, Error, Fork, Patch, Snapshot};
 use helpers::{Height, Round, ValidatorId};
@@ -303,7 +303,7 @@ impl Blockchain {
                 let state_hash = {
                     let mut sum_table = schema.state_hash_aggregator_mut();
                     for (key, hash) in state_hashes {
-                        sum_table.put(&key, hash)
+                        sum_table.put(&EntryHash(key), EntryHash(hash))
                     }
                     sum_table.merkle_root()
                 };
@@ -320,8 +320,8 @@ impl Blockchain {
                 height,
                 tx_hashes.len() as u32,
                 &last_hash,
-                &tx_hash,
-                &state_hash,
+                &tx_hash.hash(),
+                &state_hash.hash(),
             );
             trace!("execute block = {:?}", block);
             // Calculate block hash
@@ -532,8 +532,11 @@ fn execute_transaction(tx: &Transaction, height: Height, index: usize, fork: &mu
 
     let mut schema = Schema::new(fork);
     schema.transactions_mut().put(&tx_hash, tx.raw().clone());
-    schema.transaction_results_mut().put(&tx_hash, tx_result);
-    schema.block_txs_mut(height).push(tx_hash);
+    schema.transaction_results_mut().put(
+        &EntryHash(tx_hash),
+        tx_result,
+    );
+    schema.block_txs_mut(height).push(EntryHash(tx_hash));
     let location = TxLocation::new(height, index as u64);
     schema.tx_location_by_tx_hash_mut().put(&tx_hash, location);
 }

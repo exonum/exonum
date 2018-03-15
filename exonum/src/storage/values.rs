@@ -20,7 +20,7 @@ use std::mem;
 use std::borrow::Cow;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use crypto::{CryptoHash, Hash, PublicKey};
+use crypto::{CryptoHash, Hash, PublicKey, EntryHash};
 use messages::{RawMessage, MessageBuffer};
 use helpers::Round;
 
@@ -217,6 +217,16 @@ impl StorageValue for Hash {
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
         Self::from_slice(value.as_ref()).unwrap()
+    }
+}
+
+impl StorageValue for EntryHash {
+    fn into_bytes(self) -> Vec<u8> {
+        self.0.as_ref().to_vec()
+    }
+
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        EntryHash(Hash::from_slice(value.as_ref()).unwrap())
     }
 }
 

@@ -15,7 +15,7 @@
 //! Transaction definitions for the configuration service.
 
 use exonum::blockchain::{ExecutionResult, Schema as CoreSchema, StoredConfiguration, Transaction};
-use exonum::crypto::{CryptoHash, Hash, PublicKey};
+use exonum::crypto::{CryptoHash, Hash, PublicKey, EntryHash};
 use exonum::encoding::Error as EncodingError;
 use exonum::messages::{Message, RawTransaction};
 use exonum::node::State;
@@ -173,7 +173,7 @@ impl Propose {
     fn save(&self, fork: &mut Fork, cfg: &StoredConfiguration, cfg_hash: Hash) {
         let prev_cfg = CoreSchema::new(fork.as_ref())
             .configs()
-            .get(&cfg.previous_cfg_hash)
+            .get(&EntryHash(cfg.previous_cfg_hash))
             .unwrap();
 
         // Start writing to storage.
@@ -192,7 +192,7 @@ impl Propose {
 
             ProposeData::new(
                 self.clone(),
-                &votes_table.merkle_root(),
+                &votes_table.merkle_root().hash(),
                 num_validators as u64,
             )
         };
@@ -276,7 +276,7 @@ impl Vote {
             .previous_cfg_hash;
         let prev_cfg = CoreSchema::new(fork.as_ref())
             .configs()
-            .get(&prev_cfg_hash)
+            .get(&EntryHash(prev_cfg_hash))
             .unwrap();
         let validator_id = prev_cfg
             .validator_keys
@@ -292,7 +292,7 @@ impl Vote {
         let propose_data = {
             let mut votes = schema.votes_by_config_hash_mut(cfg_hash);
             votes.set(validator_id as u64, MaybeVote::some(self.clone()));
-            propose_data.set_history_hash(&votes.merkle_root())
+            propose_data.set_history_hash(&votes.merkle_root().hash())
         };
 
         schema.propose_data_by_config_hash_mut().put(

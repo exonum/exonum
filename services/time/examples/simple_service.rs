@@ -24,7 +24,7 @@ extern crate serde;
 
 use std::time::{UNIX_EPOCH, SystemTime, Duration};
 use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
-use exonum::crypto::{gen_keypair, Hash, PublicKey};
+use exonum::crypto::{gen_keypair, Hash, PublicKey, CryptoHash};
 use exonum::encoding;
 use exonum::helpers::Height;
 use exonum::messages::{Message, RawTransaction};
@@ -56,7 +56,7 @@ impl<T: AsRef<Snapshot>> MarkerSchema<T> {
 
     /// Returns hashes for stored table.
     pub fn state_hash(&self) -> Vec<Hash> {
-        vec![self.marks().merkle_root()]
+        vec![self.marks().merkle_root().hash()]
     }
 }
 

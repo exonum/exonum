@@ -14,7 +14,7 @@
 
 use rand::{thread_rng, Rng};
 
-use crypto::{CryptoHash, Hash, hash};
+use crypto::{CryptoHash, Hash, hash, EntryHash};
 use storage::Database;
 use encoding::serialize::json::reexport::{to_string, from_str};
 use encoding::serialize::reexport::Serialize;
@@ -111,14 +111,14 @@ fn list_index_proof(db: Box<Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
 
-    let h0 = 2u64.hash();
-    let h1 = 4u64.hash();
-    let h2 = 6u64.hash();
+    let h0 = EntryHash(2u64.hash());
+    let h1 = EntryHash(4u64.hash());
+    let h2 = EntryHash(6u64.hash());
     let h01 = pair_hash(&h0, &h1);
-    let h22 = hash(h2.as_ref());
+    let h22 = EntryHash(hash(h2.hash().as_ref()));
     let h012 = pair_hash(&h01, &h22);
 
-    assert_eq!(index.merkle_root(), Hash::default());
+    assert_eq!(index.merkle_root(), EntryHash::default());
 
     index.push(2u64);
 
@@ -277,7 +277,7 @@ fn randomly_generate_proofs(db: Box<Database>) {
         }
 
         let _proof_info = ProofInfo {
-            merkle_root: table_merkle_root,
+            merkle_root: table_merkle_root.hash(),
             list_length: index.len(),
             proof: &range_proof,
             range_st: start_range,
@@ -293,41 +293,49 @@ fn randomly_generate_proofs(db: Box<Database>) {
 fn index_and_proof_roots(db: Box<Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
-    assert_eq!(index.merkle_root(), Hash::zero());
+    assert_eq!(index.merkle_root(), EntryHash(Hash::zero()));
 
-    let h1 = hash(&[1, 2]);
-    let h2 = hash(&[2, 3]);
-    let h3 = hash(&[3, 4]);
-    let h4 = hash(&[4, 5]);
-    let h5 = hash(&[5, 6]);
-    let h6 = hash(&[6, 7]);
-    let h7 = hash(&[7, 8]);
-    let h8 = hash(&[8, 9]);
+    let h1 = EntryHash(hash(&[1, 2]));
+    let h2 = EntryHash(hash(&[2, 3]));
+    let h3 = EntryHash(hash(&[3, 4]));
+    let h4 = EntryHash(hash(&[4, 5]));
+    let h5 = EntryHash(hash(&[5, 6]));
+    let h6 = EntryHash(hash(&[6, 7]));
+    let h7 = EntryHash(hash(&[7, 8]));
+    let h8 = EntryHash(hash(&[8, 9]));
 
-    let h12 = hash(&[h1.as_ref(), h2.as_ref()].concat());
-    let h3up = hash(h3.as_ref());
-    let h123 = hash(&[h12.as_ref(), h3up.as_ref()].concat());
+    let h12 = EntryHash(hash(&[h1.hash().as_ref(), h2.hash().as_ref()].concat()));
+    let h3up = EntryHash(hash(h3.hash().as_ref()));
+    let h123 = EntryHash(hash(&[h12.hash().as_ref(), h3up.hash().as_ref()].concat()));
 
-    let h34 = hash(&[h3.as_ref(), h4.as_ref()].concat());
-    let h1234 = hash(&[h12.as_ref(), h34.as_ref()].concat());
+    let h34 = EntryHash(hash(&[h3.hash().as_ref(), h4.hash().as_ref()].concat()));
+    let h1234 = EntryHash(hash(&[h12.hash().as_ref(), h34.hash().as_ref()].concat()));
 
-    let h5up = hash(h5.as_ref());
-    let h5upup = hash(h5up.as_ref());
-    let h12345 = hash(&[h1234.as_ref(), h5upup.as_ref()].concat());
+    let h5up = EntryHash(hash(h5.hash().as_ref()));
+    let h5upup = EntryHash(hash(h5up.hash().as_ref()));
+    let h12345 = EntryHash(hash(
+        &[h1234.hash().as_ref(), h5upup.hash().as_ref()].concat(),
+    ));
 
-    let h56 = hash(&[h5.as_ref(), h6.as_ref()].concat());
-    let h56up = hash(h56.as_ref());
-    let h123456 = hash(&[h1234.as_ref(), h56up.as_ref()].concat());
+    let h56 = EntryHash(hash(&[h5.hash().as_ref(), h6.hash().as_ref()].concat()));
+    let h56up = EntryHash(hash(h56.hash().as_ref()));
+    let h123456 = EntryHash(hash(
+        &[h1234.hash().as_ref(), h56up.hash().as_ref()].concat(),
+    ));
 
-    let h7up = hash(h7.as_ref());
-    let h567 = hash(&[h56.as_ref(), h7up.as_ref()].concat());
-    let h1234567 = hash(&[h1234.as_ref(), h567.as_ref()].concat());
+    let h7up = EntryHash(hash(h7.hash().as_ref()));
+    let h567 = EntryHash(hash(&[h56.hash().as_ref(), h7up.hash().as_ref()].concat()));
+    let h1234567 = EntryHash(hash(
+        &[h1234.hash().as_ref(), h567.hash().as_ref()].concat(),
+    ));
 
-    let h78 = hash(&[h7.as_ref(), h8.as_ref()].concat());
-    let h5678 = hash(&[h56.as_ref(), h78.as_ref()].concat());
-    let h12345678 = hash(&[h1234.as_ref(), h5678.as_ref()].concat());
+    let h78 = EntryHash(hash(&[h7.hash().as_ref(), h8.hash().as_ref()].concat()));
+    let h5678 = EntryHash(hash(&[h56.hash().as_ref(), h78.hash().as_ref()].concat()));
+    let h12345678 = EntryHash(hash(
+        &[h1234.hash().as_ref(), h5678.hash().as_ref()].concat(),
+    ));
 
-    let expected_hash_comb: Vec<(Vec<u8>, Hash, u64)> = vec![
+    let expected_hash_comb: Vec<(Vec<u8>, EntryHash, u64)> = vec![
         (vec![1, 2], h1, 0),
         (vec![2, 3], h12, 1),
         (vec![3, 4], h123, 2),
@@ -343,6 +351,7 @@ fn index_and_proof_roots(db: Box<Database>) {
 
         assert_eq!(index.merkle_root(), exp_root);
         let range_proof = index.get_range_proof(proof_ind, proof_ind + 1);
+
         assert_eq!(
             range_proof
                 .validate(index.merkle_root(), index.len())
@@ -350,9 +359,11 @@ fn index_and_proof_roots(db: Box<Database>) {
                 .len(),
             1
         );
+
         let json_representation = to_string(&range_proof).unwrap();
         let deserialized_proof: ListProof<Vec<u8>> = from_str(&json_representation).unwrap();
         assert_eq!(deserialized_proof, range_proof);
+        println!("{:?}", proof_ind);
         let range_proof = index.get_range_proof(0, proof_ind + 1);
         assert_eq!(
             range_proof
@@ -446,21 +457,23 @@ fn proof_illegal_range(db: Box<Database>) {
 fn proof_structure(db: Box<Database>) {
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);
-    assert_eq!(index.merkle_root(), Hash::zero());
+    assert_eq!(index.merkle_root(), EntryHash(Hash::zero()));
 
     // spell-checker:ignore upup
 
-    let h1 = hash(&vec![0, 1, 2]);
-    let h2 = hash(&vec![1, 2, 3]);
-    let h3 = hash(&vec![2, 3, 4]);
-    let h4 = hash(&vec![3, 4, 5]);
-    let h5 = hash(&vec![4, 5, 6]);
-    let h12 = hash(&[h1.as_ref(), h2.as_ref()].concat());
-    let h34 = hash(&[h3.as_ref(), h4.as_ref()].concat());
-    let h1234 = hash(&[h12.as_ref(), h34.as_ref()].concat());
-    let h5up = hash(h5.as_ref());
-    let h5upup = hash(h5up.as_ref());
-    let h12345 = hash(&[h1234.as_ref(), h5upup.as_ref()].concat());
+    let h1 = EntryHash(hash(&vec![0, 1, 2]));
+    let h2 = EntryHash(hash(&vec![1, 2, 3]));
+    let h3 = EntryHash(hash(&vec![2, 3, 4]));
+    let h4 = EntryHash(hash(&vec![3, 4, 5]));
+    let h5 = EntryHash(hash(&vec![4, 5, 6]));
+    let h12 = EntryHash(hash(&[h1.hash().as_ref(), h2.hash().as_ref()].concat()));
+    let h34 = EntryHash(hash(&[h3.hash().as_ref(), h4.hash().as_ref()].concat()));
+    let h1234 = EntryHash(hash(&[h12.hash().as_ref(), h34.hash().as_ref()].concat()));
+    let h5up = EntryHash(hash(h5.hash().as_ref()));
+    let h5upup = EntryHash(hash(h5up.hash().as_ref()));
+    let h12345 = EntryHash(hash(
+        &[h1234.hash().as_ref(), h5upup.hash().as_ref()].concat(),
+    ));
 
     for i in 0u8..5 {
         index.push(vec![i, i + 1, i + 2]);
@@ -495,8 +508,8 @@ fn proof_structure(db: Box<Database>) {
 }
 
 fn simple_merkle_root(db: Box<Database>) {
-    let h1 = hash(&[1]);
-    let h2 = hash(&[2]);
+    let h1 = EntryHash(hash(&[1]));
+    let h2 = EntryHash(hash(&[2]));
 
     let mut fork = db.fork();
     let mut index = ProofListIndex::new(IDX_NAME, &mut fork);

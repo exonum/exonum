@@ -46,7 +46,7 @@ use exonum::blockchain::{Blockchain, Service, ServiceContext, Schema, ApiContext
 use exonum::messages::{RawTransaction, Message};
 use exonum::encoding::serialize::json::reexport::Value;
 use exonum::storage::{Fork, Snapshot, ProofMapIndex, Entry};
-use exonum::crypto::{Hash, PublicKey};
+use exonum::crypto::{Hash, PublicKey, CryptoHash};
 use exonum::encoding;
 use exonum::helpers::fabric::{ServiceFactory, Context};
 use exonum::api::Api;
@@ -83,7 +83,7 @@ impl<T: AsRef<Snapshot>> TimeSchema<T> {
 
     /// Returns hashes for stored tables.
     pub fn state_hash(&self) -> Vec<Hash> {
-        vec![self.validators_times().merkle_root(), self.time().hash()]
+        vec![self.validators_times().merkle_root().hash(), self.time().hash()]
     }
 }
 
