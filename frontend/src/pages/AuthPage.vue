@@ -5,7 +5,16 @@
         <div class="col-md-6 col-md-offset-3">
           <h1 class="mt-5 mb-4">Authorization</h1>
           <tabs>
-            <tab :is-active="true" title="Log in">
+            <tab :is-active="true" title="Register">
+              <form @submit.prevent="register">
+                <div class="form-group">
+                  <label class="control-label">Name:</label>
+                  <input v-model="name" type="text" class="form-control" placeholder="Enter name" maxlength="260" required>
+                </div>
+                <button type="submit" class="btn btn-lg btn-block btn-primary">Register</button>
+              </form>
+            </tab>
+            <tab title="Log in">
               <form @submit.prevent="login">
                 <div class="form-group">
                   <label class="control-label">Public key:</label>
@@ -16,15 +25,6 @@
                   <input v-model="secretKey" type="text" class="form-control" placeholder="Enter secret key" required>
                 </div>
                 <button type="submit" class="btn btn-lg btn-block btn-primary">Log in</button>
-              </form>
-            </tab>
-            <tab title="Register">
-              <form @submit.prevent="register">
-                <div class="form-group">
-                  <label class="control-label">Name:</label>
-                  <input v-model="name" type="text" class="form-control" placeholder="Enter name" maxlength="260" required>
-                </div>
-                <button type="submit" class="btn btn-lg btn-block btn-primary">Register</button>
               </form>
             </tab>
           </tabs>
