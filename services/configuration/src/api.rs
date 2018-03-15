@@ -277,6 +277,8 @@ impl PrivateApi {
                 Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
             };
 
+            config.consensus.check_timeout_recommendations();
+
             let cfg_hash = config.hash();
             let propose = Propose::new(
                 &self.service_keys.0,
