@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -46,6 +46,9 @@ pub struct StoredConfiguration {
     pub validator_keys: Vec<ValidatorKeys>,
     /// Consensus algorithm parameters.
     pub consensus: ConsensusConfig,
+    /// Number of votes required to commit new configuration.
+    /// Should be greater than 2/3 and less or equal to the validators count.
+    pub majority_count: Option<u16>,
     /// Services specific variables.
     /// Keys are `service_name` from `Service` trait and values are the serialized json.
     pub services: BTreeMap<String, serde_json::Value>,
@@ -70,7 +73,7 @@ pub struct ConsensusConfig {
 
 impl ConsensusConfig {
     /// Default value for max_message_len.
-    pub const DEFAULT_MESSAGE_MAX_LEN: u32 = 1024 * 1024; // 1 MB
+    pub const DEFAULT_MAX_MESSAGE_LEN: u32 = 1024 * 1024; // 1 MB
 }
 
 impl Default for ConsensusConfig {
@@ -80,7 +83,7 @@ impl Default for ConsensusConfig {
             status_timeout: 5000,
             peers_timeout: 10_000,
             txs_block_limit: 1000,
-            max_message_len: Self::DEFAULT_MESSAGE_MAX_LEN,
+            max_message_len: Self::DEFAULT_MAX_MESSAGE_LEN,
             timeout_adjuster: TimeoutAdjusterConfig::Constant { timeout: 500 },
         }
     }
@@ -111,9 +114,9 @@ impl StoredConfiguration {
         }
 
         // Check timeout adjuster.
-        match config.consensus.timeout_adjuster {
+        let propose_timeout = match config.consensus.timeout_adjuster {
             // There is no need to validate `Constant` timeout adjuster.
-            TimeoutAdjusterConfig::Constant { .. } => (),
+            TimeoutAdjusterConfig::Constant { timeout } => timeout,
             TimeoutAdjusterConfig::Dynamic { min, max, .. } => {
                 if min >= max {
                     return Err(JsonError::custom(format!(
@@ -123,6 +126,7 @@ impl StoredConfiguration {
                         max
                     )));
                 }
+                max
             }
             TimeoutAdjusterConfig::MovingAverage {
                 min,
@@ -150,7 +154,25 @@ impl StoredConfiguration {
                         adjustment_speed,
                     )));
                 }
+                max
             }
+        };
+
+        if config.consensus.round_timeout <= propose_timeout {
+            return Err(JsonError::custom(format!(
+                "round_timeout({}) must be strictly larger than propose_timeout({})",
+                config.consensus.round_timeout,
+                propose_timeout
+            )));
+        }
+
+        if config.consensus.round_timeout <= 2 * propose_timeout {
+            warn!(
+                "It is recommended that round_timeout({}) be at least twice as large \
+                as propose_timeout({})",
+                config.consensus.round_timeout,
+                propose_timeout
+            );
         }
 
         Ok(config)
@@ -357,6 +379,42 @@ mod tests {
         serialize_deserialize(&configuration);
     }
 
+    #[test]
+    #[should_panic(expected = "round_timeout(50) must be strictly larger than propose_timeout(50)")]
+    fn constant_adjuster_invalid_timeout() {
+        let mut configuration = create_test_configuration();
+        configuration.consensus.round_timeout = 50;
+        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::Constant { timeout: 50 };
+        serialize_deserialize(&configuration);
+    }
+
+    #[test]
+    #[should_panic(expected = "round_timeout(50) must be strictly larger than propose_timeout(50)")]
+    fn dynamic_adjuster_invalid_timeout() {
+        let mut configuration = create_test_configuration();
+        configuration.consensus.round_timeout = 50;
+        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::Dynamic {
+            min: 10,
+            max: 50,
+            threshold: 1,
+        };
+        serialize_deserialize(&configuration);
+    }
+
+    #[test]
+    #[should_panic(expected = "round_timeout(50) must be strictly larger than propose_timeout(50)")]
+    fn moving_average_adjuster_invalid_timeout() {
+        let mut configuration = create_test_configuration();
+        configuration.consensus.round_timeout = 50;
+        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::MovingAverage {
+            min: 10,
+            max: 50,
+            adjustment_speed: 0.7,
+            optimal_block_load: 0.2,
+        };
+        serialize_deserialize(&configuration);
+    }
+
     fn create_test_configuration() -> StoredConfiguration {
         let validator_keys = (1..4)
             .map(|i| {
@@ -373,6 +431,7 @@ mod tests {
             validator_keys,
             consensus: ConsensusConfig::default(),
             services: BTreeMap::new(),
+            majority_count: None,
         }
     }
 

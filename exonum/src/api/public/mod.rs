@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,8 +14,9 @@
 
 //! Public part of the Exonum rest api.
 
-pub use self::system::{SystemApi, HealthCheckInfo};
-pub use self::blockchain_explorer::ExplorerApi;
+pub use self::system::{HealthCheckInfo, SystemApi};
+pub use self::blockchain_explorer::{BlockInfo, BlockchainExplorer, BlocksRange, ExplorerApi,
+                                    TransactionInfo, TxInfo, TxStatus};
 
 mod system;
 mod blockchain_explorer;

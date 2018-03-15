@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,9 +26,7 @@ mod tests {
     use test::Bencher;
     use rand::{Rng, XorShiftRng, SeedableRng};
     use tempdir::TempDir;
-    use exonum::storage::{Database, MemoryDB};
-    use exonum::storage::{RocksDB, RocksDBOptions};
-    use exonum::storage::{ProofMapIndex, ProofListIndex};
+    use exonum::storage::{Database, MemoryDB, RocksDB, DbOptions, ProofMapIndex, ProofListIndex};
     use exonum::storage::proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE;
 
     const NAME: &str = "name";
@@ -162,8 +160,7 @@ mod tests {
     }
 
     fn create_rocksdb(tempdir: &TempDir) -> RocksDB {
-        let mut options = RocksDBOptions::default();
-        options.create_if_missing(true);
+        let options = DbOptions::default();
         RocksDB::open(tempdir.path(), &options).unwrap()
     }
 

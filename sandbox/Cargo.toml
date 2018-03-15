@@ -5,14 +5,14 @@ publish = false
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 
 [dependencies]
-exonum = { version = "0.5.1", path = "../exonum" }
+exonum = { version = "0.6.0", path = "../exonum" }
 
 log = "0.4.1"
 env_logger = "0.5.3"
-clap = { version = "2.25.0", features = ["unstable"] }
+clap = { version = "2.30.0", features = ["unstable"] }
 rand = "0.4.2"
 bit-vec = "0.4.4"
 futures = "0.1.14"
 
 [dev-dependencies]
-pretty_assertions = "0.4.0"
+pretty_assertions = "0.5.0"

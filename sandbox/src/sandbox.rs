@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ use exonum::messages::{Any, Connect, Message, RawMessage, RawTransaction, Status
 use exonum::crypto::{gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed};
 #[cfg(test)]
 use exonum::crypto::gen_keypair;
-use exonum::helpers::{Height, Milliseconds, Round, ValidatorId};
+use exonum::helpers::{Height, Milliseconds, Round, ValidatorId, user_agent};
 use exonum::events::{Event, InternalEvent, EventHandler, NetworkEvent, NetworkRequest,
                      TimeoutRequest, InternalRequest};
 use exonum::events::network::NetworkConfiguration;
@@ -46,6 +46,8 @@ use config_updater::ConfigUpdateService;
 use sandbox_tests_helper::VALIDATOR_0;
 
 pub type SharedTime = Arc<Mutex<SystemTime>>;
+
+const INITIAL_TIME_IN_SECS: u64 = 1_486_720_340;
 
 #[derive(Debug)]
 pub struct SandboxSystemStateProvider {
@@ -101,6 +103,7 @@ impl SandboxInner {
         });
         network_getter.wait().unwrap();
     }
+
     fn process_internal_requests(&mut self) {
         let internal_getter = futures::lazy(|| -> Result<(), ()> {
             while let Async::Ready(Some(internal)) = self.internal_requests_rx.poll()? {
@@ -111,6 +114,7 @@ impl SandboxInner {
                             InternalEvent::JumpToRound(height, round).into(),
                         )
                     }
+                    InternalRequest::Shutdown => unimplemented!(),
                 }
 
             }
@@ -134,11 +138,13 @@ pub struct Sandbox {
     pub services_map: HashMap<PublicKey, SecretKey>,
     inner: RefCell<SandboxInner>,
     addresses: Vec<SocketAddr>,
+    /// Connect message used during initialization.
+    connect: Option<Connect>,
 }
 
 impl Sandbox {
     pub fn initialize(
-        &self,
+        &mut self,
         connect_message_time: SystemTime,
         start_index: usize,
         end_index: usize,
@@ -147,6 +153,7 @@ impl Sandbox {
             &self.p(VALIDATOR_0),
             self.a(VALIDATOR_0),
             connect_message_time,
+            &user_agent::get(),
             self.s(VALIDATOR_0),
         );
 
@@ -156,12 +163,14 @@ impl Sandbox {
                 &self.p(validator),
                 self.a(validator),
                 self.time(),
+                &user_agent::get(),
                 self.s(validator),
             ));
             self.send(self.a(validator), &connect);
         }
 
-        self.check_unexpected_message()
+        self.check_unexpected_message();
+        self.connect = Some(connect);
     }
 
     pub fn set_validators_map(
@@ -260,6 +269,11 @@ impl Sandbox {
             self.inner.borrow_mut(),
             |inner| &mut inner.handler.blockchain,
         )
+    }
+
+    /// Returns connect message used during initialization.
+    pub fn connect(&self) -> Option<&Connect> {
+        self.connect.as_ref()
     }
 
     pub fn recv<T: Message>(&self, msg: &T) {
@@ -484,10 +498,10 @@ impl Sandbox {
         schema.get_proof_to_service_table(service_id, table_idx)
     }
 
-    pub fn get_configs_root_hash(&self) -> Hash {
+    pub fn get_configs_merkle_root(&self) -> Hash {
         let snapshot = self.blockchain_ref().snapshot();
         let schema = Schema::new(&snapshot);
-        schema.configs().root_hash()
+        schema.configs().merkle_root()
     }
 
     pub fn cfg(&self) -> StoredConfiguration {
@@ -561,6 +575,110 @@ impl Sandbox {
         assert_eq!(actual_hash, expected_hash);
     }
 
+    /// Creates new sandbox with "restarted" node.
+    pub fn restart(self) -> Self {
+        self.restart_with_time(UNIX_EPOCH + Duration::new(INITIAL_TIME_IN_SECS, 0))
+    }
+
+    /// Creates new sandbox with "restarted" node initialized by the given time.
+    pub fn restart_with_time(self, time: SystemTime) -> Self {
+        let connect = self.connect().map(|c| {
+            Connect::new(
+                c.pub_key(),
+                c.addr(),
+                time,
+                c.user_agent(),
+                self.s(VALIDATOR_0),
+            )
+        });
+        let sandbox = self.restart_uninitialized_with_time(time);
+        if let Some(connect) = connect {
+            sandbox.broadcast(&connect);
+        }
+
+        sandbox
+    }
+
+    /// Constructs a new uninitialized instance of a `Sandbox` preserving database and
+    /// configuration.
+    pub fn restart_uninitialized(self) -> Sandbox {
+        self.restart_uninitialized_with_time(UNIX_EPOCH + Duration::new(INITIAL_TIME_IN_SECS, 0))
+    }
+
+    /// Constructs a new uninitialized instance of a `Sandbox` preserving database and
+    /// configuration.
+    pub fn restart_uninitialized_with_time(self, time: SystemTime) -> Sandbox {
+        let network_channel = mpsc::channel(100);
+        let internal_channel = mpsc::channel(100);
+        let api_channel = mpsc::channel(100);
+
+        let address = self.a(VALIDATOR_0);
+        let inner = self.inner.borrow();
+
+        let blockchain = inner.handler.blockchain.clone_with_api_sender(
+            ApiSender::new(
+                api_channel.0.clone(),
+            ),
+        );
+
+        let node_sender = NodeSender {
+            network_requests: network_channel.0.clone().wait(),
+            internal_requests: internal_channel.0.clone().wait(),
+            api_requests: api_channel.0.clone().wait(),
+        };
+
+        let config = Configuration {
+            listener: ListenerConfig {
+                address,
+                consensus_public_key: *inner.handler.state.consensus_public_key(),
+                consensus_secret_key: inner.handler.state.consensus_secret_key().clone(),
+                whitelist: Default::default(),
+            },
+            service: ServiceConfig {
+                service_public_key: *inner.handler.state.service_public_key(),
+                service_secret_key: inner.handler.state.service_secret_key().clone(),
+            },
+            network: NetworkConfiguration::default(),
+            peer_discovery: Vec::new(),
+            mempool: Default::default(),
+        };
+
+        let system_state = SandboxSystemStateProvider {
+            listen_address: address,
+            shared_time: SharedTime::new(Mutex::new(time)),
+        };
+
+        let mut handler = NodeHandler::new(
+            blockchain,
+            address,
+            node_sender,
+            Box::new(system_state),
+            config,
+            inner.handler.api_state.clone(),
+        );
+        handler.initialize();
+
+        let inner = SandboxInner {
+            sent: VecDeque::new(),
+            events: VecDeque::new(),
+            timers: BinaryHeap::new(),
+            internal_requests_rx: internal_channel.1,
+            network_requests_rx: network_channel.1,
+            api_requests_rx: api_channel.1,
+            handler,
+            time: Arc::clone(&inner.time),
+        };
+        let sandbox = Sandbox {
+            inner: RefCell::new(inner),
+            validators_map: self.validators_map.clone(),
+            services_map: self.services_map.clone(),
+            addresses: self.addresses.clone(),
+            connect: None,
+        };
+        sandbox.process_events();
+        sandbox
+    }
+
     fn node_public_key(&self) -> PublicKey {
         *self.node_state().consensus_public_key()
     }
@@ -585,8 +703,10 @@ fn gen_primitive_socket_addr(idx: u8) -> SocketAddr {
 
 /// Constructs an instance of a `Sandbox` and initializes connections.
 pub fn sandbox_with_services(services: Vec<Box<Service>>) -> Sandbox {
-    let sandbox = sandbox_with_services_uninitialized(services);
-    sandbox.initialize(sandbox.time(), 1, sandbox.validators_map.len());
+    let mut sandbox = sandbox_with_services_uninitialized(services);
+    let time = sandbox.time();
+    let validators_count = sandbox.validators_map.len();
+    sandbox.initialize(time, 1, validators_count);
     sandbox
 }
 
@@ -608,7 +728,7 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandb
     let addresses: Vec<SocketAddr> = (1..5).map(gen_primitive_socket_addr).collect::<Vec<_>>();
 
     let api_channel = mpsc::channel(100);
-    let db = Box::new(MemoryDB::new());
+    let db = MemoryDB::new();
     let mut blockchain = Blockchain::new(
         db,
         services,
@@ -634,7 +754,7 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandb
             }
         }),
     );
-    blockchain.create_genesis_block(genesis).unwrap();
+    blockchain.initialize(genesis).unwrap();
 
     let config = Configuration {
         listener: ListenerConfig {
@@ -655,7 +775,9 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandb
     // TODO use factory or other solution like set_handler or run
     let system_state = SandboxSystemStateProvider {
         listen_address: addresses[0],
-        shared_time: SharedTime::new(Mutex::new(UNIX_EPOCH + Duration::new(1_486_720_340, 0))),
+        shared_time: SharedTime::new(Mutex::new(
+            UNIX_EPOCH + Duration::new(INITIAL_TIME_IN_SECS, 0),
+        )),
     };
     let shared_time = Arc::clone(&system_state.shared_time);
 
@@ -692,91 +814,11 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandb
         validators_map: HashMap::from_iter(validators.clone()),
         services_map: HashMap::from_iter(service_keys),
         addresses,
+        connect: None,
     };
 
     // General assumption; necessary for correct work of consensus algorithm
     assert!(sandbox.propose_timeout() < sandbox.round_timeout());
-    sandbox.process_events();
-    sandbox
-}
-
-/// Constructs a new instance of a `Sandbox` preserving database and configuration and initializes
-/// connections.
-pub fn sandbox_restarted(sandbox: Sandbox) -> Sandbox {
-    let sandbox = sandbox_restarted_uninitialized(sandbox);
-    sandbox.initialize(sandbox.time(), 1, sandbox.validators_map.len());
-    sandbox
-}
-
-/// Constructs a new uninitialized instance of a `Sandbox` preserving database and configuration.
-#[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
-pub fn sandbox_restarted_uninitialized(sandbox: Sandbox) -> Sandbox {
-    let network_channel = mpsc::channel(100);
-    let internal_channel = mpsc::channel(100);
-    let api_channel = mpsc::channel(100);
-
-    let address = sandbox.a(VALIDATOR_0);
-    let inner = sandbox.inner.borrow();
-
-    let blockchain = inner.handler.blockchain.clone_with_api_sender(
-        ApiSender::new(
-            api_channel.0.clone(),
-        ),
-    );
-
-    let node_sender = NodeSender {
-        network_requests: network_channel.0.clone().wait(),
-        internal_requests: internal_channel.0.clone().wait(),
-        api_requests: api_channel.0.clone().wait(),
-    };
-
-    let config = Configuration {
-        listener: ListenerConfig {
-            address,
-            consensus_public_key: *inner.handler.state.consensus_public_key(),
-            consensus_secret_key: inner.handler.state.consensus_secret_key().clone(),
-            whitelist: Default::default(),
-        },
-        service: ServiceConfig {
-            service_public_key: *inner.handler.state.service_public_key(),
-            service_secret_key: inner.handler.state.service_secret_key().clone(),
-        },
-        network: NetworkConfiguration::default(),
-        peer_discovery: Vec::new(),
-        mempool: Default::default(),
-    };
-
-    let system_state = SandboxSystemStateProvider {
-        listen_address: address,
-        shared_time: SharedTime::new(Mutex::new(UNIX_EPOCH + Duration::new(1_486_720_340, 0))),
-    };
-
-    let mut handler = NodeHandler::new(
-        blockchain,
-        address,
-        node_sender,
-        Box::new(system_state),
-        config,
-        inner.handler.api_state.clone(),
-    );
-    handler.initialize();
-
-    let inner = SandboxInner {
-        sent: VecDeque::new(),
-        events: VecDeque::new(),
-        timers: BinaryHeap::new(),
-        internal_requests_rx: internal_channel.1,
-        network_requests_rx: network_channel.1,
-        api_requests_rx: api_channel.1,
-        handler,
-        time: Arc::clone(&inner.time),
-    };
-    let sandbox = Sandbox {
-        inner: RefCell::new(inner),
-        validators_map: sandbox.validators_map.clone(),
-        services_map: sandbox.services_map.clone(),
-        addresses: sandbox.addresses.clone(),
-    };
     sandbox.process_events();
     sandbox
 }
@@ -864,13 +906,20 @@ mod tests {
     fn test_sandbox_recv_and_send() {
         let s = timestamping_sandbox();
         let (public, secret) = gen_keypair();
-        s.recv(&Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
+        s.recv(&Connect::new(
+            &public,
+            s.a(VALIDATOR_2),
+            s.time(),
+            &user_agent::get(),
+            &secret,
+        ));
         s.send(
             s.a(VALIDATOR_2),
             &Connect::new(
                 &s.p(VALIDATOR_0),
                 s.a(VALIDATOR_0),
                 s.time(),
+                &user_agent::get(),
                 s.s(VALIDATOR_0),
             ),
         );
@@ -897,6 +946,7 @@ mod tests {
                 &s.p(VALIDATOR_0),
                 s.a(VALIDATOR_0),
                 s.time(),
+                &user_agent::get(),
                 s.s(VALIDATOR_0),
             ),
         );
@@ -907,13 +957,20 @@ mod tests {
     fn test_sandbox_expected_to_send_another_message() {
         let s = timestamping_sandbox();
         let (public, secret) = gen_keypair();
-        s.recv(&Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
+        s.recv(&Connect::new(
+            &public,
+            s.a(VALIDATOR_2),
+            s.time(),
+            &user_agent::get(),
+            &secret,
+        ));
         s.send(
             s.a(VALIDATOR_1),
             &Connect::new(
                 &s.p(VALIDATOR_0),
                 s.a(VALIDATOR_0),
                 s.time(),
+                &user_agent::get(),
                 s.s(VALIDATOR_0),
             ),
         );
@@ -924,7 +981,13 @@ mod tests {
     fn test_sandbox_unexpected_message_when_drop() {
         let s = timestamping_sandbox();
         let (public, secret) = gen_keypair();
-        s.recv(&Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
+        s.recv(&Connect::new(
+            &public,
+            s.a(VALIDATOR_2),
+            s.time(),
+            &user_agent::get(),
+            &secret,
+        ));
     }
 
     #[test]
@@ -932,8 +995,20 @@ mod tests {
     fn test_sandbox_unexpected_message_when_handle_another_message() {
         let s = timestamping_sandbox();
         let (public, secret) = gen_keypair();
-        s.recv(&Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
-        s.recv(&Connect::new(&public, s.a(VALIDATOR_3), s.time(), &secret));
+        s.recv(&Connect::new(
+            &public,
+            s.a(VALIDATOR_2),
+            s.time(),
+            &user_agent::get(),
+            &secret,
+        ));
+        s.recv(&Connect::new(
+            &public,
+            s.a(VALIDATOR_3),
+            s.time(),
+            &user_agent::get(),
+            &secret,
+        ));
         panic!("Oops! We don't catch unexpected message");
     }
 
@@ -942,7 +1017,13 @@ mod tests {
     fn test_sandbox_unexpected_message_when_time_changed() {
         let s = timestamping_sandbox();
         let (public, secret) = gen_keypair();
-        s.recv(&Connect::new(&public, s.a(VALIDATOR_2), s.time(), &secret));
+        s.recv(&Connect::new(
+            &public,
+            s.a(VALIDATOR_2),
+            s.time(),
+            &user_agent::get(),
+            &secret,
+        ));
         s.add_time(Duration::from_millis(1000));
         panic!("Oops! We don't catch unexpected message");
     }

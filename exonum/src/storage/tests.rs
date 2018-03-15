@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -194,11 +194,10 @@ mod memorydb_tests {
 mod rocksdb_tests {
     use std::path::Path;
     use tempdir::TempDir;
-    use super::super::{RocksDB, RocksDBOptions};
+    use super::super::{RocksDB, DbOptions};
 
     fn rocksdb_database(path: &Path) -> RocksDB {
-        let mut options = RocksDBOptions::default();
-        options.create_if_missing(true);
+        let options = DbOptions::default();
         RocksDB::open(path, &options).unwrap()
     }
 

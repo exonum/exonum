@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -623,5 +623,11 @@ impl<'a> Iterator for ForkIter<'a> {
                 Finished => return None,
             }
         }
+    }
+}
+
+impl<T: Database> From<T> for Box<Database> {
+    fn from(db: T) -> Self {
+        Box::new(db) as Box<Database>
     }
 }

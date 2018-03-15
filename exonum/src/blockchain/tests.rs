@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -384,7 +384,7 @@ mod memorydb_tests {
         let service_keypair = gen_keypair();
         let api_channel = mpsc::channel(1);
         Blockchain::new(
-            Box::new(MemoryDB::new()),
+            MemoryDB::new(),
             Vec::new(),
             service_keypair.0,
             service_keypair.1,
@@ -417,14 +417,13 @@ mod rocksdb_tests {
     use futures::sync::mpsc;
     use std::path::Path;
     use tempdir::TempDir;
-    use storage::{Database, RocksDB, RocksDBOptions};
+    use storage::{Database, RocksDB, DbOptions};
     use blockchain::Blockchain;
     use crypto::gen_keypair;
     use node::ApiSender;
 
     fn create_database(path: &Path) -> Box<Database> {
-        let mut opts = RocksDBOptions::default();
-        opts.create_if_missing(true);
+        let opts = DbOptions::default();
         Box::new(RocksDB::open(path, &opts).unwrap())
     }
 

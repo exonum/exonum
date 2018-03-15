@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -39,13 +39,17 @@ pub type SyncSender<T> = Wait<Sender<T>>;
 pub enum InternalEvent {
     /// Round update event.
     JumpToRound(Height, Round),
+    /// Timeout event.
     Timeout(NodeTimeout),
+    /// Shutdown the node.
+    Shutdown,
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum InternalRequest {
     Timeout(TimeoutRequest),
     JumpToRound(Height, Round),
+    Shutdown,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -61,7 +65,6 @@ pub enum Event {
 pub trait EventHandler {
     fn handle_event(&mut self, event: Event);
 }
-
 
 #[derive(Debug)]
 pub struct HandlerPart<H: EventHandler> {
@@ -126,6 +129,7 @@ impl Into<Event> for InternalEvent {
         Event::Internal(self)
     }
 }
+
 /// Receives timeout, network and api events and invokes `handle_event` method of handler.
 /// If one of these streams closes, the aggregator stream completes immediately.
 #[derive(Debug)]
@@ -177,12 +181,13 @@ where
             Ok(Async::Ready(None))
         } else {
             match self.internal.poll()? {
-                Async::Ready(Some(item)) => {
-                    return Ok(Async::Ready(Some(Event::Internal(item))));
-                }
-                Async::Ready(None) => {
+                Async::Ready(None) |
+                Async::Ready(Some(InternalEvent::Shutdown)) => {
                     self.done = true;
                     return Ok(Async::Ready(None));
+                }
+                Async::Ready(Some(item)) => {
+                    return Ok(Async::Ready(Some(Event::Internal(item))));
                 }
                 Async::NotReady => {}
             };
@@ -197,12 +202,12 @@ where
                 Async::NotReady => {}
             };
             match self.api.poll()? {
-                Async::Ready(Some(item)) => {
-                    return Ok(Async::Ready(Some(Event::Api(item))));
-                }
                 Async::Ready(None) => {
                     self.done = true;
                     return Ok(Async::Ready(None));
+                }
+                Async::Ready(Some(item)) => {
+                    return Ok(Async::Ready(Some(Event::Api(item))));
                 }
                 Async::NotReady => {}
             };
@@ -211,7 +216,6 @@ where
         }
     }
 }
-
 
 fn to_box<F: Future + 'static>(f: F) -> Box<Future<Item = (), Error = F::Error>> {
     Box::new(f.map(drop))

@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,11 +17,6 @@
 //! [Sodium library](https://github.com/jedisct1/libsodium) is used under the hood through
 //! [sodiumoxide rust bindings](https://github.com/dnaq/sodiumoxide).
 
-use std::default::Default;
-use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
-use std::fmt;
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use sodiumoxide::crypto::sign::ed25519::{gen_keypair as gen_keypair_sodium, keypair_from_seed,
                                          sign_detached, verify_detached,
                                          PublicKey as PublicKeySodium,
@@ -34,7 +29,14 @@ use serde::{Serialize, Serializer};
 use serde::de::{self, Deserialize, Deserializer, Visitor};
 use byteorder::{ByteOrder, LittleEndian};
 
+use std::default::Default;
+use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
+use std::fmt;
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use encoding::serialize::FromHex;
+use helpers::Round;
+
 // spell-checker:disable
 pub use sodiumoxide::crypto::sign::ed25519::{PUBLICKEYBYTES as PUBLIC_KEY_LENGTH,
                                              SECRETKEYBYTES as SECRET_KEY_LENGTH,
@@ -689,6 +691,12 @@ impl CryptoHash for SystemTime {
         LittleEndian::write_u64(&mut buffer[0..8], secs);
         LittleEndian::write_u32(&mut buffer[8..12], nanos);
         hash(&buffer)
+    }
+}
+
+impl CryptoHash for Round {
+    fn hash(&self) -> Hash {
+        self.0.hash()
     }
 }
 

@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -135,6 +135,8 @@ pub struct ProposeState {
     propose: Propose,
     unknown_txs: HashSet<Hash>,
     block_hash: Option<Hash>,
+    // Whether the message has been saved to the consensus messages' cache or not.
+    is_saved: bool,
 }
 
 /// State of a block.
@@ -177,7 +179,7 @@ impl ValidatorState {
     /// Creates new `ValidatorState` with given validator id.
     pub fn new(id: ValidatorId) -> Self {
         ValidatorState {
-            id: id,
+            id,
             our_precommits: HashMap::new(),
             our_prevotes: HashMap::new(),
         }
@@ -314,6 +316,16 @@ impl ProposeState {
     pub fn has_unknown_txs(&self) -> bool {
         !self.unknown_txs.is_empty()
     }
+
+    /// Indicates whether Propose has been saved to the consensus messages cache
+    pub fn is_saved(&self) -> bool {
+        self.is_saved
+    }
+
+    /// Marks Propose as saved to the consensus messages cache
+    pub fn set_saved(&mut self, saved: bool) {
+        self.is_saved = saved;
+    }
 }
 
 impl BlockState {
@@ -372,8 +384,8 @@ impl State {
             consensus_secret_key,
             service_public_key,
             service_secret_key,
-            tx_pool_capacity: tx_pool_capacity,
-            whitelist: whitelist,
+            tx_pool_capacity,
+            whitelist,
             peers,
             connections: HashMap::new(),
             height: last_height,
@@ -754,6 +766,7 @@ impl State {
     /// transactions now.
     ///
     /// Transaction is ignored if the following criteria are fulfilled:
+    ///
     /// - transactions pool size is exceeded
     /// - transaction isn't contained in unknown transaction list of any propose
     /// - transaction isn't a part of block
@@ -833,6 +846,9 @@ impl State {
                 propose: msg,
                 unknown_txs: HashSet::new(),
                 block_hash: None,
+                // TODO:: for the moment it's true because this code gets called immediately after
+                // saving a propose to the cache. Think about making this approach less error-prone
+                is_saved: true,
             },
         );
 
@@ -858,8 +874,9 @@ impl State {
                 }
                 Some(e.insert(ProposeState {
                     propose: msg.clone(),
-                    unknown_txs: unknown_txs,
+                    unknown_txs,
                     block_hash: None,
+                    is_saved: false,
                 }))
             }
         }

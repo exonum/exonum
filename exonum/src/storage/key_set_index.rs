@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,11 +18,13 @@ use std::marker::PhantomData;
 use std::borrow::Borrow;
 
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageKey};
+use super::indexes_metadata::IndexType;
 
 /// A set of items that implement `StorageKey` trait.
 ///
 /// `KeySetIndex` implements a set, storing the elements as keys with empty values.
 /// `KeySetIndex` requires that the elements implement the [`StorageKey`] trait.
+///
 /// [`StorageKey`]: ../trait.StorageKey.html
 #[derive(Debug)]
 pub struct KeySetIndex<T, K> {
@@ -43,12 +45,17 @@ pub struct KeySetIndexIter<'a, K> {
     base_iter: BaseIndexIter<'a, K, ()>,
 }
 
-impl<T, K> KeySetIndex<T, K> {
+impl<T, K> KeySetIndex<T, K>
+where
+    T: AsRef<Snapshot>,
+    K: StorageKey,
+{
     /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     ///
@@ -63,19 +70,20 @@ impl<T, K> KeySetIndex<T, K> {
     /// let index: KeySetIndex<_, u8> = KeySetIndex::new(name, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         KeySetIndex {
-            base: BaseIndex::new(name, view),
+            base: BaseIndex::new(index_name, IndexType::KeySet, view),
             _k: PhantomData,
         }
     }
 
-    /// Creates a new index representation based on the name, common prefix of its keys
+    /// Creates a new index representation based on the name, index id in family
     /// and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     ///
@@ -87,23 +95,21 @@ impl<T, K> KeySetIndex<T, K> {
     /// let db = MemoryDB::new();
     /// let snapshot = db.snapshot();
     /// let name = "name";
-    /// let prefix = vec![123];
-    /// let index: KeySetIndex<_, u8> = KeySetIndex::with_prefix(name, prefix, &snapshot);
+    /// let index_id = vec![123];
+    /// let index: KeySetIndex<_, u8> = KeySetIndex::new_in_family(name, &index_id, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
+    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
+        family_name: S,
+        index_id: &I,
+        view: T,
+    ) -> Self {
         KeySetIndex {
-            base: BaseIndex::with_prefix(name, prefix, view),
+            base: BaseIndex::new_in_family(family_name, index_id, IndexType::KeySet, view),
             _k: PhantomData,
         }
     }
-}
 
-impl<T, K> KeySetIndex<T, K>
-where
-    T: AsRef<Snapshot>,
-    K: StorageKey,
-{
     /// Returns `true` if the set contains a value.
     ///
     /// # Examples

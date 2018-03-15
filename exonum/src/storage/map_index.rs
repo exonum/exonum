@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,11 +18,13 @@ use std::marker::PhantomData;
 use std::borrow::Borrow;
 
 use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageKey, StorageValue};
+use super::indexes_metadata::IndexType;
 
 /// A map of keys and values.
 ///
 /// `MapIndex` requires that the keys implement the [`StorageKey`] trait and the values implement
 /// [`StorageValue`] trait.
+///
 /// [`StorageKey`]: ../trait.StorageKey.html
 /// [`StorageValue`]: ../trait.StorageValue.html
 #[derive(Debug)]
@@ -71,12 +73,18 @@ pub struct MapIndexValues<'a, V> {
     base_iter: BaseIndexIter<'a, (), V>,
 }
 
-impl<T, K, V> MapIndex<T, K, V> {
+impl<T, K, V> MapIndex<T, K, V>
+where
+    T: AsRef<Snapshot>,
+    K: StorageKey,
+    V: StorageValue,
+{
     /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     ///
@@ -91,20 +99,21 @@ impl<T, K, V> MapIndex<T, K, V> {
     /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         MapIndex {
-            base: BaseIndex::new(name, view),
+            base: BaseIndex::new(index_name, IndexType::Map, view),
             _k: PhantomData,
             _v: PhantomData,
         }
     }
 
-    /// Creates a new index representation based on the name, common prefix of its keys
+    /// Creates a new index representation based on the name, index id in family
     /// and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     ///
@@ -115,27 +124,24 @@ impl<T, K, V> MapIndex<T, K, V> {
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";
-    /// let prefix = vec![01];
+    /// let index_id = vec![01];
     ///
     /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::with_prefix(name, prefix, &snapshot);
+    /// let index: MapIndex<_, u8, u8> = MapIndex::new_in_family(name, &index_id, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
+    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
+        family_name: S,
+        index_id: &I,
+        view: T,
+    ) -> Self {
         MapIndex {
-            base: BaseIndex::with_prefix(name, prefix, view),
+            base: BaseIndex::new_in_family(family_name, index_id, IndexType::Map, view),
             _k: PhantomData,
             _v: PhantomData,
         }
     }
-}
 
-impl<T, K, V> MapIndex<T, K, V>
-where
-    T: AsRef<Snapshot>,
-    K: StorageKey,
-    V: StorageValue,
-{
     /// Returns a value corresponding to the key.
     ///
     /// # Examples
@@ -582,9 +588,8 @@ mod tests {
         use tempdir::TempDir;
 
         fn create_database(path: &Path) -> Box<Database> {
-            use storage::{RocksDB, RocksDBOptions};
-            let mut opts = RocksDBOptions::default();
-            opts.create_if_missing(true);
+            use storage::{RocksDB, DbOptions};
+            let opts = DbOptions::default();
             Box::new(RocksDB::open(path, &opts).unwrap())
         }
 

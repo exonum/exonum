@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 
 //! An implementation of `MemoryDB` database.
 
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 use std::clone::Clone;
 use std::collections::btree_map::BTreeMap;
 use std::collections::HashMap;
@@ -128,6 +128,12 @@ impl Iterator for MemoryDBIter {
         } else {
             None
         }
+    }
+}
+
+impl From<MemoryDB> for Arc<Database> {
+    fn from(db: MemoryDB) -> Arc<Database> {
+        Arc::from(Box::new(db) as Box<Database>)
     }
 }
 

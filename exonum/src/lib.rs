@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -42,6 +42,7 @@ extern crate vec_map;
 extern crate env_logger;
 extern crate colored;
 extern crate term;
+extern crate chrono;
 #[macro_use(crate_version, crate_authors)]
 extern crate clap;
 extern crate hyper;
@@ -59,6 +60,7 @@ extern crate tokio_timer;
 extern crate tokio_core;
 extern crate tokio_io;
 extern crate tokio_retry;
+extern crate os_info;
 #[macro_use]
 extern crate failure;
 #[cfg(test)]
@@ -66,6 +68,7 @@ extern crate failure;
 extern crate lazy_static;
 #[cfg(test)]
 extern crate tempdir;
+extern crate bodyparser;
 
 #[macro_use]
 pub mod encoding;
@@ -80,5 +83,4 @@ pub mod node;
 pub mod storage;
 #[macro_use]
 pub mod blockchain;
-pub mod explorer;
 pub mod api;

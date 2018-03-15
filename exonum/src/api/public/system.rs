@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,14 +14,16 @@
 
 use router::Router;
 use iron::prelude::*;
+use serde_json;
 
 use node::state::TxPool;
 use blockchain::{Blockchain, SharedNodeState};
 use api::Api;
+use helpers::user_agent;
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, PartialEq)]
 struct MemPoolInfo {
-    size: usize,
+    pub size: usize,
 }
 
 #[doc(hidden)]
@@ -52,30 +54,36 @@ impl SystemApi {
         }
     }
 
-    fn get_mempool_info(&self) -> MemPoolInfo {
-        MemPoolInfo { size: self.pool.read().expect("Expected read lock").len() }
+    fn mempool_info(self, router: &mut Router) {
+        let mempool = move |_: &mut Request| -> IronResult<Response> {
+            let info = MemPoolInfo { size: self.pool.read().expect("Expected read lock").len() };
+            self.ok_response(&serde_json::to_value(info).unwrap())
+        };
+        router.get("/v1/mempool", mempool, "mempool");
     }
 
-    fn get_healthcheck_info(&self) -> HealthCheckInfo {
-        HealthCheckInfo { connectivity: !self.shared_api_state.peers_info().is_empty() }
+    fn healthcheck_info(self, router: &mut Router) {
+        let healthcheck = move |_: &mut Request| -> IronResult<Response> {
+            let info =
+                HealthCheckInfo { connectivity: !self.shared_api_state.peers_info().is_empty() };
+            self.ok_response(&serde_json::to_value(info).unwrap())
+        };
+        router.get("/v1/healthcheck", healthcheck, "healthcheck");
+    }
+
+    fn user_agent_info(self, router: &mut Router) {
+        let user_agent = move |_: &mut Request| -> IronResult<Response> {
+            let info = user_agent::get();
+            self.ok_response(&serde_json::to_value(info).unwrap())
+        };
+        router.get("/v1/user_agent", user_agent, "user_agent");
     }
 }
 
 impl Api for SystemApi {
     fn wire(&self, router: &mut Router) {
-        let self_ = self.clone();
-        let mempool_info = move |_: &mut Request| -> IronResult<Response> {
-            let info = self_.get_mempool_info();
-            self_.ok_response(&::serde_json::to_value(info).unwrap())
-        };
-
-        let self_ = self.clone();
-        let healthcheck = move |_: &mut Request| {
-            let info = self_.get_healthcheck_info();
-            self_.ok_response(&::serde_json::to_value(info).unwrap())
-        };
-
-        router.get("/v1/mempool", mempool_info, "mempool");
-        router.get("/v1/healthcheck", healthcheck, "healthcheck_info");
+        self.clone().mempool_info(router);
+        self.clone().healthcheck_info(router);
+        self.clone().user_agent_info(router);
     }
 }

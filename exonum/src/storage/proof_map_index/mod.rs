@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,8 @@ use std::marker::PhantomData;
 use std::fmt;
 
 use crypto::{Hash, CryptoHash, HashStream};
-use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageValue};
+use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageValue, StorageKey};
+use super::indexes_metadata::IndexType;
 use self::key::{BitsRange, ChildKind, LEAF_KEY_PREFIX};
 use self::node::{BranchNode, Node};
 use self::proof::MapProofBuilder;
@@ -41,6 +42,7 @@ mod proof;
 ///
 /// **The size of the proof map keys must be exactly 32 bytes and the keys must have a uniform
 /// distribution.** Usually [`Hash`] and [`PublicKey`] are used as types of proof map keys.
+///
 /// [`ProofMapKey`]: trait.ProofMapKey.html
 /// [`StorageValue`]: ../trait.StorageValue.html
 /// [`Hash`]: ../../crypto/struct.Hash.html
@@ -99,12 +101,18 @@ enum RemoveResult {
     UpdateHash(Hash),
 }
 
-impl<T, K, V> ProofMapIndex<T, K, V> {
+impl<T, K, V> ProofMapIndex<T, K, V>
+where
+    T: AsRef<Snapshot>,
+    K: ProofMapKey,
+    V: StorageValue,
+{
     /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     ///
@@ -124,9 +132,9 @@ impl<T, K, V> ProofMapIndex<T, K, V> {
     /// # drop(index);
     /// # drop(mut_index);
     /// ```
-    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         ProofMapIndex {
-            base: BaseIndex::new(name, view),
+            base: BaseIndex::new(index_name, IndexType::ProofMap, view),
             _k: PhantomData,
             _v: PhantomData,
         }
@@ -138,6 +146,7 @@ impl<T, K, V> ProofMapIndex<T, K, V> {
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     ///
@@ -149,33 +158,30 @@ impl<T, K, V> ProofMapIndex<T, K, V> {
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";
-    /// let prefix = vec![01];
+    /// let index_id = vec![01];
     ///
     /// let snapshot = db.snapshot();
     /// let index: ProofMapIndex<_, Hash, u8> =
-    ///                             ProofMapIndex::with_prefix(name, prefix.clone(), &snapshot);
+    ///                             ProofMapIndex::new_in_family(name, &index_id, &snapshot);
     ///
     /// let mut fork = db.fork();
     /// let mut mut_index : ProofMapIndex<_, Hash, u8> =
-    ///                                     ProofMapIndex::with_prefix(name, prefix, &mut fork);
+    ///                                ProofMapIndex::new_in_family(name, &index_id, &mut fork);
     /// # drop(index);
     /// # drop(mut_index);
     /// ```
-    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
+    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
+        family_name: S,
+        index_id: &I,
+        view: T,
+    ) -> Self {
         ProofMapIndex {
-            base: BaseIndex::with_prefix(name, prefix, view),
+            base: BaseIndex::new_in_family(family_name, index_id, IndexType::ProofMap, view),
             _k: PhantomData,
             _v: PhantomData,
         }
     }
-}
 
-impl<T, K, V> ProofMapIndex<T, K, V>
-where
-    T: AsRef<Snapshot>,
-    K: ProofMapKey,
-    V: StorageValue,
-{
     fn get_root_path(&self) -> Option<ProofPath> {
         self.base.iter::<_, ProofPath, _>(&()).next().map(
             |(k, _): (ProofPath, ())| k,
@@ -211,14 +217,14 @@ where
     /// let mut fork = db.fork();
     /// let mut index = ProofMapIndex::new(name, &mut fork);
     ///
-    /// let default_hash = index.root_hash();
+    /// let default_hash = index.merkle_root();
     /// assert_eq!(Hash::default(), default_hash);
     ///
     /// index.put(&default_hash, 100);
-    /// let hash = index.root_hash();
+    /// let hash = index.merkle_root();
     /// assert_ne!(hash, default_hash);
     /// ```
-    pub fn root_hash(&self) -> Hash {
+    pub fn merkle_root(&self) -> Hash {
         match self.get_root_node() {
             Some((k, Node::Leaf(v))) => {
                 HashStream::new()
@@ -1129,7 +1135,7 @@ where
         }
 
         if let Some(prefix) = self.get_root_path() {
-            let root_entry = Entry::new(self, self.root_hash(), prefix);
+            let root_entry = Entry::new(self, self.merkle_root(), prefix);
             f.debug_struct("ProofMapIndex")
                 .field("entries", &root_entry)
                 .finish()

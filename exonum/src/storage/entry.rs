@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,10 +18,12 @@ use std::marker::PhantomData;
 
 use crypto::Hash;
 use super::{BaseIndex, Snapshot, Fork, StorageValue};
+use super::indexes_metadata::IndexType;
 
 /// An index that may only contain one element.
 ///
 /// A value should implement [`StorageValue`] trait.
+///
 /// [`StorageValue`]: trait.StorageValue.html
 #[derive(Debug)]
 pub struct Entry<T, V> {
@@ -29,12 +31,17 @@ pub struct Entry<T, V> {
     _v: PhantomData<V>,
 }
 
-impl<T, V> Entry<T, V> {
+impl<T, V> Entry<T, V>
+where
+    T: AsRef<Snapshot>,
+    V: StorageValue,
+{
     /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: trait.Snapshot.html
     /// [`&mut Fork`]: struct.Fork.html
     ///
@@ -49,19 +56,13 @@ impl<T, V> Entry<T, V> {
     /// let index: Entry<_, u8> = Entry::new(name, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         Entry {
-            base: BaseIndex::new(name, view),
+            base: BaseIndex::new(index_name.as_ref(), IndexType::Entry, view),
             _v: PhantomData,
         }
     }
-}
 
-impl<T, V> Entry<T, V>
-where
-    T: AsRef<Snapshot>,
-    V: StorageValue,
-{
     /// Returns a value of the entry or `None` if does not exist.
     ///
     /// # Examples

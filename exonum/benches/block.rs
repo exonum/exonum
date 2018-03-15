@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ mod tests {
     use tempdir::TempDir;
     use futures::sync::mpsc;
     use test::Bencher;
-    use exonum::storage::{Database, Fork, Patch, ProofMapIndex, RocksDB, RocksDBOptions};
+    use exonum::storage::{Database, Fork, Patch, ProofMapIndex, RocksDB, DbOptions};
     use exonum::blockchain::{Blockchain, Transaction, ExecutionResult};
     use exonum::crypto::{gen_keypair, CryptoHash, Hash, PublicKey, SecretKey};
     use exonum::messages::Message;
@@ -184,8 +184,7 @@ mod tests {
     }
 
     fn create_rocksdb(tempdir: &TempDir) -> Box<Database> {
-        let mut options = RocksDBOptions::default();
-        options.create_if_missing(true);
+        let options = DbOptions::default();
         let db = Box::new(RocksDB::open(tempdir.path(), &options).unwrap());
         db as Box<Database>
     }

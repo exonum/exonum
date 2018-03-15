@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -449,6 +449,6 @@ impl ExonumJson for ValidatorId {
 /// Reexport of `serde` specific traits, this reexports
 /// provide compatibility layer with important `serde_json` version.
 pub mod reexport {
-    pub use serde_json::{from_str, from_value, to_string, to_value, Value};
+    pub use serde_json::{from_str, from_value, to_string, to_value, Value, Error};
     pub use serde_json::map::Map;
 }

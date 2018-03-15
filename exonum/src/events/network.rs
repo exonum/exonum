@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-use futures::{future, unsync, Future, IntoFuture, Sink, Stream, Poll};
+use futures::{future, unsync, Future, IntoFuture, Poll, Sink, Stream};
 use futures::future::Either;
 use futures::sync::mpsc;
 use tokio_core::net::{TcpListener, TcpStream};
@@ -28,7 +28,7 @@ use tokio_io::AsyncRead;
 use tokio_retry::Retry;
 use tokio_retry::strategy::{jitter, FixedInterval};
 
-use messages::{Any, Connect, RawMessage, Message};
+use messages::{Any, Connect, Message, RawMessage};
 use helpers::Milliseconds;
 use super::to_box;
 use super::error::{into_other, log_error, other_error, result_ok};
@@ -121,12 +121,11 @@ impl ConnectionsPool {
         network_tx: mpsc::Sender<NetworkEvent>,
         handle: &Handle,
     ) -> Option<mpsc::Sender<RawMessage>> {
-
         let limit = network_config.max_outgoing_connections;
         if self.len() >= limit {
             warn!(
                 "Rejected outgoing connection with peer={}, \
-                                     connections limit reached.",
+                 connections limit reached.",
                 peer
             );
             return None;
@@ -209,7 +208,6 @@ impl NetworkPart {
         let network_config = self.network_config;
         // Cancellation token
         let (cancel_sender, cancel_handler) = unsync::oneshot::channel();
-        let cancel_sender = Some(cancel_sender);
 
         let requests_handle = RequestHandler::new(
             self.our_connect_message,
@@ -229,7 +227,10 @@ impl NetworkPart {
             &self.network_tx,
         ).unwrap();
 
-        let cancel_handler = cancel_handler.map_err(|_| other_error("can't cancel routine"));
+        let cancel_handler = cancel_handler.or_else(|e| {
+            trace!("Requests handler closed: {}", e);
+            Ok(())
+        });
         let fut = server
             .join(requests_handle)
             .map(drop)
@@ -252,15 +253,15 @@ impl RequestHandler {
         network_tx: mpsc::Sender<NetworkEvent>,
         handle: Handle,
         receiver: mpsc::Receiver<NetworkRequest>,
-        mut cancel_sender: Option<unsync::oneshot::Sender<()>>,
+        cancel_sender: unsync::oneshot::Sender<()>,
     ) -> RequestHandler {
+        let mut cancel_sender = Some(cancel_sender);
         let outgoing_connections = ConnectionsPool::new();
         let requests_handler = receiver
             .map_err(|_| other_error("no network requests"))
             .for_each(move |request| {
                 match request {
                     NetworkRequest::SendMessage(peer, msg) => {
-
                         let conn_tx = outgoing_connections
                             .get(peer)
                             .map(|conn_tx| conn_fut(Ok(conn_tx).into_future()))
@@ -308,16 +309,12 @@ impl RequestHandler {
                     }
                     // Immediately stop the event loop.
                     NetworkRequest::Shutdown => {
-                        let fut = cancel_sender
-                            .take()
-                            .ok_or_else(|| other_error("shutdown twice"))
-                            .and_then(|sender| {
-                                sender.send(()).map_err(
-                                    |_| other_error("can't send shutdown signal"),
-                                )
-                            })
-                            .into_future();
-                        to_box(fut)
+                        to_box(
+                            cancel_sender
+                                .take()
+                                .ok_or_else(|| other_error("shutdown twice"))
+                                .into_future(),
+                        )
                     }
                 }
             });
@@ -333,7 +330,6 @@ impl Future for RequestHandler {
         self.0.poll()
     }
 }
-
 
 struct Listener(Box<Future<Item = (), Error = io::Error>>);
 

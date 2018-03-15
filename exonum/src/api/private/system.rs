@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::net::SocketAddr;
-use std::collections::HashMap;
-
+use serde_json;
 use router::Router;
 use iron::prelude::*;
+
+use std::net::SocketAddr;
+use std::collections::HashMap;
 
 use crypto::PublicKey;
 use node::{ExternalMessage, ApiSender};
@@ -24,14 +25,14 @@ use blockchain::{Service, Blockchain, SharedNodeState};
 use api::{Api, ApiError};
 use messages::{TEST_NETWORK_ID, PROTOCOL_MAJOR_VERSION};
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 struct ServiceInfo {
     name: String,
     id: u16,
 }
 
 /// `DTO` is used to transfer information about node.
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NodeInfo {
     network_id: u8,
     protocol_version: u8,
@@ -115,7 +116,7 @@ impl SystemApi {
         }
     }
 
-    fn get_peers_info(&self) -> PeersInfo {
+    fn peers_info(&self) -> PeersInfo {
         let mut outgoing_connections: HashMap<SocketAddr, IncomingConnection> = HashMap::new();
 
         for socket in self.shared_api_state.outgoing_connections() {
@@ -142,68 +143,93 @@ impl SystemApi {
         }
     }
 
-    fn get_network_info(&self) -> NodeInfo {
-        self.info.clone()
-    }
-
-    fn get_consensus_enabled_info(&self) -> bool {
-        self.shared_api_state.is_enabled()
-    }
-
-    fn set_consensus_enabled_info(&self, enabled: bool) -> Result<(), ApiError> {
-        let message = ExternalMessage::Enable(enabled);
-        self.node_channel.send_external_message(message)?;
-        Ok(())
-    }
-}
-
-impl Api for SystemApi {
-    fn wire(&self, router: &mut Router) {
-
-        let self_ = self.clone();
-        let peer_add = move |req: &mut Request| -> IronResult<Response> {
-            let addr: SocketAddr = self_.required_param(req, "ip")?;
-            self_.node_channel.peer_add(addr).map_err(ApiError::from)?;
-            self_.ok_response(&::serde_json::to_value("Ok").unwrap())
-        };
-
-        let self_ = self.clone();
+    fn handle_peers_info(self, router: &mut Router) {
         let peers_info = move |_: &mut Request| -> IronResult<Response> {
-            let info = self_.get_peers_info();
-            self_.ok_response(&::serde_json::to_value(info).unwrap())
-        };
-
-        let self_ = self.clone();
-        let network = move |_: &mut Request| -> IronResult<Response> {
-            let info = self_.get_network_info();
-            self_.ok_response(&::serde_json::to_value(info).unwrap())
-        };
-
-        let self_ = self.clone();
-        let consensus_enabled_info = move |_: &mut Request| -> IronResult<Response> {
-            let info = self_.get_consensus_enabled_info();
-            self_.ok_response(&::serde_json::to_value(info).unwrap())
-        };
-
-        let self_ = self.clone();
-        let consensus_enabled_set = move |req: &mut Request| -> IronResult<Response> {
-            let enabled: bool = self_.required_param(req, "enabled")?;
-            self_.set_consensus_enabled_info(enabled)?;
-            self_.ok_response(&::serde_json::to_value("Ok").unwrap())
+            let info = self.peers_info();
+            self.ok_response(&serde_json::to_value(info).unwrap())
         };
 
         router.get("/v1/peers", peers_info, "peers_info");
+    }
+
+    fn handle_peer_add(self, router: &mut Router) {
+        let peer_add = move |request: &mut Request| -> IronResult<Response> {
+            #[derive(Serialize, Deserialize, Clone, Debug)]
+            struct PeerAddInfo {
+                ip: SocketAddr,
+            }
+
+            let PeerAddInfo { ip } = self.parse_body(request)?;
+            self.node_channel.peer_add(ip).map_err(ApiError::from)?;
+            self.ok_response(&serde_json::to_value("Ok").unwrap())
+        };
+
         router.post("/v1/peers", peer_add, "peer_add");
+    }
+
+    fn handle_network(self, router: &mut Router) {
+        let network = move |_: &mut Request| -> IronResult<Response> {
+            let info = self.info.clone();
+            self.ok_response(&serde_json::to_value(info).unwrap())
+        };
+
         router.get("/v1/network", network, "network_info");
+    }
+
+    fn handle_is_consensus_enabled(self, router: &mut Router) {
+        let consensus_enabled_info = move |_: &mut Request| -> IronResult<Response> {
+            let info = self.shared_api_state.is_enabled();
+            self.ok_response(&serde_json::to_value(info).unwrap())
+        };
+
         router.get(
             "/v1/consensus_enabled",
             consensus_enabled_info,
             "consensus_enabled_info",
         );
+    }
+
+    fn handle_set_consensus_enabled(self, router: &mut Router) {
+        let consensus_enabled_set = move |request: &mut Request| -> IronResult<Response> {
+            #[derive(Serialize, Deserialize, Clone, Debug)]
+            struct EnabledInfo {
+                enabled: bool,
+            }
+
+            let EnabledInfo { enabled } = self.parse_body(request)?;
+            let message = ExternalMessage::Enable(enabled);
+            self.node_channel.send_external_message(message).map_err(
+                ApiError::from,
+            )?;
+            self.ok_response(&serde_json::to_value("Ok").unwrap())
+        };
+
         router.post(
             "/v1/consensus_enabled",
             consensus_enabled_set,
             "consensus_enabled_set",
         );
+    }
+
+    fn handle_shutdown(self, router: &mut Router) {
+        let shutdown = move |_: &mut Request| -> IronResult<Response> {
+            self.node_channel
+                .send_external_message(ExternalMessage::Shutdown)
+                .map_err(ApiError::from)?;
+            self.ok_response(&serde_json::to_value("Ok").unwrap())
+        };
+
+        router.post("/v1/shutdown", shutdown, "shutdown");
+    }
+}
+
+impl Api for SystemApi {
+    fn wire(&self, router: &mut Router) {
+        self.clone().handle_peers_info(router);
+        self.clone().handle_peer_add(router);
+        self.clone().handle_network(router);
+        self.clone().handle_is_consensus_enabled(router);
+        self.clone().handle_set_consensus_enabled(router);
+        self.clone().handle_shutdown(router);
     }
 }

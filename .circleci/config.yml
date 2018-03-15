@@ -7,14 +7,24 @@ jobs:
     environment:
       - ROCKSDB_LIB_DIR: /usr/local/lib
       - SNAPPY_LIB_DIR: /usr/local/lib
+      - RUSTFLAGS: -D warnings
     steps:
       - checkout
+      - restore_cache:
+          keys:
+            - cache-{{ arch }}-{{ .Branch }}
       - run: curl https://sh.rustup.rs -sSf | sh -s -- -y
       - run: echo 'export PATH=~/.cargo/bin:$PATH' >> $BASH_ENV
       - run: rustup show
       - run: brew install libsodium rocksdb pkg-config
       - run: cargo build
       - run: cargo test
+      - save_cache:
+          key: cache-{{ arch }}-{{ .Branch }}
+          paths:
+            - $HOME/.cargo
+            - $HOME/.rustup
+            - target
 
 workflows:
   version: 2

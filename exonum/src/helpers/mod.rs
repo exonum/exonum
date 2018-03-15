@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,11 +16,12 @@
 
 use std::env;
 use std::io::{self, Write};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::SystemTime;
 
 use log::{Level, Record, SetLoggerError};
 use env_logger::{Builder, Formatter};
 use colored::*;
+use chrono::{DateTime, Local};
 
 use blockchain::{GenesisConfig, ValidatorKeys};
 use node::NodeConfig;
@@ -32,6 +33,7 @@ mod types;
 
 pub mod fabric;
 pub mod config;
+pub mod user_agent;
 #[macro_use]
 pub mod metrics;
 
@@ -85,6 +87,7 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
                 api: Default::default(),
                 mempool: Default::default(),
                 services_configs: Default::default(),
+                database: Some(Default::default()),
             }
         })
         .collect::<Vec<_>>()
@@ -103,10 +106,12 @@ fn has_colors() -> bool {
     }
 }
 
+fn format_time(time: SystemTime) -> String {
+    DateTime::<Local>::from(time).to_rfc2822()
+}
+
 fn format_log_record(buf: &mut Formatter, record: &Record) -> io::Result<()> {
-    let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
-    let secs = ts.as_secs().to_string();
-    let millis = (u64::from(ts.subsec_nanos()) / 1_000_000).to_string();
+    let time = format_time(SystemTime::now());
 
     let verbose_src_path = match env::var("RUST_VERBOSE_PATH") {
         Ok(val) => val.parse::<bool>().unwrap_or(false),
@@ -132,11 +137,10 @@ fn format_log_record(buf: &mut Formatter, record: &Record) -> io::Result<()> {
         };
         writeln!(
             buf,
-            "[{} : {:03}] - [ {} ] - {} - {}",
-            secs.bold(),
-            millis.bold(),
+            "{} {} {} {}",
+            time.dimmed(),
             level,
-            &source_path,
+            source_path.dimmed(),
             record.args()
         )
     } else {
@@ -147,14 +151,6 @@ fn format_log_record(buf: &mut Formatter, record: &Record) -> io::Result<()> {
             Level::Debug => "DEBUG",
             Level::Trace => "TRACE",
         };
-        writeln!(
-            buf,
-            "[{} : {:03}] - [ {} ] - {} - {}",
-            secs,
-            millis,
-            level,
-            &source_path,
-            record.args()
-        )
+        writeln!(buf, "{} {} {} {}", time, level, &source_path, record.args())
     }
 }

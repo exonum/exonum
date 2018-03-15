@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ use crypto::{hash, gen_keypair};
 use blockchain::{self, BlockProof, Block};
 use messages::{RawMessage, Message, Connect, Propose, Prevote, Precommit, Status, BlockResponse,
                BlockRequest};
-use helpers::{Height, Round, ValidatorId};
+use helpers::{Height, Round, ValidatorId, user_agent};
 use super::{Field, Offset};
 
 static VALIDATOR: ValidatorId = ValidatorId(65_123);
@@ -250,7 +250,13 @@ fn test_connect() {
     let (public_key, secret_key) = gen_keypair();
 
     // write
-    let connect = Connect::new(&public_key, socket_address, time, &secret_key);
+    let connect = Connect::new(
+        &public_key,
+        socket_address,
+        time,
+        &user_agent::get(),
+        &secret_key,
+    );
     // read
     assert_eq!(connect.pub_key(), &public_key);
     assert_eq!(connect.addr(), socket_address);

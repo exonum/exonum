@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -98,14 +98,14 @@ fn insert_trivial(db1: Box<Database>, db2: Box<Database>) {
     assert_eq!(index2.get(&[255; 32]), Some(vec![1]));
     assert_eq!(index2.get(&[254; 32]), Some(vec![2]));
 
-    assert_ne!(index1.root_hash(), Hash::zero());
-    assert_eq!(index1.root_hash(), index2.root_hash());
+    assert_ne!(index1.merkle_root(), Hash::zero());
+    assert_eq!(index1.merkle_root(), index2.merkle_root());
 }
 
 fn insert_same_key(db: Box<Database>) {
     let mut storage = db.fork();
     let mut table = ProofMapIndex::new(IDX_NAME, &mut storage);
-    assert_eq!(table.root_hash(), Hash::zero());
+    assert_eq!(table.merkle_root(), Hash::zero());
     let root_prefix = &[&[LEAF_KEY_PREFIX], vec![255; 32].as_slice(), &[0u8]].concat();
     let hash = HashStream::new()
         .update(root_prefix)
@@ -115,7 +115,7 @@ fn insert_same_key(db: Box<Database>) {
     table.put(&[255; 32], vec![1]);
     table.put(&[255; 32], vec![2]);
     assert_eq!(table.get(&[255; 32]), Some(vec![2]));
-    assert_eq!(table.root_hash(), hash);
+    assert_eq!(table.merkle_root(), hash);
 }
 
 fn insert_simple(db1: Box<Database>, db2: Box<Database>) {
@@ -134,8 +134,8 @@ fn insert_simple(db1: Box<Database>, db2: Box<Database>) {
     index2.put(&[255; 32], vec![3]);
     index2.put(&[254; 32], vec![5]);
 
-    assert!(index1.root_hash() != Hash::zero());
-    assert_eq!(index1.root_hash(), index2.root_hash());
+    assert!(index1.merkle_root() != Hash::zero());
+    assert_eq!(index1.merkle_root(), index2.merkle_root());
 }
 
 fn insert_reverse(db1: Box<Database>, db2: Box<Database>) {
@@ -157,8 +157,8 @@ fn insert_reverse(db1: Box<Database>, db2: Box<Database>) {
     index2.put(&[64; 32], vec![2]);
     index2.put(&[42; 32], vec![1]);
 
-    assert!(index2.root_hash() != Hash::zero());
-    assert_eq!(index2.root_hash(), index1.root_hash());
+    assert!(index2.merkle_root() != Hash::zero());
+    assert_eq!(index2.merkle_root(), index1.merkle_root());
 }
 
 fn remove_trivial(db1: Box<Database>, db2: Box<Database>) {
@@ -172,8 +172,8 @@ fn remove_trivial(db1: Box<Database>, db2: Box<Database>) {
     index2.put(&[255; 32], vec![6]);
     index2.remove(&[255; 32]);
 
-    assert_eq!(index1.root_hash(), Hash::zero());
-    assert_eq!(index2.root_hash(), Hash::zero());
+    assert_eq!(index1.merkle_root(), Hash::zero());
+    assert_eq!(index2.merkle_root(), Hash::zero());
 }
 
 fn remove_simple(db1: Box<Database>, db2: Box<Database>) {
@@ -202,7 +202,7 @@ fn remove_simple(db1: Box<Database>, db2: Box<Database>) {
     assert!(index1.get(&[245; 32]).is_none());
     assert!(index2.get(&[245; 32]).is_none());
 
-    assert_eq!(index1.root_hash(), index2.root_hash());
+    assert_eq!(index1.merkle_root(), index2.merkle_root());
 }
 
 fn remove_reverse(db1: Box<Database>, db2: Box<Database>) {
@@ -238,7 +238,7 @@ fn remove_reverse(db1: Box<Database>, db2: Box<Database>) {
     index2.remove(&[250; 32]);
     index2.remove(&[255; 32]);
 
-    assert_eq!(index2.root_hash(), index1.root_hash());
+    assert_eq!(index2.merkle_root(), index1.merkle_root());
 }
 
 fn fuzz_insert(db1: Box<Database>, db2: Box<Database>) {
@@ -265,8 +265,8 @@ fn fuzz_insert(db1: Box<Database>, db2: Box<Database>) {
         assert_eq!(v2.as_ref(), Some(&item.1));
     }
 
-    assert!(index2.root_hash() != Hash::zero());
-    assert_eq!(index2.root_hash(), index1.root_hash());
+    assert!(index2.merkle_root() != Hash::zero());
+    assert_eq!(index2.merkle_root(), index1.merkle_root());
 
     // Test same keys
     rng.shuffle(&mut data);
@@ -284,7 +284,7 @@ fn fuzz_insert(db1: Box<Database>, db2: Box<Database>) {
         assert_eq!(v1.as_ref(), Some(&vec![1]));
         assert_eq!(v2.as_ref(), Some(&vec![1]));
     }
-    assert_eq!(index2.root_hash(), index1.root_hash());
+    assert_eq!(index2.merkle_root(), index1.merkle_root());
 }
 
 fn check_map_proof<K, V>(
@@ -311,7 +311,7 @@ fn check_map_proof<K, V>(
             .map(|&(ref k, ref v)| (k, v))
             .collect::<Vec<_>>()
     );
-    assert_eq!(proof.hash(), table.root_hash());
+    assert_eq!(proof.merkle_root(), table.merkle_root());
 }
 
 fn check_map_multiproof<K, V>(
@@ -348,7 +348,7 @@ fn check_map_multiproof<K, V>(
     };
 
     let proof = proof.check().unwrap();
-    assert_eq!(proof.hash(), table.root_hash());
+    assert_eq!(proof.merkle_root(), table.merkle_root());
     assert_eq!(missing_keys.iter().collect::<Vec<&_>>(), {
         let mut actual_keys = proof.missing_keys();
         actual_keys.sort_unstable_by(|&x, &y| {
@@ -717,7 +717,7 @@ fn build_proof_in_complex_tree(db: Box<Database>) {
     );
     check_map_proof(proof, None, &table);
 
-    let subtree_hash = table.root_hash();
+    let subtree_hash = table.merkle_root();
     table.put(&[129; 32], vec![5]);
     // The tree is now as follows:
     // - Bits(0000_0): -> (subtree_hash)
@@ -1002,7 +1002,7 @@ fn fuzz_delete(db1: Box<Database>, db2: Box<Database>) {
         index2.put(&item.0, item.1.clone());
     }
 
-    let saved_hash = index1.root_hash();
+    let saved_hash = index1.merkle_root();
 
     let mut keys_to_remove = data.iter()
         .take(50)
@@ -1023,8 +1023,8 @@ fn fuzz_delete(db1: Box<Database>, db2: Box<Database>) {
         assert!(index2.get(key).is_none());
     }
 
-    assert!(index2.root_hash() != Hash::zero());
-    assert_eq!(index2.root_hash(), index1.root_hash());
+    assert!(index2.merkle_root() != Hash::zero());
+    assert_eq!(index2.merkle_root(), index1.merkle_root());
 
     for item in &data {
         index1.put(&item.0, item.1.clone());
@@ -1040,8 +1040,8 @@ fn fuzz_delete(db1: Box<Database>, db2: Box<Database>) {
         assert_eq!(v1.as_ref(), Some(&item.1));
         assert_eq!(v2.as_ref(), Some(&item.1));
     }
-    assert_eq!(index2.root_hash(), index1.root_hash());
-    assert_eq!(index2.root_hash(), saved_hash);
+    assert_eq!(index2.merkle_root(), index1.merkle_root());
+    assert_eq!(index2.merkle_root(), saved_hash);
 }
 
 fn fuzz_insert_after_delete(db: Box<Database>) {
@@ -1053,7 +1053,7 @@ fn fuzz_insert_after_delete(db: Box<Database>) {
     for item in &data[0..50] {
         index.put(&item.0, item.1.clone());
     }
-    let saved_hash = index.root_hash();
+    let saved_hash = index.merkle_root();
     for item in &data[50..] {
         index.put(&item.0, item.1.clone());
     }
@@ -1069,7 +1069,7 @@ fn fuzz_insert_after_delete(db: Box<Database>) {
         let v1 = index.get(&item.0);
         assert_eq!(v1.as_ref(), None);
     }
-    assert_eq!(index.root_hash(), saved_hash);
+    assert_eq!(index.merkle_root(), saved_hash);
 }
 
 fn iter(db: Box<Database>) {
@@ -1197,14 +1197,14 @@ fn tree_with_hashed_key(db: Box<Database>) {
     );
     let proof = proof.check().unwrap();
     assert_eq!(proof.all_entries(), vec![(&Point::new(1, 2), Some(&vec![1, 2, 3]))]);
-    assert_eq!(proof.hash(), table.root_hash());
+    assert_eq!(proof.merkle_root(), table.merkle_root());
 
     let proof = table.get_proof(Point::new(3, 4)).map(
         |(k, v)| (k.hash(), v),
     );
     let proof = proof.check().unwrap();
     assert_eq!(proof.all_entries(), vec![(&Point::new(3, 4).hash(), Some(&vec![2, 3, 4]))]);
-    assert_eq!(proof.hash(), table.root_hash());
+    assert_eq!(proof.merkle_root(), table.merkle_root());
 
     let key = Point::new(3, 4);
     let other_key = Point::new(1, 2);
@@ -1214,7 +1214,7 @@ fn tree_with_hashed_key(db: Box<Database>) {
     assert_eq!(table.get(&key), None);
     assert_eq!(table.get(&other_key), Some(vec![1, 2, 3]));
     assert_eq!(
-        table.root_hash(),
+        table.merkle_root(),
         hash_isolated_node(&ProofPath::new(&other_key.hash()), &hash(&vec![1, 2, 3]))
     );
 }
@@ -1298,11 +1298,10 @@ mod memorydb_tests {
 mod rocksdb_tests {
     use std::path::Path;
     use tempdir::TempDir;
-    use storage::{Database, RocksDB, RocksDBOptions};
+    use storage::{Database, RocksDB, DbOptions};
 
     fn create_database(path: &Path) -> Box<Database> {
-        let mut opts = RocksDBOptions::default();
-        opts.create_if_missing(true);
+        let opts = DbOptions::default();
         Box::new(RocksDB::open(path, &opts).unwrap())
     }
 

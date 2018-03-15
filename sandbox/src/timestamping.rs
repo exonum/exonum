@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -68,8 +68,8 @@ impl TimestampingTxGenerator {
         let rand = XorShiftRng::from_seed([192, 168, 56, 1]);
 
         TimestampingTxGenerator {
-            rand: rand,
-            data_size: data_size,
+            rand,
+            data_size,
             public_key: keypair.0,
             secret_key: keypair.1,
         }

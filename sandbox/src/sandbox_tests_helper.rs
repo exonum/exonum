@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -75,7 +75,7 @@ impl<'a> BlockBuilder<'a> {
             state_hash: None,
             tx_count: None,
 
-            sandbox: sandbox,
+            sandbox,
         }
     }
 
@@ -110,7 +110,7 @@ impl<'a> BlockBuilder<'a> {
 
     pub fn with_txs_hashes(mut self, tx_hashes: &[Hash]) -> Self {
         // root of merkle table, containing this array of transactions
-        let merkle_root = compute_txs_root_hash(tx_hashes);
+        let merkle_root = compute_txs_merkle_root(tx_hashes);
         self.tx_hash = Some(merkle_root);
         self.tx_count = Some(tx_hashes.len() as u32);
         self
@@ -160,7 +160,7 @@ impl<'a> ProposeBuilder<'a> {
             duration_since_sandbox_time: None,
             prev_hash: None,
             tx_hashes: None,
-            sandbox: sandbox,
+            sandbox,
         }
     }
 
@@ -237,19 +237,18 @@ impl Default for SandboxState {
     }
 }
 
-/// just returns valid Hash object filled with zeros
+/// Returns valid Hash object filled with zeros.
 pub fn empty_hash() -> Hash {
     Hash::from_slice(&[0; HASH_SIZE]).unwrap()
 }
 
-pub fn compute_txs_root_hash(txs: &[Hash]) -> Hash {
-    // TODO use special function
+pub fn compute_txs_merkle_root(txs: &[Hash]) -> Hash {
     use exonum::storage::{MemoryDB, ProofListIndex};
 
     let mut fork = MemoryDB::new().fork();
     let mut hashes = ProofListIndex::new("name", &mut fork);
     hashes.extend(txs.iter().cloned());
-    hashes.root_hash()
+    hashes.merkle_root()
 }
 
 pub fn add_round_with_transactions(

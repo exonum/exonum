@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -203,7 +203,7 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 /// let checked_proof = proof.check().unwrap();
 /// assert_eq!(checked_proof.entries(), vec![(&h1, &100u32)]);
 /// assert_eq!(checked_proof.missing_keys(), vec![&h3]);
-/// assert_eq!(checked_proof.hash(), map.root_hash());
+/// assert_eq!(checked_proof.merkle_root(), map.merkle_root());
 /// ```
 ///
 /// # JSON serialization
@@ -543,7 +543,7 @@ where
     /// let proof = map.get_proof(h2);
     /// let checked_proof = proof.check().unwrap();
     /// assert_eq!(checked_proof.entries(), vec![(&h2, &200u32)]);
-    /// assert_eq!(checked_proof.hash(), map.root_hash());
+    /// assert_eq!(checked_proof.merkle_root(), map.merkle_root());
     /// ```
     ///
     /// [`ProofMapIndex`]: struct.ProofMapIndex.html
@@ -611,7 +611,7 @@ impl<K, V> CheckedMapProof<K, V> {
     }
 
     /// Returns a hash of the map that this proof is constructed for.
-    pub fn hash(&self) -> Hash {
+    pub fn merkle_root(&self) -> Hash {
         self.hash
     }
 }

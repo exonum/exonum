@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -91,7 +91,7 @@ impl MessageBuffer {
         // TODO: check that size >= HEADER_LENGTH
         // TODO: check that payload_length == raw.len()
         // ECR-166
-        MessageBuffer { raw: raw }
+        MessageBuffer { raw }
     }
 
     /// Returns the length of the message in bytes.
@@ -115,7 +115,7 @@ impl MessageBuffer {
     ///
     /// ```
     /// use exonum::messages::MessageBuffer;
-    ///;
+    ///
     /// let message_buffer = MessageBuffer::from_vec(vec![]);
     /// assert!(message_buffer.is_empty());
     /// ```

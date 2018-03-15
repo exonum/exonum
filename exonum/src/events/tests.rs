@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,6 +29,7 @@ use events::network::{NetworkConfiguration, NetworkPart};
 use events::error::log_error;
 use node::{EventsPoolCapacity, NodeChannel};
 use blockchain::ConsensusConfig;
+use helpers::user_agent;
 
 #[derive(Debug)]
 pub struct TestHandler {
@@ -163,7 +164,7 @@ impl TestEvents {
             our_connect_message: connect_message(self.listen_address),
             listen_address: self.listen_address,
             network_config,
-            max_message_len: ConsensusConfig::DEFAULT_MESSAGE_MAX_LEN,
+            max_message_len: ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN,
             network_requests: channel.network_requests,
             network_tx: network_tx.clone(),
         };
@@ -175,7 +176,13 @@ impl TestEvents {
 
 pub fn connect_message(addr: SocketAddr) -> Connect {
     let time = time::UNIX_EPOCH;
-    Connect::new_with_signature(&PublicKey::zero(), addr, time, &Signature::zero())
+    Connect::new_with_signature(
+        &PublicKey::zero(),
+        addr,
+        time,
+        &user_agent::get(),
+        &Signature::zero(),
+    )
 }
 
 pub fn raw_message(id: u16, len: usize) -> RawMessage {
@@ -266,7 +273,7 @@ fn test_network_max_message_len() {
     let first = "127.0.0.1:17202".parse().unwrap();
     let second = "127.0.0.1:17303".parse().unwrap();
 
-    let max_message_length = ConsensusConfig::DEFAULT_MESSAGE_MAX_LEN as usize;
+    let max_message_length = ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN as usize;
     let max_payload_length = max_message_length - ::messages::HEADER_LENGTH -
         ::crypto::SIGNATURE_LENGTH;
     let acceptable_message = raw_message(15, max_payload_length);

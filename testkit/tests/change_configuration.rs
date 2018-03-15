@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -38,17 +38,56 @@ fn test_following_config() {
     };
     let stored = proposal.stored_configuration().clone();
     testkit.commit_configuration_change(proposal);
-    // Check that following configuration is none.
+    // Check that the following configuration is none.
     assert_eq!(
         Schema::new(&testkit.snapshot()).following_configuration(),
         None
     );
     testkit.create_block();
-    // Check that following configuration is appears.
+    // Check that the following configuration has appeared.
     assert_eq!(
         Schema::new(&testkit.snapshot()).following_configuration(),
         Some(stored)
     );
+}
+
+#[test]
+fn test_configuration_and_rollbacks() {
+    let mut testkit = TestKitBuilder::validator().create();
+    testkit.create_blocks_until(Height(5));
+
+    let cfg_change_height = Height(10);
+    let proposal = {
+        let mut cfg = testkit.configuration_change_proposal();
+        cfg.set_actual_from(cfg_change_height);
+        cfg.set_service_config("service", "config");
+        cfg
+    };
+    let old_config = testkit.actual_configuration();
+    let new_config = proposal.stored_configuration().clone();
+
+    testkit.commit_configuration_change(proposal);
+
+    testkit.create_blocks_until(Height(10));
+    assert_eq!(testkit.actual_configuration(), new_config);
+    testkit.rollback(2);
+    assert_eq!(testkit.actual_configuration(), old_config);
+    testkit.create_blocks_until(Height(10));
+    assert_eq!(testkit.actual_configuration(), new_config);
+
+    testkit.rollback(4);
+    assert_eq!(testkit.height(), Height(6));
+    testkit.rollback(1);
+    assert_eq!(testkit.height(), Height(5));
+    // Check regression: if the config is merged to blockchain as a separate patch,
+    // the rollbacks may work incorrectly.
+    testkit.rollback(1);
+    assert_eq!(testkit.height(), Height(4));
+
+    // As rollback is behind the time a proposal entered the blockchain,
+    // the proposal is effectively forgotten.
+    testkit.create_blocks_until(Height(10));
+    assert_eq!(testkit.actual_configuration(), old_config);
 }
 
 #[test]

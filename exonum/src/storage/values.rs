@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,10 +22,11 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crypto::{CryptoHash, Hash, PublicKey};
 use messages::{RawMessage, MessageBuffer};
+use helpers::Round;
 
 /// A type that can be (de)serialized as a value in the blockchain storage.
 ///
-/// `StorageValue` is automatically implemented by the [`encoding_struct!`] and [`message!`]
+/// `StorageValue` is automatically implemented by the [`encoding_struct!`] and [`transactions!`]
 /// macros. In case you need to implement it manually, use little-endian encoding
 /// for integer types for compatibility with modern architectures.
 ///
@@ -73,7 +74,7 @@ use messages::{RawMessage, MessageBuffer};
 /// ```
 ///
 /// [`encoding_struct!`]: ../macro.encoding_struct.html
-/// [`message!`]: ../macro.message.html
+/// [`transactions!`]: ../macro.transactions.html
 pub trait StorageValue: CryptoHash + Sized {
     /// Serialize a value into a vector of bytes.
     fn into_bytes(self) -> Vec<u8>;
@@ -285,6 +286,16 @@ impl StorageValue for SystemTime {
     }
 }
 
+impl StorageValue for Round {
+    fn into_bytes(self) -> Vec<u8> {
+        self.0.into_bytes()
+    }
+
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        Round(u32::from_bytes(value))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -411,6 +422,15 @@ mod tests {
         for time in times.iter() {
             let buffer = time.into_bytes();
             assert_eq!(*time, SystemTime::from_bytes(Cow::Borrowed(&buffer)));
+        }
+    }
+
+    #[test]
+    fn round_round_trip() {
+        let values = [Round::zero(), Round::first(), Round(100), Round(u32::max_value())];
+        for value in values.iter() {
+            let bytes = value.clone().into_bytes();
+            assert_eq!(*value, Round::from_bytes(Cow::Borrowed(&bytes)));
         }
     }
 }

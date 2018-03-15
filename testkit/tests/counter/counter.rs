@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ extern crate iron;
 extern crate router;
 
 use exonum::blockchain::{ApiContext, Blockchain, Service, Transaction, TransactionSet,
-                         ExecutionResult};
+                         ExecutionError, ExecutionResult};
 use exonum::messages::{Message, RawTransaction};
 use exonum::node::{ApiSender, TransactionSend};
 use exonum::storage::{Entry, Fork, Snapshot};
@@ -75,7 +75,7 @@ impl<'a> CounterSchema<&'a mut Fork> {
 // // // // Transactions // // // //
 
 transactions! {
-    CounterTransactions {
+    pub CounterTransactions {
         const SERVICE_ID = SERVICE_ID;
 
         struct TxIncrement {
@@ -94,7 +94,16 @@ impl Transaction for TxIncrement {
         self.verify_signature(self.author())
     }
 
+    // This method purposely does not check counter overflow in order to test
+    // behavior of panicking transactions.
     fn execute(&self, fork: &mut Fork) -> ExecutionResult {
+        if self.by() == 0 {
+            Err(ExecutionError::with_description(
+                0,
+                "Adding zero does nothing!".to_string(),
+            ))?;
+        }
+
         let mut schema = CounterSchema::new(fork);
         schema.inc_count(self.by());
         Ok(())

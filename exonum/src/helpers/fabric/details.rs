@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ use blockchain::config::ValidatorKeys;
 use helpers::generate_testnet_config;
 use helpers::config::ConfigFile;
 use node::{NodeApiConfig, NodeConfig};
-use storage::Database;
+use storage::{Database, RocksDB, DbOptions};
 use crypto;
 use super::internal::{CollectedCommand, Command, Feedback};
 use super::{Argument, CommandName, Context};
@@ -39,6 +39,8 @@ use super::DEFAULT_EXONUM_LISTEN_PORT;
 use super::keys;
 
 const DATABASE_PATH: &str = "DATABASE_PATH";
+const OUTPUT_DIR: &str = "OUTPUT_DIR";
+const PEER_ADDRESS: &str = "PEER_ADDRESS";
 
 /// Run command.
 pub struct Run;
@@ -50,16 +52,12 @@ impl Run {
     }
 
     /// Returns created database instance.
-    pub fn db_helper(ctx: &Context) -> Box<Database> {
-        use storage::{RocksDB, RocksDBOptions};
-
+    pub fn db_helper(ctx: &Context, options: &DbOptions) -> Box<Database> {
         let path = ctx.arg::<String>(DATABASE_PATH).expect(&format!(
             "{} not found.",
             DATABASE_PATH
         ));
-        let mut options = RocksDBOptions::default();
-        options.create_if_missing(true);
-        Box::new(RocksDB::open(Path::new(&path), &options).unwrap())
+        Box::new(RocksDB::open(Path::new(&path), options).unwrap())
     }
 
     fn node_config(ctx: &Context) -> NodeConfig {
@@ -194,7 +192,7 @@ impl RunDev {
         node_config_ctx.set_arg("COMMON_CONFIG", common_config_path.clone());
         node_config_ctx.set_arg("PUB_CONFIG", pub_config_path.clone());
         node_config_ctx.set_arg("SEC_CONFIG", sec_config_path.clone());
-        node_config_ctx.set_arg("PEER_ADDR", peer_addr.into());
+        node_config_ctx.set_arg(PEER_ADDRESS, peer_addr.into());
         let node_config_command = commands.get(GenerateNodeConfig::name()).expect(
             "Expected GenerateNodeConfig in the commands list.",
         );
@@ -325,19 +323,22 @@ impl GenerateNodeConfig {
     }
 
     fn addr(context: &Context) -> (SocketAddr, SocketAddr) {
-        let addr = context.arg::<String>("PEER_ADDR").unwrap_or_default();
+        let addr = context.arg::<String>(PEER_ADDRESS).unwrap_or_default();
 
         let mut addr_parts = addr.split(':');
         let ip = addr_parts.next().expect("Expected ip address");
         if ip.len() < 8 {
-            panic!("Expected ip address in PEER_ADDR.")
+            panic!("Expected ip address in {}.", PEER_ADDRESS);
         }
         let port = addr_parts.next().map_or(DEFAULT_EXONUM_LISTEN_PORT, |s| {
             s.parse().expect("could not parse port")
         });
-        let external_addr = format!("{}:{}", ip, port);
-        let listen_addr = format!("0.0.0.0:{}", port);
-        (external_addr.parse().unwrap(), listen_addr.parse().unwrap())
+        let external_address = format!("{}:{}", ip, port);
+        let listen_address = format!("0.0.0.0:{}", port);
+        (
+            external_address.parse().unwrap(),
+            listen_address.parse().unwrap(),
+        )
     }
 }
 
@@ -348,11 +349,11 @@ impl Command for GenerateNodeConfig {
             Argument::new_positional("PUB_CONFIG", true, "Path where save public config."),
             Argument::new_positional("SEC_CONFIG", true, "Path where save private config."),
             Argument::new_named(
-                "PEER_ADDR",
+                PEER_ADDRESS,
                 true,
                 "Remote peer address",
                 "a",
-                "peer-addr",
+                "peer-address",
                 false
             ),
         ]
@@ -412,7 +413,7 @@ impl Command for GenerateNodeConfig {
         };
         let shared_config = SharedConfig {
             node: node_pub_config,
-            common: common,
+            common,
         };
         // Save public config separately.
         ConfigFile::save(&shared_config, &pub_config_path).expect(
@@ -567,12 +568,12 @@ impl Command for Finalize {
                 external_address: our.map(|o| o.addr),
                 network: Default::default(),
                 whitelist: Default::default(),
-                peers: peers,
+                peers,
                 consensus_public_key: secret_config.consensus_public_key,
                 consensus_secret_key: secret_config.consensus_secret_key,
                 service_public_key: secret_config.service_public_key,
                 service_secret_key: secret_config.service_secret_key,
-                genesis: genesis,
+                genesis,
                 api: NodeApiConfig {
                     public_api_address: public_addr,
                     private_api_address: private_addr,
@@ -580,6 +581,7 @@ impl Command for Finalize {
                 },
                 mempool: Default::default(),
                 services_configs: Default::default(),
+                database: Some(Default::default()),
             }
         };
 
@@ -616,11 +618,11 @@ impl Command for GenerateTestnet {
     fn args(&self) -> Vec<Argument> {
         vec![
             Argument::new_named(
-                "OUTPUT_DIR",
+                OUTPUT_DIR,
                 true,
                 "Path to directory where save configs.",
                 "o",
-                "output_dir",
+                "output-dir",
                 false
             ),
             Argument::new_named(
@@ -649,7 +651,7 @@ impl Command for GenerateTestnet {
         mut context: Context,
         exts: &Fn(Context) -> Context,
     ) -> Feedback {
-        let dir = context.arg::<String>("OUTPUT_DIR").expect("output dir");
+        let dir = context.arg::<String>(OUTPUT_DIR).expect("output dir");
         let count: u8 = context.arg("COUNT").expect("count as int");
         let start_port = context.arg::<u16>("START_PORT").unwrap_or(
             DEFAULT_EXONUM_LISTEN_PORT,

@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,7 +24,8 @@ use std::cell::Cell;
 use std::marker::PhantomData;
 
 use crypto::{hash, CryptoHash, Hash};
-use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
+use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue, StorageKey};
+use super::indexes_metadata::IndexType;
 
 #[derive(Debug, Default, Clone, Copy)]
 struct SparseListSize {
@@ -69,6 +70,7 @@ impl StorageValue for SparseListSize {
 /// `SparseListIndex` implements an array list, storing the element as values and using `u64`
 /// as an index.
 /// `SparseListIndex` requires that the elements implement the [`StorageValue`] trait.
+///
 /// [`StorageValue`]: ../trait.StorageValue.html
 /// [`ListIndex`]: <../list_index/struct.ListIndex.html>
 #[derive(Debug)]
@@ -116,12 +118,17 @@ pub struct SparseListIndexValues<'a, V> {
     base_iter: BaseIndexIter<'a, (), V>,
 }
 
-impl<T, V> SparseListIndex<T, V> {
+impl<T, V> SparseListIndex<T, V>
+where
+    T: AsRef<Snapshot>,
+    V: StorageValue,
+{
     /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     ///
@@ -136,20 +143,21 @@ impl<T, V> SparseListIndex<T, V> {
     /// let index: SparseListIndex<_, u8> = SparseListIndex::new(name, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         SparseListIndex {
-            base: BaseIndex::new(name, view),
+            base: BaseIndex::new(index_name, IndexType::SparseList, view),
             size: Cell::new(None),
             _v: PhantomData,
         }
     }
 
-    /// Creates a new index representation based on the name, common prefix of its keys
+    /// Creates a new index representation based on the name, index id in family
     /// and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     ///
@@ -161,24 +169,23 @@ impl<T, V> SparseListIndex<T, V> {
     /// let db = MemoryDB::new();
     /// let snapshot = db.snapshot();
     /// let name = "name";
-    /// let prefix = vec![123];
-    /// let index: SparseListIndex<_, u8> = SparseListIndex::with_prefix(name, prefix, &snapshot);
+    /// let index_id = vec![123];
+    /// let index: SparseListIndex<_, u8> =
+    ///                             SparseListIndex::new_in_family(name, &index_id, &snapshot);
     /// # drop(index);
     /// ```
-    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
+    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
+        family_name: S,
+        index_id: &I,
+        view: T,
+    ) -> Self {
         SparseListIndex {
-            base: BaseIndex::with_prefix(name, prefix, view),
+            base: BaseIndex::new_in_family(family_name, index_id, IndexType::SparseList, view),
             size: Cell::new(None),
             _v: PhantomData,
         }
     }
-}
 
-impl<T, V> SparseListIndex<T, V>
-where
-    T: AsRef<Snapshot>,
-    V: StorageValue,
-{
     fn size(&self) -> SparseListSize {
         if let Some(size) = self.size.get() {
             return size;
@@ -755,11 +762,10 @@ mod tests {
     mod rocksdb_tests {
         use std::path::Path;
         use tempdir::TempDir;
-        use storage::{Database, RocksDB, RocksDBOptions};
+        use storage::{Database, RocksDB, DbOptions};
 
         fn create_database(path: &Path) -> Box<Database> {
-            let mut opts = RocksDBOptions::default();
-            opts.create_if_missing(true);
+            let opts = DbOptions::default();
             Box::new(RocksDB::open(path, &opts).unwrap())
         }
 

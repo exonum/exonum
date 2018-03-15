@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ use std::borrow::Cow;
 use std::marker::PhantomData;
 
 use super::{StorageKey, StorageValue, Snapshot, Fork, Iter};
+use storage::indexes_metadata::{self, IndexType, INDEXES_METADATA_TABLE_NAME};
 
 /// Basic struct for all indices that implements common features.
 ///
@@ -28,12 +29,16 @@ use super::{StorageKey, StorageValue, Snapshot, Fork, Iter};
 /// `BaseIndex` requires that the keys implement the [`StorageKey`] trait and the values implement
 /// [`StorageValue`] trait. However, this structure is not bound to specific types and allows the
 /// use of *any* types as keys or values.
+///
 /// [`StorageKey`]: ../trait.StorageKey.html
 /// [`StorageValue`]: ../trait.StorageValue.html
 #[derive(Debug)]
 pub struct BaseIndex<T> {
     name: String,
-    prefix: Option<Vec<u8>>,
+    is_family: bool,
+    index_id: Option<Vec<u8>>,
+    is_mutable: bool,
+    index_type: IndexType,
     view: T,
 }
 
@@ -48,50 +53,97 @@ pub struct BaseIndex<T> {
 pub struct BaseIndexIter<'a, K, V> {
     base_iter: Iter<'a>,
     base_prefix_len: usize,
-    prefix: Vec<u8>,
+    index_id: Vec<u8>,
     ended: bool,
     _k: PhantomData<K>,
     _v: PhantomData<V>,
 }
 
-impl<T> BaseIndex<T> {
+impl<T> BaseIndex<T>
+where
+    T: AsRef<Snapshot>,
+{
     /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
-    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
-        assert_valid_name(&name);
+    pub fn new<S: AsRef<str>>(index_name: S, index_type: IndexType, view: T) -> Self {
+        assert_valid_name(&index_name);
+
+        let is_family = false;
+        indexes_metadata::assert_index_type(
+            index_name.as_ref(),
+            index_type,
+            is_family,
+            view.as_ref(),
+        );
 
         BaseIndex {
-            name: name.as_ref().to_string(),
-            prefix: None,
+            name: index_name.as_ref().to_string(),
+            is_family,
+            index_id: None,
+            is_mutable: false,
+            index_type,
             view,
         }
     }
 
-    /// Creates a new index representation based on the name, common prefix of its keys
+    /// Creates a new index representation based on the family name, index id inside family
     /// and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
-    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
-        assert_valid_name(&name);
+    pub fn new_in_family<S: AsRef<str>, P: StorageKey>(
+        family_name: S,
+        index_id: &P,
+        index_type: IndexType,
+        view: T,
+    ) -> Self {
+        assert_valid_name(&family_name);
+
+        let is_family = true;
+        indexes_metadata::assert_index_type(
+            family_name.as_ref(),
+            index_type,
+            is_family,
+            view.as_ref(),
+        );
 
         BaseIndex {
-            name: name.as_ref().to_string(),
-            prefix: Some(prefix),
+            name: family_name.as_ref().to_string(),
+            is_family,
+            index_id: {
+                let mut buf = vec![0; index_id.size()];
+                index_id.write(&mut buf);
+                Some(buf)
+            },
+            is_mutable: false,
+            index_type,
+            view,
+        }
+    }
+
+    pub(crate) fn indexes_metadata(view: T) -> Self {
+        BaseIndex {
+            name: INDEXES_METADATA_TABLE_NAME.to_string(),
+            is_family: false,
+            index_id: None,
+            is_mutable: true,
+            index_type: IndexType::Map,
             view,
         }
     }
 
     fn prefixed_key<K: StorageKey + ?Sized>(&self, key: &K) -> Vec<u8> {
-        match self.prefix {
+        match self.index_id {
             Some(ref prefix) => {
                 let mut v = vec![0; prefix.len() + key.size()];
                 v[..prefix.len()].copy_from_slice(prefix);
@@ -105,12 +157,7 @@ impl<T> BaseIndex<T> {
             }
         }
     }
-}
 
-impl<T> BaseIndex<T>
-where
-    T: AsRef<Snapshot>,
-{
     /// Returns a value of *any* type corresponding to the key of *any* type.
     pub fn get<K, V>(&self, key: &K) -> Option<V>
     where
@@ -147,8 +194,8 @@ where
         let iter_prefix = self.prefixed_key(subprefix);
         BaseIndexIter {
             base_iter: self.view.as_ref().iter(&self.name, &iter_prefix),
-            base_prefix_len: self.prefix.as_ref().map_or(0, |p| p.len()),
-            prefix: iter_prefix,
+            base_prefix_len: self.index_id.as_ref().map_or(0, |p| p.len()),
+            index_id: iter_prefix,
             ended: false,
             _k: PhantomData,
             _v: PhantomData,
@@ -169,8 +216,8 @@ where
         let iter_from = self.prefixed_key(from);
         BaseIndexIter {
             base_iter: self.view.as_ref().iter(&self.name, &iter_from),
-            base_prefix_len: self.prefix.as_ref().map_or(0, |p| p.len()),
-            prefix: iter_prefix,
+            base_prefix_len: self.index_id.as_ref().map_or(0, |p| p.len()),
+            index_id: iter_prefix,
             ended: false,
             _k: PhantomData,
             _v: PhantomData,
@@ -179,12 +226,25 @@ where
 }
 
 impl<'a> BaseIndex<&'a mut Fork> {
+    fn set_index_type(&mut self) {
+        if !self.is_mutable {
+            indexes_metadata::set_index_type(
+                &self.name,
+                self.index_type,
+                self.is_family,
+                &mut self.view,
+            );
+            self.is_mutable = true;
+        }
+    }
+
     /// Inserts the key-value pair into the index. Both key and value may be of *any* types.
     pub fn put<K, V>(&mut self, key: &K, value: V)
     where
         K: StorageKey,
         V: StorageValue,
     {
+        self.set_index_type();
         let key = self.prefixed_key(key);
         self.view.put(&self.name, key, value.into_bytes());
     }
@@ -194,6 +254,7 @@ impl<'a> BaseIndex<&'a mut Fork> {
     where
         K: StorageKey + ?Sized,
     {
+        self.set_index_type();
         let key = self.prefixed_key(key);
         self.view.remove(&self.name, key);
     }
@@ -207,7 +268,11 @@ impl<'a> BaseIndex<&'a mut Fork> {
     /// this method the amount of allocated memory is linearly dependent on the number of elements
     /// in the index.
     pub fn clear(&mut self) {
-        self.view.remove_by_prefix(&self.name, self.prefix.as_ref());
+        self.set_index_type();
+        self.view.remove_by_prefix(
+            &self.name,
+            self.index_id.as_ref(),
+        );
     }
 }
 
@@ -223,7 +288,7 @@ where
             return None;
         }
         if let Some((k, v)) = self.base_iter.next() {
-            if k.starts_with(&self.prefix) {
+            if k.starts_with(&self.index_id) {
                 return Some((
                     K::read(&k[self.base_prefix_len..]),
                     V::from_bytes(Cow::Borrowed(v)),
@@ -260,8 +325,6 @@ fn assert_valid_name<S: AsRef<str>>(name: S) {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    static INDEX_NAME: &str = "test_index_name";
 
     #[test]
     fn test_index_name_validator() {

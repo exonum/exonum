@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,8 @@ extern crate exonum_testkit;
 extern crate serde_json;
 
 use exonum::crypto::{gen_keypair, Hash, PublicKey, CryptoHash};
-use exonum::blockchain::{Block, Schema, Service, Transaction, TransactionSet, ExecutionResult};
+use exonum::blockchain::{Schema, Service, Transaction, TransactionSet, ExecutionResult};
+use exonum::api::public::BlocksRange;
 use exonum::messages::{Message, RawTransaction};
 use exonum::storage::{Fork, Snapshot};
 use exonum::encoding;
@@ -92,8 +93,8 @@ fn main() {
     assert!(schema.transactions().contains(&tx3.hash()));
     // Check results with api.
     let api = testkit.api();
-    let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10");
-    assert_eq!(blocks.len(), 2);
+    let blocks_range: BlocksRange = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+    assert_eq!(blocks_range.blocks.len(), 2);
     api.get::<serde_json::Value>(
         ApiKind::Explorer,
         &format!("v1/transactions/{}", tx1.hash().to_string()),

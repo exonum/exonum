@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -56,6 +56,12 @@ impl<T: Database> Database for CheckpointDb<T> {
 
     fn merge_sync(&self, patch: Patch) -> StorageResult<()> {
         self.merge(patch)
+    }
+}
+
+impl<T: Database> From<CheckpointDb<T>> for Arc<Database> {
+    fn from(db: CheckpointDb<T>) -> Arc<Database> {
+        Arc::from(Box::new(db) as Box<Database>)
     }
 }
 

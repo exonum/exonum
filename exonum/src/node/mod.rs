@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,20 +31,20 @@ use router::Router;
 use mount::Mount;
 use iron::{Chain, Iron};
 use iron_cors::CorsMiddleware;
-use serde::{ser, de};
+use serde::{de, ser};
 use futures::{Future, Sink};
 use futures::sync::mpsc;
 use tokio_core::reactor::Core;
 
-use crypto::{self, Hash, CryptoHash, PublicKey, SecretKey};
-use blockchain::{Blockchain, GenesisConfig, Schema, SharedNodeState, Transaction, Service};
+use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
+use blockchain::{Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction};
 use api::{private, public, Api};
 use messages::{Connect, Message, RawMessage};
-use events::{NetworkRequest, TimeoutRequest, NetworkEvent, InternalRequest, InternalEvent,
-             SyncSender, HandlerPart, NetworkConfiguration, NetworkPart, InternalPart};
-use events::error::{into_other, other_error, LogError, log_error};
-use helpers::{Height, Milliseconds, Round, ValidatorId};
-use storage::Database;
+use events::{HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkConfiguration,
+             NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest};
+use events::error::{into_other, log_error, other_error, LogError};
+use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
+use storage::{Database, DbOptions};
 
 pub use self::state::{RequestData, State, TxPool, ValidatorState};
 pub use self::whitelist::Whitelist;
@@ -60,12 +60,14 @@ pub mod timeout_adjuster;
 /// External messages.
 #[derive(Debug)]
 pub enum ExternalMessage {
-    /// Add new connection
+    /// Add a new connection.
     PeerAdd(SocketAddr),
     /// Transaction that implements the `Transaction` trait.
     Transaction(Box<Transaction>),
     /// Enable or disable the node.
     Enable(bool),
+    /// Shutdown the node.
+    Shutdown,
 }
 
 /// Node timeout types.
@@ -87,7 +89,7 @@ pub enum NodeTimeout {
 
 /// A helper trait that provides the node with information about the state of the system such
 /// as current time or listen address.
-pub trait SystemStateProvider: ::std::fmt::Debug {
+pub trait SystemStateProvider: ::std::fmt::Debug + Send + 'static {
     /// Returns the current address that the node listens on.
     fn listen_address(&self) -> SocketAddr;
     /// Return the current system time.
@@ -102,9 +104,9 @@ pub struct ApiSender(pub mpsc::Sender<ExternalMessage>);
 pub struct NodeHandler {
     /// State of the `NodeHandler`.
     pub state: State,
-    /// Shared api state
+    /// Shared api state.
     pub api_state: SharedNodeState,
-    /// System state
+    /// System state.
     pub system_state: Box<SystemStateProvider>,
     /// Channel for messages and timeouts.
     pub channel: NodeSender,
@@ -182,9 +184,9 @@ impl From<AllowOrigin> for CorsMiddleware {
     fn from(allow_origin: AllowOrigin) -> CorsMiddleware {
         match allow_origin {
             AllowOrigin::Any => CorsMiddleware::with_allow_any(),
-            AllowOrigin::Whitelist(hosts) => CorsMiddleware::with_whitelist(
-                hosts.into_iter().collect(),
-            ),
+            AllowOrigin::Whitelist(hosts) => {
+                CorsMiddleware::with_whitelist(hosts.into_iter().collect())
+            }
         }
     }
 }
@@ -269,7 +271,6 @@ fn allow_origin_serde() {
     );
 }
 
-
 /// Events pool capacities.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EventsPoolCapacity {
@@ -293,7 +294,6 @@ impl Default for EventsPoolCapacity {
         }
     }
 }
-
 
 /// Memory pool configuration parameters.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -343,6 +343,8 @@ pub struct NodeConfig {
     pub mempool: MemoryPoolConfig,
     /// Additional config, usable for services.
     pub services_configs: BTreeMap<String, Value>,
+    /// Optional database configuration.
+    pub database: Option<DbOptions>,
 }
 
 /// Configuration for the `NodeHandler`.
@@ -404,6 +406,7 @@ impl NodeHandler {
             &config.listener.consensus_public_key,
             external_address,
             system_state.current_time(),
+            &user_agent::get(),
             &config.listener.consensus_secret_key,
         );
 
@@ -486,7 +489,11 @@ impl NodeHandler {
             info!("Trying to connect with peer {}", address);
         }
 
-        let round = Round::first();
+        let snapshot = self.blockchain.snapshot();
+        let schema = Schema::new(&snapshot);
+
+        // Recover previous saved round if any
+        let round = schema.consensus_round();
         self.state.jump_round(round);
         info!("Jump to round {}", round);
 
@@ -494,6 +501,13 @@ impl NodeHandler {
         self.add_status_timeout();
         self.add_peer_exchange_timeout();
         self.add_update_api_state_timeout();
+
+        // Recover cached consensus messages if any. We do this after main initialization and before
+        // the start of event processing.
+        let messages = schema.consensus_messages_cache();
+        for msg in messages.iter() {
+            self.handle_message(msg);
+        }
     }
 
     /// Sends the given message to a peer by its id.
@@ -748,7 +762,11 @@ impl NodeChannel {
 
 impl Node {
     /// Creates node for the given services and node configuration.
-    pub fn new(db: Box<Database>, services: Vec<Box<Service>>, node_cfg: NodeConfig) -> Self {
+    pub fn new<D: Into<Arc<Database>>>(
+        db: D,
+        services: Vec<Box<Service>>,
+        node_cfg: NodeConfig,
+    ) -> Self {
         crypto::init();
 
         if cfg!(feature = "flame_profile") {
@@ -768,10 +786,7 @@ impl Node {
             node_cfg.service_secret_key.clone(),
             ApiSender::new(channel.api_requests.0.clone()),
         );
-        blockchain
-            .create_genesis_block(node_cfg.genesis.clone())
-            .unwrap();
-
+        blockchain.initialize(node_cfg.genesis.clone()).unwrap();
 
         let config = Configuration {
             listener: ListenerConfig {
@@ -902,7 +917,7 @@ impl Node {
             our_connect_message: connect_message,
             listen_address: self.handler.system_state.listen_address(),
             network_requests: self.channel.network_requests,
-            network_tx: network_tx,
+            network_tx,
             network_config: self.network_config,
             max_message_len: self.max_message_len,
         };
