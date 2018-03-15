@@ -1,5 +1,5 @@
 export default {
-  install: function(Vue) {
+  install(Vue) {
     Vue.prototype.$validateHex = function(hash, bytes) {
       bytes = bytes || 32
 

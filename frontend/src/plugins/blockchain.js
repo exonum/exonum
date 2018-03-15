@@ -5,6 +5,8 @@ const TX_URL = '/api/services/cryptocurrency/v1/wallets/transaction'
 const CONFIG_URL = '/api/services/configuration/v1/configs/actual'
 const WALLET_URL = '/api/services/cryptocurrency/v1/wallets/info?pubkey='
 
+const ATTEMPTS = 10
+const ATTEMPT_TIMEOUT = 500
 const NETWORK_ID = 0
 const PROTOCOL_VERSION = 0
 const SERVICE_ID = 128
@@ -96,8 +98,103 @@ function getPublicKeyOfTransaction(transactionId, transaction) {
   }
 }
 
+function getWallet(keyPair) {
+  return axios.get(CONFIG_URL).then(response => {
+    // actual list of public keys of validators
+    const validators = response.data.config.validator_keys.map(validator => {
+      return validator.consensus_key
+    })
+
+    return axios.get(WALLET_URL + keyPair.publicKey).then(response => {
+      return response.data
+    }).then((data) => {
+      if (!Exonum.verifyBlock(data.block_info, validators, NETWORK_ID)) {
+        throw new Error('Block can not be verified')
+      }
+
+      // find root hash of table with wallets in the tree of all tables
+      const tableKey = TableKey.hash({
+        service_id: SERVICE_ID,
+        table_index: 0
+      })
+      const walletsHash = Exonum.merklePatriciaProof(data.block_info.block.state_hash, data.wallet.mpt_proof, tableKey)
+      if (walletsHash === null) {
+        throw new Error('Wallets table not found')
+      }
+
+      // find wallet in the tree of all wallets
+      const wallet = Exonum.merklePatriciaProof(walletsHash, data.wallet.value, keyPair.publicKey, Wallet)
+      if (wallet === null) {
+        throw new Error('Wallet not found')
+      }
+
+      // get transactions
+      const transactionsMetaData = Exonum.merkleProof(
+        wallet.history_hash,
+        wallet.history_len,
+        data.wallet_history.mt_proof,
+        [0, wallet.history_len],
+        TransactionMetaData
+      )
+
+      if (data.wallet_history.values.length !== transactionsMetaData.length) {
+        // number of transactions in wallet history is not equal
+        // to number of transactions in array with transactions meta data
+        throw new Error('Transactions can not be verified')
+      }
+
+      // validate each transaction
+      let transactions = []
+      for (let i = 0; i < data.wallet_history.values.length; i++) {
+        let Transaction = getTransaction(data.wallet_history.values[i].message_id)
+        const publicKey = getPublicKeyOfTransaction(data.wallet_history.values[i].message_id, data.wallet_history.values[i].body)
+
+        Transaction.signature = data.wallet_history.values[i].signature
+
+        if (Transaction.hash(data.wallet_history.values[i].body) !== transactionsMetaData[i].tx_hash) {
+          throw new Error('Invalid transaction hash has been found')
+        } else if (!Transaction.verifySignature(data.wallet_history.values[i].signature, publicKey, data.wallet_history.values[i].body)) {
+          throw new Error('Invalid transaction signature has been found')
+        }
+
+        transactions.push(Object.assign({
+          hash: transactionsMetaData[i].tx_hash,
+          status: transactionsMetaData[i].execution_status
+        }, data.wallet_history.values[i]))
+      }
+
+      return {
+        block: data.block_info.block,
+        wallet: wallet,
+        transactions: transactions
+      }
+    })
+  })
+}
+
+function waitForAcceptance(keyPair, hash) {
+  let attempt = ATTEMPTS
+
+  return (function makeAttempt() {
+    return getWallet(keyPair).then(data => {
+      // find transaction in a wallet proof
+      if (typeof data.transactions.find((transaction) => transaction.hash === hash) === 'undefined') {
+        if (--attempt > 0) {
+          return new Promise((resolve) => {
+            setTimeout(resolve, ATTEMPT_TIMEOUT)
+          }).then(makeAttempt)
+        } else {
+          throw new Error('Transaction has not been found')
+        }
+      } else {
+        return data
+      }
+    })
+  })();
+}
+
 module.exports = {
-  install: function(Vue) {
+  install(Vue) {
     Vue.prototype.$blockchain = {
       createWallet: name => {
         const keyPair = Exonum.keyPair()
@@ -118,9 +215,7 @@ module.exports = {
           message_id: TX_WALLET_ID,
           signature: signature,
           body: data
-        }).then(() => {
-          return keyPair
-        })
+        }).then(() => keyPair)
       },
 
       addFunds: (keyPair, amountToAdd) => {
@@ -141,7 +236,7 @@ module.exports = {
           message_id: TX_ISSUE_ID,
           signature: signature,
           body: data
-        })
+        }).then(response => waitForAcceptance(keyPair, response.data.tx_hash))
       },
 
       transfer: (keyPair, receiver, amountToTransfer) => {
@@ -163,82 +258,10 @@ module.exports = {
           message_id: TX_TRANSFER_ID,
           signature: signature,
           body: data
-        })
+        }).then(response => waitForAcceptance(keyPair, response.data.tx_hash))
       },
 
-      getWallet: keyPair => {
-        return axios.get(CONFIG_URL).then(response => {
-          // actual list of public keys of validators
-          const validators = response.data.config.validator_keys.map(validator => {
-            return validator.consensus_key
-          })
-
-          return axios.get(WALLET_URL + keyPair.publicKey).then(response => {
-            return response.data
-          }).then((data) => {
-            if (!Exonum.verifyBlock(data.block_info, validators, NETWORK_ID)) {
-              throw new Error('Block can not be verified')
-            }
-
-            // find root hash of table with wallets in the tree of all tables
-            const tableKey = TableKey.hash({
-              service_id: SERVICE_ID,
-              table_index: 0
-            })
-            const walletsHash = Exonum.merklePatriciaProof(data.block_info.block.state_hash, data.wallet.mpt_proof, tableKey)
-            if (walletsHash === null) {
-              throw new Error('Wallets table not found')
-            }
-
-            // find wallet in the tree of all wallets
-            const wallet = Exonum.merklePatriciaProof(walletsHash, data.wallet.value, keyPair.publicKey, Wallet)
-            if (wallet === null) {
-              throw new Error('Wallet not found')
-            }
-
-            // get transactions
-            const transactionsMetaData = Exonum.merkleProof(
-              wallet.history_hash,
-              wallet.history_len,
-              data.wallet_history.mt_proof,
-              [0, wallet.history_len],
-              TransactionMetaData
-            )
-
-            if (data.wallet_history.values.length !== transactionsMetaData.length) {
-              // number of transactions in wallet history is not equal
-              // to number of transactions in array with transactions meta data
-              throw new Error('Transactions can not be verified')
-            }
-
-            // validate each transaction
-            let transactions = []
-            for (let i = 0; i < data.wallet_history.values.length; i++) {
-              let Transaction = getTransaction(data.wallet_history.values[i].message_id)
-              const publicKey = getPublicKeyOfTransaction(data.wallet_history.values[i].message_id, data.wallet_history.values[i].body)
-
-              Transaction.signature = data.wallet_history.values[i].signature
-
-              if (Transaction.hash(data.wallet_history.values[i].body) !== transactionsMetaData[i].tx_hash) {
-                throw new Error('Invalid transaction hash has been found')
-              } else if (!Transaction.verifySignature(data.wallet_history.values[i].signature, publicKey, data.wallet_history.values[i].body)) {
-                throw new Error('Invalid transaction signature has been found')
-              }
-
-              transactions.push(Object.assign({
-                hash: transactionsMetaData[i].tx_hash,
-                status: transactionsMetaData[i].execution_status
-              }, data.wallet_history.values[i]))
-            }
-
-            return {
-              block: data.block_info.block,
-              wallet: wallet,
-              transactions: transactions
-            }
-          })
-        })
-      }
+      getWallet: getWallet
     }
   }
 }

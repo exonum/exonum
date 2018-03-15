@@ -1,7 +1,7 @@
 import Noty from 'noty'
 
 export default {
-  install: function(Vue) {
+  install(Vue) {
     Vue.prototype.$notify = function(type = 'information', text) {
       new Noty({
         theme: 'bootstrap-v4',
