@@ -498,8 +498,7 @@ impl Sandbox {
             {
                 let mut schema = Schema::new(&mut fork);
                 for hash in recover {
-                    schema.transactions_mut().remove(&hash);
-                    schema.transactions_pool_mut().remove(&hash);
+                    schema.reject_transaction(&hash).unwrap();
                 }
             }
             fork.into_patch()

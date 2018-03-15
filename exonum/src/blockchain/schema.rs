@@ -343,6 +343,7 @@ where
     #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
     pub fn pool_len(&self) -> usize {
         let pool = self.transactions_pool();
+        // TODO: Change count to other method with O(1) complexity (ECR-977)
         let count = pool.iter().count();
         count
     }
@@ -352,8 +353,7 @@ impl<'a> Schema<&'a mut Fork> {
     /// Mutable reference to the [`transactions`][1] index.
     ///
     /// [1]: struct.Schema.html#method.transactions
-    #[doc(hidden)]
-    pub fn transactions_mut(&mut self) -> MapIndex<&mut Fork, Hash, RawMessage> {
+    pub(crate) fn transactions_mut(&mut self) -> MapIndex<&mut Fork, Hash, RawMessage> {
         MapIndex::new(TRANSACTIONS, self.view)
     }
 
@@ -369,8 +369,7 @@ impl<'a> Schema<&'a mut Fork> {
     /// Mutable reference to the [`transactions_pool`][1] index.
     ///
     /// [1]: struct.Schema.html#method.transactions_pool
-    #[doc(hidden)]
-    pub fn transactions_pool_mut(&mut self) -> KeySetIndex<&mut Fork, Hash> {
+    fn transactions_pool_mut(&mut self) -> KeySetIndex<&mut Fork, Hash> {
         KeySetIndex::new(TRANSACTIONS_POOL, self.view)
     }
 
@@ -489,10 +488,24 @@ impl<'a> Schema<&'a mut Fork> {
         // TODO: clear storages
     }
 
-    /// Adds transaction into persistent pool
+    /// Adds transaction into persistent pool.
     #[doc(hidden)]
     pub fn add_transaction_into_pool(&mut self, tx: RawMessage) {
         self.transactions_pool_mut().insert(tx.hash());
         self.transactions_mut().put(&tx.hash(), tx);
+    }
+
+    /// Change transaction status from `in_pool`, to `committed`.
+    pub(crate) fn commit_transaction(&mut self, tx_hash: &Hash) {
+        self.transactions_pool_mut().remove(tx_hash)
+    }
+
+    /// Remove transaction from persistent pool.
+    #[doc(hidden)]
+    pub fn reject_transaction(&mut self, tx_hash: &Hash) -> Result<(), ()> {
+        let contains = self.transactions_pool_mut().contains(tx_hash);
+        self.transactions_pool_mut().remove(tx_hash);
+        self.transactions_mut().remove(tx_hash);
+        if contains { Ok(()) } else { Err(()) }
     }
 }

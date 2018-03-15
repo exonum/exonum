@@ -739,8 +739,8 @@ impl State {
     }
 
 
-    /// Handles a transaction validated event and returns list of proposes
-    /// that don't contain unknown transactions now.
+    /// Checks whether some proposes are waiting for this transaction.
+    /// Returns a list of proposes that don't contain unknown transactions.
     ///
     /// Transaction is ignored if the following criteria are fulfilled:
     ///

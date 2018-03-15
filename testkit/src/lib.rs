@@ -590,9 +590,10 @@ impl TestKit {
                     .filter(|tx| tx.verify())
                     .map(|tx| {
                         let tx_id = tx.hash();
+                        let tx_not_found = !schema.transactions().contains(&tx_id);
+                        let tx_in_pool = schema.transactions_pool().contains(&tx_id);
                         assert!(
-                            !schema.transactions().contains(&tx_id) ||
-                                schema.transactions_pool().contains(&tx_id),
+                            tx_not_found || tx_in_pool,
                             "Transaction is already committed: {:?}",
                             tx
                         );
@@ -647,7 +648,7 @@ impl TestKit {
         let schema = CoreSchema::new(&snapshot);
         let txs = schema.transactions_pool();
         let tx_hashes: Vec<_> = txs.iter().collect();
-        //FIXME: every block should contain two merges
+        //TODO: every block should contain two merges (ECR-975)
         {
             let blockchain = self.blockchain_mut();
             let fork = blockchain.fork();

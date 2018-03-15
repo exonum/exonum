@@ -389,7 +389,7 @@ impl Blockchain {
 
         let mut schema = Schema::new(fork);
         schema.transaction_results_mut().put(&tx_hash, tx_result);
-        schema.transactions_pool_mut().remove(&tx_hash);
+        schema.commit_transaction(&tx_hash);
         schema.block_txs_mut(height).push(tx_hash);
         let location = TxLocation::new(height, index as u64);
         schema.tx_location_by_tx_hash_mut().put(&tx_hash, location);
