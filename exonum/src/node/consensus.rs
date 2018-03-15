@@ -216,9 +216,9 @@ impl NodeHandler {
                 for raw in msg.transactions() {
                     if let Some(tx) = self.blockchain.tx_from_raw(raw) {
                         let hash = tx.hash();
-                        if schema.transactions().get(&hash).is_some() {
+                        if schema.transactions().contains(&hash) {
                             error!(
-                                "Received block with already committed transaction, block={:?}",
+                                "Received block with already known transaction, block={:?}",
                                 msg
                             );
                             return;

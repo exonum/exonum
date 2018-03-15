@@ -478,8 +478,7 @@ impl Sandbox {
                     hashes.push(hash);
                     if schema.transactions().get(&hash).is_none() {
                         recover.insert(hash);
-                        schema.transactions_mut().put(&hash, raw.clone());
-                        schema.transactions_pool_mut().insert(hash);
+                        schema.add_transaction_into_pool(raw.clone());
                     }
                 }
             }

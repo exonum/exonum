@@ -759,11 +759,7 @@ mod tests {
                 let mut fork = blockchain.fork();
                 {
                     let mut schema = Schema::new(&mut fork);
-                    schema.transactions_mut().put(
-                        &hash,
-                        transaction.raw().clone(),
-                    );
-                    schema.transactions_pool_mut().insert(hash);
+                    schema.add_transaction_into_pool(transaction.raw().clone());
                 }
                 blockchain.merge(fork.into_patch()).unwrap();
             }

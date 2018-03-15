@@ -96,7 +96,6 @@ impl Transaction for TxIncrement {
     // This method purposely does not check counter overflow in order to test
     // behavior of panicking transactions.
     fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-        trace!("execute tx {}", self.by());
         if self.by() == 0 {
             Err(ExecutionError::with_description(
                 0,
