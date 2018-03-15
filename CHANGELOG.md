@@ -54,7 +54,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum-time
 
 - `SystemTime` has been replaced with `chrono::DateTime<Utc>`, as it provides
-more predictable behavior on all systems.
+  more predictable behavior on all systems.
 
 ### New features
 

@@ -341,7 +341,8 @@ impl TimeProvider for SystemTimeProvider {
 /// # extern crate exonum;
 /// # extern crate exonum_testkit;
 /// # extern crate exonum_time;
-/// use std::time::{Duration, UNIX_EPOCH};
+/// # extern crate chrono;
+/// use chrono::{Utc, Duration, TimeZone};
 /// use exonum::helpers::Height;
 /// use exonum_testkit::TestKitBuilder;
 /// use exonum_time::{MockTimeProvider, TimeSchema, TimeService};
@@ -351,14 +352,14 @@ impl TimeProvider for SystemTimeProvider {
 /// let mut testkit = TestKitBuilder::validator()
 ///     .with_service(TimeService::with_provider(mock_provider.clone()))
 ///     .create();
-/// mock_provider.add_time(Duration::new(15, 0));
+/// mock_provider.add_time(Duration::seconds(15));
 /// testkit.create_blocks_until(Height(2));
 ///
 /// // The time reported by the mock time provider is reflected by the service.
 /// let snapshot = testkit.snapshot();
 /// let schema = TimeSchema::new(snapshot);
 /// assert_eq!(
-///     Some(UNIX_EPOCH + Duration::new(15, 0)),
+///     Some(Utc.timestamp(15, 0)),
 ///     schema.time().get().map(|time| time)
 /// );
 /// # }

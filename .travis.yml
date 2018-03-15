@@ -91,6 +91,8 @@ jobs:
     - touch target/std/string/struct.String.html
     - touch target/doc/exonum/encoding/serialize/trait.Serialize.html
     - touch target/doc/exonum_configuration/enum.Option.html
+    - mkdir -p target/doc/exonum/encoding/serialize/reexport/serde/ts_seconds
+    - touch target/doc/exonum/encoding/serialize/reexport/serde/ts_seconds/index.html
     - cargo deadlinks --dir target/doc
 
 

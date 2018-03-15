@@ -288,8 +288,7 @@ impl StorageKey for DateTime<Utc> {
 mod tests {
     use super::*;
 
-    use std::time::Duration;
-    use chrono::{TimeZone, Duration as OldDuration};
+    use chrono::{TimeZone, Duration};
 
     // Number of samples for fuzz testing
     const FUZZ_SAMPLES: usize = 100_000;
@@ -450,14 +449,12 @@ mod tests {
     }
 
     #[test]
-    fn test_storage_key_for_chrono_datetime_round_trip() {
-        use chrono::Duration as OldDuration;
-
+    fn test_storage_key_for_chrono_date_time_round_trip() {
         let times = [
             Utc.timestamp(0, 0),
             Utc.timestamp(13, 23),
             Utc::now(),
-            Utc::now() + OldDuration::from_std(Duration::new(17, 15)).unwrap(),
+            Utc::now() + Duration::seconds(17) + Duration::nanoseconds(15),
             Utc.timestamp(0, 999_999_999),
             Utc.timestamp(0, 1_500_000_000), // leap second
         ];
@@ -499,7 +496,7 @@ mod tests {
         let x1 = Utc.timestamp(80, 0);
         let x2 = Utc.timestamp(10, 0);
         let y1 = Utc::now();
-        let y2 = y1 + OldDuration::from_std(Duration::new(10, 0)).unwrap();
+        let y2 = y1 + Duration::seconds(10);
         let mut fork = db.fork();
         {
             let mut index: MapIndex<_, DateTime<Utc>, DateTime<Utc>> =

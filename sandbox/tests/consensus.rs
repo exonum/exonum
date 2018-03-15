@@ -203,7 +203,7 @@ fn test_disable_and_enable() {
     sandbox.process_events();
 
     // Save the current time to "rewind" sandbox to it later.
-    let time_saved = sandbox.time().into();
+    let time_saved = sandbox.time();
 
     // A fail is expected here as the node is disabled.
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);

@@ -167,12 +167,7 @@ fn main() {
     assert_eq!(schema.marks().get(&keypair2.0), Some(2));
     assert_eq!(schema.marks().get(&keypair3.0), None);
 
-    let tx4 = TxMarker::new(
-        &keypair3.0,
-        4,
-        Utc.timestamp(15, 0),
-        &keypair3.1,
-    );
+    let tx4 = TxMarker::new(&keypair3.0, 4, Utc.timestamp(15, 0), &keypair3.1);
     testkit.create_block_with_transactions(txvec![tx4]);
 
     let snapshot = testkit.snapshot();

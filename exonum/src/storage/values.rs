@@ -410,14 +410,13 @@ mod tests {
 
     #[test]
     fn test_storage_value_for_system_time_round_trip() {
-        use std::time::Duration;
-        use chrono::{TimeZone, Duration as OldDuration};
+        use chrono::{TimeZone, Duration};
 
         let times = [
             Utc.timestamp(0, 0),
             Utc.timestamp(13, 23),
             Utc::now(),
-            Utc::now() + OldDuration::from_std(Duration::new(17, 15)).unwrap(),
+            Utc::now() + Duration::seconds(17) + Duration::nanoseconds(15),
             Utc.timestamp(0, 999_999_999),
             Utc.timestamp(0, 1_500_000_000), // leap second
         ];
