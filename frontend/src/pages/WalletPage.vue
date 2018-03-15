@@ -183,6 +183,10 @@
         }
 
         this.$storage.get().then(function(keyPair) {
+          if (self.receiver === keyPair.publicKey) {
+            return self.$notify('error', 'Can not transfer funds to yourself')
+          }
+
           self.isSpinnerVisible = true
 
           self.$blockchain.transfer(keyPair, self.receiver, self.amountToTransfer).then(data => {
