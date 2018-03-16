@@ -35,6 +35,6 @@ fn test_handle_commit() {
     for i in 1..5 {
         testkit.create_block();
         let tx = TxAfterCommit::new_with_signature(Height(i), &Signature::zero());
-        assert!(testkit.mempool().contains_key(&tx.hash()));
+        assert!(testkit.is_tx_in_pool(&tx.hash()));
     }
 }

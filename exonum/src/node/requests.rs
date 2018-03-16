@@ -77,15 +77,7 @@ impl NodeHandler {
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
         for hash in msg.txs() {
-            let tx = self.state
-                .transactions()
-                .read()
-                .expect("Expected read lock")
-                .get(hash)
-                .map(|tx| tx.raw())
-                .cloned()
-                .or_else(|| schema.transactions().get(hash));
-
+            let tx = schema.transactions().get(hash);
             if let Some(tx) = tx {
                 self.send_to_peer(*msg.from(), &tx);
             }
