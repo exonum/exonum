@@ -80,7 +80,8 @@ impl ConsensusConfig {
     pub fn validate_configuration(&self) {
         let propose_timeout = match self.timeout_adjuster {
             TimeoutAdjusterConfig::Constant { timeout } => timeout,
-            TimeoutAdjusterConfig::Dynamic { max, .. } | TimeoutAdjusterConfig::MovingAverage { max, .. } => max
+            TimeoutAdjusterConfig::Dynamic { max, .. } |
+            TimeoutAdjusterConfig::MovingAverage { max, .. } => max
         };
 
         if self.round_timeout <= 2 * propose_timeout {
