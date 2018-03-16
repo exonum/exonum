@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![allow(dead_code)]
+#![allow(dead_code, unsafe_code)]
 
 use rand::{thread_rng, Rng};
 use serde_json;
