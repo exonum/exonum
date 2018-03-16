@@ -76,6 +76,7 @@ impl ConsensusConfig {
     pub const DEFAULT_MAX_MESSAGE_LEN: u32 = 1024 * 1024; // 1 MB
 
     /// Checks if propose timeout is less than round timeout. Warns if fails.
+    #[doc(hidden)]
     pub fn validate_configuration(&self) {
         let propose_timeout = match self.timeout_adjuster {
             TimeoutAdjusterConfig::Constant { timeout } => timeout,
