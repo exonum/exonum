@@ -36,6 +36,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   or `add_tx` methods.
 - `SystemTime` can't serve as storage key or value anymore, it has been replaced
   with `chrono::DateTime<Utc>`.
+- `SystemTime` previously used as storage key or value turned out to show
+  different behavior on different platforms and, hence,  has been replaced with
+  `chrono::DateTime<Utc>` that behaves the same in any environment.
 
   Migration path:
 
