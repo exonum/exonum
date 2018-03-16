@@ -430,22 +430,6 @@ impl<K, V> MapProofBuilder<K, V> {
 }
 
 impl<K, V> MapProof<K, V> {
-    /// Maps this proof to another type of keys and/or values.
-    pub fn map<F, L, U>(self, map_fn: F) -> MapProof<L, U>
-    where
-        F: FnMut((K, Option<V>)) -> (L, Option<U>),
-    {
-        MapProof {
-            entries: self.entries
-                .into_iter()
-                .map(OptionalEntry::into)
-                .map(map_fn)
-                .map(OptionalEntry::from)
-                .collect(),
-            proof: self.proof,
-        }
-    }
-
     /// Provides access to the proof part of the view. Useful mainly for debug purposes.
     pub fn proof_unchecked(&self) -> Vec<(ProofPath, Hash)> {
         self.proof

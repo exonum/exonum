@@ -1199,13 +1199,6 @@ fn tree_with_hashed_key(db: Box<Database>) {
     assert_eq!(proof.all_entries(), vec![(&Point::new(1, 2), Some(&vec![1, 2, 3]))]);
     assert_eq!(proof.merkle_root(), table.merkle_root());
 
-    let proof = table.get_proof(Point::new(3, 4)).map(
-        |(k, v)| (k.hash(), v),
-    );
-    let proof = proof.check().unwrap();
-    assert_eq!(proof.all_entries(), vec![(&Point::new(3, 4).hash(), Some(&vec![2, 3, 4]))]);
-    assert_eq!(proof.merkle_root(), table.merkle_root());
-
     let key = Point::new(3, 4);
     let other_key = Point::new(1, 2);
     table.remove(&key);
