@@ -178,8 +178,8 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
     }
 }
 
-/// View of a [`ProofMapIndex`], i.e., a subset of its elements coupled with a *proof*,
-/// which jointly allow to restore the [`root_hash()`] of the index. Besides existing elements,
+/// View of a `ProofMapIndex`, i.e., a subset of its elements coupled with a *proof*,
+/// which jointly allow to restore the `merkle_root()` of the index. Besides existing elements,
 /// `MapProof` can assert absence of certain keys from the underlying index.
 ///
 /// # Workflow
@@ -197,8 +197,10 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 /// let (h1, h2, h3) = (hash(&[1]), hash(&[2]), hash(&[3]));
 /// map.put(&h1, 100u32);
 /// map.put(&h2, 200u32);
+///
 /// // Get the proof from the index
 /// let proof = map.get_multiproof(vec![h1, h3]);
+///
 /// // Check the proof consistency
 /// let checked_proof = proof.check().unwrap();
 /// assert_eq!(checked_proof.entries(), vec![(&h1, &100u32)]);
@@ -215,7 +217,7 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 ///   is a concern.
 /// - `entries` is an array with 2 kinds of objects: `{ "missing": K }` for keys missing from
 ///   the underlying index, and `{ "key": K, "value": V }` for key-value pairs, existence of
-///   which is asserted by the proof
+///   which is asserted by the proof.
 ///
 /// ```
 /// # extern crate exonum;
@@ -241,8 +243,6 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 /// # }
 /// ```
 ///
-/// [`ProofMapIndex`]: struct.ProofMapIndex.html
-/// [`root_hash()`]: struct.ProofMapIndex.html#method.root_hash
 /// [`get_proof()`]: struct.ProofMapIndex.html#method.get_proof
 /// [`get_multiproof()`]: struct.ProofMapIndex.html#method.get_multiproof
 /// [`check()`]: #method.check

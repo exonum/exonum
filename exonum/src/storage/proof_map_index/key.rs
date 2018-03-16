@@ -30,26 +30,28 @@ pub const PROOF_PATH_KIND_POS: usize = 0;
 pub const PROOF_PATH_LEN_POS: usize = KEY_SIZE + 1;
 
 /// A trait that defines a subset of storage key types which are suitable for use with
-/// [`ProofMapIndex`].
+/// `ProofMapIndex`.
 ///
 /// The size of the keys must be exactly [`PROOF_MAP_KEY_SIZE`] bytes and the keys must have
 /// a uniform distribution.
 ///
-/// [`ProofMapIndex`]: struct.ProofMapIndex.html
 /// [`PROOF_MAP_KEY_SIZE`]: constant.PROOF_MAP_KEY_SIZE.html
 pub trait ProofMapKey
 where
     Self::Output: ProofMapKey,
 {
-    /// The type of keys as read from the database. `Output` is not necessarily
-    /// equal to `Self`, which provides flexibility for [`HashedKey`]s and similar cases
+    /// The type of keys as read from the database.
+    ///
+    /// `Output` is not necessarily equal to `Self`, which provides flexibility
+    /// for [`HashedKey`]s and similar cases
     /// where the key cannot be uniquely restored from the database.
     ///
     /// [`HashedKey`]: trait.HashedKey.html
     type Output;
 
-    /// Writes this key into a byte buffer. The buffer is guaranteed to have size
-    /// [`PROOF_MAP_KEY_SIZE`].
+    /// Writes this key into a byte buffer.
+    ///
+    /// The buffer is guaranteed to have size [`PROOF_MAP_KEY_SIZE`].
     ///
     /// [`PROOF_MAP_KEY_SIZE`]: constant.PROOF_MAP_KEY_SIZE.html
     fn write_key(&self, &mut [u8]);
@@ -59,7 +61,7 @@ where
 }
 
 /// A trait denoting that a certain storage value is suitable for use as a key for
-/// [`ProofMapIndex`] after hashing.
+/// `ProofMapIndex` after hashing.
 ///
 /// **Warning:** The implementation of the [`ProofMapKey.write_key()`] method provided
 /// by this trait is not efficient; it calculates the hash anew on each call.
@@ -103,7 +105,6 @@ impl<T: HashedKey> ProofMapKey for T {
     }
 }
 
-// TODO: consider removing.
 impl ProofMapKey for PublicKey {
     type Output = PublicKey;
 
@@ -128,8 +129,6 @@ impl ProofMapKey for Hash {
     }
 }
 
-// TODO: should probably be removed; `[u8; 32]` values are not guaranteed
-// to be uniformly distributed.
 impl ProofMapKey for [u8; 32] {
     type Output = [u8; 32];
 
@@ -161,8 +160,9 @@ impl ::std::ops::Not for ChildKind {
     }
 }
 
-/// Bit slice type used internally to serialize [`ProofMapKey`]s. A single slice can contain
-/// from 1 to [`PROOF_MAP_KEY_SIZE`]`* 8` bits.
+/// Bit slice type used internally to serialize `ProofMapKey`s.
+///
+/// A single slice can contain from 1 to [`PROOF_MAP_KEY_SIZE`]`* 8` bits.
 ///
 /// # Binary representation
 ///
@@ -176,7 +176,6 @@ impl ::std::ops::Not for ChildKind {
 ///
 /// Serialized as a string of `'0'` and `'1'` chars, corresponding exactly to bits in the slice.
 ///
-/// [`ProofMapKey`]: trait.ProofMapKey.html
 /// [`PROOF_MAP_KEY_SIZE`]: constant.PROOF_MAP_KEY_SIZE.html
 #[derive(Copy, Clone)]
 pub struct ProofPath {
