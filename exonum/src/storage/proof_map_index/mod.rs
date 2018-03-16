@@ -22,7 +22,7 @@ use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageValue, StorageKey};
 use super::indexes_metadata::IndexType;
 use self::key::{BitsRange, ChildKind, LEAF_KEY_PREFIX};
 use self::node::{BranchNode, Node};
-use self::proof::MapProofBuilder;
+use self::proof::{create_multiproof, create_proof};
 
 pub use self::key::{KEY_SIZE as PROOF_MAP_KEY_SIZE, ProofMapKey, HashedKey, ProofPath};
 pub use self::proof::{CheckedMapProof, MapProof, MapProofError};
@@ -299,88 +299,11 @@ where
     /// # drop(proof);
     /// ```
     pub fn get_proof(&self, key: K) -> MapProof<K, V> {
-        // How many key-hash pairs are expected to be on each side relative to the searched key
-        const DEFAULT_CAPACITY: usize = 8;
-
-        fn combine(
-            mut left_hashes: Vec<(ProofPath, Hash)>,
-            right_hashes: Vec<(ProofPath, Hash)>,
-        ) -> Vec<(ProofPath, Hash)> {
-            left_hashes.extend(right_hashes.into_iter().rev());
-            left_hashes
-        }
-
-        let searched_path = ProofPath::new(&key);
-
-        match self.get_root_node() {
-            Some((root_path, Node::Branch(root_branch))) => {
-                let mut left_hashes: Vec<(ProofPath, Hash)> = Vec::with_capacity(DEFAULT_CAPACITY);
-                let mut right_hashes: Vec<(ProofPath, Hash)> = Vec::with_capacity(DEFAULT_CAPACITY);
-
-                // Currently visited branch and its key, respectively
-                let (mut branch, mut node_path) = (root_branch, root_path);
-
-                // Do at least one loop, even if the supplied key does not match the root key.
-                // This is necessary to put both children of the root node into the proof
-                // in this case.
-                loop {
-                    // <256 by induction; `branch` is always a branch node, and `node_path`
-                    // is its key
-                    let next_height = node_path.len();
-                    let next_bit = searched_path.bit(next_height);
-                    node_path = branch.child_path(next_bit);
-
-                    let other_path_and_hash =
-                        (branch.child_path(!next_bit), *branch.child_hash(!next_bit));
-                    match !next_bit {
-                        ChildKind::Left => left_hashes.push(other_path_and_hash),
-                        ChildKind::Right => right_hashes.push(other_path_and_hash),
-                    }
-
-                    if !searched_path.matches_from(&node_path, next_height) {
-                        // Both children of `branch` do not fit
-
-                        let next_hash = *branch.child_hash(next_bit);
-                        match next_bit {
-                            ChildKind::Left => left_hashes.push((node_path, next_hash)),
-                            ChildKind::Right => right_hashes.push((node_path, next_hash)),
-                        }
-
-                        return MapProofBuilder::new()
-                            .add_missing(key)
-                            .add_proof_entries(combine(left_hashes, right_hashes))
-                            .create();
-                    } else {
-                        let node = self.get_node_unchecked(&node_path);
-                        match node {
-                            Node::Branch(branch_) => branch = branch_,
-                            Node::Leaf(value) => {
-                                // We have reached the leaf node and haven't diverged!
-                                // The key is there, we've just gotten the value, so we just
-                                // need to return it.
-                                return MapProofBuilder::new()
-                                    .add_entry(key, value)
-                                    .add_proof_entries(combine(left_hashes, right_hashes))
-                                    .create();
-                            }
-                        }
-                    }
-                }
-            }
-
-            Some((root_path, Node::Leaf(root_value))) => {
-                if root_path == searched_path {
-                    MapProofBuilder::new().add_entry(key, root_value).create()
-                } else {
-                    MapProofBuilder::new()
-                        .add_missing(key)
-                        .add_proof_entry(root_path, root_value.hash())
-                        .create()
-                }
-            }
-
-            None => MapProofBuilder::new().add_missing(key).create(),
-        }
+        create_proof(
+            key,
+            self.get_root_node(),
+            |path| self.get_node_unchecked(path),
+        )
     }
 
     /// Returns the combined proof of existence or non-existence for the multiple specified keys.
@@ -401,193 +324,11 @@ where
     where
         KI: IntoIterator<Item = K>,
     {
-        const CONTOUR_CAPACITY: usize = 8;
-
-        #[derive(Debug)]
-        struct ContourNode {
-            key: ProofPath,
-            branch: BranchNode,
-            visited_left: bool,
-            visited_right: bool,
-        }
-
-        impl ContourNode {
-            fn new(key: ProofPath, branch: BranchNode) -> Self {
-                ContourNode {
-                    key,
-                    branch,
-                    visited_left: false,
-                    visited_right: false,
-                }
-            }
-
-            // Adds this contour node into a proof builder.
-            fn add_to_proof<K, V>(
-                self,
-                mut builder: MapProofBuilder<K, V>,
-            ) -> MapProofBuilder<K, V> {
-                if !self.visited_right {
-                    // This works due to the following observation: If neither of the child nodes
-                    // were visited when the node is being ejected from the contour,
-                    // this means that it is safe to add the left and right hashes (in this order)
-                    // to the proof. The observation is provable by induction.
-                    if !self.visited_left {
-                        builder = builder.add_proof_entry(
-                            self.branch.child_path(ChildKind::Left),
-                            *self.branch.child_hash(ChildKind::Left),
-                        );
-                    }
-
-                    builder = builder.add_proof_entry(
-                        self.branch.child_path(ChildKind::Right),
-                        *self.branch.child_hash(ChildKind::Right),
-                    );
-                }
-
-                builder
-            }
-        }
-
-        // // // // Processing for a single key in a map with multiple entries // // // //
-
-        fn process_key<K, V, F>(
-            contour: &mut Vec<ContourNode>,
-            mut builder: MapProofBuilder<K, V>,
-            proof_path: &ProofPath,
-            key: K,
-            lookup: F,
-        ) -> MapProofBuilder<K, V>
-        where
-            V: StorageValue,
-            F: Fn(&ProofPath) -> Node<V>,
-        {
-            // `unwrap()` is safe: there is at least 1 element in the contour by design
-            let common_prefix = proof_path.common_prefix_len(&contour.last().unwrap().key);
-
-            // Eject nodes from the contour while they will they can be "finalized"
-            while let Some(node) = contour.pop() {
-                if contour.is_empty() || node.key.len() <= common_prefix {
-                    contour.push(node);
-                    break;
-                } else {
-                    builder = node.add_to_proof(builder);
-                }
-            }
-
-            // Push new items to the contour
-            'traverse: loop {
-                let node_path = {
-                    let contour_tip = contour.last_mut().unwrap();
-
-                    let next_height = contour_tip.key.len();
-                    let next_bit = proof_path.bit(next_height);
-                    let node_path = contour_tip.branch.child_path(next_bit);
-
-                    if !proof_path.matches_from(&node_path, next_height) {
-                        // Both children of `branch` do not fit; stop here
-                        builder = builder.add_missing(key);
-                        break 'traverse;
-                    } else {
-                        match next_bit {
-                            ChildKind::Left => contour_tip.visited_left = true,
-                            ChildKind::Right => {
-                                if !contour_tip.visited_left {
-                                    builder =
-                                        builder.add_proof_entry(
-                                            contour_tip.branch.child_path(ChildKind::Left),
-                                            *contour_tip.branch.child_hash(ChildKind::Left),
-                                        );
-                                }
-                                contour_tip.visited_right = true;
-                            }
-                        }
-
-                        node_path
-                    }
-                };
-
-                let node = lookup(&node_path);
-                match node {
-                    Node::Branch(branch) => {
-                        contour.push(ContourNode::new(node_path, branch));
-                    }
-
-                    Node::Leaf(value) => {
-                        // We have reached the leaf node and haven't diverged!
-                        builder = builder.add_entry(key, value);
-                        break 'traverse;
-                    }
-                }
-            }
-
-            builder
-        }
-
-        // // // // `get_multiproof()` main section // // // //
-
-        match self.get_root_node() {
-            Some((root_path, Node::Branch(root_branch))) => {
-                let mut builder = MapProofBuilder::new();
-
-                let searched_paths: Vec<_> = {
-                    let mut keys: Vec<_> =
-                        keys.into_iter().map(|k| (ProofPath::new(&k), k)).collect();
-
-                    keys.sort_by(|x, y| {
-                        // `unwrap` is safe here because all keys start from the same position `0`
-                        x.0.partial_cmp(&y.0).unwrap()
-                    });
-                    keys
-                };
-
-                let mut contour = Vec::with_capacity(CONTOUR_CAPACITY);
-                contour.push(ContourNode::new(root_path, root_branch));
-
-                for (proof_path, key) in searched_paths {
-                    builder = process_key(&mut contour, builder, &proof_path, key, |key| {
-                        self.get_node_unchecked(key)
-                    });
-                }
-
-                // Eject remaining entries from the contour
-                while let Some(node) = contour.pop() {
-                    builder = node.add_to_proof(builder);
-                }
-
-                builder.create()
-            }
-
-            Some((root_path, Node::Leaf(root_value))) => {
-                let mut builder = MapProofBuilder::new();
-                // (One of) keys corresponding to the existing table entry.
-                let mut found_key: Option<K> = None;
-
-                for key in keys {
-                    let searched_path = ProofPath::new(&key);
-                    if root_path == searched_path {
-                        found_key = Some(key);
-                    } else {
-                        builder = builder.add_missing(key);
-                    }
-                }
-
-                builder = if let Some(key) = found_key {
-                    builder.add_entry(key, root_value)
-                } else {
-                    builder.add_proof_entry(root_path, root_value.hash())
-                };
-
-                builder.create()
-            }
-
-            None => {
-                keys.into_iter()
-                    .fold(MapProofBuilder::new(), |builder, key| {
-                        builder.add_missing(key)
-                    })
-                    .create()
-            }
-        }
+        create_multiproof(
+            keys,
+            self.get_root_node(),
+            |path| self.get_node_unchecked(path),
+        )
     }
 
     /// Returns an iterator over the entries of the map in ascending order. The iterator element
