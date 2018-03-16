@@ -71,6 +71,7 @@ macro_rules! encoding_struct {
 
         // Re-implement `Field` for `encoding_struct!`
         // to write fields in place of another structure
+        #[allow(unsafe_code)]
         impl<'a> $crate::encoding::Field<'a> for $name {
             unsafe fn read(buffer: &'a [u8],
                             from: $crate::encoding::Offset,
@@ -389,6 +390,7 @@ macro_rules! __ex_struct_mk_field {
         $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr
     ) => {
         $(#[$field_attr])*
+        #[allow(unsafe_code)]
         pub fn $field_name(&self) -> $field_type {
             use $crate::encoding::Field;
             unsafe {

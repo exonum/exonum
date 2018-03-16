@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![allow(unsafe_code)]
+
 use byteorder::{ByteOrder, LittleEndian};
 use bit_vec::BitVec;
 

@@ -13,7 +13,6 @@
 // limitations under the License.
 
 //! Sample counter service.
-
 extern crate bodyparser;
 extern crate iron;
 extern crate router;
@@ -144,6 +143,7 @@ struct CounterApi {
 
 impl CounterApi {
     fn increment(&self, req: &mut Request) -> IronResult<Response> {
+        trace!("received increment tx");
         match req.get::<bodyparser::Struct<TxIncrement>>() {
             Ok(Some(transaction)) => {
                 let transaction: Box<Transaction> = Box::new(transaction);

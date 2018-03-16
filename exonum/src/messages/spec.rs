@@ -129,6 +129,7 @@ macro_rules! __ex_message {
             }
         }
 
+        #[allow(unsafe_code)]
         impl<'a> $crate::encoding::SegmentField<'a> for $name {
 
             fn item_size() -> $crate::encoding::Offset {
@@ -438,6 +439,7 @@ macro_rules! __ex_message_mk_field {
         $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr
     ) => {
         $(#[$field_attr])*
+        #[allow(unsafe_code)]
         pub fn $field_name(&self) -> $field_type {
             unsafe { self.raw.read::<$field_type>($from, $to) }
         }
