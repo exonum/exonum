@@ -78,6 +78,7 @@ impl ConsensusConfig {
 
     /// Checks if propose timeout is less than round timeout. Warns if fails.
 <<<<<<< HEAD
+<<<<<<< HEAD
     #[doc(hidden)]
     pub fn validate_configuration(&self) {
         let propose_timeout = match self.timeout_adjuster {
@@ -85,6 +86,9 @@ impl ConsensusConfig {
             TimeoutAdjusterConfig::Dynamic { max, .. } |
             TimeoutAdjusterConfig::MovingAverage { max, .. } => max,
 =======
+=======
+    #[doc(hidden)]
+>>>>>>> Add doc(hidden) attribute to validate_configuration()
     pub fn validate_configuration(&self) {
         let propose_timeout = match self.timeout_adjuster {
             TimeoutAdjusterConfig::Constant { timeout } => timeout,
