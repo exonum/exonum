@@ -267,8 +267,8 @@ impl Blockchain {
             // Save & execute transactions.
             for (index, hash) in tx_hashes.iter().enumerate() {
                 self.execute_transaction(*hash, height, index, &mut fork)
-                    // execute_transaction could fail,with invalid
-                    // Transaction that cannot be deserialized, or not found in pool.
+                    // Execution could fail if the transaction
+                    // cannot be deserialized or it isn't in the pool.
                     .expect("Transaction not found in the database.");
             }
 

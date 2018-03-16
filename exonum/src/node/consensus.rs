@@ -151,6 +151,40 @@ impl NodeHandler {
         }
     }
 
+    // Validates transaction from the block and appends them into the pool.
+    // Returns tuple of transaction hashes and Patch of changes in the pool.
+    fn validate_block_transactions(&self, block: &BlockResponse) -> Option<(Vec<Hash>, Patch)> {
+        let mut fork = self.blockchain.fork();
+        let mut tx_hashes = Vec::new();
+        {
+            let mut schema = Schema::new(&mut fork);
+            for raw in block.transactions() {
+                if let Some(tx) = self.blockchain.tx_from_raw(raw) {
+                    let hash = tx.hash();
+                    if schema.transactions().contains(&hash) {
+                        error!(
+                            "Received block with already known transaction, block={:?}",
+                            block
+                        );
+                        return None;
+                    }
+                    profiler_span!("tx.verify()", {
+                        if !tx.verify() {
+                            error!("Incorrect transaction in block detected, block={:?}", block);
+                            return None;
+                        }
+                    });
+                    schema.add_transaction_into_pool(tx.raw().clone());
+                    tx_hashes.push(hash);
+                } else {
+                    error!("Unknown transaction in block detected, block={:?}", block);
+                    return None;
+                }
+            }
+        }
+        Some((tx_hashes, fork.into_patch()))
+    }
+
     /// Handles the `Block` message. For details see the message documentation.
     // TODO write helper function which returns Result (ECR-123)
     #[cfg_attr(feature = "flame_profile", flame)]
@@ -208,38 +242,15 @@ impl NodeHandler {
         if self.state.block(&block_hash).is_none() {
 
             // Verify transactions
-            let mut tx_hashes = Vec::new();
-            let mut fork = self.blockchain.fork();
-            {
-                let mut schema = Schema::new(&mut fork);
+            let tx_hashes = if let Some(res) = self.validate_block_transactions(msg) {
+                self.blockchain.merge(res.1).expect(
+                    "Unable to save transaction to persistent pool.",
+                );
+                res.0
+            } else {
+                return;
+            };
 
-                for raw in msg.transactions() {
-                    if let Some(tx) = self.blockchain.tx_from_raw(raw) {
-                        let hash = tx.hash();
-                        if schema.transactions().contains(&hash) {
-                            error!(
-                                "Received block with already known transaction, block={:?}",
-                                msg
-                            );
-                            return;
-                        }
-                        profiler_span!("tx.verify()", {
-                            if !tx.verify() {
-                                error!("Incorrect transaction in block detected, block={:?}", msg);
-                                return;
-                            }
-                        });
-                        schema.add_transaction_into_pool(tx.raw().clone());
-                        tx_hashes.push(hash);
-                    } else {
-                        error!("Unknown transaction in block detected, block={:?}", msg);
-                        return;
-                    }
-                }
-            }
-            self.blockchain.merge(fork.into_patch()).expect(
-                "Unable to save transaction to persistent pool.",
-            );
             let (block_hash, patch) =
                 self.create_block(block.proposer_id(), block.height(), tx_hashes.as_slice());
             // Verify block_hash
@@ -491,9 +502,9 @@ impl NodeHandler {
         };
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
-        let pool = schema.pool_len();
+        let pool_len = schema.tx_pool_len();
 
-        metric!("node.mempool", pool);
+        metric!("node.mempool", pool_len);
 
         let height = self.state.height();
         info!(
@@ -504,7 +515,7 @@ impl NodeHandler {
                 .map(|x| format!("{}", x))
                 .unwrap_or_else(|| "?".into()),
             committed_txs,
-            pool,
+            pool_len,
             block_hash.to_hex(),
         );
 
@@ -679,7 +690,7 @@ impl NodeHandler {
             let snapshot = self.blockchain.snapshot();
             let schema = Schema::new(&snapshot);
             let pool = schema.transactions_pool();
-            let pool_len = schema.pool_len();
+            let pool_len = schema.tx_pool_len();
 
             info!("LEADER: pool = {}", pool_len);
 

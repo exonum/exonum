@@ -339,11 +339,11 @@ where
         Height(self.block_hashes_by_height().len())
     }
 
-    /// Count txs in pool
+    /// Returns number of transactions in the pool
     #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
-    pub fn pool_len(&self) -> usize {
+    pub fn tx_pool_len(&self) -> usize {
         let pool = self.transactions_pool();
-        // TODO: Change count to other method with O(1) complexity (ECR-977)
+        // TODO: Change count to other method with O(1) complexity. (ECR-977)
         let count = pool.iter().count();
         count
     }

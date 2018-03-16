@@ -35,7 +35,7 @@ mod tests {
     use exonum::node::ApiSender;
 
     const TIMESTAMPING_SERVICE_ID: u16 = 1;
-    const CRYPTOCURRENCY_SERVICE_ID: u16 = 1;
+    const CRYPTOCURRENCY_SERVICE_ID: u16 = 255;
 
     fn create_blockchain(db: Box<Database>, services: Vec<Box<Service>>) -> Blockchain {
         let dummy_channel = mpsc::channel(1);
@@ -76,6 +76,7 @@ mod tests {
                 Ok(Box::new(Tx::from_raw(raw)?))
             }
         }
+
         transactions! {
             TimestampingTransactions {
                 const SERVICE_ID = TIMESTAMPING_SERVICE_ID;

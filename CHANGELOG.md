@@ -5,13 +5,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
-### Internal improvements
-
-#### Exonum core
-
-- Non-committed transactions are now stored persistently in the storage
-  instead of memory pool. (#549)
-
 ### Breaking changes
 
 #### Exonum core
@@ -29,9 +22,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum-testkit
 
-- Testkit api now contain two methods to work with transaction pool:
-  - `is_tx_in_pool` - for checking transaction existence in pool;
-  - `add_tx` - for adding new transaction into pool.
+- Testkit api now contains two methods to work with the transaction pool:
+  - `is_tx_in_pool` - for checking transaction existence in the pool;
+  - `add_tx` - for adding a new transaction into the pool.
 
   Migration path:
 
@@ -61,6 +54,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Added `v1/user_agent` endpoint with information about Exonum, Rust
   and OS versions. (#548)
+
+### Internal improvements
+
+#### Exonum core
+
+- Non-committed transactions are now stored persistently in the storage
+  instead of memory pool. (#549)
 
 ## 0.6 - 2018-03-06
 
