@@ -17,7 +17,7 @@
 //! For more information see the project readme.
 // spell-checker:ignore cors
 
-#![deny(missing_debug_implementations, missing_docs)]
+#![deny(missing_debug_implementations, missing_docs, unsafe_code)]
 
 #![cfg_attr(feature="flame_profile", feature(plugin, custom_attribute))]
 #![cfg_attr(feature="flame_profile", plugin(exonum_flamer))]

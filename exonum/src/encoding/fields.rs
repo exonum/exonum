@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![allow(unsafe_code)]
+
 use std::mem;
 use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
 use std::time::{SystemTime, Duration, UNIX_EPOCH};
