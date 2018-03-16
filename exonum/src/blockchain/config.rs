@@ -84,6 +84,7 @@ impl ConsensusConfig {
         let propose_timeout = match self.timeout_adjuster {
             TimeoutAdjusterConfig::Constant { timeout } => timeout,
             TimeoutAdjusterConfig::Dynamic { max, .. } |
+<<<<<<< HEAD
             TimeoutAdjusterConfig::MovingAverage { max, .. } => max,
 =======
 =======
@@ -94,6 +95,9 @@ impl ConsensusConfig {
             TimeoutAdjusterConfig::Constant { timeout } => timeout,
             TimeoutAdjusterConfig::Dynamic { max, .. } | TimeoutAdjusterConfig::MovingAverage { max, .. } => max
 >>>>>>> check_timeout_recommendations() is now validate_configuration() + formatting
+=======
+            TimeoutAdjusterConfig::MovingAverage { max, .. } => max
+>>>>>>> More formatting
         };
 
         if self.round_timeout <= 2 * propose_timeout {
