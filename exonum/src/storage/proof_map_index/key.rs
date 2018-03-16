@@ -298,7 +298,7 @@ pub(crate) trait BitsRange {
         max_len
     }
 
-    #[doc(hidden)]
+    /// Checks if this range of bits matches the other one starting from the specified offset.
     fn matches_from(&self, other: &Self, from: u16) -> bool {
         debug_assert!(from >= self.start());
         self.match_len(other, from) == other.len()
@@ -422,7 +422,7 @@ impl PartialOrd for ProofPath {
         }
         // NB: This check can be moved to "real" code; the code below does not work
         // if `self.start() % 8 != 0` without additional modifications.
-        debug_assert_eq!(self.start(), 0);
+        assert_eq!(self.start(), 0);
 
         let right_bit = min(self.end(), other.end());
         let right = (right_bit as usize + 7) / 8;
@@ -476,7 +476,7 @@ mod tests {
         let path: ProofPath = serde_json::from_value(json!("101001")).unwrap();
         assert_eq!(path, ProofPath::new(&[0b00_100101; 32]).prefix(6));
 
-        // Fuzz tests for roundtrip
+        // Fuzz tests for roundtrip.
         let mut rng = rand::thread_rng();
         for _ in 0..1000 {
             let path = random_path(&mut rng);

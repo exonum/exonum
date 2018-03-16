@@ -1212,8 +1212,6 @@ fn tree_with_hashed_key(db: Box<Database>) {
     );
 }
 
-// // // // Macros // // // //
-
 macro_rules! test_on_db {
     {$test_name:ident, $fn_name:ident} => {
         #[test]
@@ -1240,8 +1238,6 @@ macro_rules! test_on_2dbs {
         }
     };
 }
-
-// // // // Test suites // // // //
 
 macro_rules! common_tests {
     {} => {

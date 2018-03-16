@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// spell-checker:ignore bpath, deser, precheck, repr
-
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
 
 use crypto::{CryptoHash, Hash, HashStream};
@@ -21,15 +19,17 @@ use storage::StorageValue;
 use super::key::{BitsRange, ChildKind, ProofMapKey, ProofPath, KEY_SIZE};
 use super::node::{Node, BranchNode};
 
+// Expected size of the proof, in a number of hashed entries.
+const DEFAULT_PROOF_CAPACITY: usize = 8;
+
 impl Serialize for ProofPath {
     fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         let mut repr = String::with_capacity(KEY_SIZE * 8);
-        let bpath = self;
-        for ind in 0..self.len() {
-            match bpath.bit(ind) {
+        for index in 0..self.len() {
+            match self.bit(index) {
                 ChildKind::Left => {
                     repr.push('0');
                 }
@@ -43,7 +43,7 @@ impl Serialize for ProofPath {
 }
 
 impl<'de> Deserialize<'de> for ProofPath {
-    fn deserialize<D>(deser: D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -85,7 +85,7 @@ impl<'de> Deserialize<'de> for ProofPath {
             }
         }
 
-        deser.deserialize_str(ProofPathVisitor)
+        deserializer.deserialize_str(ProofPathVisitor)
     }
 }
 
@@ -99,9 +99,9 @@ pub enum MapProofError {
     /// One path in the proof is a prefix of another path.
     #[fail(display = "embedded paths in proof")]
     EmbeddedPaths {
-        /// Prefix key
+        /// Prefix key.
         prefix: ProofPath,
-        /// Key containing the prefix
+        /// Key containing the prefix.
         path: ProofPath,
     },
 
@@ -599,13 +599,6 @@ impl<K, V> CheckedMapProof<K, V> {
         self.hash
     }
 }
-
-////////////////////////////////////////////////////////////////
-// Proof creation
-////////////////////////////////////////////////////////////////
-
-// Expected size of the proof, in a number of hashed entries.
-const DEFAULT_PROOF_CAPACITY: usize = 8;
 
 /// Creates a proof for a single key.
 pub fn create_proof<K, V, F>(
