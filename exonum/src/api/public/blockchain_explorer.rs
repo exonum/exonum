@@ -20,12 +20,12 @@ use std::ops::Range;
 use std::cmp;
 
 use api::{Api, ApiError};
-use blockchain::{Block, Blockchain, TxLocation, Schema, TransactionErrorType, TransactionResult};
+use blockchain::{Transaction, Block, Blockchain, TxLocation, Schema, TransactionErrorType,
+                 TransactionResult};
 use crypto::Hash;
 use helpers::Height;
-use node::state::TxPool;
 use messages::Precommit;
-use storage::ListProof;
+use storage::{ListProof, Snapshot};
 
 const MAX_BLOCKS_PER_REQUEST: u64 = 1000;
 
@@ -101,13 +101,12 @@ pub enum TransactionInfo {
 #[derive(Clone, Debug)]
 pub struct ExplorerApi {
     blockchain: Blockchain,
-    pool: TxPool,
 }
 
 impl ExplorerApi {
     /// Creates a new `ExplorerApi` instance.
-    pub fn new(pool: TxPool, blockchain: Blockchain) -> Self {
-        ExplorerApi { pool, blockchain }
+    pub fn new(blockchain: Blockchain) -> Self {
+        ExplorerApi { blockchain }
     }
 
     fn explorer(&self) -> BlockchainExplorer {
@@ -133,11 +132,28 @@ impl ExplorerApi {
         self.explorer().block_info(height)
     }
 
+    fn tx_from_raw(
+        &self,
+        schema: &Schema<Box<Snapshot>>,
+        hash: &Hash,
+    ) -> Result<Box<Transaction>, ApiError> {
+        let raw_tx = schema.transactions().get(hash).expect(
+            "Expected tx in database",
+        );
+
+        Ok(self.blockchain.tx_from_raw(raw_tx.clone()).ok_or_else(|| {
+            ApiError::InternalError(format!("Service not found for tx: {:?}", raw_tx).into())
+        })?)
+    }
+
     fn transaction_info(&self, hash: &Hash) -> Result<TransactionInfo, ApiError> {
-        if let Some(tx) = self.pool.read().expect("Unable to read pool").get(hash) {
-            Ok(TransactionInfo::InPool {
-                content: tx.serialize_field().map_err(ApiError::InternalError)?,
-            })
+        let snapshot = self.blockchain.snapshot();
+        let schema = Schema::new(snapshot);
+        if schema.transactions_pool().contains(hash) {
+            let content = self.tx_from_raw(&schema, hash)?.serialize_field().map_err(
+                ApiError::InternalError,
+            )?;
+            Ok(TransactionInfo::InPool { content })
         } else if let Some(tx_info) = self.explorer().tx_info(hash)? {
             Ok(TransactionInfo::Committed(tx_info))
         } else {

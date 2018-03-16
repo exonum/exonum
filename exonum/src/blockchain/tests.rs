@@ -14,18 +14,64 @@
 
 #![allow(dead_code)]
 
-use std::collections::BTreeMap;
-
 use rand::{thread_rng, Rng};
 use serde_json;
 
-use blockchain::{Blockchain, Schema, Transaction, ExecutionResult};
-use crypto::{gen_keypair, CryptoHash, Hash};
-use storage::{Database, Fork, Error, ListIndex};
-use messages::Message;
+use blockchain::{Blockchain, Service, Snapshot, Schema, Transaction, ExecutionResult};
+use crypto::{gen_keypair, Hash, CryptoHash};
+use storage::{Error, Fork, ListIndex};
+use messages::{Message, RawTransaction};
+use encoding::Error as MessageError;
 use helpers::{Height, ValidatorId};
 
 const IDX_NAME: &'static str = "idx_name";
+const TEST_SERVICE_ID: u16 = 255;
+
+struct TestService;
+
+impl Service for TestService {
+    fn service_id(&self) -> u16 {
+        TEST_SERVICE_ID
+    }
+
+    fn service_name(&self) -> &'static str {
+        "test service"
+    }
+
+
+    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+        vec![]
+    }
+
+    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
+        Ok(Box::new(Tx::from_raw(raw)?))
+    }
+}
+
+transactions! {
+    TestServiceTxs {
+        const SERVICE_ID = TEST_SERVICE_ID;
+        struct Tx {
+            value: u64,
+        }
+    }
+}
+
+impl Transaction for Tx {
+    fn verify(&self) -> bool {
+        true
+    }
+
+    fn execute(&self, view: &mut Fork) -> ExecutionResult {
+        if self.value() == 42 {
+            panic!(Error::new("42"))
+        }
+        let mut index = ListIndex::new(IDX_NAME, view);
+        index.push(self.value());
+        index.push(42 / self.value());
+        Ok(())
+    }
+}
 
 #[test]
 fn test_encode_decode() {
@@ -141,32 +187,8 @@ fn gen_tempdir_name() -> String {
     thread_rng().gen_ascii_chars().take(10).collect()
 }
 
-fn handling_tx_panic(blockchain: &Blockchain, db: &mut Box<Database>) {
-    messages! {
-        const SERVICE_ID = 1;
-        struct Tx {
-            value: u64,
-        }
-    }
 
-    impl Transaction for Tx {
-        fn verify(&self) -> bool {
-            true
-        }
-
-        fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-            if self.value() == 42 {
-                panic!(Error::new("42"))
-            }
-
-            let mut index = ListIndex::new(IDX_NAME, fork);
-            index.push(self.value());
-            index.push(42 / self.value());
-
-            Ok(())
-        }
-    }
-
+fn handling_tx_panic(blockchain: &mut Blockchain) {
     let (_, sec_key) = gen_keypair();
 
     let tx_ok1 = Tx::new(3, &sec_key);
@@ -174,31 +196,30 @@ fn handling_tx_panic(blockchain: &Blockchain, db: &mut Box<Database>) {
     let tx_failed = Tx::new(0, &sec_key);
     let tx_storage_error = Tx::new(42, &sec_key);
 
-    let mut pool: BTreeMap<Hash, Box<Transaction>> = BTreeMap::new();
+    let patch = {
+        let mut fork = blockchain.fork();
+        {
+            let mut schema = Schema::new(&mut fork);
 
-    pool.insert(tx_ok1.hash(), Box::new(tx_ok1.clone()) as Box<Transaction>);
-    pool.insert(tx_ok2.hash(), Box::new(tx_ok2.clone()) as Box<Transaction>);
-    pool.insert(
-        tx_failed.hash(),
-        Box::new(tx_failed.clone()) as Box<Transaction>,
-    );
-    pool.insert(
-        tx_storage_error.hash(),
-        Box::new(tx_storage_error.clone()) as Box<Transaction>,
-    );
+            schema.add_transaction_into_pool(tx_ok1.raw().clone());
+            schema.add_transaction_into_pool(tx_ok2.raw().clone());
+            schema.add_transaction_into_pool(tx_failed.raw().clone());
+            schema.add_transaction_into_pool(tx_storage_error.raw().clone());
+        }
+        fork.into_patch()
+    };
+    blockchain.merge(patch).unwrap();
 
     let (_, patch) = blockchain.create_patch(
         ValidatorId::zero(),
         Height::zero(),
         &[tx_ok1.hash(), tx_failed.hash(), tx_ok2.hash()],
-        &pool,
     );
 
-    db.merge(patch).unwrap();
-    let snapshot = db.snapshot();
+    blockchain.merge(patch).unwrap();
+    let snapshot = blockchain.snapshot();
 
     let schema = Schema::new(&snapshot);
-
     assert_eq!(
         schema.transactions().get(&tx_ok1.hash()),
         Some(tx_ok1.raw().clone())
@@ -221,30 +242,7 @@ fn handling_tx_panic(blockchain: &Blockchain, db: &mut Box<Database>) {
     assert_eq!(index.get(3), Some(10));
 }
 
-fn handling_tx_panic_storage_error(blockchain: &Blockchain) {
-    messages! {
-        const SERVICE_ID = 1;
-        struct Tx {
-            value: u64,
-        }
-    }
-
-    impl Transaction for Tx {
-        fn verify(&self) -> bool {
-            true
-        }
-
-        fn execute(&self, view: &mut Fork) -> ExecutionResult {
-            if self.value() == 42 {
-                panic!(Error::new("42"))
-            }
-            let mut index = ListIndex::new(IDX_NAME, view);
-            index.push(self.value());
-            index.push(42 / self.value());
-            Ok(())
-        }
-    }
-
+fn handling_tx_panic_storage_error(blockchain: &mut Blockchain) {
     let (_, sec_key) = gen_keypair();
 
     let tx_ok1 = Tx::new(3, &sec_key);
@@ -252,24 +250,22 @@ fn handling_tx_panic_storage_error(blockchain: &Blockchain) {
     let tx_failed = Tx::new(0, &sec_key);
     let tx_storage_error = Tx::new(42, &sec_key);
 
-    let mut pool: BTreeMap<Hash, Box<Transaction>> = BTreeMap::new();
-
-    pool.insert(tx_ok1.hash(), Box::new(tx_ok1.clone()) as Box<Transaction>);
-    pool.insert(tx_ok2.hash(), Box::new(tx_ok2.clone()) as Box<Transaction>);
-    pool.insert(
-        tx_failed.hash(),
-        Box::new(tx_failed.clone()) as Box<Transaction>,
-    );
-    pool.insert(
-        tx_storage_error.hash(),
-        Box::new(tx_storage_error.clone()) as Box<Transaction>,
-    );
-
+    let patch = {
+        let mut fork = blockchain.fork();
+        {
+            let mut schema = Schema::new(&mut fork);
+            schema.add_transaction_into_pool(tx_ok1.raw().clone());
+            schema.add_transaction_into_pool(tx_ok2.raw().clone());
+            schema.add_transaction_into_pool(tx_failed.raw().clone());
+            schema.add_transaction_into_pool(tx_storage_error.raw().clone());
+        }
+        fork.into_patch()
+    };
+    blockchain.merge(patch).unwrap();
     blockchain.create_patch(
         ValidatorId::zero(),
         Height::zero(),
         &[tx_ok1.hash(), tx_storage_error.hash(), tx_ok2.hash()],
-        &pool,
     );
 }
 
@@ -372,7 +368,7 @@ mod memorydb_tests {
     use std::path::Path;
     use tempdir::TempDir;
     use storage::{Database, MemoryDB};
-    use blockchain::Blockchain;
+    use blockchain::{Blockchain, Service};
     use crypto::gen_keypair;
     use node::ApiSender;
 
@@ -385,7 +381,7 @@ mod memorydb_tests {
         let api_channel = mpsc::channel(1);
         Blockchain::new(
             MemoryDB::new(),
-            Vec::new(),
+            vec![Box::new(super::TestService) as Box<Service>],
             service_keypair.0,
             service_keypair.1,
             ApiSender::new(api_channel.0),
@@ -396,11 +392,8 @@ mod memorydb_tests {
     fn test_handling_tx_panic() {
         let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
         let path = dir.path();
-        let blockchain = create_blockchain(path);
-        let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path1 = dir1.path();
-        let mut db = create_database(path1);
-        super::handling_tx_panic(&blockchain, &mut db);
+        let mut blockchain = create_blockchain(path);
+        super::handling_tx_panic(&mut blockchain);
     }
 
     #[test]
@@ -408,8 +401,8 @@ mod memorydb_tests {
     fn test_handling_tx_panic_storage_error() {
         let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
         let path = dir.path();
-        let blockchain = create_blockchain(path);
-        super::handling_tx_panic_storage_error(&blockchain);
+        let mut blockchain = create_blockchain(path);
+        super::handling_tx_panic_storage_error(&mut blockchain);
     }
 }
 
@@ -418,7 +411,7 @@ mod rocksdb_tests {
     use std::path::Path;
     use tempdir::TempDir;
     use storage::{Database, RocksDB, DbOptions};
-    use blockchain::Blockchain;
+    use blockchain::{Blockchain, Service};
     use crypto::gen_keypair;
     use node::ApiSender;
 
@@ -433,7 +426,7 @@ mod rocksdb_tests {
         let api_channel = mpsc::channel(1);
         Blockchain::new(
             db,
-            Vec::new(),
+            vec![Box::new(super::TestService) as Box<Service>],
             service_keypair.0,
             service_keypair.1,
             ApiSender::new(api_channel.0),
@@ -444,11 +437,8 @@ mod rocksdb_tests {
     fn test_handling_tx_panic() {
         let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
         let path = dir.path();
-        let blockchain = create_blockchain(path);
-        let dir1 = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let path1 = dir1.path();
-        let mut db = create_database(path1);
-        super::handling_tx_panic(&blockchain, &mut db);
+        let mut blockchain = create_blockchain(path);
+        super::handling_tx_panic(&mut blockchain);
     }
 
     #[test]
@@ -456,7 +446,7 @@ mod rocksdb_tests {
     fn test_handling_tx_panic_storage_error() {
         let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
         let path = dir.path();
-        let blockchain = create_blockchain(path);
-        super::handling_tx_panic_storage_error(&blockchain);
+        let mut blockchain = create_blockchain(path);
+        super::handling_tx_panic_storage_error(&mut blockchain);
     }
 }

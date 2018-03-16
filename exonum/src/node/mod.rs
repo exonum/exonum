@@ -46,7 +46,7 @@ use events::error::{into_other, log_error, other_error, LogError};
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
 use storage::{Database, DbOptions};
 
-pub use self::state::{RequestData, State, TxPool, ValidatorState};
+pub use self::state::{RequestData, State, ValidatorState};
 pub use self::whitelist::Whitelist;
 
 mod events;
@@ -884,7 +884,6 @@ impl Node {
             Some(listen_address) => {
                 let handler = create_public_api_handler(
                     blockchain,
-                    Arc::clone(self.state().transactions()),
                     self.handler.api_state().clone(),
                     &self.api_options,
                 );
@@ -962,7 +961,6 @@ impl Node {
 #[doc(hidden)]
 pub fn create_public_api_handler(
     blockchain: Blockchain,
-    pool: TxPool,
     shared_api_state: SharedNodeState,
     config: &NodeApiConfig,
 ) -> Chain {
@@ -971,13 +969,13 @@ pub fn create_public_api_handler(
 
     if config.enable_blockchain_explorer {
         let mut router = Router::new();
-        let explorer_api = public::ExplorerApi::new(Arc::clone(&pool), blockchain.clone());
+        let explorer_api = public::ExplorerApi::new(blockchain.clone());
         explorer_api.wire(&mut router);
         mount.mount("api/explorer", router);
     }
 
     let mut router = Router::new();
-    let system_api = public::SystemApi::new(pool, blockchain, shared_api_state);
+    let system_api = public::SystemApi::new(blockchain, shared_api_state);
     system_api.wire(&mut router);
     mount.mount("api/system", router);
 

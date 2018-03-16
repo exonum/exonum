@@ -20,6 +20,17 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   `blockchain::gen_prefix` method has been removed. Instead, any type that
   implements `StorageKey` trait, can serve as an `index_id`. (#531)
 
+#### exonum-testkit
+
+- Testkit api now contains two methods to work with the transaction pool:
+  - `is_tx_in_pool` - for checking transaction existence in the pool;
+  - `add_tx` - for adding a new transaction into the pool.
+
+  Migration path:
+
+  - Instead of calling `mempool()`, one should use `is_tx_in_pool`
+  or `add_tx` methods.
+
 #### exonum-configuration
 
 - `majority_count: Option<u16>` configuration parameter is introduced.
@@ -43,6 +54,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Added `v1/user_agent` endpoint with information about Exonum, Rust
   and OS versions. (#548)
+
+### Internal improvements
+
+#### Exonum core
+
+- Non-committed transactions are now stored persistently in the storage
+  instead of memory pool. (#549)
 
 ## 0.6 - 2018-03-06
 

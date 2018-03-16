@@ -37,6 +37,7 @@ fn test_json_response_for_complex_val() {
         &Hash::new([38; 32]),
     );
     struct SampleAPI;
+
     impl Api for SampleAPI {
         fn wire<'b>(&self, _: &'b mut Router) {
             return;

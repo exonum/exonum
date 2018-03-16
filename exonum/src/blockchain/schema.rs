@@ -14,7 +14,8 @@
 
 use crypto::{PublicKey, Hash, CryptoHash};
 use messages::{Precommit, RawMessage, Connect};
-use storage::{Entry, Fork, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex, Snapshot};
+use storage::{Entry, Fork, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex, Snapshot,
+              KeySetIndex};
 use helpers::{Height, Round};
 use super::{Block, BlockProof, Blockchain, TransactionResult};
 use super::config::StoredConfiguration;
@@ -33,6 +34,7 @@ macro_rules! define_names {
 define_names!(
     TRANSACTIONS => "transactions";
     TRANSACTION_RESULTS => "transaction_results";
+    TRANSACTIONS_POOL => "transactions_pool";
     TX_LOCATION_BY_TX_HASH => "tx_location_by_tx_hash";
     BLOCKS => "blocks";
     BLOCK_HASHES_BY_HEIGHT => "block_hashes_by_height";
@@ -89,6 +91,11 @@ where
     /// Returns table that represents a map from transaction hash into execution result.
     pub fn transaction_results(&self) -> ProofMapIndex<&T, Hash, TransactionResult> {
         ProofMapIndex::new(TRANSACTION_RESULTS, &self.view)
+    }
+
+    /// Returns table that represents a set of uncommitted transactions hashes.
+    pub fn transactions_pool(&self) -> KeySetIndex<&T, Hash> {
+        KeySetIndex::new(TRANSACTIONS_POOL, &self.view)
     }
 
     /// Returns table that keeps the block height and tx position inside block for every
@@ -331,6 +338,15 @@ where
     fn next_height(&self) -> Height {
         Height(self.block_hashes_by_height().len())
     }
+
+    /// Returns number of transactions in the pool
+    #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
+    pub fn tx_pool_len(&self) -> usize {
+        let pool = self.transactions_pool();
+        // TODO: Change count to other method with O(1) complexity. (ECR-977)
+        let count = pool.iter().count();
+        count
+    }
 }
 
 impl<'a> Schema<&'a mut Fork> {
@@ -348,6 +364,13 @@ impl<'a> Schema<&'a mut Fork> {
         &mut self,
     ) -> ProofMapIndex<&mut Fork, Hash, TransactionResult> {
         ProofMapIndex::new(TRANSACTION_RESULTS, self.view)
+    }
+
+    /// Mutable reference to the [`transactions_pool`][1] index.
+    ///
+    /// [1]: struct.Schema.html#method.transactions_pool
+    fn transactions_pool_mut(&mut self) -> KeySetIndex<&mut Fork, Hash> {
+        KeySetIndex::new(TRANSACTIONS_POOL, self.view)
     }
 
     /// Mutable reference to the [`tx_location_by_tx_hash`][1] index.
@@ -463,5 +486,26 @@ impl<'a> Schema<&'a mut Fork> {
         let cfg_ref = ConfigReference::new(actual_from, &cfg_hash);
         self.configs_actual_from_mut().push(cfg_ref);
         // TODO: clear storages
+    }
+
+    /// Adds transaction into persistent pool.
+    #[doc(hidden)]
+    pub fn add_transaction_into_pool(&mut self, tx: RawMessage) {
+        self.transactions_pool_mut().insert(tx.hash());
+        self.transactions_mut().put(&tx.hash(), tx);
+    }
+
+    /// Change transaction status from `in_pool`, to `committed`.
+    pub(crate) fn commit_transaction(&mut self, tx_hash: &Hash) {
+        self.transactions_pool_mut().remove(tx_hash)
+    }
+
+    /// Remove transaction from persistent pool.
+    #[doc(hidden)]
+    pub fn reject_transaction(&mut self, tx_hash: &Hash) -> Result<(), ()> {
+        let contains = self.transactions_pool_mut().contains(tx_hash);
+        self.transactions_pool_mut().remove(tx_hash);
+        self.transactions_mut().remove(tx_hash);
+        if contains { Ok(()) } else { Err(()) }
     }
 }

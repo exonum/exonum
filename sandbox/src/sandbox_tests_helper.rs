@@ -396,6 +396,7 @@ where
             sandbox.assert_lock(round, Some(propose.hash()));
 
             trace!("last_block: {:?}", sandbox.last_block());
+            trace!("last_block.hash(): {:?}", sandbox.last_block().hash());
 
             let state_hash = sandbox.compute_state_hash(&raw_txs);
             let block = BlockBuilder::new(sandbox)
