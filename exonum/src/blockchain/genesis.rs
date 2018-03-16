@@ -34,7 +34,7 @@ impl GenesisConfig {
     where
         I: Iterator<Item = ValidatorKeys>,
     {
-        consensus.check_timeout_recommendations();
+        consensus.validate_configuration();
         GenesisConfig {
             consensus,
             validator_keys: validator_keys.collect(),
