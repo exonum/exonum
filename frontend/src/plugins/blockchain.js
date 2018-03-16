@@ -190,7 +190,7 @@ function waitForAcceptance(keyPair, hash) {
         return data
       }
     })
-  })();
+  })()
 }
 
 module.exports = {
