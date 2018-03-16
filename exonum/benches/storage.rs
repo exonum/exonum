@@ -126,7 +126,7 @@ mod tests {
         for item in &data {
             table.put(&item.0, item.1.clone());
         }
-        let table_root_hash = table.root_hash();
+        let table_merkle_root = table.merkle_root();
         let mut proofs = Vec::with_capacity(data.len());
 
         b.iter(|| {
@@ -137,7 +137,7 @@ mod tests {
         for (i, proof) in proofs.into_iter().enumerate() {
             let checked_proof = proof.check().unwrap();
             assert_eq!(*checked_proof.entries()[0].1, data[i].1);
-            assert_eq!(checked_proof.hash(), table_root_hash);
+            assert_eq!(checked_proof.merkle_root(), table_merkle_root);
         }
     }
 
@@ -149,13 +149,13 @@ mod tests {
         for item in &data {
             table.put(&item.0, item.1.clone());
         }
-        let table_root_hash = table.root_hash();
+        let table_merkle_root = table.merkle_root();
         let proofs: Vec<_> = data.iter().map(|item| table.get_proof(item.0)).collect();
 
         b.iter(|| for (i, proof) in proofs.iter().enumerate() {
             let checked_proof = proof.clone().check().unwrap();
             assert_eq!(*checked_proof.entries()[0].1, data[i].1);
-            assert_eq!(checked_proof.hash(), table_root_hash);
+            assert_eq!(checked_proof.merkle_root(), table_merkle_root);
         });
     }
 
