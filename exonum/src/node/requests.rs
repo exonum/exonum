@@ -123,7 +123,7 @@ impl NodeHandler {
 
         let block = schema.blocks().get(&block_hash).unwrap();
         let precommits = schema.precommits(&block_hash);
-        let transactions = schema.block_txs(height);
+        let transactions = schema.block_transactions(height);
 
 
         let block_msg = BlockResponse::new(

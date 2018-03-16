@@ -237,14 +237,14 @@ impl<'a> BlockchainExplorer<'a> {
             ApiError::InternalError,
         )?;
 
-        let location = schema.tx_location_by_tx_hash().get(tx_hash).expect(
+        let location = schema.transactions_locations().get(tx_hash).expect(
             &format!(
                 "Not found tx_hash location: {:?}",
                 tx_hash
             ),
         );
 
-        let location_proof = schema.block_txs(location.block_height()).get_proof(
+        let location_proof = schema.block_transactions(location.block_height()).get_proof(
             location.position_in_block(),
         );
 
@@ -271,7 +271,7 @@ impl<'a> BlockchainExplorer<'a> {
     /// Returns block information for the specified height or `None` if there is no such block.
     pub fn block_info(&self, height: Height) -> Option<BlockInfo> {
         let schema = Schema::new(self.blockchain.snapshot());
-        let txs_table = schema.block_txs(height);
+        let txs_table = schema.block_transactions(height);
         let block_proof = schema.block_and_precommits(height);
         match block_proof {
             None => None,
@@ -317,7 +317,7 @@ impl<'a> BlockchainExplorer<'a> {
             height -= 1;
             genesis = height == 0;
 
-            let block_txs = schema.block_txs(Height(height));
+            let block_txs = schema.block_transactions(Height(height));
             if skip_empty_blocks && block_txs.is_empty() {
                 continue;
             }
