@@ -15,7 +15,7 @@
 use std::collections::HashSet;
 
 use serde_json;
-use rand::{self, Rng};
+use rand::{self, Rng, XorShiftRng};
 use rand::seq::sample_iter;
 
 use crypto::{hash, CryptoHash, Hash, HashStream};
@@ -56,9 +56,7 @@ fn generate_random_data(len: usize) -> Vec<([u8; KEY_SIZE], Vec<u8>)> {
 }
 
 // Makes large data set with unique keys
-fn generate_fully_random_data_keys(len: usize) -> Vec<([u8; KEY_SIZE], Vec<u8>)> {
-    let mut rng = rand::thread_rng();
-
+fn generate_random_data_keys<R: Rng>(len: usize, rng: &mut R) -> Vec<([u8; KEY_SIZE], Vec<u8>)> {
     let mut exists_keys = HashSet::new();
 
     let kv_generator = |_| {
@@ -388,7 +386,7 @@ where
     let indexes = if batch_size < MAX_CHECKED_ELEMENTS {
         (0..batch_size).collect()
     } else {
-        let mut rng = rand::thread_rng();
+        let mut rng: XorShiftRng = rand::random();
         sample_iter(&mut rng, 0..batch_size, MAX_CHECKED_ELEMENTS).unwrap()
     };
 
@@ -418,7 +416,7 @@ where
         table.put(key, value.clone());
     }
 
-    let mut rng = rand::thread_rng();
+    let mut rng: XorShiftRng = rand::random();
 
     // Test for batches of 1, 11, ..., 101 keys
     for proof_size in (0..11).map(|x| x * 10 + 1) {
@@ -906,14 +904,16 @@ fn build_multiproof_simple(db: Box<Database>) {
 }
 
 fn fuzz_insert_build_proofs_in_table_filled_with_hashes(db: Box<Database>) {
-    for batch_size in (0..16).map(|x| 1 << x) {
-        let data: Vec<(Hash, Hash)> = generate_fully_random_data_keys(batch_size)
+    let mut rng: XorShiftRng = rand::random();
+
+    for batch_size in (12..16).map(|x| 1 << x) {
+        let data: Vec<(Hash, Hash)> = generate_random_data_keys(batch_size, &mut rng)
             .into_iter()
             .map(|(key, val)| (hash(&key), hash(&val)))
             .collect();
 
         let nonexisting_count = ::std::cmp::min(MAX_CHECKED_ELEMENTS, batch_size);
-        let nonexisting_keys: Vec<_> = generate_fully_random_data_keys(nonexisting_count / 2)
+        let nonexisting_keys: Vec<_> = generate_random_data_keys(nonexisting_count / 2, &mut rng)
             .into_iter()
             .flat_map(|(key, val)| vec![hash(&key), hash(&val)])
             .collect();
@@ -923,11 +923,13 @@ fn fuzz_insert_build_proofs_in_table_filled_with_hashes(db: Box<Database>) {
 }
 
 fn fuzz_insert_build_proofs(db: Box<Database>) {
+    let mut rng: XorShiftRng = rand::random();
+
     for batch_size in (1..11).map(|x| (1 << x) - 1) {
-        let data = generate_fully_random_data_keys(batch_size);
+        let data = generate_random_data_keys(batch_size, &mut rng);
 
         let nonexisting_count = ::std::cmp::min(MAX_CHECKED_ELEMENTS, batch_size);
-        let nonexisting_keys: Vec<_> = generate_fully_random_data_keys(nonexisting_count)
+        let nonexisting_keys: Vec<_> = generate_random_data_keys(nonexisting_count, &mut rng)
             .into_iter()
             .map(|(key, _)| key)
             .collect();
@@ -937,11 +939,13 @@ fn fuzz_insert_build_proofs(db: Box<Database>) {
 }
 
 fn fuzz_insert_build_multiproofs(db: Box<Database>) {
+    let mut rng: XorShiftRng = rand::random();
+
     for batch_size in (9..16).map(|x| 1 << x) {
-        let data = generate_fully_random_data_keys(batch_size);
+        let data = generate_random_data_keys(batch_size, &mut rng);
 
         let nonexisting_count = ::std::cmp::min(MAX_CHECKED_ELEMENTS, batch_size);
-        let nonexisting_keys: Vec<_> = generate_fully_random_data_keys(nonexisting_count)
+        let nonexisting_keys: Vec<_> = generate_random_data_keys(nonexisting_count, &mut rng)
             .into_iter()
             .map(|(key, _)| key)
             .collect();
@@ -951,7 +955,9 @@ fn fuzz_insert_build_multiproofs(db: Box<Database>) {
 }
 
 fn fuzz_delete_build_proofs(db: Box<Database>) {
-    let data = generate_fully_random_data_keys(9_000);
+    let mut rng: XorShiftRng = rand::random();
+    let data = generate_random_data_keys(9_000, &mut rng);
+
     let mut storage = db.fork();
     let mut table = ProofMapIndex::new(IDX_NAME, &mut storage);
     for item in &data {
@@ -959,7 +965,6 @@ fn fuzz_delete_build_proofs(db: Box<Database>) {
     }
 
     let (keys_to_remove, keys_to_remove_seq) = {
-        let mut rng = rand::thread_rng();
         let mut keys = sample_iter(&mut rng, data.iter().map(|item| item.0.clone()), 2_000)
             .unwrap();
         rng.shuffle(&mut keys);
