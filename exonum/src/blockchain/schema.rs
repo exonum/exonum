@@ -397,7 +397,10 @@ impl<'a> Schema<&'a mut Fork> {
     /// Mutable reference to the [`block_transactions`][1] index.
     ///
     /// [1]: struct.Schema.html#method.block_transactions
-    pub(crate) fn block_transactions_mut(&mut self, height: Height) -> ProofListIndex<&mut Fork, Hash> {
+    pub(crate) fn block_transactions_mut(
+        &mut self,
+        height: Height,
+    ) -> ProofListIndex<&mut Fork, Hash> {
         let height: u64 = height.into();
         ProofListIndex::new_in_family(BLOCK_TRANSACTIONS, &height, self.view)
     }

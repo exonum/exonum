@@ -21,8 +21,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   implements `StorageKey` trait, can serve as an `index_id`. (#531)
 
 - Several `Schema`'s methods have been renamed:
-  - `tx_location_by_tx_hash` to `transactions_lications`.
-  - `block_txs` to `block_transactions`. 
+  - `tx_location_by_tx_hash` to `transactions_locations`.
+  - `block_txs` to `block_transactions`.
 
 #### exonum-testkit
 

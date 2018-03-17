@@ -244,9 +244,9 @@ impl<'a> BlockchainExplorer<'a> {
             ),
         );
 
-        let location_proof = schema.block_transactions(location.block_height()).get_proof(
-            location.position_in_block(),
-        );
+        let location_proof = schema
+            .block_transactions(location.block_height())
+            .get_proof(location.position_in_block());
 
         // Unwrap is OK here, because we already know that transaction is committed.
         let status = match schema.transaction_results().get(tx_hash).unwrap() {
