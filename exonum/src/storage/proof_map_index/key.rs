@@ -21,6 +21,8 @@ pub const BRANCH_KEY_PREFIX: u8 = 0;
 pub const LEAF_KEY_PREFIX: u8 = 1;
 
 /// Size in bytes of the `ProofMapKey`.
+///
+/// Equal to the size of the hash function output (32).
 pub const KEY_SIZE: usize = HASH_SIZE;
 /// Size in bytes of the `ProofPath`.
 pub const PROOF_PATH_SIZE: usize = KEY_SIZE + 2;
