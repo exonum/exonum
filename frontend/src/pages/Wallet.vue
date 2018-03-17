@@ -11,7 +11,7 @@
                   <div class="col-sm-3"><strong>Name:</strong></div>
                   <div class="col-sm-9">
                     {{ name }}
-                    <button class="btn btn-sm btn-outline-secondary ml-1" @click="logout">Logout</button>
+                    <button class="btn btn-sm btn-secondary ml-1" @click="logout">Logout</button>
                   </div>
                 </div>
               </li>
@@ -26,19 +26,14 @@
                   <div class="col-sm-3"><strong>Balance:</strong></div>
                   <div class="col-sm-9">
                     <span v-numeral="balance"/>
-                    <button class="btn btn-sm btn-outline-success ml-1" @click="openAddFundsModal">Add Funds</button>
-                    <button :disabled="!balance" class="btn btn-sm btn-outline-primary ml-1" @click="openTransferModal">Transfer Funds</button>
+                    <button class="btn btn-sm btn-success ml-1" @click="openAddFundsModal">Add Funds</button>
+                    <button :disabled="balance == 0" class="btn btn-sm btn-primary ml-1" @click="openTransferModal">Transfer Funds</button>
                   </div>
-                </div>
-              </li>
-              <li class="list-group-item">
-                <div class="row">
-                  <div class="col-sm-3"><strong>Block:</strong></div>
-                  <div class="col-sm-9">{{ height }}</div>
                 </div>
               </li>
             </ul>
           </div>
+
           <div class="card mt-5">
             <div class="card-header">Transactions</div>
             <ul class="list-group list-group-flush">
@@ -52,7 +47,9 @@
               <!-- eslint-disable-next-line vue/require-v-for-key -->
               <li v-for="transaction in transactions" class="list-group-item">
                 <div class="row">
-                  <div class="col-sm-4"><code>{{ transaction.hash }}</code></div>
+                  <div class="col-sm-4">
+                    <router-link :to="{ name: 'transaction', params: { hash: transaction.hash } }">{{ transaction.hash }}</router-link>
+                  </div>
                   <div v-if="transaction.message_id == 130" class="col-sm-5">Wallet created</div>
                   <div v-else-if="transaction.message_id == 129" class="col-sm-5">
                     <strong v-numeral="transaction.body.amount"/> funds added
@@ -64,8 +61,8 @@
                     <strong v-numeral="transaction.body.amount"/> received from <code>{{ transaction.body.from }}</code>
                   </div>
                   <div class="col-sm-3">
-                    <span v-if="transaction.status" class="badge badge-success">accepted</span>
-                    <span v-else class="badge badge-danger">rejected</span>
+                    <span v-if="transaction.status" class="badge badge-success">Accepted</span>
+                    <span v-else class="badge badge-danger">Rejected</span>
                   </div>
                 </div>
               </li>
@@ -120,7 +117,6 @@
         name: '',
         publicKey: '',
         balance: 0,
-        height: 0,
         amountToAdd: 10,
         receiver: '',
         amountToTransfer: '',
@@ -153,7 +149,6 @@
             self.isSpinnerVisible = false
             self.isAddFundsModalVisible = false
             self.balance = data.wallet.balance
-            self.height = data.block.height
             self.transactions = data.transactions
             self.$notify('success', 'Add funds transaction has been written into the blockchain')
           }).catch(function(error) {
@@ -193,7 +188,6 @@
             self.isSpinnerVisible = false
             self.isTransferModalVisible = false
             self.balance = data.wallet.balance
-            self.height = data.block.height
             self.transactions = data.transactions
             self.$notify('success', 'Transfer transaction has been written into the blockchain')
           }).catch(function(error) {
@@ -224,7 +218,6 @@
             self.name = data.wallet.name
             self.publicKey = keyPair.publicKey
             self.balance = data.wallet.balance
-            self.height = data.block.height
             self.transactions = data.transactions
           }).catch(function(error) {
             self.isSpinnerVisible = false
