@@ -19,7 +19,7 @@ use storage::StorageValue;
 use super::key::{BitsRange, ChildKind, ProofMapKey, ProofPath, KEY_SIZE};
 use super::node::{Node, BranchNode};
 
-// Expected size of the proof, in a number of hashed entries.
+// Expected size of the proof, in number of hashed entries.
 const DEFAULT_PROOF_CAPACITY: usize = 8;
 
 impl Serialize for ProofPath {

@@ -283,8 +283,15 @@ pub(crate) trait BitsRange {
     /// Returns the raw bytes of the key.
     fn raw_key(&self) -> &[u8];
 
-    /// Returns the number of matching bits with `other` starting from position `from`.
+    /// Returns the number of matching bits with `other`, where checking bits for equality starts
+    /// from the specified position (`from`).
+    ///
+    /// Bits preceding `from` are not checked and assumed to be equal in both ranges (e.g.,
+    /// because they have been checked previously).
     fn match_len(&self, other: &Self, from: u16) -> u16 {
+        debug_assert_eq!(self.start(), other.start(), "Misaligned bit ranges");
+        debug_assert!(from >= self.start() && from <= self.end());
+
         let from = from / 8;
         let to = min((self.end() + 7) / 8, (other.end() + 7) / 8);
         let max_len = min(self.len(), other.len());
@@ -302,7 +309,6 @@ pub(crate) trait BitsRange {
 
     /// Checks if this range of bits matches the other one starting from the specified offset.
     fn matches_from(&self, other: &Self, from: u16) -> bool {
-        debug_assert!(from >= self.start());
         self.match_len(other, from) == other.len()
     }
 
@@ -520,6 +526,50 @@ mod tests {
             assert_eq!(x.partial_cmp(&y).unwrap(), x_bits.cmp(y_bits));
         }
     }
+
+    #[test]
+    fn test_fuzz_match_len() {
+        let mut rng = rand::thread_rng();
+        for _ in 0..10_000 {
+            let (x, y) = (random_path(&mut rng), random_path(&mut rng));
+            let min_len = min(x.len(), y.len());
+            let start = rng.gen::<u16>() % min_len;
+            let match_len = x.match_len(&y, start);
+
+            assert!(
+                match_len <= min_len,
+                "{:?}.match_len({:?}, {}) = {}",
+                x,
+                y,
+                start,
+                match_len
+            );
+
+            for i in start..match_len {
+                assert_eq!(
+                    x.bit(i),
+                    y.bit(i),
+                    "{:?}.match_len({:?}, {}) = {}",
+                    x,
+                    y,
+                    start,
+                    match_len
+                );
+            }
+
+            if match_len < min_len {
+                assert_ne!(
+                    x.bit(match_len),
+                    y.bit(match_len),
+                    "{:?}.match_len({:?}, {}) = {}",
+                    x,
+                    y,
+                    start,
+                    match_len
+                );
+            }
+        }
+    }
 }
 
 #[test]
@@ -645,6 +695,36 @@ fn test_proof_path_common_prefix_len() {
     assert_eq!(b3.common_prefix_len(&b3), 200);
     let b5 = ProofPath::from_raw(*b"\x01\xF00000000000000000000000000000000\x00");
     assert_eq!(b5.prefix(0).common_prefix_len(&b3), 0);
+}
+
+#[test]
+fn test_proof_path_match_len() {
+    let b1 = ProofPath::from_raw(*b"\x01abcd0000000000000000000000000000\x00");
+    let b2 = ProofPath::from_raw(*b"\x01abef0000000000000000000000000000\x00");
+
+    for start in 0..256 {
+        assert_eq!(b1.match_len(&b1, start), 256);
+    }
+    for start in 0..18 {
+        assert_eq!(b1.match_len(&b2, start), 17);
+        assert_eq!(b2.match_len(&b1, start), 17);
+    }
+    for start in 32..256 {
+        assert_eq!(b1.match_len(&b2, start), 256);
+        assert_eq!(b2.match_len(&b1, start), 256);
+    }
+
+    let b2 = ProofPath::from_raw(*b"\x01abce0000000000000000000000000000\x00");
+    for start in 0..25 {
+        assert_eq!(b1.match_len(&b2, start), 24);
+        assert_eq!(b2.match_len(&b1, start), 24);
+    }
+
+    let b1 = b1.prefix(19);
+    for start in 0..19 {
+        assert_eq!(b1.match_len(&b2, start), 19);
+        assert_eq!(b2.match_len(&b1, start), 19);
+    }
 }
 
 #[test]
