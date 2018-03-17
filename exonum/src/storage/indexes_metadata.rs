@@ -172,27 +172,13 @@ pub fn set_index_type(name: &str, index_type: IndexType, is_family: bool, view: 
 #[cfg(test)]
 mod tests {
     use super::{IndexType, IndexMetadata, INDEXES_METADATA_TABLE_NAME};
-    use storage::{MemoryDB, Database, MapIndex, ProofMapIndex, StorageKey};
-
-    impl StorageKey for [u8; 32] {
-        fn size(&self) -> usize {
-            32
-        }
-
-        fn write(&self, buffer: &mut [u8]) {
-            buffer.copy_from_slice(self.as_ref())
-        }
-
-        fn read(buffer: &[u8]) -> Self {
-            let mut value = [0; 32];
-            value.copy_from_slice(buffer);
-            value
-        }
-    }
+    use crypto::{PublicKey, Hash};
+    use storage::{MemoryDB, Database, MapIndex, ProofMapIndex};
 
     #[test]
     fn index_metadata_roundtrip() {
         use self::IndexType::*;
+
         let index_types = [Entry, KeySet, List, SparseList, Map, ProofList, ProofMap, ValueSet];
         let is_family = [true, true, false, false, true, false, true, false];
         for (t, f) in index_types.iter().zip(&is_family) {
@@ -229,10 +215,10 @@ mod tests {
         let mut fork = database.fork();
         {
             let mut index = ProofMapIndex::new("test_index", &mut fork);
-            index.put(&[0u8; 32], 42);
+            index.put(&PublicKey::zero(), 42);
         }
 
-        let _: MapIndex<_, [u8; 32], i32> = MapIndex::new("test_index", &mut fork);
+        let _: MapIndex<_, PublicKey, i32> = MapIndex::new("test_index", &mut fork);
     }
 
     #[test]
@@ -241,10 +227,10 @@ mod tests {
         let mut fork = database.fork();
         {
             let mut index = ProofMapIndex::new("test_index", &mut fork);
-            index.put(&[0u8; 32], 42);
+            index.put(&PublicKey::zero(), 42);
         }
 
-        let _: ProofMapIndex<_, [u8; 32], i32> = ProofMapIndex::new("test_index", &mut fork);
+        let _: ProofMapIndex<_, PublicKey, i32> = ProofMapIndex::new("test_index", &mut fork);
     }
 
     #[test]
@@ -285,10 +271,10 @@ mod tests {
         let index_id: i32 = 42;
         {
             let mut index = ProofMapIndex::new_in_family("test_index", &index_id, &mut fork);
-            index.put(&[0u8; 32], 42);
+            index.put(&Hash::zero(), 42);
         }
 
-        let _: ProofMapIndex<_, [u8; 32], i32> =
+        let _: ProofMapIndex<_, Hash, i32> =
             ProofMapIndex::new_in_family("test_index", &index_id, &mut fork);
     }
 
@@ -301,29 +287,27 @@ mod tests {
 
         // Type is unlocked, can read with any
         {
-            let index: MapIndex<_, [u8; 32], i32> = MapIndex::new("test_index", &mut fork);
-            assert!(index.get(&[0u8; 32]).is_none());
+            let index: MapIndex<_, Hash, i32> = MapIndex::new("test_index", &mut fork);
+            assert!(index.get(&Hash::zero()).is_none());
         }
 
         {
-            let index: ProofMapIndex<_, [u8; 32], i32> =
-                ProofMapIndex::new("test_index", &mut fork);
-            assert!(index.get(&[0u8; 32]).is_none());
+            let index: ProofMapIndex<_, Hash, i32> = ProofMapIndex::new("test_index", &mut fork);
+            assert!(index.get(&Hash::zero()).is_none());
         }
 
         // Lock the type
         {
             let mut index = ProofMapIndex::new("test_index", &mut fork);
-            index.put(&[0u8; 32], 42);
+            index.put(&Hash::zero(), 42);
         }
         {
-            let index: ProofMapIndex<_, [u8; 32], i32> =
-                ProofMapIndex::new("test_index", &mut fork);
-            assert_eq!(index.get(&[0u8; 32]), Some(42));
+            let index: ProofMapIndex<_, Hash, i32> = ProofMapIndex::new("test_index", &mut fork);
+            assert_eq!(index.get(&Hash::zero()), Some(42));
         }
 
         // Make sure we're unable to read with different type now
         let mut index = MapIndex::new("test_index", &mut fork);
-        index.put(&[0u8; 32], 43);
+        index.put(&Hash::zero(), 43);
     }
 }
