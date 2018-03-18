@@ -75,8 +75,6 @@ pub fn sign(data: &[u8], secret_key: &SecretKey) -> Signature {
 ///
 /// # crypto::init();
 /// let (public_key, secret_key) = crypto::gen_keypair_from_seed(&Seed::new([1; 32]));
-/// # drop(public_key);
-/// # drop(secret_key);
 /// ```
 pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
     let (sod_pub_key, sod_secret_key) = keypair_from_seed(&seed.0);
@@ -93,8 +91,6 @@ pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
 ///
 /// # crypto::init();
 /// let (public_key, secret_key) = crypto::gen_keypair();
-/// # drop(public_key);
-/// # drop(secret_key);
 /// ```
 pub fn gen_keypair() -> (PublicKey, SecretKey) {
     let (pubkey, secret_key) = gen_keypair_sodium();
@@ -128,7 +124,6 @@ pub fn verify(sig: &Signature, data: &[u8], pubkey: &PublicKey) -> bool {
 /// # crypto::init();
 /// let data = [1, 2, 3];
 /// let hash = crypto::hash(&data);
-/// # drop(hash);
 /// ```
 pub fn hash(data: &[u8]) -> Hash {
     let dig = hash_sodium(data);
@@ -376,7 +371,6 @@ implement_public_sodium_wrapper! {
 ///
 /// # crypto::init();
 /// let (public_key, _) = crypto::gen_keypair();
-/// # drop(public_key);
 /// ```
     struct PublicKey, PublicKeySodium, PUBLIC_KEY_LENGTH
 }
@@ -391,7 +385,6 @@ implement_private_sodium_wrapper! {
 ///
 /// # crypto::init();
 /// let (_, secret_key) = crypto::gen_keypair();
-/// # drop(secret_key);
 /// ```
     struct SecretKey, SecretKeySodium, SECRET_KEY_LENGTH
 }
@@ -407,8 +400,6 @@ implement_public_sodium_wrapper! {
 /// let data = [1, 2, 3];
 /// let hash_from_data = crypto::hash(&data);
 /// let default_hash = Hash::default();
-/// # drop(hash_from_data);
-/// # drop(default_hash);
 /// ```
     struct Hash, DigestSodium, HASH_SIZE
 }
@@ -440,8 +431,6 @@ implement_private_sodium_wrapper! {
 ///
 /// # crypto::init();
 /// let (public_key, secret_key) = crypto::gen_keypair_from_seed(&Seed::new([1; 32]));
-/// # drop(public_key);
-/// # drop(secret_key);
 /// ```
     struct Seed, SeedSodium, SEED_LENGTH
 }

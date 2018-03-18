@@ -71,7 +71,6 @@ impl Constant {
     /// use exonum::node::timeout_adjuster::Constant;
     ///
     /// let mut adjuster = Constant::new(10);
-    /// # drop(adjuster);
     /// ```
     pub fn new(timeout: Milliseconds) -> Self {
         Constant { timeout }
@@ -103,7 +102,6 @@ impl Dynamic {
     /// use exonum::node::timeout_adjuster::Dynamic;
     ///
     /// let mut adjuster = Dynamic::new(1, 10, 100);
-    /// # drop(adjuster);
     /// ```
     pub fn new(min: Milliseconds, max: Milliseconds, threshold: u32) -> Self {
         Dynamic {
@@ -150,7 +148,6 @@ impl MovingAverage {
     /// use exonum::node::timeout_adjuster::MovingAverage;
     ///
     /// let mut adjuster = MovingAverage::new(1, 10, 0.5, 5000, 0.75);
-    /// # drop(adjuster);
     /// ```
     pub fn new(
         min: Milliseconds,

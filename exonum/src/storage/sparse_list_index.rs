@@ -141,7 +141,6 @@ where
     /// let snapshot = db.snapshot();
     /// let name = "name";
     /// let index: SparseListIndex<_, u8> = SparseListIndex::new(name, &snapshot);
-    /// # drop(index);
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         SparseListIndex {
@@ -170,9 +169,11 @@ where
     /// let snapshot = db.snapshot();
     /// let name = "name";
     /// let index_id = vec![123];
-    /// let index: SparseListIndex<_, u8> =
-    ///                             SparseListIndex::new_in_family(name, &index_id, &snapshot);
-    /// # drop(index);
+    /// let index: SparseListIndex<_, u8> = SparseListIndex::new_in_family(
+    ///     name,
+    ///     &index_id,
+    ///     &snapshot,
+    ///  );
     /// ```
     pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
         family_name: S,

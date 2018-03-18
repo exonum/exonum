@@ -54,7 +54,6 @@ where
     /// let name = "name";
     /// let snapshot = db.snapshot();
     /// let index: Entry<_, u8> = Entry::new(name, &snapshot);
-    /// # drop(index);
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         Entry {
