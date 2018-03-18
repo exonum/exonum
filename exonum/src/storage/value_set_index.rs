@@ -81,7 +81,6 @@ where
     /// let name  = "name";
     /// let snapshot = db.snapshot();
     /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(name, &snapshot);
-    /// # drop(index);
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         ValueSetIndex {
@@ -110,7 +109,6 @@ where
     /// let name = "name";
     /// let index_id = vec![123];
     /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new_in_family(name, &index_id, &snapshot);
-    /// # drop(index);
     /// ```
     pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
         family_name: S,

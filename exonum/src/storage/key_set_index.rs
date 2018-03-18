@@ -68,7 +68,6 @@ where
     /// let snapshot = db.snapshot();
     /// let name = "name";
     /// let index: KeySetIndex<_, u8> = KeySetIndex::new(name, &snapshot);
-    /// # drop(index);
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         KeySetIndex {
@@ -97,7 +96,6 @@ where
     /// let name = "name";
     /// let index_id = vec![123];
     /// let index: KeySetIndex<_, u8> = KeySetIndex::new_in_family(name, &index_id, &snapshot);
-    /// # drop(index);
     /// ```
     pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
         family_name: S,

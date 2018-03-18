@@ -69,7 +69,6 @@ where
     /// let name = "name";
     /// let snapshot = db.snapshot();
     /// let index: ListIndex<_, u8> = ListIndex::new(name, &snapshot);
-    /// # drop(index);
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         ListIndex {
@@ -99,7 +98,6 @@ where
     /// let index_id = vec![01];
     /// let snapshot = db.snapshot();
     /// let index: ListIndex<_, u8> = ListIndex::new_in_family(name, &index_id, &snapshot);
-    /// # drop(index);
     /// ```
     pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
         family_name: S,

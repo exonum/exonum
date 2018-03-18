@@ -91,8 +91,6 @@ where
     ///
     /// let mut fork = db.fork();
     /// let mut mut_index: ProofListIndex<_, u8> = ProofListIndex::new(name, &mut fork);
-    /// # drop(index);
-    /// # drop(mut_index);
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         ProofListIndex {
@@ -128,8 +126,6 @@ where
     /// let mut fork = db.fork();
     /// let mut mut_index : ProofListIndex<_, u8> =
     ///                                 ProofListIndex::new_in_family(name, &index_id, &mut fork);
-    /// # drop(index);
-    /// # drop(mut_index);
     /// ```
     pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
         family_name: S,
@@ -344,7 +340,6 @@ where
     /// index.push(1);
     ///
     /// let proof = index.get_proof(0);
-    /// # drop(proof);
     /// ```
     pub fn get_proof(&self, index: u64) -> ListProof<V> {
         if index >= self.len() {
@@ -376,7 +371,6 @@ where
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     ///
     /// let list_proof = index.get_range_proof(1, 3);
-    /// # drop(list_proof);
     /// ```
     pub fn get_range_proof(&self, from: u64, to: u64) -> ListProof<V> {
         if to > self.len() {

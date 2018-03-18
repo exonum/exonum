@@ -97,7 +97,6 @@ where
     /// let name = "name";
     /// let snapshot = db.snapshot();
     /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
-    /// # drop(index);
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         MapIndex {
@@ -128,7 +127,6 @@ where
     ///
     /// let snapshot = db.snapshot();
     /// let index: MapIndex<_, u8, u8> = MapIndex::new_in_family(name, &index_id, &snapshot);
-    /// # drop(index);
     /// ```
     pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
         family_name: S,
