@@ -24,6 +24,17 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - `tx_location_by_tx_hash` to `transactions_locations`.
   - `block_txs` to `block_transactions`.
 
+- `SystemTime` previously used as storage key or value turned out to show
+  different behavior on different platforms and, hence, has been replaced with
+  `chrono::DateTime<Utc>` that behaves the same in any environment.
+
+  Migration path:
+
+  - Replace all `SystemTime` fields with `chrono::DateTime<Utc>` ones.
+  - Use `DateTime::from` and `into()` methods to convert your existing
+  `SystemTime` instances into suitable type when constructing transactions or
+  working with database.
+
 #### exonum-testkit
 
 - Testkit api now contains two methods to work with the transaction pool:
@@ -34,18 +45,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
   - Instead of calling `mempool()`, one should use `is_tx_in_pool`
   or `add_tx` methods.
-- `SystemTime` can't serve as storage key or value anymore, it has been replaced
-  with `chrono::DateTime<Utc>`.
-- `SystemTime` previously used as storage key or value turned out to show
-  different behavior on different platforms and, hence,  has been replaced with
-  `chrono::DateTime<Utc>` that behaves the same in any environment.
-
-  Migration path:
-
-  - Replace all `SystemTime` fields with `chrono::DateTime<Utc>` ones.
-  - Use `DateTime::from` and `into()` methods to convert your existing
-  `SystemTime` instances into suitable type when constructing transactions or
-  working with database.
 
 #### exonum-configuration
 
