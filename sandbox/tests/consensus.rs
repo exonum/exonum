@@ -712,7 +712,7 @@ fn test_store_txs_positions() {
 
     let snapshot = sandbox.blockchain_ref().snapshot();
     let schema = Schema::new(&snapshot);
-    let locations = schema.tx_location_by_tx_hash();
+    let locations = schema.transactions_locations();
     for (expected_idx, hash) in hashes.iter().enumerate() {
         let location = locations.get(hash).unwrap();
         assert_eq!(expected_idx as u64, location.position_in_block());

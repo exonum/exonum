@@ -502,7 +502,7 @@ impl NodeHandler {
         };
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
-        let pool_len = schema.tx_pool_len();
+        let pool_len = schema.transactions_pool_len();
 
         metric!("node.mempool", pool_len);
 
@@ -690,7 +690,7 @@ impl NodeHandler {
             let snapshot = self.blockchain.snapshot();
             let schema = Schema::new(&snapshot);
             let pool = schema.transactions_pool();
-            let pool_len = schema.tx_pool_len();
+            let pool_len = schema.transactions_pool_len();
 
             info!("LEADER: pool = {}", pool_len);
 
