@@ -24,6 +24,7 @@
 use std::net::SocketAddr;
 use std::error::Error;
 
+use serde_json;
 use serde_json::value::Value;
 use bit_vec::BitVec;
 use hex::FromHex;
@@ -211,7 +212,7 @@ impl ExonumJson for DateTime<Utc> {
             secs: self.timestamp().to_string(),
             nanos: self.timestamp_subsec_nanos(),
         };
-        Ok(::serde_json::to_value(&timestamp)?)
+        Ok(serde_json::to_value(&timestamp)?)
     }
 }
 
@@ -228,7 +229,7 @@ impl ExonumJson for SocketAddr {
     }
 
     fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
-        Ok(::serde_json::to_value(&self)?)
+        Ok(serde_json::to_value(&self)?)
     }
 }
 
