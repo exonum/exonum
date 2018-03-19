@@ -913,7 +913,7 @@ impl NodeHandler {
             round,
             propose_hash,
             block_hash,
-            self.system_state.current_time(),
+            self.system_state.current_time().into(),
             self.state.consensus_secret_key(),
         );
         self.state.add_precommit(&precommit);

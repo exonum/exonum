@@ -141,7 +141,7 @@ fn test_get_lock_and_send_precommit() {
         ROUND_ONE,
         &propose.hash(),
         &block.hash(),
-        sandbox.time(),
+        sandbox.time().into(),
         sandbox.s(VALIDATOR_0),
     ));
     sandbox.assert_lock(ROUND_ONE, Some(propose.hash()));
@@ -201,7 +201,7 @@ fn test_commit() {
         ROUND_ONE,
         &propose.hash(),
         &block.hash(),
-        sandbox.time(),
+        sandbox.time().into(),
         sandbox.s(VALIDATOR_0),
     ));
     sandbox.recv(&Precommit::new(
@@ -210,7 +210,7 @@ fn test_commit() {
         ROUND_ONE,
         &propose.hash(),
         &propose.hash(),
-        sandbox.time(),
+        sandbox.time().into(),
         sandbox.s(VALIDATOR_2),
     ));
     sandbox.recv(&Precommit::new(
@@ -219,7 +219,7 @@ fn test_commit() {
         ROUND_ONE,
         &propose.hash(),
         &propose.hash(),
-        sandbox.time(),
+        sandbox.time().into(),
         sandbox.s(VALIDATOR_3),
     ));
     sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
