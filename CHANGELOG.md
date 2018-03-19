@@ -83,7 +83,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Non-committed transactions are now stored persistently in the storage
   instead of memory pool. (#549)
-  
+
 - Sandbox tests have been moved inside of the exonum core. (#568)
 
 ## 0.6 - 2018-03-06
