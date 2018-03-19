@@ -18,6 +18,7 @@ use iron::prelude::*;
 
 use std::ops::Range;
 use std::cmp;
+use std::error::Error;
 
 use api::{Api, ApiError};
 use blockchain::{Transaction, Block, Blockchain, TxLocation, Schema, TransactionErrorType,
@@ -229,9 +230,13 @@ impl<'a> BlockchainExplorer<'a> {
             }
         };
 
-        let box_transaction = self.blockchain.tx_from_raw(raw_tx.clone()).or_else(|_| {
-            Err(ApiError::InternalError(format!("Service not found for tx: {:?}", raw_tx).into()))
-        })?;
+        let box_transaction = self.blockchain.tx_from_raw(raw_tx.clone()).or_else(
+            |error| {
+                Err(ApiError::InternalError(
+                    format!("{}, tx: {:?}", error.description(), raw_tx).into(),
+                ))
+            },
+        )?;
 
         let content = box_transaction.serialize_field().map_err(
             ApiError::InternalError,

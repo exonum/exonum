@@ -22,6 +22,7 @@ use helpers::{Height, Round, ValidatorId};
 use storage::Patch;
 use node::{NodeHandler, RequestData};
 use events::InternalRequest;
+use std::error::Error;
 
 // TODO reduce view invocations (ECR-171)
 impl NodeHandler {
@@ -159,26 +160,29 @@ impl NodeHandler {
         {
             let mut schema = Schema::new(&mut fork);
             for raw in block.transactions() {
-                if let Some(tx) = self.blockchain.tx_from_raw(raw) {
-                    let hash = tx.hash();
-                    if schema.transactions().contains(&hash) {
-                        error!(
-                            "Received block with already known transaction, block={:?}",
-                            block
-                        );
-                        return None;
-                    }
-                    profiler_span!("tx.verify()", {
-                        if !tx.verify() {
-                            error!("Incorrect transaction in block detected, block={:?}", block);
+                match self.blockchain.tx_from_raw(raw) {
+                    Ok(tx) => {
+                        let hash = tx.hash();
+                        if schema.transactions().contains(&hash) {
+                            error!(
+                                "Received block with already committed transaction, block={:?}",
+                                msg
+                            );
                             return None;
                         }
-                    });
-                    schema.add_transaction_into_pool(tx.raw().clone());
-                    tx_hashes.push(hash);
-                } else {
-                    error!("Unknown transaction in block detected, block={:?}", block);
-                    return None;
+                        profiler_span!("tx.verify()", {
+                            if !tx.verify() {
+                                error!("Incorrect transaction in block detected, block={:?}", msg);
+                                return;
+                            }
+                        });
+                        schema.add_transaction_into_pool(tx.raw().clone());
+                        tx_hashes.push(hash);
+                    }
+                    Err(e) => {
+                        error!("{}, block={:?}", e.description(), msg);
+                        return None;
+                    }
                 }
             }
         }
@@ -547,14 +551,12 @@ impl NodeHandler {
         let hash = msg.hash();
         let tx = {
             let service_id = msg.service_id();
-            if let Some(tx) = self.blockchain.tx_from_raw(msg.clone()) {
-                tx
-            } else {
-                error!(
-                    "Received transaction with unknown service_id={}",
-                    service_id
-                );
-                return;
+            match self.blockchain.tx_from_raw(msg.clone()) {
+                Ok(tx) => tx,
+                Err(e) => {
+                    error!("{}, service_id={}", e.description(), service_id);
+                    return;
+                }
             }
         };
 
