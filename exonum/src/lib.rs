@@ -28,6 +28,7 @@ extern crate exonum_rocksdb as rocksdb;
 extern crate exonum_profiler;
 #[macro_use]
 extern crate log;
+extern crate env_logger;
 extern crate byteorder;
 extern crate rand;
 extern crate serde;
@@ -38,7 +39,6 @@ extern crate toml;
 extern crate hex;
 extern crate bit_vec;
 extern crate vec_map;
-extern crate env_logger;
 extern crate colored;
 extern crate term;
 extern crate chrono;
@@ -62,12 +62,14 @@ extern crate tokio_retry;
 extern crate os_info;
 #[macro_use]
 extern crate failure;
+extern crate bodyparser;
+
+// Test dependencies.
 #[cfg(test)]
 #[macro_use]
 extern crate lazy_static;
 #[cfg(test)]
 extern crate tempdir;
-extern crate bodyparser;
 
 #[macro_use]
 pub mod encoding;
@@ -76,10 +78,12 @@ pub mod messages;
 #[macro_use]
 pub mod helpers;
 pub mod crypto;
-#[doc(hidden)]
-pub mod events;
 pub mod node;
 pub mod storage;
 #[macro_use]
 pub mod blockchain;
 pub mod api;
+
+mod events;
+#[cfg(test)]
+mod sandbox;

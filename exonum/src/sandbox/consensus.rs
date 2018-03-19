@@ -14,34 +14,23 @@
 
 // spell-checker:ignore precommiters, uncommented, uncomment, commited
 
-#[macro_use]
-extern crate pretty_assertions;
-extern crate rand;
-extern crate exonum;
-extern crate sandbox;
-#[macro_use]
-extern crate log;
-extern crate env_logger;
-extern crate bit_vec;
-
 use std::time::Duration;
 use std::collections::BTreeMap;
 
 use rand::{thread_rng, Rng};
 use bit_vec::BitVec;
-use exonum::messages::{RawMessage, Message, Propose, Prevote, Precommit, ProposeRequest,
-                       TransactionsRequest, PrevotesRequest, CONSENSUS, Connect, PeersRequest};
-use exonum::crypto::{CryptoHash, Hash, Seed, gen_keypair, gen_keypair_from_seed};
-use exonum::blockchain::{Blockchain, Schema};
-use exonum::node::state::{PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT,
-                          TRANSACTIONS_REQUEST_TIMEOUT};
-use exonum::helpers::{Height, Round, user_agent};
 
-use sandbox::timestamping::{TimestampTx, TimestampingTxGenerator, TIMESTAMPING_SERVICE};
-use sandbox::timestamping_sandbox;
-use sandbox::sandbox::sandbox_with_services_uninitialized;
-use sandbox::sandbox_tests_helper::*;
-use sandbox::config_updater::TxConfig;
+use messages::{RawMessage, Message, Propose, Prevote, Precommit, ProposeRequest, PrevotesRequest,
+               TransactionsRequest, CONSENSUS, Connect, PeersRequest};
+use crypto::{CryptoHash, Hash, Seed, gen_keypair, gen_keypair_from_seed};
+use blockchain::{Blockchain, Schema};
+use node;
+use node::state::{PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT};
+use helpers::{Height, Round, user_agent};
+use super::timestamping::{TimestampTx, TimestampingTxGenerator, TIMESTAMPING_SERVICE};
+use super::sandbox::{timestamping_sandbox, sandbox_with_services_uninitialized};
+use super::sandbox_tests_helper::*;
+use super::config_updater::TxConfig;
 
 // HANDLE CONSENSUS BASIC
 
@@ -193,7 +182,7 @@ fn test_disable_and_enable() {
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
 
     // Disable the node.
-    let message = exonum::node::ExternalMessage::Enable(false);
+    let message = node::ExternalMessage::Enable(false);
     sandbox
         .node_handler_mut()
         .channel
@@ -211,7 +200,7 @@ fn test_disable_and_enable() {
     assert!(result.is_err());
 
     // Re-enable the node.
-    let message = exonum::node::ExternalMessage::Enable(true);
+    let message = node::ExternalMessage::Enable(true);
     sandbox
         .node_handler_mut()
         .channel
@@ -3194,7 +3183,7 @@ fn test_handle_round_timeout_queue_prevote_message_from_next_round() {
 /// - node continues as `full node`
 #[test]
 fn test_exclude_validator_from_consensus() {
-    use exonum::storage::StorageValue;
+    use storage::StorageValue;
 
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
@@ -3225,7 +3214,7 @@ fn test_exclude_validator_from_consensus() {
 /// - idea of the test is check configurations method from schema
 #[test]
 fn test_schema_config_changes() {
-    use exonum::storage::StorageValue;
+    use storage::StorageValue;
 
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();

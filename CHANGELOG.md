@@ -26,7 +26,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `SystemTime` previously used as storage key or value turned out to show
   different behavior on different platforms and, hence, has been replaced with
-  `chrono::DateTime<Utc>` that behaves the same in any environment.
+  `chrono::DateTime<Utc>` that behaves the same in any environment. (#557)
 
   Migration path:
 
@@ -56,7 +56,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum-time
 
 - `SystemTime` has been replaced with `chrono::DateTime<Utc>`, as it provides
-  more predictable behavior on all systems.
+  more predictable behavior on all systems. (#557)
 
 ### New features
 
