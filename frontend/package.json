@@ -6,7 +6,7 @@
   "license": "Apache-2.0",
   "scripts": {
     "build": "./node_modules/grunt/bin/grunt",
-    "start": "node app.js"
+    "start": "node server.js"
   },
   "dependencies": {
     "axios": "^0.18.0",
