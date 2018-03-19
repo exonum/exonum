@@ -142,9 +142,13 @@ impl ExplorerApi {
             "Expected tx in database",
         );
 
-        Ok(self.blockchain.tx_from_raw(raw_tx.clone()).ok_or_else(|| {
-            ApiError::InternalError(format!("Service not found for tx: {:?}", raw_tx).into())
-        })?)
+        Ok(self.blockchain.tx_from_raw(raw_tx.clone()).or_else(
+            |error| {
+                Err(ApiError::InternalError(
+                    format!("{}, tx: {:?}", error.description(), raw_tx).into(),
+                ))
+            },
+        )?)
     }
 
     fn transaction_info(&self, hash: &Hash) -> Result<TransactionInfo, ApiError> {

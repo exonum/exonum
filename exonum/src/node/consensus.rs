@@ -165,22 +165,25 @@ impl NodeHandler {
                         let hash = tx.hash();
                         if schema.transactions().contains(&hash) {
                             error!(
-                                "Received block with already committed transaction, block={:?}",
-                                msg
+                                "Received block with already known transaction, block={:?}",
+                                block
                             );
                             return None;
                         }
                         profiler_span!("tx.verify()", {
                             if !tx.verify() {
-                                error!("Incorrect transaction in block detected, block={:?}", msg);
-                                return;
+                                error!(
+                                    "Incorrect transaction in block detected, block={:?}",
+                                    block
+                                );
+                                return None;
                             }
                         });
                         schema.add_transaction_into_pool(tx.raw().clone());
                         tx_hashes.push(hash);
                     }
                     Err(e) => {
-                        error!("{}, block={:?}", e.description(), msg);
+                        error!("{}, block={:?}", e.description(), block);
                         return None;
                     }
                 }

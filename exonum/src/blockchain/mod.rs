@@ -356,8 +356,8 @@ impl Blockchain {
                 failure::err_msg("BUG: Cannot find transaction in database.")
             })?;
 
-            self.tx_from_raw(tx).ok_or_else(|| {
-                failure::err_msg("BUG: couldn't create tx from raw message")
+            self.tx_from_raw(tx).or_else(|_| {
+                Err(failure::err_msg("BUG: couldn't create tx from raw message"))
             })?
         };
 
