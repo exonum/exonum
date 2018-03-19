@@ -905,8 +905,9 @@ fn build_multiproof_simple(db: Box<Database>) {
 
 fn fuzz_insert_build_proofs_in_table_filled_with_hashes(db: Box<Database>) {
     let mut rng: XorShiftRng = rand::random();
+    let batch_sizes = (7..9).map(|x| 1 << x);
 
-    for batch_size in (12..16).map(|x| 1 << x) {
+    for batch_size in batch_sizes {
         let data: Vec<(Hash, Hash)> = generate_random_data_keys(batch_size, &mut rng)
             .into_iter()
             .map(|(key, val)| (hash(&key), hash(&val)))
@@ -924,8 +925,9 @@ fn fuzz_insert_build_proofs_in_table_filled_with_hashes(db: Box<Database>) {
 
 fn fuzz_insert_build_proofs(db: Box<Database>) {
     let mut rng: XorShiftRng = rand::random();
+    let batch_sizes = (7..9).map(|x| (1 << x) - 1);
 
-    for batch_size in (1..11).map(|x| (1 << x) - 1) {
+    for batch_size in batch_sizes {
         let data = generate_random_data_keys(batch_size, &mut rng);
 
         let nonexisting_count = ::std::cmp::min(MAX_CHECKED_ELEMENTS, batch_size);
@@ -940,8 +942,9 @@ fn fuzz_insert_build_proofs(db: Box<Database>) {
 
 fn fuzz_insert_build_multiproofs(db: Box<Database>) {
     let mut rng: XorShiftRng = rand::random();
+    let batch_sizes = (7..9).map(|x| 1 << x);
 
-    for batch_size in (9..16).map(|x| 1 << x) {
+    for batch_size in batch_sizes {
         let data = generate_random_data_keys(batch_size, &mut rng);
 
         let nonexisting_count = ::std::cmp::min(MAX_CHECKED_ELEMENTS, batch_size);
@@ -955,8 +958,10 @@ fn fuzz_insert_build_multiproofs(db: Box<Database>) {
 }
 
 fn fuzz_delete_build_proofs(db: Box<Database>) {
+    const SAMPLE_SIZE: usize = 200;
+
     let mut rng: XorShiftRng = rand::random();
-    let data = generate_random_data_keys(9_000, &mut rng);
+    let data = generate_random_data_keys(SAMPLE_SIZE, &mut rng);
 
     let mut storage = db.fork();
     let mut table = ProofMapIndex::new(IDX_NAME, &mut storage);
@@ -965,10 +970,13 @@ fn fuzz_delete_build_proofs(db: Box<Database>) {
     }
 
     let (keys_to_remove, keys_to_remove_seq) = {
-        let mut keys = sample_iter(&mut rng, data.iter().map(|item| item.0.clone()), 2_000)
-            .unwrap();
+        let mut keys = sample_iter(
+            &mut rng,
+            data.iter().map(|item| item.0.clone()),
+            SAMPLE_SIZE / 5,
+        ).unwrap();
         rng.shuffle(&mut keys);
-        let seq_keys = keys.split_off(1_000);
+        let seq_keys = keys.split_off(SAMPLE_SIZE / 10);
         (keys, seq_keys)
     };
 
