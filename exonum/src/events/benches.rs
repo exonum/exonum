@@ -12,11 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![feature(test)]
-
-extern crate exonum;
-extern crate test;
-
 #[cfg(all(test, feature = "long_benchmarks"))]
 #[cfg(test)]
 mod tests {
@@ -24,9 +19,9 @@ mod tests {
     use std::thread;
 
     use test::Bencher;
-    use exonum::node::EventsPoolCapacity;
-    use exonum::events::network::NetworkConfiguration;
-    use exonum::events::tests::{connect_message, raw_message, TestEvents};
+    use node::EventsPoolCapacity;
+    use events::network::NetworkConfiguration;
+    use events::tests::{connect_message, raw_message, TestEvents};
 
     struct BenchConfig {
         times: usize,
