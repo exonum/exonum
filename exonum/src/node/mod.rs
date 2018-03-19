@@ -405,7 +405,7 @@ impl NodeHandler {
         let connect = Connect::new(
             &config.listener.consensus_public_key,
             external_address,
-            system_state.current_time(),
+            system_state.current_time().into(),
             &user_agent::get(),
             &config.listener.consensus_secret_key,
         );

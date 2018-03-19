@@ -16,7 +16,7 @@
 
 use std::mem;
 use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
-use std::time::{SystemTime, Duration, UNIX_EPOCH};
+use chrono::{DateTime, Utc, TimeZone};
 
 use byteorder::{ByteOrder, LittleEndian};
 
@@ -266,23 +266,21 @@ implement_pod_as_ref_field! {Signature}
 implement_pod_as_ref_field! {PublicKey}
 implement_pod_as_ref_field! {Hash}
 
-// TODO should we check `SystemTime` validity in check (ECR-157)?
-impl<'a> Field<'a> for SystemTime {
+impl<'a> Field<'a> for DateTime<Utc> {
     fn field_size() -> Offset {
-        (mem::size_of::<u64>() + mem::size_of::<u32>()) as Offset
+        (mem::size_of::<i64>() + mem::size_of::<u32>()) as Offset
     }
 
-    unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> SystemTime {
-        let secs = LittleEndian::read_u64(&buffer[from as usize..from as usize + 8]);
+    unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
+        let secs = LittleEndian::read_i64(&buffer[from as usize..from as usize + 8]);
         let nanos = LittleEndian::read_u32(&buffer[from as usize + 8..to as usize]);
-        UNIX_EPOCH + Duration::new(secs, nanos)
+        Utc.timestamp(secs, nanos)
     }
 
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
-        let duration = self.duration_since(UNIX_EPOCH).unwrap();
-        let secs = duration.as_secs();
-        let nanos = duration.subsec_nanos();
-        LittleEndian::write_u64(
+        let secs = self.timestamp();
+        let nanos = self.timestamp_subsec_nanos();
+        LittleEndian::write_i64(
             &mut buffer[from as usize..to as usize - mem::size_of_val(&nanos)],
             secs,
         );

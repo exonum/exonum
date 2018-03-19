@@ -20,6 +20,21 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   `blockchain::gen_prefix` method has been removed. Instead, any type that
   implements `StorageKey` trait, can serve as an `index_id`. (#531)
 
+- Several `Schema`'s methods have been renamed:
+  - `tx_location_by_tx_hash` to `transactions_locations`.
+  - `block_txs` to `block_transactions`.
+
+- `SystemTime` previously used as storage key or value turned out to show
+  different behavior on different platforms and, hence, has been replaced with
+  `chrono::DateTime<Utc>` that behaves the same in any environment.
+
+  Migration path:
+
+  - Replace all `SystemTime` fields with `chrono::DateTime<Utc>` ones.
+  - Use `DateTime::from` and `into()` methods to convert your existing
+  `SystemTime` instances into suitable type when constructing transactions or
+  working with database.
+
 #### exonum-testkit
 
 - Testkit api now contains two methods to work with the transaction pool:
@@ -37,6 +52,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   Allows to increase the threshold amount of votes required to commit
   a new configuration proposal. By default the number of votes is calculated
   as 2/3 + 1 of total validators count. (#546)
+
+#### exonum-time
+
+- `SystemTime` has been replaced with `chrono::DateTime<Utc>`, as it provides
+  more predictable behavior on all systems.
 
 ### New features
 

@@ -50,7 +50,6 @@
 //!
 //! # fn main() {
 //! let student = MyAwesomeStructure::new("Andrew", 23);
-//! # drop(student);
 //! # }
 //! ```
 //!

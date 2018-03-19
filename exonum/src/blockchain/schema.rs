@@ -35,10 +35,10 @@ define_names!(
     TRANSACTIONS => "transactions";
     TRANSACTION_RESULTS => "transaction_results";
     TRANSACTIONS_POOL => "transactions_pool";
-    TX_LOCATION_BY_TX_HASH => "tx_location_by_tx_hash";
+    TRANSACTIONS_LOCATIONS => "transactions_locations";
     BLOCKS => "blocks";
     BLOCK_HASHES_BY_HEIGHT => "block_hashes_by_height";
-    BLOCK_TXS => "block_txs";
+    BLOCK_TRANSACTIONS => "block_transactions";
     PRECOMMITS => "precommits";
     CONFIGS => "configs";
     CONFIGS_ACTUAL_FROM => "configs_actual_from";
@@ -98,10 +98,19 @@ where
         KeySetIndex::new(TRANSACTIONS_POOL, &self.view)
     }
 
+    /// Returns number of transactions in the pool
+    #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
+    pub fn transactions_pool_len(&self) -> usize {
+        let pool = self.transactions_pool();
+        // TODO: Change count to other method with O(1) complexity. (ECR-977)
+        let count = pool.iter().count();
+        count
+    }
+
     /// Returns table that keeps the block height and tx position inside block for every
     /// transaction hash.
-    pub fn tx_location_by_tx_hash(&self) -> MapIndex<&T, Hash, TxLocation> {
-        MapIndex::new(TX_LOCATION_BY_TX_HASH, &self.view)
+    pub fn transactions_locations(&self) -> MapIndex<&T, Hash, TxLocation> {
+        MapIndex::new(TRANSACTIONS_LOCATIONS, &self.view)
     }
 
     /// Returns table that stores block object for every block height.
@@ -115,9 +124,9 @@ where
     }
 
     /// Returns table that keeps a list of transactions for the each block.
-    pub fn block_txs(&self, height: Height) -> ProofListIndex<&T, Hash> {
+    pub fn block_transactions(&self, height: Height) -> ProofListIndex<&T, Hash> {
         let height: u64 = height.into();
-        ProofListIndex::new_in_family(BLOCK_TXS, &height, &self.view)
+        ProofListIndex::new_in_family(BLOCK_TRANSACTIONS, &height, &self.view)
     }
 
     /// Returns table that saves a list of precommits for block with given hash.
@@ -342,15 +351,6 @@ where
     fn next_height(&self) -> Height {
         Height(self.block_hashes_by_height().len())
     }
-
-    /// Returns number of transactions in the pool
-    #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
-    pub fn tx_pool_len(&self) -> usize {
-        let pool = self.transactions_pool();
-        // TODO: Change count to other method with O(1) complexity. (ECR-977)
-        let count = pool.iter().count();
-        count
-    }
 }
 
 impl<'a> Schema<&'a mut Fork> {
@@ -377,11 +377,11 @@ impl<'a> Schema<&'a mut Fork> {
         KeySetIndex::new(TRANSACTIONS_POOL, self.view)
     }
 
-    /// Mutable reference to the [`tx_location_by_tx_hash`][1] index.
+    /// Mutable reference to the [`transactions_locations`][1] index.
     ///
-    /// [1]: struct.Schema.html#method.tx_location_by_tx_hash
-    pub(crate) fn tx_location_by_tx_hash_mut(&mut self) -> MapIndex<&mut Fork, Hash, TxLocation> {
-        MapIndex::new(TX_LOCATION_BY_TX_HASH, self.view)
+    /// [1]: struct.Schema.html#method.transactions_locations
+    pub(crate) fn transactions_locations_mut(&mut self) -> MapIndex<&mut Fork, Hash, TxLocation> {
+        MapIndex::new(TRANSACTIONS_LOCATIONS, self.view)
     }
 
     /// Mutable reference to the [`blocks][1] index.
@@ -398,12 +398,15 @@ impl<'a> Schema<&'a mut Fork> {
         ListIndex::new(BLOCK_HASHES_BY_HEIGHT, self.view)
     }
 
-    /// Mutable reference to the [`block_txs`][1] index.
+    /// Mutable reference to the [`block_transactions`][1] index.
     ///
-    /// [1]: struct.Schema.html#method.block_txs
-    pub(crate) fn block_txs_mut(&mut self, height: Height) -> ProofListIndex<&mut Fork, Hash> {
+    /// [1]: struct.Schema.html#method.block_transactions
+    pub(crate) fn block_transactions_mut(
+        &mut self,
+        height: Height,
+    ) -> ProofListIndex<&mut Fork, Hash> {
         let height: u64 = height.into();
-        ProofListIndex::new_in_family(BLOCK_TXS, &height, self.view)
+        ProofListIndex::new_in_family(BLOCK_TRANSACTIONS, &height, self.view)
     }
 
     /// Mutable reference to the [`precommits`][1] index.
@@ -499,17 +502,17 @@ impl<'a> Schema<&'a mut Fork> {
         self.transactions_mut().put(&tx.hash(), tx);
     }
 
-    /// Change transaction status from `in_pool`, to `committed`.
-    pub(crate) fn commit_transaction(&mut self, tx_hash: &Hash) {
-        self.transactions_pool_mut().remove(tx_hash)
+    /// Changes transaction status from `in_pool`, to `committed`.
+    pub(crate) fn commit_transaction(&mut self, hash: &Hash) {
+        self.transactions_pool_mut().remove(hash)
     }
 
     /// Remove transaction from persistent pool.
     #[doc(hidden)]
-    pub fn reject_transaction(&mut self, tx_hash: &Hash) -> Result<(), ()> {
-        let contains = self.transactions_pool_mut().contains(tx_hash);
-        self.transactions_pool_mut().remove(tx_hash);
-        self.transactions_mut().remove(tx_hash);
+    pub fn reject_transaction(&mut self, hash: &Hash) -> Result<(), ()> {
+        let contains = self.transactions_pool_mut().contains(hash);
+        self.transactions_pool_mut().remove(hash);
+        self.transactions_mut().remove(hash);
         if contains { Ok(()) } else { Err(()) }
     }
 }

@@ -152,7 +152,7 @@ impl Sandbox {
         let connect = Connect::new(
             &self.p(VALIDATOR_0),
             self.a(VALIDATOR_0),
-            connect_message_time,
+            connect_message_time.into(),
             &user_agent::get(),
             self.s(VALIDATOR_0),
         );
@@ -162,7 +162,7 @@ impl Sandbox {
             self.recv(&Connect::new(
                 &self.p(validator),
                 self.a(validator),
-                self.time(),
+                self.time().into(),
                 &user_agent::get(),
                 self.s(validator),
             ));
@@ -605,7 +605,7 @@ impl Sandbox {
             Connect::new(
                 c.pub_key(),
                 c.addr(),
-                time,
+                time.into(),
                 c.user_agent(),
                 self.s(VALIDATOR_0),
             )
@@ -928,7 +928,7 @@ mod tests {
         s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_2),
-            s.time(),
+            s.time().into(),
             &user_agent::get(),
             &secret,
         ));
@@ -937,7 +937,7 @@ mod tests {
             &Connect::new(
                 &s.p(VALIDATOR_0),
                 s.a(VALIDATOR_0),
-                s.time(),
+                s.time().into(),
                 &user_agent::get(),
                 s.s(VALIDATOR_0),
             ),
@@ -964,7 +964,7 @@ mod tests {
             &Connect::new(
                 &s.p(VALIDATOR_0),
                 s.a(VALIDATOR_0),
-                s.time(),
+                s.time().into(),
                 &user_agent::get(),
                 s.s(VALIDATOR_0),
             ),
@@ -979,7 +979,7 @@ mod tests {
         s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_2),
-            s.time(),
+            s.time().into(),
             &user_agent::get(),
             &secret,
         ));
@@ -988,7 +988,7 @@ mod tests {
             &Connect::new(
                 &s.p(VALIDATOR_0),
                 s.a(VALIDATOR_0),
-                s.time(),
+                s.time().into(),
                 &user_agent::get(),
                 s.s(VALIDATOR_0),
             ),
@@ -1003,7 +1003,7 @@ mod tests {
         s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_2),
-            s.time(),
+            s.time().into(),
             &user_agent::get(),
             &secret,
         ));
@@ -1017,14 +1017,14 @@ mod tests {
         s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_2),
-            s.time(),
+            s.time().into(),
             &user_agent::get(),
             &secret,
         ));
         s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_3),
-            s.time(),
+            s.time().into(),
             &user_agent::get(),
             &secret,
         ));
@@ -1039,7 +1039,7 @@ mod tests {
         s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_2),
-            s.time(),
+            s.time().into(),
             &user_agent::get(),
             &secret,
         ));

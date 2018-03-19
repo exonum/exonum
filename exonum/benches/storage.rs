@@ -14,6 +14,7 @@
 
 #![feature(test)]
 #![allow(dead_code)]
+
 extern crate test;
 extern crate rand;
 extern crate tempdir;

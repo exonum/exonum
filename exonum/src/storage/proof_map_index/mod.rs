@@ -129,8 +129,6 @@ where
     ///
     /// let mut fork = db.fork();
     /// let mut mut_index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &mut fork);
-    /// # drop(index);
-    /// # drop(mut_index);
     /// ```
     pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         ProofMapIndex {
@@ -161,14 +159,18 @@ where
     /// let index_id = vec![01];
     ///
     /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> =
-    ///                             ProofMapIndex::new_in_family(name, &index_id, &snapshot);
+    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new_in_family(
+    ///     name,
+    ///     &index_id,
+    ///     &snapshot,
+    ///  );
     ///
     /// let mut fork = db.fork();
-    /// let mut mut_index : ProofMapIndex<_, Hash, u8> =
-    ///                                ProofMapIndex::new_in_family(name, &index_id, &mut fork);
-    /// # drop(index);
-    /// # drop(mut_index);
+    /// let mut mut_index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new_in_family(
+    ///     name,
+    ///     &index_id,
+    ///     &mut fork,
+    ///  );
     /// ```
     pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
         family_name: S,
@@ -296,7 +298,6 @@ where
     /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new("index", &snapshot);
     ///
     /// let proof = index.get_proof(Hash::default());
-    /// # drop(proof);
     /// ```
     pub fn get_proof(&self, key: K) -> MapProof<K, V> {
         create_proof(
@@ -318,7 +319,6 @@ where
     /// let index: ProofMapIndex<_, [u8; 32], u8> = ProofMapIndex::new("index", &snapshot);
     ///
     /// let proof = index.get_multiproof(vec![[0; 32], [1; 32]]);
-    /// # drop(proof);
     /// ```
     pub fn get_multiproof<KI>(&self, keys: KI) -> MapProof<K, V>
     where
