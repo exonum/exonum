@@ -22,7 +22,8 @@ use byteorder::{ByteOrder, LittleEndian};
 
 use crypto::{hash, sign, verify, CryptoHash, Hash, PublicKey, SecretKey, Signature,
              SIGNATURE_LENGTH};
-use encoding::{self, CheckedOffset, Field, Offset, Result as StreamStructResult};
+use encoding::{self, CheckedOffset, Field, MeasureHeader, Offset, SegmentField,
+               Result as StreamStructResult};
 
 /// Length of the message header.
 pub const HEADER_LENGTH: usize = 10;
@@ -238,6 +239,11 @@ impl MessageWriter {
     /// Writes given field to the given offset.
     #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
     pub fn write<'a, F: Field<'a>>(&'a mut self, field: F, from: Offset, to: Offset) {
+        self.write_ref(&field, from, to);
+    }
+
+    /// Writes given field taken by a shared reference to the given offset.
+    pub fn write_ref<'a, F: Field<'a>>(&'a mut self, field: &F, from: Offset, to: Offset) {
         field.write(
             &mut self.raw,
             from + HEADER_LENGTH as Offset,
@@ -315,5 +321,171 @@ impl Message for RawMessage {
 
     fn verify_signature(&self, pub_key: &PublicKey) -> bool {
         verify(self.signature(), self.body(), pub_key)
+    }
+}
+
+/// Object that can check the validity of a raw message according to a certain schema.
+pub trait Check {
+    /// Checks the raw message validity.
+    fn check(raw: &RawMessage) -> Result<(), encoding::Error>;
+}
+
+/// Object that can be constructed from a raw message.
+pub trait Read<'a>: Sized + Check {
+    /// Reads a raw message from a trusted source.
+    ///
+    /// It is assumed that the validity of the message has been previously verified with
+    /// [`Check::check`], so checks should not be performed by this method.
+    ///
+    /// [`Check::check`]: trait.Check#tymethod.check
+    unsafe fn unchecked_read(raw: &'a RawMessage) -> Self;
+
+    /// Reads a raw message from an untrusted source.
+    fn read(raw: &'a RawMessage) -> Result<Self, encoding::Error> {
+        <Self as Check>::check(raw)?;
+        Ok(unsafe { Self::unchecked_read(raw) })
+    }
+}
+
+impl Check for RawMessage {
+    fn check(_: &RawMessage) -> Result<(), encoding::Error> {
+        Ok(())
+    }
+}
+
+impl<'a> Read<'a> for RawMessage {
+    unsafe fn unchecked_read(raw: &'a RawMessage) -> Self {
+        raw.clone()
+    }
+}
+
+/// Object that can be converted to a message.
+pub trait Write<T>
+where
+    T: Message + for<'a> Read<'a>,
+{
+    /// Writes a payload of the message to the writer.
+    fn write_payload(&self, writer: &mut MessageWriter);
+
+    /// Signs a message with the specified secret key.
+    fn sign(&self, secret_key: &SecretKey) -> T
+    where
+        Self: MessageSet,
+    {
+        let message_id = self.message_id();
+
+        let mut writer = MessageWriter::new(
+            PROTOCOL_MAJOR_VERSION,
+            TEST_NETWORK_ID,
+            Self::SERVICE_ID,
+            message_id.into(),
+            message_id.header_size() as usize,
+        );
+        self.write_payload(&mut writer);
+
+        unsafe { T::unchecked_read(&RawMessage::new(writer.sign(secret_key))) }
+    }
+
+    /// Constructs a message with the specified signature.
+    fn with_signature(&self, signature: &Signature) -> T
+    where
+        Self: MessageSet,
+    {
+        let message_id = self.message_id();
+
+        let mut writer = MessageWriter::new(
+            PROTOCOL_MAJOR_VERSION,
+            TEST_NETWORK_ID,
+            Self::SERVICE_ID,
+            message_id.into(),
+            message_id.header_size() as usize,
+        );
+        self.write_payload(&mut writer);
+
+        unsafe { T::unchecked_read(&RawMessage::new(writer.append_signature(signature))) }
+    }
+}
+
+/// Set of messages sharing a common `service_id`.
+pub trait MessageSet {
+    /// Enum of all allowed `message_id`s.
+    type MessageId: Copy + Into<u16> + MeasureHeader;
+    /// Service identifier for messages.
+    const SERVICE_ID: u16;
+
+    /// Determines the message identifier for the message.
+    fn message_id(&self) -> Self::MessageId;
+}
+
+impl<'a, T: Message + Check> SegmentField<'a> for T {
+    fn item_size() -> Offset {
+        1
+    }
+
+    fn count(&self) -> Offset {
+        self.raw().len() as Offset
+    }
+
+    fn extend_buffer(&self, buffer: &mut Vec<u8>) {
+        buffer.extend_from_slice(self.raw().as_ref())
+    }
+
+    unsafe fn from_buffer(buffer: &'a [u8], from: Offset, count: Offset) -> Self {
+        let to = from + count * Self::item_size();
+        let slice = &buffer[from as usize..to as usize];
+        let raw = RawMessage::new(MessageBuffer::from_vec(Vec::from(slice)));
+        // TODO: should this use `Read::unchecked_read`?
+        Message::from_raw(raw).unwrap()
+    }
+
+    fn check_data(
+        buffer: &'a [u8],
+        from: CheckedOffset,
+        count: CheckedOffset,
+        latest_segment: CheckedOffset,
+    ) -> encoding::Result {
+        // `RawMessage` checks
+        let size: CheckedOffset = (count * Self::item_size())?;
+        let to: CheckedOffset = (from + size)?;
+        let slice = &buffer[from.unchecked_offset() as usize..to.unchecked_offset() as usize];
+
+        if slice.len() < HEADER_LENGTH {
+            return Err(encoding::Error::UnexpectedlyShortRawMessage {
+                position: from.unchecked_offset(),
+                size: slice.len() as Offset,
+            });
+        }
+
+        let actual_size = slice.len() as Offset;
+        let declared_size: Offset = LittleEndian::read_u32(&slice[6..10]);
+        if actual_size != declared_size {
+            return Err(encoding::Error::IncorrectSizeOfRawMessage {
+                position: from.unchecked_offset(),
+                actual_size: slice.len() as Offset,
+                declared_size,
+            });
+        }
+
+        let raw_message: RawMessage = unsafe {
+            SegmentField::from_buffer(buffer, from.unchecked_offset(), count.unchecked_offset())
+        };
+        Self::check(&raw_message)?;
+        Ok(latest_segment)
+    }
+}
+
+impl<T: Message + for<'a> Read<'a>> ::storage::StorageValue for T {
+    fn into_bytes(self) -> Vec<u8> {
+        self.raw().as_ref().to_vec()
+    }
+
+    fn from_bytes(value: ::std::borrow::Cow<[u8]>) -> Self {
+        unsafe {
+            // We assume that the messages in the storage have been previously verified,
+            // so this should be safe.
+            T::unchecked_read(&RawMessage::new(
+                MessageBuffer::from_vec(value.into_owned()),
+            ))
+        }
     }
 }

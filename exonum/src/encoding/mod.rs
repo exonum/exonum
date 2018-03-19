@@ -187,3 +187,11 @@ impl From<Offset> for CheckedOffset {
         CheckedOffset::new(offset)
     }
 }
+
+/// Object with a measurable size of the serialization header.
+///
+/// See the module docs for explanation what the header is.
+pub trait MeasureHeader {
+    /// Returns the size of the serialization header.
+    fn header_size(&self) -> Offset;
+}
