@@ -40,7 +40,7 @@ use exonum::helpers::{Height, Milliseconds, Round, ValidatorId, user_agent};
 use exonum::events::{Event, InternalEvent, EventHandler, NetworkEvent, NetworkRequest,
                      TimeoutRequest, InternalRequest};
 use exonum::events::network::NetworkConfiguration;
-use exonum::encoding::{Error as MessageError};
+use exonum::encoding::Error as MessageError;
 
 use timestamping::TimestampingService;
 use config_updater::ConfigUpdateService;
