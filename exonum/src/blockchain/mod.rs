@@ -51,6 +51,7 @@ use messages::{CONSENSUS as CORE_SERVICE, Connect, Precommit, RawMessage};
 use storage::{Database, Error, Fork, Patch, Snapshot};
 use helpers::{Height, Round, ValidatorId};
 use node::ApiSender;
+use encoding::{Error as MessageError};
 
 pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
 pub use self::schema::{Schema, TxLocation};
@@ -141,11 +142,11 @@ impl Blockchain {
     ///
     /// - Blockchain has service with the `service_id` of given raw message.
     /// - Service can deserialize given raw message.
-    pub fn tx_from_raw(&self, raw: RawMessage) -> Option<Box<Transaction>> {
+    pub fn tx_from_raw(&self, raw: RawMessage) -> Result<Box<Transaction>, MessageError> {
         let id = raw.service_id() as usize;
-        self.service_map.get(id).and_then(|service| {
-            service.tx_from_raw(raw).ok()
-        })
+        self.service_map.get(id).map(|service| {
+            service.tx_from_raw(raw)
+        }).unwrap()
     }
 
     /// Commits changes from the patch to the blockchain storage.

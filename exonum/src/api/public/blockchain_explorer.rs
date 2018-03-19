@@ -229,8 +229,8 @@ impl<'a> BlockchainExplorer<'a> {
             }
         };
 
-        let box_transaction = self.blockchain.tx_from_raw(raw_tx.clone()).ok_or_else(|| {
-            ApiError::InternalError(format!("Service not found for tx: {:?}", raw_tx).into())
+        let box_transaction = self.blockchain.tx_from_raw(raw_tx.clone()).or_else(|_| {
+            Err(ApiError::InternalError(format!("Service not found for tx: {:?}", raw_tx).into()))
         })?;
 
         let content = box_transaction.serialize_field().map_err(
