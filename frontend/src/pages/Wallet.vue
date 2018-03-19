@@ -1,18 +1,17 @@
 <template>
   <div>
+    <navbar/>
+
     <div class="container">
       <div class="row">
-        <div class="col-sm-12">
+        <div class="col-md-6">
           <div class="card mt-5">
             <div class="card-header">User summary</div>
             <ul class="list-group list-group-flush">
               <li class="list-group-item">
                 <div class="row">
                   <div class="col-sm-3"><strong>Name:</strong></div>
-                  <div class="col-sm-9">
-                    {{ name }}
-                    <button class="btn btn-sm btn-secondary ml-1" @click="logout">Logout</button>
-                  </div>
+                  <div class="col-sm-9">{{ name }}</div>
                 </div>
               </li>
               <li class="list-group-item">
@@ -26,8 +25,6 @@
                   <div class="col-sm-3"><strong>Balance:</strong></div>
                   <div class="col-sm-9">
                     <span v-numeral="balance"/>
-                    <button class="btn btn-sm btn-success ml-1" @click="openAddFundsModal">Add Funds</button>
-                    <button :disabled="balance == 0" class="btn btn-sm btn-primary ml-1" @click="openTransferModal">Transfer Funds</button>
                   </div>
                 </div>
               </li>
@@ -39,28 +36,28 @@
             <ul class="list-group list-group-flush">
               <li class="list-group-item font-weight-bold">
                 <div class="row">
-                  <div class="col-sm-4">Hash</div>
-                  <div class="col-sm-5">Description</div>
-                  <div class="col-sm-3">Status</div>
+                  <div class="col-sm-8">Description</div>
+                  <div class="col-sm-4">Status</div>
                 </div>
               </li>
               <!-- eslint-disable-next-line vue/require-v-for-key -->
               <li v-for="transaction in transactions" class="list-group-item">
                 <div class="row">
+                  <div class="col-sm-8">
+                    <router-link :to="{ name: 'transaction', params: { hash: transaction.hash } }">
+                      <span v-if="transaction.message_id == 130">You wallet created</span>
+                      <span v-else-if="transaction.message_id == 129">
+                        <strong v-numeral="transaction.body.amount"/> funds added
+                      </span>
+                      <span v-else-if="transaction.message_id == 128 && transaction.body.from == publicKey">
+                        <strong v-numeral="transaction.body.amount"/> sent
+                      </span>
+                      <span v-else-if="transaction.message_id == 128 && transaction.body.to == publicKey">
+                        <strong v-numeral="transaction.body.amount"/> received
+                      </span>
+                    </router-link>
+                  </div>
                   <div class="col-sm-4">
-                    <router-link :to="{ name: 'transaction', params: { hash: transaction.hash } }">{{ transaction.hash }}</router-link>
-                  </div>
-                  <div v-if="transaction.message_id == 130" class="col-sm-5">Wallet created</div>
-                  <div v-else-if="transaction.message_id == 129" class="col-sm-5">
-                    <strong v-numeral="transaction.body.amount"/> funds added
-                  </div>
-                  <div v-else-if="transaction.message_id == 128 && transaction.body.from == publicKey" class="col-sm-5">
-                    <strong v-numeral="transaction.body.amount"/> sent to <code>{{ transaction.body.to }}</code>
-                  </div>
-                  <div v-else-if="transaction.message_id == 128 && transaction.body.to == publicKey" class="col-sm-5">
-                    <strong v-numeral="transaction.body.amount"/> received from <code>{{ transaction.body.from }}</code>
-                  </div>
-                  <div class="col-sm-3">
                     <span v-if="transaction.status" class="badge badge-success">Accepted</span>
                     <span v-else class="badge badge-danger">Rejected</span>
                   </div>
@@ -69,35 +66,48 @@
             </ul>
           </div>
         </div>
+        <div class="col-md-6">
+          <div class="card mt-5">
+            <div class="card-header">Add funds</div>
+            <div class="card-body">
+              <form @submit.prevent="addFunds">
+                <div class="form-group">
+                  <label class="d-block">Select amount to be added:</label>
+                  <!-- eslint-disable-next-line vue/require-v-for-key -->
+                  <div v-for="variant in variants" class="form-check form-check-inline">
+                    <input :id="variant.id" :value="variant.amount" :checked="amountToAdd == variant.amount" v-model="amountToAdd" class="form-check-input" type="radio">
+                    <label :for="variant.id" class="form-check-label">${{ variant.amount }}</label>
+                  </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Add funds</button>
+              </form>
+            </div>
+          </div>
+
+          <div class="card mt-5">
+            <div class="card-header">Transfer funds</div>
+            <div class="card-body">
+              <form @submit.prevent="transfer">
+                <div class="form-group">
+                  <label>Receiver:</label>
+                  <input v-model="receiver" type="text" class="form-control" placeholder="Enter public key" required>
+                </div>
+                <div class="form-group">
+                  <label>Amount:</label>
+                  <div class="input-group">
+                    <div class="input-group-prepend">
+                      <div class="input-group-text">$</div>
+                    </div>
+                    <input v-model="amountToTransfer" type="number" class="form-control" placeholder="Enter amount" min="0" required>
+                  </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Transfer funds</button>
+              </form>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-
-    <modal :visible="isAddFundsModalVisible" title="Add Funds" action-btn="Add funds" @close="closeAddFundsModal" @submit="addFunds">
-      <div class="form-group">
-        <label class="d-block">Select amount to be added:</label>
-        <!-- eslint-disable-next-line vue/require-v-for-key -->
-        <div v-for="variant in variants" class="form-check form-check-inline">
-          <input :id="variant.id" :value="variant.amount" :checked="amountToAdd == variant.amount" v-model="amountToAdd" class="form-check-input" type="radio">
-          <label :for="variant.id" class="form-check-label">${{ variant.amount }}</label>
-        </div>
-      </div>
-    </modal>
-
-    <modal :visible="isTransferModalVisible" title="Transfer Funds" action-btn="Transfer" @close="closeTransferModal" @submit="transfer">
-      <div class="form-group">
-        <label>Receiver:</label>
-        <input v-model="receiver" type="text" class="form-control" placeholder="Enter public key" required>
-      </div>
-      <div class="form-group">
-        <label>Amount:</label>
-        <div class="input-group">
-          <div class="input-group-prepend">
-            <div class="input-group-text">$</div>
-          </div>
-          <input v-model="amountToTransfer" type="number" class="form-control" placeholder="Enter amount" min="0" required>
-        </div>
-      </div>
-    </modal>
 
     <spinner :visible="isSpinnerVisible"/>
   </div>
@@ -105,11 +115,13 @@
 
 <script>
   const Modal = require('../components/Modal.vue')
+  const Navbar = require('../components/Navbar.vue')
   const Spinner = require('../components/Spinner.vue')
 
   module.exports = {
     components: {
       Modal,
+      Navbar,
       Spinner
     },
     data: function() {
@@ -120,8 +132,6 @@
         amountToAdd: 10,
         receiver: '',
         amountToTransfer: '',
-        isAddFundsModalVisible: false,
-        isTransferModalVisible: false,
         isSpinnerVisible: false,
         variants: [
           {id: 'ten', amount: 10},
@@ -131,14 +141,6 @@
       }
     },
     methods: {
-      openAddFundsModal: function() {
-        this.isAddFundsModalVisible = true
-      },
-
-      closeAddFundsModal: function() {
-        this.isAddFundsModalVisible = false
-      },
-
       addFunds: function() {
         const self = this
 
@@ -147,7 +149,6 @@
 
           self.$blockchain.addFunds(keyPair, self.amountToAdd).then(data => {
             self.isSpinnerVisible = false
-            self.isAddFundsModalVisible = false
             self.balance = data.wallet.balance
             self.transactions = data.transactions
             self.$notify('success', 'Add funds transaction has been written into the blockchain')
@@ -156,18 +157,9 @@
             self.$notify('error', error.toString())
           })
         }).catch(function(error) {
-          self.isAddFundsModalVisible = false
           self.$notify('error', error.toString())
           self.logout()
         })
-      },
-
-      openTransferModal: function() {
-        this.isTransferModalVisible = true
-      },
-
-      closeTransferModal: function() {
-        this.isTransferModalVisible = false
       },
 
       transfer: function() {
@@ -186,7 +178,6 @@
 
           self.$blockchain.transfer(keyPair, self.receiver, self.amountToTransfer).then(data => {
             self.isSpinnerVisible = false
-            self.isTransferModalVisible = false
             self.balance = data.wallet.balance
             self.transactions = data.transactions
             self.$notify('success', 'Transfer transaction has been written into the blockchain')
@@ -195,7 +186,6 @@
             self.$notify('error', error.toString())
           })
         }).catch(function(error) {
-          self.isTransferModalVisible = false
           self.$notify('error', error.toString())
           self.logout()
         })

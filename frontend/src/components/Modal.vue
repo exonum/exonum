@@ -3,7 +3,7 @@
     <div :class="{ 'show d-block': visible }" class="modal" tabindex="-1" role="dialog">
       <div class="modal-dialog" role="document">
         <div class="modal-content">
-          <form @submit="submit">
+          <form @submit.prevent="submit">
             <div class="modal-header">
               <h5 class="modal-title">{{ title }}</h5>
               <button type="button" class="close" @click="close">

@@ -1,5 +1,7 @@
 <template>
   <div>
+    <navbar/>
+
     <div class="container">
       <div class="row">
         <div class="col-sm-12">
@@ -34,11 +36,13 @@
 </template>
 
 <script>
+  const Navbar = require('../components/Navbar.vue')
   const Spinner = require('../components/Spinner.vue')
   const PER_PAGE = 10
 
   module.exports = {
     components: {
+      Navbar,
       Spinner
     },
     data() {
