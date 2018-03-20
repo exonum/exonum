@@ -15,12 +15,14 @@
 use exonum::blockchain::{SharedNodeState, Transaction};
 use exonum::node::{ApiSender, TransactionSend, create_public_api_handler,
                    create_private_api_handler};
-use iron::{IronError, Handler, Chain};
+use exonum::api::ApiError;
+use iron::{Response, IronError, Handler, Chain};
 use iron::headers::{ContentType, Headers};
-use iron::status::StatusClass;
+use iron::status;
 use iron_test::{request, response};
 use serde::{Deserialize, Serialize};
 use serde_json;
+use serde_json::Value as JsonValue;
 
 use std::fmt;
 
@@ -39,6 +41,37 @@ pub enum ApiKind {
     Explorer,
     /// Endpoints corresponding to a service with the specified string identifier.
     Service(&'static str),
+}
+
+#[derive(Debug)]
+struct TestkitApiError(ApiError);
+
+impl Into<TestkitApiError> for Response {
+    fn into(self) -> TestkitApiError {
+        let status = self.status;
+        let body = response::extract_body_to_string(self);
+        let error: String = serde_json::from_str::<JsonValue>(&body)
+            .map(|value| match value {
+                JsonValue::Object(object) => {
+                    object
+                        .get("description")
+                        .map(|value| value.as_str().map(String::from))
+                        .unwrap_or_else(|| serde_json::to_string(&object).ok())
+                        .unwrap_or_default()
+                }
+                value => serde_json::to_string(&value).unwrap_or_default(),
+            })
+            .unwrap_or_default();
+
+        let api_error = match status.expect("Status header is not set") {
+            status::Forbidden => ApiError::Unauthorized,
+            status::BadRequest => ApiError::BadRequest(error),
+            status::NotFound => ApiError::NotFound(error),
+            _ => ApiError::InternalError(error.into()),
+        };
+
+        TestkitApiError(api_error)
+    }
 }
 
 impl ApiKind {
@@ -117,9 +150,9 @@ impl TestKitApi {
         for<'de> D: Deserialize<'de>,
     {
         let status_class = if expect_error {
-            StatusClass::ClientError
+            status::StatusClass::ClientError
         } else {
-            StatusClass::Success
+            status::StatusClass::Success
         };
 
         let url = format!("http://localhost:3000/{}", endpoint);
@@ -192,16 +225,14 @@ impl TestKitApi {
     /// # Panics
     ///
     /// - Panics if the response has a non-40x response status.
-    pub fn get_err<D>(&self, kind: ApiKind, endpoint: &str) -> D
-    where
-        for<'de> D: Deserialize<'de>,
-    {
-        TestKitApi::get_internal(
-            &self.public_handler,
-            &format!("{}/{}", kind.into_prefix(), endpoint),
-            true,
-            true,
-        )
+    pub fn get_err(&self, kind: ApiKind, endpoint: &str) -> ApiError {
+        let url = format!("http://localhost:3000/{}/{}", kind.into_prefix(), endpoint);
+        let response = match request::get(&url, Headers::new(), &self.public_handler) {
+            Ok(response) |
+            Err(IronError { response, .. }) => response,
+        };
+        let testkit_error: TestkitApiError = response.into();
+        testkit_error.0
     }
 
     fn post_internal<H, T, D>(handler: &H, endpoint: &str, data: &T, is_public: bool) -> D
