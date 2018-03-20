@@ -508,8 +508,11 @@ impl Sandbox {
         *Schema::new(&fork).last_block().state_hash()
     }
 
-
-    pub fn get_proof_to_service_table(&self, service_id: u16, table_idx: usize) -> MapProof<Hash> {
+    pub fn get_proof_to_service_table(
+        &self,
+        service_id: u16,
+        table_idx: usize,
+    ) -> MapProof<Hash, Hash> {
         let snapshot = self.blockchain_ref().snapshot();
         let schema = Schema::new(&snapshot);
         schema.get_proof_to_service_table(service_id, table_idx)
