@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use std::sync::{Arc, RwLock};
+use std::collections::VecDeque;
 
 use exonum::storage::{Database, Patch, Result as StorageResult, Snapshot};
 
@@ -73,31 +74,50 @@ pub struct CheckpointDbHandler<T> {
 }
 
 impl<T: Database> CheckpointDbHandler<T> {
+    /// Set a checkpoint for future rollback
+    ///
+    /// # Panics
+    ///
+    /// - Panics if another checkpoint was set before and have not been rollbacked to.
+    pub fn checkpoint(&self) {
+        self.inner
+            .write()
+            .expect("Cannot lock CheckpointDb for checkpoint")
+            .checkpoint();
+    }
+
     /// Rolls back this database by undoing the latest `count` `merge()` operations.
     ///
     /// # Panics
     ///
-    /// - Panics if more operations are attempted to be reverted than the number of operations
-    ///   in the DB journal.
-    pub fn rollback(&self, count: usize) {
+    /// - Panics if there is no checkpoint to rollback to.
+    pub fn rollback(&self) {
         self.inner
             .write()
             .expect("Cannot lock CheckpointDb for rollback")
-            .rollback(count);
+            .rollback();
     }
 }
 
 #[derive(Debug)]
+// Journal is used here to track patches that need to be applied (in order
+// that they appear) to db for it to become what it was on checkpoint.
+//
+// Insertion should happen to the front of the journal,
+// application of patches in the journal should happen
+// sequentially in order that they are in the VecDeque.
 struct CheckpointDbInner<T> {
     db: T,
-    journal: Vec<Patch>,
+    journal: VecDeque<Patch>,
+    checkpoint_set: bool,
 }
 
 impl<T: Database> CheckpointDbInner<T> {
     fn new(db: T) -> Self {
         CheckpointDbInner {
             db,
-            journal: Vec::new(),
+            journal: VecDeque::new(),
+            checkpoint_set: false,
         }
     }
 
@@ -106,6 +126,14 @@ impl<T: Database> CheckpointDbInner<T> {
     }
 
     fn merge(&mut self, patch: Patch) -> StorageResult<()> {
+        if self.checkpoint_set {
+            self.merge_with_journaling(patch)
+        } else {
+            self.db.merge(patch)
+        }
+    }
+
+    fn merge_with_journaling(&mut self, patch: Patch) -> StorageResult<()> {
         // NB: make sure that **both** the db and the journal
         // are updated atomically.
         let snapshot = self.db.snapshot();
@@ -125,22 +153,24 @@ impl<T: Database> CheckpointDbInner<T> {
             }
         }
 
-        self.journal.push(rev_fork.into_patch());
+        self.journal.push_front(rev_fork.into_patch());
         Ok(())
     }
 
-    fn rollback(&mut self, count: usize) {
+    fn checkpoint(&mut self) {
         assert!(
-            self.journal.len() >= count,
-            "Cannot rollback {} changes; only {} checkpoints in the journal",
-            count,
-            self.journal.len()
+            !self.checkpoint_set,
+            "Checkpoint is already set. There can only be one checkpoint at a time."
         );
+        self.checkpoint_set = true;
+    }
 
-        for _ in 0..count {
-            let patch = self.journal.pop().unwrap();
+    fn rollback(&mut self) {
+        assert!(self.checkpoint_set, "Checkpoint was not set yet.");
+        for patch in self.journal.drain(..) {
             self.db.merge(patch).expect("Cannot merge roll-back patch");
         }
+        self.checkpoint_set = false;
     }
 }
 
@@ -197,6 +227,9 @@ mod tests {
     #[test]
     fn test_checkpoint_db_basics() {
         let db = CheckpointDb::new(MemoryDB::new());
+        let handler = db.handler();
+
+        handler.checkpoint();
         let mut fork = db.fork();
         fork.put("foo", vec![], vec![2]);
         db.merge(fork.into_patch()).unwrap();
@@ -218,9 +251,9 @@ mod tests {
             let inner = db.inner.read().unwrap();
             let journal = &inner.journal;
             assert_eq!(journal.len(), 2);
-            check_patch(&journal[0], vec![("foo", vec![], Change::Delete)]);
+            check_patch(&journal[1], vec![("foo", vec![], Change::Delete)]);
             check_patch(
-                &journal[1],
+                &journal[0],
                 vec![("foo", vec![], Change::Put(vec![2])), ("bar", vec![1], Change::Delete)],
             );
         }
@@ -239,6 +272,8 @@ mod tests {
         fork.put("foo", vec![], vec![2]);
         db.merge(fork.into_patch()).unwrap();
 
+        handler.checkpoint();
+
         let mut fork = db.fork();
         fork.put("foo", vec![], vec![3]);
         fork.put("bar", vec![1], vec![4]);
@@ -246,22 +281,23 @@ mod tests {
         {
             let inner = db.inner.read().unwrap();
             let journal = &inner.journal;
-            assert_eq!(journal.len(), 2);
+            assert_eq!(journal.len(), 1);
         }
 
         let snapshot = db.snapshot();
         assert_eq!(snapshot.get("foo", &[]), Some(vec![3]));
-        handler.rollback(1);
+        handler.rollback();
         let snapshot = db.snapshot();
         assert_eq!(snapshot.get("foo", &[]), Some(vec![2]));
         assert_eq!(snapshot.get("bar", &[1]), None);
         {
             let inner = db.inner.read().unwrap();
             let journal = &inner.journal;
-            assert_eq!(journal.len(), 1);
+            assert_eq!(journal.len(), 0);
         }
 
         // Check that DB continues working as usual after a rollback
+        handler.checkpoint();
         let mut fork = db.fork();
         fork.put("foo", vec![], vec![4]);
         fork.put("foo", vec![0, 0], vec![255]);
@@ -269,7 +305,7 @@ mod tests {
         {
             let inner = db.inner.read().unwrap();
             let journal = &inner.journal;
-            assert_eq!(journal.len(), 2);
+            assert_eq!(journal.len(), 1);
         }
         let snapshot = db.snapshot();
         assert_eq!(snapshot.get("foo", &[]), Some(vec![4]));
@@ -281,18 +317,18 @@ mod tests {
         {
             let inner = db.inner.read().unwrap();
             let journal = &inner.journal;
-            assert_eq!(journal.len(), 3);
+            assert_eq!(journal.len(), 2);
         }
         let new_snapshot = db.snapshot();
         assert_eq!(new_snapshot.get("foo", &[]), Some(vec![4]));
         assert_eq!(new_snapshot.get("foo", &[0, 0]), Some(vec![255]));
         assert_eq!(new_snapshot.get("bar", &[1]), Some(vec![254]));
 
-        handler.rollback(2);
+        handler.rollback();
         {
             let inner = db.inner.read().unwrap();
             let journal = &inner.journal;
-            assert_eq!(journal.len(), 1);
+            assert_eq!(journal.len(), 0);
         }
         let snapshot = db.snapshot();
         assert_eq!(snapshot.get("foo", &[]), Some(vec![2]));
@@ -309,13 +345,14 @@ mod tests {
         let db = CheckpointDb::new(MemoryDB::new());
         let db_handler = db.handler();
 
+        db_handler.checkpoint();
         let mut fork = db.fork();
         fork.put("foo", vec![], vec![2]);
         db.merge(fork.into_patch()).unwrap();
         let snapshot = db.snapshot();
         assert_eq!(snapshot.get("foo", &[]), Some(vec![2]));
 
-        db_handler.rollback(1);
+        db_handler.rollback();
         let snapshot = db.snapshot();
         assert_eq!(snapshot.get("foo", &[]), None);
     }
