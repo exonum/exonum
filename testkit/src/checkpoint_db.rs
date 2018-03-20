@@ -128,13 +128,21 @@ impl<T: Database> CheckpointDbInner<T> {
 
     fn merge(&mut self, patch: Patch) -> StorageResult<()> {
         if self.checkpoint_set {
+<<<<<<< HEAD
             self.merge_with_logging(patch)
+=======
+            self.merge_with_journal_logging(patch)
+>>>>>>> Fix spelling
         } else {
             self.db.merge(patch)
         }
     }
 
+<<<<<<< HEAD
     fn merge_with_logging(&mut self, patch: Patch) -> StorageResult<()> {
+=======
+    fn merge_with_journal_logging(&mut self, patch: Patch) -> StorageResult<()> {
+>>>>>>> Fix spelling
         // NB: make sure that **both** the db and the journal
         // are updated atomically.
         let snapshot = self.db.snapshot();
