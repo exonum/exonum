@@ -142,13 +142,9 @@ impl ExplorerApi {
             "Expected tx in database",
         );
 
-        Ok(self.blockchain.tx_from_raw(raw_tx.clone()).or_else(
-            |error| {
-                Err(ApiError::InternalError(
-                    format!("{}, tx: {:?}", error.description(), raw_tx).into(),
-                ))
-            },
-        )?)
+        self.blockchain.tx_from_raw(raw_tx).map_err(|error| {
+            ApiError::InternalError(format!("{}, tx: {:?}", error.description(), hash).into())
+        })
     }
 
     fn transaction_info(&self, hash: &Hash) -> Result<TransactionInfo, ApiError> {
@@ -237,7 +233,7 @@ impl<'a> BlockchainExplorer<'a> {
         let box_transaction = self.blockchain.tx_from_raw(raw_tx.clone()).or_else(
             |error| {
                 Err(ApiError::InternalError(
-                    format!("{}, tx: {:?}", error.description(), raw_tx).into(),
+                    format!("{}, tx: {:?}", error.description(), tx_hash).into(),
                 ))
             },
         )?;

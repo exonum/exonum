@@ -160,33 +160,30 @@ impl NodeHandler {
         {
             let mut schema = Schema::new(&mut fork);
             for raw in block.transactions() {
-                match self.blockchain.tx_from_raw(raw) {
-                    Ok(tx) => {
-                        let hash = tx.hash();
-                        if schema.transactions().contains(&hash) {
-                            error!(
-                                "Received block with already known transaction, block={:?}",
-                                block
-                            );
-                            return None;
-                        }
-                        profiler_span!("tx.verify()", {
-                            if !tx.verify() {
-                                error!(
-                                    "Incorrect transaction in block detected, block={:?}",
-                                    block
-                                );
-                                return None;
-                            }
-                        });
-                        schema.add_transaction_into_pool(tx.raw().clone());
-                        tx_hashes.push(hash);
-                    }
+                let tx = match self.blockchain.tx_from_raw(raw) {
+                    Ok(tx) => tx,
                     Err(e) => {
                         error!("{}, block={:?}", e.description(), block);
                         return None;
                     }
+                };
+
+                let hash = tx.hash();
+                if schema.transactions().contains(&hash) {
+                    error!(
+                        "Received block with already known transaction, block={:?}",
+                        block
+                    );
+                    return None;
                 }
+                profiler_span!("tx.verify()", {
+                    if !tx.verify() {
+                        error!("Incorrect transaction in block detected, block={:?}", block);
+                        return None;
+                    }
+                });
+                schema.add_transaction_into_pool(tx.raw().clone());
+                tx_hashes.push(hash);
             }
         }
         Some((tx_hashes, fork.into_patch()))

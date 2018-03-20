@@ -40,6 +40,7 @@ use std::fmt;
 use std::iter;
 use std::panic;
 use std::net::SocketAddr;
+use std::error::Error as StdError;
 use failure;
 
 use vec_map::VecMap;
@@ -144,12 +145,10 @@ impl Blockchain {
     /// - Service can deserialize given raw message.
     pub fn tx_from_raw(&self, raw: RawMessage) -> Result<Box<Transaction>, MessageError> {
         let id = raw.service_id() as usize;
-        self.service_map
-            .get(id)
-            .map(|service| service.tx_from_raw(raw))
-            .unwrap_or_else(|| {
-                Err(MessageError::IncorrectServiceId { service_id: id as u16 })
-            })
+        let service = self.service_map.get(id).ok_or_else(|| {
+            MessageError::from("Service not found.")
+        })?;
+        service.tx_from_raw(raw)
     }
 
     /// Commits changes from the patch to the blockchain storage.
@@ -356,8 +355,10 @@ impl Blockchain {
                 failure::err_msg("BUG: Cannot find transaction in database.")
             })?;
 
-            self.tx_from_raw(tx).or_else(|_| {
-                Err(failure::err_msg("BUG: couldn't create tx from raw message"))
+            self.tx_from_raw(tx).or_else(|error| {
+                Err(failure::err_msg(
+                    format!("{}, tx: {:?}", error.description(), tx_hash),
+                ))
             })?
         };
 
