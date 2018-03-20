@@ -553,6 +553,15 @@ where
             )
         });
 
+        // This check is required as duplicate paths can be introduced by entries
+        // (further, it's generally possible that two different entry keys lead to the same
+        // `ProofPath`).
+        for window in proof.windows(2) {
+            if window[0].path == window[1].path {
+                return Err(MapProofError::DuplicatePath(window[0].path));
+            }
+        }
+
         collect(&proof).map(|h| {
             CheckedMapProof {
                 entries: entries.into_iter().map(OptionalEntry::into).collect(),
@@ -826,7 +835,7 @@ where
             let searched_paths = {
                 let mut keys: Vec<_> = keys.into_iter().map(|k| (ProofPath::new(&k), k)).collect();
 
-                keys.sort_by(|x, y| {
+                keys.sort_unstable_by(|x, y| {
                     // `unwrap` is safe here because all keys start from the same position `0`
                     x.0.partial_cmp(&y.0).unwrap()
                 });
@@ -836,8 +845,15 @@ where
             let mut contour = Vec::with_capacity(DEFAULT_PROOF_CAPACITY);
             contour.push(ContourNode::new(root_path, root_branch));
 
+            let mut last_searched_path: Option<ProofPath> = None;
             for (proof_path, key) in searched_paths {
+                if last_searched_path == Some(proof_path) {
+                    // The key has already been looked up; skipping.
+                    continue;
+                }
+
                 builder = process_key(&mut contour, builder, &proof_path, key, &lookup);
+                last_searched_path = Some(proof_path);
             }
 
             // Eject remaining entries from the contour

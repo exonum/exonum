@@ -497,6 +497,16 @@ fn test_invalid_map_proofs() {
         DuplicatePath(..) => {}
         e => panic!("expected duplicate path error, got {}", e),
     }
+
+    let proof: MapProof<[u8; 32], Vec<u8>> = MapProofBuilder::new()
+        .add_proof_entry(ProofPath::new(&[0; 32]).prefix(10), h)
+        .add_entry([1; 32], vec![1, 2, 3])
+        .add_entry([1; 32], vec![1, 2, 3])
+        .create();
+    match proof.check().unwrap_err() {
+        DuplicatePath(..) => {}
+        e => panic!("expected duplicate path error, got {}", e),
+    }
 }
 
 fn build_proof_in_empty_tree(db: Box<Database>) {
@@ -799,6 +809,27 @@ fn build_multiproof_simple(db: Box<Database>) {
         ]
     );
     check_map_multiproof(proof, keys, &table);
+
+    let keys = vec![[64; 32], [64; 32]];
+    let proof = table.get_multiproof(keys.clone());
+    assert_eq!(
+        proof.proof_unchecked(),
+        vec![
+            (ProofPath::new(&[128; 32]), hash(&vec![1])),
+            (ProofPath::new(&[32; 32]), hash(&vec![2])),
+        ]
+    );
+    check_map_multiproof(proof, vec![[64; 32]], &table);
+
+    let keys = vec![[128; 32], [64; 32], [128; 32]];
+    let proof = table.get_multiproof(keys.clone());
+    assert_eq!(
+        proof.proof_unchecked(),
+        vec![
+            (ProofPath::new(&[32; 32]), hash(&vec![2])),
+        ]
+    );
+    check_map_multiproof(proof, vec![[128; 32], [64; 32]], &table);
 
     let keys = vec![[255; 32], [129; 32]];
     let proof = table.get_multiproof(keys.clone());
