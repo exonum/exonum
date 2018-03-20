@@ -78,7 +78,7 @@ impl<T: Database> CheckpointDbHandler<T> {
     ///
     /// # Panics
     ///
-    /// - Panics if another checkpoint was set before and have not been rollbacked to.
+    /// - Panics if another checkpoint was set before and have not been rolled back to.
     pub fn checkpoint(&self) {
         self.inner
             .write()
@@ -127,13 +127,13 @@ impl<T: Database> CheckpointDbInner<T> {
 
     fn merge(&mut self, patch: Patch) -> StorageResult<()> {
         if self.checkpoint_set {
-            self.merge_with_journaling(patch)
+            self.merge_with_journal_logging(patch)
         } else {
             self.db.merge(patch)
         }
     }
 
-    fn merge_with_journaling(&mut self, patch: Patch) -> StorageResult<()> {
+    fn merge_with_journal_logging(&mut self, patch: Patch) -> StorageResult<()> {
         // NB: make sure that **both** the db and the journal
         // are updated atomically.
         let snapshot = self.db.snapshot();
