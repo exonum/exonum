@@ -192,7 +192,7 @@ impl TestNode {
             propose.round(),
             &propose.hash(),
             block_hash,
-            SystemTime::now(),
+            SystemTime::now().into(),
             &self.consensus_secret_key,
         )
     }

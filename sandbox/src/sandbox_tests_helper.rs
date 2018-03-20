@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -396,6 +396,7 @@ where
             sandbox.assert_lock(round, Some(propose.hash()));
 
             trace!("last_block: {:?}", sandbox.last_block());
+            trace!("last_block.hash(): {:?}", sandbox.last_block().hash());
 
             let state_hash = sandbox.compute_state_hash(&raw_txs);
             let block = BlockBuilder::new(sandbox)
@@ -415,7 +416,7 @@ where
                 round,
                 &propose.hash(),
                 &block.hash(),
-                sandbox.time(),
+                sandbox.time().into(),
                 sandbox.s(VALIDATOR_0),
             ));
             sandbox.assert_lock(round, Some(propose.hash()));
@@ -428,7 +429,7 @@ where
                     round,
                     &propose.hash(),
                     &block.hash(),
-                    sandbox.time(),
+                    sandbox.time().into(),
                     sandbox.s(val_idx),
                 ));
 
@@ -529,7 +530,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
                     round,
                     &propose.hash(),
                     &block.hash(),
-                    sandbox.time(),
+                    sandbox.time().into(),
                     sandbox.s(val_idx),
                 ));
             }

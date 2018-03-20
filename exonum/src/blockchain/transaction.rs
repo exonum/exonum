@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -616,16 +616,18 @@ fn panic_description(any: &Box<Any + Send>) -> Option<String> {
 mod tests {
     use futures::sync::mpsc;
 
-    use std::collections::BTreeMap;
     use std::sync::Mutex;
     use std::panic;
 
     use super::*;
     use crypto;
-    use blockchain::Blockchain;
-    use storage::{Database, MemoryDB, Entry};
+    use encoding;
+    use blockchain::{Service, Schema, Blockchain};
+    use storage::{Snapshot, Database, MemoryDB, Entry};
     use node::ApiSender;
     use helpers::{ValidatorId, Height};
+
+    const TX_RESULT_SERVICE_ID: u16 = 255;
 
     lazy_static! {
         static ref EXECUTION_STATUS: Mutex<ExecutionResult> = Mutex::new(Ok(()));
@@ -743,7 +745,7 @@ mod tests {
         ];
 
         let (_, sec_key) = crypto::gen_keypair();
-        let (blockchain, mut pool) = create_blockchain();
+        let mut blockchain = create_blockchain();
         let db = Box::new(MemoryDB::new());
 
         for (index, status) in statuses.iter().enumerate() {
@@ -752,17 +754,17 @@ mod tests {
             *EXECUTION_STATUS.lock().unwrap() = status.clone();
 
             let transaction = TxResult::new(index, &sec_key);
-            pool.insert(
-                transaction.hash(),
-                Box::new(transaction.clone()) as Box<Transaction>,
-            );
+            let hash = transaction.hash();
+            {
+                let mut fork = blockchain.fork();
+                {
+                    let mut schema = Schema::new(&mut fork);
+                    schema.add_transaction_into_pool(transaction.raw().clone());
+                }
+                blockchain.merge(fork.into_patch()).unwrap();
+            }
 
-            let (_, patch) = blockchain.create_patch(
-                ValidatorId::zero(),
-                Height(index),
-                &[transaction.hash()],
-                &pool,
-            );
+            let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(index), &[hash]);
 
             db.merge(patch).unwrap();
 
@@ -808,24 +810,42 @@ mod tests {
         panic::catch_unwind(panic::AssertUnwindSafe(|| panic!(val))).unwrap_err()
     }
 
-    fn create_blockchain() -> (Blockchain, BTreeMap<Hash, Box<Transaction>>) {
+    fn create_blockchain() -> Blockchain {
         let service_keypair = crypto::gen_keypair();
         let api_channel = mpsc::channel(1);
-        (
-            Blockchain::new(
-                MemoryDB::new(),
-                Vec::new(),
-                service_keypair.0,
-                service_keypair.1,
-                ApiSender::new(api_channel.0),
-            ),
-            BTreeMap::new(),
+        Blockchain::new(
+            MemoryDB::new(),
+            vec![Box::new(TxResultService) as Box<Service>],
+            service_keypair.0,
+            service_keypair.1,
+            ApiSender::new(api_channel.0),
         )
+
+    }
+
+    struct TxResultService;
+
+    impl Service for TxResultService {
+        fn service_id(&self) -> u16 {
+            TX_RESULT_SERVICE_ID
+        }
+
+        fn service_name(&self) -> &'static str {
+            "test service"
+        }
+
+        fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+            vec![]
+        }
+
+        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
+            Ok(Box::new(TxResult::from_raw(raw)?))
+        }
     }
 
     transactions! {
-        Transactions {
-            const SERVICE_ID = 1;
+        TestTxs {
+            const SERVICE_ID = TX_RESULT_SERVICE_ID;
 
             struct TxResult {
                 index: u64,

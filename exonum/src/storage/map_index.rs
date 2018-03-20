@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -97,17 +97,16 @@ where
     /// let name = "name";
     /// let snapshot = db.snapshot();
     /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
-    /// # drop(index);
     /// ```
-    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         MapIndex {
-            base: BaseIndex::new(name, IndexType::Map, view),
+            base: BaseIndex::new(index_name, IndexType::Map, view),
             _k: PhantomData,
             _v: PhantomData,
         }
     }
 
-    /// Creates a new index representation based on the name, common prefix of its keys
+    /// Creates a new index representation based on the name, index id in family
     /// and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
@@ -124,15 +123,18 @@ where
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";
-    /// let prefix = vec![01];
+    /// let index_id = vec![01];
     ///
     /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::with_prefix(name, prefix, &snapshot);
-    /// # drop(index);
+    /// let index: MapIndex<_, u8, u8> = MapIndex::new_in_family(name, &index_id, &snapshot);
     /// ```
-    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
+    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
+        family_name: S,
+        index_id: &I,
+        view: T,
+    ) -> Self {
         MapIndex {
-            base: BaseIndex::with_prefix(name, prefix, IndexType::Map, view),
+            base: BaseIndex::new_in_family(family_name, index_id, IndexType::Map, view),
             _k: PhantomData,
             _v: PhantomData,
         }

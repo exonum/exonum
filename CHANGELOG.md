@@ -15,12 +15,48 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `ProofListIndex` and `ProofMapIndex` `root_hash` method has been renamed to
   `merkle_root`. (#547)
 
+- `with_prefix` constructor of all index types has been renamed to
+  `new_in_family`. Now it uses `index_id` instead of prefixes. Moreover,
+  `blockchain::gen_prefix` method has been removed. Instead, any type that
+  implements `StorageKey` trait, can serve as an `index_id`. (#531)
+
+- Several `Schema`'s methods have been renamed:
+  - `tx_location_by_tx_hash` to `transactions_locations`.
+  - `block_txs` to `block_transactions`.
+
+- `SystemTime` previously used as storage key or value turned out to show
+  different behavior on different platforms and, hence, has been replaced with
+  `chrono::DateTime<Utc>` that behaves the same in any environment.
+
+  Migration path:
+
+  - Replace all `SystemTime` fields with `chrono::DateTime<Utc>` ones.
+  - Use `DateTime::from` and `into()` methods to convert your existing
+  `SystemTime` instances into suitable type when constructing transactions or
+  working with database.
+
+#### exonum-testkit
+
+- Testkit api now contains two methods to work with the transaction pool:
+  - `is_tx_in_pool` - for checking transaction existence in the pool;
+  - `add_tx` - for adding a new transaction into the pool.
+
+  Migration path:
+
+  - Instead of calling `mempool()`, one should use `is_tx_in_pool`
+  or `add_tx` methods.
+
 #### exonum-configuration
 
 - `majority_count: Option<u16>` configuration parameter is introduced.
   Allows to increase the threshold amount of votes required to commit
   a new configuration proposal. By default the number of votes is calculated
   as 2/3 + 1 of total validators count. (#546)
+
+#### exonum-time
+
+- `SystemTime` has been replaced with `chrono::DateTime<Utc>`, as it provides
+  more predictable behavior on all systems.
 
 ### New features
 
@@ -38,6 +74,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Added `v1/user_agent` endpoint with information about Exonum, Rust
   and OS versions. (#548)
+
+### Internal improvements
+
+#### Exonum core
+
+- Non-committed transactions are now stored persistently in the storage
+  instead of memory pool. (#549)
 
 ## 0.6 - 2018-03-06
 

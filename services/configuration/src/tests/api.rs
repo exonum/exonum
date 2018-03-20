@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -436,7 +436,7 @@ fn test_post_propose_tx() {
     // Check results
     let tx = new_tx_config_propose(&testkit.network().validators()[0], new_cfg.clone());
     assert_eq!(tx.hash(), info.tx_hash);
-    assert!(testkit.mempool().contains_key(&info.tx_hash));
+    assert!(testkit.is_tx_in_pool(&info.tx_hash));
 }
 
 #[test]
@@ -458,5 +458,5 @@ fn test_post_vote_tx() {
     // Check results
     let tx = new_tx_config_vote(&testkit.network().validators()[0], new_cfg.hash());
     assert_eq!(tx.hash(), info.tx_hash);
-    assert!(testkit.mempool().contains_key(&info.tx_hash));
+    assert!(testkit.is_tx_in_pool(&info.tx_hash));
 }

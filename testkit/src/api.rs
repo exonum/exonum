@@ -68,7 +68,6 @@ impl fmt::Debug for TestKitApi {
 impl TestKitApi {
     /// Creates a new instance of API.
     pub(crate) fn new(testkit: &TestKit) -> Self {
-        use std::sync::Arc;
 
         let blockchain = &testkit.blockchain;
         let api_state = SharedNodeState::new(10_000);
@@ -76,7 +75,6 @@ impl TestKitApi {
         TestKitApi {
             public_handler: create_public_api_handler(
                 blockchain.clone(),
-                Arc::clone(&testkit.mempool),
                 api_state.clone(),
                 &testkit.api_config,
             ),

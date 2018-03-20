@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -136,16 +136,15 @@ extern crate log;
 use futures::Stream;
 use futures::sync::mpsc;
 
-use std::collections::BTreeMap;
-use std::sync::{Arc, RwLock, RwLockReadGuard};
 use std::fmt;
 
 use exonum::blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfiguration,
                          Transaction};
-use exonum::crypto;
+use exonum::crypto::{self, Hash};
 use exonum::helpers::{Height, ValidatorId};
-use exonum::node::{ApiSender, ExternalMessage, State as NodeState, TxPool, NodeApiConfig};
+use exonum::node::{ApiSender, ExternalMessage, State as NodeState, NodeApiConfig};
 use exonum::storage::{MemoryDB, Patch, Snapshot};
+use exonum::messages::RawMessage;
 
 #[macro_use]
 mod macros;
@@ -293,7 +292,6 @@ pub struct TestKit {
     events_stream: Box<Stream<Item = (), Error = ()> + Send + Sync>,
     network: TestNetwork,
     api_sender: ApiSender,
-    mempool: TxPool,
     cfg_proposal: Option<ConfigurationProposalState>,
     api_config: NodeApiConfig,
 }
@@ -303,7 +301,6 @@ impl fmt::Debug for TestKit {
         f.debug_struct("TestKit")
             .field("blockchain", &self.blockchain)
             .field("network", &self.network)
-            .field("mempool", &self.mempool)
             .field("cfg_change_proposal", &self.cfg_proposal)
             .finish()
     }
@@ -336,29 +333,25 @@ impl TestKit {
         let genesis = network.genesis_config();
         blockchain.initialize(genesis.clone()).unwrap();
 
-        let mempool = Arc::new(RwLock::new(BTreeMap::new()));
         let events_stream: Box<Stream<Item = (), Error = ()> + Send + Sync> = {
-            let blockchain = blockchain.clone();
-            let mempool = Arc::clone(&mempool);
-
+            let mut blockchain = blockchain.clone();
             Box::new(api_channel.1.and_then(move |event| {
-                let snapshot = blockchain.snapshot();
-                let schema = CoreSchema::new(&snapshot);
-
-                match event {
-                    ExternalMessage::Transaction(tx) => {
-                        let hash = tx.hash();
-                        if !schema.transactions().contains(&hash) {
-                            mempool
-                                .write()
-                                .expect("Cannot write transactions to mempool")
-                                .insert(tx.hash(), tx);
+                let mut fork = blockchain.fork();
+                {
+                    let mut schema = CoreSchema::new(&mut fork);
+                    match event {
+                        ExternalMessage::Transaction(tx) => {
+                            let hash = tx.hash();
+                            if !schema.transactions().contains(&hash) {
+                                schema.add_transaction_into_pool(tx.raw().clone());
+                            }
                         }
+                        ExternalMessage::PeerAdd(_) |
+                        ExternalMessage::Enable(_) |
+                        ExternalMessage::Shutdown => { /* Ignored */ }
                     }
-                    ExternalMessage::PeerAdd(_) |
-                    ExternalMessage::Enable(_) |
-                    ExternalMessage::Shutdown => { /* Ignored */ }
                 }
+                blockchain.merge(fork.into_patch()).unwrap();
                 Ok(())
             }))
         };
@@ -369,7 +362,6 @@ impl TestKit {
             api_sender,
             events_stream,
             network,
-            mempool: Arc::clone(&mempool),
             cfg_proposal: None,
             api_config: Default::default(),
         }
@@ -406,7 +398,7 @@ impl TestKit {
     /// ```
     /// # #[macro_use] extern crate exonum;
     /// # #[macro_use] extern crate exonum_testkit;
-    /// # use exonum::blockchain::{Service, Transaction, ExecutionResult};
+    /// # use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
     /// # use exonum::messages::RawTransaction;
     /// # use exonum::encoding;
     /// # use exonum_testkit::{TestKit, TestKitBuilder};
@@ -421,16 +413,17 @@ impl TestKit {
     /// #        Vec::new()
     /// #    }
     /// #    fn service_id(&self) -> u16 {
-    /// #        0
+    /// #        1
     /// #    }
-    /// #    fn tx_from_raw(&self, _raw: RawTransaction) -> FromRawResult {
-    /// #        unimplemented!();
+    /// #    fn tx_from_raw(&self, raw: RawTransaction) -> FromRawResult {
+    /// #        let tx = MyServiceTransactions::tx_from_raw(raw)?;
+    /// #        Ok(tx.into())
     /// #    }
     /// # }
     /// #
     /// # transactions! {
-    /// #     Transactions {
-    /// #         const SERVICE_ID = 0;
+    /// #     MyServiceTransactions {
+    /// #         const SERVICE_ID = 1;
     /// #
     /// #         struct MyTransaction {
     /// #             from: &exonum::crypto::PublicKey,
@@ -465,10 +458,13 @@ impl TestKit {
     /// ```
     pub fn rollback(&mut self, blocks: usize) {
         assert!(
-            (blocks as u64) <= self.height().0,
+            self.height().0 >= blocks as u64,
             "Cannot rollback past genesis block"
         );
-        self.db_handler.rollback(blocks);
+        // Each block contain at least two phases:
+        // 1. add tx into pool;
+        // 2. commit tx from pool into next block.
+        self.db_handler.rollback(blocks * 2);
     }
 
     /// Executes a list of transactions given the current state of the blockchain, but does not
@@ -479,13 +475,14 @@ impl TestKit {
     where
         I: IntoIterator<Item = Box<Transaction>>,
     {
+        self.poll_events();
         // Filter out already committed transactions; otherwise,
         // `create_block_with_transactions()` will panic.
         let schema = CoreSchema::new(self.snapshot());
         let uncommitted_txs = transactions.into_iter().filter(|tx| {
-            !schema.transactions().contains(&tx.hash())
+            !schema.transactions().contains(&tx.hash()) ||
+                schema.transactions_pool().contains(&tx.hash())
         });
-
         self.create_block_with_transactions(uncommitted_txs);
         let snapshot = self.snapshot();
         self.rollback(1);
@@ -507,12 +504,10 @@ impl TestKit {
         let config_patch = self.update_configuration(new_block_height);
         let (block_hash, patch) = {
             let validator_id = self.leader().validator_id().unwrap();
-            let transactions = self.mempool();
             self.blockchain.create_patch(
                 validator_id,
                 new_block_height,
                 tx_hashes,
-                &transactions,
             )
         };
 
@@ -524,16 +519,6 @@ impl TestKit {
         } else {
             patch
         };
-
-        // Remove txs from mempool
-        {
-            let mut transactions = self.mempool.write().expect(
-                "Cannot modify transactions in mempool",
-            );
-            for hash in tx_hashes {
-                transactions.remove(hash);
-            }
-        }
 
         let propose = self.leader().create_propose(
             new_block_height,
@@ -586,7 +571,7 @@ impl TestKit {
     }
 
     /// Creates a block with the given transactions.
-    /// Transactions that are in the mempool will be ignored.
+    /// Transactions that are in the pool will be ignored.
     ///
     /// # Panics
     ///
@@ -596,31 +581,37 @@ impl TestKit {
         I: IntoIterator<Item = Box<Transaction>>,
     {
         let tx_hashes: Vec<_> = {
-            let mut mempool = self.mempool.write().expect(
-                "Cannot write transactions to mempool",
-            );
+            let blockchain = self.blockchain_mut();
+            let mut fork = blockchain.fork();
+            let hashes = {
+                let mut schema = CoreSchema::new(&mut fork);
 
-            let snapshot = self.snapshot();
-            let schema = CoreSchema::new(&snapshot);
-            txs.into_iter()
-                .filter(|tx| tx.verify())
-                .map(|tx| {
-                    let tx_id = tx.hash();
-                    assert!(
-                        !schema.transactions().contains(&tx_id),
-                        "Transaction is already committed: {:?}",
-                        tx
-                    );
-                    mempool.insert(tx_id, tx);
-                    tx_id
-                })
-                .collect()
+                txs.into_iter()
+                    .filter(|tx| tx.verify())
+                    .map(|tx| {
+                        let tx_id = tx.hash();
+                        let tx_not_found = !schema.transactions().contains(&tx_id);
+                        let tx_in_pool = schema.transactions_pool().contains(&tx_id);
+                        assert!(
+                            tx_not_found || tx_in_pool,
+                            "Transaction is already committed: {:?}",
+                            tx
+                        );
+                        schema.add_transaction_into_pool(tx.raw().clone());
+
+                        tx_id
+                    })
+                    .collect()
+            };
+            blockchain.merge(fork.into_patch()).unwrap();
+            hashes
         };
+
         self.create_block_with_tx_hashes(&tx_hashes);
     }
 
     /// Creates a block with the given transaction.
-    /// Transactions that are in the mempool will be ignored.
+    /// Transactions that are in the pool will be ignored.
     ///
     /// # Panics
     ///
@@ -634,27 +625,50 @@ impl TestKit {
     ///
     /// # Panics
     ///
-    /// - Panics in the case any of transaction hashes are not in the mempool.
+    /// - Panics in the case any of transaction hashes are not in the pool.
     pub fn create_block_with_tx_hashes(&mut self, tx_hashes: &[crypto::Hash]) {
         self.poll_events();
 
         {
-            let txs = self.mempool();
+            let snapshot = self.blockchain.snapshot();
+            let schema = CoreSchema::new(&snapshot);
             for hash in tx_hashes {
-                assert!(txs.contains_key(hash));
+                assert!(schema.transactions_pool().contains(hash));
             }
         }
 
         self.do_create_block(tx_hashes);
     }
 
-    /// Creates block with all transactions in the mempool.
+    /// Creates block with all transactions in the pool.
     pub fn create_block(&mut self) {
         self.poll_events();
 
-        let tx_hashes: Vec<_> = self.mempool().keys().cloned().collect();
-
+        let snapshot = self.blockchain.snapshot();
+        let schema = CoreSchema::new(&snapshot);
+        let txs = schema.transactions_pool();
+        let tx_hashes: Vec<_> = txs.iter().collect();
+        //TODO: every block should contain two merges (ECR-975)
+        {
+            let blockchain = self.blockchain_mut();
+            let fork = blockchain.fork();
+            blockchain.merge(fork.into_patch()).unwrap();
+        }
         self.do_create_block(&tx_hashes);
+    }
+
+    /// Adds transaction into persistent pool.
+    pub fn add_tx(&mut self, transaction: RawMessage) {
+        let mut fork = self.blockchain.fork();
+        let mut schema = CoreSchema::new(&mut fork);
+        schema.add_transaction_into_pool(transaction)
+    }
+
+    /// Checks if transaction can be found in pool
+    pub fn is_tx_in_pool(&self, tx_hash: &Hash) -> bool {
+        let snapshot = self.blockchain.snapshot();
+        let schema = CoreSchema::new(&snapshot);
+        schema.transactions_pool().contains(tx_hash)
     }
 
     /// Creates a chain of blocks until a given height.
@@ -704,13 +718,6 @@ impl TestKit {
     /// Returns sufficient number of validators for the Byzantine Fault Tolerance consensus.
     pub fn majority_count(&self) -> usize {
         NodeState::byzantine_majority_count(self.network().validators().len())
-    }
-
-    /// Returns the test node memory pool handle.
-    pub fn mempool(&self) -> RwLockReadGuard<BTreeMap<crypto::Hash, Box<Transaction>>> {
-        self.mempool.read().expect(
-            "Can't read transactions from the mempool.",
-        )
     }
 
     /// Returns the leader on the current height. At the moment first validator.

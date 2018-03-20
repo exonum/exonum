@@ -12,26 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! An implementation of `Error` type.
+//! Shared constants used both in api and transactions logic tests.
 
-/// The error type for I/O operations with storage.
-#[derive(Fail, Debug, Clone)]
-#[fail(display = "{}", message)]
-pub struct Error {
-    message: String,
-}
-
-impl Error {
-    /// Creates a new storage error with an information message about the reason.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum::storage::Error;
-    ///
-    /// let error = Error::new("Oh no!");
-    /// ```
-    pub fn new<T: Into<String>>(message: T) -> Error {
-        Error { message: message.into() }
-    }
-}
+/// Alice's wallets name.
+pub const ALICE_NAME: &str = "Alice";
+/// Bob's wallet name.
+pub const BOB_NAME: &str = "Bob";

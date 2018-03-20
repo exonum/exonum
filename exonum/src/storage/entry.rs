@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -54,11 +54,10 @@ where
     /// let name = "name";
     /// let snapshot = db.snapshot();
     /// let index: Entry<_, u8> = Entry::new(name, &snapshot);
-    /// # drop(index);
     /// ```
-    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         Entry {
-            base: BaseIndex::new(name.as_ref(), IndexType::Entry, view),
+            base: BaseIndex::new(index_name.as_ref(), IndexType::Entry, view),
             _v: PhantomData,
         }
     }

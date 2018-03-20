@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,8 +16,7 @@ use router::Router;
 use iron::prelude::*;
 use serde_json;
 
-use node::state::TxPool;
-use blockchain::{Blockchain, SharedNodeState};
+use blockchain::{Schema, Blockchain, SharedNodeState};
 use api::Api;
 use helpers::user_agent;
 
@@ -35,20 +34,14 @@ pub struct HealthCheckInfo {
 /// Public system API.
 #[derive(Clone, Debug)]
 pub struct SystemApi {
-    pool: TxPool,
     blockchain: Blockchain,
     shared_api_state: SharedNodeState,
 }
 
 impl SystemApi {
     /// Creates a new `private::SystemApi` instance.
-    pub fn new(
-        pool: TxPool,
-        blockchain: Blockchain,
-        shared_api_state: SharedNodeState,
-    ) -> SystemApi {
+    pub fn new(blockchain: Blockchain, shared_api_state: SharedNodeState) -> SystemApi {
         SystemApi {
-            pool,
             blockchain,
             shared_api_state,
         }
@@ -56,7 +49,9 @@ impl SystemApi {
 
     fn mempool_info(self, router: &mut Router) {
         let mempool = move |_: &mut Request| -> IronResult<Response> {
-            let info = MemPoolInfo { size: self.pool.read().expect("Expected read lock").len() };
+            let snapshot = self.blockchain.snapshot();
+            let schema = Schema::new(&snapshot);
+            let info = MemPoolInfo { size: schema.transactions_pool_len() };
             self.ok_response(&serde_json::to_value(info).unwrap())
         };
         router.get("/v1/mempool", mempool, "mempool");
