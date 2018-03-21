@@ -27,6 +27,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `SystemTime` previously used as storage key or value turned out to show
   different behavior on different platforms and, hence, has been replaced with
   `chrono::DateTime<Utc>` that behaves the same in any environment.
+  
+- `Blockchain` method `tx_from_raw()` now returns `Result<Box<Transaction>, MessageError>` instead of
+  `Option<Box<Transaction>>`.
 
   Migration path:
 
