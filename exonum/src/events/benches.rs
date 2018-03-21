@@ -14,6 +14,8 @@
 
 #![feature(test)]
 
+extern crate test;
+
 use std::net::SocketAddr;
 use std::thread;
 

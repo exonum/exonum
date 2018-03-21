@@ -66,8 +66,6 @@ extern crate failure;
 extern crate bodyparser;
 
 // Test dependencies.
-#[cfg(all(test, feature = "long_benchmarks"))]
-extern crate test;
 #[cfg(test)]
 #[macro_use]
 extern crate lazy_static;
