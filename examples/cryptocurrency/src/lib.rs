@@ -248,7 +248,7 @@ pub mod contracts {
         /// balance and applies changes to the balances of the wallets if the sender's balance
         /// is sufficient. Otherwise, performs no op.
         ///
-        /// [`TxCreateWallet`]: struct.TxCreateWallet.html
+        /// [`TxCreateWallet`]: transactions/struct.TxCreateWallet.html
         fn execute(&self, view: &mut Fork) -> ExecutionResult {
             let mut schema = CurrencySchema::new(view);
 
@@ -449,7 +449,7 @@ pub mod service {
     /// hash of the transaction encumbered in an object: `{ "tx_hash": <hash> }`.
     ///
     /// [`TxCreateWallet`]: struct.TxCreateWallet.html
-    /// [`TxTransfer`]: struct.TxTransfer.html
+    /// [`TxTransfer`]: transactions/struct.TxTransfer.html
     pub struct CurrencyService;
 
     impl Service for CurrencyService {
