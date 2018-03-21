@@ -17,7 +17,7 @@ pub mod error;
 pub mod network;
 pub mod internal;
 
-#[cfg(any(test, feature = "long_benchmarks"))]
+#[cfg(test)]
 mod tests;
 #[cfg(all(test, feature = "long_benchmarks"))]
 mod benches;
