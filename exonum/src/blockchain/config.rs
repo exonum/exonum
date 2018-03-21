@@ -51,6 +51,7 @@ pub struct StoredConfiguration {
     pub majority_count: Option<u16>,
     /// Services specific variables.
     /// Keys are `service_name` from `Service` trait and values are the serialized json.
+    #[serde(default)]
     pub services: BTreeMap<String, serde_json::Value>,
 }
 
