@@ -14,14 +14,13 @@
 
 use rand::{Rng, XorShiftRng, SeedableRng};
 
-use exonum::messages::{Message, RawTransaction};
-use exonum::encoding::Error as MessageError;
-use exonum::crypto::{PublicKey, SecretKey, Hash, gen_keypair};
-use exonum::storage::{Fork, Snapshot};
-use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
+use messages::{Message, RawTransaction};
+use encoding::Error as MessageError;
+use crypto::{PublicKey, SecretKey, Hash, gen_keypair};
+use storage::{Fork, Snapshot};
+use blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
 
 pub const TIMESTAMPING_SERVICE: u16 = 129;
-pub const TIMESTAMPING_TRANSACTION_MESSAGE_ID: u16 = 128;
 
 transactions! {
     TimestampingTransactions {

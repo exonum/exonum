@@ -12,20 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate exonum;
-extern crate sandbox;
-
 use std::time::Duration;
 
-use exonum::messages::{Propose, Prevote, Precommit};
-use exonum::blockchain::{Block, SCHEMA_MAJOR_VERSION};
-use exonum::crypto::{CryptoHash, Hash};
-use exonum::helpers::{Height, Round};
-
-use sandbox::timestamping_sandbox;
-use sandbox::sandbox_tests_helper::gen_timestamping_tx;
-use sandbox::sandbox_tests_helper::{HEIGHT_ONE, ROUND_ONE, ROUND_THREE, VALIDATOR_0, VALIDATOR_1,
-                                    VALIDATOR_2, VALIDATOR_3};
+use messages::{Propose, Prevote, Precommit};
+use blockchain::{Block, SCHEMA_MAJOR_VERSION};
+use crypto::{CryptoHash, Hash};
+use helpers::{Height, Round};
+use super::sandbox::timestamping_sandbox;
+use super::sandbox_tests_helper::{gen_timestamping_tx, HEIGHT_ONE, ROUND_ONE, ROUND_THREE,
+                                  VALIDATOR_0, VALIDATOR_1, VALIDATOR_2, VALIDATOR_3};
 
 #[test]
 fn test_send_propose_and_prevote() {

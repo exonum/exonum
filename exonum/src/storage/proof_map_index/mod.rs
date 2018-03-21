@@ -22,9 +22,10 @@ use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageValue, StorageKey};
 use super::indexes_metadata::IndexType;
 use self::key::{BitsRange, ChildKind, LEAF_KEY_PREFIX};
 use self::node::{BranchNode, Node};
+use self::proof::{create_multiproof, create_proof};
 
-pub use self::key::{KEY_SIZE as PROOF_MAP_KEY_SIZE, ProofMapKey, ProofPath};
-pub use self::proof::{BranchProofNode, MapProof, ProofNode};
+pub use self::key::{KEY_SIZE as PROOF_MAP_KEY_SIZE, ProofMapKey, HashedKey, ProofPath};
+pub use self::proof::{CheckedMapProof, MapProof, MapProofError};
 
 #[cfg(test)]
 mod tests;
@@ -183,20 +184,17 @@ where
         }
     }
 
-    fn get_root_key(&self) -> Option<ProofPath> {
+    fn get_root_path(&self) -> Option<ProofPath> {
         self.base.iter::<_, ProofPath, _>(&()).next().map(
             |(k, _): (ProofPath, ())| k,
         )
     }
 
     fn get_root_node(&self) -> Option<(ProofPath, Node<V>)> {
-        match self.get_root_key() {
-            Some(key) => {
-                let node = self.get_node_unchecked(&key);
-                Some((key, node))
-            }
-            None => None,
-        }
+        self.get_root_path().map(|key| {
+            let node = self.get_node_unchecked(&key);
+            (key, node)
+        })
     }
 
     fn get_node_unchecked(&self, key: &ProofPath) -> Node<V> {
@@ -208,65 +206,7 @@ where
         }
     }
 
-    fn construct_proof(
-        &self,
-        current_branch: &BranchNode,
-        searched_path: &ProofPath,
-    ) -> Option<ProofNode<V>> {
-        let child_path = current_branch.child_path(searched_path.bit(0)).start_from(
-            searched_path
-                .start(),
-        );
-        let c_pr_l = child_path.common_prefix_len(searched_path);
-        debug_assert!(c_pr_l > 0);
-        if c_pr_l < child_path.len() {
-            return None;
-        }
-
-        let res: ProofNode<V> = match self.get_node_unchecked(&child_path) {
-            Node::Leaf(child_value) => ProofNode::Leaf(child_value),
-            Node::Branch(child_branch) => {
-                let l_s = child_branch.child_path(ChildKind::Left);
-                let r_s = child_branch.child_path(ChildKind::Right);
-                let suf_searched_path = searched_path.suffix(c_pr_l);
-                let proof_from_level_below: Option<ProofNode<V>> =
-                    self.construct_proof(&child_branch, &suf_searched_path);
-
-                if let Some(child_proof) = proof_from_level_below {
-                    let child_proof_pos = suf_searched_path.bit(0);
-                    let neighbor_child_hash = *child_branch.child_hash(!child_proof_pos);
-                    match child_proof_pos {
-                        ChildKind::Left => ProofNode::Branch(BranchProofNode::LeftBranch {
-                            left_node: Box::new(child_proof),
-                            right_hash: neighbor_child_hash,
-                            left_key: l_s.suffix(searched_path.start() + c_pr_l),
-                            right_key: r_s.suffix(searched_path.start() + c_pr_l),
-                        }),
-                        ChildKind::Right => ProofNode::Branch(BranchProofNode::RightBranch {
-                            left_hash: neighbor_child_hash,
-                            right_node: Box::new(child_proof),
-                            left_key: l_s.suffix(searched_path.start() + c_pr_l),
-                            right_key: r_s.suffix(searched_path.start() + c_pr_l),
-                        }),
-                    }
-                } else {
-                    let l_h = *child_branch.child_hash(ChildKind::Left); //copy
-                    let r_h = *child_branch.child_hash(ChildKind::Right); //copy
-                    ProofNode::Branch(BranchProofNode::BranchKeyNotFound {
-                        left_hash: l_h,
-                        right_hash: r_h,
-                        left_key: l_s.suffix(searched_path.start() + c_pr_l),
-                        right_key: r_s.suffix(searched_path.start() + c_pr_l),
-                    })
-                    // proof of exclusion of a key, because none of child paths is a
-                    // prefix(searched_path)
-                }
-            }
-        };
-        Some(res)
-    }
-
-    /// Returns the Merkle root hash of the proof map or default hash value if it is empty.
+    /// Returns the root hash of the proof map or default hash value if it is empty.
     ///
     /// # Examples
     ///
@@ -354,83 +294,45 @@ where
     /// use exonum::crypto::Hash;
     ///
     /// let db = MemoryDB::new();
-    /// let name = "name";
     /// let snapshot = db.snapshot();
-    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new(name, &snapshot);
+    /// let index: ProofMapIndex<_, Hash, u8> = ProofMapIndex::new("index", &snapshot);
     ///
-    /// let hash = Hash::default();
-    /// let proof = index.get_proof(&hash);
+    /// let proof = index.get_proof(Hash::default());
     /// ```
-    pub fn get_proof(&self, key: &K) -> MapProof<V> {
-        let searched_path = ProofPath::new(key);
+    pub fn get_proof(&self, key: K) -> MapProof<K, V> {
+        create_proof(
+            key,
+            self.get_root_node(),
+            |path| self.get_node_unchecked(path),
+        )
+    }
 
-        match self.get_root_node() {
-            Some((root_db_key, Node::Leaf(root_value))) => {
-                if searched_path == root_db_key {
-                    MapProof::LeafRootInclusive(root_db_key, root_value)
-                } else {
-                    MapProof::LeafRootExclusive(root_db_key, root_value.hash())
-                }
-            }
-            Some((root_db_key, Node::Branch(branch))) => {
-                let root_path = root_db_key;
-                let l_s = branch.child_path(ChildKind::Left);
-                let r_s = branch.child_path(ChildKind::Right);
-
-                let c_pr_l = root_path.common_prefix_len(&searched_path);
-                if c_pr_l == root_path.len() {
-                    let suf_searched_path = searched_path.suffix(c_pr_l);
-                    let proof_from_level_below: Option<ProofNode<V>> =
-                        self.construct_proof(&branch, &suf_searched_path);
-
-                    if let Some(child_proof) = proof_from_level_below {
-                        let child_proof_pos = suf_searched_path.bit(0);
-                        let neighbor_child_hash = *branch.child_hash(!child_proof_pos);
-                        match child_proof_pos {
-                            ChildKind::Left => MapProof::Branch(BranchProofNode::LeftBranch {
-                                left_node: Box::new(child_proof),
-                                right_hash: neighbor_child_hash,
-                                left_key: l_s,
-                                right_key: r_s,
-                            }),
-                            ChildKind::Right => MapProof::Branch(BranchProofNode::RightBranch {
-                                left_hash: neighbor_child_hash,
-                                right_node: Box::new(child_proof),
-                                left_key: l_s,
-                                right_key: r_s,
-                            }),
-                        }
-                    } else {
-                        let l_h = *branch.child_hash(ChildKind::Left); //copy
-                        let r_h = *branch.child_hash(ChildKind::Right); //copy
-                        MapProof::Branch(BranchProofNode::BranchKeyNotFound {
-                            left_hash: l_h,
-                            right_hash: r_h,
-                            left_key: l_s,
-                            right_key: r_s,
-                        })
-                        // proof of exclusion of a key, because none of child paths is a
-                        // prefix(searched_path)
-                    }
-                } else {
-                    // if common prefix length with root_path is less than root_path length
-                    let l_h = *branch.child_hash(ChildKind::Left); //copy
-                    let r_h = *branch.child_hash(ChildKind::Right); //copy
-                    MapProof::Branch(BranchProofNode::BranchKeyNotFound {
-                        left_hash: l_h,
-                        right_hash: r_h,
-                        left_key: l_s,
-                        right_key: r_s,
-                    })
-                    // proof of exclusion of a key, because root_path != prefix(searched_path)
-                }
-            }
-            None => MapProof::Empty,
-        }
+    /// Returns the combined proof of existence or non-existence for the multiple specified keys.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::storage::{MemoryDB, Database, ProofMapIndex};
+    ///
+    /// let db = MemoryDB::new();
+    /// let snapshot = db.snapshot();
+    /// let index: ProofMapIndex<_, [u8; 32], u8> = ProofMapIndex::new("index", &snapshot);
+    ///
+    /// let proof = index.get_multiproof(vec![[0; 32], [1; 32]]);
+    /// ```
+    pub fn get_multiproof<KI>(&self, keys: KI) -> MapProof<K, V>
+    where
+        KI: IntoIterator<Item = K>,
+    {
+        create_multiproof(
+            keys,
+            self.get_root_node(),
+            |path| self.get_node_unchecked(path),
+        )
     }
 
     /// Returns an iterator over the entries of the map in ascending order. The iterator element
-    /// type is (K, V).
+    /// type is `(K::Output, V)`.
     ///
     /// # Examples
     ///
@@ -455,7 +357,7 @@ where
     }
 
     /// Returns an iterator over the keys of the map in ascending order. The iterator element
-    /// type is K.
+    /// type is `K::Output`.
     ///
     /// # Examples
     ///
@@ -480,7 +382,7 @@ where
     }
 
     /// Returns an iterator over the values of the map in ascending order of keys. The iterator
-    /// element type is V.
+    /// element type is `V`.
     ///
     /// # Examples
     ///
@@ -502,7 +404,7 @@ where
     }
 
     /// Returns an iterator over the entries of the map in ascending order starting from the
-    /// specified key. The iterator element type is (K, V).
+    /// specified key. The iterator element type is `(K::Output, V)`.
     ///
     /// # Examples
     ///
@@ -528,7 +430,7 @@ where
     }
 
     /// Returns an iterator over the keys of the map in ascending order starting from the
-    /// specified key. The iterator element type is K.
+    /// specified key. The iterator element type is `K::Output`.
     ///
     /// # Examples
     ///
@@ -554,7 +456,7 @@ where
     }
 
     /// Returns an iterator over the values of the map in ascending order of keys starting from the
-    /// specified key. The iterator element type is V.
+    /// specified key. The iterator element type is `V`.
     ///
     /// # Examples
     ///
@@ -862,7 +764,7 @@ where
     K: ProofMapKey,
     V: StorageValue,
 {
-    type Item = (K::Owned, V);
+    type Item = (K::Output, V);
     type IntoIter = ProofMapIndexIter<'a, K, V>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -875,23 +777,24 @@ where
     K: ProofMapKey,
     V: StorageValue,
 {
-    type Item = (K::Owned, V);
+    type Item = (K::Output, V);
 
     fn next(&mut self) -> Option<Self::Item> {
         self.base_iter.next().map(
-            |(k, v)| (K::read(k.raw_key()), v),
+            |(k, v)| (K::read_key(k.raw_key()), v),
         )
     }
 }
+
 
 impl<'a, K> Iterator for ProofMapIndexKeys<'a, K>
 where
     K: ProofMapKey,
 {
-    type Item = K::Owned;
+    type Item = K::Output;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.base_iter.next().map(|(k, _)| K::read(k.raw_key()))
+        self.base_iter.next().map(|(k, _)| K::read_key(k.raw_key()))
     }
 }
 
@@ -906,89 +809,74 @@ where
     }
 }
 
-#[derive(Debug)]
-enum ProofMapIndexEntry<V: StorageValue + fmt::Debug> {
-    Branch {
-        hash: Hash,
-        prefix: ProofPath,
-        left: Box<ProofMapIndexEntry<V>>,
-        right: Box<ProofMapIndexEntry<V>>,
-    },
-    Leaf {
-        key: ProofPath,
-        hash: Hash,
-        value: V,
-    },
-}
-
-impl<V: StorageValue + fmt::Debug> ProofMapIndexEntry<V> {
-    fn dump<T, K>(
-        index: &ProofMapIndex<T, K, V>,
-        root_prefix: ProofPath,
-        root_node: Node<V>,
-    ) -> ProofMapIndexEntry<V>
-    where
-        T: AsRef<Snapshot>,
-        K: ProofMapKey,
-    {
-        let merkle_root = index.merkle_root();
-        match root_node {
-            Node::Leaf(value) => ProofMapIndexEntry::Leaf {
-                key: root_prefix,
-                hash: merkle_root,
-                value,
-            },
-            Node::Branch(branch) => {
-                let left = Box::new(Self::child_node(index, &branch, ChildKind::Left));
-                let right = Box::new(Self::child_node(index, &branch, ChildKind::Right));
-                ProofMapIndexEntry::Branch {
-                    hash: merkle_root,
-                    prefix: root_prefix,
-                    left,
-                    right,
-                }
-            }
-        }
-    }
-
-    fn child_node<T, K>(
-        index: &ProofMapIndex<T, K, V>,
-        parent: &BranchNode,
-        kind: ChildKind,
-    ) -> ProofMapIndexEntry<V>
-    where
-        T: AsRef<Snapshot>,
-        K: ProofMapKey,
-    {
-        let key = parent.child_path(kind);
-        let hash = *parent.child_hash(kind);
-        let node = index.get_node_unchecked(&key);
-
-        match node {
-            Node::Leaf(value) => ProofMapIndexEntry::Leaf { key, hash, value },
-            Node::Branch(branch) => {
-                let left = Box::new(Self::child_node(index, &branch, ChildKind::Left));
-                let right = Box::new(Self::child_node(index, &branch, ChildKind::Right));
-                ProofMapIndexEntry::Branch {
-                    hash,
-                    prefix: key,
-                    left,
-                    right,
-                }
-            }
-        }
-    }
-}
-
-impl<T, K, V> ::std::fmt::Debug for ProofMapIndex<T, K, V>
+impl<T, K, V> fmt::Debug for ProofMapIndex<T, K, V>
 where
     T: AsRef<Snapshot>,
     K: ProofMapKey,
     V: StorageValue + fmt::Debug,
 {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        if let Some((prefix, node)) = self.get_root_node() {
-            let root_entry = ProofMapIndexEntry::dump(self, prefix, node);
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        struct Entry<'a, T: 'a, K: 'a, V: 'a + StorageValue> {
+            index: &'a ProofMapIndex<T, K, V>,
+            path: ProofPath,
+            hash: Hash,
+            node: Node<V>,
+        }
+
+        impl<'a, T, K, V> Entry<'a, T, K, V>
+        where
+            T: AsRef<Snapshot>,
+            K: ProofMapKey,
+            V: StorageValue,
+        {
+            fn new(index: &'a ProofMapIndex<T, K, V>, hash: Hash, path: ProofPath) -> Self {
+                Entry {
+                    index,
+                    path,
+                    hash,
+                    node: index.get_node_unchecked(&path),
+                }
+            }
+
+            fn child(&self, self_branch: &BranchNode, kind: ChildKind) -> Self {
+                Self::new(
+                    self.index,
+                    *self_branch.child_hash(kind),
+                    self_branch.child_path(kind),
+                )
+            }
+        }
+
+        impl<'a, T, K, V> fmt::Debug for Entry<'a, T, K, V>
+        where
+            T: AsRef<Snapshot>,
+            K: ProofMapKey,
+            V: StorageValue + fmt::Debug,
+        {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                match self.node {
+                    Node::Leaf(ref value) => {
+                        f.debug_struct("Leaf")
+                            .field("key", &self.path)
+                            .field("hash", &self.hash)
+                            .field("value", value)
+                            .finish()
+                    }
+                    Node::Branch(ref branch) => {
+                        f.debug_struct("Branch")
+                            .field("path", &self.path)
+                            .field("hash", &self.hash)
+                            .field("left", &self.child(branch, ChildKind::Left))
+                            .field("right", &self.child(branch, ChildKind::Right))
+                            .finish()
+                    }
+                }
+
+            }
+        }
+
+        if let Some(prefix) = self.get_root_path() {
+            let root_entry = Entry::new(self, self.merkle_root(), prefix);
             f.debug_struct("ProofMapIndex")
                 .field("entries", &root_entry)
                 .finish()

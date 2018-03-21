@@ -129,7 +129,8 @@ pub use self::sparse_list_index::SparseListIndex;
 pub use self::key_set_index::KeySetIndex;
 pub use self::value_set_index::ValueSetIndex;
 pub use self::proof_list_index::{ProofListIndex, ListProof};
-pub use self::proof_map_index::{ProofMapIndex, MapProof};
+#[doc(no_inline)]
+pub use self::proof_map_index::{ProofMapIndex, MapProof, HashedKey};
 
 /// A specialized `Result` type for I/O operations with storage.
 pub type Result<T> = ::std::result::Result<T, Error>;

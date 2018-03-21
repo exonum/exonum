@@ -26,25 +26,22 @@ use std::iter::FromIterator;
 use futures::{self, Async, Future, Stream};
 use futures::Sink;
 use futures::sync::mpsc;
-use exonum::node::{Configuration, ExternalMessage, ListenerConfig, NodeHandler, NodeSender,
-                   ServiceConfig, State, SystemStateProvider, ApiSender};
-use exonum::blockchain::{Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema,
-                         Service, SharedNodeState, StoredConfiguration, TimeoutAdjusterConfig,
-                         Transaction, ValidatorKeys};
-use exonum::storage::{MapProof, MemoryDB};
-use exonum::messages::{Any, Connect, Message, RawMessage, RawTransaction, Status};
-use exonum::crypto::{gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed};
-#[cfg(test)]
-use exonum::crypto::gen_keypair;
-use exonum::helpers::{Height, Milliseconds, Round, ValidatorId, user_agent};
-use exonum::events::{Event, InternalEvent, EventHandler, NetworkEvent, NetworkRequest,
-                     TimeoutRequest, InternalRequest};
-use exonum::events::network::NetworkConfiguration;
-use exonum::encoding::Error as MessageError;
+use node::{Configuration, ExternalMessage, ListenerConfig, NodeHandler, NodeSender, ServiceConfig,
+           State, SystemStateProvider, ApiSender};
+use blockchain::{Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
+                 SharedNodeState, StoredConfiguration, TimeoutAdjusterConfig, Transaction,
+                 ValidatorKeys};
+use storage::{MapProof, MemoryDB};
+use messages::{Any, Connect, Message, RawMessage, RawTransaction, Status};
+use crypto::{Hash, PublicKey, SecretKey, Seed, gen_keypair, gen_keypair_from_seed};
+use helpers::{Height, Milliseconds, Round, ValidatorId, user_agent};
+use events::{Event, InternalEvent, EventHandler, NetworkEvent, NetworkRequest, TimeoutRequest,
+             InternalRequest};
+use events::network::NetworkConfiguration;
 
-use timestamping::TimestampingService;
-use config_updater::ConfigUpdateService;
-use sandbox_tests_helper::VALIDATOR_0;
+use super::timestamping::TimestampingService;
+use super::config_updater::ConfigUpdateService;
+use super::sandbox_tests_helper::VALIDATOR_0;
 
 pub type SharedTime = Arc<Mutex<SystemTime>>;
 
@@ -174,28 +171,11 @@ impl Sandbox {
         self.connect = Some(connect);
     }
 
-    pub fn set_validators_map(
-        &mut self,
-        new_addresses_len: u8,
-        validators: Vec<(PublicKey, SecretKey)>,
-        services: Vec<(PublicKey, SecretKey)>,
-    ) {
-        self.addresses = (1..(new_addresses_len + 1) as u8)
-            .map(gen_primitive_socket_addr)
-            .collect::<Vec<_>>();
-        self.validators_map.extend(validators);
-        self.services_map.extend(services);
-    }
-
     fn check_unexpected_message(&self) {
         if let Some((addr, msg)) = self.inner.borrow_mut().sent.pop_front() {
             let any_msg = Any::from_raw(msg.clone()).expect("Send incorrect message");
             panic!("Send unexpected message {:?} to {}", any_msg, addr);
         }
-    }
-
-    pub fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
-        self.blockchain_ref().tx_from_raw(raw)
     }
 
     pub fn p(&self, id: ValidatorId) -> PublicKey {
@@ -205,16 +185,6 @@ impl Sandbox {
     pub fn s(&self, id: ValidatorId) -> &SecretKey {
         let p = self.p(id);
         &self.validators_map[&p]
-    }
-
-    pub fn service_public_key(&self, id: ValidatorId) -> PublicKey {
-        let id: usize = id.into();
-        self.nodes_keys()[id].service_key
-    }
-
-    pub fn service_secret_key(&self, id: ValidatorId) -> &SecretKey {
-        let public_key = self.service_public_key(id);
-        &self.services_map[&public_key]
     }
 
     pub fn a(&self, id: ValidatorId) -> SocketAddr {
@@ -230,10 +200,6 @@ impl Sandbox {
             .collect()
     }
 
-    pub fn nodes_keys(&self) -> Vec<ValidatorKeys> {
-        self.cfg().validator_keys
-    }
-
     pub fn n_validators(&self) -> usize {
         self.validators().len()
     }
@@ -247,10 +213,6 @@ impl Sandbox {
     pub fn set_time(&mut self, new_time: SystemTime) {
         let mut inner = self.inner.borrow_mut();
         *inner.time.lock().unwrap() = new_time;
-    }
-
-    pub fn node_handler(&self) -> Ref<NodeHandler> {
-        Ref::map(self.inner.borrow(), |inner| &inner.handler)
     }
 
     pub fn node_handler_mut(&self) -> RefMut<NodeHandler> {
@@ -421,10 +383,6 @@ impl Sandbox {
         self.node_state().leader(round)
     }
 
-    pub fn is_validator(&self) -> bool {
-        self.node_state().is_validator()
-    }
-
     pub fn last_block(&self) -> Block {
         self.blockchain_ref().last_block()
     }
@@ -509,8 +467,11 @@ impl Sandbox {
         *Schema::new(&fork).last_block().state_hash()
     }
 
-
-    pub fn get_proof_to_service_table(&self, service_id: u16, table_idx: usize) -> MapProof<Hash> {
+    pub fn get_proof_to_service_table(
+        &self,
+        service_id: u16,
+        table_idx: usize,
+    ) -> MapProof<Hash, Hash> {
         let snapshot = self.blockchain_ref().snapshot();
         let schema = Schema::new(&snapshot);
         schema.get_proof_to_service_table(service_id, table_idx)
@@ -526,12 +487,6 @@ impl Sandbox {
         let snapshot = self.blockchain_ref().snapshot();
         let schema = Schema::new(&snapshot);
         schema.actual_configuration()
-    }
-
-    pub fn following_cfg(&self) -> Option<StoredConfiguration> {
-        let snapshot = self.blockchain_ref().snapshot();
-        let schema = Schema::new(&snapshot);
-        schema.following_configuration()
     }
 
     pub fn propose_timeout(&self) -> Milliseconds {
@@ -849,15 +804,14 @@ pub fn timestamping_sandbox() -> Sandbox {
 
 #[cfg(test)]
 mod tests {
-    use exonum::blockchain::{ServiceContext, ExecutionResult, TransactionSet};
-    use exonum::messages::RawTransaction;
-    use exonum::encoding;
-    use exonum::crypto::{gen_keypair_from_seed, Seed};
-    use exonum::storage::{Fork, Snapshot};
-
-    use sandbox_tests_helper::{add_one_height, SandboxState, VALIDATOR_1, VALIDATOR_2,
-                               VALIDATOR_3, HEIGHT_ONE, ROUND_ONE, ROUND_TWO};
     use super::*;
+    use blockchain::{ServiceContext, ExecutionResult, TransactionSet};
+    use messages::RawTransaction;
+    use encoding;
+    use crypto::{gen_keypair_from_seed, Seed};
+    use storage::{Fork, Snapshot};
+    use sandbox::sandbox_tests_helper::{add_one_height, SandboxState, VALIDATOR_1, VALIDATOR_2,
+                                        VALIDATOR_3, HEIGHT_ONE, ROUND_ONE, ROUND_TWO};
 
     const SERVICE_ID: u16 = 1;
 

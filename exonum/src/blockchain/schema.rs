@@ -322,10 +322,14 @@ where
     /// `Service` trait
     /// * `table_idx` - index of service table in `Vec`, returned by
     /// `state_hash` method of instance of type of `Service` trait
-    pub fn get_proof_to_service_table(&self, service_id: u16, table_idx: usize) -> MapProof<Hash> {
+    pub fn get_proof_to_service_table(
+        &self,
+        service_id: u16,
+        table_idx: usize,
+    ) -> MapProof<Hash, Hash> {
         let key = Blockchain::service_table_unique_key(service_id, table_idx);
         let sum_table = self.state_hash_aggregator();
-        sum_table.get_proof(&key)
+        sum_table.get_proof(key)
     }
 
     fn find_configurations_index_by_height(&self, height: Height) -> u64 {
