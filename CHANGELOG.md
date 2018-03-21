@@ -53,7 +53,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `events` module becomes private. (#568)
 
-- `CryptoHash` trait is no longer implemented for `Hash`. (#579) 
+- `CryptoHash` trait is no longer implemented for `Hash`. (#579)
 
 #### exonum-testkit
 
