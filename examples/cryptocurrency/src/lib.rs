@@ -37,15 +37,6 @@ extern crate router;
 extern crate bodyparser;
 extern crate iron;
 
-/// Constants.
-pub mod constants {
-    /// Service ID for the `Service` trait.
-    pub const SERVICE_ID: u16 = 1;
-
-    /// Initial balance of a newly created wallet.
-    pub const INIT_BALANCE: u64 = 100;
-}
-
 /// Persistent data.
 pub mod schema {
     use exonum::storage::{Fork, MapIndex, Snapshot};
@@ -125,7 +116,7 @@ pub mod schema {
 pub mod transactions {
     use exonum::crypto::PublicKey;
 
-    use constants::SERVICE_ID;
+    use service::SERVICE_ID;
 
     transactions! {
         pub(crate) CurrencyTransactions {
@@ -208,10 +199,12 @@ pub mod contracts {
     use exonum::messages::Message;
     use exonum::storage::Fork;
 
-    use constants::INIT_BALANCE;
     use schema::{Wallet, CurrencySchema};
     use transactions::{TxCreateWallet, TxTransfer};
     use errors::Error;
+
+    /// Initial balance of a newly created wallet.
+    const INIT_BALANCE: u64 = 100;
 
     impl Transaction for TxCreateWallet {
         /// Verifies integrity of the transaction by checking the transaction
@@ -408,9 +401,11 @@ pub mod service {
     use iron::Handler;
     use router::Router;
 
-    use constants::SERVICE_ID;
     use transactions::CurrencyTransactions;
     use api::CryptocurrencyApi;
+
+    /// Service ID for the `Service` trait.
+    pub const SERVICE_ID: u16 = 1;
 
     /// Demo cryptocurrency service.
     ///
