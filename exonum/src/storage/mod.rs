@@ -131,6 +131,7 @@ pub use self::value_set_index::ValueSetIndex;
 pub use self::proof_list_index::{ProofListIndex, ListProof};
 #[doc(no_inline)]
 pub use self::proof_map_index::{ProofMapIndex, MapProof, HashedKey};
+pub use self::hash::UniqueHash;
 
 /// A specialized `Result` type for I/O operations with storage.
 pub type Result<T> = ::std::result::Result<T, Error>;
@@ -140,11 +141,10 @@ mod db;
 mod options;
 mod rocksdb;
 mod memorydb;
-
 mod keys;
 mod values;
-
 mod entry;
+mod hash;
 
 pub mod base_index;
 mod indexes_metadata;
