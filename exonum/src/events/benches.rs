@@ -18,6 +18,7 @@ use std::net::SocketAddr;
 use std::thread;
 
 use test::Bencher;
+
 use node::EventsPoolCapacity;
 use events::network::NetworkConfiguration;
 use events::tests::{connect_message, raw_message, TestEvents};

@@ -67,6 +67,8 @@ extern crate bodyparser;
 
 // Test dependencies.
 #[cfg(test)]
+extern crate test;
+#[cfg(test)]
 #[macro_use]
 extern crate lazy_static;
 #[cfg(test)]

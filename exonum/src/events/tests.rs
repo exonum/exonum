@@ -169,8 +169,7 @@ impl TestEvents {
             network_tx: network_tx.clone(),
         };
 
-        let handler_part =
-            TestHandler::new(self.listen_address, network_requests_tx, network_rx);
+        let handler_part = TestHandler::new(self.listen_address, network_requests_tx, network_rx);
         (handler_part, network_part)
     }
 }
