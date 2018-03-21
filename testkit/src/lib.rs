@@ -389,12 +389,13 @@ impl TestKit {
     }
 
     /// Sets a checkpoint for future [`rollback`](#method.rollback).
-    /// There can be only one checkpoint at a time.
+    /// There can be any number of checkpoints at the time.
+    /// Rollbacks happen to the latest checkpoint.
     pub fn checkpoint(&mut self) {
         self.db_handler.checkpoint();
     }
 
-    /// Rolls the blockchain back to the [`checkpoint`](#method.checkpoint) set before.
+    /// Rolls the blockchain back to the last [`checkpoint`](#method.checkpoint) set.
     ///
     /// # Examples
     ///
