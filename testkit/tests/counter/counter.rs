@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -75,7 +75,7 @@ impl<'a> CounterSchema<&'a mut Fork> {
 // // // // Transactions // // // //
 
 transactions! {
-    CounterTransactions {
+    pub CounterTransactions {
         const SERVICE_ID = SERVICE_ID;
 
         struct TxIncrement {
@@ -144,6 +144,7 @@ struct CounterApi {
 
 impl CounterApi {
     fn increment(&self, req: &mut Request) -> IronResult<Response> {
+        trace!("received increment tx");
         match req.get::<bodyparser::Struct<TxIncrement>>() {
             Ok(Some(transaction)) => {
                 let transaction: Box<Transaction> = Box::new(transaction);

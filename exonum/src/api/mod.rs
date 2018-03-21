@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ use serde_json;
 use serde::{Serialize, Serializer};
 use serde::de::{self, Visitor, Deserialize, Deserializer};
 use failure::Fail;
+use bodyparser;
 
 use crypto::{PublicKey, SecretKey};
 use encoding::serialize::{FromHex, FromHexError, ToHex, encode_hex};
@@ -226,6 +227,18 @@ pub trait Api {
         self.optional_param(request, name)?.ok_or_else(|| {
             ApiError::BadRequest(format!("Required parameter '{}' is missing", name))
         })
+    }
+
+    /// Deserializes request's body as a struct of type `T`.
+    fn parse_body<T: 'static>(&self, req: &mut Request) -> Result<T, ApiError>
+    where
+        T: Clone + for<'de> Deserialize<'de>,
+    {
+        match req.get::<bodyparser::Struct<T>>() {
+            Ok(Some(param)) => Ok(param),
+            Ok(None) => Err(ApiError::BadRequest("Body is empty".into())),
+            Err(e) => Err(ApiError::BadRequest(format!("Invalid struct: {}", e))),
+        }
     }
 
     /// Loads hex value from the cookies.

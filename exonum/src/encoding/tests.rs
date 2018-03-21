@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![allow(unsafe_code)]
+
 use std::net::SocketAddr;
-use std::time::SystemTime;
 
 use bit_vec::BitVec;
+use chrono::Utc;
 
 use crypto::{hash, gen_keypair};
 use blockchain::{self, BlockProof, Block};
@@ -246,7 +248,7 @@ fn test_connect() {
     use std::str::FromStr;
 
     let socket_address = SocketAddr::from_str("18.34.3.4:7777").unwrap();
-    let time = SystemTime::now();
+    let time = Utc::now();
     let (public_key, secret_key) = gen_keypair();
 
     // write
@@ -313,7 +315,7 @@ fn test_precommit() {
     let propose_hash = hash(&[1, 2, 3]);
     let block_hash = hash(&[3, 2, 1]);
     let (public_key, secret_key) = gen_keypair();
-    let time = SystemTime::now();
+    let time = Utc::now();
 
     // write
     let precommit = Precommit::new(
@@ -356,7 +358,7 @@ fn test_status() {
 #[test]
 fn test_block() {
     let (pub_key, secret_key) = gen_keypair();
-    let ts = SystemTime::now();
+    let ts = Utc::now();
     let txs = [2];
     let tx_count = txs.len() as u32;
 

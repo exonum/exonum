@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -35,6 +35,6 @@ fn test_handle_commit() {
     for i in 1..5 {
         testkit.create_block();
         let tx = TxAfterCommit::new_with_signature(Height(i), &Signature::zero());
-        assert!(testkit.mempool().contains_key(&tx.hash()));
+        assert!(testkit.is_tx_in_pool(&tx.hash()));
     }
 }

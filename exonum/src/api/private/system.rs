@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,14 +25,14 @@ use blockchain::{Service, Blockchain, SharedNodeState};
 use api::{Api, ApiError};
 use messages::{TEST_NETWORK_ID, PROTOCOL_MAJOR_VERSION};
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 struct ServiceInfo {
     name: String,
     id: u16,
 }
 
 /// `DTO` is used to transfer information about node.
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NodeInfo {
     network_id: u8,
     protocol_version: u8,
@@ -154,8 +154,13 @@ impl SystemApi {
 
     fn handle_peer_add(self, router: &mut Router) {
         let peer_add = move |request: &mut Request| -> IronResult<Response> {
-            let address: SocketAddr = self.required_param(request, "ip")?;
-            self.node_channel.peer_add(address).map_err(ApiError::from)?;
+            #[derive(Serialize, Deserialize, Clone, Debug)]
+            struct PeerAddInfo {
+                ip: SocketAddr,
+            }
+
+            let PeerAddInfo { ip } = self.parse_body(request)?;
+            self.node_channel.peer_add(ip).map_err(ApiError::from)?;
             self.ok_response(&serde_json::to_value("Ok").unwrap())
         };
 
@@ -186,7 +191,12 @@ impl SystemApi {
 
     fn handle_set_consensus_enabled(self, router: &mut Router) {
         let consensus_enabled_set = move |request: &mut Request| -> IronResult<Response> {
-            let enabled: bool = self.required_param(request, "enabled")?;
+            #[derive(Serialize, Deserialize, Clone, Debug)]
+            struct EnabledInfo {
+                enabled: bool,
+            }
+
+            let EnabledInfo { enabled } = self.parse_body(request)?;
             let message = ExternalMessage::Enable(enabled);
             self.node_channel.send_external_message(message).map_err(
                 ApiError::from,

@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -87,6 +87,7 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
                 api: Default::default(),
                 mempool: Default::default(),
                 services_configs: Default::default(),
+                database: Some(Default::default()),
             }
         })
         .collect::<Vec<_>>()

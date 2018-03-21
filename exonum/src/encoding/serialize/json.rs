@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,13 +21,14 @@
 // TODO remove WriteBufferWrapper hack (after refactor storage),
 // should be moved into storage (ECR-156).
 
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::net::SocketAddr;
 use std::error::Error;
 
+use serde_json;
 use serde_json::value::Value;
 use bit_vec::BitVec;
 use hex::FromHex;
+use chrono::{DateTime, Utc, TimeZone};
 
 use crypto::{Hash, PublicKey, Signature};
 use helpers::{Height, Round, ValidatorId};
@@ -78,10 +79,11 @@ pub trait ExonumJsonDeserialize {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct DurationHelper {
+struct TimestampHelper {
     secs: String,
     nanos: u32,
 }
+
 // implementation of deserialization
 macro_rules! impl_deserialize_int {
     (@impl $typename:ty) => {
@@ -192,27 +194,25 @@ impl<'a> ExonumJson for &'a str {
     }
 }
 
-impl ExonumJson for SystemTime {
+impl ExonumJson for DateTime<Utc> {
     fn deserialize_field<B: WriteBufferWrapper>(
         value: &Value,
         buffer: &mut B,
         from: Offset,
         to: Offset,
     ) -> Result<(), Box<Error>> {
-        let helper: DurationHelper = ::serde_json::from_value(value.clone())?;
-        let duration = Duration::new(helper.secs.parse()?, helper.nanos);
-        let system_time = UNIX_EPOCH + duration;
-        buffer.write(from, to, system_time);
+        let helper: TimestampHelper = ::serde_json::from_value(value.clone())?;
+        let date_time = Utc.timestamp(helper.secs.parse()?, helper.nanos);
+        buffer.write(from, to, date_time);
         Ok(())
     }
 
     fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
-        let duration = self.duration_since(UNIX_EPOCH)?;
-        let duration = DurationHelper {
-            secs: duration.as_secs().to_string(),
-            nanos: duration.subsec_nanos(),
+        let timestamp = TimestampHelper {
+            secs: self.timestamp().to_string(),
+            nanos: self.timestamp_subsec_nanos(),
         };
-        Ok(::serde_json::to_value(&duration)?)
+        Ok(serde_json::to_value(&timestamp)?)
     }
 }
 
@@ -229,7 +229,7 @@ impl ExonumJson for SocketAddr {
     }
 
     fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
-        Ok(::serde_json::to_value(&self)?)
+        Ok(serde_json::to_value(&self)?)
     }
 }
 

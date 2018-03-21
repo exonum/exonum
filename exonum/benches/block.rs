@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,37 +23,63 @@ extern crate test;
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-
     use tempdir::TempDir;
     use futures::sync::mpsc;
     use test::Bencher;
-    use exonum::storage::{Database, Fork, Patch, ProofMapIndex, RocksDB, RocksDBOptions};
-    use exonum::blockchain::{Blockchain, Transaction, ExecutionResult};
+    use exonum::storage::{Database, Fork, Patch, ProofMapIndex, RocksDB, DbOptions, Snapshot};
+    use exonum::blockchain::{ExecutionResult, Blockchain, Transaction, Schema, Service};
     use exonum::crypto::{gen_keypair, CryptoHash, Hash, PublicKey, SecretKey};
-    use exonum::messages::Message;
+    use exonum::messages::{Message, RawTransaction};
+    use exonum::encoding::Error as EncodingError;
     use exonum::helpers::{Height, ValidatorId};
     use exonum::node::ApiSender;
 
-    fn create_blockchain(db: Box<Database>) -> Blockchain {
+    const TIMESTAMPING_SERVICE_ID: u16 = 1;
+    const CRYPTOCURRENCY_SERVICE_ID: u16 = 255;
+
+    fn create_blockchain(db: Box<Database>, services: Vec<Box<Service>>) -> Blockchain {
         let dummy_channel = mpsc::channel(1);
         let dummy_keypair = (PublicKey::zero(), SecretKey::zero());
         Blockchain::new(
             db,
-            Vec::new(),
+            services,
             dummy_keypair.0,
             dummy_keypair.1,
             ApiSender::new(dummy_channel.0),
         )
     }
 
+    fn execute_block(blockchain: &Blockchain, height: u64, txs: &[Hash]) -> Patch {
+        blockchain
+            .create_patch(ValidatorId::zero(), Height(height), txs)
+            .1
+    }
+
     fn execute_timestamping(db: Box<Database>, b: &mut Bencher) {
-        let mut blockchain = create_blockchain(db);
+
+        struct Timestamping;
+
+        impl Service for Timestamping {
+            fn service_id(&self) -> u16 {
+                TIMESTAMPING_SERVICE_ID
+            }
+
+            fn service_name(&self) -> &'static str {
+                "timestamping"
+            }
+
+            fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+                Vec::new()
+            }
+
+            fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, EncodingError> {
+                Ok(Box::new(Tx::from_raw(raw)?))
+            }
+        }
 
         transactions! {
-            Transactions {
-                const SERVICE_ID = 1;
-
+            TimestampingTransactions {
+                const SERVICE_ID = TIMESTAMPING_SERVICE_ID;
                 struct Tx {
                     from: &PublicKey,
                     data: &Hash,
@@ -71,48 +97,58 @@ mod tests {
             }
         }
 
-        fn prepare_txs(height: u64, count: u64) -> (Vec<Hash>, BTreeMap<Hash, Box<Transaction>>) {
-            let (pub_key, sec_key) = gen_keypair();
+        fn prepare_txs(blockchain: &mut Blockchain, height: u64, count: u64) -> Vec<Hash> {
+            let mut fork = blockchain.fork();
             let mut txs = Vec::new();
-            let mut pool = BTreeMap::new();
-            for i in (height * count)..((height + 1) * count) {
-                let tx = Tx::new(&pub_key, &i.hash(), &sec_key);
-                let tx_hash = Transaction::hash(&tx);
-                txs.push(tx_hash);
-                pool.insert(tx_hash, Box::new(tx) as Box<Transaction>);
+            {
+                let mut schema = Schema::new(&mut fork);
+                let (pub_key, sec_key) = gen_keypair();
+                for i in (height * count)..((height + 1) * count) {
+                    let tx = Tx::new(&pub_key, &i.hash(), &sec_key);
+                    let tx_hash = Transaction::hash(&tx);
+                    txs.push(tx_hash);
+                    schema.add_transaction_into_pool(tx.raw().clone());
+                }
             }
-            (txs, pool)
+            blockchain.merge(fork.into_patch()).unwrap();
+            txs
         }
-
-        fn execute_block(
-            blockchain: &Blockchain,
-            height: u64,
-            txs: &[Hash],
-            pool: &BTreeMap<Hash, Box<Transaction>>,
-        ) -> Patch {
-            blockchain
-                .create_patch(ValidatorId::zero(), Height(height), txs, pool)
-                .1
-        }
-
+        let mut blockchain = create_blockchain(db, vec![Box::new(Timestamping)]);
         for i in 0..100 {
-            let (txs, pool) = prepare_txs(i, 1000);
-            let patch = execute_block(&blockchain, i, &txs, &pool);
+            let txs = prepare_txs(&mut blockchain, i, 1000);
+            let patch = execute_block(&blockchain, i, &txs);
             blockchain.merge(patch).unwrap();
         }
 
-        let (txs, pool) = prepare_txs(100, 1000);
+        let txs = prepare_txs(&mut blockchain, 100, 1000);
 
-        b.iter(|| execute_block(&blockchain, 100, &txs, &pool));
+        b.iter(|| execute_block(&blockchain, 100, &txs));
     }
 
     fn execute_cryptocurrency(db: Box<Database>, b: &mut Bencher) {
-        let mut blockchain = create_blockchain(db);
+        struct Cryptocurrency;
+
+        impl Service for Cryptocurrency {
+            fn service_id(&self) -> u16 {
+                255
+            }
+
+            fn service_name(&self) -> &'static str {
+                "cryptocurrency"
+            }
+
+            fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+                Vec::new()
+            }
+
+            fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, EncodingError> {
+                Ok(Box::new(Tx::from_raw(raw)?))
+            }
+        }
 
         transactions! {
-            Transactions {
-                const SERVICE_ID = 1;
-
+            CryptocurrencyTransactions {
+                const SERVICE_ID = CRYPTOCURRENCY_SERVICE_ID;
                 struct Tx {
                     from: &PublicKey,
                     to: &PublicKey,
@@ -125,8 +161,8 @@ mod tests {
                 self.verify_signature(self.from())
             }
 
-            fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-                let mut index = ProofMapIndex::new("balances_txs", fork);
+            fn execute(&self, view: &mut Fork) -> ExecutionResult {
+                let mut index = ProofMapIndex::new("balances_txs", view);
                 let from_balance = index.get(self.from()).unwrap_or(0u64);
                 let to_balance = index.get(self.to()).unwrap_or(0u64);
                 index.put(self.from(), from_balance - 1);
@@ -135,57 +171,51 @@ mod tests {
             }
         }
 
+        fn prepare_txs(
+            blockchain: &mut Blockchain,
+            height: u64,
+            count: u64,
+            keys: &[(PublicKey, SecretKey)],
+        ) -> Vec<Hash> {
+            let mut fork = blockchain.fork();
+            let mut txs = Vec::new();
+            {
+                let mut schema = Schema::new(&mut fork);
+                for i in (height * count)..((height + 1) * count) {
+                    let tx = Tx::new(
+                        &keys[i as usize % 10_000].0,
+                        &keys[(i as usize + 3_456) % 10_000].0,
+                        &keys[i as usize % 10_000].1,
+                    );
+                    let tx_hash = Transaction::hash(&tx);
+                    txs.push(tx_hash);
+                    schema.add_transaction_into_pool(tx.raw().clone());
+                }
+            }
+            blockchain.merge(fork.into_patch()).unwrap();
+            txs
+        }
+
+
+        let mut blockchain = create_blockchain(db, vec![Box::new(Cryptocurrency)]);
         let mut keys = Vec::new();
 
         for _ in 0..10_000 {
             keys.push(gen_keypair());
         }
-
-        fn prepare_txs(
-            height: u64,
-            count: u64,
-            keys: &[(PublicKey, SecretKey)],
-        ) -> (Vec<Hash>, BTreeMap<Hash, Box<Transaction>>) {
-            let mut txs = Vec::new();
-            let mut pool = BTreeMap::new();
-            for i in (height * count)..((height + 1) * count) {
-                let tx = Tx::new(
-                    &keys[i as usize % 10_000].0,
-                    &keys[(i as usize + 3_456) % 10_000].0,
-                    &keys[i as usize % 10_000].1,
-                );
-                let tx_hash = Transaction::hash(&tx);
-                txs.push(tx_hash);
-                pool.insert(tx_hash, Box::new(tx) as Box<Transaction>);
-            }
-            (txs, pool)
-        }
-
-        fn execute_block(
-            blockchain: &Blockchain,
-            height: u64,
-            txs: &[Hash],
-            pool: &BTreeMap<Hash, Box<Transaction>>,
-        ) -> Patch {
-            blockchain
-                .create_patch(ValidatorId::zero(), Height(height), txs, pool)
-                .1
-        }
-
         for i in 0..100 {
-            let (txs, pool) = prepare_txs(i, 1000, &keys);
-            let patch = execute_block(&blockchain, i, &txs, &pool);
+            let txs = prepare_txs(&mut blockchain, i, 1000, &keys);
+            let patch = execute_block(&blockchain, i, &txs);
             blockchain.merge(patch).unwrap();
         }
 
-        let (txs, pool) = prepare_txs(100, 1000, &keys);
+        let txs = prepare_txs(&mut blockchain, 100, 1000, &keys);
 
-        b.iter(|| execute_block(&blockchain, 100, &txs, &pool));
+        b.iter(|| execute_block(&blockchain, 100, &txs));
     }
 
     fn create_rocksdb(tempdir: &TempDir) -> Box<Database> {
-        let mut options = RocksDBOptions::default();
-        options.create_if_missing(true);
+        let options = DbOptions::default();
         let db = Box::new(RocksDB::open(tempdir.path(), &options).unwrap());
         db as Box<Database>
     }

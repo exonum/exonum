@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -44,9 +44,9 @@ use events::{HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkC
              NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest};
 use events::error::{into_other, log_error, other_error, LogError};
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
-use storage::Database;
+use storage::{Database, DbOptions};
 
-pub use self::state::{RequestData, State, TxPool, ValidatorState};
+pub use self::state::{RequestData, State, ValidatorState};
 pub use self::whitelist::Whitelist;
 
 mod events;
@@ -343,6 +343,8 @@ pub struct NodeConfig {
     pub mempool: MemoryPoolConfig,
     /// Additional config, usable for services.
     pub services_configs: BTreeMap<String, Value>,
+    /// Optional database configuration.
+    pub database: Option<DbOptions>,
 }
 
 /// Configuration for the `NodeHandler`.
@@ -403,7 +405,7 @@ impl NodeHandler {
         let connect = Connect::new(
             &config.listener.consensus_public_key,
             external_address,
-            system_state.current_time(),
+            system_state.current_time().into(),
             &user_agent::get(),
             &config.listener.consensus_secret_key,
         );
@@ -882,7 +884,6 @@ impl Node {
             Some(listen_address) => {
                 let handler = create_public_api_handler(
                     blockchain,
-                    Arc::clone(self.state().transactions()),
                     self.handler.api_state().clone(),
                     &self.api_options,
                 );
@@ -915,7 +916,7 @@ impl Node {
             our_connect_message: connect_message,
             listen_address: self.handler.system_state.listen_address(),
             network_requests: self.channel.network_requests,
-            network_tx: network_tx,
+            network_tx,
             network_config: self.network_config,
             max_message_len: self.max_message_len,
         };
@@ -960,7 +961,6 @@ impl Node {
 #[doc(hidden)]
 pub fn create_public_api_handler(
     blockchain: Blockchain,
-    pool: TxPool,
     shared_api_state: SharedNodeState,
     config: &NodeApiConfig,
 ) -> Chain {
@@ -969,13 +969,13 @@ pub fn create_public_api_handler(
 
     if config.enable_blockchain_explorer {
         let mut router = Router::new();
-        let explorer_api = public::ExplorerApi::new(Arc::clone(&pool), blockchain.clone());
+        let explorer_api = public::ExplorerApi::new(blockchain.clone());
         explorer_api.wire(&mut router);
         mount.mount("api/explorer", router);
     }
 
     let mut router = Router::new();
-    let system_api = public::SystemApi::new(pool, blockchain, shared_api_state);
+    let system_api = public::SystemApi::new(blockchain, shared_api_state);
     system_api.wire(&mut router);
     mount.mount("api/system", router);
 

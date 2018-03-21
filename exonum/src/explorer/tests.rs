@@ -127,16 +127,23 @@ fn create_blockchain() -> Blockchain {
 // Simplified compared to real life / testkit, but we don't need to test *everything*
 // here.
 fn create_block(blockchain: &mut Blockchain, transactions: Vec<Box<Transaction>>) {
-    use std::collections::BTreeMap;
     use std::time::SystemTime;
     use helpers::{Round, ValidatorId};
     use messages::Propose;
 
     let tx_hashes: Vec<_> = transactions.iter().map(|tx| tx.hash()).collect();
-    let pool: BTreeMap<_, _> = transactions.into_iter().map(|tx| (tx.hash(), tx)).collect();
     let height = blockchain.last_block().height().next();
 
-    let (block_hash, patch) = blockchain.create_patch(ValidatorId(0), height, &tx_hashes, &pool);
+    let mut fork = blockchain.fork();
+    {
+        let mut schema = Schema::new(&mut fork);
+        for tx in transactions {
+            schema.add_transaction_into_pool(tx.raw().clone())
+        }
+    }
+    blockchain.merge(fork.into_patch()).unwrap();
+
+    let (block_hash, patch) = blockchain.create_patch(ValidatorId(0), height, &tx_hashes);
     let (_, consensus_secret_key) = consensus_keys();
 
     let propose = Propose::new(
@@ -153,7 +160,7 @@ fn create_block(blockchain: &mut Blockchain, transactions: Vec<Box<Transaction>>
         propose.round(),
         &propose.hash(),
         &block_hash,
-        SystemTime::now(),
+        SystemTime::now().into(),
         &consensus_secret_key,
     );
 
@@ -206,7 +213,10 @@ fn test_explorer_basics() {
     assert_eq!(tx_info.status(), Ok(()));
     assert_eq!(tx_info.content().raw(), tx_alice.raw());
 
-    let tx_info = explorer.transaction(&tx_alice.hash()).unwrap();
+    let tx_info = match explorer.transaction(&tx_alice.hash()) {
+        Some(TxInfo::Committed(info)) => info,
+        tx => panic!("{:?}", tx),
+    };
     assert_eq!(*tx_info.location(), TxLocation::new(Height(1), 0));
     assert_eq!(
         serde_json::to_value(&tx_info).unwrap(),

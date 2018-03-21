@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ use blockchain::config::ValidatorKeys;
 use helpers::generate_testnet_config;
 use helpers::config::ConfigFile;
 use node::{NodeApiConfig, NodeConfig};
-use storage::Database;
+use storage::{Database, RocksDB, DbOptions};
 use crypto;
 use super::internal::{CollectedCommand, Command, Feedback};
 use super::{Argument, CommandName, Context};
@@ -52,16 +52,12 @@ impl Run {
     }
 
     /// Returns created database instance.
-    pub fn db_helper(ctx: &Context) -> Box<Database> {
-        use storage::{RocksDB, RocksDBOptions};
-
+    pub fn db_helper(ctx: &Context, options: &DbOptions) -> Box<Database> {
         let path = ctx.arg::<String>(DATABASE_PATH).expect(&format!(
             "{} not found.",
             DATABASE_PATH
         ));
-        let mut options = RocksDBOptions::default();
-        options.create_if_missing(true);
-        Box::new(RocksDB::open(Path::new(&path), &options).unwrap())
+        Box::new(RocksDB::open(Path::new(&path), options).unwrap())
     }
 
     fn node_config(ctx: &Context) -> NodeConfig {
@@ -417,7 +413,7 @@ impl Command for GenerateNodeConfig {
         };
         let shared_config = SharedConfig {
             node: node_pub_config,
-            common: common,
+            common,
         };
         // Save public config separately.
         ConfigFile::save(&shared_config, &pub_config_path).expect(
@@ -572,12 +568,12 @@ impl Command for Finalize {
                 external_address: our.map(|o| o.addr),
                 network: Default::default(),
                 whitelist: Default::default(),
-                peers: peers,
+                peers,
                 consensus_public_key: secret_config.consensus_public_key,
                 consensus_secret_key: secret_config.consensus_secret_key,
                 service_public_key: secret_config.service_public_key,
                 service_secret_key: secret_config.service_secret_key,
-                genesis: genesis,
+                genesis,
                 api: NodeApiConfig {
                     public_api_address: public_addr,
                     private_api_address: private_addr,
@@ -585,6 +581,7 @@ impl Command for Finalize {
                 },
                 mempool: Default::default(),
                 services_configs: Default::default(),
+                database: Some(Default::default()),
             }
         };
 

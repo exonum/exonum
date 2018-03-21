@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,8 +26,9 @@
 //!     * processing - how message is processed and result of the processing
 //!     * generation - in which cases message is generated
 
+use chrono::{DateTime, Utc};
+
 use std::net::SocketAddr;
-use std::time::SystemTime;
 
 use crypto::{Hash, PublicKey};
 use blockchain;
@@ -85,7 +86,7 @@ messages! {
         /// The node's address.
         addr: SocketAddr,
         /// Time when the message was created.
-        time: SystemTime,
+        time: DateTime<Utc>,
         /// String containing information about this node including Exonum, Rust and OS versions.
         user_agent: &str,
     }
@@ -205,7 +206,7 @@ messages! {
         /// Hash of the new block.
         block_hash: &Hash,
         /// Time of the `Precommit`.
-        time: SystemTime,
+        time: DateTime<Utc>,
     }
 
     /// Information about a block.

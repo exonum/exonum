@@ -7,6 +7,105 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Breaking changes
 
+#### Exonum core
+
+- POST-requests are now handled with `bodyparser` crate,
+  so all the parameters must be passed in the body. (#529)
+
+- `ProofListIndex` and `ProofMapIndex` `root_hash` method has been renamed to
+  `merkle_root`. (#547)
+
+- Proofs of existence / absence for `ProofMapIndex`s have been reworked.
+  They now have a linear structure with two components: key-value pairs,
+  and additional *proof* information allowing to restore the Merkle root
+  of the entire index. `MapProof` interface has been reworked
+  correspondingly. (#380)
+
+  Migration path:
+
+  - Consult documents for the updated workflow for creation and verification
+    of `MapProof`s.
+  - See the README in the `storage::proof_map_index` module for theoretical
+    details about the new proof structure.
+
+- `with_prefix` constructor of all index types has been renamed to
+  `new_in_family`. Now it uses `index_id` instead of prefixes. Moreover,
+  `blockchain::gen_prefix` method has been removed. Instead, any type that
+  implements `StorageKey` trait, can serve as an `index_id`. (#531)
+
+- Several `Schema`'s methods have been renamed:
+  - `tx_location_by_tx_hash` to `transactions_locations`.
+  - `block_txs` to `block_transactions`.
+
+- `SystemTime` previously used as storage key or value turned out to show
+  different behavior on different platforms and, hence, has been replaced with
+  `chrono::DateTime<Utc>` that behaves the same in any environment.
+
+  Migration path:
+
+  - Replace all `SystemTime` fields with `chrono::DateTime<Utc>` ones.
+  - Use `DateTime::from` and `into()` methods to convert your existing
+  `SystemTime` instances into suitable type when constructing transactions or
+  working with database.
+
+#### exonum-testkit
+
+- Testkit api now contains two methods to work with the transaction pool:
+  - `is_tx_in_pool` - for checking transaction existence in the pool;
+  - `add_tx` - for adding a new transaction into the pool.
+
+  Migration path:
+
+  - Instead of calling `mempool()`, one should use `is_tx_in_pool`
+  or `add_tx` methods.
+
+#### exonum-configuration
+
+- `majority_count: Option<u16>` configuration parameter is introduced.
+  Allows to increase the threshold amount of votes required to commit
+  a new configuration proposal. By default the number of votes is calculated
+  as 2/3 + 1 of total validators count. (#546)
+
+#### exonum-time
+
+- `SystemTime` has been replaced with `chrono::DateTime<Utc>`, as it provides
+  more predictable behavior on all systems.
+
+### New features
+
+#### Exonum core
+
+- New `database` field added to the `NodeConfig`.
+  This optional setting adjusts database-specific settings,
+  like number of simultaneously opened files. (#538)
+
+- `exonum::explorer` module moved to the `exonum::api::public`. (#550)
+
+  Migration Path:
+
+  - Rename imports like `exonum::explorer::*` to the `exonum::api::public::*`.
+
+- Added `v1/user_agent` endpoint with information about Exonum, Rust
+  and OS versions. (#548)
+
+- `ProofMapIndex` now allows to retrieve a proof of presence / absence for an
+  arbitrary number of elements at one time with the help of `get_multiproof`
+  method. Correspondingly, `MapProof` allows to verify proofs for an arbitrary
+  number of elements. (#380)
+
+### Internal improvements
+
+#### Exonum core
+
+- Non-committed transactions are now stored persistently in the storage
+  instead of memory pool. (#549)
+
+## 0.6 - 2018-03-06
+
+### Breaking changes
+
+#### Exonum core
+
 - `exonum::crypto::CryptoHash` trait is introduced, and `StorageValue::hash`
   and `Message::hash` methods are removed. (#442)
 
@@ -87,7 +186,56 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - Just pass database argument as is, for example instead of
     `Box::new(MemoryDb::new())` use `MemoryDb::new()`.
 
+#### exonum-configuration
+
+- Most types renamed to avoid stuttering (see [here][stuttering] for
+  an explanation of the term) (#496):
+
+  - `ConfigurationService` to `Service`
+  - `ConfigurationServiceFactory` to `ServiceFactory`
+  - `TxConfigPropose` to `Propose`
+  - `TxConfigVote` to `Vote`
+  - `ConfigurationSchema` to `Schema`
+  - `StorageValueConfigProposeData` to `ProposeData`
+  - `CONFIG_SERVICE` constant to `SERVICE_ID`
+
+  Check the crate documentation for more details.
+
+  **Migration path:** Rename imported types from the crate, using aliases
+  or qualified names if necessary: `use exonum_configuration::Service as ConfigService`.
+
+[stuttering]: https://doc.rust-lang.org/1.0.0/style/style/naming/README.html#avoid-redundant-prefixes-[rfc-356]
+
+- Multiple APIs are no longer public (#496):
+
+  - Message identifiers
+  - Mutating methods of the service schema
+  - Module implementing HTTP API of the service
+
+  Check the crate documentation for more details.
+
+  **Migration path:** The restrictions are security-based and should not
+  influence intended service use.
+
+<!-- cspell:disable -->
+
+- `ZEROVOTE` is replaced with the `MaybeVote` type, which is now used
+  instead of `Vote` in the schema method signatures. The storage format itself
+  is unchanged (#496).
+
+<!-- cspell:enable -->
+
+#### exonum-time
+
+- The structure `Time` is removed, use `SystemTime`
+  for saving validators time in `ProofMapIndex` instead. (#20)
+
+- Renamed methods `validators_time`/`validators_time_mut` to
+  `validators_times`/`validators_times_mut` in `Schema`. (#20)
+
 ### New features
+
+#### Exonum core
 
 - `StorageKey` and `StorageValue` traits are implemented for `SystemTime`. (#456)
 
@@ -103,7 +251,26 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Added `v1/shutdown` endpoint for graceful node termination. (#526)
 
+- `TransactionInfo` from the public api module became public. (#537)
+
+#### exonum-testkit
+
+- Modified signature of the `TestKitApi::send` method, which previously did not
+  accept `Box<Transaction>`. (#505)
+
+- Added possibility to init a logger in `TestKitBuilder`. (#524)
+
+#### exonum-configuration
+
+- Information about configurations by `/v1/configs/actual`, `/v1/configs/following`
+  and `/v1/configs/committed` endpoints is extended with the hash of the corresponding
+  proposal and votes for the proposal (#481).
+
+- Implemented error handling based on error codes (#496).
+
 ### Bug fixes
+
+#### Exonum core
 
 - `ExonumJsonDeserialize` trait is implemented for `F32` and `F64`. (#461)
 
@@ -114,6 +281,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Fixed panic "can't cancel routine" during node shutdown. (#530)
 
 ### Internal improvements
+
+#### Exonum core
 
 - Consensus messages are stored persistently (in the database), so restart will
   not affect the node's behavior. (#322)

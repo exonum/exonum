@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -128,7 +128,9 @@ fn test_node_run() {
     }
 }
 
+// See ECR-907 for the details.
 #[test]
+#[ignore]
 fn test_node_shutdown_twice() {
     let (nodes, commit_rxs) = run_nodes(1, 16_400);
 

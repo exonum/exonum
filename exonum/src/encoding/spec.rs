@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@
 /// The macro also implements [`Field`], [`ExonumJson`] and [`StorageValue`] traits
 /// for the declared datatype.
 ///
-/// Unlike types created with [`message!`], the datatype is mapped to a byte buffer
+/// Unlike types created with [`transactions!`], the datatype is mapped to a byte buffer
 /// without any checks; it is assumed that the relevant checks have been performed
 /// when persisting the structure to the blockchain storage.
 ///
@@ -33,7 +33,7 @@
 /// [`Field`]: ./encoding/trait.Field.html
 /// [`ExonumJson`]: ./encoding/serialize/json/trait.ExonumJson.html
 /// [`StorageValue`]: ./storage/trait.StorageValue.html
-/// [`message!`]: macro.message.html
+/// [`transactions!`]: macro.transactions.html
 ///
 /// # Examples
 ///
@@ -71,6 +71,7 @@ macro_rules! encoding_struct {
 
         // Re-implement `Field` for `encoding_struct!`
         // to write fields in place of another structure
+        #[allow(unsafe_code)]
         impl<'a> $crate::encoding::Field<'a> for $name {
             unsafe fn read(buffer: &'a [u8],
                             from: $crate::encoding::Offset,
@@ -389,6 +390,7 @@ macro_rules! __ex_struct_mk_field {
         $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr
     ) => {
         $(#[$field_attr])*
+        #[allow(unsafe_code)]
         pub fn $field_name(&self) -> $field_type {
             use $crate::encoding::Field;
             unsafe {

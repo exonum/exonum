@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,6 +23,8 @@ extern crate serde_derive;
 extern crate serde_json;
 #[macro_use]
 extern crate pretty_assertions;
+#[macro_use]
+extern crate log;
 
 use exonum::blockchain::Transaction;
 use exonum::crypto::{self, PublicKey, CryptoHash};
@@ -187,7 +189,6 @@ fn test_probe() {
     let snapshot = testkit.probe(other_tx.clone());
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(3));
-
     testkit.create_block();
     let snapshot = testkit.probe(other_tx.clone());
     let schema = CounterSchema::new(&snapshot);

@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -46,6 +46,9 @@ pub struct StoredConfiguration {
     pub validator_keys: Vec<ValidatorKeys>,
     /// Consensus algorithm parameters.
     pub consensus: ConsensusConfig,
+    /// Number of votes required to commit new configuration.
+    /// Should be greater than 2/3 and less or equal to the validators count.
+    pub majority_count: Option<u16>,
     /// Services specific variables.
     /// Keys are `service_name` from `Service` trait and values are the serialized json.
     pub services: BTreeMap<String, serde_json::Value>,
@@ -70,7 +73,26 @@ pub struct ConsensusConfig {
 
 impl ConsensusConfig {
     /// Default value for max_message_len.
-    pub const DEFAULT_MESSAGE_MAX_LEN: u32 = 1024 * 1024; // 1 MB
+    pub const DEFAULT_MAX_MESSAGE_LEN: u32 = 1024 * 1024; // 1 MB
+
+    /// Checks if propose timeout is less than round timeout. Warns if fails.
+    #[doc(hidden)]
+    pub fn validate_configuration(&self) {
+        let propose_timeout = match self.timeout_adjuster {
+            TimeoutAdjusterConfig::Constant { timeout } => timeout,
+            TimeoutAdjusterConfig::Dynamic { max, .. } |
+            TimeoutAdjusterConfig::MovingAverage { max, .. } => max,
+        };
+
+        if self.round_timeout <= 2 * propose_timeout {
+            warn!(
+                "It is recommended that round_timeout ({}) be at least twice as large \
+                as propose_timeout ({})",
+                self.round_timeout,
+                propose_timeout
+            );
+        }
+    }
 }
 
 impl Default for ConsensusConfig {
@@ -80,7 +102,7 @@ impl Default for ConsensusConfig {
             status_timeout: 5000,
             peers_timeout: 10_000,
             txs_block_limit: 1000,
-            max_message_len: Self::DEFAULT_MESSAGE_MAX_LEN,
+            max_message_len: Self::DEFAULT_MAX_MESSAGE_LEN,
             timeout_adjuster: TimeoutAdjusterConfig::Constant { timeout: 500 },
         }
     }
@@ -161,15 +183,6 @@ impl StoredConfiguration {
                 config.consensus.round_timeout,
                 propose_timeout
             )));
-        }
-
-        if config.consensus.round_timeout <= 2 * propose_timeout {
-            warn!(
-                "It is recommended that round_timeout({}) be at least twice as large \
-                as propose_timeout({})",
-                config.consensus.round_timeout,
-                propose_timeout
-            );
         }
 
         Ok(config)
@@ -428,6 +441,7 @@ mod tests {
             validator_keys,
             consensus: ConsensusConfig::default(),
             services: BTreeMap::new(),
+            majority_count: None,
         }
     }
 

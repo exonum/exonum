@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -108,7 +108,7 @@ use super::transaction::Transaction;
 ///        SERVICE_ID
 ///     }
 ///
-///     fn service_name(&self) -> &'static str {
+///     fn service_name(&self) -> &str {
 ///         "my_special_unique_service"
 ///     }
 ///

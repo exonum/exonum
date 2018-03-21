@@ -36,6 +36,7 @@ Exonum
 fsync
 fuzzer
 gitter
+hashable
 healthcheck
 idempotence
 keepalive
@@ -56,6 +57,8 @@ Merkle
 millis
 mkdir
 mpsc
+multiproof
+multiproofs
 mutex
 nanos
 nodelay
@@ -75,6 +78,7 @@ println
 pubkey
 pubkeys
 readonly
+rebasing
 reddit
 reimplemented
 repr

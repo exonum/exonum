@@ -119,7 +119,7 @@ impl<'a> BlockInfo<'a> {
     /// Returns a transaction with the specified index in the block.
     pub fn transaction(&self, index: usize) -> Option<TransactionInfo> {
         self.txs.get(index).map(|hash| {
-            self.explorer.transaction(hash).unwrap()
+            self.explorer.committed_transaction(hash, None)
         })
     }
 
@@ -144,7 +144,7 @@ impl<'a> Iterator for TransactionsIter<'a> {
 
     fn next(&mut self) -> Option<TransactionInfo> {
         self.inner.next().map(|hash| {
-            self.explorer.transaction(hash).unwrap()
+            self.explorer.committed_transaction(hash, None)
         })
     }
 }
@@ -467,6 +467,20 @@ impl TransactionInfo {
     }
 }
 
+/// Information about the transaction.
+#[derive(Debug, Serialize)]
+#[serde(tag = "type", rename_all = "kebab-case")]
+pub enum TxInfo {
+    /// Transaction is in the memory pool, but not yet committed to the blockchain.
+    InPool {
+        /// Json representation of the given transaction.
+        #[serde(serialize_with = "TransactionInfo::serialize_content")]
+        content: Box<Transaction>,
+    },
+
+    /// Transaction is already committed to the blockchain.
+    Committed(TransactionInfo),
+}
 
 /// Information on blocks coupled with the corresponding range in the blockchain.
 #[derive(Debug, Serialize, Deserialize)]
@@ -490,7 +504,7 @@ impl BlockchainExplorer {
     }
 
     /// Returns information about the transaction identified by the hash.
-    pub fn transaction(&self, tx_hash: &Hash) -> Option<TransactionInfo> {
+    pub fn transaction(&self, tx_hash: &Hash) -> Option<TxInfo> {
         let schema = Schema::new(self.blockchain.snapshot());
         let raw_tx = schema.transactions().get(tx_hash)?;
 
@@ -501,31 +515,52 @@ impl BlockchainExplorer {
         }
         let content = content.unwrap();
 
-        let location = schema.tx_location_by_tx_hash().get(tx_hash).expect(
+        if schema.transactions_pool().contains(tx_hash) {
+            return Some(TxInfo::InPool { content });
+        }
+
+        let tx = self.committed_transaction(tx_hash, Some(content));
+        Some(TxInfo::Committed(tx))
+    }
+
+    /// Retrieves a transaction that is known to be committed.
+    fn committed_transaction(
+        &self,
+        tx_hash: &Hash,
+        maybe_content: Option<Box<Transaction>>,
+    ) -> TransactionInfo {
+        let schema = Schema::new(self.blockchain.snapshot());
+
+        let location = schema.transactions_locations().get(tx_hash).expect(
             &format!(
                 "Not found tx_hash location: {:?}",
                 tx_hash
             ),
         );
 
-        let location_proof = schema.block_txs(location.block_height()).get_proof(
+        let location_proof = schema.block_transactions(location.block_height()).get_proof(
             location.position_in_block(),
         );
 
         // Unwrap is OK here, because we already know that transaction is committed.
         let status = schema.transaction_results().get(tx_hash).unwrap();
-        Some(TransactionInfo {
-            content,
+
+        TransactionInfo {
+            content: maybe_content.unwrap_or_else(|| {
+                let raw_tx = schema.transactions().get(tx_hash).unwrap();
+                self.blockchain.tx_from_raw(raw_tx).unwrap()
+            }),
+
             location,
             location_proof,
             status,
-        })
+        }
     }
 
     /// Returns block information for the specified height or `None` if there is no such block.
     pub fn block(&self, height: Height) -> Option<BlockInfo> {
         let schema = Schema::new(self.blockchain.snapshot());
-        let txs_table = schema.block_txs(height);
+        let txs_table = schema.block_transactions(height);
         let block_proof = schema.block_and_precommits(height);
 
         block_proof.map(|proof| {
@@ -541,7 +576,7 @@ impl BlockchainExplorer {
     /// Returns block information for the specified height or `None` if there is no such block.
     pub fn block_with_txs(&self, height: Height) -> Option<BlockWithTransactions> {
         let schema = Schema::new(self.blockchain.snapshot());
-        let txs_table = schema.block_txs(height);
+        let txs_table = schema.block_transactions(height);
         let block_proof = schema.block_and_precommits(height);
 
         block_proof.map(|proof| {
@@ -550,7 +585,7 @@ impl BlockchainExplorer {
                 precommits: proof.precommits,
                 txs: txs_table
                     .iter()
-                    .map(|tx_hash| (tx_hash, self.transaction(&tx_hash).unwrap()))
+                    .map(|tx_hash| (tx_hash, self.committed_transaction(&tx_hash, None)))
                     .collect(),
             }
         })
@@ -653,7 +688,7 @@ impl Iterator for BlocksIter {
         }
 
         while let Some(height) = self.height {
-            let is_empty = self.schema.block_txs(height).is_empty();
+            let is_empty = self.schema.block_transactions(height).is_empty();
 
             if !self.skip_empty || !is_empty {
                 let block = {

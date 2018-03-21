@@ -14,7 +14,6 @@
 
 //! Storage schema for the configuration service.
 
-use exonum::blockchain::gen_prefix;
 use exonum::crypto::{self, CryptoHash, Hash, PublicKey, Signature};
 use exonum::encoding::Field;
 use exonum::storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot, StorageValue};
@@ -156,7 +155,7 @@ where
     /// Returns a table of votes of validators for a particular proposal, referenced
     /// by its configuration hash.
     pub fn votes_by_config_hash(&self, config_hash: &Hash) -> ProofListIndex<&Snapshot, MaybeVote> {
-        ProofListIndex::with_prefix(VOTES, gen_prefix(config_hash), self.view.as_ref())
+        ProofListIndex::new_in_family(VOTES, config_hash, self.view.as_ref())
     }
 
     /// Returns a `Propose` transaction with a particular configuration hash.
@@ -178,8 +177,8 @@ where
     /// Returns state hash values used by the configuration service.
     pub fn state_hash(&self) -> Vec<Hash> {
         vec![
-            self.propose_data_by_config_hash().root_hash(),
-            self.config_hash_by_ordinal().root_hash(),
+            self.propose_data_by_config_hash().merkle_root(),
+            self.config_hash_by_ordinal().merkle_root(),
         ]
     }
 }
@@ -202,7 +201,7 @@ impl<'a> Schema<&'a mut Fork> {
         &mut self,
         config_hash: &Hash,
     ) -> ProofListIndex<&mut Fork, MaybeVote> {
-        ProofListIndex::with_prefix(VOTES, gen_prefix(config_hash), &mut self.view)
+        ProofListIndex::new_in_family(VOTES, config_hash, &mut self.view)
     }
 }
 
@@ -237,13 +236,13 @@ mod tests {
 
         let db = MemoryDB::new();
         let mut fork = db.fork();
-        let root_hash = {
+        let merkle_root = {
             let mut index: ProofListIndex<_, Vote> = ProofListIndex::new("index", &mut fork);
             for _ in 0..VALIDATORS {
                 index.push(NO_VOTE.clone());
             }
             index.set(1, vote.clone());
-            index.root_hash()
+            index.merkle_root()
         };
         db.merge(fork.into_patch()).unwrap();
 
@@ -261,13 +260,13 @@ mod tests {
         }
 
         // Touch the index in order to recalculate its root hash
-        let new_root_hash = {
+        let new_merkle_root = {
             let mut fork = db.fork();
             let mut index: ProofListIndex<_, MaybeVote> = ProofListIndex::new("index", &mut fork);
             index.set(2, MaybeVote::some(vote.clone()));
             index.set(2, MaybeVote::none());
-            index.root_hash()
+            index.merkle_root()
         };
-        assert_eq!(root_hash, new_root_hash);
+        assert_eq!(merkle_root, new_merkle_root);
     }
 }

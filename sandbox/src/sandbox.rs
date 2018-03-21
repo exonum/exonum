@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ use std::sync::{Arc, Mutex};
 use std::cell::{Ref, RefCell, RefMut};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet, VecDeque};
+use std::collections::{BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque};
 use std::iter::FromIterator;
 
 use futures::{self, Async, Future, Stream};
@@ -152,7 +152,7 @@ impl Sandbox {
         let connect = Connect::new(
             &self.p(VALIDATOR_0),
             self.a(VALIDATOR_0),
-            connect_message_time,
+            connect_message_time.into(),
             &user_agent::get(),
             self.s(VALIDATOR_0),
         );
@@ -162,7 +162,7 @@ impl Sandbox {
             self.recv(&Connect::new(
                 &self.p(validator),
                 self.a(validator),
-                self.time(),
+                self.time().into(),
                 &user_agent::get(),
                 self.s(validator),
             ));
@@ -465,39 +465,63 @@ impl Sandbox {
     where
         I: IntoIterator<Item = &'a RawTransaction>,
     {
-        let blockchain = &self.blockchain_ref();
-        let (hashes, tx_pool) = {
-            let mut pool = BTreeMap::new();
+        let height = self.current_height();
+        let mut blockchain = self.blockchain_mut();
+        let (hashes, recover, patch) = {
             let mut hashes = Vec::new();
-            for raw in txs {
-                let tx = blockchain.tx_from_raw(raw.clone()).unwrap();
-                let hash = tx.hash();
-                hashes.push(hash);
-                pool.insert(hash, tx);
+            let mut recover = BTreeSet::new();
+            let mut fork = blockchain.fork();
+            {
+                let mut schema = Schema::new(&mut fork);
+                for raw in txs {
+                    let hash = raw.hash();
+                    hashes.push(hash);
+                    if schema.transactions().get(&hash).is_none() {
+                        recover.insert(hash);
+                        schema.add_transaction_into_pool(raw.clone());
+                    }
+                }
             }
-            (hashes, pool)
+
+            (hashes, recover, fork.into_patch())
         };
+        blockchain.merge(patch).unwrap();
 
         let fork = {
             let mut fork = blockchain.fork();
-            let (_, patch) =
-                blockchain.create_patch(ValidatorId(0), self.current_height(), &hashes, &tx_pool);
+            let (_, patch) = blockchain.create_patch(ValidatorId(0), height, &hashes);
             fork.merge(patch);
             fork
         };
+        let patch = {
+            let mut fork = blockchain.fork();
+            {
+                let mut schema = Schema::new(&mut fork);
+                for hash in recover {
+                    schema.reject_transaction(&hash).unwrap();
+                }
+            }
+            fork.into_patch()
+        };
+
+        blockchain.merge(patch).unwrap();
         *Schema::new(&fork).last_block().state_hash()
     }
 
-    pub fn get_proof_to_service_table(&self, service_id: u16, table_idx: usize) -> MapProof<Hash> {
+    pub fn get_proof_to_service_table(
+        &self,
+        service_id: u16,
+        table_idx: usize,
+    ) -> MapProof<Hash, Hash> {
         let snapshot = self.blockchain_ref().snapshot();
         let schema = Schema::new(&snapshot);
         schema.get_proof_to_service_table(service_id, table_idx)
     }
 
-    pub fn get_configs_root_hash(&self) -> Hash {
+    pub fn get_configs_merkle_root(&self) -> Hash {
         let snapshot = self.blockchain_ref().snapshot();
         let schema = Schema::new(&snapshot);
-        schema.configs().root_hash()
+        schema.configs().merkle_root()
     }
 
     pub fn cfg(&self) -> StoredConfiguration {
@@ -528,11 +552,10 @@ impl Sandbox {
     }
 
     pub fn transactions_hashes(&self) -> Vec<Hash> {
-        let node_state = self.node_state();
-        let read_lock = node_state.transactions().read().expect(
-            "Expected read lock",
-        );
-        read_lock.keys().cloned().collect()
+        let schema = Schema::new(self.blockchain_ref().snapshot());
+        let idx = schema.transactions_pool();
+        let vec = idx.iter().collect();
+        vec
     }
 
     pub fn current_round(&self) -> Round {
@@ -582,7 +605,7 @@ impl Sandbox {
             Connect::new(
                 c.pub_key(),
                 c.addr(),
-                time,
+                time.into(),
                 c.user_agent(),
                 self.s(VALIDATOR_0),
             )
@@ -905,7 +928,7 @@ mod tests {
         s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_2),
-            s.time(),
+            s.time().into(),
             &user_agent::get(),
             &secret,
         ));
@@ -914,7 +937,7 @@ mod tests {
             &Connect::new(
                 &s.p(VALIDATOR_0),
                 s.a(VALIDATOR_0),
-                s.time(),
+                s.time().into(),
                 &user_agent::get(),
                 s.s(VALIDATOR_0),
             ),
@@ -941,7 +964,7 @@ mod tests {
             &Connect::new(
                 &s.p(VALIDATOR_0),
                 s.a(VALIDATOR_0),
-                s.time(),
+                s.time().into(),
                 &user_agent::get(),
                 s.s(VALIDATOR_0),
             ),
@@ -956,7 +979,7 @@ mod tests {
         s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_2),
-            s.time(),
+            s.time().into(),
             &user_agent::get(),
             &secret,
         ));
@@ -965,7 +988,7 @@ mod tests {
             &Connect::new(
                 &s.p(VALIDATOR_0),
                 s.a(VALIDATOR_0),
-                s.time(),
+                s.time().into(),
                 &user_agent::get(),
                 s.s(VALIDATOR_0),
             ),
@@ -980,7 +1003,7 @@ mod tests {
         s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_2),
-            s.time(),
+            s.time().into(),
             &user_agent::get(),
             &secret,
         ));
@@ -994,14 +1017,14 @@ mod tests {
         s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_2),
-            s.time(),
+            s.time().into(),
             &user_agent::get(),
             &secret,
         ));
         s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_3),
-            s.time(),
+            s.time().into(),
             &user_agent::get(),
             &secret,
         ));
@@ -1016,7 +1039,7 @@ mod tests {
         s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_2),
-            s.time(),
+            s.time().into(),
             &user_agent::get(),
             &secret,
         ));

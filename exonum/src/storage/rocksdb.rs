@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![allow(unsafe_code)]
+
 //! An implementation of `RocksDB` database.
 
 use exonum_profiler::ProfilerSpan;
-use rocksdb::{self, WriteBatch, DBIterator};
+use rocksdb::{self, Options as RocksDbOptions, WriteBatch, DBIterator};
 use rocksdb::utils::get_cf_names;
 
 use std::mem;
@@ -25,10 +27,10 @@ use std::fmt;
 use std::error::Error;
 use std::iter::Peekable;
 
-use storage::{self, Database, Iterator, Iter, Snapshot, Patch};
+use storage::{self, DbOptions, Database, Iterator, Iter, Snapshot, Patch};
 use storage::db::Change;
 
-pub use rocksdb::{Options as RocksDBOptions, WriteOptions as RocksDBWriteOptions};
+pub use rocksdb::WriteOptions as RocksDBWriteOptions;
 pub use rocksdb::BlockBasedOptions as RocksBlockOptions;
 
 impl From<rocksdb::Error> for storage::Error {
@@ -40,6 +42,15 @@ impl From<rocksdb::Error> for storage::Error {
 /// Database implementation on the top of `RocksDB` backend.
 pub struct RocksDB {
     db: Arc<rocksdb::DB>,
+}
+
+impl DbOptions {
+    fn to_rocksdb(&self) -> RocksDbOptions {
+        let mut defaults = RocksDbOptions::default();
+        defaults.create_if_missing(self.create_if_missing);
+        defaults.set_max_open_files(self.max_open_files.unwrap_or(-1));
+        defaults
+    }
 }
 
 /// A snapshot of a `RocksDB`.
@@ -57,13 +68,13 @@ struct RocksDBIterator {
 
 impl RocksDB {
     /// Open a database stored in the specified path with the specified options.
-    pub fn open<P: AsRef<Path>>(path: P, options: &RocksDBOptions) -> storage::Result<RocksDB> {
+    pub fn open<P: AsRef<Path>>(path: P, options: &DbOptions) -> storage::Result<RocksDB> {
         let db = {
             if let Ok(names) = get_cf_names(&path) {
                 let cf_names = names.iter().map(|name| name.as_str()).collect::<Vec<_>>();
-                rocksdb::DB::open_cf(options, path, cf_names.as_ref())?
+                rocksdb::DB::open_cf(&options.to_rocksdb(), path, cf_names.as_ref())?
             } else {
-                rocksdb::DB::open(options, path)?
+                rocksdb::DB::open(&options.to_rocksdb(), path)?
             }
         };
         Ok(RocksDB { db: Arc::new(db) })
@@ -77,7 +88,7 @@ impl RocksDB {
                 Some(cf) => cf,
                 None => {
                     self.db
-                        .create_cf(&cf_name, &RocksDBOptions::default())
+                        .create_cf(&cf_name, &DbOptions::default().to_rocksdb())
                         .unwrap()
                 }
             };

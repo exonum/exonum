@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,10 +26,7 @@ pub struct ProofListKey {
 impl ProofListKey {
     pub fn new(height: u8, index: u64) -> Self {
         debug_assert!(height <= 58 && index <= MAX_INDEX);
-        Self {
-            height: height,
-            index: index,
-        }
+        Self { height, index }
     }
 
     pub fn height(&self) -> u8 {

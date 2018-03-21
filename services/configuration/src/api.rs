@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -276,6 +276,8 @@ impl PrivateApi {
                 Ok(None) => Err(ApiError::BadRequest("Empty request body".into()))?,
                 Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
             };
+
+            config.consensus.validate_configuration();
 
             let cfg_hash = config.hash();
             let propose = Propose::new(

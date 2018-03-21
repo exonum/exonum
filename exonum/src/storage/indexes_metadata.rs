@@ -1,3 +1,19 @@
+// Copyright 2018 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#![allow(unsafe_code)]
+
 use std::borrow::Cow;
 use std::error::Error;
 
@@ -11,6 +27,7 @@ pub const INDEXES_METADATA_TABLE_NAME: &str = "__INDEXES_METADATA__";
 encoding_struct!(
     struct IndexMetadata {
         index_type: IndexType,
+        is_family: bool,
     }
 );
 
@@ -109,10 +126,11 @@ impl json::ExonumJson for IndexType {
     }
 }
 
-pub fn assert_index_type(name: &str, index_type: IndexType, view: &Snapshot) {
+pub fn assert_index_type(name: &str, index_type: IndexType, is_family: bool, view: &Snapshot) {
     let metadata = BaseIndex::indexes_metadata(view);
     if let Some(value) = metadata.get::<_, IndexMetadata>(name) {
         let stored_type = value.index_type();
+        let stored_is_family = value.is_family();
         assert_eq!(
             stored_type,
             index_type,
@@ -122,31 +140,51 @@ pub fn assert_index_type(name: &str, index_type: IndexType, view: &Snapshot) {
             index_type,
             stored_type
         );
+        assert_eq!(
+            stored_is_family,
+            is_family,
+            "Attempt to access {} '{}' while it's {}",
+            if is_family {
+                "index family"
+            } else {
+                "an ordinary index"
+            },
+            name,
+            if stored_is_family {
+                "index family "
+            } else {
+                "an ordinary index"
+            }
+        );
     }
 }
 
-pub fn set_index_type(name: &str, index_type: IndexType, view: &mut Fork) {
+pub fn set_index_type(name: &str, index_type: IndexType, is_family: bool, view: &mut Fork) {
     if name == INDEXES_METADATA_TABLE_NAME {
         panic!("Attempt to access an internal storage infrastructure");
     }
     let mut metadata = BaseIndex::indexes_metadata(view);
     if metadata.get::<_, IndexMetadata>(name).is_none() {
-        metadata.put(&name.to_owned(), IndexMetadata::new(index_type));
+        metadata.put(&name.to_owned(), IndexMetadata::new(index_type, is_family));
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{IndexType, IndexMetadata, INDEXES_METADATA_TABLE_NAME};
+    use crypto::{PublicKey, Hash};
     use storage::{MemoryDB, Database, MapIndex, ProofMapIndex};
 
     #[test]
     fn index_metadata_roundtrip() {
         use self::IndexType::*;
+
         let index_types = [Entry, KeySet, List, SparseList, Map, ProofList, ProofMap, ValueSet];
-        for t in &index_types {
-            let metadata = IndexMetadata::new(*t);
+        let is_family = [true, true, false, false, true, false, true, false];
+        for (t, f) in index_types.iter().zip(&is_family) {
+            let metadata = IndexMetadata::new(*t, *f);
             assert_eq!(metadata.index_type(), *t);
+            assert_eq!(metadata.is_family(), *f)
         }
     }
 
@@ -177,23 +215,67 @@ mod tests {
         let mut fork = database.fork();
         {
             let mut index = ProofMapIndex::new("test_index", &mut fork);
-            index.put(&[0u8; 32], 42);
+            index.put(&PublicKey::zero(), 42);
         }
 
-        let _: MapIndex<_, [u8; 32], i32> = MapIndex::new("test_index", &mut fork);
+        let _: MapIndex<_, PublicKey, i32> = MapIndex::new("test_index", &mut fork);
     }
 
     #[test]
     fn valid_index_type() {
         let database = MemoryDB::new();
         let mut fork = database.fork();
-
         {
             let mut index = ProofMapIndex::new("test_index", &mut fork);
-            index.put(&[0u8; 32], 42);
+            index.put(&PublicKey::zero(), 42);
         }
 
-        let _: ProofMapIndex<_, [u8; 32], i32> = ProofMapIndex::new("test_index", &mut fork);
+        let _: ProofMapIndex<_, PublicKey, i32> = ProofMapIndex::new("test_index", &mut fork);
+    }
+
+    #[test]
+    #[should_panic(expected = "Attempt to access index family 'test_index' \
+    while it's an ordinary index")]
+    fn ordinary_index_as_index_family() {
+        let database = MemoryDB::new();
+        let mut fork = database.fork();
+        let index_id: i32 = 42;
+        {
+            let mut index = MapIndex::new("test_index", &mut fork);
+            index.put(&"KEY".to_owned(), 42);
+        }
+
+        let _: MapIndex<_, String, i32> =
+            MapIndex::new_in_family("test_index", &index_id, &mut fork);
+    }
+
+    #[test]
+    #[should_panic(expected = "Attempt to access an ordinary index 'test_index' \
+    while it's index family")]
+    fn index_family_as_ordinary_index() {
+        let database = MemoryDB::new();
+        let mut fork = database.fork();
+        let index_id: i32 = 42;
+        {
+            let mut index = MapIndex::new_in_family("test_index", &index_id, &mut fork);
+            index.put(&"KEY".to_owned(), 42);
+        }
+
+        let _: MapIndex<_, String, i32> = MapIndex::new("test_index", &mut fork);
+    }
+
+    #[test]
+    fn valid_index_type_in_family() {
+        let database = MemoryDB::new();
+        let mut fork = database.fork();
+        let index_id: i32 = 42;
+        {
+            let mut index = ProofMapIndex::new_in_family("test_index", &index_id, &mut fork);
+            index.put(&Hash::zero(), 42);
+        }
+
+        let _: ProofMapIndex<_, Hash, i32> =
+            ProofMapIndex::new_in_family("test_index", &index_id, &mut fork);
     }
 
     #[test]
@@ -205,29 +287,27 @@ mod tests {
 
         // Type is unlocked, can read with any
         {
-            let index: MapIndex<_, [u8; 32], i32> = MapIndex::new("test_index", &mut fork);
-            assert!(index.get(&[0u8; 32]).is_none());
+            let index: MapIndex<_, Hash, i32> = MapIndex::new("test_index", &mut fork);
+            assert!(index.get(&Hash::zero()).is_none());
         }
 
         {
-            let index: ProofMapIndex<_, [u8; 32], i32> =
-                ProofMapIndex::new("test_index", &mut fork);
-            assert!(index.get(&[0u8; 32]).is_none());
+            let index: ProofMapIndex<_, Hash, i32> = ProofMapIndex::new("test_index", &mut fork);
+            assert!(index.get(&Hash::zero()).is_none());
         }
 
         // Lock the type
         {
             let mut index = ProofMapIndex::new("test_index", &mut fork);
-            index.put(&[0u8; 32], 42);
+            index.put(&Hash::zero(), 42);
         }
         {
-            let index: ProofMapIndex<_, [u8; 32], i32> =
-                ProofMapIndex::new("test_index", &mut fork);
-            assert_eq!(index.get(&[0u8; 32]), Some(42));
+            let index: ProofMapIndex<_, Hash, i32> = ProofMapIndex::new("test_index", &mut fork);
+            assert_eq!(index.get(&Hash::zero()), Some(42));
         }
 
         // Make sure we're unable to read with different type now
         let mut index = MapIndex::new("test_index", &mut fork);
-        index.put(&[0u8; 32], 43);
+        index.put(&Hash::zero(), 43);
     }
 }
