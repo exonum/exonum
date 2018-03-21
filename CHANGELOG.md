@@ -15,6 +15,19 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `ProofListIndex` and `ProofMapIndex` `root_hash` method has been renamed to
   `merkle_root`. (#547)
 
+- Proofs of existence / absence for `ProofMapIndex`s have been reworked.
+  They now have a linear structure with two components: key-value pairs,
+  and additional *proof* information allowing to restore the Merkle root
+  of the entire index. `MapProof` interface has been reworked
+  correspondingly. (#380)
+
+  Migration path:
+
+  - Consult documents for the updated workflow for creation and verification
+    of `MapProof`s.
+  - See the README in the `storage::proof_map_index` module for theoretical
+    details about the new proof structure.
+
 - `with_prefix` constructor of all index types has been renamed to
   `new_in_family`. Now it uses `index_id` instead of prefixes. Moreover,
   `blockchain::gen_prefix` method has been removed. Instead, any type that
@@ -76,6 +89,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Added `v1/user_agent` endpoint with information about Exonum, Rust
   and OS versions. (#548)
+
+- `ProofMapIndex` now allows to retrieve a proof of presence / absence for an
+  arbitrary number of elements at one time with the help of `get_multiproof`
+  method. Correspondingly, `MapProof` allows to verify proofs for an arbitrary
+  number of elements. (#380)
 
 ### Internal improvements
 

@@ -12,15 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::cmp::min;
+use std::cmp::{min, Ordering};
 
-use crypto::{Hash, PublicKey, HASH_SIZE};
-use super::super::StorageKey;
+use crypto::{CryptoHash, Hash, PublicKey, HASH_SIZE};
+use storage::StorageKey;
 
 pub const BRANCH_KEY_PREFIX: u8 = 0;
 pub const LEAF_KEY_PREFIX: u8 = 1;
 
 /// Size in bytes of the `ProofMapKey`.
+///
+/// Equal to the size of the hash function output (32).
 pub const KEY_SIZE: usize = HASH_SIZE;
 /// Size in bytes of the `ProofPath`.
 pub const PROOF_PATH_SIZE: usize = KEY_SIZE + 2;
@@ -32,30 +34,118 @@ pub const PROOF_PATH_LEN_POS: usize = KEY_SIZE + 1;
 /// A trait that defines a subset of storage key types which are suitable for use with
 /// `ProofMapIndex`.
 ///
-/// The size of the keys must be exactly 32 bytes and the keys must have a uniform distribution.
-pub trait ProofMapKey: StorageKey {}
+/// The size of the keys must be exactly [`PROOF_MAP_KEY_SIZE`] bytes and the keys must have
+/// a uniform distribution.
+///
+/// [`PROOF_MAP_KEY_SIZE`]: constant.PROOF_MAP_KEY_SIZE.html
+pub trait ProofMapKey
+where
+    Self::Output: ProofMapKey,
+{
+    /// The type of keys as read from the database.
+    ///
+    /// `Output` is not necessarily equal to `Self`, which provides flexibility
+    /// for [`HashedKey`]s and similar cases
+    /// where the key cannot be uniquely restored from the database.
+    ///
+    /// [`HashedKey`]: trait.HashedKey.html
+    type Output;
 
-impl ProofMapKey for Hash {}
-impl ProofMapKey for PublicKey {}
-impl ProofMapKey for [u8; KEY_SIZE] {}
+    /// Writes this key into a byte buffer.
+    ///
+    /// The buffer is guaranteed to have size [`PROOF_MAP_KEY_SIZE`].
+    ///
+    /// [`PROOF_MAP_KEY_SIZE`]: constant.PROOF_MAP_KEY_SIZE.html
+    fn write_key(&self, &mut [u8]);
 
-impl StorageKey for [u8; KEY_SIZE] {
-    fn size(&self) -> usize {
-        KEY_SIZE
+    /// Reads this key from the buffer.
+    fn read_key(&[u8]) -> Self::Output;
+}
+
+/// A trait denoting that a certain storage value is suitable for use as a key for
+/// `ProofMapIndex` after hashing.
+///
+/// **Warning:** The implementation of the [`ProofMapKey.write_key()`] method provided
+/// by this trait is not efficient; it calculates the hash anew on each call.
+///
+/// # Example
+///
+/// ```
+/// # #[macro_use] extern crate exonum;
+/// # use exonum::storage::{MemoryDB, Database, ProofMapIndex, HashedKey};
+/// encoding_struct!{
+///     struct Point {
+///         x: i32,
+///         y: i32,
+///     }
+/// }
+///
+/// impl HashedKey for Point {}
+///
+/// # fn main() {
+/// let mut fork = { let db = MemoryDB::new(); db.fork() };
+/// let mut map = ProofMapIndex::new("index", &mut fork);
+/// map.put(&Point::new(3, -4), 5u32);
+/// assert_eq!(map.get(&Point::new(3, -4)), Some(5));
+/// assert_eq!(map.get(&Point::new(3, 4)), None);
+/// # }
+/// ```
+///
+/// [`ProofMapIndex`]: struct.ProofMapIndex.html
+/// [`ProofMapKey.write_key()`]: trait.ProofMapKey.html#tymethod.write_key
+pub trait HashedKey: CryptoHash {}
+
+impl<T: HashedKey> ProofMapKey for T {
+    type Output = Hash;
+
+    fn write_key(&self, buffer: &mut [u8]) {
+        self.hash().write(buffer);
     }
 
-    fn write(&self, buffer: &mut [u8]) {
-        buffer.copy_from_slice(self.as_ref())
+    fn read_key(buffer: &[u8]) -> Hash {
+        <Hash as StorageKey>::read(buffer)
+    }
+}
+
+impl ProofMapKey for PublicKey {
+    type Output = PublicKey;
+
+    fn write_key(&self, buffer: &mut [u8]) {
+        StorageKey::write(self, buffer);
     }
 
-    fn read(buffer: &[u8]) -> Self {
+    fn read_key(raw: &[u8]) -> PublicKey {
+        <PublicKey as StorageKey>::read(raw)
+    }
+}
+
+impl ProofMapKey for Hash {
+    type Output = Hash;
+
+    fn write_key(&self, buffer: &mut [u8]) {
+        StorageKey::write(self, buffer);
+    }
+
+    fn read_key(raw: &[u8]) -> Hash {
+        <Hash as StorageKey>::read(raw)
+    }
+}
+
+impl ProofMapKey for [u8; 32] {
+    type Output = [u8; 32];
+
+    fn write_key(&self, buffer: &mut [u8]) {
+        buffer.copy_from_slice(self);
+    }
+
+    fn read_key(raw: &[u8]) -> [u8; 32] {
         let mut value = [0; KEY_SIZE];
-        value.copy_from_slice(buffer);
+        value.copy_from_slice(raw);
         value
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ChildKind {
     Left,
     Right,
@@ -72,7 +162,9 @@ impl ::std::ops::Not for ChildKind {
     }
 }
 
-/// A structure that represents paths to `ProofMapIndex` nodes.
+/// Bit slice type used internally to serialize `ProofMapKey`s.
+///
+/// A single slice can contain from 1 to [`PROOF_MAP_KEY_SIZE`]`* 8` bits.
 ///
 /// # Binary representation
 ///
@@ -82,6 +174,11 @@ impl ::std::ops::Not for ChildKind {
 /// | 1..33                 | `ProofMapKey` bytes.    	                            |
 /// | 33                    | Total length in bits of `ProofMapKey` for branches.   |
 ///
+/// # JSON serialization
+///
+/// Serialized as a string of `'0'` and `'1'` chars, corresponding exactly to bits in the slice.
+///
+/// [`PROOF_MAP_KEY_SIZE`]: constant.PROOF_MAP_KEY_SIZE.html
 #[derive(Copy, Clone)]
 pub struct ProofPath {
     bytes: [u8; PROOF_PATH_SIZE],
@@ -91,11 +188,9 @@ pub struct ProofPath {
 impl ProofPath {
     /// Create a path from the given key.
     pub fn new<K: ProofMapKey>(key: &K) -> ProofPath {
-        debug_assert_eq!(key.size(), KEY_SIZE);
-
         let mut data = [0; PROOF_PATH_SIZE];
         data[0] = LEAF_KEY_PREFIX;
-        key.write(&mut data[1..KEY_SIZE + 1]);
+        key.write_key(&mut data[1..KEY_SIZE + 1]);
         data[PROOF_PATH_LEN_POS] = 0;
         ProofPath::from_raw(data)
     }
@@ -188,6 +283,35 @@ pub(crate) trait BitsRange {
     /// Returns the raw bytes of the key.
     fn raw_key(&self) -> &[u8];
 
+    /// Returns the number of matching bits with `other`, where checking bits for equality starts
+    /// from the specified position (`from`).
+    ///
+    /// Bits preceding `from` are not checked and assumed to be equal in both ranges (e.g.,
+    /// because they have been checked previously).
+    fn match_len(&self, other: &Self, from: u16) -> u16 {
+        debug_assert_eq!(self.start(), other.start(), "Misaligned bit ranges");
+        debug_assert!(from >= self.start() && from <= self.end());
+
+        let from = from / 8;
+        let to = min((self.end() + 7) / 8, (other.end() + 7) / 8);
+        let max_len = min(self.len(), other.len());
+
+        for i in from..to {
+            let x = self.raw_key()[i as usize] ^ other.raw_key()[i as usize];
+            if x != 0 {
+                let tail = x.trailing_zeros() as u16;
+                return min(i * 8 + tail - self.start(), max_len);
+            }
+        }
+
+        max_len
+    }
+
+    /// Checks if this range of bits matches the other one starting from the specified offset.
+    fn matches_from(&self, other: &Self, from: u16) -> bool {
+        self.match_len(other, from) == other.len()
+    }
+
     /// Returns the length of the common prefix between this and the other range,
     /// provided that they start from the same position.
     /// If start positions differ, returns 0.
@@ -195,19 +319,7 @@ pub(crate) trait BitsRange {
         if self.start() != other.start() {
             0
         } else {
-            let from = self.start() / 8;
-            let to = min((self.end() + 7) / 8, (other.end() + 7) / 8);
-            let max_len = min(self.len(), other.len());
-
-            for i in from..to {
-                let x = self.raw_key()[i as usize] ^ other.raw_key()[i as usize];
-                if x != 0 {
-                    let tail = x.trailing_zeros() as u16;
-                    return min(i * 8 + tail - self.start(), max_len);
-                }
-            }
-
-            max_len
+            self.match_len(other, self.start())
         }
     }
 }
@@ -235,7 +347,7 @@ impl BitsRange for ProofPath {
 
     fn prefix(&self, len: u16) -> Self {
         let end = self.start + len;
-        let key_len = self.raw_key().len() as u16 * 8;
+        let key_len = KEY_SIZE as u16 * 8;
         debug_assert!(end < key_len);
 
         let mut key = ProofPath::from_raw(self.bytes);
@@ -308,6 +420,155 @@ impl StorageKey for ProofPath {
         let mut data = [0; PROOF_PATH_SIZE];
         data.copy_from_slice(buffer);
         ProofPath::from_raw(data)
+    }
+}
+
+impl PartialOrd for ProofPath {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if self.start() != other.start() {
+            return None;
+        }
+        // NB: This check can be moved to "real" code; the code below does not work
+        // if `self.start() % 8 != 0` without additional modifications.
+        assert_eq!(self.start(), 0);
+
+        let right_bit = min(self.end(), other.end());
+        let right = (right_bit as usize + 7) / 8;
+
+        for i in 0..right {
+            let (mut self_byte, mut other_byte) = (self.raw_key()[i], other.raw_key()[i]);
+
+            if i + 1 == right && right_bit % 8 != 0 {
+                // Cut possible junk after the end of path(s)
+                self_byte &= !(255 << (right_bit % 8));
+                other_byte &= !(255 << (right_bit % 8));
+            }
+
+            // Try to find a first bit index at which this path is greater than the other path
+            // (i.e., a bit of this path is 1 and the corresponding bit of the other path
+            // is 0), and vice versa. The smaller of these indexes indicates the actual
+            // larger path. In turn, the indexes can be found by counting trailing zeros.
+            let self_zeros = (self_byte & !other_byte).trailing_zeros();
+            let other_zeros = (!self_byte & other_byte).trailing_zeros();
+
+            let cmp = other_zeros.cmp(&self_zeros);
+            if cmp != Ordering::Equal {
+                return Some(cmp);
+            }
+        }
+
+        Some(self.end().cmp(&other.end()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::{self, Value};
+    use rand::{self, Rng};
+
+    use super::*;
+
+    /// Creates a random non-leaf, non-empty path.
+    fn random_path<T: Rng>(rng: &mut T) -> ProofPath {
+        ProofPath::new(&{
+            let mut buf = [0; 32];
+            rng.fill_bytes(&mut buf);
+            buf
+        }).prefix(1 + rng.gen::<u16>() % 255)
+    }
+
+    #[test]
+    fn test_proof_path_serialization() {
+        let path = ProofPath::new(&[1; 32]).prefix(3);
+        assert_eq!(serde_json::to_value(&path).unwrap(), json!("100"));
+        let path: ProofPath = serde_json::from_value(json!("101001")).unwrap();
+        assert_eq!(path, ProofPath::new(&[0b00_100101; 32]).prefix(6));
+
+        // Fuzz tests for roundtrip.
+        let mut rng = rand::thread_rng();
+        for _ in 0..1000 {
+            let path = random_path(&mut rng);
+
+            let value = serde_json::to_value(&path).unwrap();
+            let other_path: ProofPath = serde_json::from_value(value.clone()).unwrap();
+            assert_eq!(other_path, path);
+
+            if let Value::String(s) = value {
+                assert_eq!(s.len(), path.len() as usize);
+                for (i, byte) in s.bytes().enumerate() {
+                    assert_eq!(
+                        byte,
+                        match path.bit(i as u16) {
+                            ChildKind::Left => b'0',
+                            ChildKind::Right => b'1',
+                        }
+                    );
+                }
+            } else {
+                panic!("Incorrect ProofPath serialization, string expected");
+            }
+        }
+    }
+
+    #[test]
+    fn test_proof_path_ordering() {
+        assert!(ProofPath::new(&[1; 32]) > ProofPath::new(&[254; 32]));
+        assert!(ProofPath::new(&[0b0001_0001; 32]) > ProofPath::new(&[0b0010_0001; 32]));
+        assert!(ProofPath::new(&[1; 32]) == ProofPath::new(&[1; 32]));
+        assert!(ProofPath::new(&[1; 32]).prefix(6) == ProofPath::new(&[129; 32]).prefix(6));
+        assert!(ProofPath::new(&[1; 32]).prefix(254) < ProofPath::new(&[1; 32]));
+
+        let mut rng = rand::thread_rng();
+        for _ in 0..1000 {
+            let (x, y) = (random_path(&mut rng), random_path(&mut rng));
+            let x_bits = (0..x.len()).map(|i| x.bit(i));
+            let y_bits = (0..y.len()).map(|i| y.bit(i));
+            assert_eq!(x.partial_cmp(&y).unwrap(), x_bits.cmp(y_bits));
+        }
+    }
+
+    #[test]
+    fn test_fuzz_match_len() {
+        let mut rng = rand::thread_rng();
+        for _ in 0..10_000 {
+            let (x, y) = (random_path(&mut rng), random_path(&mut rng));
+            let min_len = min(x.len(), y.len());
+            let start = rng.gen::<u16>() % min_len;
+            let match_len = x.match_len(&y, start);
+
+            assert!(
+                match_len <= min_len,
+                "{:?}.match_len({:?}, {}) = {}",
+                x,
+                y,
+                start,
+                match_len
+            );
+
+            for i in start..match_len {
+                assert_eq!(
+                    x.bit(i),
+                    y.bit(i),
+                    "{:?}.match_len({:?}, {}) = {}",
+                    x,
+                    y,
+                    start,
+                    match_len
+                );
+            }
+
+            if match_len < min_len {
+                assert_ne!(
+                    x.bit(match_len),
+                    y.bit(match_len),
+                    "{:?}.match_len({:?}, {}) = {}",
+                    x,
+                    y,
+                    start,
+                    match_len
+                );
+            }
+        }
     }
 }
 
@@ -434,6 +695,36 @@ fn test_proof_path_common_prefix_len() {
     assert_eq!(b3.common_prefix_len(&b3), 200);
     let b5 = ProofPath::from_raw(*b"\x01\xF00000000000000000000000000000000\x00");
     assert_eq!(b5.prefix(0).common_prefix_len(&b3), 0);
+}
+
+#[test]
+fn test_proof_path_match_len() {
+    let b1 = ProofPath::from_raw(*b"\x01abcd0000000000000000000000000000\x00");
+    let b2 = ProofPath::from_raw(*b"\x01abef0000000000000000000000000000\x00");
+
+    for start in 0..256 {
+        assert_eq!(b1.match_len(&b1, start), 256);
+    }
+    for start in 0..18 {
+        assert_eq!(b1.match_len(&b2, start), 17);
+        assert_eq!(b2.match_len(&b1, start), 17);
+    }
+    for start in 32..256 {
+        assert_eq!(b1.match_len(&b2, start), 256);
+        assert_eq!(b2.match_len(&b1, start), 256);
+    }
+
+    let b2 = ProofPath::from_raw(*b"\x01abce0000000000000000000000000000\x00");
+    for start in 0..25 {
+        assert_eq!(b1.match_len(&b2, start), 24);
+        assert_eq!(b2.match_len(&b1, start), 24);
+    }
+
+    let b1 = b1.prefix(19);
+    for start in 0..19 {
+        assert_eq!(b1.match_len(&b2, start), 19);
+        assert_eq!(b2.match_len(&b1, start), 19);
+    }
 }
 
 #[test]

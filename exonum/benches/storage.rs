@@ -25,7 +25,7 @@ mod tests {
     use std::collections::HashSet;
 
     use test::Bencher;
-    use rand::{Rng, thread_rng, XorShiftRng, SeedableRng};
+    use rand::{Rng, XorShiftRng, SeedableRng};
     use tempdir::TempDir;
     use exonum::storage::{Database, MemoryDB, RocksDB, DbOptions, ProofMapIndex, ProofListIndex};
     use exonum::storage::proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE;
@@ -33,7 +33,7 @@ mod tests {
     const NAME: &str = "name";
 
     fn generate_random_kv(len: usize) -> Vec<([u8; KEY_SIZE], Vec<u8>)> {
-        let mut rng = thread_rng();
+        let mut rng = XorShiftRng::from_seed([1, 56, 168, 192]);
         let mut exists_keys = HashSet::new();
         let mut base = [0; KEY_SIZE];
         rng.fill_bytes(&mut base);
@@ -119,6 +119,47 @@ mod tests {
         });
     }
 
+    fn proof_map_index_build_proofs<T: Database>(b: &mut Bencher, db: &T) {
+        let data = generate_random_kv(512);
+        let mut storage = db.fork();
+        let mut table = ProofMapIndex::new(NAME, &mut storage);
+
+        for item in &data {
+            table.put(&item.0, item.1.clone());
+        }
+        let table_merkle_root = table.merkle_root();
+        let mut proofs = Vec::with_capacity(data.len());
+
+        b.iter(|| {
+            proofs.clear();
+            proofs.extend(data.iter().map(|item| table.get_proof(item.0)));
+        });
+
+        for (i, proof) in proofs.into_iter().enumerate() {
+            let checked_proof = proof.check().unwrap();
+            assert_eq!(*checked_proof.entries()[0].1, data[i].1);
+            assert_eq!(checked_proof.merkle_root(), table_merkle_root);
+        }
+    }
+
+    fn proof_map_index_verify_proofs<T: Database>(b: &mut Bencher, db: &T) {
+        let data = generate_random_kv(512);
+        let mut storage = db.fork();
+        let mut table = ProofMapIndex::new(NAME, &mut storage);
+
+        for item in &data {
+            table.put(&item.0, item.1.clone());
+        }
+        let table_merkle_root = table.merkle_root();
+        let proofs: Vec<_> = data.iter().map(|item| table.get_proof(item.0)).collect();
+
+        b.iter(|| for (i, proof) in proofs.iter().enumerate() {
+            let checked_proof = proof.clone().check().unwrap();
+            assert_eq!(*checked_proof.entries()[0].1, data[i].1);
+            assert_eq!(checked_proof.merkle_root(), table_merkle_root);
+        });
+    }
+
     fn create_rocksdb(tempdir: &TempDir) -> RocksDB {
         let options = DbOptions::default();
         RocksDB::open(tempdir.path(), &options).unwrap()
@@ -174,5 +215,24 @@ mod tests {
         let tempdir = TempDir::new("exonum").unwrap();
         let db = create_rocksdb(&tempdir);
         merkle_patricia_table_insertion_large_map(b, &db);
+    }
+
+    #[bench]
+    fn long_bench_proof_map_index_build_proofs_memorydb(b: &mut Bencher) {
+        let db = MemoryDB::new();
+        proof_map_index_build_proofs(b, &db);
+    }
+
+    #[bench]
+    fn long_bench_proof_map_index_build_proofs_rocksdb(b: &mut Bencher) {
+        let tempdir = TempDir::new("exonum").unwrap();
+        let db = create_rocksdb(&tempdir);
+        proof_map_index_build_proofs(b, &db);
+    }
+
+    #[bench]
+    fn long_bench_proof_map_index_validate_proofs_memorydb(b: &mut Bencher) {
+        let db = MemoryDB::new();
+        proof_map_index_verify_proofs(b, &db);
     }
 }
