@@ -21,6 +21,7 @@
 
 #![cfg_attr(feature="flame_profile", feature(plugin, custom_attribute))]
 #![cfg_attr(feature="flame_profile", plugin(exonum_flamer))]
+#![cfg_attr(feature="long_benchmarks", feature(test))]
 
 extern crate exonum_sodiumoxide as sodiumoxide;
 extern crate exonum_rocksdb as rocksdb;
@@ -66,6 +67,8 @@ extern crate failure;
 extern crate bodyparser;
 
 // Test dependencies.
+#[cfg(all(test, feature="long_benchmarks"))]
+extern crate test;
 #[cfg(test)]
 #[macro_use]
 extern crate lazy_static;
