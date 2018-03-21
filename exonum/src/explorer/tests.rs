@@ -169,6 +169,13 @@ fn create_block(blockchain: &mut Blockchain, transactions: Vec<Box<Transaction>>
         .unwrap();
 }
 
+/// Creates a transaction for the mempool.
+#[cfg(feature = "doctests")]
+pub fn mempool_transaction() -> Box<Transaction> {
+    let (pk_alex, key_alex) = consensus_keys(); // Must be deterministic!
+    CreateWallet::new(&pk_alex, "Alex", &key_alex).into()
+}
+
 /// Creates a sample blockchain for doc tests.
 #[cfg(feature = "doctests")]
 pub fn sample_blockchain() -> Blockchain {
@@ -178,10 +185,19 @@ pub fn sample_blockchain() -> Blockchain {
     let tx_alice = CreateWallet::new(&pk_alice, "Alice", &key_alice);
     let tx_bob = CreateWallet::new(&pk_bob, "Bob", &key_bob);
     let tx_transfer = Transfer::new(&pk_alice, &pk_bob, 100, &key_alice);
+
     create_block(
         &mut blockchain,
         vec![tx_alice.into(), tx_bob.into(), tx_transfer.into()],
     );
+
+    let mut fork = blockchain.fork();
+    {
+        let mut schema = Schema::new(&mut fork);
+        schema.add_transaction_into_pool(mempool_transaction().raw().clone());
+    }
+    blockchain.merge(fork.into_patch()).unwrap();
+
     blockchain
 }
 
@@ -213,8 +229,13 @@ fn test_explorer_basics() {
     assert_eq!(tx_info.status(), Ok(()));
     assert_eq!(tx_info.content().raw(), tx_alice.raw());
 
-    let tx_info = match explorer.transaction(&tx_alice.hash()) {
-        Some(TxInfo::Committed(info)) => info,
+    let tx_info = explorer.transaction(&tx_alice.hash()).unwrap();
+    assert!(!tx_info.is_in_pool());
+    assert!(tx_info.is_committed());
+    assert_eq!(tx_info.content().raw(), tx_alice.raw());
+
+    let tx_info = match tx_info {
+        TransactionInfo::Committed(info) => info,
         tx => panic!("{:?}", tx),
     };
     assert_eq!(*tx_info.location(), TxLocation::new(Height(1), 0));
@@ -280,6 +301,30 @@ fn test_explorer_basics() {
             },
         })
     );
+}
+
+#[test]
+fn test_explorer_pool_transaction() {
+    let mut blockchain = create_blockchain();
+
+    let (pk_alice, key_alice) = crypto::gen_keypair();
+    let tx_alice = CreateWallet::new(&pk_alice, "Alice", &key_alice);
+    let tx_hash = tx_alice.hash();
+
+    let explorer = BlockchainExplorer::new(blockchain.clone());
+    assert!(explorer.transaction(&tx_hash).is_none());
+
+    let mut fork = blockchain.fork();
+    {
+        let mut schema = Schema::new(&mut fork);
+        schema.add_transaction_into_pool(tx_alice.raw().clone());
+    }
+    blockchain.merge(fork.into_patch()).unwrap();
+
+    let tx_info = explorer.transaction(&tx_hash).unwrap();
+    assert!(tx_info.is_in_pool());
+    assert!(!tx_info.is_committed());
+    assert_eq!(tx_info.content().raw(), tx_alice.raw());
 }
 
 fn tx_generator() -> Box<Iterator<Item = Box<Transaction>>> {
