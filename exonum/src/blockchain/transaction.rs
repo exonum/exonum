@@ -453,7 +453,7 @@ macro_rules! transactions {
         }
 
         #[derive(Clone, Debug)]
-        $($tx_set_attr)*
+        $(#[$tx_set_attr])*
         enum $transaction_set {
             $($name($name),)*
         }
@@ -485,7 +485,7 @@ macro_rules! transactions {
         }
 
         #[derive(Clone, Debug)]
-        $($tx_set_attr)*
+        $(#[$tx_set_attr])*
         pub enum $transaction_set {
             $($name($name),)*
         }
@@ -517,7 +517,7 @@ macro_rules! transactions {
         }
 
         #[derive(Clone, Debug)]
-        $($tx_set_attr)*
+        $(#[$tx_set_attr])*
         pub($($vis)+) enum $transaction_set {
             $($name($name),)*
         }
