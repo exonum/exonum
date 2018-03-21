@@ -51,6 +51,27 @@ fn test_create_wallet() {
     assert_eq!(wallet.balance(), 100);
 }
 
+/// Check that the transaction invoked twice via API reports the error in human-readable form.
+#[test]
+fn test_create_wallet_twice() {
+    let (mut testkit, api) = create_testkit();
+    // Create a wallet the first time.
+    let (tx_alice, key_alice) = api.create_wallet(ALICE_NAME);
+    println!("{:?}", tx_alice.hash());
+    testkit.create_block_with_tx_hashes(&[tx_alice.hash()]);
+    api.assert_tx_status(&tx_alice.hash(), &json!({ "type": "success" }));
+    
+    // Create and send the same transaction via API the second time.
+    let tx_alice2 = api.create_specific_wallet(ALICE_NAME, &tx_alice.pub_key(), &key_alice);
+    println!("{:?}", tx_alice2.hash());
+    testkit.create_block_with_tx_hashes(&[tx_alice2.hash()]);
+    api.assert_tx_status(&tx_alice2.hash(), &json!({
+        "code": 0,
+        "description": "Wallet already exists",
+        "type": "error"
+    }));
+}
+
 /// Check that the transfer transaction works as intended.
 #[test]
 fn test_transfer() {
@@ -235,6 +256,19 @@ impl CryptocurrencyApi {
         );
         assert_eq!(tx_info, json!({ "tx_hash": tx.hash() }));
         (tx, key)
+    }
+    
+    fn create_specific_wallet(&self, name: &str, pub_key: &PublicKey, key: &SecretKey) -> TxCreateWallet {
+        // Create a pre-signed transaction
+        let tx = TxCreateWallet::new(&pub_key, name, &key);
+
+        let tx_info: serde_json::Value = self.inner.post(
+            ApiKind::Service("cryptocurrency"),
+            "v1/wallets",
+            &tx,
+        );
+        assert_eq!(tx_info, json!({ "tx_hash": tx.hash() }));
+        tx
     }
 
     /// Sends a transfer transaction over HTTP and checks the synchronous result.
