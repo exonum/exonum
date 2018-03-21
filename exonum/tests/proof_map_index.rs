@@ -13,6 +13,12 @@
 // limitations under the License.
 
 //! Property testing for proofs of existence / absence in `ProofMapIndex`.
+//!
+//! To adjust the number of test cases for each test, set the `PROPTEST_CASES` environment
+//! variable as per `proptest` docs. The number of test cases for large tests will be scaled
+//! back automatically. A reasonable value for `PROPTEST_CASES` is `256`
+//! (default; results in running time ~30 sec for larger tests) or more. The run time
+//! scales linearly with the number of cases.
 
 // cspell:ignore proptest
 
@@ -244,23 +250,39 @@ macro_rules! proof_map_tests {
 mod small_index {
     use super::*;
 
-    proof_map_tests!(cases = 1_000, sizes = 10..100, bytes = 0u8..);
+    proof_map_tests!(
+        cases = Config::default().cases,
+        sizes = 10..100,
+        bytes = 0u8..
+    );
 }
 
 mod small_index_skewed {
     use super::*;
 
-    proof_map_tests!(cases = 1_000, sizes = 10..100, bytes = 0u8..3);
+    proof_map_tests!(
+        cases = Config::default().cases,
+        sizes = 10..100,
+        bytes = 0u8..3
+    );
 }
 
 mod large_index {
     use super::*;
 
-    proof_map_tests!(cases = 20, sizes = 5_000..10_000, bytes = 0u8..);
+    proof_map_tests!(
+        cases = Config::default().cases >> 5,
+        sizes = 5_000..10_000,
+        bytes = 0u8..
+    );
 }
 
 mod large_index_skewed {
     use super::*;
 
-    proof_map_tests!(cases = 20, sizes = 5_000..10_000, bytes = 0u8..3);
+    proof_map_tests!(
+        cases = Config::default().cases >> 5,
+        sizes = 5_000..10_000,
+        bytes = 0u8..3
+    );
 }
