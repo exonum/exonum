@@ -19,15 +19,15 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 
 use bit_vec::BitVec;
-use exonum::messages::{RawTransaction, Message, Propose, Prevote, Precommit, ProposeRequest,
-                       PrevotesRequest};
-use exonum::blockchain::{Block, SCHEMA_MAJOR_VERSION};
-use exonum::crypto::{CryptoHash, Hash, HASH_SIZE};
-use exonum::storage::Database;
-use exonum::helpers::{Height, Round, ValidatorId, Milliseconds};
+use messages::{RawTransaction, Message, Propose, Prevote, Precommit, ProposeRequest,
+               PrevotesRequest};
+use blockchain::{Block, SCHEMA_MAJOR_VERSION};
+use crypto::{CryptoHash, Hash, HASH_SIZE};
+use storage::Database;
+use helpers::{Height, Round, ValidatorId, Milliseconds};
 
-use sandbox::Sandbox;
-use timestamping::{TimestampTx, TimestampingTxGenerator};
+use super::sandbox::Sandbox;
+use super::timestamping::{TimestampTx, TimestampingTxGenerator};
 
 pub type TimestampingSandbox = Sandbox;
 
@@ -43,7 +43,6 @@ pub const ROUND_ONE: Round = Round(1);
 pub const ROUND_TWO: Round = Round(2);
 pub const ROUND_THREE: Round = Round(3);
 pub const ROUND_FOUR: Round = Round(4);
-pub const ROUND_FIVE: Round = Round(5);
 pub const VALIDATOR_0: ValidatorId = ValidatorId(0);
 pub const VALIDATOR_1: ValidatorId = ValidatorId(1);
 pub const VALIDATOR_2: ValidatorId = ValidatorId(2);
@@ -243,7 +242,7 @@ pub fn empty_hash() -> Hash {
 }
 
 pub fn compute_txs_merkle_root(txs: &[Hash]) -> Hash {
-    use exonum::storage::{MemoryDB, ProofListIndex};
+    use storage::{MemoryDB, ProofListIndex};
 
     let mut fork = MemoryDB::new().fork();
     let mut hashes = ProofListIndex::new("name", &mut fork);
@@ -674,10 +673,6 @@ pub fn make_request_prevote_from_precommit(
         validators,
         sandbox.s(VALIDATOR_0),
     )
-}
-
-pub fn last_block_hash(sandbox: &TimestampingSandbox) -> Hash {
-    sandbox.last_hash()
 }
 
 /// idea of the method is to return valid Prevote using provided Propose.

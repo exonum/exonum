@@ -39,7 +39,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `SystemTime` previously used as storage key or value turned out to show
   different behavior on different platforms and, hence, has been replaced with
-  `chrono::DateTime<Utc>` that behaves the same in any environment.
+  `chrono::DateTime<Utc>` that behaves the same in any environment. (#557)
 
   Migration path:
 
@@ -47,6 +47,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - Use `DateTime::from` and `into()` methods to convert your existing
   `SystemTime` instances into suitable type when constructing transactions or
   working with database.
+
+- `events` module becomes private. (#568)
 
 #### exonum-testkit
 
@@ -69,7 +71,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum-time
 
 - `SystemTime` has been replaced with `chrono::DateTime<Utc>`, as it provides
-  more predictable behavior on all systems.
+  more predictable behavior on all systems. (#557)
 
 ### New features
 
@@ -99,6 +101,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Non-committed transactions are now stored persistently in the storage
   instead of memory pool. (#549)
+
+- Sandbox tests have been moved inside of the exonum core. (#568)
 
 ## 0.6 - 2018-03-06
 
