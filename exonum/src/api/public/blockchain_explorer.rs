@@ -16,7 +16,7 @@ use router::Router;
 use iron::prelude::*;
 
 use blockchain::Blockchain;
-use explorer::{BlockchainExplorer, BlocksRange, TxInfo};
+use explorer::{BlockchainExplorer, BlocksRange, TransactionInfo};
 use api::{Api, ApiError};
 use crypto::Hash;
 use helpers::Height;
@@ -54,7 +54,7 @@ impl ExplorerApi {
         Ok(self.explorer().blocks_range(count, from, skip_empty_blocks))
     }
 
-    fn transaction_info(&self, hash: &Hash) -> Option<TxInfo> {
+    fn transaction_info(&self, hash: &Hash) -> Option<TransactionInfo> {
         self.explorer().transaction(hash)
     }
 

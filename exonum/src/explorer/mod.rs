@@ -117,7 +117,7 @@ impl<'a> BlockInfo<'a> {
     }
 
     /// Returns a transaction with the specified index in the block.
-    pub fn transaction(&self, index: usize) -> Option<TransactionInfo> {
+    pub fn transaction(&self, index: usize) -> Option<CommittedTransaction> {
         self.txs.get(index).map(|hash| {
             self.explorer.committed_transaction(hash, None)
         })
@@ -140,9 +140,9 @@ pub struct TransactionsIter<'a> {
 }
 
 impl<'a> Iterator for TransactionsIter<'a> {
-    type Item = TransactionInfo;
+    type Item = CommittedTransaction;
 
-    fn next(&mut self) -> Option<TransactionInfo> {
+    fn next(&mut self) -> Option<CommittedTransaction> {
         self.inner.next().map(|hash| {
             self.explorer.committed_transaction(hash, None)
         })
@@ -150,7 +150,7 @@ impl<'a> Iterator for TransactionsIter<'a> {
 }
 
 impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
-    type Item = TransactionInfo;
+    type Item = CommittedTransaction;
     type IntoIter = TransactionsIter<'a>;
 
     fn into_iter(self) -> TransactionsIter<'a> {
@@ -163,7 +163,7 @@ impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
 /// # Examples
 ///
 /// ```ignore
-/// # use exonum::explorer::{BlockchainExplorer, BlockWithTransactions, TransactionInfo};
+/// # use exonum::explorer::{BlockchainExplorer, BlockWithTransactions, CommittedTransaction};
 /// # use exonum::explorer::tests::sample_blockchain;
 /// # use exonum::helpers::Height;
 /// let blockchain = // ...
@@ -179,7 +179,7 @@ impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
 /// }
 ///
 /// // Compared to `BlockInfo`, you can access transactions in a block using indexes
-/// let tx: &TransactionInfo = &block[1];
+/// let tx: &CommittedTransaction = &block[1];
 /// assert_eq!(tx.location().position_in_block(), 1);
 /// let tx_copy = &block[&tx.content().hash()];
 /// assert_eq!(tx.content().raw(), tx_copy.content().raw());
@@ -188,7 +188,7 @@ impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
 pub struct BlockWithTransactions {
     block: Block,
     precommits: Vec<Precommit>,
-    txs: LinkedHashMap<Hash, TransactionInfo>,
+    txs: LinkedHashMap<Hash, CommittedTransaction>,
 }
 
 impl BlockWithTransactions {
@@ -213,12 +213,12 @@ impl BlockWithTransactions {
     }
 
     /// Returns a transaction with the specified index in the block.
-    pub fn transaction(&self, index: usize) -> Option<&TransactionInfo> {
+    pub fn transaction(&self, index: usize) -> Option<&CommittedTransaction> {
         self.txs.values().nth(index)
     }
 
     /// Returns a transaction with the specified hash in the block.
-    pub fn transaction_by_hash(&self, hash: &Hash) -> Option<&TransactionInfo> {
+    pub fn transaction_by_hash(&self, hash: &Hash) -> Option<&CommittedTransaction> {
         self.txs.get(hash)
     }
 
@@ -231,12 +231,12 @@ impl BlockWithTransactions {
 /// Iterator over transactions in [`BlockWithTransactions`].
 ///
 /// [`BlockWithTransactions`]: struct.BlockWithTransactions.html
-pub type EagerTransactionsIter<'a> = self::linked_hash_map::Values<'a, Hash, TransactionInfo>;
+pub type EagerTransactionsIter<'a> = self::linked_hash_map::Values<'a, Hash, CommittedTransaction>;
 
 impl Index<usize> for BlockWithTransactions {
-    type Output = TransactionInfo;
+    type Output = CommittedTransaction;
 
-    fn index(&self, index: usize) -> &TransactionInfo {
+    fn index(&self, index: usize) -> &CommittedTransaction {
         self.transaction(index).expect(&format!(
             "Index exceeds number of transactions in block {}",
             self.len()
@@ -245,9 +245,9 @@ impl Index<usize> for BlockWithTransactions {
 }
 
 impl<'a> Index<&'a Hash> for BlockWithTransactions {
-    type Output = TransactionInfo;
+    type Output = CommittedTransaction;
 
-    fn index(&self, tx_hash: &'a Hash) -> &TransactionInfo {
+    fn index(&self, tx_hash: &'a Hash) -> &CommittedTransaction {
         self.transaction_by_hash(tx_hash).expect(&format!(
             "Transaction with hash {:?} not in block",
             tx_hash
@@ -256,7 +256,7 @@ impl<'a> Index<&'a Hash> for BlockWithTransactions {
 }
 
 impl<'a> IntoIterator for &'a BlockWithTransactions {
-    type Item = &'a TransactionInfo;
+    type Item = &'a CommittedTransaction;
     type IntoIter = EagerTransactionsIter<'a>;
 
     fn into_iter(self) -> EagerTransactionsIter<'a> {
@@ -264,14 +264,13 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
     }
 }
 
-
 /// Information about a particular transaction in the blockchain.
 ///
 /// # Examples
 ///
 /// ```ignore
 /// use exonum::blockchain::{Transaction, TransactionError};
-/// # use exonum::explorer::{BlockchainExplorer, TransactionInfo};
+/// # use exonum::explorer::{BlockchainExplorer, CommittedTransaction};
 /// # use exonum::explorer::tests::sample_blockchain;
 /// # use exonum::helpers::Height;
 ///
@@ -296,7 +295,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// ```ignore
 /// # #[macro_use] extern crate serde_json;
 /// # extern crate exonum;
-/// # use exonum::explorer::{BlockchainExplorer, TransactionInfo};
+/// # use exonum::explorer::{BlockchainExplorer, CommittedTransaction};
 /// # use exonum::explorer::tests::sample_blockchain;
 /// # use exonum::helpers::Height;
 /// use exonum::encoding::serialize::json::ExonumJson;
@@ -335,14 +334,14 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// # #[macro_use] extern crate serde_json;
 /// # extern crate exonum;
 /// # use exonum::encoding::serialize::json::ExonumJson;
-/// # use exonum::explorer::{BlockchainExplorer, TransactionInfo};
+/// # use exonum::explorer::{BlockchainExplorer, CommittedTransaction};
 /// # use exonum::explorer::tests::sample_blockchain;
 /// # use exonum::helpers::Height;
 /// #
 /// # fn main() {
 /// # let blockchain = sample_blockchain();
 /// # let explorer = BlockchainExplorer::new(blockchain);
-/// let erroneous_tx: TransactionInfo = // ...
+/// let erroneous_tx: CommittedTransaction = // ...
 /// #   explorer.block(Height(1)).unwrap().transaction(1).unwrap();
 /// assert_eq!(
 ///     serde_json::to_value(&erroneous_tx).unwrap(),
@@ -369,14 +368,14 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// # #[macro_use] extern crate serde_json;
 /// # extern crate exonum;
 /// # use exonum::encoding::serialize::json::ExonumJson;
-/// # use exonum::explorer::{BlockchainExplorer, TransactionInfo};
+/// # use exonum::explorer::{BlockchainExplorer, CommittedTransaction};
 /// # use exonum::explorer::tests::sample_blockchain;
 /// # use exonum::helpers::Height;
 /// #
 /// # fn main() {
 /// # let blockchain = sample_blockchain();
 /// # let explorer = BlockchainExplorer::new(blockchain);
-/// let panicked_tx: TransactionInfo = // ...
+/// let panicked_tx: CommittedTransaction = // ...
 /// #   explorer.block(Height(1)).unwrap().transaction(2).unwrap();
 /// assert_eq!(
 ///     serde_json::to_value(&panicked_tx).unwrap(),
@@ -391,16 +390,16 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// # }
 /// ```
 #[derive(Debug, Serialize)]
-pub struct TransactionInfo {
-    #[serde(serialize_with = "TransactionInfo::serialize_content")]
+pub struct CommittedTransaction {
+    #[serde(serialize_with = "CommittedTransaction::serialize_content")]
     content: Box<Transaction>,
     location: TxLocation,
     location_proof: ListProof<Hash>,
-    #[serde(serialize_with = "TransactionInfo::serialize_status")]
+    #[serde(serialize_with = "CommittedTransaction::serialize_status")]
     status: TransactionResult,
 }
 
-impl TransactionInfo {
+impl CommittedTransaction {
     /// Returns the content of the transaction.
     pub fn content(&self) -> &Transaction {
         self.content.as_ref()
@@ -468,18 +467,59 @@ impl TransactionInfo {
 }
 
 /// Information about the transaction.
+///
+/// # Examples
+///
+/// ```ignore
+/// # use exonum::explorer::{BlockchainExplorer, TransactionInfo};
+/// # use exonum::explorer::tests::{sample_blockchain, mempool_transaction};
+/// let blockchain = // ...
+/// #                sample_blockchain();
+/// let explorer = BlockchainExplorer::new(blockchain);
+/// let hash = // ...
+/// #          mempool_transaction().hash();
+/// let tx: TransactionInfo = explorer.transaction(&hash).unwrap();
+/// assert!(tx.is_in_pool());
+/// println!("{:?}", tx.content());
+/// ```
 #[derive(Debug, Serialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
-pub enum TxInfo {
+pub enum TransactionInfo {
     /// Transaction is in the memory pool, but not yet committed to the blockchain.
     InPool {
         /// Json representation of the given transaction.
-        #[serde(serialize_with = "TransactionInfo::serialize_content")]
+        #[serde(serialize_with = "CommittedTransaction::serialize_content")]
         content: Box<Transaction>,
     },
 
     /// Transaction is already committed to the blockchain.
-    Committed(TransactionInfo),
+    Committed(CommittedTransaction),
+}
+
+impl TransactionInfo {
+    /// Returns the content of this transaction.
+    pub fn content(&self) -> &Transaction {
+        match *self {
+            TransactionInfo::InPool { ref content } => content.as_ref(),
+            TransactionInfo::Committed(ref tx) => tx.content(),
+        }
+    }
+
+    /// Is this in-pool transaction?
+    pub fn is_in_pool(&self) -> bool {
+        match *self {
+            TransactionInfo::InPool { .. } => true,
+            _ => false,
+        }
+    }
+
+    /// Is this a committed transaction?
+    pub fn is_committed(&self) -> bool {
+        match *self {
+            TransactionInfo::Committed(_) => true,
+            _ => false,
+        }
+    }
 }
 
 /// Information on blocks coupled with the corresponding range in the blockchain.
@@ -504,7 +544,7 @@ impl BlockchainExplorer {
     }
 
     /// Returns information about the transaction identified by the hash.
-    pub fn transaction(&self, tx_hash: &Hash) -> Option<TxInfo> {
+    pub fn transaction(&self, tx_hash: &Hash) -> Option<TransactionInfo> {
         let schema = Schema::new(self.blockchain.snapshot());
         let raw_tx = schema.transactions().get(tx_hash)?;
 
@@ -516,11 +556,11 @@ impl BlockchainExplorer {
         let content = content.unwrap();
 
         if schema.transactions_pool().contains(tx_hash) {
-            return Some(TxInfo::InPool { content });
+            return Some(TransactionInfo::InPool { content });
         }
 
         let tx = self.committed_transaction(tx_hash, Some(content));
-        Some(TxInfo::Committed(tx))
+        Some(TransactionInfo::Committed(tx))
     }
 
     /// Retrieves a transaction that is known to be committed.
@@ -528,7 +568,7 @@ impl BlockchainExplorer {
         &self,
         tx_hash: &Hash,
         maybe_content: Option<Box<Transaction>>,
-    ) -> TransactionInfo {
+    ) -> CommittedTransaction {
         let schema = Schema::new(self.blockchain.snapshot());
 
         let location = schema.transactions_locations().get(tx_hash).expect(
@@ -538,14 +578,14 @@ impl BlockchainExplorer {
             ),
         );
 
-        let location_proof = schema.block_transactions(location.block_height()).get_proof(
-            location.position_in_block(),
-        );
+        let location_proof = schema
+            .block_transactions(location.block_height())
+            .get_proof(location.position_in_block());
 
         // Unwrap is OK here, because we already know that transaction is committed.
         let status = schema.transaction_results().get(tx_hash).unwrap();
 
-        TransactionInfo {
+        CommittedTransaction {
             content: maybe_content.unwrap_or_else(|| {
                 let raw_tx = schema.transactions().get(tx_hash).unwrap();
                 self.blockchain.tx_from_raw(raw_tx).unwrap()
@@ -585,7 +625,9 @@ impl BlockchainExplorer {
                 precommits: proof.precommits,
                 txs: txs_table
                     .iter()
-                    .map(|tx_hash| (tx_hash, self.committed_transaction(&tx_hash, None)))
+                    .map(|tx_hash| {
+                        (tx_hash, self.committed_transaction(&tx_hash, None))
+                    })
                     .collect(),
             }
         })
