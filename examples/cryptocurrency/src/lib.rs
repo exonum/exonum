@@ -37,7 +37,7 @@ extern crate router;
 extern crate bodyparser;
 extern crate iron;
 
-/// Constants
+/// Constants.
 pub mod constants {
     /// Service ID for the `Service` trait.
     pub const SERVICE_ID: u16 = 1;
@@ -46,7 +46,7 @@ pub mod constants {
     pub const INIT_BALANCE: u64 = 100;
 }
 
-/// Persistent data
+/// Persistent data.
 pub mod schema {
     use exonum::storage::{Fork, MapIndex, Snapshot};
     use exonum::crypto::PublicKey;
@@ -121,11 +121,11 @@ pub mod schema {
     }
 }
 
-/// Transactions
+/// Transactions.
 pub mod transactions {
     use exonum::crypto::PublicKey;
 
-    use super::constants::SERVICE_ID;
+    use constants::SERVICE_ID;
 
     transactions! {
         pub(crate) CurrencyTransactions {
@@ -162,7 +162,7 @@ pub mod transactions {
     }
 }
 
-/// Contract errors
+/// Contract errors.
 pub mod errors {
     use exonum::blockchain::ExecutionError;
 
@@ -202,7 +202,7 @@ pub mod errors {
     }
 }
 
-/// Contracts
+/// Contracts.
 pub mod contracts {
     use exonum::blockchain::{Transaction, ExecutionResult};
     use exonum::messages::Message;
@@ -278,7 +278,7 @@ pub mod contracts {
     }
 }
 
-/// REST API
+/// REST API.
 pub mod api {
     use exonum::blockchain::{Blockchain, Transaction};
     use exonum::encoding::serialize::FromHex;
@@ -304,7 +304,7 @@ pub mod api {
     }
 
     impl CryptocurrencyApi {
-        /// Method for struct construction
+        /// Method for struct construction.
         pub fn new(channel: ApiSender, blockchain: Blockchain) -> CryptocurrencyApi {
             CryptocurrencyApi {
                 channel,
@@ -397,7 +397,7 @@ pub mod api {
     }
 }
 
-/// Service declaration
+/// Service declaration.
 pub mod service {
     use exonum::blockchain::{Service, Transaction, ApiContext, TransactionSet};
     use exonum::messages::RawTransaction;
