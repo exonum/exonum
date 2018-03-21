@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(any(test, feature = "long_benchmarks"))]
-pub mod tests;
 pub mod codec;
 pub mod error;
 pub mod network;
 pub mod internal;
+
+#[cfg(any(test, feature = "long_benchmarks"))]
+mod tests;
+#[cfg(all(test, feature = "long_benchmarks"))]
+mod benches;
 
 use std::time::SystemTime;
 use std::cmp::Ordering;

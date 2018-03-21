@@ -79,12 +79,12 @@ pub mod messages;
 #[macro_use]
 pub mod helpers;
 pub mod crypto;
-pub mod node;
 pub mod storage;
 #[macro_use]
 pub mod blockchain;
 pub mod api;
 
 mod events;
+mod node;
 #[cfg(test)]
 mod sandbox;
