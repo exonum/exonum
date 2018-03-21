@@ -114,7 +114,7 @@ fn test_transfer_from_nonexisting_wallet() {
     testkit.create_block_with_tx_hashes(&[tx.hash()]);
     api.assert_tx_status(
         &tx.hash(),
-        &json!({ "type": "error", "code": 1, "description": "" }),
+        &json!({ "type": "error", "code": 1, "description": "Sender doesn't exist" }),
     );
 
     // Check that Bob's balance doesn't change.
@@ -148,7 +148,7 @@ fn test_transfer_to_nonexisting_wallet() {
     testkit.create_block_with_tx_hashes(&[tx.hash()]);
     api.assert_tx_status(
         &tx.hash(),
-        &json!({ "type": "error", "code": 2, "description": "" }),
+        &json!({ "type": "error", "code": 2, "description": "Receiver doesn't exist" }),
     );
 
     // Check that Alice's balance doesn't change.
@@ -177,7 +177,7 @@ fn test_transfer_overcharge() {
     testkit.create_block();
     api.assert_tx_status(
         &tx.hash(),
-        &json!({ "type": "error", "code": 3, "description": "" }),
+        &json!({ "type": "error", "code": 3, "description": "Insufficient currency amount" }),
     );
 
     let wallet = api.get_wallet(tx_alice.pub_key());
