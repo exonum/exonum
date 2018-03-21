@@ -40,6 +40,7 @@ use std::fmt;
 use std::iter;
 use std::panic;
 use std::net::SocketAddr;
+use std::error::Error as StdError;
 use failure;
 
 use vec_map::VecMap;
@@ -51,6 +52,7 @@ use messages::{CONSENSUS as CORE_SERVICE, Connect, Precommit, RawMessage};
 use storage::{Database, Error, Fork, Patch, Snapshot};
 use helpers::{Height, Round, ValidatorId};
 use node::ApiSender;
+use encoding::Error as MessageError;
 
 pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
 pub use self::schema::{Schema, TxLocation};
@@ -141,11 +143,12 @@ impl Blockchain {
     ///
     /// - Blockchain has service with the `service_id` of given raw message.
     /// - Service can deserialize given raw message.
-    pub fn tx_from_raw(&self, raw: RawMessage) -> Option<Box<Transaction>> {
+    pub fn tx_from_raw(&self, raw: RawMessage) -> Result<Box<Transaction>, MessageError> {
         let id = raw.service_id() as usize;
-        self.service_map.get(id).and_then(|service| {
-            service.tx_from_raw(raw).ok()
-        })
+        let service = self.service_map.get(id).ok_or_else(|| {
+            MessageError::from("Service not found.")
+        })?;
+        service.tx_from_raw(raw)
     }
 
     /// Commits changes from the patch to the blockchain storage.
@@ -352,8 +355,10 @@ impl Blockchain {
                 failure::err_msg("BUG: Cannot find transaction in database.")
             })?;
 
-            self.tx_from_raw(tx).ok_or_else(|| {
-                failure::err_msg("BUG: couldn't create tx from raw message")
+            self.tx_from_raw(tx).or_else(|error| {
+                Err(failure::err_msg(
+                    format!("{}, tx: {:?}", error.description(), tx_hash),
+                ))
             })?
         };
 

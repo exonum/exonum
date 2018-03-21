@@ -46,7 +46,7 @@ testnet:
 ```bash
 mkdir -p testnet/configuration_service
 cd testnet/configuration_service
-configuration generate-testnet --start 5400 4 --output_dir .
+configuration generate-testnet --start 5400 4 --output-dir .
 cd ..
 ```
 
