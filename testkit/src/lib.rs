@@ -394,7 +394,7 @@ impl TestKit {
         self.db_handler.checkpoint();
     }
 
-    /// Rolls the blockchain back to a [`checkpoint`](#method.checkpoint) set before.
+    /// Rolls the blockchain back to the [`checkpoint`](#method.checkpoint) set before.
     ///
     /// # Examples
     ///

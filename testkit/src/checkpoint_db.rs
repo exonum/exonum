@@ -100,12 +100,13 @@ impl<T: Database> CheckpointDbHandler<T> {
 }
 
 #[derive(Debug)]
-// Journal is used here to track patches that need to be applied (in order
-// that they appear) to db for it to become what it was on checkpoint.
+// Journal is used to track patches that need to be applied
+// (in the order that they appear) to the database in order
+// to restore its state to a checkpoint.
 //
-// Insertion should happen to the front of the journal,
-// application of patches in the journal should happen
-// sequentially in order that they are in the VecDeque.
+// Insertion should occur at the front of the journal,
+// while patches should apply sequentially in the order
+// in which they are in the VecDeque.
 struct CheckpointDbInner<T> {
     db: T,
     journal: VecDeque<Patch>,
@@ -127,13 +128,13 @@ impl<T: Database> CheckpointDbInner<T> {
 
     fn merge(&mut self, patch: Patch) -> StorageResult<()> {
         if self.checkpoint_set {
-            self.merge_with_journal_logging(patch)
+            self.merge_with_logging(patch)
         } else {
             self.db.merge(patch)
         }
     }
 
-    fn merge_with_journal_logging(&mut self, patch: Patch) -> StorageResult<()> {
+    fn merge_with_logging(&mut self, patch: Patch) -> StorageResult<()> {
         // NB: make sure that **both** the db and the journal
         // are updated atomically.
         let snapshot = self.db.snapshot();
@@ -160,13 +161,13 @@ impl<T: Database> CheckpointDbInner<T> {
     fn checkpoint(&mut self) {
         assert!(
             !self.checkpoint_set,
-            "Checkpoint is already set. There can only be one checkpoint at a time."
+            "Checkpoint has already been set. There can only be one checkpoint at a time."
         );
         self.checkpoint_set = true;
     }
 
     fn rollback(&mut self) {
-        assert!(self.checkpoint_set, "Checkpoint was not set yet.");
+        assert!(self.checkpoint_set, "Checkpoint has not been set yet");
         for patch in self.journal.drain(..) {
             self.db.merge(patch).expect("Cannot merge roll-back patch");
         }
