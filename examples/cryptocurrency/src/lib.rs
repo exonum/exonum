@@ -110,6 +110,7 @@ pub mod schema {
             MapIndex::new("cryptocurrency.wallets", &mut self.view)
         }
     }
+}
 
 /// Transactions.
 pub mod transactions {
