@@ -186,10 +186,11 @@ pub mod errors {
         InsufficientCurrencyAmount = 3,
     }
 
-impl From<Error> for ExecutionError {
-    fn from(value: Error) -> ExecutionError {
-        let description = format!("{}", &value);
-        ExecutionError::with_description(value as u8, description)
+    impl From<Error> for ExecutionError {
+        fn from(value: Error) -> ExecutionError {
+            let description = format!("{}", value);
+            ExecutionError::with_description(value as u8, description)
+        }
     }
 }
 
