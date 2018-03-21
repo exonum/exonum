@@ -108,7 +108,7 @@ use super::transaction::Transaction;
 ///        SERVICE_ID
 ///     }
 ///
-///     fn service_name(&self) -> &'static str {
+///     fn service_name(&self) -> &str {
 ///         "my_special_unique_service"
 ///     }
 ///
