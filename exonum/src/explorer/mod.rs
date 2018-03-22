@@ -17,17 +17,18 @@
 
 use serde::{Serialize, Serializer};
 
+use crypto::{CryptoHash, Hash};
+use blockchain::{Schema, Blockchain, Block, TxLocation, Transaction, TransactionResult,
+                 TransactionError, TransactionErrorType};
+use encoding;
+use helpers::Height;
+use messages::{Precommit, RawMessage};
+use storage::{ListProof, Snapshot};
+
 use std::cell::{Ref, RefCell};
 use std::collections::Bound;
 use std::fmt;
 use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
-
-use storage::{ListProof, Snapshot};
-use crypto::{CryptoHash, Hash};
-use blockchain::{Schema, Blockchain, Block, TxLocation, Transaction, TransactionResult,
-                 TransactionError, TransactionErrorType};
-use messages::{Precommit, RawMessage};
-use helpers::Height;
 
 #[cfg(any(test, feature = "doctests"))]
 #[doc(hidden)]
@@ -709,7 +710,7 @@ pub struct BlocksRange {
 /// Blockchain explorer.
 pub struct BlockchainExplorer<'a> {
     snapshot: Box<Snapshot>,
-    transaction_parser: Box<'a + Fn(RawMessage) -> Option<Box<Transaction>>>,
+    transaction_parser: Box<'a + Fn(RawMessage) -> Result<Box<Transaction>, encoding::Error>>,
 }
 
 impl<'a> fmt::Debug for BlockchainExplorer<'a> {
@@ -733,8 +734,8 @@ impl<'a> BlockchainExplorer<'a> {
         let raw_tx = schema.transactions().get(tx_hash)?;
 
         let content = (self.transaction_parser)(raw_tx.clone());
-        if content.is_none() {
-            error!("Service not found for tx: {:?}", raw_tx);
+        if let Err(e) = content {
+            error!("Error while parsing transaction {:?}: {}", raw_tx, e);
             return None;
         }
         let content = content.unwrap();

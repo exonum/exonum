@@ -33,13 +33,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   `blockchain::gen_prefix` method has been removed. Instead, any type that
   implements `StorageKey` trait, can serve as an `index_id`. (#531)
 
-- Several `Schema`'s methods have been renamed:
+- Several `Schema`'s methods have been renamed (#565):
   - `tx_location_by_tx_hash` to `transactions_locations`.
   - `block_txs` to `block_transactions`.
 
 - `SystemTime` previously used as storage key or value turned out to show
   different behavior on different platforms and, hence, has been replaced with
-  `chrono::DateTime<Utc>` that behaves the same in any environment.
+  `chrono::DateTime<Utc>` that behaves the same in any environment. (#557)
 
   Migration path:
 
@@ -48,9 +48,17 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   `SystemTime` instances into suitable type when constructing transactions or
   working with database.
 
+- `Blockchain` method `tx_from_raw()` now returns
+  `Result<Box<Transaction>, MessageError>` instead of `Option<Box<Transaction>>`.
+  (#567)
+
+- `events` module becomes private. (#568)
+
+- `CryptoHash` trait is no longer implemented for `Hash`. (#579)
+
 #### exonum-testkit
 
-- Testkit api now contains two methods to work with the transaction pool:
+- Testkit api now contains two methods to work with the transaction pool (#549):
   - `is_tx_in_pool` - for checking transaction existence in the pool;
   - `add_tx` - for adding a new transaction into the pool.
 
@@ -69,7 +77,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum-time
 
 - `SystemTime` has been replaced with `chrono::DateTime<Utc>`, as it provides
-  more predictable behavior on all systems.
+  more predictable behavior on all systems. (#557)
 
 ### New features
 
@@ -93,12 +101,17 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   method. Correspondingly, `MapProof` allows to verify proofs for an arbitrary
   number of elements. (#380)
 
+- `storage::UniqueHash` trait that represents a unique, but not necessary
+  cryptographic hash function, is introduced. (#579)
+
 ### Internal improvements
 
 #### Exonum core
 
 - Non-committed transactions are now stored persistently in the storage
   instead of memory pool. (#549)
+
+- Sandbox tests have been moved inside of the exonum core. (#568)
 
 ## 0.6 - 2018-03-06
 
