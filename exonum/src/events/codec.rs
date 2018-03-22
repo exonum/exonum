@@ -43,7 +43,7 @@ impl Decoder for MessagesCodec {
             return Ok(None);
         }
         // Check payload len
-        let total_len = LittleEndian::read_u32(&buf[6..10]) as usize;
+        let total_len = LittleEndian::read_u32(&buf[5..9]) as usize;
 
         if total_len as u32 > self.max_message_len {
             return Err(other_error(format!(
@@ -92,7 +92,7 @@ mod test {
 
     #[test]
     fn decode_message_valid_header_size() {
-        let data = vec![0u8, 0, 0, 0, 0, 0, 10, 0, 0, 0];
+        let data = vec![0u8, 0, 0, 0, 0, 10, 0, 0, 0, 0];
         let mut bytes: BytesMut = data.as_slice().into();
         let mut codec = MessagesCodec { max_message_len: 10000 };
         match codec.decode(&mut bytes) {

@@ -206,8 +206,8 @@ impl MessageWriter {
     }
 
     /// Sets the service id.
-    fn set_service_id(&mut self, message_type: u16) {
-        LittleEndian::write_u16(&mut self.raw[3..5], message_type)
+    fn set_service_id(&mut self, service_id: u16) {
+        LittleEndian::write_u16(&mut self.raw[3..5], service_id)
     }
 
     /// Sets the message type.

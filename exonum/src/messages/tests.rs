@@ -42,7 +42,7 @@ fn test_message_without_fields() {
 fn test_unsupported_version() {
     let tx = TxSimple::new_with_signature(&PublicKey::zero(), "My little pony", &Signature::zero());
     let mut vec = tx.as_ref().as_ref().to_vec();
-    vec[1] = 128;
+    vec[0] = 128;
     let _msg = TxSimple::from_raw(RawMessage::from_vec(vec)).unwrap();
 }
 
