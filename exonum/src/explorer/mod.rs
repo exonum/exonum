@@ -26,7 +26,7 @@ use storage::{ListProof, Snapshot};
 use crypto::{CryptoHash, Hash};
 use blockchain::{Schema, Blockchain, Block, TxLocation, Transaction, TransactionResult,
                  TransactionError, TransactionErrorType};
-use messages::Precommit;
+use messages::{Precommit, RawMessage};
 use helpers::Height;
 
 #[cfg(any(test, feature = "doctests"))]
@@ -94,7 +94,7 @@ impl HeightRange {
 /// # use exonum::helpers::Height;
 /// let blockchain = // ...
 /// #                sample_blockchain();
-/// let explorer = BlockchainExplorer::new(blockchain);
+/// let explorer = BlockchainExplorer::new(&blockchain);
 /// let block: BlockInfo = explorer.block(Height(1)).unwrap();
 /// assert_eq!(block.block().height(), Height(1));
 /// assert_eq!(block.len(), 3);
@@ -115,7 +115,7 @@ impl HeightRange {
 /// # use exonum::helpers::Height;
 /// # fn main() {
 /// # let blockchain = sample_blockchain();
-/// # let explorer = BlockchainExplorer::new(blockchain);
+/// # let explorer = BlockchainExplorer::new(&blockchain);
 /// let block: BlockInfo = // ...
 /// #                      explorer.block(Height(1)).unwrap();
 /// assert_eq!(
@@ -133,17 +133,15 @@ impl HeightRange {
 /// ```
 #[derive(Debug)]
 pub struct BlockInfo<'a> {
-    explorer: &'a BlockchainExplorer,
+    explorer: &'a BlockchainExplorer<'a>,
     block: Block,
     precommits: RefCell<Option<Vec<Precommit>>>,
     txs: RefCell<Option<Vec<Hash>>>,
 }
 
 impl<'a> BlockInfo<'a> {
-    fn new<T>(explorer: &'a BlockchainExplorer, schema: &Schema<T>, height: Height) -> Self
-    where
-        T: AsRef<Snapshot>,
-    {
+    fn new(explorer: &'a BlockchainExplorer, height: Height) -> Self {
+        let schema = Schema::new(&explorer.snapshot);
         let block = {
             let hashes = schema.block_hashes_by_height();
             let blocks = schema.blocks();
@@ -295,7 +293,7 @@ impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
 /// # use exonum::helpers::Height;
 /// let blockchain = // ...
 /// #                sample_blockchain();
-/// let explorer = BlockchainExplorer::new(blockchain);
+/// let explorer = BlockchainExplorer::new(&blockchain);
 /// let block: BlockWithTransactions = explorer.block_with_txs(Height(1)).unwrap();
 /// assert_eq!(block.block.height(), Height(1));
 /// assert_eq!(block.len(), 3);
@@ -373,7 +371,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 ///
 /// let blockchain = // ...
 /// #                sample_blockchain();
-/// let explorer = BlockchainExplorer::new(blockchain);
+/// let explorer = BlockchainExplorer::new(&blockchain);
 /// let tx = explorer.block(Height(1)).unwrap().transaction(0).unwrap();
 /// assert_eq!(tx.location().block_height(), Height(1));
 /// assert_eq!(tx.location().position_in_block(), 0);
@@ -400,7 +398,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// # fn main() {
 /// let blockchain = // ...
 /// #                sample_blockchain();
-/// let explorer = BlockchainExplorer::new(blockchain);
+/// let explorer = BlockchainExplorer::new(&blockchain);
 /// let tx = explorer.block(Height(1)).unwrap().transaction(0).unwrap();
 /// assert_eq!(
 ///     serde_json::to_value(&tx).unwrap(),
@@ -437,7 +435,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// #
 /// # fn main() {
 /// # let blockchain = sample_blockchain();
-/// # let explorer = BlockchainExplorer::new(blockchain);
+/// # let explorer = BlockchainExplorer::new(&blockchain);
 /// let erroneous_tx: CommittedTransaction = // ...
 /// #   explorer.block(Height(1)).unwrap().transaction(1).unwrap();
 /// assert_eq!(
@@ -471,7 +469,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// #
 /// # fn main() {
 /// # let blockchain = sample_blockchain();
-/// # let explorer = BlockchainExplorer::new(blockchain);
+/// # let explorer = BlockchainExplorer::new(&blockchain);
 /// let panicked_tx: CommittedTransaction = // ...
 /// #   explorer.block(Height(1)).unwrap().transaction(2).unwrap();
 /// assert_eq!(
@@ -576,7 +574,7 @@ impl CommittedTransaction {
 /// # use exonum::explorer::tests::{sample_blockchain, mempool_transaction};
 /// let blockchain = // ...
 /// #                sample_blockchain();
-/// let explorer = BlockchainExplorer::new(blockchain);
+/// let explorer = BlockchainExplorer::new(&blockchain);
 /// let hash = // ...
 /// #          mempool_transaction().hash();
 /// let tx: TransactionInfo = explorer.transaction(&hash).unwrap();
@@ -603,7 +601,7 @@ impl CommittedTransaction {
 ///
 /// # fn main() {
 /// # let blockchain = sample_blockchain();
-/// # let explorer = BlockchainExplorer::new(blockchain);
+/// # let explorer = BlockchainExplorer::new(&blockchain);
 /// # let block = explorer.block(Height(1)).unwrap();
 /// let committed_tx: TransactionInfo = // ...
 /// #   explorer.transaction(&block.transaction_hashes()[0]).unwrap();
@@ -638,7 +636,7 @@ impl CommittedTransaction {
 ///
 /// # fn main() {
 /// # let blockchain = sample_blockchain();
-/// # let explorer = BlockchainExplorer::new(blockchain);
+/// # let explorer = BlockchainExplorer::new(&blockchain);
 /// let tx_in_pool: TransactionInfo = // ...
 /// #   explorer.transaction(&mempool_transaction().hash()).unwrap();
 /// assert_eq!(
@@ -709,23 +707,32 @@ pub struct BlocksRange {
 }
 
 /// Blockchain explorer.
-#[derive(Debug, Clone)]
-pub struct BlockchainExplorer {
-    blockchain: Blockchain,
+pub struct BlockchainExplorer<'a> {
+    snapshot: Box<Snapshot>,
+    transaction_parser: Box<'a + Fn(RawMessage) -> Option<Box<Transaction>>>,
 }
 
-impl BlockchainExplorer {
+impl<'a> fmt::Debug for BlockchainExplorer<'a> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        formatter.pad("BlockchainExplorer { .. }")
+    }
+}
+
+impl<'a> BlockchainExplorer<'a> {
     /// Creates a new `BlockchainExplorer` instance.
-    pub fn new(blockchain: Blockchain) -> Self {
-        BlockchainExplorer { blockchain }
+    pub fn new(blockchain: &'a Blockchain) -> Self {
+        BlockchainExplorer {
+            snapshot: blockchain.snapshot(),
+            transaction_parser: Box::new(move |raw| blockchain.tx_from_raw(raw)),
+        }
     }
 
     /// Returns information about the transaction identified by the hash.
     pub fn transaction(&self, tx_hash: &Hash) -> Option<TransactionInfo> {
-        let schema = Schema::new(self.blockchain.snapshot());
+        let schema = Schema::new(&self.snapshot);
         let raw_tx = schema.transactions().get(tx_hash)?;
 
-        let content = self.blockchain.tx_from_raw(raw_tx.clone());
+        let content = (self.transaction_parser)(raw_tx.clone());
         if content.is_none() {
             error!("Service not found for tx: {:?}", raw_tx);
             return None;
@@ -742,7 +749,7 @@ impl BlockchainExplorer {
 
     #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
     fn precommits(&self, block: &Block) -> Vec<Precommit> {
-        let schema = Schema::new(self.blockchain.snapshot());
+        let schema = Schema::new(&self.snapshot);
         let precommits_table = schema.precommits(&block.hash());
         let precommits = precommits_table.iter().collect();
         precommits
@@ -750,7 +757,7 @@ impl BlockchainExplorer {
 
     #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
     fn transaction_hashes(&self, block: &Block) -> Vec<Hash> {
-        let schema = Schema::new(self.blockchain.snapshot());
+        let schema = Schema::new(&self.snapshot);
         let tx_hashes_table = schema.block_transactions(block.height());
         let tx_hashes = tx_hashes_table.iter().collect();
         tx_hashes
@@ -762,7 +769,7 @@ impl BlockchainExplorer {
         tx_hash: &Hash,
         maybe_content: Option<Box<Transaction>>,
     ) -> CommittedTransaction {
-        let schema = Schema::new(self.blockchain.snapshot());
+        let schema = Schema::new(&self.snapshot);
 
         let location = schema.transactions_locations().get(tx_hash).expect(
             &format!(
@@ -781,7 +788,7 @@ impl BlockchainExplorer {
         CommittedTransaction {
             content: maybe_content.unwrap_or_else(|| {
                 let raw_tx = schema.transactions().get(tx_hash).unwrap();
-                self.blockchain.tx_from_raw(raw_tx).unwrap()
+                (self.transaction_parser)(raw_tx).unwrap()
             }),
 
             location,
@@ -792,9 +799,9 @@ impl BlockchainExplorer {
 
     /// Returns block information for the specified height or `None` if there is no such block.
     pub fn block(&self, height: Height) -> Option<BlockInfo> {
-        let schema = Schema::new(self.blockchain.snapshot());
+        let schema = Schema::new(&self.snapshot);
         if schema.height() >= height {
-            Some(BlockInfo::new(self, &schema, height))
+            Some(BlockInfo::new(self, height))
         } else {
             None
         }
@@ -802,7 +809,7 @@ impl BlockchainExplorer {
 
     /// Returns block information for the specified height or `None` if there is no such block.
     pub fn block_with_txs(&self, height: Height) -> Option<BlockWithTransactions> {
-        let schema = Schema::new(self.blockchain.snapshot());
+        let schema = Schema::new(&self.snapshot);
         let txs_table = schema.block_transactions(height);
         let block_proof = schema.block_and_precommits(height);
 
@@ -855,29 +862,21 @@ impl BlockchainExplorer {
         use std::cmp::max;
 
         let heights = heights.into();
-        let schema = Schema::new(self.blockchain.snapshot());
+        let schema = Schema::new(&self.snapshot);
         let max_height = schema.height();
 
         let ptr = heights.start_height();
         BlocksIter {
             explorer: self,
-            schema,
             ptr,
             back: max(ptr, heights.end_height(max_height)),
         }
-    }
-
-    /// Returns transaction result for a certain transaction.
-    pub fn transaction_result(&self, hash: &Hash) -> Option<TransactionResult> {
-        let schema = Schema::new(self.blockchain.snapshot());
-        schema.transaction_results().get(hash)
     }
 }
 
 /// Iterator over blocks in descending order.
 pub struct BlocksIter<'a> {
-    schema: Schema<Box<Snapshot>>,
-    explorer: &'a BlockchainExplorer,
+    explorer: &'a BlockchainExplorer<'a>,
     ptr: Height,
     back: Height,
 }
@@ -900,7 +899,7 @@ impl<'a> Iterator for BlocksIter<'a> {
             return None;
         }
 
-        let block = BlockInfo::new(self.explorer, &self.schema, self.ptr);
+        let block = BlockInfo::new(self.explorer, self.ptr);
         self.ptr = self.ptr.next();
         Some(block)
     }
@@ -920,7 +919,7 @@ impl<'a> Iterator for BlocksIter<'a> {
             None
         } else {
             self.ptr = Height(self.ptr.0 + n as u64);
-            let block = BlockInfo::new(self.explorer, &self.schema, self.ptr);
+            let block = BlockInfo::new(self.explorer, self.ptr);
             self.ptr = self.ptr.next();
             Some(block)
         }
@@ -934,6 +933,6 @@ impl<'a> DoubleEndedIterator for BlocksIter<'a> {
         }
 
         self.back = self.back.previous();
-        Some(BlockInfo::new(self.explorer, &self.schema, self.back))
+        Some(BlockInfo::new(self.explorer, self.back))
     }
 }

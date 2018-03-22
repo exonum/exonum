@@ -212,46 +212,52 @@ fn test_explorer_basics() {
     let tx_bob = CreateWallet::new(&pk_bob, "Bob", &key_bob);
     let tx_transfer = Transfer::new(&pk_alice, &pk_bob, 100, &key_alice);
 
-    let explorer = BlockchainExplorer::new(blockchain.clone());
-    let block = explorer.block(Height(0)).unwrap();
-    assert_eq!(block.len(), 0);
-    assert!(block.transaction(0).is_none());
-    assert!(explorer.transaction(&tx_alice.hash()).is_none());
+    {
+        let explorer = BlockchainExplorer::new(&blockchain);
+        let block = explorer.block(Height(0)).unwrap();
+        assert_eq!(block.len(), 0);
+        assert!(block.transaction(0).is_none());
+        assert!(explorer.transaction(&tx_alice.hash()).is_none());
+    }
 
     // Block #1: Alice's transaction.
 
     create_block(&mut blockchain, vec![tx_alice.clone().into()]);
-    assert!(explorer.block(Height(2)).is_none());
-    let block = explorer.block(Height(1)).unwrap();
-    assert_eq!(block.len(), 1);
-    let tx_info = block.transaction(0).unwrap();
-    assert_eq!(*tx_info.location(), TxLocation::new(Height(1), 0));
-    assert_eq!(tx_info.status(), Ok(()));
-    assert_eq!(tx_info.content().raw(), tx_alice.raw());
-    assert_eq!(tx_info.content().hash(), block.transaction_hashes()[0]);
 
-    let tx_info = explorer.transaction(&tx_alice.hash()).unwrap();
-    assert!(!tx_info.is_in_pool());
-    assert!(tx_info.is_committed());
-    assert_eq!(tx_info.content().raw(), tx_alice.raw());
+    {
+        let explorer = BlockchainExplorer::new(&blockchain);
+        assert!(explorer.block(Height(2)).is_none());
+        let block = explorer.block(Height(1)).unwrap();
+        assert_eq!(block.len(), 1);
+        let tx_info = block.transaction(0).unwrap();
+        assert_eq!(*tx_info.location(), TxLocation::new(Height(1), 0));
+        assert_eq!(tx_info.status(), Ok(()));
+        assert_eq!(tx_info.content().raw(), tx_alice.raw());
+        assert_eq!(tx_info.content().hash(), block.transaction_hashes()[0]);
 
-    let tx_info = match tx_info {
-        TransactionInfo::Committed(info) => info,
-        tx => panic!("{:?}", tx),
-    };
-    assert_eq!(*tx_info.location(), TxLocation::new(Height(1), 0));
-    assert_eq!(
-        serde_json::to_value(&tx_info).unwrap(),
-        json!({
-            "content": tx_alice,
-            "location": {
-                "block_height": "1",
-                "position_in_block": "0",
-            },
-            "location_proof": tx_info.location_proof(), // too complicated to check
-            "status": { "type": "success" },
-        })
-    );
+        let tx_info = explorer.transaction(&tx_alice.hash()).unwrap();
+        assert!(!tx_info.is_in_pool());
+        assert!(tx_info.is_committed());
+        assert_eq!(tx_info.content().raw(), tx_alice.raw());
+
+        let tx_info = match tx_info {
+            TransactionInfo::Committed(info) => info,
+            tx => panic!("{:?}", tx),
+        };
+        assert_eq!(*tx_info.location(), TxLocation::new(Height(1), 0));
+        assert_eq!(
+            serde_json::to_value(&tx_info).unwrap(),
+            json!({
+                "content": tx_alice,
+                "location": {
+                    "block_height": "1",
+                    "position_in_block": "0",
+                },
+                "location_proof": tx_info.location_proof(), // too complicated to check
+                "status": { "type": "success" },
+            })
+        );
+    }
 
     // Block #2: other transactions.
 
@@ -259,6 +265,8 @@ fn test_explorer_basics() {
         &mut blockchain,
         vec![tx_bob.clone().into(), tx_transfer.clone().into()],
     );
+
+    let explorer = BlockchainExplorer::new(&blockchain);
     let block = explorer.block(Height(2)).unwrap();
     assert_eq!(block.len(), 2);
 
@@ -312,8 +320,10 @@ fn test_explorer_pool_transaction() {
     let tx_alice = CreateWallet::new(&pk_alice, "Alice", &key_alice);
     let tx_hash = tx_alice.hash();
 
-    let explorer = BlockchainExplorer::new(blockchain.clone());
-    assert!(explorer.transaction(&tx_hash).is_none());
+    {
+        let explorer = BlockchainExplorer::new(&blockchain);
+        assert!(explorer.transaction(&tx_hash).is_none());
+    }
 
     let mut fork = blockchain.fork();
     {
@@ -322,6 +332,7 @@ fn test_explorer_pool_transaction() {
     }
     blockchain.merge(fork.into_patch()).unwrap();
 
+    let explorer = BlockchainExplorer::new(&blockchain);
     let tx_info = explorer.transaction(&tx_hash).unwrap();
     assert!(tx_info.is_in_pool());
     assert!(!tx_info.is_committed());
@@ -353,7 +364,7 @@ fn test_explorer_block_iter() {
     create_block(&mut blockchain, txs.take(5).collect()); // Height(9)
     assert_eq!(blockchain.last_block().height(), Height(9));
 
-    let explorer = BlockchainExplorer::new(blockchain);
+    let explorer = BlockchainExplorer::new(&blockchain);
 
     let mut count = 0;
     for (i, block) in explorer.blocks(..).enumerate() {
@@ -465,14 +476,16 @@ fn test_transaction_iterator() {
     let txs = tx_generator();
     create_block(&mut blockchain, txs.take(5).collect());
 
-    let explorer = BlockchainExplorer::new(blockchain.clone());
-    let block = explorer.block(Height(1)).unwrap();
-    for tx in &block {
-        assert_eq!(tx.status(), Ok(()));
-    }
-    for (i, tx) in block.iter().enumerate() {
-        let parsed_tx = CreateWallet::from_raw(tx.content().raw().clone()).unwrap();
-        assert_eq!(parsed_tx.name(), &format!("Alice #{}", i));
+    {
+        let explorer = BlockchainExplorer::new(&blockchain);
+        let block = explorer.block(Height(1)).unwrap();
+        for tx in &block {
+            assert_eq!(tx.status(), Ok(()));
+        }
+        for (i, tx) in block.iter().enumerate() {
+            let parsed_tx = CreateWallet::from_raw(tx.content().raw().clone()).unwrap();
+            assert_eq!(parsed_tx.name(), &format!("Alice #{}", i));
+        }
     }
 
     // Test filtering and other nice stuff.
@@ -486,6 +499,8 @@ fn test_transaction_iterator() {
         &mut blockchain,
         vec![tx_alice.clone().into(), tx_bob.clone().into(), tx_transfer.clone().into()],
     );
+
+    let explorer = BlockchainExplorer::new(&blockchain);
 
     let block = explorer.block(Height(2)).unwrap();
     let failed_tx_hashes: Vec<_> = block
@@ -509,10 +524,9 @@ fn test_transaction_iterator() {
 fn test_block_with_transactions() {
     let mut blockchain = create_blockchain();
     let txs: Vec<_> = tx_generator().take(5).collect();
-    let tx_hashes: Vec<_> = txs.iter().map(|tx| tx.hash()).collect();
     create_block(&mut blockchain, txs);
 
-    let explorer = BlockchainExplorer::new(blockchain);
+    let explorer = BlockchainExplorer::new(&blockchain);
     let block = explorer.block_with_txs(Height(1)).unwrap();
     assert_eq!(block.len(), 5);
     assert!(!block.is_empty());
@@ -528,7 +542,7 @@ fn test_block_with_transactions_index_overflow() {
     let txs: Vec<_> = tx_generator().take(5).collect();
     create_block(&mut blockchain, txs);
 
-    let explorer = BlockchainExplorer::new(blockchain);
+    let explorer = BlockchainExplorer::new(&blockchain);
     let block = explorer.block_with_txs(Height(1)).unwrap();
     assert!(block[6].status().is_ok());
 }

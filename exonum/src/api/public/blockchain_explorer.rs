@@ -26,17 +26,17 @@ const MAX_BLOCKS_PER_REQUEST: usize = 1000;
 /// Public explorer API.
 #[derive(Clone, Debug)]
 pub struct ExplorerApi {
-    explorer: BlockchainExplorer,
+    blockchain: Blockchain,
 }
 
 impl ExplorerApi {
     /// Creates a new `ExplorerApi` instance.
     pub fn new(blockchain: Blockchain) -> Self {
-        ExplorerApi { explorer: BlockchainExplorer::new(blockchain) }
+        ExplorerApi { blockchain }
     }
 
-    fn explorer(&self) -> &BlockchainExplorer {
-        &self.explorer
+    fn explorer(&self) -> BlockchainExplorer {
+        BlockchainExplorer::new(&self.blockchain)
     }
 
     fn blocks(
@@ -74,8 +74,8 @@ impl ExplorerApi {
     fn set_block_response(self, router: &mut Router) {
         let block = move |req: &mut Request| -> IronResult<Response> {
             let height: Height = self.url_fragment(req, "height")?;
-            let info = self.explorer().block(height);
-            self.ok_response(&::serde_json::to_value(info).unwrap())
+            let explorer = self.explorer();
+            self.ok_response(&::serde_json::to_value(explorer.block(height)).unwrap())
         };
 
         router.get("/v1/blocks/:height", block, "height");
