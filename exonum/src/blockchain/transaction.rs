@@ -454,7 +454,7 @@ macro_rules! transactions {
 
         #[derive(Clone, Debug)]
         $(#[$tx_set_attr])*
-        enum $transaction_set {                    
+        enum $transaction_set {
             $(
                 #[allow(missing_docs)]
                 $name($name),
@@ -491,7 +491,7 @@ macro_rules! transactions {
         $(#[$tx_set_attr])*
         pub enum $transaction_set {
             $(
-                #[allow(missing_docs)]              
+                #[allow(missing_docs)]
                 $name($name),
             )*
         }
@@ -526,7 +526,7 @@ macro_rules! transactions {
         $(#[$tx_set_attr])*
         pub($($vis)+) enum $transaction_set {
             $(
-                #[allow(missing_docs)]                            
+                #[allow(missing_docs)]
                 $name($name),
             )*
         }
