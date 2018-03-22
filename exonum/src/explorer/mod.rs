@@ -15,9 +15,6 @@
 //! Blockchain explorer module provides api for getting information about blocks and transactions
 //! from the blockchain.
 
-extern crate linked_hash_map;
-
-use self::linked_hash_map::LinkedHashMap;
 use serde::{Serialize, Serializer};
 
 use std::cell::{Ref, RefCell};
@@ -221,6 +218,28 @@ impl<'a> BlockInfo<'a> {
             len: self.len(),
         }
     }
+
+    /// Loads transactions and precommits for the block.
+    pub fn with_transactions(self) -> BlockWithTransactions {
+        let (explorer, block, precommits, transactions) =
+            (self.explorer, self.block, self.precommits, self.txs);
+
+        let precommits = precommits.into_inner().unwrap_or_else(
+            || explorer.precommits(&block),
+        );
+        let transactions = transactions
+            .into_inner()
+            .unwrap_or_else(|| explorer.transaction_hashes(&block))
+            .iter()
+            .map(|tx_hash| explorer.committed_transaction(tx_hash, None))
+            .collect();
+
+        BlockWithTransactions {
+            block,
+            precommits,
+            transactions,
+        }
+    }
 }
 
 impl<'a> Serialize for BlockInfo<'a> {
@@ -278,7 +297,7 @@ impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
 /// #                sample_blockchain();
 /// let explorer = BlockchainExplorer::new(blockchain);
 /// let block: BlockWithTransactions = explorer.block_with_txs(Height(1)).unwrap();
-/// assert_eq!(block.block().height(), Height(1));
+/// assert_eq!(block.block.height(), Height(1));
 /// assert_eq!(block.len(), 3);
 ///
 /// // Iterate over transactions in the block
@@ -289,76 +308,46 @@ impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
 /// // Compared to `BlockInfo`, you can access transactions in a block using indexes
 /// let tx: &CommittedTransaction = &block[1];
 /// assert_eq!(tx.location().position_in_block(), 1);
-/// let tx_copy = &block[&tx.content().hash()];
-/// assert_eq!(tx.content().raw(), tx_copy.content().raw());
 /// ```
 #[derive(Debug)]
 pub struct BlockWithTransactions {
-    block: Block,
-    precommits: Vec<Precommit>,
-    txs: LinkedHashMap<Hash, CommittedTransaction>,
+    /// Block header.
+    pub block: Block,
+    /// Precommits.
+    pub precommits: Vec<Precommit>,
+    /// Transactions in the order they appear in the block.
+    pub transactions: Vec<CommittedTransaction>,
 }
 
 impl BlockWithTransactions {
-    /// Returns the block header as recorded in the blockchain.
-    pub fn block(&self) -> &Block {
-        &self.block
-    }
-
     /// Returns the number of transactions in this block.
     pub fn len(&self) -> usize {
-        self.txs.len()
+        self.transactions.len()
     }
 
     /// Is this block empty (i.e., contains no transactions)?
     pub fn is_empty(&self) -> bool {
-        self.txs.is_empty()
-    }
-
-    /// Returns a list of precommits for this block.
-    pub fn precommits(&self) -> &[Precommit] {
-        &self.precommits
-    }
-
-    /// Returns a transaction with the specified index in the block.
-    pub fn transaction(&self, index: usize) -> Option<&CommittedTransaction> {
-        self.txs.values().nth(index)
-    }
-
-    /// Returns a transaction with the specified hash in the block.
-    pub fn transaction_by_hash(&self, hash: &Hash) -> Option<&CommittedTransaction> {
-        self.txs.get(hash)
+        self.transactions.is_empty()
     }
 
     /// Iterates over transactions in the block.
     pub fn iter(&self) -> EagerTransactionsIter {
-        self.txs.values()
+        self.transactions.iter()
     }
 }
 
 /// Iterator over transactions in [`BlockWithTransactions`].
 ///
 /// [`BlockWithTransactions`]: struct.BlockWithTransactions.html
-pub type EagerTransactionsIter<'a> = self::linked_hash_map::Values<'a, Hash, CommittedTransaction>;
+pub type EagerTransactionsIter<'a> = ::std::slice::Iter<'a, CommittedTransaction>;
 
 impl Index<usize> for BlockWithTransactions {
     type Output = CommittedTransaction;
 
     fn index(&self, index: usize) -> &CommittedTransaction {
-        self.transaction(index).expect(&format!(
+        self.transactions.get(index).expect(&format!(
             "Index exceeds number of transactions in block {}",
             self.len()
-        ))
-    }
-}
-
-impl<'a> Index<&'a Hash> for BlockWithTransactions {
-    type Output = CommittedTransaction;
-
-    fn index(&self, tx_hash: &'a Hash) -> &CommittedTransaction {
-        self.transaction_by_hash(tx_hash).expect(&format!(
-            "Transaction with hash {:?} not in block",
-            tx_hash
         ))
     }
 }
@@ -821,11 +810,9 @@ impl BlockchainExplorer {
             BlockWithTransactions {
                 block: proof.block,
                 precommits: proof.precommits,
-                txs: txs_table
+                transactions: txs_table
                     .iter()
-                    .map(|tx_hash| {
-                        (tx_hash, self.committed_transaction(&tx_hash, None))
-                    })
+                    .map(|tx_hash| self.committed_transaction(&tx_hash, None))
                     .collect(),
             }
         })

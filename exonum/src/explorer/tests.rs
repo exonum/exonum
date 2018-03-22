@@ -368,6 +368,22 @@ fn test_explorer_block_iter() {
     let count = explorer.blocks(..).filter(BlockInfo::is_empty).count();
     assert_eq!(count, 6);
 
+    let transaction_hashes: Vec<Hash> = explorer
+        .blocks(..)
+        .flat_map(|info| info.transaction_hashes().to_vec())
+        .collect();
+    assert_eq!(transaction_hashes.len(), 12);
+
+    let block = explorer.block(Height(4)).unwrap();
+    assert_eq!(transaction_hashes[3], block.transaction_hashes()[1]);
+
+    let transactions: Vec<CommittedTransaction> = explorer
+        .blocks(..)
+        .flat_map(|info| info.with_transactions().transactions)
+        .collect();
+    assert_eq!(transactions.len(), 12);
+    assert!(transactions.iter().all(|tx| tx.location().block_height() < Height(10)));
+
     let heights: Vec<_> = explorer
         .blocks(..)
         .rev()
@@ -501,7 +517,6 @@ fn test_block_with_transactions() {
     assert_eq!(block.len(), 5);
     assert!(!block.is_empty());
     assert!(block[1].status().is_ok());
-    assert_eq!(block[&tx_hashes[3]].location().position_in_block(), 3);
 
     assert!(block.iter().all(|tx| tx.content().raw().message_type() == CreateWallet::MESSAGE_ID));
 }
@@ -516,16 +531,4 @@ fn test_block_with_transactions_index_overflow() {
     let explorer = BlockchainExplorer::new(blockchain);
     let block = explorer.block_with_txs(Height(1)).unwrap();
     assert!(block[6].status().is_ok());
-}
-
-#[test]
-#[should_panic(expected = "not in block")]
-fn test_block_with_transactions_nonexisting_hash() {
-    let mut blockchain = create_blockchain();
-    let txs: Vec<_> = tx_generator().take(5).collect();
-    create_block(&mut blockchain, txs);
-
-    let explorer = BlockchainExplorer::new(blockchain);
-    let block = explorer.block_with_txs(Height(1)).unwrap();
-    assert!(block[&Hash::zero()].status().is_ok());
 }
