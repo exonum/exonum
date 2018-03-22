@@ -54,6 +54,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `events` module becomes private. (#568)
 
+- `CryptoHash` trait is no longer implemented for `Hash`. (#579)
+
 #### exonum-testkit
 
 - Testkit api now contains two methods to work with the transaction pool (#549):
@@ -98,6 +100,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   arbitrary number of elements at one time with the help of `get_multiproof`
   method. Correspondingly, `MapProof` allows to verify proofs for an arbitrary
   number of elements. (#380)
+
+- `storage::UniqueHash` trait that represents a unique, but not necessary
+  cryptographic hash function, is introduced. (#579)
 
 ### Internal improvements
 

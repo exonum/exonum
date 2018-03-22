@@ -28,6 +28,7 @@ use sodiumoxide;
 use serde::{Serialize, Serializer};
 use serde::de::{self, Deserialize, Deserializer, Visitor};
 use byteorder::{ByteOrder, LittleEndian};
+use chrono::{DateTime, Utc};
 
 use std::default::Default;
 use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
@@ -130,8 +131,7 @@ pub fn hash(data: &[u8]) -> Hash {
     Hash(dig)
 }
 
-/// A common trait for the ability to compute a
-/// cryptographic hash.
+/// A common trait for the ability to compute a cryptographic hash.
 pub trait CryptoHash {
     /// Returns a hash of the value.
     ///
@@ -644,12 +644,6 @@ impl CryptoHash for () {
     }
 }
 
-impl CryptoHash for Hash {
-    fn hash(&self) -> Hash {
-        *self
-    }
-}
-
 impl CryptoHash for PublicKey {
     fn hash(&self) -> Hash {
         hash(self.as_ref())
@@ -680,6 +674,18 @@ impl CryptoHash for SystemTime {
         LittleEndian::write_u64(&mut buffer[0..8], secs);
         LittleEndian::write_u32(&mut buffer[8..12], nanos);
         hash(&buffer)
+    }
+}
+
+impl CryptoHash for DateTime<Utc> {
+    fn hash(&self) -> Hash {
+        let secs = self.timestamp();
+        let nanos = self.timestamp_subsec_nanos();
+
+        let mut buffer = vec![0; 12];
+        LittleEndian::write_i64(&mut buffer[0..8], secs);
+        LittleEndian::write_u32(&mut buffer[8..12], nanos);
+        buffer.hash()
     }
 }
 

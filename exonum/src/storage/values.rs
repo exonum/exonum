@@ -20,9 +20,10 @@ use chrono::{DateTime, Utc, NaiveDateTime};
 use std::mem;
 use std::borrow::Cow;
 
-use crypto::{CryptoHash, Hash, PublicKey};
+use crypto::{Hash, PublicKey};
 use messages::{RawMessage, MessageBuffer};
 use helpers::Round;
+use super::UniqueHash;
 
 /// A type that can be (de)serialized as a value in the blockchain storage.
 ///
@@ -75,7 +76,7 @@ use helpers::Round;
 ///
 /// [`encoding_struct!`]: ../macro.encoding_struct.html
 /// [`transactions!`]: ../macro.transactions.html
-pub trait StorageValue: CryptoHash + Sized {
+pub trait StorageValue: UniqueHash + Sized {
     /// Serialize a value into a vector of bytes.
     fn into_bytes(self) -> Vec<u8>;
 
@@ -258,18 +259,6 @@ impl StorageValue for String {
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
         String::from_utf8(value.into_owned()).unwrap()
-    }
-}
-
-impl CryptoHash for DateTime<Utc> {
-    fn hash(&self) -> Hash {
-        let secs = self.timestamp();
-        let nanos = self.timestamp_subsec_nanos();
-
-        let mut buffer = vec![0; 12];
-        LittleEndian::write_i64(&mut buffer[0..8], secs);
-        LittleEndian::write_u32(&mut buffer[8..12], nanos);
-        buffer.hash()
     }
 }
 
