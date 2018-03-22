@@ -487,6 +487,7 @@ macro_rules! transactions {
             )*
         }
 
+        #[allow(missing_docs)]                
         #[derive(Clone, Debug)]
         $(#[$tx_set_attr])*
         pub enum $transaction_set {
