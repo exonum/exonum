@@ -31,14 +31,6 @@
 <script>
   const className = 'modal-open'
 
-  function toggle(state) {
-    if (state) {
-      document.body.classList.add(className)
-    } else {
-      document.body.classList.remove(className)
-    }
-  }
-
   module.exports = {
     name: 'modal',
     props: {
@@ -47,19 +39,30 @@
       visible: Boolean
     },
     watch: {
-      visible: toggle
+      visible: function(value) {
+        this.toggle(value)
+      }
     },
     methods: {
       close: function() {
         this.$emit('close')
       },
+
       submit: function() {
         this.$emit('submit')
+      },
+
+      toggle: function(state) {
+        if (state) {
+          document.body.classList.add(className)
+        } else {
+          document.body.classList.remove(className)
+        }
       }
     },
     mounted: function() {
       this.$nextTick(function() {
-        toggle(false)
+        this.toggle(false)
       })
     }
   }
