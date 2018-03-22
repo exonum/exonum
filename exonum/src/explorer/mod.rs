@@ -20,11 +20,13 @@ extern crate linked_hash_map;
 use self::linked_hash_map::LinkedHashMap;
 use serde::{Serialize, Serializer};
 
+use std::cell::{Ref, RefCell};
+use std::collections::Bound;
 use std::fmt;
-use std::ops::{Index, Range};
+use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
 
 use storage::{ListProof, Snapshot};
-use crypto::Hash;
+use crypto::{CryptoHash, Hash};
 use blockchain::{Schema, Blockchain, Block, TxLocation, Transaction, TransactionResult,
                  TransactionError, TransactionErrorType};
 use messages::Precommit;
@@ -33,6 +35,57 @@ use helpers::Height;
 #[cfg(any(test, feature = "doctests"))]
 #[doc(hidden)]
 pub mod tests;
+
+/// Range of `Height`s.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct HeightRange(pub Bound<Height>, pub Bound<Height>);
+
+impl From<RangeFull> for HeightRange {
+    fn from(_: RangeFull) -> HeightRange {
+        HeightRange(Bound::Unbounded, Bound::Unbounded)
+    }
+}
+
+impl From<Range<Height>> for HeightRange {
+    fn from(range: Range<Height>) -> HeightRange {
+        HeightRange(Bound::Included(range.start), Bound::Excluded(range.end))
+    }
+}
+
+impl From<RangeFrom<Height>> for HeightRange {
+    fn from(range: RangeFrom<Height>) -> HeightRange {
+        HeightRange(Bound::Included(range.start), Bound::Unbounded)
+    }
+}
+
+impl From<RangeTo<Height>> for HeightRange {
+    fn from(range: RangeTo<Height>) -> HeightRange {
+        HeightRange(Bound::Unbounded, Bound::Excluded(range.end))
+    }
+}
+
+impl HeightRange {
+    /// Ending height of the range (exclusive), given the a priori max height.
+    fn end_height(&self, max: Height) -> Height {
+        use std::cmp::min;
+
+        let inner_end = match self.1 {
+            Bound::Included(height) => height.next(),
+            Bound::Excluded(height) => height,
+            Bound::Unbounded => max.next(),
+        };
+
+        min(inner_end, max.next())
+    }
+
+    fn start_height(&self) -> Height {
+        match self.0 {
+            Bound::Included(height) => height,
+            Bound::Excluded(height) => height.next(),
+            Bound::Unbounded => Height(0),
+        }
+    }
+}
 
 /// Information about a block in the blockchain.
 ///
@@ -74,23 +127,48 @@ pub mod tests;
 ///         // `Block` representation
 ///         "block": block.block(),
 ///         // Array of `Precommit`s
-///         "precommits": block.precommits(),
+///         "precommits": *block.precommits(),
 ///         // Array of transaction hashes
-///         "txs": block.transaction_hashes(),
+///         "txs": *block.transaction_hashes(),
 ///     })
 /// );
 /// # }
 /// ```
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct BlockInfo<'a> {
-    #[serde(skip)]
     explorer: &'a BlockchainExplorer,
     block: Block,
-    precommits: Vec<Precommit>,
-    txs: Vec<Hash>,
+    precommits: RefCell<Option<Vec<Precommit>>>,
+    txs: RefCell<Option<Vec<Hash>>>,
 }
 
 impl<'a> BlockInfo<'a> {
+    fn new<T>(explorer: &'a BlockchainExplorer, schema: &Schema<T>, height: Height) -> Self
+    where
+        T: AsRef<Snapshot>,
+    {
+        let block = {
+            let hashes = schema.block_hashes_by_height();
+            let blocks = schema.blocks();
+
+            let block_hash = hashes.get(height.0).expect(&format!(
+                "Block not found, height: {:?}",
+                height
+            ));
+            blocks.get(&block_hash).expect(&format!(
+                "Block not found, hash: {:?}",
+                block_hash
+            ))
+        };
+
+        BlockInfo {
+            explorer,
+            block,
+            precommits: RefCell::new(None),
+            txs: RefCell::new(None),
+        }
+    }
+
     /// Returns the block header as recorded in the blockchain.
     pub fn block(&self) -> &Block {
         &self.block
@@ -98,27 +176,39 @@ impl<'a> BlockInfo<'a> {
 
     /// Returns the number of transactions in this block.
     pub fn len(&self) -> usize {
-        self.txs.len()
+        self.block.tx_count() as usize
     }
 
     /// Is this block empty (i.e., contains no transactions)?
     pub fn is_empty(&self) -> bool {
-        self.txs.is_empty()
+        self.len() == 0
     }
 
     /// Returns a list of precommits for this block.
-    pub fn precommits(&self) -> &[Precommit] {
-        &self.precommits
+    pub fn precommits(&self) -> Ref<[Precommit]> {
+        if self.precommits.borrow().is_none() {
+            let precommits = self.explorer.precommits(&self.block);
+            *self.precommits.borrow_mut() = Some(precommits);
+        }
+
+        Ref::map(self.precommits.borrow(), |cache| {
+            cache.as_ref().unwrap().as_ref()
+        })
     }
 
     /// List of hashes for transactions that was executed into this block.
-    pub fn transaction_hashes(&self) -> &[Hash] {
-        &self.txs
+    pub fn transaction_hashes(&self) -> Ref<[Hash]> {
+        if self.txs.borrow().is_none() {
+            let txs = self.explorer.transaction_hashes(&self.block);
+            *self.txs.borrow_mut() = Some(txs);
+        }
+
+        Ref::map(self.txs.borrow(), |cache| cache.as_ref().unwrap().as_ref())
     }
 
     /// Returns a transaction with the specified index in the block.
     pub fn transaction(&self, index: usize) -> Option<CommittedTransaction> {
-        self.txs.get(index).map(|hash| {
+        self.transaction_hashes().get(index).map(|hash| {
             self.explorer.committed_transaction(hash, None)
         })
     }
@@ -126,34 +216,52 @@ impl<'a> BlockInfo<'a> {
     /// Iterates over transactions in the block.
     pub fn iter(&self) -> TransactionsIter {
         TransactionsIter {
-            explorer: self.explorer,
-            inner: self.txs.iter(),
+            block: self,
+            ptr: 0,
+            len: self.len(),
         }
+    }
+}
+
+impl<'a> Serialize for BlockInfo<'a> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeStruct;
+
+        let mut s = serializer.serialize_struct("BlockInfo", 3)?;
+        s.serialize_field("block", self.block())?;
+        s.serialize_field("precommits", &*self.precommits())?;
+        s.serialize_field("txs", &*self.transaction_hashes())?;
+        s.end()
     }
 }
 
 /// Iterator over transactions in a block.
 #[derive(Debug)]
-pub struct TransactionsIter<'a> {
-    explorer: &'a BlockchainExplorer,
-    inner: ::std::slice::Iter<'a, Hash>,
+pub struct TransactionsIter<'r, 'a: 'r> {
+    block: &'r BlockInfo<'a>,
+    ptr: usize,
+    len: usize,
 }
 
-impl<'a> Iterator for TransactionsIter<'a> {
+impl<'a, 'r> Iterator for TransactionsIter<'a, 'r> {
     type Item = CommittedTransaction;
 
     fn next(&mut self) -> Option<CommittedTransaction> {
-        self.inner.next().map(|hash| {
-            self.explorer.committed_transaction(hash, None)
-        })
+        if self.ptr == self.len {
+            None
+        } else {
+            let transaction = self.block.transaction(self.ptr);
+            self.ptr += 1;
+            transaction
+        }
     }
 }
 
 impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
     type Item = CommittedTransaction;
-    type IntoIter = TransactionsIter<'a>;
+    type IntoIter = TransactionsIter<'a, 'r>;
 
-    fn into_iter(self) -> TransactionsIter<'a> {
+    fn into_iter(self) -> TransactionsIter<'a, 'r> {
         self.iter()
     }
 }
@@ -643,6 +751,22 @@ impl BlockchainExplorer {
         Some(TransactionInfo::Committed(tx))
     }
 
+    #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
+    fn precommits(&self, block: &Block) -> Vec<Precommit> {
+        let schema = Schema::new(self.blockchain.snapshot());
+        let precommits_table = schema.precommits(&block.hash());
+        let precommits = precommits_table.iter().collect();
+        precommits
+    }
+
+    #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
+    fn transaction_hashes(&self, block: &Block) -> Vec<Hash> {
+        let schema = Schema::new(self.blockchain.snapshot());
+        let tx_hashes_table = schema.block_transactions(block.height());
+        let tx_hashes = tx_hashes_table.iter().collect();
+        tx_hashes
+    }
+
     /// Retrieves a transaction that is known to be committed.
     fn committed_transaction(
         &self,
@@ -680,17 +804,11 @@ impl BlockchainExplorer {
     /// Returns block information for the specified height or `None` if there is no such block.
     pub fn block(&self, height: Height) -> Option<BlockInfo> {
         let schema = Schema::new(self.blockchain.snapshot());
-        let txs_table = schema.block_transactions(height);
-        let block_proof = schema.block_and_precommits(height);
-
-        block_proof.map(|proof| {
-            BlockInfo {
-                explorer: self,
-                block: proof.block,
-                precommits: proof.precommits,
-                txs: txs_table.iter().collect(),
-            }
-        })
+        if schema.height() >= height {
+            Some(BlockInfo::new(self, &schema, height))
+        } else {
+            None
+        }
     }
 
     /// Returns block information for the specified height or `None` if there is no such block.
@@ -720,16 +838,24 @@ impl BlockchainExplorer {
         upper: Option<Height>,
         skip_empty_blocks: bool,
     ) -> BlocksRange {
-        let mut blocks_iter = self.blocks_rev(skip_empty_blocks);
-        if let Some(upper) = upper {
-            blocks_iter.skip_to(upper);
-        }
+        let blocks_iter = if let Some(upper) = upper {
+            self.blocks(..upper)
+        } else {
+            self.blocks(..)
+        };
+        let upper = blocks_iter.back;
+        let blocks: Vec<_> = blocks_iter
+            .rev()
+            .filter(|block| !skip_empty_blocks || !block.is_empty())
+            .take(count)
+            .map(|info| info.block)
+            .collect();
 
-        // Safe: we haven't iterated yet, and there is at least the genesis block.
-        let upper = blocks_iter.height.unwrap();
-
-        let blocks: Vec<_> = blocks_iter.by_ref().take(count).collect();
-        let height = blocks_iter.last_seen_height();
+        let height = if blocks.len() < count {
+            Height(0)
+        } else {
+            blocks.last().map_or(Height(0), |block| block.height())
+        };
 
         BlocksRange {
             range: height..upper.next(),
@@ -737,15 +863,20 @@ impl BlockchainExplorer {
         }
     }
 
-    /// Iterates over blocks in the descending order, optionally skipping empty blocks.
-    pub fn blocks_rev(&self, skip_empty: bool) -> BlocksIter {
-        let schema = Schema::new(self.blockchain.snapshot());
-        let height = schema.height();
+    /// Iterates over blocks in the blockchain.
+    pub fn blocks<R: Into<HeightRange>>(&self, heights: R) -> BlocksIter {
+        use std::cmp::max;
 
+        let heights = heights.into();
+        let schema = Schema::new(self.blockchain.snapshot());
+        let max_height = schema.height();
+
+        let ptr = heights.start_height();
         BlocksIter {
+            explorer: self,
             schema,
-            skip_empty,
-            height: Some(height),
+            ptr,
+            back: max(ptr, heights.end_height(max_height)),
         }
     }
 
@@ -757,83 +888,65 @@ impl BlockchainExplorer {
 }
 
 /// Iterator over blocks in descending order.
-pub struct BlocksIter {
-    skip_empty: bool,
+pub struct BlocksIter<'a> {
     schema: Schema<Box<Snapshot>>,
-    height: Option<Height>,
+    explorer: &'a BlockchainExplorer,
+    ptr: Height,
+    back: Height,
 }
 
-impl fmt::Debug for BlocksIter {
+impl<'a> fmt::Debug for BlocksIter<'a> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         formatter
             .debug_struct("BlocksIter")
-            .field("skip_empty", &self.skip_empty)
-            .field("height", &self.height)
+            .field("ptr", &self.ptr)
+            .field("back", &self.back)
             .finish()
     }
 }
 
-impl BlocksIter {
-    /// Skips the iterator to the specified height.
-    /// Has no effect if the specified height is greater or equal than the current height
-    /// of the iterator.
-    pub fn skip_to(&mut self, height: Height) -> &mut Self {
-        match self.height {
-            Some(ref mut self_height) if *self_height > height => {
-                *self_height = height;
-            }
-            _ => {}
-        }
+impl<'a> Iterator for BlocksIter<'a> {
+    type Item = BlockInfo<'a>;
 
-        self
-    }
-
-    fn decrease_height(&mut self) {
-        self.height = match self.height {
-            Some(Height(0)) => None,
-            Some(height) => Some(height.previous()),
-            None => unreachable!(),
-        }
-    }
-
-    fn last_seen_height(&self) -> Height {
-        self.height.map(|h| h.next()).unwrap_or(Height(0))
-    }
-}
-
-impl Iterator for BlocksIter {
-    type Item = Block;
-
-    fn next(&mut self) -> Option<Block> {
-        if self.height.is_none() {
+    fn next(&mut self) -> Option<BlockInfo<'a>> {
+        if self.ptr == self.back {
             return None;
         }
 
-        while let Some(height) = self.height {
-            let is_empty = self.schema.block_transactions(height).is_empty();
+        let block = BlockInfo::new(self.explorer, &self.schema, self.ptr);
+        self.ptr = self.ptr.next();
+        Some(block)
+    }
 
-            if !self.skip_empty || !is_empty {
-                let block = {
-                    let hashes = self.schema.block_hashes_by_height();
-                    let blocks = self.schema.blocks();
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let exact = (self.back.0 - self.ptr.0) as usize;
+        (exact, Some(exact))
+    }
 
-                    let block_hash = hashes.get(height.0).expect(&format!(
-                        "Block not found, height:{:?}",
-                        height
-                    ));
-                    blocks.get(&block_hash).expect(&format!(
-                        "Block not found, hash:{:?}",
-                        block_hash
-                    ))
-                };
+    fn count(self) -> usize {
+        (self.back.0 - self.ptr.0) as usize
+    }
 
-                self.decrease_height();
-                return Some(block);
-            }
+    fn nth(&mut self, n: usize) -> Option<BlockInfo<'a>> {
+        if self.ptr.0 + n as u64 >= self.back.0 {
+            self.ptr = self.back;
+            None
+        } else {
+            self.ptr = Height(self.ptr.0 + n as u64);
+            let block = BlockInfo::new(self.explorer, &self.schema, self.ptr);
+            self.ptr = self.ptr.next();
+            Some(block)
+        }
+    }
+}
 
-            self.decrease_height();
+impl<'a> DoubleEndedIterator for BlocksIter<'a> {
+    fn next_back(&mut self) -> Option<BlockInfo<'a>> {
+        if self.ptr == self.back {
+            return None;
         }
 
-        None
+        self.back = self.back.previous();
+        Some(BlockInfo::new(self.explorer, &self.schema, self.back))
     }
 }

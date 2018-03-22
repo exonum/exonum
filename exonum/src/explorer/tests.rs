@@ -228,6 +228,7 @@ fn test_explorer_basics() {
     assert_eq!(*tx_info.location(), TxLocation::new(Height(1), 0));
     assert_eq!(tx_info.status(), Ok(()));
     assert_eq!(tx_info.content().raw(), tx_alice.raw());
+    assert_eq!(tx_info.content().hash(), block.transaction_hashes()[0]);
 
     let tx_info = explorer.transaction(&tx_alice.hash()).unwrap();
     assert!(!tx_info.is_in_pool());
@@ -355,66 +356,91 @@ fn test_explorer_block_iter() {
     let explorer = BlockchainExplorer::new(blockchain);
 
     let mut count = 0;
-    for (i, block) in explorer.blocks_rev(false).enumerate() {
-        assert_eq!(block.height(), Height(9 - i as u64));
+    for (i, block) in explorer.blocks(..).enumerate() {
+        assert_eq!(block.block().height(), Height(i as u64));
         count += 1;
     }
     assert_eq!(count, 10);
 
-    let heights: Vec<_> = explorer.blocks_rev(true).map(|bl| bl.height()).collect();
+    let tx_count: usize = explorer.blocks(..Height(1_000)).map(|bl| bl.len()).sum();
+    assert_eq!(tx_count, 12);
+
+    let count = explorer.blocks(..).filter(BlockInfo::is_empty).count();
+    assert_eq!(count, 6);
+
+    let heights: Vec<_> = explorer
+        .blocks(..)
+        .rev()
+        .filter(|bl| !bl.is_empty())
+        .map(|bl| bl.block().height())
+        .collect();
     assert_eq!(heights, vec![Height(9), Height(5), Height(4), Height(2)]);
 
-    let block = explorer.blocks_rev(true).nth(2).unwrap();
-    assert_eq!(block.height(), Height(4));
+    let block = explorer
+        .blocks(..)
+        .filter(|bl| !bl.is_empty())
+        .nth(2)
+        .unwrap();
+    assert_eq!(block.block().height(), Height(5));
 
-    let mut iter = explorer.blocks_rev(true);
+    let mut iter = explorer.blocks(..).filter(|bl| !bl.is_empty()).rev();
     let _ = iter.by_ref().nth(1);
-    let heights: Vec<_> = iter.by_ref().map(|bl| bl.height()).collect();
+    let heights: Vec<_> = iter.by_ref().map(|bl| bl.block().height()).collect();
     assert_eq!(heights, vec![Height(4), Height(2)]);
     assert!(iter.next().is_none());
 
     let heights: Vec<_> = explorer
-        .blocks_rev(true)
-        .skip_to(Height(8))
-        .map(|bl| bl.height())
+        .blocks(..Height(9))
+        .filter(|bl| !bl.is_empty())
+        .rev()
+        .map(|bl| bl.block().height())
         .collect();
     assert_eq!(heights, vec![Height(5), Height(4), Height(2)]);
+
     let heights: Vec<_> = explorer
-        .blocks_rev(true)
-        .skip_to(Height(4))
-        .map(|bl| bl.height())
+        .blocks(..Height(5))
+        .filter(|bl| !bl.is_empty())
+        .map(|bl| bl.block().height())
         .collect();
-    assert_eq!(heights, vec![Height(4), Height(2)]);
+    assert_eq!(heights, vec![Height(2), Height(4)]);
+
     let heights: Vec<_> = explorer
-        .blocks_rev(true)
-        .skip_to(Height(1))
-        .map(|bl| bl.height())
+        .blocks(Height(0)..Height(2))
+        .filter(|bl| !bl.is_empty())
+        .map(|bl| bl.block().height())
         .collect();
     assert_eq!(heights, vec![]);
+
     let heights: Vec<_> = explorer
-        .blocks_rev(false)
-        .skip_to(Height(1))
-        .map(|bl| bl.height())
+        .blocks(..Height(2))
+        .map(|bl| bl.block().height())
         .collect();
-    assert_eq!(heights, vec![Height(1), Height(0)]);
+    assert_eq!(heights, vec![Height(0), Height(1)]);
+
     let heights: Vec<_> = explorer
-        .blocks_rev(false)
-        .skip_to(Height(0))
-        .map(|bl| bl.height())
+        .blocks(..Height(1))
+        .map(|bl| bl.block().height())
         .collect();
     assert_eq!(heights, vec![Height(0)]);
 
     let heights: Vec<_> = explorer
-        .blocks_rev(false)
-        .skip_to(Height(0))
-        .map(|bl| bl.height())
+        .blocks(..Height(0))
+        .map(|bl| bl.block().height())
+        .collect();
+    assert_eq!(heights, vec![]);
+
+    let heights: Vec<_> = explorer
+        .blocks(Height(0)..Height(1))
+        .map(|bl| bl.block().height())
         .collect();
     assert_eq!(heights, vec![Height(0)]);
 
-    let mut iter = explorer.blocks_rev(true);
-    assert_eq!(iter.by_ref().skip_to(Height(6)).next().unwrap().height(), Height(5));
-    assert_eq!(iter.skip_to(Height(3)).next().unwrap().height(), Height(2));
-    assert!(iter.skip_to(Height(1000)).next().is_none());
+    let mut iter = explorer.blocks(..).map(|bl| bl.block().clone());
+    assert_eq!(iter.by_ref().nth(3).unwrap().height(), Height(3));
+    assert_eq!(
+        iter.nth(2).unwrap().height(),
+        Height(6)
+    );
 }
 
 #[test]
