@@ -484,14 +484,16 @@ fn test_explorer_single_block() {
         .with_validators(4)
         .with_service(CounterService)
         .create();
-    let explorer = BlockchainExplorer::new(testkit.blockchain().clone());
 
     assert_eq!(testkit.majority_count(), 3);
 
-    let info: BlockInfo = explorer.block(Height(0)).unwrap();
-    assert_eq!(info.block().height(), Height(0));
-    assert_eq!(*info.block().prev_hash(), crypto::Hash::default());
-    assert_eq!(info.transaction_hashes(), &[]);
+    {
+        let explorer = BlockchainExplorer::new(testkit.blockchain());
+        let info: BlockInfo = explorer.block(Height(0)).unwrap();
+        assert_eq!(info.block().height(), Height(0));
+        assert_eq!(*info.block().prev_hash(), crypto::Hash::default());
+        assert_eq!(&*info.transaction_hashes(), &[]);
+    }
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -500,30 +502,33 @@ fn test_explorer_single_block() {
     testkit.api().send(tx.clone());
     testkit.create_block(); // height == 1
 
-    let info: BlockInfo = explorer.block(Height(1)).unwrap();
-    assert_eq!(info.block().height(), Height(1));
-    assert_eq!(info.block().tx_count(), 1);
-    assert_eq!(*info.block().tx_hash(), tx.hash());
-    assert_eq!(info.transaction_hashes(), &[tx.hash()]);
+    {
+        let explorer = BlockchainExplorer::new(testkit.blockchain());
+        let info: BlockInfo = explorer.block(Height(1)).unwrap();
+        assert_eq!(info.block().height(), Height(1));
+        assert_eq!(info.block().tx_count(), 1);
+        assert_eq!(*info.block().tx_hash(), tx.hash());
+        assert_eq!(&*info.transaction_hashes(), &[tx.hash()]);
 
-    let mut validators = HashSet::new();
-    for precommit in info.precommits() {
-        assert_eq!(precommit.height(), Height(1));
-        assert_eq!(*precommit.block_hash(), info.block().hash());
-        let pk = testkit
-            .network()
-            .consensus_public_key_of(precommit.validator())
-            .expect("Cannot find validator id");
-        assert!(precommit.verify_signature(pk));
-        validators.insert(precommit.validator());
+        let mut validators = HashSet::new();
+        for precommit in info.precommits().iter() {
+            assert_eq!(precommit.height(), Height(1));
+            assert_eq!(*precommit.block_hash(), info.block().hash());
+            let pk = testkit
+                .network()
+                .consensus_public_key_of(precommit.validator())
+                .expect("Cannot find validator id");
+            assert!(precommit.verify_signature(pk));
+            validators.insert(precommit.validator());
+        }
+
+        assert!(validators.len() >= testkit.majority_count());
     }
-
-    assert!(validators.len() >= testkit.majority_count());
 }
 
 #[test]
 fn test_explorer_transaction() {
-    use exonum::explorer::{BlockchainExplorer, BlockInfo};
+    use exonum::explorer::BlockchainExplorer;
     use exonum::helpers::Height;
     use exonum::storage::ListProof;
 
@@ -540,7 +545,6 @@ fn test_explorer_transaction() {
     }
 
     let (mut testkit, api) = init_testkit();
-    let explorer = BlockchainExplorer::new(testkit.blockchain().clone());
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -586,7 +590,9 @@ fn test_explorer_transaction() {
         let location_proof = info.remove("location_proof").unwrap();
         let location_proof: ListProof<crypto::Hash> = serde_json::from_value(location_proof)
             .unwrap();
-        let block: BlockInfo = explorer.block(Height(1)).unwrap();
+
+        let explorer = BlockchainExplorer::new(testkit.blockchain());
+        let block = explorer.block(Height(1)).unwrap();
         let block = block.block();
         assert!(
             location_proof
