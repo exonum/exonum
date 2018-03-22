@@ -833,7 +833,7 @@ impl<'a> BlockchainExplorer<'a> {
         skip_empty_blocks: bool,
     ) -> BlocksRange {
         let blocks_iter = if let Some(upper) = upper {
-            self.blocks(..upper)
+            self.blocks(..upper.next())
         } else {
             self.blocks(..)
         };
@@ -852,7 +852,7 @@ impl<'a> BlockchainExplorer<'a> {
         };
 
         BlocksRange {
-            range: height..upper.next(),
+            range: height..upper,
             blocks,
         }
     }
