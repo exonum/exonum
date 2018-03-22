@@ -73,7 +73,7 @@ impl NodeBuilder {
                 let config = ctx.get(keys::NODE_CONFIG).expect(
                     "could not find node_config",
                 );
-                let db = Run::db_helper(ctx, &config.database.unwrap_or_default());
+                let db = Run::db_helper(ctx, &config.database);
                 let services: Vec<Box<Service>> = self.service_factories
                     .into_iter()
                     .map(|mut factory| factory.make_service(ctx))

@@ -346,7 +346,8 @@ pub struct NodeConfig {
     #[serde(default)]
     pub services_configs: BTreeMap<String, Value>,
     /// Optional database configuration.
-    pub database: Option<DbOptions>,
+    #[serde(default)]
+    pub database: DbOptions,
 }
 
 /// Configuration for the `NodeHandler`.
