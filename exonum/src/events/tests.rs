@@ -188,7 +188,6 @@ pub fn connect_message(addr: SocketAddr) -> Connect {
 pub fn raw_message(id: u16, len: usize) -> RawMessage {
     let writer = MessageWriter::new(
         ::messages::PROTOCOL_MAJOR_VERSION,
-        ::messages::TEST_NETWORK_ID,
         0,
         id,
         len,

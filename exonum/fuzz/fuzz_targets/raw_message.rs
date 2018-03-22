@@ -22,7 +22,6 @@ fn fuzz_target(data: &[u8]) {
     let msg = RawMessage::from_vec(data.to_vec());
 
     let _ = msg.version();
-    let _ = msg.network_id();
     let _ = msg.service_id();
     let _ = msg.message_type();
     let _ = msg.body();
