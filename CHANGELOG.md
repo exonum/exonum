@@ -93,6 +93,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   method. Correspondingly, `MapProof` allows to verify proofs for an arbitrary
   number of elements. (#380)
 
+- Added the opportunity to parse configuration files with missing empty structures.
+  Fields of such structures are equal to the default values. (#576)
+
 ### Internal improvements
 
 #### Exonum core
