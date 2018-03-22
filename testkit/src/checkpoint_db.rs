@@ -239,7 +239,7 @@ mod tests {
             let inner = db.inner.read().unwrap();
             let journal = &inner.journal;
             assert_eq!(journal.len(), 1);
-            let inner_journal = journal[0];
+            let inner_journal = &journal[0];
             assert_eq!(inner_journal.len(), 0)
         }
         handler.rollback();
@@ -265,7 +265,7 @@ mod tests {
             let journal = &inner.journal;
             assert_eq!(journal.len(), 1);
         }
-        handler.checkpoint()();
+        handler.checkpoint();
         {
             let inner = db.inner.read().unwrap();
             let journal = &inner.journal;
