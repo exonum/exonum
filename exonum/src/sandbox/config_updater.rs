@@ -12,16 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::crypto::{PublicKey, Hash};
-use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult, Schema};
-use exonum::messages::{RawTransaction, Message};
-use exonum::storage::{Fork, Snapshot};
-use exonum::encoding::Error as MessageError;
-use exonum::blockchain::StoredConfiguration;
-use exonum::helpers::Height;
+use crypto::{PublicKey, Hash};
+use blockchain::{Service, Transaction, TransactionSet, ExecutionResult, Schema};
+use messages::{RawTransaction, Message};
+use storage::{Fork, Snapshot};
+use encoding::Error as MessageError;
+use blockchain::StoredConfiguration;
+use helpers::Height;
 
 pub const CONFIG_SERVICE: u16 = 1;
-pub const CONFIG_PROPOSE_MESSAGE_ID: u16 = 0;
 
 transactions! {
     ConfigUpdaterTransactions {
