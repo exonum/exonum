@@ -468,6 +468,10 @@ impl CommittedTransaction {
 
 /// Information about the transaction.
 ///
+/// Values of this type are returned by the [`transaction()`] method of the `BlockchainExplorer`.
+///
+/// [`transaction()`]: struct.BlockchainExplorer.html#method.transaction
+///
 /// # Examples
 ///
 /// ```ignore
@@ -482,12 +486,79 @@ impl CommittedTransaction {
 /// assert!(tx.is_in_pool());
 /// println!("{:?}", tx.content());
 /// ```
+///
+/// # JSON presentation
+///
+/// ## Committed transactions
+///
+/// Committed transactions are represented just like a [`CommittedTransaction`],
+/// with the additional `type` field equal to `"committed"`.
+///
+/// [`CommittedTransaction`]: struct.CommittedTransaction.html#json-presentation
+///
+/// ```ignore
+/// # #[macro_use] extern crate serde_json;
+/// # extern crate exonum;
+/// # use exonum::explorer::{BlockchainExplorer, TransactionInfo};
+/// # use exonum::explorer::tests::sample_blockchain;
+/// # use exonum::helpers::Height;
+/// use exonum::encoding::serialize::json::ExonumJson;
+///
+/// # fn main() {
+/// # let blockchain = sample_blockchain();
+/// # let explorer = BlockchainExplorer::new(blockchain);
+/// # let block = explorer.block(Height(1)).unwrap();
+/// let committed_tx: TransactionInfo = // ...
+/// #   explorer.transaction(&block.transaction_hashes()[0]).unwrap();
+/// # let tx_ref = committed_tx.as_committed().unwrap();
+/// assert_eq!(
+///     serde_json::to_value(&committed_tx).unwrap(),
+///     json!({
+///         "type": "committed",
+///         "content": committed_tx.content().serialize_field().unwrap(),
+///         "status": { "type": "success" },
+///         // Other fields...
+/// #       "location": tx_ref.location(),
+/// #       "location_proof": tx_ref.location_proof(),
+///     })
+/// );
+/// # }
+/// ```
+///
+/// ## Transaction in pool
+///
+/// Transactions in pool are represented with a 2-field object:
+///
+/// - `type` field contains transaction type (`"in-pool"`).
+/// - `content` is JSON serialization of the transaction.
+///
+/// ```ignore
+/// # #[macro_use] extern crate serde_json;
+/// # extern crate exonum;
+/// # use exonum::explorer::{BlockchainExplorer, TransactionInfo};
+/// # use exonum::explorer::tests::{sample_blockchain, mempool_transaction};
+/// use exonum::encoding::serialize::json::ExonumJson;
+///
+/// # fn main() {
+/// # let blockchain = sample_blockchain();
+/// # let explorer = BlockchainExplorer::new(blockchain);
+/// let tx_in_pool: TransactionInfo = // ...
+/// #   explorer.transaction(&mempool_transaction().hash()).unwrap();
+/// assert_eq!(
+///     serde_json::to_value(&tx_in_pool).unwrap(),
+///     json!({
+///         "type": "in-pool",
+///         "content": tx_in_pool.content().serialize_field().unwrap(),
+///     })
+/// );
+/// # }
+/// ```
 #[derive(Debug, Serialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum TransactionInfo {
     /// Transaction is in the memory pool, but not yet committed to the blockchain.
     InPool {
-        /// Json representation of the given transaction.
+        /// Transaction contents.
         #[serde(serialize_with = "CommittedTransaction::serialize_content")]
         content: Box<Transaction>,
     },
@@ -518,6 +589,15 @@ impl TransactionInfo {
         match *self {
             TransactionInfo::Committed(_) => true,
             _ => false,
+        }
+    }
+
+    /// Returns a reference to the inner committed transaction if this transaction is committed.
+    /// For transactions in pool, returns `None`.
+    pub fn as_committed(&self) -> Option<&CommittedTransaction> {
+        match *self {
+            TransactionInfo::Committed(ref tx) => Some(tx),
+            _ => None,
         }
     }
 }
