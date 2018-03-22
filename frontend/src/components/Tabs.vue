@@ -31,6 +31,7 @@
           this.current = tab
         }
       },
+
       changeTab: function(tab) {
         this.current = tab
         this.tabs.forEach(value => {
