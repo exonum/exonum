@@ -323,7 +323,7 @@ impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
 /// # } // main
 /// # #[cfg(not(feature = "doctests"))] fn main() {}
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct BlockWithTransactions {
     /// Block header.
     pub block: Block,
