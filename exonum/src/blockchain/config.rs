@@ -262,21 +262,26 @@ mod tests {
         let toml_content = r#"
             previous_cfg_hash = "0000000000000000000000000000000000000000000000000000000000000000"
             actual_from = 42
+
             [[validator_keys]]
             consensus_key = "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
             service_key = "43a72e714401762df66b68c26dfbdf2682aaec9f2474eca4613e424a0fbafd3c"
+
             [[validator_keys]]
             consensus_key = "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
             service_key = "20828bf5c5bdcacb684863336c202fb5599da48be5596615742170705beca9f7"
+
             [[validator_keys]]
             consensus_key = "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1"
             service_key = "acdb0e29743f0ccb8686d0a104cb96e05abefec1538765e7595869f7dc8c49aa"
+
             [consensus]
             round_timeout = 3000
             status_timeout = 5000
             peers_timeout = 10000
             txs_block_limit = 1000
             max_message_len = 1048576
+            
             [consensus.timeout_adjuster]
             type = "Constant"
             timeout = 500
