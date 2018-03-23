@@ -66,27 +66,12 @@ fn test_configuration_and_rollbacks() {
     let old_config = testkit.actual_configuration();
     let new_config = proposal.stored_configuration().clone();
 
+    testkit.checkpoint();
     testkit.commit_configuration_change(proposal);
 
     testkit.create_blocks_until(Height(10));
     assert_eq!(testkit.actual_configuration(), new_config);
-    testkit.rollback(2);
-    assert_eq!(testkit.actual_configuration(), old_config);
-    testkit.create_blocks_until(Height(10));
-    assert_eq!(testkit.actual_configuration(), new_config);
-
-    testkit.rollback(4);
-    assert_eq!(testkit.height(), Height(6));
-    testkit.rollback(1);
-    assert_eq!(testkit.height(), Height(5));
-    // Check regression: if the config is merged to blockchain as a separate patch,
-    // the rollbacks may work incorrectly.
-    testkit.rollback(1);
-    assert_eq!(testkit.height(), Height(4));
-
-    // As rollback is behind the time a proposal entered the blockchain,
-    // the proposal is effectively forgotten.
-    testkit.create_blocks_until(Height(10));
+    testkit.rollback();
     assert_eq!(testkit.actual_configuration(), old_config);
 }
 

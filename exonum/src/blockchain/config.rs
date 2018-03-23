@@ -77,12 +77,31 @@ impl ConsensusConfig {
     pub const DEFAULT_MAX_MESSAGE_LEN: u32 = 1024 * 1024; // 1 MB
 
     /// Checks if propose timeout is less than round timeout. Warns if fails.
+<<<<<<< HEAD
+<<<<<<< HEAD
     #[doc(hidden)]
     pub fn validate_configuration(&self) {
         let propose_timeout = match self.timeout_adjuster {
             TimeoutAdjusterConfig::Constant { timeout } => timeout,
             TimeoutAdjusterConfig::Dynamic { max, .. } |
+<<<<<<< HEAD
+<<<<<<< HEAD
             TimeoutAdjusterConfig::MovingAverage { max, .. } => max,
+=======
+=======
+    #[doc(hidden)]
+>>>>>>> Add doc(hidden) attribute to validate_configuration()
+    pub fn validate_configuration(&self) {
+        let propose_timeout = match self.timeout_adjuster {
+            TimeoutAdjusterConfig::Constant { timeout } => timeout,
+            TimeoutAdjusterConfig::Dynamic { max, .. } | TimeoutAdjusterConfig::MovingAverage { max, .. } => max
+>>>>>>> check_timeout_recommendations() is now validate_configuration() + formatting
+=======
+            TimeoutAdjusterConfig::MovingAverage { max, .. } => max
+>>>>>>> More formatting
+=======
+            TimeoutAdjusterConfig::MovingAverage { max, .. } => max,
+>>>>>>> Even more formatting
         };
 
         if self.round_timeout <= 2 * propose_timeout {
