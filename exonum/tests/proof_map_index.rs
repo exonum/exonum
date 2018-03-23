@@ -168,6 +168,7 @@ macro_rules! proof_map_tests {
 
 
             #[test]
+            #[cfg_attr(feature = "cargo-clippy", allow(useless_format))]
             fn proof_of_absence(
                 ref db in index_data($bytes, $sizes).prop_map(data_to_db),
                 key in prop::array::uniform32($bytes)
@@ -204,6 +205,7 @@ macro_rules! proof_map_tests {
             }
 
             #[test]
+            #[cfg_attr(feature = "cargo-clippy", allow(useless_format))]
             fn multiproof_of_nonexisting_elements(
                 ref db in index_data($bytes, $sizes).prop_map(data_to_db),
                 ref keys in prop::collection::vec(prop::array::uniform32($bytes), 20)
