@@ -104,6 +104,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `storage::UniqueHash` trait that represents a unique, but not necessary
   cryptographic hash function, is introduced. (#579)
 
+- Added the opportunity to parse configuration files with missing empty structures.
+  Fields of such structures are equal to the default values. (#576)
+
 ### Internal improvements
 
 #### Exonum core

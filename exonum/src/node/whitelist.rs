@@ -22,6 +22,7 @@ use crypto::PublicKey;
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Whitelist {
     whitelist_enabled: bool,
+    #[serde(default)]
     whitelisted_peers: BTreeSet<PublicKey>,
 
     #[serde(default)]

@@ -326,6 +326,7 @@ pub struct NodeConfig {
     /// Network configuration.
     pub network: NetworkConfiguration,
     /// Peer addresses.
+    #[serde(default)]
     pub peers: Vec<SocketAddr>,
     /// Consensus public key.
     pub consensus_public_key: PublicKey,
@@ -342,9 +343,11 @@ pub struct NodeConfig {
     /// Memory pool configuration.
     pub mempool: MemoryPoolConfig,
     /// Additional config, usable for services.
+    #[serde(default)]
     pub services_configs: BTreeMap<String, Value>,
     /// Optional database configuration.
-    pub database: Option<DbOptions>,
+    #[serde(default)]
+    pub database: DbOptions,
 }
 
 /// Configuration for the `NodeHandler`.

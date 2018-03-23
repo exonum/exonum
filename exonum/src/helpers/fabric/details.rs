@@ -581,7 +581,7 @@ impl Command for Finalize {
                 },
                 mempool: Default::default(),
                 services_configs: Default::default(),
-                database: Some(Default::default()),
+                database: Default::default(),
             }
         };
 

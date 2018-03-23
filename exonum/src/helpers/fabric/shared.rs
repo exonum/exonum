@@ -34,6 +34,7 @@ pub struct NodePublicConfig {
     /// Public keys of a validator.
     pub validator_keys: ValidatorKeys,
     /// Services configurations.
+    #[serde(default)]
     pub services_public_configs: AbstractConfig,
 }
 
@@ -62,6 +63,7 @@ pub struct CommonConfigTemplate {
     /// Consensus configuration.
     pub consensus_config: ConsensusConfig,
     /// Services configuration.
+    #[serde(default)]
     pub services_config: AbstractConfig,
 }
 
@@ -79,5 +81,6 @@ pub struct NodePrivateConfig {
     /// Service secret key.
     pub service_secret_key: SecretKey,
     /// Additional service secret config.
+    #[serde(default)]
     pub services_secret_configs: AbstractConfig,
 }
