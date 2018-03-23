@@ -281,7 +281,7 @@ mod tests {
             peers_timeout = 10000
             txs_block_limit = 1000
             max_message_len = 1048576
-            
+
             [consensus.timeout_adjuster]
             type = "Constant"
             timeout = 500
