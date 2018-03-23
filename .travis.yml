@@ -135,7 +135,7 @@ jobs:
   # Additional tests
   - env: FEATURE=test-aux
     script:
-    - cd $TRAVIS_BUILD_DIR/exonum && cargo test --features doctests --doc -- --ignored
+    - cd $TRAVIS_BUILD_DIR/exonum && cargo test --features doctests --doc explorer
 
   # Benchmarks (compilation only)
   - env: FEATURE=benchmarks

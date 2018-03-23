@@ -89,7 +89,8 @@ impl HeightRange {
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```
+/// # #[cfg(feature = "doctests")] fn main() {
 /// # use exonum::explorer::{BlockchainExplorer, BlockInfo};
 /// # use exonum::explorer::tests::sample_blockchain;
 /// # use exonum::helpers::Height;
@@ -104,17 +105,19 @@ impl HeightRange {
 /// for tx in &block {
 ///     println!("{:?}: {:?}", tx.location(), tx.content());
 /// }
+/// # } // main
+/// # #[cfg(not(feature = "doctests"))] fn main() {}
 /// ```
 ///
 /// # JSON presentation
 ///
-/// ```ignore
+/// ```
 /// # #[macro_use] extern crate serde_json;
 /// # extern crate exonum;
+/// # #[cfg(feature = "doctests")] fn main() {
+/// # use exonum::helpers::Height;
 /// # use exonum::explorer::{BlockchainExplorer, BlockInfo};
 /// # use exonum::explorer::tests::sample_blockchain;
-/// # use exonum::helpers::Height;
-/// # fn main() {
 /// # let blockchain = sample_blockchain();
 /// # let explorer = BlockchainExplorer::new(&blockchain);
 /// let block: BlockInfo = // ...
@@ -130,7 +133,8 @@ impl HeightRange {
 ///         "txs": *block.transaction_hashes(),
 ///     })
 /// );
-/// # }
+/// # } // main
+/// # #[cfg(not(feature = "doctests"))] fn main() {}
 /// ```
 #[derive(Debug)]
 pub struct BlockInfo<'a> {
@@ -288,7 +292,8 @@ impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```
+/// # #[cfg(feature = "doctests")] fn main() {
 /// # use exonum::explorer::{BlockchainExplorer, BlockWithTransactions, CommittedTransaction};
 /// # use exonum::explorer::tests::sample_blockchain;
 /// # use exonum::helpers::Height;
@@ -307,6 +312,8 @@ impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
 /// // Compared to `BlockInfo`, you can access transactions in a block using indexes
 /// let tx: &CommittedTransaction = &block[1];
 /// assert_eq!(tx.location().position_in_block(), 1);
+/// # } // main
+/// # #[cfg(not(feature = "doctests"))] fn main() {}
 /// ```
 #[derive(Debug)]
 pub struct BlockWithTransactions {
@@ -364,7 +371,8 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```
+/// # #[cfg(feature = "doctests")] fn main() {
 /// use exonum::blockchain::{Transaction, TransactionError};
 /// # use exonum::explorer::{BlockchainExplorer, CommittedTransaction};
 /// # use exonum::explorer::tests::sample_blockchain;
@@ -384,19 +392,21 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// // ...and transaction status as well
 /// let status: Result<(), &TransactionError> = tx.status();
 /// assert!(status.is_ok());
+/// # } // main
+/// # #[cfg(not(feature = "doctests"))] fn main() {}
 /// ```
 ///
 /// # JSON presentation
 ///
-/// ```ignore
+/// ```
 /// # #[macro_use] extern crate serde_json;
 /// # extern crate exonum;
+/// # #[cfg(feature = "doctests")] fn main() {
 /// # use exonum::explorer::{BlockchainExplorer, CommittedTransaction};
 /// # use exonum::explorer::tests::sample_blockchain;
 /// # use exonum::helpers::Height;
 /// use exonum::encoding::serialize::json::ExonumJson;
 ///
-/// # fn main() {
 /// let blockchain = // ...
 /// #                sample_blockchain();
 /// let explorer = BlockchainExplorer::new(&blockchain);
@@ -417,7 +427,8 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 ///         "status": { "type": "success" },
 ///     })
 /// );
-/// # }
+/// # } // main
+/// # #[cfg(not(feature = "doctests"))] fn main() {}
 /// ```
 ///
 /// ## Erroneous transactions
@@ -426,15 +437,15 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// (i.e., one returned as `Err(..)` from `Transaction::execute`)
 /// have `code` and `description` fields in `status` and have `type` set to `"error"`:
 ///
-/// ```ignore
+/// ```
 /// # #[macro_use] extern crate serde_json;
 /// # extern crate exonum;
+/// # #[cfg(feature = "doctests")] fn main() {
 /// # use exonum::encoding::serialize::json::ExonumJson;
 /// # use exonum::explorer::{BlockchainExplorer, CommittedTransaction};
 /// # use exonum::explorer::tests::sample_blockchain;
 /// # use exonum::helpers::Height;
 /// #
-/// # fn main() {
 /// # let blockchain = sample_blockchain();
 /// # let explorer = BlockchainExplorer::new(&blockchain);
 /// let erroneous_tx: CommittedTransaction = // ...
@@ -453,22 +464,23 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// #       "location_proof": erroneous_tx.location_proof(),
 ///     })
 /// );
-/// # }
+/// # } // main
+/// # #[cfg(not(feature = "doctests"))] fn main() {}
 /// ```
 ///
 /// ## Panicking transactions
 ///
 /// If transaction execution resulted in panic, it has `type` set to `"panic"`:
 ///
-/// ```ignore
+/// ```
 /// # #[macro_use] extern crate serde_json;
 /// # extern crate exonum;
+/// # #[cfg(feature = "doctests")] fn main() {
 /// # use exonum::encoding::serialize::json::ExonumJson;
 /// # use exonum::explorer::{BlockchainExplorer, CommittedTransaction};
 /// # use exonum::explorer::tests::sample_blockchain;
 /// # use exonum::helpers::Height;
 /// #
-/// # fn main() {
 /// # let blockchain = sample_blockchain();
 /// # let explorer = BlockchainExplorer::new(&blockchain);
 /// let panicked_tx: CommittedTransaction = // ...
@@ -483,7 +495,8 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// #       "location_proof": panicked_tx.location_proof(),
 ///     })
 /// );
-/// # }
+/// # } // main
+/// # #[cfg(not(feature = "doctests"))] fn main() {}
 /// ```
 #[derive(Debug, Serialize)]
 pub struct CommittedTransaction {
@@ -570,7 +583,8 @@ impl CommittedTransaction {
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```
+/// # #[cfg(feature = "doctests")] fn main() {
 /// # use exonum::explorer::{BlockchainExplorer, TransactionInfo};
 /// # use exonum::explorer::tests::{sample_blockchain, mempool_transaction};
 /// let blockchain = // ...
@@ -581,6 +595,8 @@ impl CommittedTransaction {
 /// let tx: TransactionInfo = explorer.transaction(&hash).unwrap();
 /// assert!(tx.is_in_pool());
 /// println!("{:?}", tx.content());
+/// # } // main
+/// # #[cfg(not(feature = "doctests"))] fn main() {}
 /// ```
 ///
 /// # JSON presentation
@@ -592,15 +608,15 @@ impl CommittedTransaction {
 ///
 /// [`CommittedTransaction`]: struct.CommittedTransaction.html#json-presentation
 ///
-/// ```ignore
+/// ```
 /// # #[macro_use] extern crate serde_json;
 /// # extern crate exonum;
+/// # #[cfg(feature = "doctests")] fn main() {
 /// # use exonum::explorer::{BlockchainExplorer, TransactionInfo};
 /// # use exonum::explorer::tests::sample_blockchain;
 /// # use exonum::helpers::Height;
 /// use exonum::encoding::serialize::json::ExonumJson;
 ///
-/// # fn main() {
 /// # let blockchain = sample_blockchain();
 /// # let explorer = BlockchainExplorer::new(&blockchain);
 /// # let block = explorer.block(Height(1)).unwrap();
@@ -618,7 +634,8 @@ impl CommittedTransaction {
 /// #       "location_proof": tx_ref.location_proof(),
 ///     })
 /// );
-/// # }
+/// # } // main
+/// # #[cfg(not(feature = "doctests"))] fn main() {}
 /// ```
 ///
 /// ## Transaction in pool
@@ -628,14 +645,14 @@ impl CommittedTransaction {
 /// - `type` field contains transaction type (`"in-pool"`).
 /// - `content` is JSON serialization of the transaction.
 ///
-/// ```ignore
+/// ```
 /// # #[macro_use] extern crate serde_json;
 /// # extern crate exonum;
+/// # #[cfg(feature = "doctests")] fn main() {
 /// # use exonum::explorer::{BlockchainExplorer, TransactionInfo};
 /// # use exonum::explorer::tests::{sample_blockchain, mempool_transaction};
 /// use exonum::encoding::serialize::json::ExonumJson;
 ///
-/// # fn main() {
 /// # let blockchain = sample_blockchain();
 /// # let explorer = BlockchainExplorer::new(&blockchain);
 /// let tx_in_pool: TransactionInfo = // ...
@@ -647,7 +664,8 @@ impl CommittedTransaction {
 ///         "content": tx_in_pool.content().serialize_field().unwrap(),
 ///     })
 /// );
-/// # }
+/// # } // main
+/// # #[cfg(not(feature = "doctests"))] fn main() {}
 /// ```
 #[derive(Debug, Serialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
