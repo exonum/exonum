@@ -34,6 +34,9 @@ use std::ops::{Deref, Index, Range, RangeFrom, RangeFull, RangeTo};
 #[doc(hidden)]
 pub mod tests;
 
+/// Transaction parsing result.
+type ParseResult = Result<Box<Transaction>, encoding::Error>;
+
 /// Range of `Height`s.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HeightRange(pub Bound<Height>, pub Bound<Height>);
@@ -744,7 +747,7 @@ pub struct BlocksRange {
 /// Blockchain explorer.
 pub struct BlockchainExplorer<'a> {
     snapshot: Box<Snapshot>,
-    transaction_parser: Box<'a + Fn(RawMessage) -> Result<Box<Transaction>, encoding::Error>>,
+    transaction_parser: Box<'a + Fn(RawMessage) -> ParseResult>,
 }
 
 impl<'a> fmt::Debug for BlockchainExplorer<'a> {

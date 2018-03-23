@@ -438,22 +438,13 @@ fn test_explorer_block_iter() {
         .collect();
     assert_eq!(heights, vec![]);
 
-    let heights: Vec<_> = explorer
-        .blocks(..Height(2))
-        .map(|bl| bl.height())
-        .collect();
+    let heights: Vec<_> = explorer.blocks(..Height(2)).map(|bl| bl.height()).collect();
     assert_eq!(heights, vec![Height(0), Height(1)]);
 
-    let heights: Vec<_> = explorer
-        .blocks(..Height(1))
-        .map(|bl| bl.height())
-        .collect();
+    let heights: Vec<_> = explorer.blocks(..Height(1)).map(|bl| bl.height()).collect();
     assert_eq!(heights, vec![Height(0)]);
 
-    let heights: Vec<_> = explorer
-        .blocks(..Height(0))
-        .map(|bl| bl.height())
-        .collect();
+    let heights: Vec<_> = explorer.blocks(..Height(0)).map(|bl| bl.height()).collect();
     assert_eq!(heights, vec![]);
 
     let heights: Vec<_> = explorer
