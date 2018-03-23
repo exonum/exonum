@@ -26,7 +26,7 @@ extern crate pretty_assertions;
 #[macro_use]
 extern crate log;
 
-use exonum::blockchain::Transaction;
+use exonum::blockchain::{Transaction, TransactionErrorType as ErrorType};
 use exonum::crypto::{self, PublicKey, CryptoHash};
 use exonum::helpers::Height;
 use exonum::messages::Message;
@@ -433,6 +433,15 @@ fn test_explorer_blocks() {
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(5));
 
+    // Run a comparable `BlockchainExplorer` method.
+    let heights: Vec<_> = testkit
+        .explorer()
+        .blocks(..)
+        .filter(|block| !block.is_empty())
+        .map(|block| block.height())
+        .collect();
+    assert_eq!(heights, vec![Height(2)]);
+
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
         TxIncrement::new(&pubkey, 5, &key)
@@ -634,11 +643,22 @@ fn test_explorer_transaction_statuses() {
         TxIncrement::new(&pubkey, u64::max_value() - 3, &key)
     };
 
-    testkit.create_block_with_transactions(txvec![
+    let block = testkit.create_block_with_transactions(txvec![
         tx.clone(),
         error_tx.clone(),
         panicking_tx.clone(),
     ]);
+    assert!(block[0].status().is_ok());
+    assert!({
+        let err = block[1].status().unwrap_err();
+        err.error_type() == ErrorType::Code(0) &&
+            err.description() == Some("Adding zero does nothing!")
+    });
+    assert!({
+        let err = block[2].status().unwrap_err();
+        err.error_type() == ErrorType::Panic &&
+            err.description() == Some("attempt to add with overflow")
+    });
 
     assert_status(&api, &tx, &json!({ "type": "success" }));
     assert_status(
@@ -664,5 +684,7 @@ fn test_boxed_tx() {
     };
 
     api.send(tx);
-    testkit.create_block();
+    let block = testkit.create_block();
+    assert_eq!(block.len(), 1);
+    assert_eq!(block[0].content().raw().service_id(), counter::SERVICE_ID);
 }

@@ -83,14 +83,23 @@ fn main() {
     let tx1 = TxTimestamp::new(&keypair.0, "Down To Earth", &keypair.1);
     let tx2 = TxTimestamp::new(&keypair.0, "Cry Over Spilt Milk", &keypair.1);
     let tx3 = TxTimestamp::new(&keypair.0, "Dropping Like Flies", &keypair.1);
+
     // Commit them into blockchain.
-    testkit.create_block_with_transactions(txvec![tx1.clone(), tx2.clone(), tx3.clone()]);
+    let block = testkit.create_block_with_transactions(txvec![
+        tx1.clone(),
+        tx2.clone(),
+        tx3.clone(),
+    ]);
+    assert_eq!(block.len(), 3);
+    assert!(block.iter().all(|transaction| transaction.status().is_ok()));
+
     // Check results with schema.
     let snapshot = testkit.snapshot();
     let schema = Schema::new(&snapshot);
     assert!(schema.transactions().contains(&tx1.hash()));
     assert!(schema.transactions().contains(&tx2.hash()));
     assert!(schema.transactions().contains(&tx3.hash()));
+
     // Check results with api.
     let api = testkit.api();
     let blocks_range: BlocksRange = api.get(ApiKind::Explorer, "v1/blocks?count=10");
