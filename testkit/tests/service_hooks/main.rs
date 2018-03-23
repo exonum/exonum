@@ -47,7 +47,8 @@ fn test_handle_commit() {
         assert!(testkit.is_tx_in_pool(&tx.hash()));
     }
 
-    assert!(testkit.explorer().blocks(Height(1)..).all(|block| {
+    let expected_block_sizes = testkit.explorer().blocks(Height(1)..).all(|block| {
         block.len() == if block.height() == Height(1) { 0 } else { 1 }
-    }));
+    });
+    assert!(expected_block_sizes);
 }
