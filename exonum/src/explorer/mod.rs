@@ -214,8 +214,8 @@ impl<'a> BlockInfo<'a> {
     }
 
     /// Iterates over transactions in the block.
-    pub fn iter(&self) -> TransactionsIter {
-        TransactionsIter {
+    pub fn iter(&self) -> Transactions {
+        Transactions {
             block: self,
             ptr: 0,
             len: self.len(),
@@ -259,13 +259,13 @@ impl<'a> Serialize for BlockInfo<'a> {
 
 /// Iterator over transactions in a block.
 #[derive(Debug)]
-pub struct TransactionsIter<'r, 'a: 'r> {
+pub struct Transactions<'r, 'a: 'r> {
     block: &'r BlockInfo<'a>,
     ptr: usize,
     len: usize,
 }
 
-impl<'a, 'r> Iterator for TransactionsIter<'a, 'r> {
+impl<'a, 'r> Iterator for Transactions<'a, 'r> {
     type Item = CommittedTransaction;
 
     fn next(&mut self) -> Option<CommittedTransaction> {
@@ -281,9 +281,9 @@ impl<'a, 'r> Iterator for TransactionsIter<'a, 'r> {
 
 impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
     type Item = CommittedTransaction;
-    type IntoIter = TransactionsIter<'a, 'r>;
+    type IntoIter = Transactions<'a, 'r>;
 
-    fn into_iter(self) -> TransactionsIter<'a, 'r> {
+    fn into_iter(self) -> Transactions<'a, 'r> {
         self.iter()
     }
 }
@@ -337,7 +337,7 @@ impl BlockWithTransactions {
     }
 
     /// Iterates over transactions in the block.
-    pub fn iter(&self) -> EagerTransactionsIter {
+    pub fn iter(&self) -> EagerTransactions {
         self.transactions.iter()
     }
 }
@@ -345,7 +345,7 @@ impl BlockWithTransactions {
 /// Iterator over transactions in [`BlockWithTransactions`].
 ///
 /// [`BlockWithTransactions`]: struct.BlockWithTransactions.html
-pub type EagerTransactionsIter<'a> = ::std::slice::Iter<'a, CommittedTransaction>;
+pub type EagerTransactions<'a> = ::std::slice::Iter<'a, CommittedTransaction>;
 
 impl Index<usize> for BlockWithTransactions {
     type Output = CommittedTransaction;
@@ -360,9 +360,9 @@ impl Index<usize> for BlockWithTransactions {
 
 impl<'a> IntoIterator for &'a BlockWithTransactions {
     type Item = &'a CommittedTransaction;
-    type IntoIter = EagerTransactionsIter<'a>;
+    type IntoIter = EagerTransactions<'a>;
 
-    fn into_iter(self) -> EagerTransactionsIter<'a> {
+    fn into_iter(self) -> EagerTransactions<'a> {
         self.iter()
     }
 }
@@ -877,7 +877,7 @@ impl<'a> BlockchainExplorer<'a> {
     }
 
     /// Iterates over blocks in the blockchain.
-    pub fn blocks<R: Into<HeightRange>>(&self, heights: R) -> BlocksIter {
+    pub fn blocks<R: Into<HeightRange>>(&self, heights: R) -> Blocks {
         use std::cmp::max;
 
         let heights = heights.into();
@@ -885,7 +885,7 @@ impl<'a> BlockchainExplorer<'a> {
         let max_height = schema.height();
 
         let ptr = heights.start_height();
-        BlocksIter {
+        Blocks {
             explorer: self,
             ptr,
             back: max(ptr, heights.end_height(max_height)),
@@ -894,23 +894,23 @@ impl<'a> BlockchainExplorer<'a> {
 }
 
 /// Iterator over blocks in descending order.
-pub struct BlocksIter<'a> {
+pub struct Blocks<'a> {
     explorer: &'a BlockchainExplorer<'a>,
     ptr: Height,
     back: Height,
 }
 
-impl<'a> fmt::Debug for BlocksIter<'a> {
+impl<'a> fmt::Debug for Blocks<'a> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         formatter
-            .debug_struct("BlocksIter")
+            .debug_struct("Blocks")
             .field("ptr", &self.ptr)
             .field("back", &self.back)
             .finish()
     }
 }
 
-impl<'a> Iterator for BlocksIter<'a> {
+impl<'a> Iterator for Blocks<'a> {
     type Item = BlockInfo<'a>;
 
     fn next(&mut self) -> Option<BlockInfo<'a>> {
@@ -945,7 +945,7 @@ impl<'a> Iterator for BlocksIter<'a> {
     }
 }
 
-impl<'a> DoubleEndedIterator for BlocksIter<'a> {
+impl<'a> DoubleEndedIterator for Blocks<'a> {
     fn next_back(&mut self) -> Option<BlockInfo<'a>> {
         if self.ptr == self.back {
             return None;
