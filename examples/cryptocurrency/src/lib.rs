@@ -326,13 +326,10 @@ pub mod api {
                 ))
             })?;
 
-            let wallet = {
-                let snapshot = self.blockchain.snapshot();
-                let schema = CurrencySchema::new(snapshot);
-                schema.wallet(&public_key)
-            };
+            let snapshot = self.blockchain.snapshot();
+            let schema = CurrencySchema::new(snapshot);
 
-            if let Some(wallet) = wallet {
+            if let Some(wallet) = schema.wallet(&public_key) {
                 self.ok_response(&serde_json::to_value(wallet).unwrap())
             } else {
                 self.not_found_response(&serde_json::to_value("Wallet not found").unwrap())
