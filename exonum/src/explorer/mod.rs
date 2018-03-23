@@ -28,7 +28,7 @@ use storage::{ListProof, Snapshot};
 use std::cell::{Ref, RefCell};
 use std::collections::Bound;
 use std::fmt;
-use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
+use std::ops::{Deref, Index, Range, RangeFrom, RangeFull, RangeTo};
 
 #[cfg(any(test, feature = "doctests"))]
 #[doc(hidden)]
@@ -98,7 +98,7 @@ impl HeightRange {
 /// #                sample_blockchain();
 /// let explorer = BlockchainExplorer::new(&blockchain);
 /// let block: BlockInfo = explorer.block(Height(1)).unwrap();
-/// assert_eq!(block.block().height(), Height(1));
+/// assert_eq!(block.height(), Height(1));
 /// assert_eq!(block.len(), 3);
 ///
 /// // Iterate over transactions in the block
@@ -245,6 +245,14 @@ impl<'a> BlockInfo<'a> {
     }
 }
 
+impl<'a> Deref for BlockInfo<'a> {
+    type Target = Block;
+
+    fn deref(&self) -> &Block {
+        &self.block
+    }
+}
+
 impl<'a> Serialize for BlockInfo<'a> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeStruct;
@@ -301,7 +309,7 @@ impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
 /// #                sample_blockchain();
 /// let explorer = BlockchainExplorer::new(&blockchain);
 /// let block: BlockWithTransactions = explorer.block_with_txs(Height(1)).unwrap();
-/// assert_eq!(block.block.height(), Height(1));
+/// assert_eq!(block.height(), Height(1));
 /// assert_eq!(block.len(), 3);
 ///
 /// // Iterate over transactions in the block
@@ -339,6 +347,14 @@ impl BlockWithTransactions {
     /// Iterates over transactions in the block.
     pub fn iter(&self) -> EagerTransactions {
         self.transactions.iter()
+    }
+}
+
+impl Deref for BlockWithTransactions {
+    type Target = Block;
+
+    fn deref(&self) -> &Block {
+        &self.block
     }
 }
 
