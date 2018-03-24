@@ -188,7 +188,8 @@ pub mod errors {
 
     impl From<Error> for ExecutionError {
         fn from(value: Error) -> ExecutionError {
-            ExecutionError::new(value as u8)
+            let description = format!("{}", value);
+            ExecutionError::with_description(value as u8, description)
         }
     }
 }
