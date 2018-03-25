@@ -34,6 +34,7 @@ use proptest::num::u8::BinarySearch as U8BinarySearch;
 use proptest::test_runner::Config;
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::Debug;
 use std::ops::Range;
 
 const INDEX_NAME: &str = "index";
@@ -41,16 +42,13 @@ const INDEX_NAME: &str = "index";
 fn check_map_proof<T, K, V>(proof: MapProof<K, V>, key: Option<K>, table: &ProofMapIndex<T, K, V>)
 where
     T: AsRef<Snapshot>,
-    K: ProofMapKey + PartialEq + ::std::fmt::Debug,
-    V: StorageValue + PartialEq + ::std::fmt::Debug,
+    K: ProofMapKey + PartialEq + Debug,
+    V: StorageValue + PartialEq + Debug,
 {
-    let entries = match key {
-        Some(key) => {
-            let value = table.get(&key).unwrap();
-            vec![(key, value)]
-        }
-        None => vec![],
-    };
+    let entries = key.map(|key| {
+        let value = table.get(&key).unwrap();
+        (key, value)
+    });
 
     let proof = proof.check().unwrap();
     assert_eq!(
@@ -69,8 +67,8 @@ fn check_map_multiproof<T, K, V>(
     table: &ProofMapIndex<T, K, V>,
 ) where
     T: AsRef<Snapshot>,
-    K: ProofMapKey + Clone + PartialEq + ::std::fmt::Debug,
-    V: StorageValue + PartialEq + ::std::fmt::Debug,
+    K: ProofMapKey + Clone + PartialEq + Debug,
+    V: StorageValue + PartialEq + Debug,
 {
     let (entries, missing_keys) = {
         let mut entries: Vec<(K, V)> = Vec::new();
