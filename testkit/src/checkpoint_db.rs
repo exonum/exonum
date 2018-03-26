@@ -146,7 +146,7 @@ impl<T: Database> CheckpointDbInner<T> {
         // Should insert backup patches to the front of the backup (VecDeque)
         self.backup_stack
             .last_mut()
-            .expect("`merge_with_loggin` called before checkpoint has been set")
+            .expect("`merge_with_logging` called before checkpoint has been set")
             .push_front(rev_fork.into_patch());
         Ok(())
     }
@@ -326,7 +326,7 @@ mod tests {
             let backup = stack.last().expect("There are not backups in the stack");
             assert_eq!(backup.len(), 1);
             let old_backup = stack.get(stack.len() - 2).expect(
-                "Exepcted 2 backups in the stack, found 1",
+                "Expected 2 backups in the stack, found 1",
             );
             assert_eq!(old_backup.len(), 0);
         }
@@ -359,7 +359,7 @@ mod tests {
             let backup = stack.last().expect("There are not backups in the stack");
             assert_eq!(backup.len(), 1);
             let old_backup = stack.get(stack.len() - 2).expect(
-                "Exepcted 2 backups in the stack, found 1",
+                "Expected 2 backups in the stack, found 1",
             );
             assert_eq!(old_backup.len(), 0);
         }
@@ -377,7 +377,7 @@ mod tests {
             let backup = stack.last().expect("There are not backups in the stack");
             assert_eq!(backup.len(), 2);
             let old_backup = stack.get(stack.len() - 2).expect(
-                "Exepcted 2 backups in the stack, found 1",
+                "Expected 2 backups in the stack, found 1",
             );
             assert_eq!(old_backup.len(), 0);
         }
