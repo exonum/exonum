@@ -189,7 +189,7 @@ impl<'a> SegmentField<'a> for RawMessage {
             });
         }
         let actual_size = slice.len() as Offset;
-        let declared_size: Offset = LittleEndian::read_u32(&slice[5..9]);
+        let declared_size: Offset = LittleEndian::read_u32(&slice[6..10]);
         if actual_size != declared_size {
             return Err(Error::IncorrectSizeOfRawMessage {
                 position: from.unchecked_offset(),
