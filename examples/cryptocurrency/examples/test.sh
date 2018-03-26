@@ -123,21 +123,18 @@ launch-server
 
 echo "Creating a wallet for Alice..."
 create-wallet create-wallet-1.json
-check-transaction b45f18c7
+check-transaction 099d455a
 
 echo "Creating a wallet for Bob..."
 create-wallet create-wallet-2.json
-check-transaction 118d0b93
-
-echo "Waiting until transactions are committed..."
-sleep 5
+check-transaction 2fb289b9
 
 echo "Transferring funds from Alice to Bob"
 transfer transfer-funds.json
-check-transaction 45b8363b
+check-transaction 4d6de957
 
-echo "Waiting until transfer transaction is committed..."
-sleep 5
+echo "Waiting until transactions are committed..."
+sleep 7
 
 echo "Retrieving info on all wallets..."
 RESP=`curl $BASE_URL/wallets 2>/dev/null`
@@ -148,17 +145,17 @@ check-request "Alice" 85 "`echo $RESP | jq .[0]`"
 check-request "Bob" 115 "`echo $RESP | jq .[1]`"
 
 echo "Retrieving info on Alice's wallet..."
-RESP=`curl $BASE_URL/wallet/3fc6dad512a26ddaefb24f1f4187dccb21c182a217cf7fdc356e02a008aba30c 2>/dev/null`
+RESP=`curl $BASE_URL/wallet/6ce29b2d3ecadc434107ce52c287001c968a1b6eca3e5a1eb62a2419e2924b85 2>/dev/null`
 check-request "Alice" 85 "$RESP"
 
 echo "Retrieving Alice's transaction info..."
-TXID=b45f18c71ae62479e90ee0fb1201bface4c4009f6aa759fe672fc367e1dd3a94
+TXID=099d455ab563505cad55b7c6ec02e8a52bca86b0c4446d9879af70f5ceca5dd8
 RESP=`curl http://127.0.0.1:8000/api/explorer/v1/transactions/$TXID 2>/dev/null`
 EXP=`cat create-wallet-1.json`
 check-create-tx "Alice" "$EXP" "$RESP"
 
 echo "Retrieving transfer transaction info..."
-TXID=45b8363b8c61a2aaebf6df2a52c1246a7eeac0e604f95b58d7c14177da581ae0
+TXID=4d6de957f58c894db2dca577d4fdd0da1249a8dff1df5eb69d23458e43320ee2
 RESP=`curl http://127.0.0.1:8000/api/explorer/v1/transactions/$TXID 2>/dev/null`
 EXP=`cat transfer-funds.json`
 check-transfer-tx "$EXP" "$RESP"

@@ -82,12 +82,12 @@ function Main () {
     @{
       name = 'Alice';
       json = "$wd/create-wallet-1.json";
-      hash = 'b45f18c71ae62479e90ee0fb1201bface4c4009f6aa759fe672fc367e1dd3a94';
+      hash = '099d455ab563505cad55b7c6ec02e8a52bca86b0c4446d9879af70f5ceca5dd8';
     },
     @{
       name = 'Bob';
       json = "$wd/create-wallet-2.json";
-      hash = '118d0b9377ab491544adbcbdd92bb186f072063a99e9c29e5790b51c070d2bc6';
+      hash = '2fb289b9928f5a75acf261cc1e61fd654fcb63bf285688f0fc8e59f44dede048';
     }
   );
 
@@ -110,7 +110,7 @@ function Main () {
   }
 
   echo 'Transferring tokens between Alice and Bob...';
-  $transferHash = '45b8363b8c61a2aaebf6df2a52c1246a7eeac0e604f95b58d7c14177da581ae0';
+  $transferHash = '4d6de957f58c894db2dca577d4fdd0da1249a8dff1df5eb69d23458e43320ee2';
   $hash = Transfer("$wd/transfer-funds.json");
   if ($hash -ne $transferHash) {
     throw "Unexpected transaction hash: $hash";
@@ -128,7 +128,7 @@ function Main () {
   Check-Wallet $resp[1] 'Bob' '115';
 
   echo "Retrieving info on Alice's wallet...";
-  $pubkey = '3fc6dad512a26ddaefb24f1f4187dccb21c182a217cf7fdc356e02a008aba30c';
+  $pubkey = '6ce29b2d3ecadc434107ce52c287001c968a1b6eca3e5a1eb62a2419e2924b85';
   $resp = (Invoke-WebRequest "$BASE_URL/wallet/$pubkey").Content | ConvertFrom-Json;
   Check-Wallet $resp 'Alice' '85';
 }
