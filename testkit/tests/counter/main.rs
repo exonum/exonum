@@ -23,9 +23,10 @@ extern crate serde_derive;
 extern crate serde_json;
 #[macro_use]
 extern crate pretty_assertions;
+#[macro_use]
 extern crate log;
 #[macro_use]
-extern crate matches;
+extern crate assert_matches;
 
 use exonum::api::ApiError;
 use exonum::blockchain::Transaction;
@@ -552,7 +553,7 @@ fn test_explorer_transaction_info() {
         &format!("v1/transactions/{}", &tx.hash().to_string()),
     );
     let error_body = json!({ "type": "unknown" }).to_string();
-    assert!(matches!(info, ApiError::NotFound(ref body) if *body == error_body));
+    assert_matches!(info, ApiError::NotFound(ref body) if *body == error_body);
 
     api.send(tx.clone());
     testkit.poll_events();

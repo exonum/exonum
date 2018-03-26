@@ -18,7 +18,7 @@ use exonum::node::{ApiSender, TransactionSend, create_public_api_handler,
 use exonum::api::ApiError;
 use iron::{Response, IronError, Handler, Chain};
 use iron::headers::{ContentType, Headers};
-use iron::status;
+use iron::status::{self, StatusClass};
 use iron_test::{request, response};
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -41,37 +41,6 @@ pub enum ApiKind {
     Explorer,
     /// Endpoints corresponding to a service with the specified string identifier.
     Service(&'static str),
-}
-
-#[derive(Debug)]
-struct TestkitApiError(ApiError);
-
-impl Into<TestkitApiError> for Response {
-    fn into(self) -> TestkitApiError {
-        let status = self.status;
-        let body = response::extract_body_to_string(self);
-        let error: String = serde_json::from_str::<JsonValue>(&body)
-            .map(|value| match value {
-                JsonValue::Object(object) => {
-                    object
-                        .get("description")
-                        .map(|value| value.as_str().map(String::from))
-                        .unwrap_or_else(|| serde_json::to_string(&object).ok())
-                        .unwrap_or_default()
-                }
-                value => serde_json::to_string(&value).unwrap_or_default(),
-            })
-            .unwrap_or_default();
-
-        let api_error = match status.expect("Status header is not set") {
-            status::Forbidden => ApiError::Unauthorized,
-            status::BadRequest => ApiError::BadRequest(error),
-            status::NotFound => ApiError::NotFound(error),
-            _ => ApiError::InternalError(error.into()),
-        };
-
-        TestkitApiError(api_error)
-    }
 }
 
 impl ApiKind {
@@ -150,9 +119,9 @@ impl TestKitApi {
         for<'de> D: Deserialize<'de>,
     {
         let status_class = if expect_error {
-            status::StatusClass::ClientError
+            StatusClass::ClientError
         } else {
-            status::StatusClass::Success
+            StatusClass::Success
         };
 
         let url = format!("http://localhost:3000/{}", endpoint);
@@ -224,15 +193,14 @@ impl TestKitApi {
     ///
     /// # Panics
     ///
-    /// - Panics if the response has a non-40x response status.
+    /// - Panics if the response has a non-error response status.
     pub fn get_err(&self, kind: ApiKind, endpoint: &str) -> ApiError {
         let url = format!("http://localhost:3000/{}/{}", kind.into_prefix(), endpoint);
         let response = match request::get(&url, Headers::new(), &self.public_handler) {
             Ok(response) |
             Err(IronError { response, .. }) => response,
         };
-        let testkit_error: TestkitApiError = response.into();
-        testkit_error.0
+        TestKitApi::response_to_api_error(response)
     }
 
     fn post_internal<H, T, D>(handler: &H, endpoint: &str, data: &T, is_public: bool) -> D
@@ -310,5 +278,60 @@ impl TestKitApi {
             transaction,
             false,
         )
+    }
+
+    /// Converts iron Response to ApiError.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if the response has a non-error response status.
+    fn response_to_api_error(response: Response) -> ApiError {
+        let status = response.status.expect("Status header is not set");
+        let status_class = status.class();
+        if status_class != StatusClass::ClientError && status_class != StatusClass::ServerError {
+            panic!("Received non-error response status: {}", status.to_u16());
+        }
+
+        let body = response::extract_body_to_string(response);
+        let error: String = serde_json::from_str::<JsonValue>(&body)
+            .map(|value| match value {
+                JsonValue::Object(object) => {
+                    object
+                        .get("description")
+                        .map(|value| value.as_str().map(String::from))
+                        .unwrap_or_else(|| serde_json::to_string(&object).ok())
+                        .unwrap_or_default()
+                }
+                JsonValue::String(string) => string,
+                value => serde_json::to_string(&value).unwrap_or_default(),
+            })
+            .unwrap_or_default();
+
+        match status {
+            status::Forbidden => ApiError::Unauthorized,
+            status::BadRequest => ApiError::BadRequest(error),
+            status::NotFound => ApiError::NotFound(error),
+            _ => ApiError::InternalError(error.into()),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use super::super::TestKitBuilder;
+
+    #[test]
+    fn test_get_err() {
+        let api = TestKitBuilder::validator().create().api();
+        let response: ApiError = api.get_err(ApiKind::System, "v1/not_found");
+        assert_matches!(response, ApiError::NotFound(_));
+    }
+
+    #[test]
+    #[should_panic(expected = "Received non-error response status")]
+    fn test_get_err_non_error_status() {
+        let api = TestKitBuilder::validator().create().api();
+        api.get_err(ApiKind::System, "v1/healthcheck");
     }
 }
