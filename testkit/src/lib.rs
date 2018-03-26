@@ -388,7 +388,12 @@ impl TestKit {
         &mut self.blockchain
     }
 
-    /// Rolls the blockchain back for a certain number of blocks.
+    /// Sets a checkpoint for a future [`rollback`](#method.rollback)
+    pub fn checkpoint(&mut self) {
+        self.db_handler.checkpoint()
+    }
+
+    /// Rolls the blockchain back to the latest [`checkpoint`](#method.checkpoint)
     ///
     /// # Examples
     ///
@@ -447,24 +452,21 @@ impl TestKit {
     /// let (pubkey, key) = exonum::crypto::gen_keypair();
     /// let tx_a = MyTransaction::new(&pubkey, "foo", &key);
     /// let tx_b = MyTransaction::new(&pubkey, "bar", &key);
+    ///
+    /// testkit.checkpoint();
     /// testkit.create_block_with_transactions(txvec![tx_a.clone(), tx_b.clone()]);
     /// assert_something_about(&testkit);
-    /// testkit.rollback(1);
+    /// testkit.rollback();
+    ///
+    /// testkit.checkpoint();
     /// testkit.create_block_with_transactions(txvec![tx_a.clone()]);
     /// testkit.create_block_with_transactions(txvec![tx_b.clone()]);
     /// assert_something_about(&testkit);
-    /// testkit.rollback(2);
+    /// testkit.rollback();
     /// # }
     /// ```
-    pub fn rollback(&mut self, blocks: usize) {
-        assert!(
-            self.height().0 >= blocks as u64,
-            "Cannot rollback past genesis block"
-        );
-        // Each block contain at least two phases:
-        // 1. add tx into pool;
-        // 2. commit tx from pool into next block.
-        self.db_handler.rollback(blocks * 2);
+    pub fn rollback(&mut self) {
+        self.db_handler.rollback()
     }
 
     /// Executes a list of transactions given the current state of the blockchain, but does not
@@ -483,9 +485,11 @@ impl TestKit {
             !schema.transactions().contains(&tx.hash()) ||
                 schema.transactions_pool().contains(&tx.hash())
         });
+
+        self.checkpoint();
         self.create_block_with_transactions(uncommitted_txs);
         let snapshot = self.snapshot();
-        self.rollback(1);
+        self.rollback();
         snapshot
     }
 
