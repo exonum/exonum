@@ -217,42 +217,27 @@ mod tests {
         assert_eq!(patch_set, expected_set);
     }
 
+    fn stack_len<T>(db: &CheckpointDb<T>) -> usize {
+        let inner = db.inner.read().unwrap();
+        inner.backup_stack.len()
+    }
+
     #[test]
     fn test_backup_stack() {
         let db = CheckpointDb::new(MemoryDB::new());
         let handler = db.handler();
 
-        {
-            let inner = db.inner.read().unwrap();
-            let stack = &inner.backup_stack;
-            assert_eq!(stack.len(), 0);
-        }
+        assert_eq!(stack_len(&db), 0);
         handler.checkpoint();
-        {
-            let inner = db.inner.read().unwrap();
-            let stack = &inner.backup_stack;
-            assert_eq!(stack.len(), 1);
-        }
+        assert_eq!(stack_len(&db), 1);
         handler.rollback();
-        {
-            let inner = db.inner.read().unwrap();
-            let stack = &inner.backup_stack;
-            assert_eq!(stack.len(), 0);
-        }
+        assert_eq!(stack_len(&db), 0);
 
         handler.checkpoint();
         handler.checkpoint();
-        {
-            let inner = db.inner.read().unwrap();
-            let stack = &inner.backup_stack;
-            assert_eq!(stack.len(), 2);
-        }
+        assert_eq!(stack_len(&db), 2);
         handler.rollback();
-        {
-            let inner = db.inner.read().unwrap();
-            let stack = &inner.backup_stack;
-            assert_eq!(stack.len(), 1);
-        }
+        assert_eq!(stack_len(&db), 1);
     }
 
     #[test]
