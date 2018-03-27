@@ -129,7 +129,7 @@ impl<T: Database> CheckpointDbInner<T> {
         self.db.merge(patch.clone())?;
         let mut rev_fork = self.db.fork();
 
-        // Reverse a patch to get a backup patch
+        // Reverse a patch to get a backup patch.
         for (name, changes) in patch {
             for (key, _) in changes {
                 match snapshot.get(&name, &key) {
@@ -143,7 +143,7 @@ impl<T: Database> CheckpointDbInner<T> {
             }
         }
 
-        // Should insert backup patches to the front of the backup (VecDeque)
+        // Should insert backup patches to the front of the backup (VecDeque).
         self.backup_stack
             .last_mut()
             .expect("`merge_with_logging` called before checkpoint has been set")
@@ -283,7 +283,7 @@ mod tests {
             );
         }
 
-        // Check that the old snapshot still corresponds to the same DB state
+        // Check that the old snapshot still corresponds to the same DB state.
         assert_eq!(snapshot.get("foo", &[]), Some(vec![2]));
         let snapshot = db.snapshot();
         assert_eq!(snapshot.get("foo", &[]), Some(vec![3]));
@@ -297,7 +297,7 @@ mod tests {
         fork.put("foo", vec![], vec![2]);
         db.merge(fork.into_patch()).unwrap();
 
-        // Both checkpoints are on purpose
+        // Both checkpoints are on purpose.
         handler.checkpoint();
         handler.checkpoint();
         let mut fork = db.fork();
@@ -331,7 +331,7 @@ mod tests {
             assert_eq!(backup.len(), 0);
         }
 
-        // Check that DB continues working as usual after a rollback
+        // Check that DB continues working as usual after a rollback.
         handler.checkpoint();
         let mut fork = db.fork();
         fork.put("foo", vec![], vec![4]);

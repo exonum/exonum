@@ -388,12 +388,12 @@ impl TestKit {
         &mut self.blockchain
     }
 
-    /// Sets a checkpoint for a future [`rollback`](#method.rollback)
+    /// Sets a checkpoint for a future [`rollback`](#method.rollback).
     pub fn checkpoint(&mut self) {
         self.db_handler.checkpoint()
     }
 
-    /// Rolls the blockchain back to the latest [`checkpoint`](#method.checkpoint)
+    /// Rolls the blockchain back to the latest [`checkpoint`](#method.checkpoint).
     ///
     /// # Examples
     ///
