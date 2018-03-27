@@ -44,7 +44,7 @@ impl Decoder for MessagesCodec {
         }
 
         if buf[0] != 0 {
-            return Err(other_error("Message zero byte must be set to 0"));
+            return Err(other_error("Message first byte must be set to 0"));
         }
 
         // Check payload len
