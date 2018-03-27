@@ -23,7 +23,7 @@ use crypto::PublicKey;
 use node::{ExternalMessage, ApiSender};
 use blockchain::{Service, Blockchain, SharedNodeState};
 use api::{Api, ApiError};
-use messages::{TEST_NETWORK_ID, PROTOCOL_MAJOR_VERSION};
+use messages::PROTOCOL_MAJOR_VERSION;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct ServiceInfo {
@@ -34,7 +34,6 @@ struct ServiceInfo {
 /// `DTO` is used to transfer information about node.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NodeInfo {
-    network_id: u8,
     protocol_version: u8,
     services: Vec<ServiceInfo>,
 }
@@ -46,7 +45,6 @@ impl NodeInfo {
         I: IntoIterator<Item = &'a Box<Service>>,
     {
         NodeInfo {
-            network_id: TEST_NETWORK_ID,
             protocol_version: PROTOCOL_MAJOR_VERSION,
             services: services
                 .into_iter()

@@ -47,15 +47,6 @@ fn test_unsupported_version() {
 }
 
 #[test]
-#[should_panic(expected = "IncorrectNetworkId")]
-fn test_incorrect_network_id() {
-    let tx = TxSimple::new_with_signature(&PublicKey::zero(), "My little pony", &Signature::zero());
-    let mut vec = tx.as_ref().as_ref().to_vec();
-    vec[0] = 128;
-    let _msg = TxSimple::from_raw(RawMessage::from_vec(vec)).unwrap();
-}
-
-#[test]
 #[allow(dead_code)]
 #[should_panic(expected = "Found error in from_raw: UnexpectedlyShortPayload")]
 fn test_message_with_small_size() {
