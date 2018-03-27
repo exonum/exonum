@@ -47,6 +47,7 @@ pub struct WalletHistoryProof {
 #[derive(Debug, Serialize)]
 pub struct WalletInfo {
     block_proof: BlockProof,
+    wallet: Option<Wallet>,
     wallet_proof: WalletProof,
     wallet_history: Option<WalletHistoryProof>,
 }
@@ -86,7 +87,9 @@ where
             to_wallet,
         };
 
-        let wallet_history = currency_schema.wallet(pub_key).map(|_| {
+        let wallet = currency_schema.wallet(pub_key);
+
+        let wallet_history = if wallet.is_some() {
             let history = currency_schema.wallet_history(pub_key);
 
             let proof: ListProof<MetaRecord> = history.get_range_proof(0, history.len());
@@ -102,14 +105,17 @@ where
                 .map(|raw| WalletTransactions::tx_from_raw(raw).unwrap())
                 .collect::<Vec<_>>();
 
-            WalletHistoryProof {
+            Some(WalletHistoryProof {
                 proof,
                 transactions,
-            }
-        });
+            })
+        } else {
+            None
+        };
 
         Ok(WalletInfo {
             block_proof,
+            wallet,
             wallet_proof,
             wallet_history,
         })
@@ -136,7 +142,7 @@ where
 
     fn wire_wallet_info(self, router: &mut Router) {
         let wallet_info = move |req: &mut Request| -> IronResult<Response> {
-            let pub_key: PublicKey = self.required_param(req, "pubkey")?;
+            let pub_key: PublicKey = self.url_fragment(req, "pubkey")?;
             let info = self.wallet_info(&pub_key)?;
             self.ok_response(&serde_json::to_value(&info).unwrap())
         };

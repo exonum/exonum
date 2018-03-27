@@ -38,7 +38,7 @@ pub const CRYPTOCURRENCY_SERVICE_ID: u16 = 128;
 pub struct CurrencyService;
 
 impl Service for CurrencyService {
-    fn service_name(&self) -> &'static str {
+    fn service_name(&self) -> &str {
         "cryptocurrency"
     }
 
