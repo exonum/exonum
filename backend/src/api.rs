@@ -1,49 +1,54 @@
 //! Cryptocurrency API.
 
 use serde::Serialize;
-use serde_json::to_value;
+use serde_json;
 use router::Router;
 use iron::prelude::*;
 use bodyparser;
-use params::{Params, Value};
-
-use std::fmt;
 
 use exonum::api::{Api, ApiError};
 use exonum::node::TransactionSend;
-use exonum::messages::Message;
 use exonum::crypto::{PublicKey, Hash};
 use exonum::storage::{MapProof, ListProof};
-use exonum::blockchain::{self, Blockchain, BlockProof};
+use exonum::blockchain::{self, Blockchain, BlockProof, Transaction, TransactionSet};
 use exonum::helpers::Height;
-#[cfg(feature = "byzantine-behavior")]
-use exonum::storage::proof_map_index::{BranchProofNode, ProofNode};
-use exonum::encoding::serialize::FromHex;
 
-use super::tx_metarecord::TxMetaRecord;
-use super::wallet::Wallet;
-use super::{CRYPTOCURRENCY_SERVICE_ID, CurrencySchema, CurrencyTx};
+use std::fmt;
 
-/// TODO: Add documentation.
-#[derive(Debug, Serialize)]
-pub struct MapProofTemplate<V: Serialize> {
-    mpt_proof: MapProof<Hash>,
-    value: V,
+use {CRYPTOCURRENCY_SERVICE_ID, CurrencySchema};
+use schema::MetaRecord;
+use transactions::WalletTransactions;
+use wallet::Wallet;
+
+/// The structure returned by the REST API.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TransactionResponse {
+    /// Hash of the transaction.
+    pub tx_hash: Hash,
 }
 
-/// TODO: Add documentation.
+/// Proof of existence for specific wallet.
 #[derive(Debug, Serialize)]
-pub struct ListProofTemplate<V: Serialize> {
-    mt_proof: ListProof<TxMetaRecord>,
-    values: Vec<V>,
+pub struct WalletProof {
+    /// Proof to the whole database table.
+    to_table: MapProof<Hash>,
+    /// Proof to the specific wallet in this table.
+    to_wallet: MapProof<Wallet>,
+}
+
+/// Proof to wallet history.
+#[derive(Debug, Serialize)]
+pub struct WalletHistoryProof {
+    proof: ListProof<MetaRecord>,
+    transactions: Vec<WalletTransactions>,
 }
 
 /// Wallet information.
 #[derive(Debug, Serialize)]
 pub struct WalletInfo {
-    block_info: BlockProof,
-    wallet: MapProofTemplate<MapProof<Wallet>>,
-    wallet_history: Option<ListProofTemplate<CurrencyTx>>,
+    block_proof: BlockProof,
+    wallet_proof: WalletProof,
+    wallet_history: Option<WalletHistoryProof>,
 }
 
 /// TODO: Add documentation.
@@ -57,7 +62,7 @@ pub struct CryptocurrencyApi<T: TransactionSend + Clone> {
 
 impl<T> CryptocurrencyApi<T>
 where
-    T: TransactionSend + Clone,
+    T: TransactionSend + Clone + 'static,
 {
     fn wallet_info(&self, pub_key: &PublicKey) -> Result<WalletInfo, ApiError> {
         let view = self.blockchain.snapshot();
@@ -66,117 +71,80 @@ where
         let mut currency_schema = CurrencySchema::new(&mut view);
 
         let max_height = general_schema.block_hashes_by_height().len() - 1;
+
         let block_proof = general_schema
             .block_and_precommits(Height(max_height))
             .unwrap();
-        let state_hash = *block_proof.block.state_hash();
 
-        let wallet_path: MapProofTemplate<MapProof<Wallet>>;
-        let wallet_history: Option<ListProofTemplate<CurrencyTx>>;
-
-        let to_wallets_table: MapProof<Hash> =
+        let to_table: MapProof<Hash> =
             general_schema.get_proof_to_service_table(CRYPTOCURRENCY_SERVICE_ID, 0);
 
-        {
-            let wallets_root_hash = currency_schema.wallets_proof().root_hash();
-            let check_result =
-                to_wallets_table.validate(
-                    &Blockchain::service_table_unique_key(CRYPTOCURRENCY_SERVICE_ID, 0),
-                    state_hash,
-                );
-            debug_assert_eq!(wallets_root_hash, *check_result.unwrap().unwrap());
-        }
+        let to_wallet: MapProof<Wallet> = currency_schema.wallets().get_proof(pub_key);
 
-        if cfg!(feature = "byzantine-behavior") {
-            let mut to_specific_wallet: MapProof<Wallet> =
-                currency_schema.wallets_proof().get_proof(pub_key);
-            change_wallet_proof(&mut to_specific_wallet);
-            wallet_path = MapProofTemplate {
-                mpt_proof: to_wallets_table,
-                value: to_specific_wallet,
-            };
-        } else {
-            let to_specific_wallet: MapProof<Wallet> =
-                currency_schema.wallets_proof().get_proof(pub_key);
-            wallet_path = MapProofTemplate {
-                mpt_proof: to_wallets_table,
-                value: to_specific_wallet,
-            };
-        }
+        let wallet_proof = WalletProof {
+            to_table,
+            to_wallet,
+        };
 
-        wallet_history = match currency_schema.wallet(pub_key) {
-            Some(wallet) => {
-                let history = currency_schema.wallet_history(pub_key);
-                let history_len = history.len();
-                debug_assert!(history_len >= 1);
-                debug_assert_eq!(history_len, wallet.history_len());
-                let tx_records: Vec<TxMetaRecord> = history.into_iter().collect();
-                let transactions_table = general_schema.transactions();
-                let mut txs: Vec<CurrencyTx> = Vec::with_capacity(tx_records.len());
-                for record in tx_records {
-                    let raw_message = transactions_table.get(record.tx_hash()).unwrap();
-                    txs.push(CurrencyTx::from(raw_message));
-                }
-                let to_transaction_hashes: ListProof<TxMetaRecord> =
-                    history.get_range_proof(0, history_len);
-                let path_to_transactions = ListProofTemplate {
-                    mt_proof: to_transaction_hashes,
-                    values: txs,
-                };
-                Some(path_to_transactions)
+        let wallet_history = currency_schema.wallet(pub_key).map(|_| {
+            let history = currency_schema.wallet_history(pub_key);
+
+            let proof: ListProof<MetaRecord> = history.get_range_proof(0, history.len());
+
+            let transactions: Vec<WalletTransactions> = history
+                .iter()
+                .map(|record| {
+                    general_schema
+                        .transactions()
+                        .get(record.transaction_hash())
+                        .unwrap()
+                })
+                .map(|raw| WalletTransactions::tx_from_raw(raw).unwrap())
+                .collect::<Vec<_>>();
+
+            WalletHistoryProof {
+                proof,
+                transactions,
             }
-            None => None,
-        };
-        let res = WalletInfo {
-            block_info: block_proof,
-            wallet: wallet_path,
+        });
+
+        Ok(WalletInfo {
+            block_proof,
+            wallet_proof,
             wallet_history,
-        };
-        Ok(res)
+        })
     }
 
-    fn transaction(&self, tx: CurrencyTx) -> Result<Hash, ApiError> {
-        let tx_hash = tx.hash();
-        match self.channel.send(Box::new(tx)) {
-            Ok(_) => Ok(tx_hash),
-            Err(e) => Err(ApiError::Io(e)),
+    fn post_transaction(&self, req: &mut Request) -> IronResult<Response> {
+        match req.get::<bodyparser::Struct<WalletTransactions>>() {
+            Ok(Some(transaction)) => {
+                let transaction: Box<Transaction> = transaction.into();
+                let tx_hash = transaction.hash();
+                self.channel.send(transaction).map_err(ApiError::from)?;
+                let json = TransactionResponse { tx_hash };
+                self.ok_response(&serde_json::to_value(&json).unwrap())
+            }
+            Ok(None) => Err(ApiError::BadRequest("Empty request body".into()))?,
+            Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
         }
     }
-}
 
-#[cfg(not(feature = "byzantine-behavior"))]
-fn change_wallet_proof(_: &mut MapProof<Wallet>) {
-    unimplemented!()
-}
+    fn wire_post_transaction(self, router: &mut Router) {
+        let transaction = move |req: &mut Request| self.post_transaction(req);
+        router.post("/v1/wallets/transaction", transaction, "post_transaction");
+    }
 
-#[cfg(feature = "byzantine-behavior")]
-fn change_wallet_proof(proof: &mut MapProof<Wallet>) {
-    match *proof {
-        MapProof::LeafRootInclusive(_, ref mut wallet) => wallet.set_balance(100_500),
-        MapProof::Branch(ref mut branch) => change_branch_proof_node(branch),
-        MapProof::LeafRootExclusive { .. } |
-        MapProof::Empty => (),
+    fn wire_wallet_info(self, router: &mut Router) {
+        let wallet_info = move |req: &mut Request| -> IronResult<Response> {
+            let pub_key: PublicKey = self.required_param(req, "pubkey")?;
+            let info = self.wallet_info(&pub_key)?;
+            self.ok_response(&serde_json::to_value(&info).unwrap())
+        };
+        router.get("/v1/wallets/info/:pubkey", wallet_info, "wallet_info");
     }
 }
 
-#[cfg(feature = "byzantine-behavior")]
-fn change_branch_proof_node(branch: &mut BranchProofNode<Wallet>) {
-    match *branch {
-        BranchProofNode::LeftBranch { ref mut left_node, .. } => change_proof_node(left_node),
-        BranchProofNode::RightBranch { ref mut right_node, .. } => change_proof_node(right_node),
-        BranchProofNode::BranchKeyNotFound { .. } => (),
-    }
-}
-
-#[cfg(feature = "byzantine-behavior")]
-fn change_proof_node(node: &mut ProofNode<Wallet>) {
-    match *node {
-        ProofNode::Branch(ref mut branch) => change_branch_proof_node(branch),
-        ProofNode::Leaf(ref mut wallet) => wallet.set_balance(100_500),
-    }
-}
-
-impl<T: Clone + TransactionSend> fmt::Debug for CryptocurrencyApi<T> {
+impl<T: TransactionSend + Clone> fmt::Debug for CryptocurrencyApi<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "CryptocurrencyApi {{}}")
     }
@@ -187,50 +155,7 @@ where
     T: 'static + TransactionSend + Clone,
 {
     fn wire(&self, router: &mut Router) {
-        let self_ = self.clone();
-        let wallet_info = move |req: &mut Request| -> IronResult<Response> {
-            let map = req.get_ref::<Params>().unwrap();
-            match map.find(&["pubkey"]) {
-                Some(&Value::String(ref pub_key_string)) => {
-                    let public_key = PublicKey::from_hex(pub_key_string).map_err(
-                        ApiError::FromHex,
-                    )?;
-                    let info = self_.wallet_info(&public_key)?;
-                    self_.ok_response(&to_value(&info).unwrap())
-                }
-                _ => {
-                    Err(ApiError::IncorrectRequest(
-                        "Required parameter of \
-                                                     wallet 'pubkey' is missing"
-                            .into(),
-                    ))?
-                }
-            }
-        };
-
-        let self_ = self.clone();
-        let transaction = move |req: &mut Request| -> IronResult<Response> {
-            match req.get::<bodyparser::Struct<CurrencyTx>>() {
-                Ok(Some(transaction)) => {
-                    let tx_hash = self_.transaction(transaction)?;
-                    let json = TxResponse { tx_hash: tx_hash };
-                    self_.ok_response(&to_value(&json).unwrap())
-                }
-                Ok(None) => Err(ApiError::IncorrectRequest("Empty request body".into()))?,
-                Err(e) => Err(ApiError::IncorrectRequest(Box::new(e)))?,
-            }
-        };
-
-        let route_post = "/v1/wallets/transaction";
-        let route_get = "/v1/wallets/info";
-        router.post(&route_post, transaction, "transaction");
-        info!("Created POST route: {}", route_post);
-        router.get(&route_get, wallet_info, "wallet_info");
-        info!("Created GET route: {}", route_get);
+        self.clone().wire_post_transaction(router);
+        self.clone().wire_wallet_info(router);
     }
-}
-
-#[derive(Serialize, Deserialize)]
-struct TxResponse {
-    tx_hash: Hash,
 }
