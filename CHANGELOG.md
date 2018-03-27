@@ -56,6 +56,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `CryptoHash` trait is no longer implemented for `Hash`. (#578)
 
+- `network_id` attribute has been removed from `NodeInfo` and `RawMessage`.
+  `HEADER_LENGTH` remains the same, zero byte of `RawMessage` is now reserved and
+  always set to `0`. (#579)
+
 #### exonum-testkit
 
 - Testkit api now contains two methods to work with the transaction pool (#549):
@@ -115,10 +119,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   instead of memory pool. (#549)
 
 - Sandbox tests have been moved inside of the exonum core. (#568)
-
-- `network_id` attribute has been removed from `NodeInfo` and `RawMessage`.
-  `HEADER_LENGTH` remains the same, zero byte of `RawMessage` is now reserved and
-  always set to `0`. (#579)
 
 ## 0.6 - 2018-03-06
 
