@@ -486,7 +486,7 @@ fn test_explorer_blocks() {
 #[test]
 fn test_explorer_single_block() {
     use std::collections::HashSet;
-    use exonum::explorer::{BlockchainExplorer, BlockInfo};
+    use exonum::explorer::BlockchainExplorer;
     use exonum::helpers::Height;
 
     let mut testkit = TestKitBuilder::validator()
@@ -498,10 +498,10 @@ fn test_explorer_single_block() {
 
     {
         let explorer = BlockchainExplorer::new(testkit.blockchain());
-        let info: BlockInfo = explorer.block(Height(0)).unwrap();
-        assert_eq!(info.block().height(), Height(0));
-        assert_eq!(*info.block().prev_hash(), crypto::Hash::default());
-        assert_eq!(&*info.transaction_hashes(), &[]);
+        let block = explorer.block(Height(0)).unwrap();
+        assert_eq!(block.height(), Height(0));
+        assert_eq!(*block.header().prev_hash(), crypto::Hash::default());
+        assert_eq!(&*block.transaction_hashes(), &[]);
     }
 
     let tx = {
@@ -513,16 +513,16 @@ fn test_explorer_single_block() {
 
     {
         let explorer = BlockchainExplorer::new(testkit.blockchain());
-        let info: BlockInfo = explorer.block(Height(1)).unwrap();
-        assert_eq!(info.block().height(), Height(1));
-        assert_eq!(info.block().tx_count(), 1);
-        assert_eq!(*info.block().tx_hash(), tx.hash());
-        assert_eq!(&*info.transaction_hashes(), &[tx.hash()]);
+        let block = explorer.block(Height(1)).unwrap();
+        assert_eq!(block.height(), Height(1));
+        assert_eq!(block.len(), 1);
+        assert_eq!(*block.header().tx_hash(), tx.hash());
+        assert_eq!(&*block.transaction_hashes(), &[tx.hash()]);
 
         let mut validators = HashSet::new();
-        for precommit in info.precommits().iter() {
+        for precommit in block.precommits().iter() {
             assert_eq!(precommit.height(), Height(1));
-            assert_eq!(*precommit.block_hash(), info.block().hash());
+            assert_eq!(*precommit.block_hash(), block.header().hash());
             let pk = testkit
                 .network()
                 .consensus_public_key_of(precommit.validator())
@@ -602,10 +602,9 @@ fn test_explorer_transaction() {
 
         let explorer = BlockchainExplorer::new(testkit.blockchain());
         let block = explorer.block(Height(1)).unwrap();
-        let block = block.block();
         assert!(
             location_proof
-                .validate(*block.tx_hash(), u64::from(block.tx_count()))
+                .validate(*block.header().tx_hash(), u64::from(block.header().tx_count()))
                 .is_ok()
         );
     } else {

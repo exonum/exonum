@@ -28,7 +28,7 @@ use storage::{ListProof, Snapshot};
 use std::cell::{Ref, RefCell};
 use std::collections::Bound;
 use std::fmt;
-use std::ops::{Deref, Index, Range, RangeFrom, RangeFull, RangeTo};
+use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
 
 #[cfg(any(test, feature = "doctests"))]
 #[doc(hidden)]
@@ -129,7 +129,7 @@ impl HeightRange {
 ///     serde_json::to_value(&block).unwrap(),
 ///     json!({
 ///         // `Block` representation
-///         "block": block.block(),
+///         "block": block.header(),
 ///         // Array of `Precommit`s
 ///         "precommits": *block.precommits(),
 ///         // Array of transaction hashes
@@ -141,8 +141,8 @@ impl HeightRange {
 /// ```
 #[derive(Debug)]
 pub struct BlockInfo<'a> {
+    header: Block,
     explorer: &'a BlockchainExplorer<'a>,
-    block: Block,
     precommits: RefCell<Option<Vec<Precommit>>>,
     txs: RefCell<Option<Vec<Hash>>>,
 }
@@ -150,7 +150,7 @@ pub struct BlockInfo<'a> {
 impl<'a> BlockInfo<'a> {
     fn new(explorer: &'a BlockchainExplorer, height: Height) -> Self {
         let schema = Schema::new(&explorer.snapshot);
-        let block = {
+        let header = {
             let hashes = schema.block_hashes_by_height();
             let blocks = schema.blocks();
 
@@ -166,20 +166,32 @@ impl<'a> BlockInfo<'a> {
 
         BlockInfo {
             explorer,
-            block,
+            header,
             precommits: RefCell::new(None),
             txs: RefCell::new(None),
         }
     }
 
-    /// Returns the block header as recorded in the blockchain.
-    pub fn block(&self) -> &Block {
-        &self.block
+    /// Returns block header as recorded in the blockchain.
+    pub fn header(&self) -> &Block {
+        &self.header
+    }
+
+    /// Extracts the header discarding all other information.
+    pub fn into_header(self) -> Block {
+        self.header
+    }
+
+    /// Returns the height of this block.
+    ///
+    /// This method is equivalent to calling `block.header().height()`.
+    pub fn height(&self) -> Height {
+        self.header.height()
     }
 
     /// Returns the number of transactions in this block.
     pub fn len(&self) -> usize {
-        self.block.tx_count() as usize
+        self.header.tx_count() as usize
     }
 
     /// Is this block empty (i.e., contains no transactions)?
@@ -190,7 +202,7 @@ impl<'a> BlockInfo<'a> {
     /// Returns a list of precommits for this block.
     pub fn precommits(&self) -> Ref<[Precommit]> {
         if self.precommits.borrow().is_none() {
-            let precommits = self.explorer.precommits(&self.block);
+            let precommits = self.explorer.precommits(&self.header);
             *self.precommits.borrow_mut() = Some(precommits);
         }
 
@@ -202,7 +214,7 @@ impl<'a> BlockInfo<'a> {
     /// List of hashes for transactions that was executed into this block.
     pub fn transaction_hashes(&self) -> Ref<[Hash]> {
         if self.txs.borrow().is_none() {
-            let txs = self.explorer.transaction_hashes(&self.block);
+            let txs = self.explorer.transaction_hashes(&self.header);
             *self.txs.borrow_mut() = Some(txs);
         }
 
@@ -227,32 +239,24 @@ impl<'a> BlockInfo<'a> {
 
     /// Loads transactions and precommits for the block.
     pub fn with_transactions(self) -> BlockWithTransactions {
-        let (explorer, block, precommits, transactions) =
-            (self.explorer, self.block, self.precommits, self.txs);
+        let (explorer, header, precommits, transactions) =
+            (self.explorer, self.header, self.precommits, self.txs);
 
         let precommits = precommits.into_inner().unwrap_or_else(
-            || explorer.precommits(&block),
+            || explorer.precommits(&header),
         );
         let transactions = transactions
             .into_inner()
-            .unwrap_or_else(|| explorer.transaction_hashes(&block))
+            .unwrap_or_else(|| explorer.transaction_hashes(&header))
             .iter()
             .map(|tx_hash| explorer.committed_transaction(tx_hash, None))
             .collect();
 
         BlockWithTransactions {
-            block,
+            header,
             precommits,
             transactions,
         }
-    }
-}
-
-impl<'a> Deref for BlockInfo<'a> {
-    type Target = Block;
-
-    fn deref(&self) -> &Block {
-        &self.block
     }
 }
 
@@ -261,7 +265,7 @@ impl<'a> Serialize for BlockInfo<'a> {
         use serde::ser::SerializeStruct;
 
         let mut s = serializer.serialize_struct("BlockInfo", 3)?;
-        s.serialize_field("block", self.block())?;
+        s.serialize_field("block", &self.header)?;
         s.serialize_field("precommits", &*self.precommits())?;
         s.serialize_field("txs", &*self.transaction_hashes())?;
         s.end()
@@ -328,8 +332,9 @@ impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
 /// ```
 #[derive(Debug, Serialize)]
 pub struct BlockWithTransactions {
-    /// Block header.
-    pub block: Block,
+    /// Block header as recorded in the blockchain.
+    #[serde(rename = "block")]
+    pub header: Block,
     /// Precommits.
     pub precommits: Vec<Precommit>,
     /// Transactions in the order they appear in the block.
@@ -337,6 +342,13 @@ pub struct BlockWithTransactions {
 }
 
 impl BlockWithTransactions {
+    /// Returns the height of this block.
+    ///
+    /// This method is equivalent to calling `block.header.height()`.
+    pub fn height(&self) -> Height {
+        self.header.height()
+    }
+
     /// Returns the number of transactions in this block.
     pub fn len(&self) -> usize {
         self.transactions.len()
@@ -350,14 +362,6 @@ impl BlockWithTransactions {
     /// Iterates over transactions in the block.
     pub fn iter(&self) -> EagerTransactions {
         self.transactions.iter()
-    }
-}
-
-impl Deref for BlockWithTransactions {
-    type Target = Block;
-
-    fn deref(&self) -> &Block {
-        &self.block
     }
 }
 
@@ -853,7 +857,7 @@ impl<'a> BlockchainExplorer<'a> {
 
         block_proof.map(|proof| {
             BlockWithTransactions {
-                block: proof.block,
+                header: proof.block,
                 precommits: proof.precommits,
                 transactions: txs_table
                     .iter()
@@ -880,7 +884,7 @@ impl<'a> BlockchainExplorer<'a> {
             .rev()
             .filter(|block| !skip_empty_blocks || !block.is_empty())
             .take(count)
-            .map(|info| info.block)
+            .map(|block| block.header)
             .collect();
 
         let height = if blocks.len() < count {
@@ -912,7 +916,7 @@ impl<'a> BlockchainExplorer<'a> {
     }
 }
 
-/// Iterator over blocks in descending order.
+/// Iterator over blocks in the blockchain.
 pub struct Blocks<'a> {
     explorer: &'a BlockchainExplorer<'a>,
     ptr: Height,
