@@ -774,6 +774,7 @@ pub struct BlocksRange {
 /// let blockchain = // ...
 /// #                sample_blockchain();
 /// let explorer = BlockchainExplorer::new(&blockchain);
+///
 /// // Getting a specific block
 /// let block = explorer.block(Height(1)).unwrap();
 /// // Getting a block together with its transactions
@@ -785,6 +786,33 @@ pub struct BlocksRange {
 /// for block in explorer.blocks(Height(1)..).rev().take(2) {
 ///     println!("{:?}", block);
 /// }
+/// # } // main
+/// # #[cfg(not(feature = "doctests"))] fn main() {}
+/// ```
+///
+/// Some more interesting capabilities:
+///
+/// ```
+/// # extern crate exonum;
+/// # #[cfg(feature = "doctests")] fn main() {
+/// # use exonum::explorer::BlockchainExplorer;
+/// # use exonum::explorer::tests::sample_blockchain;
+/// use exonum::helpers::{Height, ValidatorId};
+///
+/// # let blockchain = sample_blockchain();
+/// # let explorer = BlockchainExplorer::new(&blockchain);
+/// // Calculate the total number of transactions in the first 10 blocks
+/// let tx_count: usize = explorer
+///     .blocks(..Height(10))
+///     .map(|block| block.len())
+///     .sum();
+/// # assert_eq!(tx_count, 3);
+/// // Determine the number of blocks proposed by a specific validator
+/// let block_count = explorer
+///     .blocks(Height(1)..) // skip genesis block
+///     .filter(|block| block.header().proposer_id() == ValidatorId(0))
+///     .count();
+/// # assert_eq!(block_count, 1);
 /// # } // main
 /// # #[cfg(not(feature = "doctests"))] fn main() {}
 /// ```
