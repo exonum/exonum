@@ -12,8 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Blockchain explorer module provides api for getting information about blocks and transactions
+//! Blockchain explorer module provides API for getting information about blocks and transactions
 //! from the blockchain.
+//!
+//! See the [`BlockchainExplorer`] documentation for examples of usage.
+//!
+//! [`BlockchainExplorer`]: struct.BlockchainExplorer.html
 
 use serde::{Serialize, Serializer};
 
@@ -211,7 +215,7 @@ impl<'a> BlockInfo<'a> {
         })
     }
 
-    /// List of hashes for transactions that was executed into this block.
+    /// Lists hashes of transactions included in this block.
     pub fn transaction_hashes(&self) -> Ref<[Hash]> {
         if self.txs.borrow().is_none() {
             let txs = self.explorer.transaction_hashes(&self.header);
@@ -749,6 +753,41 @@ pub struct BlocksRange {
 }
 
 /// Blockchain explorer.
+///
+/// # Notes
+///
+/// The explorer wraps a specific [`Snapshot`] of the blockchain state; that is,
+/// all calls to the methods of an explorer instance are guaranteed to be consistent.
+///
+/// [`Snapshot`]: ../storage/trait.Snapshot.html
+///
+/// # Examples
+///
+/// ```
+/// # extern crate exonum;
+/// # #[cfg(feature = "doctests")] fn main() {
+/// # use exonum::crypto::Hash;
+/// # use exonum::explorer::BlockchainExplorer;
+/// # use exonum::explorer::tests::sample_blockchain;
+/// # use exonum::helpers::Height;
+/// #
+/// let blockchain = // ...
+/// #                sample_blockchain();
+/// let explorer = BlockchainExplorer::new(&blockchain);
+/// // Getting a specific block
+/// let block = explorer.block(Height(1)).unwrap();
+/// // Getting a block together with its transactions
+/// let block = explorer.block_with_txs(Height(1)).unwrap();
+/// // Getting a specific transaction either in one of blocks,
+/// // or in the pool of unconfirmed transactions
+/// let tx = explorer.transaction(&Hash::zero());
+/// // Iterating over blocks in the blockchain
+/// for block in explorer.blocks(Height(1)..).rev().take(2) {
+///     println!("{:?}", block);
+/// }
+/// # } // main
+/// # #[cfg(not(feature = "doctests"))] fn main() {}
+/// ```
 pub struct BlockchainExplorer<'a> {
     snapshot: Box<Snapshot>,
     transaction_parser: Box<'a + Fn(RawMessage) -> ParseResult>,
@@ -815,7 +854,7 @@ impl<'a> BlockchainExplorer<'a> {
 
         let location = schema.transactions_locations().get(tx_hash).expect(
             &format!(
-                "Not found tx_hash location: {:?}",
+                "Location not found for transaction hash {:?}",
                 tx_hash
             ),
         );
@@ -849,7 +888,8 @@ impl<'a> BlockchainExplorer<'a> {
         }
     }
 
-    /// Returns block information for the specified height or `None` if there is no such block.
+    /// Returns block together with its transactions for the specified height, or `None`
+    /// if there is no such block.
     pub fn block_with_txs(&self, height: Height) -> Option<BlockWithTransactions> {
         let schema = Schema::new(&self.snapshot);
         let txs_table = schema.block_transactions(height);
