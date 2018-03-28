@@ -69,6 +69,8 @@ fn test_configuration_and_rollbacks() {
     testkit.checkpoint();
 
     testkit.commit_configuration_change(proposal);
+    testkit.checkpoint();
+    testkit.rollback();
     testkit.create_blocks_until(Height(10));
     assert_eq!(testkit.actual_configuration(), new_config);
 
