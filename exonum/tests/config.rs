@@ -111,7 +111,7 @@ fn generate_config(folder: &str, i: usize) {
     ]));
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(needless_range_loop, unused_must_use))]
+#[cfg_attr(feature = "cargo-clippy", allow(needless_range_loop))]
 fn finalize_config(folder: &str, config: &str, i: usize, count: usize) {
 
     let mut variables = vec![
@@ -122,7 +122,7 @@ fn finalize_config(folder: &str, config: &str, i: usize, count: usize) {
         "-p".to_owned(),
     ];
 
-    fs::create_dir_all(full_tmp_name("", folder));
+    fs::create_dir_all(full_tmp_name("", folder)).expect("Can't create temp folder");
 
     for n in 0..count {
         override_validators_count(PUB_CONFIG[n], count, folder);
@@ -131,12 +131,13 @@ fn finalize_config(folder: &str, config: &str, i: usize, count: usize) {
     assert!(!default_run_with_matches(variables));
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(unused_must_use))]
 fn override_validators_count(config: &str, n: usize, folder: &str) {
     let res = {
         let mut contents = String::new();
-        let mut f = File::open(full_testdata_name(config)).unwrap();
-        f.read_to_string(&mut contents);
+        let mut file = File::open(full_testdata_name(config)).unwrap();
+        file.read_to_string(&mut contents).expect(
+            "Read from config file failed",
+        );
 
         let mut value = contents.as_str().parse::<Value>().unwrap();
         {
@@ -156,7 +157,8 @@ fn override_validators_count(config: &str, n: usize, folder: &str) {
 
     File::create(full_tmp_name(config, folder))
         .unwrap()
-        .write_all(res.as_bytes());
+        .write_all(res.as_bytes())
+        .expect("Create temp config file is failed");
 }
 
 fn run_node(config: &str, folder: &str) {
