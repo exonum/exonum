@@ -282,12 +282,14 @@ impl Command for GenerateCommonConfig {
     fn args(&self) -> Vec<Argument> {
         vec![
             Argument::new_positional("COMMON_CONFIG", true, "Path to common config."),
-            Argument::new_named("VALIDATORS_COUNT",
-                                true,
-                                "Number of validators",
-                                    None,
-                                "validators-count",
-                                false),
+            Argument::new_named(
+                "VALIDATORS_COUNT",
+                true,
+                "Number of validators",
+                None,
+                "validators-count",
+                false
+            ),
         ]
     }
 
@@ -575,13 +577,12 @@ impl Command for Finalize {
 
         let (common, list, our) = Self::reduce_configs(public_configs, &secret_config);
 
-        let validators_count = common.general_config
+        let validators_count = common
+            .general_config
             .get("validators_count")
             .expect("validators_count is not found in common config.")
             .as_integer()
             .unwrap() as usize;
-
-        println!("validators count {}, list.len {}", validators_count, list.len());
 
         if validators_count != list.len() {
             panic!("Number of validators configs does not match number of validator keys.");

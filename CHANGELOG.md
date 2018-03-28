@@ -78,6 +78,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   a new configuration proposal. By default the number of votes is calculated
   as 2/3 + 1 of total validators count. (#546)
 
+- `validators-count` command-line parameter is added. Now, when generating
+  config template using `generate-template` command you must specify number of validators.
+
 #### exonum-time
 
 - `SystemTime` has been replaced with `chrono::DateTime<Utc>`, as it provides

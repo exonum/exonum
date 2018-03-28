@@ -111,7 +111,7 @@ fn generate_config(folder: &str, i: usize) {
     ]));
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(needless_range_loop))]
+#[cfg_attr(feature = "cargo-clippy", allow(needless_range_loop, unused_must_use))]
 fn finalize_config(folder: &str, config: &str, i: usize, count: usize) {
 
     let mut variables = vec![
@@ -131,10 +131,11 @@ fn finalize_config(folder: &str, config: &str, i: usize, count: usize) {
     assert!(!default_run_with_matches(variables));
 }
 
+#[cfg_attr(feature = "cargo-clippy", allow(unused_must_use))]
 fn override_validators_count(config: &str, n: usize, folder: &str) {
     let res = {
         let mut contents = String::new();
-        let mut f = File::open(full_testdata_name(&config)).unwrap();
+        let mut f = File::open(full_testdata_name(config)).unwrap();
         f.read_to_string(&mut contents);
 
         let mut value = contents.as_str().parse::<Value>().unwrap();
@@ -153,7 +154,9 @@ fn override_validators_count(config: &str, n: usize, folder: &str) {
         toml::to_string(&value).unwrap()
     };
 
-    let res = File::create(full_tmp_name(&config, folder)).unwrap().write_all(res.as_bytes());
+    File::create(full_tmp_name(config, folder))
+        .unwrap()
+        .write_all(res.as_bytes());
 }
 
 fn run_node(config: &str, folder: &str) {
@@ -235,7 +238,7 @@ fn test_generate_full_config_run() {
         }
     });
 
-//    fs::remove_dir_all(full_tmp_folder(command)).unwrap();
+    fs::remove_dir_all(full_tmp_folder(command)).unwrap();
 
     if let Err(err) = result {
         panic::resume_unwind(err);
