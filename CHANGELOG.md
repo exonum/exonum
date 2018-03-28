@@ -71,6 +71,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - Instead of calling `mempool()`, one should use `is_tx_in_pool`
   or `add_tx` methods.
 
+- `TestKitApi::get_err` method now returns `ApiError`, rather than
+  a deserialized object, as it is for `get`. For checking such results
+  in tests you may want to use `assert_matches`.
+
 #### exonum-configuration
 
 - `majority_count: Option<u16>` configuration parameter is introduced.
