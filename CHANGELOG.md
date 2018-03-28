@@ -62,6 +62,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum-testkit
 
+- `CheckpointDb` and `Testkit` have their `rollback` methods updated (#582):
+  - `rollback` by blocks in `Testkit` was removed;
+  - `rollback` by merge count in `CheckpointDb` was removed;
+  - `checkpoint` method was introduced to set checkpoints;
+  - new `rollback` rolls back to the last set checkpoint.
+
 - Testkit api now contains two methods to work with the transaction pool (#549):
   - `is_tx_in_pool` - for checking transaction existence in the pool;
   - `add_tx` - for adding a new transaction into the pool.
