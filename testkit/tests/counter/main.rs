@@ -552,8 +552,11 @@ fn test_explorer_transaction_info() {
         ApiKind::Explorer,
         &format!("v1/transactions/{}", &tx.hash().to_string()),
     );
-    let error_body = json!({ "type": "unknown" }).to_string();
-    assert_matches!(info, ApiError::NotFound(ref body) if *body == error_body);
+    let error_body = json!({ "type": "unknown" });
+    assert_matches!(
+        info,
+        ApiError::NotFound(ref body) if serde_json::from_str::<Value>(body).unwrap() == error_body
+    );
 
     api.send(tx.clone());
     testkit.poll_events();

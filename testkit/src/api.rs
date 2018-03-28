@@ -287,31 +287,30 @@ impl TestKitApi {
     /// - Panics if the response has a non-error response status.
     fn response_to_api_error(response: Response) -> ApiError {
         let status = response.status.expect("Status header is not set");
-        let status_class = status.class();
-        if status_class != StatusClass::ClientError && status_class != StatusClass::ServerError {
-            panic!("Received non-error response status: {}", status.to_u16());
-        }
 
-        let body = response::extract_body_to_string(response);
-        let error: String = serde_json::from_str::<JsonValue>(&body)
-            .map(|value| match value {
-                JsonValue::Object(object) => {
-                    object
-                        .get("description")
-                        .map(|value| value.as_str().map(String::from))
-                        .unwrap_or_else(|| serde_json::to_string(&object).ok())
-                        .unwrap_or_default()
-                }
-                JsonValue::String(string) => string,
-                value => serde_json::to_string(&value).unwrap_or_default(),
-            })
-            .unwrap_or_default();
+        fn error(response: Response) -> String {
+            let body = response::extract_body_to_string(response);
+            serde_json::from_str::<JsonValue>(&body)
+                .map(|value| match value {
+                    JsonValue::Object(object) => {
+                        object
+                            .get("description")
+                            .map(|value| value.as_str().map(String::from))
+                            .unwrap_or_else(|| serde_json::to_string(&object).ok())
+                            .unwrap_or_default()
+                    }
+                    JsonValue::String(string) => string,
+                    value => serde_json::to_string(&value).unwrap_or_default(),
+                })
+                .unwrap_or_default()
+        }
 
         match status {
             status::Forbidden => ApiError::Unauthorized,
-            status::BadRequest => ApiError::BadRequest(error),
-            status::NotFound => ApiError::NotFound(error),
-            _ => ApiError::InternalError(error.into()),
+            status::BadRequest => ApiError::BadRequest(error(response)),
+            status::NotFound => ApiError::NotFound(error(response)),
+            s if s.is_server_error() => ApiError::InternalError(error(response).into()),
+            s => panic!("Received non-error response status: {}", s.to_u16()),
         }
     }
 }
