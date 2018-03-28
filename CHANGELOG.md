@@ -79,7 +79,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   as 2/3 + 1 of total validators count. (#546)
 
 - `validators-count` command-line parameter is added. Now, when generating
-  config template using `generate-template` command you must specify number of validators.
+  config template using `generate-template` command you must specify number of
+  validators. (#586)
 
 #### exonum-time
 
