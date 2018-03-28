@@ -119,7 +119,8 @@ pub mod transactions {
     use service::SERVICE_ID;
 
     transactions! {
-        pub(crate) CurrencyTransactions {
+        /// Transaction group.
+        pub CurrencyTransactions {
             const SERVICE_ID = SERVICE_ID;
 
             /// Transaction type for creating a new wallet.
