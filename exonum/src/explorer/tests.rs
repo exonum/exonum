@@ -214,6 +214,7 @@ fn test_explorer_basics() {
 
     {
         let explorer = BlockchainExplorer::new(&blockchain);
+        assert_eq!(explorer.height(), Height(0));
         let block = explorer.block(Height(0)).unwrap();
         assert_eq!(block.len(), 0);
         assert!(block.transaction(0).is_none());
@@ -226,7 +227,9 @@ fn test_explorer_basics() {
 
     {
         let explorer = BlockchainExplorer::new(&blockchain);
+        assert_eq!(explorer.height(), Height(1));
         assert!(explorer.block(Height(2)).is_none());
+
         let block = explorer.block(Height(1)).unwrap();
         assert_eq!(block.len(), 1);
         let tx_info = block.transaction(0).unwrap();
@@ -267,6 +270,7 @@ fn test_explorer_basics() {
     );
 
     let explorer = BlockchainExplorer::new(&blockchain);
+    assert_eq!(explorer.height(), Height(2));
     let block = explorer.block(Height(2)).unwrap();
     assert_eq!(block.len(), 2);
 

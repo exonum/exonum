@@ -878,10 +878,15 @@ impl<'a> BlockchainExplorer<'a> {
         }
     }
 
+    /// Returns the height of the blockchain.
+    pub fn height(&self) -> Height {
+        let schema = Schema::new(&self.snapshot);
+        schema.height()
+    }
+
     /// Returns block information for the specified height or `None` if there is no such block.
     pub fn block(&self, height: Height) -> Option<BlockInfo> {
-        let schema = Schema::new(&self.snapshot);
-        if schema.height() >= height {
+        if self.height() >= height {
             Some(BlockInfo::new(self, height))
         } else {
             None
