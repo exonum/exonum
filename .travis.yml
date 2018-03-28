@@ -66,7 +66,7 @@ jobs:
   - env: FEATURE=lints
     install:
     - cargo-audit -V || cargo install cargo-audit --force
-    - cargo-deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
+    - cargo deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
     - rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
     - nvm install 8 && nvm use 8
     - npm install cspell
