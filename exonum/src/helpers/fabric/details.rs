@@ -176,6 +176,7 @@ impl RunDev {
 
     fn generate_config(commands: &HashMap<CommandName, CollectedCommand>, ctx: &Context) -> String {
         let common_config_path = Self::artifacts_path("common.toml", ctx);
+        let validators_count = "1";
         let peer_addr = "127.0.0.1";
         let pub_config_path = Self::artifacts_path("public.toml", ctx);
         let sec_config_path = Self::artifacts_path("secret.toml", ctx);
@@ -183,6 +184,7 @@ impl RunDev {
 
         let mut common_config_ctx = ctx.clone();
         common_config_ctx.set_arg("COMMON_CONFIG", common_config_path.clone());
+        common_config_ctx.set_arg("VALIDATORS_COUNT", validators_count.into());
         let common_config_command = commands.get(GenerateCommonConfig::name()).expect(
             "Expected GenerateCommonConfig in the commands list.",
         );
@@ -278,7 +280,15 @@ impl GenerateCommonConfig {
 
 impl Command for GenerateCommonConfig {
     fn args(&self) -> Vec<Argument> {
-        vec![Argument::new_positional("COMMON_CONFIG", true, "Path to common config.")]
+        vec![
+            Argument::new_positional("COMMON_CONFIG", true, "Path to common config."),
+            Argument::new_named("VALIDATORS_COUNT",
+                                true,
+                                "Number of validators",
+                                    None,
+                                "validators-count",
+                                false),
+        ]
     }
 
     fn name(&self) -> CommandName {
@@ -299,12 +309,20 @@ impl Command for GenerateCommonConfig {
             "COMMON_CONFIG not found",
         );
 
+        let validators_count = context.arg::<u8>("VALIDATORS_COUNT").expect(
+            "VALIDATORS_COUNT not found",
+        );
+
         context.set(keys::SERVICES_CONFIG, AbstractConfig::default());
         let new_context = exts(context);
         let services_config = new_context.get(keys::SERVICES_CONFIG).unwrap_or_default();
 
+        let mut general_config = AbstractConfig::default();
+        general_config.insert(String::from("validators_count"), validators_count.into());
+
         let template = CommonConfigTemplate {
             services_config,
+            general_config,
             ..CommonConfigTemplate::default()
         };
 
@@ -554,7 +572,20 @@ impl Command for Finalize {
                 ConfigFile::load(path).expect("Failed to load validator public config.")
             })
             .collect();
+
         let (common, list, our) = Self::reduce_configs(public_configs, &secret_config);
+
+        let validators_count = common.general_config
+            .get("validators_count")
+            .expect("validators_count is not found in common config.")
+            .as_integer()
+            .unwrap() as usize;
+
+        println!("validators count {}, list.len {}", validators_count, list.len());
+
+        if validators_count != list.len() {
+            panic!("Number of validators configs does not match number of validator keys.");
+        }
 
         context.set(keys::AUDITOR_MODE, our.is_none());
 

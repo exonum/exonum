@@ -183,6 +183,7 @@ pub struct Context {
 impl Context {
     fn new_from_args(args: &[Argument], matches: &clap::ArgMatches) -> Context {
         let mut context = Context::default();
+
         for arg in args {
             // processing multiple value arguments make code ugly =(
             match arg.argument_type {
