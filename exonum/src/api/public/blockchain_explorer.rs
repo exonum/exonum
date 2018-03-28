@@ -15,13 +15,24 @@
 use router::Router;
 use iron::prelude::*;
 
-use blockchain::Blockchain;
-use explorer::{BlockchainExplorer, BlocksRange, TransactionInfo};
+use std::ops::Range;
+
+use blockchain::{Block, Blockchain};
+use explorer::{BlockchainExplorer, TransactionInfo};
 use api::{Api, ApiError};
 use crypto::Hash;
 use helpers::Height;
 
 const MAX_BLOCKS_PER_REQUEST: usize = 1000;
+
+/// Information on blocks coupled with the corresponding range in the blockchain.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BlocksRange {
+    /// Exclusive range of blocks.
+    pub range: Range<Height>,
+    /// Blocks in the range.
+    pub blocks: Vec<Block>,
+}
 
 /// Public explorer API.
 #[derive(Clone, Debug)]
@@ -42,7 +53,7 @@ impl ExplorerApi {
     fn blocks(
         &self,
         count: usize,
-        from: Option<Height>,
+        upper: Option<Height>,
         skip_empty_blocks: bool,
     ) -> Result<BlocksRange, ApiError> {
         if count > MAX_BLOCKS_PER_REQUEST {
@@ -51,7 +62,31 @@ impl ExplorerApi {
                 MAX_BLOCKS_PER_REQUEST
             )));
         }
-        Ok(self.explorer().blocks_range(count, from, skip_empty_blocks))
+
+        let explorer = self.explorer();
+        let (upper, blocks_iter) = if let Some(upper) = upper {
+            (upper, explorer.blocks(..upper.next()))
+        } else {
+            (explorer.height(), explorer.blocks(..))
+        };
+
+        let blocks: Vec<_> = blocks_iter
+            .rev()
+            .filter(|block| !skip_empty_blocks || !block.is_empty())
+            .take(count)
+            .map(|block| block.into_header())
+            .collect();
+
+        let height = if blocks.len() < count {
+            Height(0)
+        } else {
+            blocks.last().map_or(Height(0), |block| block.height())
+        };
+
+        Ok(BlocksRange {
+            range: height..upper.next(),
+            blocks,
+        })
     }
 
     fn transaction_info(&self, hash: &Hash) -> Option<TransactionInfo> {

@@ -18,9 +18,9 @@ extern crate exonum;
 extern crate exonum_testkit;
 extern crate serde_json;
 
+use exonum::api::public::BlocksRange;
 use exonum::crypto::{gen_keypair, Hash, PublicKey, CryptoHash};
 use exonum::blockchain::{Schema, Service, Transaction, TransactionSet, ExecutionResult};
-use exonum::explorer::BlocksRange;
 use exonum::messages::{Message, RawTransaction};
 use exonum::storage::{Fork, Snapshot};
 use exonum::encoding;

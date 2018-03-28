@@ -743,15 +743,6 @@ impl TransactionInfo {
     }
 }
 
-/// Information on blocks coupled with the corresponding range in the blockchain.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct BlocksRange {
-    /// Exclusive range of blocks.
-    pub range: Range<Height>,
-    /// Blocks in the range.
-    pub blocks: Vec<Block>,
-}
-
 /// Blockchain explorer.
 ///
 /// # Notes
@@ -938,38 +929,6 @@ impl<'a> BlockchainExplorer<'a> {
                     .collect(),
             }
         })
-    }
-
-    /// Returns the list of blocks in the given range.
-    pub fn blocks_range(
-        &self,
-        count: usize,
-        upper: Option<Height>,
-        skip_empty_blocks: bool,
-    ) -> BlocksRange {
-        let blocks_iter = if let Some(upper) = upper {
-            self.blocks(..upper.next())
-        } else {
-            self.blocks(..)
-        };
-        let upper = blocks_iter.back;
-        let blocks: Vec<_> = blocks_iter
-            .rev()
-            .filter(|block| !skip_empty_blocks || !block.is_empty())
-            .take(count)
-            .map(|block| block.header)
-            .collect();
-
-        let height = if blocks.len() < count {
-            Height(0)
-        } else {
-            blocks.last().map_or(Height(0), |block| block.height())
-        };
-
-        BlocksRange {
-            range: height..upper,
-            blocks,
-        }
     }
 
     /// Iterates over blocks in the blockchain.

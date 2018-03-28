@@ -357,7 +357,7 @@ fn test_snapshot_comparison_panic() {
 
 #[test]
 fn test_explorer_blocks() {
-    use exonum::explorer::BlocksRange;
+    use exonum::api::public::BlocksRange;
     use exonum::helpers::Height;
 
     let (mut testkit, api) = init_testkit();
