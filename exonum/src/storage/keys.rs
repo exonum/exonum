@@ -295,7 +295,7 @@ impl StorageKey for Uuid {
     }
 
     fn read(buffer: &[u8]) -> Self::Owned {
-        Self::from_bytes(&buffer).unwrap()
+        Self::from_bytes(buffer).unwrap()
     }
 }
 

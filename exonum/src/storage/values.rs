@@ -446,7 +446,10 @@ mod tests {
 
         for value in values.iter() {
             let bytes = value.clone().into_bytes();
-            assert_eq!(*value, <Uuid as StorageValue>::from_bytes(Cow::Borrowed(&bytes)));
+            assert_eq!(
+                *value,
+                <Uuid as StorageValue>::from_bytes(Cow::Borrowed(&bytes))
+            );
         }
     }
 }

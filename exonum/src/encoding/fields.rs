@@ -16,7 +16,7 @@
 
 use chrono::{DateTime, Utc, TimeZone};
 use byteorder::{ByteOrder, LittleEndian};
-use uuid::{Uuid, self};
+use uuid::{self, Uuid};
 
 use std::mem;
 use std::result::Result as StdResult;
@@ -366,7 +366,7 @@ impl<'a> Field<'a> for Uuid {
         debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
         match try_read_uuid(buffer, from.unchecked_offset(), to.unchecked_offset()) {
             Ok(_) => Ok(latest_segment),
-            Err(e) => Err(Error::Other(Box::new(e)))
+            Err(e) => Err(Error::Other(Box::new(e))),
         }
     }
 }
