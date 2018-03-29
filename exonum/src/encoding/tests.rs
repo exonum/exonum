@@ -14,10 +14,11 @@
 
 #![allow(unsafe_code)]
 
-use std::net::SocketAddr;
-
 use bit_vec::BitVec;
 use chrono::Utc;
+use uuid::Uuid;
+
+use std::net::SocketAddr;
 
 use crypto::{hash, gen_keypair};
 use blockchain::{self, BlockProof, Block};
@@ -143,6 +144,15 @@ fn test_u64_segment() {
 fn test_i64_segment() {
     let dat = vec![1i64, 3, 10, 15, 23, 4, 45];
     assert_write_check_read(dat, 8);
+}
+
+#[test]
+fn test_uuid_segment() {
+    let uuid = Uuid::nil();
+    assert_write_check_read(uuid, 16);
+
+    let uuid = Uuid::parse_str("936DA01F9ABD4d9d80C702AF85C822A8").unwrap();
+    assert_write_check_read(uuid, 16);
 }
 
 #[test]

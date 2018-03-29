@@ -29,6 +29,7 @@ use serde::{Serialize, Serializer};
 use serde::de::{self, Deserialize, Deserializer, Visitor};
 use byteorder::{ByteOrder, LittleEndian};
 use chrono::{DateTime, Utc};
+use uuid::Uuid;
 
 use std::default::Default;
 use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
@@ -692,6 +693,12 @@ impl CryptoHash for DateTime<Utc> {
 impl CryptoHash for Round {
     fn hash(&self) -> Hash {
         self.0.hash()
+    }
+}
+
+impl CryptoHash for Uuid {
+    fn hash(&self) -> Hash {
+        hash(self.as_bytes())
     }
 }
 

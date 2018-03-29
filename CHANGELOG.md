@@ -111,6 +111,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Added the opportunity to parse configuration files with missing empty structures.
   Fields of such structures are equal to the default values. (#576)
 
+- `CryptoHash`, `Field`, `StorageKey` and `StorageValue` traits are implemented for
+  the `uuid::Uuid`. (#588)
+
 ### Internal improvements
 
 #### Exonum core
