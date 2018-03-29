@@ -286,24 +286,22 @@ impl TestKitApi {
     ///
     /// - Panics if the response has a non-error response status.
     fn response_to_api_error(response: Response) -> ApiError {
-        let status = response.status.expect("Status header is not set");
+        fn extract_description(body: &str) -> Option<String> {
+            match serde_json::from_str::<JsonValue>(body).ok()? {
+                JsonValue::Object(ref object) if object.contains_key("description") => {
+                    Some(object["description"].as_str()?.to_owned())
+                }
+                JsonValue::String(string) => Some(string),
+                _ => None,
+            }
+        }
 
         fn error(response: Response) -> String {
             let body = response::extract_body_to_string(response);
-            serde_json::from_str::<JsonValue>(&body)
-                .map(|value| match value {
-                    JsonValue::Object(object) => {
-                        object
-                            .get("description")
-                            .map(|value| value.as_str().map(String::from))
-                            .unwrap_or_else(|| serde_json::to_string(&object).ok())
-                            .unwrap_or_default()
-                    }
-                    JsonValue::String(string) => string,
-                    value => serde_json::to_string(&value).unwrap_or_default(),
-                })
-                .unwrap_or_default()
+            extract_description(&body).unwrap_or(body)
         }
+
+        let status = response.status.expect("Status header is not set");
 
         match status {
             status::Forbidden => ApiError::Unauthorized,
@@ -318,19 +316,59 @@ impl TestKitApi {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::TestKitBuilder;
 
     #[test]
-    fn test_get_err() {
-        let api = TestKitBuilder::validator().create().api();
-        let response: ApiError = api.get_err(ApiKind::System, "v1/not_found");
-        assert_matches!(response, ApiError::NotFound(_));
+    fn test_get_err_non_json() {
+        let response = Response::with((status::NotFound, "Not found"));
+        assert_matches!(
+            TestKitApi::response_to_api_error(response),
+            ApiError::NotFound(ref body) if body == "Not found"
+        );
+    }
+
+    #[test]
+    fn test_get_err_json_string() {
+        let response = Response::with((status::NotFound, "\"Wallet not found\""));
+        assert_matches!(
+            TestKitApi::response_to_api_error(response),
+            ApiError::NotFound(ref body) if body == "Wallet not found"
+        );
+    }
+
+    #[test]
+    fn test_get_err_json_object_with_description() {
+        let response_body = r#"{ "debug": "Some debug info", "description": "Some description" }"#;
+        let response = Response::with((status::BadRequest, response_body));
+        assert_matches!(
+            TestKitApi::response_to_api_error(response),
+            ApiError::BadRequest(ref body) if body == "Some description"
+        );
+    }
+
+    #[test]
+    fn test_get_err_json_object_without_description() {
+        let response_body = r#"{ "type": "unknown" }"#;
+        let response = Response::with((status::BadRequest, response_body));
+        assert_matches!(
+            TestKitApi::response_to_api_error(response),
+            ApiError::BadRequest(ref body) if body == response_body
+        );
+    }
+
+    #[test]
+    fn test_get_err_other_json() {
+        let response_body = r#"[1, 2, 3]"#;
+        let response = Response::with((status::BadRequest, response_body));
+        assert_matches!(
+            TestKitApi::response_to_api_error(response),
+            ApiError::BadRequest(ref body) if body == response_body
+        );
     }
 
     #[test]
     #[should_panic(expected = "Received non-error response status")]
     fn test_get_err_non_error_status() {
-        let api = TestKitBuilder::validator().create().api();
-        api.get_err(ApiKind::System, "v1/healthcheck");
+        let response = Response::with(status::Ok);
+        TestKitApi::response_to_api_error(response);
     }
 }
