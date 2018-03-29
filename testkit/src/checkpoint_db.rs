@@ -304,10 +304,8 @@ mod tests {
             let inner = db.inner.read().unwrap();
             let stack = &inner.backup_stack;
             assert_eq!(stack.len(), 2);
-            let backup = &stack[1];
-            assert_eq!(backup.len(), 1);
-            let old_backup = &stack[0];
-            assert_eq!(old_backup.len(), 0);
+            assert_eq!(stack[1].len(), 1);
+            assert_eq!(stack[0].len(), 0);
         }
 
         let snapshot = db.snapshot();
@@ -321,8 +319,7 @@ mod tests {
             let inner = db.inner.read().unwrap();
             let stack = &inner.backup_stack;
             assert_eq!(stack.len(), 1);
-            let backup = &stack[0];
-            assert_eq!(backup.len(), 0);
+            assert_eq!(stack[0].len(), 0);
         }
 
         // Check that DB continues working as usual after a rollback.
@@ -335,10 +332,8 @@ mod tests {
             let inner = db.inner.read().unwrap();
             let stack = &inner.backup_stack;
             assert_eq!(stack.len(), 2);
-            let backup = &stack[1];
-            assert_eq!(backup.len(), 1);
-            let old_backup = &stack[0];
-            assert_eq!(old_backup.len(), 0);
+            assert_eq!(stack[1].len(), 1);
+            assert_eq!(stack[0].len(), 0);
         }
         let snapshot = db.snapshot();
         assert_eq!(snapshot.get("foo", &[]), Some(vec![4]));
@@ -351,10 +346,8 @@ mod tests {
             let inner = db.inner.read().unwrap();
             let stack = &inner.backup_stack;
             assert_eq!(stack.len(), 2);
-            let backup = &stack[1];
-            assert_eq!(backup.len(), 2);
-            let old_backup = &stack[0];
-            assert_eq!(old_backup.len(), 0);
+            assert_eq!(stack[1].len(), 2);
+            assert_eq!(stack[0].len(), 0);
         }
         let new_snapshot = db.snapshot();
         assert_eq!(new_snapshot.get("foo", &[]), Some(vec![4]));
@@ -366,8 +359,7 @@ mod tests {
             let inner = db.inner.read().unwrap();
             let stack = &inner.backup_stack;
             assert_eq!(stack.len(), 1);
-            let backup = &stack[0];
-            assert_eq!(backup.len(), 0);
+            assert_eq!(stack[0].len(), 0);
         }
         let snapshot = db.snapshot();
         assert_eq!(snapshot.get("foo", &[]), Some(vec![2]));

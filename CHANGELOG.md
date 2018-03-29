@@ -62,9 +62,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum-testkit
 
-- `CheckpointDb` and `Testkit` have their `rollback` methods updated (#582):
-  - `rollback` by blocks in `Testkit` was removed;
-  - `rollback` by merge count in `CheckpointDb` was removed;
+- Rollback mechanism in `Testkit` is reworked to work with checkpoints (#582):
+  - old `rollback` by blocks in `Testkit` was removed;
   - `checkpoint` method was introduced to set checkpoints;
   - new `rollback` rolls back to the last set checkpoint.
 
