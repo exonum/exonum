@@ -77,11 +77,6 @@ fn test_configuration_and_rollbacks() {
     testkit.rollback();
     assert_eq!(testkit.actual_configuration(), new_config);
 
-    testkit.checkpoint();
-    testkit.create_block();
-    testkit.rollback();
-    assert_eq!(testkit.actual_configuration(), new_config);
-
     testkit.rollback();
 
     // As rollback is behind the time a proposal entered the blockchain,
