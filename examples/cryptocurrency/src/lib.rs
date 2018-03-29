@@ -119,7 +119,8 @@ pub mod transactions {
     use service::SERVICE_ID;
 
     transactions! {
-        pub(crate) CurrencyTransactions {
+        /// Transaction group.
+        pub CurrencyTransactions {
             const SERVICE_ID = SERVICE_ID;
 
             /// Transaction type for creating a new wallet.
@@ -188,7 +189,8 @@ pub mod errors {
 
     impl From<Error> for ExecutionError {
         fn from(value: Error) -> ExecutionError {
-            ExecutionError::new(value as u8)
+            let description = format!("{}", value);
+            ExecutionError::with_description(value as u8, description)
         }
     }
 }
@@ -326,13 +328,10 @@ pub mod api {
                 ))
             })?;
 
-            let wallet = {
-                let snapshot = self.blockchain.snapshot();
-                let schema = CurrencySchema::new(snapshot);
-                schema.wallet(&public_key)
-            };
+            let snapshot = self.blockchain.snapshot();
+            let schema = CurrencySchema::new(snapshot);
 
-            if let Some(wallet) = wallet {
+            if let Some(wallet) = schema.wallet(&public_key) {
                 self.ok_response(&serde_json::to_value(wallet).unwrap())
             } else {
                 self.not_found_response(&serde_json::to_value("Wallet not found").unwrap())

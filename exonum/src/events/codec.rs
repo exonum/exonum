@@ -42,6 +42,11 @@ impl Decoder for MessagesCodec {
         if buf.len() < HEADER_LENGTH {
             return Ok(None);
         }
+
+        if buf[0] != 0 {
+            return Err(other_error("Message first byte must be set to 0"));
+        }
+
         // Check payload len
         let total_len = LittleEndian::read_u32(&buf[6..10]) as usize;
 
@@ -104,6 +109,14 @@ mod test {
     #[test]
     fn decode_message_small_size_in_header() {
         let data = vec![0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        let mut bytes: BytesMut = data.as_slice().into();
+        let mut codec = MessagesCodec { max_message_len: 10000 };
+        assert!(codec.decode(&mut bytes).is_err());
+    }
+
+    #[test]
+    fn decode_message_zero_byte() {
+        let data = vec![1u8, 0, 0, 0, 0, 0, 10, 0, 0, 0];
         let mut bytes: BytesMut = data.as_slice().into();
         let mut codec = MessagesCodec { max_message_len: 10000 };
         assert!(codec.decode(&mut bytes).is_err());

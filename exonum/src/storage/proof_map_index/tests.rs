@@ -12,11 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashSet;
-
 use serde_json;
 use rand::{self, Rng, XorShiftRng};
 use rand::seq::sample_iter;
+
+use std::cmp;
+use std::collections::HashSet;
+use std::fmt::Debug;
+use std::hash::Hash as StdHash;
 
 use crypto::{hash, CryptoHash, Hash, HashStream};
 use storage::{Database, Fork, StorageValue};
@@ -290,8 +293,8 @@ fn check_map_proof<K, V>(
     key: Option<K>,
     table: &ProofMapIndex<&mut Fork, K, V>,
 ) where
-    K: ProofMapKey + PartialEq + ::std::fmt::Debug,
-    V: StorageValue + PartialEq + ::std::fmt::Debug,
+    K: ProofMapKey + PartialEq + Debug,
+    V: StorageValue + PartialEq + Debug,
 {
     let entries = match key {
         Some(key) => {
@@ -317,8 +320,8 @@ fn check_map_multiproof<K, V>(
     keys: Vec<K>,
     table: &ProofMapIndex<&mut Fork, K, V>,
 ) where
-    K: ProofMapKey + Clone + PartialEq + ::std::fmt::Debug,
-    V: StorageValue + PartialEq + ::std::fmt::Debug,
+    K: ProofMapKey + Clone + PartialEq + Debug,
+    V: StorageValue + PartialEq + Debug,
 {
     let (entries, missing_keys) = {
         let mut entries: Vec<(K, V)> = Vec::new();
@@ -373,8 +376,8 @@ const MAX_CHECKED_ELEMENTS: usize = 1_024;
 
 fn check_proofs_for_data<K, V>(db: &Box<Database>, data: Vec<(K, V)>, nonexisting_keys: Vec<K>)
 where
-    K: ProofMapKey + Copy + PartialEq + ::std::fmt::Debug + Serialize,
-    V: StorageValue + Clone + PartialEq + ::std::fmt::Debug + Serialize,
+    K: ProofMapKey + Copy + PartialEq + Debug + Serialize,
+    V: StorageValue + Clone + PartialEq + Debug + Serialize,
 {
     let mut storage = db.fork();
     let mut table = ProofMapIndex::new(IDX_NAME, &mut storage);
@@ -407,8 +410,8 @@ where
 
 fn check_multiproofs_for_data<K, V>(db: &Box<Database>, data: Vec<(K, V)>, nonexisting_keys: Vec<K>)
 where
-    K: ProofMapKey + Copy + Ord + PartialEq + ::std::hash::Hash + ::std::fmt::Debug + Serialize,
-    V: StorageValue + Clone + PartialEq + ::std::fmt::Debug + Serialize,
+    K: ProofMapKey + Copy + Ord + PartialEq + StdHash + Debug + Serialize,
+    V: StorageValue + Clone + PartialEq + Debug + Serialize,
 {
     let mut storage = db.fork();
     let mut table = ProofMapIndex::new(IDX_NAME, &mut storage);
@@ -944,7 +947,7 @@ fn fuzz_insert_build_proofs_in_table_filled_with_hashes(db: Box<Database>) {
             .map(|(key, val)| (hash(&key), hash(&val)))
             .collect();
 
-        let nonexisting_count = ::std::cmp::min(MAX_CHECKED_ELEMENTS, batch_size);
+        let nonexisting_count = cmp::min(MAX_CHECKED_ELEMENTS, batch_size);
         let nonexisting_keys: Vec<_> = generate_random_data_keys(nonexisting_count / 2, &mut rng)
             .into_iter()
             .flat_map(|(key, val)| vec![hash(&key), hash(&val)])
@@ -961,7 +964,7 @@ fn fuzz_insert_build_proofs(db: Box<Database>) {
     for batch_size in batch_sizes {
         let data = generate_random_data_keys(batch_size, &mut rng);
 
-        let nonexisting_count = ::std::cmp::min(MAX_CHECKED_ELEMENTS, batch_size);
+        let nonexisting_count = cmp::min(MAX_CHECKED_ELEMENTS, batch_size);
         let nonexisting_keys: Vec<_> = generate_random_data_keys(nonexisting_count, &mut rng)
             .into_iter()
             .map(|(key, _)| key)
@@ -978,7 +981,7 @@ fn fuzz_insert_build_multiproofs(db: Box<Database>) {
     for batch_size in batch_sizes {
         let data = generate_random_data_keys(batch_size, &mut rng);
 
-        let nonexisting_count = ::std::cmp::min(MAX_CHECKED_ELEMENTS, batch_size);
+        let nonexisting_count = cmp::min(MAX_CHECKED_ELEMENTS, batch_size);
         let nonexisting_keys: Vec<_> = generate_random_data_keys(nonexisting_count, &mut rng)
             .into_iter()
             .map(|(key, _)| key)

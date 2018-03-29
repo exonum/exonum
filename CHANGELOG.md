@@ -54,7 +54,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `events` module becomes private. (#568)
 
-- `CryptoHash` trait is no longer implemented for `Hash`. (#579)
+- `CryptoHash` trait is no longer implemented for `Hash`. (#578)
+
+- `network_id` attribute has been removed from `NodeInfo` and `RawMessage`.
+  `HEADER_LENGTH` remains the same, first byte of `RawMessage` is now reserved and
+  always set to `0`. (#579)
 
 #### exonum-testkit
 
@@ -103,6 +107,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `storage::UniqueHash` trait that represents a unique, but not necessary
   cryptographic hash function, is introduced. (#579)
+
+- Added the opportunity to parse configuration files with missing empty structures.
+  Fields of such structures are equal to the default values. (#576)
 
 ### Internal improvements
 

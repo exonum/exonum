@@ -84,11 +84,6 @@ pub enum Error {
         /// expected `service_id`
         service_id: u16,
     },
-    /// Incorrect `network_id` found in buffer.
-    IncorrectNetworkId {
-        /// expected `network_id`
-        network_id: u8,
-    },
     /// Unsupported message version.
     UnsupportedProtocolVersion {
         /// Actual message version.
@@ -141,7 +136,6 @@ impl StdError for Error {
             Error::IncorrectSizeOfRawMessage { .. } => "Incorrect size of RawMessage",
             Error::IncorrectMessageType { .. } => "Incorrect message type",
             Error::IncorrectServiceId { .. } => "Incorrect service id",
-            Error::IncorrectNetworkId { .. } => "Incorrect network id",
             Error::UnsupportedProtocolVersion { .. } => "Unsupported protocol version",
             Error::OverlappingSegment { .. } => "Overlapping segments",
             Error::SpaceBetweenSegments { .. } => "Space between segments",
