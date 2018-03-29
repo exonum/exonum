@@ -65,7 +65,7 @@ pub struct CommonConfigTemplate {
     /// Services configuration.
     #[serde(default)]
     pub services_config: AbstractConfig,
-    /// General configuration
+    /// General configuration.
     pub general_config: AbstractConfig,
 }
 
