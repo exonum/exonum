@@ -125,6 +125,7 @@ unsync
 untagged
 usize
 uuid
+uuids
 validator
 validator's
 validators
