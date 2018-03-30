@@ -25,7 +25,10 @@ extern crate serde_json;
 extern crate pretty_assertions;
 #[macro_use]
 extern crate log;
+#[macro_use]
+extern crate assert_matches;
 
+use exonum::api::ApiError;
 use exonum::blockchain::{Transaction, TransactionErrorType as ErrorType};
 use exonum::crypto::{self, PublicKey, CryptoHash};
 use exonum::helpers::Height;
@@ -536,7 +539,7 @@ fn test_explorer_single_block() {
 }
 
 #[test]
-fn test_explorer_transaction() {
+fn test_explorer_transaction_info() {
     use exonum::explorer::BlockchainExplorer;
     use exonum::helpers::Height;
     use exonum::storage::ListProof;
@@ -559,11 +562,15 @@ fn test_explorer_transaction() {
         let (pubkey, key) = crypto::gen_keypair();
         TxIncrement::new(&pubkey, 5, &key)
     };
-    let info: Value = api.get_err(
+    let info: ApiError = api.get_err(
         ApiKind::Explorer,
         &format!("v1/transactions/{}", &tx.hash().to_string()),
     );
-    assert_eq!(info, json!({ "type": "unknown" }));
+    let error_body = json!({ "type": "unknown" });
+    assert_matches!(
+        info,
+        ApiError::NotFound(ref body) if serde_json::from_str::<Value>(body).unwrap() == error_body
+    );
 
     api.send(tx.clone());
     testkit.poll_events();

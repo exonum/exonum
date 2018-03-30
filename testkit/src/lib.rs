@@ -134,6 +134,10 @@ extern crate serde_json;
 #[macro_use]
 extern crate log;
 
+#[cfg(test)]
+#[macro_use]
+extern crate assert_matches;
+
 use futures::Stream;
 use futures::sync::mpsc;
 

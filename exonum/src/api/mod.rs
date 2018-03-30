@@ -65,6 +65,10 @@ pub enum ApiError {
     #[fail(display = "Bad request: {}", _0)]
     BadRequest(String),
 
+    /// Not found.
+    #[fail(display = "Not found: {}", _0)]
+    NotFound(String),
+
     /// Internal error.
     #[fail(display = "Internal server error: {}", _0)]
     InternalError(Box<::std::error::Error + Send + Sync>),
@@ -98,6 +102,7 @@ impl From<ApiError> for IronError {
             ApiError::Unauthorized => status::Forbidden,
 
             ApiError::BadRequest(..) => status::BadRequest,
+            ApiError::NotFound(..) => status::NotFound,
 
             ApiError::Storage(..) |
             ApiError::Io(..) |

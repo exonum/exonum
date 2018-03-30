@@ -21,14 +21,15 @@
 // TODO remove WriteBufferWrapper hack (after refactor storage),
 // should be moved into storage (ECR-156).
 
-use std::net::SocketAddr;
-use std::error::Error;
-
 use serde_json;
 use serde_json::value::Value;
 use bit_vec::BitVec;
 use hex::FromHex;
 use chrono::{DateTime, Utc, TimeZone};
+use uuid::Uuid;
+
+use std::net::SocketAddr;
+use std::error::Error;
 
 use crypto::{Hash, PublicKey, Signature};
 use helpers::{Height, Round, ValidatorId};
@@ -201,7 +202,7 @@ impl ExonumJson for DateTime<Utc> {
         from: Offset,
         to: Offset,
     ) -> Result<(), Box<Error>> {
-        let helper: TimestampHelper = ::serde_json::from_value(value.clone())?;
+        let helper: TimestampHelper = serde_json::from_value(value.clone())?;
         let date_time = Utc.timestamp(helper.secs.parse()?, helper.nanos);
         buffer.write(from, to, date_time);
         Ok(())
@@ -223,7 +224,7 @@ impl ExonumJson for SocketAddr {
         from: Offset,
         to: Offset,
     ) -> Result<(), Box<Error>> {
-        let addr: SocketAddr = ::serde_json::from_value(value.clone())?;
+        let addr: SocketAddr = serde_json::from_value(value.clone())?;
         buffer.write(from, to, addr);
         Ok(())
     }
@@ -443,6 +444,23 @@ impl ExonumJson for ValidatorId {
     fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
         let val: u16 = self.to_owned().into();
         Ok(Value::Number(val.into()))
+    }
+}
+
+impl ExonumJson for Uuid {
+    fn deserialize_field<B: WriteBufferWrapper>(
+        value: &Value,
+        buffer: &mut B,
+        from: Offset,
+        to: Offset,
+    ) -> Result<(), Box<Error>> {
+        let uuid: Self = serde_json::from_value(value.clone())?;
+        buffer.write(from, to, uuid);
+        Ok(())
+    }
+
+    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+        Ok(serde_json::to_value(&self)?)
     }
 }
 

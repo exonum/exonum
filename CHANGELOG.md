@@ -62,6 +62,14 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum-testkit
 
+- Rollback mechanism in `Testkit` is reworked to work with checkpoints (#582):
+  - old `rollback` by blocks in `Testkit` was removed;
+  - `checkpoint` method was introduced to set checkpoints;
+  - new `rollback` rolls back to the last set checkpoint.
+
+  Migration path:
+  - Replace every old `rollback(blocks)` by a pair of `checkpoint()` and `rollback()`.
+
 - Testkit api now contains two methods to work with the transaction pool (#549):
   - `is_tx_in_pool` - for checking transaction existence in the pool;
   - `add_tx` - for adding a new transaction into the pool.
@@ -71,12 +79,20 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - Instead of calling `mempool()`, one should use `is_tx_in_pool`
   or `add_tx` methods.
 
+- `TestKitApi::get_err` method now returns `ApiError`, rather than
+  a deserialized object, as it is for `get`. For checking such results
+  in tests you may want to use `assert_matches`.
+
 #### exonum-configuration
 
 - `majority_count: Option<u16>` configuration parameter is introduced.
   Allows to increase the threshold amount of votes required to commit
   a new configuration proposal. By default the number of votes is calculated
   as 2/3 + 1 of total validators count. (#546)
+
+- `validators-count` command-line parameter has been added. Now, when
+  generating config template using `generate-template` command, you must
+  specify the number of validators. (#586)
 
 #### exonum-time
 
@@ -110,6 +126,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Added the opportunity to parse configuration files with missing empty structures.
   Fields of such structures are equal to the default values. (#576)
+
+- `CryptoHash`, `Field`, `StorageKey` and `StorageValue` traits are implemented for
+  the `uuid::Uuid`. (#588)
 
 ### Internal improvements
 

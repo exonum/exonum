@@ -16,6 +16,7 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use chrono::{DateTime, Utc, NaiveDateTime};
+use uuid::Uuid;
 
 use std::mem;
 use std::borrow::Cow;
@@ -291,6 +292,16 @@ impl StorageValue for Round {
     }
 }
 
+impl StorageValue for Uuid {
+    fn into_bytes(self) -> Vec<u8> {
+        self.as_bytes().to_vec()
+    }
+
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        Uuid::from_bytes(&value).unwrap()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -398,7 +409,7 @@ mod tests {
     }
 
     #[test]
-    fn test_storage_value_for_system_time_round_trip() {
+    fn storage_value_for_system_time_round_trip() {
         use chrono::{TimeZone, Duration};
 
         let times = [
@@ -422,6 +433,23 @@ mod tests {
         for value in values.iter() {
             let bytes = value.clone().into_bytes();
             assert_eq!(*value, Round::from_bytes(Cow::Borrowed(&bytes)));
+        }
+    }
+
+    #[test]
+    fn uuid_round_trip() {
+        let values = [
+            Uuid::nil(),
+            Uuid::parse_str("936DA01F9ABD4d9d80C702AF85C822A8").unwrap(),
+            Uuid::parse_str("0000002a-000c-0005-0c03-0938362b0809").unwrap(),
+        ];
+
+        for value in values.iter() {
+            let bytes = value.clone().into_bytes();
+            assert_eq!(
+                *value,
+                <Uuid as StorageValue>::from_bytes(Cow::Borrowed(&bytes))
+            );
         }
     }
 }

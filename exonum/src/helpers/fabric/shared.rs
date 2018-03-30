@@ -65,6 +65,8 @@ pub struct CommonConfigTemplate {
     /// Services configuration.
     #[serde(default)]
     pub services_config: AbstractConfig,
+    /// General configuration.
+    pub general_config: AbstractConfig,
 }
 
 /// `NodePrivateConfig` collects all public and secret keys.
