@@ -88,9 +88,19 @@ impl HeightRange {
 
 /// Information about a block in the blockchain.
 ///
+/// # JSON presentation
 ///
+/// JSON object with the following fields:
 ///
+/// | Name | Equivalent type | Description |
+/// |:------|:-------|:--------|
+/// | `block` | [`Block`] | Block header as recorded in the blockchain |
+/// | `precommits` | `Vec<`[`Precommit`]`>` | Precommits authorizing the block |
+/// | `txs` | `Vec<`[`Hash`]`>` | Hashes of transactions in the block |
 ///
+/// [`Block`]: ../blockchain/struct.Block.html
+/// [`Precommit`]: ../messages/struct.Precommit.html
+/// [`Hash`]: ../crypto/struct.Hash.html
 #[derive(Debug)]
 pub struct BlockInfo<'a> {
     header: Block,
@@ -318,18 +328,48 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 
 /// Information about a particular transaction in the blockchain.
 ///
+/// # JSON presentation
 ///
+/// | Name | Equivalent type | Description |
+/// |:------|:-------|:--------|
+/// | `content` | `Box<`[`Transaction`]`>` | Transaction as recorded in the blockchain |
+/// | `location` | [`TxLocation`] | Location of the transaction in the block |
+/// | `location_proof` | [`ListProof`]`<`[`Hash`]`>` | Proof of transaction inclusion into a block |
+/// | `status` | (custom; see below) | Execution status |
 ///
+/// ## `status` field
 ///
+/// The `status` field is a more readable version of the [`TransactionResult`] type.
 ///
+/// For successfully executed transactions, `status` is equal to
 ///
+/// ```json
+/// { "type": "success" }
 /// ```
 ///
+/// For transactions that return an [`ExecutionError`], `status` contains the error code
+/// and an optional description, i.e., has the following type in the
+/// [Flow] / [TypeScript] notation:
 ///
+/// ```javascript
+/// { type: 'error', code: number, description?: string }
 /// ```
 ///
+/// For transactions that have resulted in a panic, `status` contains an optional description
+/// as well:
 ///
+/// ```javascript
+/// { type: 'panic', description?: string }
 /// ```
+///
+/// [`Transaction`]: ../blockchain/trait.Transaction.html
+/// [`TxLocation`]: ../blockchain/struct.TxLocation.html
+/// [`ListProof`]: ../storage/struct.ListProof.html
+/// [`Hash`]: ../crypto/struct.Hash.html
+/// [`TransactionResult`]: ../blockchain/type.TransactionResult.html
+/// [`ExecutionError`]: ../blockchain/struct.ExecutionError.html
+/// [Flow]: https://flow.org/
+/// [TypeScript]: https://www.typescriptlang.org/
 #[derive(Debug, Serialize)]
 pub struct CommittedTransaction {
     #[serde(serialize_with = "CommittedTransaction::serialize_content")]
