@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Examples of usage of a blockchain explorer.
+
 #[macro_use]
 extern crate exonum;
 #[macro_use]
@@ -28,8 +30,8 @@ use blockchain::{consensus_keys, create_block, create_blockchain, CreateWallet, 
 
 /// Creates a transaction for the mempool.
 pub fn mempool_transaction() -> Box<Transaction> {
-    // Must be deterministic, so we are using deterministically generated
-    // consensus keys here.
+    // Must be deterministic, so we are using consensus keys, which are generated from
+    // a passphrase.
     let (pk_alex, key_alex) = consensus_keys();
     CreateWallet::new(&pk_alex, "Alex", &key_alex).into()
 }

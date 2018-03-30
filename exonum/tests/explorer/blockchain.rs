@@ -89,7 +89,7 @@ impl Service for MyService {
     }
 }
 
-/// Deterministically generates a keypair.
+/// Generates a keypair from a fixed passphrase.
 pub fn consensus_keys() -> (PublicKey, SecretKey) {
     const SEED_PHRASE: &[u8] = b"correct horse battery staple";
     let seed = crypto::Seed::from_slice(crypto::hash(SEED_PHRASE).as_ref()).unwrap();
