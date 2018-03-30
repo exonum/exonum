@@ -96,7 +96,10 @@ fn bench_msg_short_100(b: &mut Bencher) {
         len: 100,
         times: 100,
     };
-    let addrs = ["127.0.0.1:6990".parse().unwrap(), "127.0.0.1:6991".parse().unwrap()];
+    let addrs = [
+        "127.0.0.1:6990".parse().unwrap(),
+        "127.0.0.1:6991".parse().unwrap(),
+    ];
     bench_network(b, addrs, &cfg);
 }
 
@@ -107,7 +110,10 @@ fn bench_msg_short_1000(b: &mut Bencher) {
         len: 1000,
         times: 1000,
     };
-    let addrs = ["127.0.0.1:9792".parse().unwrap(), "127.0.0.1:9793".parse().unwrap()];
+    let addrs = [
+        "127.0.0.1:9792".parse().unwrap(),
+        "127.0.0.1:9793".parse().unwrap(),
+    ];
     bench_network(b, addrs, &cfg);
 }
 
@@ -118,7 +124,10 @@ fn bench_msg_short_10_000(b: &mut Bencher) {
         len: 1000,
         times: 10_000,
     };
-    let addrs = ["127.0.0.1:9792".parse().unwrap(), "127.0.0.1:9793".parse().unwrap()];
+    let addrs = [
+        "127.0.0.1:9792".parse().unwrap(),
+        "127.0.0.1:9793".parse().unwrap(),
+    ];
     bench_network(b, addrs, &cfg);
 }
 
@@ -129,7 +138,10 @@ fn bench_msg_short_100_nodelay(b: &mut Bencher) {
         len: 100,
         times: 100,
     };
-    let addrs = ["127.0.0.1:4990".parse().unwrap(), "127.0.0.1:4991".parse().unwrap()];
+    let addrs = [
+        "127.0.0.1:4990".parse().unwrap(),
+        "127.0.0.1:4991".parse().unwrap(),
+    ];
     bench_network(b, addrs, &cfg);
 }
 
@@ -140,7 +152,10 @@ fn bench_msg_short_1000_nodelay(b: &mut Bencher) {
         len: 100,
         times: 1000,
     };
-    let addrs = ["127.0.0.1:5990".parse().unwrap(), "127.0.0.1:5991".parse().unwrap()];
+    let addrs = [
+        "127.0.0.1:5990".parse().unwrap(),
+        "127.0.0.1:5991".parse().unwrap(),
+    ];
     bench_network(b, addrs, &cfg);
 }
 
@@ -151,7 +166,10 @@ fn bench_msg_short_10_000_nodelay(b: &mut Bencher) {
         len: 100,
         times: 10_000,
     };
-    let addrs = ["127.0.0.1:5990".parse().unwrap(), "127.0.0.1:5991".parse().unwrap()];
+    let addrs = [
+        "127.0.0.1:5990".parse().unwrap(),
+        "127.0.0.1:5991".parse().unwrap(),
+    ];
     bench_network(b, addrs, &cfg);
 }
 
@@ -162,7 +180,10 @@ fn bench_msg_long_10(b: &mut Bencher) {
         len: 100_000,
         times: 10,
     };
-    let addrs = ["127.0.0.1:9984".parse().unwrap(), "127.0.0.1:9985".parse().unwrap()];
+    let addrs = [
+        "127.0.0.1:9984".parse().unwrap(),
+        "127.0.0.1:9985".parse().unwrap(),
+    ];
     bench_network(b, addrs, &cfg);
 }
 
@@ -173,7 +194,10 @@ fn bench_msg_long_100(b: &mut Bencher) {
         len: 100_000,
         times: 100,
     };
-    let addrs = ["127.0.0.1:9946".parse().unwrap(), "127.0.0.1:9947".parse().unwrap()];
+    let addrs = [
+        "127.0.0.1:9946".parse().unwrap(),
+        "127.0.0.1:9947".parse().unwrap(),
+    ];
     bench_network(b, addrs, &cfg);
 }
 
@@ -184,7 +208,10 @@ fn bench_msg_long_10_nodelay(b: &mut Bencher) {
         len: 100_000,
         times: 10,
     };
-    let addrs = ["127.0.0.1:9198".parse().unwrap(), "127.0.0.1:9199".parse().unwrap()];
+    let addrs = [
+        "127.0.0.1:9198".parse().unwrap(),
+        "127.0.0.1:9199".parse().unwrap(),
+    ];
     bench_network(b, addrs, &cfg);
 }
 
@@ -195,6 +222,9 @@ fn bench_msg_long_100_nodelay(b: &mut Bencher) {
         len: 100_000,
         times: 100,
     };
-    let addrs = ["127.0.0.1:9198".parse().unwrap(), "127.0.0.1:9199".parse().unwrap()];
+    let addrs = [
+        "127.0.0.1:9198".parse().unwrap(),
+        "127.0.0.1:9199".parse().unwrap(),
+    ];
     bench_network(b, addrs, &cfg);
 }

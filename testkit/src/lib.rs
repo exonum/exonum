@@ -128,11 +128,11 @@ extern crate exonum;
 extern crate futures;
 extern crate iron;
 extern crate iron_test;
+#[macro_use]
+extern crate log;
 extern crate router;
 extern crate serde;
 extern crate serde_json;
-#[macro_use]
-extern crate log;
 
 #[cfg(test)]
 #[macro_use]
@@ -146,9 +146,9 @@ use std::fmt;
 use exonum::blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfiguration,
                          Transaction};
 use exonum::crypto::{self, Hash};
-use exonum::explorer::{BlockchainExplorer, BlockWithTransactions};
+use exonum::explorer::{BlockWithTransactions, BlockchainExplorer};
 use exonum::helpers::{Height, ValidatorId};
-use exonum::node::{ApiSender, ExternalMessage, State as NodeState, NodeApiConfig};
+use exonum::node::{ApiSender, ExternalMessage, NodeApiConfig, State as NodeState};
 use exonum::storage::{MemoryDB, Patch, Snapshot};
 use exonum::messages::RawMessage;
 
@@ -162,7 +162,7 @@ mod poll_events;
 
 pub use api::{ApiKind, TestKitApi};
 pub use compare::ComparableSnapshot;
-pub use network::{TestNetwork, TestNode, TestNetworkConfiguration};
+pub use network::{TestNetwork, TestNetworkConfiguration, TestNode};
 
 use checkpoint_db::{CheckpointDb, CheckpointDbHandler};
 use poll_events::poll_events;
@@ -214,9 +214,8 @@ impl fmt::Debug for TestKitBuilder {
         f.debug_struct("TestKitBuilder")
             .field(
                 "us",
-                &self.our_validator_id.map_or("Auditor".to_string(), |id| {
-                    format!("Validator #{}", id.0)
-                }),
+                &self.our_validator_id
+                    .map_or("Auditor".to_string(), |id| format!("Validator #{}", id.0)),
             )
             .field("validator_count", &self.validator_count)
             .field(
@@ -352,9 +351,9 @@ impl TestKit {
                                 schema.add_transaction_into_pool(tx.raw().clone());
                             }
                         }
-                        ExternalMessage::PeerAdd(_) |
-                        ExternalMessage::Enable(_) |
-                        ExternalMessage::Shutdown => { /* Ignored */ }
+                        ExternalMessage::PeerAdd(_)
+                        | ExternalMessage::Enable(_)
+                        | ExternalMessage::Shutdown => { /* Ignored */ }
                     }
                 }
                 blockchain.merge(fork.into_patch()).unwrap();
@@ -493,8 +492,8 @@ impl TestKit {
         // `create_block_with_transactions()` will panic.
         let schema = CoreSchema::new(self.snapshot());
         let uncommitted_txs = transactions.into_iter().filter(|tx| {
-            !schema.transactions().contains(&tx.hash()) ||
-                schema.transactions_pool().contains(&tx.hash())
+            !schema.transactions().contains(&tx.hash())
+                || schema.transactions_pool().contains(&tx.hash())
         });
 
         self.checkpoint();
@@ -519,11 +518,8 @@ impl TestKit {
         let config_patch = self.update_configuration(new_block_height);
         let (block_hash, patch) = {
             let validator_id = self.leader().validator_id().unwrap();
-            self.blockchain.create_patch(
-                validator_id,
-                new_block_height,
-                tx_hashes,
-            )
+            self.blockchain
+                .create_patch(validator_id, new_block_height, tx_hashes)
         };
 
         let patch = if let Some(config_patch) = config_patch {
@@ -535,11 +531,8 @@ impl TestKit {
             patch
         };
 
-        let propose = self.leader().create_propose(
-            new_block_height,
-            &last_hash,
-            tx_hashes,
-        );
+        let propose = self.leader()
+            .create_propose(new_block_height, &last_hash, tx_hashes);
         let precommits: Vec<_> = self.network()
             .validators()
             .iter()

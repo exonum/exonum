@@ -16,8 +16,8 @@
 
 //! A definition of `StorageKey` trait and implementations for common types.
 
-use byteorder::{ByteOrder, BigEndian};
-use chrono::{DateTime, Utc, NaiveDateTime};
+use byteorder::{BigEndian, ByteOrder};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use uuid::Uuid;
 
 use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
@@ -303,7 +303,7 @@ impl StorageKey for Uuid {
 mod tests {
     use super::*;
 
-    use chrono::{TimeZone, Duration};
+    use chrono::{Duration, TimeZone};
 
     // Number of samples for fuzz testing
     const FUZZ_SAMPLES: usize = 100_000;
@@ -483,7 +483,7 @@ mod tests {
 
     #[test]
     fn storage_key_for_system_time_ordering() {
-        use rand::{Rng, thread_rng};
+        use rand::{thread_rng, Rng};
 
         let mut rng = thread_rng();
 

@@ -78,7 +78,7 @@ extern crate exonum_testkit;
 extern crate pretty_assertions;
 
 use exonum::api::Api;
-use exonum::blockchain::{self, Transaction, ApiContext};
+use exonum::blockchain::{self, ApiContext, Transaction};
 use exonum::crypto::Hash;
 use exonum::encoding::Error as EncodingError;
 use exonum::helpers::fabric::{self, Context};
@@ -95,7 +95,7 @@ mod tests;
 mod transactions;
 
 pub use errors::ErrorCode;
-pub use schema::{MaybeVote, Schema, ProposeData};
+pub use schema::{MaybeVote, ProposeData, Schema};
 pub use transactions::{Propose, Vote};
 
 /// Service identifier for the configuration service.

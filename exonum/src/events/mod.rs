@@ -25,12 +25,12 @@ mod benches;
 use std::time::SystemTime;
 use std::cmp::Ordering;
 
-use futures::{Future, Async, Poll, Stream};
+use futures::{Async, Future, Poll, Stream};
 use futures::sink::Wait;
 use futures::sync::mpsc::{self, Sender};
 
 use node::{ExternalMessage, NodeTimeout};
-pub use self::network::{NetworkEvent, NetworkRequest, NetworkPart, NetworkConfiguration};
+pub use self::network::{NetworkConfiguration, NetworkEvent, NetworkPart, NetworkRequest};
 pub use self::internal::InternalPart;
 use helpers::{Height, Round};
 
@@ -81,11 +81,12 @@ impl<H: EventHandler + 'static> HandlerPart<H> {
     pub fn run(self) -> Box<Future<Item = (), Error = ()>> {
         let mut handler = self.handler;
 
-        let fut = EventsAggregator::new(self.internal_rx, self.network_rx, self.api_rx)
-            .for_each(move |event| {
+        let fut = EventsAggregator::new(self.internal_rx, self.network_rx, self.api_rx).for_each(
+            move |event| {
                 handler.handle_event(event);
                 Ok(())
-            });
+            },
+        );
 
         to_box(fut)
     }
@@ -167,14 +168,8 @@ where
 impl<S1, S2, S3> Stream for EventsAggregator<S1, S2, S3>
 where
     S1: Stream<Item = InternalEvent>,
-    S2: Stream<
-        Item = NetworkEvent,
-        Error = S1::Error,
-    >,
-    S3: Stream<
-        Item = ExternalMessage,
-        Error = S1::Error,
-    >,
+    S2: Stream<Item = NetworkEvent, Error = S1::Error>,
+    S3: Stream<Item = ExternalMessage, Error = S1::Error>,
 {
     type Item = Event;
     type Error = S1::Error;
@@ -184,8 +179,7 @@ where
             Ok(Async::Ready(None))
         } else {
             match self.internal.poll()? {
-                Async::Ready(None) |
-                Async::Ready(Some(InternalEvent::Shutdown)) => {
+                Async::Ready(None) | Async::Ready(Some(InternalEvent::Shutdown)) => {
                     self.done = true;
                     return Ok(Async::Ready(None));
                 }

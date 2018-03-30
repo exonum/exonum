@@ -14,13 +14,13 @@
 
 #![feature(test)]
 
-extern crate test;
 extern crate exonum;
+extern crate test;
 
 #[cfg(test)]
 mod tests {
     use test::Bencher;
-    use exonum::crypto::{gen_keypair, sign, verify, hash};
+    use exonum::crypto::{gen_keypair, hash, sign, verify};
 
     #[bench]
     fn bench_sign_64(b: &mut Bencher) {

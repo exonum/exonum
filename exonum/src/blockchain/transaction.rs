@@ -25,7 +25,7 @@ use serde::de::DeserializeOwned;
 
 use messages::{Message, RawTransaction};
 use storage::{Fork, StorageValue};
-use crypto::{Hash, CryptoHash};
+use crypto::{CryptoHash, Hash};
 use encoding;
 use encoding::serialize::json::ExonumJson;
 
@@ -334,12 +334,10 @@ impl StorageValue for TransactionResult {
 fn status_as_u16(status: &TransactionResult) -> u16 {
     match *status {
         Ok(()) => TRANSACTION_STATUS_OK,
-        Err(ref e) => {
-            match e.error_type {
-                TransactionErrorType::Panic => TRANSACTION_STATUS_PANIC,
-                TransactionErrorType::Code(c) => u16::from(c),
-            }
-        }
+        Err(ref e) => match e.error_type {
+            TransactionErrorType::Panic => TRANSACTION_STATUS_PANIC,
+            TransactionErrorType::Code(c) => u16::from(c),
+        },
     }
 }
 
@@ -631,10 +629,10 @@ mod tests {
     use super::*;
     use crypto;
     use encoding;
-    use blockchain::{Service, Schema, Blockchain};
-    use storage::{Snapshot, Database, MemoryDB, Entry};
+    use blockchain::{Blockchain, Schema, Service};
+    use storage::{Database, Entry, MemoryDB, Snapshot};
     use node::ApiSender;
-    use helpers::{ValidatorId, Height};
+    use helpers::{Height, ValidatorId};
 
     const TX_RESULT_SERVICE_ID: u16 = 255;
 
@@ -709,9 +707,9 @@ mod tests {
             Ok(()),
             Err(TransactionError::panic(None)),
             Err(TransactionError::panic(Some("".to_owned()))),
-            Err(TransactionError::panic(
-                Some("Panic error description".to_owned()),
-            )),
+            Err(TransactionError::panic(Some(
+                "Panic error description".to_owned(),
+            ))),
             Err(TransactionError::code(0, None)),
             Err(TransactionError::code(
                 0,
@@ -829,7 +827,6 @@ mod tests {
             service_keypair.1,
             ApiSender::new(api_channel.0),
         )
-
     }
 
     struct TxResultService;

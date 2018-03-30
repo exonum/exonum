@@ -14,24 +14,24 @@
 
 //! Service, which uses the time oracle.
 
+extern crate chrono;
 #[macro_use]
 extern crate exonum;
-extern crate exonum_time;
 #[macro_use]
 extern crate exonum_testkit;
-extern crate serde_json;
+extern crate exonum_time;
 extern crate serde;
-extern crate chrono;
+extern crate serde_json;
 
-use chrono::{DateTime, Utc, Duration, TimeZone};
+use chrono::{DateTime, Duration, TimeZone, Utc};
 
-use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
+use exonum::blockchain::{ExecutionResult, Service, Transaction, TransactionSet};
 use exonum::crypto::{gen_keypair, Hash, PublicKey};
 use exonum::encoding;
 use exonum::helpers::Height;
 use exonum::messages::{Message, RawTransaction};
 use exonum::storage::{Fork, ProofMapIndex, Snapshot};
-use exonum_time::{TimeService, TimeSchema, MockTimeProvider};
+use exonum_time::{MockTimeProvider, TimeSchema, TimeService};
 use exonum_testkit::TestKitBuilder;
 
 /// Marker service id.
@@ -61,7 +61,6 @@ impl<T: AsRef<Snapshot>> MarkerSchema<T> {
         vec![self.marks().merkle_root()]
     }
 }
-
 
 impl<'a> MarkerSchema<&'a mut Fork> {
     /// Mutable reference to the ['marks'][1] index.

@@ -26,8 +26,8 @@ mod tests {
     use tempdir::TempDir;
     use futures::sync::mpsc;
     use test::Bencher;
-    use exonum::storage::{Database, Fork, Patch, ProofMapIndex, RocksDB, DbOptions, Snapshot};
-    use exonum::blockchain::{ExecutionResult, Blockchain, Transaction, Schema, Service};
+    use exonum::storage::{Database, DbOptions, Fork, Patch, ProofMapIndex, RocksDB, Snapshot};
+    use exonum::blockchain::{Blockchain, ExecutionResult, Schema, Service, Transaction};
     use exonum::crypto::{gen_keypair, CryptoHash, Hash, PublicKey, SecretKey};
     use exonum::messages::{Message, RawTransaction};
     use exonum::encoding::Error as EncodingError;
@@ -56,7 +56,6 @@ mod tests {
     }
 
     fn execute_timestamping(db: Box<Database>, b: &mut Bencher) {
-
         struct Timestamping;
 
         impl Service for Timestamping {
@@ -195,7 +194,6 @@ mod tests {
             blockchain.merge(fork.into_patch()).unwrap();
             txs
         }
-
 
         let mut blockchain = create_blockchain(db, vec![Box::new(Cryptocurrency)]);
         let mut keys = Vec::new();

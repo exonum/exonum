@@ -24,8 +24,8 @@ use std::hash::Hash as StdHash;
 use crypto::{hash, CryptoHash, Hash, HashStream};
 use storage::{Database, Fork, StorageValue};
 use encoding::serialize::reexport::Serialize;
-use super::{ProofPath, ProofMapIndex, ProofMapKey, HashedKey, MapProof, MapProofError};
-use super::key::{ChildKind, BitsRange, KEY_SIZE, LEAF_KEY_PREFIX};
+use super::{HashedKey, MapProof, MapProofError, ProofMapIndex, ProofMapKey, ProofPath};
+use super::key::{BitsRange, ChildKind, KEY_SIZE, LEAF_KEY_PREFIX};
 use super::node::BranchNode;
 use super::proof::MapProofBuilder;
 
@@ -341,9 +341,8 @@ fn check_map_multiproof<K, V>(
         entries.sort_unstable_by(|&(ref x, _), &(ref y, _)| {
             ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap()
         });
-        missing_keys.sort_unstable_by(|x, y| {
-            ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap()
-        });
+        missing_keys
+            .sort_unstable_by(|x, y| ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap());
 
         (entries, missing_keys)
     };
@@ -352,9 +351,8 @@ fn check_map_multiproof<K, V>(
     assert_eq!(proof.merkle_root(), table.merkle_root());
     assert_eq!(missing_keys.iter().collect::<Vec<&_>>(), {
         let mut actual_keys = proof.missing_keys();
-        actual_keys.sort_unstable_by(|&x, &y| {
-            ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap()
-        });
+        actual_keys
+            .sort_unstable_by(|&x, &y| ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap());
         actual_keys
     });
     assert_eq!(
@@ -583,11 +581,17 @@ fn build_proof_in_complex_tree(db: Box<Database>) {
     table.put(&[128; 32], vec![1]); // 128 = 0b1000_0000 ~ ProofPath(00000001...)
     table.put(&[32; 32], vec![2]); //   32 = 0b0010_0000 ~ ProofPath(00000100...)
     let proof = table.get_proof([128; 32]);
-    assert_eq!(proof.proof_unchecked(), vec![(ProofPath::new(&[32; 32]), hash(&vec![2]))]);
+    assert_eq!(
+        proof.proof_unchecked(),
+        vec![(ProofPath::new(&[32; 32]), hash(&vec![2]))]
+    );
     check_map_proof(proof, Some([128; 32]), &table);
 
     let proof = table.get_proof([32; 32]);
-    assert_eq!(proof.proof_unchecked(), vec![(ProofPath::new(&[128; 32]), hash(&vec![1]))]);
+    assert_eq!(
+        proof.proof_unchecked(),
+        vec![(ProofPath::new(&[128; 32]), hash(&vec![1]))]
+    );
     check_map_proof(proof, Some([32; 32]), &table);
 
     // Key left of all keys in the tree
@@ -778,12 +782,18 @@ fn build_multiproof_simple(db: Box<Database>) {
 
     let keys = vec![[0; 32], [128; 32]];
     let proof = table.get_multiproof(keys.clone());
-    assert_eq!(proof.proof_unchecked(), vec![(ProofPath::new(&[32; 32]), hash(&vec![2]))]);
+    assert_eq!(
+        proof.proof_unchecked(),
+        vec![(ProofPath::new(&[32; 32]), hash(&vec![2]))]
+    );
     check_map_multiproof(proof, keys, &table);
 
     let keys = vec![[64; 32], [0; 32], [128; 32], [129; 32]];
     let proof = table.get_multiproof(keys.clone());
-    assert_eq!(proof.proof_unchecked(), vec![(ProofPath::new(&[32; 32]), hash(&vec![2]))]);
+    assert_eq!(
+        proof.proof_unchecked(),
+        vec![(ProofPath::new(&[32; 32]), hash(&vec![2]))]
+    );
     check_map_multiproof(proof, keys, &table);
 
     let keys = vec![[64; 32], [0; 32], [128; 32], [129; 32], [32; 32]];
@@ -828,9 +838,7 @@ fn build_multiproof_simple(db: Box<Database>) {
     let proof = table.get_multiproof(keys.clone());
     assert_eq!(
         proof.proof_unchecked(),
-        vec![
-            (ProofPath::new(&[32; 32]), hash(&vec![2])),
-        ]
+        vec![(ProofPath::new(&[32; 32]), hash(&vec![2]))]
     );
     check_map_multiproof(proof, vec![[128; 32], [64; 32]], &table);
 
@@ -1243,7 +1251,10 @@ fn tree_with_hashed_key(db: Box<Database>) {
         vec![(ProofPath::new(&Point::new(3, 4)), hash(&vec![2, 3, 4]))]
     );
     let proof = proof.check().unwrap();
-    assert_eq!(proof.all_entries(), vec![(&Point::new(1, 2), Some(&vec![1, 2, 3]))]);
+    assert_eq!(
+        proof.all_entries(),
+        vec![(&Point::new(1, 2), Some(&vec![1, 2, 3]))]
+    );
     assert_eq!(proof.merkle_root(), table.merkle_root());
 
     let key = Point::new(3, 4);
@@ -1334,7 +1345,7 @@ mod memorydb_tests {
 mod rocksdb_tests {
     use std::path::Path;
     use tempdir::TempDir;
-    use storage::{Database, RocksDB, DbOptions};
+    use storage::{Database, DbOptions, RocksDB};
 
     fn create_database(path: &Path) -> Box<Database> {
         let opts = DbOptions::default();

@@ -14,11 +14,11 @@
 
 use rand::{thread_rng, Rng};
 
-use crypto::{CryptoHash, Hash, hash};
+use crypto::{hash, CryptoHash, Hash};
 use storage::Database;
-use encoding::serialize::json::reexport::{to_string, from_str};
+use encoding::serialize::json::reexport::{from_str, to_string};
 use encoding::serialize::reexport::Serialize;
-use super::{ProofListIndex, ListProof, pair_hash};
+use super::{pair_hash, ListProof, ProofListIndex};
 use self::ListProof::*;
 
 const IDX_NAME: &'static str = "idx_name";
@@ -198,7 +198,6 @@ fn list_index_proof(db: Box<Database>) {
             .unwrap(),
         [(2, &6)]
     );
-
 
     assert_eq!(
         index.get_range_proof(0, 2),
@@ -488,7 +487,6 @@ fn proof_structure(db: Box<Database>) {
         } else {
             assert!(false);
         }
-
     } else {
         assert!(false);
     }
@@ -657,7 +655,7 @@ mod memorydb_tests {
 mod rocksdb_tests {
     use std::path::Path;
     use tempdir::TempDir;
-    use storage::{Database, RocksDB, DbOptions};
+    use storage::{Database, DbOptions, RocksDB};
 
     fn create_database(path: &Path) -> Box<Database> {
         let opts = DbOptions::default();

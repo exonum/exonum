@@ -194,7 +194,9 @@ impl MessageWriter {
         payload_length: usize,
     ) -> Self {
         // First byte is reserved for backward-compatibility and better alignment.
-        let mut raw = MessageWriter { raw: vec![0; HEADER_LENGTH + payload_length] };
+        let mut raw = MessageWriter {
+            raw: vec![0; HEADER_LENGTH + payload_length],
+        };
         raw.set_version(protocol_version);
         raw.set_service_id(service_id);
         raw.set_message_type(message_type);

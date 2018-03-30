@@ -224,7 +224,11 @@ fn test_explorer_block_iter() {
         .flat_map(|info| info.with_transactions().transactions)
         .collect();
     assert_eq!(transactions.len(), 12);
-    assert!(transactions.iter().all(|tx| tx.location().block_height() < Height(10)));
+    assert!(
+        transactions
+            .iter()
+            .all(|tx| tx.location().block_height() < Height(10))
+    );
 
     let heights: Vec<_> = explorer
         .blocks(..)
@@ -286,10 +290,7 @@ fn test_explorer_block_iter() {
 
     let mut iter = explorer.blocks(..);
     assert_eq!(iter.by_ref().nth(3).unwrap().height(), Height(3));
-    assert_eq!(
-        iter.nth(2).unwrap().height(),
-        Height(6)
-    );
+    assert_eq!(iter.nth(2).unwrap().height(), Height(6));
 }
 
 #[test]
@@ -319,7 +320,11 @@ fn test_transaction_iterator() {
     let tx_transfer = Transfer::new(&pk_alice, &pk_bob, 100, &key_alice);
     create_block(
         &mut blockchain,
-        vec![tx_alice.clone().into(), tx_bob.clone().into(), tx_transfer.clone().into()],
+        vec![
+            tx_alice.clone().into(),
+            tx_bob.clone().into(),
+            tx_transfer.clone().into(),
+        ],
     );
 
     let explorer = BlockchainExplorer::new(&blockchain);
@@ -334,9 +339,7 @@ fn test_transaction_iterator() {
 
     let create_wallet_positions: Vec<_> = block
         .iter()
-        .filter(|tx| {
-            tx.content().raw().message_type() == CreateWallet::MESSAGE_ID
-        })
+        .filter(|tx| tx.content().raw().message_type() == CreateWallet::MESSAGE_ID)
         .map(|tx| tx.location().position_in_block())
         .collect();
     assert_eq!(create_wallet_positions, vec![0, 1]);
@@ -354,7 +357,11 @@ fn test_block_with_transactions() {
     assert!(!block.is_empty());
     assert!(block[1].status().is_ok());
 
-    assert!(block.iter().all(|tx| tx.content().raw().message_type() == CreateWallet::MESSAGE_ID));
+    assert!(
+        block
+            .iter()
+            .all(|tx| tx.content().raw().message_type() == CreateWallet::MESSAGE_ID)
+    );
 }
 
 #[test]

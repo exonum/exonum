@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use messages::{RequestMessage, Message, ProposeRequest, TransactionsRequest, PrevotesRequest,
-               BlockRequest, BlockResponse};
+use messages::{BlockRequest, BlockResponse, Message, PrevotesRequest, ProposeRequest,
+               RequestMessage, TransactionsRequest};
 use blockchain::Schema;
 use super::NodeHandler;
 
@@ -59,9 +59,9 @@ impl NodeHandler {
         }
 
         let propose = if msg.height() == self.state.height() {
-            self.state.propose(msg.propose_hash()).map(|p| {
-                p.message().raw().clone()
-            })
+            self.state
+                .propose(msg.propose_hash())
+                .map(|p| p.message().raw().clone())
         } else {
             return;
         };
@@ -124,7 +124,6 @@ impl NodeHandler {
         let block = schema.blocks().get(&block_hash).unwrap();
         let precommits = schema.precommits(&block_hash);
         let transactions = schema.block_transactions(height);
-
 
         let block_msg = BlockResponse::new(
             self.state.consensus_public_key(),

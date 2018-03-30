@@ -100,7 +100,9 @@ fn run_nodes(count: u8, start_port: u16) -> (Vec<RunHandle>, Vec<oneshot::Receiv
         let node = Node::new(MemoryDB::new(), vec![service], node_cfg);
         let api_tx = node.channel();
         node_threads.push(RunHandle {
-            node_thread: thread::spawn(move || { node.run().unwrap(); }),
+            node_thread: thread::spawn(move || {
+                node.run().unwrap();
+            }),
             api_tx,
         });
         commit_rxs.push(commit_rx);
@@ -160,7 +162,9 @@ fn test_node_restart_regression() {
         let service = Box::new(InitializeCheckerService(init_times));
         let node = Node::new(db, vec![service], node_cfg);
         let api_tx = node.channel();
-        let node_thread = thread::spawn(move || { node.run().unwrap(); });
+        let node_thread = thread::spawn(move || {
+            node.run().unwrap();
+        });
         // Wait for shutdown
         api_tx
             .send_external_message(ExternalMessage::Shutdown)

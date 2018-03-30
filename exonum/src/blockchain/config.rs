@@ -20,7 +20,7 @@ use serde::de::Error;
 use serde_json::{self, Error as JsonError};
 
 use storage::StorageValue;
-use crypto::{hash, CryptoHash, PublicKey, Hash};
+use crypto::{hash, CryptoHash, Hash, PublicKey};
 use helpers::{Height, Milliseconds};
 
 /// Public keys of a validator.
@@ -81,16 +81,15 @@ impl ConsensusConfig {
     pub fn validate_configuration(&self) {
         let propose_timeout = match self.timeout_adjuster {
             TimeoutAdjusterConfig::Constant { timeout } => timeout,
-            TimeoutAdjusterConfig::Dynamic { max, .. } |
-            TimeoutAdjusterConfig::MovingAverage { max, .. } => max,
+            TimeoutAdjusterConfig::Dynamic { max, .. }
+            | TimeoutAdjusterConfig::MovingAverage { max, .. } => max,
         };
 
         if self.round_timeout <= 2 * propose_timeout {
             warn!(
                 "It is recommended that round_timeout ({}) be at least twice as large \
-                as propose_timeout ({})",
-                self.round_timeout,
-                propose_timeout
+                 as propose_timeout ({})",
+                self.round_timeout, propose_timeout
             );
         }
     }
@@ -141,9 +140,8 @@ impl StoredConfiguration {
                 if min >= max {
                     return Err(JsonError::custom(format!(
                         "Dynamic adjuster: minimal timeout should be less then maximal: \
-                        min = {}, max = {}",
-                        min,
-                        max
+                         min = {}, max = {}",
+                        min, max
                     )));
                 }
                 max
@@ -157,9 +155,8 @@ impl StoredConfiguration {
                 if min >= max {
                     return Err(JsonError::custom(format!(
                         "Moving average adjuster: minimal timeout must be less then maximal: \
-                        min = {}, max = {}",
-                        min,
-                        max
+                         min = {}, max = {}",
+                        min, max
                     )));
                 }
                 if adjustment_speed <= 0. || adjustment_speed > 1. {
@@ -181,8 +178,7 @@ impl StoredConfiguration {
         if config.consensus.round_timeout <= propose_timeout {
             return Err(JsonError::custom(format!(
                 "round_timeout({}) must be strictly larger than propose_timeout({})",
-                config.consensus.round_timeout,
-                propose_timeout
+                config.consensus.round_timeout, propose_timeout
             )));
         }
 
@@ -241,11 +237,11 @@ pub enum TimeoutAdjusterConfig {
 #[cfg(test)]
 mod tests {
     use toml;
-    use serde::{Serialize, Deserialize};
+    use serde::{Deserialize, Serialize};
 
     use std::fmt::Debug;
 
-    use crypto::{Seed, gen_keypair_from_seed};
+    use crypto::{gen_keypair_from_seed, Seed};
     use super::*;
 
     // TOML doesn't support all rust types, but `StoredConfiguration` must be able to save as TOML.
@@ -463,11 +459,9 @@ mod tests {
 
     fn create_test_configuration() -> StoredConfiguration {
         let validator_keys = (1..4)
-            .map(|i| {
-                ValidatorKeys {
-                    consensus_key: gen_keypair_from_seed(&Seed::new([i; 32])).0,
-                    service_key: gen_keypair_from_seed(&Seed::new([i * 10; 32])).0,
-                }
+            .map(|i| ValidatorKeys {
+                consensus_key: gen_keypair_from_seed(&Seed::new([i; 32])).0,
+                service_key: gen_keypair_from_seed(&Seed::new([i * 10; 32])).0,
             })
             .collect();
 

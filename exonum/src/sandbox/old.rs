@@ -14,13 +14,13 @@
 
 use std::time::Duration;
 
-use messages::{Propose, Prevote, Precommit};
+use messages::{Precommit, Prevote, Propose};
 use blockchain::{Block, SCHEMA_MAJOR_VERSION};
 use crypto::{CryptoHash, Hash};
 use helpers::{Height, Round};
 use super::sandbox::timestamping_sandbox;
-use super::sandbox_tests_helper::{gen_timestamping_tx, HEIGHT_ONE, ROUND_ONE, ROUND_THREE,
-                                  VALIDATOR_0, VALIDATOR_1, VALIDATOR_2, VALIDATOR_3};
+use super::sandbox_tests_helper::{gen_timestamping_tx, VALIDATOR_0, VALIDATOR_1, VALIDATOR_2,
+                                  VALIDATOR_3, HEIGHT_ONE, ROUND_ONE, ROUND_THREE};
 
 #[test]
 fn test_send_propose_and_prevote() {

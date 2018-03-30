@@ -16,7 +16,7 @@ use std::mem;
 use std::error::Error;
 
 use byteorder::{ByteOrder, LittleEndian};
-use serde_json::value::{Value, Number};
+use serde_json::value::{Number, Value};
 
 use super::Result as EncodingResult;
 use super::Error as EncodingError;
@@ -233,28 +233,22 @@ impl ExonumJson for F32 {
         buffer.write(
             from,
             to,
-            Self::try_from(number as f32).ok_or(
-                "Invalid float value in json",
-            )?,
+            Self::try_from(number as f32).ok_or("Invalid float value in json")?,
         );
         Ok(())
     }
 
     fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
-        Ok(Value::Number(
-            Number::from_f64(f64::from(self.get())).ok_or(
-                "Can't cast float as json",
-            )?,
-        ))
+        Ok(
+            Value::Number(Number::from_f64(f64::from(self.get())).ok_or("Can't cast float as json")?),
+        )
     }
 }
 
 impl ExonumJsonDeserialize for F32 {
     fn deserialize(value: &Value) -> Result<Self, Box<Error>> {
         let number = value.as_f64().ok_or("Can't cast json as float")?;
-        Ok(Self::try_from(number as f32).ok_or(
-            "Invalid float value in json",
-        )?)
+        Ok(Self::try_from(number as f32).ok_or("Invalid float value in json")?)
     }
 }
 
@@ -275,9 +269,7 @@ impl ExonumJson for F64 {
     }
 
     fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
-        Ok(Value::Number(Number::from_f64(self.get()).ok_or(
-            "Can't cast float as json",
-        )?))
+        Ok(Value::Number(Number::from_f64(self.get()).ok_or("Can't cast float as json")?))
     }
 }
 
@@ -295,7 +287,7 @@ mod tests {
     use std::{f32, f64};
     use std::panic;
     use encoding::fields::Field;
-    use byteorder::{LittleEndian, ByteOrder};
+    use byteorder::{ByteOrder, LittleEndian};
     use encoding::Offset;
 
     fn validate_constructor<T, V, C: Fn(V) -> T>(

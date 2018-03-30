@@ -20,8 +20,8 @@ use std::net::SocketAddr;
 use std::collections::HashMap;
 
 use crypto::PublicKey;
-use node::{ExternalMessage, ApiSender};
-use blockchain::{Service, Blockchain, SharedNodeState};
+use node::{ApiSender, ExternalMessage};
+use blockchain::{Blockchain, Service, SharedNodeState};
 use api::{Api, ApiError};
 use messages::PROTOCOL_MAJOR_VERSION;
 
@@ -48,11 +48,9 @@ impl NodeInfo {
             protocol_version: PROTOCOL_MAJOR_VERSION,
             services: services
                 .into_iter()
-                .map(|s| {
-                    ServiceInfo {
-                        name: s.service_name().to_owned(),
-                        id: s.service_id(),
-                    }
+                .map(|s| ServiceInfo {
+                    name: s.service_name().to_owned(),
+                    id: s.service_id(),
                 })
                 .collect(),
         }
@@ -196,9 +194,9 @@ impl SystemApi {
 
             let EnabledInfo { enabled } = self.parse_body(request)?;
             let message = ExternalMessage::Enable(enabled);
-            self.node_channel.send_external_message(message).map_err(
-                ApiError::from,
-            )?;
+            self.node_channel
+                .send_external_message(message)
+                .map_err(ApiError::from)?;
             self.ok_response(&serde_json::to_value("Ok").unwrap())
         };
 

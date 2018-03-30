@@ -31,12 +31,12 @@ use router::Router;
 use params;
 use serde_json;
 use serde::{Serialize, Serializer};
-use serde::de::{self, Visitor, Deserialize, Deserializer};
+use serde::de::{self, Deserialize, Deserializer, Visitor};
 use failure::Fail;
 use bodyparser;
 
 use crypto::{PublicKey, SecretKey};
-use encoding::serialize::{FromHex, FromHexError, ToHex, encode_hex};
+use encoding::serialize::{encode_hex, FromHex, FromHexError, ToHex};
 use storage;
 
 pub mod public;
@@ -49,17 +49,11 @@ mod tests;
 pub enum ApiError {
     /// Storage error.
     #[fail(display = "Storage error: {}", _0)]
-    Storage(
-        #[cause]
-        storage::Error
-    ),
+    Storage(#[cause] storage::Error),
 
     /// Input/output error.
     #[fail(display = "IO error: {}", _0)]
-    Io(
-        #[cause]
-        ::std::io::Error
-    ),
+    Io(#[cause] ::std::io::Error),
 
     /// Bad request.
     #[fail(display = "Bad request: {}", _0)]
@@ -104,9 +98,9 @@ impl From<ApiError> for IronError {
             ApiError::BadRequest(..) => status::BadRequest,
             ApiError::NotFound(..) => status::NotFound,
 
-            ApiError::Storage(..) |
-            ApiError::Io(..) |
-            ApiError::InternalError(..) => status::InternalServerError,
+            ApiError::Storage(..) | ApiError::Io(..) | ApiError::InternalError(..) => {
+                status::InternalServerError
+            }
         };
         let body = {
             let mut map = BTreeMap::new();
@@ -173,10 +167,7 @@ where
 
 impl<'de, T> Deserialize<'de> for HexField<T>
 where
-    T: AsRef<[u8]>
-        + FromHex<Error = FromHexError>
-        + ToHex
-        + Clone,
+    T: AsRef<[u8]> + FromHex<Error = FromHexError> + ToHex + Clone,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -198,9 +189,8 @@ pub trait Api {
         let fragment = params.find(name).ok_or_else(|| {
             ApiError::BadRequest(format!("Required parameter '{}' is missing", name))
         })?;
-        let value = T::from_str(fragment).map_err(|e| {
-            ApiError::BadRequest(format!("Invalid '{}' parameter: {}", name, e))
-        })?;
+        let value = T::from_str(fragment)
+            .map_err(|e| ApiError::BadRequest(format!("Invalid '{}' parameter: {}", name, e)))?;
         Ok(value)
     }
 
@@ -263,9 +253,10 @@ pub trait Api {
                 }
             }
         }
-        Err(storage::Error::new(
-            format!("Unable to find value with given key {}", key),
-        ))
+        Err(storage::Error::new(format!(
+            "Unable to find value with given key {}",
+            key
+        )))
     }
 
     /// Loads public and secret key from the cookies.

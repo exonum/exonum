@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crypto::{CryptoHash, Hash, HashStream};
 use storage::StorageValue;
 use super::key::{BitsRange, ChildKind, ProofMapKey, ProofPath, KEY_SIZE};
-use super::node::{Node, BranchNode};
+use super::node::{BranchNode, Node};
 
 // Expected size of the proof, in number of hashed entries.
 const DEFAULT_PROOF_CAPACITY: usize = 8;
@@ -48,7 +48,7 @@ impl<'de> Deserialize<'de> for ProofPath {
         D: Deserializer<'de>,
     {
         use std::fmt;
-        use serde::de::{self, Visitor, Unexpected};
+        use serde::de::{self, Unexpected, Visitor};
 
         struct ProofPathVisitor;
 
@@ -344,7 +344,9 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
                 let new_prefix_len = new_prefix.len();
 
                 while contour.len() > 1 && new_prefix_len < last_prefix.len() {
-                    fold(&mut contour, last_prefix).map(|prefix| { last_prefix = prefix; });
+                    fold(&mut contour, last_prefix).map(|prefix| {
+                        last_prefix = prefix;
+                    });
                 }
 
                 contour.push(*entry);
@@ -352,7 +354,9 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
             }
 
             while contour.len() > 1 {
-                fold(&mut contour, last_prefix).map(|prefix| { last_prefix = prefix; });
+                fold(&mut contour, last_prefix).map(|prefix| {
+                    last_prefix = prefix;
+                });
             }
 
             Ok(contour[0].hash)
@@ -411,9 +415,11 @@ impl<K, V> MapProofBuilder<K, V> {
     where
         I: IntoIterator<Item = (ProofPath, Hash)>,
     {
-        self.proof.extend(paths.into_iter().map(
-            |(path, hash)| MapProofEntry { path, hash },
-        ));
+        self.proof.extend(
+            paths
+                .into_iter()
+                .map(|(path, hash)| MapProofEntry { path, hash }),
+        );
         debug_assert!(self.proof.windows(2).all(|w| w[0].path < w[1].path));
         self
     }
@@ -484,9 +490,9 @@ where
             let path = ProofPath::new(e.key());
 
             match self.proof.binary_search_by(|pe| {
-                pe.path.partial_cmp(&path).expect(
-                    "Incomparable paths in proof",
-                )
+                pe.path
+                    .partial_cmp(&path)
+                    .expect("Incomparable paths in proof")
             }) {
                 Ok(_) => {
                     return Err(DuplicatePath(path));
@@ -536,11 +542,9 @@ where
         let (mut proof, entries) = (self.proof, self.entries);
 
         proof.extend(entries.iter().filter_map(|e| {
-            e.as_kv().map(|(k, v)| {
-                MapProofEntry {
-                    path: ProofPath::new(k),
-                    hash: v.hash(),
-                }
+            e.as_kv().map(|(k, v)| MapProofEntry {
+                path: ProofPath::new(k),
+                hash: v.hash(),
             })
         }));
         // Rust docs state that in the case `self.proof` and `self.entries` are sorted
@@ -562,11 +566,9 @@ where
             }
         }
 
-        collect(&proof).map(|h| {
-            CheckedMapProof {
-                entries: entries.into_iter().map(OptionalEntry::into).collect(),
-                hash: h,
-            }
+        collect(&proof).map(|h| CheckedMapProof {
+            entries: entries.into_iter().map(OptionalEntry::into).collect(),
+            hash: h,
         })
     }
 }
@@ -887,12 +889,10 @@ where
             builder.create()
         }
 
-        None => {
-            keys.into_iter()
-                .fold(MapProofBuilder::new(), |builder, key| {
-                    builder.add_missing(key)
-                })
-                .create()
-        }
+        None => keys.into_iter()
+            .fold(MapProofBuilder::new(), |builder, key| {
+                builder.add_missing(key)
+            })
+            .create(),
     }
 }

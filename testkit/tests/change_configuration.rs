@@ -14,12 +14,12 @@
 
 extern crate exonum;
 extern crate exonum_testkit;
+#[macro_use]
+extern crate pretty_assertions;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
-#[macro_use]
-extern crate pretty_assertions;
 
 use exonum::blockchain::Schema;
 use exonum::crypto::CryptoHash;

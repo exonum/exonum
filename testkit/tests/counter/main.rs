@@ -13,24 +13,24 @@
 // limitations under the License.
 
 #[macro_use]
+extern crate assert_matches;
+#[macro_use]
 extern crate exonum;
 #[macro_use]
 extern crate exonum_testkit;
+#[macro_use]
+extern crate log;
+#[macro_use]
+extern crate pretty_assertions;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
-#[macro_use]
-extern crate pretty_assertions;
-#[macro_use]
-extern crate log;
-#[macro_use]
-extern crate assert_matches;
 
 use exonum::api::ApiError;
 use exonum::blockchain::{Transaction, TransactionErrorType as ErrorType};
-use exonum::crypto::{self, PublicKey, CryptoHash};
+use exonum::crypto::{self, CryptoHash, PublicKey};
 use exonum::helpers::Height;
 use exonum::messages::Message;
 use exonum::encoding::serialize::FromHex;
@@ -355,7 +355,9 @@ fn test_snapshot_comparison_panic() {
         .map(CounterSchema::new)
         .map(CounterSchema::count)
         .map(|&c| c.unwrap())
-        .assert("Counter has increased", |&old, &new| new == old + tx.by());
+        .assert("Counter has increased", |&old, &new| {
+            new == old + tx.by()
+        });
 }
 
 #[test]
@@ -579,10 +581,13 @@ fn test_explorer_transaction_info() {
         ApiKind::Explorer,
         &format!("v1/transactions/{}", &tx.hash().to_string()),
     );
-    assert_eq!(info, json!({
+    assert_eq!(
+        info,
+        json!({
         "type": "in-pool",
         "content": tx.serialize_field().unwrap(),
-    }));
+    })
+    );
 
     testkit.create_block();
     let info: Value = api.get(
@@ -604,14 +609,17 @@ fn test_explorer_transaction_info() {
 
     if let Value::Object(mut info) = info {
         let location_proof = info.remove("location_proof").unwrap();
-        let location_proof: ListProof<crypto::Hash> = serde_json::from_value(location_proof)
-            .unwrap();
+        let location_proof: ListProof<crypto::Hash> =
+            serde_json::from_value(location_proof).unwrap();
 
         let explorer = BlockchainExplorer::new(testkit.blockchain());
         let block = explorer.block(Height(1)).unwrap();
         assert!(
             location_proof
-                .validate(*block.header().tx_hash(), u64::from(block.header().tx_count()))
+                .validate(
+                    *block.header().tx_hash(),
+                    u64::from(block.header().tx_count())
+                )
                 .is_ok()
         );
     } else {
@@ -657,13 +665,13 @@ fn test_explorer_transaction_statuses() {
     assert!(block[0].status().is_ok());
     assert!({
         let err = block[1].status().unwrap_err();
-        err.error_type() == ErrorType::Code(0) &&
-            err.description() == Some("Adding zero does nothing!")
+        err.error_type() == ErrorType::Code(0)
+            && err.description() == Some("Adding zero does nothing!")
     });
     assert!({
         let err = block[2].status().unwrap_err();
-        err.error_type() == ErrorType::Panic &&
-            err.description() == Some("attempt to add with overflow")
+        err.error_type() == ErrorType::Panic
+            && err.description() == Some("attempt to add with overflow")
     });
 
     assert_status(&api, &tx, &json!({ "type": "success" }));

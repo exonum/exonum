@@ -17,8 +17,8 @@ use std::collections::HashMap;
 
 use clap;
 
-use super::{Context, ArgumentType};
-use super::internal::{Feedback, CollectedCommand};
+use super::{ArgumentType, Context};
+use super::internal::{CollectedCommand, Feedback};
 use super::CommandName;
 
 pub struct ClapBackend;
@@ -42,9 +42,7 @@ impl ClapBackend {
             .setting(clap::AppSettings::ArgRequiredElseHelp)
             .version(crate_version!())
             .author(crate_authors!("\n"))
-            .about(
-                "It contain basic set of command, to deploy network on exonum.",
-            )
+            .about("It contain basic set of command, to deploy network on exonum.")
             .subcommands(subcommands.into_iter())
             .get_matches_from_safe(line)
             .unwrap();

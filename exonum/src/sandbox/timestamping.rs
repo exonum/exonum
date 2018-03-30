@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use rand::{Rng, XorShiftRng, SeedableRng};
+use rand::{Rng, SeedableRng, XorShiftRng};
 
 use messages::{Message, RawTransaction};
 use encoding::Error as MessageError;
-use crypto::{PublicKey, SecretKey, Hash, gen_keypair};
+use crypto::{gen_keypair, Hash, PublicKey, SecretKey};
 use storage::{Fork, Snapshot};
-use blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
+use blockchain::{ExecutionResult, Service, Transaction, TransactionSet};
 
 pub const TIMESTAMPING_SERVICE: u16 = 129;
 
@@ -42,7 +42,6 @@ impl Transaction for TimestampTx {
         Ok(())
     }
 }
-
 
 #[derive(Default)]
 pub struct TimestampingService {}

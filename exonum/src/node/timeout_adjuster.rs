@@ -173,13 +173,13 @@ impl MovingAverage {
         let target_t = if current_load < optimal_load {
             self.max - (self.max - self.previous_timeout) * load_percent
         } else {
-            self.previous_timeout -
-                (self.previous_timeout - self.min) * (load_percent - 1.) /
-                    (1. / self.optimal_block_load - 1.)
+            self.previous_timeout
+                - (self.previous_timeout - self.min) * (load_percent - 1.)
+                    / (1. / self.optimal_block_load - 1.)
         };
 
-        self.previous_timeout = target_t * self.adjustment_speed +
-            self.previous_timeout * (1. - self.adjustment_speed);
+        self.previous_timeout =
+            target_t * self.adjustment_speed + self.previous_timeout * (1. - self.adjustment_speed);
         self.previous_timeout.round() as Milliseconds
     }
 }
@@ -220,7 +220,6 @@ mod tests {
 
     #[test]
     fn moving_average_timeout_adjuster() {
-
         static MIN_TIMEOUT: Milliseconds = 1;
         static MAX_TIMEOUT: Milliseconds = 10000;
         static TXS_BLOCK_LIMIT: f64 = 5000.;
@@ -242,22 +241,8 @@ mod tests {
         }
 
         static TXS_TEST_DATA: &'static [f64] = &[
-            0.,
-            100.,
-            200.,
-            300.,
-            400.,
-            500.,
-            1000.,
-            1500.,
-            2000.,
-            2500.,
-            3000.,
-            4000.,
-            4500.,
-            5000.,
-            5500.,
-            6000.,
+            0., 100., 200., 300., 400., 500., 1000., 1500., 2000., 2500., 3000., 4000., 4500.,
+            5000., 5500., 6000.,
         ];
 
         // As the transaction number declines, timeout should increase until it reaches maximum.
@@ -266,8 +251,7 @@ mod tests {
             let timeout = adjuster.adjust_timeout_impl(*transactions);
             info!(
                 "Timeout: current = {}, previous = {}",
-                timeout,
-                previous_timeout
+                timeout, previous_timeout
             );
             assert!(timeout >= previous_timeout);
             previous_timeout = timeout;
@@ -284,8 +268,7 @@ mod tests {
             let timeout = adjuster.adjust_timeout_impl(*transactions);
             info!(
                 "Timeout: current = {}, previous = {}",
-                timeout,
-                previous_timeout
+                timeout, previous_timeout
             );
             assert!(timeout <= previous_timeout);
             previous_timeout = timeout;

@@ -16,10 +16,10 @@
 
 use rand::{thread_rng, Rng};
 use serde_json;
-use chrono::{DateTime, Utc, TimeZone};
+use chrono::{DateTime, TimeZone, Utc};
 
-use blockchain::{Blockchain, Service, Snapshot, Schema, Transaction, ExecutionResult};
-use crypto::{gen_keypair, Hash, CryptoHash};
+use blockchain::{Blockchain, ExecutionResult, Schema, Service, Snapshot, Transaction};
+use crypto::{gen_keypair, CryptoHash, Hash};
 use storage::{Error, Fork, ListIndex};
 use messages::{Message, RawTransaction};
 use encoding::Error as MessageError;
@@ -38,7 +38,6 @@ impl Service for TestService {
     fn service_name(&self) -> &'static str {
         "test service"
     }
-
 
     fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
         vec![]
@@ -132,8 +131,9 @@ encoding_struct! {
 
 #[test]
 fn test_correct_encoding_struct() {
-    let dat: Vec<u8> =
-        vec![8u8, 0, 0, 0, 18, 0, 0, 0, 16, 0, 0, 0, 1, 0, 0, 0, 17, 0, 0, 0, 1, 0, 0, 0, 1, 2];
+    let dat: Vec<u8> = vec![
+        8u8, 0, 0, 0, 18, 0, 0, 0, 16, 0, 0, 0, 1, 0, 0, 0, 17, 0, 0, 0, 1, 0, 0, 0, 1, 2
+    ];
     let test = vec![16u8, 0, 0, 0, 1, 0, 0, 0, 17, 0, 0, 0, 1, 0, 0, 0, 1, 2];
     let mut buffer = vec![0; 8];
     test.write(&mut buffer, 0, 8);
@@ -152,7 +152,6 @@ fn test_overlap_segments() {
     test.write(&mut buffer, 0, 8);
     <StructWithTwoSegments as Field>::check(&buffer, 0.into(), 8.into(), 8.into()).unwrap();
 }
-
 
 #[test]
 #[should_panic(expected = "SpaceBetweenSegments")]
@@ -186,7 +185,6 @@ fn test_segments_has_spaces_between() {
 fn gen_tempdir_name() -> String {
     thread_rng().gen_ascii_chars().take(10).collect()
 }
-
 
 fn handling_tx_panic(blockchain: &mut Blockchain) {
     let (_, sec_key) = gen_keypair();
@@ -270,7 +268,7 @@ fn handling_tx_panic_storage_error(blockchain: &mut Blockchain) {
 }
 
 mod transactions_tests {
-    use blockchain::{Transaction, TransactionSet, ExecutionResult};
+    use blockchain::{ExecutionResult, Transaction, TransactionSet};
     use storage::Fork;
     use crypto::gen_keypair;
     use serde::Serialize;
@@ -410,7 +408,7 @@ mod rocksdb_tests {
     use futures::sync::mpsc;
     use std::path::Path;
     use tempdir::TempDir;
-    use storage::{Database, RocksDB, DbOptions};
+    use storage::{Database, DbOptions, RocksDB};
     use blockchain::{Blockchain, Service};
     use crypto::gen_keypair;
     use node::ApiSender;
