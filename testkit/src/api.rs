@@ -15,12 +15,14 @@
 use exonum::blockchain::{SharedNodeState, Transaction};
 use exonum::node::{ApiSender, TransactionSend, create_public_api_handler,
                    create_private_api_handler};
-use iron::{IronError, Handler, Chain};
+use exonum::api::ApiError;
+use iron::{Response, IronError, Handler, Chain};
 use iron::headers::{ContentType, Headers};
-use iron::status::StatusClass;
+use iron::status::{self, StatusClass};
 use iron_test::{request, response};
 use serde::{Deserialize, Serialize};
 use serde_json;
+use serde_json::Value as JsonValue;
 
 use std::fmt;
 
@@ -191,17 +193,14 @@ impl TestKitApi {
     ///
     /// # Panics
     ///
-    /// - Panics if the response has a non-40x response status.
-    pub fn get_err<D>(&self, kind: ApiKind, endpoint: &str) -> D
-    where
-        for<'de> D: Deserialize<'de>,
-    {
-        TestKitApi::get_internal(
-            &self.public_handler,
-            &format!("{}/{}", kind.into_prefix(), endpoint),
-            true,
-            true,
-        )
+    /// - Panics if the response has a non-error response status.
+    pub fn get_err(&self, kind: ApiKind, endpoint: &str) -> ApiError {
+        let url = format!("http://localhost:3000/{}/{}", kind.into_prefix(), endpoint);
+        let response = match request::get(&url, Headers::new(), &self.public_handler) {
+            Ok(response) |
+            Err(IronError { response, .. }) => response,
+        };
+        TestKitApi::response_to_api_error(response)
     }
 
     fn post_internal<H, T, D>(handler: &H, endpoint: &str, data: &T, is_public: bool) -> D
@@ -279,5 +278,97 @@ impl TestKitApi {
             transaction,
             false,
         )
+    }
+
+    /// Converts iron Response to ApiError.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if the response has a non-error response status.
+    fn response_to_api_error(response: Response) -> ApiError {
+        fn extract_description(body: &str) -> Option<String> {
+            match serde_json::from_str::<JsonValue>(body).ok()? {
+                JsonValue::Object(ref object) if object.contains_key("description") => {
+                    Some(object["description"].as_str()?.to_owned())
+                }
+                JsonValue::String(string) => Some(string),
+                _ => None,
+            }
+        }
+
+        fn error(response: Response) -> String {
+            let body = response::extract_body_to_string(response);
+            extract_description(&body).unwrap_or(body)
+        }
+
+        let status = response.status.expect("Status header is not set");
+
+        match status {
+            status::Forbidden => ApiError::Unauthorized,
+            status::BadRequest => ApiError::BadRequest(error(response)),
+            status::NotFound => ApiError::NotFound(error(response)),
+            s if s.is_server_error() => ApiError::InternalError(error(response).into()),
+            s => panic!("Received non-error response status: {}", s.to_u16()),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_err_non_json() {
+        let response = Response::with((status::NotFound, "Not found"));
+        assert_matches!(
+            TestKitApi::response_to_api_error(response),
+            ApiError::NotFound(ref body) if body == "Not found"
+        );
+    }
+
+    #[test]
+    fn test_get_err_json_string() {
+        let response = Response::with((status::NotFound, "\"Wallet not found\""));
+        assert_matches!(
+            TestKitApi::response_to_api_error(response),
+            ApiError::NotFound(ref body) if body == "Wallet not found"
+        );
+    }
+
+    #[test]
+    fn test_get_err_json_object_with_description() {
+        let response_body = r#"{ "debug": "Some debug info", "description": "Some description" }"#;
+        let response = Response::with((status::BadRequest, response_body));
+        assert_matches!(
+            TestKitApi::response_to_api_error(response),
+            ApiError::BadRequest(ref body) if body == "Some description"
+        );
+    }
+
+    #[test]
+    fn test_get_err_json_object_without_description() {
+        let response_body = r#"{ "type": "unknown" }"#;
+        let response = Response::with((status::BadRequest, response_body));
+        assert_matches!(
+            TestKitApi::response_to_api_error(response),
+            ApiError::BadRequest(ref body) if body == response_body
+        );
+    }
+
+    #[test]
+    fn test_get_err_other_json() {
+        let response_body = r#"[1, 2, 3]"#;
+        let response = Response::with((status::BadRequest, response_body));
+        assert_matches!(
+            TestKitApi::response_to_api_error(response),
+            ApiError::BadRequest(ref body) if body == response_body
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Received non-error response status")]
+    fn test_get_err_non_error_status() {
+        let response = Response::with(status::Ok);
+        TestKitApi::response_to_api_error(response);
     }
 }
