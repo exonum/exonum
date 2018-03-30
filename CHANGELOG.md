@@ -67,6 +67,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - `checkpoint` method was introduced to set checkpoints;
   - new `rollback` rolls back to the last set checkpoint.
 
+  Migration path:
+  - Replace every old `rollback(blocks)` by a pair of `checkpoint()` and `rollback()`
+
 - Testkit api now contains two methods to work with the transaction pool (#549):
   - `is_tx_in_pool` - for checking transaction existence in the pool;
   - `add_tx` - for adding a new transaction into the pool.
