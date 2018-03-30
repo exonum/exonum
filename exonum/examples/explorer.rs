@@ -17,13 +17,54 @@ extern crate exonum;
 #[macro_use]
 extern crate serde_json;
 
-use exonum::blockchain::{Transaction, TransactionError};
+use exonum::blockchain::{Blockchain, Schema, Transaction, TransactionError};
+use exonum::crypto;
 use exonum::explorer::*;
 use exonum::helpers::{Height, ValidatorId};
 
 #[path = "../tests/explorer/blockchain.rs"]
 mod blockchain;
-use blockchain::{sample_blockchain, mempool_transaction};
+use blockchain::{consensus_keys, create_block, create_blockchain, CreateWallet, Transfer};
+
+/// Creates a transaction for the mempool.
+pub fn mempool_transaction() -> Box<Transaction> {
+    // Must be deterministic, so we are using deterministically generated
+    // consensus keys here.
+    let (pk_alex, key_alex) = consensus_keys();
+    CreateWallet::new(&pk_alex, "Alex", &key_alex).into()
+}
+
+/// Creates a sample blockchain for the example.
+///
+/// The blockchain has a single non-genesis block with 3 transactions:
+///
+/// - A successfully executed transaction
+/// - An erroneous transaction
+/// - A panicking transaction
+///
+/// Additionally, a single transaction is placed into the pool.
+pub fn sample_blockchain() -> Blockchain {
+    let mut blockchain = create_blockchain();
+    let (pk_alice, key_alice) = crypto::gen_keypair();
+    let (pk_bob, key_bob) = crypto::gen_keypair();
+    let tx_alice = CreateWallet::new(&pk_alice, "Alice", &key_alice);
+    let tx_bob = CreateWallet::new(&pk_bob, "Bob", &key_bob);
+    let tx_transfer = Transfer::new(&pk_alice, &pk_bob, 100, &key_alice);
+
+    create_block(
+        &mut blockchain,
+        vec![tx_alice.into(), tx_bob.into(), tx_transfer.into()],
+    );
+
+    let mut fork = blockchain.fork();
+    {
+        let mut schema = Schema::new(&mut fork);
+        schema.add_transaction_into_pool(mempool_transaction().raw().clone());
+    }
+    blockchain.merge(fork.into_patch()).unwrap();
+
+    blockchain
+}
 
 fn main() {
     let blockchain = sample_blockchain();

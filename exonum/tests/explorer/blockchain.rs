@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![allow(dead_code)]
+//! Simplified blockchain emulation for the `BlockchainExplorer`.
 
 extern crate futures;
 use self::futures::sync::mpsc;
@@ -89,7 +89,8 @@ impl Service for MyService {
     }
 }
 
-fn consensus_keys() -> (PublicKey, SecretKey) {
+/// Deterministically generates a keypair.
+pub fn consensus_keys() -> (PublicKey, SecretKey) {
     const SEED_PHRASE: &[u8] = b"correct horse battery staple";
     let seed = crypto::Seed::from_slice(crypto::hash(SEED_PHRASE).as_ref()).unwrap();
     crypto::gen_keypair_from_seed(&seed)
@@ -164,34 +165,4 @@ pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Box<Transacti
     blockchain
         .commit(&patch, block_hash, [precommit].into_iter())
         .unwrap();
-}
-
-/// Creates a transaction for the mempool.
-pub fn mempool_transaction() -> Box<Transaction> {
-    let (pk_alex, key_alex) = consensus_keys(); // Must be deterministic!
-    CreateWallet::new(&pk_alex, "Alex", &key_alex).into()
-}
-
-/// Creates a sample blockchain for doc tests.
-pub fn sample_blockchain() -> Blockchain {
-    let mut blockchain = create_blockchain();
-    let (pk_alice, key_alice) = crypto::gen_keypair();
-    let (pk_bob, key_bob) = crypto::gen_keypair();
-    let tx_alice = CreateWallet::new(&pk_alice, "Alice", &key_alice);
-    let tx_bob = CreateWallet::new(&pk_bob, "Bob", &key_bob);
-    let tx_transfer = Transfer::new(&pk_alice, &pk_bob, 100, &key_alice);
-
-    create_block(
-        &mut blockchain,
-        vec![tx_alice.into(), tx_bob.into(), tx_transfer.into()],
-    );
-
-    let mut fork = blockchain.fork();
-    {
-        let mut schema = Schema::new(&mut fork);
-        schema.add_transaction_into_pool(mempool_transaction().raw().clone());
-    }
-    blockchain.merge(fork.into_patch()).unwrap();
-
-    blockchain
 }
