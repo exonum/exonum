@@ -65,6 +65,7 @@ extern crate os_info;
 #[macro_use]
 extern crate failure;
 extern crate bodyparser;
+extern crate uuid;
 
 // Test dependencies.
 #[cfg(all(test, feature = "long_benchmarks"))]

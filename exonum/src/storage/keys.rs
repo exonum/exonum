@@ -17,8 +17,8 @@
 //! A definition of `StorageKey` trait and implementations for common types.
 
 use byteorder::{ByteOrder, BigEndian};
-
 use chrono::{DateTime, Utc, NaiveDateTime};
+use uuid::Uuid;
 
 use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 
@@ -261,6 +261,7 @@ impl StorageKey for str {
         String::read(buffer)
     }
 }
+
 /// `chrono::DateTime` uses only 12 bytes in the storage. It is represented by number of seconds
 /// since `1970-01-01 00:00:00 UTC`, which are stored in the first 8 bytes as per the `StorageKey`
 /// implementation for `i64`, and nanoseconds, which are stored in the remaining 4 bytes as per
@@ -281,6 +282,20 @@ impl StorageKey for DateTime<Utc> {
         let secs = i64::read(&buffer[0..8]);
         let nanos = u32::read(&buffer[8..12]);
         DateTime::from_utc(NaiveDateTime::from_timestamp(secs, nanos), Utc)
+    }
+}
+
+impl StorageKey for Uuid {
+    fn size(&self) -> usize {
+        16
+    }
+
+    fn write(&self, buffer: &mut [u8]) {
+        buffer.copy_from_slice(self.as_bytes());
+    }
+
+    fn read(buffer: &[u8]) -> Self::Owned {
+        Self::from_bytes(buffer).unwrap()
     }
 }
 
@@ -359,7 +374,7 @@ mod tests {
     test_storage_key_for_int_type!{fuzz i64, 8 => test_storage_key_for_i64}
 
     #[test]
-    fn test_signed_int_key_in_index() {
+    fn signed_int_key_in_index() {
         use storage::{Database, MapIndex, MemoryDB};
 
         let db: Box<Database> = Box::new(MemoryDB::new());
@@ -390,7 +405,7 @@ mod tests {
     // Example how to migrate from Exonum <= 0.5 implementation of `StorageKey`
     // for signed integers.
     #[test]
-    fn test_old_signed_int_key_in_index() {
+    fn old_signed_int_key_in_index() {
         use storage::{Database, MapIndex, MemoryDB};
 
         // Simple wrapper around a signed integer type with the `StorageKey` implementation,
@@ -449,7 +464,7 @@ mod tests {
     }
 
     #[test]
-    fn test_storage_key_for_chrono_date_time_round_trip() {
+    fn storage_key_for_chrono_date_time_round_trip() {
         let times = [
             Utc.timestamp(0, 0),
             Utc.timestamp(13, 23),
@@ -467,7 +482,7 @@ mod tests {
     }
 
     #[test]
-    fn test_storage_key_for_system_time_ordering() {
+    fn storage_key_for_system_time_ordering() {
         use rand::{Rng, thread_rng};
 
         let mut rng = thread_rng();
@@ -489,7 +504,7 @@ mod tests {
     }
 
     #[test]
-    fn test_system_time_key_in_index() {
+    fn system_time_key_in_index() {
         use storage::{Database, MapIndex, MemoryDB};
 
         let db: Box<Database> = Box::new(MemoryDB::new());
@@ -551,6 +566,21 @@ mod tests {
             val.write(&mut buffer);
             let new_val = <[u8] as StorageKey>::read(&buffer);
             assert_eq!(new_val, *val);
+        }
+    }
+
+    #[test]
+    fn uuid_round_trip() {
+        let uuids = [
+            Uuid::nil(),
+            Uuid::parse_str("936DA01F9ABD4d9d80C702AF85C822A8").unwrap(),
+            Uuid::parse_str("0000002a-000c-0005-0c03-0938362b0809").unwrap(),
+        ];
+
+        let mut buffer = [0u8; 16];
+        for uuid in uuids.iter() {
+            uuid.write(&mut buffer);
+            assert_eq!(*uuid, Uuid::read(&buffer));
         }
     }
 
