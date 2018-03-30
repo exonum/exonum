@@ -12,194 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![cfg_attr(feature = "doctests", allow(unused_imports, dead_code))]
+#[macro_use]
+extern crate exonum;
+#[macro_use]
+extern crate serde_json;
 
-use futures::sync::mpsc;
-use serde_json;
+use exonum::blockchain::{Schema, Transaction, TransactionErrorType, TxLocation};
+use exonum::crypto::{self, CryptoHash, Hash};
+use exonum::explorer::*;
+use exonum::helpers::Height;
+use exonum::messages::{Message, ServiceMessage};
 
-use blockchain::{ExecutionError, ExecutionResult, Service, TransactionSet};
-use crypto::{self, CryptoHash, PublicKey, SecretKey};
-use encoding::Error as EncodingError;
-use messages::{Message, RawTransaction, ServiceMessage};
-use node::ApiSender;
-use storage::{Fork, MemoryDB, Snapshot};
-use super::*;
-
-// // // Transactions // // //
-
-transactions! {
-    Transactions {
-        const SERVICE_ID = 10_000;
-
-        struct CreateWallet {
-            pubkey: &PublicKey,
-            name: &str,
-        }
-
-        struct Transfer {
-            from: &PublicKey,
-            to: &PublicKey,
-            amount: u64,
-        }
-    }
-}
-
-impl Transaction for CreateWallet {
-    fn verify(&self) -> bool {
-        true
-    }
-
-    fn execute(&self, _: &mut Fork) -> ExecutionResult {
-        if self.name().starts_with("Al") {
-            Ok(())
-        } else {
-            Err(ExecutionError::with_description(
-                1,
-                "Not allowed".to_string(),
-            ))
-        }
-    }
-}
-
-impl Transaction for Transfer {
-    fn verify(&self) -> bool {
-        true
-    }
-
-    fn execute(&self, _: &mut Fork) -> ExecutionResult {
-        panic!("oops")
-    }
-}
-
-// // // Service // // //
-
-struct MyService;
-
-impl Service for MyService {
-    fn service_id(&self) -> u16 {
-        10_000
-    }
-
-    fn service_name(&self) -> &str {
-        "my-service"
-    }
-
-    fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
-        vec![]
-    }
-
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, EncodingError> {
-        Transactions::tx_from_raw(raw).map(Transactions::into)
-    }
-}
-
-fn consensus_keys() -> (PublicKey, SecretKey) {
-    const SEED_PHRASE: &[u8] = b"correct horse battery staple";
-    let seed = crypto::Seed::from_slice(crypto::hash(SEED_PHRASE).as_ref()).unwrap();
-    crypto::gen_keypair_from_seed(&seed)
-}
-
-fn create_blockchain() -> Blockchain {
-    use blockchain::{GenesisConfig, ValidatorKeys};
-
-    let (consensus_key, _) = consensus_keys();
-    let service_keys = crypto::gen_keypair();
-
-    let api_channel = mpsc::channel(10);
-    let mut blockchain = Blockchain::new(
-        MemoryDB::new(),
-        vec![MyService.into()],
-        service_keys.0,
-        service_keys.1,
-        ApiSender(api_channel.0),
-    );
-
-    let keys = ValidatorKeys {
-        consensus_key,
-        service_key: service_keys.0,
-    };
-    blockchain
-        .initialize(GenesisConfig::new(vec![keys].into_iter()))
-        .unwrap();
-    blockchain
-}
-
-// Simplified compared to real life / testkit, but we don't need to test *everything*
-// here.
-fn create_block(blockchain: &mut Blockchain, transactions: Vec<Box<Transaction>>) {
-    use std::time::SystemTime;
-    use helpers::{Round, ValidatorId};
-    use messages::Propose;
-
-    let tx_hashes: Vec<_> = transactions.iter().map(|tx| tx.hash()).collect();
-    let height = blockchain.last_block().height().next();
-
-    let mut fork = blockchain.fork();
-    {
-        let mut schema = Schema::new(&mut fork);
-        for tx in transactions {
-            schema.add_transaction_into_pool(tx.raw().clone())
-        }
-    }
-    blockchain.merge(fork.into_patch()).unwrap();
-
-    let (block_hash, patch) = blockchain.create_patch(ValidatorId(0), height, &tx_hashes);
-    let (_, consensus_secret_key) = consensus_keys();
-
-    let propose = Propose::new(
-        ValidatorId(0),
-        height,
-        Round::first(),
-        &blockchain.last_hash(),
-        &tx_hashes,
-        &consensus_secret_key,
-    );
-    let precommit = Precommit::new(
-        ValidatorId(0),
-        propose.height(),
-        propose.round(),
-        &propose.hash(),
-        &block_hash,
-        SystemTime::now().into(),
-        &consensus_secret_key,
-    );
-
-    blockchain
-        .commit(&patch, block_hash, [precommit].into_iter())
-        .unwrap();
-}
-
-/// Creates a transaction for the mempool.
-#[cfg(feature = "doctests")]
-pub fn mempool_transaction() -> Box<Transaction> {
-    let (pk_alex, key_alex) = consensus_keys(); // Must be deterministic!
-    CreateWallet::new(&pk_alex, "Alex", &key_alex).into()
-}
-
-/// Creates a sample blockchain for doc tests.
-#[cfg(feature = "doctests")]
-pub fn sample_blockchain() -> Blockchain {
-    let mut blockchain = create_blockchain();
-    let (pk_alice, key_alice) = crypto::gen_keypair();
-    let (pk_bob, key_bob) = crypto::gen_keypair();
-    let tx_alice = CreateWallet::new(&pk_alice, "Alice", &key_alice);
-    let tx_bob = CreateWallet::new(&pk_bob, "Bob", &key_bob);
-    let tx_transfer = Transfer::new(&pk_alice, &pk_bob, 100, &key_alice);
-
-    create_block(
-        &mut blockchain,
-        vec![tx_alice.into(), tx_bob.into(), tx_transfer.into()],
-    );
-
-    let mut fork = blockchain.fork();
-    {
-        let mut schema = Schema::new(&mut fork);
-        schema.add_transaction_into_pool(mempool_transaction().raw().clone());
-    }
-    blockchain.merge(fork.into_patch()).unwrap();
-
-    blockchain
-}
+mod blockchain;
+use blockchain::{create_block, create_blockchain, CreateWallet, Transfer};
 
 #[test]
 fn test_explorer_basics() {
@@ -500,7 +325,7 @@ fn test_transaction_iterator() {
     let block = explorer.block(Height(2)).unwrap();
     let failed_tx_hashes: Vec<_> = block
         .iter()
-        .filter(|tx| tx.status.is_err())
+        .filter(|tx| tx.status().is_err())
         .map(|tx| tx.content().hash())
         .collect();
     assert_eq!(failed_tx_hashes, vec![tx_bob.hash(), tx_transfer.hash()]);

@@ -127,16 +127,12 @@ jobs:
         - powershell
     script:
     - cargo test --all
+    - cargo run -p exonum --example explorer
     - cargo run -p exonum-testkit --example timestamping
     - cargo run -p exonum-testkit --example configuration_change
     - cargo run -p exonum-time --example simple_service
     - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
     - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
-
-  # Additional tests
-  - env: FEATURE=test-aux
-    script:
-    - cd $TRAVIS_BUILD_DIR/exonum && cargo test --features doctests --doc explorer
 
   # Benchmarks (compilation only)
   - env: FEATURE=benchmarks

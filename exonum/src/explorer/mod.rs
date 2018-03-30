@@ -15,9 +15,7 @@
 //! Blockchain explorer module provides API for getting information about blocks and transactions
 //! from the blockchain.
 //!
-//! See the [`BlockchainExplorer`] documentation for examples of usage.
-//!
-//! [`BlockchainExplorer`]: struct.BlockchainExplorer.html
+//! See the `explorer` example in the crate for examples of usage.
 
 use serde::{Serialize, Serializer};
 
@@ -33,10 +31,6 @@ use std::cell::{Ref, RefCell};
 use std::collections::Bound;
 use std::fmt;
 use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
-
-#[cfg(any(test, feature = "doctests"))]
-#[doc(hidden)]
-pub mod tests;
 
 /// Transaction parsing result.
 type ParseResult = Result<Box<Transaction>, encoding::Error>;
@@ -94,55 +88,9 @@ impl HeightRange {
 
 /// Information about a block in the blockchain.
 ///
-/// # Examples
 ///
-/// ```
-/// # #[cfg(feature = "doctests")] fn main() {
-/// # use exonum::explorer::{BlockchainExplorer, BlockInfo};
-/// # use exonum::explorer::tests::sample_blockchain;
-/// # use exonum::helpers::Height;
-/// let blockchain = // ...
-/// #                sample_blockchain();
-/// let explorer = BlockchainExplorer::new(&blockchain);
-/// let block: BlockInfo = explorer.block(Height(1)).unwrap();
-/// assert_eq!(block.height(), Height(1));
-/// assert_eq!(block.len(), 3);
 ///
-/// // Iterate over transactions in the block
-/// for tx in &block {
-///     println!("{:?}: {:?}", tx.location(), tx.content());
-/// }
-/// # } // main
-/// # #[cfg(not(feature = "doctests"))] fn main() {}
-/// ```
 ///
-/// # JSON presentation
-///
-/// ```
-/// # #[macro_use] extern crate serde_json;
-/// # extern crate exonum;
-/// # #[cfg(feature = "doctests")] fn main() {
-/// # use exonum::helpers::Height;
-/// # use exonum::explorer::{BlockchainExplorer, BlockInfo};
-/// # use exonum::explorer::tests::sample_blockchain;
-/// # let blockchain = sample_blockchain();
-/// # let explorer = BlockchainExplorer::new(&blockchain);
-/// let block: BlockInfo = // ...
-/// #                      explorer.block(Height(1)).unwrap();
-/// assert_eq!(
-///     serde_json::to_value(&block).unwrap(),
-///     json!({
-///         // `Block` representation
-///         "block": block.header(),
-///         // Array of `Precommit`s
-///         "precommits": *block.precommits(),
-///         // Array of transaction hashes
-///         "txs": *block.transaction_hashes(),
-///     })
-/// );
-/// # } // main
-/// # #[cfg(not(feature = "doctests"))] fn main() {}
-/// ```
 #[derive(Debug)]
 pub struct BlockInfo<'a> {
     header: Block,
@@ -308,32 +256,6 @@ impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
 }
 
 /// Information about a block in the blockchain with info on transactions eagerly loaded.
-///
-/// # Examples
-///
-/// ```
-/// # #[cfg(feature = "doctests")] fn main() {
-/// # use exonum::explorer::{BlockchainExplorer, BlockWithTransactions, CommittedTransaction};
-/// # use exonum::explorer::tests::sample_blockchain;
-/// # use exonum::helpers::Height;
-/// let blockchain = // ...
-/// #                sample_blockchain();
-/// let explorer = BlockchainExplorer::new(&blockchain);
-/// let block: BlockWithTransactions = explorer.block_with_txs(Height(1)).unwrap();
-/// assert_eq!(block.height(), Height(1));
-/// assert_eq!(block.len(), 3);
-///
-/// // Iterate over transactions in the block
-/// for tx in &block {
-///     println!("{:?}: {:?}", tx.location(), tx.content());
-/// }
-///
-/// // Compared to `BlockInfo`, you can access transactions in a block using indexes
-/// let tx: &CommittedTransaction = &block[1];
-/// assert_eq!(tx.location().position_in_block(), 1);
-/// # } // main
-/// # #[cfg(not(feature = "doctests"))] fn main() {}
-/// ```
 #[derive(Debug, Serialize)]
 pub struct BlockWithTransactions {
     /// Block header as recorded in the blockchain.
@@ -396,134 +318,17 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 
 /// Information about a particular transaction in the blockchain.
 ///
-/// # Examples
+///
+///
+///
+///
 ///
 /// ```
-/// # #[cfg(feature = "doctests")] fn main() {
-/// use exonum::blockchain::{Transaction, TransactionError};
-/// # use exonum::explorer::{BlockchainExplorer, CommittedTransaction};
-/// # use exonum::explorer::tests::sample_blockchain;
-/// # use exonum::helpers::Height;
 ///
-/// let blockchain = // ...
-/// #                sample_blockchain();
-/// let explorer = BlockchainExplorer::new(&blockchain);
-/// let tx = explorer.block(Height(1)).unwrap().transaction(0).unwrap();
-/// assert_eq!(tx.location().block_height(), Height(1));
-/// assert_eq!(tx.location().position_in_block(), 0);
-///
-/// // It is possible to access transaction content
-/// let content: &Transaction = tx.content();
-/// println!("{:?}", content);
-///
-/// // ...and transaction status as well
-/// let status: Result<(), &TransactionError> = tx.status();
-/// assert!(status.is_ok());
-/// # } // main
-/// # #[cfg(not(feature = "doctests"))] fn main() {}
-/// ```
-///
-/// # JSON presentation
 ///
 /// ```
-/// # #[macro_use] extern crate serde_json;
-/// # extern crate exonum;
-/// # #[cfg(feature = "doctests")] fn main() {
-/// # use exonum::explorer::{BlockchainExplorer, CommittedTransaction};
-/// # use exonum::explorer::tests::sample_blockchain;
-/// # use exonum::helpers::Height;
-/// use exonum::encoding::serialize::json::ExonumJson;
 ///
-/// let blockchain = // ...
-/// #                sample_blockchain();
-/// let explorer = BlockchainExplorer::new(&blockchain);
-/// let tx = explorer.block(Height(1)).unwrap().transaction(0).unwrap();
-/// assert_eq!(
-///     serde_json::to_value(&tx).unwrap(),
-///     json!({
-///         // `Transaction` JSON presentation
-///         "content": tx.content().serialize_field().unwrap(),
-///         // Position in block
-///         "location": {
-///             "block_height": "1",
-///             "position_in_block": "0",
-///         },
-///         // `ListProof` of the transaction inclusion in block
-///         "location_proof": tx.location_proof(),
-///         // Execution status
-///         "status": { "type": "success" },
-///     })
-/// );
-/// # } // main
-/// # #[cfg(not(feature = "doctests"))] fn main() {}
-/// ```
 ///
-/// ## Erroneous transactions
-///
-/// Transactions which execution has resulted in a user-defined error
-/// (i.e., one returned as `Err(..)` from `Transaction::execute`)
-/// have `code` and `description` fields in `status` and have `type` set to `"error"`:
-///
-/// ```
-/// # #[macro_use] extern crate serde_json;
-/// # extern crate exonum;
-/// # #[cfg(feature = "doctests")] fn main() {
-/// # use exonum::encoding::serialize::json::ExonumJson;
-/// # use exonum::explorer::{BlockchainExplorer, CommittedTransaction};
-/// # use exonum::explorer::tests::sample_blockchain;
-/// # use exonum::helpers::Height;
-/// #
-/// # let blockchain = sample_blockchain();
-/// # let explorer = BlockchainExplorer::new(&blockchain);
-/// let erroneous_tx: CommittedTransaction = // ...
-/// #   explorer.block(Height(1)).unwrap().transaction(1).unwrap();
-/// assert_eq!(
-///     serde_json::to_value(&erroneous_tx).unwrap(),
-///     json!({
-///         "status": {
-///             "type": "error",
-///             "code": 1,
-///             "description": "Not allowed",
-///         },
-///         // Other fields...
-/// #       "content": erroneous_tx.content().serialize_field().unwrap(),
-/// #       "location": erroneous_tx.location(),
-/// #       "location_proof": erroneous_tx.location_proof(),
-///     })
-/// );
-/// # } // main
-/// # #[cfg(not(feature = "doctests"))] fn main() {}
-/// ```
-///
-/// ## Panicking transactions
-///
-/// If transaction execution resulted in panic, it has `type` set to `"panic"`:
-///
-/// ```
-/// # #[macro_use] extern crate serde_json;
-/// # extern crate exonum;
-/// # #[cfg(feature = "doctests")] fn main() {
-/// # use exonum::encoding::serialize::json::ExonumJson;
-/// # use exonum::explorer::{BlockchainExplorer, CommittedTransaction};
-/// # use exonum::explorer::tests::sample_blockchain;
-/// # use exonum::helpers::Height;
-/// #
-/// # let blockchain = sample_blockchain();
-/// # let explorer = BlockchainExplorer::new(&blockchain);
-/// let panicked_tx: CommittedTransaction = // ...
-/// #   explorer.block(Height(1)).unwrap().transaction(2).unwrap();
-/// assert_eq!(
-///     serde_json::to_value(&panicked_tx).unwrap(),
-///     json!({
-///         "status": { "type": "panic", "description": "oops" },
-///         // Other fields...
-/// #       "content": panicked_tx.content().serialize_field().unwrap(),
-/// #       "location": panicked_tx.location(),
-/// #       "location_proof": panicked_tx.location_proof(),
-///     })
-/// );
-/// # } // main
-/// # #[cfg(not(feature = "doctests"))] fn main() {}
 /// ```
 #[derive(Debug, Serialize)]
 pub struct CommittedTransaction {
@@ -608,24 +413,6 @@ impl CommittedTransaction {
 ///
 /// [`transaction()`]: struct.BlockchainExplorer.html#method.transaction
 ///
-/// # Examples
-///
-/// ```
-/// # #[cfg(feature = "doctests")] fn main() {
-/// # use exonum::explorer::{BlockchainExplorer, TransactionInfo};
-/// # use exonum::explorer::tests::{sample_blockchain, mempool_transaction};
-/// let blockchain = // ...
-/// #                sample_blockchain();
-/// let explorer = BlockchainExplorer::new(&blockchain);
-/// let hash = // ...
-/// #          mempool_transaction().hash();
-/// let tx: TransactionInfo = explorer.transaction(&hash).unwrap();
-/// assert!(tx.is_in_pool());
-/// println!("{:?}", tx.content());
-/// # } // main
-/// # #[cfg(not(feature = "doctests"))] fn main() {}
-/// ```
-///
 /// # JSON presentation
 ///
 /// ## Committed transactions
@@ -635,65 +422,12 @@ impl CommittedTransaction {
 ///
 /// [`CommittedTransaction`]: struct.CommittedTransaction.html#json-presentation
 ///
-/// ```
-/// # #[macro_use] extern crate serde_json;
-/// # extern crate exonum;
-/// # #[cfg(feature = "doctests")] fn main() {
-/// # use exonum::explorer::{BlockchainExplorer, TransactionInfo};
-/// # use exonum::explorer::tests::sample_blockchain;
-/// # use exonum::helpers::Height;
-/// use exonum::encoding::serialize::json::ExonumJson;
-///
-/// # let blockchain = sample_blockchain();
-/// # let explorer = BlockchainExplorer::new(&blockchain);
-/// # let block = explorer.block(Height(1)).unwrap();
-/// let committed_tx: TransactionInfo = // ...
-/// #   explorer.transaction(&block.transaction_hashes()[0]).unwrap();
-/// # let tx_ref = committed_tx.as_committed().unwrap();
-/// assert_eq!(
-///     serde_json::to_value(&committed_tx).unwrap(),
-///     json!({
-///         "type": "committed",
-///         "content": committed_tx.content().serialize_field().unwrap(),
-///         "status": { "type": "success" },
-///         // Other fields...
-/// #       "location": tx_ref.location(),
-/// #       "location_proof": tx_ref.location_proof(),
-///     })
-/// );
-/// # } // main
-/// # #[cfg(not(feature = "doctests"))] fn main() {}
-/// ```
-///
 /// ## Transaction in pool
 ///
 /// Transactions in pool are represented with a 2-field object:
 ///
 /// - `type` field contains transaction type (`"in-pool"`).
 /// - `content` is JSON serialization of the transaction.
-///
-/// ```
-/// # #[macro_use] extern crate serde_json;
-/// # extern crate exonum;
-/// # #[cfg(feature = "doctests")] fn main() {
-/// # use exonum::explorer::{BlockchainExplorer, TransactionInfo};
-/// # use exonum::explorer::tests::{sample_blockchain, mempool_transaction};
-/// use exonum::encoding::serialize::json::ExonumJson;
-///
-/// # let blockchain = sample_blockchain();
-/// # let explorer = BlockchainExplorer::new(&blockchain);
-/// let tx_in_pool: TransactionInfo = // ...
-/// #   explorer.transaction(&mempool_transaction().hash()).unwrap();
-/// assert_eq!(
-///     serde_json::to_value(&tx_in_pool).unwrap(),
-///     json!({
-///         "type": "in-pool",
-///         "content": tx_in_pool.content().serialize_field().unwrap(),
-///     })
-/// );
-/// # } // main
-/// # #[cfg(not(feature = "doctests"))] fn main() {}
-/// ```
 #[derive(Debug, Serialize)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 pub enum TransactionInfo {
@@ -751,62 +485,6 @@ impl TransactionInfo {
 /// all calls to the methods of an explorer instance are guaranteed to be consistent.
 ///
 /// [`Snapshot`]: ../storage/trait.Snapshot.html
-///
-/// # Examples
-///
-/// ```
-/// # extern crate exonum;
-/// # #[cfg(feature = "doctests")] fn main() {
-/// # use exonum::crypto::Hash;
-/// # use exonum::explorer::BlockchainExplorer;
-/// # use exonum::explorer::tests::sample_blockchain;
-/// # use exonum::helpers::Height;
-/// #
-/// let blockchain = // ...
-/// #                sample_blockchain();
-/// let explorer = BlockchainExplorer::new(&blockchain);
-///
-/// // Getting a specific block
-/// let block = explorer.block(Height(1)).unwrap();
-/// // Getting a block together with its transactions
-/// let block = explorer.block_with_txs(Height(1)).unwrap();
-/// // Getting a specific transaction either in one of blocks,
-/// // or in the pool of unconfirmed transactions
-/// let tx = explorer.transaction(&Hash::zero());
-/// // Iterating over blocks in the blockchain
-/// for block in explorer.blocks(Height(1)..).rev().take(2) {
-///     println!("{:?}", block);
-/// }
-/// # } // main
-/// # #[cfg(not(feature = "doctests"))] fn main() {}
-/// ```
-///
-/// Some more interesting capabilities:
-///
-/// ```
-/// # extern crate exonum;
-/// # #[cfg(feature = "doctests")] fn main() {
-/// # use exonum::explorer::BlockchainExplorer;
-/// # use exonum::explorer::tests::sample_blockchain;
-/// use exonum::helpers::{Height, ValidatorId};
-///
-/// # let blockchain = sample_blockchain();
-/// # let explorer = BlockchainExplorer::new(&blockchain);
-/// // Calculate the total number of transactions in the first 10 blocks
-/// let tx_count: usize = explorer
-///     .blocks(..Height(10))
-///     .map(|block| block.len())
-///     .sum();
-/// # assert_eq!(tx_count, 3);
-/// // Determine the number of blocks proposed by a specific validator
-/// let block_count = explorer
-///     .blocks(Height(1)..) // skip genesis block
-///     .filter(|block| block.header().proposer_id() == ValidatorId(0))
-///     .count();
-/// # assert_eq!(block_count, 1);
-/// # } // main
-/// # #[cfg(not(feature = "doctests"))] fn main() {}
-/// ```
 pub struct BlockchainExplorer<'a> {
     snapshot: Box<Snapshot>,
     transaction_parser: Box<'a + Fn(RawMessage) -> ParseResult>,
