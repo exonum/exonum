@@ -27,6 +27,7 @@
 //! use exonum::blockchain::{Block, Schema, Service, Transaction, TransactionSet, ExecutionResult};
 //! use exonum::crypto::{gen_keypair, Hash, PublicKey, CryptoHash};
 //! use exonum::encoding;
+//! use exonum::helpers::Height;
 //! use exonum::messages::{Message, RawTransaction};
 //! use exonum::storage::{Snapshot, Fork};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
@@ -111,8 +112,8 @@
 //!     let response: BlocksRange = api.get(ApiKind::Explorer, "v1/blocks?count=10");
 //!     let (blocks, range) = (response.blocks, response.range);
 //!     assert_eq!(blocks.len(), 3);
-//!     assert_eq!(range.start, 0);
-//!     assert_eq!(range.end, 3);
+//!     assert_eq!(range.start, Height(0));
+//!     assert_eq!(range.end, Height(3));
 //!
 //!     api.get::<serde_json::Value>(
 //!         ApiKind::Explorer,
@@ -145,6 +146,7 @@ use std::fmt;
 use exonum::blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfiguration,
                          Transaction};
 use exonum::crypto::{self, Hash};
+use exonum::explorer::{BlockchainExplorer, BlockWithTransactions};
 use exonum::helpers::{Height, ValidatorId};
 use exonum::node::{ApiSender, ExternalMessage, State as NodeState, NodeApiConfig};
 use exonum::storage::{MemoryDB, Patch, Snapshot};
@@ -387,6 +389,11 @@ impl TestKit {
         self.blockchain.snapshot()
     }
 
+    /// Returns a reference to the blockchain used by the testkit.
+    pub fn blockchain(&self) -> &Blockchain {
+        &self.blockchain
+    }
+
     /// Returns a blockchain instance for low level manipulations with storage.
     pub fn blockchain_mut(&mut self) -> &mut Blockchain {
         &mut self.blockchain
@@ -505,7 +512,7 @@ impl TestKit {
         self.probe_all(vec![Box::new(transaction) as Box<Transaction>])
     }
 
-    fn do_create_block(&mut self, tx_hashes: &[crypto::Hash]) {
+    fn do_create_block(&mut self, tx_hashes: &[crypto::Hash]) -> BlockWithTransactions {
         let new_block_height = self.height().next();
         let last_hash = self.last_block_hash();
 
@@ -544,6 +551,10 @@ impl TestKit {
             .unwrap();
 
         self.poll_events();
+
+        BlockchainExplorer::new(&self.blockchain)
+            .block_with_txs(self.height())
+            .unwrap()
     }
 
     /// Update test network configuration if such an update has been scheduled
@@ -581,10 +592,14 @@ impl TestKit {
     /// Creates a block with the given transactions.
     /// Transactions that are in the pool will be ignored.
     ///
+    /// # Return value
+    ///
+    /// Returns information about the created block.
+    ///
     /// # Panics
     ///
     /// - Panics if any of transactions has been already committed to the blockchain.
-    pub fn create_block_with_transactions<I>(&mut self, txs: I)
+    pub fn create_block_with_transactions<I>(&mut self, txs: I) -> BlockWithTransactions
     where
         I: IntoIterator<Item = Box<Transaction>>,
     {
@@ -615,26 +630,40 @@ impl TestKit {
             hashes
         };
 
-        self.create_block_with_tx_hashes(&tx_hashes);
+        self.create_block_with_tx_hashes(&tx_hashes)
     }
 
     /// Creates a block with the given transaction.
     /// Transactions that are in the pool will be ignored.
     ///
+    /// # Return value
+    ///
+    /// Returns information about the created block.
+    ///
     /// # Panics
     ///
     /// - Panics if given transaction has been already committed to the blockchain.
-    pub fn create_block_with_transaction<T: Transaction>(&mut self, tx: T) {
-        self.create_block_with_transactions(txvec![tx]);
+    pub fn create_block_with_transaction<T: Transaction>(
+        &mut self,
+        tx: T,
+    ) -> BlockWithTransactions {
+        self.create_block_with_transactions(txvec![tx])
     }
 
     /// Creates block with the specified transactions. The transactions must be previously
     /// sent to the node via API or directly put into the `channel()`.
     ///
+    /// # Return value
+    ///
+    /// Returns information about the created block.
+    ///
     /// # Panics
     ///
     /// - Panics in the case any of transaction hashes are not in the pool.
-    pub fn create_block_with_tx_hashes(&mut self, tx_hashes: &[crypto::Hash]) {
+    pub fn create_block_with_tx_hashes(
+        &mut self,
+        tx_hashes: &[crypto::Hash],
+    ) -> BlockWithTransactions {
         self.poll_events();
 
         {
@@ -645,11 +674,15 @@ impl TestKit {
             }
         }
 
-        self.do_create_block(tx_hashes);
+        self.do_create_block(tx_hashes)
     }
 
     /// Creates block with all transactions in the pool.
-    pub fn create_block(&mut self) {
+    ///
+    /// # Return value
+    ///
+    /// Returns information about the created block.
+    pub fn create_block(&mut self) -> BlockWithTransactions {
         self.poll_events();
 
         let snapshot = self.blockchain.snapshot();
@@ -662,7 +695,7 @@ impl TestKit {
             let fork = blockchain.fork();
             blockchain.merge(fork.into_patch()).unwrap();
         }
-        self.do_create_block(&tx_hashes);
+        self.do_create_block(&tx_hashes)
     }
 
     /// Adds transaction into persistent pool.
@@ -707,6 +740,11 @@ impl TestKit {
     /// Returns the height of latest committed block.
     pub fn height(&self) -> Height {
         self.blockchain.last_block().height()
+    }
+
+    /// Returns the blockchain explorer instance.
+    pub fn explorer(&self) -> BlockchainExplorer {
+        BlockchainExplorer::new(&self.blockchain)
     }
 
     /// Returns the actual blockchain configuration.

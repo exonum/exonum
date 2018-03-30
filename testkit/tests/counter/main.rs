@@ -29,7 +29,7 @@ extern crate log;
 extern crate assert_matches;
 
 use exonum::api::ApiError;
-use exonum::blockchain::Transaction;
+use exonum::blockchain::{Transaction, TransactionErrorType as ErrorType};
 use exonum::crypto::{self, PublicKey, CryptoHash};
 use exonum::helpers::Height;
 use exonum::messages::Message;
@@ -370,8 +370,8 @@ fn test_explorer_blocks() {
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(0));
     assert_eq!(*blocks[0].prev_hash(), crypto::Hash::default());
-    assert_eq!(range.start, 0);
-    assert_eq!(range.end, 1);
+    assert_eq!(range.start, Height(0));
+    assert_eq!(range.end, Height(1));
 
     // Check empty block creation
     testkit.create_block();
@@ -384,8 +384,8 @@ fn test_explorer_blocks() {
     assert_eq!(blocks[0].tx_count(), 0);
     assert_eq!(blocks[1].height(), Height(0));
     assert_eq!(*blocks[1].prev_hash(), crypto::Hash::default());
-    assert_eq!(range.start, 0);
-    assert_eq!(range.end, 2);
+    assert_eq!(range.start, Height(0));
+    assert_eq!(range.end, Height(2));
 
     let response: BlocksRange = api.get(
         ApiKind::Explorer,
@@ -393,8 +393,8 @@ fn test_explorer_blocks() {
     );
     let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 0);
-    assert_eq!(range.start, 0);
-    assert_eq!(range.end, 2);
+    assert_eq!(range.start, Height(0));
+    assert_eq!(range.end, Height(2));
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -410,8 +410,8 @@ fn test_explorer_blocks() {
     assert_eq!(*blocks[0].prev_hash(), blocks[1].hash());
     assert_eq!(blocks[0].tx_count(), 1);
     assert_eq!(*blocks[0].tx_hash(), tx.hash());
-    assert_eq!(range.start, 0);
-    assert_eq!(range.end, 3);
+    assert_eq!(range.start, Height(0));
+    assert_eq!(range.end, Height(3));
 
     let response: BlocksRange = api.get(
         ApiKind::Explorer,
@@ -420,8 +420,8 @@ fn test_explorer_blocks() {
     let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(2));
-    assert_eq!(range.start, 0);
-    assert_eq!(range.end, 3);
+    assert_eq!(range.start, Height(0));
+    assert_eq!(range.end, Height(3));
 
     testkit.create_block(); // height == 3
     testkit.create_block(); // height == 4
@@ -433,8 +433,17 @@ fn test_explorer_blocks() {
     let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(2));
-    assert_eq!(range.start, 0);
-    assert_eq!(range.end, 5);
+    assert_eq!(range.start, Height(0));
+    assert_eq!(range.end, Height(5));
+
+    // Run a comparable `BlockchainExplorer` method.
+    let heights: Vec<_> = testkit
+        .explorer()
+        .blocks(..)
+        .filter(|block| !block.is_empty())
+        .map(|block| block.height())
+        .collect();
+    assert_eq!(heights, vec![Height(2)]);
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -451,8 +460,8 @@ fn test_explorer_blocks() {
     let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(5));
-    assert_eq!(range.start, 5);
-    assert_eq!(range.end, 6);
+    assert_eq!(range.start, Height(5));
+    assert_eq!(range.end, Height(6));
 
     let response: BlocksRange = api.get(
         ApiKind::Explorer,
@@ -462,8 +471,8 @@ fn test_explorer_blocks() {
     assert_eq!(blocks.len(), 2);
     assert_eq!(blocks[0].height(), Height(5));
     assert_eq!(blocks[1].height(), Height(2));
-    assert_eq!(range.start, 0);
-    assert_eq!(range.end, 6);
+    assert_eq!(range.start, Height(0));
+    assert_eq!(range.end, Height(6));
 
     // Check `latest` param
     let response: BlocksRange = api.get(
@@ -473,28 +482,30 @@ fn test_explorer_blocks() {
     let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(2));
-    assert_eq!(range.start, 0);
-    assert_eq!(range.end, 5);
+    assert_eq!(range.start, Height(0));
+    assert_eq!(range.end, Height(5));
 }
 
 #[test]
 fn test_explorer_single_block() {
     use std::collections::HashSet;
-    use exonum::api::public::BlockInfo;
+    use exonum::explorer::BlockchainExplorer;
     use exonum::helpers::Height;
 
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
         .with_service(CounterService)
         .create();
-    let api = testkit.api();
 
     assert_eq!(testkit.majority_count(), 3);
 
-    let info: BlockInfo = api.get(ApiKind::Explorer, "v1/blocks/0");
-    assert_eq!(info.block.height(), Height(0));
-    assert_eq!(*info.block.prev_hash(), crypto::Hash::default());
-    assert_eq!(info.txs, vec![]);
+    {
+        let explorer = BlockchainExplorer::new(testkit.blockchain());
+        let block = explorer.block(Height(0)).unwrap();
+        assert_eq!(block.height(), Height(0));
+        assert_eq!(*block.header().prev_hash(), crypto::Hash::default());
+        assert_eq!(&*block.transaction_hashes(), &[]);
+    }
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -503,30 +514,33 @@ fn test_explorer_single_block() {
     testkit.api().send(tx.clone());
     testkit.create_block(); // height == 1
 
-    let info: BlockInfo = api.get(ApiKind::Explorer, "v1/blocks/1");
-    assert_eq!(info.block.height(), Height(1));
-    assert_eq!(info.block.tx_count(), 1);
-    assert_eq!(*info.block.tx_hash(), tx.hash());
-    assert_eq!(info.txs, vec![tx.hash()]);
+    {
+        let explorer = BlockchainExplorer::new(testkit.blockchain());
+        let block = explorer.block(Height(1)).unwrap();
+        assert_eq!(block.height(), Height(1));
+        assert_eq!(block.len(), 1);
+        assert_eq!(*block.header().tx_hash(), tx.hash());
+        assert_eq!(&*block.transaction_hashes(), &[tx.hash()]);
 
-    let mut validators = HashSet::new();
-    for precommit in &info.precommits {
-        assert_eq!(precommit.height(), Height(1));
-        assert_eq!(*precommit.block_hash(), info.block.hash());
-        let pk = testkit
-            .network()
-            .consensus_public_key_of(precommit.validator())
-            .expect("Cannot find validator id");
-        assert!(precommit.verify_signature(pk));
-        validators.insert(precommit.validator());
+        let mut validators = HashSet::new();
+        for precommit in block.precommits().iter() {
+            assert_eq!(precommit.height(), Height(1));
+            assert_eq!(*precommit.block_hash(), block.header().hash());
+            let pk = testkit
+                .network()
+                .consensus_public_key_of(precommit.validator())
+                .expect("Cannot find validator id");
+            assert!(precommit.verify_signature(pk));
+            validators.insert(precommit.validator());
+        }
+
+        assert!(validators.len() >= testkit.majority_count());
     }
-
-    assert!(validators.len() >= testkit.majority_count());
 }
 
 #[test]
 fn test_explorer_transaction_info() {
-    use exonum::api::public::BlockInfo;
+    use exonum::explorer::BlockchainExplorer;
     use exonum::helpers::Height;
     use exonum::storage::ListProof;
 
@@ -592,11 +606,12 @@ fn test_explorer_transaction_info() {
         let location_proof = info.remove("location_proof").unwrap();
         let location_proof: ListProof<crypto::Hash> = serde_json::from_value(location_proof)
             .unwrap();
-        let block: BlockInfo = api.get(ApiKind::Explorer, "v1/blocks/1");
-        let block = block.block;
+
+        let explorer = BlockchainExplorer::new(testkit.blockchain());
+        let block = explorer.block(Height(1)).unwrap();
         assert!(
             location_proof
-                .validate(*block.tx_hash(), u64::from(block.tx_count()))
+                .validate(*block.header().tx_hash(), u64::from(block.header().tx_count()))
                 .is_ok()
         );
     } else {
@@ -634,11 +649,22 @@ fn test_explorer_transaction_statuses() {
         TxIncrement::new(&pubkey, u64::max_value() - 3, &key)
     };
 
-    testkit.create_block_with_transactions(txvec![
+    let block = testkit.create_block_with_transactions(txvec![
         tx.clone(),
         error_tx.clone(),
         panicking_tx.clone(),
     ]);
+    assert!(block[0].status().is_ok());
+    assert!({
+        let err = block[1].status().unwrap_err();
+        err.error_type() == ErrorType::Code(0) &&
+            err.description() == Some("Adding zero does nothing!")
+    });
+    assert!({
+        let err = block[2].status().unwrap_err();
+        err.error_type() == ErrorType::Panic &&
+            err.description() == Some("attempt to add with overflow")
+    });
 
     assert_status(&api, &tx, &json!({ "type": "success" }));
     assert_status(
@@ -664,5 +690,7 @@ fn test_boxed_tx() {
     };
 
     api.send(tx);
-    testkit.create_block();
+    let block = testkit.create_block();
+    assert_eq!(block.len(), 1);
+    assert_eq!(block[0].content().raw().service_id(), counter::SERVICE_ID);
 }

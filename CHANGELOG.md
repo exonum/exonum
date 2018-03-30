@@ -60,6 +60,23 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   `HEADER_LENGTH` remains the same, first byte of `RawMessage` is now reserved and
   always set to `0`. (#579)
 
+- `exonum::explorer` module has been reworked to add new functionality. (#535)
+  In particular:
+
+  - The explorer now allows to iterate over blocks in the blockchain
+    in the given height range, replacing old `blocks_range` method
+  - `block_info` and `tx_info` methods of the explorer are renamed to
+    `block` and `transaction`, respectively
+  - `TransactionInfo` moved from the `api::public` module to the `explorer` module
+  - `BlocksRange` moved from the `explorer` module to the `api::public` module
+  - `TxInfo` is renamed to `CommittedTransaction`
+  - `BlockInfo` has its fields made private, instead providing getter methods
+
+  Migration path:
+
+  - Rename imported types and methods as specified above
+  - Consult `explorer` module docs for further possible changes in API
+
 #### exonum-testkit
 
 - Rollback mechanism in `Testkit` is reworked to work with checkpoints (#582):
@@ -107,12 +124,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   This optional setting adjusts database-specific settings,
   like number of simultaneously opened files. (#538)
 
-- `exonum::explorer` module moved to the `exonum::api::public`. (#550)
-
-  Migration Path:
-
-  - Rename imports like `exonum::explorer::*` to the `exonum::api::public::*`.
-
 - Added `v1/user_agent` endpoint with information about Exonum, Rust
   and OS versions. (#548)
 
@@ -129,6 +140,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `CryptoHash`, `Field`, `StorageKey` and `StorageValue` traits are implemented for
   the `uuid::Uuid`. (#588)
+
+#### exonum-testkit
+
+- `create_block*` methods of the `TestKit` now return the information about
+  the created block. (#535)
+
+- `TestKit::explorer()` method allows to access the blockchain explorer. (#535)
 
 ### Internal improvements
 

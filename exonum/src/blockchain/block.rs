@@ -31,18 +31,17 @@ encoding_struct!(
     struct Block {
         /// Information schema version.
         schema_version: u16,
-        /// Block proposer id.
+        /// Identifier of the block proposer.
         proposer_id: ValidatorId,
-        /// Height of the committed block
+        /// Height of the block.
         height: Height,
         /// Number of transactions in block.
         tx_count: u32,
         /// Hash link to the previous block in blockchain.
         prev_hash: &Hash,
-        /// Root hash of [merkle tree](struct.Schema.html#method.block_txs) of current block
-        /// transactions.
+        /// Root hash of the Merkle tree of transactions in this block.
         tx_hash: &Hash,
-        /// Hash of the current `exonum` state after applying transactions in the block.
+        /// Hash of the blockchain state after applying transactions in the block.
         state_hash: &Hash,
     }
 );

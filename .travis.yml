@@ -127,6 +127,7 @@ jobs:
         - powershell
     script:
     - cargo test --all
+    - cargo run -p exonum --example explorer
     - cargo run -p exonum-testkit --example timestamping
     - cargo run -p exonum-testkit --example configuration_change
     - cargo run -p exonum-time --example simple_service
