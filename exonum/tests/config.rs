@@ -23,7 +23,9 @@ use std::fs::{File, OpenOptions};
 use std::fs;
 use std::path::Path;
 use std::panic;
-use std::io::Read;
+use std::io::{Read, Write};
+
+use toml::Value;
 
 use exonum::helpers::fabric::NodeBuilder;
 
@@ -91,6 +93,8 @@ fn generate_template(folder: &str) {
         "exonum-config-test",
         "generate-template",
         &full_tmp_name(GENERATED_TEMPLATE, folder),
+        "--validators-count",
+        "1",
     ]));
 
 }
@@ -117,11 +121,44 @@ fn finalize_config(folder: &str, config: &str, i: usize, count: usize) {
         full_tmp_name(config, folder),
         "-p".to_owned(),
     ];
+
+    fs::create_dir_all(full_tmp_name("", folder)).expect("Can't create temp folder");
+
     for n in 0..count {
-        variables.push(full_testdata_name(PUB_CONFIG[n]));
+        override_validators_count(PUB_CONFIG[n], count, folder);
+        variables.push(full_tmp_name(PUB_CONFIG[n], folder));
     }
-    println!("{:?}", variables);
     assert!(!default_run_with_matches(variables));
+}
+
+fn override_validators_count(config: &str, n: usize, folder: &str) {
+    let res = {
+        let mut contents = String::new();
+        let mut file = File::open(full_testdata_name(config)).unwrap();
+        file.read_to_string(&mut contents).expect(
+            "Read from config file failed",
+        );
+
+        let mut value = contents.as_str().parse::<Value>().unwrap();
+        {
+            let mut count = value
+                .get_mut("common")
+                .unwrap()
+                .get_mut("general_config")
+                .unwrap()
+                .as_table_mut()
+                .unwrap();
+
+            count.insert("validators_count".into(), Value::from(n as u8));
+        }
+
+        toml::to_string(&value).unwrap()
+    };
+
+    File::create(full_tmp_name(config, folder))
+        .unwrap()
+        .write_all(res.as_bytes())
+        .expect("Create temp config file is failed");
 }
 
 fn run_node(config: &str, folder: &str) {

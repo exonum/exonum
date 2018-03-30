@@ -10,3 +10,6 @@ type = "Constant"
 timeout = 500
 
 [services_config]
+
+[general_config]
+validators_count = 1
