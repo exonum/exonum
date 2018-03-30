@@ -93,7 +93,7 @@ impl HeightRange {
 /// JSON object with the following fields:
 ///
 /// | Name | Equivalent type | Description |
-/// |:------|:-------|:--------|
+/// |------|-------|--------|
 /// | `block` | [`Block`] | Block header as recorded in the blockchain |
 /// | `precommits` | `Vec<`[`Precommit`]`>` | Precommits authorizing the block |
 /// | `txs` | `Vec<`[`Hash`]`>` | Hashes of transactions in the block |
@@ -331,7 +331,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// # JSON presentation
 ///
 /// | Name | Equivalent type | Description |
-/// |:------|:-------|:--------|
+/// |------|-------|--------|
 /// | `content` | `Box<`[`Transaction`]`>` | Transaction as recorded in the blockchain |
 /// | `location` | [`TxLocation`] | Location of the transaction in the block |
 /// | `location_proof` | [`ListProof`]`<`[`Hash`]`>` | Proof of transaction inclusion into a block |
@@ -349,7 +349,7 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 ///
 /// For transactions that return an [`ExecutionError`], `status` contains the error code
 /// and an optional description, i.e., has the following type in the
-/// [Flow] / [TypeScript] notation:
+/// [`Flow`] / [`TypeScript`] notation:
 ///
 /// ```javascript
 /// { type: 'error', code: number, description?: string }
@@ -364,12 +364,12 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 ///
 /// [`Transaction`]: ../blockchain/trait.Transaction.html
 /// [`TxLocation`]: ../blockchain/struct.TxLocation.html
-/// [`ListProof`]: ../storage/struct.ListProof.html
+/// [`ListProof`]: ../storage/enum.ListProof.html
 /// [`Hash`]: ../crypto/struct.Hash.html
 /// [`TransactionResult`]: ../blockchain/type.TransactionResult.html
 /// [`ExecutionError`]: ../blockchain/struct.ExecutionError.html
-/// [Flow]: https://flow.org/
-/// [TypeScript]: https://www.typescriptlang.org/
+/// [`Flow`]: https://flow.org/
+/// [`TypeScript`]: https://www.typescriptlang.org/
 #[derive(Debug, Serialize)]
 pub struct CommittedTransaction {
     #[serde(serialize_with = "CommittedTransaction::serialize_content")]
