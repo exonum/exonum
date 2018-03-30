@@ -580,12 +580,14 @@ impl Command for Finalize {
         let validators_count = common
             .general_config
             .get("validators_count")
-            .expect("validators_count is not found in common config.")
+            .expect("validators_count not found in common config.")
             .as_integer()
             .unwrap() as usize;
 
         if validators_count != list.len() {
-            panic!("Number of validators configs does not match number of validator keys.");
+            panic!(
+                "The number of validators configs does not match the number of validators keys."
+            );
         }
 
         context.set(keys::AUDITOR_MODE, our.is_none());
