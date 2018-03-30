@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use std::sync::{Arc, RwLock};
-use std::collections::VecDeque;
 
 use exonum::storage::{Database, Patch, Result as StorageResult, Snapshot};
 
@@ -99,7 +98,7 @@ impl<T: Database> CheckpointDbHandler<T> {
 #[derive(Debug)]
 struct CheckpointDbInner<T> {
     db: T,
-    backup_stack: Vec<VecDeque<Patch>>,
+    backup_stack: Vec<Vec<Patch>>,
 }
 
 impl<T: Database> CheckpointDbInner<T> {
@@ -143,16 +142,15 @@ impl<T: Database> CheckpointDbInner<T> {
             }
         }
 
-        // Should insert backup patches to the front of the backup (VecDeque).
         self.backup_stack
             .last_mut()
             .expect("`merge_with_logging` called before checkpoint has been set")
-            .push_front(rev_fork.into_patch());
+            .push(rev_fork.into_patch());
         Ok(())
     }
 
     fn checkpoint(&mut self) {
-        self.backup_stack.push(VecDeque::new())
+        self.backup_stack.push(Vec::new())
     }
 
     fn rollback(&mut self) {
@@ -160,8 +158,8 @@ impl<T: Database> CheckpointDbInner<T> {
             !self.backup_stack.is_empty(),
             "Checkpoint has not been set yet"
         );
-        let mut changelog = self.backup_stack.pop().unwrap();
-        for patch in changelog.drain(..) {
+        let changelog = self.backup_stack.pop().unwrap();
+        for patch in changelog.into_iter().rev() {
             self.db.merge(patch).expect("Cannot merge roll-back patch");
         }
     }
@@ -250,8 +248,7 @@ mod tests {
         db.merge(fork.into_patch()).unwrap();
         {
             let inner = db.inner.read().unwrap();
-            let stack = &inner.backup_stack;
-            let backup = stack.last().expect("There are not backups in the stack");
+            let backup = &inner.backup_stack[0];
             assert_eq!(backup.len(), 1);
             check_patch(&backup[0], vec![("foo", vec![], Change::Delete)]);
         }
@@ -268,10 +265,9 @@ mod tests {
         {
             let inner = db.inner.read().unwrap();
             let stack = &inner.backup_stack;
-            let recent_backup = stack.last().expect("There are not backups in the stack");
-            let older_backup = stack.get(stack.len() - 2).expect(
-                "Expected 2 backups, found 1",
-            );
+            assert_eq!(stack.len(), 2);
+            let recent_backup = &stack[1];
+            let older_backup = &stack[0];
             check_patch(&older_backup[0], vec![("foo", vec![], Change::Delete)]);
             check_patch(
                 &recent_backup[0],
@@ -308,12 +304,8 @@ mod tests {
             let inner = db.inner.read().unwrap();
             let stack = &inner.backup_stack;
             assert_eq!(stack.len(), 2);
-            let backup = stack.last().expect("There are not backups in the stack");
-            assert_eq!(backup.len(), 1);
-            let old_backup = stack.get(stack.len() - 2).expect(
-                "Expected 2 backups in the stack, found 1",
-            );
-            assert_eq!(old_backup.len(), 0);
+            assert_eq!(stack[1].len(), 1);
+            assert_eq!(stack[0].len(), 0);
         }
 
         let snapshot = db.snapshot();
@@ -327,8 +319,7 @@ mod tests {
             let inner = db.inner.read().unwrap();
             let stack = &inner.backup_stack;
             assert_eq!(stack.len(), 1);
-            let backup = stack.last().expect("There are not backups in the stack");
-            assert_eq!(backup.len(), 0);
+            assert_eq!(stack[0].len(), 0);
         }
 
         // Check that DB continues working as usual after a rollback.
@@ -341,12 +332,8 @@ mod tests {
             let inner = db.inner.read().unwrap();
             let stack = &inner.backup_stack;
             assert_eq!(stack.len(), 2);
-            let backup = stack.last().expect("There are not backups in the stack");
-            assert_eq!(backup.len(), 1);
-            let old_backup = stack.get(stack.len() - 2).expect(
-                "Expected 2 backups in the stack, found 1",
-            );
-            assert_eq!(old_backup.len(), 0);
+            assert_eq!(stack[1].len(), 1);
+            assert_eq!(stack[0].len(), 0);
         }
         let snapshot = db.snapshot();
         assert_eq!(snapshot.get("foo", &[]), Some(vec![4]));
@@ -359,12 +346,8 @@ mod tests {
             let inner = db.inner.read().unwrap();
             let stack = &inner.backup_stack;
             assert_eq!(stack.len(), 2);
-            let backup = stack.last().expect("There are not backups in the stack");
-            assert_eq!(backup.len(), 2);
-            let old_backup = stack.get(stack.len() - 2).expect(
-                "Expected 2 backups in the stack, found 1",
-            );
-            assert_eq!(old_backup.len(), 0);
+            assert_eq!(stack[1].len(), 2);
+            assert_eq!(stack[0].len(), 0);
         }
         let new_snapshot = db.snapshot();
         assert_eq!(new_snapshot.get("foo", &[]), Some(vec![4]));
@@ -376,8 +359,7 @@ mod tests {
             let inner = db.inner.read().unwrap();
             let stack = &inner.backup_stack;
             assert_eq!(stack.len(), 1);
-            let backup = stack.last().expect("There are not backups in the stack");
-            assert_eq!(backup.len(), 0);
+            assert_eq!(stack[0].len(), 0);
         }
         let snapshot = db.snapshot();
         assert_eq!(snapshot.get("foo", &[]), Some(vec![2]));
