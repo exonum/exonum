@@ -37,7 +37,7 @@ use std::fmt;
 use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use encoding::serialize::{FromHex, FromHexError, ToHex, encode_hex};
+use encoding::serialize::{encode_hex, FromHex, FromHexError, ToHex};
 use helpers::Round;
 
 // spell-checker:disable
