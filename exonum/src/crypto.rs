@@ -37,7 +37,7 @@ use std::fmt;
 use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use encoding::serialize::FromHex;
+use encoding::serialize::{FromHex, FromHexError, ToHex, encode_hex};
 use helpers::Round;
 
 // spell-checker:disable
@@ -273,7 +273,7 @@ macro_rules! implement_public_sodium_wrapper {
         /// Returns the hex representation of the binary data.
         /// Lower case letters are used (e.g. f9b4ca).
         pub fn to_hex(&self) -> String {
-            $crate::encoding::serialize::encode_hex(self)
+            encode_hex(self)
         }
     }
 
@@ -284,7 +284,7 @@ macro_rules! implement_public_sodium_wrapper {
     }
 
     impl FromStr for $name {
-        type Err = ::encoding::serialize::FromHexError;
+        type Err = FromHexError;
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             $name::from_hex(s)
         }
@@ -336,7 +336,7 @@ macro_rules! implement_private_sodium_wrapper {
         /// Returns the hex representation of the binary data.
         /// Lower case letters are used (e.g. f9b4ca).
         pub fn to_hex(&self) -> String {
-            $crate::encoding::serialize::encode_hex(&self[..])
+            encode_hex(&self[..])
         }
     }
 
@@ -351,7 +351,7 @@ macro_rules! implement_private_sodium_wrapper {
         }
     }
 
-    impl $crate::encoding::serialize::ToHex for $name {
+    impl ToHex for $name {
         fn write_hex<W: ::std::fmt::Write>(&self, w: &mut W) -> ::std::fmt::Result {
             (self.0).0.as_ref().write_hex(w)
         }
@@ -439,15 +439,15 @@ implement_private_sodium_wrapper! {
 
 macro_rules! implement_serde {
 ($name:ident) => (
-    impl $crate::encoding::serialize::FromHex for $name {
-        type Error = $crate::encoding::serialize::FromHexError;
+    impl FromHex for $name {
+        type Error = FromHexError;
 
         fn from_hex<T: AsRef<[u8]>>(v: T) -> Result<Self, Self::Error> {
             let bytes = Vec::<u8>::from_hex(v)?;
             if let Some(self_value) = Self::from_slice(bytes.as_ref()) {
                 Ok(self_value)
             } else {
-                Err($crate::encoding::serialize::FromHexError::InvalidStringLength)
+                Err(FromHexError::InvalidStringLength)
             }
         }
     }
@@ -457,7 +457,7 @@ macro_rules! implement_serde {
         fn serialize<S>(&self, ser:S) -> Result<S::Ok, S::Error>
         where S: Serializer
         {
-            let hex_string = $crate::encoding::serialize::encode_hex(&self[..]);
+            let hex_string = encode_hex(&self[..]);
             ser.serialize_str(&hex_string)
         }
     }
