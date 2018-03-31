@@ -34,6 +34,7 @@ use uuid::Uuid;
 use std::default::Default;
 use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
 use std::fmt;
+use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use encoding::serialize::FromHex;
@@ -282,7 +283,7 @@ macro_rules! implement_public_sodium_wrapper {
         }
     }
 
-    impl ::std::str::FromStr for $name {
+    impl FromStr for $name {
         type Err = ::encoding::serialize::FromHexError;
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             $name::from_hex(s)
