@@ -289,12 +289,6 @@ macro_rules! implement_public_sodium_wrapper {
         }
     }
 
-    impl ToString for $name {
-        fn to_string(&self) -> String {
-            self.to_hex()
-        }
-    }
-
     impl fmt::Debug for $name {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write!(f, stringify!($name))?;
@@ -303,6 +297,12 @@ macro_rules! implement_public_sodium_wrapper {
                 write!(f, "{:02X}", i)?
             }
             write!(f, ")")
+        }
+    }
+
+    impl fmt::Display for $name {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            f.write_str(&self.to_hex())
         }
     }
     )
