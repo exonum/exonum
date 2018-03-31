@@ -141,6 +141,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `CryptoHash`, `Field`, `StorageKey` and `StorageValue` traits are implemented for
   the `uuid::Uuid`. (#588)
 
+- `Display` trait is implemented for types from the `crypto` module. (#590)
+
 #### exonum-testkit
 
 - `create_block*` methods of the `TestKit` now return the information about
