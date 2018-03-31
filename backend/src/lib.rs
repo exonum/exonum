@@ -20,7 +20,7 @@ use exonum::storage::Snapshot;
 use exonum::blockchain::{Service, Transaction, TransactionSet, ApiContext};
 use exonum::encoding::serialize::json::reexport as serde_json;
 use exonum::encoding::Error as EncodingError;
-use exonum::helpers::fabric::{ServiceFactory, Context};
+use exonum::helpers::fabric::{self, Context};
 
 pub use schema::CurrencySchema;
 use transactions::WalletTransactions;
@@ -31,7 +31,7 @@ pub mod transactions;
 pub mod schema;
 
 /// Unique service ID.
-pub const CRYPTOCURRENCY_SERVICE_ID: u16 = 128;
+const CRYPTOCURRENCY_SERVICE_ID: u16 = 128;
 
 /// Exonum `Service` implementation.
 #[derive(Default, Debug)]
@@ -68,7 +68,9 @@ impl Service for CurrencyService {
     }
 }
 
-impl ServiceFactory for CurrencyService {
+pub struct ServiceFactory;
+
+impl fabric::ServiceFactory for ServiceFactory {
     fn make_service(&mut self, _: &Context) -> Box<Service> {
         Box::new(CurrencyService)
     }

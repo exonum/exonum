@@ -13,6 +13,6 @@ fn main() {
 
     let node = NodeBuilder::new()
         .with_service(Box::new(configuration::ServiceFactory))
-        .with_service(Box::new(cryptocurrency::CurrencyService));
+        .with_service(Box::new(cryptocurrency::ServiceFactory));
     node.run();
 }

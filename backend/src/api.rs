@@ -1,6 +1,6 @@
 //! Cryptocurrency API.
 
-use serde::Serialize;
+#[macro_use]
 use serde_json;
 use router::Router;
 use iron::prelude::*;
@@ -47,9 +47,9 @@ pub struct WalletHistoryProof {
 #[derive(Debug, Serialize)]
 pub struct WalletInfo {
     block_proof: BlockProof,
-    wallet: Option<Wallet>,
+    wallet: Wallet,
     wallet_proof: WalletProof,
-    wallet_history: Option<WalletHistoryProof>,
+    wallet_history: WalletHistoryProof,
 }
 
 /// TODO: Add documentation.
@@ -65,7 +65,7 @@ impl<T> CryptocurrencyApi<T>
 where
     T: TransactionSend + Clone + 'static,
 {
-    fn wallet_info(&self, pub_key: &PublicKey) -> Result<WalletInfo, ApiError> {
+    fn wallet_info(&self, pub_key: &PublicKey) -> Result<Option<WalletInfo>, ApiError> {
         let view = self.blockchain.snapshot();
         let general_schema = blockchain::Schema::new(&view);
         let mut view = self.blockchain.fork();
@@ -89,7 +89,7 @@ where
 
         let wallet = currency_schema.wallet(pub_key);
 
-        let wallet_history = if wallet.is_some() {
+        Ok(wallet.map(|wallet| {
             let history = currency_schema.wallet_history(pub_key);
 
             let proof: ListProof<MetaRecord> = history.get_range_proof(0, history.len());
@@ -105,38 +105,32 @@ where
                 .map(|raw| WalletTransactions::tx_from_raw(raw).unwrap())
                 .collect::<Vec<_>>();
 
-            Some(WalletHistoryProof {
-                proof,
-                transactions,
-            })
-        } else {
-            None
-        };
-
-        Ok(WalletInfo {
-            block_proof,
-            wallet,
-            wallet_proof,
-            wallet_history,
-        })
-    }
-
-    fn post_transaction(&self, req: &mut Request) -> IronResult<Response> {
-        match req.get::<bodyparser::Struct<WalletTransactions>>() {
-            Ok(Some(transaction)) => {
-                let transaction: Box<Transaction> = transaction.into();
-                let tx_hash = transaction.hash();
-                self.channel.send(transaction).map_err(ApiError::from)?;
-                let json = TransactionResponse { tx_hash };
-                self.ok_response(&serde_json::to_value(&json).unwrap())
+            WalletInfo {
+                block_proof,
+                wallet,
+                wallet_proof,
+                wallet_history: WalletHistoryProof {
+                    proof,
+                    transactions,
+                }
             }
-            Ok(None) => Err(ApiError::BadRequest("Empty request body".into()))?,
-            Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
-        }
+        }))
     }
 
     fn wire_post_transaction(self, router: &mut Router) {
-        let transaction = move |req: &mut Request| self.post_transaction(req);
+        let transaction = move |req: &mut Request| -> IronResult<Response> {
+            match req.get::<bodyparser::Struct<WalletTransactions>>() {
+                Ok(Some(transaction)) => {
+                    let transaction: Box<Transaction> = transaction.into();
+                    let tx_hash = transaction.hash();
+                    self.channel.send(transaction).map_err(ApiError::from)?;
+                    let json = TransactionResponse { tx_hash };
+                    self.ok_response(&serde_json::to_value(&json).unwrap())
+                }
+                Ok(None) => Err(ApiError::BadRequest("Empty request body".into()))?,
+                Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
+            }
+        };
         router.post("/v1/wallets/transaction", transaction, "post_transaction");
     }
 
@@ -144,7 +138,11 @@ where
         let wallet_info = move |req: &mut Request| -> IronResult<Response> {
             let pub_key: PublicKey = self.url_fragment(req, "pubkey")?;
             let info = self.wallet_info(&pub_key)?;
-            self.ok_response(&serde_json::to_value(&info).unwrap())
+            if info.is_some() {
+                self.ok_response(&serde_json::to_value(&info).unwrap())
+            } else {
+                self.not_found_response(&serde_json::to_value("Wallet not found").unwrap())
+            }
         };
         router.get("/v1/wallets/info/:pubkey", wallet_info, "wallet_info");
     }

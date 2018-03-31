@@ -7,7 +7,7 @@ use CRYPTOCURRENCY_SERVICE_ID;
 use schema::CurrencySchema;
 use wallet::Wallet;
 
-const INITIAL_BALANCE: u64 = 0;
+const INITIAL_BALANCE: u64 = 100;
 
 /// Error codes emitted by wallet transactions during execution.
 #[derive(Debug, Fail)]
@@ -86,7 +86,6 @@ impl Transaction for Transfer {
         let amount = self.amount();
 
         let sender = schema.wallet(from).ok_or_else(|| {
-            schema.append_failure(from, &hash);
             Error::SenderNotFound
         })?;
 
@@ -128,7 +127,6 @@ impl Transaction for Issue {
             schema.append_success(pub_key, &hash);
             Ok(())
         } else {
-            schema.append_failure(pub_key, &hash);
             Err(Error::ReceiverNotFound)?
         }
     }
