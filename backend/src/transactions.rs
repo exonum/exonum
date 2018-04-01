@@ -85,9 +85,7 @@ impl Transaction for Transfer {
         let hash = self.hash();
         let amount = self.amount();
 
-        let sender = schema.wallet(from).ok_or_else(|| {
-            Error::SenderNotFound
-        })?;
+        let sender = schema.wallet(from).ok_or_else(|| Error::SenderNotFound)?;
 
         let receiver = schema.wallet(to).ok_or_else(|| {
             schema.append_failure(from, &hash);

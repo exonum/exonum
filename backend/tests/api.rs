@@ -196,7 +196,8 @@ fn test_malformed_wallet_request() {
         ApiKind::Service("cryptocurrency"),
         "v1/wallets/info/c0ffee",
     );
-    assert_eq!(info.get("description").unwrap(), &json!{"Bad request: Invalid 'pubkey' parameter: Invalid string length"});
+    assert_eq!(info.get("description").unwrap(),
+               &json!{"Bad request: Invalid 'pubkey' parameter: Invalid string length"});
 }
 
 #[test]
