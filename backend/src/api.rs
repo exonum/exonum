@@ -1,6 +1,5 @@
 //! Cryptocurrency API.
 
-#[macro_use]
 use serde_json;
 use router::Router;
 use iron::prelude::*;
@@ -47,9 +46,8 @@ pub struct WalletHistoryProof {
 #[derive(Debug, Serialize)]
 pub struct WalletInfo {
     block_proof: BlockProof,
-    wallet: Wallet,
     wallet_proof: WalletProof,
-    wallet_history: WalletHistoryProof,
+    wallet_history: Option<WalletHistoryProof>,
 }
 
 /// TODO: Add documentation.
@@ -65,7 +63,7 @@ impl<T> CryptocurrencyApi<T>
 where
     T: TransactionSend + Clone + 'static,
 {
-    fn wallet_info(&self, pub_key: &PublicKey) -> Result<Option<WalletInfo>, ApiError> {
+    fn wallet_info(&self, pub_key: &PublicKey) -> Result<WalletInfo, ApiError> {
         let view = self.blockchain.snapshot();
         let general_schema = blockchain::Schema::new(&view);
         let mut view = self.blockchain.fork();
@@ -89,7 +87,7 @@ where
 
         let wallet = currency_schema.wallet(pub_key);
 
-        Ok(wallet.map(|wallet| {
+        let wallet_history = wallet.map(|_| {
             let history = currency_schema.wallet_history(pub_key);
 
             let proof: ListProof<MetaRecord> = history.get_range_proof(0, history.len());
@@ -105,16 +103,17 @@ where
                 .map(|raw| WalletTransactions::tx_from_raw(raw).unwrap())
                 .collect::<Vec<_>>();
 
-            WalletInfo {
-                block_proof,
-                wallet,
-                wallet_proof,
-                wallet_history: WalletHistoryProof {
-                    proof,
-                    transactions,
-                }
+            WalletHistoryProof {
+                proof,
+                transactions,
             }
-        }))
+        });
+
+        Ok(WalletInfo {
+            block_proof,
+            wallet_proof,
+            wallet_history,
+        })
     }
 
     fn wire_post_transaction(self, router: &mut Router) {
@@ -138,11 +137,7 @@ where
         let wallet_info = move |req: &mut Request| -> IronResult<Response> {
             let pub_key: PublicKey = self.url_fragment(req, "pubkey")?;
             let info = self.wallet_info(&pub_key)?;
-            if info.is_some() {
-                self.ok_response(&serde_json::to_value(&info).unwrap())
-            } else {
-                self.not_found_response(&serde_json::to_value("Wallet not found").unwrap())
-            }
+            self.ok_response(&serde_json::to_value(&info).unwrap())
         };
         router.get("/v1/wallets/info/:pubkey", wallet_info, "wallet_info");
     }

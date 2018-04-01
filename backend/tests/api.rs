@@ -241,13 +241,24 @@ impl CryptocurrencyApi {
     }
 
     fn get_wallet(&self, pub_key: &PublicKey) -> Option<Wallet> {
-        let value: serde_json::Value = self.inner.get(
+        use exonum::blockchain::BlockProof;
+        use exonum::storage::MapProof;
+
+        let info: serde_json::Value = self.inner.get(
             ApiKind::Service("cryptocurrency"),
             &format!("/v1/wallets/info/{}", pub_key.to_string()),
         );
-        value.get("wallet").map(|v| {
-            serde_json::from_value(v.clone()).unwrap()
-        })
+        let block_proof: BlockProof = serde_json::from_value(info.get("block_proof").unwrap().clone()).unwrap();
+        let state_hash = block_proof.block.state_hash();
+
+        let wallet_proof = info.get("wallet_proof").unwrap().clone();
+
+        let to_table: MapProof<Hash> = serde_json::from_value(wallet_proof.get("to_table").unwrap().clone()).unwrap();
+        let key = exonum::blockchain::Blockchain::service_table_unique_key(128, 0);
+        let table_hash = to_table.validate(&key, &state_hash).unwrap().unwrap();
+
+        let wallet_proof: MapProof<Wallet> = serde_json::from_value(wallet_proof.clone()).unwrap();
+        let wallet: Option<Wallet> = wallet_proof.validate(&pub_key, &table_hash).unwrap().cloned();
     }
 
     /// Sends a transfer transaction over HTTP and checks the synchronous result.
