@@ -67,7 +67,7 @@ where
         let view = self.blockchain.snapshot();
         let general_schema = blockchain::Schema::new(&view);
         let mut view = self.blockchain.fork();
-        let mut currency_schema = CurrencySchema::new(&mut view);
+        let currency_schema = CurrencySchema::new(&mut view);
 
         let max_height = general_schema.block_hashes_by_height().len() - 1;
 
@@ -141,6 +141,20 @@ where
         };
         router.get("/v1/wallets/info/:pubkey", wallet_info, "wallet_info");
     }
+
+    fn wire_wallet(self, router: &mut Router) {
+        let wallet = move |req: &mut Request| -> IronResult<Response> {
+            let pub_key: PublicKey = self.url_fragment(req, "pubkey")?;
+            let view = self.blockchain.snapshot();
+            let schema = CurrencySchema::new(view);
+            if let Some(wallet) = schema.wallet(&pub_key) {
+                self.ok_response(&serde_json::to_value(&wallet).unwrap())
+            } else {
+                self.not_found_response(&serde_json::to_value("Wallet not found").unwrap())
+            }
+        };
+        router.get("/v1/wallets/:pubkey", wallet, "wallet");
+    }
 }
 
 impl<T: TransactionSend + Clone> fmt::Debug for CryptocurrencyApi<T> {
@@ -156,5 +170,6 @@ where
     fn wire(&self, router: &mut Router) {
         self.clone().wire_post_transaction(router);
         self.clone().wire_wallet_info(router);
+        self.clone().wire_wallet(router);
     }
 }

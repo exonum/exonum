@@ -56,7 +56,7 @@ where
     }
 
     /// Returns wallet for the given public key.
-    pub fn wallet(&mut self, pub_key: &PublicKey) -> Option<Wallet> {
+    pub fn wallet(&self, pub_key: &PublicKey) -> Option<Wallet> {
         self.wallets().get(pub_key)
     }
 
