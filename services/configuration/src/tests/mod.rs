@@ -381,7 +381,7 @@ fn test_discard_votes_with_expired_actual_from() {
     testkit.create_block_with_transactions(txvec![illegal_vote.clone()]);
     assert!(!testkit
         .votes_for_propose(new_cfg.hash())
-        .contains(&Some(illegal_vote,)));
+        .contains(&Some(illegal_vote)));
 }
 
 #[test]
