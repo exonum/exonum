@@ -141,24 +141,42 @@
       }
     },
     methods: {
+      loadUser: function() {
+        const self = this
+
+        if (this.$store.state.keyPair === null) {
+          this.$store.commit('logout')
+          this.$router.push({name: 'home'})
+          return
+        }
+
+        this.isSpinnerVisible = true
+
+        this.$blockchain.getWallet(this.$store.state.keyPair).then(data => {
+          self.name = data.wallet.name
+          self.publicKey = this.$store.state.keyPair.publicKey
+          self.balance = data.wallet.balance
+          self.transactions = data.transactions
+          self.isSpinnerVisible = false
+        }).catch(function(error) {
+          self.isSpinnerVisible = false
+          self.$notify('error', error.toString())
+        })
+      },
+
       addFunds: function() {
         const self = this
 
-        this.$storage.get().then(function(keyPair) {
-          self.isSpinnerVisible = true
+        this.isSpinnerVisible = true
 
-          self.$blockchain.addFunds(keyPair, self.amountToAdd).then(data => {
-            self.isSpinnerVisible = false
-            self.balance = data.wallet.balance
-            self.transactions = data.transactions
-            self.$notify('success', 'Add funds transaction has been written into the blockchain')
-          }).catch(function(error) {
-            self.isSpinnerVisible = false
-            self.$notify('error', error.toString())
-          })
+        this.$blockchain.addFunds(this.$store.state.keyPair, this.amountToAdd).then(data => {
+          self.balance = data.wallet.balance
+          self.transactions = data.transactions
+          self.isSpinnerVisible = false
+          self.$notify('success', 'Add funds transaction has been written into the blockchain')
         }).catch(function(error) {
+          self.isSpinnerVisible = false
           self.$notify('error', error.toString())
-          self.logout()
         })
       },
 
@@ -169,54 +187,26 @@
           return this.$notify('error', 'Invalid public key is passed')
         }
 
-        this.$storage.get().then(function(keyPair) {
-          if (self.receiver === keyPair.publicKey) {
-            return self.$notify('error', 'Can not transfer funds to yourself')
-          }
+        if (this.receiver === this.$store.state.keyPair.publicKey) {
+          return self.$notify('error', 'Can not transfer funds to yourself')
+        }
 
-          self.isSpinnerVisible = true
+        this.isSpinnerVisible = true
 
-          self.$blockchain.transfer(keyPair, self.receiver, self.amountToTransfer).then(data => {
-            self.isSpinnerVisible = false
-            self.balance = data.wallet.balance
-            self.transactions = data.transactions
-            self.$notify('success', 'Transfer transaction has been written into the blockchain')
-          }).catch(function(error) {
-            self.isSpinnerVisible = false
-            self.$notify('error', error.toString())
-          })
+        this.$blockchain.transfer(this.$store.state.keyPair, this.receiver, this.amountToTransfer).then(data => {
+          self.balance = data.wallet.balance
+          self.transactions = data.transactions
+          self.isSpinnerVisible = false
+          self.$notify('success', 'Transfer transaction has been written into the blockchain')
         }).catch(function(error) {
+          self.isSpinnerVisible = false
           self.$notify('error', error.toString())
-          self.logout()
         })
-      },
-
-      logout: function() {
-        this.$storage.remove()
-        this.$router.push({name: 'home'})
       }
     },
     mounted: function() {
       this.$nextTick(function() {
-        const self = this
-
-        this.$storage.get().then(function(keyPair) {
-          self.isSpinnerVisible = true
-
-          self.$blockchain.getWallet(keyPair).then(data => {
-            self.isSpinnerVisible = false
-            self.name = data.wallet.name
-            self.publicKey = keyPair.publicKey
-            self.balance = data.wallet.balance
-            self.transactions = data.transactions
-          }).catch(function(error) {
-            self.isSpinnerVisible = false
-            self.$notify('error', error.toString())
-          })
-        }).catch(function(error) {
-          self.$notify('error', error.toString())
-          self.logout()
-        })
+        this.loadUser()
       })
     }
   }

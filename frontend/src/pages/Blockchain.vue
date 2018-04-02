@@ -38,7 +38,6 @@
 <script>
   const Navbar = require('../components/Navbar.vue')
   const Spinner = require('../components/Spinner.vue')
-  const PER_PAGE = 10
 
   module.exports = {
     components: {

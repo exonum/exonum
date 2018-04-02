@@ -2,8 +2,7 @@ import * as Exonum from 'exonum-client'
 import axios from 'axios'
 
 const TX_URL = '/api/services/cryptocurrency/v1/wallets/transaction'
-const CONFIG_URL = '/api/services/configuration/v1/configs/actual'
-const WALLET_URL = '/api/services/cryptocurrency/v1/wallets/info?pubkey='
+const PER_PAGE = 10
 
 const ATTEMPTS = 10
 const ATTEMPT_TIMEOUT = 500
@@ -99,13 +98,13 @@ function getPublicKeyOfTransaction(transactionId, transaction) {
 }
 
 function getWallet(keyPair) {
-  return axios.get(CONFIG_URL).then(response => {
+  return axios.get('/api/services/configuration/v1/configs/actual').then(response => {
     // actual list of public keys of validators
     const validators = response.data.config.validator_keys.map(validator => {
       return validator.consensus_key
     })
 
-    return axios.get(WALLET_URL + keyPair.publicKey).then(response => {
+    return axios.get('/api/services/cryptocurrency/v1/wallets/info?pubkey=' + keyPair.publicKey).then(response => {
       return response.data
     }).then((data) => {
       if (!Exonum.verifyBlock(data.block_info, validators, NETWORK_ID)) {

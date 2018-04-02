@@ -80,12 +80,14 @@
 
         this.isSpinnerVisible = true
 
-        this.$storage.set({
+        this.$store.commit('login', {
           publicKey: this.publicKey,
           secretKey: this.secretKey
         })
 
-        this.$router.push({name: 'user'})
+        this.$nextTick(function() {
+          this.$router.push({name: 'user'})
+        })
       },
 
       register: function() {
@@ -115,7 +117,7 @@
       proceed: function() {
         this.isModalVisible = false
 
-        this.$storage.set(this.keyPair)
+        this.$store.commit('login', this.keyPair)
 
         this.$nextTick(function() {
           this.$router.push({name: 'user'})
