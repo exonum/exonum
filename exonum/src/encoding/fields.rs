@@ -14,17 +14,17 @@
 
 #![allow(unsafe_code)]
 
-use chrono::{DateTime, Utc, TimeZone};
+use chrono::{DateTime, TimeZone, Utc};
 use byteorder::{ByteOrder, LittleEndian};
 use uuid::{self, Uuid};
 
 use std::mem;
 use std::result::Result as StdResult;
-use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
 use crypto::{Hash, PublicKey, Signature};
 use helpers::{Height, Round, ValidatorId};
-use super::{Error, CheckedOffset, Offset, Result};
+use super::{CheckedOffset, Error, Offset, Result};
 
 /// Trait for all types that could be a field in `encoding`.
 pub trait Field<'a> {

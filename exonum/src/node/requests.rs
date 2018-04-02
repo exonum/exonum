@@ -83,8 +83,8 @@ impl NodeHandler {
 
         let mut txs = Vec::new();
         let mut txs_size = 0;
-        let unoccupied_message_size: u32 = self.state.config().consensus.max_message_len -
-            (HEADER_LENGTH + SIGNATURE_LENGTH + 2 * PUBLIC_KEY_LENGTH + 8) as u32;
+        let unoccupied_message_size: u32 = self.state.config().consensus.max_message_len
+            - (HEADER_LENGTH + SIGNATURE_LENGTH + 2 * PUBLIC_KEY_LENGTH + 8) as u32;
 
         for hash in msg.txs() {
             let tx = schema.transactions().get(hash);

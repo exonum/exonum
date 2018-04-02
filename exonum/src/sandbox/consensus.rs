@@ -1042,12 +1042,15 @@ fn response_to_request_txs() {
         sandbox.s(VALIDATOR_1),
     ));
 
-    sandbox.send(sandbox.a(VALIDATOR_1), &TransactionsResponse::new(
-        &sandbox.p(VALIDATOR_0),
-        &sandbox.p(VALIDATOR_1),
-        vec![tx.raw().clone()],
-        sandbox.s(VALIDATOR_0),
-    ));
+    sandbox.send(
+        sandbox.a(VALIDATOR_1),
+        &TransactionsResponse::new(
+            &sandbox.p(VALIDATOR_0),
+            &sandbox.p(VALIDATOR_1),
+            vec![tx.raw().clone()],
+            sandbox.s(VALIDATOR_0),
+        ),
+    );
 }
 
 #[test]
@@ -1084,20 +1087,19 @@ fn duplicate_tx_in_pool() {
             &sandbox.p(VALIDATOR_2),
             &[tx1.hash()],
             &sandbox.s(VALIDATOR_0),
-        ));
+        ),
+    );
     sandbox.recv(&tx1);
     sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
 
     sandbox.recv(&tx2);
 
-    sandbox.recv(
-        &TransactionsResponse::new(
-            &sandbox.p(VALIDATOR_2),
-            &sandbox.p(VALIDATOR_0),
-            vec![tx1.raw().clone()],
-            sandbox.s(VALIDATOR_2),
-        ),
-    );
+    sandbox.recv(&TransactionsResponse::new(
+        &sandbox.p(VALIDATOR_2),
+        &sandbox.p(VALIDATOR_0),
+        vec![tx1.raw().clone()],
+        sandbox.s(VALIDATOR_2),
+    ));
 }
 
 #[test]
@@ -1124,7 +1126,7 @@ fn incorrect_tx_in_request() {
             &sandbox.p(VALIDATOR_2),
             &[tx0.hash()],
             &sandbox.s(VALIDATOR_0),
-        )
+        ),
     );
 
     sandbox.recv(&TransactionsResponse::new(
@@ -1282,12 +1284,15 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
             sandbox.s(VALIDATOR_1),
         ));
 
-        sandbox.send(sandbox.a(VALIDATOR_1), &TransactionsResponse::new(
-            &sandbox.p(VALIDATOR_0),
-            &sandbox.p(VALIDATOR_1),
-            vec![tx.raw().clone()],
-            sandbox.s(VALIDATOR_0),
-        ));
+        sandbox.send(
+            sandbox.a(VALIDATOR_1),
+            &TransactionsResponse::new(
+                &sandbox.p(VALIDATOR_0),
+                &sandbox.p(VALIDATOR_1),
+                vec![tx.raw().clone()],
+                sandbox.s(VALIDATOR_0),
+            ),
+        );
     }
 
     {

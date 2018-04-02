@@ -16,7 +16,7 @@ use router::Router;
 use iron::prelude::*;
 use serde_json;
 
-use blockchain::{Schema, Blockchain, SharedNodeState};
+use blockchain::{Blockchain, Schema, SharedNodeState};
 use api::Api;
 use helpers::user_agent;
 
@@ -51,7 +51,9 @@ impl SystemApi {
         let mempool = move |_: &mut Request| -> IronResult<Response> {
             let snapshot = self.blockchain.snapshot();
             let schema = Schema::new(&snapshot);
-            let info = MemPoolInfo { size: schema.transactions_pool_len() };
+            let info = MemPoolInfo {
+                size: schema.transactions_pool_len(),
+            };
             self.ok_response(&serde_json::to_value(info).unwrap())
         };
         router.get("/v1/mempool", mempool, "mempool");
@@ -59,8 +61,9 @@ impl SystemApi {
 
     fn healthcheck_info(self, router: &mut Router) {
         let healthcheck = move |_: &mut Request| -> IronResult<Response> {
-            let info =
-                HealthCheckInfo { connectivity: !self.shared_api_state.peers_info().is_empty() };
+            let info = HealthCheckInfo {
+                connectivity: !self.shared_api_state.peers_info().is_empty(),
+            };
             self.ok_response(&serde_json::to_value(info).unwrap())
         };
         router.get("/v1/healthcheck", healthcheck, "healthcheck");

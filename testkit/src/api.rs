@@ -13,10 +13,10 @@
 // limitations under the License.
 
 use exonum::blockchain::{SharedNodeState, Transaction};
-use exonum::node::{ApiSender, TransactionSend, create_public_api_handler,
-                   create_private_api_handler};
+use exonum::node::{create_private_api_handler, create_public_api_handler, ApiSender,
+                   TransactionSend};
 use exonum::api::ApiError;
-use iron::{Response, IronError, Handler, Chain};
+use iron::{Chain, Handler, IronError, Response};
 use iron::headers::{ContentType, Headers};
 use iron::status::{self, StatusClass};
 use iron_test::{request, response};
@@ -70,7 +70,6 @@ impl fmt::Debug for TestKitApi {
 impl TestKitApi {
     /// Creates a new instance of API.
     pub(crate) fn new(testkit: &TestKit) -> Self {
-
         let blockchain = &testkit.blockchain;
         let api_state = SharedNodeState::new(10_000);
 
@@ -108,9 +107,9 @@ impl TestKitApi {
     where
         T: Into<Box<Transaction>>,
     {
-        self.api_sender.send(transaction.into()).expect(
-            "Cannot send transaction",
-        );
+        self.api_sender
+            .send(transaction.into())
+            .expect("Cannot send transaction");
     }
 
     fn get_internal<H, D>(handler: &H, endpoint: &str, expect_error: bool, is_public: bool) -> D
@@ -197,8 +196,7 @@ impl TestKitApi {
     pub fn get_err(&self, kind: ApiKind, endpoint: &str) -> ApiError {
         let url = format!("http://localhost:3000/{}/{}", kind.into_prefix(), endpoint);
         let response = match request::get(&url, Headers::new(), &self.public_handler) {
-            Ok(response) |
-            Err(IronError { response, .. }) => response,
+            Ok(response) | Err(IronError { response, .. }) => response,
         };
         TestKitApi::response_to_api_error(response)
     }

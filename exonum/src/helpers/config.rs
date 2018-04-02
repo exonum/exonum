@@ -19,7 +19,7 @@ use std::io::{Read, Write};
 use std::fs::{self, File};
 
 use serde::de::DeserializeOwned;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use toml;
 use failure::{Error, ResultExt};
 
@@ -35,10 +35,7 @@ impl ConfigFile {
         P: AsRef<Path>,
     {
         let path = path.as_ref();
-        let res = do_load(path).context(format!(
-            "loading config from {}",
-            path.display()
-        ))?;
+        let res = do_load(path).context(format!("loading config from {}", path.display()))?;
         Ok(res)
     }
 
@@ -49,9 +46,7 @@ impl ConfigFile {
         P: AsRef<Path>,
     {
         let path = path.as_ref();
-        do_save(value, path).with_context(|_| {
-            format!("saving config to {}", path.display())
-        })?;
+        do_save(value, path).with_context(|_| format!("saving config to {}", path.display()))?;
         Ok(())
     }
 }

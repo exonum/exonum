@@ -83,10 +83,7 @@ pub(crate) enum Error {
     AlreadyProposed(Propose),
 
     #[fail(display = "Cannot parse configuration: {}", _0)]
-    InvalidConfig(
-        #[cause]
-        JsonError
-    ),
+    InvalidConfig(#[cause] JsonError),
 
     #[fail(display = "Invalid majority count: {}, it should be >= {} and <= {}", proposed, min,
            max)]

@@ -119,8 +119,8 @@ impl Propose {
             Err(UnknownSender)?;
         }
 
-        let config_candidate = StoredConfiguration::try_deserialize(self.cfg().as_bytes())
-            .map_err(InvalidConfig)?;
+        let config_candidate =
+            StoredConfiguration::try_deserialize(self.cfg().as_bytes()).map_err(InvalidConfig)?;
         self.check_config_candidate(&config_candidate, snapshot)?;
 
         let cfg = StoredConfiguration::from_bytes(self.cfg().as_bytes().into());
@@ -155,8 +155,7 @@ impl Propose {
             let validators_num = candidate.validator_keys.len();
             let min_votes_count = State::byzantine_majority_count(validators_num);
 
-            if proposed_majority_count < min_votes_count ||
-                proposed_majority_count > validators_num
+            if proposed_majority_count < min_votes_count || proposed_majority_count > validators_num
             {
                 return Err(InvalidMajorityCount {
                     min: min_votes_count,
@@ -250,11 +249,9 @@ impl Vote {
             Err(UnknownSender)?;
         }
 
-        let propose = Schema::new(snapshot).propose(self.cfg_hash()).ok_or_else(
-            || {
-                UnknownConfigRef(*self.cfg_hash())
-            },
-        )?;
+        let propose = Schema::new(snapshot)
+            .propose(self.cfg_hash())
+            .ok_or_else(|| UnknownConfigRef(*self.cfg_hash()))?;
 
         let parsed = StoredConfiguration::try_deserialize(propose.cfg().as_bytes()).unwrap();
         propose.check_config_candidate(&parsed, snapshot)?;
@@ -272,8 +269,8 @@ impl Vote {
             .unwrap();
 
         let propose = propose_data.tx_propose();
-        let prev_cfg_hash = StoredConfiguration::from_bytes(propose.cfg().as_bytes().into())
-            .previous_cfg_hash;
+        let prev_cfg_hash =
+            StoredConfiguration::from_bytes(propose.cfg().as_bytes().into()).previous_cfg_hash;
         let prev_cfg = CoreSchema::new(fork.as_ref())
             .configs()
             .get(&prev_cfg_hash)
@@ -295,10 +292,9 @@ impl Vote {
             propose_data.set_history_hash(&votes.merkle_root())
         };
 
-        schema.propose_data_by_config_hash_mut().put(
-            cfg_hash,
-            propose_data,
-        );
+        schema
+            .propose_data_by_config_hash_mut()
+            .put(cfg_hash, propose_data);
     }
 }
 

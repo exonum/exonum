@@ -18,7 +18,7 @@
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
-use super::{StorageKey, StorageValue, Snapshot, Fork, Iter};
+use super::{Fork, Iter, Snapshot, StorageKey, StorageValue};
 use storage::indexes_metadata::{self, IndexType, INDEXES_METADATA_TABLE_NAME};
 
 /// Basic struct for all indices that implements common features.
@@ -176,10 +176,9 @@ where
     where
         K: StorageKey + ?Sized,
     {
-        self.view.as_ref().contains(
-            &self.name,
-            &self.prefixed_key(key),
-        )
+        self.view
+            .as_ref()
+            .contains(&self.name, &self.prefixed_key(key))
     }
 
     /// Returns an iterator over the entries of the index in ascending order. The iterator element
@@ -269,10 +268,8 @@ impl<'a> BaseIndex<&'a mut Fork> {
     /// in the index.
     pub fn clear(&mut self) {
         self.set_index_type();
-        self.view.remove_by_prefix(
-            &self.name,
-            self.index_id.as_ref(),
-        );
+        self.view
+            .remove_by_prefix(&self.name, self.index_id.as_ref());
     }
 }
 

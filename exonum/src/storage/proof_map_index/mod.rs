@@ -17,14 +17,14 @@
 use std::marker::PhantomData;
 use std::fmt;
 
-use crypto::{Hash, CryptoHash, HashStream};
-use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageValue, StorageKey};
+use crypto::{CryptoHash, Hash, HashStream};
+use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey, StorageValue};
 use super::indexes_metadata::IndexType;
 use self::key::{BitsRange, ChildKind, LEAF_KEY_PREFIX};
 use self::node::{BranchNode, Node};
 use self::proof::{create_multiproof, create_proof};
 
-pub use self::key::{KEY_SIZE as PROOF_MAP_KEY_SIZE, ProofMapKey, HashedKey, ProofPath};
+pub use self::key::{HashedKey, KEY_SIZE as PROOF_MAP_KEY_SIZE, ProofMapKey, ProofPath};
 pub use self::proof::{CheckedMapProof, MapProof, MapProofError};
 
 #[cfg(test)]
@@ -185,9 +185,10 @@ where
     }
 
     fn get_root_path(&self) -> Option<ProofPath> {
-        self.base.iter::<_, ProofPath, _>(&()).next().map(
-            |(k, _): (ProofPath, ())| k,
-        )
+        self.base
+            .iter::<_, ProofPath, _>(&())
+            .next()
+            .map(|(k, _): (ProofPath, ())| k)
     }
 
     fn get_root_node(&self) -> Option<(ProofPath, Node<V>)> {
@@ -228,12 +229,10 @@ where
     /// ```
     pub fn merkle_root(&self) -> Hash {
         match self.get_root_node() {
-            Some((k, Node::Leaf(v))) => {
-                HashStream::new()
-                    .update(k.as_bytes())
-                    .update(v.hash().as_ref())
-                    .hash()
-            }
+            Some((k, Node::Leaf(v))) => HashStream::new()
+                .update(k.as_bytes())
+                .update(v.hash().as_ref())
+                .hash(),
             Some((_, Node::Branch(branch))) => branch.hash(),
             None => Hash::zero(),
         }
@@ -300,11 +299,9 @@ where
     /// let proof = index.get_proof(Hash::default());
     /// ```
     pub fn get_proof(&self, key: K) -> MapProof<K, V> {
-        create_proof(
-            key,
-            self.get_root_node(),
-            |path| self.get_node_unchecked(path),
-        )
+        create_proof(key, self.get_root_node(), |path| {
+            self.get_node_unchecked(path)
+        })
     }
 
     /// Returns the combined proof of existence or non-existence for the multiple specified keys.
@@ -324,11 +321,9 @@ where
     where
         KI: IntoIterator<Item = K>,
     {
-        create_multiproof(
-            keys,
-            self.get_root_node(),
-            |path| self.get_node_unchecked(path),
-        )
+        create_multiproof(keys, self.get_root_node(), |path| {
+            self.get_node_unchecked(path)
+        })
     }
 
     /// Returns an iterator over the entries of the map in ascending order. The iterator element
@@ -400,7 +395,9 @@ where
     /// }
     /// ```
     pub fn values(&self) -> ProofMapIndexValues<V> {
-        ProofMapIndexValues { base_iter: self.base.iter(&LEAF_KEY_PREFIX) }
+        ProofMapIndexValues {
+            base_iter: self.base.iter(&LEAF_KEY_PREFIX),
+        }
     }
 
     /// Returns an iterator over the entries of the map in ascending order starting from the
@@ -501,9 +498,9 @@ where
         proof_path: &ProofPath,
         value: V,
     ) -> (Option<u16>, Hash) {
-        let child_path = parent.child_path(proof_path.bit(0)).start_from(
-            proof_path.start(),
-        );
+        let child_path = parent
+            .child_path(proof_path.bit(0))
+            .start_from(proof_path.start());
         // If the path is fully fit in key then there is a two cases
         let i = child_path.common_prefix_len(proof_path);
         if child_path.len() == i {
@@ -628,9 +625,9 @@ where
     }
 
     fn remove_node(&mut self, parent: &BranchNode, proof_path: &ProofPath) -> RemoveResult {
-        let child_path = parent.child_path(proof_path.bit(0)).start_from(
-            proof_path.start(),
-        );
+        let child_path = parent
+            .child_path(proof_path.bit(0))
+            .start_from(proof_path.start());
         let i = child_path.common_prefix_len(proof_path);
 
         if i == child_path.len() {
@@ -780,12 +777,11 @@ where
     type Item = (K::Output, V);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.base_iter.next().map(
-            |(k, v)| (K::read_key(k.raw_key()), v),
-        )
+        self.base_iter
+            .next()
+            .map(|(k, v)| (K::read_key(k.raw_key()), v))
     }
 }
-
 
 impl<'a, K> Iterator for ProofMapIndexKeys<'a, K>
 where
@@ -855,23 +851,18 @@ where
         {
             fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                 match self.node {
-                    Node::Leaf(ref value) => {
-                        f.debug_struct("Leaf")
-                            .field("key", &self.path)
-                            .field("hash", &self.hash)
-                            .field("value", value)
-                            .finish()
-                    }
-                    Node::Branch(ref branch) => {
-                        f.debug_struct("Branch")
-                            .field("path", &self.path)
-                            .field("hash", &self.hash)
-                            .field("left", &self.child(branch, ChildKind::Left))
-                            .field("right", &self.child(branch, ChildKind::Right))
-                            .finish()
-                    }
+                    Node::Leaf(ref value) => f.debug_struct("Leaf")
+                        .field("key", &self.path)
+                        .field("hash", &self.hash)
+                        .field("value", value)
+                        .finish(),
+                    Node::Branch(ref branch) => f.debug_struct("Branch")
+                        .field("path", &self.path)
+                        .field("hash", &self.hash)
+                        .field("left", &self.child(branch, ChildKind::Left))
+                        .field("right", &self.child(branch, ChildKind::Right))
+                        .finish(),
                 }
-
             }
         }
 

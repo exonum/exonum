@@ -17,7 +17,7 @@
 use std::marker::PhantomData;
 
 use crypto::Hash;
-use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue, StorageKey};
+use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey, StorageValue};
 use super::indexes_metadata::IndexType;
 
 /// A set of items that implement `StorageValue` trait.
@@ -181,7 +181,9 @@ where
     /// }
     /// ```
     pub fn iter(&self) -> ValueSetIndexIter<V> {
-        ValueSetIndexIter { base_iter: self.base.iter(&()) }
+        ValueSetIndexIter {
+            base_iter: self.base.iter(&()),
+        }
     }
 
     /// An iterator visiting all elements in arbitrary order starting from the specified hash of
@@ -205,7 +207,9 @@ where
     /// }
     /// ```
     pub fn iter_from(&self, from: &Hash) -> ValueSetIndexIter<V> {
-        ValueSetIndexIter { base_iter: self.base.iter_from(&(), from) }
+        ValueSetIndexIter {
+            base_iter: self.base.iter_from(&(), from),
+        }
     }
 
     /// An iterator visiting hashes of all elements in ascending order. The iterator element type
@@ -226,7 +230,9 @@ where
     /// }
     /// ```
     pub fn hashes(&self) -> ValueSetIndexHashes {
-        ValueSetIndexHashes { base_iter: self.base.iter(&()) }
+        ValueSetIndexHashes {
+            base_iter: self.base.iter(&()),
+        }
     }
 
     /// An iterator visiting hashes of all elements in ascending order starting from the specified
@@ -250,7 +256,9 @@ where
     /// }
     /// ```
     pub fn hashes_from(&self, from: &Hash) -> ValueSetIndexHashes {
-        ValueSetIndexHashes { base_iter: self.base.iter_from(&(), from) }
+        ValueSetIndexHashes {
+            base_iter: self.base.iter_from(&(), from),
+        }
     }
 }
 
@@ -363,7 +371,6 @@ where
         self.iter()
     }
 }
-
 
 impl<'a, V> Iterator for ValueSetIndexIter<'a, V>
 where

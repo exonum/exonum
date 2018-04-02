@@ -15,14 +15,14 @@
 //! A definition of `StorageValue` trait and implementations for common types.
 
 use byteorder::{ByteOrder, LittleEndian};
-use chrono::{DateTime, Utc, NaiveDateTime};
+use chrono::{DateTime, NaiveDateTime, Utc};
 use uuid::Uuid;
 
 use std::mem;
 use std::borrow::Cow;
 
 use crypto::{Hash, PublicKey};
-use messages::{RawMessage, MessageBuffer};
+use messages::{MessageBuffer, RawMessage};
 use helpers::Round;
 use super::UniqueHash;
 
@@ -410,7 +410,7 @@ mod tests {
 
     #[test]
     fn storage_value_for_system_time_round_trip() {
-        use chrono::{TimeZone, Duration};
+        use chrono::{Duration, TimeZone};
 
         let times = [
             Utc.timestamp(0, 0),
@@ -429,7 +429,12 @@ mod tests {
 
     #[test]
     fn round_round_trip() {
-        let values = [Round::zero(), Round::first(), Round(100), Round(u32::max_value())];
+        let values = [
+            Round::zero(),
+            Round::first(),
+            Round(100),
+            Round(u32::max_value()),
+        ];
         for value in values.iter() {
             let bytes = value.clone().into_bytes();
             assert_eq!(*value, Round::from_bytes(Cow::Borrowed(&bytes)));

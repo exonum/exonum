@@ -21,35 +21,35 @@
 
 #![deny(missing_debug_implementations, missing_docs)]
 
+extern crate bodyparser;
+extern crate chrono;
+#[macro_use]
+extern crate exonum;
 #[macro_use]
 extern crate failure;
+extern crate iron;
+extern crate router;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
-#[macro_use]
-extern crate exonum;
-extern crate router;
-extern crate bodyparser;
-extern crate iron;
-extern crate chrono;
 
 use iron::prelude::*;
 use iron::Handler;
 use router::Router;
-use chrono::{DateTime, Utc, TimeZone, Duration};
+use chrono::{DateTime, Duration, TimeZone, Utc};
 
 use std::sync::{Arc, RwLock};
 
-use exonum::blockchain::{Blockchain, Service, ServiceContext, Schema, ApiContext, Transaction,
-                         TransactionSet, ExecutionResult, ExecutionError};
-use exonum::messages::{RawTransaction, Message};
+use exonum::blockchain::{ApiContext, Blockchain, ExecutionError, ExecutionResult, Schema, Service,
+                         ServiceContext, Transaction, TransactionSet};
+use exonum::messages::{Message, RawTransaction};
 use exonum::encoding::serialize::json::reexport::Value;
-use exonum::storage::{Fork, Snapshot, ProofMapIndex, Entry};
+use exonum::storage::{Entry, Fork, ProofMapIndex, Snapshot};
 use exonum::crypto::{Hash, PublicKey};
 use exonum::encoding;
-use exonum::helpers::fabric::{ServiceFactory, Context};
+use exonum::helpers::fabric::{Context, ServiceFactory};
 use exonum::api::Api;
 
 /// Time service id.
@@ -87,7 +87,6 @@ impl<T: AsRef<Snapshot>> TimeSchema<T> {
         vec![self.validators_times().merkle_root(), self.time().hash()]
     }
 }
-
 
 impl<'a> TimeSchema<&'a mut Fork> {
     /// Mutable reference to the ['validators_times'][1] index.
@@ -156,10 +155,9 @@ impl TxTime {
             Some(time) if time >= self.time() => Err(Error::ValidatorTimeIsGreater)?,
             // Write the time for the validator.
             _ => {
-                schema.validators_times_mut().put(
-                    self.pub_key(),
-                    self.time(),
-                );
+                schema
+                    .validators_times_mut()
+                    .put(self.pub_key(), self.time());
                 Ok(())
             }
         }
@@ -202,7 +200,6 @@ impl TxTime {
         }
     }
 }
-
 
 impl Transaction for TxTime {
     fn verify(&self) -> bool {
@@ -249,11 +246,9 @@ impl TimeApi {
 
         // The times of all validators for which time is known.
         let validators_times = idx.iter()
-            .map(|(public_key, time)| {
-                ValidatorTime {
-                    public_key,
-                    time: Some(time),
-                }
+            .map(|(public_key, time)| ValidatorTime {
+                public_key,
+                time: Some(time),
             })
             .collect::<Vec<_>>();
 
@@ -271,11 +266,9 @@ impl TimeApi {
         // `None` if the time of the validator is unknown.
         let validators_times = validator_keys
             .iter()
-            .map(|validator| {
-                ValidatorTime {
-                    public_key: validator.service_key,
-                    time: idx.get(&validator.service_key),
-                }
+            .map(|validator| ValidatorTime {
+                public_key: validator.service_key,
+                time: idx.get(&validator.service_key),
             })
             .collect::<Vec<_>>();
 
@@ -383,7 +376,9 @@ impl Default for MockTimeProvider {
 impl MockTimeProvider {
     /// Creates a new `MockTimeProvider` with time value equal to `time`.
     pub fn new(time: DateTime<Utc>) -> Self {
-        Self { time: Arc::new(RwLock::new(time)) }
+        Self {
+            time: Arc::new(RwLock::new(time)),
+        }
     }
 
     /// Gets the time value currently reported by the provider.
@@ -425,7 +420,9 @@ pub struct TimeService {
 
 impl Default for TimeService {
     fn default() -> TimeService {
-        TimeService { time: Box::new(SystemTimeProvider) as Box<TimeProvider> }
+        TimeService {
+            time: Box::new(SystemTimeProvider) as Box<TimeProvider>,
+        }
     }
 }
 
@@ -437,7 +434,9 @@ impl TimeService {
 
     /// Create a new `TimeService` with time provider `T`.
     pub fn with_provider<T: Into<Box<TimeProvider>>>(time_provider: T) -> TimeService {
-        TimeService { time: time_provider.into() }
+        TimeService {
+            time: time_provider.into(),
+        }
     }
 }
 
@@ -473,22 +472,28 @@ impl Service for TimeService {
         let (pub_key, sec_key) = (*context.public_key(), context.secret_key().clone());
         context
             .transaction_sender()
-            .send(Box::new(
-                TxTime::new(self.time.current_time(), &pub_key, &sec_key),
-            ))
+            .send(Box::new(TxTime::new(
+                self.time.current_time(),
+                &pub_key,
+                &sec_key,
+            )))
             .unwrap();
     }
 
     fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
         let mut router = Router::new();
-        let api = TimeApi { blockchain: ctx.blockchain().clone() };
+        let api = TimeApi {
+            blockchain: ctx.blockchain().clone(),
+        };
         api.wire_private(&mut router);
         Some(Box::new(router))
     }
 
     fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
         let mut router = Router::new();
-        let api = TimeApi { blockchain: ctx.blockchain().clone() };
+        let api = TimeApi {
+            blockchain: ctx.blockchain().clone(),
+        };
         api.wire(&mut router);
         Some(Box::new(router))
     }

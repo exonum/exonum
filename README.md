@@ -9,7 +9,7 @@
 [![Docs.rs](https://docs.rs/exonum/badge.svg)](https://docs.rs/exonum)
 [![License: Apache-2.0](https://img.shields.io/github/license/exonum/exonum.svg)](LICENSE.md)
 [![LoC](https://tokei.rs/b1/github/exonum/exonum)](https://github.com/exonum/exonum)
-![rust 1.23+ required](https://img.shields.io/badge/rust-1.23+-blue.svg?label=Required%20Rust)
+![rust 1.25+ required](https://img.shields.io/badge/rust-1.25+-blue.svg?label=Required%20Rust)
 
 **Community:**
 [![Join the chat at https://gitter.im/exonum/exonum](https://img.shields.io/gitter/room/exonum/exonum.svg?label=Chat)](https://gitter.im/exonum/exonum)

@@ -18,7 +18,7 @@ use crypto::{CryptoHash, Hash, PublicKey};
 use blockchain::{Schema, Transaction};
 use messages::{BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote,
                PrevotesRequest, Propose, ProposeRequest, RawTransaction, TransactionsRequest,
-                TransactionsResponse};
+               TransactionsResponse};
 use helpers::{Height, Round, ValidatorId};
 use storage::Patch;
 use node::{NodeHandler, RequestData};
@@ -578,7 +578,7 @@ impl NodeHandler {
 
     /// Handles raw transactions.
     #[cfg_attr(feature = "flame_profile", flame)]
-    pub fn handle_txs(&mut self, msg: &TransactionsResponse) {
+    pub fn handle_txs_batch(&mut self, msg: &TransactionsResponse) {
         if msg.to() != self.state.consensus_public_key() {
             error!(
                 "Received response that intended for another peer, to={}, from={}",

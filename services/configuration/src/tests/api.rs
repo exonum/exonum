@@ -272,15 +272,14 @@ fn test_votes_for_propose() {
         .map(to_boxed)
         .collect::<Vec<_>>();
     testkit.create_block_with_transactions(tx_votes);
-    let response = api.votes_for_propose(&new_cfg.hash()).expect(
-        "Votes for config is absent",
-    );
+    let response = api.votes_for_propose(&new_cfg.hash())
+        .expect("Votes for config is absent");
     for entry in response.into_iter().take(testkit.majority_count()) {
         let tx = entry.expect("Vote for config is absent");
         assert!(
-            Schema::new(&testkit.snapshot()).transactions().contains(
-                &tx.hash(),
-            ),
+            Schema::new(&testkit.snapshot())
+                .transactions()
+                .contains(&tx.hash(),),
             "Transaction is absent in blockchain: {:?}",
             tx
         );
@@ -391,7 +390,11 @@ fn test_all_committed() {
         votes: Some(testkit.votes_for_propose(new_cfg_2.hash())),
     };
     assert_eq!(
-        vec![expected_response_1.clone(), expected_response_2.clone(), expected_response_3.clone()],
+        vec![
+            expected_response_1.clone(),
+            expected_response_2.clone(),
+            expected_response_3.clone(),
+        ],
         api.all_committed(None, None)
     );
     assert_eq!(
