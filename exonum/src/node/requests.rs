@@ -12,9 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use messages::{RequestMessage, Message, ProposeRequest, TransactionsRequest, PrevotesRequest,
-               BlockRequest, BlockResponse};
+use std::mem::replace;
+
+use messages::{BlockRequest, BlockResponse, Message, PrevotesRequest, ProposeRequest,
+               RequestMessage, TransactionsRequest, TransactionsResponse};
 use blockchain::Schema;
+use crypto::{PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
+use messages::HEADER_LENGTH;
 use super::NodeHandler;
 
 // TODO: height should be updated after any message, not only after status (if signature is correct)
@@ -59,9 +63,9 @@ impl NodeHandler {
         }
 
         let propose = if msg.height() == self.state.height() {
-            self.state.propose(msg.propose_hash()).map(|p| {
-                p.message().raw().clone()
-            })
+            self.state
+                .propose(msg.propose_hash())
+                .map(|p| p.message().raw().clone())
         } else {
             return;
         };
@@ -76,11 +80,41 @@ impl NodeHandler {
         trace!("HANDLE TRANSACTIONS REQUEST");
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
+
+        let mut txs = Vec::new();
+        let mut txs_size = 0;
+        let unoccupied_message_size: u32 = self.state.config().consensus.max_message_len -
+            (HEADER_LENGTH + SIGNATURE_LENGTH + 2 * PUBLIC_KEY_LENGTH + 8) as u32;
+
         for hash in msg.txs() {
             let tx = schema.transactions().get(hash);
             if let Some(tx) = tx {
-                self.send_to_peer(*msg.from(), &tx);
+                if txs_size + tx.raw().len() as u32 > unoccupied_message_size {
+                    let txs_response = TransactionsResponse::new(
+                        self.state.consensus_public_key(),
+                        msg.from(),
+                        replace(&mut txs, vec![]),
+                        self.state.consensus_secret_key(),
+                    );
+
+                    self.send_to_peer(*msg.from(), txs_response.raw());
+                    txs_size = 0;
+                    txs.clear();
+                }
+                txs_size += tx.raw().len() as u32;
+                txs.push(tx);
             }
+        }
+
+        if !txs.is_empty() {
+            let txs_response = TransactionsResponse::new(
+                self.state.consensus_public_key(),
+                msg.from(),
+                txs,
+                self.state.consensus_secret_key(),
+            );
+
+            self.send_to_peer(*msg.from(), txs_response.raw());
         }
     }
 
@@ -124,7 +158,6 @@ impl NodeHandler {
         let block = schema.blocks().get(&block_hash).unwrap();
         let precommits = schema.precommits(&block_hash);
         let transactions = schema.block_transactions(height);
-
 
         let block_msg = BlockResponse::new(
             self.state.consensus_public_key(),

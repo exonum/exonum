@@ -17,7 +17,7 @@ use std::error::Error;
 
 use rand::{self, Rng};
 
-use messages::{Any, RawMessage, Connect, Status, Message, PeersRequest};
+use messages::{Any, Connect, Message, PeersRequest, RawMessage, Status};
 use helpers::Height;
 use super::{NodeHandler, RequestData};
 
@@ -37,6 +37,7 @@ impl NodeHandler {
             Ok(Any::Request(msg)) => self.handle_request(msg),
             Ok(Any::Block(msg)) => self.handle_block(&msg),
             Ok(Any::Transaction(msg)) => self.handle_tx(msg),
+            Ok(Any::TransactionsBatch(msg)) => self.handle_txs(&msg),
             Err(err) => {
                 error!("Invalid message received: {:?}", err.description());
             }
@@ -124,8 +125,7 @@ impl NodeHandler {
         self.state.add_peer(public_key, message.clone());
         info!(
             "Received Connect message from {}, {}",
-            address,
-            need_connect,
+            address, need_connect,
         );
         self.blockchain.save_peer(&public_key, message);
         if need_connect {

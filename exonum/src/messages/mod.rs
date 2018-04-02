@@ -22,7 +22,7 @@ use crypto::PublicKey;
 use encoding::Error;
 use helpers::{Height, Round, ValidatorId};
 
-pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, ServiceMessage, Message,
+pub use self::raw::{Message, MessageBuffer, MessageWriter, RawMessage, ServiceMessage,
                     HEADER_LENGTH, PROTOCOL_MAJOR_VERSION};
 pub use self::protocol::*;
 
@@ -55,6 +55,8 @@ pub enum Any {
     Request(RequestMessage),
     /// Transaction.
     Transaction(RawTransaction),
+    /// A batch of the transactions.
+    TransactionsBatch(TransactionsResponse),
 }
 
 /// Consensus message.
@@ -208,6 +210,9 @@ impl Any {
                 CONNECT_MESSAGE_ID => Any::Connect(Connect::from_raw(raw)?),
                 STATUS_MESSAGE_ID => Any::Status(Status::from_raw(raw)?),
                 BLOCK_RESPONSE_MESSAGE_ID => Any::Block(BlockResponse::from_raw(raw)?),
+                TRANSACTIONS_RESPONSE_MESSAGE_ID => Any::TransactionsBatch(
+                    TransactionsResponse::from_raw(raw)?
+                ),
 
                 PROPOSE_MESSAGE_ID => {
                     Any::Consensus(ConsensusMessage::Propose(Propose::from_raw(raw)?))

@@ -51,6 +51,8 @@ pub const PREVOTE_MESSAGE_ID: u16 = Prevote::MESSAGE_ID;
 pub const PRECOMMIT_MESSAGE_ID: u16 = Precommit::MESSAGE_ID;
 /// `BlockResponse` message id.
 pub const BLOCK_RESPONSE_MESSAGE_ID: u16 = BlockResponse::MESSAGE_ID;
+/// `TransactionsResponse` message id.
+pub const TRANSACTIONS_RESPONSE_MESSAGE_ID: u16 = TransactionsResponse::MESSAGE_ID;
 
 /// `ProposeRequest` message id.
 pub const PROPOSE_REQUEST_MESSAGE_ID: u16 = ProposeRequest::MESSAGE_ID;
@@ -231,6 +233,27 @@ messages! {
         block: blockchain::Block,
         /// List of pre-commits.
         precommits: Vec<Precommit>,
+        /// List of the transactions.
+        transactions: Vec<RawMessage>,
+    }
+
+    /// Information about the transactions.
+    ///
+    /// ### Validation
+    /// The message is ignored if
+    ///     * its `to` field corresponds to a different node
+    ///     * the `transactions` field cannot be parsed or verified
+    ///
+    /// ### Processing
+    /// Returns information about the transactions requested by the hash.
+    ///
+    /// ### Generation
+    /// The message is sent as response to `TransactionsRequest`.
+    struct TransactionsResponse {
+        /// The sender's public key.
+        from: &PublicKey,
+        /// Public key of the recipient.
+        to: &PublicKey,
         /// List of the transactions.
         transactions: Vec<RawMessage>,
     }
