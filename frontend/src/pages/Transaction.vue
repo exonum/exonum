@@ -103,16 +103,12 @@
       loadTransaction: function() {
         const self = this
 
-        this.$http.get('/api/system/v1/transactions/' + this.hash).then(response => {
-          if (typeof response.data === 'object') {
-            self.transaction = response.data.content
-            self.location = response.data.location
-            self.type = response.data.type
-          } else {
-            self.$notify('success', 'Unknown format of server response')
-          }
+        this.$blockchain.getTransaction(this.hash).then(data => {
+          self.transaction = data.content
+          self.location = data.location
+          self.type = data.type
         }).catch(error => {
-          self.$notify('success', error.toString())
+          self.$notify('error', error.toString())
         })
       }
     },

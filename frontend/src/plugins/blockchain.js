@@ -261,7 +261,20 @@ module.exports = {
         }).then(response => waitForAcceptance(keyPair, response.data.tx_hash))
       },
 
-      getWallet: getWallet
+      getWallet: getWallet,
+
+      getBlocks: latest => {
+        const suffix = !isNaN(latest) ? '&latest=' + latest : ''
+        return axios.get(`/api/explorer/v1/blocks?count=${PER_PAGE}` + suffix).then(response => response.data)
+      },
+
+      getBlock: height => {
+        return axios.get(`/api/explorer/v1/blocks/${height}`).then(response => response.data)
+      },
+
+      getTransaction: hash => {
+        return axios.get(`/api/system/v1/transactions/${hash}`).then(response => response.data)
+      }
     }
   }
 }
