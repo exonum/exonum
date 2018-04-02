@@ -14,70 +14,64 @@ const TX_ISSUE_ID = 129
 const TX_TRANSFER_ID = 128
 
 const TableKey = Exonum.newType({
-  size: 4,
-  fields: {
-    service_id: {type: Exonum.Uint16, size: 2, from: 0, to: 2},
-    table_index: {type: Exonum.Uint16, size: 2, from: 2, to: 4}
-  }
+  fields: [
+    { name: 'service_id', type: Exonum.Uint16 },
+    { name: 'table_index', type: Exonum.Uint16 }
+  ]
 })
 const Wallet = Exonum.newType({
-  size: 88,
-  fields: {
-    pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-    name: {type: Exonum.String, size: 8, from: 32, to: 40},
-    balance: {type: Exonum.Uint64, size: 8, from: 40, to: 48},
-    history_len: {type: Exonum.Uint64, size: 8, from: 48, to: 56},
-    history_hash: {type: Exonum.Hash, size: 32, from: 56, to: 88}
-  }
+  fields: [
+    { name: 'pub_key', type: Exonum.PublicKey },
+    { name: 'name', type: Exonum.String },
+    { name: 'balance', type: Exonum.Uint64 },
+    { name: 'history_len', type: Exonum.Uint64 },
+    { name: 'history_hash', type: Exonum.Hash }
+  ]
 })
 const TransactionMetaData = Exonum.newType({
-  size: 33,
-  fields: {
-    tx_hash: {type: Exonum.Hash, size: 32, from: 0, to: 32},
-    execution_status: {type: Exonum.Bool, size: 1, from: 32, to: 33}
-  }
+  fields: [
+    { name: 'tx_hash', type: Exonum.Hash },
+    { name: 'execution_status', type: Exonum.Bool }
+  ]
 })
 
 function getTransaction(transactionId) {
   switch (transactionId) {
     case TX_WALLET_ID:
       return Exonum.newMessage({
-        size: 40,
         network_id: NETWORK_ID,
         protocol_version: PROTOCOL_VERSION,
         service_id: SERVICE_ID,
         message_id: TX_WALLET_ID,
-        fields: {
-          pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-          name: {type: Exonum.String, size: 8, from: 32, to: 40}
-        }
+        fields: [
+          { name: 'pub_key', type: Exonum.PublicKey },
+          { name: 'name', type: Exonum.String }
+        ]
       })
     case TX_ISSUE_ID:
       return Exonum.newMessage({
-        size: 48,
         network_id: NETWORK_ID,
         protocol_version: PROTOCOL_VERSION,
         service_id: SERVICE_ID,
         message_id: TX_ISSUE_ID,
-        fields: {
-          wallet: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-          amount: {type: Exonum.Uint64, size: 8, from: 32, to: 40},
-          seed: {type: Exonum.Uint64, size: 8, from: 40, to: 48}
-        }
+        fields: [
+          { name: 'wallet', type: Exonum.PublicKey },
+          { name: 'amount', type: Exonum.Uint64 },
+          { name: 'seed', type: Exonum.Uint64 }
+        ]
       })
     case TX_TRANSFER_ID:
       return Exonum.newMessage({
-        size: 80,
         network_id: NETWORK_ID,
         protocol_version: PROTOCOL_VERSION,
         service_id: SERVICE_ID,
         message_id: TX_TRANSFER_ID,
-        fields: {
-          from: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-          to: {type: Exonum.PublicKey, size: 32, from: 32, to: 64},
-          amount: {type: Exonum.Uint64, size: 8, from: 64, to: 72},
-          seed: {type: Exonum.Uint64, size: 8, from: 72, to: 80}
-        }
+        fields: [
+          { name: 'from', type: Exonum.PublicKey },
+          { name: 'to', type: Exonum.PublicKey },
+          { name: 'amount', type: Exonum.Uint64 },
+          { name: 'seed', type: Exonum.Uint64 }
+        ]
       })
     default:
       throw new Error('Unknown transaction ID has been passed')
