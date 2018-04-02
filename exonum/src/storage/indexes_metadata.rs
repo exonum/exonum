@@ -19,8 +19,8 @@ use std::error::Error;
 
 use storage::{BaseIndex, Fork, Snapshot, StorageValue};
 use crypto::{CryptoHash, Hash};
-use encoding::{Field, Offset, CheckedOffset, Error as EncodingError};
-use encoding::serialize::{WriteBufferWrapper, json};
+use encoding::{CheckedOffset, Error as EncodingError, Field, Offset};
+use encoding::serialize::{json, WriteBufferWrapper};
 
 pub const INDEXES_METADATA_TABLE_NAME: &str = "__INDEXES_METADATA__";
 
@@ -56,13 +56,11 @@ impl From<u8> for IndexType {
             5 => ProofList,
             6 => ProofMap,
             7 => ValueSet,
-            invalid => {
-                panic!(
-                    "Unreachable pattern ({:?}) while constructing table type. \
-                    Storage data is probably corrupted",
-                    invalid
-                )
-            }
+            invalid => panic!(
+                "Unreachable pattern ({:?}) while constructing table type. \
+                 Storage data is probably corrupted",
+                invalid
+            ),
         }
     }
 }
@@ -132,13 +130,10 @@ pub fn assert_index_type(name: &str, index_type: IndexType, is_family: bool, vie
         let stored_type = value.index_type();
         let stored_is_family = value.is_family();
         assert_eq!(
-            stored_type,
-            index_type,
+            stored_type, index_type,
             "Attempt to access index '{}' of type {:?}, \
-            while said index was initially created with type {:?}",
-            name,
-            index_type,
-            stored_type
+             while said index was initially created with type {:?}",
+            name, index_type, stored_type
         );
         assert_eq!(
             stored_is_family,
@@ -171,15 +166,17 @@ pub fn set_index_type(name: &str, index_type: IndexType, is_family: bool, view: 
 
 #[cfg(test)]
 mod tests {
-    use super::{IndexType, IndexMetadata, INDEXES_METADATA_TABLE_NAME};
-    use crypto::{PublicKey, Hash};
-    use storage::{MemoryDB, Database, MapIndex, ProofMapIndex};
+    use super::{IndexMetadata, IndexType, INDEXES_METADATA_TABLE_NAME};
+    use crypto::{Hash, PublicKey};
+    use storage::{Database, MapIndex, MemoryDB, ProofMapIndex};
 
     #[test]
     fn index_metadata_roundtrip() {
         use self::IndexType::*;
 
-        let index_types = [Entry, KeySet, List, SparseList, Map, ProofList, ProofMap, ValueSet];
+        let index_types = [
+            Entry, KeySet, List, SparseList, Map, ProofList, ProofMap, ValueSet
+        ];
         let is_family = [true, true, false, false, true, false, true, false];
         for (t, f) in index_types.iter().zip(&is_family) {
             let metadata = IndexMetadata::new(*t, *f);
@@ -209,7 +206,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "Attempt to access index 'test_index' of type Map, \
-    while said index was initially created with type ProofMap")]
+                               while said index was initially created with type ProofMap")]
     fn invalid_index_type() {
         let database = MemoryDB::new();
         let mut fork = database.fork();
@@ -235,7 +232,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "Attempt to access index family 'test_index' \
-    while it's an ordinary index")]
+                               while it's an ordinary index")]
     fn ordinary_index_as_index_family() {
         let database = MemoryDB::new();
         let mut fork = database.fork();
@@ -251,7 +248,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "Attempt to access an ordinary index 'test_index' \
-    while it's index family")]
+                               while it's index family")]
     fn index_family_as_ordinary_index() {
         let database = MemoryDB::new();
         let mut fork = database.fork();
@@ -280,7 +277,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "Attempt to access index 'test_index' of type Map, \
-    while said index was initially created with type ProofMap")]
+                               while said index was initially created with type ProofMap")]
     fn multiple_read_before_write() {
         let database = MemoryDB::new();
         let mut fork = database.fork();

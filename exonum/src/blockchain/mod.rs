@@ -145,9 +145,9 @@ impl Blockchain {
     /// - Service can deserialize given raw message.
     pub fn tx_from_raw(&self, raw: RawMessage) -> Result<Box<Transaction>, MessageError> {
         let id = raw.service_id() as usize;
-        let service = self.service_map.get(id).ok_or_else(|| {
-            MessageError::from("Service not found.")
-        })?;
+        let service = self.service_map
+            .get(id)
+            .ok_or_else(|| MessageError::from("Service not found."))?;
         service.tx_from_raw(raw)
     }
 
@@ -340,7 +340,6 @@ impl Blockchain {
         (block_hash, fork.into_patch())
     }
 
-
     fn execute_transaction(
         &self,
         tx_hash: Hash,
@@ -351,14 +350,17 @@ impl Blockchain {
         let tx = {
             let schema = Schema::new(&fork);
 
-            let tx = schema.transactions().get(&tx_hash).ok_or_else(|| {
-                failure::err_msg("BUG: Cannot find transaction in database.")
-            })?;
+            let tx = schema
+                .transactions()
+                .get(&tx_hash)
+                .ok_or_else(|| failure::err_msg("BUG: Cannot find transaction in database."))?;
 
             self.tx_from_raw(tx).or_else(|error| {
-                Err(failure::err_msg(
-                    format!("{}, tx: {:?}", error.description(), tx_hash),
-                ))
+                Err(failure::err_msg(format!(
+                    "{}, tx: {:?}",
+                    error.description(),
+                    tx_hash
+                )))
             })?
         };
 
@@ -490,9 +492,8 @@ impl Blockchain {
             schema.peers_cache_mut().put(pubkey, peer);
         }
 
-        self.merge(fork.into_patch()).expect(
-            "Unable to save peer to the peers cache",
-        );
+        self.merge(fork.into_patch())
+            .expect("Unable to save peer to the peers cache");
     }
 
     /// Removes peer from the peers cache
@@ -508,9 +509,8 @@ impl Blockchain {
             }
         }
 
-        self.merge(fork.into_patch()).expect(
-            "Unable to remove peer from the peers cache",
-        );
+        self.merge(fork.into_patch())
+            .expect("Unable to remove peer from the peers cache");
     }
 
     /// Recover cached peers if any.
@@ -540,9 +540,8 @@ impl Blockchain {
             schema.set_consensus_round(round);
         }
 
-        self.merge(fork.into_patch()).expect(
-            "Unable to save messages to the consensus cache",
-        );
+        self.merge(fork.into_patch())
+            .expect("Unable to save messages to the consensus cache");
     }
 }
 

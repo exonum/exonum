@@ -19,14 +19,14 @@ use std::collections::BTreeMap;
 
 use clap;
 use toml::Value;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use failure;
 
 use blockchain::Service;
 
 pub use self::builder::NodeBuilder;
-pub use self::details::{Run, Finalize, GenerateNodeConfig, GenerateCommonConfig, GenerateTestnet};
-pub use self::shared::{AbstractConfig, NodePublicConfig, CommonConfigTemplate, NodePrivateConfig};
+pub use self::details::{Finalize, GenerateCommonConfig, GenerateNodeConfig, GenerateTestnet, Run};
+pub use self::shared::{AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig};
 pub use self::context_key::ContextKey;
 
 mod shared;
@@ -158,7 +158,6 @@ pub mod keys {
     pub const AUDITOR_MODE: ContextKey<bool> = context_key!("auditor_mode");
 }
 
-
 /// `Context` is a type, used to keep some values from `Command` into
 /// `CommandExtension` and vice verse.
 /// To access values stored inside Context, use `ContextKey`.
@@ -210,8 +209,6 @@ impl Context {
                 {
                     panic!("Duplicated argument: {}", arg.name);
                 }
-
-
             } else if arg.required {
                 panic!("Required argument is not found: {}", arg.name)
             }

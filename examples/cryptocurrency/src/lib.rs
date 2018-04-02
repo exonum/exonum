@@ -25,17 +25,17 @@
 
 #![deny(missing_docs)]
 
-#[macro_use]
-extern crate failure;
-extern crate serde;
-extern crate serde_json;
-#[macro_use]
-extern crate serde_derive;
+extern crate bodyparser;
 #[macro_use]
 extern crate exonum;
-extern crate router;
-extern crate bodyparser;
+#[macro_use]
+extern crate failure;
 extern crate iron;
+extern crate router;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde_json;
 
 /// Persistent data.
 pub mod schema {
@@ -197,11 +197,11 @@ pub mod errors {
 
 /// Contracts.
 pub mod contracts {
-    use exonum::blockchain::{Transaction, ExecutionResult};
+    use exonum::blockchain::{ExecutionResult, Transaction};
     use exonum::messages::Message;
     use exonum::storage::Fork;
 
-    use schema::{Wallet, CurrencySchema};
+    use schema::{CurrencySchema, Wallet};
     use transactions::{TxCreateWallet, TxTransfer};
     use errors::Error;
 
@@ -277,7 +277,7 @@ pub mod contracts {
 pub mod api {
     use exonum::blockchain::{Blockchain, Transaction};
     use exonum::encoding::serialize::FromHex;
-    use exonum::node::{TransactionSend, ApiSender};
+    use exonum::node::{ApiSender, TransactionSend};
     use exonum::crypto::{Hash, PublicKey};
     use exonum::api::{Api, ApiError};
     use iron::prelude::*;
@@ -288,7 +288,7 @@ pub mod api {
 
     use bodyparser;
     use serde_json;
-    use schema::{Wallet, CurrencySchema};
+    use schema::{CurrencySchema, Wallet};
     use transactions::CurrencyTransactions;
 
     /// Container for the service API.
@@ -321,11 +321,14 @@ pub mod api {
             let path = req.url.path();
             let wallet_key = path.last().unwrap();
             let public_key = PublicKey::from_hex(wallet_key).map_err(|e| {
-                IronError::new(e, (
-                    Status::BadRequest,
-                    Header(ContentType::json()),
-                    "\"Invalid request param: `pub_key`\"",
-                ))
+                IronError::new(
+                    e,
+                    (
+                        Status::BadRequest,
+                        Header(ContentType::json()),
+                        "\"Invalid request param: `pub_key`\"",
+                    ),
+                )
             })?;
 
             let snapshot = self.blockchain.snapshot();
@@ -391,7 +394,7 @@ pub mod api {
 
 /// Service declaration.
 pub mod service {
-    use exonum::blockchain::{Service, Transaction, ApiContext, TransactionSet};
+    use exonum::blockchain::{ApiContext, Service, Transaction, TransactionSet};
     use exonum::messages::RawTransaction;
     use exonum::storage::Snapshot;
     use exonum::crypto::Hash;

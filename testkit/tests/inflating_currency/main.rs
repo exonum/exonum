@@ -20,14 +20,14 @@
 extern crate exonum;
 #[macro_use]
 extern crate exonum_testkit;
+#[macro_use]
+extern crate pretty_assertions;
 extern crate rand;
 #[macro_use]
 extern crate serde_derive;
-#[macro_use]
-extern crate pretty_assertions;
 
 use exonum::blockchain::Transaction;
-use exonum::crypto::{self, PublicKey, SecretKey, CryptoHash};
+use exonum::crypto::{self, CryptoHash, PublicKey, SecretKey};
 use exonum::helpers::Height;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use rand::Rng;
@@ -167,9 +167,11 @@ fn test_fuzz_transfers() {
         .map(|&(_, ref tx)| tx.pub_key())
         .collect();
 
-    testkit.create_block_with_transactions(keys_and_txs.iter().map(|&(_, ref tx)| {
-        Box::new(tx.clone()) as Box<Transaction>
-    }));
+    testkit.create_block_with_transactions(
+        keys_and_txs
+            .iter()
+            .map(|&(_, ref tx)| Box::new(tx.clone()) as Box<Transaction>),
+    );
 
     for _ in 0..64 {
         let total_balance: u64 = pubkeys.iter().map(|key| get_balance(&api, key)).sum();

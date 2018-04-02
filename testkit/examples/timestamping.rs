@@ -19,8 +19,8 @@ extern crate exonum_testkit;
 extern crate serde_json;
 
 use exonum::api::public::BlocksRange;
-use exonum::crypto::{gen_keypair, Hash, PublicKey, CryptoHash};
-use exonum::blockchain::{Schema, Service, Transaction, TransactionSet, ExecutionResult};
+use exonum::crypto::{gen_keypair, CryptoHash, Hash, PublicKey};
+use exonum::blockchain::{ExecutionResult, Schema, Service, Transaction, TransactionSet};
 use exonum::messages::{Message, RawTransaction};
 use exonum::storage::{Fork, Snapshot};
 use exonum::encoding;
@@ -85,11 +85,8 @@ fn main() {
     let tx3 = TxTimestamp::new(&keypair.0, "Dropping Like Flies", &keypair.1);
 
     // Commit them into blockchain.
-    let block = testkit.create_block_with_transactions(txvec![
-        tx1.clone(),
-        tx2.clone(),
-        tx3.clone(),
-    ]);
+    let block =
+        testkit.create_block_with_transactions(txvec![tx1.clone(), tx2.clone(), tx3.clone(),]);
     assert_eq!(block.len(), 3);
     assert!(block.iter().all(|transaction| transaction.status().is_ok()));
 

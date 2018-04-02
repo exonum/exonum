@@ -34,8 +34,8 @@ pub struct Whitelist {
 impl Whitelist {
     /// Returns `true` if a peer with the given public key can connect.
     pub fn allow(&self, peer: &PublicKey) -> bool {
-        !self.whitelist_enabled || self.validators_list.contains(peer) ||
-            self.whitelisted_peers.contains(peer)
+        !self.whitelist_enabled || self.validators_list.contains(peer)
+            || self.whitelisted_peers.contains(peer)
     }
 
     /// Adds peer to the whitelist.
@@ -65,7 +65,6 @@ impl Whitelist {
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use super::Whitelist;
@@ -79,9 +78,7 @@ mod test {
         let mut rng = XorShiftRng::from_seed(source);
         (0..count)
             .into_iter()
-            .map(|_| {
-                PublicKey::from_slice(&<[u8; 32] as Rand>::rand(&mut rng)).unwrap()
-            })
+            .map(|_| PublicKey::from_slice(&<[u8; 32] as Rand>::rand(&mut rng)).unwrap())
             .collect()
     }
 

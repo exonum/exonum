@@ -20,8 +20,8 @@
 use serde::{Serialize, Serializer};
 
 use crypto::{CryptoHash, Hash};
-use blockchain::{Schema, Blockchain, Block, TxLocation, Transaction, TransactionResult,
-                 TransactionError, TransactionErrorType};
+use blockchain::{Block, Blockchain, Schema, Transaction, TransactionError, TransactionErrorType,
+                 TransactionResult, TxLocation};
 use encoding;
 use helpers::Height;
 use messages::{Precommit, RawMessage};
@@ -116,14 +116,12 @@ impl<'a> BlockInfo<'a> {
             let hashes = schema.block_hashes_by_height();
             let blocks = schema.blocks();
 
-            let block_hash = hashes.get(height.0).expect(&format!(
-                "Block not found, height: {:?}",
-                height
-            ));
-            blocks.get(&block_hash).expect(&format!(
-                "Block not found, hash: {:?}",
-                block_hash
-            ))
+            let block_hash = hashes
+                .get(height.0)
+                .expect(&format!("Block not found, height: {:?}", height));
+            blocks
+                .get(&block_hash)
+                .expect(&format!("Block not found, hash: {:?}", block_hash))
         };
 
         BlockInfo {
@@ -185,9 +183,9 @@ impl<'a> BlockInfo<'a> {
 
     /// Returns a transaction with the specified index in the block.
     pub fn transaction(&self, index: usize) -> Option<CommittedTransaction> {
-        self.transaction_hashes().get(index).map(|hash| {
-            self.explorer.committed_transaction(hash, None)
-        })
+        self.transaction_hashes()
+            .get(index)
+            .map(|hash| self.explorer.committed_transaction(hash, None))
     }
 
     /// Iterates over transactions in the block.
@@ -204,9 +202,9 @@ impl<'a> BlockInfo<'a> {
         let (explorer, header, precommits, transactions) =
             (self.explorer, self.header, self.precommits, self.txs);
 
-        let precommits = precommits.into_inner().unwrap_or_else(
-            || explorer.precommits(&header),
-        );
+        let precommits = precommits
+            .into_inner()
+            .unwrap_or_else(|| explorer.precommits(&header));
         let transactions = transactions
             .into_inner()
             .unwrap_or_else(|| explorer.transaction_hashes(&header))
@@ -393,9 +391,9 @@ impl CommittedTransaction {
     {
         use serde::ser::Error;
 
-        let value = tx.as_ref().serialize_field().map_err(|err| {
-            S::Error::custom(err.description())
-        })?;
+        let value = tx.as_ref()
+            .serialize_field()
+            .map_err(|err| S::Error::custom(err.description()))?;
         value.serialize(serializer)
     }
 
@@ -589,12 +587,13 @@ impl<'a> BlockchainExplorer<'a> {
     ) -> CommittedTransaction {
         let schema = Schema::new(&self.snapshot);
 
-        let location = schema.transactions_locations().get(tx_hash).expect(
-            &format!(
+        let location = schema
+            .transactions_locations()
+            .get(tx_hash)
+            .expect(&format!(
                 "Location not found for transaction hash {:?}",
                 tx_hash
-            ),
-        );
+            ));
 
         let location_proof = schema
             .block_transactions(location.block_height())
@@ -637,15 +636,13 @@ impl<'a> BlockchainExplorer<'a> {
         let txs_table = schema.block_transactions(height);
         let block_proof = schema.block_and_precommits(height);
 
-        block_proof.map(|proof| {
-            BlockWithTransactions {
-                header: proof.block,
-                precommits: proof.precommits,
-                transactions: txs_table
-                    .iter()
-                    .map(|tx_hash| self.committed_transaction(&tx_hash, None))
-                    .collect(),
-            }
+        block_proof.map(|proof| BlockWithTransactions {
+            header: proof.block,
+            precommits: proof.precommits,
+            transactions: txs_table
+                .iter()
+                .map(|tx_hash| self.committed_transaction(&tx_hash, None))
+                .collect(),
         })
     }
 

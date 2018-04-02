@@ -26,7 +26,9 @@ fn test_healthcheck_connectivity_false() {
     let testkit = TestKitBuilder::validator().with_validators(2).create();
     let api = testkit.api();
     let info: HealthCheckInfo = api.get(ApiKind::System, "v1/healthcheck");
-    let expected = HealthCheckInfo { connectivity: false };
+    let expected = HealthCheckInfo {
+        connectivity: false,
+    };
     assert_eq!(info, expected);
 }
 

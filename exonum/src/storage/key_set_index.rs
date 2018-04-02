@@ -17,7 +17,7 @@
 use std::marker::PhantomData;
 use std::borrow::Borrow;
 
-use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageKey};
+use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey};
 use super::indexes_metadata::IndexType;
 
 /// A set of items that implement `StorageKey` trait.
@@ -149,7 +149,9 @@ where
     /// }
     /// ```
     pub fn iter(&self) -> KeySetIndexIter<K> {
-        KeySetIndexIter { base_iter: self.base.iter(&()) }
+        KeySetIndexIter {
+            base_iter: self.base.iter(&()),
+        }
     }
 
     /// An iterator visiting all elements in arbitrary order starting from the specified value.
@@ -170,7 +172,9 @@ where
     /// }
     /// ```
     pub fn iter_from(&self, from: &K) -> KeySetIndexIter<K> {
-        KeySetIndexIter { base_iter: self.base.iter_from(&(), from) }
+        KeySetIndexIter {
+            base_iter: self.base.iter_from(&(), from),
+        }
     }
 }
 
@@ -279,7 +283,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::{MemoryDB, Database};
+    use super::super::{Database, MemoryDB};
 
     const INDEX_NAME: &str = "test_index_name";
 

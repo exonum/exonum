@@ -15,19 +15,19 @@
 #![feature(test)]
 #![allow(dead_code)]
 
-extern crate test;
+extern crate exonum;
 extern crate rand;
 extern crate tempdir;
-extern crate exonum;
+extern crate test;
 
 #[cfg(all(test, feature = "long_benchmarks"))]
 mod tests {
     use std::collections::HashSet;
 
     use test::Bencher;
-    use rand::{Rng, XorShiftRng, SeedableRng};
+    use rand::{Rng, SeedableRng, XorShiftRng};
     use tempdir::TempDir;
-    use exonum::storage::{Database, MemoryDB, RocksDB, DbOptions, ProofMapIndex, ProofListIndex};
+    use exonum::storage::{Database, DbOptions, MemoryDB, ProofListIndex, ProofMapIndex, RocksDB};
     use exonum::storage::proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE;
 
     const NAME: &str = "name";
@@ -81,8 +81,10 @@ mod tests {
         let mut storage = db.fork();
         let mut table = ProofMapIndex::new(NAME, &mut storage);
 
-        b.iter(|| for item in &data {
-            table.put(&item.0, item.1.clone());
+        b.iter(|| {
+            for item in &data {
+                table.put(&item.0, item.1.clone());
+            }
         });
     }
 
@@ -114,8 +116,10 @@ mod tests {
             table.put(&item.0, item.1.clone());
         }
 
-        b.iter(|| for item in &data {
-            table.put(&item.0, item.1.clone());
+        b.iter(|| {
+            for item in &data {
+                table.put(&item.0, item.1.clone());
+            }
         });
     }
 
@@ -153,10 +157,12 @@ mod tests {
         let table_merkle_root = table.merkle_root();
         let proofs: Vec<_> = data.iter().map(|item| table.get_proof(item.0)).collect();
 
-        b.iter(|| for (i, proof) in proofs.iter().enumerate() {
-            let checked_proof = proof.clone().check().unwrap();
-            assert_eq!(*checked_proof.entries()[0].1, data[i].1);
-            assert_eq!(checked_proof.merkle_root(), table_merkle_root);
+        b.iter(|| {
+            for (i, proof) in proofs.iter().enumerate() {
+                let checked_proof = proof.clone().check().unwrap();
+                assert_eq!(*checked_proof.entries()[0].1, data[i].1);
+                assert_eq!(checked_proof.merkle_root(), table_merkle_root);
+            }
         });
     }
 

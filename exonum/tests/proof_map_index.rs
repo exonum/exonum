@@ -88,9 +88,8 @@ fn check_map_multiproof<T, K, V>(
         entries.sort_unstable_by(|&(ref x, _), &(ref y, _)| {
             ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap()
         });
-        missing_keys.sort_unstable_by(|x, y| {
-            ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap()
-        });
+        missing_keys
+            .sort_unstable_by(|x, y| ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap());
 
         (entries, missing_keys)
     };
@@ -99,9 +98,8 @@ fn check_map_multiproof<T, K, V>(
     assert_eq!(proof.merkle_root(), table.merkle_root());
     assert_eq!(missing_keys.iter().collect::<Vec<&_>>(), {
         let mut actual_keys = proof.missing_keys();
-        actual_keys.sort_unstable_by(|&x, &y| {
-            ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap()
-        });
+        actual_keys
+            .sort_unstable_by(|&x, &y| ProofPath::new(x).partial_cmp(&ProofPath::new(y)).unwrap());
         actual_keys
     });
     assert_eq!(

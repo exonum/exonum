@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crypto::{PublicKey, Hash};
-use blockchain::{Service, Transaction, TransactionSet, ExecutionResult, Schema};
-use messages::{RawTransaction, Message};
+use crypto::{Hash, PublicKey};
+use blockchain::{ExecutionResult, Schema, Service, Transaction, TransactionSet};
+use messages::{Message, RawTransaction};
 use storage::{Fork, Snapshot};
 use encoding::Error as MessageError;
 use blockchain::StoredConfiguration;

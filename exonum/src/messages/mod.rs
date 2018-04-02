@@ -22,7 +22,7 @@ use crypto::PublicKey;
 use encoding::Error;
 use helpers::{Height, Round, ValidatorId};
 
-pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, ServiceMessage, Message,
+pub use self::raw::{Message, MessageBuffer, MessageWriter, RawMessage, ServiceMessage,
                     HEADER_LENGTH, PROTOCOL_MAJOR_VERSION};
 pub use self::protocol::*;
 

@@ -25,7 +25,7 @@ use serde_json;
 use serde_json::value::Value;
 use bit_vec::BitVec;
 use hex::FromHex;
-use chrono::{DateTime, Utc, TimeZone};
+use chrono::{DateTime, TimeZone, Utc};
 use uuid::Uuid;
 
 use std::net::SocketAddr;
@@ -158,8 +158,8 @@ macro_rules! impl_deserialize_hex_segment {
 impl_deserialize_int!{u8; u16; u32; i8; i16; i32}
 impl_deserialize_bigint!{u64; i64}
 impl_deserialize_hex_segment!{Hash; PublicKey; Signature}
-impl_default_deserialize_owned!{u8; u16; u32; i8; i16; i32; u64; i64;
-                                Hash; PublicKey; Signature; bool}
+impl_default_deserialize_owned!{u8; u16; u32; i8; i16; i32; u64; i64}
+impl_default_deserialize_owned!{Hash; PublicKey; Signature; bool}
 
 impl ExonumJson for bool {
     fn deserialize_field<B: WriteBufferWrapper>(
@@ -299,9 +299,7 @@ impl ExonumJson for Vec<RawMessage> {
 
     fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
         let vec = self.iter()
-            .map(|slice| {
-                Value::String(::encoding::serialize::encode_hex(slice))
-            })
+            .map(|slice| Value::String(::encoding::serialize::encode_hex(slice)))
             .collect();
         Ok(Value::Array(vec))
     }
@@ -467,6 +465,6 @@ impl ExonumJson for Uuid {
 /// Reexport of `serde` specific traits, this reexports
 /// provide compatibility layer with important `serde_json` version.
 pub mod reexport {
-    pub use serde_json::{from_str, from_value, to_string, to_value, Value, Error};
+    pub use serde_json::{from_str, from_value, to_string, to_value, Error, Value};
     pub use serde_json::map::Map;
 }
