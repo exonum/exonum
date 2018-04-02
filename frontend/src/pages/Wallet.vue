@@ -41,7 +41,7 @@
                 </div>
               </li>
               <!-- eslint-disable-next-line vue/require-v-for-key -->
-              <li v-for="transaction in transactions" class="list-group-item">
+              <li v-for="transaction in reverseTransactions" class="list-group-item">
                 <div class="row">
                   <div class="col-sm-8">
                     <router-link :to="{ name: 'transaction', params: { hash: transaction.hash } }">
@@ -133,11 +133,17 @@
         receiver: '',
         amountToTransfer: '',
         isSpinnerVisible: false,
+        transactions: [],
         variants: [
           {id: 'ten', amount: 10},
           {id: 'fifty', amount: 50},
           {id: 'hundred', amount: 100}
         ]
+      }
+    },
+    computed: {
+      reverseTransactions: function() {
+        return this.transactions.slice().reverse()
       }
     },
     methods: {
