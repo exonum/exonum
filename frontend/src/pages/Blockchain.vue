@@ -38,7 +38,6 @@
 <script>
   const Navbar = require('../components/Navbar.vue')
   const Spinner = require('../components/Spinner.vue')
-  const PER_PAGE = 10
 
   module.exports = {
     components: {
@@ -54,25 +53,15 @@
     methods: {
       loadBlocks: function(latest) {
         const self = this
-        let suffix = ''
-
-        if (!isNaN(latest)) {
-          suffix += '&latest=' + latest
-        }
 
         this.isSpinnerVisible = true
 
-        this.$http.get('/api/explorer/v1/blocks?count=' + PER_PAGE + suffix).then(response => {
+        this.$blockchain.getBlocks(latest).then(data => {
           self.isSpinnerVisible = false
-
-          if (typeof response.data === 'object') {
-            self.blocks = self.blocks.concat(response.data)
-          } else {
-            self.$notify('success', 'Unknown format of server response')
-          }
+          self.blocks = self.blocks.concat(data)
         }).catch(error => {
           self.isSpinnerVisible = true
-          self.$notify('success', error.toString())
+          self.$notify('error', error.toString())
         })
       },
 

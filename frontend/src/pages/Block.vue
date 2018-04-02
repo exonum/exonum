@@ -95,17 +95,12 @@
 
         this.isSpinnerVisible = true
 
-        this.$http.get('/api/explorer/v1/blocks/' + this.height).then(response => {
+        this.$blockchain.getBlock(this.height).then(data => {
           self.isSpinnerVisible = false
-
-          if (typeof response.data === 'object') {
-            self.block = response.data.block
-            self.transactions = response.data.txs
-          } else {
-            self.$notify('success', 'Unknown format of server response')
-          }
+          self.block = data.block
+          self.transactions = data.txs
         }).catch(error => {
-          self.$notify('success', error.toString())
+          self.$notify('error', error.toString())
         })
       }
     },

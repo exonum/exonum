@@ -2,8 +2,7 @@ import * as Exonum from 'exonum-client'
 import axios from 'axios'
 
 const TX_URL = '/api/services/cryptocurrency/v1/wallets/transaction'
-const CONFIG_URL = '/api/services/configuration/v1/configs/actual'
-const WALLET_URL = '/api/services/cryptocurrency/v1/wallets/info?pubkey='
+const PER_PAGE = 10
 
 const ATTEMPTS = 10
 const ATTEMPT_TIMEOUT = 500
@@ -15,70 +14,64 @@ const TX_ISSUE_ID = 129
 const TX_TRANSFER_ID = 128
 
 const TableKey = Exonum.newType({
-  size: 4,
-  fields: {
-    service_id: {type: Exonum.Uint16, size: 2, from: 0, to: 2},
-    table_index: {type: Exonum.Uint16, size: 2, from: 2, to: 4}
-  }
+  fields: [
+    { name: 'service_id', type: Exonum.Uint16 },
+    { name: 'table_index', type: Exonum.Uint16 }
+  ]
 })
 const Wallet = Exonum.newType({
-  size: 88,
-  fields: {
-    pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-    name: {type: Exonum.String, size: 8, from: 32, to: 40},
-    balance: {type: Exonum.Uint64, size: 8, from: 40, to: 48},
-    history_len: {type: Exonum.Uint64, size: 8, from: 48, to: 56},
-    history_hash: {type: Exonum.Hash, size: 32, from: 56, to: 88}
-  }
+  fields: [
+    { name: 'pub_key', type: Exonum.PublicKey },
+    { name: 'name', type: Exonum.String },
+    { name: 'balance', type: Exonum.Uint64 },
+    { name: 'history_len', type: Exonum.Uint64 },
+    { name: 'history_hash', type: Exonum.Hash }
+  ]
 })
 const TransactionMetaData = Exonum.newType({
-  size: 33,
-  fields: {
-    tx_hash: {type: Exonum.Hash, size: 32, from: 0, to: 32},
-    execution_status: {type: Exonum.Bool, size: 1, from: 32, to: 33}
-  }
+  fields: [
+    { name: 'tx_hash', type: Exonum.Hash },
+    { name: 'execution_status', type: Exonum.Bool }
+  ]
 })
 
 function getTransaction(transactionId) {
   switch (transactionId) {
     case TX_WALLET_ID:
       return Exonum.newMessage({
-        size: 40,
         network_id: NETWORK_ID,
         protocol_version: PROTOCOL_VERSION,
         service_id: SERVICE_ID,
         message_id: TX_WALLET_ID,
-        fields: {
-          pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-          name: {type: Exonum.String, size: 8, from: 32, to: 40}
-        }
+        fields: [
+          { name: 'pub_key', type: Exonum.PublicKey },
+          { name: 'name', type: Exonum.String }
+        ]
       })
     case TX_ISSUE_ID:
       return Exonum.newMessage({
-        size: 48,
         network_id: NETWORK_ID,
         protocol_version: PROTOCOL_VERSION,
         service_id: SERVICE_ID,
         message_id: TX_ISSUE_ID,
-        fields: {
-          wallet: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-          amount: {type: Exonum.Uint64, size: 8, from: 32, to: 40},
-          seed: {type: Exonum.Uint64, size: 8, from: 40, to: 48}
-        }
+        fields: [
+          { name: 'wallet', type: Exonum.PublicKey },
+          { name: 'amount', type: Exonum.Uint64 },
+          { name: 'seed', type: Exonum.Uint64 }
+        ]
       })
     case TX_TRANSFER_ID:
       return Exonum.newMessage({
-        size: 80,
         network_id: NETWORK_ID,
         protocol_version: PROTOCOL_VERSION,
         service_id: SERVICE_ID,
         message_id: TX_TRANSFER_ID,
-        fields: {
-          from: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-          to: {type: Exonum.PublicKey, size: 32, from: 32, to: 64},
-          amount: {type: Exonum.Uint64, size: 8, from: 64, to: 72},
-          seed: {type: Exonum.Uint64, size: 8, from: 72, to: 80}
-        }
+        fields: [
+          { name: 'from', type: Exonum.PublicKey },
+          { name: 'to', type: Exonum.PublicKey },
+          { name: 'amount', type: Exonum.Uint64 },
+          { name: 'seed', type: Exonum.Uint64 }
+        ]
       })
     default:
       throw new Error('Unknown transaction ID has been passed')
@@ -99,13 +92,13 @@ function getPublicKeyOfTransaction(transactionId, transaction) {
 }
 
 function getWallet(keyPair) {
-  return axios.get(CONFIG_URL).then(response => {
+  return axios.get('/api/services/configuration/v1/configs/actual').then(response => {
     // actual list of public keys of validators
     const validators = response.data.config.validator_keys.map(validator => {
       return validator.consensus_key
     })
 
-    return axios.get(WALLET_URL + keyPair.publicKey).then(response => {
+    return axios.get('/api/services/cryptocurrency/v1/wallets/info?pubkey=' + keyPair.publicKey).then(response => {
       return response.data
     }).then((data) => {
       if (!Exonum.verifyBlock(data.block_info, validators, NETWORK_ID)) {
@@ -261,7 +254,20 @@ module.exports = {
         }).then(response => waitForAcceptance(keyPair, response.data.tx_hash))
       },
 
-      getWallet: getWallet
+      getWallet: getWallet,
+
+      getBlocks: latest => {
+        const suffix = !isNaN(latest) ? '&latest=' + latest : ''
+        return axios.get(`/api/explorer/v1/blocks?count=${PER_PAGE}` + suffix).then(response => response.data)
+      },
+
+      getBlock: height => {
+        return axios.get(`/api/explorer/v1/blocks/${height}`).then(response => response.data)
+      },
+
+      getTransaction: hash => {
+        return axios.get(`/api/system/v1/transactions/${hash}`).then(response => response.data)
+      }
     }
   }
 }
