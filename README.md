@@ -104,14 +104,6 @@ npm start -- --port=8280 --api-root=http://127.0.0.1:8200
 
 Ready! Find demo at [http://127.0.0.1:8280](http://127.0.0.1:8280).
 
-## Blockchain monitoring
-
-Use the official [blockchain explorer](https://github.com/exonum/blockchain-explorer)
-to monitor blocks and transactions in the blockchain.
-
-Use root URL of public API address of one of nodes as `--api-root`
-parameter, e.g `http://127.0.0.1:8200`.
-
 ## Tutorials
 
 * Read the [frontend tutorial](tutorial/frontend.md) to get detailed
