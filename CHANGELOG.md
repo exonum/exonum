@@ -143,6 +143,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `Display` trait is implemented for types from the `crypto` module. (#590)
 
+- `transactions!` macro now allows empty body. (#593)
+
 #### exonum-testkit
 
 - `create_block*` methods of the `TestKit` now return the information about
