@@ -15,7 +15,7 @@
 // Workaround: Clippy does not correctly handle borrowing checking rules for returned types.
 #![cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
 
-use futures::{self, Async, Future, Stream, Sink, sync::mpsc};
+use futures::{self, Async, Future, Sink, Stream, sync::mpsc};
 
 use std::ops::{AddAssign, Deref};
 use std::sync::{Arc, Mutex};

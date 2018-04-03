@@ -23,7 +23,7 @@ use exonum_profiler::ProfilerSpan;
 use rocksdb::{self, DBIterator, Options as RocksDbOptions, WriteBatch};
 use rocksdb::utils::get_cf_names;
 
-use std::{mem, fmt};
+use std::{fmt, mem};
 use std::sync::Arc;
 use std::path::Path;
 use std::error::Error;

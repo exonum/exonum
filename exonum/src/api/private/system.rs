@@ -16,7 +16,7 @@ use serde_json;
 use router::Router;
 use iron::prelude::*;
 
-use std::{net::SocketAddr, collections::HashMap};
+use std::{collections::HashMap, net::SocketAddr};
 
 use crypto::PublicKey;
 use node::{ApiSender, ExternalMessage};

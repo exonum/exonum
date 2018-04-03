@@ -280,7 +280,7 @@ pub mod api {
     use exonum::crypto::{Hash, PublicKey};
     use exonum::api::{Api, ApiError};
     use iron::prelude::*;
-    use iron::{status::Status, headers::ContentType, modifiers::Header};
+    use iron::{headers::ContentType, modifiers::Header, status::Status};
     use router::Router;
 
     use bodyparser;
@@ -392,7 +392,7 @@ pub mod api {
 /// Service declaration.
 pub mod service {
     use exonum::blockchain::{ApiContext, Service, Transaction, TransactionSet};
-    use exonum::{messages::RawTransaction, storage::Snapshot, crypto::Hash, encoding, api::Api};
+    use exonum::{encoding, api::Api, crypto::Hash, messages::RawTransaction, storage::Snapshot};
     use iron::Handler;
     use router::Router;
 

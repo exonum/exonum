@@ -32,7 +32,7 @@ use serde::{de, ser};
 use futures::{Future, Sink, sync::mpsc};
 use tokio_core::reactor::Core;
 
-use std::{io, fmt};
+use std::{fmt, io};
 use std::sync::Arc;
 use std::thread;
 use std::net::SocketAddr;

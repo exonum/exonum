@@ -47,7 +47,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use mount::Mount;
 use failure;
 
-use std::{mem, fmt, iter, panic};
+use std::{fmt, iter, mem, panic};
 use std::sync::Arc;
 use std::collections::{BTreeMap, HashMap};
 use std::net::SocketAddr;

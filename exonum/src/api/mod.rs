@@ -17,7 +17,7 @@
 pub mod public;
 pub mod private;
 
-use iron::{IronError, status, headers::Cookie};
+use iron::{status, IronError, headers::Cookie};
 use iron::prelude::*;
 use hyper::header::{ContentType, SetCookie};
 use cookie::Cookie as CookiePair;
@@ -29,7 +29,7 @@ use serde::de::{self, Deserialize, Deserializer, Visitor};
 use failure::Fail;
 use bodyparser;
 
-use std::{io, fmt};
+use std::{fmt, io};
 use std::ops::Deref;
 use std::marker::PhantomData;
 use std::collections::BTreeMap;

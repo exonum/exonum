@@ -25,7 +25,7 @@ use futures::sink::Wait;
 use futures::sync::mpsc::{self, Sender};
 
 use std::time::SystemTime;
-use std::cmp::Ordering;1
+use std::cmp::Ordering;
 
 use node::{ExternalMessage, NodeTimeout};
 use helpers::{Height, Round};

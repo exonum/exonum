@@ -16,7 +16,7 @@
 
 use std::sync::{Arc, RwLock};
 use std::clone::Clone;
-use std::collections::{HashMap, BTreeMap};
+use std::collections::{BTreeMap, HashMap};
 
 use super::{Database, Iter, Iterator, Patch, Result, Snapshot};
 use super::db::Change;
