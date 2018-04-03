@@ -64,13 +64,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   In particular:
 
   - The explorer now allows to iterate over blocks in the blockchain
-    in the given height range, replacing old `blocks_range` method
+    in the given height range, replacing old `blocks_range` method.
   - `block_info` and `tx_info` methods of the explorer are renamed to
-    `block` and `transaction`, respectively
-  - `TransactionInfo` moved from the `api::public` module to the `explorer` module
-  - `BlocksRange` moved from the `explorer` module to the `api::public` module
-  - `TxInfo` is renamed to `CommittedTransaction`
-  - `BlockInfo` has its fields made private, instead providing getter methods
+    `block` and `transaction` respectively.
+  - `TransactionInfo` moved from the `api::public` module to the `explorer` module.
+  - `BlocksRange` moved from the `explorer` module to the `api::public` module.
+  - `TxInfo` is renamed to `CommittedTransaction`.
+  - `BlockInfo` fields are private now, yet accessible with getter methods.
 
   Migration path:
 
