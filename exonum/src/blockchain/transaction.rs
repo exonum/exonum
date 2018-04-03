@@ -426,6 +426,8 @@ pub trait TransactionSet
 /// ```
 #[macro_export]
 macro_rules! transactions {
+    // Empty variant.
+    {} => {};
     // Variant with the private enum.
     {
         $(#[$tx_set_attr:meta])*
@@ -639,6 +641,9 @@ mod tests {
     lazy_static! {
         static ref EXECUTION_STATUS: Mutex<ExecutionResult> = Mutex::new(Ok(()));
     }
+
+    // Testing macro with empty body.
+    transactions!{}
 
     #[test]
     fn execution_error_new() {
