@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![cfg_attr(feature = "cargo-clippy", allow(redundant_field_names))]
+
 use exonum::blockchain::{ExecutionError, ExecutionResult, Transaction};
 use exonum::crypto::{CryptoHash, PublicKey};
 use exonum::messages::Message;
