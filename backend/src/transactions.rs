@@ -104,8 +104,8 @@ impl Transaction for Transfer {
             Err(Error::InsufficientCurrencyAmount)?
         }
 
-        schema.decrease_wallet_balance(from, amount, &hash);
-        schema.increase_wallet_balance(to, amount, &hash);
+        schema.decrease_wallet_balance(sender, amount, &hash);
+        schema.increase_wallet_balance(receiver, amount, &hash);
 
         Ok(())
     }
@@ -121,9 +121,9 @@ impl Transaction for Issue {
         let pub_key = self.pub_key();
         let hash = self.hash();
 
-        if schema.wallet(pub_key).is_some() {
+        if let Some(wallet) = schema.wallet(pub_key) {
             let amount = self.amount();
-            schema.increase_wallet_balance(pub_key, amount, &hash);
+            schema.increase_wallet_balance(wallet, amount, &hash);
             Ok(())
         } else {
             Err(Error::ReceiverNotFound)?

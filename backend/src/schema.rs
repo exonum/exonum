@@ -94,31 +94,29 @@ impl<'a> CurrencySchema<&'a mut Fork> {
     /// Increase balance of the wallet and append new record to its history.
     ///
     /// Panics if there is no wallet with given public key.
-    pub fn increase_wallet_balance(&mut self, key: &PublicKey, amount: u64, transaction: &Hash) {
+    pub fn increase_wallet_balance(&mut self, wallet: Wallet, amount: u64, transaction: &Hash) {
         let wallet = {
-            let wallet = self.wallet(key).unwrap();
-            let mut history = self.wallet_history_mut(key);
+            let mut history = self.wallet_history_mut(wallet.pub_key());
             history.push(*transaction);
             let history_hash = history.root_hash();
             let balance = wallet.balance();
             wallet.set_balance(balance + amount, &history_hash)
         };
-        self.wallets_mut().put(key, wallet);
+        self.wallets_mut().put(wallet.pub_key(), wallet.clone());
     }
 
     /// Decrease balance of the wallet and append new record to its history.
     ///
     /// Panics if there is no wallet with given public key.
-    pub fn decrease_wallet_balance(&mut self, key: &PublicKey, amount: u64, transaction: &Hash) {
+    pub fn decrease_wallet_balance(&mut self, wallet: Wallet, amount: u64, transaction: &Hash) {
         let wallet = {
-            let wallet = self.wallet(key).unwrap();
-            let mut history = self.wallet_history_mut(key);
+            let mut history = self.wallet_history_mut(wallet.pub_key());
             history.push(*transaction);
             let history_hash = history.root_hash();
             let balance = wallet.balance();
             wallet.set_balance(balance - amount, &history_hash)
         };
-        self.wallets_mut().put(key, wallet);
+        self.wallets_mut().put(wallet.pub_key(), wallet.clone());
     }
 
     /// Create new wallet and append first record to its history.
