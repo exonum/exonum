@@ -25,8 +25,9 @@ use exonum::explorer::*;
 use exonum::helpers::Height;
 use exonum::messages::{Message, ServiceMessage};
 
-mod blockchain;
 use blockchain::{create_block, create_blockchain, CreateWallet, Transfer};
+
+mod blockchain;
 
 #[test]
 fn test_explorer_basics() {

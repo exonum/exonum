@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::str;
-
 use exonum::blockchain::{Schema, StoredConfiguration, Transaction};
 use exonum::helpers::{Height, ValidatorId};
 use exonum::storage::StorageValue;
 use exonum::crypto::{hash, CryptoHash, Hash, HASH_SIZE};
 use exonum_testkit::{TestKit, TestKitBuilder, TestNode};
+
+use std::str;
 
 use {Propose, Schema as ConfigurationSchema, Service as ConfigurationService, Vote};
 

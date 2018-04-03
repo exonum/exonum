@@ -138,6 +138,12 @@ extern crate serde_json;
 #[macro_use]
 extern crate assert_matches;
 
+pub use api::{ApiKind, TestKitApi};
+pub use compare::ComparableSnapshot;
+pub use network::{TestNetwork, TestNetworkConfiguration, TestNode};
+
+pub mod compare;
+
 use futures::Stream;
 use futures::sync::mpsc;
 
@@ -152,20 +158,15 @@ use exonum::node::{ApiSender, ExternalMessage, NodeApiConfig, State as NodeState
 use exonum::storage::{MemoryDB, Patch, Snapshot};
 use exonum::messages::RawMessage;
 
+use checkpoint_db::{CheckpointDb, CheckpointDbHandler};
+use poll_events::poll_events;
+
 #[macro_use]
 mod macros;
 mod api;
 mod checkpoint_db;
-pub mod compare;
 mod network;
 mod poll_events;
-
-pub use api::{ApiKind, TestKitApi};
-pub use compare::ComparableSnapshot;
-pub use network::{TestNetwork, TestNetworkConfiguration, TestNode};
-
-use checkpoint_db::{CheckpointDb, CheckpointDbHandler};
-use poll_events::poll_events;
 
 /// Builder for `TestKit`.
 ///

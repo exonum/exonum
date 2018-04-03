@@ -14,6 +14,8 @@
 
 //! An implementation of a Merkelized version of an array list (Merkle tree).
 
+pub use self::proof::{ListProof, ListProofError};
+
 use std::cell::Cell;
 use std::marker::PhantomData;
 
@@ -21,8 +23,6 @@ use crypto::{hash, Hash, HashStream};
 use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey, StorageValue};
 use super::indexes_metadata::IndexType;
 use self::key::ProofListKey;
-
-pub use self::proof::{ListProof, ListProofError};
 
 #[cfg(test)]
 mod tests;

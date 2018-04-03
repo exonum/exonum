@@ -77,6 +77,10 @@ extern crate exonum_testkit;
 #[macro_use]
 extern crate pretty_assertions;
 
+pub use errors::ErrorCode;
+pub use schema::{MaybeVote, ProposeData, Schema};
+pub use transactions::{Propose, Vote};
+
 use exonum::api::Api;
 use exonum::blockchain::{self, ApiContext, Transaction};
 use exonum::crypto::Hash;
@@ -93,10 +97,6 @@ mod schema;
 #[cfg(test)]
 mod tests;
 mod transactions;
-
-pub use errors::ErrorCode;
-pub use schema::{MaybeVote, ProposeData, Schema};
-pub use transactions::{Propose, Vote};
 
 /// Service identifier for the configuration service.
 pub const SERVICE_ID: u16 = 1;

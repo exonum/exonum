@@ -18,14 +18,15 @@ extern crate exonum_testkit;
 extern crate serde;
 extern crate serde_json;
 
+// HACK: Silent "dead_code" warning.
+pub use hooks::{HandleCommitService, TxAfterCommit};
+
 use exonum::crypto::{CryptoHash, Signature};
 use exonum::helpers::Height;
 use exonum::messages::Message;
 use exonum_testkit::TestKitBuilder;
 
 mod hooks;
-// HACK: Silent "dead_code" warning.
-pub use hooks::{HandleCommitService, TxAfterCommit};
 
 #[test]
 fn test_handle_commit() {

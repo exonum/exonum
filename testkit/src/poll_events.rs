@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::fmt;
-
 use futures::{executor, Async, Poll, Stream};
+
+use std::fmt;
 
 /// Stream that terminates as soon as the underlying stream does not have items ready.
 struct TakeWhileReady<S> {

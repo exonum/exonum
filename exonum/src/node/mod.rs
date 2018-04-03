@@ -17,14 +17,11 @@
 //! For details about consensus message handling see messages module documentation.
 // spell-checker:ignore cors
 
-use std::io;
-use std::sync::Arc;
-use std::thread;
-use std::net::SocketAddr;
-use std::time::{Duration, SystemTime};
-use std::collections::BTreeMap;
-use std::collections::HashSet;
-use std::fmt;
+pub use self::state::{RequestData, State, ValidatorState};
+pub use self::whitelist::Whitelist;
+
+pub mod state; // TODO: temporary solution to get access to WAIT constants (ECR-167)
+pub mod timeout_adjuster;
 
 use toml::Value;
 use router::Router;
@@ -32,9 +29,15 @@ use mount::Mount;
 use iron::{Chain, Iron};
 use iron_cors::CorsMiddleware;
 use serde::{de, ser};
-use futures::{Future, Sink};
-use futures::sync::mpsc;
+use futures::{Future, Sink, sync::mpsc};
 use tokio_core::reactor::Core;
+
+use std::{io, fmt};
+use std::sync::Arc;
+use std::thread;
+use std::net::SocketAddr;
+use std::time::{Duration, SystemTime};
+use std::collections::{BTreeMap, HashSet};
 
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use blockchain::{Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction};
@@ -46,16 +49,11 @@ use events::error::{into_other, log_error, other_error, LogError};
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
 use storage::{Database, DbOptions};
 
-pub use self::state::{RequestData, State, ValidatorState};
-pub use self::whitelist::Whitelist;
-
 mod events;
 mod basic;
 mod consensus;
 mod requests;
 mod whitelist;
-pub mod state; // TODO: temporary solution to get access to WAIT constants (ECR-167)
-pub mod timeout_adjuster;
 
 /// External messages.
 #[derive(Debug)]

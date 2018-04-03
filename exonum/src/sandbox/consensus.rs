@@ -14,11 +14,11 @@
 
 // spell-checker:ignore precommiters, uncommented, uncomment, commited
 
-use std::time::Duration;
-use std::collections::BTreeMap;
-
 use rand::{thread_rng, Rng};
 use bit_vec::BitVec;
+
+use std::time::Duration;
+use std::collections::BTreeMap;
 
 use messages::{Connect, Message, PeersRequest, Precommit, Prevote, PrevotesRequest, Propose,
                ProposeRequest, RawMessage, TransactionsRequest, CONSENSUS};

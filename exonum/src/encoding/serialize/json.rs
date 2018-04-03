@@ -21,8 +21,7 @@
 // TODO remove WriteBufferWrapper hack (after refactor storage),
 // should be moved into storage (ECR-156).
 
-use serde_json;
-use serde_json::value::Value;
+use serde_json::{self, value::Value};
 use bit_vec::BitVec;
 use hex::FromHex;
 use chrono::{DateTime, TimeZone, Utc};

@@ -24,7 +24,6 @@ extern crate serde;
 extern crate serde_json;
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
-
 use exonum::blockchain::{ExecutionResult, Service, Transaction, TransactionSet};
 use exonum::crypto::{gen_keypair, Hash, PublicKey};
 use exonum::encoding;

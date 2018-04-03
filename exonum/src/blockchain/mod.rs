@@ -32,28 +32,6 @@
 //! [`Service`]: ./trait.Service.html
 //! [doc:create-service]: https://exonum.com/doc/get-started/create-service
 
-use std::sync::Arc;
-use std::collections::BTreeMap;
-use std::collections::HashMap;
-use std::mem;
-use std::fmt;
-use std::iter;
-use std::panic;
-use std::net::SocketAddr;
-use std::error::Error as StdError;
-use failure;
-
-use vec_map::VecMap;
-use byteorder::{ByteOrder, LittleEndian};
-use mount::Mount;
-
-use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
-use messages::{CONSENSUS as CORE_SERVICE, Connect, Precommit, RawMessage};
-use storage::{Database, Error, Fork, Patch, Snapshot};
-use helpers::{Height, Round, ValidatorId};
-use node::ApiSender;
-use encoding::Error as MessageError;
-
 pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
 pub use self::schema::{Schema, TxLocation};
 pub use self::genesis::GenesisConfig;
@@ -61,6 +39,26 @@ pub use self::config::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConf
 pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState};
 pub use self::transaction::{ExecutionError, ExecutionResult, Transaction, TransactionError,
                             TransactionErrorType, TransactionResult, TransactionSet};
+
+pub mod config;
+
+use vec_map::VecMap;
+use byteorder::{ByteOrder, LittleEndian};
+use mount::Mount;
+use failure;
+
+use std::{mem, fmt, iter, panic};
+use std::sync::Arc;
+use std::collections::{BTreeMap, HashMap};
+use std::net::SocketAddr;
+use std::error::Error as StdError;
+
+use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
+use messages::{CONSENSUS as CORE_SERVICE, Connect, Precommit, RawMessage};
+use storage::{Database, Error, Fork, Patch, Snapshot};
+use helpers::{Height, Round, ValidatorId};
+use node::ApiSender;
+use encoding::Error as MessageError;
 
 mod block;
 mod schema;
@@ -70,8 +68,6 @@ mod service;
 mod transaction;
 #[cfg(test)]
 mod tests;
-
-pub mod config;
 
 /// Exonum blockchain instance with the concrete services set and data storage.
 /// Only blockchains with the identical set of services and genesis block can be combined

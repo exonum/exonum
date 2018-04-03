@@ -33,13 +33,13 @@ use exonum::blockchain::{Transaction, TransactionErrorType as ErrorType};
 use exonum::crypto::{self, CryptoHash, PublicKey};
 use exonum::helpers::Height;
 use exonum::messages::Message;
-use exonum::encoding::serialize::FromHex;
-use exonum::encoding::serialize::json::ExonumJson;
+use exonum::encoding::serialize::{FromHex, json::ExonumJson};
 use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};
 use serde_json::Value;
 
-mod counter;
 use counter::{CounterSchema, CounterService, TransactionResponse, TxIncrement, TxReset, ADMIN_KEY};
+
+mod counter;
 
 fn init_testkit() -> (TestKit, TestKitApi) {
     let testkit = TestKit::for_service(CounterService);

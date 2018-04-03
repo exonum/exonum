@@ -14,28 +14,28 @@
 
 //! Different assorted utilities.
 
-use std::env;
-use std::io::{self, Write};
-use std::time::SystemTime;
-
-use log::{Level, Record, SetLoggerError};
-use env_logger::{Builder, Formatter};
-use colored::*;
-use chrono::{DateTime, Local};
-
-use blockchain::{GenesisConfig, ValidatorKeys};
-use node::NodeConfig;
-use crypto::gen_keypair;
-
 pub use self::types::{Height, Milliseconds, Round, ValidatorId};
-
-mod types;
 
 pub mod fabric;
 pub mod config;
 pub mod user_agent;
 #[macro_use]
 pub mod metrics;
+
+use log::{Level, Record, SetLoggerError};
+use env_logger::{Builder, Formatter};
+use colored::*;
+use chrono::{DateTime, Local};
+
+use std::env;
+use std::io::{self, Write};
+use std::time::SystemTime;
+
+use blockchain::{GenesisConfig, ValidatorKeys};
+use node::NodeConfig;
+use crypto::gen_keypair;
+
+mod types;
 
 /// Performs the logger initialization.
 pub fn init_logger() -> Result<(), SetLoggerError> {

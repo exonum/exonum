@@ -18,14 +18,14 @@ extern crate futures;
 extern crate serde_json;
 extern crate tokio_timer;
 
-use std::thread::{self, JoinHandle};
-use std::time::Duration;
-use std::sync::{Arc, Mutex};
-
 use futures::Future;
 use futures::sync::oneshot;
 use tokio_timer::Timer;
 use serde_json::Value;
+
+use std::thread::{self, JoinHandle};
+use std::time::Duration;
+use std::sync::{Arc, Mutex};
 
 use exonum::blockchain::{Service, ServiceContext, Transaction};
 use exonum::encoding::Error as EncodingError;

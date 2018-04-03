@@ -17,17 +17,15 @@
 //! This module implement all core commands.
 // spell-checker:ignore exts
 
+use toml;
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::net::SocketAddr;
 use std::collections::{BTreeMap, HashMap};
 
-use toml::Value;
-
-use blockchain::GenesisConfig;
-use blockchain::config::ValidatorKeys;
-use helpers::generate_testnet_config;
-use helpers::config::ConfigFile;
+use blockchain::{GenesisConfig, config::ValidatorKeys};
+use helpers::{generate_testnet_config, config::ConfigFile};
 use node::{NodeApiConfig, NodeConfig};
 use storage::{Database, DbOptions, RocksDB};
 use crypto;
@@ -403,11 +401,11 @@ impl Command for GenerateNodeConfig {
         context.set(keys::COMMON_CONFIG, common.clone());
         context.set(
             keys::SERVICES_PUBLIC_CONFIGS,
-            BTreeMap::<String, Value>::default(),
+            BTreeMap::<String, toml::Value>::default(),
         );
         context.set(
             keys::SERVICES_SECRET_CONFIGS,
-            BTreeMap::<String, Value>::default(),
+            BTreeMap::<String, toml::Value>::default(),
         );
         let new_context = exts(context);
         let services_public_configs = new_context.get(keys::SERVICES_PUBLIC_CONFIGS).unwrap();

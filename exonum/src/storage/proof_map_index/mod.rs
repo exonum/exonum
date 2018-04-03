@@ -14,6 +14,9 @@
 
 //! An implementation of a Merkelized version of a map (Merkle Patricia tree).
 
+pub use self::key::{HashedKey, KEY_SIZE as PROOF_MAP_KEY_SIZE, ProofMapKey, ProofPath};
+pub use self::proof::{CheckedMapProof, MapProof, MapProofError};
+
 use std::marker::PhantomData;
 use std::fmt;
 
@@ -23,9 +26,6 @@ use super::indexes_metadata::IndexType;
 use self::key::{BitsRange, ChildKind, LEAF_KEY_PREFIX};
 use self::node::{BranchNode, Node};
 use self::proof::{create_multiproof, create_proof};
-
-pub use self::key::{HashedKey, KEY_SIZE as PROOF_MAP_KEY_SIZE, ProofMapKey, ProofPath};
-pub use self::proof::{CheckedMapProof, MapProof, MapProofError};
 
 #[cfg(test)]
 mod tests;

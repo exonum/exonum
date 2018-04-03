@@ -16,22 +16,21 @@
 
 //! An implementation of `RocksDB` database.
 
+pub use rocksdb::WriteOptions as RocksDBWriteOptions;
+pub use rocksdb::BlockBasedOptions as RocksBlockOptions;
+
 use exonum_profiler::ProfilerSpan;
 use rocksdb::{self, DBIterator, Options as RocksDbOptions, WriteBatch};
 use rocksdb::utils::get_cf_names;
 
-use std::mem;
+use std::{mem, fmt};
 use std::sync::Arc;
 use std::path::Path;
-use std::fmt;
 use std::error::Error;
 use std::iter::Peekable;
 
 use storage::{self, Database, DbOptions, Iter, Iterator, Patch, Snapshot};
 use storage::db::Change;
-
-pub use rocksdb::WriteOptions as RocksDBWriteOptions;
-pub use rocksdb::BlockBasedOptions as RocksBlockOptions;
 
 impl From<rocksdb::Error> for storage::Error {
     fn from(err: rocksdb::Error) -> storage::Error {

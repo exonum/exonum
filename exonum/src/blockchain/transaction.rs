@@ -14,14 +14,13 @@
 
 //! `Transaction` related types.
 
+use serde::Serialize;
+use serde::de::DeserializeOwned;
+
 use std::borrow::Cow;
 use std::any::Any;
 use std::error::Error;
-use std::fmt;
-use std::u8;
-
-use serde::Serialize;
-use serde::de::DeserializeOwned;
+use std::{fmt, u8};
 
 use messages::{Message, RawTransaction};
 use storage::{Fork, StorageValue};

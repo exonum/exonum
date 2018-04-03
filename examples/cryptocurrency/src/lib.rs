@@ -198,8 +198,7 @@ pub mod errors {
 /// Contracts.
 pub mod contracts {
     use exonum::blockchain::{ExecutionResult, Transaction};
-    use exonum::messages::Message;
-    use exonum::storage::Fork;
+    use exonum::{messages::Message, storage::Fork};
 
     use schema::{CurrencySchema, Wallet};
     use transactions::{TxCreateWallet, TxTransfer};
@@ -281,9 +280,7 @@ pub mod api {
     use exonum::crypto::{Hash, PublicKey};
     use exonum::api::{Api, ApiError};
     use iron::prelude::*;
-    use iron::status::Status;
-    use iron::headers::ContentType;
-    use iron::modifiers::Header;
+    use iron::{status::Status, headers::ContentType, modifiers::Header};
     use router::Router;
 
     use bodyparser;
@@ -395,11 +392,7 @@ pub mod api {
 /// Service declaration.
 pub mod service {
     use exonum::blockchain::{ApiContext, Service, Transaction, TransactionSet};
-    use exonum::messages::RawTransaction;
-    use exonum::storage::Snapshot;
-    use exonum::crypto::Hash;
-    use exonum::encoding;
-    use exonum::api::Api;
+    use exonum::{messages::RawTransaction, storage::Snapshot, crypto::Hash, encoding, api::Api};
     use iron::Handler;
     use router::Router;
 
