@@ -96,16 +96,16 @@ impl Transaction for Transfer {
         let hash = self.hash();
         let amount = self.amount();
 
-        let sender = schema.wallet(from).ok_or_else(|| Error::SenderNotFound)?;
+        let sender = schema.wallet(from).ok_or(Error::SenderNotFound)?;
 
-        let receiver = schema.wallet(to).ok_or_else(|| Error::ReceiverNotFound)?;
+        let receiver = schema.wallet(to).ok_or(Error::ReceiverNotFound)?;
 
         if sender.balance() < amount {
             Err(Error::InsufficientCurrencyAmount)?
         }
 
-        schema.set_wallet_balance(from, sender.balance() - amount, &hash);
-        schema.set_wallet_balance(to, receiver.balance() + amount, &hash);
+        schema.decrease_wallet_balance(from, amount, &hash);
+        schema.increase_wallet_balance(to, amount, &hash);
 
         Ok(())
     }
@@ -121,9 +121,9 @@ impl Transaction for Issue {
         let pub_key = self.pub_key();
         let hash = self.hash();
 
-        if let Some(wallet) = schema.wallet(pub_key) {
+        if schema.wallet(pub_key).is_some() {
             let amount = self.amount();
-            schema.set_wallet_balance(pub_key, wallet.balance() + amount, &hash);
+            schema.increase_wallet_balance(pub_key, amount, &hash);
             Ok(())
         } else {
             Err(Error::ReceiverNotFound)?
@@ -141,12 +141,12 @@ impl Transaction for CreateWallet {
         let pub_key = self.pub_key();
         let hash = self.hash();
 
-        if schema.wallet(pub_key).is_some() {
-            Err(Error::WalletAlreadyExists)?
-        } else {
+        if schema.wallet(pub_key).is_none() {
             let name = self.name();
             schema.create_wallet(pub_key, name, &hash);
             Ok(())
+        } else {
+            Err(Error::WalletAlreadyExists)?
         }
     }
 }

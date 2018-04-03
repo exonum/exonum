@@ -91,16 +91,32 @@ impl<'a> CurrencySchema<&'a mut Fork> {
         )
     }
 
-    /// Update balance of the wallet and append new record to its history.
+    /// Increase balance of the wallet and append new record to its history.
     ///
     /// Panics if there is no wallet with given public key.
-    pub fn set_wallet_balance(&mut self, key: &PublicKey, balance: u64, transaction: &Hash) {
+    pub fn increase_wallet_balance(&mut self, key: &PublicKey, amount: u64, transaction: &Hash) {
         let wallet = {
             let wallet = self.wallet(key).unwrap();
             let mut history = self.wallet_history_mut(key);
             history.push(*transaction);
             let history_hash = history.root_hash();
-            wallet.set_balance(balance, &history_hash)
+            let balance = wallet.balance();
+            wallet.set_balance(balance + amount, &history_hash)
+        };
+        self.wallets_mut().put(key, wallet);
+    }
+
+    /// Decrease balance of the wallet and append new record to its history.
+    ///
+    /// Panics if there is no wallet with given public key.
+    pub fn decrease_wallet_balance(&mut self, key: &PublicKey, amount: u64, transaction: &Hash) {
+        let wallet = {
+            let wallet = self.wallet(key).unwrap();
+            let mut history = self.wallet_history_mut(key);
+            history.push(*transaction);
+            let history_hash = history.root_hash();
+            let balance = wallet.balance();
+            wallet.set_balance(balance - amount, &history_hash)
         };
         self.wallets_mut().put(key, wallet);
     }
