@@ -26,10 +26,9 @@ use exonum::storage::{Entry, Fork, Snapshot};
 use exonum::crypto::{Hash, PublicKey};
 use exonum::encoding;
 use exonum::api::{Api, ApiError};
-use self::iron::Handler;
-use self::iron::prelude::*;
-use self::router::Router;
 use serde_json;
+use self::iron::{Handler, prelude::*};
+use self::router::Router;
 
 pub const SERVICE_ID: u16 = 1;
 

@@ -16,11 +16,11 @@
 //! Currently support only json.
 //! This module is a pack of superstructures over serde `Serializer`\`Deserializer`
 
+pub use hex::{decode as decode_hex, encode as encode_hex, FromHex, FromHexError, ToHex};
+
 use encoding::Field;
 use messages::MessageWriter;
 use super::Offset;
-
-pub use hex::{decode as decode_hex, encode as encode_hex, FromHex, FromHexError, ToHex};
 
 /// implement exonum serialization\deserialization based on serde `Serialize`\ `Deserialize`
 ///

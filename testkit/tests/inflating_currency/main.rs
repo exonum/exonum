@@ -32,8 +32,9 @@ use exonum::helpers::Height;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use rand::Rng;
 
-mod inflating_cryptocurrency;
 use inflating_cryptocurrency::{CurrencyService, TransactionResponse, TxCreateWallet, TxTransfer};
+
+mod inflating_cryptocurrency;
 
 fn init_testkit() -> TestKit {
     TestKitBuilder::validator()

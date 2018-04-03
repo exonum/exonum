@@ -60,11 +60,16 @@ but we have several additional conventions:
   Public method should be documented, but meaningful parameter names are also
   helpful for better understanding.
 
-- Imports (`use`) should be in the following order:
+- Modules and imports (`use`) should be in the following order:
 
-  - Third-party libraries.
-  - Standard library.
-  - Internal.
+  - `extern crate`s.
+  - Reexporting (`pub use`).
+  - Public modules (`pub mod`).
+  - Imports (`use`):
+    - Third-party libraries.
+    - Standard library.
+    - Internal.
+  - Internal modules (`mod`).
 
 [suggestions]: https://github.com/exonum/exonum/issues/new?template=feature.md
 [bug reports]: https://github.com/exonum/exonum/issues/new?template=bug.md

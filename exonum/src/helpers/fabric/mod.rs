@@ -14,20 +14,20 @@
 
 //! Command line commands utilities.
 
-use std::str::FromStr;
-use std::collections::BTreeMap;
+pub use self::builder::NodeBuilder;
+pub use self::details::{Finalize, GenerateCommonConfig, GenerateNodeConfig, GenerateTestnet, Run};
+pub use self::shared::{AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig};
+pub use self::context_key::ContextKey;
 
 use clap;
 use toml::Value;
 use serde::{Deserialize, Serialize};
 use failure;
 
-use blockchain::Service;
+use std::str::FromStr;
+use std::collections::BTreeMap;
 
-pub use self::builder::NodeBuilder;
-pub use self::details::{Finalize, GenerateCommonConfig, GenerateNodeConfig, GenerateTestnet, Run};
-pub use self::shared::{AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig};
-pub use self::context_key::ContextKey;
+use blockchain::Service;
 
 mod shared;
 mod builder;

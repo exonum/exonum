@@ -105,9 +105,6 @@
 //!
 //! [`field_size()`]: ./trait.Field.html#tymethod.field_size
 
-use std::convert::From;
-use std::ops::{Add, Div, Mul, Sub};
-
 pub use self::fields::Field;
 pub use self::segments::SegmentField;
 pub use self::error::Error;
@@ -116,6 +113,9 @@ pub use self::float::{F32, F64};
 
 #[macro_use]
 pub mod serialize;
+
+use std::convert::From;
+use std::ops::{Add, Div, Mul, Sub};
 
 mod error;
 #[macro_use]

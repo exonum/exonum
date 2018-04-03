@@ -12,17 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::mem;
-use std::error::Error;
-
 use byteorder::{ByteOrder, LittleEndian};
 use serde_json::value::{Number, Value};
 
-use super::Result as EncodingResult;
-use super::Error as EncodingError;
+use std::mem;
+use std::error::Error;
+
 use encoding::{CheckedOffset, Field, Offset};
 use encoding::serialize::WriteBufferWrapper;
 use encoding::serialize::json::{ExonumJson, ExonumJsonDeserialize};
+use super::Result as EncodingResult;
+use super::Error as EncodingError;
 
 /// Wrapper for the `f32` type that restricts non-finite
 /// (NaN, Infinity, negative zero and subnormal) values.

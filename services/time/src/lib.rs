@@ -35,8 +35,7 @@ extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
 
-use iron::prelude::*;
-use iron::Handler;
+use iron::{Handler, prelude::*};
 use router::Router;
 use chrono::{DateTime, Duration, TimeZone, Utc};
 

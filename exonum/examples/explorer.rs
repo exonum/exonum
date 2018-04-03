@@ -24,9 +24,10 @@ use exonum::crypto;
 use exonum::explorer::*;
 use exonum::helpers::{Height, ValidatorId};
 
+use blockchain::{consensus_keys, create_block, create_blockchain, CreateWallet, Transfer};
+
 #[path = "../tests/explorer/blockchain.rs"]
 mod blockchain;
-use blockchain::{consensus_keys, create_block, create_blockchain, CreateWallet, Transfer};
 
 /// Creates a transaction for the mempool.
 pub fn mempool_transaction() -> Box<Transaction> {

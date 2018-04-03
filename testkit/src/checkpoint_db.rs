@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::sync::{Arc, RwLock};
-
 use exonum::storage::{Database, Patch, Result as StorageResult, Snapshot};
+
+use std::sync::{Arc, RwLock};
 
 /// Implementation of a `Database`, which allows to rollback its state
 /// to the last made checkpoint.

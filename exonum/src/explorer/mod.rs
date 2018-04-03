@@ -19,6 +19,11 @@
 
 use serde::{Serialize, Serializer};
 
+use std::cell::{Ref, RefCell};
+use std::collections::Bound;
+use std::fmt;
+use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
+
 use crypto::{CryptoHash, Hash};
 use blockchain::{Block, Blockchain, Schema, Transaction, TransactionError, TransactionErrorType,
                  TransactionResult, TxLocation};
@@ -26,11 +31,6 @@ use encoding;
 use helpers::Height;
 use messages::{Precommit, RawMessage};
 use storage::{ListProof, Snapshot};
-
-use std::cell::{Ref, RefCell};
-use std::collections::Bound;
-use std::fmt;
-use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
 
 /// Transaction parsing result.
 type ParseResult = Result<Box<Transaction>, encoding::Error>;

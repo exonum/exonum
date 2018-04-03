@@ -15,13 +15,13 @@
 //! This module defines the Exonum services interfaces. Like smart contracts in some other
 //! blockchain platforms, Exonum services encapsulate business logic of the blockchain application.
 
+use serde_json::Value;
+use iron::Handler;
+
 use std::fmt;
 use std::sync::{Arc, RwLock};
 use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
-
-use serde_json::Value;
-use iron::Handler;
 
 use crypto::{Hash, PublicKey, SecretKey};
 use storage::{Fork, Snapshot};

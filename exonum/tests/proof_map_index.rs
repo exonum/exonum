@@ -28,7 +28,6 @@ extern crate proptest;
 
 use exonum::storage::{Database, MapProof, MemoryDB, ProofMapIndex, Snapshot, StorageValue};
 use exonum::storage::proof_map_index::{ProofMapKey, ProofPath};
-
 use proptest::prelude::*;
 use proptest::num::u8::BinarySearch as U8BinarySearch;
 use proptest::test_runner::Config;

@@ -12,15 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use futures::{Future, Sink, Stream};
+use futures::{stream::Wait, sync::mpsc};
+use tokio_core::reactor::Core;
+use tokio_timer::{TimeoutStream, Timer};
+
 use std::net::SocketAddr;
 use std::thread;
 use std::time::{self, Duration};
-
-use futures::{Future, Sink, Stream};
-use futures::stream::Wait;
-use futures::sync::mpsc;
-use tokio_core::reactor::Core;
-use tokio_timer::{TimeoutStream, Timer};
 
 use crypto::{gen_keypair, PublicKey, Signature};
 use messages::{Connect, Message, MessageWriter, RawMessage};

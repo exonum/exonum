@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use clap;
+
 use std::ffi::OsString;
 use std::collections::HashMap;
-
-use clap;
 
 use super::{ArgumentType, Context};
 use super::internal::{CollectedCommand, Feedback};

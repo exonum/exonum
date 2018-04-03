@@ -15,6 +15,8 @@
 // Workaround: Clippy does not correctly handle borrowing checking rules for returned types.
 #![cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
 
+use futures::{self, Async, Future, Sink, Stream, sync::mpsc};
+
 use std::ops::{AddAssign, Deref};
 use std::sync::{Arc, Mutex};
 use std::cell::{Ref, RefCell, RefMut};
@@ -23,9 +25,6 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::collections::{BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque};
 use std::iter::FromIterator;
 
-use futures::{self, Async, Future, Stream};
-use futures::Sink;
-use futures::sync::mpsc;
 use node::{ApiSender, Configuration, ExternalMessage, ListenerConfig, NodeHandler, NodeSender,
            ServiceConfig, State, SystemStateProvider};
 use blockchain::{Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
@@ -38,7 +37,6 @@ use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
 use events::{Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent, NetworkRequest,
              TimeoutRequest};
 use events::network::NetworkConfiguration;
-
 use super::timestamping::TimestampingService;
 use super::config_updater::ConfigUpdateService;
 use super::sandbox_tests_helper::VALIDATOR_0;

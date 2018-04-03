@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use events::{Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent};
-use super::{ExternalMessage, NodeHandler, NodeTimeout};
 use events::error::LogError;
+use super::{ExternalMessage, NodeHandler, NodeTimeout};
 
 impl EventHandler for NodeHandler {
     fn handle_event(&mut self, event: Event) {

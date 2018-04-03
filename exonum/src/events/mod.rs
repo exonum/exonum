@@ -12,27 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub use self::network::{NetworkConfiguration, NetworkEvent, NetworkPart, NetworkRequest};
+pub use self::internal::InternalPart;
+
 pub mod codec;
 pub mod error;
 pub mod network;
 pub mod internal;
 
-#[cfg(test)]
-mod tests;
-#[cfg(all(test, feature = "long_benchmarks"))]
-mod benches;
-
-use std::time::SystemTime;
-use std::cmp::Ordering;
-
 use futures::{Async, Future, Poll, Stream};
 use futures::sink::Wait;
 use futures::sync::mpsc::{self, Sender};
 
+use std::time::SystemTime;
+use std::cmp::Ordering;
+
 use node::{ExternalMessage, NodeTimeout};
-pub use self::network::{NetworkConfiguration, NetworkEvent, NetworkPart, NetworkRequest};
-pub use self::internal::InternalPart;
 use helpers::{Height, Round};
+
+#[cfg(test)]
+mod tests;
+#[cfg(all(test, feature = "long_benchmarks"))]
+mod benches;
 
 pub type SyncSender<T> = Wait<Sender<T>>;
 
