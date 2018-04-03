@@ -9,7 +9,7 @@ use exonum::api::{Api, ApiError};
 use exonum::node::TransactionSend;
 use exonum::crypto::{PublicKey, Hash};
 use exonum::storage::{MapProof, ListProof};
-use exonum::blockchain::{self, Blockchain, BlockProof, Transaction};
+use exonum::blockchain::{self, Blockchain, BlockProof, Transaction, TransactionSet};
 use exonum::helpers::Height;
 
 use std::fmt;
@@ -34,12 +34,19 @@ pub struct WalletProof {
     to_wallet: MapProof<Wallet>,
 }
 
+/// Wallet history.
+#[derive(Debug, Serialize)]
+pub struct WalletHistory {
+    proof: ListProof<Hash>,
+    transactions: Vec<WalletTransactions>,
+}
+
 /// Wallet information.
 #[derive(Debug, Serialize)]
 pub struct WalletInfo {
     block_proof: BlockProof,
     wallet_proof: WalletProof,
-    wallet_history: Option<ListProof<Hash>>,
+    wallet_history: Option<WalletHistory>,
 }
 
 /// TODO: Add documentation.
@@ -81,7 +88,23 @@ where
 
         let wallet_history = wallet.map(|_| {
             let history = currency_schema.wallet_history(pub_key);
-            history.get_range_proof(0, history.len())
+            let proof = history.get_range_proof(0, history.len());
+
+            let transactions: Vec<WalletTransactions> = history
+                .iter()
+                .map(|record| {
+                    general_schema
+                        .transactions()
+                        .get(&record)
+                        .unwrap()
+                })
+                .map(|raw| WalletTransactions::tx_from_raw(raw).unwrap())
+                .collect::<Vec<_>>();
+
+            WalletHistory {
+                proof,
+                transactions,
+            }
         });
 
         Ok(WalletInfo {
