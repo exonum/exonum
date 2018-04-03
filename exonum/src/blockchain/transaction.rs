@@ -21,6 +21,7 @@ use std::borrow::Cow;
 use std::any::Any;
 use std::error::Error;
 use std::{fmt, u8};
+use std::convert::Into;
 
 use messages::{Message, RawTransaction};
 use storage::{Fork, StorageValue};
@@ -165,10 +166,10 @@ impl ExecutionError {
     }
 
     /// Constructs a new `ExecutionError` instance with the given error code and description.
-    pub fn with_description(code: u8, description: String) -> Self {
+    pub fn with_description<T: Into<String>>(code: u8, description: T) -> Self {
         Self {
             code,
-            description: Some(description),
+            description: Some(description.into()),
         }
     }
 }
@@ -425,6 +426,8 @@ pub trait TransactionSet
 /// ```
 #[macro_export]
 macro_rules! transactions {
+    // Empty variant.
+    {} => {};
     // Variant with the private enum.
     {
         $(#[$tx_set_attr:meta])*
@@ -639,6 +642,9 @@ mod tests {
         static ref EXECUTION_STATUS: Mutex<ExecutionResult> = Mutex::new(Ok(()));
     }
 
+    // Testing macro with empty body.
+    transactions!{}
+
     #[test]
     fn execution_error_new() {
         let codes = [0, 1, 100, 255];
@@ -655,7 +661,7 @@ mod tests {
         let values = [(0, ""), (1, "test"), (100, "error"), (255, "hello")];
 
         for value in &values {
-            let error = ExecutionError::with_description(value.0, value.1.to_owned());
+            let error = ExecutionError::with_description(value.0, value.1);
             assert_eq!(value.0, error.code);
             assert_eq!(value.1, error.description.unwrap());
         }
@@ -684,8 +690,8 @@ mod tests {
         let execution_errors = [
             ExecutionError::new(0),
             ExecutionError::new(255),
-            ExecutionError::with_description(1, "".to_owned()),
-            ExecutionError::with_description(1, "Terrible failure".to_owned()),
+            ExecutionError::with_description(1, ""),
+            ExecutionError::with_description(1, "Terrible failure"),
         ];
 
         for execution_error in &execution_errors {
@@ -738,14 +744,11 @@ mod tests {
     fn error_discards_transaction_changes() {
         let statuses = [
             Err(ExecutionError::new(0)),
-            Err(ExecutionError::with_description(
-                0,
-                "Strange error".to_owned(),
-            )),
+            Err(ExecutionError::with_description(0, "Strange error")),
             Err(ExecutionError::new(255)),
             Err(ExecutionError::with_description(
                 255,
-                "Error description...".to_owned(),
+                "Error description...",
             )),
             Ok(()),
         ];
