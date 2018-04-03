@@ -9,8 +9,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### Exonum core
 
-- ExecutionError::with_description method now takes Into<String> instead of 
-  String which allows to pass &amp;str directly. (#592)
+- `ExecutionError::with_description` method now takes `Into<String>` instead of `String` which allows to pass `&str` directly. (#592)
 
 - POST-requests are now handled with `bodyparser` crate,
   so all the parameters must be passed in the body. (#529)
