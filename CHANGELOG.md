@@ -159,6 +159,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Sandbox tests have been moved inside of the exonum core. (#568)
 
+- The requested transactions in the `TransactionsRequest` are now sent by batches,
+  rather than one by one. The number of batches depends on the size limits
+  of the message. (#583)
+
 ## 0.6 - 2018-03-06
 
 ### Breaking changes

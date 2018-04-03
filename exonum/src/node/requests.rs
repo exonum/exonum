@@ -15,10 +15,9 @@
 use std::mem::replace;
 
 use messages::{BlockRequest, BlockResponse, Message, PrevotesRequest, ProposeRequest,
-               RequestMessage, TransactionsRequest, TransactionsResponse};
+               RequestMessage, TransactionsRequest, TransactionsResponse, HEADER_LENGTH};
 use blockchain::Schema;
 use crypto::{PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
-use messages::HEADER_LENGTH;
 use super::NodeHandler;
 
 // TODO: height should be updated after any message, not only after status (if signature is correct)
