@@ -65,7 +65,7 @@ but we have several additional conventions:
   - `extern crate`s.
   - Reexporting (`pub use`).
   - Public modules (`pub mod`).
-  - Imports (`use`): 
+  - Imports (`use`):
     - Third-party libraries.
     - Standard library.
     - Internal.

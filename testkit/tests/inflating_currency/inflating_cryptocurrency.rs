@@ -28,11 +28,11 @@ use exonum::encoding;
 use exonum::encoding::serialize::FromHex;
 use exonum::api::{Api, ApiError};
 use exonum::helpers::Height;
-use iron::prelude::*;
-use iron::headers::ContentType;
-use iron::{Handler, IronError};
-use iron::status::Status;
-use router::Router;
+use self::iron::prelude::*;
+use self::iron::headers::ContentType;
+use self::iron::{Handler, IronError};
+use self::iron::status::Status;
+use self::router::Router;
 
 // // // // // // // // // // CONSTANTS // // // // // // // // // //
 
