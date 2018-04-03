@@ -59,7 +59,7 @@ transactions! {
 
         /// Issue `amount` of the currency to the `wallet`.
         struct Issue {
-            wallet:  &PublicKey,
+            pub_key:  &PublicKey,
             amount:  u64,
             seed:    u64,
         }
@@ -87,13 +87,9 @@ impl Transaction for Transfer {
 
         let sender = schema.wallet(from).ok_or_else(|| Error::SenderNotFound)?;
 
-        let receiver = schema.wallet(to).ok_or_else(|| {
-            schema.append_failure(from, &hash);
-            Error::ReceiverNotFound
-        })?;
+        let receiver = schema.wallet(to).ok_or_else(|| Error::ReceiverNotFound)?;
 
         if sender.balance() < amount {
-            schema.append_failure(from, &hash);
             Err(Error::InsufficientCurrencyAmount)?
         }
 
@@ -102,7 +98,8 @@ impl Transaction for Transfer {
 
         schema.wallets_mut().put(from, sender);
         schema.wallets_mut().put(to, receiver);
-        schema.append_success(from, &hash);
+        schema.append_history(from, &hash);
+        schema.append_history(to, &hash);
 
         Ok(())
     }
@@ -110,19 +107,19 @@ impl Transaction for Transfer {
 
 impl Transaction for Issue {
     fn verify(&self) -> bool {
-        self.verify_signature(self.wallet())
+        self.verify_signature(self.pub_key())
     }
 
     fn execute(&self, fork: &mut Fork) -> ExecutionResult {
         let mut schema = CurrencySchema::new(fork);
-        let pub_key = self.wallet();
+        let pub_key = self.pub_key();
         let hash = self.hash();
 
         if let Some(wallet) = schema.wallet(pub_key) {
             let amount = self.amount();
             let wallet = wallet.increase(amount);
             schema.wallets_mut().put(pub_key, wallet);
-            schema.append_success(pub_key, &hash);
+            schema.append_history(pub_key, &hash);
             Ok(())
         } else {
             Err(Error::ReceiverNotFound)?
@@ -141,13 +138,12 @@ impl Transaction for CreateWallet {
         let hash = self.hash();
 
         if schema.wallet(pub_key).is_some() {
-            schema.append_failure(pub_key, &hash);
             Err(Error::WalletAlreadyExists)?
         } else {
             let name = self.name();
             let wallet = Wallet::create(pub_key, name, INITIAL_BALANCE);
             schema.wallets_mut().put(pub_key, wallet);
-            schema.append_success(pub_key, &hash);
+            schema.append_history(pub_key, &hash);
             Ok(())
         }
     }

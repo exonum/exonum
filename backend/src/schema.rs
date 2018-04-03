@@ -6,15 +6,6 @@ use std::fmt;
 
 use wallet::Wallet;
 
-/// Represents transaction. If `execution_status` equals to `true`, then the transaction
-/// was successful.
-encoding_struct! {
-    struct MetaRecord {
-        transaction_hash:    &Hash,
-        execution_status:    bool,
-    }
-}
-
 /// Database schema for the cryptocurrency.
 pub struct CurrencySchema<T> {
     view: T,
@@ -47,7 +38,7 @@ where
     }
 
     /// Returns history of the wallet with the given public key.
-    pub fn wallet_history(&self, public_key: &PublicKey) -> ProofListIndex<&T, MetaRecord> {
+    pub fn wallet_history(&self, public_key: &PublicKey) -> ProofListIndex<&T, Hash> {
         ProofListIndex::with_prefix(
             "cryptocurrency.wallet_history",
             gen_prefix(public_key),
@@ -77,7 +68,7 @@ impl<'a> CurrencySchema<&'a mut Fork> {
     pub fn wallet_history_mut(
         &mut self,
         public_key: &PublicKey,
-    ) -> ProofListIndex<&mut Fork, MetaRecord> {
+    ) -> ProofListIndex<&mut Fork, Hash> {
         ProofListIndex::with_prefix(
             "cryptocurrency.wallet_history",
             gen_prefix(public_key),
@@ -86,25 +77,13 @@ impl<'a> CurrencySchema<&'a mut Fork> {
     }
 
     /// Appends transaction record to the wallet with the given public key.
-    fn append_history(&mut self, key: &PublicKey, record: MetaRecord) {
+    pub fn append_history(&mut self, key: &PublicKey, tx_hash: &Hash) {
         let wallet = {
             let wallet = self.wallet(key).unwrap();
             let mut history = self.wallet_history_mut(key);
-            history.push(record);
+            history.push(*tx_hash);
             wallet.grow_length_set_history_hash(&history.root_hash())
         };
         self.wallets_mut().put(key, wallet);
-    }
-
-    /// Appends record with `successful` status to the wallet history.
-    pub fn append_success(&mut self, key: &PublicKey, hash: &Hash) {
-        let record = MetaRecord::new(hash, true);
-        self.append_history(key, record);
-    }
-
-    /// Appends record with `unsuccessful` status to the wallet history.
-    pub fn append_failure(&mut self, key: &PublicKey, hash: &Hash) {
-        let record = MetaRecord::new(hash, false);
-        self.append_history(key, record);
     }
 }

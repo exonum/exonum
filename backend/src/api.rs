@@ -9,13 +9,12 @@ use exonum::api::{Api, ApiError};
 use exonum::node::TransactionSend;
 use exonum::crypto::{PublicKey, Hash};
 use exonum::storage::{MapProof, ListProof};
-use exonum::blockchain::{self, Blockchain, BlockProof, Transaction, TransactionSet};
+use exonum::blockchain::{self, Blockchain, BlockProof, Transaction};
 use exonum::helpers::Height;
 
 use std::fmt;
 
 use {CRYPTOCURRENCY_SERVICE_ID, CurrencySchema};
-use schema::MetaRecord;
 use transactions::WalletTransactions;
 use wallet::Wallet;
 
@@ -35,19 +34,12 @@ pub struct WalletProof {
     to_wallet: MapProof<Wallet>,
 }
 
-/// Proof to wallet history.
-#[derive(Debug, Serialize)]
-pub struct WalletHistoryProof {
-    proof: ListProof<MetaRecord>,
-    transactions: Vec<WalletTransactions>,
-}
-
 /// Wallet information.
 #[derive(Debug, Serialize)]
 pub struct WalletInfo {
     block_proof: BlockProof,
     wallet_proof: WalletProof,
-    wallet_history: Option<WalletHistoryProof>,
+    wallet_history: Option<ListProof<Hash>>,
 }
 
 /// TODO: Add documentation.
@@ -89,24 +81,7 @@ where
 
         let wallet_history = wallet.map(|_| {
             let history = currency_schema.wallet_history(pub_key);
-
-            let proof: ListProof<MetaRecord> = history.get_range_proof(0, history.len());
-
-            let transactions: Vec<WalletTransactions> = history
-                .iter()
-                .map(|record| {
-                    general_schema
-                        .transactions()
-                        .get(record.transaction_hash())
-                        .unwrap()
-                })
-                .map(|raw| WalletTransactions::tx_from_raw(raw).unwrap())
-                .collect::<Vec<_>>();
-
-            WalletHistoryProof {
-                proof,
-                transactions,
-            }
+            history.get_range_proof(0, history.len())
         });
 
         Ok(WalletInfo {
