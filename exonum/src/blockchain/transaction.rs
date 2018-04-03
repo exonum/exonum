@@ -167,7 +167,7 @@ impl ExecutionError {
     }
 
     /// Constructs a new `ExecutionError` instance with the given error code and description.
-    pub fn with_description<T : Into<String>>(code: u8, description: T) -> Self {
+    pub fn with_description<T: Into<String>>(code: u8, description: T) -> Self {
         Self {
             code,
             description: Some(description.into()),
@@ -663,7 +663,6 @@ mod tests {
         }
     }
 
-
     #[test]
     fn transaction_error_new() {
         let values = [
@@ -741,10 +740,7 @@ mod tests {
     fn error_discards_transaction_changes() {
         let statuses = [
             Err(ExecutionError::new(0)),
-            Err(ExecutionError::with_description(
-                0,
-                "Strange error",
-            )),
+            Err(ExecutionError::with_description(0, "Strange error")),
             Err(ExecutionError::new(255)),
             Err(ExecutionError::with_description(
                 255,
