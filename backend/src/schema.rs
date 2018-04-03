@@ -5,6 +5,7 @@ use exonum::blockchain::gen_prefix;
 use std::fmt;
 
 use wallet::Wallet;
+use INITIAL_BALANCE;
 
 /// Database schema for the cryptocurrency.
 pub struct CurrencySchema<T> {
@@ -76,13 +77,27 @@ impl<'a> CurrencySchema<&'a mut Fork> {
         )
     }
 
-    /// Appends transaction record to the wallet with the given public key.
-    pub fn append_history(&mut self, key: &PublicKey, tx_hash: &Hash) {
+    /// Update balance of the wallet and append new record to its history.
+    ///
+    /// Panics if there is no wallet with given public key.
+    pub fn set_wallet_balance(&mut self, key: &PublicKey, balance: u64, transaction: &Hash) {
         let wallet = {
             let wallet = self.wallet(key).unwrap();
             let mut history = self.wallet_history_mut(key);
-            history.push(*tx_hash);
-            wallet.grow_length_set_history_hash(&history.root_hash())
+            history.push(*transaction);
+            let history_hash = history.root_hash();
+            wallet.set_balance(balance, &history_hash)
+        };
+        self.wallets_mut().put(key, wallet);
+    }
+
+    /// Create new wallet and append first record to its history.
+    pub fn create_wallet(&mut self, key: &PublicKey, name: &str, transaction: &Hash) {
+        let wallet = {
+            let mut history = self.wallet_history_mut(key);
+            history.push(*transaction);
+            let history_hash = history.root_hash();
+            Wallet::new(key, name, INITIAL_BALANCE, history.len(), &history_hash)
         };
         self.wallets_mut().put(key, wallet);
     }

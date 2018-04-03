@@ -5,9 +5,6 @@ use exonum::messages::Message;
 
 use CRYPTOCURRENCY_SERVICE_ID;
 use schema::CurrencySchema;
-use wallet::Wallet;
-
-const INITIAL_BALANCE: u64 = 100;
 
 /// Error codes emitted by wallet transactions during execution.
 #[derive(Debug, Fail)]
@@ -93,13 +90,8 @@ impl Transaction for Transfer {
             Err(Error::InsufficientCurrencyAmount)?
         }
 
-        let sender = sender.decrease(amount);
-        let receiver = receiver.increase(amount);
-
-        schema.wallets_mut().put(from, sender);
-        schema.wallets_mut().put(to, receiver);
-        schema.append_history(from, &hash);
-        schema.append_history(to, &hash);
+        schema.set_wallet_balance(from, sender.balance() - amount, &hash);
+        schema.set_wallet_balance(to, receiver.balance() + amount, &hash);
 
         Ok(())
     }
@@ -117,9 +109,7 @@ impl Transaction for Issue {
 
         if let Some(wallet) = schema.wallet(pub_key) {
             let amount = self.amount();
-            let wallet = wallet.increase(amount);
-            schema.wallets_mut().put(pub_key, wallet);
-            schema.append_history(pub_key, &hash);
+            schema.set_wallet_balance(pub_key, wallet.balance() + amount, &hash);
             Ok(())
         } else {
             Err(Error::ReceiverNotFound)?
@@ -141,9 +131,7 @@ impl Transaction for CreateWallet {
             Err(Error::WalletAlreadyExists)?
         } else {
             let name = self.name();
-            let wallet = Wallet::create(pub_key, name, INITIAL_BALANCE);
-            schema.wallets_mut().put(pub_key, wallet);
-            schema.append_history(pub_key, &hash);
+            schema.create_wallet(pub_key, name, &hash);
             Ok(())
         }
     }

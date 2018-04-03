@@ -32,6 +32,8 @@ pub mod schema;
 
 /// Unique service ID.
 const CRYPTOCURRENCY_SERVICE_ID: u16 = 128;
+/// Initial balance of the wallet.
+const INITIAL_BALANCE: u64 = 100;
 
 /// Exonum `Service` implementation.
 #[derive(Default, Debug)]
