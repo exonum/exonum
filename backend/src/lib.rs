@@ -5,30 +5,31 @@ extern crate serde;
 extern crate serde_derive;
 #[macro_use]
 extern crate exonum;
-extern crate router;
-extern crate iron;
 extern crate bodyparser;
+extern crate iron;
+extern crate router;
 #[macro_use]
 extern crate failure;
+
+pub use schema::CurrencySchema;
+
+pub mod api;
+pub mod schema;
+pub mod transactions;
+pub mod wallet;
 
 use iron::Handler;
 use router::Router;
 
-use exonum::messages::RawTransaction;
+use exonum::blockchain::{ApiContext, Service, Transaction, TransactionSet};
 use exonum::crypto::Hash;
-use exonum::storage::Snapshot;
-use exonum::blockchain::{Service, Transaction, TransactionSet, ApiContext};
-use exonum::encoding::serialize::json::reexport as serde_json;
 use exonum::encoding::Error as EncodingError;
+use exonum::encoding::serialize::json::reexport as serde_json;
 use exonum::helpers::fabric::{self, Context};
+use exonum::messages::RawTransaction;
+use exonum::storage::Snapshot;
 
-pub use schema::CurrencySchema;
 use transactions::WalletTransactions;
-
-pub mod api;
-pub mod wallet;
-pub mod transactions;
-pub mod schema;
 
 /// Unique service ID.
 const CRYPTOCURRENCY_SERVICE_ID: u16 = 128;

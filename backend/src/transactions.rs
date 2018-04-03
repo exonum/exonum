@@ -1,7 +1,7 @@
-use exonum::blockchain::{ExecutionResult, ExecutionError, Transaction};
-use exonum::storage::Fork;
+use exonum::blockchain::{ExecutionError, ExecutionResult, Transaction};
 use exonum::crypto::{CryptoHash, PublicKey};
 use exonum::messages::Message;
+use exonum::storage::Fork;
 
 use CRYPTOCURRENCY_SERVICE_ID;
 use schema::CurrencySchema;

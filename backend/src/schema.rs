@@ -1,11 +1,11 @@
-use exonum::storage::{Snapshot, ProofMapIndex, ProofListIndex, Fork};
-use exonum::crypto::{Hash, PublicKey};
 use exonum::blockchain::gen_prefix;
+use exonum::crypto::{Hash, PublicKey};
+use exonum::storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot};
 
 use std::fmt;
 
-use wallet::Wallet;
 use INITIAL_BALANCE;
+use wallet::Wallet;
 
 /// Database schema for the cryptocurrency.
 pub struct CurrencySchema<T> {

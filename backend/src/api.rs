@@ -1,22 +1,22 @@
 //! Cryptocurrency API.
 
-use serde_json;
-use router::Router;
-use iron::prelude::*;
 use bodyparser;
+use iron::prelude::*;
+use router::Router;
+use serde_json;
 
 use exonum::api::{Api, ApiError};
-use exonum::node::TransactionSend;
-use exonum::crypto::{PublicKey, Hash};
-use exonum::storage::{MapProof, ListProof};
-use exonum::blockchain::{self, Blockchain, BlockProof, Transaction, TransactionSet};
+use exonum::blockchain::{self, BlockProof, Blockchain, Transaction, TransactionSet};
+use exonum::crypto::{Hash, PublicKey};
 use exonum::helpers::Height;
+use exonum::node::TransactionSend;
+use exonum::storage::{ListProof, MapProof};
 
 use std::fmt;
 
-use {CRYPTOCURRENCY_SERVICE_ID, CurrencySchema};
 use transactions::WalletTransactions;
 use wallet::Wallet;
+use {CurrencySchema, CRYPTOCURRENCY_SERVICE_ID};
 
 /// The structure returned by the REST API.
 #[derive(Debug, Serialize, Deserialize)]
@@ -92,12 +92,7 @@ where
 
             let transactions: Vec<WalletTransactions> = history
                 .iter()
-                .map(|record| {
-                    general_schema
-                        .transactions()
-                        .get(&record)
-                        .unwrap()
-                })
+                .map(|record| general_schema.transactions().get(&record).unwrap())
                 .map(|raw| WalletTransactions::tx_from_raw(raw).unwrap())
                 .collect::<Vec<_>>();
 

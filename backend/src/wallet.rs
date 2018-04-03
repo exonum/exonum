@@ -1,6 +1,6 @@
 //! Wallet.
 
-use exonum::crypto::{PublicKey, Hash};
+use exonum::crypto::{Hash, PublicKey};
 
 encoding_struct! {
     /// Wallet information stored in the database.
