@@ -62,6 +62,7 @@ but we have several additional conventions:
 
 - Modules and imports (`use`) should be in the following order:
 
+  - `extern crate`s.
   - Reexporting (`pub use`).
   - Public modules (`pub mod`).
   - Imports (`use`): 
