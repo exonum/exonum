@@ -67,10 +67,10 @@ describe('CurrencyService', function () {
     service_id: SERVICE_ID,
     message_id: TX_CREATE_WALLET_ID,
 
-    fields: {
-      pub_key: { type: exonum.PublicKey, size: 32, from: 0, to: 32 },
-      name: { type: exonum.String, size: 8, from: 32, to: 40 }
-    }
+    fields: [
+      { name: 'pub_key', type: exonum.PublicKey },
+      { name: 'name', type: exonum.String }
+    ]
   })
 
   TxCreateWallet.new = function (body) {
@@ -97,12 +97,12 @@ describe('CurrencyService', function () {
     service_id: SERVICE_ID,
     message_id: TX_TRANSFER_ID,
 
-    fields: {
-      from: { type: exonum.PublicKey, size: 32, from: 0, to: 32 },
-      to: { type: exonum.PublicKey, size: 32, from: 32, to: 64 },
-      amount: { type: exonum.Uint64, size: 8, from: 64, to: 72 },
-      seed: { type: exonum.Uint64, size: 8, from: 72, to: 80 }
-    }
+    fields: [
+      { name: 'from', type: exonum.PublicKey },
+      { name: 'to', type: exonum.PublicKey },
+      { name: 'amount', type: exonum.Uint64 },
+      { name: 'seed', type: exonum.Uint64 }
+    ]
   })
 
   TxTranfer.new = function (body) {
