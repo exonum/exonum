@@ -12,21 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate advanced_cryptocurrency;
-extern crate exonum;
-extern crate exonum_configuration;
+//! Shared constants used both in api and transactions logic tests.
 
-use advanced_cryptocurrency as cryptocurrency;
-use exonum::helpers;
-use exonum::helpers::fabric::NodeBuilder;
-use exonum_configuration as configuration;
-
-fn main() {
-    exonum::crypto::init();
-    helpers::init_logger().unwrap();
-
-    let node = NodeBuilder::new()
-        .with_service(Box::new(configuration::ServiceFactory))
-        .with_service(Box::new(cryptocurrency::ServiceFactory));
-    node.run();
-}
+/// Alice's wallets name.
+pub const ALICE_NAME: &str = "Alice";
+/// Bob's wallet name.
+pub const BOB_NAME: &str = "Bob";
