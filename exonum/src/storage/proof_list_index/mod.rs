@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,14 +14,15 @@
 
 //! An implementation of a Merkelized version of an array list (Merkle tree).
 
+pub use self::proof::{ListProof, ListProofError};
+
 use std::cell::Cell;
 use std::marker::PhantomData;
 
-use crypto::{Hash, hash, HashStream};
-use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
+use crypto::{hash, Hash, HashStream};
+use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey, StorageValue};
+use super::indexes_metadata::IndexType;
 use self::key::ProofListKey;
-
-pub use self::proof::{ListProof, ListProofError};
 
 #[cfg(test)]
 mod tests;
@@ -34,6 +35,7 @@ mod proof;
 ///
 /// `ProofListIndex` implements a Merkle tree, storing elements as leaves and using `u64` as
 /// an index. `ProofListIndex` requires that the elements implement the [`StorageValue`] trait.
+///
 /// [`StorageValue`]: ../trait.StorageValue.html
 #[derive(Debug)]
 pub struct ProofListIndex<T, V> {
@@ -55,12 +57,24 @@ pub struct ProofListIndexIter<'a, V> {
     base_iter: BaseIndexIter<'a, ProofListKey, V>,
 }
 
-impl<T, V> ProofListIndex<T, V> {
+fn pair_hash(h1: &Hash, h2: &Hash) -> Hash {
+    HashStream::new()
+        .update(h1.as_ref())
+        .update(h2.as_ref())
+        .hash()
+}
+
+impl<T, V> ProofListIndex<T, V>
+where
+    T: AsRef<Snapshot>,
+    V: StorageValue,
+{
     /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     ///
@@ -77,12 +91,10 @@ impl<T, V> ProofListIndex<T, V> {
     ///
     /// let mut fork = db.fork();
     /// let mut mut_index: ProofListIndex<_, u8> = ProofListIndex::new(name, &mut fork);
-    /// # drop(index);
-    /// # drop(mut_index);
     /// ```
-    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         ProofListIndex {
-            base: BaseIndex::new(name, view),
+            base: BaseIndex::new(index_name, IndexType::ProofList, view),
             length: Cell::new(None),
             _v: PhantomData,
         }
@@ -94,6 +106,7 @@ impl<T, V> ProofListIndex<T, V> {
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     ///
@@ -104,39 +117,28 @@ impl<T, V> ProofListIndex<T, V> {
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";
-    /// let prefix = vec![01];
+    /// let index_id = vec![01];
     ///
     /// let snapshot = db.snapshot();
     /// let index: ProofListIndex<_, u8> =
-    ///                             ProofListIndex::with_prefix(name, prefix.clone(), &snapshot);
+    ///                             ProofListIndex::new_in_family(name, &index_id, &snapshot);
     ///
     /// let mut fork = db.fork();
     /// let mut mut_index : ProofListIndex<_, u8> =
-    ///                                     ProofListIndex::with_prefix(name, prefix, &mut fork);
-    /// # drop(index);
-    /// # drop(mut_index);
+    ///                                 ProofListIndex::new_in_family(name, &index_id, &mut fork);
     /// ```
-    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
+    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
+        family_name: S,
+        index_id: &I,
+        view: T,
+    ) -> Self {
         ProofListIndex {
-            base: BaseIndex::with_prefix(name, prefix, view),
+            base: BaseIndex::new_in_family(family_name, index_id, IndexType::ProofList, view),
             length: Cell::new(None),
             _v: PhantomData,
         }
     }
-}
 
-fn pair_hash(h1: &Hash, h2: &Hash) -> Hash {
-    HashStream::new()
-        .update(h1.as_ref())
-        .update(h2.as_ref())
-        .hash()
-}
-
-impl<T, V> ProofListIndex<T, V>
-where
-    T: AsRef<Snapshot>,
-    V: StorageValue,
-{
     fn has_branch(&self, key: ProofListKey) -> bool {
         debug_assert!(key.height() > 0);
 
@@ -295,7 +297,7 @@ where
         self.len().next_power_of_two().trailing_zeros() as u8 + 1
     }
 
-    /// Returns the root hash of the proof list or default hash value if it is empty.
+    /// Returns the Merkle root hash of the proof list or default hash value if it is empty.
     ///
     /// # Examples
     ///
@@ -308,14 +310,14 @@ where
     /// let mut fork = db.fork();
     /// let mut index = ProofListIndex::new(name, &mut fork);
     ///
-    /// let default_hash = index.root_hash();
+    /// let default_hash = index.merkle_root();
     /// assert_eq!(Hash::default(), default_hash);
     ///
     /// index.push(1);
-    /// let hash = index.root_hash();
+    /// let hash = index.merkle_root();
     /// assert_ne!(hash, default_hash);
     /// ```
-    pub fn root_hash(&self) -> Hash {
+    pub fn merkle_root(&self) -> Hash {
         self.get_branch(self.root_key()).unwrap_or_default()
     }
 
@@ -338,7 +340,6 @@ where
     /// index.push(1);
     ///
     /// let proof = index.get_proof(0);
-    /// # drop(proof);
     /// ```
     pub fn get_proof(&self, index: u64) -> ListProof<V> {
         if index >= self.len() {
@@ -370,7 +371,6 @@ where
     /// index.extend([1, 2, 3, 4, 5].iter().cloned());
     ///
     /// let list_proof = index.get_range_proof(1, 3);
-    /// # drop(list_proof);
     /// ```
     pub fn get_range_proof(&self, from: u64, to: u64) -> ListProof<V> {
         if to > self.len() {
@@ -383,8 +383,7 @@ where
         if to <= from {
             panic!(
                 "Illegal range boundaries: the range start is {:?}, but the range end is {:?}",
-                from,
-                to
+                from, to
             )
         }
 
@@ -408,7 +407,9 @@ where
     /// }
     /// ```
     pub fn iter(&self) -> ProofListIndexIter<V> {
-        ProofListIndexIter { base_iter: self.base.iter(&0u8) }
+        ProofListIndexIter {
+            base_iter: self.base.iter(&0u8),
+        }
     }
 
     /// Returns an iterator over the list starting from the specified position. The iterator
@@ -429,7 +430,9 @@ where
     /// }
     /// ```
     pub fn iter_from(&self, from: u64) -> ProofListIndexIter<V> {
-        ProofListIndexIter { base_iter: self.base.iter_from(&0u8, &ProofListKey::leaf(from)) }
+        ProofListIndexIter {
+            base_iter: self.base.iter_from(&0u8, &ProofListKey::leaf(from)),
+        }
     }
 }
 

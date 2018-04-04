@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,10 +17,13 @@
 //! [Sodium library](https://github.com/jedisct1/libsodium) is used under the hood through
 //! [sodiumoxide rust bindings](https://github.com/dnaq/sodiumoxide).
 
-use std::default::Default;
-use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
-use std::fmt;
-use std::time::{SystemTime, UNIX_EPOCH};
+// spell-checker:disable
+pub use sodiumoxide::crypto::sign::ed25519::{PUBLICKEYBYTES as PUBLIC_KEY_LENGTH,
+                                             SECRETKEYBYTES as SECRET_KEY_LENGTH,
+                                             SEEDBYTES as SEED_LENGTH,
+                                             SIGNATUREBYTES as SIGNATURE_LENGTH};
+pub use sodiumoxide::crypto::hash::sha256::DIGESTBYTES as HASH_SIZE;
+// spell-checker:enable
 
 use sodiumoxide::crypto::sign::ed25519::{gen_keypair as gen_keypair_sodium, keypair_from_seed,
                                          sign_detached, verify_detached,
@@ -33,15 +36,17 @@ use sodiumoxide;
 use serde::{Serialize, Serializer};
 use serde::de::{self, Deserialize, Deserializer, Visitor};
 use byteorder::{ByteOrder, LittleEndian};
+use chrono::{DateTime, Utc};
+use uuid::Uuid;
 
-use encoding::serialize::FromHex;
-// spell-checker:disable
-pub use sodiumoxide::crypto::sign::ed25519::{PUBLICKEYBYTES as PUBLIC_KEY_LENGTH,
-                                             SECRETKEYBYTES as SECRET_KEY_LENGTH,
-                                             SEEDBYTES as SEED_LENGTH,
-                                             SIGNATUREBYTES as SIGNATURE_LENGTH};
-pub use sodiumoxide::crypto::hash::sha256::DIGESTBYTES as HASH_SIZE;
-// spell-checker:enable
+use std::default::Default;
+use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
+use std::fmt;
+use std::str::FromStr;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use encoding::serialize::{encode_hex, FromHex, FromHexError, ToHex};
+use helpers::Round;
 
 /// The size to crop the string in debug messages.
 const BYTES_IN_DEBUG: usize = 4;
@@ -73,8 +78,6 @@ pub fn sign(data: &[u8], secret_key: &SecretKey) -> Signature {
 ///
 /// # crypto::init();
 /// let (public_key, secret_key) = crypto::gen_keypair_from_seed(&Seed::new([1; 32]));
-/// # drop(public_key);
-/// # drop(secret_key);
 /// ```
 pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
     let (sod_pub_key, sod_secret_key) = keypair_from_seed(&seed.0);
@@ -91,8 +94,6 @@ pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
 ///
 /// # crypto::init();
 /// let (public_key, secret_key) = crypto::gen_keypair();
-/// # drop(public_key);
-/// # drop(secret_key);
 /// ```
 pub fn gen_keypair() -> (PublicKey, SecretKey) {
     let (pubkey, secret_key) = gen_keypair_sodium();
@@ -126,15 +127,13 @@ pub fn verify(sig: &Signature, data: &[u8], pubkey: &PublicKey) -> bool {
 /// # crypto::init();
 /// let data = [1, 2, 3];
 /// let hash = crypto::hash(&data);
-/// # drop(hash);
 /// ```
 pub fn hash(data: &[u8]) -> Hash {
     let dig = hash_sodium(data);
     Hash(dig)
 }
 
-/// A common trait for the ability to compute a
-/// cryptographic hash.
+/// A common trait for the ability to compute a cryptographic hash.
 pub trait CryptoHash {
     /// Returns a hash of the value.
     ///
@@ -274,7 +273,7 @@ macro_rules! implement_public_sodium_wrapper {
         /// Returns the hex representation of the binary data.
         /// Lower case letters are used (e.g. f9b4ca).
         pub fn to_hex(&self) -> String {
-            $crate::encoding::serialize::encode_hex(self)
+            encode_hex(self)
         }
     }
 
@@ -284,16 +283,10 @@ macro_rules! implement_public_sodium_wrapper {
         }
     }
 
-    impl ::std::str::FromStr for $name {
-        type Err = ::encoding::serialize::FromHexError;
+    impl FromStr for $name {
+        type Err = FromHexError;
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             $name::from_hex(s)
-        }
-    }
-
-    impl ToString for $name {
-        fn to_string(&self) -> String {
-            self.to_hex()
         }
     }
 
@@ -305,6 +298,12 @@ macro_rules! implement_public_sodium_wrapper {
                 write!(f, "{:02X}", i)?
             }
             write!(f, ")")
+        }
+    }
+
+    impl fmt::Display for $name {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            f.write_str(&self.to_hex())
         }
     }
     )
@@ -337,7 +336,7 @@ macro_rules! implement_private_sodium_wrapper {
         /// Returns the hex representation of the binary data.
         /// Lower case letters are used (e.g. f9b4ca).
         pub fn to_hex(&self) -> String {
-            $crate::encoding::serialize::encode_hex(&self[..])
+            encode_hex(&self[..])
         }
     }
 
@@ -352,7 +351,7 @@ macro_rules! implement_private_sodium_wrapper {
         }
     }
 
-    impl $crate::encoding::serialize::ToHex for $name {
+    impl ToHex for $name {
         fn write_hex<W: ::std::fmt::Write>(&self, w: &mut W) -> ::std::fmt::Result {
             (self.0).0.as_ref().write_hex(w)
         }
@@ -374,7 +373,6 @@ implement_public_sodium_wrapper! {
 ///
 /// # crypto::init();
 /// let (public_key, _) = crypto::gen_keypair();
-/// # drop(public_key);
 /// ```
     struct PublicKey, PublicKeySodium, PUBLIC_KEY_LENGTH
 }
@@ -389,7 +387,6 @@ implement_private_sodium_wrapper! {
 ///
 /// # crypto::init();
 /// let (_, secret_key) = crypto::gen_keypair();
-/// # drop(secret_key);
 /// ```
     struct SecretKey, SecretKeySodium, SECRET_KEY_LENGTH
 }
@@ -405,8 +402,6 @@ implement_public_sodium_wrapper! {
 /// let data = [1, 2, 3];
 /// let hash_from_data = crypto::hash(&data);
 /// let default_hash = Hash::default();
-/// # drop(hash_from_data);
-/// # drop(default_hash);
 /// ```
     struct Hash, DigestSodium, HASH_SIZE
 }
@@ -438,23 +433,21 @@ implement_private_sodium_wrapper! {
 ///
 /// # crypto::init();
 /// let (public_key, secret_key) = crypto::gen_keypair_from_seed(&Seed::new([1; 32]));
-/// # drop(public_key);
-/// # drop(secret_key);
 /// ```
     struct Seed, SeedSodium, SEED_LENGTH
 }
 
 macro_rules! implement_serde {
 ($name:ident) => (
-    impl $crate::encoding::serialize::FromHex for $name {
-        type Error = $crate::encoding::serialize::FromHexError;
+    impl FromHex for $name {
+        type Error = FromHexError;
 
         fn from_hex<T: AsRef<[u8]>>(v: T) -> Result<Self, Self::Error> {
             let bytes = Vec::<u8>::from_hex(v)?;
             if let Some(self_value) = Self::from_slice(bytes.as_ref()) {
                 Ok(self_value)
             } else {
-                Err($crate::encoding::serialize::FromHexError::InvalidStringLength)
+                Err(FromHexError::InvalidStringLength)
             }
         }
     }
@@ -464,7 +457,7 @@ macro_rules! implement_serde {
         fn serialize<S>(&self, ser:S) -> Result<S::Ok, S::Error>
         where S: Serializer
         {
-            let hex_string = $crate::encoding::serialize::encode_hex(&self[..]);
+            let hex_string = encode_hex(&self[..]);
             ser.serialize_str(&hex_string)
         }
     }
@@ -610,52 +603,14 @@ impl CryptoHash for i64 {
     }
 }
 
-const EMPTY_SLICE_HASH: Hash = Hash(DigestSodium(
-    [
-        227,
-        176,
-        196,
-        66,
-        152,
-        252,
-        28,
-        20,
-        154,
-        251,
-        244,
-        200,
-        153,
-        111,
-        185,
-        36,
-        39,
-        174,
-        65,
-        228,
-        100,
-        155,
-        147,
-        76,
-        164,
-        149,
-        153,
-        27,
-        120,
-        82,
-        184,
-        85,
-    ],
-));
+const EMPTY_SLICE_HASH: Hash = Hash(DigestSodium([
+    227, 176, 196, 66, 152, 252, 28, 20, 154, 251, 244, 200, 153, 111, 185, 36, 39, 174, 65, 228,
+    100, 155, 147, 76, 164, 149, 153, 27, 120, 82, 184, 85,
+]));
 
 impl CryptoHash for () {
     fn hash(&self) -> Hash {
         EMPTY_SLICE_HASH
-    }
-}
-
-impl CryptoHash for Hash {
-    fn hash(&self) -> Hash {
-        *self
     }
 }
 
@@ -679,9 +634,8 @@ impl CryptoHash for String {
 
 impl CryptoHash for SystemTime {
     fn hash(&self) -> Hash {
-        let duration = self.duration_since(UNIX_EPOCH).expect(
-            "time value is later than 1970-01-01 00:00:00 UTC.",
-        );
+        let duration = self.duration_since(UNIX_EPOCH)
+            .expect("time value is later than 1970-01-01 00:00:00 UTC.");
         let secs = duration.as_secs();
         let nanos = duration.subsec_nanos();
 
@@ -689,6 +643,30 @@ impl CryptoHash for SystemTime {
         LittleEndian::write_u64(&mut buffer[0..8], secs);
         LittleEndian::write_u32(&mut buffer[8..12], nanos);
         hash(&buffer)
+    }
+}
+
+impl CryptoHash for DateTime<Utc> {
+    fn hash(&self) -> Hash {
+        let secs = self.timestamp();
+        let nanos = self.timestamp_subsec_nanos();
+
+        let mut buffer = vec![0; 12];
+        LittleEndian::write_i64(&mut buffer[0..8], secs);
+        LittleEndian::write_u32(&mut buffer[8..12], nanos);
+        buffer.hash()
+    }
+}
+
+impl CryptoHash for Round {
+    fn hash(&self) -> Hash {
+        self.0.hash()
+    }
+}
+
+impl CryptoHash for Uuid {
+    fn hash(&self) -> Hash {
+        hash(self.as_bytes())
     }
 }
 

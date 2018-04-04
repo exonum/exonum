@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::str;
-
 use exonum::blockchain::{Schema, StoredConfiguration, Transaction};
 use exonum::helpers::{Height, ValidatorId};
 use exonum::storage::StorageValue;
-use exonum::crypto::{CryptoHash, Hash, hash, HASH_SIZE};
+use exonum::crypto::{hash, CryptoHash, Hash, HASH_SIZE};
 use exonum_testkit::{TestKit, TestKitBuilder, TestNode};
 
-use {ConfigurationSchema, ConfigurationService, TxConfigPropose, TxConfigVote};
+use std::str;
+
+use {Propose, Schema as ConfigurationSchema, Service as ConfigurationService, Vote};
 
 mod api;
 
@@ -28,21 +28,18 @@ pub fn to_boxed<T: Transaction>(tx: T) -> Box<Transaction> {
     Box::new(tx) as Box<Transaction>
 }
 
-pub fn new_tx_config_propose(
-    node: &TestNode,
-    cfg_proposal: StoredConfiguration,
-) -> TxConfigPropose {
+pub fn new_tx_config_propose(node: &TestNode, cfg_proposal: StoredConfiguration) -> Propose {
     let keypair = node.service_keypair();
-    TxConfigPropose::new(
+    Propose::new(
         keypair.0,
         str::from_utf8(cfg_proposal.into_bytes().as_slice()).unwrap(),
         keypair.1,
     )
 }
 
-pub fn new_tx_config_vote(node: &TestNode, cfg_proposal_hash: Hash) -> TxConfigVote {
+pub fn new_tx_config_vote(node: &TestNode, cfg_proposal_hash: Hash) -> Vote {
     let keypair = node.service_keypair();
-    TxConfigVote::new(keypair.0, &cfg_proposal_hash, keypair.1)
+    Vote::new(keypair.0, &cfg_proposal_hash, keypair.1)
 }
 
 pub trait ConfigurationTestKit {
@@ -50,16 +47,16 @@ pub trait ConfigurationTestKit {
 
     fn apply_configuration(&mut self, proposer: ValidatorId, cfg_proposal: StoredConfiguration);
 
-    fn votes_for_propose(&self, config_hash: Hash) -> Vec<Option<TxConfigVote>>;
+    fn votes_for_propose(&self, config_hash: Hash) -> Vec<Option<Vote>>;
 
-    fn find_propose(&self, config_hash: Hash) -> Option<TxConfigPropose>;
+    fn find_propose(&self, config_hash: Hash) -> Option<Propose>;
 }
 
 impl ConfigurationTestKit for TestKit {
     fn configuration_default() -> Self {
         TestKitBuilder::validator()
             .with_validators(4)
-            .with_service(ConfigurationService::new())
+            .with_service(ConfigurationService {})
             .create()
     }
 
@@ -89,16 +86,16 @@ impl ConfigurationTestKit for TestKit {
         );
     }
 
-    fn votes_for_propose(&self, config_hash: Hash) -> Vec<Option<TxConfigVote>> {
+    fn votes_for_propose(&self, config_hash: Hash) -> Vec<Option<Vote>> {
         let snapshot = self.snapshot();
         let schema = ConfigurationSchema::new(&snapshot);
-        schema.get_votes(&config_hash)
+        schema.votes(&config_hash)
     }
 
-    fn find_propose(&self, config_hash: Hash) -> Option<TxConfigPropose> {
+    fn find_propose(&self, config_hash: Hash) -> Option<Propose> {
         let snapshot = self.snapshot();
         let schema = ConfigurationSchema::new(&snapshot);
-        schema.get_propose(&config_hash)
+        schema.propose(&config_hash)
     }
 }
 
@@ -106,7 +103,7 @@ impl ConfigurationTestKit for TestKit {
 fn test_full_node_to_validator() {
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(3)
-        .with_service(ConfigurationService::new())
+        .with_service(ConfigurationService {})
         .create();
 
     let cfg_change_height = Height(5);
@@ -125,7 +122,7 @@ fn test_full_node_to_validator() {
 fn test_add_validators_to_config() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
-        .with_service(ConfigurationService::new())
+        .with_service(ConfigurationService {})
         .create();
 
     let cfg_change_height = Height(5);
@@ -144,7 +141,7 @@ fn test_add_validators_to_config() {
 fn test_exclude_sandbox_node_from_config() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
-        .with_service(ConfigurationService::new())
+        .with_service(ConfigurationService {})
         .create();
 
     let cfg_change_height = Height(5);
@@ -163,7 +160,7 @@ fn test_exclude_sandbox_node_from_config() {
 fn test_apply_second_configuration() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
-        .with_service(ConfigurationService::new())
+        .with_service(ConfigurationService {})
         .create();
     // First configuration.
     let cfg_change_height = Height(5);
@@ -187,6 +184,104 @@ fn test_apply_second_configuration() {
         cfg.stored_configuration().clone()
     };
     testkit.apply_configuration(ValidatorId(0), new_cfg);
+}
+
+#[test]
+fn test_apply_with_increased_majority() {
+    let mut testkit = TestKitBuilder::validator()
+        .with_validators(6)
+        .with_service(ConfigurationService {})
+        .create();
+
+    // Applying the first configuration with custom majority count.
+    let cfg_change_height = Height(5);
+    let new_cfg = {
+        let mut cfg = testkit.configuration_change_proposal();
+        cfg.set_service_config("dummy", "First cfg");
+        cfg.set_majority_count(Some(6));
+        cfg.set_actual_from(cfg_change_height);
+        cfg.stored_configuration().clone()
+    };
+    testkit.apply_configuration(ValidatorId(0), new_cfg);
+
+    // Applying the second configuration.
+    // Number of votes equals to the number of validators.
+    let cfg_change_height = Height(10);
+    let new_cfg = {
+        let mut cfg = testkit.configuration_change_proposal();
+        cfg.set_service_config("dummy", "Second cfg");
+        cfg.set_actual_from(cfg_change_height);
+        cfg.stored_configuration().clone()
+    };
+    testkit.apply_configuration(ValidatorId(0), new_cfg);
+
+    // Trying to apply the third configuration.
+    // Number is greater than byzantine_majority_count but less than configured majority count.
+    let cfg_change_height = Height(15);
+    let new_cfg = {
+        let mut cfg = testkit.configuration_change_proposal();
+        cfg.set_service_config("dummy", "Second cfg");
+        cfg.set_actual_from(cfg_change_height);
+        cfg.stored_configuration().clone()
+    };
+
+    let validators = testkit.network().validators().to_vec();
+    let tx_propose = new_tx_config_propose(&validators[1], new_cfg.clone());
+    testkit.create_block_with_transactions(txvec![tx_propose]);
+
+    let cfg_proposal_hash = new_cfg.hash();
+
+    let tx_votes = validators[0..5] // not enough validators
+        .iter()
+        .map(|validator| new_tx_config_vote(validator, cfg_proposal_hash))
+        .map(to_boxed)
+        .collect::<Vec<_>>();
+
+    testkit.create_block_with_transactions(tx_votes);
+    testkit.create_blocks_until(cfg_change_height);
+
+    assert_ne!(
+        Schema::new(&testkit.snapshot()).actual_configuration(),
+        new_cfg
+    );
+}
+
+#[test]
+fn test_discard_proposes_with_too_big_majority_count() {
+    let mut testkit: TestKit = TestKit::configuration_default();
+
+    let cfg_change_height = Height(5);
+    let new_cfg = {
+        let mut cfg = testkit.configuration_change_proposal();
+        let excessive_majority_count = (&testkit.network().validators().len() + 100) as u16;
+        cfg.set_service_config("dummy", "First cfg");
+        cfg.set_majority_count(Some(excessive_majority_count));
+        cfg.set_actual_from(cfg_change_height);
+        cfg.stored_configuration().clone()
+    };
+
+    let propose_tx = new_tx_config_propose(&testkit.network().validators()[1], new_cfg.clone());
+    testkit.create_block_with_transactions(txvec![propose_tx]);
+    assert!(testkit.find_propose(new_cfg.hash()).is_none());
+}
+
+#[test]
+fn test_discard_proposes_with_too_small_majority_count() {
+    let mut testkit: TestKit = TestKit::configuration_default();
+
+    let cfg_change_height = Height(5);
+    let new_cfg = {
+        let mut cfg = testkit.configuration_change_proposal();
+        let insufficient_majority_count = (&testkit.network().validators().len() / 2) as u16;
+        cfg.set_service_config("dummy", "First cfg");
+        cfg.set_majority_count(Some(insufficient_majority_count));
+        cfg.set_actual_from(cfg_change_height);
+        cfg.stored_configuration().clone()
+    };
+
+    let propose_tx = new_tx_config_propose(&testkit.network().validators()[1], new_cfg.clone());
+    testkit.create_block_with_transactions(txvec![propose_tx]);
+    assert!(testkit.find_propose(new_cfg.hash()).is_none());
 }
 
 #[test]
@@ -284,9 +379,9 @@ fn test_discard_votes_with_expired_actual_from() {
     testkit.create_blocks_until(Height(10));
     let illegal_vote = new_tx_config_vote(&testkit.network().validators()[0], new_cfg.hash());
     testkit.create_block_with_transactions(txvec![illegal_vote.clone()]);
-    assert!(!testkit.votes_for_propose(new_cfg.hash()).contains(&Some(
-        illegal_vote,
-    )));
+    assert!(!testkit
+        .votes_for_propose(new_cfg.hash())
+        .contains(&Some(illegal_vote)));
 }
 
 #[test]
@@ -298,7 +393,7 @@ fn test_discard_invalid_config_json() {
 
     let propose_tx = {
         let keypair = testkit.network().validators()[1].service_keypair();
-        TxConfigPropose::new(&keypair.0, new_cfg, &keypair.1)
+        Propose::new(&keypair.0, new_cfg, &keypair.1)
     };
     testkit.create_block_with_transactions(txvec![propose_tx]);
     assert_eq!(None, testkit.find_propose(hash(new_cfg.as_bytes())));
@@ -401,9 +496,7 @@ fn test_config_txs_discarded_when_not_referencing_actual_config_or_sent_by_illeg
     }
     {
         let votes = (0..3)
-            .map(|id| {
-                new_tx_config_vote(&testkit.network().validators()[id], new_cfg.hash())
-            })
+            .map(|id| new_tx_config_vote(&testkit.network().validators()[id], new_cfg.hash()))
             .map(to_boxed)
             .collect::<Vec<_>>();
         testkit.create_block_with_transactions(votes);

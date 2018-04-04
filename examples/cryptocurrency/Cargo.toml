@@ -1,6 +1,7 @@
 [package]
 name = "exonum-cryptocurrency"
-version = "0.5.0"
+version = "0.0.0"
+publish = false
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 repository = "https://github.com/exonum/exonum"
 readme = "README.md"
@@ -10,14 +11,17 @@ license = "Apache-2.0"
 travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-exonum = { version = "0.5.1", path = "../../exonum" }
+exonum = { version = "0.6.0", path = "../../exonum" }
 iron = "0.6.0"
 bodyparser = "0.8.0"
 router = "0.6.0"
 serde = "1.0.0"
 serde_json = "1.0.0"
 serde_derive = "1.0.0"
+failure = "0.1.1"
 
 [dev-dependencies]
-exonum-testkit = { version = "0.5.0", path = "../../testkit" }
+exonum-testkit = { version = "0.6.0", path = "../../testkit" }
 rand = "0.4"
+pretty_assertions = "0.5.0"
+assert_matches = "1.2.0"

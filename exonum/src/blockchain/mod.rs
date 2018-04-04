@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@
 //! your service on top of Exonum blockchain you need to do the following:
 //!
 //! - Define your own information schema.
-//! - Create one or more transaction types using the [`message!`] macro and
+//! - Create one or more transaction types using the [`transactions!`] macro and
 //!   implement the [`Transaction`] trait for them.
 //! - Create a data structure implementing the [`Service`] trait.
 //! - Write API handlers for the service, if required.
@@ -27,36 +27,38 @@
 //! You may consult [the service creation tutorial][doc:create-service] for a more detailed
 //! manual on how to create services.
 //!
-//! [`message!`]: ../macro.message.html
+//! [`transactions!`]: ../macro.transactions.html
 //! [`Transaction`]: ./trait.Transaction.html
 //! [`Service`]: ./trait.Service.html
 //! [doc:create-service]: https://exonum.com/doc/get-started/create-service
 
-use std::sync::Arc;
-use std::collections::BTreeMap;
-use std::collections::HashMap;
-use std::mem;
-use std::fmt;
-use std::panic;
-use std::net::SocketAddr;
+pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
+pub use self::schema::{Schema, TxLocation};
+pub use self::genesis::GenesisConfig;
+pub use self::config::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
+pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState};
+pub use self::transaction::{ExecutionError, ExecutionResult, Transaction, TransactionError,
+                            TransactionErrorType, TransactionResult, TransactionSet};
+
+pub mod config;
 
 use vec_map::VecMap;
 use byteorder::{ByteOrder, LittleEndian};
 use mount::Mount;
+use failure;
 
-use crypto::{self, Hash, CryptoHash, PublicKey, SecretKey};
-use messages::{CONSENSUS as CORE_SERVICE, Precommit, RawMessage, Connect};
+use std::{fmt, iter, mem, panic};
+use std::sync::Arc;
+use std::collections::{BTreeMap, HashMap};
+use std::net::SocketAddr;
+use std::error::Error as StdError;
+
+use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
+use messages::{CONSENSUS as CORE_SERVICE, Connect, Precommit, RawMessage};
 use storage::{Database, Error, Fork, Patch, Snapshot};
-use helpers::{Height, ValidatorId};
+use helpers::{Height, Round, ValidatorId};
 use node::ApiSender;
-
-pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
-pub use self::schema::{gen_prefix, Schema, TxLocation};
-pub use self::genesis::GenesisConfig;
-pub use self::config::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
-pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState};
-pub use self::transaction::{Transaction, TransactionSet, ExecutionResult, TransactionResult,
-                            ExecutionError, TransactionError, TransactionErrorType};
+use encoding::Error as MessageError;
 
 mod block;
 mod schema;
@@ -66,8 +68,6 @@ mod service;
 mod transaction;
 #[cfg(test)]
 mod tests;
-
-pub mod config;
 
 /// Exonum blockchain instance with the concrete services set and data storage.
 /// Only blockchains with the identical set of services and genesis block can be combined
@@ -81,8 +81,8 @@ pub struct Blockchain {
 
 impl Blockchain {
     /// Constructs a blockchain for the given `storage` and list of `services`.
-    pub fn new(
-        storage: Box<Database>,
+    pub fn new<D: Into<Arc<Database>>>(
+        storage: D,
         services: Vec<Box<Service>>,
         service_public_key: PublicKey,
         service_secret_key: SecretKey,
@@ -139,11 +139,12 @@ impl Blockchain {
     ///
     /// - Blockchain has service with the `service_id` of given raw message.
     /// - Service can deserialize given raw message.
-    pub fn tx_from_raw(&self, raw: RawMessage) -> Option<Box<Transaction>> {
+    pub fn tx_from_raw(&self, raw: RawMessage) -> Result<Box<Transaction>, MessageError> {
         let id = raw.service_id() as usize;
-        self.service_map.get(id).and_then(|service| {
-            service.tx_from_raw(raw).ok()
-        })
+        let service = self.service_map
+            .get(id)
+            .ok_or_else(|| MessageError::from("Service not found."))?;
+        service.tx_from_raw(raw)
     }
 
     /// Commits changes from the patch to the blockchain storage.
@@ -173,14 +174,27 @@ impl Blockchain {
         Schema::new(&self.snapshot()).last_block()
     }
 
+    /// Creates and commits the genesis block for the given genesis configuration
+    /// if the blockchain was not initialized.
+    pub fn initialize(&mut self, cfg: GenesisConfig) -> Result<(), Error> {
+        let has_genesis_block = !Schema::new(&self.snapshot())
+            .block_hashes_by_height()
+            .is_empty();
+        if !has_genesis_block {
+            self.create_genesis_block(cfg)?;
+        }
+        Ok(())
+    }
+
     /// Creates and commits the genesis block for the given genesis configuration.
-    pub fn create_genesis_block(&mut self, cfg: GenesisConfig) -> Result<(), Error> {
+    fn create_genesis_block(&mut self, cfg: GenesisConfig) -> Result<(), Error> {
         let mut config_propose = StoredConfiguration {
             previous_cfg_hash: Hash::zero(),
             actual_from: Height::zero(),
             validator_keys: cfg.validator_keys,
             consensus: cfg.consensus,
             services: BTreeMap::new(),
+            majority_count: None,
         };
 
         let patch = {
@@ -207,7 +221,7 @@ impl Blockchain {
                 schema.commit_configuration(config_propose);
             };
             self.merge(fork.into_patch())?;
-            self.create_patch(ValidatorId::zero(), Height::zero(), &[], &BTreeMap::new())
+            self.create_patch(ValidatorId::zero(), Height::zero(), &[])
                 .1
         };
         self.merge(patch)?;
@@ -242,24 +256,22 @@ impl Blockchain {
         proposer_id: ValidatorId,
         height: Height,
         tx_hashes: &[Hash],
-        pool: &BTreeMap<Hash, Box<Transaction>>,
     ) -> (Hash, Patch) {
         // Create fork
         let mut fork = self.fork();
 
         let block_hash = {
-            // Get last hash
+            // Get last hash.
             let last_hash = self.last_hash();
-            // Save & execute transactions
+            // Save & execute transactions.
             for (index, hash) in tx_hashes.iter().enumerate() {
-                let tx = pool.get(hash).expect(
-                    "BUG: Cannot find transaction in pool.",
-                );
-
-                execute_transaction(tx.as_ref(), height, index, &mut fork);
+                self.execute_transaction(*hash, height, index, &mut fork)
+                    // Execution could fail if the transaction
+                    // cannot be deserialized or it isn't in the pool.
+                    .expect("Transaction not found in the database.");
             }
 
-            // Get tx & state hash
+            // Get tx & state hash.
             let (tx_hash, state_hash) = {
                 let state_hashes = {
                     let schema = Schema::new(&fork);
@@ -291,15 +303,15 @@ impl Blockchain {
                     for (key, hash) in state_hashes {
                         sum_table.put(&key, hash)
                     }
-                    sum_table.root_hash()
+                    sum_table.merkle_root()
                 };
 
-                let tx_hash = schema.block_txs(height).root_hash();
+                let tx_hash = schema.block_transactions(height).merkle_root();
 
                 (tx_hash, state_hash)
             };
 
-            // Create block
+            // Create block.
             let block = Block::new(
                 SCHEMA_MAJOR_VERSION,
                 proposer_id,
@@ -310,12 +322,12 @@ impl Blockchain {
                 &state_hash,
             );
             trace!("execute block = {:?}", block);
-            // Calculate block hash
+            // Calculate block hash.
             let block_hash = block.hash();
-            // Update height
+            // Update height.
             let mut schema = Schema::new(&mut fork);
             schema.block_hashes_by_height_mut().push(block_hash);
-            // Save block
+            // Save block.
             schema.blocks_mut().put(&block_hash, block);
 
             block_hash
@@ -324,9 +336,72 @@ impl Blockchain {
         (block_hash, fork.into_patch())
     }
 
+    fn execute_transaction(
+        &self,
+        tx_hash: Hash,
+        height: Height,
+        index: usize,
+        fork: &mut Fork,
+    ) -> Result<(), failure::Error> {
+        let tx = {
+            let schema = Schema::new(&fork);
+
+            let tx = schema
+                .transactions()
+                .get(&tx_hash)
+                .ok_or_else(|| failure::err_msg("BUG: Cannot find transaction in database."))?;
+
+            self.tx_from_raw(tx).or_else(|error| {
+                Err(failure::err_msg(format!(
+                    "{}, tx: {:?}",
+                    error.description(),
+                    tx_hash
+                )))
+            })?
+        };
+
+        fork.checkpoint();
+
+        let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| tx.execute(fork)));
+
+        let tx_result = match catch_result {
+            Ok(execution_result) => {
+                match execution_result {
+                    Ok(()) => {
+                        fork.commit();
+                    }
+                    Err(ref e) => {
+                        // Unlike panic, transaction failure isn't that rare, so logging the
+                        // whole transaction body is an overkill: it can be relatively big.
+                        info!("{:?} transaction execution failed: {:?}", tx_hash, e);
+                        fork.rollback();
+                    }
+                }
+                execution_result.map_err(TransactionError::from)
+            }
+            Err(err) => {
+                if err.is::<Error>() {
+                    // Continue panic unwind if the reason is StorageError.
+                    panic::resume_unwind(err);
+                }
+                fork.rollback();
+                error!("{:?} transaction execution panicked: {:?}", tx, err);
+                Err(TransactionError::from_panic(&err))
+            }
+        };
+
+        let mut schema = Schema::new(fork);
+        schema.transaction_results_mut().put(&tx_hash, tx_result);
+        schema.commit_transaction(&tx_hash);
+        schema.block_transactions_mut(height).push(tx_hash);
+        let location = TxLocation::new(height, index as u64);
+        schema.transactions_locations_mut().put(&tx_hash, location);
+        Ok(())
+    }
+
     /// Commits to the storage block that proposes by node `State`.
     /// After that invokes `handle_commit` for each service in order of their identifiers
-    /// and returns the list of transactions which which were created by the `handle_commit` event.
+    /// and returns the list of transactions which were created by the `handle_commit` event.
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn commit<'a, I>(
         &mut self,
@@ -349,6 +424,10 @@ impl Blockchain {
                 for precommit in precommits {
                     schema.precommits_mut(&block_hash).push(precommit.clone());
                 }
+
+                // Consensus messages cache is useful only during one height, so it should be
+                // cleared when a new height is achieved.
+                schema.consensus_messages_cache_mut().clear();
             }
             fork.into_patch()
         };
@@ -409,9 +488,8 @@ impl Blockchain {
             schema.peers_cache_mut().put(pubkey, peer);
         }
 
-        self.merge(fork.into_patch()).expect(
-            "Unable to save peer to the peers cache",
-        );
+        self.merge(fork.into_patch())
+            .expect("Unable to save peer to the peers cache");
     }
 
     /// Removes peer from the peers cache
@@ -427,9 +505,8 @@ impl Blockchain {
             }
         }
 
-        self.merge(fork.into_patch()).expect(
-            "Unable to remove peer from the peers cache",
-        );
+        self.merge(fork.into_patch())
+            .expect("Unable to remove peer from the peers cache");
     }
 
     /// Recover cached peers if any.
@@ -438,6 +515,29 @@ impl Blockchain {
         let peers_cache = schema.peers_cache();
         let it = peers_cache.iter().map(|(k, v)| (k, v.clone()));
         it.collect()
+    }
+
+    /// Saves the given raw message to the consensus messages cache.
+    pub fn save_message(&mut self, round: Round, raw: &RawMessage) {
+        self.save_messages(round, iter::once(raw.clone()));
+    }
+
+    /// Saves a collection of RawMessage to the consensus messages cache with single access to the
+    /// `Fork` instance.
+    pub fn save_messages<I>(&mut self, round: Round, iter: I)
+    where
+        I: IntoIterator<Item = RawMessage>,
+    {
+        let mut fork = self.fork();
+
+        {
+            let mut schema = Schema::new(&mut fork);
+            schema.consensus_messages_cache_mut().extend(iter);
+            schema.set_consensus_round(round);
+        }
+
+        self.merge(fork.into_patch())
+            .expect("Unable to save messages to the consensus cache");
     }
 }
 
@@ -456,42 +556,4 @@ impl Clone for Blockchain {
             service_keypair: self.service_keypair.clone(),
         }
     }
-}
-
-fn execute_transaction(tx: &Transaction, height: Height, index: usize, fork: &mut Fork) {
-    fork.checkpoint();
-
-    let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| tx.execute(fork)));
-
-    let tx_hash = tx.hash();
-    let tx_result = match catch_result {
-        Ok(execution_result) => {
-            match execution_result {
-                Ok(()) => fork.commit(),
-                Err(ref e) => {
-                    // Unlike panic, transaction failure isn't that rare, so logging the
-                    // whole transaction body is an overkill: it can be relatively big.
-                    info!("{:?} transaction execution failed: {:?}", tx_hash, e);
-                    fork.rollback();
-                }
-            }
-            execution_result.map_err(TransactionError::from)
-        }
-        Err(err) => {
-            if err.is::<Error>() {
-                // Continue panic unwind if the reason is StorageError.
-                panic::resume_unwind(err);
-            }
-            fork.rollback();
-            error!("{:?} transaction execution panicked: {:?}", tx, err);
-            Err(TransactionError::from_panic(&err))
-        }
-    };
-
-    let mut schema = Schema::new(fork);
-    schema.transactions_mut().put(&tx_hash, tx.raw().clone());
-    schema.transaction_results_mut().put(&tx_hash, tx_result);
-    schema.block_txs_mut(height).push(tx_hash);
-    let location = TxLocation::new(height, index as u64);
-    schema.tx_location_by_tx_hash_mut().put(&tx_hash, location);
 }

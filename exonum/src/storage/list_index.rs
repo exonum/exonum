@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,12 +17,14 @@
 use std::cell::Cell;
 use std::marker::PhantomData;
 
-use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
+use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey, StorageValue};
+use super::indexes_metadata::IndexType;
 
 /// A list of items that implement `StorageValue` trait.
 ///
 /// `ListIndex` implements an array list, storing the element as values and using `u64` as an index.
 /// `ListIndex` requires that the elements implement the [`StorageValue`] trait.
+///
 /// [`StorageValue`]: ../trait.StorageValue.html
 #[derive(Debug)]
 pub struct ListIndex<T, V> {
@@ -44,12 +46,17 @@ pub struct ListIndexIter<'a, V> {
     base_iter: BaseIndexIter<'a, u64, V>,
 }
 
-impl<T, V> ListIndex<T, V> {
+impl<T, V> ListIndex<T, V>
+where
+    T: AsRef<Snapshot>,
+    V: StorageValue,
+{
     /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     ///
@@ -62,22 +69,22 @@ impl<T, V> ListIndex<T, V> {
     /// let name = "name";
     /// let snapshot = db.snapshot();
     /// let index: ListIndex<_, u8> = ListIndex::new(name, &snapshot);
-    /// # drop(index);
     /// ```
-    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         ListIndex {
-            base: BaseIndex::new(name, view),
+            base: BaseIndex::new(index_name, IndexType::List, view),
             length: Cell::new(None),
             _v: PhantomData,
         }
     }
 
-    /// Creates a new index representation based on the name, common prefix of its keys
+    /// Creates a new index representation based on the name, index id in family
     /// and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     ///
@@ -88,25 +95,22 @@ impl<T, V> ListIndex<T, V> {
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";
-    /// let prefix = vec![01];
+    /// let index_id = vec![01];
     /// let snapshot = db.snapshot();
-    /// let index: ListIndex<_, u8> = ListIndex::with_prefix(name, prefix, &snapshot);
-    /// # drop(index);
+    /// let index: ListIndex<_, u8> = ListIndex::new_in_family(name, &index_id, &snapshot);
     /// ```
-    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
+    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
+        family_name: S,
+        index_id: &I,
+        view: T,
+    ) -> Self {
         ListIndex {
-            base: BaseIndex::with_prefix(name, prefix, view),
+            base: BaseIndex::new_in_family(family_name, index_id, IndexType::List, view),
             length: Cell::new(None),
             _v: PhantomData,
         }
     }
-}
 
-impl<T, V> ListIndex<T, V>
-where
-    T: AsRef<Snapshot>,
-    V: StorageValue,
-{
     /// Returns an element at that position or `None` if out of bounds.
     ///
     /// # Examples
@@ -217,7 +221,9 @@ where
     /// }
     /// ```
     pub fn iter(&self) -> ListIndexIter<V> {
-        ListIndexIter { base_iter: self.base.iter_from(&(), &0u64) }
+        ListIndexIter {
+            base_iter: self.base.iter_from(&(), &0u64),
+        }
     }
 
     /// Returns an iterator over the list starting from the specified position. The iterator
@@ -240,7 +246,9 @@ where
     /// }
     /// ```
     pub fn iter_from(&self, from: u64) -> ListIndexIter<V> {
-        ListIndexIter { base_iter: self.base.iter_from(&(), &from) }
+        ListIndexIter {
+            base_iter: self.base.iter_from(&(), &from),
+        }
     }
 }
 
@@ -384,7 +392,7 @@ where
         if index >= self.len() {
             panic!(
                 "index out of bounds: \
-                    the len is {} but the index is {}",
+                 the len is {} but the index is {}",
                 self.len(),
                 index
             );
@@ -449,14 +457,13 @@ where
 #[cfg(test)]
 mod tests {
     use rand::{thread_rng, Rng};
-    use super::{ListIndex, Fork};
+    use super::{Fork, ListIndex};
 
     fn gen_tempdir_name() -> String {
         thread_rng().gen_ascii_chars().take(10).collect()
     }
 
     fn list_index_methods(list_index: &mut ListIndex<&mut Fork, i32>) {
-
         assert!(list_index.is_empty());
         assert_eq!(0, list_index.len());
         assert!(list_index.last().is_none());
@@ -511,7 +518,7 @@ mod tests {
     mod memorydb_tests {
         use std::path::Path;
         use tempdir::TempDir;
-        use storage::{Database, MemoryDB, ListIndex};
+        use storage::{Database, ListIndex, MemoryDB};
 
         const IDX_NAME: &'static str = "idx_name";
 
@@ -530,12 +537,12 @@ mod tests {
         }
 
         #[test]
-        fn test_list_index_with_prefix_methods() {
+        fn test_list_index_in_family_methods() {
             let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
-            let mut list_index = ListIndex::with_prefix(IDX_NAME, vec![01], &mut fork);
+            let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![01], &mut fork);
             super::list_index_methods(&mut list_index);
         }
 
@@ -550,12 +557,12 @@ mod tests {
         }
 
         #[test]
-        fn test_list_index_with_prefix_iter() {
+        fn test_list_index_in_family_iter() {
             let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
-            let mut list_index = ListIndex::with_prefix(IDX_NAME, vec![01], &mut fork);
+            let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![01], &mut fork);
             super::list_index_iter(&mut list_index);
         }
     }
@@ -563,13 +570,12 @@ mod tests {
     mod rocksdb_tests {
         use std::path::Path;
         use tempdir::TempDir;
-        use storage::{Database, ListIndex, RocksDB, RocksDBOptions};
+        use storage::{Database, DbOptions, ListIndex, RocksDB};
 
         const IDX_NAME: &'static str = "idx_name";
 
         fn create_database(path: &Path) -> Box<Database> {
-            let mut opts = RocksDBOptions::default();
-            opts.create_if_missing(true);
+            let opts = DbOptions::default();
             Box::new(RocksDB::open(path, &opts).unwrap())
         }
 
@@ -584,12 +590,12 @@ mod tests {
         }
 
         #[test]
-        fn test_list_index_with_prefix_methods() {
+        fn test_list_index_in_family_methods() {
             let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
-            let mut list_index = ListIndex::with_prefix(IDX_NAME, vec![01], &mut fork);
+            let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![01], &mut fork);
             super::list_index_methods(&mut list_index);
         }
 
@@ -604,12 +610,12 @@ mod tests {
         }
 
         #[test]
-        fn test_list_index_with_prefix_iter() {
+        fn test_list_index_in_family_iter() {
             let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
             let path = dir.path();
             let db = create_database(path);
             let mut fork = db.fork();
-            let mut list_index = ListIndex::with_prefix(IDX_NAME, vec![01], &mut fork);
+            let mut list_index = ListIndex::new_in_family(IDX_NAME, &vec![01], &mut fork);
             super::list_index_iter(&mut list_index);
         }
     }

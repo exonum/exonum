@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,6 +14,6 @@
 
 //! Private part of the Exonum rest api.
 
-pub use self::system::{SystemApi, NodeInfo};
+pub use self::system::{NodeInfo, SystemApi};
 
 mod system;

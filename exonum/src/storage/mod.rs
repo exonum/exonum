@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -57,7 +57,7 @@
 //! Each index occupies a certain set of keys in a single column family of the [`Database`].
 //! On the other hand, multiple indices can be stored in the same column family, provided
 //! that their key spaces do not intersect. Isolation is commonly achieved with the help
-//! of prefixes; see `with_prefix` constructor in the built-in index types.
+//! of column families; see `new_in_family` constructor in the built-in index types.
 //!
 //! Merkelized indices can generate cryptographic proofs about inclusion
 //! of entries. Having such a proof, an external client may verify locally that the received data
@@ -110,10 +110,11 @@
 //! [`HashSet`]: https://doc.rust-lang.org/std/collections/struct.HashSet.html
 
 pub use self::error::Error;
-pub use self::db::{Database, Snapshot, Fork, Patch, PatchIterator, Change, Changes,
-                   ChangesIterator, Iterator, Iter};
+pub use self::db::{Change, Changes, ChangesIterator, Database, Fork, Iter, Iterator, Patch,
+                   PatchIterator, Snapshot};
 
-pub use self::rocksdb::{RocksDB, RocksDBOptions};
+pub use self::options::DbOptions;
+pub use self::rocksdb::RocksDB;
 pub use self::memorydb::MemoryDB;
 
 pub use self::keys::StorageKey;
@@ -127,23 +128,26 @@ pub use self::list_index::ListIndex;
 pub use self::sparse_list_index::SparseListIndex;
 pub use self::key_set_index::KeySetIndex;
 pub use self::value_set_index::ValueSetIndex;
-pub use self::proof_list_index::{ProofListIndex, ListProof};
-pub use self::proof_map_index::{ProofMapIndex, MapProof};
+pub use self::proof_list_index::{ListProof, ProofListIndex};
+#[doc(no_inline)]
+pub use self::proof_map_index::{HashedKey, MapProof, ProofMapIndex};
+pub use self::hash::UniqueHash;
 
 /// A specialized `Result` type for I/O operations with storage.
 pub type Result<T> = ::std::result::Result<T, Error>;
 
 mod error;
 mod db;
+mod options;
 mod rocksdb;
 mod memorydb;
-
 mod keys;
 mod values;
-
 mod entry;
+mod hash;
 
 pub mod base_index;
+mod indexes_metadata;
 
 pub mod map_index;
 pub mod list_index;

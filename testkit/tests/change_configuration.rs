@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,12 +14,12 @@
 
 extern crate exonum;
 extern crate exonum_testkit;
+#[macro_use]
+extern crate pretty_assertions;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
-#[macro_use]
-extern crate pretty_assertions;
 
 use exonum::blockchain::Schema;
 use exonum::crypto::CryptoHash;
@@ -38,17 +38,51 @@ fn test_following_config() {
     };
     let stored = proposal.stored_configuration().clone();
     testkit.commit_configuration_change(proposal);
-    // Check that following configuration is none.
+    // Check that the following configuration is none.
     assert_eq!(
         Schema::new(&testkit.snapshot()).following_configuration(),
         None
     );
     testkit.create_block();
-    // Check that following configuration is appears.
+    // Check that the following configuration has appeared.
     assert_eq!(
         Schema::new(&testkit.snapshot()).following_configuration(),
         Some(stored)
     );
+}
+
+#[test]
+fn test_configuration_and_rollbacks() {
+    let mut testkit = TestKitBuilder::validator().create();
+    testkit.create_blocks_until(Height(5));
+
+    let cfg_change_height = Height(10);
+    let proposal = {
+        let mut cfg = testkit.configuration_change_proposal();
+        cfg.set_actual_from(cfg_change_height);
+        cfg.set_service_config("service", "config");
+        cfg
+    };
+    let old_config = testkit.actual_configuration();
+    let new_config = proposal.stored_configuration().clone();
+
+    testkit.checkpoint();
+
+    testkit.commit_configuration_change(proposal);
+    testkit.create_blocks_until(Height(10));
+    assert_eq!(testkit.actual_configuration(), new_config);
+
+    testkit.checkpoint();
+    testkit.create_block();
+    testkit.rollback();
+    assert_eq!(testkit.actual_configuration(), new_config);
+
+    testkit.rollback();
+
+    // As rollback is behind the time a proposal entered the blockchain,
+    // the proposal is effectively forgotten.
+    testkit.create_blocks_until(Height(10));
+    assert_eq!(testkit.actual_configuration(), old_config);
 }
 
 #[test]

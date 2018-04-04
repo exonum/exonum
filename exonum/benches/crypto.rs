@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,13 +14,13 @@
 
 #![feature(test)]
 
-extern crate test;
 extern crate exonum;
+extern crate test;
 
 #[cfg(test)]
 mod tests {
     use test::Bencher;
-    use exonum::crypto::{gen_keypair, sign, verify, hash};
+    use exonum::crypto::{gen_keypair, hash, sign, verify};
 
     #[bench]
     fn bench_sign_64(b: &mut Bencher) {

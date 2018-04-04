@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,35 +13,42 @@
 // limitations under the License.
 
 //! The time oracle service for Exonum.
+//!
+//! See [the Exonum documentation][docs:time] for a high-level overview of the service,
+//! in particular, its design rationale and the proof of correctness.
+//!
+//! [docs:time]: https://exonum.com/doc/advanced/time
 
 #![deny(missing_debug_implementations, missing_docs)]
 
+extern crate bodyparser;
+extern crate chrono;
+#[macro_use]
+extern crate exonum;
+#[macro_use]
+extern crate failure;
+extern crate iron;
+extern crate router;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
-#[macro_use]
-extern crate exonum;
-extern crate router;
-extern crate bodyparser;
-extern crate iron;
 
-use iron::prelude::*;
-use iron::Handler;
+use iron::{Handler, prelude::*};
 use router::Router;
+use chrono::{DateTime, Duration, TimeZone, Utc};
 
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use exonum::blockchain::{Blockchain, Service, ServiceContext, Schema, ApiContext, Transaction,
-                         TransactionSet, ExecutionResult};
-use exonum::messages::{RawTransaction, Message};
+use exonum::blockchain::{ApiContext, Blockchain, ExecutionError, ExecutionResult, Schema, Service,
+                         ServiceContext, Transaction, TransactionSet};
+use exonum::messages::{Message, RawTransaction};
 use exonum::encoding::serialize::json::reexport::Value;
-use exonum::storage::{Fork, Snapshot, ProofMapIndex, Entry};
+use exonum::storage::{Entry, Fork, ProofMapIndex, Snapshot};
 use exonum::crypto::{Hash, PublicKey};
 use exonum::encoding;
-use exonum::helpers::fabric::{ServiceFactory, Context};
+use exonum::helpers::fabric::{Context, ServiceFactory};
 use exonum::api::Api;
 
 /// Time service id.
@@ -62,7 +69,7 @@ impl<T: AsRef<Snapshot>> TimeSchema<T> {
     }
 
     /// Returns the table that stores `SystemTime` for every validator.
-    pub fn validators_times(&self) -> ProofMapIndex<&Snapshot, PublicKey, SystemTime> {
+    pub fn validators_times(&self) -> ProofMapIndex<&Snapshot, PublicKey, DateTime<Utc>> {
         ProofMapIndex::new(
             format!("{}.validators_times", SERVICE_NAME),
             self.view.as_ref(),
@@ -70,29 +77,28 @@ impl<T: AsRef<Snapshot>> TimeSchema<T> {
     }
 
     /// Returns stored time.
-    pub fn time(&self) -> Entry<&Snapshot, SystemTime> {
+    pub fn time(&self) -> Entry<&Snapshot, DateTime<Utc>> {
         Entry::new(format!("{}.time", SERVICE_NAME), self.view.as_ref())
     }
 
     /// Returns hashes for stored tables.
     pub fn state_hash(&self) -> Vec<Hash> {
-        vec![self.validators_times().root_hash(), self.time().hash()]
+        vec![self.validators_times().merkle_root(), self.time().hash()]
     }
 }
-
 
 impl<'a> TimeSchema<&'a mut Fork> {
     /// Mutable reference to the ['validators_times'][1] index.
     ///
     /// [1]: struct.TimeSchema.html#method.validators_times
-    pub fn validators_times_mut(&mut self) -> ProofMapIndex<&mut Fork, PublicKey, SystemTime> {
+    pub fn validators_times_mut(&mut self) -> ProofMapIndex<&mut Fork, PublicKey, DateTime<Utc>> {
         ProofMapIndex::new(format!("{}.validators_times", SERVICE_NAME), self.view)
     }
 
     /// Mutable reference to the ['time'][1] index.
     ///
     /// [1]: struct.TimeSchema.html#method.time
-    pub fn time_mut(&mut self) -> Entry<&mut Fork, SystemTime> {
+    pub fn time_mut(&mut self) -> Entry<&mut Fork, DateTime<Utc>> {
         Entry::new(format!("{}.time", SERVICE_NAME), self.view)
     }
 }
@@ -104,9 +110,92 @@ transactions! {
         /// Transaction that is sent by the validator after the commit of the block.
         struct TxTime {
             /// Time of the validator.
-            time: SystemTime,
+            time: DateTime<Utc>,
             /// Public key of the validator.
             pub_key: &PublicKey,
+        }
+    }
+}
+
+/// Common errors emitted by transactions during execution.
+#[derive(Debug, Fail)]
+#[repr(u8)]
+pub enum Error {
+    /// The sender of the transaction is not among the active validators.
+    #[fail(display = "Not authored by a validator")]
+    UnknownSender = 0,
+
+    /// The validator time that is stored in storage is greater than the proposed one.
+    #[fail(display = "The validator time is greater than the proposed one")]
+    ValidatorTimeIsGreater = 1,
+}
+
+impl From<Error> for ExecutionError {
+    fn from(value: Error) -> ExecutionError {
+        ExecutionError::new(value as u8)
+    }
+}
+
+impl TxTime {
+    fn check_signed_by_validator(&self, snapshot: &Snapshot) -> ExecutionResult {
+        let keys = Schema::new(&snapshot).actual_configuration().validator_keys;
+        let signed = keys.iter().any(|k| k.service_key == *self.pub_key());
+        if !signed {
+            Err(Error::UnknownSender)?
+        } else {
+            Ok(())
+        }
+    }
+
+    fn update_validator_time(&self, fork: &mut Fork) -> ExecutionResult {
+        let mut schema = TimeSchema::new(fork);
+        match schema.validators_times().get(self.pub_key()) {
+            // The validator time in the storage should be less than in the transaction.
+            Some(time) if time >= self.time() => Err(Error::ValidatorTimeIsGreater)?,
+            // Write the time for the validator.
+            _ => {
+                schema
+                    .validators_times_mut()
+                    .put(self.pub_key(), self.time());
+                Ok(())
+            }
+        }
+    }
+
+    fn update_consolidated_time(fork: &mut Fork) {
+        let keys = Schema::new(&fork).actual_configuration().validator_keys;
+        let mut schema = TimeSchema::new(fork);
+
+        // Find all known times for the validators.
+        let validator_times = {
+            let idx = schema.validators_times();
+            let mut times = idx.iter()
+                .filter_map(|(public_key, time)| {
+                    keys.iter()
+                        .find(|validator| validator.service_key == public_key)
+                        .map(|_| time)
+                })
+                .collect::<Vec<_>>();
+            // Ordering time from highest to lowest.
+            times.sort_by(|a, b| b.cmp(a));
+            times
+        };
+
+        // The largest number of Byzantine nodes.
+        let max_byzantine_nodes = (keys.len() - 1) / 3;
+        if validator_times.len() <= 2 * max_byzantine_nodes {
+            return;
+        }
+
+        match schema.time().get() {
+            // Selected time should be greater than the time in the storage.
+            Some(current_time) if current_time >= validator_times[max_byzantine_nodes] => {
+                return;
+            }
+            _ => {
+                // Change the time in the storage.
+                schema.time_mut().set(validator_times[max_byzantine_nodes]);
+            }
         }
     }
 }
@@ -117,62 +206,9 @@ impl Transaction for TxTime {
     }
 
     fn execute(&self, view: &mut Fork) -> ExecutionResult {
-        let validator_keys = Schema::new(&view).actual_configuration().validator_keys;
-
-        // The transaction must be signed by the validator.
-        let signed = validator_keys.iter().any(|&validator| {
-            validator.service_key == *self.pub_key()
-        });
-        if !signed {
-            return Ok(());
-        }
-
-        let mut schema = TimeSchema::new(view);
-        match schema.validators_times().get(self.pub_key()) {
-            // The validator time in the storage should be less than in the transaction.
-            Some(storage_time) if storage_time >= self.time() => {
-                return Ok(());
-            }
-            // Write the time for the validator.
-            _ => {
-                schema.validators_times_mut().put(
-                    self.pub_key(),
-                    self.time(),
-                )
-            }
-        }
-
-        // Find all known times for the validators.
-        let mut validator_times: Vec<SystemTime>;
-        {
-            let idx = schema.validators_times();
-            validator_times = idx.iter()
-                .filter_map(|(public_key, time)| {
-                    validator_keys
-                        .iter()
-                        .find(|validator| validator.service_key == public_key)
-                        .map(|_| time)
-                })
-                .collect();
-        }
-
-        // The largest number of Byzantine nodes.
-        let max_byzantine_nodes = (validator_keys.len() - 1) / 3;
-        if validator_times.len() <= 2 * max_byzantine_nodes {
-            return Ok(());
-        }
-        // Ordering time from highest to lowest.
-        validator_times.sort_by(|a, b| b.cmp(a));
-
-        match schema.time().get() {
-            // Selected time should be longer than the time in the storage.
-            Some(current_time) if current_time >= validator_times[max_byzantine_nodes] => {}
-            _ => {
-                // Change the time in the storage.
-                schema.time_mut().set(validator_times[max_byzantine_nodes]);
-            }
-        }
-
+        self.check_signed_by_validator(view.as_ref())?;
+        self.update_validator_time(view)?;
+        Self::update_consolidated_time(view);
         Ok(())
     }
 }
@@ -189,7 +225,7 @@ pub struct ValidatorTime {
     /// Public key of the validator.
     pub public_key: PublicKey,
     /// Time of the validator.
-    pub time: Option<SystemTime>,
+    pub time: Option<DateTime<Utc>>,
 }
 
 /// Shortcut to get data from storage.
@@ -209,11 +245,9 @@ impl TimeApi {
 
         // The times of all validators for which time is known.
         let validators_times = idx.iter()
-            .map(|(public_key, time)| {
-                ValidatorTime {
-                    public_key,
-                    time: Some(time),
-                }
+            .map(|(public_key, time)| ValidatorTime {
+                public_key,
+                time: Some(time),
             })
             .collect::<Vec<_>>();
 
@@ -231,11 +265,9 @@ impl TimeApi {
         // `None` if the time of the validator is unknown.
         let validators_times = validator_keys
             .iter()
-            .map(|validator| {
-                ValidatorTime {
-                    public_key: validator.service_key,
-                    time: idx.get(&validator.service_key),
-                }
+            .map(|validator| ValidatorTime {
+                public_key: validator.service_key,
+                time: idx.get(&validator.service_key),
             })
             .collect::<Vec<_>>();
 
@@ -275,15 +307,15 @@ impl Api for TimeApi {
 /// A helper trait that provides the node with a current time.
 pub trait TimeProvider: Send + Sync + ::std::fmt::Debug {
     /// Returns the current time.
-    fn current_time(&self) -> SystemTime;
+    fn current_time(&self) -> DateTime<Utc>;
 }
 
 #[derive(Debug)]
 struct SystemTimeProvider;
 
 impl TimeProvider for SystemTimeProvider {
-    fn current_time(&self) -> SystemTime {
-        SystemTime::now()
+    fn current_time(&self) -> DateTime<Utc> {
+        Utc::now()
     }
 }
 
@@ -301,7 +333,8 @@ impl TimeProvider for SystemTimeProvider {
 /// # extern crate exonum;
 /// # extern crate exonum_testkit;
 /// # extern crate exonum_time;
-/// use std::time::{Duration, UNIX_EPOCH};
+/// # extern crate chrono;
+/// use chrono::{Utc, Duration, TimeZone};
 /// use exonum::helpers::Height;
 /// use exonum_testkit::TestKitBuilder;
 /// use exonum_time::{MockTimeProvider, TimeSchema, TimeService};
@@ -311,14 +344,14 @@ impl TimeProvider for SystemTimeProvider {
 /// let mut testkit = TestKitBuilder::validator()
 ///     .with_service(TimeService::with_provider(mock_provider.clone()))
 ///     .create();
-/// mock_provider.add_time(Duration::new(15, 0));
+/// mock_provider.add_time(Duration::seconds(15));
 /// testkit.create_blocks_until(Height(2));
 ///
 /// // The time reported by the mock time provider is reflected by the service.
 /// let snapshot = testkit.snapshot();
 /// let schema = TimeSchema::new(snapshot);
 /// assert_eq!(
-///     Some(UNIX_EPOCH + Duration::new(15, 0)),
+///     Some(Utc.timestamp(15, 0)),
 ///     schema.time().get().map(|time| time)
 /// );
 /// # }
@@ -329,29 +362,31 @@ impl TimeProvider for SystemTimeProvider {
 #[derive(Debug, Clone)]
 pub struct MockTimeProvider {
     /// Local time value.
-    time: Arc<RwLock<SystemTime>>,
+    time: Arc<RwLock<DateTime<Utc>>>,
 }
 
 impl Default for MockTimeProvider {
     /// Initializes the provider with the time set to the Unix epoch start.
     fn default() -> Self {
-        Self::new(UNIX_EPOCH)
+        Self::new(Utc.timestamp(0, 0))
     }
 }
 
 impl MockTimeProvider {
     /// Creates a new `MockTimeProvider` with time value equal to `time`.
-    pub fn new(time: SystemTime) -> Self {
-        Self { time: Arc::new(RwLock::new(time)) }
+    pub fn new(time: DateTime<Utc>) -> Self {
+        Self {
+            time: Arc::new(RwLock::new(time)),
+        }
     }
 
     /// Gets the time value currently reported by the provider.
-    pub fn time(&self) -> SystemTime {
+    pub fn time(&self) -> DateTime<Utc> {
         *self.time.read().unwrap()
     }
 
     /// Sets the time value to `new_time`.
-    pub fn set_time(&self, new_time: SystemTime) {
+    pub fn set_time(&self, new_time: DateTime<Utc>) {
         let mut time = self.time.write().unwrap();
         *time = new_time;
     }
@@ -359,12 +394,12 @@ impl MockTimeProvider {
     /// Adds `duration` to the value of `time`.
     pub fn add_time(&self, duration: Duration) {
         let mut time = self.time.write().unwrap();
-        *time += duration;
+        *time = *time + duration;
     }
 }
 
 impl TimeProvider for MockTimeProvider {
-    fn current_time(&self) -> SystemTime {
+    fn current_time(&self) -> DateTime<Utc> {
         self.time()
     }
 }
@@ -384,7 +419,9 @@ pub struct TimeService {
 
 impl Default for TimeService {
     fn default() -> TimeService {
-        TimeService { time: Box::new(SystemTimeProvider) as Box<TimeProvider> }
+        TimeService {
+            time: Box::new(SystemTimeProvider) as Box<TimeProvider>,
+        }
     }
 }
 
@@ -396,7 +433,9 @@ impl TimeService {
 
     /// Create a new `TimeService` with time provider `T`.
     pub fn with_provider<T: Into<Box<TimeProvider>>>(time_provider: T) -> TimeService {
-        TimeService { time: time_provider.into() }
+        TimeService {
+            time: time_provider.into(),
+        }
     }
 }
 
@@ -432,22 +471,28 @@ impl Service for TimeService {
         let (pub_key, sec_key) = (*context.public_key(), context.secret_key().clone());
         context
             .transaction_sender()
-            .send(Box::new(
-                TxTime::new(self.time.current_time(), &pub_key, &sec_key),
-            ))
+            .send(Box::new(TxTime::new(
+                self.time.current_time(),
+                &pub_key,
+                &sec_key,
+            )))
             .unwrap();
     }
 
     fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
         let mut router = Router::new();
-        let api = TimeApi { blockchain: ctx.blockchain().clone() };
+        let api = TimeApi {
+            blockchain: ctx.blockchain().clone(),
+        };
         api.wire_private(&mut router);
         Some(Box::new(router))
     }
 
     fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
         let mut router = Router::new();
-        let api = TimeApi { blockchain: ctx.blockchain().clone() };
+        let api = TimeApi {
+            blockchain: ctx.blockchain().clone(),
+        };
         api.wire(&mut router);
         Some(Box::new(router))
     }

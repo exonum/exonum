@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crypto::{PublicKey, SecretKey, Signature, gen_keypair};
+use crypto::{gen_keypair, PublicKey, SecretKey, Signature};
 use messages::raw::MessageBuffer;
 use messages::{Message, RawMessage};
 use encoding::serialize::FromHex;
@@ -43,15 +43,6 @@ fn test_unsupported_version() {
     let tx = TxSimple::new_with_signature(&PublicKey::zero(), "My little pony", &Signature::zero());
     let mut vec = tx.as_ref().as_ref().to_vec();
     vec[1] = 128;
-    let _msg = TxSimple::from_raw(RawMessage::from_vec(vec)).unwrap();
-}
-
-#[test]
-#[should_panic(expected = "IncorrectNetworkId")]
-fn test_incorrect_network_id() {
-    let tx = TxSimple::new_with_signature(&PublicKey::zero(), "My little pony", &Signature::zero());
-    let mut vec = tx.as_ref().as_ref().to_vec();
-    vec[0] = 128;
     let _msg = TxSimple::from_raw(RawMessage::from_vec(vec)).unwrap();
 }
 

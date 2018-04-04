@@ -117,24 +117,23 @@ impl TestKitHandler for TestKit {
             Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
         };
 
-        if let Some(tx_hashes) = req.tx_hashes {
-            let maybe_missing_tx = {
-                let mempool = self.mempool();
-                tx_hashes.iter().find(|h| !mempool.contains_key(h))
-            };
+        let block_info = if let Some(tx_hashes) = req.tx_hashes {
+            let maybe_missing_tx = tx_hashes.iter().find(|h| !self.is_tx_in_pool(h));
             if let Some(missing_tx) = maybe_missing_tx {
                 Err(ApiError::BadRequest(format!(
                     "Transaction not in mempool: {}",
                     missing_tx.to_string()
                 )))?;
             }
-            self.create_block_with_tx_hashes(&tx_hashes);
-        } else {
-            self.create_block();
-        }
 
-        let explorer = BlockchainExplorer::new(&self.blockchain);
-        let block_info = explorer.block_info(self.height());
+            // NB: checkpoints must correspond 1-to-1 to blocks.
+            self.checkpoint();
+            self.create_block_with_tx_hashes(&tx_hashes)
+        } else {
+            self.checkpoint();
+            self.create_block()
+        };
+
         ok_response(&block_info)
     }
 
@@ -142,16 +141,12 @@ impl TestKitHandler for TestKit {
         let params = req.extensions.get::<Router>().unwrap();
 
         let height: u64 = match params.find("height") {
-            Some(height_str) => {
-                height_str.parse().map_err(|e: ParseIntError| {
-                    ApiError::BadRequest(e.to_string())
-                })?
-            }
-            None => {
-                Err(ApiError::BadRequest(
-                    "Required request parameter is missing: height".to_string(),
-                ))?
-            }
+            Some(height_str) => height_str
+                .parse()
+                .map_err(|e: ParseIntError| ApiError::BadRequest(e.to_string()))?,
+            None => Err(ApiError::BadRequest(
+                "Required request parameter is missing: height".to_string(),
+            ))?,
         };
         if height == 0 {
             Err(ApiError::BadRequest(
@@ -161,22 +156,24 @@ impl TestKitHandler for TestKit {
 
         if self.height().0 >= height {
             let rollback_blocks = (self.height().0 - height + 1) as usize;
-            self.rollback(rollback_blocks);
+            for _ in 0..rollback_blocks {
+                self.rollback();
+            }
         }
+
         let explorer = BlockchainExplorer::new(&self.blockchain);
-        let block_info = explorer.block_info(self.height());
+        let block_info = explorer.block_with_txs(self.height()).unwrap();
         ok_response(&block_info)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use exonum::blockchain::{ExecutionResult, Service, Transaction};
+    use exonum::blockchain::{Block, ExecutionResult, Service, Transaction};
     use exonum::crypto::{CryptoHash, Hash, PublicKey};
     use exonum::encoding::Error as EncodingError;
-    use exonum::explorer::BlockInfo;
     use exonum::helpers::Height;
-    use exonum::messages::{Message, RawTransaction};
+    use exonum::messages::{Message, Precommit, RawTransaction};
     use exonum::storage::{Fork, Snapshot};
     use iron::Handler;
     use iron::headers::{ContentType, Headers};
@@ -184,6 +181,29 @@ mod tests {
 
     use super::*;
     use TestKitBuilder;
+
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct DeTransaction {
+        content: serde_json::Value,
+    }
+
+    impl DeTransaction {
+        fn from<T: Transaction>(transaction: &T) -> Self {
+            DeTransaction {
+                content: transaction.serialize_field().unwrap(),
+            }
+        }
+    }
+
+    // Deserializable analogue of `BlockWithTransactions`.
+    #[derive(Debug, Deserialize)]
+    struct DeBlock {
+        #[serde(rename = "block")]
+        header: Block,
+        precommits: Vec<Precommit>,
+        /// Transactions in the order they appear in the block.
+        transactions: Vec<DeTransaction>,
+    }
 
     transactions! {
         Any {
@@ -231,8 +251,10 @@ mod tests {
                 Vec::new()
             }
 
-            fn tx_from_raw(&self, _: RawTransaction) -> Result<Box<Transaction>, EncodingError> {
-                unimplemented!();
+            fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, EncodingError> {
+                use exonum::blockchain::TransactionSet;
+
+                Any::tx_from_raw(raw).map(Any::into)
             }
         }
 
@@ -250,7 +272,7 @@ mod tests {
         (testkit, handler)
     }
 
-    fn extract_block_info(resp: Response) -> BlockInfo {
+    fn extract_block_info(resp: Response) -> DeBlock {
         serde_json::from_str(&response::extract_body_to_string(resp)).unwrap()
     }
 
@@ -291,21 +313,16 @@ mod tests {
                 &handler,
             ).unwrap(),
         );
-        assert_eq!(block_info.block.height(), Height(1));
-        assert_eq!(block_info.txs, vec![tx.hash()]);
+        assert_eq!(block_info.header.height(), Height(1));
+        assert_eq!(block_info.transactions, vec![DeTransaction::from(&tx)]);
 
         // Requests with a body that invoke `create_block`
-        let bodies = vec![
-            json!({}),
-            json!({
-                "tx_hashes": null
-            }),
-        ];
+        let bodies = vec![json!({}), json!({ "tx_hashes": null })];
 
         for body in bodies {
             {
                 let mut testkit = testkit.write().unwrap();
-                testkit.rollback(1);
+                testkit.rollback();
                 assert_eq!(testkit.height(), Height(0));
                 testkit.api().send(tx.clone());
                 testkit.poll_events();
@@ -314,8 +331,8 @@ mod tests {
             let block_info = extract_block_info(
                 post_json("http://localhost:3000/v1/blocks", &body, &handler).unwrap(),
             );
-            assert_eq!(block_info.block.height(), Height(1));
-            assert_eq!(block_info.txs, vec![tx.hash()]);
+            assert_eq!(block_info.header.height(), Height(1));
+            assert_eq!(block_info.transactions, vec![DeTransaction::from(&tx)]);
         }
     }
 
@@ -336,15 +353,15 @@ mod tests {
         let block_info = extract_block_info(
             post_json("http://localhost:3000/v1/blocks", &body, &handler).unwrap(),
         );
-        assert_eq!(block_info.block.height(), Height(1));
-        assert_eq!(block_info.txs, vec![tx_foo.hash()]);
+        assert_eq!(block_info.header.height(), Height(1));
+        assert_eq!(block_info.transactions, vec![DeTransaction::from(&tx_foo)]);
 
         let body = json!({ "tx_hashes": [ tx_bar.hash().to_string() ] });
         let block_info = extract_block_info(
             post_json("http://localhost:3000/v1/blocks", &body, &handler).unwrap(),
         );
-        assert_eq!(block_info.block.height(), Height(2));
-        assert_eq!(block_info.txs, vec![tx_bar.hash()]);
+        assert_eq!(block_info.header.height(), Height(2));
+        assert_eq!(block_info.transactions, vec![DeTransaction::from(&tx_bar)]);
     }
 
     #[test]
@@ -352,14 +369,18 @@ mod tests {
         let (_, handler) = init_handler(Height(0));
         let body = json!({ "tx_hashes": [ Hash::default().to_string() ] });
         let err = post_json("http://localhost:3000/v1/blocks", &body, &handler).unwrap_err();
-        assert!(response::extract_body_to_string(err.response).contains(
-            "Transaction not in mempool",
-        ));
+        assert!(
+            response::extract_body_to_string(err.response).contains("Transaction not in mempool",)
+        );
     }
 
     #[test]
     fn test_rollback_normal() {
-        let (testkit, handler) = init_handler(Height(4));
+        let (testkit, handler) = init_handler(Height(0));
+        for _ in 0..4 {
+            post_json("http://localhost:3000/v1/blocks", &json!({}), &handler).unwrap();
+        }
+        assert_eq!(testkit.read().unwrap().height(), Height(4));
 
         // Test that requests with "overflowing" heights do nothing
         let block_info = extract_block_info(
@@ -369,7 +390,7 @@ mod tests {
                 &handler,
             ).unwrap(),
         );
-        assert_eq!(block_info.block.height(), Height(4));
+        assert_eq!(block_info.header.height(), Height(4));
 
         // Test idempotence of the rollback endpoint
         for _ in 0..2 {
@@ -380,7 +401,7 @@ mod tests {
                     &handler,
                 ).unwrap(),
             );
-            assert_eq!(block_info.block.height(), Height(3));
+            assert_eq!(block_info.header.height(), Height(3));
             {
                 let testkit = testkit.read().unwrap();
                 assert_eq!(testkit.height(), Height(3));
@@ -408,8 +429,9 @@ mod tests {
             Headers::new(),
             &handler,
         ).unwrap_err();
-        assert!(response::extract_body_to_string(err.response).contains(
-            "Cannot rollback past genesis block",
-        ));
+        assert!(
+            response::extract_body_to_string(err.response)
+                .contains("Cannot rollback past genesis block",)
+        );
     }
 }

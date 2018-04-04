@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![allow(unsafe_code)]
+
 use std::borrow::Cow;
 
 use crypto::{hash, CryptoHash, Hash, HASH_SIZE};
-
 use super::super::{StorageKey, StorageValue};
 use super::key::{ChildKind, ProofPath, PROOF_PATH_SIZE};
 
@@ -36,7 +37,9 @@ pub struct BranchNode {
 
 impl BranchNode {
     pub fn empty() -> BranchNode {
-        BranchNode { raw: vec![0; BRANCH_NODE_SIZE] }
+        BranchNode {
+            raw: vec![0; BRANCH_NODE_SIZE],
+        }
     }
 
     pub fn child_hash(&self, kind: ChildKind) -> &Hash {
@@ -91,7 +94,9 @@ impl StorageValue for BranchNode {
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
-        BranchNode { raw: value.into_owned() }
+        BranchNode {
+            raw: value.into_owned(),
+        }
     }
 }
 

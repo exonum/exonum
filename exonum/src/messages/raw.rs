@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,11 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![allow(unsafe_code)]
+
+use byteorder::{ByteOrder, LittleEndian};
+
 use std::{convert, mem, sync};
 use std::fmt::Debug;
 use std::ops::Deref;
-
-use byteorder::{ByteOrder, LittleEndian};
 
 use crypto::{hash, sign, verify, CryptoHash, Hash, PublicKey, SecretKey, Signature,
              SIGNATURE_LENGTH};
@@ -24,9 +26,6 @@ use encoding::{self, CheckedOffset, Field, Offset, Result as StreamStructResult}
 
 /// Length of the message header.
 pub const HEADER_LENGTH: usize = 10;
-// TODO: Better name (ECR-166).
-#[doc(hidden)]
-pub const TEST_NETWORK_ID: u8 = 0;
 /// Version of the protocol. Different versions are incompatible.
 pub const PROTOCOL_MAJOR_VERSION: u8 = 0;
 
@@ -91,7 +90,7 @@ impl MessageBuffer {
         // TODO: check that size >= HEADER_LENGTH
         // TODO: check that payload_length == raw.len()
         // ECR-166
-        MessageBuffer { raw: raw }
+        MessageBuffer { raw }
     }
 
     /// Returns the length of the message in bytes.
@@ -115,17 +114,12 @@ impl MessageBuffer {
     ///
     /// ```
     /// use exonum::messages::MessageBuffer;
-    ///;
+    ///
     /// let message_buffer = MessageBuffer::from_vec(vec![]);
     /// assert!(message_buffer.is_empty());
     /// ```
     pub fn is_empty(&self) -> bool {
         self.raw.is_empty()
-    }
-
-    /// Returns network id.
-    pub fn network_id(&self) -> u8 {
-        self.raw[0]
     }
 
     /// Returns the protocol version.
@@ -195,22 +189,18 @@ impl MessageWriter {
     /// Creates a `MessageWriter` instance with given parameters.
     pub fn new(
         protocol_version: u8,
-        network_id: u8,
         service_id: u16,
         message_type: u16,
         payload_length: usize,
     ) -> Self {
-        let mut raw = MessageWriter { raw: vec![0; HEADER_LENGTH + payload_length] };
-        raw.set_network_id(network_id);
+        // First byte is reserved for backward-compatibility and better alignment.
+        let mut raw = MessageWriter {
+            raw: vec![0; HEADER_LENGTH + payload_length],
+        };
         raw.set_version(protocol_version);
         raw.set_service_id(service_id);
         raw.set_message_type(message_type);
         raw
-    }
-
-    /// Sets network id.
-    fn set_network_id(&mut self, network_id: u8) {
-        self.raw[0] = network_id
     }
 
     /// Sets version.
@@ -219,8 +209,8 @@ impl MessageWriter {
     }
 
     /// Sets the service id.
-    fn set_service_id(&mut self, message_type: u16) {
-        LittleEndian::write_u16(&mut self.raw[4..6], message_type)
+    fn set_service_id(&mut self, service_id: u16) {
+        LittleEndian::write_u16(&mut self.raw[4..6], service_id)
     }
 
     /// Sets the message type.

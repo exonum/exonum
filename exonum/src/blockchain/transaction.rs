@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,17 +14,18 @@
 
 //! `Transaction` related types.
 
-use std::borrow::Cow;
-use std::any::Any;
-use std::fmt;
-use std::u8;
-
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
+use std::borrow::Cow;
+use std::any::Any;
+use std::error::Error;
+use std::{fmt, u8};
+use std::convert::Into;
+
 use messages::{Message, RawTransaction};
 use storage::{Fork, StorageValue};
-use crypto::{Hash, CryptoHash};
+use crypto::{CryptoHash, Hash};
 use encoding;
 use encoding::serialize::json::ExonumJson;
 
@@ -165,10 +166,10 @@ impl ExecutionError {
     }
 
     /// Constructs a new `ExecutionError` instance with the given error code and description.
-    pub fn with_description(code: u8, description: String) -> Self {
+    pub fn with_description<T: Into<String>>(code: u8, description: T) -> Self {
         Self {
             code,
-            description: Some(description),
+            description: Some(description.into()),
         }
     }
 }
@@ -245,9 +246,8 @@ impl TransactionError {
     }
 
     /// Creates a new `TransactionError` instance from `std::thread::Result`'s `Err`.
-    pub(crate) fn from_panic(_panic: &Box<Any + Send>) -> Self {
-        // TODO: Try to get description from panic.
-        Self::panic(None)
+    pub(crate) fn from_panic(panic: &Box<Any + Send>) -> Self {
+        Self::panic(panic_description(panic))
     }
 
     /// Returns error type of this `TransactionError` instance.
@@ -334,15 +334,12 @@ impl StorageValue for TransactionResult {
 fn status_as_u16(status: &TransactionResult) -> u16 {
     match *status {
         Ok(()) => TRANSACTION_STATUS_OK,
-        Err(ref e) => {
-            match e.error_type {
-                TransactionErrorType::Panic => TRANSACTION_STATUS_PANIC,
-                TransactionErrorType::Code(c) => u16::from(c),
-            }
-        }
+        Err(ref e) => match e.error_type {
+            TransactionErrorType::Panic => TRANSACTION_STATUS_PANIC,
+            TransactionErrorType::Code(c) => u16::from(c),
+        },
     }
 }
-
 
 /// `TransactionSet` trait describes a type which is an `enum` of several transactions.
 /// The implementation of this trait is generated automatically by the `transactions!`
@@ -352,7 +349,6 @@ pub trait TransactionSet
     /// Parse a transaction from this set from a `RawMessage`.
     fn tx_from_raw(raw: RawTransaction) -> Result<Self, encoding::Error>;
 }
-
 
 /// `transactions!` is used to declare a set of transactions of a particular service.
 ///
@@ -430,43 +426,115 @@ pub trait TransactionSet
 /// ```
 #[macro_export]
 macro_rules! transactions {
+    // Empty variant.
+    {} => {};
+    // Variant with the private enum.
     {
+        $(#[$tx_set_attr:meta])*
         $transaction_set:ident {
             const SERVICE_ID = $service_id:expr;
 
             $(
                 $(#[$tx_attr:meta])*
                 struct $name:ident {
-                $(
-                    $(#[$field_attr:meta])*
-                    $field_name:ident : $field_type:ty
-                ),*
-                $(,)* // optional trailing comma
+                    $($def:tt)*
                 }
             )*
         }
-    }
-
-    =>
-
-    {
+    } => {
         messages! {
             const SERVICE_ID = $service_id;
             $(
                 $(#[$tx_attr])*
                 struct $name {
-                $(
-                    $(#[$field_attr])*
-                    $field_name : $field_type
-                ),*
+                    $($def)*
                 }
             )*
         }
 
         #[derive(Clone, Debug)]
+        $(#[$tx_set_attr])*
         enum $transaction_set {
-            $($name($name),)*
+            $(
+                #[allow(missing_docs)]
+                $name($name),
+            )*
         }
+
+        transactions!(@implement $transaction_set, $($name)*);
+    };
+    // Variant with the public enum without restrictions.
+    {
+        $(#[$tx_set_attr:meta])*
+        pub $transaction_set:ident {
+            const SERVICE_ID = $service_id:expr;
+
+            $(
+                $(#[$tx_attr:meta])*
+                struct $name:ident {
+                    $($def:tt)*
+                }
+            )*
+        }
+    } => {
+        messages! {
+            const SERVICE_ID = $service_id;
+            $(
+                $(#[$tx_attr])*
+                struct $name {
+                    $($def)*
+                }
+            )*
+        }
+
+        #[derive(Clone, Debug)]
+        $(#[$tx_set_attr])*
+        pub enum $transaction_set {
+            $(
+                #[allow(missing_docs)]
+                $name($name),
+            )*
+        }
+
+        transactions!(@implement $transaction_set, $($name)*);
+    };
+    // Variant with the public enum with visibility restrictions.
+    {
+        $(#[$tx_set_attr:meta])*
+        pub($($vis:tt)+) $transaction_set:ident {
+            const SERVICE_ID = $service_id:expr;
+
+            $(
+                $(#[$tx_attr:meta])*
+                struct $name:ident {
+                    $($def:tt)*
+                }
+            )*
+        }
+    } => {
+        messages! {
+            const SERVICE_ID = $service_id;
+            $(
+                $(#[$tx_attr])*
+                struct $name {
+                    $($def)*
+                }
+            )*
+        }
+
+        #[derive(Clone, Debug)]
+        $(#[$tx_set_attr])*
+        pub($($vis)+) enum $transaction_set {
+            $(
+                #[allow(missing_docs)]
+                $name($name),
+            )*
+        }
+
+        transactions!(@implement $transaction_set, $($name)*);
+    };
+    // Implementation details
+    (@implement $transaction_set:ident, $($name:ident)*) => {
 
         impl $crate::blockchain::TransactionSet for $transaction_set {
             fn tx_from_raw(
@@ -540,24 +608,42 @@ macro_rules! transactions {
     };
 }
 
+/// Tries to get a meaningful description from the given panic.
+fn panic_description(any: &Box<Any + Send>) -> Option<String> {
+    if let Some(s) = any.downcast_ref::<&str>() {
+        Some(s.to_string())
+    } else if let Some(s) = any.downcast_ref::<String>() {
+        Some(s.clone())
+    } else if let Some(error) = any.downcast_ref::<Box<Error + Send>>() {
+        Some(error.description().to_string())
+    } else {
+        None
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use futures::sync::mpsc;
 
-    use std::collections::BTreeMap;
     use std::sync::Mutex;
+    use std::panic;
 
     use super::*;
     use crypto;
-    use blockchain::Blockchain;
-    use storage::{Database, MemoryDB, Entry};
+    use encoding;
+    use blockchain::{Blockchain, Schema, Service};
+    use storage::{Database, Entry, MemoryDB, Snapshot};
     use node::ApiSender;
-    use helpers::{ValidatorId, Height};
+    use helpers::{Height, ValidatorId};
+
+    const TX_RESULT_SERVICE_ID: u16 = 255;
 
     lazy_static! {
         static ref EXECUTION_STATUS: Mutex<ExecutionResult> = Mutex::new(Ok(()));
     }
+
+    // Testing macro with empty body.
+    transactions!{}
 
     #[test]
     fn execution_error_new() {
@@ -575,7 +661,7 @@ mod tests {
         let values = [(0, ""), (1, "test"), (100, "error"), (255, "hello")];
 
         for value in &values {
-            let error = ExecutionError::with_description(value.0, value.1.to_owned());
+            let error = ExecutionError::with_description(value.0, value.1);
             assert_eq!(value.0, error.code);
             assert_eq!(value.1, error.description.unwrap());
         }
@@ -604,8 +690,8 @@ mod tests {
         let execution_errors = [
             ExecutionError::new(0),
             ExecutionError::new(255),
-            ExecutionError::with_description(1, "".to_owned()),
-            ExecutionError::with_description(1, "Terrible failure".to_owned()),
+            ExecutionError::with_description(1, ""),
+            ExecutionError::with_description(1, "Terrible failure"),
         ];
 
         for execution_error in &execution_errors {
@@ -626,9 +712,9 @@ mod tests {
             Ok(()),
             Err(TransactionError::panic(None)),
             Err(TransactionError::panic(Some("".to_owned()))),
-            Err(TransactionError::panic(
-                Some("Panic error description".to_owned()),
-            )),
+            Err(TransactionError::panic(Some(
+                "Panic error description".to_owned(),
+            ))),
             Err(TransactionError::code(0, None)),
             Err(TransactionError::code(
                 0,
@@ -658,20 +744,17 @@ mod tests {
     fn error_discards_transaction_changes() {
         let statuses = [
             Err(ExecutionError::new(0)),
-            Err(ExecutionError::with_description(
-                0,
-                "Strange error".to_owned(),
-            )),
+            Err(ExecutionError::with_description(0, "Strange error")),
             Err(ExecutionError::new(255)),
             Err(ExecutionError::with_description(
                 255,
-                "Error description...".to_owned(),
+                "Error description...",
             )),
             Ok(()),
         ];
 
         let (_, sec_key) = crypto::gen_keypair();
-        let (blockchain, mut pool) = create_blockchain();
+        let mut blockchain = create_blockchain();
         let db = Box::new(MemoryDB::new());
 
         for (index, status) in statuses.iter().enumerate() {
@@ -680,17 +763,17 @@ mod tests {
             *EXECUTION_STATUS.lock().unwrap() = status.clone();
 
             let transaction = TxResult::new(index, &sec_key);
-            pool.insert(
-                transaction.hash(),
-                Box::new(transaction.clone()) as Box<Transaction>,
-            );
+            let hash = transaction.hash();
+            {
+                let mut fork = blockchain.fork();
+                {
+                    let mut schema = Schema::new(&mut fork);
+                    schema.add_transaction_into_pool(transaction.raw().clone());
+                }
+                blockchain.merge(fork.into_patch()).unwrap();
+            }
 
-            let (_, patch) = blockchain.create_patch(
-                ValidatorId::zero(),
-                Height(index),
-                &[transaction.hash()],
-                &pool,
-            );
+            let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(index), &[hash]);
 
             db.merge(patch).unwrap();
 
@@ -704,24 +787,73 @@ mod tests {
         }
     }
 
-    fn create_blockchain() -> (Blockchain, BTreeMap<Hash, Box<Transaction>>) {
+    #[test]
+    fn str_panic() {
+        let static_str = "Static string (&str)";
+        let panic = make_panic(static_str);
+        assert_eq!(Some(static_str.to_string()), panic_description(&panic));
+    }
+
+    #[test]
+    fn string_panic() {
+        let string = "Owned string (String)".to_owned();
+        let error = make_panic(string.clone());
+        assert_eq!(Some(string), panic_description(&error));
+    }
+
+    #[test]
+    fn box_error_panic() {
+        let error: Box<Error + Send> = Box::new("e".parse::<i32>().unwrap_err());
+        let description = error.description().to_owned();
+        let error = make_panic(error);
+        assert_eq!(Some(description), panic_description(&error));
+    }
+
+    #[test]
+    fn unknown_panic() {
+        let error = make_panic(1);
+        assert_eq!(None, panic_description(&error));
+    }
+
+    fn make_panic<T: Send + 'static>(val: T) -> Box<Any + Send> {
+        panic::catch_unwind(panic::AssertUnwindSafe(|| panic!(val))).unwrap_err()
+    }
+
+    fn create_blockchain() -> Blockchain {
         let service_keypair = crypto::gen_keypair();
         let api_channel = mpsc::channel(1);
-        (
-            Blockchain::new(
-                Box::new(MemoryDB::new()),
-                Vec::new(),
-                service_keypair.0,
-                service_keypair.1,
-                ApiSender::new(api_channel.0),
-            ),
-            BTreeMap::new(),
+        Blockchain::new(
+            MemoryDB::new(),
+            vec![Box::new(TxResultService) as Box<Service>],
+            service_keypair.0,
+            service_keypair.1,
+            ApiSender::new(api_channel.0),
         )
     }
 
+    struct TxResultService;
+
+    impl Service for TxResultService {
+        fn service_id(&self) -> u16 {
+            TX_RESULT_SERVICE_ID
+        }
+
+        fn service_name(&self) -> &'static str {
+            "test service"
+        }
+
+        fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
+            vec![]
+        }
+
+        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, encoding::Error> {
+            Ok(Box::new(TxResult::from_raw(raw)?))
+        }
+    }
+
     transactions! {
-        Transactions {
-            const SERVICE_ID = 1;
+        TestTxs {
+            const SERVICE_ID = TX_RESULT_SERVICE_ID;
 
             struct TxResult {
                 index: u64,

@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,7 +24,8 @@ use std::cell::Cell;
 use std::marker::PhantomData;
 
 use crypto::{hash, CryptoHash, Hash};
-use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
+use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey, StorageValue};
+use super::indexes_metadata::IndexType;
 
 #[derive(Debug, Default, Clone, Copy)]
 struct SparseListSize {
@@ -69,6 +70,7 @@ impl StorageValue for SparseListSize {
 /// `SparseListIndex` implements an array list, storing the element as values and using `u64`
 /// as an index.
 /// `SparseListIndex` requires that the elements implement the [`StorageValue`] trait.
+///
 /// [`StorageValue`]: ../trait.StorageValue.html
 /// [`ListIndex`]: <../list_index/struct.ListIndex.html>
 #[derive(Debug)]
@@ -90,7 +92,6 @@ pub struct SparseListIndexIter<'a, V> {
     base_iter: BaseIndexIter<'a, u64, V>,
 }
 
-
 /// An iterator over the indices of a `SparseListIndex`.
 ///
 /// This struct is created by the [`indices`] method on [`SparseListIndex`].
@@ -102,7 +103,6 @@ pub struct SparseListIndexIter<'a, V> {
 pub struct SparseListIndexKeys<'a> {
     base_iter: BaseIndexIter<'a, u64, ()>,
 }
-
 
 /// An iterator over the values of a `SparseListIndex`.
 ///
@@ -116,12 +116,17 @@ pub struct SparseListIndexValues<'a, V> {
     base_iter: BaseIndexIter<'a, (), V>,
 }
 
-impl<T, V> SparseListIndex<T, V> {
+impl<T, V> SparseListIndex<T, V>
+where
+    T: AsRef<Snapshot>,
+    V: StorageValue,
+{
     /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     ///
@@ -134,22 +139,22 @@ impl<T, V> SparseListIndex<T, V> {
     /// let snapshot = db.snapshot();
     /// let name = "name";
     /// let index: SparseListIndex<_, u8> = SparseListIndex::new(name, &snapshot);
-    /// # drop(index);
     /// ```
-    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         SparseListIndex {
-            base: BaseIndex::new(name, view),
+            base: BaseIndex::new(index_name, IndexType::SparseList, view),
             size: Cell::new(None),
             _v: PhantomData,
         }
     }
 
-    /// Creates a new index representation based on the name, common prefix of its keys
+    /// Creates a new index representation based on the name, index id in family
     /// and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     ///
@@ -161,24 +166,25 @@ impl<T, V> SparseListIndex<T, V> {
     /// let db = MemoryDB::new();
     /// let snapshot = db.snapshot();
     /// let name = "name";
-    /// let prefix = vec![123];
-    /// let index: SparseListIndex<_, u8> = SparseListIndex::with_prefix(name, prefix, &snapshot);
-    /// # drop(index);
+    /// let index_id = vec![123];
+    /// let index: SparseListIndex<_, u8> = SparseListIndex::new_in_family(
+    ///     name,
+    ///     &index_id,
+    ///     &snapshot,
+    ///  );
     /// ```
-    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
+    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
+        family_name: S,
+        index_id: &I,
+        view: T,
+    ) -> Self {
         SparseListIndex {
-            base: BaseIndex::with_prefix(name, prefix, view),
+            base: BaseIndex::new_in_family(family_name, index_id, IndexType::SparseList, view),
             size: Cell::new(None),
             _v: PhantomData,
         }
     }
-}
 
-impl<T, V> SparseListIndex<T, V>
-where
-    T: AsRef<Snapshot>,
-    V: StorageValue,
-{
     fn size(&self) -> SparseListSize {
         if let Some(size) = self.size.get() {
             return size;
@@ -229,7 +235,6 @@ where
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
-
 
     /// Returns the total amount of elements (including "empty" elements) in the list. The value of
     /// capacity is determined by the maximum index of the element ever inserted into the index.
@@ -299,7 +304,9 @@ where
     /// }
     /// ```
     pub fn iter(&self) -> SparseListIndexIter<V> {
-        SparseListIndexIter { base_iter: self.base.iter_from(&(), &0u64) }
+        SparseListIndexIter {
+            base_iter: self.base.iter_from(&(), &0u64),
+        }
     }
 
     /// Returns an iterator over the indices of the 'SparseListIndex'.
@@ -320,7 +327,9 @@ where
     /// }
     /// ```
     pub fn indices(&self) -> SparseListIndexKeys {
-        SparseListIndexKeys { base_iter: self.base.iter_from(&(), &0u64) }
+        SparseListIndexKeys {
+            base_iter: self.base.iter_from(&(), &0u64),
+        }
     }
 
     /// Returns an iterator over the values of the 'SparseListIndex'. The iterator element type is
@@ -342,7 +351,9 @@ where
     /// }
     /// ```
     pub fn values(&self) -> SparseListIndexValues<V> {
-        SparseListIndexValues { base_iter: self.base.iter_from(&(), &0u64) }
+        SparseListIndexValues {
+            base_iter: self.base.iter_from(&(), &0u64),
+        }
     }
 
     /// Returns an iterator over the list starting from the specified position. The iterator
@@ -365,10 +376,11 @@ where
     /// }
     /// ```
     pub fn iter_from(&self, from: u64) -> SparseListIndexIter<V> {
-        SparseListIndexIter { base_iter: self.base.iter_from(&(), &from) }
+        SparseListIndexIter {
+            base_iter: self.base.iter_from(&(), &from),
+        }
     }
 }
-
 
 impl<'a, V> SparseListIndex<&'a mut Fork, V>
 where
@@ -549,10 +561,7 @@ where
     /// assert_eq!(Some(1), index.pop());
     /// ```
     pub fn pop(&mut self) -> Option<V> {
-
-        let first_item = {
-            self.iter().next()
-        };
+        let first_item = { self.iter().next() };
 
         if let Some((first_index, first_elem)) = first_item {
             let mut size = self.size();
@@ -564,7 +573,6 @@ where
         None
     }
 }
-
 
 impl<'a, T, V> ::std::iter::IntoIterator for &'a SparseListIndex<T, V>
 where
@@ -608,7 +616,6 @@ where
         self.base_iter.next().map(|(.., v)| v)
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -680,7 +687,6 @@ mod tests {
         assert_eq!(6, list_index.capacity());
         assert_eq!(0, list_index.len());
         assert_eq!(None, list_index.pop());
-
 
         // check that capacity gets overwritten by bigger index correctly
         assert_eq!(None, list_index.set(42, 1024));
@@ -755,11 +761,10 @@ mod tests {
     mod rocksdb_tests {
         use std::path::Path;
         use tempdir::TempDir;
-        use storage::{Database, RocksDB, RocksDBOptions};
+        use storage::{Database, DbOptions, RocksDB};
 
         fn create_database(path: &Path) -> Box<Database> {
-            let mut opts = RocksDBOptions::default();
-            opts.create_if_missing(true);
+            let opts = DbOptions::default();
             Box::new(RocksDB::open(path, &opts).unwrap())
         }
 

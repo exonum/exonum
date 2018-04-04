@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use messages::{RequestMessage, Message, ProposeRequest, TransactionsRequest, PrevotesRequest,
-               BlockRequest, BlockResponse};
+use messages::{BlockRequest, BlockResponse, Message, PrevotesRequest, ProposeRequest,
+               RequestMessage, TransactionsRequest};
 use blockchain::Schema;
 use super::NodeHandler;
 
@@ -59,9 +59,9 @@ impl NodeHandler {
         }
 
         let propose = if msg.height() == self.state.height() {
-            self.state.propose(msg.propose_hash()).map(|p| {
-                p.message().raw().clone()
-            })
+            self.state
+                .propose(msg.propose_hash())
+                .map(|p| p.message().raw().clone())
         } else {
             return;
         };
@@ -77,15 +77,7 @@ impl NodeHandler {
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
         for hash in msg.txs() {
-            let tx = self.state
-                .transactions()
-                .read()
-                .expect("Expected read lock")
-                .get(hash)
-                .map(|tx| tx.raw())
-                .cloned()
-                .or_else(|| schema.transactions().get(hash));
-
+            let tx = schema.transactions().get(hash);
             if let Some(tx) = tx {
                 self.send_to_peer(*msg.from(), &tx);
             }
@@ -131,8 +123,7 @@ impl NodeHandler {
 
         let block = schema.blocks().get(&block_hash).unwrap();
         let precommits = schema.precommits(&block_hash);
-        let transactions = schema.block_txs(height);
-
+        let transactions = schema.block_transactions(height);
 
         let block_msg = BlockResponse::new(
             self.state.consensus_public_key(),

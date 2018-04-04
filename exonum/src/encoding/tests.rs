@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,16 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::net::SocketAddr;
-use std::time::SystemTime;
+#![allow(unsafe_code)]
 
 use bit_vec::BitVec;
+use chrono::Utc;
+use uuid::Uuid;
 
-use crypto::{hash, gen_keypair};
-use blockchain::{self, BlockProof, Block};
-use messages::{RawMessage, Message, Connect, Propose, Prevote, Precommit, Status, BlockResponse,
-               BlockRequest};
-use helpers::{Height, Round, ValidatorId, user_agent};
+use std::net::SocketAddr;
+
+use crypto::{gen_keypair, hash};
+use blockchain::{self, Block, BlockProof};
+use messages::{BlockRequest, BlockResponse, Connect, Message, Precommit, Prevote, Propose,
+               RawMessage, Status};
+use helpers::{user_agent, Height, Round, ValidatorId};
 use super::{Field, Offset};
 
 static VALIDATOR: ValidatorId = ValidatorId(65_123);
@@ -144,6 +147,15 @@ fn test_i64_segment() {
 }
 
 #[test]
+fn test_uuid_segment() {
+    let uuid = Uuid::nil();
+    assert_write_check_read(uuid, 16);
+
+    let uuid = Uuid::parse_str("936DA01F9ABD4d9d80C702AF85C822A8").unwrap();
+    assert_write_check_read(uuid, 16);
+}
+
+#[test]
 fn test_byte_array() {
     let mut buf = vec![255; 8];
     let arr = [2u8, 5, 2, 3, 56, 3];
@@ -246,7 +258,7 @@ fn test_connect() {
     use std::str::FromStr;
 
     let socket_address = SocketAddr::from_str("18.34.3.4:7777").unwrap();
-    let time = SystemTime::now();
+    let time = Utc::now();
     let (public_key, secret_key) = gen_keypair();
 
     // write
@@ -313,7 +325,7 @@ fn test_precommit() {
     let propose_hash = hash(&[1, 2, 3]);
     let block_hash = hash(&[3, 2, 1]);
     let (public_key, secret_key) = gen_keypair();
-    let time = SystemTime::now();
+    let time = Utc::now();
 
     // write
     let precommit = Precommit::new(
@@ -356,7 +368,7 @@ fn test_status() {
 #[test]
 fn test_block() {
     let (pub_key, secret_key) = gen_keypair();
-    let ts = SystemTime::now();
+    let ts = Utc::now();
     let txs = [2];
     let tx_count = txs.len() as u32;
 
@@ -378,7 +390,7 @@ fn test_block() {
             &hash(&[1, 2, 3]),
             &hash(&[3, 2, 1]),
             ts,
-            &secret_key
+            &secret_key,
         ),
         Precommit::new(
             ValidatorId(13),
@@ -387,7 +399,7 @@ fn test_block() {
             &hash(&[4, 2, 3]),
             &hash(&[3, 3, 1]),
             ts,
-            &secret_key
+            &secret_key,
         ),
         Precommit::new(
             ValidatorId(323),
@@ -396,7 +408,7 @@ fn test_block() {
             &hash(&[1, 1, 3]),
             &hash(&[5, 2, 1]),
             ts,
-            &secret_key
+            &secret_key,
         ),
     ];
     let transactions = vec![

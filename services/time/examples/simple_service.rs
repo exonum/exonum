@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,22 +14,23 @@
 
 //! Service, which uses the time oracle.
 
+extern crate chrono;
 #[macro_use]
 extern crate exonum;
-extern crate exonum_time;
 #[macro_use]
 extern crate exonum_testkit;
-extern crate serde_json;
+extern crate exonum_time;
 extern crate serde;
+extern crate serde_json;
 
-use std::time::{UNIX_EPOCH, SystemTime, Duration};
-use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
+use chrono::{DateTime, Duration, TimeZone, Utc};
+use exonum::blockchain::{ExecutionResult, Service, Transaction, TransactionSet};
 use exonum::crypto::{gen_keypair, Hash, PublicKey};
 use exonum::encoding;
 use exonum::helpers::Height;
 use exonum::messages::{Message, RawTransaction};
 use exonum::storage::{Fork, ProofMapIndex, Snapshot};
-use exonum_time::{TimeService, TimeSchema, MockTimeProvider};
+use exonum_time::{MockTimeProvider, TimeSchema, TimeService};
 use exonum_testkit::TestKitBuilder;
 
 /// Marker service id.
@@ -56,10 +57,9 @@ impl<T: AsRef<Snapshot>> MarkerSchema<T> {
 
     /// Returns hashes for stored table.
     pub fn state_hash(&self) -> Vec<Hash> {
-        vec![self.marks().root_hash()]
+        vec![self.marks().merkle_root()]
     }
 }
-
 
 impl<'a> MarkerSchema<&'a mut Fork> {
     /// Mutable reference to the ['marks'][1] index.
@@ -78,7 +78,7 @@ transactions! {
         struct TxMarker {
             from: &PublicKey,
             mark: i32,
-            time: SystemTime,
+            time: DateTime<Utc>,
         }
     }
 }
@@ -131,7 +131,7 @@ fn main() {
         .with_service(TimeService::with_provider(mock_provider.clone()))
         .create();
 
-    mock_provider.set_time(UNIX_EPOCH + Duration::new(10, 0));
+    mock_provider.set_time(Utc.timestamp(10, 0));
     testkit.create_blocks_until(Height(2));
 
     let snapshot = testkit.snapshot();
@@ -148,13 +148,13 @@ fn main() {
     let tx2 = TxMarker::new(
         &keypair2.0,
         2,
-        mock_provider.time() + Duration::new(10, 0),
+        mock_provider.time() + Duration::seconds(10),
         &keypair2.1,
     );
     let tx3 = TxMarker::new(
         &keypair3.0,
         3,
-        mock_provider.time() - Duration::new(5, 0),
+        mock_provider.time() - Duration::seconds(5),
         &keypair3.1,
     );
     testkit.create_block_with_transactions(txvec![tx1, tx2, tx3]);
@@ -165,12 +165,7 @@ fn main() {
     assert_eq!(schema.marks().get(&keypair2.0), Some(2));
     assert_eq!(schema.marks().get(&keypair3.0), None);
 
-    let tx4 = TxMarker::new(
-        &keypair3.0,
-        4,
-        UNIX_EPOCH + Duration::new(15, 0),
-        &keypair3.1,
-    );
+    let tx4 = TxMarker::new(&keypair3.0, 4, Utc.timestamp(15, 0), &keypair3.1);
     testkit.create_block_with_transactions(txvec![tx4]);
 
     let snapshot = testkit.snapshot();

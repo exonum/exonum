@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use clap;
+
 use std::ffi::OsString;
 use std::collections::HashMap;
 
-use clap;
-
-use super::{Context, ArgumentType};
-use super::internal::{Feedback, CollectedCommand};
+use super::{ArgumentType, Context};
+use super::internal::{CollectedCommand, Feedback};
 use super::CommandName;
 
 pub struct ClapBackend;
@@ -42,9 +42,7 @@ impl ClapBackend {
             .setting(clap::AppSettings::ArgRequiredElseHelp)
             .version(crate_version!())
             .author(crate_authors!("\n"))
-            .about(
-                "It contain basic set of command, to deploy network on exonum.",
-            )
+            .about("It contain basic set of command, to deploy network on exonum.")
             .subcommands(subcommands.into_iter())
             .get_matches_from_safe(line)
             .unwrap();

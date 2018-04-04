@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,24 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![allow(unsafe_code)]
+
 //! An implementation of `RocksDB` database.
 
+pub use rocksdb::WriteOptions as RocksDBWriteOptions;
+pub use rocksdb::BlockBasedOptions as RocksBlockOptions;
+
 use exonum_profiler::ProfilerSpan;
-use rocksdb::{self, WriteBatch, DBIterator};
+use rocksdb::{self, DBIterator, Options as RocksDbOptions, WriteBatch};
 use rocksdb::utils::get_cf_names;
 
-use std::mem;
+use std::{fmt, mem};
 use std::sync::Arc;
 use std::path::Path;
-use std::fmt;
 use std::error::Error;
 use std::iter::Peekable;
 
-use storage::{self, Database, Iterator, Iter, Snapshot, Patch};
+use storage::{self, Database, DbOptions, Iter, Iterator, Patch, Snapshot};
 use storage::db::Change;
-
-pub use rocksdb::{Options as RocksDBOptions, WriteOptions as RocksDBWriteOptions};
-pub use rocksdb::BlockBasedOptions as RocksBlockOptions;
 
 impl From<rocksdb::Error> for storage::Error {
     fn from(err: rocksdb::Error) -> storage::Error {
@@ -40,6 +41,15 @@ impl From<rocksdb::Error> for storage::Error {
 /// Database implementation on the top of `RocksDB` backend.
 pub struct RocksDB {
     db: Arc<rocksdb::DB>,
+}
+
+impl DbOptions {
+    fn to_rocksdb(&self) -> RocksDbOptions {
+        let mut defaults = RocksDbOptions::default();
+        defaults.create_if_missing(self.create_if_missing);
+        defaults.set_max_open_files(self.max_open_files.unwrap_or(-1));
+        defaults
+    }
 }
 
 /// A snapshot of a `RocksDB`.
@@ -57,13 +67,13 @@ struct RocksDBIterator {
 
 impl RocksDB {
     /// Open a database stored in the specified path with the specified options.
-    pub fn open<P: AsRef<Path>>(path: P, options: &RocksDBOptions) -> storage::Result<RocksDB> {
+    pub fn open<P: AsRef<Path>>(path: P, options: &DbOptions) -> storage::Result<RocksDB> {
         let db = {
             if let Ok(names) = get_cf_names(&path) {
                 let cf_names = names.iter().map(|name| name.as_str()).collect::<Vec<_>>();
-                rocksdb::DB::open_cf(options, path, cf_names.as_ref())?
+                rocksdb::DB::open_cf(&options.to_rocksdb(), path, cf_names.as_ref())?
             } else {
-                rocksdb::DB::open(options, path)?
+                rocksdb::DB::open(&options.to_rocksdb(), path)?
             }
         };
         Ok(RocksDB { db: Arc::new(db) })
@@ -75,11 +85,9 @@ impl RocksDB {
         for (cf_name, changes) in patch {
             let cf = match self.db.cf_handle(&cf_name) {
                 Some(cf) => cf,
-                None => {
-                    self.db
-                        .create_cf(&cf_name, &RocksDBOptions::default())
-                        .unwrap()
-                }
+                None => self.db
+                    .create_cf(&cf_name, &DbOptions::default().to_rocksdb())
+                    .unwrap(),
             };
             for (key, change) in changes {
                 match change {
@@ -127,14 +135,12 @@ impl Snapshot for RocksDBSnapshot {
     }
 
     fn iter<'a>(&'a self, name: &str, from: &[u8]) -> Iter<'a> {
-        use rocksdb::{IteratorMode, Direction};
+        use rocksdb::{Direction, IteratorMode};
         let _p = ProfilerSpan::new("RocksDBSnapshot::iter");
         let iter = match self._db.cf_handle(name) {
-            Some(cf) => {
-                self.snapshot
-                    .iterator_cf(cf, IteratorMode::From(from, Direction::Forward))
-                    .unwrap()
-            }
+            Some(cf) => self.snapshot
+                .iterator_cf(cf, IteratorMode::From(from, Direction::Forward))
+                .unwrap(),
             None => self.snapshot.iterator(IteratorMode::Start),
         };
         Box::new(RocksDBIterator {
@@ -164,6 +170,12 @@ impl Iterator for RocksDBIterator {
         } else {
             None
         }
+    }
+}
+
+impl From<RocksDB> for Arc<Database> {
+    fn from(db: RocksDB) -> Arc<Database> {
+        Arc::from(Box::new(db) as Box<Database>)
     }
 }
 

@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,8 +23,8 @@ use node::Node;
 use super::internal::{CollectedCommand, Feedback};
 use super::clap_backend::ClapBackend;
 use super::ServiceFactory;
-use super::details::{Run, RunDev, Finalize, GenerateNodeConfig, GenerateCommonConfig,
-                     GenerateTestnet};
+use super::details::{Finalize, GenerateCommonConfig, GenerateNodeConfig, GenerateTestnet, Run,
+                     RunDev};
 use super::keys;
 use super::CommandName;
 
@@ -70,10 +70,9 @@ impl NodeBuilder {
     pub fn parse_cmd(self) -> Option<Node> {
         match ClapBackend::execute(&self.commands) {
             Feedback::RunNode(ref ctx) => {
-                let db = Run::db_helper(ctx);
-                let config = ctx.get(keys::NODE_CONFIG).expect(
-                    "could not find node_config",
-                );
+                let config = ctx.get(keys::NODE_CONFIG)
+                    .expect("could not find node_config");
+                let db = Run::db_helper(ctx, &config.database);
                 let services: Vec<Box<Service>> = self.service_factories
                     .into_iter()
                     .map(|mut factory| factory.make_service(ctx))
@@ -89,12 +88,10 @@ impl NodeBuilder {
     fn panic_hook(info: &PanicInfo) {
         let msg = match info.payload().downcast_ref::<&'static str>() {
             Some(s) => *s,
-            None => {
-                match info.payload().downcast_ref::<String>() {
-                    Some(s) => &s[..],
-                    None => "Box<Any>",
-                }
-            }
+            None => match info.payload().downcast_ref::<String>() {
+                Some(s) => &s[..],
+                None => "Box<Any>",
+            },
         };
         println!("error: {}", msg);
     }

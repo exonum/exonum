@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,13 +15,13 @@
 //! This module defines the Exonum services interfaces. Like smart contracts in some other
 //! blockchain platforms, Exonum services encapsulate business logic of the blockchain application.
 
+use serde_json::Value;
+use iron::Handler;
+
 use std::fmt;
 use std::sync::{Arc, RwLock};
 use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
-
-use serde_json::Value;
-use iron::Handler;
 
 use crypto::{Hash, PublicKey, SecretKey};
 use storage::{Fork, Snapshot};
@@ -31,7 +31,6 @@ use node::{ApiSender, Node, State, TransactionSend};
 use blockchain::{Blockchain, ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use helpers::{Height, Milliseconds, ValidatorId};
 use super::transaction::Transaction;
-
 
 /// A trait that describes business logic of a concrete service.
 ///
@@ -108,7 +107,7 @@ use super::transaction::Transaction;
 ///        SERVICE_ID
 ///     }
 ///
-///     fn service_name(&self) -> &'static str {
+///     fn service_name(&self) -> &str {
 ///         "my_special_unique_service"
 ///     }
 ///
@@ -154,6 +153,7 @@ pub trait Service: Send + Sync + 'static {
     /// transactions that may come from byzantine nodes.
     ///
     /// Service should return an error in the following cases (see `MessageError` for more details):
+    ///
     /// - Incorrect transaction identifier.
     /// - Incorrect data layout.
     ///
@@ -387,7 +387,7 @@ impl SharedNodeState {
     }
 
     /// Informs internal state about node's halting.
-    pub fn update_is_enabled(&self, is_enabled: bool) {
+    pub fn set_enabled(&self, is_enabled: bool) {
         let mut state = self.state.write().expect("Expected read lock.");
         state.is_enabled = is_enabled;
     }
@@ -517,8 +517,7 @@ impl ::std::fmt::Debug for ApiContext {
         write!(
             f,
             "ApiContext(blockchain: {:?}, public_key: {:?})",
-            self.blockchain,
-            self.public_key
+            self.blockchain, self.public_key
         )
     }
 }

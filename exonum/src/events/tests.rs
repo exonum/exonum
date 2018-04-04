@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,15 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use futures::{Future, Sink, Stream};
+use futures::{stream::Wait, sync::mpsc};
+use tokio_core::reactor::Core;
+use tokio_timer::{TimeoutStream, Timer};
+
 use std::net::SocketAddr;
 use std::thread;
 use std::time::{self, Duration};
-
-use futures::{Future, Sink, Stream};
-use futures::stream::Wait;
-use futures::sync::mpsc;
-use tokio_core::reactor::Core;
-use tokio_timer::{TimeoutStream, Timer};
 
 use crypto::{gen_keypair, PublicKey, Signature};
 use messages::{Connect, Message, MessageWriter, RawMessage};
@@ -164,7 +163,7 @@ impl TestEvents {
             our_connect_message: connect_message(self.listen_address),
             listen_address: self.listen_address,
             network_config,
-            max_message_len: ConsensusConfig::DEFAULT_MESSAGE_MAX_LEN,
+            max_message_len: ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN,
             network_requests: channel.network_requests,
             network_tx: network_tx.clone(),
         };
@@ -179,20 +178,14 @@ pub fn connect_message(addr: SocketAddr) -> Connect {
     Connect::new_with_signature(
         &PublicKey::zero(),
         addr,
-        time,
+        time.into(),
         &user_agent::get(),
         &Signature::zero(),
     )
 }
 
 pub fn raw_message(id: u16, len: usize) -> RawMessage {
-    let writer = MessageWriter::new(
-        ::messages::PROTOCOL_MAJOR_VERSION,
-        ::messages::TEST_NETWORK_ID,
-        0,
-        id,
-        len,
-    );
+    let writer = MessageWriter::new(::messages::PROTOCOL_MAJOR_VERSION, 0, id, len);
     RawMessage::new(writer.sign(&gen_keypair().1))
 }
 
@@ -273,9 +266,9 @@ fn test_network_max_message_len() {
     let first = "127.0.0.1:17202".parse().unwrap();
     let second = "127.0.0.1:17303".parse().unwrap();
 
-    let max_message_length = ConsensusConfig::DEFAULT_MESSAGE_MAX_LEN as usize;
-    let max_payload_length = max_message_length - ::messages::HEADER_LENGTH -
-        ::crypto::SIGNATURE_LENGTH;
+    let max_message_length = ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN as usize;
+    let max_payload_length =
+        max_message_length - ::messages::HEADER_LENGTH - ::crypto::SIGNATURE_LENGTH;
     let acceptable_message = raw_message(15, max_payload_length);
     let too_big_message = raw_message(16, max_payload_length + 1000);
 

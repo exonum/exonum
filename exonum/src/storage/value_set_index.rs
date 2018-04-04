@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,12 +17,14 @@
 use std::marker::PhantomData;
 
 use crypto::Hash;
-use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageValue};
+use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey, StorageValue};
+use super::indexes_metadata::IndexType;
 
 /// A set of items that implement `StorageValue` trait.
 ///
 /// `ValueSetIndex` implements a set, storing the element as values using its hash as a key.
 /// `ValueSetIndex` requires that the elements implement the [`StorageValue`] trait.
+///
 /// [`StorageValue`]: ../trait.StorageValue.html
 #[derive(Debug)]
 pub struct ValueSetIndex<T, V> {
@@ -56,12 +58,17 @@ pub struct ValueSetIndexHashes<'a> {
     base_iter: BaseIndexIter<'a, Hash, ()>,
 }
 
-impl<T, V> ValueSetIndex<T, V> {
+impl<T, V> ValueSetIndex<T, V>
+where
+    T: AsRef<Snapshot>,
+    V: StorageValue,
+{
     /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     ///
@@ -74,21 +81,21 @@ impl<T, V> ValueSetIndex<T, V> {
     /// let name  = "name";
     /// let snapshot = db.snapshot();
     /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new(name, &snapshot);
-    /// # drop(index);
     /// ```
-    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         ValueSetIndex {
-            base: BaseIndex::new(name, view),
+            base: BaseIndex::new(index_name, IndexType::ValueSet, view),
             _v: PhantomData,
         }
     }
 
-    /// Creates a new index representation based on the name, common prefix of its keys
+    /// Creates a new index representation based on the name, index id in family
     /// and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     ///
@@ -100,23 +107,20 @@ impl<T, V> ValueSetIndex<T, V> {
     /// let db = MemoryDB::new();
     /// let snapshot = db.snapshot();
     /// let name = "name";
-    /// let prefix = vec![123];
-    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::with_prefix(name, prefix, &snapshot);
-    /// # drop(index);
+    /// let index_id = vec![123];
+    /// let index: ValueSetIndex<_, u8> = ValueSetIndex::new_in_family(name, &index_id, &snapshot);
     /// ```
-    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
+    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
+        family_name: S,
+        index_id: &I,
+        view: T,
+    ) -> Self {
         ValueSetIndex {
-            base: BaseIndex::with_prefix(name, prefix, view),
+            base: BaseIndex::new_in_family(family_name, index_id, IndexType::ValueSet, view),
             _v: PhantomData,
         }
     }
-}
 
-impl<T, V> ValueSetIndex<T, V>
-where
-    T: AsRef<Snapshot>,
-    V: StorageValue,
-{
     /// Returns `true` if the set contains a value.
     ///
     /// # Examples
@@ -177,7 +181,9 @@ where
     /// }
     /// ```
     pub fn iter(&self) -> ValueSetIndexIter<V> {
-        ValueSetIndexIter { base_iter: self.base.iter(&()) }
+        ValueSetIndexIter {
+            base_iter: self.base.iter(&()),
+        }
     }
 
     /// An iterator visiting all elements in arbitrary order starting from the specified hash of
@@ -201,7 +207,9 @@ where
     /// }
     /// ```
     pub fn iter_from(&self, from: &Hash) -> ValueSetIndexIter<V> {
-        ValueSetIndexIter { base_iter: self.base.iter_from(&(), from) }
+        ValueSetIndexIter {
+            base_iter: self.base.iter_from(&(), from),
+        }
     }
 
     /// An iterator visiting hashes of all elements in ascending order. The iterator element type
@@ -222,7 +230,9 @@ where
     /// }
     /// ```
     pub fn hashes(&self) -> ValueSetIndexHashes {
-        ValueSetIndexHashes { base_iter: self.base.iter(&()) }
+        ValueSetIndexHashes {
+            base_iter: self.base.iter(&()),
+        }
     }
 
     /// An iterator visiting hashes of all elements in ascending order starting from the specified
@@ -246,7 +256,9 @@ where
     /// }
     /// ```
     pub fn hashes_from(&self, from: &Hash) -> ValueSetIndexHashes {
-        ValueSetIndexHashes { base_iter: self.base.iter_from(&(), from) }
+        ValueSetIndexHashes {
+            base_iter: self.base.iter_from(&(), from),
+        }
     }
 }
 
@@ -359,7 +371,6 @@ where
         self.iter()
     }
 }
-
 
 impl<'a, V> Iterator for ValueSetIndexIter<'a, V>
 where

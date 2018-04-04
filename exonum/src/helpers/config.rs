@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,14 +14,13 @@
 
 //! Loading and saving TOML-encoded configurations.
 
+use toml;
+use failure::{Error, ResultExt};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
+
 use std::path::Path;
 use std::io::{Read, Write};
 use std::fs::{self, File};
-
-use serde::de::DeserializeOwned;
-use serde::{Serialize, Deserialize};
-use toml;
-use failure::{Error, ResultExt};
 
 /// Implements loading and saving TOML-encoded configurations.
 #[derive(Debug)]
@@ -35,10 +34,7 @@ impl ConfigFile {
         P: AsRef<Path>,
     {
         let path = path.as_ref();
-        let res = do_load(path).context(format!(
-            "loading config from {}",
-            path.display()
-        ))?;
+        let res = do_load(path).context(format!("loading config from {}", path.display()))?;
         Ok(res)
     }
 
@@ -49,9 +45,7 @@ impl ConfigFile {
         P: AsRef<Path>,
     {
         let path = path.as_ref();
-        do_save(value, path).with_context(|_| {
-            format!("saving config to {}", path.display())
-        })?;
+        do_save(value, path).with_context(|_| format!("saving config to {}", path.display()))?;
         Ok(())
     }
 }

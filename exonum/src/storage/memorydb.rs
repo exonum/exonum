@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,12 +14,11 @@
 
 //! An implementation of `MemoryDB` database.
 
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 use std::clone::Clone;
-use std::collections::btree_map::BTreeMap;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
-use super::{Database, Snapshot, Patch, Iterator, Iter, Result};
+use super::{Database, Iter, Iterator, Patch, Result, Snapshot};
 use super::db::Change;
 
 type DB = HashMap<String, BTreeMap<Vec<u8>, Vec<u8>>>;
@@ -41,7 +40,9 @@ struct MemoryDBIter {
 impl MemoryDB {
     /// Creates a new, empty database.
     pub fn new() -> MemoryDB {
-        MemoryDB { map: RwLock::new(HashMap::new()) }
+        MemoryDB {
+            map: RwLock::new(HashMap::new()),
+        }
     }
 }
 
@@ -80,27 +81,29 @@ impl Database for MemoryDB {
 
 impl Snapshot for MemoryDB {
     fn get(&self, name: &str, key: &[u8]) -> Option<Vec<u8>> {
-        self.map.read().unwrap().get(name).and_then(|table| {
-            table.get(key).cloned()
-        })
+        self.map
+            .read()
+            .unwrap()
+            .get(name)
+            .and_then(|table| table.get(key).cloned())
     }
 
     fn contains(&self, name: &str, key: &[u8]) -> bool {
-        self.map.read().unwrap().get(name).map_or(false, |table| {
-            table.contains_key(key)
-        })
+        self.map
+            .read()
+            .unwrap()
+            .get(name)
+            .map_or(false, |table| table.contains_key(key))
     }
 
     fn iter(&self, name: &str, from: &[u8]) -> Iter {
         let map_guard = self.map.read().unwrap();
         let data = match map_guard.get(name) {
-            Some(table) => {
-                table
-                    .iter()
-                    .skip_while(|&(k, _)| k.as_slice() < from)
-                    .map(|(k, v)| (k.to_vec(), v.to_vec()))
-                    .collect()
-            }
+            Some(table) => table
+                .iter()
+                .skip_while(|&(k, _)| k.as_slice() < from)
+                .map(|(k, v)| (k.to_vec(), v.to_vec()))
+                .collect(),
             None => Vec::new(),
         };
 
@@ -112,9 +115,9 @@ impl Iterator for MemoryDBIter {
     fn next(&mut self) -> Option<(&[u8], &[u8])> {
         if self.index < self.data.len() {
             self.index += 1;
-            self.data.get(self.index - 1).map(|&(ref k, ref v)| {
-                (k.as_slice(), v.as_slice())
-            })
+            self.data
+                .get(self.index - 1)
+                .map(|&(ref k, ref v)| (k.as_slice(), v.as_slice()))
         } else {
             None
         }
@@ -122,12 +125,18 @@ impl Iterator for MemoryDBIter {
 
     fn peek(&mut self) -> Option<(&[u8], &[u8])> {
         if self.index < self.data.len() {
-            self.data.get(self.index).map(|&(ref k, ref v)| {
-                (k.as_slice(), v.as_slice())
-            })
+            self.data
+                .get(self.index)
+                .map(|&(ref k, ref v)| (k.as_slice(), v.as_slice()))
         } else {
             None
         }
+    }
+}
+
+impl From<MemoryDB> for Arc<Database> {
+    fn from(db: MemoryDB) -> Arc<Database> {
+        Arc::from(Box::new(db) as Box<Database>)
     }
 }
 

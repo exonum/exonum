@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,23 +14,21 @@
 
 //! State of the `NodeHandler`.
 
-use std::collections::{BTreeMap, HashMap, HashSet};
-use std::collections::hash_map::Entry;
-use std::sync::{Arc, RwLock};
-use std::net::SocketAddr;
-use std::time::{SystemTime, Duration};
-
 use serde_json::Value;
 use bit_vec::BitVec;
+use failure;
 
-use messages::{Message, Propose, Prevote, Precommit, ConsensusMessage, Connect};
-use crypto::{CryptoHash, PublicKey, SecretKey, Hash};
-use storage::{Patch, Snapshot};
-use blockchain::{ValidatorKeys, ConsensusConfig, StoredConfiguration, Transaction,
-                 TimeoutAdjusterConfig};
-use helpers::{Height, Round, ValidatorId, Milliseconds};
+use std::collections::{BTreeMap, HashMap, HashSet, hash_map::Entry};
+use std::net::SocketAddr;
+use std::time::{Duration, SystemTime};
+
+use messages::{Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawMessage};
+use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
+use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
+use blockchain::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
+use helpers::{Height, Milliseconds, Round, ValidatorId};
 use node::whitelist::Whitelist;
-use node::timeout_adjuster::{TimeoutAdjuster, Constant, Dynamic, MovingAverage};
+use node::timeout_adjuster::{Constant, Dynamic, MovingAverage, TimeoutAdjuster};
 
 // TODO: move request timeouts into node configuration (ECR-171)
 
@@ -42,11 +40,6 @@ pub const TRANSACTIONS_REQUEST_TIMEOUT: Milliseconds = 100;
 pub const PREVOTES_REQUEST_TIMEOUT: Milliseconds = 100;
 /// Timeout value for the `BlockRequest` message.
 pub const BLOCK_REQUEST_TIMEOUT: Milliseconds = 100;
-
-/// Transactions pool.
-// TODO replace by persistent TxPool (ECR-171)
-pub type TxPool = Arc<RwLock<BTreeMap<Hash, Box<Transaction>>>>;
-// TODO: reduce copying of Hash (ECR-171)
 
 /// State of the `NodeHandler`.
 #[derive(Debug)]
@@ -78,8 +71,6 @@ pub struct State {
     blocks: HashMap<Hash, BlockState>,
     prevotes: HashMap<(Round, Hash), Votes<Prevote>>,
     precommits: HashMap<(Round, Hash), Votes<Precommit>>,
-
-    transactions: TxPool,
 
     queued: Vec<ConsensusMessage>,
 
@@ -135,6 +126,8 @@ pub struct ProposeState {
     propose: Propose,
     unknown_txs: HashSet<Hash>,
     block_hash: Option<Hash>,
+    // Whether the message has been saved to the consensus messages' cache or not.
+    is_saved: bool,
 }
 
 /// State of a block.
@@ -177,7 +170,7 @@ impl ValidatorState {
     /// Creates new `ValidatorState` with given validator id.
     pub fn new(id: ValidatorId) -> Self {
         ValidatorState {
-            id: id,
+            id,
             our_precommits: HashMap::new(),
             our_prevotes: HashMap::new(),
         }
@@ -247,7 +240,7 @@ where
 impl RequestData {
     /// Returns timeout value of the data request.
     pub fn timeout(&self) -> Duration {
-        #![cfg_attr(feature="cargo-clippy", allow(match_same_arms))]
+        #![cfg_attr(feature = "cargo-clippy", allow(match_same_arms))]
         let ms = match *self {
             RequestData::Propose(..) => PROPOSE_REQUEST_TIMEOUT,
             RequestData::Transactions(..) => TRANSACTIONS_REQUEST_TIMEOUT,
@@ -314,6 +307,16 @@ impl ProposeState {
     pub fn has_unknown_txs(&self) -> bool {
         !self.unknown_txs.is_empty()
     }
+
+    /// Indicates whether Propose has been saved to the consensus messages cache
+    pub fn is_saved(&self) -> bool {
+        self.is_saved
+    }
+
+    /// Marks Propose as saved to the consensus messages cache
+    pub fn set_saved(&mut self, saved: bool) {
+        self.is_saved = saved;
+    }
 }
 
 impl BlockState {
@@ -372,8 +375,8 @@ impl State {
             consensus_secret_key,
             service_public_key,
             service_secret_key,
-            tx_pool_capacity: tx_pool_capacity,
-            whitelist: whitelist,
+            tx_pool_capacity,
+            whitelist,
             peers,
             connections: HashMap::new(),
             height: last_height,
@@ -387,8 +390,6 @@ impl State {
             blocks: HashMap::new(),
             prevotes: HashMap::new(),
             precommits: HashMap::new(),
-
-            transactions: Arc::new(RwLock::new(BTreeMap::new())),
 
             queued: Vec::new(),
 
@@ -490,11 +491,8 @@ impl State {
             .iter()
             .position(|pk| pk.consensus_key == *self.consensus_public_key())
             .map(|id| ValidatorId(id as u16));
-        self.whitelist.set_validators(
-            config.validator_keys.iter().map(|x| {
-                x.consensus_key
-            }),
-        );
+        self.whitelist
+            .set_validators(config.validator_keys.iter().map(|x| x.consensus_key));
         self.renew_validator_id(validator_id);
         trace!("Validator={:#?}", self.validator_state());
 
@@ -523,9 +521,10 @@ impl State {
     pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) -> bool {
         if let Some(pubkey) = self.connections.remove(addr) {
             self.peers.remove(&pubkey);
-            return self.config.validator_keys.iter().any(|x| {
-                x.consensus_key == pubkey
-            });
+            return self.config
+                .validator_keys
+                .iter()
+                .any(|x| x.consensus_key == pubkey);
         }
         false
     }
@@ -578,8 +577,8 @@ impl State {
                 // keep only maximum round
                 trace!(
                     "Received a message from a lower round than we know already,\
-                message_round = {},\
-                known_round = {}.",
+                     message_round = {},\
+                     known_round = {}.",
                     round,
                     known_round
                 );
@@ -601,7 +600,6 @@ impl State {
         } else {
             None
         }
-
     }
 
     /// Returns the height for a validator identified by the public key.
@@ -611,9 +609,9 @@ impl State {
 
     /// Updates known height for a validator identified by the public key.
     pub fn set_node_height(&mut self, key: PublicKey, height: Height) {
-        *self.nodes_max_height.entry(key).or_insert_with(
-            Height::zero,
-        ) = height;
+        *self.nodes_max_height
+            .entry(key)
+            .or_insert_with(Height::zero) = height;
     }
 
     /// Returns a list of nodes whose height is bigger than one of the current node.
@@ -711,16 +709,6 @@ impl State {
         self.locked_round = Round::zero();
         self.locked_propose = None;
         self.last_hash = *block_hash;
-        {
-            // Commit transactions if needed
-            let txs = self.block(block_hash).unwrap().txs.clone();
-            for hash in txs {
-                self.transactions
-                    .write()
-                    .expect("Expected write lock")
-                    .remove(&hash);
-            }
-        }
         // TODO: destruct/construct structure HeightState instead of call clear (ECR-171)
         self.blocks.clear();
         self.proposes.clear();
@@ -745,50 +733,21 @@ impl State {
         self.queued.push(msg);
     }
 
-    /// Returns non-committed transactions.
-    pub fn transactions(&self) -> &TxPool {
-        &self.transactions
-    }
-
-    /// Adds a transaction to the pool and returns list of proposes that don't contain unknown
-    /// transactions now.
+    /// Checks whether some proposes are waiting for this transaction.
+    /// Returns a list of proposes that don't contain unknown transactions.
     ///
     /// Transaction is ignored if the following criteria are fulfilled:
-    /// - transactions pool size is exceeded
+    ///
     /// - transaction isn't contained in unknown transaction list of any propose
     /// - transaction isn't a part of block
-    pub fn add_transaction(
-        &mut self,
-        tx_hash: Hash,
-        msg: Box<Transaction>,
-        // if tx is in some of propose or in a block,
-        // we should add it, or we could become stuck in some state
-        mut high_priority_tx: bool,
-    ) -> Vec<(Hash, Round)> {
+    pub fn check_incomplete_proposes(&mut self, tx_hash: Hash) -> Vec<(Hash, Round)> {
         let mut full_proposes = Vec::new();
         for (propose_hash, propose_state) in &mut self.proposes {
-            high_priority_tx |= propose_state.unknown_txs.remove(&tx_hash);
+            propose_state.unknown_txs.remove(&tx_hash);
             if propose_state.unknown_txs.is_empty() {
                 full_proposes.push((*propose_hash, propose_state.message().round()));
             }
         }
-        let tx_pool_len = self.transactions.read().expect("Expected read lock").len();
-        if tx_pool_len >= self.tx_pool_capacity {
-            // but make warn about pool exceeded, even if we should add tx
-            warn!(
-                "Too many transactions in pool, txs={}, high_priority={}",
-                tx_pool_len,
-                high_priority_tx
-            );
-            if !high_priority_tx {
-                return full_proposes;
-            }
-        }
-
-        self.transactions
-            .write()
-            .expect("Expected read lock")
-            .insert(tx_hash, msg);
 
         full_proposes
     }
@@ -833,6 +792,9 @@ impl State {
                 propose: msg,
                 unknown_txs: HashSet::new(),
                 block_hash: None,
+                // TODO:: for the moment it's true because this code gets called immediately after
+                // saving a propose to the cache. Think about making this approach less error-prone
+                is_saved: true,
             },
         );
 
@@ -840,26 +802,42 @@ impl State {
     }
 
     /// Adds propose from other node. Returns `ProposeState` if it is a new propose.
-    pub fn add_propose(&mut self, msg: &Propose) -> Option<&ProposeState> {
+    pub fn add_propose(
+        &mut self,
+        msg: &Propose,
+        transactions: &MapIndex<&&Snapshot, Hash, RawMessage>,
+        transaction_pool: &KeySetIndex<&&Snapshot, Hash>,
+    ) -> Result<&ProposeState, failure::Error> {
         let propose_hash = msg.hash();
-        let txs = &self.transactions.read().expect("Expected read lock");
         match self.proposes.entry(propose_hash) {
-            Entry::Occupied(..) => None,
+            Entry::Occupied(..) => bail!("Propose already found"),
             Entry::Vacant(e) => {
-                let unknown_txs = msg.transactions()
-                    .iter()
-                    .filter(|tx| !txs.contains_key(tx))
-                    .cloned()
-                    .collect::<HashSet<Hash>>();
-                for tx in &unknown_txs {
-                    self.unknown_txs.entry(*tx).or_insert_with(Vec::new).push(
-                        propose_hash,
-                    );
+                let mut unknown_txs = HashSet::new();
+                for hash in msg.transactions() {
+                    if transactions.get(hash).is_some() {
+                        if !transaction_pool.contains(hash) {
+                            bail!(
+                                "Received propose with already\
+                                 committed transaction"
+                            )
+                        }
+                    } else {
+                        unknown_txs.insert(*hash);
+                    }
                 }
-                Some(e.insert(ProposeState {
+
+                for tx in &unknown_txs {
+                    self.unknown_txs
+                        .entry(*tx)
+                        .or_insert_with(Vec::new)
+                        .push(propose_hash);
+                }
+
+                Ok(e.insert(ProposeState {
                     propose: msg.clone(),
-                    unknown_txs: unknown_txs,
+                    unknown_txs,
                     block_hash: None,
+                    is_saved: false,
                 }))
             }
         }
@@ -876,14 +854,12 @@ impl State {
     ) -> Option<&BlockState> {
         match self.blocks.entry(block_hash) {
             Entry::Occupied(..) => None,
-            Entry::Vacant(e) => {
-                Some(e.insert(BlockState {
-                    hash: block_hash,
-                    patch,
-                    txs,
-                    proposer_id,
-                }))
-            }
+            Entry::Vacant(e) => Some(e.insert(BlockState {
+                hash: block_hash,
+                patch,
+                txs,
+                proposer_id,
+            })),
         }
     }
 
@@ -896,17 +872,15 @@ impl State {
         let majority_count = self.majority_count();
         if let Some(ref mut validator_state) = self.validator_state {
             if validator_state.id == msg.validator() {
-                if let Some(other) = validator_state.our_prevotes.insert(
-                    msg.round(),
-                    msg.clone(),
-                )
+                if let Some(other) = validator_state
+                    .our_prevotes
+                    .insert(msg.round(), msg.clone())
                 {
                     if &other != msg {
                         panic!(
                             "Trying to send different prevotes for the same round: \
-                            old = {:?}, new = {:?}",
-                            other,
-                            msg
+                             old = {:?}, new = {:?}",
+                            other, msg
                         );
                     }
                 }
@@ -915,9 +889,9 @@ impl State {
 
         let key = (msg.round(), *msg.propose_hash());
         let validators_len = self.validators().len();
-        let votes = self.prevotes.entry(key).or_insert_with(
-            || Votes::new(validators_len),
-        );
+        let votes = self.prevotes
+            .entry(key)
+            .or_insert_with(|| Votes::new(validators_len));
         votes.insert(msg);
         votes.count() >= majority_count
     }
@@ -957,17 +931,15 @@ impl State {
         let majority_count = self.majority_count();
         if let Some(ref mut validator_state) = self.validator_state {
             if validator_state.id == msg.validator() {
-                if let Some(other) = validator_state.our_precommits.insert(
-                    msg.round(),
-                    msg.clone(),
-                )
+                if let Some(other) = validator_state
+                    .our_precommits
+                    .insert(msg.round(), msg.clone())
                 {
                     if other.propose_hash() != msg.propose_hash() {
                         panic!(
                             "Trying to send different precommits for same round, old={:?}, \
-                                new={:?}",
-                            other,
-                            msg
+                             new={:?}",
+                            other, msg
                         );
                     }
                 }
@@ -976,9 +948,9 @@ impl State {
 
         let key = (msg.round(), *msg.block_hash());
         let validators_len = self.validators().len();
-        let votes = self.precommits.entry(key).or_insert_with(
-            || Votes::new(validators_len),
-        );
+        let votes = self.precommits
+            .entry(key)
+            .or_insert_with(|| Votes::new(validators_len));
         votes.insert(msg);
         votes.count() >= majority_count
     }

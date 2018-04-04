@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ use exonum::blockchain::{GenesisConfig, ValidatorKeys};
 use exonum::node::{Node, NodeApiConfig, NodeConfig};
 use exonum::storage::MemoryDB;
 
-use cryptocurrency::CurrencyService;
+use cryptocurrency::service::CurrencyService;
 
 fn node_config() -> NodeConfig {
     let (consensus_public_key, consensus_secret_key) = exonum::crypto::gen_keypair();
@@ -53,6 +53,7 @@ fn node_config() -> NodeConfig {
         api: api_cfg,
         mempool: Default::default(),
         services_configs: Default::default(),
+        database: Default::default(),
     }
 }
 
@@ -61,7 +62,7 @@ fn main() {
 
     println!("Creating in-memory database...");
     let node = Node::new(
-        Box::new(MemoryDB::new()),
+        MemoryDB::new(),
         vec![Box::new(CurrencyService)],
         node_config(),
     );

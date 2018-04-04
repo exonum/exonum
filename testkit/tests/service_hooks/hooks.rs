@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 
 //! A special service which generates transactions on `handle_commit` events.
 
-use exonum::blockchain::{Service, ServiceContext, Transaction, TransactionSet, ExecutionResult};
+use exonum::blockchain::{ExecutionResult, Service, ServiceContext, Transaction, TransactionSet};
 use exonum::messages::RawTransaction;
 use exonum::storage::{Fork, Snapshot};
 use exonum::crypto::{Hash, Signature};

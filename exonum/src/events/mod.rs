@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,24 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(any(test, feature = "long_benchmarks"))]
-pub mod tests;
+pub use self::network::{NetworkConfiguration, NetworkEvent, NetworkPart, NetworkRequest};
+pub use self::internal::InternalPart;
+
 pub mod codec;
 pub mod error;
 pub mod network;
 pub mod internal;
 
-use std::time::SystemTime;
-use std::cmp::Ordering;
-
-use futures::{Future, Async, Poll, Stream};
+use futures::{Async, Future, Poll, Stream};
 use futures::sink::Wait;
 use futures::sync::mpsc::{self, Sender};
 
+use std::time::SystemTime;
+use std::cmp::Ordering;
+
 use node::{ExternalMessage, NodeTimeout};
-pub use self::network::{NetworkEvent, NetworkRequest, NetworkPart, NetworkConfiguration};
-pub use self::internal::InternalPart;
 use helpers::{Height, Round};
+
+#[cfg(test)]
+mod tests;
+#[cfg(all(test, feature = "long_benchmarks"))]
+mod benches;
 
 pub type SyncSender<T> = Wait<Sender<T>>;
 
@@ -39,13 +43,17 @@ pub type SyncSender<T> = Wait<Sender<T>>;
 pub enum InternalEvent {
     /// Round update event.
     JumpToRound(Height, Round),
+    /// Timeout event.
     Timeout(NodeTimeout),
+    /// Shutdown the node.
+    Shutdown,
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum InternalRequest {
     Timeout(TimeoutRequest),
     JumpToRound(Height, Round),
+    Shutdown,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -62,7 +70,6 @@ pub trait EventHandler {
     fn handle_event(&mut self, event: Event);
 }
 
-
 #[derive(Debug)]
 pub struct HandlerPart<H: EventHandler> {
     pub handler: H,
@@ -75,11 +82,12 @@ impl<H: EventHandler + 'static> HandlerPart<H> {
     pub fn run(self) -> Box<Future<Item = (), Error = ()>> {
         let mut handler = self.handler;
 
-        let fut = EventsAggregator::new(self.internal_rx, self.network_rx, self.api_rx)
-            .for_each(move |event| {
+        let fut = EventsAggregator::new(self.internal_rx, self.network_rx, self.api_rx).for_each(
+            move |event| {
                 handler.handle_event(event);
                 Ok(())
-            });
+            },
+        );
 
         to_box(fut)
     }
@@ -126,6 +134,7 @@ impl Into<Event> for InternalEvent {
         Event::Internal(self)
     }
 }
+
 /// Receives timeout, network and api events and invokes `handle_event` method of handler.
 /// If one of these streams closes, the aggregator stream completes immediately.
 #[derive(Debug)]
@@ -160,14 +169,8 @@ where
 impl<S1, S2, S3> Stream for EventsAggregator<S1, S2, S3>
 where
     S1: Stream<Item = InternalEvent>,
-    S2: Stream<
-        Item = NetworkEvent,
-        Error = S1::Error,
-    >,
-    S3: Stream<
-        Item = ExternalMessage,
-        Error = S1::Error,
-    >,
+    S2: Stream<Item = NetworkEvent, Error = S1::Error>,
+    S3: Stream<Item = ExternalMessage, Error = S1::Error>,
 {
     type Item = Event;
     type Error = S1::Error;
@@ -177,12 +180,12 @@ where
             Ok(Async::Ready(None))
         } else {
             match self.internal.poll()? {
-                Async::Ready(Some(item)) => {
-                    return Ok(Async::Ready(Some(Event::Internal(item))));
-                }
-                Async::Ready(None) => {
+                Async::Ready(None) | Async::Ready(Some(InternalEvent::Shutdown)) => {
                     self.done = true;
                     return Ok(Async::Ready(None));
+                }
+                Async::Ready(Some(item)) => {
+                    return Ok(Async::Ready(Some(Event::Internal(item))));
                 }
                 Async::NotReady => {}
             };
@@ -197,12 +200,12 @@ where
                 Async::NotReady => {}
             };
             match self.api.poll()? {
-                Async::Ready(Some(item)) => {
-                    return Ok(Async::Ready(Some(Event::Api(item))));
-                }
                 Async::Ready(None) => {
                     self.done = true;
                     return Ok(Async::Ready(None));
+                }
+                Async::Ready(Some(item)) => {
+                    return Ok(Async::Ready(Some(Event::Api(item))));
                 }
                 Async::NotReady => {}
             };
@@ -211,7 +214,6 @@ where
         }
     }
 }
-
 
 fn to_box<F: Future + 'static>(f: F) -> Box<Future<Item = (), Error = F::Error>> {
     Box::new(f.map(drop))

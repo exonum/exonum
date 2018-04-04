@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use events::{Event, EventHandler, NetworkEvent, InternalEvent, InternalRequest};
-use super::{NodeHandler, ExternalMessage, NodeTimeout};
+use events::{Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent};
 use events::error::LogError;
+use super::{ExternalMessage, NodeHandler, NodeTimeout};
 
 impl EventHandler for NodeHandler {
     fn handle_event(&mut self, event: Event) {
@@ -29,11 +29,12 @@ impl EventHandler for NodeHandler {
 impl NodeHandler {
     // clippy sure that `InternalEvent` is not consumed in the body
     // this is because of internal `Copy` types in `JumpToRound`.
-    #![cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
+    #![cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
     fn handle_internal_event(&mut self, event: InternalEvent) {
         match event {
             InternalEvent::Timeout(timeout) => self.handle_timeout(timeout),
             InternalEvent::JumpToRound(height, round) => self.handle_new_round(height, round),
+            InternalEvent::Shutdown => panic!("Shutdown should be processed in the event loop"),
         }
     }
 
@@ -49,7 +50,7 @@ impl NodeHandler {
             NetworkEvent::PeerConnected(peer, connect) => self.handle_connected(peer, connect),
             NetworkEvent::PeerDisconnected(peer) => self.handle_disconnected(peer),
             NetworkEvent::UnableConnectToPeer(peer) => self.handle_unable_to_connect(peer),
-            NetworkEvent::MessageReceived(peer, raw) => self.handle_message(peer, raw),
+            NetworkEvent::MessageReceived(_, raw) => self.handle_message(raw),
         }
     }
 
@@ -82,13 +83,14 @@ impl NodeHandler {
                     info!("Node is already {}", s);
                 } else {
                     self.is_enabled = value;
-                    self.api_state().update_is_enabled(value);
+                    self.api_state().set_enabled(value);
                     info!("The node is {} now", s);
                     if self.is_enabled {
                         self.add_round_timeout();
                     }
                 }
             }
+            ExternalMessage::Shutdown => self.execute_later(InternalRequest::Shutdown),
         }
     }
 

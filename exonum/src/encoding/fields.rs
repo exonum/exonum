@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,20 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::mem;
-use std::net::{SocketAddr, SocketAddrV4, Ipv4Addr};
-use std::time::{SystemTime, Duration, UNIX_EPOCH};
+#![allow(unsafe_code)]
 
+use chrono::{DateTime, TimeZone, Utc};
 use byteorder::{ByteOrder, LittleEndian};
+use uuid::{self, Uuid};
+
+use std::mem;
+use std::result::Result as StdResult;
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
 use crypto::{Hash, PublicKey, Signature};
 use helpers::{Height, Round, ValidatorId};
-use super::{Error, CheckedOffset, Offset, Result};
+use super::{CheckedOffset, Error, Offset, Result};
 
 /// Trait for all types that could be a field in `encoding`.
 pub trait Field<'a> {
     // TODO: use Read and Cursor (ECR-156)
     // TODO: debug_assert_eq!(to-from == size of Self) (ECR-156)
+
+    /// Field's header size.
+    fn field_size() -> Offset;
 
     /// Read Field from buffer, with given position,
     /// beware of memory unsafety,
@@ -35,8 +42,6 @@ pub trait Field<'a> {
     /// Write Field to buffer, in given position
     /// `write` doesn't lead to memory unsafety.
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset);
-    /// Field's header size
-    fn field_size() -> Offset;
 
     /// Checks if data in the buffer could be deserialized.
     /// Returns an index of latest data seen.
@@ -264,23 +269,21 @@ implement_pod_as_ref_field! {Signature}
 implement_pod_as_ref_field! {PublicKey}
 implement_pod_as_ref_field! {Hash}
 
-// TODO should we check `SystemTime` validity in check (ECR-157)?
-impl<'a> Field<'a> for SystemTime {
+impl<'a> Field<'a> for DateTime<Utc> {
     fn field_size() -> Offset {
-        (mem::size_of::<u64>() + mem::size_of::<u32>()) as Offset
+        (mem::size_of::<i64>() + mem::size_of::<u32>()) as Offset
     }
 
-    unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> SystemTime {
-        let secs = LittleEndian::read_u64(&buffer[from as usize..from as usize + 8]);
+    unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
+        let secs = LittleEndian::read_i64(&buffer[from as usize..from as usize + 8]);
         let nanos = LittleEndian::read_u32(&buffer[from as usize + 8..to as usize]);
-        UNIX_EPOCH + Duration::new(secs, nanos)
+        Utc.timestamp(secs, nanos)
     }
 
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
-        let duration = self.duration_since(UNIX_EPOCH).unwrap();
-        let secs = duration.as_secs();
-        let nanos = duration.subsec_nanos();
-        LittleEndian::write_u64(
+        let secs = self.timestamp();
+        let nanos = self.timestamp_subsec_nanos();
+        LittleEndian::write_i64(
             &mut buffer[from as usize..to as usize - mem::size_of_val(&nanos)],
             secs,
         );
@@ -309,7 +312,7 @@ impl<'a> Field<'a> for SocketAddr {
         6
     }
 
-    unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> SocketAddr {
+    unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
         let mut octets = [0u8; 4];
         octets.copy_from_slice(&buffer[from as usize..from as usize + 4]);
         let ip = Ipv4Addr::from(octets);
@@ -339,4 +342,35 @@ impl<'a> Field<'a> for SocketAddr {
         debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
         Ok(latest_segment)
     }
+}
+
+impl<'a> Field<'a> for Uuid {
+    fn field_size() -> Offset {
+        16
+    }
+
+    unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
+        try_read_uuid(buffer, from, to).unwrap()
+    }
+
+    fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
+        buffer[from as usize..to as usize].copy_from_slice(self.as_bytes());
+    }
+
+    fn check(
+        buffer: &'a [u8],
+        from: CheckedOffset,
+        to: CheckedOffset,
+        latest_segment: CheckedOffset,
+    ) -> Result {
+        debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
+        match try_read_uuid(buffer, from.unchecked_offset(), to.unchecked_offset()) {
+            Ok(_) => Ok(latest_segment),
+            Err(e) => Err(Error::Other(Box::new(e))),
+        }
+    }
+}
+
+fn try_read_uuid(buffer: &[u8], from: Offset, to: Offset) -> StdResult<Uuid, uuid::ParseError> {
+    Uuid::from_bytes(&buffer[from as usize..to as usize])
 }

@@ -1,7 +1,6 @@
 [workspace]
 members = [
     "exonum",
-    "sandbox",
     "testkit",
     "services/configuration",
     "services/time",

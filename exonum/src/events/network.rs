@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,6 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use futures::{future, unsync, Future, IntoFuture, Poll, Sink, Stream};
+use futures::{future::Either, sync::mpsc};
+use tokio_core::net::{TcpListener, TcpStream};
+use tokio_core::reactor::Handle;
+use tokio_io::AsyncRead;
+use tokio_retry::{Retry, strategy::{jitter, FixedInterval}};
+
 use std::io;
 use std::net::SocketAddr;
 use std::time::Duration;
@@ -19,16 +26,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-use futures::{future, unsync, Future, IntoFuture, Sink, Stream, Poll};
-use futures::future::Either;
-use futures::sync::mpsc;
-use tokio_core::net::{TcpListener, TcpStream};
-use tokio_core::reactor::Handle;
-use tokio_io::AsyncRead;
-use tokio_retry::Retry;
-use tokio_retry::strategy::{jitter, FixedInterval};
-
-use messages::{Any, Connect, RawMessage, Message};
+use messages::{Any, Connect, Message, RawMessage};
 use helpers::Milliseconds;
 use super::to_box;
 use super::error::{into_other, log_error, other_error, result_ok};
@@ -100,9 +98,10 @@ impl ConnectionsPool {
     }
 
     fn remove(&self, peer: &SocketAddr) -> Result<mpsc::Sender<RawMessage>, &'static str> {
-        self.inner.borrow_mut().remove(peer).ok_or(
-            "there is no sender in the connection pool",
-        )
+        self.inner
+            .borrow_mut()
+            .remove(peer)
+            .ok_or("there is no sender in the connection pool")
     }
 
     fn get(&self, peer: SocketAddr) -> Option<mpsc::Sender<RawMessage>> {
@@ -121,12 +120,11 @@ impl ConnectionsPool {
         network_tx: mpsc::Sender<NetworkEvent>,
         handle: &Handle,
     ) -> Option<mpsc::Sender<RawMessage>> {
-
         let limit = network_config.max_outgoing_connections;
         if self.len() >= limit {
             warn!(
                 "Rejected outgoing connection with peer={}, \
-                                     connections limit reached.",
+                 connections limit reached.",
                 peer
             );
             return None;
@@ -137,9 +135,9 @@ impl ConnectionsPool {
         // Enable retry feature for outgoing connection.
         let timeout = network_config.tcp_connect_retry_timeout;
         let max_tries = network_config.tcp_connect_max_retries as usize;
-        let strategy = FixedInterval::from_millis(timeout).map(jitter).take(
-            max_tries,
-        );
+        let strategy = FixedInterval::from_millis(timeout)
+            .map(jitter)
+            .take(max_tries);
         let handle_clonned = handle.clone();
 
         let action = move || TcpStream::connect(&peer, &handle_clonned);
@@ -209,7 +207,6 @@ impl NetworkPart {
         let network_config = self.network_config;
         // Cancellation token
         let (cancel_sender, cancel_handler) = unsync::oneshot::channel();
-        let cancel_sender = Some(cancel_sender);
 
         let requests_handle = RequestHandler::new(
             self.our_connect_message,
@@ -229,7 +226,10 @@ impl NetworkPart {
             &self.network_tx,
         ).unwrap();
 
-        let cancel_handler = cancel_handler.map_err(|_| other_error("can't cancel routine"));
+        let cancel_handler = cancel_handler.or_else(|e| {
+            trace!("Requests handler closed: {}", e);
+            Ok(())
+        });
         let fut = server
             .join(requests_handle)
             .map(drop)
@@ -241,7 +241,7 @@ impl NetworkPart {
 
 struct RequestHandler(
     // TODO: Replace with concrete type
-    Box<Future<Item = (), Error = io::Error>>
+    Box<Future<Item = (), Error = io::Error>>,
 );
 
 impl RequestHandler {
@@ -252,15 +252,15 @@ impl RequestHandler {
         network_tx: mpsc::Sender<NetworkEvent>,
         handle: Handle,
         receiver: mpsc::Receiver<NetworkRequest>,
-        mut cancel_sender: Option<unsync::oneshot::Sender<()>>,
+        cancel_sender: unsync::oneshot::Sender<()>,
     ) -> RequestHandler {
+        let mut cancel_sender = Some(cancel_sender);
         let outgoing_connections = ConnectionsPool::new();
         let requests_handler = receiver
             .map_err(|_| other_error("no network requests"))
             .for_each(move |request| {
                 match request {
                     NetworkRequest::SendMessage(peer, msg) => {
-
                         let conn_tx = outgoing_connections
                             .get(peer)
                             .map(|conn_tx| conn_fut(Ok(conn_tx).into_future()))
@@ -288,9 +288,9 @@ impl RequestHandler {
                             });
                         if let Some(conn_tx) = conn_tx {
                             let fut = conn_tx.and_then(|conn_tx| {
-                                conn_tx.send(msg).map_err(|_| {
-                                    other_error("can't send message to a connection")
-                                })
+                                conn_tx
+                                    .send(msg)
+                                    .map_err(|_| other_error("can't send message to a connection"))
                             });
                             to_box(fut)
                         } else {
@@ -307,18 +307,12 @@ impl RequestHandler {
                         outgoing_connections.disconnect_with_peer(peer, network_tx.clone())
                     }
                     // Immediately stop the event loop.
-                    NetworkRequest::Shutdown => {
-                        let fut = cancel_sender
+                    NetworkRequest::Shutdown => to_box(
+                        cancel_sender
                             .take()
                             .ok_or_else(|| other_error("shutdown twice"))
-                            .and_then(|sender| {
-                                sender.send(()).map_err(
-                                    |_| other_error("can't send shutdown signal"),
-                                )
-                            })
-                            .into_future();
-                        to_box(fut)
-                    }
+                            .into_future(),
+                    ),
                 }
             });
         RequestHandler(to_box(requests_handler))
@@ -333,7 +327,6 @@ impl Future for RequestHandler {
         self.0.poll()
     }
 }
-
 
 struct Listener(Box<Future<Item = (), Error = io::Error>>);
 
@@ -373,9 +366,10 @@ impl Listener {
                 .map_err(|e| e.0)
                 .and_then(move |(raw, stream)| match raw.map(Any::from_raw) {
                     Some(Ok(Any::Connect(msg))) => Ok((msg, stream)),
-                    Some(Ok(other)) => Err(other_error(
-                        &format!("First message is not Connect, got={:?}", other),
-                    )),
+                    Some(Ok(other)) => Err(other_error(&format!(
+                        "First message is not Connect, got={:?}",
+                        other
+                    ))),
                     Some(Err(e)) => Err(into_other(e)),
                     None => Err(other_error("Incoming socket closed")),
                 })

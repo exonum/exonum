@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,17 +14,17 @@
 
 //! Consensus and other messages and related utilities.
 
-use std::fmt;
+pub use self::raw::{Message, MessageBuffer, MessageWriter, RawMessage, ServiceMessage,
+                    HEADER_LENGTH, PROTOCOL_MAJOR_VERSION};
+pub use self::protocol::*;
 
 use bit_vec::BitVec;
+
+use std::fmt;
 
 use crypto::PublicKey;
 use encoding::Error;
 use helpers::{Height, Round, ValidatorId};
-
-pub use self::raw::{RawMessage, MessageWriter, MessageBuffer, ServiceMessage, Message,
-                    HEADER_LENGTH, PROTOCOL_MAJOR_VERSION, TEST_NETWORK_ID};
-pub use self::protocol::*;
 
 #[macro_use]
 mod spec;

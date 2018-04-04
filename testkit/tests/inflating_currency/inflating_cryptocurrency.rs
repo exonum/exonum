@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,8 +18,8 @@ extern crate router;
 extern crate serde;
 extern crate serde_json;
 
-use exonum::blockchain::{ApiContext, Blockchain, Schema as CoreSchema, Service, Transaction,
-                         TransactionSet, ExecutionResult};
+use exonum::blockchain::{ApiContext, Blockchain, ExecutionResult, Schema as CoreSchema, Service,
+                         Transaction, TransactionSet};
 use exonum::node::{ApiSender, TransactionSend};
 use exonum::messages::{Message, RawTransaction};
 use exonum::storage::{Fork, MapIndex, Snapshot};
@@ -99,7 +99,7 @@ impl<'a> CurrencySchema<&'a mut Fork> {
 // // // // // // // // // // TRANSACTIONS // // // // // // // // // //
 
 transactions! {
-    CurrencyTransactions {
+    pub(in inflating_cryptocurrency) CurrencyTransactions {
         const SERVICE_ID = SERVICE_ID;
 
         /// Create a new wallet.
@@ -211,16 +211,18 @@ impl CryptocurrencyApi {
         let path = req.url.path();
         let wallet_key = path.last().unwrap();
         let public_key = PublicKey::from_hex(wallet_key).map_err(|e| {
-            IronError::new(e, (
-                Status::BadRequest,
-                Header(ContentType::json()),
-                "\"Invalid request param: `pub_key`\"",
-            ))
+            IronError::new(
+                e,
+                (
+                    Status::BadRequest,
+                    Header(ContentType::json()),
+                    "\"Invalid request param: `pub_key`\"",
+                ),
+            )
         })?;
         if let Some(wallet) = self.wallet(&public_key) {
             let height = CoreSchema::new(self.blockchain.snapshot()).height();
-            self.ok_response(&serde_json::to_value(wallet.actual_balance(height))
-                .unwrap())
+            self.ok_response(&serde_json::to_value(wallet.actual_balance(height)).unwrap())
         } else {
             self.not_found_response(&serde_json::to_value("Wallet not found").unwrap())
         }

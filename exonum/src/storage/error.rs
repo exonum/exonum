@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -32,6 +32,8 @@ impl Error {
     /// let error = Error::new("Oh no!");
     /// ```
     pub fn new<T: Into<String>>(message: T) -> Error {
-        Error { message: message.into() }
+        Error {
+            message: message.into(),
+        }
     }
 }

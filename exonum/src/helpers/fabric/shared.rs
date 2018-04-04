@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,17 +14,17 @@
 
 //! This module is used to collect structures that is shared into `CommandExtension` from `Command`.
 
+use toml;
+
 use std::collections::BTreeMap;
 use std::net::SocketAddr;
-
-use toml::Value;
 
 use crypto::{PublicKey, SecretKey};
 use blockchain::config::ConsensusConfig;
 use blockchain::config::ValidatorKeys;
 
 /// Abstract configuration.
-pub type AbstractConfig = BTreeMap<String, Value>;
+pub type AbstractConfig = BTreeMap<String, toml::Value>;
 
 /// Node public configurations.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,6 +34,7 @@ pub struct NodePublicConfig {
     /// Public keys of a validator.
     pub validator_keys: ValidatorKeys,
     /// Services configurations.
+    #[serde(default)]
     pub services_public_configs: AbstractConfig,
 }
 
@@ -62,7 +63,10 @@ pub struct CommonConfigTemplate {
     /// Consensus configuration.
     pub consensus_config: ConsensusConfig,
     /// Services configuration.
+    #[serde(default)]
     pub services_config: AbstractConfig,
+    /// General configuration.
+    pub general_config: AbstractConfig,
 }
 
 /// `NodePrivateConfig` collects all public and secret keys.
@@ -79,5 +83,6 @@ pub struct NodePrivateConfig {
     /// Service secret key.
     pub service_secret_key: SecretKey,
     /// Additional service secret config.
+    #[serde(default)]
     pub services_secret_configs: AbstractConfig,
 }

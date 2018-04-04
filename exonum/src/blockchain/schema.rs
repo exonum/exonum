@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crypto::{PublicKey, Hash, CryptoHash};
-use messages::{Precommit, RawMessage, Connect};
-use storage::{Fork, ListIndex, MapIndex, MapProof, ProofListIndex, ProofMapIndex, Snapshot,
-              StorageKey};
-use helpers::Height;
+use crypto::{CryptoHash, Hash, PublicKey};
+use messages::{Connect, Precommit, RawMessage};
+use storage::{Entry, Fork, KeySetIndex, ListIndex, MapIndex, MapProof, ProofListIndex,
+              ProofMapIndex, Snapshot};
+use helpers::{Height, Round};
 use super::{Block, BlockProof, Blockchain, TransactionResult};
 use super::config::StoredConfiguration;
 
@@ -34,22 +34,19 @@ macro_rules! define_names {
 define_names!(
     TRANSACTIONS => "transactions";
     TRANSACTION_RESULTS => "transaction_results";
-    TX_LOCATION_BY_TX_HASH => "tx_location_by_tx_hash";
+    TRANSACTIONS_POOL => "transactions_pool";
+    TRANSACTIONS_LOCATIONS => "transactions_locations";
     BLOCKS => "blocks";
     BLOCK_HASHES_BY_HEIGHT => "block_hashes_by_height";
-    BLOCK_TXS => "block_txs";
+    BLOCK_TRANSACTIONS => "block_transactions";
     PRECOMMITS => "precommits";
     CONFIGS => "configs";
     CONFIGS_ACTUAL_FROM => "configs_actual_from";
     STATE_HASH_AGGREGATOR => "state_hash_aggregator";
+    PEERS_CACHE => "peers_cache";
+    CONSENSUS_MESSAGES_CACHE => "consensus_messages_cache";
+    CONSENSUS_ROUND => "consensus_round";
 );
-
-/// Generates an array of bytes from the `prefix`.
-pub fn gen_prefix<K: StorageKey>(prefix: &K) -> Vec<u8> {
-    let mut res = vec![0; prefix.size()];
-    prefix.write(&mut res[..]);
-    res
-}
 
 encoding_struct! (
     /// Configuration index.
@@ -96,10 +93,24 @@ where
         ProofMapIndex::new(TRANSACTION_RESULTS, &self.view)
     }
 
+    /// Returns table that represents a set of uncommitted transactions hashes.
+    pub fn transactions_pool(&self) -> KeySetIndex<&T, Hash> {
+        KeySetIndex::new(TRANSACTIONS_POOL, &self.view)
+    }
+
+    /// Returns number of transactions in the pool
+    #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
+    pub fn transactions_pool_len(&self) -> usize {
+        let pool = self.transactions_pool();
+        // TODO: Change count to other method with O(1) complexity. (ECR-977)
+        let count = pool.iter().count();
+        count
+    }
+
     /// Returns table that keeps the block height and tx position inside block for every
     /// transaction hash.
-    pub fn tx_location_by_tx_hash(&self) -> MapIndex<&T, Hash, TxLocation> {
-        MapIndex::new(TX_LOCATION_BY_TX_HASH, &self.view)
+    pub fn transactions_locations(&self) -> MapIndex<&T, Hash, TxLocation> {
+        MapIndex::new(TRANSACTIONS_LOCATIONS, &self.view)
     }
 
     /// Returns table that stores block object for every block height.
@@ -113,14 +124,14 @@ where
     }
 
     /// Returns table that keeps a list of transactions for the each block.
-    pub fn block_txs(&self, height: Height) -> ProofListIndex<&T, Hash> {
+    pub fn block_transactions(&self, height: Height) -> ProofListIndex<&T, Hash> {
         let height: u64 = height.into();
-        ProofListIndex::with_prefix(BLOCK_TXS, gen_prefix(&height), &self.view)
+        ProofListIndex::new_in_family(BLOCK_TRANSACTIONS, &height, &self.view)
     }
 
     /// Returns table that saves a list of precommits for block with given hash.
     pub fn precommits(&self, hash: &Hash) -> ListIndex<&T, Precommit> {
-        ListIndex::with_prefix(PRECOMMITS, gen_prefix(hash), &self.view)
+        ListIndex::new_in_family(PRECOMMITS, hash, &self.view)
     }
 
     /// Returns table that represents a map from configuration hash into contents.
@@ -156,8 +167,21 @@ where
 
     /// Returns peers that have to be recovered in case of process' restart
     /// after abnormal termination.
-    pub fn peers_cache(&self) -> MapIndex<&T, PublicKey, Connect> {
-        MapIndex::new("core.peers_cache", &self.view)
+    pub(crate) fn peers_cache(&self) -> MapIndex<&T, PublicKey, Connect> {
+        MapIndex::new(PEERS_CACHE, &self.view)
+    }
+
+    /// Returns consensus messages that have to be recovered in case of process' restart
+    /// after abnormal termination.
+    pub(crate) fn consensus_messages_cache(&self) -> ListIndex<&T, RawMessage> {
+        ListIndex::new(CONSENSUS_MESSAGES_CACHE, &self.view)
+    }
+
+    /// Returns saved value of the consensus round. Returns first round if it wasn't saved.
+    pub(crate) fn consensus_round(&self) -> Round {
+        Entry::new(CONSENSUS_ROUND, &self.view)
+            .get()
+            .unwrap_or_else(Round::first)
     }
 
     /// Returns block hash for the given height.
@@ -184,9 +208,9 @@ where
     ///
     /// Panics if the "genesis block" was not created.
     pub fn last_block(&self) -> Block {
-        let hash = self.block_hashes_by_height().last().expect(
-            "An attempt to get the `last_block` during creating the genesis block.",
-        );
+        let hash = self.block_hashes_by_height()
+            .last()
+            .expect("An attempt to get the `last_block` during creating the genesis block.");
         self.blocks().get(&hash).unwrap()
     }
 
@@ -238,10 +262,9 @@ where
         let next_height = self.next_height();
         let idx = self.find_configurations_index_by_height(next_height);
         if idx > 0 {
-            let cfg_ref = self.configs_actual_from().get(idx - 1).expect(&format!(
-                "Configuration at index {} not found",
-                idx
-            ));
+            let cfg_ref = self.configs_actual_from()
+                .get(idx - 1)
+                .expect(&format!("Configuration at index {} not found", idx));
             let cfg_hash = cfg_ref.cfg_hash();
             let cfg = self.configuration_by_hash(cfg_hash).expect(&format!(
                 "Config with hash {:?} is absent in configs table",
@@ -256,10 +279,9 @@ where
     /// Returns the configuration that is the actual for the given height.
     pub fn configuration_by_height(&self, height: Height) -> StoredConfiguration {
         let idx = self.find_configurations_index_by_height(height);
-        let cfg_ref = self.configs_actual_from().get(idx).expect(&format!(
-            "Configuration at index {} not found",
-            idx
-        ));
+        let cfg_ref = self.configs_actual_from()
+            .get(idx)
+            .expect(&format!("Configuration at index {} not found", idx));
         let cfg_hash = cfg_ref.cfg_hash();
         self.configuration_by_hash(cfg_hash).expect(&format!(
             "Config with hash {:?} is absent in configs table",
@@ -274,7 +296,10 @@ where
 
     /// Returns the `state_hash` table for core tables.
     pub fn core_state_hash(&self) -> Vec<Hash> {
-        vec![self.configs().root_hash(), self.transaction_results().root_hash()]
+        vec![
+            self.configs().merkle_root(),
+            self.transaction_results().merkle_root(),
+        ]
     }
 
     /// Constructs a proof of inclusion of root hash of a specific service
@@ -298,10 +323,14 @@ where
     /// `Service` trait
     /// * `table_idx` - index of service table in `Vec`, returned by
     /// `state_hash` method of instance of type of `Service` trait
-    pub fn get_proof_to_service_table(&self, service_id: u16, table_idx: usize) -> MapProof<Hash> {
+    pub fn get_proof_to_service_table(
+        &self,
+        service_id: u16,
+        table_idx: usize,
+    ) -> MapProof<Hash, Hash> {
         let key = Blockchain::service_table_unique_key(service_id, table_idx);
         let sum_table = self.state_hash_aggregator();
-        sum_table.get_proof(&key)
+        sum_table.get_proof(key)
     }
 
     fn find_configurations_index_by_height(&self, height: Height) -> u64 {
@@ -329,86 +358,104 @@ impl<'a> Schema<&'a mut Fork> {
     /// Mutable reference to the [`transactions`][1] index.
     ///
     /// [1]: struct.Schema.html#method.transactions
-    pub fn transactions_mut(&mut self) -> MapIndex<&mut Fork, Hash, RawMessage> {
-        MapIndex::new(TRANSACTIONS, &mut self.view)
+    pub(crate) fn transactions_mut(&mut self) -> MapIndex<&mut Fork, Hash, RawMessage> {
+        MapIndex::new(TRANSACTIONS, self.view)
     }
 
     /// Mutable reference to the [`transaction_results`][1] index.
     ///
     /// [1]: struct.Schema.html#method.transaction_results
-    pub fn transaction_results_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, TransactionResult> {
-        ProofMapIndex::new(TRANSACTION_RESULTS, &mut self.view)
+    pub(crate) fn transaction_results_mut(
+        &mut self,
+    ) -> ProofMapIndex<&mut Fork, Hash, TransactionResult> {
+        ProofMapIndex::new(TRANSACTION_RESULTS, self.view)
     }
 
-    /// Mutable reference to the [`tx_location_by_tx_hash`][1] index.
+    /// Mutable reference to the [`transactions_pool`][1] index.
     ///
-    /// [1]: struct.Schema.html#method.tx_location_by_tx_hash
-    pub fn tx_location_by_tx_hash_mut(&mut self) -> MapIndex<&mut Fork, Hash, TxLocation> {
-        MapIndex::new(TX_LOCATION_BY_TX_HASH, &mut self.view)
+    /// [1]: struct.Schema.html#method.transactions_pool
+    fn transactions_pool_mut(&mut self) -> KeySetIndex<&mut Fork, Hash> {
+        KeySetIndex::new(TRANSACTIONS_POOL, self.view)
+    }
+
+    /// Mutable reference to the [`transactions_locations`][1] index.
+    ///
+    /// [1]: struct.Schema.html#method.transactions_locations
+    pub(crate) fn transactions_locations_mut(&mut self) -> MapIndex<&mut Fork, Hash, TxLocation> {
+        MapIndex::new(TRANSACTIONS_LOCATIONS, self.view)
     }
 
     /// Mutable reference to the [`blocks][1] index.
     ///
     /// [1]: struct.Schema.html#method.blocks
-    pub fn blocks_mut(&mut self) -> MapIndex<&mut Fork, Hash, Block> {
-        MapIndex::new(BLOCKS, &mut self.view)
+    pub(crate) fn blocks_mut(&mut self) -> MapIndex<&mut Fork, Hash, Block> {
+        MapIndex::new(BLOCKS, self.view)
     }
 
     /// Mutable reference to the [`block_hashes_by_height_mut`][1] index.
     ///
     /// [1]: struct.Schema.html#method.block_hashes_by_height_mut
-    pub fn block_hashes_by_height_mut(&mut self) -> ListIndex<&mut Fork, Hash> {
-        ListIndex::new(BLOCK_HASHES_BY_HEIGHT, &mut self.view)
+    pub(crate) fn block_hashes_by_height_mut(&mut self) -> ListIndex<&mut Fork, Hash> {
+        ListIndex::new(BLOCK_HASHES_BY_HEIGHT, self.view)
     }
 
-    /// Mutable reference to the [`block_hash_by_height`][1] index.
+    /// Mutable reference to the [`block_transactions`][1] index.
     ///
-    /// [1]: struct.Schema.html#method.block_hash_by_height
-    pub fn block_hash_by_height_mut(&mut self, height: Height) -> Option<Hash> {
-        self.block_hashes_by_height().get(height.into())
-    }
-
-    /// Mutable reference to the [`block_txs`][1] index.
-    ///
-    /// [1]: struct.Schema.html#method.block_txs
-    pub fn block_txs_mut(&mut self, height: Height) -> ProofListIndex<&mut Fork, Hash> {
+    /// [1]: struct.Schema.html#method.block_transactions
+    pub(crate) fn block_transactions_mut(
+        &mut self,
+        height: Height,
+    ) -> ProofListIndex<&mut Fork, Hash> {
         let height: u64 = height.into();
-        ProofListIndex::with_prefix(BLOCK_TXS, gen_prefix(&height), &mut self.view)
+        ProofListIndex::new_in_family(BLOCK_TRANSACTIONS, &height, self.view)
     }
 
     /// Mutable reference to the [`precommits`][1] index.
     ///
     /// [1]: struct.Schema.html#method.precommits
-    pub fn precommits_mut(&mut self, hash: &Hash) -> ListIndex<&mut Fork, Precommit> {
-        ListIndex::with_prefix(PRECOMMITS, gen_prefix(hash), &mut self.view)
+    pub(crate) fn precommits_mut(&mut self, hash: &Hash) -> ListIndex<&mut Fork, Precommit> {
+        ListIndex::new_in_family(PRECOMMITS, hash, self.view)
     }
 
     /// Mutable reference to the [`configs`][1] index.
     ///
     /// [1]: struct.Schema.html#method.configs
-    pub fn configs_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, StoredConfiguration> {
-        ProofMapIndex::new(CONFIGS, &mut self.view)
+    pub(crate) fn configs_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, StoredConfiguration> {
+        ProofMapIndex::new(CONFIGS, self.view)
     }
 
     /// Mutable reference to the [`configs_actual_from`][1] index.
     ///
     /// [1]: struct.Schema.html#method.configs_actual_from
-    pub fn configs_actual_from_mut(&mut self) -> ListIndex<&mut Fork, ConfigReference> {
-        ListIndex::new(CONFIGS_ACTUAL_FROM, &mut self.view)
+    pub(crate) fn configs_actual_from_mut(&mut self) -> ListIndex<&mut Fork, ConfigReference> {
+        ListIndex::new(CONFIGS_ACTUAL_FROM, self.view)
     }
 
     /// Mutable reference to the [`state_hash_aggregator`][1] index.
     ///
     /// [1]: struct.Schema.html#method.state_hash_aggregator
-    pub fn state_hash_aggregator_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, Hash> {
-        ProofMapIndex::new(STATE_HASH_AGGREGATOR, &mut self.view)
+    pub(crate) fn state_hash_aggregator_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, Hash> {
+        ProofMapIndex::new(STATE_HASH_AGGREGATOR, self.view)
     }
 
     /// Mutable reference to the [`peers_cache`][1] index.
     ///
     /// [1]: struct.Schema.html#method.peers_cache
-    pub fn peers_cache_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Connect> {
-        MapIndex::new("core.peers_cache", &mut self.view)
+    pub(crate) fn peers_cache_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Connect> {
+        MapIndex::new(PEERS_CACHE, self.view)
+    }
+
+    /// Mutable reference to the [`consensus_messages_cache`][1] index.
+    ///
+    /// [1]: struct.Schema.html#method.consensus_messages
+    pub(crate) fn consensus_messages_cache_mut(&mut self) -> ListIndex<&mut Fork, RawMessage> {
+        ListIndex::new(CONSENSUS_MESSAGES_CACHE, self.view)
+    }
+
+    /// Saves the given consensus round value into storage.
+    pub(crate) fn set_consensus_round(&mut self, round: Round) {
+        let mut entry: Entry<&mut Fork, _> = Entry::new(CONSENSUS_ROUND, self.view);
+        entry.set(round);
     }
 
     /// Adds a new configuration to the blockchain, which will become an actual at
@@ -447,5 +494,30 @@ impl<'a> Schema<&'a mut Fork> {
         let cfg_ref = ConfigReference::new(actual_from, &cfg_hash);
         self.configs_actual_from_mut().push(cfg_ref);
         // TODO: clear storages
+    }
+
+    /// Adds transaction into persistent pool.
+    #[doc(hidden)]
+    pub fn add_transaction_into_pool(&mut self, tx: RawMessage) {
+        self.transactions_pool_mut().insert(tx.hash());
+        self.transactions_mut().put(&tx.hash(), tx);
+    }
+
+    /// Changes transaction status from `in_pool`, to `committed`.
+    pub(crate) fn commit_transaction(&mut self, hash: &Hash) {
+        self.transactions_pool_mut().remove(hash)
+    }
+
+    /// Remove transaction from persistent pool.
+    #[doc(hidden)]
+    pub fn reject_transaction(&mut self, hash: &Hash) -> Result<(), ()> {
+        let contains = self.transactions_pool_mut().contains(hash);
+        self.transactions_pool_mut().remove(hash);
+        self.transactions_mut().remove(hash);
+        if contains {
+            Ok(())
+        } else {
+            Err(())
+        }
     }
 }

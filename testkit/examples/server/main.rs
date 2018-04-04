@@ -15,7 +15,7 @@
 extern crate exonum_cryptocurrency as cryptocurrency;
 extern crate exonum_testkit;
 
-use cryptocurrency::CurrencyService;
+use cryptocurrency::service::CurrencyService;
 use exonum_testkit::TestKitBuilder;
 
 fn main() {

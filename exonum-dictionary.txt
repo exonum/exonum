@@ -12,6 +12,7 @@ btree
 bytearray
 byteorder
 checkpointed
+chrono
 clippy
 clonned
 compat
@@ -29,11 +30,13 @@ deserializer
 deserializes
 deserializing
 DESTDIR
+doctests
 emsp
 Exonum
 fsync
 fuzzer
 gitter
+hashable
 healthcheck
 idempotence
 keepalive
@@ -45,8 +48,8 @@ librocksdb
 libsnappy
 libsodium
 libssl
-markdownlint
 maintainer's
+markdownlint
 memorydb
 mempool
 Merkelized
@@ -54,6 +57,8 @@ Merkle
 millis
 mkdir
 mpsc
+multiproof
+multiproofs
 mutex
 nanos
 nodelay
@@ -64,6 +69,7 @@ permissioned
 postcondition
 postpropose
 postvote
+precheck
 precommit
 precommits
 prevote
@@ -72,8 +78,10 @@ println
 pubkey
 pubkeys
 readonly
+rebasing
 reddit
 reimplemented
+repr
 RESTful
 roadmap
 rocksdb
@@ -117,8 +125,10 @@ unreceived
 unsync
 untagged
 usize
+uuid
+uuids
 validator
-validators
 validator's
+validators
 whitelisted
 writeln

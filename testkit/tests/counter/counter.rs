@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,20 +18,19 @@ extern crate bodyparser;
 extern crate iron;
 extern crate router;
 
-use exonum::blockchain::{ApiContext, Blockchain, Service, Transaction, TransactionSet,
-                         ExecutionResult};
+use exonum::blockchain::{ApiContext, Blockchain, ExecutionError, ExecutionResult, Service,
+                         Transaction, TransactionSet};
 use exonum::messages::{Message, RawTransaction};
 use exonum::node::{ApiSender, TransactionSend};
 use exonum::storage::{Entry, Fork, Snapshot};
 use exonum::crypto::{Hash, PublicKey};
 use exonum::encoding;
 use exonum::api::{Api, ApiError};
-use self::iron::Handler;
-use self::iron::prelude::*;
-use self::router::Router;
 use serde_json;
+use self::iron::{Handler, prelude::*};
+use self::router::Router;
 
-const SERVICE_ID: u16 = 1;
+pub const SERVICE_ID: u16 = 1;
 
 // "correct horse battery staple" brainwallet pubkey in Ed25519 with SHA-256 digest
 pub const ADMIN_KEY: &str = "506f27b1b4c2403f2602d663a059b0262afd6a5bcda95a08dd96a4614a89f1b0";
@@ -75,7 +74,7 @@ impl<'a> CounterSchema<&'a mut Fork> {
 // // // // Transactions // // // //
 
 transactions! {
-    CounterTransactions {
+    pub CounterTransactions {
         const SERVICE_ID = SERVICE_ID;
 
         struct TxIncrement {
@@ -94,7 +93,16 @@ impl Transaction for TxIncrement {
         self.verify_signature(self.author())
     }
 
+    // This method purposely does not check counter overflow in order to test
+    // behavior of panicking transactions.
     fn execute(&self, fork: &mut Fork) -> ExecutionResult {
+        if self.by() == 0 {
+            Err(ExecutionError::with_description(
+                0,
+                "Adding zero does nothing!".to_string(),
+            ))?;
+        }
+
         let mut schema = CounterSchema::new(fork);
         schema.inc_count(self.by());
         Ok(())
@@ -135,6 +143,7 @@ struct CounterApi {
 
 impl CounterApi {
     fn increment(&self, req: &mut Request) -> IronResult<Response> {
+        trace!("received increment tx");
         match req.get::<bodyparser::Struct<TxIncrement>>() {
             Ok(Some(transaction)) => {
                 let transaction: Box<Transaction> = Box::new(transaction);

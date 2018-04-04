@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,30 +13,38 @@
 // limitations under the License.
 
 // This is a regression test for exonum configuration.
+extern crate exonum;
 #[macro_use]
 extern crate pretty_assertions;
 extern crate toml;
-extern crate exonum;
+
+use toml::Value;
+use exonum::helpers::fabric::NodeBuilder;
 
 use std::ffi::OsString;
 use std::fs::{File, OpenOptions};
-use std::fs;
+use std::{fs, panic};
 use std::path::Path;
-use std::panic;
-use std::io::Read;
-
-use exonum::helpers::fabric::NodeBuilder;
+use std::io::{Read, Write};
 
 const CONFIG_TMP_FOLDER: &str = "/tmp/";
 const CONFIG_TESTDATA_FOLDER: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/testdata/config/");
 
 const GENERATED_TEMPLATE: &str = "template.toml";
 
-const SEC_CONFIG: [&str; 4] =
-    ["config0_sec.toml", "config1_sec.toml", "config2_sec.toml", "config3_sec.toml"];
+const SEC_CONFIG: [&str; 4] = [
+    "config0_sec.toml",
+    "config1_sec.toml",
+    "config2_sec.toml",
+    "config3_sec.toml",
+];
 
-const PUB_CONFIG: [&str; 4] =
-    ["config0_pub.toml", "config1_pub.toml", "config2_pub.toml", "config3_pub.toml"];
+const PUB_CONFIG: [&str; 4] = [
+    "config0_pub.toml",
+    "config1_pub.toml",
+    "config2_pub.toml",
+    "config3_pub.toml",
+];
 
 fn full_tmp_folder(folder: &str) -> String {
     format!("{}exonum-test-{}/", CONFIG_TMP_FOLDER, folder)
@@ -91,8 +99,9 @@ fn generate_template(folder: &str) {
         "exonum-config-test",
         "generate-template",
         &full_tmp_name(GENERATED_TEMPLATE, folder),
+        "--validators-count",
+        "1",
     ]));
-
 }
 
 fn generate_config(folder: &str, i: usize) {
@@ -109,7 +118,6 @@ fn generate_config(folder: &str, i: usize) {
 
 #[cfg_attr(feature = "cargo-clippy", allow(needless_range_loop))]
 fn finalize_config(folder: &str, config: &str, i: usize, count: usize) {
-
     let mut variables = vec![
         "exonum-config-test".to_owned(),
         "finalize".to_owned(),
@@ -117,11 +125,43 @@ fn finalize_config(folder: &str, config: &str, i: usize, count: usize) {
         full_tmp_name(config, folder),
         "-p".to_owned(),
     ];
+
+    fs::create_dir_all(full_tmp_name("", folder)).expect("Can't create temp folder");
+
     for n in 0..count {
-        variables.push(full_testdata_name(PUB_CONFIG[n]));
+        override_validators_count(PUB_CONFIG[n], count, folder);
+        variables.push(full_tmp_name(PUB_CONFIG[n], folder));
     }
-    println!("{:?}", variables);
     assert!(!default_run_with_matches(variables));
+}
+
+fn override_validators_count(config: &str, n: usize, folder: &str) {
+    let res = {
+        let mut contents = String::new();
+        let mut file = File::open(full_testdata_name(config)).unwrap();
+        file.read_to_string(&mut contents)
+            .expect("Read from config file failed");
+
+        let mut value = contents.as_str().parse::<Value>().unwrap();
+        {
+            let mut count = value
+                .get_mut("common")
+                .unwrap()
+                .get_mut("general_config")
+                .unwrap()
+                .as_table_mut()
+                .unwrap();
+
+            count.insert("validators_count".into(), Value::from(n as u8));
+        }
+
+        toml::to_string(&value).unwrap()
+    };
+
+    File::create(full_tmp_name(config, folder))
+        .unwrap()
+        .write_all(res.as_bytes())
+        .expect("Create temp config file is failed");
 }
 
 fn run_node(config: &str, folder: &str) {
@@ -165,8 +205,10 @@ fn test_generate_template() {
 fn test_generate_config() {
     let command = "generate-config";
 
-    let result = panic::catch_unwind(|| for i in 0..PUB_CONFIG.len() {
-        generate_config(command, i);
+    let result = panic::catch_unwind(|| {
+        for i in 0..PUB_CONFIG.len() {
+            generate_config(command, i);
+        }
     });
 
     fs::remove_dir_all(full_tmp_folder(command)).unwrap();
@@ -199,7 +241,6 @@ fn test_generate_full_config_run() {
                     assert!(result.is_ok());
                 }
             }
-
         }
     });
 

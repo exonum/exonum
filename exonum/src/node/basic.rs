@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,20 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use rand::{self, Rng};
+
 use std::net::SocketAddr;
 use std::error::Error;
 
-use rand::{self, Rng};
-
-use messages::{Any, RawMessage, Connect, Status, Message, PeersRequest};
+use messages::{Any, Connect, Message, PeersRequest, RawMessage, Status};
 use helpers::Height;
 use super::{NodeHandler, RequestData};
 
 impl NodeHandler {
     /// Redirects message to the corresponding `handle_...` function.
-    pub fn handle_message(&mut self, _peer: SocketAddr, raw: RawMessage) {
-        // TODO Use the `peer` to send responses and spam protection.
-
+    pub fn handle_message(&mut self, raw: RawMessage) {
         // TODO: check message headers (network id, protocol version)
         // FIXME: call message.verify method
         //     if !raw.verify() {
@@ -126,8 +124,7 @@ impl NodeHandler {
         self.state.add_peer(public_key, message.clone());
         info!(
             "Received Connect message from {}, {}",
-            address,
-            need_connect,
+            address, need_connect,
         );
         self.blockchain.save_peer(&public_key, message);
         if need_connect {

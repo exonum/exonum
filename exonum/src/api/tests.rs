@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -37,6 +37,7 @@ fn test_json_response_for_complex_val() {
         &Hash::new([38; 32]),
     );
     struct SampleAPI;
+
     impl Api for SampleAPI {
         fn wire<'b>(&self, _: &'b mut Router) {
             return;

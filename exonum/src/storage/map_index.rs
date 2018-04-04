@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,12 +17,14 @@
 use std::marker::PhantomData;
 use std::borrow::Borrow;
 
-use super::{BaseIndex, BaseIndexIter, Snapshot, Fork, StorageKey, StorageValue};
+use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey, StorageValue};
+use super::indexes_metadata::IndexType;
 
 /// A map of keys and values.
 ///
 /// `MapIndex` requires that the keys implement the [`StorageKey`] trait and the values implement
 /// [`StorageValue`] trait.
+///
 /// [`StorageKey`]: ../trait.StorageKey.html
 /// [`StorageValue`]: ../trait.StorageValue.html
 #[derive(Debug)]
@@ -71,12 +73,18 @@ pub struct MapIndexValues<'a, V> {
     base_iter: BaseIndexIter<'a, (), V>,
 }
 
-impl<T, K, V> MapIndex<T, K, V> {
+impl<T, K, V> MapIndex<T, K, V>
+where
+    T: AsRef<Snapshot>,
+    K: StorageKey,
+    V: StorageValue,
+{
     /// Creates a new index representation based on the name and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     ///
@@ -89,22 +97,22 @@ impl<T, K, V> MapIndex<T, K, V> {
     /// let name = "name";
     /// let snapshot = db.snapshot();
     /// let index: MapIndex<_, u8, u8> = MapIndex::new(name, &snapshot);
-    /// # drop(index);
     /// ```
-    pub fn new<S: AsRef<str>>(name: S, view: T) -> Self {
+    pub fn new<S: AsRef<str>>(index_name: S, view: T) -> Self {
         MapIndex {
-            base: BaseIndex::new(name, view),
+            base: BaseIndex::new(index_name, IndexType::Map, view),
             _k: PhantomData,
             _v: PhantomData,
         }
     }
 
-    /// Creates a new index representation based on the name, common prefix of its keys
+    /// Creates a new index representation based on the name, index id in family
     /// and storage view.
     ///
     /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
     /// immutable methods are available. In the second case both immutable and mutable methods are
     /// available.
+    ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
     /// [`&mut Fork`]: ../struct.Fork.html
     ///
@@ -115,27 +123,23 @@ impl<T, K, V> MapIndex<T, K, V> {
     ///
     /// let db = MemoryDB::new();
     /// let name = "name";
-    /// let prefix = vec![01];
+    /// let index_id = vec![01];
     ///
     /// let snapshot = db.snapshot();
-    /// let index: MapIndex<_, u8, u8> = MapIndex::with_prefix(name, prefix, &snapshot);
-    /// # drop(index);
+    /// let index: MapIndex<_, u8, u8> = MapIndex::new_in_family(name, &index_id, &snapshot);
     /// ```
-    pub fn with_prefix<S: AsRef<str>>(name: S, prefix: Vec<u8>, view: T) -> Self {
+    pub fn new_in_family<S: AsRef<str>, I: StorageKey>(
+        family_name: S,
+        index_id: &I,
+        view: T,
+    ) -> Self {
         MapIndex {
-            base: BaseIndex::with_prefix(name, prefix, view),
+            base: BaseIndex::new_in_family(family_name, index_id, IndexType::Map, view),
             _k: PhantomData,
             _v: PhantomData,
         }
     }
-}
 
-impl<T, K, V> MapIndex<T, K, V>
-where
-    T: AsRef<Snapshot>,
-    K: StorageKey,
-    V: StorageValue,
-{
     /// Returns a value corresponding to the key.
     ///
     /// # Examples
@@ -201,7 +205,9 @@ where
     /// }
     /// ```
     pub fn iter(&self) -> MapIndexIter<K, V> {
-        MapIndexIter { base_iter: self.base.iter(&()) }
+        MapIndexIter {
+            base_iter: self.base.iter(&()),
+        }
     }
 
     /// Returns an iterator over the keys of the map in ascending order. The iterator element
@@ -222,7 +228,9 @@ where
     /// }
     /// ```
     pub fn keys(&self) -> MapIndexKeys<K> {
-        MapIndexKeys { base_iter: self.base.iter(&()) }
+        MapIndexKeys {
+            base_iter: self.base.iter(&()),
+        }
     }
 
     /// Returns an iterator over the values of the map in ascending order of keys. The iterator
@@ -243,7 +251,9 @@ where
     /// }
     /// ```
     pub fn values(&self) -> MapIndexValues<V> {
-        MapIndexValues { base_iter: self.base.iter(&()) }
+        MapIndexValues {
+            base_iter: self.base.iter(&()),
+        }
     }
 
     /// Returns an iterator over the entries of the map in ascending order starting from the
@@ -268,7 +278,9 @@ where
         K: Borrow<Q>,
         Q: StorageKey + ?Sized,
     {
-        MapIndexIter { base_iter: self.base.iter_from(&(), from) }
+        MapIndexIter {
+            base_iter: self.base.iter_from(&(), from),
+        }
     }
 
     /// Returns an iterator over the keys of the map in ascending order starting from the
@@ -293,7 +305,9 @@ where
         K: Borrow<Q>,
         Q: StorageKey + ?Sized,
     {
-        MapIndexKeys { base_iter: self.base.iter_from(&(), from) }
+        MapIndexKeys {
+            base_iter: self.base.iter_from(&(), from),
+        }
     }
 
     /// Returns an iterator over the values of the map in ascending order of keys starting from the
@@ -317,7 +331,9 @@ where
         K: Borrow<Q>,
         Q: StorageKey + ?Sized,
     {
-        MapIndexValues { base_iter: self.base.iter_from(&(), from) }
+        MapIndexValues {
+            base_iter: self.base.iter_from(&(), from),
+        }
     }
 }
 
@@ -448,7 +464,7 @@ where
 mod tests {
     use rand::{thread_rng, Rng};
     use super::*;
-    use super::super::{MemoryDB, Database};
+    use super::super::{Database, MemoryDB};
 
     const IDX_NAME: &'static str = "idx_name";
 
@@ -582,9 +598,8 @@ mod tests {
         use tempdir::TempDir;
 
         fn create_database(path: &Path) -> Box<Database> {
-            use storage::{RocksDB, RocksDBOptions};
-            let mut opts = RocksDBOptions::default();
-            opts.create_if_missing(true);
+            use storage::{DbOptions, RocksDB};
+            let opts = DbOptions::default();
             Box::new(RocksDB::open(path, &opts).unwrap())
         }
 

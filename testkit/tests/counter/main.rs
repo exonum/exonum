@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,25 +13,33 @@
 // limitations under the License.
 
 #[macro_use]
+extern crate assert_matches;
+#[macro_use]
 extern crate exonum;
 #[macro_use]
 extern crate exonum_testkit;
+#[macro_use]
+extern crate log;
+#[macro_use]
+extern crate pretty_assertions;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate serde_json;
 #[macro_use]
-extern crate pretty_assertions;
+extern crate serde_json;
 
-use exonum::crypto::{self, PublicKey, CryptoHash};
+use exonum::api::ApiError;
+use exonum::blockchain::{Transaction, TransactionErrorType as ErrorType};
+use exonum::crypto::{self, CryptoHash, PublicKey};
 use exonum::helpers::Height;
 use exonum::messages::Message;
-use exonum::encoding::serialize::FromHex;
-use exonum::encoding::serialize::json::ExonumJson;
+use exonum::encoding::serialize::{FromHex, json::ExonumJson};
 use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};
+use serde_json::Value;
+
+use counter::{CounterSchema, CounterService, TransactionResponse, TxIncrement, TxReset, ADMIN_KEY};
 
 mod counter;
-use counter::{CounterSchema, CounterService, TransactionResponse, TxIncrement, TxReset, ADMIN_KEY};
 
 fn init_testkit() -> (TestKit, TestKitApi) {
     let testkit = TestKit::for_service(CounterService);
@@ -184,7 +192,6 @@ fn test_probe() {
     let snapshot = testkit.probe(other_tx.clone());
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(3));
-
     testkit.create_block();
     let snapshot = testkit.probe(other_tx.clone());
     let schema = CounterSchema::new(&snapshot);
@@ -348,37 +355,48 @@ fn test_snapshot_comparison_panic() {
         .map(CounterSchema::new)
         .map(CounterSchema::count)
         .map(|&c| c.unwrap())
-        .assert("Counter has increased", |&old, &new| new == old + tx.by());
+        .assert("Counter has increased", |&old, &new| {
+            new == old + tx.by()
+        });
 }
 
 #[test]
 fn test_explorer_blocks() {
-    use exonum::blockchain::Block;
+    use exonum::api::public::BlocksRange;
     use exonum::helpers::Height;
 
     let (mut testkit, api) = init_testkit();
 
-    let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+    let response: BlocksRange = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+    let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(0));
     assert_eq!(*blocks[0].prev_hash(), crypto::Hash::default());
+    assert_eq!(range.start, Height(0));
+    assert_eq!(range.end, Height(1));
 
     // Check empty block creation
     testkit.create_block();
 
-    let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+    let response: BlocksRange = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+    let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 2);
     assert_eq!(blocks[0].height(), Height(1));
     assert_eq!(*blocks[0].prev_hash(), blocks[1].hash());
     assert_eq!(blocks[0].tx_count(), 0);
     assert_eq!(blocks[1].height(), Height(0));
     assert_eq!(*blocks[1].prev_hash(), crypto::Hash::default());
+    assert_eq!(range.start, Height(0));
+    assert_eq!(range.end, Height(2));
 
-    let blocks: Vec<Block> = api.get(
+    let response: BlocksRange = api.get(
         ApiKind::Explorer,
         "v1/blocks?count=10&skip_empty_blocks=true",
     );
+    let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 0);
+    assert_eq!(range.start, Height(0));
+    assert_eq!(range.end, Height(2));
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -387,29 +405,47 @@ fn test_explorer_blocks() {
     testkit.api().send(tx.clone());
     testkit.create_block(); // height == 2
 
-    let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+    let response: BlocksRange = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+    let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 3);
     assert_eq!(blocks[0].height(), Height(2));
     assert_eq!(*blocks[0].prev_hash(), blocks[1].hash());
     assert_eq!(blocks[0].tx_count(), 1);
     assert_eq!(*blocks[0].tx_hash(), tx.hash());
+    assert_eq!(range.start, Height(0));
+    assert_eq!(range.end, Height(3));
 
-    let blocks: Vec<Block> = api.get(
+    let response: BlocksRange = api.get(
         ApiKind::Explorer,
         "v1/blocks?count=10&skip_empty_blocks=true",
     );
+    let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(2));
+    assert_eq!(range.start, Height(0));
+    assert_eq!(range.end, Height(3));
 
     testkit.create_block(); // height == 3
     testkit.create_block(); // height == 4
 
-    let blocks: Vec<Block> = api.get(
+    let response: BlocksRange = api.get(
         ApiKind::Explorer,
         "v1/blocks?count=10&skip_empty_blocks=true",
     );
+    let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(2));
+    assert_eq!(range.start, Height(0));
+    assert_eq!(range.end, Height(5));
+
+    // Run a comparable `BlockchainExplorer` method.
+    let heights: Vec<_> = testkit
+        .explorer()
+        .blocks(..)
+        .filter(|block| !block.is_empty())
+        .map(|block| block.height())
+        .collect();
+    assert_eq!(heights, vec![Height(2)]);
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -419,47 +455,59 @@ fn test_explorer_blocks() {
     testkit.create_block(); // height == 5
 
     // Check block filtering
-    let blocks: Vec<Block> = api.get(
+    let response: BlocksRange = api.get(
+        ApiKind::Explorer,
+        "v1/blocks?count=1&skip_empty_blocks=true",
+    );
+    let (blocks, range) = (response.blocks, response.range);
+    assert_eq!(blocks.len(), 1);
+    assert_eq!(blocks[0].height(), Height(5));
+    assert_eq!(range.start, Height(5));
+    assert_eq!(range.end, Height(6));
+
+    let response: BlocksRange = api.get(
         ApiKind::Explorer,
         "v1/blocks?count=3&skip_empty_blocks=true",
     );
-    assert_eq!(blocks.len(), 1);
-    assert_eq!(blocks[0].height(), Height(5));
-    let blocks: Vec<Block> = api.get(
-        ApiKind::Explorer,
-        "v1/blocks?count=4&skip_empty_blocks=true",
-    );
+    let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 2);
     assert_eq!(blocks[0].height(), Height(5));
     assert_eq!(blocks[1].height(), Height(2));
+    assert_eq!(range.start, Height(0));
+    assert_eq!(range.end, Height(6));
 
     // Check `latest` param
-    let blocks: Vec<Block> = api.get(
+    let response: BlocksRange = api.get(
         ApiKind::Explorer,
         "v1/blocks?count=10&skip_empty_blocks=true&latest=4",
     );
+    let (blocks, range) = (response.blocks, response.range);
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].height(), Height(2));
+    assert_eq!(range.start, Height(0));
+    assert_eq!(range.end, Height(5));
 }
 
 #[test]
 fn test_explorer_single_block() {
     use std::collections::HashSet;
-    use exonum::explorer::BlockInfo;
+    use exonum::explorer::BlockchainExplorer;
     use exonum::helpers::Height;
 
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
         .with_service(CounterService)
         .create();
-    let api = testkit.api();
 
     assert_eq!(testkit.majority_count(), 3);
 
-    let info: BlockInfo = api.get(ApiKind::Explorer, "v1/blocks/0");
-    assert_eq!(info.block.height(), Height(0));
-    assert_eq!(*info.block.prev_hash(), crypto::Hash::default());
-    assert_eq!(info.txs, vec![]);
+    {
+        let explorer = BlockchainExplorer::new(testkit.blockchain());
+        let block = explorer.block(Height(0)).unwrap();
+        assert_eq!(block.height(), Height(0));
+        assert_eq!(*block.header().prev_hash(), crypto::Hash::default());
+        assert_eq!(&*block.transaction_hashes(), &[]);
+    }
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -468,93 +516,189 @@ fn test_explorer_single_block() {
     testkit.api().send(tx.clone());
     testkit.create_block(); // height == 1
 
-    let info: BlockInfo = api.get(ApiKind::Explorer, "v1/blocks/1");
-    assert_eq!(info.block.height(), Height(1));
-    assert_eq!(info.block.tx_count(), 1);
-    assert_eq!(*info.block.tx_hash(), tx.hash());
-    assert_eq!(info.txs, vec![tx.hash()]);
+    {
+        let explorer = BlockchainExplorer::new(testkit.blockchain());
+        let block = explorer.block(Height(1)).unwrap();
+        assert_eq!(block.height(), Height(1));
+        assert_eq!(block.len(), 1);
+        assert_eq!(*block.header().tx_hash(), tx.hash());
+        assert_eq!(&*block.transaction_hashes(), &[tx.hash()]);
 
-    let mut validators = HashSet::new();
-    for precommit in &info.precommits {
-        assert_eq!(precommit.height(), Height(1));
-        assert_eq!(*precommit.block_hash(), info.block.hash());
-        let pk = testkit
-            .network()
-            .consensus_public_key_of(precommit.validator())
-            .expect("Cannot find validator id");
-        assert!(precommit.verify_signature(pk));
-        validators.insert(precommit.validator());
+        let mut validators = HashSet::new();
+        for precommit in block.precommits().iter() {
+            assert_eq!(precommit.height(), Height(1));
+            assert_eq!(*precommit.block_hash(), block.header().hash());
+            let pk = testkit
+                .network()
+                .consensus_public_key_of(precommit.validator())
+                .expect("Cannot find validator id");
+            assert!(precommit.verify_signature(pk));
+            validators.insert(precommit.validator());
+        }
+
+        assert!(validators.len() >= testkit.majority_count());
     }
-
-    assert!(validators.len() >= testkit.majority_count());
 }
 
 #[test]
-fn test_explorer_transaction() {
-    use exonum::explorer::{BlockInfo, TxInfo as CommittedTxInfo, TxStatus};
+fn test_explorer_transaction_info() {
+    use exonum::explorer::BlockchainExplorer;
     use exonum::helpers::Height;
+    use exonum::storage::ListProof;
 
-    // Analog of the structure defined by the system API handler.
-    #[derive(Deserialize)]
-    #[serde(rename_all = "kebab-case")]
-    enum TxInfo {
-        Unknown,
-        InPool { content: serde_json::Value },
-        Committed(CommittedTxInfo),
+    /// Asserts that all properties from `sub` are equal to the corresponding properties
+    /// in `obj`.
+    fn assert_contains_all(obj: &Value, sub: &Value) {
+        if let (&Value::Object(ref obj), &Value::Object(ref sub)) = (obj, sub) {
+            for (key, value) in sub {
+                assert_eq!(obj[key], *value);
+            }
+        } else {
+            panic!("Two objects expected");
+        }
     }
 
-    let mut testkit = TestKitBuilder::validator()
-        .with_validators(4)
-        .with_service(CounterService)
-        .create();
-    let api = testkit.api();
+    let (mut testkit, api) = init_testkit();
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
         TxIncrement::new(&pubkey, 5, &key)
     };
-
-    let info: TxInfo = api.get_err(
+    let info: ApiError = api.get_err(
         ApiKind::Explorer,
         &format!("v1/transactions/{}", &tx.hash().to_string()),
     );
-    match info {
-        TxInfo::Unknown => {}
-        _ => panic!("Transaction should be unknown to the node"),
-    }
+    let error_body = json!({ "type": "unknown" });
+    assert_matches!(
+        info,
+        ApiError::NotFound(ref body) if serde_json::from_str::<Value>(body).unwrap() == error_body
+    );
 
     api.send(tx.clone());
     testkit.poll_events();
 
-    let info: TxInfo = api.get(
+    let info: Value = api.get(
         ApiKind::Explorer,
         &format!("v1/transactions/{}", &tx.hash().to_string()),
     );
-    if let TxInfo::InPool { content } = info {
-        assert_eq!(content, tx.serialize_field().unwrap());
-    } else {
-        panic!("Transaction should be in the pool");
-    }
+    assert_eq!(
+        info,
+        json!({
+        "type": "in-pool",
+        "content": tx.serialize_field().unwrap(),
+    })
+    );
 
     testkit.create_block();
-    let info: TxInfo = api.get(
+    let info: Value = api.get(
         ApiKind::Explorer,
         &format!("v1/transactions/{}", &tx.hash().to_string()),
     );
-    if let TxInfo::Committed(info) = info {
-        assert_eq!(info.content, tx.serialize_field().unwrap());
-        assert_eq!(info.location.block_height(), Height(1));
-        assert_eq!(info.location.position_in_block(), 0);
-        assert_eq!(info.status, TxStatus::Success);
+    assert_contains_all(
+        &info,
+        &json!({
+            "type": "committed",
+            "content": tx.serialize_field().unwrap(),
+            "location": {
+                "block_height": Height(1).serialize_field().unwrap(),
+                "position_in_block": "0",
+            },
+            "status": { "type": "success" },
+        }),
+    );
 
-        let block: BlockInfo = api.get(ApiKind::Explorer, "v1/blocks/1");
-        let block = block.block;
+    if let Value::Object(mut info) = info {
+        let location_proof = info.remove("location_proof").unwrap();
+        let location_proof: ListProof<crypto::Hash> =
+            serde_json::from_value(location_proof).unwrap();
+
+        let explorer = BlockchainExplorer::new(testkit.blockchain());
+        let block = explorer.block(Height(1)).unwrap();
         assert!(
-            info.location_proof
-                .validate(*block.tx_hash(), u64::from(block.tx_count()))
+            location_proof
+                .validate(
+                    *block.header().tx_hash(),
+                    u64::from(block.header().tx_count())
+                )
                 .is_ok()
         );
     } else {
-        panic!("Transaction should be committed");
+        panic!("Invalid transaction info format, object expected");
     }
+}
+
+#[test]
+fn test_explorer_transaction_statuses() {
+    fn assert_status(api: &TestKitApi, tx: &Transaction, expected_status: &Value) {
+        let info: Value = api.get(
+            ApiKind::Explorer,
+            &format!("v1/transactions/{}", &tx.hash().to_string()),
+        );
+        if let Value::Object(mut info) = info {
+            let tx_status = info.remove("status").unwrap();
+            assert_eq!(tx_status, *expected_status);
+        } else {
+            panic!("Invalid transaction info format, object expected");
+        }
+    }
+
+    let (mut testkit, api) = init_testkit();
+
+    let tx = {
+        let (pubkey, key) = crypto::gen_keypair();
+        TxIncrement::new(&pubkey, 5, &key)
+    };
+    let error_tx = {
+        let (pubkey, key) = crypto::gen_keypair();
+        TxIncrement::new(&pubkey, 0, &key)
+    };
+    let panicking_tx = {
+        let (pubkey, key) = crypto::gen_keypair();
+        TxIncrement::new(&pubkey, u64::max_value() - 3, &key)
+    };
+
+    let block = testkit.create_block_with_transactions(txvec![
+        tx.clone(),
+        error_tx.clone(),
+        panicking_tx.clone(),
+    ]);
+    assert!(block[0].status().is_ok());
+    assert!({
+        let err = block[1].status().unwrap_err();
+        err.error_type() == ErrorType::Code(0)
+            && err.description() == Some("Adding zero does nothing!")
+    });
+    assert!({
+        let err = block[2].status().unwrap_err();
+        err.error_type() == ErrorType::Panic
+            && err.description() == Some("attempt to add with overflow")
+    });
+
+    assert_status(&api, &tx, &json!({ "type": "success" }));
+    assert_status(
+        &api,
+        &error_tx,
+        &json!({ "type": "error", "code": 0, "description": "Adding zero does nothing!" }),
+    );
+    assert_status(
+        &api,
+        &panicking_tx,
+        &json!({ "type": "panic", "description": "attempt to add with overflow" }),
+    );
+}
+
+// Make sure that boxed transaction can be used in the `TestKitApi::send`.
+#[test]
+fn test_boxed_tx() {
+    let (mut testkit, api) = init_testkit();
+
+    let tx = {
+        let (pubkey, key) = crypto::gen_keypair();
+        Box::new(TxIncrement::new(&pubkey, 5, &key)) as Box<Transaction>
+    };
+
+    api.send(tx);
+    let block = testkit.create_block();
+    assert_eq!(block.len(), 1);
+    assert_eq!(block[0].content().raw().service_id(), counter::SERVICE_ID);
 }

@@ -63,7 +63,6 @@
             "from": "de24ff6ba3ac92035ab09792c397d9af9264528af689cdaed98688a595e5b6ac"
           },
           "message_id": 0,
-          "network_id": 0,
           "protocol_version": 0,
           "service_id": 1,
           "signature": "0033beb4d628d0475a34c176eeea192b25dd56ac0652a952ee89ecc858e027532606771378e8a5970c5ed99f5d5968aed6d71e5b6c56d45908b37ff0e736f002"
@@ -83,7 +82,6 @@
             "from": "de24ff6ba3ac92035ab09792c397d9af9264528af689cdaed98688a595e5b6ac"
           },
           "message_id": 1,
-          "network_id": 0,
           "protocol_version": 0,
           "service_id": 1,
           "signature": "a5767124e1dc5166a536a44571d8c3f848a9cb8b424aeb913499c1a665f9f051a9d20d92fb3e9c6e8b76fe64f60789de52904b778b8de6458299d2ae3603a00c"
@@ -94,7 +92,6 @@
             "from": "5eb97034457d7632cd6f3d3230f958ef2f00c167e514d34b59975277fbb24baa"
           },
           "message_id": 1,
-          "network_id": 0,
           "protocol_version": 0,
           "service_id": 1,
           "signature": "4853d9b622b55eff57327425ee83c95b75b8ede0641d0c684747a6ff44e5ffe7e06b0d7b070364e1bae3cbf5bde18c590a2ae9952b65ba51966a4fce913e2f00"
@@ -106,7 +103,6 @@
             "from": "1995c0a3f6313e872549316d52d2f070cc10ecebe78ce3bc730af1d24537f420"
           },
           "message_id": 1,
-          "network_id": 0,
           "protocol_version": 0,
           "service_id": 1,
           "signature": "ec041203eebd2b3aa2c5353e98142c94f8b8e40ba76de2595d26cab9ddafd301c26d697cbc5b5f355db5be42fbd2f7309c8f4f3eddd24303691ef07c3d4fab06"

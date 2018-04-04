@@ -43,6 +43,12 @@ You can set up and run these tools locally (see [Travis script] for the details)
 Generally, we follow common best practices established in the Rust community,
 but we have several additional conventions:
 
+- Create as minimal pull request as possible: they are easier to review and
+  integrate.
+
+  Additionally, we merge pull requests using the "squash and merge" strategy, so
+  feel free to merge `master` branch instead of rebasing.
+
 - Don't use `debug!` log level.
 
   It is convenient to use `debug!` when you develop some feature and are only
@@ -54,11 +60,16 @@ but we have several additional conventions:
   Public method should be documented, but meaningful parameter names are also
   helpful for better understanding.
 
-- Imports (`use`) should be in the following order:
+- Modules and imports (`use`) should be in the following order:
 
-  - Third-party libraries.
-  - Standard library.
-  - Internal.
+  - `extern crate`s.
+  - Reexporting (`pub use`).
+  - Public modules (`pub mod`).
+  - Imports (`use`):
+    - Third-party libraries.
+    - Standard library.
+    - Internal.
+  - Internal modules (`mod`).
 
 [suggestions]: https://github.com/exonum/exonum/issues/new?template=feature.md
 [bug reports]: https://github.com/exonum/exonum/issues/new?template=bug.md
@@ -66,7 +77,7 @@ but we have several additional conventions:
 [documentation]: https://exonum.com/doc/
 [gitter]: https://gitter.im/exonum/exonum
 [gitter-ru]: https://gitter.im/exonum/ruExonum
-[installation guide]: INSTALL.md
+[installation guide]: https://exonum.com/doc/get-started/install/
 [good first issue]: https://github.com/exonum/exonum/labels/good%20first%20issue
 [clippy]: https://github.com/rust-lang-nursery/rust-clippy
 [cargo audit]: https://github.com/RustSec/cargo-audit

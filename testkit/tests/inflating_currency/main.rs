@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,20 +20,21 @@
 extern crate exonum;
 #[macro_use]
 extern crate exonum_testkit;
+#[macro_use]
+extern crate pretty_assertions;
 extern crate rand;
 #[macro_use]
 extern crate serde_derive;
-#[macro_use]
-extern crate pretty_assertions;
 
 use exonum::blockchain::Transaction;
-use exonum::crypto::{self, PublicKey, SecretKey, CryptoHash};
+use exonum::crypto::{self, CryptoHash, PublicKey, SecretKey};
 use exonum::helpers::Height;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use rand::Rng;
 
-mod inflating_cryptocurrency;
 use inflating_cryptocurrency::{CurrencyService, TransactionResponse, TxCreateWallet, TxTransfer};
+
+mod inflating_cryptocurrency;
 
 fn init_testkit() -> TestKit {
     TestKitBuilder::validator()
@@ -106,41 +107,48 @@ fn test_transfer_scenarios() {
         &key_alice,
     );
     // Put transactions from A to B in separate blocks, allowing them both to succeed.
+    testkit.checkpoint();
     testkit.create_block_with_transactions(txvec![tx_a_to_b.clone()]); // A: 4 + 1, B: 14 + 1
     testkit.create_block_with_transactions(txvec![]); // A: 4 + 2, B: 14 + 2
     testkit.create_block_with_transactions(txvec![next_tx_a_to_b.clone()]); // A: 0 + 1, B: 20 + 3
     assert_eq!(get_balance(&api, tx_alice.pub_key()), 1); // 0 + 1
     assert_eq!(get_balance(&api, tx_bob.pub_key()), 23); // 20 + 3
-    testkit.rollback(3);
+    testkit.rollback();
 
     // If there is no block separating transactions, Alice's balance is insufficient
     // to complete the second transaction.
+    testkit.checkpoint();
     testkit.create_block_with_transactions(txvec![tx_a_to_b.clone()]); // A: 4 + 1, B: 14 + 1
     testkit.create_block_with_transactions(txvec![next_tx_a_to_b.clone()]); // fails
     assert_eq!(get_balance(&api, tx_alice.pub_key()), 6); // 4 + 2
     assert_eq!(get_balance(&api, tx_bob.pub_key()), 16); // 14 + 2
-    testkit.rollback(2);
+    testkit.rollback();
 
+    testkit.checkpoint();
     testkit.create_block_with_transactions(txvec![next_tx_a_to_b.clone()]); // A: 3 + 1, B: 15 + 1
     testkit.create_block_with_transactions(txvec![tx_a_to_b.clone()]); // fails
     assert_eq!(get_balance(&api, tx_alice.pub_key()), 5); // 3 + 2
     assert_eq!(get_balance(&api, tx_bob.pub_key()), 17); // 15 + 2
-    testkit.rollback(2);
+    testkit.rollback();
 
     // If the transactions are put in the same block, only the first transaction should succeed
+    testkit.checkpoint();
     testkit.create_block_with_transactions(txvec![tx_a_to_b.clone(), next_tx_a_to_b.clone()]);
     assert_eq!(get_balance(&api, tx_alice.pub_key()), 5); // 4 + 1
     assert_eq!(get_balance(&api, tx_bob.pub_key()), 15); // 14 + 1
-    testkit.rollback(1);
+    testkit.rollback();
 
     // Same here
+    testkit.checkpoint();
     testkit.create_block_with_transactions(txvec![next_tx_a_to_b.clone(), tx_a_to_b.clone()]);
     assert_eq!(get_balance(&api, tx_alice.pub_key()), 4); // 3 + 1
     assert_eq!(get_balance(&api, tx_bob.pub_key()), 16); // 15 + 1
-    testkit.rollback(1);
+    testkit.rollback();
 }
 
-fn fuzz_transfers_and_maybe_rollbacks(use_rollbacks: bool) {
+/// Test randomly generated transfers among users without blockchain rollbacks.
+#[test]
+fn test_fuzz_transfers() {
     const USERS: usize = 10;
 
     let mut rng = rand::thread_rng();
@@ -160,23 +168,15 @@ fn fuzz_transfers_and_maybe_rollbacks(use_rollbacks: bool) {
         .map(|&(_, ref tx)| tx.pub_key())
         .collect();
 
-    testkit.create_block_with_transactions(keys_and_txs.iter().map(|&(_, ref tx)| {
-        Box::new(tx.clone()) as Box<Transaction>
-    }));
+    testkit.create_block_with_transactions(
+        keys_and_txs
+            .iter()
+            .map(|&(_, ref tx)| Box::new(tx.clone()) as Box<Transaction>),
+    );
 
     for _ in 0..64 {
         let total_balance: u64 = pubkeys.iter().map(|key| get_balance(&api, key)).sum();
         assert_eq!(total_balance, (USERS as u64) * testkit.height().0);
-
-        if use_rollbacks {
-            let rollback_blocks = rng.choose(&[0usize, 0, 0, 1, 2, 3]);
-            match rollback_blocks {
-                Some(&blocks) if testkit.height() > Height(blocks as u64) => {
-                    testkit.rollback(blocks)
-                }
-                _ => {}
-            }
-        }
 
         let tx_count = rng.next_u32() & 15;
         let height = testkit.height().0;
@@ -193,18 +193,4 @@ fn fuzz_transfers_and_maybe_rollbacks(use_rollbacks: bool) {
             .map(Box::<Transaction>::from);
         testkit.create_block_with_transactions(txs);
     }
-}
-
-/// Test randomly generated transfers among users without blockchain rollbacks.
-#[test]
-fn test_fuzz_transfers() {
-    fuzz_transfers_and_maybe_rollbacks(false);
-}
-
-/// Test randomly generated transfers among users with blockchain rollbacks.
-/// This mostly tests `TestKit::rollback()` method rather than the service,
-/// because in practice rollbacks are impossible.
-#[test]
-fn test_fuzz_transfers_and_rollbacks() {
-    fuzz_transfers_and_maybe_rollbacks(true);
 }

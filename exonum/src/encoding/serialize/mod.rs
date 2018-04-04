@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,11 +16,11 @@
 //! Currently support only json.
 //! This module is a pack of superstructures over serde `Serializer`\`Deserializer`
 
+pub use hex::{decode as decode_hex, encode as encode_hex, FromHex, FromHexError, ToHex};
+
 use encoding::Field;
 use messages::MessageWriter;
 use super::Offset;
-
-pub use hex::{FromHexError, ToHex, FromHex, encode as encode_hex, decode as decode_hex};
 
 /// implement exonum serialization\deserialization based on serde `Serialize`\ `Deserialize`
 ///
@@ -95,7 +95,7 @@ impl WriteBufferWrapper for Vec<u8> {
 /// Reexport of `serde` specific traits, this reexports
 /// provide compatibility layer with important `serde` version.
 pub mod reexport {
-    pub use serde::{Serializer, Deserializer, Serialize, Deserialize};
+    pub use serde::{Deserialize, Deserializer, Serialize, Serializer};
     pub use serde::de::Error as DeError;
     pub use serde::ser::Error as SerError;
     pub use serde::ser::SerializeStruct;

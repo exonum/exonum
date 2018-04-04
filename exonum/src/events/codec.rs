@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::io;
-
 use bytes::BytesMut;
-use byteorder::{LittleEndian, ByteOrder};
+use byteorder::{ByteOrder, LittleEndian};
 use tokio_io::codec::{Decoder, Encoder};
 
-use messages::{HEADER_LENGTH, MessageBuffer, RawMessage};
+use std::io;
+
+use messages::{MessageBuffer, RawMessage, HEADER_LENGTH};
 use super::error::other_error;
 
 #[derive(Debug)]
@@ -42,23 +42,26 @@ impl Decoder for MessagesCodec {
         if buf.len() < HEADER_LENGTH {
             return Ok(None);
         }
+
+        if buf[0] != 0 {
+            return Err(other_error("Message first byte must be set to 0"));
+        }
+
         // Check payload len
         let total_len = LittleEndian::read_u32(&buf[6..10]) as usize;
 
         if total_len as u32 > self.max_message_len {
             return Err(other_error(format!(
                 "Received message is too long: {}, maximum allowed length is {} bytes",
-                total_len,
-                self.max_message_len,
+                total_len, self.max_message_len,
             )));
         }
 
         if total_len < HEADER_LENGTH {
             return Err(other_error(format!(
                 "Received malicious message with insufficient \
-                size in header: {}, expected header size {}",
-                total_len,
-                HEADER_LENGTH
+                 size in header: {}, expected header size {}",
+                total_len, HEADER_LENGTH
             )));
         }
 
@@ -94,7 +97,9 @@ mod test {
     fn decode_message_valid_header_size() {
         let data = vec![0u8, 0, 0, 0, 0, 0, 10, 0, 0, 0];
         let mut bytes: BytesMut = data.as_slice().into();
-        let mut codec = MessagesCodec { max_message_len: 10000 };
+        let mut codec = MessagesCodec {
+            max_message_len: 10000,
+        };
         match codec.decode(&mut bytes) {
             Ok(Some(ref r)) if r == &RawMessage::new(MessageBuffer::from_vec(data)) => {}
             _ => panic!("Wrong input"),
@@ -105,7 +110,19 @@ mod test {
     fn decode_message_small_size_in_header() {
         let data = vec![0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0];
         let mut bytes: BytesMut = data.as_slice().into();
-        let mut codec = MessagesCodec { max_message_len: 10000 };
+        let mut codec = MessagesCodec {
+            max_message_len: 10000,
+        };
+        assert!(codec.decode(&mut bytes).is_err());
+    }
+
+    #[test]
+    fn decode_message_zero_byte() {
+        let data = vec![1u8, 0, 0, 0, 0, 0, 10, 0, 0, 0];
+        let mut bytes: BytesMut = data.as_slice().into();
+        let mut codec = MessagesCodec {
+            max_message_len: 10000,
+        };
         assert!(codec.decode(&mut bytes).is_err());
     }
 }

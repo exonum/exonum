@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,13 +21,14 @@
 // TODO remove WriteBufferWrapper hack (after refactor storage),
 // should be moved into storage (ECR-156).
 
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use std::net::SocketAddr;
-use std::error::Error;
-
-use serde_json::value::Value;
+use serde_json::{self, value::Value};
 use bit_vec::BitVec;
 use hex::FromHex;
+use chrono::{DateTime, TimeZone, Utc};
+use uuid::Uuid;
+
+use std::net::SocketAddr;
+use std::error::Error;
 
 use crypto::{Hash, PublicKey, Signature};
 use helpers::{Height, Round, ValidatorId};
@@ -78,10 +79,11 @@ pub trait ExonumJsonDeserialize {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-struct DurationHelper {
+struct TimestampHelper {
     secs: String,
     nanos: u32,
 }
+
 // implementation of deserialization
 macro_rules! impl_deserialize_int {
     (@impl $typename:ty) => {
@@ -155,8 +157,8 @@ macro_rules! impl_deserialize_hex_segment {
 impl_deserialize_int!{u8; u16; u32; i8; i16; i32}
 impl_deserialize_bigint!{u64; i64}
 impl_deserialize_hex_segment!{Hash; PublicKey; Signature}
-impl_default_deserialize_owned!{u8; u16; u32; i8; i16; i32; u64; i64;
-                                Hash; PublicKey; Signature; bool}
+impl_default_deserialize_owned!{u8; u16; u32; i8; i16; i32; u64; i64}
+impl_default_deserialize_owned!{Hash; PublicKey; Signature; bool}
 
 impl ExonumJson for bool {
     fn deserialize_field<B: WriteBufferWrapper>(
@@ -192,27 +194,25 @@ impl<'a> ExonumJson for &'a str {
     }
 }
 
-impl ExonumJson for SystemTime {
+impl ExonumJson for DateTime<Utc> {
     fn deserialize_field<B: WriteBufferWrapper>(
         value: &Value,
         buffer: &mut B,
         from: Offset,
         to: Offset,
     ) -> Result<(), Box<Error>> {
-        let helper: DurationHelper = ::serde_json::from_value(value.clone())?;
-        let duration = Duration::new(helper.secs.parse()?, helper.nanos);
-        let system_time = UNIX_EPOCH + duration;
-        buffer.write(from, to, system_time);
+        let helper: TimestampHelper = serde_json::from_value(value.clone())?;
+        let date_time = Utc.timestamp(helper.secs.parse()?, helper.nanos);
+        buffer.write(from, to, date_time);
         Ok(())
     }
 
     fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
-        let duration = self.duration_since(UNIX_EPOCH)?;
-        let duration = DurationHelper {
-            secs: duration.as_secs().to_string(),
-            nanos: duration.subsec_nanos(),
+        let timestamp = TimestampHelper {
+            secs: self.timestamp().to_string(),
+            nanos: self.timestamp_subsec_nanos(),
         };
-        Ok(::serde_json::to_value(&duration)?)
+        Ok(serde_json::to_value(&timestamp)?)
     }
 }
 
@@ -223,13 +223,13 @@ impl ExonumJson for SocketAddr {
         from: Offset,
         to: Offset,
     ) -> Result<(), Box<Error>> {
-        let addr: SocketAddr = ::serde_json::from_value(value.clone())?;
+        let addr: SocketAddr = serde_json::from_value(value.clone())?;
         buffer.write(from, to, addr);
         Ok(())
     }
 
     fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
-        Ok(::serde_json::to_value(&self)?)
+        Ok(serde_json::to_value(&self)?)
     }
 }
 
@@ -298,9 +298,7 @@ impl ExonumJson for Vec<RawMessage> {
 
     fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
         let vec = self.iter()
-            .map(|slice| {
-                Value::String(::encoding::serialize::encode_hex(slice))
-            })
+            .map(|slice| Value::String(::encoding::serialize::encode_hex(slice)))
             .collect();
         Ok(Value::Array(vec))
     }
@@ -446,9 +444,26 @@ impl ExonumJson for ValidatorId {
     }
 }
 
+impl ExonumJson for Uuid {
+    fn deserialize_field<B: WriteBufferWrapper>(
+        value: &Value,
+        buffer: &mut B,
+        from: Offset,
+        to: Offset,
+    ) -> Result<(), Box<Error>> {
+        let uuid: Self = serde_json::from_value(value.clone())?;
+        buffer.write(from, to, uuid);
+        Ok(())
+    }
+
+    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+        Ok(serde_json::to_value(&self)?)
+    }
+}
+
 /// Reexport of `serde` specific traits, this reexports
 /// provide compatibility layer with important `serde_json` version.
 pub mod reexport {
-    pub use serde_json::{from_str, from_value, to_string, to_value, Value};
+    pub use serde_json::{from_str, from_value, to_string, to_value, Error, Value};
     pub use serde_json::map::Map;
 }

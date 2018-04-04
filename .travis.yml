@@ -19,12 +19,7 @@ addons:
 rust:
   # Feel free to bump this version if you need features of newer Rust.
   # Sync with badge in README.md
-  - 1.23.0
-
-matrix:
-  allow_failures:
-  - env: FEATURE=non-fatal-checks
-  fast_finish: true
+  - 1.25.0
 
 cache:
   directories:
@@ -32,7 +27,6 @@ cache:
   - $HOME/.cargo
   - $HOME/.local
   - $TRAVIS_BUILD_DIR/target
-  - $TRAVIS_BUILD_DIR/sandbox/target
   - $TRAVIS_BUILD_DIR/testkit/examples/server/node_modules
 
 dist: trusty
@@ -40,14 +34,11 @@ sudo: required
 
 env:
   global:
-  - CLIPPY_VERS=0.0.181
-  - RUSTFMT_VERS=0.9.0
+  - CLIPPY_VERS=0.0.187
   - DEADLINKS_VERS=0.3.0
-  - OUTDATED_VERS=0.7.0
   - SODIUM_VERS=1.0.13
   - CARGO_INCREMENTAL=1
-  - RUSTFLAGS="-C link-dead-code -D warnings"
-  - CODECOV_TOKEN=90006bf6-e4b7-4825-b880-8d19c4e21c21
+  - RUSTFLAGS="-D warnings"
   - ROCKSDB_LIB_DIR=/usr/lib/x86_64-linux-gnu
   - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
   matrix:
@@ -75,7 +66,10 @@ jobs:
   - env: FEATURE=lints
     install:
     - cargo-audit -V || cargo install cargo-audit --force
-    - rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
+    - cargo deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
+    - cargo install --list
+    - rustup component add rustfmt-preview
+    - rustfmt -V
     - nvm install 8 && nvm use 8
     - npm install cspell
     - ./node_modules/.bin/cspell --version
@@ -92,10 +86,21 @@ jobs:
     - ./node_modules/.bin/cspell examples/cryptocurrency/{src,examples,tests}/**/*.rs
     - find . -not -path "./3rdparty/*" -and -not -path "./node_modules/*" -name "*.md" | xargs ./node_modules/.bin/cspell
     - find . -not -path "./3rdparty/*" -and -not -path "./node_modules/*" -name "*.md" | xargs ./node_modules/.bin/markdownlint --config .markdownlintrc
+    - cargo doc --no-deps
+    # TODO: a tmp hack to ignore warnings about missing pages [ECR-703]
+    - mkdir -p target/std/string
+    - touch target/std/primitive.usize.html
+    - touch target/std/string/struct.String.html
+    - touch target/doc/exonum/encoding/serialize/trait.Serialize.html
+    - touch target/doc/exonum/encoding/serialize/reexport/serde/index.html
+    - touch target/doc/exonum_configuration/enum.Option.html
+    - mkdir -p target/doc/exonum/encoding/serialize/reexport/serde/ts_seconds
+    - touch target/doc/exonum/encoding/serialize/reexport/serde/ts_seconds/index.html
+    - cargo deadlinks --dir target/doc
 
   # Clippy linting
   - env: FEATURE=clippy
-    rust: nightly-2018-01-22
+    rust: nightly-2018-03-06
     install:
     - cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
     script:
@@ -103,30 +108,42 @@ jobs:
 
   # Tests
   - env: FEATURE=test
+    addons:
+      apt:
+        sources:
+        - sourceline: 'ppa:giskou/librocksdb'
+        - sourceline: 'deb [arch=amd64] https://packages.microsoft.com/ubuntu/14.04/prod trusty main'
+          key_url: https://packages.microsoft.com/keys/microsoft.asc
+        packages:
+        - gcc
+        - g++
+        - libssl-dev
+        - libcurl4-openssl-dev
+        - libelf-dev
+        - libdw-dev
+        - binutils-dev
+        - libiberty-dev
+        - libsnappy-dev
+        - librocksdb
+        - powershell
     install:
     - nvm install 8 && nvm use 8
-    - cd testkit/examples/server && npm install && cd ../../..
+    - cd $TRAVIS_BUILD_DIR/testkit/examples/server && npm install && cd $TRAVIS_BUILD_DIR
     script:
     - cargo test --all
+    - cargo run -p exonum --example explorer
     - cargo run -p exonum-testkit --example timestamping
     - cargo run -p exonum-testkit --example configuration_change
     - cargo run -p exonum-time --example simple_service
-    - cd testkit/examples/server && npm run test:unix && cd ../../..
+    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
+    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
+    - cd $TRAVIS_BUILD_DIR/testkit/examples/server && npm run test:unix
 
   # Benchmarks (compilation only)
   - env: FEATURE=benchmarks
-    rust: nightly-2018-01-22
+    rust: nightly-2018-03-06
     script:
     - RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
-
-  # Non-fatal checks
-  - env: FEATURE=non-fatal-checks
-    install:
-    - cargo-deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
-    script:
-    - cargo doc --no-deps
-    - touch target/doc/exonum/encoding/serialize/trait.Serialize.html  # TODO: a tmp hack to ignore a warning about missing page [ECR-703]
-    - cargo deadlinks --dir target/doc
 
 notifications:
   slack:

@@ -6,8 +6,11 @@ status_timeout = 5000
 txs_block_limit = 1000
 
 [common.consensus_config.timeout_adjuster]
-type = "Constant"
 timeout = 500
+type = "Constant"
+
+[common.general_config]
+validators_count = 1
 
 [common.services_config]
 

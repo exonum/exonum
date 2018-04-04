@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,23 +18,39 @@ extern crate exonum_testkit;
 extern crate serde;
 extern crate serde_json;
 
-use exonum::crypto::{Signature, CryptoHash};
+// HACK: Silent "dead_code" warning.
+pub use hooks::{HandleCommitService, TxAfterCommit};
+
+use exonum::crypto::{CryptoHash, Signature};
 use exonum::helpers::Height;
+use exonum::messages::Message;
 use exonum_testkit::TestKitBuilder;
 
 mod hooks;
-// HACK: Silent "dead_code" warning.
-pub use hooks::{HandleCommitService, TxAfterCommit};
 
 #[test]
 fn test_handle_commit() {
     let mut testkit = TestKitBuilder::validator()
         .with_service(HandleCommitService)
         .create();
+
     // Check that `handle_commit` invoked on the correct height.
     for i in 1..5 {
-        testkit.create_block();
+        let block = testkit.create_block();
+        if i > 1 {
+            assert_eq!(
+                block[0].content().raw(),
+                TxAfterCommit::new_with_signature(Height(i - 1), &Signature::zero()).raw()
+            );
+        }
+
         let tx = TxAfterCommit::new_with_signature(Height(i), &Signature::zero());
-        assert!(testkit.mempool().contains_key(&tx.hash()));
+        assert!(testkit.is_tx_in_pool(&tx.hash()));
     }
+
+    let expected_block_sizes = testkit
+        .explorer()
+        .blocks(Height(1)..)
+        .all(|block| block.len() == if block.height() == Height(1) { 0 } else { 1 });
+    assert!(expected_block_sizes);
 }

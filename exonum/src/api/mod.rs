@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,32 +14,31 @@
 
 //! `RESTful` API and corresponding utilities.
 
-use std::ops::Deref;
-use std::marker::PhantomData;
-use std::io;
-use std::collections::BTreeMap;
-use std::fmt;
-use std::str::FromStr;
+pub mod public;
+pub mod private;
 
-use iron::IronError;
+use iron::{status, IronError, headers::Cookie};
 use iron::prelude::*;
-use iron::status;
-use iron::headers::Cookie;
 use hyper::header::{ContentType, SetCookie};
 use cookie::Cookie as CookiePair;
 use router::Router;
 use params;
 use serde_json;
 use serde::{Serialize, Serializer};
-use serde::de::{self, Visitor, Deserialize, Deserializer};
+use serde::de::{self, Deserialize, Deserializer, Visitor};
 use failure::Fail;
+use bodyparser;
+
+use std::{fmt, io};
+use std::ops::Deref;
+use std::marker::PhantomData;
+use std::collections::BTreeMap;
+use std::str::FromStr;
 
 use crypto::{PublicKey, SecretKey};
-use encoding::serialize::{FromHex, FromHexError, ToHex, encode_hex};
+use encoding::serialize::{encode_hex, FromHex, FromHexError, ToHex};
 use storage;
 
-pub mod public;
-pub mod private;
 #[cfg(test)]
 mod tests;
 
@@ -48,21 +47,19 @@ mod tests;
 pub enum ApiError {
     /// Storage error.
     #[fail(display = "Storage error: {}", _0)]
-    Storage(
-        #[cause]
-        storage::Error
-    ),
+    Storage(#[cause] storage::Error),
 
     /// Input/output error.
     #[fail(display = "IO error: {}", _0)]
-    Io(
-        #[cause]
-        ::std::io::Error
-    ),
+    Io(#[cause] ::std::io::Error),
 
     /// Bad request.
     #[fail(display = "Bad request: {}", _0)]
     BadRequest(String),
+
+    /// Not found.
+    #[fail(display = "Not found: {}", _0)]
+    NotFound(String),
 
     /// Internal error.
     #[fail(display = "Internal server error: {}", _0)]
@@ -97,10 +94,11 @@ impl From<ApiError> for IronError {
             ApiError::Unauthorized => status::Forbidden,
 
             ApiError::BadRequest(..) => status::BadRequest,
+            ApiError::NotFound(..) => status::NotFound,
 
-            ApiError::Storage(..) |
-            ApiError::Io(..) |
-            ApiError::InternalError(..) => status::InternalServerError,
+            ApiError::Storage(..) | ApiError::Io(..) | ApiError::InternalError(..) => {
+                status::InternalServerError
+            }
         };
         let body = {
             let mut map = BTreeMap::new();
@@ -167,10 +165,7 @@ where
 
 impl<'de, T> Deserialize<'de> for HexField<T>
 where
-    T: AsRef<[u8]>
-        + FromHex<Error = FromHexError>
-        + ToHex
-        + Clone,
+    T: AsRef<[u8]> + FromHex<Error = FromHexError> + ToHex + Clone,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -192,9 +187,8 @@ pub trait Api {
         let fragment = params.find(name).ok_or_else(|| {
             ApiError::BadRequest(format!("Required parameter '{}' is missing", name))
         })?;
-        let value = T::from_str(fragment).map_err(|e| {
-            ApiError::BadRequest(format!("Invalid '{}' parameter: {}", name, e))
-        })?;
+        let value = T::from_str(fragment)
+            .map_err(|e| ApiError::BadRequest(format!("Invalid '{}' parameter: {}", name, e)))?;
         Ok(value)
     }
 
@@ -228,6 +222,18 @@ pub trait Api {
         })
     }
 
+    /// Deserializes request's body as a struct of type `T`.
+    fn parse_body<T: 'static>(&self, req: &mut Request) -> Result<T, ApiError>
+    where
+        T: Clone + for<'de> Deserialize<'de>,
+    {
+        match req.get::<bodyparser::Struct<T>>() {
+            Ok(Some(param)) => Ok(param),
+            Ok(None) => Err(ApiError::BadRequest("Body is empty".into())),
+            Err(e) => Err(ApiError::BadRequest(format!("Invalid struct: {}", e))),
+        }
+    }
+
     /// Loads hex value from the cookies.
     fn load_hex_value_from_cookie<'a>(
         &self,
@@ -245,9 +251,10 @@ pub trait Api {
                 }
             }
         }
-        Err(storage::Error::new(
-            format!("Unable to find value with given key {}", key),
-        ))
+        Err(storage::Error::new(format!(
+            "Unable to find value with given key {}",
+            key
+        )))
     }
 
     /// Loads public and secret key from the cookies.

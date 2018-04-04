@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -25,10 +25,10 @@
 //! - **Header:** a fixed-sized part
 //! - **Body:** dynamically sized part, known only after parsing the header
 //!
-//! To create a structure type, you can use [`message!`] and [`encoding_struct!`] macros.
+//! To create a structure type, you can use [`transactions!`] and [`encoding_struct!`] macros.
 //!
 //! [doc:serialization]: https://exonum.com/doc/architecture/serialization/
-//! [`message!`]: ../macro.message.html
+//! [`transactions!`]: ../macro.transactions.html
 //! [`encoding_struct!`]: ../macro.encoding_struct.html
 //!
 //! # Examples
@@ -50,14 +50,13 @@
 //!
 //! # fn main() {
 //! let student = MyAwesomeStructure::new("Andrew", 23);
-//! # drop(student);
 //! # }
 //! ```
 //!
 //! Then the internal buffer of `student` is as follows:
 //!
 //! | Position | Stored data | Hexadecimal form | Comment |
-//! |:--------|:------:|:---------------------|:------------------------------------------|
+//! |--------|------|---------------------|------------------------------------------|
 //! | `0  => 4`  | 16    | `10 00 00 00`            | LE-encoded segment pointer to the data |
 //! | `4  => 8`  | 6     | `06 00 00 00`            | LE-encoded segment size |
 //! | `8  => 16` | 23    | `17 00 00 00 00 00 00 00` | number in little endian |
@@ -70,7 +69,7 @@
 //! Primitive types are all fixed-sized, and located fully in the header.
 //!
 //! | Type name | Size in Header | Info |
-//! |:--------|:---------------------|:--------------------------------------------------|
+//! |--------|---------------------|--------------------------------------------------|
 //! | `u8`     | 1    | Regular byte  |
 //! | `i8`     | 1    | Signed byte  |
 //! | `u16`    | 2    | Short unsigned integer stored in little endian  |
@@ -106,9 +105,6 @@
 //!
 //! [`field_size()`]: ./trait.Field.html#tymethod.field_size
 
-use std::convert::From;
-use std::ops::{Add, Sub, Mul, Div};
-
 pub use self::fields::Field;
 pub use self::segments::SegmentField;
 pub use self::error::Error;
@@ -117,6 +113,9 @@ pub use self::float::{F32, F64};
 
 #[macro_use]
 pub mod serialize;
+
+use std::convert::From;
+use std::ops::{Add, Div, Mul, Sub};
 
 mod error;
 #[macro_use]
@@ -148,7 +147,7 @@ pub struct CheckedOffset {
 impl CheckedOffset {
     /// create checked value
     pub fn new(offset: Offset) -> CheckedOffset {
-        CheckedOffset { offset: offset }
+        CheckedOffset { offset }
     }
 
     /// return unchecked offset

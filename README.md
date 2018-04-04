@@ -2,14 +2,14 @@
 
 **Status:**
 [![Travis Build Status](https://img.shields.io/travis/exonum/exonum/master.svg?label=Linux)](https://travis-ci.org/exonum/exonum)
-![CircleCI Build Status](https://img.shields.io/circleci/project/github/exonum/exonum.svg?label=MacOS)
+[![CircleCI Build Status](https://img.shields.io/circleci/project/github/exonum/exonum/master.svg?label=MacOS)](https://circleci.com/gh/exonum/exonum/tree/master)
 [![dependency status](https://deps.rs/repo/github/exonum/exonum/status.svg)](https://deps.rs/repo/github/exonum/exonum)
 
 **Project info:**
 [![Docs.rs](https://docs.rs/exonum/badge.svg)](https://docs.rs/exonum)
 [![License: Apache-2.0](https://img.shields.io/github/license/exonum/exonum.svg)](LICENSE.md)
 [![LoC](https://tokei.rs/b1/github/exonum/exonum)](https://github.com/exonum/exonum)
-![rust 1.23+ required](https://img.shields.io/badge/rust-1.23+-blue.svg?label=Required%20Rust)
+![rust 1.25+ required](https://img.shields.io/badge/rust-1.25+-blue.svg?label=Required%20Rust)
 
 **Community:**
 [![Join the chat at https://gitter.im/exonum/exonum](https://img.shields.io/gitter/room/exonum/exonum.svg?label=Chat)](https://gitter.im/exonum/exonum)

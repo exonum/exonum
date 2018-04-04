@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,11 +13,11 @@
 // limitations under the License.
 
 use std::collections::HashMap;
-use std::collections::btree_map::{BTreeMap, Range, Iter as BtmIter, IntoIter as BtmIntoIter};
-use std::collections::hash_map::{Iter as HmIter, IntoIter as HmIntoIter, Entry as HmEntry};
+use std::collections::btree_map::{BTreeMap, IntoIter as BtmIntoIter, Iter as BtmIter, Range};
+use std::collections::hash_map::{Entry as HmEntry, IntoIter as HmIntoIter, Iter as HmIter};
 use std::collections::Bound::*;
 use std::cmp::Ordering::*;
-use std::iter::{Peekable, Iterator as StdIterator};
+use std::iter::{Iterator as StdIterator, Peekable};
 
 use super::Result;
 use self::NextIterValue::*;
@@ -31,7 +31,9 @@ pub struct Changes {
 impl Changes {
     /// Creates a new empty `Changes` instance.
     fn new() -> Self {
-        Self { data: BTreeMap::new() }
+        Self {
+            data: BTreeMap::new(),
+        }
     }
 
     /// Returns iterator over changes.
@@ -59,7 +61,9 @@ impl IntoIterator for Changes {
     type IntoIter = ChangesIterator;
 
     fn into_iter(self) -> Self::IntoIter {
-        Self::IntoIter { inner: self.data.into_iter() }
+        Self::IntoIter {
+            inner: self.data.into_iter(),
+        }
     }
 }
 
@@ -72,7 +76,9 @@ pub struct Patch {
 impl Patch {
     /// Creates a new empty `Patch` instance.
     fn new() -> Self {
-        Self { changes: HashMap::new() }
+        Self {
+            changes: HashMap::new(),
+        }
     }
 
     /// Returns changes for the given name.
@@ -102,9 +108,9 @@ impl Patch {
 
     /// Returns the number of changes.
     pub fn len(&self) -> usize {
-        self.changes.iter().fold(0, |acc, (_, changes)| {
-            acc + changes.data.len()
-        })
+        self.changes
+            .iter()
+            .fold(0, |acc, (_, changes)| acc + changes.data.len())
     }
 
     /// Returns `true` if this patch contains no changes and `false` otherwise.
@@ -132,7 +138,9 @@ impl IntoIterator for Patch {
     type IntoIter = PatchIterator;
 
     fn into_iter(self) -> Self::IntoIter {
-        Self::IntoIter { inner: self.changes.into_iter() }
+        Self::IntoIter {
+            inner: self.changes.into_iter(),
+        }
     }
 }
 
@@ -394,9 +402,9 @@ impl Fork {
 
     /// Inserts a key-value pair into the fork.
     pub fn put(&mut self, name: &str, key: Vec<u8>, value: Vec<u8>) {
-        let changes = self.patch.changes_entry(name.to_string()).or_insert_with(
-            Changes::new,
-        );
+        let changes = self.patch
+            .changes_entry(name.to_string())
+            .or_insert_with(Changes::new);
         if self.logged {
             self.changelog.push((
                 name.to_string(),
@@ -410,9 +418,9 @@ impl Fork {
 
     /// Removes the key from the fork.
     pub fn remove(&mut self, name: &str, key: Vec<u8>) {
-        let changes = self.patch.changes_entry(name.to_string()).or_insert_with(
-            Changes::new,
-        );
+        let changes = self.patch
+            .changes_entry(name.to_string())
+            .or_insert_with(Changes::new);
         if self.logged {
             self.changelog.push((
                 name.to_string(),
@@ -427,9 +435,9 @@ impl Fork {
     /// Removes all keys starting with the specified prefix from the column family
     /// with the given `name`.
     pub fn remove_by_prefix(&mut self, name: &str, prefix: Option<&Vec<u8>>) {
-        let changes = self.patch.changes_entry(name.to_string()).or_insert_with(
-            Changes::new,
-        );
+        let changes = self.patch
+            .changes_entry(name.to_string())
+            .or_insert_with(Changes::new);
         // Remove changes
         if let Some(prefix) = prefix {
             let keys = changes
@@ -445,10 +453,8 @@ impl Fork {
             changes.data.clear();
         }
         // Remove from storage
-        let mut iter = self.snapshot.iter(
-            name,
-            prefix.map_or(&[], |k| k.as_slice()),
-        );
+        let mut iter = self.snapshot
+            .iter(name, prefix.map_or(&[], |k| k.as_slice()));
         while let Some((k, ..)) = iter.next() {
             let change = changes.data.insert(k.to_vec(), Change::Delete);
             if self.logged {
@@ -514,40 +520,28 @@ impl<'a> ForkIter<'a> {
     fn step(&mut self) -> NextIterValue {
         if let Some(ref mut changes) = self.changes {
             match changes.peek() {
-                Some(&(k, change)) => {
-                    match self.snapshot.peek() {
-                        Some((key, ..)) => {
-                            match *change {
-                                Change::Put(..) => {
-                                    match k[..].cmp(key) {
-                                        Equal => Replaced,
-                                        Less => Inserted,
-                                        Greater => Stored,
-                                    }
-                                }
-                                Change::Delete => {
-                                    match k[..].cmp(key) {
-                                        Equal => Deleted,
-                                        Less => MissDeleted,
-                                        Greater => Stored,
-                                    }
-                                }
-                            }
-                        }
-                        None => {
-                            match *change {
-                                Change::Put(..) => Inserted,
-                                Change::Delete => MissDeleted,
-                            }
-                        }
-                    }
-                }
-                None => {
-                    match self.snapshot.peek() {
-                        Some(..) => Stored,
-                        None => Finished,
-                    }
-                }
+                Some(&(k, change)) => match self.snapshot.peek() {
+                    Some((key, ..)) => match *change {
+                        Change::Put(..) => match k[..].cmp(key) {
+                            Equal => Replaced,
+                            Less => Inserted,
+                            Greater => Stored,
+                        },
+                        Change::Delete => match k[..].cmp(key) {
+                            Equal => Deleted,
+                            Less => MissDeleted,
+                            Greater => Stored,
+                        },
+                    },
+                    None => match *change {
+                        Change::Put(..) => Inserted,
+                        Change::Delete => MissDeleted,
+                    },
+                },
+                None => match self.snapshot.peek() {
+                    Some(..) => Stored,
+                    None => Finished,
+                },
             }
         } else {
             match self.snapshot.peek() {
@@ -623,5 +617,11 @@ impl<'a> Iterator for ForkIter<'a> {
                 Finished => return None,
             }
         }
+    }
+}
+
+impl<T: Database> From<T> for Box<Database> {
+    fn from(db: T) -> Self {
+        Box::new(db) as Box<Database>
     }
 }

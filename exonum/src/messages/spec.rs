@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -97,11 +97,6 @@ macro_rules! __ex_message {
                         version: $crate::messages::PROTOCOL_MAJOR_VERSION
                     });
                 }
-                if raw.network_id() != $crate::messages::TEST_NETWORK_ID {
-                    return Err($crate::encoding::Error::IncorrectNetworkId {
-                        network_id: $crate::messages::TEST_NETWORK_ID
-                    });
-                }
                 if raw.message_type() != <Self as $crate::messages::ServiceMessage>::MESSAGE_ID {
                     return Err($crate::encoding::Error::IncorrectMessageType {
                         message_type: <Self as $crate::messages::ServiceMessage>::MESSAGE_ID
@@ -120,7 +115,7 @@ macro_rules! __ex_message {
                     return Err("Incorrect raw message length.".into())
                 }
 
-                Ok($name { raw: raw })
+                Ok($name { raw })
             }
 
 
@@ -129,6 +124,7 @@ macro_rules! __ex_message {
             }
         }
 
+        #[allow(unsafe_code)]
         impl<'a> $crate::encoding::SegmentField<'a> for $name {
 
             fn item_size() -> $crate::encoding::Offset {
@@ -186,7 +182,6 @@ macro_rules! __ex_message {
                 use $crate::messages::{RawMessage, MessageWriter};
                 let mut writer = MessageWriter::new(
                     $crate::messages::PROTOCOL_MAJOR_VERSION,
-                    $crate::messages::TEST_NETWORK_ID,
                     <Self as $crate::messages::ServiceMessage>::SERVICE_ID,
                     <Self as $crate::messages::ServiceMessage>::MESSAGE_ID,
                     $name::__ex_header_size() as usize,
@@ -206,7 +201,6 @@ macro_rules! __ex_message {
                 use $crate::messages::{RawMessage, MessageWriter};
                 let mut writer = MessageWriter::new(
                     $crate::messages::PROTOCOL_MAJOR_VERSION,
-                    $crate::messages::TEST_NETWORK_ID,
                     <Self as $crate::messages::ServiceMessage>::SERVICE_ID,
                     <Self as $crate::messages::ServiceMessage>::MESSAGE_ID,
                     $name::__ex_header_size() as usize,
@@ -330,8 +324,6 @@ macro_rules! __ex_message {
                                     self.raw.message_type().serialize_field()?);
                 structure.insert("service_id".to_string(),
                                     self.raw.service_id().serialize_field()?);
-                structure.insert("network_id".to_string(),
-                                    self.raw.network_id().serialize_field()?);
                 structure.insert("protocol_version".to_string(),
                                     self.raw.version().serialize_field()?);
                 Ok(Value::Object(structure))
@@ -359,8 +351,6 @@ macro_rules! __ex_message {
                 let service_id = from_value(obj.get("service_id")
                                     .ok_or("Can't get service_id from json")?.clone())?;
 
-                let network_id = from_value(obj.get("network_id")
-                                    .ok_or("Can't get network_id from json")?.clone())?;
                 let protocol_version = from_value(obj.get("protocol_version")
                                         .ok_or("Can't get protocol_version from json")?.clone())?;
 
@@ -374,7 +364,6 @@ macro_rules! __ex_message {
 
                 let mut writer = MessageWriter::new(
                     protocol_version,
-                    network_id,
                     service_id,
                     message_id,
                     $name::__ex_header_size() as usize,
@@ -438,6 +427,7 @@ macro_rules! __ex_message_mk_field {
         $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr
     ) => {
         $(#[$field_attr])*
+        #[allow(unsafe_code)]
         pub fn $field_name(&self) -> $field_type {
             unsafe { self.raw.read::<$field_type>($from, $to) }
         }

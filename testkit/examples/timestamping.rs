@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,8 +18,9 @@ extern crate exonum;
 extern crate exonum_testkit;
 extern crate serde_json;
 
-use exonum::crypto::{gen_keypair, Hash, PublicKey, CryptoHash};
-use exonum::blockchain::{Block, Schema, Service, Transaction, TransactionSet, ExecutionResult};
+use exonum::api::public::BlocksRange;
+use exonum::crypto::{gen_keypair, CryptoHash, Hash, PublicKey};
+use exonum::blockchain::{ExecutionResult, Schema, Service, Transaction, TransactionSet};
 use exonum::messages::{Message, RawTransaction};
 use exonum::storage::{Fork, Snapshot};
 use exonum::encoding;
@@ -82,18 +83,24 @@ fn main() {
     let tx1 = TxTimestamp::new(&keypair.0, "Down To Earth", &keypair.1);
     let tx2 = TxTimestamp::new(&keypair.0, "Cry Over Spilt Milk", &keypair.1);
     let tx3 = TxTimestamp::new(&keypair.0, "Dropping Like Flies", &keypair.1);
+
     // Commit them into blockchain.
-    testkit.create_block_with_transactions(txvec![tx1.clone(), tx2.clone(), tx3.clone()]);
+    let block =
+        testkit.create_block_with_transactions(txvec![tx1.clone(), tx2.clone(), tx3.clone(),]);
+    assert_eq!(block.len(), 3);
+    assert!(block.iter().all(|transaction| transaction.status().is_ok()));
+
     // Check results with schema.
     let snapshot = testkit.snapshot();
     let schema = Schema::new(&snapshot);
     assert!(schema.transactions().contains(&tx1.hash()));
     assert!(schema.transactions().contains(&tx2.hash()));
     assert!(schema.transactions().contains(&tx3.hash()));
+
     // Check results with api.
     let api = testkit.api();
-    let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10");
-    assert_eq!(blocks.len(), 2);
+    let blocks_range: BlocksRange = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+    assert_eq!(blocks_range.blocks.len(), 2);
     api.get::<serde_json::Value>(
         ApiKind::Explorer,
         &format!("v1/transactions/{}", tx1.hash().to_string()),

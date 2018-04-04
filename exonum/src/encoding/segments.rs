@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![allow(unsafe_code)]
+
 use byteorder::{ByteOrder, LittleEndian};
 use bit_vec::BitVec;
 
-use messages::{RawMessage, HEADER_LENGTH, MessageBuffer};
+use messages::{MessageBuffer, RawMessage, HEADER_LENGTH};
 use crypto::Hash;
-use super::{Result, Error, Field, Offset, CheckedOffset};
+use super::{CheckedOffset, Error, Field, Offset, Result};
 
 /// Trait for fields, that has unknown `compile-time` size.
 /// Usually important for arrays,
@@ -64,7 +66,6 @@ where
             self.count() as u32,
         );
         self.extend_buffer(buffer);
-
     }
 
     fn check(
@@ -79,12 +80,10 @@ where
         );
         let pointer_count_start: Offset = (pointer_from + 4)?.unchecked_offset();
         let segment_start: CheckedOffset = LittleEndian::read_u32(
-            &buffer[pointer_from.unchecked_offset() as usize..
-                        pointer_count_start as usize],
+            &buffer[pointer_from.unchecked_offset() as usize..pointer_count_start as usize],
         ).into();
         let count: CheckedOffset = LittleEndian::read_u32(
-            &buffer[pointer_count_start as usize..
-                        pointer_to.unchecked_offset() as usize],
+            &buffer[pointer_count_start as usize..pointer_to.unchecked_offset() as usize],
         ).into();
 
         if segment_start < latest_segment {
@@ -167,7 +166,6 @@ impl<'a> SegmentField<'a> for RawMessage {
     }
 
     fn extend_buffer(&self, buffer: &mut Vec<u8>) {
-
         buffer.extend_from_slice(self.as_ref())
     }
 
@@ -192,7 +190,7 @@ impl<'a> SegmentField<'a> for RawMessage {
             return Err(Error::IncorrectSizeOfRawMessage {
                 position: from.unchecked_offset(),
                 actual_size: slice.len() as Offset,
-                declared_size: declared_size,
+                declared_size,
             });
         }
         Ok(latest_segment)
@@ -312,7 +310,6 @@ impl<'a> SegmentField<'a> for &'a [u8] {
         Ok(latest_segment)
     }
 }
-
 
 /// Implement field helper for all array of POD types
 /// it writes POD type as bytearray in place.

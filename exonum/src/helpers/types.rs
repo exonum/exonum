@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ use std::fmt;
 use std::str::FromStr;
 use std::num::ParseIntError;
 
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Number of milliseconds.
 pub type Milliseconds = u64;
@@ -114,7 +114,7 @@ impl Height {
 }
 
 /// Consensus round index.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 pub struct Round(pub u32);
 
 impl Round {
@@ -321,7 +321,6 @@ impl<'de> Deserialize<'de> for Height {
     where
         D: Deserializer<'de>,
     {
-
         Ok(Height(u64::deserialize(deserializer)?))
     }
 }

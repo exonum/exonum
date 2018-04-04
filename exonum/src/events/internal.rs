@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,19 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
-use futures::{Future, Sink, Stream, IntoFuture};
+use futures::{self, Future, Sink, Stream};
 use futures::sync::mpsc;
-
-use tokio_core::reactor::Handle;
-use tokio_core::reactor::Timeout;
+use tokio_core::reactor::{Handle, Timeout};
 
 use std::io;
 use std::time::{Duration, SystemTime};
 
-
 use super::error::{into_other, other_error};
-use super::{InternalRequest, TimeoutRequest, InternalEvent, to_box};
+use super::{to_box, InternalEvent, InternalRequest, TimeoutRequest};
 
 #[derive(Debug)]
 pub struct InternalPart {
@@ -39,9 +35,8 @@ impl InternalPart {
             .for_each(move |request| {
                 let event = match request {
                     InternalRequest::Timeout(TimeoutRequest(time, timeout)) => {
-                        let duration = time.duration_since(SystemTime::now()).unwrap_or_else(|_| {
-                            Duration::from_millis(0)
-                        });
+                        let duration = time.duration_since(SystemTime::now())
+                            .unwrap_or_else(|_| Duration::from_millis(0));
                         let internal_tx = internal_tx.clone();
                         let fut = Timeout::new(duration, &handle)
                             .expect("Unable to create timeout")
@@ -57,16 +52,23 @@ impl InternalPart {
                     }
                     InternalRequest::JumpToRound(height, round) => {
                         let internal_tx = internal_tx.clone();
-                        let fut = Ok(())
-                            .into_future()
-                            .and_then(move |_| {
-                                internal_tx
-                                    .send(InternalEvent::JumpToRound(height, round))
-                                    .map(drop)
-                                    .map_err(into_other)
-                            })
-                            .map_err(|_| panic!("Can't execute jump to round"));
-                        to_box(fut)
+                        let f = futures::lazy(move || {
+                            internal_tx
+                                .send(InternalEvent::JumpToRound(height, round))
+                                .map(drop)
+                                .map_err(into_other)
+                        }).map_err(|_| panic!("Can't execute jump to round"));
+                        to_box(f)
+                    }
+                    InternalRequest::Shutdown => {
+                        let internal_tx = internal_tx.clone();
+                        let f = futures::lazy(move || {
+                            internal_tx
+                                .send(InternalEvent::Shutdown)
+                                .map(drop)
+                                .map_err(into_other)
+                        }).map_err(|_| panic!("Can't execute shutdown"));
+                        to_box(f)
                     }
                 };
 

@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,11 +23,13 @@
 //! extern crate exonum_testkit;
 //! extern crate serde_json;
 //!
-//! use exonum::crypto::{gen_keypair, Hash, PublicKey, CryptoHash};
+//! use exonum::api::public::BlocksRange;
 //! use exonum::blockchain::{Block, Schema, Service, Transaction, TransactionSet, ExecutionResult};
+//! use exonum::crypto::{gen_keypair, Hash, PublicKey, CryptoHash};
+//! use exonum::encoding;
+//! use exonum::helpers::Height;
 //! use exonum::messages::{Message, RawTransaction};
 //! use exonum::storage::{Snapshot, Fork};
-//! use exonum::encoding;
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! // Simple service implementation.
@@ -107,8 +109,12 @@
 //!
 //!     // Check results with api.
 //!     let api = testkit.api();
-//!     let blocks: Vec<Block> = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+//!     let response: BlocksRange = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+//!     let (blocks, range) = (response.blocks, response.range);
 //!     assert_eq!(blocks.len(), 3);
+//!     assert_eq!(range.start, Height(0));
+//!     assert_eq!(range.end, Height(3));
+//!
 //!     api.get::<serde_json::Value>(
 //!         ApiKind::Explorer,
 //!         &format!("v1/transactions/{}", tx1.hash().to_string()),
@@ -124,6 +130,8 @@ extern crate exonum;
 extern crate futures;
 extern crate iron;
 extern crate iron_test;
+#[macro_use]
+extern crate log;
 extern crate mount;
 extern crate router;
 extern crate serde;
@@ -132,235 +140,48 @@ extern crate serde_derive;
 #[cfg_attr(test, macro_use)]
 extern crate serde_json;
 extern crate tokio_core;
+
+#[cfg(test)]
 #[macro_use]
-extern crate log;
+extern crate assert_matches;
 
-use futures::{executor, Future, Stream};
-use futures::sync::mpsc;
-use iron::{Chain, Handler, Iron, IronError};
-use iron::headers::{ContentType, Headers};
-use iron::status::StatusClass;
-use iron_test::{request, response};
-use mount::Mount;
-use serde::{Deserialize, Serialize};
-use tokio_core::reactor::Core;
-
-use std::collections::BTreeMap;
-use std::fmt;
-use std::net::SocketAddr;
-use std::sync::{Arc, RwLock, RwLockReadGuard};
-use std::thread;
-
-use exonum::blockchain::{Blockchain, ConsensusConfig, GenesisConfig, Schema as CoreSchema,
-                         Service, SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys};
-use exonum::crypto::{self, CryptoHash};
-use exonum::helpers::{Height, Round, ValidatorId};
-use exonum::messages::{Precommit, Propose};
-use exonum::node::{ApiSender, ExternalMessage, State as NodeState, TransactionSend, TxPool,
-                   NodeApiConfig, create_public_api_handler, create_private_api_handler};
-use exonum::storage::{MemoryDB, Snapshot};
+pub use api::{ApiKind, TestKitApi};
+pub use compare::ComparableSnapshot;
+pub use network::{TestNetwork, TestNetworkConfiguration, TestNode};
 
 pub mod compare;
 
-mod checkpoint_db;
-mod handler;
-#[macro_use]
-mod macros;
-mod take_while_ready;
+use futures::{Future, Stream};
+use futures::sync::mpsc;
+use iron::{Chain, Iron};
+use mount::Mount;
+use tokio_core::reactor::Core;
 
-pub use compare::ComparableSnapshot;
+use std::fmt;
+use std::net::SocketAddr;
+use std::sync::{Arc, RwLock};
+use std::thread;
+
+use exonum::blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfiguration,
+                         Transaction};
+use exonum::crypto::{self, Hash};
+use exonum::explorer::{BlockWithTransactions, BlockchainExplorer};
+use exonum::helpers::{Height, ValidatorId};
+use exonum::node::{ApiSender, ExternalMessage, NodeApiConfig, State as NodeState};
+use exonum::storage::{MemoryDB, Patch, Snapshot};
+use exonum::messages::RawMessage;
 
 use checkpoint_db::{CheckpointDb, CheckpointDbHandler};
-use take_while_ready::TakeWhileReady;
 use handler::create_testkit_handler;
+use poll_events::poll_events;
 
-/// Emulated test network.
-#[derive(Debug)]
-pub struct TestNetwork {
-    us: TestNode,
-    validators: Vec<TestNode>,
-}
-
-impl TestNetwork {
-    /// Creates a new emulated network.
-    pub fn new(validator_count: u16) -> Self {
-        let validators = (0..validator_count)
-            .map(ValidatorId)
-            .map(TestNode::new_validator)
-            .collect::<Vec<_>>();
-
-        let us = validators[0].clone();
-        TestNetwork { validators, us }
-    }
-
-    /// Returns the node in the emulated network, from whose perspective the testkit operates.
-    pub fn us(&self) -> &TestNode {
-        &self.us
-    }
-
-    /// Returns a slice of all validators in the network.
-    pub fn validators(&self) -> &[TestNode] {
-        &self.validators
-    }
-
-    /// Returns config encoding the network structure usable for creating the genesis block of
-    /// a blockchain.
-    pub fn genesis_config(&self) -> GenesisConfig {
-        GenesisConfig::new(self.validators.iter().map(TestNode::public_keys))
-    }
-
-    /// Updates the test network by the new set of nodes.
-    pub fn update<I: IntoIterator<Item = TestNode>>(&mut self, mut us: TestNode, validators: I) {
-        let validators = validators
-            .into_iter()
-            .enumerate()
-            .map(|(id, mut validator)| {
-                let validator_id = ValidatorId(id as u16);
-                validator.change_role(Some(validator_id));
-                if us.public_keys().consensus_key == validator.public_keys().consensus_key {
-                    us.change_role(Some(validator_id));
-                }
-                validator
-            })
-            .collect::<Vec<_>>();
-        self.validators = validators;
-        self.us.clone_from(&us);
-    }
-
-    /// Returns service public key of the validator with given id.
-    pub fn service_public_key_of(&self, id: ValidatorId) -> Option<&crypto::PublicKey> {
-        self.validators().get(id.0 as usize).map(|x| {
-            &x.service_public_key
-        })
-    }
-
-    /// Returns consensus public key of the validator with given id.
-    pub fn consensus_public_key_of(&self, id: ValidatorId) -> Option<&crypto::PublicKey> {
-        self.validators().get(id.0 as usize).map(|x| {
-            &x.consensus_public_key
-        })
-    }
-}
-
-/// An emulated node in the test network.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct TestNode {
-    consensus_secret_key: crypto::SecretKey,
-    consensus_public_key: crypto::PublicKey,
-    service_secret_key: crypto::SecretKey,
-    service_public_key: crypto::PublicKey,
-    validator_id: Option<ValidatorId>,
-}
-
-impl TestNode {
-    /// Creates a new auditor.
-    pub fn new_auditor() -> Self {
-        let (consensus_public_key, consensus_secret_key) = crypto::gen_keypair();
-        let (service_public_key, service_secret_key) = crypto::gen_keypair();
-
-        TestNode {
-            consensus_secret_key,
-            consensus_public_key,
-            service_secret_key,
-            service_public_key,
-            validator_id: None,
-        }
-    }
-
-    /// Creates a new validator with the given id.
-    pub fn new_validator(validator_id: ValidatorId) -> Self {
-        let (consensus_public_key, consensus_secret_key) = crypto::gen_keypair();
-        let (service_public_key, service_secret_key) = crypto::gen_keypair();
-
-        TestNode {
-            consensus_secret_key,
-            consensus_public_key,
-            service_secret_key,
-            service_public_key,
-            validator_id: Some(validator_id),
-        }
-    }
-
-    /// Constructs a new node from the given keypairs.
-    pub fn from_parts(
-        consensus_keypair: (crypto::PublicKey, crypto::SecretKey),
-        service_keypair: (crypto::PublicKey, crypto::SecretKey),
-        validator_id: Option<ValidatorId>,
-    ) -> TestNode {
-        TestNode {
-            consensus_public_key: consensus_keypair.0,
-            consensus_secret_key: consensus_keypair.1,
-            service_public_key: service_keypair.0,
-            service_secret_key: service_keypair.1,
-            validator_id,
-        }
-    }
-
-    /// Creates a `Propose` message signed by this validator.
-    pub fn create_propose(
-        &self,
-        height: Height,
-        last_hash: &crypto::Hash,
-        tx_hashes: &[crypto::Hash],
-    ) -> Propose {
-        Propose::new(
-            self.validator_id.expect(
-                "An attempt to create propose from a non-validator node.",
-            ),
-            height,
-            Round::first(),
-            last_hash,
-            tx_hashes,
-            &self.consensus_secret_key,
-        )
-    }
-
-    /// Creates a `Precommit` message signed by this validator.
-    pub fn create_precommit(&self, propose: &Propose, block_hash: &crypto::Hash) -> Precommit {
-        use std::time::SystemTime;
-
-        Precommit::new(
-            self.validator_id.expect(
-                "An attempt to create propose from a non-validator node.",
-            ),
-            propose.height(),
-            propose.round(),
-            &propose.hash(),
-            block_hash,
-            SystemTime::now(),
-            &self.consensus_secret_key,
-        )
-    }
-
-    /// Returns public keys of the node.
-    pub fn public_keys(&self) -> ValidatorKeys {
-        ValidatorKeys {
-            consensus_key: self.consensus_public_key,
-            service_key: self.service_public_key,
-        }
-    }
-
-    /// Returns the current validator id of node if it is validator of the test network.
-    pub fn validator_id(&self) -> Option<ValidatorId> {
-        self.validator_id
-    }
-
-    /// Changes node role.
-    pub fn change_role(&mut self, role: Option<ValidatorId>) {
-        self.validator_id = role;
-    }
-
-    /// Returns the service keypair.
-    pub fn service_keypair(&self) -> (&crypto::PublicKey, &crypto::SecretKey) {
-        (&self.service_public_key, &self.service_secret_key)
-    }
-}
-
-impl From<TestNode> for ValidatorKeys {
-    fn from(node: TestNode) -> Self {
-        node.public_keys()
-    }
-}
+#[macro_use]
+mod macros;
+mod api;
+mod checkpoint_db;
+mod handler;
+mod network;
+mod poll_events;
 
 /// Builder for `TestKit`.
 ///
@@ -398,16 +219,21 @@ impl From<TestNode> for ValidatorKeys {
 /// # }
 /// ```
 pub struct TestKitBuilder {
-    us: TestNode,
-    validators: Vec<TestNode>,
+    our_validator_id: Option<ValidatorId>,
+    validator_count: Option<u16>,
     services: Vec<Box<Service>>,
+    logger: bool,
 }
 
 impl fmt::Debug for TestKitBuilder {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         f.debug_struct("TestKitBuilder")
-            .field("us", &self.us)
-            .field("validators", &self.validators)
+            .field(
+                "us",
+                &self.our_validator_id
+                    .map_or("Auditor".to_string(), |id| format!("Validator #{}", id.0)),
+            )
+            .field("validator_count", &self.validator_count)
             .field(
                 "services",
                 &self.services
@@ -415,6 +241,7 @@ impl fmt::Debug for TestKitBuilder {
                     .map(|x| x.service_name())
                     .collect::<Vec<_>>(),
             )
+            .field("logger", &self.logger)
             .finish()
     }
 }
@@ -422,34 +249,31 @@ impl fmt::Debug for TestKitBuilder {
 impl TestKitBuilder {
     /// Creates testkit for the validator node.
     pub fn validator() -> Self {
-        let us = TestNode::new_validator(ValidatorId(0));
         TestKitBuilder {
-            validators: vec![us.clone()],
+            validator_count: None,
+            our_validator_id: Some(ValidatorId(0)),
             services: Vec::new(),
-            us,
+            logger: false,
         }
     }
 
     /// Creates testkit for the auditor node.
     pub fn auditor() -> Self {
-        let us = TestNode::new_auditor();
         TestKitBuilder {
-            validators: vec![TestNode::new_validator(ValidatorId(0))],
+            validator_count: None,
+            our_validator_id: None,
             services: Vec::new(),
-            us,
+            logger: false,
         }
     }
 
     /// Sets the number of validator nodes in the test network.
-    pub fn with_validators(mut self, validators_count: u16) -> Self {
+    pub fn with_validators(mut self, validator_count: u16) -> Self {
         assert!(
-            validators_count > 0,
-            "At least one validator should be present in the network."
+            self.validator_count.is_none(),
+            "Number of validators is already specified"
         );
-        let additional_validators = (self.validators.len() as u16..validators_count)
-            .map(ValidatorId)
-            .map(TestNode::new_validator);
-        self.validators.extend(additional_validators);
+        self.validator_count = Some(validator_count);
         self
     }
 
@@ -462,15 +286,21 @@ impl TestKitBuilder {
         self
     }
 
+    /// Enables a logger inside the testkit.
+    pub fn with_logger(mut self) -> Self {
+        self.logger = true;
+        self
+    }
+
     /// Creates the testkit.
     pub fn create(self) -> TestKit {
+        if self.logger {
+            exonum::helpers::init_logger().unwrap();
+        }
         crypto::init();
         TestKit::assemble(
             self.services,
-            TestNetwork {
-                us: self.us,
-                validators: self.validators,
-            },
+            TestNetwork::with_our_role(self.our_validator_id, self.validator_count.unwrap_or(1)),
         )
     }
 }
@@ -530,7 +360,6 @@ pub struct TestKit {
     events_stream: Box<Stream<Item = (), Error = ()> + Send + Sync>,
     network: TestNetwork,
     api_sender: ApiSender,
-    mempool: TxPool,
     cfg_proposal: Option<ConfigurationProposalState>,
     api_config: NodeApiConfig,
 }
@@ -540,7 +369,6 @@ impl fmt::Debug for TestKit {
         f.debug_struct("TestKit")
             .field("blockchain", &self.blockchain)
             .field("network", &self.network)
-            .field("mempool", &self.mempool)
             .field("cfg_change_proposal", &self.cfg_proposal)
             .finish()
     }
@@ -563,7 +391,7 @@ impl TestKit {
         let db_handler = db.handler();
 
         let mut blockchain = Blockchain::new(
-            Box::new(db),
+            db,
             services,
             *network.us().service_keypair().0,
             network.us().service_keypair().1.clone(),
@@ -571,28 +399,27 @@ impl TestKit {
         );
 
         let genesis = network.genesis_config();
-        blockchain.create_genesis_block(genesis.clone()).unwrap();
+        blockchain.initialize(genesis.clone()).unwrap();
 
-        let mempool = Arc::new(RwLock::new(BTreeMap::new()));
         let events_stream: Box<Stream<Item = (), Error = ()> + Send + Sync> = {
-            let blockchain = blockchain.clone();
-            let mempool = Arc::clone(&mempool);
+            let mut blockchain = blockchain.clone();
             Box::new(api_channel.1.and_then(move |event| {
-                let snapshot = blockchain.snapshot();
-                let schema = CoreSchema::new(&snapshot);
-                match event {
-                    ExternalMessage::Transaction(tx) => {
-                        let hash = tx.hash();
-                        if !schema.transactions().contains(&hash) {
-                            mempool
-                                .write()
-                                .expect("Cannot write transactions to mempool")
-                                .insert(tx.hash(), tx);
+                let mut fork = blockchain.fork();
+                {
+                    let mut schema = CoreSchema::new(&mut fork);
+                    match event {
+                        ExternalMessage::Transaction(tx) => {
+                            let hash = tx.hash();
+                            if !schema.transactions().contains(&hash) {
+                                schema.add_transaction_into_pool(tx.raw().clone());
+                            }
                         }
+                        ExternalMessage::PeerAdd(_)
+                        | ExternalMessage::Enable(_)
+                        | ExternalMessage::Shutdown => { /* Ignored */ }
                     }
-                    ExternalMessage::PeerAdd(_) |
-                    ExternalMessage::Enable(_) => { /* Ignored */ }
                 }
+                blockchain.merge(fork.into_patch()).unwrap();
                 Ok(())
             }))
         };
@@ -603,7 +430,6 @@ impl TestKit {
             api_sender,
             events_stream,
             network,
-            mempool: Arc::clone(&mempool),
             cfg_proposal: None,
             api_config: Default::default(),
         }
@@ -617,9 +443,7 @@ impl TestKit {
     /// Polls the *existing* events from the event loop until exhaustion. Does not wait
     /// until new events arrive.
     pub fn poll_events(&mut self) {
-        let events = TakeWhileReady::new(self.events_stream.by_ref()).for_each(|_| Ok(()));
-        let mut spawn = executor::spawn(events);
-        spawn.wait_future().expect("Error polling testkit events");
+        poll_events(&mut self.events_stream);
     }
 
     /// Returns a snapshot of the current blockchain state.
@@ -627,12 +451,22 @@ impl TestKit {
         self.blockchain.snapshot()
     }
 
+    /// Returns a reference to the blockchain used by the testkit.
+    pub fn blockchain(&self) -> &Blockchain {
+        &self.blockchain
+    }
+
     /// Returns a blockchain instance for low level manipulations with storage.
     pub fn blockchain_mut(&mut self) -> &mut Blockchain {
         &mut self.blockchain
     }
 
-    /// Rolls the blockchain back for a certain number of blocks.
+    /// Sets a checkpoint for a future [`rollback`](#method.rollback).
+    pub fn checkpoint(&mut self) {
+        self.db_handler.checkpoint()
+    }
+
+    /// Rolls the blockchain back to the latest [`checkpoint`](#method.checkpoint).
     ///
     /// # Examples
     ///
@@ -642,7 +476,7 @@ impl TestKit {
     /// ```
     /// # #[macro_use] extern crate exonum;
     /// # #[macro_use] extern crate exonum_testkit;
-    /// # use exonum::blockchain::{Service, Transaction, ExecutionResult};
+    /// # use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
     /// # use exonum::messages::RawTransaction;
     /// # use exonum::encoding;
     /// # use exonum_testkit::{TestKit, TestKitBuilder};
@@ -657,16 +491,17 @@ impl TestKit {
     /// #        Vec::new()
     /// #    }
     /// #    fn service_id(&self) -> u16 {
-    /// #        0
+    /// #        1
     /// #    }
-    /// #    fn tx_from_raw(&self, _raw: RawTransaction) -> FromRawResult {
-    /// #        unimplemented!();
+    /// #    fn tx_from_raw(&self, raw: RawTransaction) -> FromRawResult {
+    /// #        let tx = MyServiceTransactions::tx_from_raw(raw)?;
+    /// #        Ok(tx.into())
     /// #    }
     /// # }
     /// #
     /// # transactions! {
-    /// #     Transactions {
-    /// #         const SERVICE_ID = 0;
+    /// #     MyServiceTransactions {
+    /// #         const SERVICE_ID = 1;
     /// #
     /// #         struct MyTransaction {
     /// #             from: &exonum::crypto::PublicKey,
@@ -690,21 +525,21 @@ impl TestKit {
     /// let (pubkey, key) = exonum::crypto::gen_keypair();
     /// let tx_a = MyTransaction::new(&pubkey, "foo", &key);
     /// let tx_b = MyTransaction::new(&pubkey, "bar", &key);
+    ///
+    /// testkit.checkpoint();
     /// testkit.create_block_with_transactions(txvec![tx_a.clone(), tx_b.clone()]);
     /// assert_something_about(&testkit);
-    /// testkit.rollback(1);
+    /// testkit.rollback();
+    ///
+    /// testkit.checkpoint();
     /// testkit.create_block_with_transactions(txvec![tx_a.clone()]);
     /// testkit.create_block_with_transactions(txvec![tx_b.clone()]);
     /// assert_something_about(&testkit);
-    /// testkit.rollback(2);
+    /// testkit.rollback();
     /// # }
     /// ```
-    pub fn rollback(&mut self, blocks: usize) {
-        assert!(
-            (blocks as u64) <= self.height().0,
-            "Cannot rollback past genesis block"
-        );
-        self.db_handler.rollback(blocks);
+    pub fn rollback(&mut self) {
+        self.db_handler.rollback()
     }
 
     /// Executes a list of transactions given the current state of the blockchain, but does not
@@ -715,16 +550,19 @@ impl TestKit {
     where
         I: IntoIterator<Item = Box<Transaction>>,
     {
+        self.poll_events();
         // Filter out already committed transactions; otherwise,
         // `create_block_with_transactions()` will panic.
         let schema = CoreSchema::new(self.snapshot());
         let uncommitted_txs = transactions.into_iter().filter(|tx| {
             !schema.transactions().contains(&tx.hash())
+                || schema.transactions_pool().contains(&tx.hash())
         });
 
+        self.checkpoint();
         self.create_block_with_transactions(uncommitted_txs);
         let snapshot = self.snapshot();
-        self.rollback(1);
+        self.rollback();
         snapshot
     }
 
@@ -736,37 +574,28 @@ impl TestKit {
         self.probe_all(vec![Box::new(transaction) as Box<Transaction>])
     }
 
-    fn do_create_block(&mut self, tx_hashes: &[crypto::Hash]) {
+    fn do_create_block(&mut self, tx_hashes: &[crypto::Hash]) -> BlockWithTransactions {
         let new_block_height = self.height().next();
         let last_hash = self.last_block_hash();
 
-        self.update_configuration(new_block_height);
+        let config_patch = self.update_configuration(new_block_height);
         let (block_hash, patch) = {
             let validator_id = self.leader().validator_id().unwrap();
-            let transactions = self.mempool();
-            self.blockchain.create_patch(
-                validator_id,
-                new_block_height,
-                tx_hashes,
-                &transactions,
-            )
+            self.blockchain
+                .create_patch(validator_id, new_block_height, tx_hashes)
         };
 
-        // Remove txs from mempool
-        {
-            let mut transactions = self.mempool.write().expect(
-                "Cannot modify transactions in mempool",
-            );
-            for hash in tx_hashes {
-                transactions.remove(hash);
-            }
-        }
+        let patch = if let Some(config_patch) = config_patch {
+            let mut fork = self.blockchain.fork();
+            fork.merge(config_patch);
+            fork.merge(patch);
+            fork.into_patch()
+        } else {
+            patch
+        };
 
-        let propose = self.leader().create_propose(
-            new_block_height,
-            &last_hash,
-            tx_hashes,
-        );
+        let propose = self.leader()
+            .create_propose(new_block_height, &last_hash, tx_hashes);
         let precommits: Vec<_> = self.network()
             .validators()
             .iter()
@@ -778,11 +607,15 @@ impl TestKit {
             .unwrap();
 
         self.poll_events();
+
+        BlockchainExplorer::new(&self.blockchain)
+            .block_with_txs(self.height())
+            .unwrap()
     }
 
     /// Update test network configuration if such an update has been scheduled
     /// with `commit_configuration_change`.
-    fn update_configuration(&mut self, new_block_height: Height) {
+    fn update_configuration(&mut self, new_block_height: Height) -> Option<Patch> {
         use ConfigurationProposalState::*;
 
         let actual_from = new_block_height.next();
@@ -791,25 +624,25 @@ impl TestKit {
                 Uncommitted(cfg_proposal) => {
                     // Commit configuration proposal
                     let stored = cfg_proposal.stored_configuration().clone();
+
                     let mut fork = self.blockchain.fork();
                     CoreSchema::new(&mut fork).commit_configuration(stored);
-                    let changes = fork.into_patch();
-                    self.blockchain.merge(changes).unwrap();
                     self.cfg_proposal = Some(Committed(cfg_proposal));
+
+                    return Some(fork.into_patch());
                 }
                 Committed(cfg_proposal) => {
                     if cfg_proposal.actual_from() == actual_from {
                         // Modify the self configuration
-                        self.network_mut().update(
-                            cfg_proposal.us,
-                            cfg_proposal.validators,
-                        );
+                        self.network_mut().update_configuration(cfg_proposal);
                     } else {
                         self.cfg_proposal = Some(Committed(cfg_proposal));
                     }
                 }
             }
         }
+
+        None
     }
 
     /// Returns a reference to the scheduled configuration proposal, or `None` if
@@ -818,81 +651,131 @@ impl TestKit {
         use ConfigurationProposalState::*;
 
         self.cfg_proposal.as_ref().map(|p| match *p {
-            Committed(ref proposal) |
-            Uncommitted(ref proposal) => proposal,
+            Committed(ref proposal) | Uncommitted(ref proposal) => proposal,
         })
     }
 
     /// Creates a block with the given transactions.
-    /// Transactions that are in the mempool will be ignored.
+    /// Transactions that are in the pool will be ignored.
+    ///
+    /// # Return value
+    ///
+    /// Returns information about the created block.
     ///
     /// # Panics
     ///
     /// - Panics if any of transactions has been already committed to the blockchain.
-    pub fn create_block_with_transactions<I>(&mut self, txs: I)
+    pub fn create_block_with_transactions<I>(&mut self, txs: I) -> BlockWithTransactions
     where
         I: IntoIterator<Item = Box<Transaction>>,
     {
         let tx_hashes: Vec<_> = {
-            let mut mempool = self.mempool.write().expect(
-                "Cannot write transactions to mempool",
-            );
+            let blockchain = self.blockchain_mut();
+            let mut fork = blockchain.fork();
+            let hashes = {
+                let mut schema = CoreSchema::new(&mut fork);
 
-            let snapshot = self.snapshot();
-            let schema = CoreSchema::new(&snapshot);
-            txs.into_iter()
-                .filter(|tx| tx.verify())
-                .map(|tx| {
-                    let tx_id = tx.hash();
-                    assert!(
-                        !schema.transactions().contains(&tx_id),
-                        "Transaction is already committed: {:?}",
-                        tx
-                    );
-                    mempool.insert(tx_id, tx);
-                    tx_id
-                })
-                .collect()
+                txs.into_iter()
+                    .filter(|tx| tx.verify())
+                    .map(|tx| {
+                        let tx_id = tx.hash();
+                        let tx_not_found = !schema.transactions().contains(&tx_id);
+                        let tx_in_pool = schema.transactions_pool().contains(&tx_id);
+                        assert!(
+                            tx_not_found || tx_in_pool,
+                            "Transaction is already committed: {:?}",
+                            tx
+                        );
+                        schema.add_transaction_into_pool(tx.raw().clone());
+
+                        tx_id
+                    })
+                    .collect()
+            };
+            blockchain.merge(fork.into_patch()).unwrap();
+            hashes
         };
-        self.create_block_with_tx_hashes(&tx_hashes);
+
+        self.create_block_with_tx_hashes(&tx_hashes)
     }
 
     /// Creates a block with the given transaction.
-    /// Transactions that are in the mempool will be ignored.
+    /// Transactions that are in the pool will be ignored.
+    ///
+    /// # Return value
+    ///
+    /// Returns information about the created block.
     ///
     /// # Panics
     ///
     /// - Panics if given transaction has been already committed to the blockchain.
-    pub fn create_block_with_transaction<T: Transaction>(&mut self, tx: T) {
-        self.create_block_with_transactions(txvec![tx]);
+    pub fn create_block_with_transaction<T: Transaction>(
+        &mut self,
+        tx: T,
+    ) -> BlockWithTransactions {
+        self.create_block_with_transactions(txvec![tx])
     }
 
     /// Creates block with the specified transactions. The transactions must be previously
     /// sent to the node via API or directly put into the `channel()`.
     ///
+    /// # Return value
+    ///
+    /// Returns information about the created block.
+    ///
     /// # Panics
     ///
-    /// - Panics in the case any of transaction hashes are not in the mempool.
-    pub fn create_block_with_tx_hashes(&mut self, tx_hashes: &[crypto::Hash]) {
+    /// - Panics in the case any of transaction hashes are not in the pool.
+    pub fn create_block_with_tx_hashes(
+        &mut self,
+        tx_hashes: &[crypto::Hash],
+    ) -> BlockWithTransactions {
         self.poll_events();
 
         {
-            let txs = self.mempool();
+            let snapshot = self.blockchain.snapshot();
+            let schema = CoreSchema::new(&snapshot);
             for hash in tx_hashes {
-                assert!(txs.contains_key(hash));
+                assert!(schema.transactions_pool().contains(hash));
             }
         }
 
-        self.do_create_block(tx_hashes);
+        self.do_create_block(tx_hashes)
     }
 
-    /// Creates block with all transactions in the mempool.
-    pub fn create_block(&mut self) {
+    /// Creates block with all transactions in the pool.
+    ///
+    /// # Return value
+    ///
+    /// Returns information about the created block.
+    pub fn create_block(&mut self) -> BlockWithTransactions {
         self.poll_events();
 
-        let tx_hashes: Vec<_> = self.mempool().keys().cloned().collect();
+        let snapshot = self.blockchain.snapshot();
+        let schema = CoreSchema::new(&snapshot);
+        let txs = schema.transactions_pool();
+        let tx_hashes: Vec<_> = txs.iter().collect();
+        //TODO: every block should contain two merges (ECR-975)
+        {
+            let blockchain = self.blockchain_mut();
+            let fork = blockchain.fork();
+            blockchain.merge(fork.into_patch()).unwrap();
+        }
+        self.do_create_block(&tx_hashes)
+    }
 
-        self.do_create_block(&tx_hashes);
+    /// Adds transaction into persistent pool.
+    pub fn add_tx(&mut self, transaction: RawMessage) {
+        let mut fork = self.blockchain.fork();
+        let mut schema = CoreSchema::new(&mut fork);
+        schema.add_transaction_into_pool(transaction)
+    }
+
+    /// Checks if transaction can be found in pool
+    pub fn is_tx_in_pool(&self, tx_hash: &Hash) -> bool {
+        let snapshot = self.blockchain.snapshot();
+        let schema = CoreSchema::new(&snapshot);
+        schema.transactions_pool().contains(tx_hash)
     }
 
     /// Creates a chain of blocks until a given height.
@@ -925,6 +808,11 @@ impl TestKit {
         self.blockchain.last_block().height()
     }
 
+    /// Returns the blockchain explorer instance.
+    pub fn explorer(&self) -> BlockchainExplorer {
+        BlockchainExplorer::new(&self.blockchain)
+    }
+
     /// Returns the actual blockchain configuration.
     pub fn actual_configuration(&self) -> StoredConfiguration {
         CoreSchema::new(&self.snapshot()).actual_configuration()
@@ -936,7 +824,7 @@ impl TestKit {
     ///
     /// - Panics if validator with the given id is absent in test network.
     pub fn validator(&self, id: ValidatorId) -> &TestNode {
-        &self.network.validators[id.0 as usize]
+        &self.network.validators()[id.0 as usize]
     }
 
     /// Returns sufficient number of validators for the Byzantine Fault Tolerance consensus.
@@ -944,16 +832,9 @@ impl TestKit {
         NodeState::byzantine_majority_count(self.network().validators().len())
     }
 
-    /// Returns the test node memory pool handle.
-    pub fn mempool(&self) -> RwLockReadGuard<BTreeMap<crypto::Hash, Box<Transaction>>> {
-        self.mempool.read().expect(
-            "Can't read transactions from the mempool.",
-        )
-    }
-
     /// Returns the leader on the current height. At the moment first validator.
     pub fn leader(&self) -> &TestNode {
-        &self.network().validators[0]
+        &self.network().validators()[0]
     }
 
     /// Returns the reference to test network.
@@ -971,11 +852,7 @@ impl TestKit {
     /// `commit_configuration_change` method.
     pub fn configuration_change_proposal(&self) -> TestNetworkConfiguration {
         let stored_configuration = CoreSchema::new(&self.snapshot()).actual_configuration();
-        TestNetworkConfiguration::from_parts(
-            self.network().us().clone(),
-            self.network().validators().into(),
-            stored_configuration,
-        )
+        TestNetworkConfiguration::new(self.network(), stored_configuration)
     }
 
     /// Adds a new configuration proposal. Remember, to add this proposal to the blockchain,
@@ -1036,6 +913,7 @@ impl TestKit {
     /// ```
     pub fn commit_configuration_change(&mut self, proposal: TestNetworkConfiguration) {
         use self::ConfigurationProposalState::*;
+
         assert!(
             self.height() < proposal.actual_from(),
             "The `actual_from` height should be greater than the current."
@@ -1057,7 +935,7 @@ impl TestKit {
     pub fn run(mut self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
         let api = self.api();
         let events_stream = self.remove_events_stream();
-        let (public_handler, private_handler) = (api.public_handler, api.private_handler);
+        let (public_handler, private_handler) = api.into_handlers();
         let testkit_ref = Arc::new(RwLock::new(self));
 
         let mut private_mount = Mount::new();
@@ -1102,382 +980,11 @@ impl TestKit {
     }
 }
 
-/// A configuration of the test network.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TestNetworkConfiguration {
-    us: TestNode,
-    validators: Vec<TestNode>,
-    stored_configuration: StoredConfiguration,
-}
-
 // A new configuration proposal state.
 #[derive(Debug)]
 enum ConfigurationProposalState {
     Uncommitted(TestNetworkConfiguration),
     Committed(TestNetworkConfiguration),
-}
-
-impl TestNetworkConfiguration {
-    fn from_parts(
-        us: TestNode,
-        validators: Vec<TestNode>,
-        mut stored_configuration: StoredConfiguration,
-    ) -> Self {
-        let prev_hash = exonum::crypto::CryptoHash::hash(&stored_configuration);
-        stored_configuration.previous_cfg_hash = prev_hash;
-        TestNetworkConfiguration {
-            us,
-            validators,
-            stored_configuration,
-        }
-    }
-
-    /// Returns the node from whose perspective the testkit operates.
-    pub fn us(&self) -> &TestNode {
-        &self.us
-    }
-
-    /// Modifies the node from whose perspective the testkit operates.
-    pub fn set_us(&mut self, us: TestNode) {
-        self.us = us;
-        self.update_our_role();
-    }
-
-    /// Returns the test network validators.
-    pub fn validators(&self) -> &[TestNode] {
-        self.validators.as_ref()
-    }
-
-    /// Returns the current consensus configuration.
-    pub fn consensus_configuration(&self) -> &ConsensusConfig {
-        &self.stored_configuration.consensus
-    }
-
-    /// Return the height, starting from which this configuration becomes actual.
-    pub fn actual_from(&self) -> Height {
-        self.stored_configuration.actual_from
-    }
-
-    /// Modifies the height, starting from which this configuration becomes actual.
-    pub fn set_actual_from(&mut self, actual_from: Height) {
-        self.stored_configuration.actual_from = actual_from;
-    }
-
-    /// Modifies the current consensus configuration.
-    pub fn set_consensus_configuration(&mut self, consensus: ConsensusConfig) {
-        self.stored_configuration.consensus = consensus;
-    }
-
-    /// Modifies the validators list.
-    pub fn set_validators<I>(&mut self, validators: I)
-    where
-        I: IntoIterator<Item = TestNode>,
-    {
-        self.validators = validators
-            .into_iter()
-            .enumerate()
-            .map(|(idx, mut node)| {
-                node.change_role(Some(ValidatorId(idx as u16)));
-                node
-            })
-            .collect();
-        self.stored_configuration.validator_keys = self.validators
-            .iter()
-            .cloned()
-            .map(ValidatorKeys::from)
-            .collect();
-        self.update_our_role();
-    }
-
-    /// Returns the configuration for service with the given identifier.
-    pub fn service_config<D>(&self, id: &str) -> D
-    where
-        for<'de> D: Deserialize<'de>,
-    {
-        let value = self.stored_configuration.services.get(id).expect(
-            "Unable to find configuration for service",
-        );
-        serde_json::from_value(value.clone()).unwrap()
-    }
-
-    /// Modifies the configuration of the service with the given identifier.
-    pub fn set_service_config<D>(&mut self, id: &str, config: D)
-    where
-        D: Serialize,
-    {
-        let value = serde_json::to_value(config).unwrap();
-        self.stored_configuration.services.insert(id.into(), value);
-    }
-
-    /// Returns the resulting exonum blockchain configuration.
-    pub fn stored_configuration(&self) -> &StoredConfiguration {
-        &self.stored_configuration
-    }
-
-    fn update_our_role(&mut self) {
-        let validator_id = self.validators
-            .iter()
-            .position(|x| {
-                x.public_keys().service_key == self.us.service_public_key
-            })
-            .map(|x| ValidatorId(x as u16));
-        self.us.validator_id = validator_id;
-    }
-}
-
-/// Kind of public or private REST API of an Exonum node.
-///
-/// `ApiKind` allows to use `get*` and `post*` methods of [`TestKitApi`] more safely.
-///
-/// [`TestKitApi`]: struct.TestKitApi.html
-#[derive(Debug)]
-pub enum ApiKind {
-    /// `api/system` endpoints of the built-in Exonum REST API.
-    System,
-    /// `api/explorer` endpoints of the built-in Exonum REST API.
-    Explorer,
-    /// Endpoints corresponding to a service with the specified string identifier.
-    Service(&'static str),
-}
-
-impl ApiKind {
-    fn into_prefix(self) -> String {
-        match self {
-            ApiKind::System => "api/system".to_string(),
-            ApiKind::Explorer => "api/explorer".to_string(),
-            ApiKind::Service(name) => format!("api/services/{}", name),
-        }
-    }
-}
-
-/// API encapsulation for the testkit. Allows to execute and synchronously retrieve results
-/// for REST-ful endpoints of services.
-pub struct TestKitApi {
-    public_handler: Chain,
-    private_handler: Chain,
-    api_sender: ApiSender,
-}
-
-impl fmt::Debug for TestKitApi {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        f.debug_struct("TestKitApi").finish()
-    }
-}
-
-impl TestKitApi {
-    /// Creates a new instance of API.
-    fn new(testkit: &TestKit) -> Self {
-        use std::sync::Arc;
-
-        let blockchain = &testkit.blockchain;
-        let api_state = SharedNodeState::new(10_000);
-
-        TestKitApi {
-            public_handler: create_public_api_handler(
-                blockchain.clone(),
-                Arc::clone(&testkit.mempool),
-                api_state.clone(),
-                &testkit.api_config,
-            ),
-
-            private_handler: create_private_api_handler(
-                blockchain.clone(),
-                api_state,
-                testkit.api_sender.clone(),
-            ),
-
-            api_sender: testkit.api_sender.clone(),
-        }
-    }
-
-    /// Returns the mounting point for public APIs. Useful for intricate testing not covered
-    /// by `get*` and `post*` functions.
-    pub fn public_handler(&self) -> &Chain {
-        &self.public_handler
-    }
-
-    /// Returns the mounting point for private APIs. Useful for intricate testing not covered
-    /// by `get*` and `post*` functions.
-    pub fn private_handler(&self) -> &Chain {
-        &self.private_handler
-    }
-
-    /// Sends a transaction to the node via `ApiSender`.
-    pub fn send<T: Transaction>(&self, transaction: T) {
-        self.api_sender.send(Box::new(transaction)).expect(
-            "Cannot send transaction",
-        );
-    }
-
-    fn get_internal<H, D>(handler: &H, endpoint: &str, expect_error: bool, is_public: bool) -> D
-    where
-        H: Handler,
-        for<'de> D: Deserialize<'de>,
-    {
-        let status_class = if expect_error {
-            StatusClass::ClientError
-        } else {
-            StatusClass::Success
-        };
-
-        let url = format!("http://localhost:3000/{}", endpoint);
-        let resp = request::get(&url, Headers::new(), handler);
-        let resp = if expect_error {
-            // Support either "normal" or erroneous responses.
-            // For example, `Api.not_found_response()` returns the response as `Ok(..)`.
-            match resp {
-                Ok(resp) => resp,
-                Err(IronError { response, .. }) => response,
-            }
-        } else {
-            resp.expect("Got unexpected `Err(..)` response")
-        };
-
-        if let Some(ref status) = resp.status {
-            if status.class() != status_class {
-                panic!("Unexpected response status: {:?}", status);
-            }
-        } else {
-            panic!("Response status not set");
-        }
-
-        let resp = response::extract_body_to_string(resp);
-
-        let publicity = if is_public { "" } else { " private" };
-        trace!("GET{} {}\nResponse:\n{}\n", publicity, endpoint, resp);
-
-        serde_json::from_str(&resp).unwrap()
-    }
-
-    /// Gets information from a public endpoint of the node.
-    ///
-    /// # Panics
-    ///
-    /// - Panics if an error occurs during request processing (e.g., the requested endpoint is
-    ///  unknown), or if the response has a non-20x response status.
-    pub fn get<D>(&self, kind: ApiKind, endpoint: &str) -> D
-    where
-        for<'de> D: Deserialize<'de>,
-    {
-        TestKitApi::get_internal(
-            &self.public_handler,
-            &format!("{}/{}", kind.into_prefix(), endpoint),
-            false,
-            true,
-        )
-    }
-
-    /// Gets information from a private endpoint of the node.
-    ///
-    /// # Panics
-    ///
-    /// - Panics if an error occurs during request processing (e.g., the requested endpoint is
-    ///  unknown), or if the response has a non-20x response status.
-    pub fn get_private<D>(&self, kind: ApiKind, endpoint: &str) -> D
-    where
-        for<'de> D: Deserialize<'de>,
-    {
-        TestKitApi::get_internal(
-            &self.private_handler,
-            &format!("{}/{}", kind.into_prefix(), endpoint),
-            false,
-            false,
-        )
-    }
-
-    /// Gets an error from a public endpoint of the node.
-    ///
-    /// # Panics
-    ///
-    /// - Panics if the response has a non-40x response status.
-    pub fn get_err<D>(&self, kind: ApiKind, endpoint: &str) -> D
-    where
-        for<'de> D: Deserialize<'de>,
-    {
-        TestKitApi::get_internal(
-            &self.public_handler,
-            &format!("{}/{}", kind.into_prefix(), endpoint),
-            true,
-            true,
-        )
-    }
-
-    fn post_internal<H, T, D>(handler: &H, endpoint: &str, data: &T, is_public: bool) -> D
-    where
-        H: Handler,
-        T: Serialize,
-        for<'de> D: Deserialize<'de>,
-    {
-        let url = format!("http://localhost:3000/{}", endpoint);
-        let body = serde_json::to_string(&data).expect("Cannot serialize data to JSON");
-        let resp = request::post(
-            &url,
-            {
-                let mut headers = Headers::new();
-                headers.set(ContentType::json());
-                headers
-            },
-            &body,
-            handler,
-        ).expect("Cannot send data");
-
-        let resp = response::extract_body_to_string(resp);
-
-        let publicity = if is_public { "" } else { " private" };
-        trace!(
-            "POST{} {}\nBody: \n{}\nResponse:\n{}\n",
-            publicity,
-            endpoint,
-            body,
-            resp
-        );
-
-        serde_json::from_str(&resp).expect("Cannot parse result")
-    }
-
-    /// Posts a transaction to the service using the public API. The returned value is the result
-    /// of synchronous transaction processing, which includes running the API shim
-    /// and `Transaction.verify()`. `Transaction.execute()` is not run until the transaction
-    /// gets to a block via one of `create_block*()` methods.
-    ///
-    /// # Panics
-    ///
-    /// - Panics if an error occurs during request processing (e.g., the requested endpoint is
-    ///  unknown).
-    pub fn post<T, D>(&self, kind: ApiKind, endpoint: &str, transaction: &T) -> D
-    where
-        T: Serialize,
-        for<'de> D: Deserialize<'de>,
-    {
-        TestKitApi::post_internal(
-            &self.public_handler,
-            &format!("{}/{}", kind.into_prefix(), endpoint),
-            transaction,
-            true,
-        )
-    }
-
-    /// Posts a transaction to the service using the private API. The returned value is the result
-    /// of synchronous transaction processing, which includes running the API shim
-    /// and `Transaction.verify()`. `Transaction.execute()` is not run until the transaction
-    /// gets to a block via one of `create_block*()` methods.
-    ///
-    /// # Panics
-    ///
-    /// - Panics if an error occurs during request processing (e.g., the requested endpoint is
-    ///  unknown).
-    pub fn post_private<T, D>(&self, kind: ApiKind, endpoint: &str, transaction: &T) -> D
-    where
-        T: Serialize,
-        for<'de> D: Deserialize<'de>,
-    {
-        TestKitApi::post_internal(
-            &self.private_handler,
-            &format!("{}/{}", kind.into_prefix(), endpoint),
-            transaction,
-            false,
-        )
-    }
 }
 
 #[test]
@@ -1488,4 +995,41 @@ fn test_create_block_heights() {
     assert_eq!(Height(1), testkit.height());
     testkit.create_blocks_until(Height(6));
     assert_eq!(Height(6), testkit.height());
+}
+
+#[test]
+fn test_number_of_validators_in_builder() {
+    let testkit = TestKitBuilder::auditor().create();
+    assert_eq!(testkit.network().validators().len(), 1);
+    assert_ne!(testkit.validator(ValidatorId(0)), testkit.us());
+
+    let testkit = TestKitBuilder::validator().create();
+    assert_eq!(testkit.network().validators().len(), 1);
+    assert_eq!(testkit.validator(ValidatorId(0)), testkit.us());
+
+    let testkit = TestKitBuilder::auditor().with_validators(3).create();
+    assert_eq!(testkit.network().validators().len(), 3);
+    let us = testkit.us();
+    assert!(!testkit.network().validators().iter().any(|v| v == us));
+
+    let testkit = TestKitBuilder::validator().with_validators(5).create();
+    assert_eq!(testkit.network().validators().len(), 5);
+    assert_eq!(testkit.validator(ValidatorId(0)), testkit.us());
+}
+
+#[test]
+#[should_panic(expected = "validator should be present")]
+fn test_zero_validators_in_builder() {
+    let testkit = TestKitBuilder::auditor().with_validators(0).create();
+    drop(testkit);
+}
+
+#[test]
+#[should_panic(expected = "Number of validators is already specified")]
+fn test_multiple_spec_of_validators_in_builder() {
+    let testkit = TestKitBuilder::auditor()
+        .with_validators(5)
+        .with_validators(2)
+        .create();
+    drop(testkit);
 }

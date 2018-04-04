@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,17 +15,20 @@
 //! A definition of `StorageValue` trait and implementations for common types.
 
 use byteorder::{ByteOrder, LittleEndian};
+use chrono::{DateTime, NaiveDateTime, Utc};
+use uuid::Uuid;
 
 use std::mem;
 use std::borrow::Cow;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use crypto::{CryptoHash, Hash, PublicKey};
-use messages::{RawMessage, MessageBuffer};
+use crypto::{Hash, PublicKey};
+use messages::{MessageBuffer, RawMessage};
+use helpers::Round;
+use super::UniqueHash;
 
 /// A type that can be (de)serialized as a value in the blockchain storage.
 ///
-/// `StorageValue` is automatically implemented by the [`encoding_struct!`] and [`message!`]
+/// `StorageValue` is automatically implemented by the [`encoding_struct!`] and [`transactions!`]
 /// macros. In case you need to implement it manually, use little-endian encoding
 /// for integer types for compatibility with modern architectures.
 ///
@@ -73,8 +76,8 @@ use messages::{RawMessage, MessageBuffer};
 /// ```
 ///
 /// [`encoding_struct!`]: ../macro.encoding_struct.html
-/// [`message!`]: ../macro.message.html
-pub trait StorageValue: CryptoHash + Sized {
+/// [`transactions!`]: ../macro.transactions.html
+pub trait StorageValue: UniqueHash + Sized {
     /// Serialize a value into a vector of bytes.
     fn into_bytes(self) -> Vec<u8>;
 
@@ -261,27 +264,41 @@ impl StorageValue for String {
 }
 
 /// Uses little-endian encoding.
-impl StorageValue for SystemTime {
+impl StorageValue for DateTime<Utc> {
     fn into_bytes(self) -> Vec<u8> {
-        let duration = self.duration_since(UNIX_EPOCH).expect(
-            "time value is later than 1970-01-01 00:00:00 UTC.",
-        );
-        let secs = duration.as_secs();
-        let nanos = duration.subsec_nanos();
+        let secs = self.timestamp();
+        let nanos = self.timestamp_subsec_nanos();
 
         let mut buffer = vec![0; 12];
-        LittleEndian::write_u64(&mut buffer[0..8], secs);
+        LittleEndian::write_i64(&mut buffer[0..8], secs);
         LittleEndian::write_u32(&mut buffer[8..12], nanos);
         buffer
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
-        let secs = LittleEndian::read_u64(&value[0..8]);
+        let secs = LittleEndian::read_i64(&value[0..8]);
         let nanos = LittleEndian::read_u32(&value[8..12]);
-        // `Duration` performs internal normalization of time.
-        // The value of nanoseconds can not be greater than or equal to 1,000,000,000.
-        assert!(nanos < 1_000_000_000);
-        UNIX_EPOCH + Duration::new(secs, nanos)
+        DateTime::from_utc(NaiveDateTime::from_timestamp(secs, nanos), Utc)
+    }
+}
+
+impl StorageValue for Round {
+    fn into_bytes(self) -> Vec<u8> {
+        self.0.into_bytes()
+    }
+
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        Round(u32::from_bytes(value))
+    }
+}
+
+impl StorageValue for Uuid {
+    fn into_bytes(self) -> Vec<u8> {
+        self.as_bytes().to_vec()
+    }
+
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        Uuid::from_bytes(&value).unwrap()
     }
 }
 
@@ -392,25 +409,52 @@ mod tests {
     }
 
     #[test]
-    fn test_storage_value_for_system_time_round_trip() {
-        use std::time::{Duration, SystemTime, UNIX_EPOCH};
+    fn storage_value_for_system_time_round_trip() {
+        use chrono::{Duration, TimeZone};
 
         let times = [
-            UNIX_EPOCH,
-            UNIX_EPOCH + Duration::new(13, 23),
-            SystemTime::now(),
-            SystemTime::now() + Duration::new(17, 15),
-            UNIX_EPOCH + Duration::new(0, u32::max_value()),
-            UNIX_EPOCH + Duration::new(i64::max_value() as u64, 0),
-            UNIX_EPOCH + Duration::new(i64::max_value() as u64, 999_999_999),
-            UNIX_EPOCH + Duration::new(i64::max_value() as u64 - 1, 1_000_000_000),
-            UNIX_EPOCH + Duration::new(i64::max_value() as u64 - 4, 4_000_000_000),
-            UNIX_EPOCH + Duration::new(i64::max_value() as u64 - 4, u32::max_value()),
+            Utc.timestamp(0, 0),
+            Utc.timestamp(13, 23),
+            Utc::now(),
+            Utc::now() + Duration::seconds(17) + Duration::nanoseconds(15),
+            Utc.timestamp(0, 999_999_999),
+            Utc.timestamp(0, 1_500_000_000), // leap second
         ];
 
         for time in times.iter() {
             let buffer = time.into_bytes();
-            assert_eq!(*time, SystemTime::from_bytes(Cow::Borrowed(&buffer)));
+            assert_eq!(*time, DateTime::from_bytes(Cow::Borrowed(&buffer)));
+        }
+    }
+
+    #[test]
+    fn round_round_trip() {
+        let values = [
+            Round::zero(),
+            Round::first(),
+            Round(100),
+            Round(u32::max_value()),
+        ];
+        for value in values.iter() {
+            let bytes = value.clone().into_bytes();
+            assert_eq!(*value, Round::from_bytes(Cow::Borrowed(&bytes)));
+        }
+    }
+
+    #[test]
+    fn uuid_round_trip() {
+        let values = [
+            Uuid::nil(),
+            Uuid::parse_str("936DA01F9ABD4d9d80C702AF85C822A8").unwrap(),
+            Uuid::parse_str("0000002a-000c-0005-0c03-0938362b0809").unwrap(),
+        ];
+
+        for value in values.iter() {
+            let bytes = value.clone().into_bytes();
+            assert_eq!(
+                *value,
+                <Uuid as StorageValue>::from_bytes(Cow::Borrowed(&bytes))
+            );
         }
     }
 }

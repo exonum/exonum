@@ -1,4 +1,4 @@
-// Copyright 2017 The Exonum Team
+// Copyright 2018 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ use crypto::PublicKey;
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Whitelist {
     whitelist_enabled: bool,
+    #[serde(default)]
     whitelisted_peers: BTreeSet<PublicKey>,
 
     #[serde(default)]
@@ -33,8 +34,8 @@ pub struct Whitelist {
 impl Whitelist {
     /// Returns `true` if a peer with the given public key can connect.
     pub fn allow(&self, peer: &PublicKey) -> bool {
-        !self.whitelist_enabled || self.validators_list.contains(peer) ||
-            self.whitelisted_peers.contains(peer)
+        !self.whitelist_enabled || self.validators_list.contains(peer)
+            || self.whitelisted_peers.contains(peer)
     }
 
     /// Adds peer to the whitelist.
@@ -64,7 +65,6 @@ impl Whitelist {
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use super::Whitelist;
@@ -78,9 +78,7 @@ mod test {
         let mut rng = XorShiftRng::from_seed(source);
         (0..count)
             .into_iter()
-            .map(|_| {
-                PublicKey::from_slice(&<[u8; 32] as Rand>::rand(&mut rng)).unwrap()
-            })
+            .map(|_| PublicKey::from_slice(&<[u8; 32] as Rand>::rand(&mut rng)).unwrap())
             .collect()
     }
 
