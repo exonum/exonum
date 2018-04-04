@@ -13,6 +13,7 @@ description = "An extensible framework for blockchain software projects."
 
 [badges]
 travis-ci = { repository = "exonum/exonum" }
+circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
 log = "0.4.1"
