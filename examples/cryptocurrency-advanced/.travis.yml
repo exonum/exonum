@@ -1,0 +1,103 @@
+language: rust
+
+addons:
+  apt:
+    sources:
+    - sourceline: 'ppa:giskou/librocksdb'
+    packages:
+    - gcc
+    - g++
+    - libssl-dev
+    - libcurl4-openssl-dev
+    - libelf-dev
+    - libdw-dev
+    - binutils-dev
+    - libiberty-dev
+    - libsnappy-dev
+    - librocksdb
+
+rust:
+  # Feel free to bump this version if you need features of newer Rust.
+  - 1.25.0
+
+cache:
+  directories:
+  - $HOME/.cargo
+  - $HOME/.local
+  - $TRAVIS_BUILD_DIR/target
+
+dist: trusty
+sudo: required
+
+env:
+  global:
+  - CLIPPY_VERS=0.0.187
+  - SODIUM_VERS=1.0.13
+  - CARGO_INCREMENTAL=1
+  - RUSTFLAGS="-D warnings"
+  - ROCKSDB_LIB_DIR=/usr/lib/x86_64-linux-gnu
+  - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
+  matrix:
+  - FEATURE=test
+
+# Separate jobs should use `install` hook in order not to override these common
+# instructions.
+before_install:
+- |
+  if [ ! -f "$HOME/.local/lib/libsodium.a" ]; then
+    wget "https://github.com/jedisct1/libsodium/releases/download/$SODIUM_VERS/libsodium-$SODIUM_VERS.tar.gz" -t 5 -O "libsodium.tar.gz"
+    tar xvf libsodium.tar.gz
+    cd libsodium-$SODIUM_VERS
+    ./configure --prefix=$HOME/.local
+    make
+    make install
+    cd ..
+  fi
+- export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.local/lib
+- export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$HOME/.local/lib/pkgconfig
+
+jobs:
+  include:
+  # Formatting & other lints that do not require compilation
+  - env: FEATURE=lints
+    install:
+    - cargo install --list
+    - rustup component add rustfmt-preview
+    - rustfmt -V
+    script:
+    - cd backend && cargo fmt -- --write-mode=diff
+
+  # Clippy linting
+  - env: FEATURE=clippy
+    rust: nightly-2018-03-06
+    install:
+    - cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
+    script:
+    - cd backend && cargo clippy --verbose -- -D warnings
+
+  # Tests
+  - env: FEATURE=test
+    addons:
+      apt:
+        sources:
+        - sourceline: 'ppa:giskou/librocksdb'
+        - sourceline: 'deb [arch=amd64] https://packages.microsoft.com/ubuntu/14.04/prod trusty main'
+          key_url: https://packages.microsoft.com/keys/microsoft.asc
+        packages:
+        - gcc
+        - g++
+        - libssl-dev
+        - libcurl4-openssl-dev
+        - libelf-dev
+        - libdw-dev
+        - binutils-dev
+        - libiberty-dev
+        - libsnappy-dev
+        - librocksdb
+        - powershell
+    script:
+    - cd backend && cargo test --verbose
+
+notifications:
+  slack:
+    secure: OT5J1ZfUxziwZNBDU86Wgxttv+uE+bTuNOF8llwAP6LS4swvBVKAiEaq9rvLFQDs1B47CPijeAR75x/Hm7E8NZtV98SOVZtxv+9RySS5xFkLuIMqCymdw9QauP3T9e9D07aBPWqzTlMwI/auHQiuMveGY2IRyUnzCdj8ZktD+RyMsSy0nkVd6E8UUZD9BbAOFndKc9dFQyOgVRtkzoxliEDL8Rg+W8Tz0fLQp33pSkTLWq6cvCW6pS+KuBD5Vj4l+UsDru1JcPVZv93AgZJ7dctHzSfpxzMFLjNF5VofmhyWkUbEOPqstI7wT4dKNwZ8GmJn2Yy6uUA0EhgpGkvKWeX8BAdd8GpJISOPH/Th2ahShWAjniDsJGDjPqmHK53g6aAJAhFryonTI7VA7pvNG+k+cgui4ar1ZU3mjXUSVkPqxndiPXMgzCClhxZFmk62T9Jx+RdxXkhoje9ItScjYblZmGkyKYlDZHqa8AKlefEKCTqkkhf9+/eRrISvpi63+PgGTIHahHI2KViS9JATLwJ0e0dXpHASzq9bC3VhlI9AANoUue9QFIMQ06t65WwzuN6Kb1dOQrboR99S8VbZRoBvn0EE+DF/wS35448gyeGwg0My0ateeW7kQbpYgDHcRpVzan+k3i8JyZqXlJtRGKNKSoHYcYYLDzg1SaUQO8E=
