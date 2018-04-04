@@ -303,6 +303,18 @@ impl TestKitBuilder {
             TestNetwork::with_our_role(self.our_validator_id, self.validator_count.unwrap_or(1)),
         )
     }
+
+    /// Starts a testkit web server, which listens to public and private APIs exposed by
+    /// the testkit, on the respective addresses. The private address also exposes the testkit
+    /// APIs with the `/api/testkit` URL prefix.
+    ///
+    /// Unlike real Exonum nodes, the testkit web server does not create peer-to-peer connections
+    /// with other nodes, and does not create blocks automatically. The only way to commit
+    /// transactions is thus to use the [testkit API](struct.TestKit.html#testkit-apis).
+    pub fn serve(self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
+        let testkit = self.create();
+        testkit.run(public_api_address, private_api_address)
+    }
 }
 
 /// Testkit for testing blockchain services. It offers simple network configuration emulation
@@ -925,14 +937,7 @@ impl TestKit {
         self.cfg_proposal = Some(Uncommitted(proposal));
     }
 
-    /// Starts a testkit web server, which listens to public and private APIs exposed by
-    /// the testkit, on the respective addresses. The private address also exposes the testkit
-    /// APIs with the `/api/testkit` URL prefix.
-    ///
-    /// Unlike real Exonum nodes, the testkit web server does not create peer-to-peer connections
-    /// with other nodes, and does not create blocks automatically. The only way to commit
-    /// transactions is thus to use the [testkit API](#testkit-apis).
-    pub fn run(mut self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
+    fn run(mut self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
         let api = self.api();
         let events_stream = self.remove_events_stream();
         let (public_handler, private_handler) = api.into_handlers();

@@ -19,11 +19,10 @@ use cryptocurrency::service::CurrencyService;
 use exonum_testkit::TestKitBuilder;
 
 fn main() {
-    let testkit = TestKitBuilder::validator()
+    TestKitBuilder::validator()
         .with_service(CurrencyService)
-        .create();
-    testkit.run(
-        "0.0.0.0:8000".parse().unwrap(),
-        "0.0.0.0:9000".parse().unwrap(),
-    );
+        .serve(
+            "0.0.0.0:8000".parse().unwrap(),
+            "0.0.0.0:9000".parse().unwrap(),
+        );
 }
