@@ -196,7 +196,7 @@ impl NodeHandler {
         // Request are sent to us
         if msg.to() != self.state.consensus_public_key() {
             error!(
-                "Received block that intended for another peer, to={}, from={}",
+                "Received block intended for another peer, to={}, from={}",
                 msg.to().to_hex(),
                 msg.from().to_hex()
             );
@@ -581,7 +581,7 @@ impl NodeHandler {
     pub fn handle_txs_batch(&mut self, msg: &TransactionsResponse) {
         if msg.to() != self.state.consensus_public_key() {
             error!(
-                "Received response that intended for another peer, to={}, from={}",
+                "Received response intended for another peer, to={}, from={}",
                 msg.to().to_hex(),
                 msg.from().to_hex()
             );

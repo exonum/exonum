@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::mem::replace;
-
 use messages::{BlockRequest, BlockResponse, Message, PrevotesRequest, ProposeRequest,
                RequestMessage, TransactionsRequest, TransactionsResponse, HEADER_LENGTH};
 use blockchain::Schema;
@@ -76,14 +74,17 @@ impl NodeHandler {
 
     /// Handles `TransactionsRequest` message. For details see the message documentation.
     pub fn handle_request_txs(&mut self, msg: &TransactionsRequest) {
+        use std::mem;
         trace!("HANDLE TRANSACTIONS REQUEST");
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
 
         let mut txs = Vec::new();
         let mut txs_size = 0;
-        let unoccupied_message_size: u32 = self.state.config().consensus.max_message_len
-            - (HEADER_LENGTH + SIGNATURE_LENGTH + 2 * PUBLIC_KEY_LENGTH + 8) as u32;
+        const EMPTY_RESPONSE_SIZE: u32 =
+            (HEADER_LENGTH + SIGNATURE_LENGTH + 2 * PUBLIC_KEY_LENGTH + 8) as u32;
+        let unoccupied_message_size =
+            self.state.config().consensus.max_message_len - EMPTY_RESPONSE_SIZE;
 
         for hash in msg.txs() {
             let tx = schema.transactions().get(hash);
@@ -92,13 +93,12 @@ impl NodeHandler {
                     let txs_response = TransactionsResponse::new(
                         self.state.consensus_public_key(),
                         msg.from(),
-                        replace(&mut txs, vec![]),
+                        mem::replace(&mut txs, vec![]),
                         self.state.consensus_secret_key(),
                     );
 
                     self.send_to_peer(*msg.from(), txs_response.raw());
                     txs_size = 0;
-                    txs.clear();
                 }
                 txs_size += tx.raw().len() as u32;
                 txs.push(tx);
