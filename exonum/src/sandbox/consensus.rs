@@ -1117,7 +1117,7 @@ fn incorrect_tx_in_request() {
         .with_tx_hashes(&[tx0.hash()])
         .build();
 
-    // Get propose with unknown transaction `tx0`.
+    // Receive propose with unknown transaction `tx0`.
     sandbox.recv(&propose);
     // After `TRANSACTIONS_REQUEST_TIMEOUT` node send request with `tx0`.
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
@@ -1131,7 +1131,7 @@ fn incorrect_tx_in_request() {
         ),
     );
 
-    // Get response with invalid `tx0`.
+    // Receive response with invalid `tx0`.
     sandbox.recv(&TransactionsResponse::new(
         &sandbox.p(VALIDATOR_2),
         &sandbox.p(VALIDATOR_0),
@@ -1147,7 +1147,7 @@ fn incorrect_tx_in_request() {
         .build();
 
     sandbox.recv(&tx1);
-    // Get new propose with `tx0` and `tx1`.
+    // Receive new propose with `tx0` and `tx1`.
     // `tx1` - valid and after receiving go to the pool.
     // `tx0` - invalid and after receiving should be dismissed.
     sandbox.recv(&propose);
@@ -1167,6 +1167,8 @@ fn response_size_larger_than_max_message_len() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
 
+    // Create 4 transactions.
+    // The size of the fourth transactions is 1 more than size of the first three.
     let tx1 = gen_timestamping_tx();
     let tx2 = gen_timestamping_tx();
     let tx3 = gen_timestamping_tx();
@@ -1179,6 +1181,8 @@ fn response_size_larger_than_max_message_len() {
         tx3.raw().len() + tx4.raw().len()
     );
 
+    // Create new config. Set the size of the message to a size
+    // that is exactly equal to the message to send the first two transactions.
     let tx_cfg = {
         let mut consensus_cfg = sandbox.cfg();
         consensus_cfg.consensus.max_message_len =
@@ -1199,6 +1203,7 @@ fn response_size_larger_than_max_message_len() {
     sandbox.recv(&tx1);
     sandbox.recv(&tx2);
 
+    // Send request with `tx1` and `tx2`.
     sandbox.recv(&TransactionsRequest::new(
         &sandbox.p(VALIDATOR_1),
         &sandbox.p(VALIDATOR_0),
@@ -1206,6 +1211,7 @@ fn response_size_larger_than_max_message_len() {
         sandbox.s(VALIDATOR_1),
     ));
 
+    // Receive response with `tx1` and `tx2`.
     sandbox.send(
         sandbox.a(VALIDATOR_1),
         &TransactionsResponse::new(
@@ -1219,6 +1225,7 @@ fn response_size_larger_than_max_message_len() {
     sandbox.recv(&tx3);
     sandbox.recv(&tx4);
 
+    // Send request with `tx3` and `tx4`.
     sandbox.recv(&TransactionsRequest::new(
         &sandbox.p(VALIDATOR_1),
         &sandbox.p(VALIDATOR_0),
@@ -1226,6 +1233,7 @@ fn response_size_larger_than_max_message_len() {
         sandbox.s(VALIDATOR_1),
     ));
 
+    // Receive separate responses with `tx3` and `tx4`.
     sandbox.send(
         sandbox.a(VALIDATOR_1),
         &TransactionsResponse::new(
