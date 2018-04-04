@@ -18,7 +18,8 @@ use std::error::Error;
 use crypto::{CryptoHash, Hash, PublicKey};
 use blockchain::{Schema, Transaction};
 use messages::{BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote,
-               PrevotesRequest, Propose, ProposeRequest, RawTransaction, TransactionsRequest};
+               PrevotesRequest, Propose, ProposeRequest, RawTransaction, TransactionsRequest,
+               TransactionsResponse};
 use helpers::{Height, Round, ValidatorId};
 use storage::Patch;
 use node::{NodeHandler, RequestData};
@@ -195,7 +196,7 @@ impl NodeHandler {
         // Request are sent to us
         if msg.to() != self.state.consensus_public_key() {
             error!(
-                "Received block that intended for another peer, to={}, from={}",
+                "Received block intended for another peer, to={}, from={}",
                 msg.to().to_hex(),
                 msg.from().to_hex()
             );
@@ -572,6 +573,36 @@ impl NodeHandler {
         for (hash, round) in full_proposes {
             self.remove_request(&RequestData::Transactions(hash));
             self.has_full_propose(hash, round);
+        }
+    }
+
+    /// Handles raw transactions.
+    #[cfg_attr(feature = "flame_profile", flame)]
+    pub fn handle_txs_batch(&mut self, msg: &TransactionsResponse) {
+        if msg.to() != self.state.consensus_public_key() {
+            error!(
+                "Received response intended for another peer, to={}, from={}",
+                msg.to().to_hex(),
+                msg.from().to_hex()
+            );
+            return;
+        }
+
+        if !self.state.whitelist().allow(msg.from()) {
+            error!(
+                "Received response message from peer = {} which not in whitelist.",
+                msg.from().to_hex()
+            );
+            return;
+        }
+
+        if !msg.verify_signature(msg.from()) {
+            error!("Received response with incorrect signature, msg={:?}", msg);
+            return;
+        }
+
+        for tx in msg.transactions() {
+            self.handle_tx(tx);
         }
     }
 
