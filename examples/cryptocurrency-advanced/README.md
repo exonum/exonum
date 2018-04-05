@@ -58,6 +58,7 @@ cryptocurrency generate-config common.toml  pub_4.toml sec_4.toml --peer-addr 12
 Finalize configs:
 
 <!-- markdownlint-disable MD013 -->
+
 ```sh
 cryptocurrency finalize --public-api-address 0.0.0.0:8200 --private-api-address 0.0.0.0:8091 sec_1.toml node_1_cfg.toml --public-configs pub_1.toml pub_2.toml pub_3.toml pub_4.toml
 
@@ -79,6 +80,7 @@ cryptocurrency run --node-config node_3_cfg.toml --db-path db3 --public-api-addr
 
 cryptocurrency run --node-config node_4_cfg.toml --db-path db4 --public-api-address 0.0.0.0:8203
 ```
+
 <!-- markdownlint-enable MD013 -->
 
 Install frontend dependencies:

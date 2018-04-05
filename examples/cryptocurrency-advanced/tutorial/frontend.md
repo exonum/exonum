@@ -216,6 +216,7 @@ Extract the value from the Merkle Patricia tree of all tables (`data.wallet.mpt_
 Use `state_hash` as a root hash of the tree.
 
 <!-- markdownlint-disable MD013 -->
+
 ```javascript
 const TableKey = Exonum.newType({
   size: 4,
@@ -281,5 +282,6 @@ for (let i = 0; i < data.wallet_history.values.length; i++) {
   }
 }
 ```
+
 <!-- markdownlint-enable MD013 -->
 `getTransaction` function returns element of `Exonum.newMessage` type.

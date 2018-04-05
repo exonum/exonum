@@ -43,9 +43,9 @@ pub struct TransactionResponse {
 #[derive(Debug, Serialize)]
 pub struct WalletProof {
     /// Proof to the whole database table.
-    to_table: MapProof<Hash>,
+    to_table: MapProof<Hash, Hash>,
     /// Proof to the specific wallet in this table.
-    to_wallet: MapProof<Wallet>,
+    to_wallet: MapProof<PublicKey, Wallet>,
 }
 
 /// Wallet history.
@@ -88,10 +88,10 @@ where
             .block_and_precommits(Height(max_height))
             .unwrap();
 
-        let to_table: MapProof<Hash> =
+        let to_table: MapProof<Hash, Hash> =
             general_schema.get_proof_to_service_table(CRYPTOCURRENCY_SERVICE_ID, 0);
 
-        let to_wallet: MapProof<Wallet> = currency_schema.wallets().get_proof(pub_key);
+        let to_wallet: MapProof<PublicKey, Wallet> = currency_schema.wallets().get_proof(*pub_key);
 
         let wallet_proof = WalletProof {
             to_table,

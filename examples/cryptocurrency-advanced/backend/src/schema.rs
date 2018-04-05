@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::blockchain::gen_prefix;
 use exonum::crypto::{Hash, PublicKey};
 use exonum::storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot};
 
@@ -22,6 +21,7 @@ use INITIAL_BALANCE;
 use wallet::Wallet;
 
 /// Database schema for the cryptocurrency.
+#[derive(Debug)]
 pub struct CurrencySchema<T> {
     view: T,
 }
@@ -54,11 +54,7 @@ where
 
     /// Returns history of the wallet with the given public key.
     pub fn wallet_history(&self, public_key: &PublicKey) -> ProofListIndex<&T, Hash> {
-        ProofListIndex::with_prefix(
-            "cryptocurrency.wallet_history",
-            gen_prefix(public_key),
-            &self.view,
-        )
+        ProofListIndex::new_in_family("cryptocurrency.wallet_history", public_key, &self.view)
     }
 
     /// Returns wallet for the given public key.
@@ -68,7 +64,7 @@ where
 
     /// Returns database state hash.
     pub fn state_hash(&self) -> Vec<Hash> {
-        vec![self.wallets().root_hash()]
+        vec![self.wallets().merkle_root()]
     }
 }
 
@@ -84,11 +80,7 @@ impl<'a> CurrencySchema<&'a mut Fork> {
         &mut self,
         public_key: &PublicKey,
     ) -> ProofListIndex<&mut Fork, Hash> {
-        ProofListIndex::with_prefix(
-            "cryptocurrency.wallet_history",
-            gen_prefix(public_key),
-            &mut self.view,
-        )
+        ProofListIndex::new_in_family("cryptocurrency.wallet_history", public_key, &mut self.view)
     }
 
     /// Increase balance of the wallet and append new record to its history.
@@ -98,7 +90,7 @@ impl<'a> CurrencySchema<&'a mut Fork> {
         let wallet = {
             let mut history = self.wallet_history_mut(wallet.pub_key());
             history.push(*transaction);
-            let history_hash = history.root_hash();
+            let history_hash = history.merkle_root();
             let balance = wallet.balance();
             wallet.set_balance(balance + amount, &history_hash)
         };
@@ -112,7 +104,7 @@ impl<'a> CurrencySchema<&'a mut Fork> {
         let wallet = {
             let mut history = self.wallet_history_mut(wallet.pub_key());
             history.push(*transaction);
-            let history_hash = history.root_hash();
+            let history_hash = history.merkle_root();
             let balance = wallet.balance();
             wallet.set_balance(balance - amount, &history_hash)
         };
@@ -124,7 +116,7 @@ impl<'a> CurrencySchema<&'a mut Fork> {
         let wallet = {
             let mut history = self.wallet_history_mut(key);
             history.push(*transaction);
-            let history_hash = history.root_hash();
+            let history_hash = history.merkle_root();
             Wallet::new(key, name, INITIAL_BALANCE, history.len(), &history_hash)
         };
         self.wallets_mut().put(key, wallet);
