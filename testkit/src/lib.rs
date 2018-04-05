@@ -124,6 +124,7 @@
 
 #![deny(missing_debug_implementations, missing_docs)]
 
+extern crate bodyparser;
 extern crate exonum;
 extern crate futures;
 extern crate iron;
