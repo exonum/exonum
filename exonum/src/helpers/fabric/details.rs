@@ -39,6 +39,7 @@ use node::{AllowOrigin, NodeApiConfig, NodeConfig};
 use storage::{Database, DbOptions, RocksDB};
 
 const DATABASE_PATH: &str = "DATABASE_PATH";
+const AUXILIARY_DATABASE_PATH: &str = "AUXILIARY_DATABASE_PATH";
 const OUTPUT_DIR: &str = "OUTPUT_DIR";
 const PEER_ADDRESS: &str = "PEER_ADDRESS";
 const NODE_CONFIG_PATH: &str = "NODE_CONFIG_PATH";
@@ -56,6 +57,13 @@ impl Run {
         let path = ctx.arg::<String>(DATABASE_PATH)
             .expect(&format!("{} not found.", DATABASE_PATH));
         Box::new(RocksDB::open(Path::new(&path), options).expect("Can't load database file"))
+    }
+
+    /// Returns created auxiliary database instance.
+    pub fn auxiliary_db_helper(ctx: &Context, options: &DbOptions) -> Box<Database> {
+        let path = ctx.arg::<String>(AUXILIARY_DATABASE_PATH)
+            .expect(&format!("{} not found.", AUXILIARY_DATABASE_PATH));
+        Box::new(RocksDB::open(Path::new(&path), options).unwrap())
     }
 
     fn node_config(ctx: &Context) -> NodeConfig {

@@ -675,8 +675,10 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandb
 
     let api_channel = mpsc::channel(100);
     let db = MemoryDB::new();
+    let auxiliary_db = MemoryDB::new();
     let mut blockchain = Blockchain::new(
         db,
+        auxiliary_db,
         services,
         service_keys[0].0,
         service_keys[0].1.clone(),

@@ -23,14 +23,19 @@ use exonum::{blockchain::{Blockchain, ExecutionResult, Schema, Service, Transact
 use futures::sync::mpsc;
 use tempdir::TempDir;
 
+use std::fs::DirBuilder;
+
 const TIMESTAMPING_SERVICE_ID: u16 = 1;
 const CRYPTOCURRENCY_SERVICE_ID: u16 = 255;
 
-fn create_blockchain(db: Box<Database>, services: Vec<Box<Service>>) -> Blockchain {
+fn create_blockchain(db: Box<Database>, auxiliary_db: Box<Database>, services: Vec<Box<Service>>)
+    -> Blockchain
+{
     let dummy_channel = mpsc::channel(1);
     let dummy_keypair = (PublicKey::zero(), SecretKey::zero());
     Blockchain::new(
         db,
+        auxiliary_db,
         services,
         dummy_keypair.0,
         dummy_keypair.1,
@@ -44,7 +49,7 @@ fn execute_block(blockchain: &Blockchain, height: u64, txs: &[Hash]) -> Patch {
         .1
 }
 
-fn execute_timestamping(db: Box<Database>, c: &mut Criterion) {
+fn execute_timestamping(db: Box<Database>, auxiliary_db: Box<Database>, c: &mut Criterion) {
     struct Timestamping;
 
     impl Service for Timestamping {
@@ -101,7 +106,7 @@ fn execute_timestamping(db: Box<Database>, c: &mut Criterion) {
         blockchain.merge(fork.into_patch()).unwrap();
         txs
     }
-    let mut blockchain = create_blockchain(db, vec![Box::new(Timestamping)]);
+    let mut blockchain = create_blockchain(db, auxiliary_db, vec![Box::new(Timestamping)]);
     for i in 0..100 {
         let txs = prepare_txs(&mut blockchain, i, 1000);
         let patch = execute_block(&blockchain, i, &txs);
@@ -118,7 +123,7 @@ fn execute_timestamping(db: Box<Database>, c: &mut Criterion) {
     );
 }
 
-fn execute_cryptocurrency(db: Box<Database>, c: &mut Criterion) {
+fn execute_cryptocurrency(db: Box<Database>, auxiliary_db: Box<Database>, c: &mut Criterion) {
     struct Cryptocurrency;
 
     impl Service for Cryptocurrency {
@@ -189,7 +194,7 @@ fn execute_cryptocurrency(db: Box<Database>, c: &mut Criterion) {
         txs
     }
 
-    let mut blockchain = create_blockchain(db, vec![Box::new(Cryptocurrency)]);
+    let mut blockchain = create_blockchain(db, auxiliary_db, vec![Box::new(Cryptocurrency)]);
     let mut keys = Vec::new();
 
     for _ in 0..10_000 {
@@ -217,15 +222,19 @@ fn create_rocksdb(tempdir: &TempDir) -> Box<Database> {
 }
 
 fn bench_execute_block_timestamping_rocksdb(c: &mut Criterion) {
-    let tempdir = TempDir::new("exonum").unwrap();
-    let db = create_rocksdb(&tempdir);
-    execute_timestamping(db, c)
+    let db_tempdir = TempDir::new("exonum_db").unwrap();
+    let auxiliary_db_tempdir = TempDir::new("exonum_auxiliary_db").unwrap();
+    let db = create_rocksdb(&db_tempdir);
+    let auxiliary_db = create_rocksdb(&auxiliary_db_tempdir);
+    execute_timestamping(db, auxiliary_db, c)
 }
 
 fn bench_execute_block_cryptocurrency_rocksdb(c: &mut Criterion) {
-    let tempdir = TempDir::new("exonum").unwrap();
-    let db = create_rocksdb(&tempdir);
-    execute_cryptocurrency(db, c)
+    let db_tempdir = TempDir::new("exonum_db").unwrap();
+    let auxiliary_db_tempdir = TempDir::new("exonum_auxiliary_db").unwrap();
+    let db = create_rocksdb(&db_tempdir);
+    let auxiliary_db = create_rocksdb(&auxiliary_db_tempdir);
+    execute_cryptocurrency(db, auxiliary_db, c)
 }
 
 pub fn bench_block(c: &mut Criterion) {

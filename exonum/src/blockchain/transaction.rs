@@ -846,6 +846,7 @@ mod tests {
         let api_channel = mpsc::channel(1);
         Blockchain::new(
             MemoryDB::new(),
+            MemoryDB::new(),
             vec![Box::new(TxResultService) as Box<Service>],
             service_keypair.0,
             service_keypair.1,

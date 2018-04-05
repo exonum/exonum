@@ -535,3 +535,28 @@ impl<'a> Schema<&'a mut Fork> {
         }
     }
 }
+
+/// Idk.
+#[derive(Debug)]
+pub struct ServiceSchema<T> {
+    view: T,
+}
+
+impl<T> ServiceSchema<T> where
+    T: AsRef<Snapshot>
+{
+    /// Constructs information schema for the given `snapshot`.
+    pub fn new(snapshot: T) -> ServiceSchema<T> {
+        ServiceSchema { view: snapshot }
+    }
+
+    pub(crate) fn peers_cache(&self) -> MapIndex<&T, PublicKey, Connect> {
+        MapIndex::new(PEERS_CACHE, &self.view)
+    }
+}
+
+impl<'a> ServiceSchema<&'a mut Fork> {
+    pub(crate) fn peers_cache_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Connect> {
+        MapIndex::new(PEERS_CACHE, self.view)
+    }
+}

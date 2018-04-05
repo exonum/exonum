@@ -96,7 +96,7 @@ fn run_nodes(count: u8, start_port: u16) -> (Vec<RunHandle>, Vec<oneshot::Receiv
     for node_cfg in helpers::generate_testnet_config(count, start_port) {
         let (commit_tx, commit_rx) = oneshot::channel();
         let service = Box::new(CommitWatcherService(Mutex::new(Some(commit_tx))));
-        let node = Node::new(MemoryDB::new(), vec![service], node_cfg);
+        let node = Node::new(MemoryDB::new(), MemoryDB::new(), vec![service], node_cfg);
         let api_tx = node.channel();
         node_threads.push(RunHandle {
             node_thread: thread::spawn(move || {
@@ -131,9 +131,9 @@ fn test_node_run() {
 
 #[test]
 fn test_node_restart_regression() {
-    let start_node = |node_cfg, db, init_times| {
+    let start_node = |node_cfg, db, auxiliary_db, init_times| {
         let service = Box::new(InitializeCheckerService(init_times));
-        let node = Node::new(db, vec![service], node_cfg);
+        let node = Node::new(db, auxiliary_db, vec![service], node_cfg);
         let api_tx = node.channel();
         let node_thread = thread::spawn(move || {
             node.run().unwrap();
@@ -146,12 +146,13 @@ fn test_node_restart_regression() {
     };
 
     let db = Arc::from(Box::new(MemoryDB::new()) as Box<Database>) as Arc<Database>;
+    let auxiliary_db = Arc::from(Box::new(MemoryDB::new()) as Box<Database>) as Arc<Database>;
     let node_cfg = helpers::generate_testnet_config(1, 3600)[0].clone();
 
     let init_times = Arc::new(Mutex::new(0));
     // First launch
-    start_node(node_cfg.clone(), db.clone(), Arc::clone(&init_times));
+    start_node(node_cfg.clone(), db.clone(), auxiliary_db.clone(), Arc::clone(&init_times));
     // Second launch
-    start_node(node_cfg, db, Arc::clone(&init_times));
+    start_node(node_cfg, db, auxiliary_db, Arc::clone(&init_times));
     assert_eq!(*init_times.lock().unwrap(), 1);
 }

@@ -435,6 +435,7 @@ impl Service for ServicePanicStorageError {
 }
 
 fn assert_service_execute(blockchain: &Blockchain, db: &mut Box<Database>) {
+    // TODO: ECR-981 do we need to do something about auxiliary db?
     let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(1), &[]);
     db.merge(patch).unwrap();
     let snapshot = db.snapshot();
@@ -469,6 +470,7 @@ mod memorydb_tests {
         let api_channel = mpsc::channel(1);
         Blockchain::new(
             MemoryDB::new(),
+            MemoryDB::new(),
             vec![Box::new(super::TestService) as Box<Service>],
             service_keypair.0,
             service_keypair.1,
@@ -480,6 +482,7 @@ mod memorydb_tests {
         let service_keypair = gen_keypair();
         let api_channel = mpsc::channel(1);
         Blockchain::new(
+            MemoryDB::new(),
             MemoryDB::new(),
             vec![service],
             service_keypair.0,
@@ -540,12 +543,14 @@ mod rocksdb_tests {
         Box::new(RocksDB::open(path, &opts).unwrap())
     }
 
-    fn create_blockchain(path: &Path) -> Blockchain {
+    fn create_blockchain(path: &Path, auxiliary_path: &Path) -> Blockchain {
         let db = create_database(path);
+        let auxiliary_db = create_database(auxiliary_path);
         let service_keypair = gen_keypair();
         let api_channel = mpsc::channel(1);
         Blockchain::new(
             db,
+            auxiliary_db,
             vec![Box::new(super::TestService) as Box<Service>],
             service_keypair.0,
             service_keypair.1,
@@ -553,12 +558,14 @@ mod rocksdb_tests {
         )
     }
 
-    fn create_blockchain_with_service(path: &Path, service: Box<Service>) -> Blockchain {
+    fn create_blockchain_with_service(path: &Path, auxiliary_path: &Path, service: Box<Service>) -> Blockchain {
         let db = create_database(path);
+        let auxiliary_db = create_database(auxiliary_path);
         let service_keypair = gen_keypair();
         let api_channel = mpsc::channel(1);
         Blockchain::new(
             db,
+            auxiliary_db,
             vec![service],
             service_keypair.0,
             service_keypair.1,
@@ -573,7 +580,8 @@ mod rocksdb_tests {
     #[test]
     fn test_handling_tx_panic() {
         let dir = create_temp_dir();
-        let mut blockchain = create_blockchain(dir.path());
+        let auxiliary_dir = create_temp_dir();
+        let mut blockchain = create_blockchain(dir.path(), auxiliary_dir.path());
         super::handling_tx_panic(&mut blockchain);
     }
 
@@ -581,15 +589,18 @@ mod rocksdb_tests {
     #[should_panic]
     fn test_handling_tx_panic_storage_error() {
         let dir = create_temp_dir();
-        let mut blockchain = create_blockchain(dir.path());
+        let auxiliary_dir = create_temp_dir();
+        let mut blockchain = create_blockchain(dir.path(), auxiliary_dir.path());
         super::handling_tx_panic_storage_error(&mut blockchain);
     }
 
     #[test]
     fn test_service_execute() {
         let dir = create_temp_dir();
-        let blockchain = create_blockchain_with_service(dir.path(), Box::new(ServiceGood));
+        let auxiliary_dir = create_temp_dir();
+        let blockchain = create_blockchain_with_service(dir.path(), auxiliary_dir.path(), Box::new(ServiceGood));
         let dir = create_temp_dir();
+        let auxiliary_dir = create_temp_dir();
         let mut db = create_database(dir.path());
         super::assert_service_execute(&blockchain, &mut db);
     }
@@ -597,7 +608,8 @@ mod rocksdb_tests {
     #[test]
     fn test_service_execute_panic() {
         let dir = create_temp_dir();
-        let blockchain = create_blockchain_with_service(dir.path(), Box::new(ServicePanic));
+        let auxiliary_dir = create_temp_dir();
+        let blockchain = create_blockchain_with_service(dir.path(), auxiliary_dir.path(), Box::new(ServicePanic));
         let dir = create_temp_dir();
         let mut db = create_database(dir.path());
         super::assert_service_execute_panic(&blockchain, &mut db);
@@ -607,8 +619,9 @@ mod rocksdb_tests {
     #[should_panic]
     fn test_service_execute_panic_storage_error() {
         let dir = create_temp_dir();
+        let auxiliary_dir = create_temp_dir();
         let blockchain =
-            create_blockchain_with_service(dir.path(), Box::new(ServicePanicStorageError));
+            create_blockchain_with_service(dir.path(), auxiliary_dir.path(), Box::new(ServicePanicStorageError));
         let dir = create_temp_dir();
         let mut db = create_database(dir.path());
         super::assert_service_execute(&blockchain, &mut db);

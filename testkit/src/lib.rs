@@ -402,6 +402,7 @@ impl TestKit {
 
         let mut blockchain = Blockchain::new(
             db,
+            CheckpointDb::new(MemoryDB::new()),
             services,
             *network.us().service_keypair().0,
             network.us().service_keypair().1.clone(),

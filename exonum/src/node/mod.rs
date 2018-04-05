@@ -802,6 +802,7 @@ impl Node {
     /// Creates node for the given services and node configuration.
     pub fn new<D: Into<Arc<Database>>>(
         db: D,
+        auxiliary_db: D,
         services: Vec<Box<Service>>,
         node_cfg: NodeConfig,
     ) -> Self {
@@ -819,6 +820,7 @@ impl Node {
         let channel = NodeChannel::new(&node_cfg.mempool.events_pool_capacity);
         let mut blockchain = Blockchain::new(
             db,
+            auxiliary_db,
             services,
             node_cfg.service_public_key,
             node_cfg.service_secret_key.clone(),
@@ -1077,10 +1079,11 @@ mod tests {
         let (p_key, s_key) = gen_keypair();
 
         let db = Arc::from(Box::new(MemoryDB::new()) as Box<Database>) as Arc<Database>;
+        let auxiliary_db = Arc::from(Box::new(MemoryDB::new()) as Box<Database>) as Arc<Database>;
         let services = vec![];
         let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
 
-        let mut node = Node::new(db, services, node_cfg);
+        let mut node = Node::new(db, auxiliary_db, services, node_cfg);
 
         let tx = TxSimple::new(&p_key, "Hello, World!", &s_key);
 

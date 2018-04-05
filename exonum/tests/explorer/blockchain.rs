@@ -106,6 +106,7 @@ pub fn create_blockchain() -> Blockchain {
     let api_channel = mpsc::channel(10);
     let mut blockchain = Blockchain::new(
         MemoryDB::new(),
+        MemoryDB::new(),
         vec![MyService.into()],
         service_keys.0,
         service_keys.1,
