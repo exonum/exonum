@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate advanced_cryptocurrency;
 extern crate exonum;
 extern crate exonum_configuration;
+extern crate exonum_cryptocurrency_advanced;
 
-use advanced_cryptocurrency as cryptocurrency;
+use exonum_cryptocurrency_advanced as cryptocurrency;
 use exonum::helpers;
 use exonum::helpers::fabric::NodeBuilder;
 use exonum_configuration as configuration;

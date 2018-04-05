@@ -15,8 +15,6 @@
 use exonum::crypto::{Hash, PublicKey};
 use exonum::storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot};
 
-use std::fmt;
-
 use INITIAL_BALANCE;
 use wallet::Wallet;
 
@@ -29,12 +27,6 @@ pub struct CurrencySchema<T> {
 impl<T> AsMut<T> for CurrencySchema<T> {
     fn as_mut(&mut self) -> &mut T {
         &mut self.view
-    }
-}
-
-impl<T> fmt::Debug for CurrencySchema<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "CurrencySchema {{}}")
     }
 }
 

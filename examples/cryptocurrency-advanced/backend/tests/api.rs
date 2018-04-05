@@ -18,8 +18,8 @@
 //! Note how API tests predominantly use `TestKitApi` to send transactions and make assertions
 //! about the storage state.
 
-extern crate advanced_cryptocurrency as cryptocurrency;
 extern crate exonum;
+extern crate exonum_cryptocurrency_advanced as cryptocurrency;
 extern crate exonum_testkit;
 #[macro_use]
 extern crate serde_json;
