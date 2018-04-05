@@ -1,9 +1,12 @@
 # Cryptocurrency frontend tutorial
 
+<!-- spell-checker:ignore uint -->
+
 Cryptocurrency demo application is built on [Vue.js](https://vuejs.org)
 framework together with [Bootstrap](https://getbootstrap.com/).
 
 This tutorial covers the interaction of the client with Exonum blockchain:
+
 - [Create a new user in the blockchain](#create-a-new-user)
 - [Add funds to the user's balance](#add-funds)
 - [Transfer funds between users](#transfer-funds)
@@ -212,6 +215,7 @@ const validators = [
 Extract the value from the Merkle Patricia tree of all tables (`data.wallet.mpt_proof`).
 Use `state_hash` as a root hash of the tree.
 
+<!-- markdownlint-disable MD013 -->
 ```javascript
 const TableKey = Exonum.newType({
   size: 4,
@@ -277,5 +281,5 @@ for (let i = 0; i < data.wallet_history.values.length; i++) {
   }
 }
 ```
-
+<!-- markdownlint-enable MD013 -->
 `getTransaction` function returns element of `Exonum.newMessage` type.

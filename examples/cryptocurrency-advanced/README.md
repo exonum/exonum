@@ -7,6 +7,7 @@ Exonum blockchain keeps balances of users and handles secure
 transactions between them.
 
 It implements most basic operations:
+
 - Create a new user
 - Add funds to the user's balance
 - Transfer funds between users
@@ -15,9 +16,9 @@ It implements most basic operations:
 
 Be sure you installed necessary packages:
 
-* [git](https://git-scm.com/downloads)
-* [Node.js with npm](https://nodejs.org/en/download/)
-* [Rust compiler](https://rustup.rs/)
+- [git](https://git-scm.com/downloads)
+- [Node.js with npm](https://nodejs.org/en/download/)
+- [Rust compiler](https://rustup.rs/)
 
 ## Install and run
 
@@ -56,6 +57,7 @@ cryptocurrency generate-config common.toml  pub_4.toml sec_4.toml --peer-addr 12
 
 Finalize configs:
 
+<!-- markdownlint-disable MD013 -->
 ```sh
 cryptocurrency finalize --public-api-address 0.0.0.0:8200 --private-api-address 0.0.0.0:8091 sec_1.toml node_1_cfg.toml --public-configs pub_1.toml pub_2.toml pub_3.toml pub_4.toml
 
@@ -77,6 +79,7 @@ cryptocurrency run --node-config node_3_cfg.toml --db-path db3 --public-api-addr
 
 cryptocurrency run --node-config node_4_cfg.toml --db-path db4 --public-api-address 0.0.0.0:8203
 ```
+<!-- markdownlint-enable MD013 -->
 
 Install frontend dependencies:
 
@@ -106,8 +109,8 @@ Ready! Find demo at [http://127.0.0.1:8280](http://127.0.0.1:8280).
 
 ## Tutorials
 
-* Read the [frontend tutorial](tutorial/frontend.md) to get detailed
-information about the interaction of the client with Exonum blockchain.
+- Read the [frontend tutorial](tutorial/frontend.md) to get detailed
+  information about the interaction of the client with Exonum blockchain.
 
 ## License
 
