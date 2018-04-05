@@ -542,21 +542,8 @@ fn test_explorer_single_block() {
 
 #[test]
 fn test_explorer_transaction_info() {
-    use exonum::explorer::BlockchainExplorer;
+    use exonum::explorer::{BlockchainExplorer, TransactionInfo};
     use exonum::helpers::Height;
-    use exonum::storage::ListProof;
-
-    /// Asserts that all properties from `sub` are equal to the corresponding properties
-    /// in `obj`.
-    fn assert_contains_all(obj: &Value, sub: &Value) {
-        if let (&Value::Object(ref obj), &Value::Object(ref sub)) = (obj, sub) {
-            for (key, value) in sub {
-                assert_eq!(obj[key], *value);
-            }
-        } else {
-            panic!("Two objects expected");
-        }
-    }
 
     let (mut testkit, api) = init_testkit();
 
@@ -584,63 +571,38 @@ fn test_explorer_transaction_info() {
     assert_eq!(
         info,
         json!({
-        "type": "in-pool",
-        "content": tx.serialize_field().unwrap(),
-    })
+            "type": "in-pool",
+            "content": tx.serialize_field().unwrap(),
+        })
     );
 
     testkit.create_block();
-    let info: Value = api.get(
+    let info: TransactionInfo<Value> = api.get(
         ApiKind::Explorer,
         &format!("v1/transactions/{}", &tx.hash().to_string()),
     );
-    assert_contains_all(
-        &info,
-        &json!({
-            "type": "committed",
-            "content": tx.serialize_field().unwrap(),
-            "location": {
-                "block_height": Height(1).serialize_field().unwrap(),
-                "position_in_block": "0",
-            },
-            "status": { "type": "success" },
-        }),
+    assert!(info.is_committed());
+    let committed = info.as_committed().unwrap();
+    assert_eq!(committed.location().block_height(), Height(1));
+    assert!(committed.status().is_ok());
+
+    let explorer = BlockchainExplorer::new(testkit.blockchain());
+    let block = explorer.block(Height(1)).unwrap();
+    assert!(
+        committed
+            .location_proof()
+            .validate(
+                *block.header().tx_hash(),
+                u64::from(block.header().tx_count())
+            )
+            .is_ok()
     );
-
-    if let Value::Object(mut info) = info {
-        let location_proof = info.remove("location_proof").unwrap();
-        let location_proof: ListProof<crypto::Hash> =
-            serde_json::from_value(location_proof).unwrap();
-
-        let explorer = BlockchainExplorer::new(testkit.blockchain());
-        let block = explorer.block(Height(1)).unwrap();
-        assert!(
-            location_proof
-                .validate(
-                    *block.header().tx_hash(),
-                    u64::from(block.header().tx_count())
-                )
-                .is_ok()
-        );
-    } else {
-        panic!("Invalid transaction info format, object expected");
-    }
 }
 
 #[test]
 fn test_explorer_transaction_statuses() {
-    fn assert_status(api: &TestKitApi, tx: &Transaction, expected_status: &Value) {
-        let info: Value = api.get(
-            ApiKind::Explorer,
-            &format!("v1/transactions/{}", &tx.hash().to_string()),
-        );
-        if let Value::Object(mut info) = info {
-            let tx_status = info.remove("status").unwrap();
-            assert_eq!(tx_status, *expected_status);
-        } else {
-            panic!("Invalid transaction info format, object expected");
-        }
-    }
+    use exonum::blockchain::TransactionResult;
+    use exonum::explorer::TransactionInfo;
 
     let (mut testkit, api) = init_testkit();
 
@@ -662,29 +624,39 @@ fn test_explorer_transaction_statuses() {
         error_tx.clone(),
         panicking_tx.clone(),
     ]);
-    assert!(block[0].status().is_ok());
-    assert!({
-        let err = block[1].status().unwrap_err();
-        err.error_type() == ErrorType::Code(0)
-            && err.description() == Some("Adding zero does nothing!")
-    });
-    assert!({
-        let err = block[2].status().unwrap_err();
-        err.error_type() == ErrorType::Panic
-            && err.description() == Some("attempt to add with overflow")
-    });
 
-    assert_status(&api, &tx, &json!({ "type": "success" }));
-    assert_status(
-        &api,
-        &error_tx,
-        &json!({ "type": "error", "code": 0, "description": "Adding zero does nothing!" }),
-    );
-    assert_status(
-        &api,
-        &panicking_tx,
-        &json!({ "type": "panic", "description": "attempt to add with overflow" }),
-    );
+    fn check_statuses(statuses: &[TransactionResult]) {
+        assert!(statuses[0].is_ok());
+        assert_matches!(
+            statuses[1],
+            Err(ref err) if err.error_type() == ErrorType::Code(0)
+                && err.description() == Some("Adding zero does nothing!")
+        );
+        assert_matches!(
+            statuses[2],
+            Err(ref err) if err.error_type() == ErrorType::Panic
+                && err.description() == Some("attempt to add with overflow")
+        );
+    }
+
+    // Check statuses retrieved from a block.
+    let statuses: Vec<_> = block
+        .transactions
+        .iter()
+        .map(|tx| tx.status().map_err(Clone::clone))
+        .collect();
+    check_statuses(&statuses);
+
+    // Now, the same statuses retrieved via explorer web API.
+    let statuses: Vec<_> = [tx.hash(), error_tx.hash(), panicking_tx.hash()]
+        .iter()
+        .map(|hash| {
+            let info: TransactionInfo<Value> =
+                api.get(ApiKind::Explorer, &format!("v1/transactions/{}", hash));
+            info.as_committed().unwrap().status().map_err(Clone::clone)
+        })
+        .collect();
+    check_statuses(&statuses);
 }
 
 // Make sure that boxed transaction can be used in the `TestKitApi::send`.
