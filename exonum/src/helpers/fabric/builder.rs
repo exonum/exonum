@@ -105,8 +105,7 @@ impl NodeBuilder {
         println!("error: {}", msg);
     }
 
-    /// Runs application.
-    pub fn run<F>(self, app: Option<clap::App>, callback: Option<F>) where F: Fn(&clap::ArgMatches) {
+    fn run_internal<F>(self, app: Option<clap::App>, callback: Option<F>) where F: Fn(&clap::ArgMatches) {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(Self::panic_hook));
         let feedback = self.parse_cmd(app, callback);
@@ -115,6 +114,16 @@ impl NodeBuilder {
         if let Some(node) = feedback {
             node.run().expect("Node return error")
         }
+    }
+
+    /// Runs application.
+    pub fn run(self) {
+        self.run_internal(None, Some(|_: &clap::ArgMatches| {}));
+    }
+
+    /// Runs application with app.
+    pub fn run_with_app<F>(self, app: clap::App, callback: F) where F: Fn(&clap::ArgMatches) {
+        self.run_internal(Some(app), Some(callback));
     }
 
     fn commands() -> HashMap<CommandName, CollectedCommand> {
