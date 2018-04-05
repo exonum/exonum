@@ -155,6 +155,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `TestKit::explorer()` method allows to access the blockchain explorer. (#535)
 
+#### exonum-cryptocurrency-advanced
+
+- A more complex example has been added featuring best practices for service
+  writing.
+
 ### Internal improvements
 
 #### Exonum core
