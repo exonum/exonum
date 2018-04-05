@@ -18,12 +18,15 @@
 //! Note how API tests predominantly use `TestKitApi` to send transactions and make assertions
 //! about the storage state.
 
+#[macro_use]
+extern crate assert_matches;
 extern crate exonum;
 extern crate exonum_cryptocurrency_advanced as cryptocurrency;
 extern crate exonum_testkit;
 #[macro_use]
 extern crate serde_json;
 
+use exonum::api::ApiError;
 use exonum::crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
@@ -192,11 +195,11 @@ fn test_transfer_overcharge() {
 fn test_malformed_wallet_request() {
     let (_testkit, api) = create_testkit();
 
-    let info: serde_json::Value = api.inner
+    let info: ApiError = api.inner
         .get_err(ApiKind::Service("cryptocurrency"), "v1/wallets/info/c0ffee");
-    assert_eq!(
-        info.get("description").unwrap(),
-        &json!{"Bad request: Invalid 'pubkey' parameter: Invalid string length"}
+    assert_matches!(
+        info,
+        ApiError::BadRequest(ref body) if body.starts_with("Bad request: Invalid 'pubkey' parameter: Invalid string length")
     );
 }
 
@@ -207,11 +210,7 @@ fn test_unknown_wallet_request() {
     // Transaction is sent by API, but isn't committed.
     let (tx, _) = api.create_wallet(ALICE_NAME);
 
-    let info: String = api.inner.get_err(
-        ApiKind::Service("cryptocurrency"),
-        &format!("v1/wallets/{}", tx.pub_key().to_string()),
-    );
-    assert_eq!(info, "Wallet not found".to_string());
+    api.assert_no_wallet(tx.pub_key());
 }
 
 /// Wrapper for the cryptocurrency service API allowing to easily use it
@@ -259,11 +258,14 @@ impl CryptocurrencyApi {
     }
     /// Asserts that a wallet with the specified public key is not known to the blockchain.
     fn assert_no_wallet(&self, pubkey: &PublicKey) {
-        let err: String = self.inner.get_err(
+        let err = self.inner.get_err(
             ApiKind::Service("cryptocurrency"),
             &format!("v1/wallets/{}", pubkey.to_string()),
         );
-        assert_eq!(err, "Wallet not found".to_string());
+        assert_matches!(
+            err,
+            ApiError::NotFound(ref body) if body == "Wallet not found"
+        );
     }
 
     /// Asserts that the transaction with the given hash has a specified status.
