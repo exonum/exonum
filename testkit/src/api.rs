@@ -83,7 +83,7 @@ impl TestKitApi {
                     &testkit.api_config,
                 );
                 handler.link_after(|req: &mut Request, resp| {
-                    log_request(ApiAccess::Public, req, resp)
+                    log_request(&ApiAccess::Public, req, resp)
                 });
                 handler
             },
@@ -95,7 +95,7 @@ impl TestKitApi {
                     testkit.api_sender.clone(),
                 );
                 handler.link_after(|req: &mut Request, resp| {
-                    log_request(ApiAccess::Private, req, resp)
+                    log_request(&ApiAccess::Private, req, resp)
                 });
                 handler
             },
@@ -324,7 +324,7 @@ impl fmt::Display for ApiAccess {
 
 // Logging middleware for `TestKitApi`.
 fn log_request(
-    access: ApiAccess,
+    access: &ApiAccess,
     request: &mut Request,
     mut response: Response,
 ) -> IronResult<Response> {
@@ -385,11 +385,11 @@ fn log_request(
             .status
             .as_ref()
             .map(ToString::to_string)
-            .unwrap_or("(no status)".to_string()),
+            .unwrap_or_else(|| "(no status)".to_string()),
         resp_body = response_body
             .as_ref()
             .map(String::clone)
-            .unwrap_or("(no body)".to_string())
+            .unwrap_or_else(|| "(no body)".to_string())
     );
 
     // Return the body to the response
