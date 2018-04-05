@@ -57,13 +57,17 @@ impl ClapBackend {
         )
     }
 
-    pub fn execute(commands: &HashMap<CommandName, CollectedCommand>) -> Feedback {
+    pub fn execute<F>(commands: &HashMap<CommandName, CollectedCommand>, app: Option<clap::App>, callback: Option<F>) -> Feedback
+        where F: Fn(&clap::ArgMatches) {
+
         let subcommands: Vec<_> = commands
             .values()
             .map(|command| ClapBackend::command_into_subcommand(command))
             .collect();
 
-        let matches = clap::App::new("Exonum application based on fabric configuration.")
+        let app = app.unwrap_or(clap::App::new("Exonum application based on fabric configuration."));
+
+        let matches = app
             .setting(clap::AppSettings::ArgRequiredElseHelp)
             .version(crate_version!())
             .author(crate_authors!("\n"))
@@ -72,11 +76,19 @@ impl ClapBackend {
             .get_matches();
 
         let subcommand = matches.subcommand();
-        let command = commands.get(subcommand.0).expect("Subcommand not found.");
-        command.execute(
-            commands,
-            Context::new_from_args(command.args(), subcommand.1.expect("Arguments not found.")),
-        )
+        let command = commands.get(subcommand.0);
+        match command {
+            Some(command) => {
+                command.execute(
+                    commands,
+                    Context::new_from_args(command.args(), subcommand.1.expect("Arguments not found.")),
+                )
+            },
+            None => {
+                callback.unwrap()(&matches);
+                Feedback::None
+            },
+        }
     }
 
     fn command_into_subcommand(command: &CollectedCommand) -> clap::App {

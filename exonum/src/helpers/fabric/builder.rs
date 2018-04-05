@@ -28,6 +28,8 @@ use super::details::{Run, RunDev, Finalize, GenerateNodeConfig, GenerateCommonCo
 use super::keys;
 use super::CommandName;
 
+use clap;
+
 /// `NodeBuilder` is a high level object,
 /// usable for fast prototyping and creating app from services list.
 #[derive(Default)]
@@ -56,6 +58,8 @@ impl NodeBuilder {
         self
     }
 
+    // TODO(evg): add with_app, with_callback methods
+
     #[doc(hidden)]
     pub fn parse_cmd_string<I, T>(self, cmd_line: I) -> bool
     where
@@ -67,8 +71,10 @@ impl NodeBuilder {
     }
 
     /// Parse cmd args, return `Node`, if run command found
-    pub fn parse_cmd(self) -> Option<Node> {
-        match ClapBackend::execute(&self.commands) {
+    pub fn parse_cmd<F>(self, app: Option<clap::App>, callback: Option<F>) -> Option<Node>
+        where F: Fn(&clap::ArgMatches) {
+
+        match ClapBackend::execute(&self.commands, app, callback) {
             Feedback::RunNode(ref ctx) => {
                 let config = ctx.get(keys::NODE_CONFIG).expect(
                     "could not find node_config",
@@ -100,10 +106,10 @@ impl NodeBuilder {
     }
 
     /// Runs application.
-    pub fn run(self) {
+    pub fn run<F>(self, app: Option<clap::App>, callback: Option<F>) where F: Fn(&clap::ArgMatches) {
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(Self::panic_hook));
-        let feedback = self.parse_cmd();
+        let feedback = self.parse_cmd(app, callback);
         panic::set_hook(old_hook);
 
         if let Some(node) = feedback {
