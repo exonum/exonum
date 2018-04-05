@@ -32,5 +32,6 @@ This is the main Exonum repository that includes
   * [Time service](services/time/README.md).
 * Examples
   * [Cryptocurrency](examples/cryptocurrency/README.md).
+  * [Cryptocurrency-advanced](examples/cryptocurrency-advanced/README.md).
 
 See individual projects readme for the details.

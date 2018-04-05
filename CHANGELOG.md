@@ -158,7 +158,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum-cryptocurrency-advanced
 
 - A more complex example has been added featuring best practices for service
-  writing.
+  writing. (#595)
 
 ### Internal improvements
 
