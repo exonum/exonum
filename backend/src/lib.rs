@@ -37,7 +37,7 @@ pub mod transactions;
 pub mod schema;
 
 use exonum::api::Api;
-use exonum::helpers::fabric::{ServiceFactory, Context};
+use exonum::helpers::fabric;
 use exonum::crypto::Hash;
 use exonum::storage::Snapshot;
 use exonum::blockchain::{Transaction, Service, ApiContext, TransactionSet};
@@ -57,11 +57,11 @@ mod tests;
 const TIMESTAMPING_SERVICE: u16 = 130;
 
 #[derive(Debug, Default)]
-pub struct TimestampingService {}
+pub struct TimestampingService;
 
 impl TimestampingService {
     pub fn new() -> TimestampingService {
-        TimestampingService {}
+        TimestampingService
     }
 }
 
@@ -94,10 +94,10 @@ impl Service for TimestampingService {
 
 /// A configuration service creator for the `NodeBuilder`.
 #[derive(Debug)]
-pub struct TimestampingServiceFactory;
+pub struct ServiceFactory;
 
-impl ServiceFactory for TimestampingServiceFactory {
-    fn make_service(&mut self, _: &Context) -> Box<Service> {
+impl fabric::ServiceFactory for ServiceFactory {
+    fn make_service(&mut self, _: &fabric::Context) -> Box<Service> {
         Box::new(TimestampingService::new())
     }
 }

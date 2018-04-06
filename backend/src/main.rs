@@ -30,7 +30,7 @@ fn main() {
         .with_service(Box::new(exonum_configuration::ServiceFactory))
         .with_service(Box::new(exonum_time::TimeServiceFactory))
         .with_service(Box::new(exonum_btc_anchoring::ServiceFactory))
-        .with_service(Box::new(timestamping::TimestampingServiceFactory))
+        .with_service(Box::new(timestamping::ServiceFactory))
         .run();
 }
 
@@ -40,6 +40,6 @@ fn main() {
     NodeBuilder::new()
         .with_service(Box::new(exonum_configuration::ServiceFactory))
         .with_service(Box::new(exonum_time::TimeServiceFactory))
-        .with_service(Box::new(timestamping::TimestampingServiceFactory))
+        .with_service(Box::new(timestamping::ServiceFactory))
         .run();
 }

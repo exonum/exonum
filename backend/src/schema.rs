@@ -49,12 +49,8 @@ pub struct Schema<T> {
 
 /// Timestamping information schema.
 impl<T> Schema<T> {
-    pub fn new(snapshot: T) -> Schema<T> {
+    pub fn new(snapshot: T) -> Self {
         Schema { view: snapshot }
-    }
-
-    pub fn into_view(self) -> T {
-        self.view
     }
 }
 
@@ -78,7 +74,7 @@ impl<'a> Schema<&'a mut Fork> {
 
     pub fn add_timestamp(&mut self, timestamp_entry: TimestampEntry) {
         let timestamp = timestamp_entry.timestamp();
-        let content_hash = *timestamp.content_hash();
+        let content_hash = timestamp.content_hash();
 
         // Check that timestamp with given content_hash does not exist.
         if self.timestamps().contains(&content_hash) {

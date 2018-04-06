@@ -32,7 +32,7 @@ pub enum Error {
 
 impl From<Error> for ExecutionError {
     fn from(value: Error) -> ExecutionError {
-        let description = format!("{}", value);
+        let description = value.to_string();
         ExecutionError::with_description(value as u8, description)
     }
 }
@@ -60,8 +60,8 @@ impl Transaction for TxTimestamp {
     fn execute(&self, fork: &mut Fork) -> ExecutionResult {
         let time = TimeSchema::new(&fork).time().get().expect("Can't get the time");
 
-        let context = self.content();
-        let hash = *context.content_hash();
+        let content = self.content();
+        let hash = content.content_hash();
 
         let mut schema = Schema::new(fork);
         if let Some(_entry) = schema.timestamps().get(&hash) {
