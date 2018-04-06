@@ -388,8 +388,8 @@ fn log_request(
             .unwrap_or_else(|| "(no status)".to_string()),
         resp_body = response_body
             .as_ref()
-            .map(String::clone)
-            .unwrap_or_else(|| "(no body)".to_string())
+            .map(String::as_ref)
+            .unwrap_or_else(|| "(no body)")
     );
 
     // Return the body to the response
