@@ -17,7 +17,7 @@ rust:
   - stable
 matrix:
   include:
-    - rust: nightly-2017-09-14
+    - rust: nightly-2018-03-06
       env: FEATURE=clippy
 
 cache:
@@ -31,8 +31,8 @@ sudo: false
 
 env:
   global:
-  - NIGHTLY_RUST=nightly-2017-09-14
-  - CLIPPY_VERS=0.0.161
+  - NIGHTLY_RUST=nightly-2018-03-06
+  - CLIPPY_VERS=0.0.187
   - RUSTFMT_VERS=0.9.0
   - SODIUM_VERS=1.0.13
   - CARGO_INCREMENTAL=1
