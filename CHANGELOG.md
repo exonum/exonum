@@ -155,6 +155,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `TestKit::explorer()` method allows to access the blockchain explorer. (#535)
 
+#### exonum-cryptocurrency-advanced
+
+- A more complex example has been added featuring best practices for service
+  writing. (#595)
+
 ### Internal improvements
 
 #### Exonum core
@@ -163,6 +168,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   instead of memory pool. (#549)
 
 - Sandbox tests have been moved inside of the exonum core. (#568)
+
+- The requested transactions in the `TransactionsRequest` are now sent by batches,
+  rather than one by one. The number of batches depends on the size limits
+  of the message. (#583)
 
 #### exonum-testkit
 
