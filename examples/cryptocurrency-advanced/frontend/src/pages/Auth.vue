@@ -17,10 +17,6 @@
             <tab title="Log in">
               <form @submit.prevent="login">
                 <div class="form-group">
-                  <label class="control-label">Public key:</label>
-                  <input v-model="publicKey" type="text" class="form-control" placeholder="Enter public key" required>
-                </div>
-                <div class="form-group">
                   <label class="control-label">Secret key:</label>
                   <input v-model="secretKey" type="text" class="form-control" placeholder="Enter secret key" required>
                 </div>
@@ -33,11 +29,7 @@
     </div>
 
     <modal :visible="isModalVisible" title="Wallet has been created" action-btn="Log in" @close="closeModal" @submit="proceed">
-      <div class="alert alert-warning" role="alert">Save the key pair in a safe place. You will need it to log in to the demo next time.</div>
-      <div class="form-group">
-        <label>Public key:</label>
-        <div><code>{{ keyPair.publicKey }}</code></div>
-      </div>
+      <div class="alert alert-warning" role="alert">Save the secret key in a safe place. You will need it to log in to the demo next time.</div>
       <div class="form-group">
         <label>Secret key:</label>
         <div><code>{{ keyPair.secretKey }}</code></div>
@@ -70,10 +62,6 @@
     },
     methods: {
       login() {
-        if (!this.$validateHex(this.publicKey)) {
-          return this.$notify('error', 'Invalid public key is passed')
-        }
-
         if (!this.$validateHex(this.secretKey, 64)) {
           return this.$notify('error', 'Invalid secret key is passed')
         }
@@ -81,7 +69,7 @@
         this.isSpinnerVisible = true
 
         this.$store.commit('login', {
-          publicKey: this.publicKey,
+          publicKey: this.secretKey.substr(64),
           secretKey: this.secretKey
         })
 
