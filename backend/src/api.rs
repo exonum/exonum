@@ -42,8 +42,8 @@ pub struct PublicApi<T: TransactionSend + Clone + 'static> {
 impl<T: TransactionSend + Clone + 'static> PublicApi<T> {
     pub fn new(blockchain: Blockchain, channel: T) -> PublicApi<T> {
         PublicApi {
-            blockchain: blockchain,
-            channel: channel,
+            blockchain,
+            channel,
         }
     }
 

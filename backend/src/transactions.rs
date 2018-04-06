@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Suppress a warning in `transactions!` macro call:
+#![cfg_attr(feature = "cargo-clippy", allow(redundant_field_names))]
+
 use exonum::storage::Fork;
 use exonum::blockchain::{ExecutionResult, ExecutionError, Transaction};
 use exonum::messages::Message;
@@ -66,7 +69,7 @@ impl Transaction for TxTimestamp {
         let hash = content.content_hash();
 
         let mut schema = Schema::new(fork);
-        if let Some(_entry) = schema.timestamps().get(&hash) {
+        if let Some(_entry) = schema.timestamps().get(hash) {
             Err(Error::HashAlreadyExists)?;
         }
 

@@ -77,11 +77,11 @@ impl<'a> Schema<&'a mut Fork> {
         let content_hash = timestamp.content_hash();
 
         // Check that timestamp with given content_hash does not exist.
-        if self.timestamps().contains(&content_hash) {
+        if self.timestamps().contains(content_hash) {
             return;
         }
 
         // Add timestamp
-        self.timestamps_mut().put(&content_hash, timestamp_entry);
+        self.timestamps_mut().put(content_hash, timestamp_entry);
     }
 }
