@@ -45,7 +45,7 @@
                 <div class="row">
                   <div class="col-sm-8">
                     <router-link :to="{ name: 'transaction', params: { hash: transaction.hash } }">
-                      <span v-if="transaction.message_id == 130">You wallet created</span>
+                      <span v-if="transaction.message_id == 130">Wallet created</span>
                       <span v-else-if="transaction.message_id == 129">
                         <strong v-numeral="transaction.body.amount"/> funds added
                       </span>
