@@ -25,12 +25,10 @@ Be sure you installed necessary packages:
 Below you will find a step-by-step guide to starting the cryptocurrency
 service on 4 nodes on the local machine.
 
-Clone the project and build it:
+Build the project:
 
 ```sh
-git clone https://github.com/exonum/cryptocurrency-advanced
-
-cd cryptocurrency-advanced/backend
+cd examples/cryptocurrency-advanced/backend
 
 cargo install
 ```
@@ -38,21 +36,21 @@ cargo install
 Generate template:
 
 ```sh
-cd .. && mkdir example && cd example
+mkdir example
 
-cryptocurrency generate-template common.toml
+cargo run -- generate-template example/common.toml --validators-count 4
 ```
 
 Generate public and secrets keys for each node:
 
 ```sh
-cryptocurrency generate-config common.toml  pub_1.toml sec_1.toml --peer-addr 127.0.0.1:6331
+cargo run -- generate-config example/common.toml  example/pub_1.toml example/sec_1.toml --peer-address 127.0.0.1:6331
 
-cryptocurrency generate-config common.toml  pub_2.toml sec_2.toml --peer-addr 127.0.0.1:6332
+cargo run -- generate-config example/common.toml  example/pub_2.toml example/sec_2.toml --peer-address 127.0.0.1:6332
 
-cryptocurrency generate-config common.toml  pub_3.toml sec_3.toml --peer-addr 127.0.0.1:6333
+cargo run -- generate-config example/common.toml  example/pub_3.toml example/sec_3.toml --peer-address 127.0.0.1:6333
 
-cryptocurrency generate-config common.toml  pub_4.toml sec_4.toml --peer-addr 127.0.0.1:6334
+cargo run -- generate-config example/common.toml  example/pub_4.toml example/sec_4.toml --peer-address 127.0.0.1:6334
 ```
 
 Finalize configs:
@@ -60,25 +58,25 @@ Finalize configs:
 <!-- markdownlint-disable MD013 -->
 
 ```sh
-cryptocurrency finalize --public-api-address 0.0.0.0:8200 --private-api-address 0.0.0.0:8091 sec_1.toml node_1_cfg.toml --public-configs pub_1.toml pub_2.toml pub_3.toml pub_4.toml
+cargo run -- finalize --public-api-address 0.0.0.0:8200 --private-api-address 0.0.0.0:8091 example/sec_1.toml example/node_1_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
 
-cryptocurrency finalize --public-api-address 0.0.0.0:8201 --private-api-address 0.0.0.0:8092 sec_2.toml node_2_cfg.toml --public-configs pub_1.toml pub_2.toml pub_3.toml pub_4.toml
+cargo run -- finalize --public-api-address 0.0.0.0:8201 --private-api-address 0.0.0.0:8092 example/sec_2.toml example/node_2_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
 
-cryptocurrency finalize --public-api-address 0.0.0.0:8202 --private-api-address 0.0.0.0:8093 sec_3.toml node_3_cfg.toml --public-configs pub_1.toml pub_2.toml pub_3.toml pub_4.toml
+cargo run -- finalize --public-api-address 0.0.0.0:8202 --private-api-address 0.0.0.0:8093 example/sec_3.toml example/node_3_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
 
-cryptocurrency finalize --public-api-address 0.0.0.0:8203 --private-api-address 0.0.0.0:8094 sec_4.toml node_4_cfg.toml --public-configs pub_1.toml pub_2.toml pub_3.toml pub_4.toml
+cargo run -- finalize --public-api-address 0.0.0.0:8203 --private-api-address 0.0.0.0:8094 example/sec_4.toml example/node_4_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
 ```
 
 Run nodes:
 
 ```sh
-cryptocurrency run --node-config node_1_cfg.toml --db-path db1 --public-api-address 0.0.0.0:8200
+cargo run -- run --node-config example/node_1_cfg.toml --db-path example/db1 --public-api-address 0.0.0.0:8200
 
-cryptocurrency run --node-config node_2_cfg.toml --db-path db2 --public-api-address 0.0.0.0:8201
+cargo run -- run --node-config example/node_2_cfg.toml --db-path example/db2 --public-api-address 0.0.0.0:8201
 
-cryptocurrency run --node-config node_3_cfg.toml --db-path db3 --public-api-address 0.0.0.0:8202
+cargo run -- run --node-config example/node_3_cfg.toml --db-path example/db3 --public-api-address 0.0.0.0:8202
 
-cryptocurrency run --node-config node_4_cfg.toml --db-path db4 --public-api-address 0.0.0.0:8203
+cargo run -- run --node-config example/node_4_cfg.toml --db-path example/db4 --public-api-address 0.0.0.0:8203
 ```
 
 <!-- markdownlint-enable MD013 -->
@@ -86,7 +84,7 @@ cryptocurrency run --node-config node_4_cfg.toml --db-path db4 --public-api-addr
 Install frontend dependencies:
 
 ```sh
-cd ../frontend
+cd frontend
 
 npm install
 ```

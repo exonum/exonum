@@ -18,21 +18,21 @@
 <script>
   module.exports = {
     name: 'tabs',
-    data: function() {
+    data() {
       return {
         tabs: [],
         current: null
       }
     },
     methods: {
-      addTab: function(tab) {
+      addTab(tab) {
         this.tabs.push(tab)
         if (tab.active === true) {
           this.current = tab
         }
       },
 
-      changeTab: function(tab) {
+      changeTab(tab) {
         this.current = tab
         this.tabs.forEach(value => {
           value.active = value === tab

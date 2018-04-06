@@ -59,8 +59,8 @@
 </template>
 
 <script>
-  const Navbar = require('../components/Navbar.vue')
-  const Spinner = require('../components/Spinner.vue')
+  import Navbar from '../components/Navbar.vue'
+  import Spinner from '../components/Spinner.vue'
 
   module.exports = {
     components: {
@@ -70,41 +70,42 @@
     props: {
       height: String
     },
-    data: function() {
+    data() {
       return {
-        block: Object,
-        transactions: Array
+        block: {},
+        transactions: [],
       }
     },
     computed: {
-      previous: function() {
+      previous() {
         return (parseInt(this.height) - 1).toString()
       },
-      next: function() {
+      next() {
         return (parseInt(this.height) + 1).toString()
       }
     },
     watch: {
-      height: function() {
+      height() {
         this.loadBlock()
       }
     },
     methods: {
-      loadBlock: function() {
+      loadBlock() {
         const self = this
 
         this.isSpinnerVisible = true
 
         this.$blockchain.getBlock(this.height).then(data => {
-          self.isSpinnerVisible = false
           self.block = data.block
           self.transactions = data.txs
+          self.isSpinnerVisible = false
         }).catch(error => {
+          self.isSpinnerVisible = false
           self.$notify('error', error.toString())
         })
       }
     },
-    mounted: function() {
+    mounted() {
       this.$nextTick(function() {
         this.loadBlock()
       })

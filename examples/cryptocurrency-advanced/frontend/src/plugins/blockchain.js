@@ -9,9 +9,9 @@ const ATTEMPT_TIMEOUT = 500
 const NETWORK_ID = 0
 const PROTOCOL_VERSION = 0
 const SERVICE_ID = 128
-const TX_WALLET_ID = 130
-const TX_ISSUE_ID = 129
-const TX_TRANSFER_ID = 128
+const TX_TRANSFER_ID = 0
+const TX_ISSUE_ID = 1
+const TX_WALLET_ID = 2
 
 const TableKey = Exonum.newType({
   fields: [
@@ -37,29 +37,6 @@ const TransactionMetaData = Exonum.newType({
 
 function getTransaction(transactionId) {
   switch (transactionId) {
-    case TX_WALLET_ID:
-      return Exonum.newMessage({
-        network_id: NETWORK_ID,
-        protocol_version: PROTOCOL_VERSION,
-        service_id: SERVICE_ID,
-        message_id: TX_WALLET_ID,
-        fields: [
-          { name: 'pub_key', type: Exonum.PublicKey },
-          { name: 'name', type: Exonum.String }
-        ]
-      })
-    case TX_ISSUE_ID:
-      return Exonum.newMessage({
-        network_id: NETWORK_ID,
-        protocol_version: PROTOCOL_VERSION,
-        service_id: SERVICE_ID,
-        message_id: TX_ISSUE_ID,
-        fields: [
-          { name: 'wallet', type: Exonum.PublicKey },
-          { name: 'amount', type: Exonum.Uint64 },
-          { name: 'seed', type: Exonum.Uint64 }
-        ]
-      })
     case TX_TRANSFER_ID:
       return Exonum.newMessage({
         network_id: NETWORK_ID,
@@ -73,6 +50,29 @@ function getTransaction(transactionId) {
           { name: 'seed', type: Exonum.Uint64 }
         ]
       })
+    case TX_ISSUE_ID:
+      return Exonum.newMessage({
+        network_id: NETWORK_ID,
+        protocol_version: PROTOCOL_VERSION,
+        service_id: SERVICE_ID,
+        message_id: TX_ISSUE_ID,
+        fields: [
+          { name: 'pub_key', type: Exonum.PublicKey },
+          { name: 'amount', type: Exonum.Uint64 },
+          { name: 'seed', type: Exonum.Uint64 }
+        ]
+      })
+    case TX_WALLET_ID:
+      return Exonum.newMessage({
+        network_id: NETWORK_ID,
+        protocol_version: PROTOCOL_VERSION,
+        service_id: SERVICE_ID,
+        message_id: TX_WALLET_ID,
+        fields: [
+          { name: 'pub_key', type: Exonum.PublicKey },
+          { name: 'name', type: Exonum.String }
+        ]
+      })
     default:
       throw new Error('Unknown transaction ID has been passed')
   }
@@ -83,7 +83,7 @@ function getPublicKeyOfTransaction(transactionId, transaction) {
     case TX_TRANSFER_ID:
       return transaction.from
     case TX_ISSUE_ID:
-      return transaction.wallet
+      return transaction.pub_key
     case TX_WALLET_ID:
       return transaction.pub_key
     default:
@@ -98,10 +98,8 @@ function getWallet(keyPair) {
       return validator.consensus_key
     })
 
-    return axios.get('/api/services/cryptocurrency/v1/wallets/info?pubkey=' + keyPair.publicKey).then(response => {
-      return response.data
-    }).then((data) => {
-      if (!Exonum.verifyBlock(data.block_info, validators, NETWORK_ID)) {
+    return axios.get(`/api/services/cryptocurrency/v1/wallets/info/${keyPair.publicKey}`).then(response => response.data).then((data) => {
+      if (!Exonum.verifyBlock(data.block_proof, validators, NETWORK_ID)) {
         throw new Error('Block can not be verified')
       }
 
@@ -110,13 +108,13 @@ function getWallet(keyPair) {
         service_id: SERVICE_ID,
         table_index: 0
       })
-      const walletsHash = Exonum.merklePatriciaProof(data.block_info.block.state_hash, data.wallet.mpt_proof, tableKey)
+      const walletsHash = Exonum.merklePatriciaProof(data.block_proof.block.state_hash, data.wallet_proof.to_table, tableKey)
       if (walletsHash === null) {
         throw new Error('Wallets table not found')
       }
 
       // find wallet in the tree of all wallets
-      const wallet = Exonum.merklePatriciaProof(walletsHash, data.wallet.value, keyPair.publicKey, Wallet)
+      const wallet = Exonum.merklePatriciaProof(walletsHash, data.wallet_proof.to_wallet, keyPair.publicKey, Wallet)
       if (wallet === null) {
         throw new Error('Wallet not found')
       }
@@ -125,12 +123,12 @@ function getWallet(keyPair) {
       const transactionsMetaData = Exonum.merkleProof(
         wallet.history_hash,
         wallet.history_len,
-        data.wallet_history.mt_proof,
+        data.wallet_history.proof,
         [0, wallet.history_len],
         TransactionMetaData
       )
 
-      if (data.wallet_history.values.length !== transactionsMetaData.length) {
+      if (data.wallet_history.transactions.length !== transactionsMetaData.length) {
         // number of transactions in wallet history is not equal
         // to number of transactions in array with transactions meta data
         throw new Error('Transactions can not be verified')
@@ -138,26 +136,26 @@ function getWallet(keyPair) {
 
       // validate each transaction
       let transactions = []
-      for (let i = 0; i < data.wallet_history.values.length; i++) {
-        let Transaction = getTransaction(data.wallet_history.values[i].message_id)
-        const publicKey = getPublicKeyOfTransaction(data.wallet_history.values[i].message_id, data.wallet_history.values[i].body)
+      for (let i = 0; i < data.wallet_history.transactions.length; i++) {
+        let Transaction = getTransaction(data.wallet_history.transactions[i].message_id)
+        const publicKey = getPublicKeyOfTransaction(data.wallet_history.transactions[i].message_id, data.wallet_history.transactions[i].body)
 
-        Transaction.signature = data.wallet_history.values[i].signature
+        Transaction.signature = data.wallet_history.transactions[i].signature
 
-        if (Transaction.hash(data.wallet_history.values[i].body) !== transactionsMetaData[i].tx_hash) {
+        if (Transaction.hash(data.wallet_history.transactions[i].body) !== transactionsMetaData[i].tx_hash) {
           throw new Error('Invalid transaction hash has been found')
-        } else if (!Transaction.verifySignature(data.wallet_history.values[i].signature, publicKey, data.wallet_history.values[i].body)) {
+        } else if (!Transaction.verifySignature(data.wallet_history.transactions[i].signature, publicKey, data.wallet_history.transactions[i].body)) {
           throw new Error('Invalid transaction signature has been found')
         }
 
         transactions.push(Object.assign({
           hash: transactionsMetaData[i].tx_hash,
           status: transactionsMetaData[i].execution_status
-        }, data.wallet_history.values[i]))
+        }, data.wallet_history.transactions[i]))
       }
 
       return {
-        block: data.block_info.block,
+        block: data.block_proof.block,
         wallet: wallet,
         transactions: transactions
       }
@@ -215,7 +213,7 @@ module.exports = {
         const TxIssue = getTransaction(TX_ISSUE_ID)
 
         const data = {
-          wallet: keyPair.publicKey,
+          pub_key: keyPair.publicKey,
           amount: amountToAdd.toString(),
           seed: Exonum.randomUint64()
         }
@@ -258,7 +256,7 @@ module.exports = {
 
       getBlocks: latest => {
         const suffix = !isNaN(latest) ? '&latest=' + latest : ''
-        return axios.get(`/api/explorer/v1/blocks?count=${PER_PAGE}` + suffix).then(response => response.data)
+        return axios.get(`/api/explorer/v1/blocks?count=${PER_PAGE}${suffix}`).then(response => response.data)
       },
 
       getBlock: height => {
@@ -266,7 +264,7 @@ module.exports = {
       },
 
       getTransaction: hash => {
-        return axios.get(`/api/system/v1/transactions/${hash}`).then(response => response.data)
+        return axios.get(`/api/explorer/v1/transactions/${hash}`).then(response => response.data)
       }
     }
   }

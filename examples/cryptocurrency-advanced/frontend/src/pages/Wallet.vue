@@ -17,7 +17,7 @@
               <li class="list-group-item">
                 <div class="row">
                   <div class="col-sm-3"><strong>Public key:</strong></div>
-                  <div class="col-sm-9"><code>{{ publicKey }}</code></div>
+                  <div class="col-sm-9"><code>{{ keyPair.publicKey }}</code></div>
                 </div>
               </li>
               <li class="list-group-item">
@@ -49,10 +49,10 @@
                       <span v-else-if="transaction.message_id == 129">
                         <strong v-numeral="transaction.body.amount"/> funds added
                       </span>
-                      <span v-else-if="transaction.message_id == 128 && transaction.body.from == publicKey">
+                      <span v-else-if="transaction.message_id == 128 && transaction.body.from == keyPair.publicKey">
                         <strong v-numeral="transaction.body.amount"/> sent
                       </span>
-                      <span v-else-if="transaction.message_id == 128 && transaction.body.to == publicKey">
+                      <span v-else-if="transaction.message_id == 128 && transaction.body.to == keyPair.publicKey">
                         <strong v-numeral="transaction.body.amount"/> received
                       </span>
                     </router-link>
@@ -114,9 +114,10 @@
 </template>
 
 <script>
-  const Modal = require('../components/Modal.vue')
-  const Navbar = require('../components/Navbar.vue')
-  const Spinner = require('../components/Spinner.vue')
+  import {mapState} from 'vuex'
+  import Modal from '../components/Modal.vue'
+  import Navbar from '../components/Navbar.vue'
+  import Spinner from '../components/Spinner.vue'
 
   module.exports = {
     components: {
@@ -124,10 +125,9 @@
       Navbar,
       Spinner
     },
-    data: function() {
+    data() {
       return {
         name: '',
-        publicKey: '',
         balance: 0,
         amountToAdd: 10,
         receiver: '',
@@ -141,16 +141,18 @@
         ]
       }
     },
-    computed: {
-      reverseTransactions: function() {
+    computed: Object.assign({
+      reverseTransactions() {
         return this.transactions.slice().reverse()
       }
-    },
+    }, mapState({
+      keyPair: state => state.keyPair
+    })),
     methods: {
-      loadUser: function() {
+      loadUser() {
         const self = this
 
-        if (this.$store.state.keyPair === null) {
+        if (this.keyPair === null) {
           this.$store.commit('logout')
           this.$router.push({name: 'home'})
           return
@@ -158,9 +160,8 @@
 
         this.isSpinnerVisible = true
 
-        this.$blockchain.getWallet(this.$store.state.keyPair).then(data => {
+        this.$blockchain.getWallet(this.keyPair).then(data => {
           self.name = data.wallet.name
-          self.publicKey = this.$store.state.keyPair.publicKey
           self.balance = data.wallet.balance
           self.transactions = data.transactions
           self.isSpinnerVisible = false
@@ -170,12 +171,12 @@
         })
       },
 
-      addFunds: function() {
+      addFunds() {
         const self = this
 
         this.isSpinnerVisible = true
 
-        this.$blockchain.addFunds(this.$store.state.keyPair, this.amountToAdd).then(data => {
+        this.$blockchain.addFunds(this.keyPair, this.amountToAdd).then(data => {
           self.balance = data.wallet.balance
           self.transactions = data.transactions
           self.isSpinnerVisible = false
@@ -186,20 +187,20 @@
         })
       },
 
-      transfer: function() {
+      transfer() {
         const self = this
 
         if (!this.$validateHex(this.receiver)) {
           return this.$notify('error', 'Invalid public key is passed')
         }
 
-        if (this.receiver === this.$store.state.keyPair.publicKey) {
+        if (this.receiver === this.keyPair.publicKey) {
           return self.$notify('error', 'Can not transfer funds to yourself')
         }
 
         this.isSpinnerVisible = true
 
-        this.$blockchain.transfer(this.$store.state.keyPair, this.receiver, this.amountToTransfer).then(data => {
+        this.$blockchain.transfer(this.keyPair, this.receiver, this.amountToTransfer).then(data => {
           self.balance = data.wallet.balance
           self.transactions = data.transactions
           self.isSpinnerVisible = false
@@ -210,7 +211,7 @@
         })
       }
     },
-    mounted: function() {
+    mounted() {
       this.$nextTick(function() {
         this.loadUser()
       })
