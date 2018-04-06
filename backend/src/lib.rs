@@ -40,7 +40,7 @@ use exonum::api::Api;
 use exonum::helpers::fabric;
 use exonum::crypto::Hash;
 use exonum::storage::Snapshot;
-use exonum::blockchain::{Transaction, Service, ApiContext, TransactionSet};
+use exonum::blockchain::{self, Transaction, ApiContext, TransactionSet};
 use exonum::messages::RawTransaction;
 use exonum::encoding::Error as StreamStructError;
 
@@ -57,15 +57,15 @@ mod tests;
 const TIMESTAMPING_SERVICE: u16 = 130;
 
 #[derive(Debug, Default)]
-pub struct TimestampingService;
+pub struct Service;
 
-impl TimestampingService {
-    pub fn new() -> TimestampingService {
-        TimestampingService
+impl Service {
+    pub fn new() -> Self {
+        Service
     }
 }
 
-impl Service for TimestampingService {
+impl blockchain::Service for Service {
     fn service_id(&self) -> u16 {
         TIMESTAMPING_SERVICE
     }
@@ -97,7 +97,7 @@ impl Service for TimestampingService {
 pub struct ServiceFactory;
 
 impl fabric::ServiceFactory for ServiceFactory {
-    fn make_service(&mut self, _: &fabric::Context) -> Box<Service> {
-        Box::new(TimestampingService::new())
+    fn make_service(&mut self, _: &fabric::Context) -> Box<blockchain::Service> {
+        Box::new(Service::new())
     }
 }

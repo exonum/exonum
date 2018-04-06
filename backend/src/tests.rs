@@ -22,7 +22,7 @@ use exonum_time::{MockTimeProvider, TimeService};
 use serde_json;
 use std::time::SystemTime;
 
-use TimestampingService;
+use Service;
 use transactions::TxTimestamp;
 use schema::{Timestamp, TimestampEntry};
 
@@ -30,7 +30,7 @@ fn init_testkit() -> (TestKit, MockTimeProvider) {
     let _ = init_logger();
     let mock_provider = MockTimeProvider::new(SystemTime::now());
     let mut testkit = TestKitBuilder::validator()
-        .with_service(TimestampingService::new())
+        .with_service(Service::new())
         .with_service(TimeService::with_provider(mock_provider.clone()))
         .create();
     testkit.create_blocks_until(Height(2)); // TimeService is None if no blocks were forged
