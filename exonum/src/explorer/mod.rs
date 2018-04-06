@@ -25,12 +25,14 @@ use std::fmt;
 use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
 
 use crypto::{CryptoHash, Hash};
-use blockchain::{Block, Blockchain, Schema, Transaction, TransactionError, TransactionErrorType,
+use blockchain::{Block, Blockchain, Schema, Transaction, TransactionError,
                  TransactionResult, TxLocation};
 use encoding;
 use helpers::Height;
 use messages::{Precommit, RawMessage};
 use storage::{ListProof, Snapshot};
+
+mod tx_status;
 
 /// Transaction parsing result.
 type ParseResult = Result<Box<Transaction>, encoding::Error>;
@@ -374,7 +376,7 @@ pub struct CommittedTransaction {
     content: Box<Transaction>,
     location: TxLocation,
     location_proof: ListProof<Hash>,
-    #[serde(serialize_with = "CommittedTransaction::serialize_status")]
+    #[serde(with = "tx_status")]
     status: TransactionResult,
 }
 
@@ -395,38 +397,6 @@ impl CommittedTransaction {
             .serialize_field()
             .map_err(|err| S::Error::custom(err.description()))?;
         value.serialize(serializer)
-    }
-
-    fn serialize_status<S>(result: &TransactionResult, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        /// Transaction execution status. Simplified version of `TransactionResult`.
-        #[serde(tag = "type", rename_all = "kebab-case")]
-        #[derive(Debug, Serialize)]
-        enum TxStatus<'a> {
-            Success,
-            Panic { description: &'a str },
-            Error { code: u8, description: &'a str },
-        }
-
-        fn from(result: &TransactionResult) -> TxStatus {
-            use self::TransactionErrorType::*;
-
-            match *result {
-                Ok(()) => TxStatus::Success,
-                Err(ref e) => {
-                    let description = e.description().unwrap_or_default();
-                    match e.error_type() {
-                        Panic => TxStatus::Panic { description },
-                        Code(code) => TxStatus::Error { code, description },
-                    }
-                }
-            }
-        }
-
-        let status = from(result);
-        status.serialize(serializer)
     }
 
     /// Returns the transaction location in block.
