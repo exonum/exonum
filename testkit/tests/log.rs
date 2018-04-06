@@ -15,6 +15,8 @@
 #[macro_use]
 extern crate exonum;
 extern crate exonum_testkit;
+extern crate iron;
+extern crate iron_test;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
@@ -221,4 +223,28 @@ fn test_post_transaction() {
         s
     );
     assert!(s.contains("Response: 200 OK\n"), "{}", s);
+}
+
+#[test]
+fn test_custom_request() {
+    use iron::headers::Headers;
+    use iron_test::request;
+
+    init_log();
+    let (mut testkit, api) = init_testkit();
+
+    request::get(
+        "http://localhost:3000/api/explorer/v1/blocks/0",
+        Headers::new(),
+        api.public_handler(),
+    ).unwrap();
+    testkit.poll_events();
+
+    let s = LOG.pop_message().expect("no message received");
+    assert!(LOG.is_empty());
+    assert!(
+        s.starts_with("GET (public) /api/explorer/v1/blocks/0"),
+        "{}",
+        s
+    );
 }
