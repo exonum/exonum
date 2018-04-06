@@ -55,17 +55,18 @@ fn assert_status(api: &TestKitApi, tx: &Transaction, expected_status: &serde_jso
 fn test_api_get_timestamp_nothing() {
     let (testkit, _) = init_testkit();
     let api = testkit.api();
-    let entry: Option<TimestampEntry> = api.get(
-        ApiKind::Service("timestamping"),
-        &format!("/v1/timestamps/value/{}", Hash::zero().to_hex()),
-    );
+    let entry: Option<TimestampEntry> =
+        api.get(
+            ApiKind::Service("timestamping"),
+            &format!("/v1/timestamps/value/{}", Hash::zero().to_hex()),
+        );
     assert!(entry.is_none());
 }
 
 #[test]
 fn test_api_post_timestamp() {
     let (testkit, _) = init_testkit();
-    
+
     let info = Timestamp::new(&Hash::zero(), "metadata");
     let keypair = gen_keypair();
     let tx = TxTimestamp::new(&keypair.0, info, &keypair.1);
@@ -111,10 +112,11 @@ fn test_api_get_timestamp_entry() {
     testkit.create_block_with_transactions(txvec![tx.clone()]);
 
     let api = testkit.api();
-    let entry: Option<TimestampEntry> = api.get(
-        ApiKind::Service("timestamping"),
-        &format!("/v1/timestamps/value/{}", Hash::zero().to_hex()),
-    );
+    let entry: Option<TimestampEntry> =
+        api.get(
+            ApiKind::Service("timestamping"),
+            &format!("/v1/timestamps/value/{}", Hash::zero().to_hex()),
+        );
 
     let entry = entry.unwrap();
     assert_eq!(entry.timestamp(), info);

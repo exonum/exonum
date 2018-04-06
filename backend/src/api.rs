@@ -83,7 +83,11 @@ impl<T: TransactionSend + Clone + 'static> PublicApi<T> {
             let proof = self.timestamp_proof(&content_hash)?;
             self.ok_response(&json!(proof))
         };
-        router.get("/v1/timestamps/proof/:content_hash", timestamp_proof, "get_timestamp_proof");
+        router.get(
+            "/v1/timestamps/proof/:content_hash",
+            timestamp_proof,
+            "get_timestamp_proof",
+        );
     }
 
     fn wire_timestamp(self, router: &mut Router) {
@@ -92,7 +96,11 @@ impl<T: TransactionSend + Clone + 'static> PublicApi<T> {
             let timestamp = self.timestamp(&content_hash)?;
             self.ok_response(&json!(timestamp))
         };
-        router.get("/v1/timestamps/value/:content_hash", timestamp, "get_timestamp");
+        router.get(
+            "/v1/timestamps/value/:content_hash",
+            timestamp,
+            "get_timestamp",
+        );
     }
 
     fn wire_post_timestamp(self, router: &mut Router) {

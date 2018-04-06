@@ -58,7 +58,9 @@ impl Transaction for TxTimestamp {
     }
 
     fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-        let time = TimeSchema::new(&fork).time().get().expect("Can't get the time");
+        let time = TimeSchema::new(&fork).time().get().expect(
+            "Can't get the time",
+        );
 
         let content = self.content();
         let hash = content.content_hash();
