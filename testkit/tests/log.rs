@@ -218,7 +218,7 @@ fn test_post_transaction() {
     let s = LOG.pop_message().expect("no message received");
     assert!(LOG.is_empty());
     assert!(
-        s.starts_with("POST (private) /api/services/counter/reset"),
+        s.starts_with("POST (private) /api/services/counter/reset\nBody: {"),
         "{}",
         s
     );

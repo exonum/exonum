@@ -374,13 +374,13 @@ fn log_request(
     };
 
     trace!(
-        "{method} ({access}) /{url}{req_body}\nResponse: {resp_status}\n{resp_body}\n",
+        "{method} ({access}) /{url}{req_body_tag}{req_body}\n\
+         Response: {resp_status}\n{resp_body}\n",
         method = request.method,
         access = access,
         url = url,
-        req_body = req_body
-            .map(|body| format!("\nBody: {}", body))
-            .unwrap_or_default(),
+        req_body_tag = if req_body.is_some() { "\nBody: " } else { "" },
+        req_body = req_body.unwrap_or_default(),
         resp_status = response
             .status
             .as_ref()
@@ -389,7 +389,7 @@ fn log_request(
         resp_body = response_body
             .as_ref()
             .map(String::as_ref)
-            .unwrap_or_else(|| "(no body)")
+            .unwrap_or("(no body)")
     );
 
     // Return the body to the response
