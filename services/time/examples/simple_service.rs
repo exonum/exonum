@@ -30,7 +30,7 @@ use exonum::encoding;
 use exonum::helpers::Height;
 use exonum::messages::{Message, RawTransaction};
 use exonum::storage::{Fork, ProofMapIndex, Snapshot};
-use exonum_time::{MockTimeProvider, TimeSchema, TimeService};
+use exonum_time::{time_provider::MockTimeProvider, schema::TimeSchema, TimeService};
 use exonum_testkit::TestKitBuilder;
 
 /// Marker service id.

@@ -29,7 +29,8 @@ use exonum::blockchain::{Schema, Transaction, TransactionErrorType};
 use exonum::helpers::{Height, ValidatorId};
 use exonum::crypto::{gen_keypair, CryptoHash, PublicKey};
 use exonum::storage::Snapshot;
-use exonum_time::{Error, MockTimeProvider, TimeSchema, TimeService, TxTime, ValidatorTime};
+use exonum_time::{Error, TimeService, time_provider::MockTimeProvider, api::ValidatorTime,
+                  transactions::TxTime, schema::TimeSchema};
 use exonum_testkit::{ApiKind, TestKitApi, TestKitBuilder, TestNode};
 
 fn assert_storage_times_eq<T: AsRef<Snapshot>>(
