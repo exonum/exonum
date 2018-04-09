@@ -289,7 +289,7 @@ impl Vote {
         let propose_data = {
             let mut votes = schema.votes_by_config_hash_mut(cfg_hash);
             votes.set(validator_id as u64, MaybeVote::some(self.clone()));
-            propose_data.set_history_hash(&votes.merkle_root())
+            ProposeData::new(propose, &votes.merkle_root(), propose_data.num_validators())
         };
 
         schema

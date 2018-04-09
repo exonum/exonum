@@ -47,14 +47,6 @@ encoding_struct! {
     }
 }
 
-impl ProposeData {
-    /// Changes the `votes_history_hash` field of this structure, leaving other fields intact.
-    pub fn set_history_hash(mut self, hash: &Hash) -> Self {
-        Field::write(&hash, &mut self.raw, 8, 40);
-        self
-    }
-}
-
 lazy_static! {
     static ref NO_VOTE_BYTES: Vec<u8> = Vote::new_with_signature(
         &PublicKey::zero(),
