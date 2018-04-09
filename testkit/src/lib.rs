@@ -153,8 +153,7 @@ pub mod compare;
 
 use futures::{Future, Stream};
 use futures::sync::mpsc;
-use iron::{Chain, Iron};
-use mount::Mount;
+use iron::Iron;
 use tokio_core::reactor::Core;
 
 use std::fmt;
@@ -940,18 +939,15 @@ impl TestKit {
     fn run(mut self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
         let api = self.api();
         let events_stream = self.remove_events_stream();
-        let (public_handler, private_handler) = api.into_handlers();
         let testkit_ref = Arc::new(RwLock::new(self));
-
-        let mut private_mount = Mount::new();
-        private_mount.mount("api/testkit", create_testkit_handler(&testkit_ref));
-        private_mount.mount("", private_handler);
+        let (public_handler, private_handler) =
+            api.into_handlers(create_testkit_handler(&testkit_ref));
 
         let public_api_thread = thread::spawn(move || {
             Iron::new(public_handler).http(public_api_address).unwrap();
         });
         let private_api_thread = thread::spawn(move || {
-            Iron::new(Chain::new(private_mount))
+            Iron::new(private_handler)
                 .http(private_api_address)
                 .unwrap();
         });

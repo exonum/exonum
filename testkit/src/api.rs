@@ -22,6 +22,7 @@ use iron::headers::{ContentType, Headers};
 use iron::status::{self, StatusClass};
 use iron_test::{request, response};
 use log::Level;
+use mount::{Mount, OriginalUrl};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use serde_json::Value as JsonValue;
@@ -116,8 +117,18 @@ impl TestKitApi {
         &self.private_handler
     }
 
-    pub(crate) fn into_handlers(self) -> (Chain, Chain) {
-        (self.public_handler, self.private_handler)
+    pub(crate) fn into_handlers<H: Handler>(self, testkit_handler: H) -> (Chain, Chain) {
+        let (public_handler, private_handler) = (self.public_handler, self.private_handler);
+
+        let mut testkit_handler = Chain::new(testkit_handler);
+        testkit_handler
+            .link_after(|req: &mut Request, resp| log_request(&ApiAccess::Private, req, resp));
+
+        let mut private_mount = Mount::new();
+        private_mount.mount("api/testkit", testkit_handler);
+        private_mount.mount("", private_handler);
+
+        (public_handler, Chain::new(private_mount))
     }
 
     /// Sends a transaction to the node via `ApiSender`.
@@ -348,7 +359,12 @@ fn log_request(
         return Ok(response);
     }
 
-    let mut url = request.url.path().join("/");
+    let mut url = request
+        .extensions
+        .get::<OriginalUrl>()
+        .unwrap_or(&request.url)
+        .path()
+        .join("/");
     if let Some(query) = request.url.query() {
         url += "?";
         url += query;
