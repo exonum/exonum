@@ -27,6 +27,7 @@ serde_json = "1.0.0"
 iron = "0.6.0"
 iron-test = "0.6.0"
 router = "0.6.0"
+bodyparser = "0.8.0"
 
 [dev-dependencies]
 bodyparser = "0.8.0"
@@ -34,3 +35,5 @@ serde_derive = "1.0.0"
 rand = "0.4.2"
 pretty_assertions = "0.5.0"
 assert_matches = "1.2.0"
+thread_local = "0.3.5"
+lazy_static = "1.0.0"

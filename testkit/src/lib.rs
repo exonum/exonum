@@ -124,6 +124,7 @@
 
 #![deny(missing_debug_implementations, missing_docs)]
 
+extern crate bodyparser;
 extern crate exonum;
 extern crate futures;
 extern crate iron;
@@ -280,7 +281,7 @@ impl TestKitBuilder {
     /// Creates the testkit.
     pub fn create(self) -> TestKit {
         if self.logger {
-            exonum::helpers::init_logger().unwrap();
+            exonum::helpers::init_logger().ok();
         }
         crypto::init();
         TestKit::assemble(

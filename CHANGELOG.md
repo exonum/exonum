@@ -173,6 +173,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   rather than one by one. The number of batches depends on the size limits
   of the message. (#583)
 
+#### exonum-testkit
+
+- Request logging for `TestKitApi` now encompasses all requests. The log
+  format is slightly changed to allow for the generic request / response form. (#601)
+
 ## 0.6 - 2018-03-06
 
 ### Breaking changes
