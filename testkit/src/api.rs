@@ -12,14 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use bodyparser;
 use exonum::blockchain::{SharedNodeState, Transaction};
 use exonum::node::{create_private_api_handler, create_public_api_handler, ApiSender,
                    TransactionSend};
 use exonum::api::ApiError;
-use iron::{Chain, Handler, IronError, Response};
+use iron::{Chain, Handler, IronError, IronResult, Plugin, Request, Response};
 use iron::headers::{ContentType, Headers};
 use iron::status::{self, StatusClass};
 use iron_test::{request, response};
+use log::Level;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use serde_json::Value as JsonValue;
@@ -74,17 +76,29 @@ impl TestKitApi {
         let api_state = SharedNodeState::new(10_000);
 
         TestKitApi {
-            public_handler: create_public_api_handler(
-                blockchain.clone(),
-                api_state.clone(),
-                &testkit.api_config,
-            ),
+            public_handler: {
+                let mut handler = create_public_api_handler(
+                    blockchain.clone(),
+                    api_state.clone(),
+                    &testkit.api_config,
+                );
+                handler.link_after(|req: &mut Request, resp| {
+                    log_request(&ApiAccess::Public, req, resp)
+                });
+                handler
+            },
 
-            private_handler: create_private_api_handler(
-                blockchain.clone(),
-                api_state,
-                testkit.api_sender.clone(),
-            ),
+            private_handler: {
+                let mut handler = create_private_api_handler(
+                    blockchain.clone(),
+                    api_state,
+                    testkit.api_sender.clone(),
+                );
+                handler.link_after(|req: &mut Request, resp| {
+                    log_request(&ApiAccess::Private, req, resp)
+                });
+                handler
+            },
 
             api_sender: testkit.api_sender.clone(),
         }
@@ -116,7 +130,7 @@ impl TestKitApi {
             .expect("Cannot send transaction");
     }
 
-    fn get_internal<H, D>(handler: &H, endpoint: &str, expect_error: bool, is_public: bool) -> D
+    fn get_internal<H, D>(handler: &H, endpoint: &str, expect_error: bool) -> D
     where
         H: Handler,
         for<'de> D: Deserialize<'de>,
@@ -149,10 +163,6 @@ impl TestKitApi {
         }
 
         let resp = response::extract_body_to_string(resp);
-
-        let publicity = if is_public { "" } else { " private" };
-        trace!("GET{} {}\nResponse:\n{}\n", publicity, endpoint, resp);
-
         serde_json::from_str(&resp).unwrap()
     }
 
@@ -170,7 +180,6 @@ impl TestKitApi {
             &self.public_handler,
             &format!("{}/{}", kind.into_prefix(), endpoint),
             false,
-            true,
         )
     }
 
@@ -188,7 +197,6 @@ impl TestKitApi {
             &self.private_handler,
             &format!("{}/{}", kind.into_prefix(), endpoint),
             false,
-            false,
         )
     }
 
@@ -205,7 +213,7 @@ impl TestKitApi {
         TestKitApi::response_to_api_error(response)
     }
 
-    fn post_internal<H, T, D>(handler: &H, endpoint: &str, data: &T, is_public: bool) -> D
+    fn post_internal<H, T, D>(handler: &H, endpoint: &str, data: &T) -> D
     where
         H: Handler,
         T: Serialize,
@@ -225,16 +233,6 @@ impl TestKitApi {
         ).expect("Cannot send data");
 
         let resp = response::extract_body_to_string(resp);
-
-        let publicity = if is_public { "" } else { " private" };
-        trace!(
-            "POST{} {}\nBody: \n{}\nResponse:\n{}\n",
-            publicity,
-            endpoint,
-            body,
-            resp
-        );
-
         serde_json::from_str(&resp).expect("Cannot parse result")
     }
 
@@ -256,7 +254,6 @@ impl TestKitApi {
             &self.public_handler,
             &format!("{}/{}", kind.into_prefix(), endpoint),
             transaction,
-            true,
         )
     }
 
@@ -278,7 +275,6 @@ impl TestKitApi {
             &self.private_handler,
             &format!("{}/{}", kind.into_prefix(), endpoint),
             transaction,
-            false,
         )
     }
 
@@ -313,6 +309,96 @@ impl TestKitApi {
             s => panic!("Received non-error response status: {}", s.to_u16()),
         }
     }
+}
+
+#[derive(Debug)]
+enum ApiAccess {
+    Public,
+    Private,
+}
+
+impl fmt::Display for ApiAccess {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            ApiAccess::Public => formatter.write_str("public"),
+            ApiAccess::Private => formatter.write_str("private"),
+        }
+    }
+}
+
+// Logging middleware for `TestKitApi`.
+fn log_request(
+    access: &ApiAccess,
+    request: &mut Request,
+    mut response: Response,
+) -> IronResult<Response> {
+    use iron::headers::ContentLength;
+    use iron::method::Method;
+    use iron::response::WriteBody;
+
+    fn has_body(method: &Method) -> bool {
+        match *method {
+            Method::Get | Method::Head | Method::Delete | Method::Trace => false,
+            _ => true,
+        }
+    }
+
+    if !log_enabled!(Level::Trace) {
+        // Avoid expensive string allocations.
+        return Ok(response);
+    }
+
+    let mut url = request.url.path().join("/");
+    if let Some(query) = request.url.query() {
+        url += "?";
+        url += query;
+    }
+
+    let req_body: Option<String> = if has_body(&request.method) {
+        request
+            .get::<bodyparser::Raw>()
+            .expect("cannot read request body")
+    } else {
+        None
+    };
+
+    let response_body: Option<String> = {
+        let len: u64 = response
+            .headers
+            .get::<ContentLength>()
+            .map(|len| len.0)
+            .unwrap_or_default();
+
+        response.body.take().map(|mut body| {
+            let mut buffer = Vec::with_capacity(len as usize);
+            body.write_body(&mut buffer)
+                .expect("cannot write response body to buffer");
+            String::from_utf8(buffer).expect("cannot decode response body")
+        })
+    };
+
+    trace!(
+        "{method} ({access}) /{url}{req_body_tag}{req_body}\n\
+         Response: {resp_status}\n{resp_body}\n",
+        method = request.method,
+        access = access,
+        url = url,
+        req_body_tag = if req_body.is_some() { "\nBody: " } else { "" },
+        req_body = req_body.unwrap_or_default(),
+        resp_status = response
+            .status
+            .as_ref()
+            .map(ToString::to_string)
+            .unwrap_or_else(|| "(no status)".to_string()),
+        resp_body = response_body
+            .as_ref()
+            .map(String::as_ref)
+            .unwrap_or("(no body)")
+    );
+
+    // Return the body to the response
+    response.body = response_body.map(|body| Box::new(body) as Box<WriteBody>);
+    Ok(response)
 }
 
 #[cfg(test)]

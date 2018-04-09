@@ -295,7 +295,7 @@ impl TestKitBuilder {
     /// Creates the testkit.
     pub fn create(self) -> TestKit {
         if self.logger {
-            exonum::helpers::init_logger().unwrap();
+            exonum::helpers::init_logger().ok();
         }
         crypto::init();
         TestKit::assemble(

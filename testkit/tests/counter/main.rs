@@ -584,9 +584,9 @@ fn test_explorer_transaction_info() {
     assert_eq!(
         info,
         json!({
-        "type": "in-pool",
-        "content": tx.serialize_field().unwrap(),
-    })
+            "type": "in-pool",
+            "content": tx.serialize_field().unwrap(),
+        })
     );
 
     testkit.create_block();
