@@ -15,7 +15,6 @@
 //! Storage schema for the configuration service.
 
 use exonum::crypto::{self, CryptoHash, Hash, PublicKey, Signature};
-use exonum::encoding::Field;
 use exonum::storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot, StorageValue};
 
 use std::borrow::Cow;

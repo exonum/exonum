@@ -25,7 +25,8 @@ use errors::Error as ServiceError;
 use schema::{MaybeVote, ProposeData, Schema};
 
 transactions! {
-    Any {
+    /// Configuration Service transactions.
+    pub ConfigurationTransactions {
         const SERVICE_ID = super::SERVICE_ID;
 
         /// Propose a new configuration.
@@ -320,11 +321,4 @@ impl Transaction for Vote {
         }
         Ok(())
     }
-}
-
-/// Parses a transaction from its raw representation.
-pub(crate) fn tx_from_raw(raw: RawTransaction) -> Result<Box<Transaction>, EncodingError> {
-    use exonum::blockchain::TransactionSet;
-
-    Any::tx_from_raw(raw).map(Any::into)
 }
