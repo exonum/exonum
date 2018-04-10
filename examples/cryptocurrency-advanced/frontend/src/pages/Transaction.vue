@@ -124,19 +124,17 @@
     },
     methods: {
       loadTransaction() {
-        const self = this
-
         this.isSpinnerVisible = true
 
         this.$blockchain.getTransaction(this.hash).then(data => {
-          self.transaction = data.content
-          self.location = data.location
-          self.status = data.status
-          self.type = data.type
-          self.isSpinnerVisible = false
+          this.transaction = data.content
+          this.location = data.location
+          this.status = data.status
+          this.type = data.type
+          this.isSpinnerVisible = false
         }).catch(error => {
-          self.isSpinnerVisible = false
-          self.$notify('error', error.toString())
+          this.isSpinnerVisible = false
+          this.$notify('error', error.toString())
         })
       }
     },

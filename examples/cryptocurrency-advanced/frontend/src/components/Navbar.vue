@@ -29,7 +29,7 @@
     methods: {
       logout() {
         this.$store.commit('logout')
-        this.$router.push({name: 'home'})
+        this.$router.push({ name: 'home' })
       }
     }
   }

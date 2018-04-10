@@ -114,7 +114,7 @@
 </template>
 
 <script>
-  import {mapState} from 'vuex'
+  import { mapState } from 'vuex'
   import Modal from '../components/Modal.vue'
   import Navbar from '../components/Navbar.vue'
   import Spinner from '../components/Spinner.vue'
@@ -135,9 +135,9 @@
         isSpinnerVisible: false,
         transactions: [],
         variants: [
-          {id: 'ten', amount: 10},
-          {id: 'fifty', amount: 50},
-          {id: 'hundred', amount: 100}
+          { id: 'ten', amount: 10 },
+          { id: 'fifty', amount: 50 },
+          { id: 'hundred', amount: 100 }
         ]
       }
     },
@@ -150,64 +150,58 @@
     })),
     methods: {
       loadUser() {
-        const self = this
-
         if (this.keyPair === null) {
           this.$store.commit('logout')
-          this.$router.push({name: 'home'})
+          this.$router.push({ name: 'home' })
           return
         }
 
         this.isSpinnerVisible = true
 
-        this.$blockchain.getWallet(this.keyPair).then(data => {
-          self.name = data.wallet.name
-          self.balance = data.wallet.balance
-          self.transactions = data.transactions
-          self.isSpinnerVisible = false
-        }).catch(function(error) {
-          self.isSpinnerVisible = false
-          self.$notify('error', error.toString())
+        this.$blockchain.getWallet(this.keyPair.publicKey).then(data => {
+          this.name = data.wallet.name
+          this.balance = data.wallet.balance
+          this.transactions = data.transactions
+          this.isSpinnerVisible = false
+        }).catch(error => {
+          this.isSpinnerVisible = false
+          this.$notify('error', error.toString())
         })
       },
 
       addFunds() {
-        const self = this
-
         this.isSpinnerVisible = true
 
         this.$blockchain.addFunds(this.keyPair, this.amountToAdd).then(data => {
-          self.balance = data.wallet.balance
-          self.transactions = data.transactions
-          self.isSpinnerVisible = false
-          self.$notify('success', 'Add funds transaction has been written into the blockchain')
-        }).catch(function(error) {
-          self.isSpinnerVisible = false
-          self.$notify('error', error.toString())
+          this.balance = data.wallet.balance
+          this.transactions = data.transactions
+          this.isSpinnerVisible = false
+          this.$notify('success', 'Add funds transaction has been written into the blockchain')
+        }).catch(error => {
+          this.isSpinnerVisible = false
+          this.$notify('error', error.toString())
         })
       },
 
       transfer() {
-        const self = this
-
         if (!this.$validateHex(this.receiver)) {
           return this.$notify('error', 'Invalid public key is passed')
         }
 
         if (this.receiver === this.keyPair.publicKey) {
-          return self.$notify('error', 'Can not transfer funds to yourself')
+          return this.$notify('error', 'Can not transfer funds to yourself')
         }
 
         this.isSpinnerVisible = true
 
         this.$blockchain.transfer(this.keyPair, this.receiver, this.amountToTransfer).then(data => {
-          self.balance = data.wallet.balance
-          self.transactions = data.transactions
-          self.isSpinnerVisible = false
-          self.$notify('success', 'Transfer transaction has been written into the blockchain')
-        }).catch(function(error) {
-          self.isSpinnerVisible = false
-          self.$notify('error', error.toString())
+          this.balance = data.wallet.balance
+          this.transactions = data.transactions
+          this.isSpinnerVisible = false
+          this.$notify('success', 'Transfer transaction has been written into the blockchain')
+        }).catch(error => {
+          this.isSpinnerVisible = false
+          this.$notify('error', error.toString())
         })
       }
     },

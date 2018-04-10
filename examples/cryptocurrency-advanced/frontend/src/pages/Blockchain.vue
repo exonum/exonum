@@ -52,16 +52,14 @@
     },
     methods: {
       loadBlocks(latest) {
-        const self = this
-
         this.isSpinnerVisible = true
 
         this.$blockchain.getBlocks(latest).then(data => {
-          self.blocks = self.blocks.concat(data.blocks)
-          self.isSpinnerVisible = false
+          this.blocks = this.blocks.concat(data.blocks)
+          this.isSpinnerVisible = false
         }).catch(error => {
-          self.isSpinnerVisible = false
-          self.$notify('error', error.toString())
+          this.isSpinnerVisible = false
+          this.$notify('error', error.toString())
         })
       },
 

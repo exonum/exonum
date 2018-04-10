@@ -3,10 +3,8 @@ import axios from 'axios'
 
 const TX_URL = '/api/services/cryptocurrency/v1/wallets/transaction'
 const PER_PAGE = 10
-
 const ATTEMPTS = 10
 const ATTEMPT_TIMEOUT = 500
-const NETWORK_ID = 0
 const PROTOCOL_VERSION = 0
 const SERVICE_ID = 128
 const TX_TRANSFER_ID = 0
@@ -39,7 +37,6 @@ function getTransaction(transactionId) {
   switch (transactionId) {
     case TX_TRANSFER_ID:
       return Exonum.newMessage({
-        network_id: NETWORK_ID,
         protocol_version: PROTOCOL_VERSION,
         service_id: SERVICE_ID,
         message_id: TX_TRANSFER_ID,
@@ -52,7 +49,6 @@ function getTransaction(transactionId) {
       })
     case TX_ISSUE_ID:
       return Exonum.newMessage({
-        network_id: NETWORK_ID,
         protocol_version: PROTOCOL_VERSION,
         service_id: SERVICE_ID,
         message_id: TX_ISSUE_ID,
@@ -64,7 +60,6 @@ function getTransaction(transactionId) {
       })
     case TX_WALLET_ID:
       return Exonum.newMessage({
-        network_id: NETWORK_ID,
         protocol_version: PROTOCOL_VERSION,
         service_id: SERVICE_ID,
         message_id: TX_WALLET_ID,
@@ -78,7 +73,7 @@ function getTransaction(transactionId) {
   }
 }
 
-function getPublicKeyOfTransaction(transactionId, transaction) {
+function getOwner(transactionId, transaction) {
   switch (transactionId) {
     case TX_TRANSFER_ID:
       return transaction.from
@@ -91,75 +86,77 @@ function getPublicKeyOfTransaction(transactionId, transaction) {
   }
 }
 
-function getWallet(keyPair) {
+function getWallet(publicKey) {
   return axios.get('/api/services/configuration/v1/configs/actual').then(response => {
     // actual list of public keys of validators
     const validators = response.data.config.validator_keys.map(validator => {
       return validator.consensus_key
     })
 
-    return axios.get(`/api/services/cryptocurrency/v1/wallets/info/${keyPair.publicKey}`).then(response => response.data).then((data) => {
-      if (!Exonum.verifyBlock(data.block_proof, validators, NETWORK_ID)) {
-        throw new Error('Block can not be verified')
-      }
-
-      // find root hash of table with wallets in the tree of all tables
-      const tableKey = TableKey.hash({
-        service_id: SERVICE_ID,
-        table_index: 0
-      })
-      const walletsHash = Exonum.merklePatriciaProof(data.block_proof.block.state_hash, data.wallet_proof.to_table, tableKey)
-      if (walletsHash === null) {
-        throw new Error('Wallets table not found')
-      }
-
-      // find wallet in the tree of all wallets
-      const wallet = Exonum.merklePatriciaProof(walletsHash, data.wallet_proof.to_wallet, keyPair.publicKey, Wallet)
-      if (wallet === null) {
-        throw new Error('Wallet not found')
-      }
-
-      // get transactions
-      const transactionsMetaData = Exonum.merkleProof(
-        wallet.history_hash,
-        wallet.history_len,
-        data.wallet_history.proof,
-        [0, wallet.history_len],
-        TransactionMetaData
-      )
-
-      if (data.wallet_history.transactions.length !== transactionsMetaData.length) {
-        // number of transactions in wallet history is not equal
-        // to number of transactions in array with transactions meta data
-        throw new Error('Transactions can not be verified')
-      }
-
-      // validate each transaction
-      let transactions = []
-      for (let i = 0; i < data.wallet_history.transactions.length; i++) {
-        let Transaction = getTransaction(data.wallet_history.transactions[i].message_id)
-        const publicKey = getPublicKeyOfTransaction(data.wallet_history.transactions[i].message_id, data.wallet_history.transactions[i].body)
-
-        Transaction.signature = data.wallet_history.transactions[i].signature
-
-        if (Transaction.hash(data.wallet_history.transactions[i].body) !== transactionsMetaData[i].tx_hash) {
-          throw new Error('Invalid transaction hash has been found')
-        } else if (!Transaction.verifySignature(data.wallet_history.transactions[i].signature, publicKey, data.wallet_history.transactions[i].body)) {
-          throw new Error('Invalid transaction signature has been found')
+    return axios.get(`/api/services/cryptocurrency/v1/wallets/info/${publicKey}`)
+      .then(response => response.data)
+      .then(data => {
+        if (!Exonum.verifyBlock(data.block_proof, validators)) {
+          throw new Error('Block can not be verified')
         }
 
-        transactions.push(Object.assign({
-          hash: transactionsMetaData[i].tx_hash,
-          status: transactionsMetaData[i].execution_status
-        }, data.wallet_history.transactions[i]))
-      }
+        // find root hash of table with wallets in the tree of all tables
+        const tableKey = TableKey.hash({
+          service_id: SERVICE_ID,
+          table_index: 0
+        })
+        const walletsHash = Exonum.merklePatriciaProof(data.block_proof.block.state_hash, data.wallet_proof.to_table, tableKey)
+        if (walletsHash === null) {
+          throw new Error('Wallets table not found')
+        }
 
-      return {
-        block: data.block_proof.block,
-        wallet: wallet,
-        transactions: transactions
-      }
-    })
+        // find wallet in the tree of all wallets
+        const wallet = Exonum.merklePatriciaProof(walletsHash, data.wallet_proof.to_wallet, publicKey, Wallet)
+        if (wallet === null) {
+          throw new Error('Wallet not found')
+        }
+
+        // get transactions
+        const transactionsMetaData = Exonum.merkleProof(
+          wallet.history_hash,
+          wallet.history_len,
+          data.wallet_history.proof,
+          [0, wallet.history_len],
+          TransactionMetaData
+        )
+
+        if (data.wallet_history.transactions.length !== transactionsMetaData.length) {
+          // number of transactions in wallet history is not equal
+          // to number of transactions in array with transactions meta data
+          throw new Error('Transactions can not be verified')
+        }
+
+        // validate each transaction
+        let transactions = []
+        for (let i = 0; i < data.wallet_history.transactions.length; i++) {
+          let Transaction = getTransaction(data.wallet_history.transactions[i].message_id)
+          const owner = getOwner(data.wallet_history.transactions[i].message_id, data.wallet_history.transactions[i].body)
+
+          Transaction.signature = data.wallet_history.transactions[i].signature
+
+          if (Transaction.hash(data.wallet_history.transactions[i].body) !== transactionsMetaData[i].tx_hash) {
+            throw new Error('Invalid transaction hash has been found')
+          } else if (!Transaction.verifySignature(data.wallet_history.transactions[i].signature, owner, data.wallet_history.transactions[i].body)) {
+            throw new Error('Invalid transaction signature has been found')
+          }
+
+          transactions.push(Object.assign({
+            hash: transactionsMetaData[i].tx_hash,
+            status: transactionsMetaData[i].execution_status
+          }, data.wallet_history.transactions[i]))
+        }
+
+        return {
+          block: data.block_proof.block,
+          wallet: wallet,
+          transactions: transactions
+        }
+      })
   })
 }
 
@@ -169,9 +166,9 @@ function waitForAcceptance(keyPair, hash) {
   return (function makeAttempt() {
     return getWallet(keyPair).then(data => {
       // find transaction in a wallet proof
-      if (typeof data.transactions.find((transaction) => transaction.hash === hash) === 'undefined') {
+      if (typeof data.transactions.find(transaction => transaction.hash === hash) === 'undefined') {
         if (--attempt > 0) {
-          return new Promise((resolve) => {
+          return new Promise(resolve => {
             setTimeout(resolve, ATTEMPT_TIMEOUT)
           }).then(makeAttempt)
         } else {
@@ -187,7 +184,7 @@ function waitForAcceptance(keyPair, hash) {
 module.exports = {
   install(Vue) {
     Vue.prototype.$blockchain = {
-      createWallet: name => {
+      createWallet(name) {
         const keyPair = Exonum.keyPair()
 
         const TxCreateWallet = getTransaction(TX_WALLET_ID)
@@ -200,7 +197,6 @@ module.exports = {
         const signature = TxCreateWallet.sign(keyPair.secretKey, data)
 
         return axios.post(TX_URL, {
-          network_id: NETWORK_ID,
           protocol_version: PROTOCOL_VERSION,
           service_id: SERVICE_ID,
           message_id: TX_WALLET_ID,
@@ -209,7 +205,7 @@ module.exports = {
         }).then(() => keyPair)
       },
 
-      addFunds: (keyPair, amountToAdd) => {
+      addFunds(keyPair, amountToAdd) {
         const TxIssue = getTransaction(TX_ISSUE_ID)
 
         const data = {
@@ -221,7 +217,6 @@ module.exports = {
         const signature = TxIssue.sign(keyPair.secretKey, data)
 
         return axios.post(TX_URL, {
-          network_id: NETWORK_ID,
           protocol_version: PROTOCOL_VERSION,
           service_id: SERVICE_ID,
           message_id: TX_ISSUE_ID,
@@ -230,7 +225,7 @@ module.exports = {
         }).then(response => waitForAcceptance(keyPair, response.data.tx_hash))
       },
 
-      transfer: (keyPair, receiver, amountToTransfer) => {
+      transfer(keyPair, receiver, amountToTransfer) {
         const TxTransfer = getTransaction(TX_TRANSFER_ID)
 
         const data = {
@@ -243,7 +238,6 @@ module.exports = {
         const signature = TxTransfer.sign(keyPair.secretKey, data)
 
         return axios.post(TX_URL, {
-          network_id: NETWORK_ID,
           protocol_version: PROTOCOL_VERSION,
           service_id: SERVICE_ID,
           message_id: TX_TRANSFER_ID,
@@ -254,16 +248,16 @@ module.exports = {
 
       getWallet: getWallet,
 
-      getBlocks: latest => {
+      getBlocks(latest) {
         const suffix = !isNaN(latest) ? '&latest=' + latest : ''
         return axios.get(`/api/explorer/v1/blocks?count=${PER_PAGE}${suffix}`).then(response => response.data)
       },
 
-      getBlock: height => {
+      getBlock(height) {
         return axios.get(`/api/explorer/v1/blocks/${height}`).then(response => response.data)
       },
 
-      getTransaction: hash => {
+      getTransaction(hash) {
         return axios.get(`/api/explorer/v1/transactions/${hash}`).then(response => response.data)
       }
     }

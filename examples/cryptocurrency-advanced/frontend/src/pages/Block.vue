@@ -91,17 +91,15 @@
     },
     methods: {
       loadBlock() {
-        const self = this
-
         this.isSpinnerVisible = true
 
         this.$blockchain.getBlock(this.height).then(data => {
-          self.block = data.block
-          self.transactions = data.txs
-          self.isSpinnerVisible = false
+          this.block = data.block
+          this.transactions = data.txs
+          this.isSpinnerVisible = false
         }).catch(error => {
-          self.isSpinnerVisible = false
-          self.$notify('error', error.toString())
+          this.isSpinnerVisible = false
+          this.$notify('error', error.toString())
         })
       }
     },

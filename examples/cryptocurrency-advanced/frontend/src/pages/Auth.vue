@@ -74,13 +74,11 @@
         })
 
         this.$nextTick(function() {
-          this.$router.push({name: 'user'})
+          this.$router.push({ name: 'user' })
         })
       },
 
       register() {
-        const self = this
-
         if (!this.name) {
           return this.$notify('error', 'The name is a required field')
         }
@@ -88,13 +86,13 @@
         this.isSpinnerVisible = true
 
         this.$blockchain.createWallet(this.name).then(keyPair => {
-          self.name = ''
-          self.keyPair = keyPair
-          self.isSpinnerVisible = false
-          self.isModalVisible = true
-        }).catch(function(error) {
-          self.isSpinnerVisible = false
-          self.$notify('error', error.toString())
+          this.name = ''
+          this.keyPair = keyPair
+          this.isSpinnerVisible = false
+          this.isModalVisible = true
+        }).catch(error => {
+          this.isSpinnerVisible = false
+          this.$notify('error', error.toString())
         })
       },
 
@@ -108,7 +106,7 @@
         this.$store.commit('login', this.keyPair)
 
         this.$nextTick(function() {
-          this.$router.push({name: 'user'})
+          this.$router.push({ name: 'user' })
         })
       }
     }

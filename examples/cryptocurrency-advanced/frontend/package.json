@@ -5,7 +5,7 @@
   "author": "Exonum Team <exonum@bitfury.com>",
   "license": "Apache-2.0",
   "scripts": {
-    "build": "node ./node_modules/grunt-cli/bin/grunt",
+    "build": "grunt",
     "start": "node server.js"
   },
   "dependencies": {
