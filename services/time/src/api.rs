@@ -65,11 +65,15 @@ impl PrivateApi {
             self.ok_response(&serde_json::to_value(validators_times).unwrap())
         };
 
-        router.get("v1/validators_times/all", get_all_validators_times, "get_all_validators_times",);
+        router.get(
+            "v1/validators_times/all",
+            get_all_validators_times,
+            "get_all_validators_times",
+        );
     }
 
     /// Endpoint for getting time values for current validators.
-    fn wire_get_current_validators_times(self, router: &mut Router)  {
+    fn wire_get_current_validators_times(self, router: &mut Router) {
         let validators_times = move |_: &mut Request| -> IronResult<Response> {
             let view = self.blockchain.snapshot();
             let validator_keys = Schema::new(&view).actual_configuration().validator_keys;
@@ -89,7 +93,11 @@ impl PrivateApi {
             self.ok_response(&serde_json::to_value(validators_times).unwrap())
         };
 
-        router.get("v1/validators_times", validators_times, "get_current_validators_times",);
+        router.get(
+            "v1/validators_times",
+            validators_times,
+            "get_current_validators_times",
+        );
     }
 }
 
@@ -105,4 +113,3 @@ impl Api for PrivateApi {
         self.clone().wire_get_current_validators_times(router);
     }
 }
-
