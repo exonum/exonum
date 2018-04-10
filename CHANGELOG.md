@@ -63,8 +63,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   `HEADER_LENGTH` remains the same, first byte of `RawMessage` is now reserved and
   always set to `0`. (#579)
 
-- `exonum::explorer` module has been reworked to add new functionality. (#535)
-  In particular:
+- `exonum::explorer` module has been reworked to add new functionality.
+  (#535, #600) In particular:
 
   - The explorer now allows to iterate over blocks in the blockchain
     in the given height range, replacing old `blocks_range` method.
@@ -78,6 +78,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   Migration path:
 
   - Rename imported types and methods as specified above
+  - Use explicit type parameter in `TransactionInfo` and `CommittedTransaction`
+    (e.g., `TransactionInfo<serde_json::Value>` or `TransactionInfo<MyTransaction>`)
+    if you need to deserialize transaction-related data returned from
+    the explorer HTTP API
   - Consult `explorer` module docs for further possible changes in API
 
 #### exonum-testkit
