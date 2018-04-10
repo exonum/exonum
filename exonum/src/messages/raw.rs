@@ -30,7 +30,7 @@ pub const HEADER_LENGTH: usize = 10;
 pub const PROTOCOL_MAJOR_VERSION: u8 = 0;
 
 /// Thread-safe reference-counting pointer to the `MessageBuffer`.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct RawMessage(sync::Arc<MessageBuffer>);
 
 impl RawMessage {
