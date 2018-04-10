@@ -20,7 +20,7 @@ use uuid::{self, Uuid};
 
 use std::mem;
 use std::result::Result as StdResult;
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 use crypto::{Hash, PublicKey, Signature};
 use helpers::{Height, Round, ValidatorId};
@@ -304,43 +304,71 @@ impl<'a> Field<'a> for DateTime<Utc> {
     }
 }
 
+const HEADER_SIZE: usize = 1;
+const PORT_SIZE: usize = 2;
+
+const IPV4_HEADER: u8 = 0;
+const IPV6_HEADER: u8 = 1;
+
 // TODO add socketaddr check, for now with only ipv4
 // all possible (>6 bytes long) sequences is a valid addr (ECR-156).
 impl<'a> Field<'a> for SocketAddr {
     fn field_size() -> Offset {
         // FIXME: reserve space for future compatibility (ECR-156)
-        6
+        (HEADER_SIZE + mem::size_of::<IpAddr>() + PORT_SIZE) as Offset
     }
 
     unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
-        let mut octets = [0u8; 4];
-        octets.copy_from_slice(&buffer[from as usize..from as usize + 4]);
-        let ip = Ipv4Addr::from(octets);
-        let port = LittleEndian::read_u16(&buffer[from as usize + 4..to as usize]);
-        SocketAddr::V4(SocketAddrV4::new(ip, port))
+        let addr_start = from as usize + HEADER_SIZE;
+        let ip = match buffer[from as usize] {
+            IPV4_HEADER => {
+                const ADDR_SIZE: usize = mem::size_of::<Ipv4Addr>();
+                let mut octets: [u8; ADDR_SIZE] = mem::uninitialized();
+                octets.copy_from_slice(&buffer[addr_start..addr_start + ADDR_SIZE]);
+                IpAddr::V4(Ipv4Addr::from(octets))
+            },
+            IPV6_HEADER => {
+                const ADDR_SIZE: usize = mem::size_of::<Ipv6Addr>();
+                let mut octets: [u8; ADDR_SIZE] = mem::uninitialized();
+                octets.copy_from_slice(&buffer[addr_start..addr_start + ADDR_SIZE]);
+                IpAddr::V6(Ipv6Addr::from(octets))
+            },
+            header => panic!("Unknown header `{:X}` for SocketAddr", header),
+        };
+        let port = LittleEndian::read_u16(&buffer[to as usize - PORT_SIZE..to as usize]);
+        SocketAddr::new(ip, port)
     }
 
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
         match *self {
             SocketAddr::V4(addr) => {
-                buffer[from as usize..to as usize - 2].copy_from_slice(&addr.ip().octets());
+                buffer[from as usize] = IPV4_HEADER;
+                buffer[from as usize + HEADER_SIZE..to as usize - PORT_SIZE].copy_from_slice(&addr.ip().octets());
             }
-            SocketAddr::V6(_) => {
-                // FIXME: Supporting Ipv6 (ECR-156, ECR-158)
-                panic!("Ipv6 are currently unsupported")
+            SocketAddr::V6(addr) => {
+                buffer[from as usize] = IPV6_HEADER;
+                buffer[from as usize + HEADER_SIZE..to as usize - PORT_SIZE].copy_from_slice(&addr.ip().octets());
             }
         }
-        LittleEndian::write_u16(&mut buffer[to as usize - 2..to as usize], self.port());
+        LittleEndian::write_u16(&mut buffer[to as usize - PORT_SIZE..to as usize], self.port());
     }
 
     fn check(
-        _: &'a [u8],
+        buffer: &'a [u8],
         from: CheckedOffset,
         to: CheckedOffset,
         latest_segment: CheckedOffset,
     ) -> Result {
         debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
-        Ok(latest_segment)
+        let from_offset = from.unchecked_offset();
+        if buffer[from_offset as usize] != IPV4_HEADER && buffer[from_offset as usize] != IPV6_HEADER {
+            Err(Error::IncorrectSocketAddrHeader {
+                position: from.unchecked_offset(),
+                value: buffer[from_offset as usize],
+            })
+        } else {
+            Ok(latest_segment)
+        }
     }
 }
 

@@ -44,6 +44,13 @@ pub enum Error {
         /// Value represented as `f64`.
         value: f64,
     },
+    /// SocketAddr header is neither 0 nor 1.
+    IncorrectSocketAddrHeader {
+        /// Position in buffer where error appears.
+        position: Offset,
+        /// Header value.
+        value: u8
+    },
     /// Segment reference is incorrect
     IncorrectSegmentReference {
         /// position in buffer where error appears.
@@ -130,6 +137,7 @@ impl StdError for Error {
             Error::UnexpectedlyShortPayload { .. } => "Unexpectedly short payload",
             Error::IncorrectBoolean { .. } => "Incorrect boolean value",
             Error::UnsupportedFloat { .. } => "Unsupported float value",
+            Error::IncorrectSocketAddrHeader { .. } => "Incorrect SocketAddr header value",
             Error::IncorrectSegmentReference { .. } => "Incorrect segment reference",
             Error::IncorrectSegmentSize { .. } => "Incorrect segment size",
             Error::UnexpectedlyShortRawMessage { .. } => "Unexpectedly short RawMessage",
