@@ -171,7 +171,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `RawTransaction` now has its own implementation of `fmt::Debug` trait instead
   of `#[derive(Debug)]`. The template of `RawTransaction`’s debug message is
   `Transaction { version: #, service_id: #, message_type: #, length: #,
-  hash: Hash(###) }`
+  hash: Hash(###) }`. (#603)
 
 - Non-committed transactions are now stored persistently in the storage
   instead of memory pool. (#549)
