@@ -90,17 +90,18 @@
       }
     },
     methods: {
-      loadBlock() {
+      async loadBlock() {
         this.isSpinnerVisible = true
 
-        this.$blockchain.getBlock(this.height).then(data => {
+        try {
+          const data = await this.$blockchain.getBlock(this.height)
           this.block = data.block
           this.transactions = data.txs
           this.isSpinnerVisible = false
-        }).catch(error => {
+        } catch (error) {
           this.isSpinnerVisible = false
           this.$notify('error', error.toString())
-        })
+        }
       }
     },
     mounted() {

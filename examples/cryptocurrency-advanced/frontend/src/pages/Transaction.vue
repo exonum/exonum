@@ -123,19 +123,20 @@
       }
     },
     methods: {
-      loadTransaction() {
+      async loadTransaction() {
         this.isSpinnerVisible = true
 
-        this.$blockchain.getTransaction(this.hash).then(data => {
+        try {
+          const data = await this.$blockchain.getTransaction(this.hash)
           this.transaction = data.content
           this.location = data.location
           this.status = data.status
           this.type = data.type
           this.isSpinnerVisible = false
-        }).catch(error => {
+        } catch (error) {
           this.isSpinnerVisible = false
           this.$notify('error', error.toString())
-        })
+        }
       }
     },
     mounted() {

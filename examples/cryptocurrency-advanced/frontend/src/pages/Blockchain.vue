@@ -51,16 +51,17 @@
       }
     },
     methods: {
-      loadBlocks(latest) {
+      async loadBlocks(latest) {
         this.isSpinnerVisible = true
 
-        this.$blockchain.getBlocks(latest).then(data => {
+        try {
+          const data = await this.$blockchain.getBlocks(latest)
           this.blocks = this.blocks.concat(data.blocks)
           this.isSpinnerVisible = false
-        }).catch(error => {
+        } catch (error) {
           this.isSpinnerVisible = false
           this.$notify('error', error.toString())
-        })
+        }
       },
 
       loadMore() {

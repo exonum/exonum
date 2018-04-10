@@ -149,7 +149,7 @@
       keyPair: state => state.keyPair
     })),
     methods: {
-      loadUser() {
+      async loadUser() {
         if (this.keyPair === null) {
           this.$store.commit('logout')
           this.$router.push({ name: 'home' })
@@ -158,32 +158,34 @@
 
         this.isSpinnerVisible = true
 
-        this.$blockchain.getWallet(this.keyPair.publicKey).then(data => {
+        try {
+          const data = await this.$blockchain.getWallet(this.keyPair.publicKey)
           this.name = data.wallet.name
           this.balance = data.wallet.balance
           this.transactions = data.transactions
           this.isSpinnerVisible = false
-        }).catch(error => {
+        } catch (error) {
           this.isSpinnerVisible = false
           this.$notify('error', error.toString())
-        })
+        }
       },
 
-      addFunds() {
+      async addFunds() {
         this.isSpinnerVisible = true
 
-        this.$blockchain.addFunds(this.keyPair, this.amountToAdd).then(data => {
+        try {
+          const data = await this.$blockchain.addFunds(this.keyPair, this.amountToAdd)
           this.balance = data.wallet.balance
           this.transactions = data.transactions
           this.isSpinnerVisible = false
           this.$notify('success', 'Add funds transaction has been written into the blockchain')
-        }).catch(error => {
+        } catch (error) {
           this.isSpinnerVisible = false
           this.$notify('error', error.toString())
-        })
+        }
       },
 
-      transfer() {
+      async transfer() {
         if (!this.$validateHex(this.receiver)) {
           return this.$notify('error', 'Invalid public key is passed')
         }
@@ -194,15 +196,16 @@
 
         this.isSpinnerVisible = true
 
-        this.$blockchain.transfer(this.keyPair, this.receiver, this.amountToTransfer).then(data => {
+        try {
+          const data = await this.$blockchain.transfer(this.keyPair, this.receiver, this.amountToTransfer)
           this.balance = data.wallet.balance
           this.transactions = data.transactions
           this.isSpinnerVisible = false
           this.$notify('success', 'Transfer transaction has been written into the blockchain')
-        }).catch(error => {
+        } catch (error) {
           this.isSpinnerVisible = false
           this.$notify('error', error.toString())
-        })
+        }
       }
     },
     mounted() {

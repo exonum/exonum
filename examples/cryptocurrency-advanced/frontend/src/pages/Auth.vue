@@ -78,22 +78,23 @@
         })
       },
 
-      register() {
+      async register() {
         if (!this.name) {
           return this.$notify('error', 'The name is a required field')
         }
 
         this.isSpinnerVisible = true
 
-        this.$blockchain.createWallet(this.name).then(keyPair => {
+        try {
+          const keyPair = await this.$blockchain.createWallet(this.name)
           this.name = ''
           this.keyPair = keyPair
           this.isSpinnerVisible = false
           this.isModalVisible = true
-        }).catch(error => {
+        } catch (error) {
           this.isSpinnerVisible = false
           this.$notify('error', error.toString())
-        })
+        }
       },
 
       closeModal() {
