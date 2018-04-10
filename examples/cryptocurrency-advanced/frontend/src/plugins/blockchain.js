@@ -11,6 +11,36 @@ const TX_TRANSFER_ID = 0
 const TX_ISSUE_ID = 1
 const TX_WALLET_ID = 2
 
+const TransferTransaction = {
+  protocol_version: PROTOCOL_VERSION,
+  service_id: SERVICE_ID,
+  message_id: TX_TRANSFER_ID,
+  fields: [
+    { name: 'from', type: Exonum.PublicKey },
+    { name: 'to', type: Exonum.PublicKey },
+    { name: 'amount', type: Exonum.Uint64 },
+    { name: 'seed', type: Exonum.Uint64 }
+  ]
+}
+const IssueTransaction = {
+  protocol_version: PROTOCOL_VERSION,
+  service_id: SERVICE_ID,
+  message_id: TX_ISSUE_ID,
+  fields: [
+    { name: 'pub_key', type: Exonum.PublicKey },
+    { name: 'amount', type: Exonum.Uint64 },
+    { name: 'seed', type: Exonum.Uint64 }
+  ]
+}
+const CreateTransaction = {
+  protocol_version: PROTOCOL_VERSION,
+  service_id: SERVICE_ID,
+  message_id: TX_WALLET_ID,
+  fields: [
+    { name: 'pub_key', type: Exonum.PublicKey },
+    { name: 'name', type: Exonum.String }
+  ]
+}
 const TableKey = Exonum.newType({
   fields: [
     { name: 'service_id', type: Exonum.Uint16 },
@@ -33,48 +63,21 @@ const TransactionMetaData = Exonum.newType({
   ]
 })
 
-function getTransaction(transactionId) {
-  switch (transactionId) {
+function getTransaction(id) {
+  switch (id) {
     case TX_TRANSFER_ID:
-      return Exonum.newMessage({
-        protocol_version: PROTOCOL_VERSION,
-        service_id: SERVICE_ID,
-        message_id: TX_TRANSFER_ID,
-        fields: [
-          { name: 'from', type: Exonum.PublicKey },
-          { name: 'to', type: Exonum.PublicKey },
-          { name: 'amount', type: Exonum.Uint64 },
-          { name: 'seed', type: Exonum.Uint64 }
-        ]
-      })
+      return Exonum.newMessage(TransferTransaction)
     case TX_ISSUE_ID:
-      return Exonum.newMessage({
-        protocol_version: PROTOCOL_VERSION,
-        service_id: SERVICE_ID,
-        message_id: TX_ISSUE_ID,
-        fields: [
-          { name: 'pub_key', type: Exonum.PublicKey },
-          { name: 'amount', type: Exonum.Uint64 },
-          { name: 'seed', type: Exonum.Uint64 }
-        ]
-      })
+      return Exonum.newMessage(IssueTransaction)
     case TX_WALLET_ID:
-      return Exonum.newMessage({
-        protocol_version: PROTOCOL_VERSION,
-        service_id: SERVICE_ID,
-        message_id: TX_WALLET_ID,
-        fields: [
-          { name: 'pub_key', type: Exonum.PublicKey },
-          { name: 'name', type: Exonum.String }
-        ]
-      })
+      return Exonum.newMessage(CreateTransaction)
     default:
       throw new Error('Unknown transaction ID has been passed')
   }
 }
 
-function getOwner(transactionId, transaction) {
-  switch (transactionId) {
+function getOwner(transaction) {
+  switch (transaction.message_id) {
     case TX_TRANSFER_ID:
       return transaction.from
     case TX_ISSUE_ID:
@@ -138,15 +141,18 @@ function getWallet(publicKey) {
           let Transaction = getTransaction(transaction.message_id)
 
           // get transaction owner
-          const owner = getOwner(transaction.message_id, transaction.body)
+          const owner = getOwner(transaction.body)
 
-          // add a signature field to the transaction definition
+          // add a signature to the transaction definition
           Transaction.signature = transaction.signature
 
           // validate transaction hash
           if (Transaction.hash(transaction.body) !== transactionsMetaData[i].tx_hash) {
             throw new Error('Invalid transaction hash has been found')
-          } else if (!Transaction.verifySignature(transaction.signature, owner, transaction.body)) {
+          }
+
+          // validate transaction signature
+          if (!Transaction.verifySignature(transaction.signature, owner, transaction.body)) {
             throw new Error('Invalid transaction signature has been found')
           }
 
