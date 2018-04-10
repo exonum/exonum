@@ -17,7 +17,7 @@
 //!
 //! See the `explorer` example in the crate for examples of usage.
 
-use serde::{Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use std::cell::{Ref, RefCell};
 use std::collections::Bound;
@@ -326,6 +326,9 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 
 /// Information about a particular transaction in the blockchain.
 ///
+/// The type parameter corresponds to some representation of `Box<Transaction>`.
+/// This generalization is needed to deserialize `CommittedTransaction`s.
+///
 /// # JSON presentation
 ///
 /// | Name | Equivalent type | Description |
@@ -368,65 +371,140 @@ impl<'a> IntoIterator for &'a BlockWithTransactions {
 /// [`ExecutionError`]: ../blockchain/struct.ExecutionError.html
 /// [`Flow`]: https://flow.org/
 /// [`TypeScript`]: https://www.typescriptlang.org/
-#[derive(Debug, Serialize)]
-pub struct CommittedTransaction {
-    #[serde(serialize_with = "CommittedTransaction::serialize_content")]
-    content: Box<Transaction>,
+///
+/// # Examples
+///
+/// Use of the custom type parameter for deserialization:
+///
+/// ```
+/// # #[macro_use] extern crate exonum;
+/// # #[macro_use] extern crate serde_json;
+/// # use exonum::blockchain::{ExecutionResult, Transaction};
+/// # use exonum::crypto::{Hash, PublicKey, Signature};
+/// # use exonum::explorer::CommittedTransaction;
+/// # use exonum::helpers::Height;
+/// # use exonum::storage::Fork;
+/// transactions! {
+///     Transactions {
+///         const SERVICE_ID = 1000;
+///
+///         struct CreateWallet {
+///             public_key: &PublicKey,
+///             name: &str,
+///         }
+///         // other transaction types...
+///     }
+/// }
+/// # impl Transaction for CreateWallet {
+/// #     fn verify(&self) -> bool { true }
+/// #     fn execute(&self, _: &mut Fork) -> ExecutionResult { Ok(()) }
+/// # }
+///
+/// # fn main() {
+/// let json = json!({
+///     "content": {
+///         "protocol_version": 0,
+///         "service_id": 1000,
+///         "message_id": 0,
+///         "body": {
+///             "public_key": // ...
+/// #                         PublicKey::zero(),
+///             "name": "Alice"
+///         },
+///         "signature": // ...
+/// #                    Signature::zero()
+///     },
+///     "location": { "block_height": "1", "position_in_block": "0" },
+///     "location_proof": // ...
+/// #                     { "val": Hash::zero() },
+///     "status": { "type": "success" }
+/// });
+///
+/// let parsed: CommittedTransaction<CreateWallet> =
+///     serde_json::from_value(json).unwrap();
+/// assert_eq!(parsed.location().block_height(), Height(1));
+/// assert_eq!(parsed.content().name(), "Alice");
+/// # } // main
+/// ```
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(bound(serialize = "T: SerializeContent"))]
+pub struct CommittedTransaction<T = Box<Transaction>> {
+    #[serde(serialize_with = "SerializeContent::serialize_content")]
+    content: T,
     location: TxLocation,
     location_proof: ListProof<Hash>,
-    #[serde(serialize_with = "CommittedTransaction::serialize_status")]
+    #[serde(with = "TxStatus")]
     status: TransactionResult,
 }
 
-impl CommittedTransaction {
-    /// Returns the content of the transaction.
-    pub fn content(&self) -> &Transaction {
-        self.content.as_ref()
-    }
+/// Transaction execution status. Simplified version of `TransactionResult`.
+#[serde(tag = "type", rename_all = "kebab-case")]
+#[derive(Debug, Serialize, Deserialize)]
+enum TxStatus<'a> {
+    Success,
+    Panic { description: &'a str },
+    Error { code: u8, description: &'a str },
+}
 
-    fn serialize_content<S, T>(tx: &T, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-        T: AsRef<Transaction>,
-    {
-        use serde::ser::Error;
-
-        let value = tx.as_ref()
-            .serialize_field()
-            .map_err(|err| S::Error::custom(err.description()))?;
-        value.serialize(serializer)
-    }
-
-    fn serialize_status<S>(result: &TransactionResult, serializer: S) -> Result<S::Ok, S::Error>
+impl<'a> TxStatus<'a> {
+    fn serialize<S>(result: &TransactionResult, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        /// Transaction execution status. Simplified version of `TransactionResult`.
-        #[serde(tag = "type", rename_all = "kebab-case")]
-        #[derive(Debug, Serialize)]
-        enum TxStatus<'a> {
-            Success,
-            Panic { description: &'a str },
-            Error { code: u8, description: &'a str },
-        }
+        let status = TxStatus::from(result);
+        status.serialize(serializer)
+    }
 
-        fn from(result: &TransactionResult) -> TxStatus {
-            use self::TransactionErrorType::*;
+    fn deserialize<D>(deserializer: D) -> Result<TransactionResult, D::Error>
+    where
+        D: Deserializer<'a>,
+    {
+        let tx_status = <Self as Deserialize>::deserialize(deserializer)?;
+        Ok(TransactionResult::from(tx_status))
+    }
+}
 
-            match *result {
-                Ok(()) => TxStatus::Success,
-                Err(ref e) => {
-                    let description = e.description().unwrap_or_default();
-                    match e.error_type() {
-                        Panic => TxStatus::Panic { description },
-                        Code(code) => TxStatus::Error { code, description },
-                    }
+impl<'a> From<&'a TransactionResult> for TxStatus<'a> {
+    fn from(result: &'a TransactionResult) -> TxStatus {
+        use self::TransactionErrorType::*;
+
+        match *result {
+            Ok(()) => TxStatus::Success,
+            Err(ref e) => {
+                let description = e.description().unwrap_or_default();
+                match e.error_type() {
+                    Panic => TxStatus::Panic { description },
+                    Code(code) => TxStatus::Error { code, description },
                 }
             }
         }
+    }
+}
 
-        let status = from(result);
-        status.serialize(serializer)
+impl<'a> From<TxStatus<'a>> for TransactionResult {
+    fn from(status: TxStatus<'a>) -> TransactionResult {
+        fn to_option(s: &str) -> Option<String> {
+            if s.is_empty() {
+                None
+            } else {
+                Some(s.to_owned())
+            }
+        };
+
+        match status {
+            TxStatus::Success => Ok(()),
+            TxStatus::Panic { description } => Err(TransactionError::panic(to_option(description))),
+            TxStatus::Error { code, description } => {
+                Err(TransactionError::code(code, to_option(description)))
+            }
+        }
+    }
+}
+
+impl<T> CommittedTransaction<T> {
+    /// Returns the content of the transaction.
+    pub fn content(&self) -> &T {
+        &self.content
     }
 
     /// Returns the transaction location in block.
@@ -449,6 +527,9 @@ impl CommittedTransaction {
 ///
 /// Values of this type are returned by the [`transaction()`] method of the `BlockchainExplorer`.
 ///
+/// The type parameter corresponds to some representation of `Box<Transaction>`.
+/// This generalization is needed to deserialize `TransactionInfo`.
+///
 /// [`transaction()`]: struct.BlockchainExplorer.html#method.transaction
 ///
 /// # JSON presentation
@@ -466,25 +547,121 @@ impl CommittedTransaction {
 ///
 /// - `type` field contains transaction type (`"in-pool"`).
 /// - `content` is JSON serialization of the transaction.
-#[derive(Debug, Serialize)]
-#[serde(tag = "type", rename_all = "kebab-case")]
-pub enum TransactionInfo {
+///
+/// # Examples
+///
+/// Use of the custom type parameter for deserialization:
+///
+/// ```
+/// # #[macro_use] extern crate exonum;
+/// # #[macro_use] extern crate serde_json;
+/// # use exonum::blockchain::{ExecutionResult, Transaction};
+/// # use exonum::crypto::{PublicKey, Signature};
+/// # use exonum::explorer::TransactionInfo;
+/// # use exonum::storage::Fork;
+/// transactions! {
+///     Transactions {
+///         const SERVICE_ID = 1000;
+///
+///         struct CreateWallet {
+///             public_key: &PublicKey,
+///             name: &str,
+///         }
+///         // other transaction types...
+///     }
+/// }
+/// # impl Transaction for CreateWallet {
+/// #     fn verify(&self) -> bool { true }
+/// #     fn execute(&self, _: &mut Fork) -> ExecutionResult { Ok(()) }
+/// # }
+///
+/// # fn main() {
+/// let json = json!({
+///     "type": "in-pool",
+///     "content": {
+///         "protocol_version": 0,
+///         "service_id": 1000,
+///         "message_id": 0,
+///         "body": {
+///             "public_key": // ...
+/// #                         PublicKey::zero(),
+///             "name": "Alice"
+///         },
+///         "signature": // ...
+/// #                    Signature::zero()
+///     }
+/// });
+///
+/// let parsed: TransactionInfo<CreateWallet> = serde_json::from_value(json).unwrap();
+/// assert!(parsed.is_in_pool());
+/// assert_eq!(parsed.content().name(), "Alice");
+/// # } // main
+/// ```
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "kebab-case", bound(serialize = "T: SerializeContent"))]
+pub enum TransactionInfo<T = Box<Transaction>> {
     /// Transaction is in the memory pool, but not yet committed to the blockchain.
     InPool {
         /// Transaction contents.
-        #[serde(serialize_with = "CommittedTransaction::serialize_content")]
-        content: Box<Transaction>,
+        #[serde(serialize_with = "SerializeContent::serialize_content")]
+        content: T,
     },
 
     /// Transaction is already committed to the blockchain.
-    Committed(CommittedTransaction),
+    Committed(CommittedTransaction<T>),
 }
 
-impl TransactionInfo {
+/// A helper trait functionally equivalent to `serde`'s `Serialize`.
+///
+/// The trait is used to specify bounds on the `Serialize` implementation
+/// in transaction-related types in the `explorer` module, such as [`TransactionInfo`]
+/// and [`CommittedTransaction`].
+///
+/// # Why separate trait?
+///
+/// It is impossible to implement `Serialize` for `Box<Transaction>` (per Rust restrictions).
+/// Similarly, it is impossible to specify `Serialize` as a super-trait for `Transaction`,
+/// as it would render `Transaction` not object-safe. Thus, `SerializeContent` makes
+/// `Box<Transaction>` (as well as types containing transactions) serializable without
+/// needing a manual implementation of `Serialize`.
+///
+/// [`TransactionInfo`]: enum.TransactionInfo.html
+/// [`CommittedTransaction`]: struct.CommittedTransaction.html
+pub trait SerializeContent {
+    /// Serializes content of a transaction with the given serializer.
+    fn serialize_content<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer;
+}
+
+impl<T: Serialize> SerializeContent for T {
+    fn serialize_content<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.serialize(serializer)
+    }
+}
+
+impl SerializeContent for Box<Transaction> {
+    fn serialize_content<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::Error;
+
+        let value = self.as_ref()
+            .serialize_field()
+            .map_err(|err| S::Error::custom(err.description()))?;
+        value.serialize(serializer)
+    }
+}
+
+impl<T> TransactionInfo<T> {
     /// Returns the content of this transaction.
-    pub fn content(&self) -> &Transaction {
+    pub fn content(&self) -> &T {
         match *self {
-            TransactionInfo::InPool { ref content } => content.as_ref(),
+            TransactionInfo::InPool { ref content } => content,
             TransactionInfo::Committed(ref tx) => tx.content(),
         }
     }
@@ -507,7 +684,7 @@ impl TransactionInfo {
 
     /// Returns a reference to the inner committed transaction if this transaction is committed.
     /// For transactions in pool, returns `None`.
-    pub fn as_committed(&self) -> Option<&CommittedTransaction> {
+    pub fn as_committed(&self) -> Option<&CommittedTransaction<T>> {
         match *self {
             TransactionInfo::Committed(ref tx) => Some(tx),
             _ => None,
