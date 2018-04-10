@@ -30,17 +30,20 @@ messages! {
 fn test_debug_transaction() {
     let (p_key, s_key) = gen_keypair();
     let tx = TxSimple::new(&p_key, "Hello, World!", &s_key);
-    let vec = tx.as_ref().as_ref().to_vec();
+    let vec = tx.raw().as_ref().to_vec();
     let transaction: RawTransaction = RawTransaction::from_vec(vec);
 
     let debug = format!("{:?}", transaction);
+    let expected = format!(
+        "Transaction {{ version: {:?}, service_id: {:?}, message_type: {:?}, length: {:?}, hash: {:?} }}",
+        transaction.version(),
+        transaction.service_id(),
+        transaction.message_type(),
+        transaction.len(),
+        transaction.hash()
+    );
 
-    assert!(debug.contains("Transaction"));
-    assert!(debug.contains("version:"));
-    assert!(debug.contains("service_id:"));
-    assert!(debug.contains("message_type:"));
-    assert!(debug.contains("length:"));
-    assert!(debug.contains("hash:"));
+    assert_eq!(debug, expected)
 }
 
 #[test]

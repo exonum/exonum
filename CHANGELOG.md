@@ -9,11 +9,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### Exonum core
 
-- `RawTransaction` now has own implementation of `fmt::Debug` trait instead
-  of `#[derive(Debug)]`. The template of `RawTransaction`’s debug message is
-  `Transaction { version: #, service_id: #, message_type: #, length: #,
-  hash: Hash(###) }`
-
 - `ExecutionError::with_description` method now takes `Into<String>`
   instead of `String` which allows to pass `&str` directly. (#592)
 
@@ -172,6 +167,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 ### Internal improvements
 
 #### Exonum core
+
+- `RawTransaction` now has its own implementation of `fmt::Debug` trait instead
+  of `#[derive(Debug)]`. The template of `RawTransaction`’s debug message is
+  `Transaction { version: #, service_id: #, message_type: #, length: #,
+  hash: Hash(###) }`
 
 - Non-committed transactions are now stored persistently in the storage
   instead of memory pool. (#549)
