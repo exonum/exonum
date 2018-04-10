@@ -16,8 +16,7 @@
 
 use exonum::blockchain::{ExecutionResult, Schema as CoreSchema, StoredConfiguration, Transaction};
 use exonum::crypto::{CryptoHash, Hash, PublicKey};
-use exonum::encoding::Error as EncodingError;
-use exonum::messages::{Message, RawTransaction};
+use exonum::messages::Message;
 use exonum::node::State;
 use exonum::storage::{Fork, Snapshot};
 
