@@ -28,10 +28,6 @@ extern crate failure;
 #[macro_use]
 extern crate log;
 
-#[cfg(test)]
-#[macro_use]
-extern crate exonum_testkit;
-
 pub mod api;
 pub mod transactions;
 pub mod schema;
@@ -50,9 +46,6 @@ use router::Router;
 use transactions::TimeTransactions;
 use schema::Schema;
 use api::PublicApi;
-
-#[cfg(test)]
-mod tests;
 
 const TIMESTAMPING_SERVICE: u16 = 130;
 

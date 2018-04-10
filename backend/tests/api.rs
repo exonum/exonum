@@ -12,6 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[macro_use]
+extern crate serde_json;
+
+#[macro_use]
+extern crate exonum_testkit;
+
+extern crate exonum;
+extern crate exonum_time;
+extern crate timestamping;
+
 use exonum::crypto::{gen_keypair, hash, Hash};
 use exonum::helpers::{init_logger, Height};
 use exonum::crypto::CryptoHash;
@@ -19,12 +29,11 @@ use exonum::blockchain::Transaction;
 use exonum_testkit::{TestKitBuilder, TestKitApi, TestKit, ApiKind};
 use exonum_time::{MockTimeProvider, TimeService};
 
-use serde_json;
 use std::time::SystemTime;
 
-use Service;
-use transactions::TxTimestamp;
-use schema::{Timestamp, TimestampEntry};
+use timestamping::Service;
+use timestamping::transactions::TxTimestamp;
+use timestamping::schema::{Timestamp, TimestampEntry};
 
 fn init_testkit() -> (TestKit, MockTimeProvider) {
     let _ = init_logger();
