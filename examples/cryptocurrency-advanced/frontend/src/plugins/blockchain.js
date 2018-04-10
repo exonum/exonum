@@ -133,22 +133,28 @@ function getWallet(publicKey) {
 
         // validate each transaction
         let transactions = []
-        for (let i = 0; i < data.wallet_history.transactions.length; i++) {
-          let Transaction = getTransaction(data.wallet_history.transactions[i].message_id)
-          const owner = getOwner(data.wallet_history.transactions[i].message_id, data.wallet_history.transactions[i].body)
+        for (let [i, transaction] of data.wallet_history.transactions) {
+          // get transaction definition
+          let Transaction = getTransaction(transaction.message_id)
 
-          Transaction.signature = data.wallet_history.transactions[i].signature
+          // get transaction owner
+          const owner = getOwner(transaction.message_id, transaction.body)
 
-          if (Transaction.hash(data.wallet_history.transactions[i].body) !== transactionsMetaData[i].tx_hash) {
+          // add a signature field to the transaction definition
+          Transaction.signature = transaction.signature
+
+          // validate transaction hash
+          if (Transaction.hash(transaction.body) !== transactionsMetaData[i].tx_hash) {
             throw new Error('Invalid transaction hash has been found')
-          } else if (!Transaction.verifySignature(data.wallet_history.transactions[i].signature, owner, data.wallet_history.transactions[i].body)) {
+          } else if (!Transaction.verifySignature(transaction.signature, owner, transaction.body)) {
             throw new Error('Invalid transaction signature has been found')
           }
 
+          // add transaction to the resulting array
           transactions.push(Object.assign({
             hash: transactionsMetaData[i].tx_hash,
             status: transactionsMetaData[i].execution_status
-          }, data.wallet_history.transactions[i]))
+          }, transaction))
         }
 
         return {
