@@ -169,11 +169,12 @@ impl TestKitHandler for TestKit {
 
 #[cfg(test)]
 mod tests {
-    use exonum::blockchain::{Block, ExecutionResult, Service, Transaction};
+    use exonum::blockchain::{ExecutionResult, Service, Transaction};
     use exonum::crypto::{CryptoHash, Hash, PublicKey};
-    use exonum::encoding::Error as EncodingError;
+    use exonum::encoding::{Error as EncodingError, serialize::json::ExonumJson};
+    use exonum::explorer::BlockWithTransactions;
     use exonum::helpers::Height;
-    use exonum::messages::{Message, Precommit, RawTransaction};
+    use exonum::messages::{Message, RawTransaction};
     use exonum::storage::{Fork, Snapshot};
     use iron::Handler;
     use iron::headers::{ContentType, Headers};
@@ -182,28 +183,7 @@ mod tests {
     use super::*;
     use TestKitBuilder;
 
-    #[derive(Debug, Deserialize, PartialEq)]
-    struct DeTransaction {
-        content: serde_json::Value,
-    }
-
-    impl DeTransaction {
-        fn from<T: Transaction>(transaction: &T) -> Self {
-            DeTransaction {
-                content: transaction.serialize_field().unwrap(),
-            }
-        }
-    }
-
-    // Deserializable analogue of `BlockWithTransactions`.
-    #[derive(Debug, Deserialize)]
-    struct DeBlock {
-        #[serde(rename = "block")]
-        header: Block,
-        precommits: Vec<Precommit>,
-        /// Transactions in the order they appear in the block.
-        transactions: Vec<DeTransaction>,
-    }
+    type DeBlock = BlockWithTransactions<serde_json::Value>;
 
     transactions! {
         Any {
@@ -314,7 +294,11 @@ mod tests {
             ).unwrap(),
         );
         assert_eq!(block_info.header.height(), Height(1));
-        assert_eq!(block_info.transactions, vec![DeTransaction::from(&tx)]);
+        assert_eq!(block_info.transactions.len(), 1);
+        assert_eq!(
+            *block_info.transactions[0].content(),
+            tx.serialize_field().unwrap()
+        );
 
         // Requests with a body that invoke `create_block`
         let bodies = vec![json!({}), json!({ "tx_hashes": null })];
@@ -332,7 +316,11 @@ mod tests {
                 post_json("http://localhost:3000/v1/blocks", &body, &handler).unwrap(),
             );
             assert_eq!(block_info.header.height(), Height(1));
-            assert_eq!(block_info.transactions, vec![DeTransaction::from(&tx)]);
+            assert_eq!(block_info.transactions.len(), 1);
+            assert_eq!(
+                *block_info.transactions[0].content(),
+                tx.serialize_field().unwrap()
+            );
         }
     }
 
@@ -354,14 +342,22 @@ mod tests {
             post_json("http://localhost:3000/v1/blocks", &body, &handler).unwrap(),
         );
         assert_eq!(block_info.header.height(), Height(1));
-        assert_eq!(block_info.transactions, vec![DeTransaction::from(&tx_foo)]);
+        assert_eq!(block_info.transactions.len(), 1);
+        assert_eq!(
+            *block_info.transactions[0].content(),
+            tx_foo.serialize_field().unwrap()
+        );
 
         let body = json!({ "tx_hashes": [ tx_bar.hash().to_string() ] });
         let block_info = extract_block_info(
             post_json("http://localhost:3000/v1/blocks", &body, &handler).unwrap(),
         );
         assert_eq!(block_info.header.height(), Height(2));
-        assert_eq!(block_info.transactions, vec![DeTransaction::from(&tx_bar)]);
+        assert_eq!(block_info.transactions.len(), 1);
+        assert_eq!(
+            *block_info.transactions[0].content(),
+            tx_bar.serialize_field().unwrap()
+        );
     }
 
     #[test]
@@ -370,7 +366,7 @@ mod tests {
         let body = json!({ "tx_hashes": [ Hash::default().to_string() ] });
         let err = post_json("http://localhost:3000/v1/blocks", &body, &handler).unwrap_err();
         assert!(
-            response::extract_body_to_string(err.response).contains("Transaction not in mempool",)
+            response::extract_body_to_string(err.response).contains("Transaction not in mempool")
         );
     }
 
