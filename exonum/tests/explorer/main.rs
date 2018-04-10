@@ -19,6 +19,8 @@ extern crate exonum;
 #[macro_use]
 extern crate serde_json;
 
+use serde_json::Value as JsonValue;
+
 use exonum::blockchain::{Schema, Transaction, TransactionErrorType, TxLocation};
 use exonum::crypto::{self, CryptoHash, Hash};
 use exonum::explorer::*;
@@ -375,4 +377,40 @@ fn test_block_with_transactions_index_overflow() {
     let explorer = BlockchainExplorer::new(&blockchain);
     let block = explorer.block_with_txs(Height(1)).unwrap();
     assert!(block[6].status().is_ok());
+}
+
+#[test]
+fn test_committed_transaction_roundtrip() {
+    let mut blockchain = create_blockchain();
+    let tx = tx_generator().next().unwrap();
+    let tx_json = tx.serialize_field().unwrap();
+    create_block(&mut blockchain, vec![tx]);
+
+    let explorer = BlockchainExplorer::new(&blockchain);
+    let tx_copy: &CommittedTransaction = &explorer.block_with_txs(Height(1)).unwrap()[0];
+    let json = serde_json::to_value(tx_copy).unwrap();
+    let tx_copy: CommittedTransaction<JsonValue> = serde_json::from_value(json).unwrap();
+
+    assert_eq!(*tx_copy.content(), tx_json);
+}
+
+#[test]
+fn test_transaction_info_roundtrip() {
+    let mut blockchain = create_blockchain();
+    let tx = tx_generator().next().unwrap();
+    let tx_json = tx.serialize_field().unwrap();
+
+    let mut fork = blockchain.fork();
+    {
+        let mut schema = Schema::new(&mut fork);
+        schema.add_transaction_into_pool(tx.raw().clone());
+    }
+    blockchain.merge(fork.into_patch()).unwrap();
+
+    let explorer = BlockchainExplorer::new(&blockchain);
+    let info: TransactionInfo = explorer.transaction(&tx.hash()).unwrap();
+    let json = serde_json::to_value(&info).unwrap();
+    let info: TransactionInfo<JsonValue> = serde_json::from_value(json).unwrap();
+
+    assert_eq!(*info.content(), tx_json);
 }
