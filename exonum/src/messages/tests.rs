@@ -14,7 +14,7 @@
 
 use crypto::{gen_keypair, PublicKey, SecretKey, Signature};
 use messages::raw::MessageBuffer;
-use messages::{Message, RawMessage};
+use messages::{Message, RawMessage, RawTransaction};
 use encoding::serialize::FromHex;
 
 messages! {
@@ -24,6 +24,23 @@ messages! {
         public_key: &PublicKey,
         msg: &str,
     }
+}
+
+#[test]
+fn test_debug_transaction() {
+    let (p_key, s_key) = gen_keypair();
+    let tx = TxSimple::new(&p_key, "Hello, World!", &s_key);
+    let vec = tx.as_ref().as_ref().to_vec();
+    let transaction: RawTransaction = RawTransaction::from_vec(vec);
+
+    let debug = format!("{:?}", transaction);
+
+    assert!(debug.contains("Transaction"));
+    assert!(debug.contains("version:"));
+    assert!(debug.contains("service_id:"));
+    assert!(debug.contains("message_type:"));
+    assert!(debug.contains("length:"));
+    assert!(debug.contains("hash:"));
 }
 
 #[test]
