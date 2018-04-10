@@ -45,7 +45,6 @@ use exonum::helpers::fabric::{Context, ServiceFactory};
 use exonum::messages::RawTransaction;
 use exonum::storage::{Fork, Snapshot};
 
-use api::TimeApi;
 use iron::Handler;
 use router::Router;
 use schema::TimeSchema;
@@ -141,16 +140,16 @@ impl Service for TimeService {
 
     fn private_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
         let mut router = Router::new();
-        let api = TimeApi {
+        let api = api::PrivateApi {
             blockchain: ctx.blockchain().clone(),
         };
-        api.wire_private(&mut router);
+        api.wire(&mut router);
         Some(Box::new(router))
     }
 
     fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
         let mut router = Router::new();
-        let api = TimeApi {
+        let api = api::PublicApi {
             blockchain: ctx.blockchain().clone(),
         };
         api.wire(&mut router);

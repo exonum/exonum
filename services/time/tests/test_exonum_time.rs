@@ -29,8 +29,8 @@ use exonum::blockchain::{Schema, Transaction, TransactionErrorType};
 use exonum::helpers::{Height, ValidatorId};
 use exonum::crypto::{gen_keypair, CryptoHash, PublicKey};
 use exonum::storage::Snapshot;
-use exonum_time::{Error, TimeService, time_provider::MockTimeProvider, api::ValidatorTime,
-                  transactions::TxTime, schema::TimeSchema};
+use exonum_time::{TimeService, time_provider::MockTimeProvider, api::ValidatorTime,
+                  transactions::Error, transactions::TxTime, schema::TimeSchema};
 use exonum_testkit::{ApiKind, TestKitApi, TestKitBuilder, TestNode};
 
 fn assert_storage_times_eq<T: AsRef<Snapshot>>(
@@ -281,7 +281,7 @@ fn test_exonum_time_service_with_7_validators() {
         assert_eq!(
             Schema::new(testkit.snapshot())
                 .transaction_results()
-                .get(&tx.hash(),),
+                .get(&tx.hash()),
             Some(Ok(()))
         );
 
@@ -381,7 +381,7 @@ fn test_selected_time_less_than_time_in_storage() {
         assert_eq!(
             Schema::new(testkit.snapshot())
                 .transaction_results()
-                .get(&tx.hash(),),
+                .get(&tx.hash()),
             Some(Ok(()))
         );
     }
@@ -432,7 +432,7 @@ fn test_transaction_time_less_than_validator_time_in_storage() {
     assert_eq!(
         Schema::new(testkit.snapshot())
             .transaction_results()
-            .get(&tx0.hash(),),
+            .get(&tx0.hash()),
         Some(Ok(()))
     );
 

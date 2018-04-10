@@ -6,7 +6,7 @@ use exonum::storage::{Fork, Snapshot};
 use chrono::{DateTime, Utc};
 use schema::TimeSchema;
 
-use super::{Error, SERVICE_ID};
+use super::SERVICE_ID;
 
 /// Common errors emitted by transactions during execution.
 #[derive(Debug, Fail)]
