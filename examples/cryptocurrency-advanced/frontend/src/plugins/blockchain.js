@@ -109,9 +109,9 @@ function getWallet(publicKey) {
           table_index: 0
         })
         const tableProof = new Exonum.MapProof(data.wallet_proof.to_table, Exonum.Hash, Exonum.Hash)
-        // if (tableProof.merkleRoot !== data.block_proof.block.state_hash) {
-        //   throw new Error('Wallets table proof is corrupted')
-        // }
+        if (tableProof.merkleRoot !== data.block_proof.block.state_hash) {
+          throw new Error('Wallets table proof is corrupted')
+        }
         const walletsHash = tableProof.entries.get(tableKey)
         if (typeof walletsHash === 'undefined') {
           throw new Error('Wallets table not found')

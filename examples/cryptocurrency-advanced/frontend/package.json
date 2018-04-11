@@ -12,7 +12,7 @@
     "axios": "^0.18.0",
     "big-integer": "^1.6.27",
     "bootstrap": "^4.0.0",
-    "exonum-client": "^0.7.1",
+    "exonum-client": "^0.7.2",
     "noty": "^3.2.0-beta",
     "numeral": "^2.0.6",
     "vue": "^2.5.16",
