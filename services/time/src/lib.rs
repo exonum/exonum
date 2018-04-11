@@ -59,6 +59,7 @@ pub mod schema;
 pub mod transactions;
 /// System time provider.
 pub mod time_provider;
+
 /// Time service id.
 pub const SERVICE_ID: u16 = 4;
 /// Time service name.
