@@ -20,12 +20,14 @@ use bit_vec::BitVec;
 use std::time::Duration;
 use std::collections::BTreeMap;
 
-use messages::{Connect, Message, PeersRequest, Precommit, Prevote, PrevotesRequest, Propose,
-               ProposeRequest, RawMessage, TransactionsRequest, TransactionsResponse, CONSENSUS};
+use messages::{BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
+               PrevotesRequest, Propose, ProposeRequest, RawMessage, Status, TransactionsRequest,
+               TransactionsResponse, CONSENSUS};
 use crypto::{gen_keypair, gen_keypair_from_seed, CryptoHash, Hash, Seed};
 use blockchain::{Blockchain, Schema};
 use node;
-use node::state::{PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT};
+use node::state::{BLOCK_REQUEST_TIMEOUT, PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT,
+                  TRANSACTIONS_REQUEST_TIMEOUT};
 use helpers::{user_agent, Height, Round};
 use super::timestamping::{TimestampTx, TimestampingTxGenerator, TIMESTAMPING_SERVICE};
 use super::sandbox::{sandbox_with_services_uninitialized, timestamping_sandbox};
@@ -3072,6 +3074,95 @@ fn handle_tx_has_full_propose() {
     sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
 
     sandbox.add_time(Duration::from_millis(0));
+}
+
+/// HANDLE block response
+
+/// - should process block even if tx in pool
+/// idea of test is:
+/// - receive some tx A
+/// - getting Status from other node with later height, send BlockRequest to this node
+/// - receive BlockResponse with already known tx A
+/// - Block should be executed and committed
+#[test]
+fn handle_block_response_tx_in_pool() {
+    let sandbox = timestamping_sandbox();
+
+    let tx = gen_timestamping_tx();
+
+    let propose = ProposeBuilder::new(&sandbox)
+        .with_duration_since_sandbox_time(sandbox.propose_timeout())
+        .build();
+
+    let block = BlockBuilder::new(&sandbox)
+        .with_duration_since_sandbox_time(sandbox.propose_timeout())
+        .with_tx_hash(&tx.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .build();
+
+    let precommit_1 = Precommit::new(
+        VALIDATOR_1,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        &block.hash(),
+        sandbox.time().into(),
+        sandbox.s(VALIDATOR_1),
+    );
+    let precommit_2 = Precommit::new(
+        VALIDATOR_2,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        &block.hash(),
+        sandbox.time().into(),
+        sandbox.s(VALIDATOR_2),
+    );
+    let precommit_3 = Precommit::new(
+        VALIDATOR_3,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        &block.hash(),
+        sandbox.time().into(),
+        sandbox.s(VALIDATOR_3),
+    );
+
+    sandbox.recv(&Status::new(
+        &sandbox.p(VALIDATOR_3),
+        HEIGHT_TWO,
+        &block.hash(),
+        sandbox.s(VALIDATOR_3),
+    ));
+
+    sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
+    sandbox.send(
+        sandbox.a(VALIDATOR_3),
+        &BlockRequest::new(
+            &sandbox.p(VALIDATOR_0),
+            &sandbox.p(VALIDATOR_3),
+            HEIGHT_ONE,
+            sandbox.s(VALIDATOR_0),
+        ),
+    );
+    sandbox.recv(&tx);
+
+    sandbox.recv(&BlockResponse::new(
+        &sandbox.p(VALIDATOR_3),
+        &sandbox.p(VALIDATOR_0),
+        block.clone(),
+        vec![precommit_1, precommit_2, precommit_3],
+        vec![tx.raw().clone()],
+        sandbox.s(VALIDATOR_3),
+    ));
+
+    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox.broadcast(&Status::new(
+        &sandbox.p(VALIDATOR_0),
+        HEIGHT_TWO,
+        &block.hash(),
+        sandbox.s(VALIDATOR_0),
+    ));
 }
 
 // - ignore existed transaction (in both blockchain and pool)
