@@ -43,6 +43,8 @@ cargo run -- generate-template example/common.toml --validators-count 4
 
 Generate public and secrets keys for each node:
 
+<!-- markdownlint-disable MD013 -->
+
 ```sh
 cargo run -- generate-config example/common.toml  example/pub_1.toml example/sec_1.toml --peer-address 127.0.0.1:6331
 
@@ -68,6 +70,8 @@ cargo run -- finalize --public-api-address 0.0.0.0:8203 --private-api-address 0.
 ```
 
 Run nodes:
+
+<!-- markdownlint-disable MD013 -->
 
 ```sh
 cargo run -- run --node-config example/node_1_cfg.toml --db-path example/db1 --public-api-address 0.0.0.0:8200
