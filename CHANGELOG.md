@@ -82,6 +82,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
     the explorer HTTP API.
   - Consult `explorer` module docs for further possible changes in API.
 
+- `validators-count` command-line parameter has been added. Now, when generating
+  config template using `generate-template` command, you must specify the number
+  of validators. (#586)
+
+- `majority_count` parameter has been added to the `StoredConfiguration`. See
+  `exonum-configuration` changes for more details. (#546)
+
 #### exonum-testkit
 
 - Rollback mechanism in `Testkit` is reworked to work with checkpoints (#582):
@@ -111,10 +118,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   increase the threshold amount of votes required to commit a new configuration
   proposal. By default the number of votes is calculated as 2/3 + 1 of total
   validators count. (#546)
-
-- `validators-count` command-line parameter has been added. Now, when generating
-  config template using `generate-template` command, you must specify the number
-  of validators. (#586)
 
 #### exonum-time
 
