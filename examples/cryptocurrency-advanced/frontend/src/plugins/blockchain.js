@@ -79,11 +79,11 @@ function getTransaction(id) {
 function getOwner(transaction) {
   switch (transaction.message_id) {
     case TX_TRANSFER_ID:
-      return transaction.from
+      return transaction.body.from
     case TX_ISSUE_ID:
-      return transaction.pub_key
+      return transaction.body.pub_key
     case TX_WALLET_ID:
-      return transaction.pub_key
+      return transaction.body.pub_key
     default:
       throw new Error('Unknown transaction ID has been passed')
   }
@@ -108,14 +108,22 @@ function getWallet(publicKey) {
           service_id: SERVICE_ID,
           table_index: 0
         })
-        const walletsHash = Exonum.merklePatriciaProof(data.block_proof.block.state_hash, data.wallet_proof.to_table, tableKey)
-        if (walletsHash === null) {
+        const tableProof = new Exonum.MapProof(data.wallet_proof.to_table, Exonum.Hash, Exonum.Hash)
+        // if (tableProof.merkleRoot !== data.block_proof.block.state_hash) {
+        //   throw new Error('Wallets table proof is corrupted')
+        // }
+        const walletsHash = tableProof.entries.get(tableKey)
+        if (typeof walletsHash === 'undefined') {
           throw new Error('Wallets table not found')
         }
 
         // find wallet in the tree of all wallets
-        const wallet = Exonum.merklePatriciaProof(walletsHash, data.wallet_proof.to_wallet, publicKey, Wallet)
-        if (wallet === null) {
+        const walletProof = new Exonum.MapProof(data.wallet_proof.to_wallet, Exonum.PublicKey, Wallet)
+        if (walletProof.merkleRoot !== walletsHash) {
+          throw new Error('Wallet proof is corrupted')
+        }
+        const wallet = walletProof.entries.get(publicKey)
+        if (typeof wallet === 'undefined') {
           throw new Error('Wallet not found')
         }
 
@@ -136,18 +144,20 @@ function getWallet(publicKey) {
 
         // validate each transaction
         let transactions = []
-        for (let [i, transaction] of data.wallet_history.transactions) {
+        for (let i in data.wallet_history.transactions) {
+          let transaction = data.wallet_history.transactions[i]
+
           // get transaction definition
           let Transaction = getTransaction(transaction.message_id)
 
           // get transaction owner
-          const owner = getOwner(transaction.body)
+          const owner = getOwner(transaction)
 
           // add a signature to the transaction definition
           Transaction.signature = transaction.signature
 
           // validate transaction hash
-          if (Transaction.hash(transaction.body) !== transactionsMetaData[i].tx_hash) {
+          if (Transaction.hash(transaction.body) !== transactionsMetaData[i]) {
             throw new Error('Invalid transaction hash has been found')
           }
 
@@ -158,8 +168,7 @@ function getWallet(publicKey) {
 
           // add transaction to the resulting array
           transactions.push(Object.assign({
-            hash: transactionsMetaData[i].tx_hash,
-            status: transactionsMetaData[i].execution_status
+            hash: transactionsMetaData[i]
           }, transaction))
         }
 

@@ -5,7 +5,7 @@
     <div class="container">
       <div class="row">
         <div class="col-sm-12">
-          <nav class="mt-5" aria-label="breadcrumb">
+          <nav v-if="location.block_height" class="mt-5" aria-label="breadcrumb">
             <ol class="breadcrumb">
               <li class="breadcrumb-item">
                 <router-link :to="{ name: 'blockchain' }">Blockchain</router-link>
@@ -28,7 +28,7 @@
                   </div>
                 </div>
               </li>
-              <li class="list-group-item">
+              <li v-if="location.block_height" class="list-group-item">
                 <div class="row">
                   <div class="col-sm-3"><strong>Block:</strong></div>
                   <div class="col-sm-9">

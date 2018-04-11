@@ -36,30 +36,25 @@
             <ul class="list-group list-group-flush">
               <li class="list-group-item font-weight-bold">
                 <div class="row">
-                  <div class="col-sm-8">Description</div>
-                  <div class="col-sm-4">Status</div>
+                  <div class="col-sm-12">Description</div>
                 </div>
               </li>
               <!-- eslint-disable-next-line vue/require-v-for-key -->
               <li v-for="transaction in reverseTransactions" class="list-group-item">
                 <div class="row">
-                  <div class="col-sm-8">
+                  <div class="col-sm-12">
                     <router-link :to="{ name: 'transaction', params: { hash: transaction.hash } }">
-                      <span v-if="transaction.message_id == 130">Wallet created</span>
-                      <span v-else-if="transaction.message_id == 129">
+                      <span v-if="transaction.message_id === 2">Wallet created</span>
+                      <span v-else-if="transaction.message_id === 1">
                         <strong v-numeral="transaction.body.amount"/> funds added
                       </span>
-                      <span v-else-if="transaction.message_id == 128 && transaction.body.from == keyPair.publicKey">
+                      <span v-else-if="transaction.message_id === 0 && transaction.body.from === keyPair.publicKey">
                         <strong v-numeral="transaction.body.amount"/> sent
                       </span>
-                      <span v-else-if="transaction.message_id == 128 && transaction.body.to == keyPair.publicKey">
+                      <span v-else-if="transaction.message_id === 0 && transaction.body.to === keyPair.publicKey">
                         <strong v-numeral="transaction.body.amount"/> received
                       </span>
                     </router-link>
-                  </div>
-                  <div class="col-sm-4">
-                    <span v-if="transaction.status" class="badge badge-success">Accepted</span>
-                    <span v-else class="badge badge-danger">Rejected</span>
                   </div>
                 </div>
               </li>
