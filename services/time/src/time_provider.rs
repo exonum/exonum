@@ -56,7 +56,7 @@ impl TimeProvider for SystemTimeProvider {
 /// ```
 ///
 /// [`Arc`]: https://doc.rust-lang.org/std/sync/struct.Arc.html
-/// [`TimeService`]: struct.TimeService.html
+/// [`TimeService`]: ../struct.TimeService.html
 #[derive(Debug, Clone)]
 pub struct MockTimeProvider {
     /// Local time value.
