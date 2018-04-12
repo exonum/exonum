@@ -11,6 +11,16 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Frontend has been updated to reflect latest backend changes. (#602)
 
+### Internal improvements
+
+#### exonum-time
+
+- Split service components to separate modules. (#604)
+
+#### exonum-configuration
+
+- Method `ProposeData::set_history_hash` has been removed. (#604)
+
 ## 0.7 - 2018-04-11
 
 ### Breaking changes
