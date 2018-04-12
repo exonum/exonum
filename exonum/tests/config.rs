@@ -126,7 +126,7 @@ fn finalize_config(folder: &str, config: &str, i: usize, count: usize) {
         "-p".to_owned(),
     ];
 
-    fs::create_dir_all(full_tmp_name("", folder)).expect("Can't create temp folder");
+    fs::create_dir_all(full_tmp_name("", folder)).expect("Can't create tmp folder");
 
     for n in 0..count {
         override_validators_count(PUB_CONFIG[n], count, folder);
