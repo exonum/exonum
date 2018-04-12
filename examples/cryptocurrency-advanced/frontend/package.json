@@ -5,17 +5,17 @@
   "author": "Exonum Team <exonum@bitfury.com>",
   "license": "Apache-2.0",
   "scripts": {
-    "build": "./node_modules/grunt/bin/grunt",
+    "build": "grunt",
     "start": "node server.js"
   },
   "dependencies": {
     "axios": "^0.18.0",
-    "big-integer": "^1.6.26",
+    "big-integer": "^1.6.27",
     "bootstrap": "^4.0.0",
-    "exonum-client": "^0.6.0",
+    "exonum-client": "^0.7.2",
     "noty": "^3.2.0-beta",
     "numeral": "^2.0.6",
-    "vue": "^2.5.13",
+    "vue": "^2.5.16",
     "vue-router": "^3.0.1",
     "vuex": "^3.0.1"
   },
@@ -26,16 +26,17 @@
     "babelify": "^8.0.0",
     "body-parser": "^1.18.2",
     "browserify": "^16.1.1",
-    "eslint": "^4.18.2",
-    "eslint-plugin-vue": "^4.3.0",
-    "express": "^4.16.2",
+    "eslint": "^4.19.1",
+    "eslint-plugin-vue": "^4.4.0",
+    "express": "^4.16.3",
     "grunt": "^1.0.2",
     "grunt-browserify": "^5.2.0",
+    "grunt-cli": "^1.2.0",
     "grunt-contrib-clean": "^1.1.0",
     "grunt-contrib-watch": "^1.0.0",
     "grunt-eslint": "^20.1.0",
     "load-grunt-tasks": "^3.5.2",
-    "request": "^2.83.0",
+    "request": "^2.85.0",
     "vueify": "^9.4.1",
     "yargs-parser": "^9.0.2"
   }
