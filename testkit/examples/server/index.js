@@ -1,6 +1,6 @@
 /**
  * @license
- * Copyright 2017 The Exonum Team
+ * Copyright 2018 The Exonum Team
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,142 +17,15 @@
 /* eslint-env node,mocha */
 
 const exonum = require('exonum-client')
-const fetch = require('node-fetch')
 const expect = require('chai').expect
-
-// // // // Testkit functions // // // //
-
-const TESTKIT_URL = 'http://127.0.0.1:9000/api/testkit'
-
-async function createBlock (txHashes) {
-  const body = (txHashes === undefined) ? { } : {
-    tx_hashes: txHashes
-  }
-
-  const response = await fetch(TESTKIT_URL + '/v1/blocks', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  })
-  return response.json()
-}
-
-async function rollbackToHeight (height) {
-  const response = await fetch(TESTKIT_URL + '/v1/blocks/' + (height + 1), {
-    method: 'DELETE'
-  })
-  return response.json()
-}
-
-async function getBlockchainHeight () {
-  let response = await fetch(TESTKIT_URL + '/v1/status')
-  response = await response.json()
-  return response.height
-}
+const testkit = require('./testkit')
+const { service, TxCreateWallet, TxTranfer } = require('./service')
 
 describe('CurrencyService', function () {
   this.slow(500)
 
-  // // // // Service constants // // // //
-
-  const SERVICE_ID = 1
-  const TX_CREATE_WALLET_ID = 0
-  const TX_TRANSFER_ID = 1
-  const SERVICE_URL = 'http://127.0.0.1:8000/api/services/cryptocurrency'
-
-  const TxCreateWallet = exonum.newMessage({
-    size: 40,
-    network_id: 0,
-    protocol_version: 0,
-    service_id: SERVICE_ID,
-    message_id: TX_CREATE_WALLET_ID,
-
-    fields: [
-      { name: 'pub_key', type: exonum.PublicKey },
-      { name: 'name', type: exonum.String }
-    ]
-  })
-
-  TxCreateWallet.new = function (body) {
-    return {
-      network_id: 0,
-      protocol_version: 0,
-      service_id: SERVICE_ID,
-      message_id: TX_CREATE_WALLET_ID,
-      body,
-
-      hash () {
-        TxCreateWallet.signature = this.signature
-        const hash = TxCreateWallet.hash(this.body)
-        delete TxCreateWallet.signature
-        return hash
-      }
-    }
-  }
-
-  const TxTranfer = exonum.newMessage({
-    size: 80,
-    network_id: 0,
-    protocol_version: 0,
-    service_id: SERVICE_ID,
-    message_id: TX_TRANSFER_ID,
-
-    fields: [
-      { name: 'from', type: exonum.PublicKey },
-      { name: 'to', type: exonum.PublicKey },
-      { name: 'amount', type: exonum.Uint64 },
-      { name: 'seed', type: exonum.Uint64 }
-    ]
-  })
-
-  TxTranfer.new = function (body) {
-    return {
-      network_id: 0,
-      protocol_version: 0,
-      service_id: SERVICE_ID,
-      message_id: TX_TRANSFER_ID,
-      body,
-
-      hash () {
-        TxTranfer.signature = this.signature
-        const hash = TxTranfer.hash(this.body)
-        delete TxTranfer.signature
-        return hash
-      }
-    }
-  }
-
-  // // // // Service-specific functions // // // //
-
-  async function createWallet (tx) {
-    let response = await fetch(SERVICE_URL + '/v1/wallets', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(tx)
-    })
-    response = await response.json()
-    expect(response.tx_hash).to.equal(tx.hash())
-  }
-
-  async function transfer (tx) {
-    let response = await fetch(SERVICE_URL + '/v1/wallets/transfer', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(tx)
-    })
-    response = await response.json()
-    expect(response.tx_hash).to.equal(tx.hash())
-  }
-
-  async function getWallet (pubkey) {
-    const response = await fetch(SERVICE_URL + '/v1/wallet/' + pubkey)
-    return response.json()
-  }
-
-  // // // // Tests // // // //
-
   beforeEach(async () => {
-    await rollbackToHeight(0)
+    await testkit.rollbackToHeight(0)
   })
 
   it('should create wallet', async () => {
@@ -163,10 +36,10 @@ describe('CurrencyService', function () {
     })
     tx.signature = TxCreateWallet.sign(secretKey, tx.body)
 
-    await createWallet(tx)
-    await createBlock()
-    expect(await getBlockchainHeight()).to.equal(1)
-    const wallet = await getWallet(publicKey)
+    await service.createWallet(tx)
+    await testkit.createBlock()
+    expect(await testkit.getBlockchainHeight()).to.equal(1)
+    const wallet = await service.getWallet(publicKey)
     expect(wallet.name).to.equal('Alice')
     expect('' + wallet.balance).to.equal('100')
   })
@@ -195,19 +68,19 @@ describe('CurrencyService', function () {
     transferTx.signature = TxTranfer.sign(aliceKey, transferTx.body)
 
     await Promise.all([
-      createWallet(txAlice),
-      createWallet(txBob),
-      transfer(transferTx)
+      service.createWallet(txAlice),
+      service.createWallet(txBob),
+      service.transfer(transferTx)
     ])
-    await createBlock([
+    await testkit.createBlock([
       txAlice.hash(),
       txBob.hash(),
       transferTx.hash()
     ])
-    expect(await getBlockchainHeight()).to.equal(1)
+    expect(await testkit.getBlockchainHeight()).to.equal(1)
     const [aliceWallet, bobWallet] = await Promise.all([
-      getWallet(alicePK),
-      getWallet(bobPK)
+      service.getWallet(alicePK),
+      service.getWallet(bobPK)
     ])
     expect('' + aliceWallet.balance).to.equal('85')
     expect('' + bobWallet.balance).to.equal('115')
@@ -237,17 +110,17 @@ describe('CurrencyService', function () {
     transferTx.signature = TxTranfer.sign(aliceKey, transferTx.body)
 
     await Promise.all([
-      createWallet(txAlice),
-      createWallet(txBob),
-      transfer(transferTx)
+      service.createWallet(txAlice),
+      service.createWallet(txBob),
+      service.transfer(transferTx)
     ])
-    await createBlock([
+    await testkit.createBlock([
       txAlice.hash(),
       transferTx.hash()
     ])
     const [aliceWallet, bobWallet] = await Promise.all([
-      getWallet(alicePK),
-      getWallet(bobPK)
+      service.getWallet(alicePK),
+      service.getWallet(bobPK)
     ])
     expect('' + aliceWallet.balance).to.equal('100')
     expect(bobWallet).to.equal('Wallet not found')
