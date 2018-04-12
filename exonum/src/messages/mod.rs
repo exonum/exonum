@@ -40,6 +40,18 @@ mod tests;
 /// Raw transaction type.
 pub type RawTransaction = RawMessage;
 
+impl fmt::Debug for RawTransaction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("Transaction")
+            .field("version", &self.version())
+            .field("service_id", &self.service_id())
+            .field("message_type", &self.message_type())
+            .field("length", &self.len())
+            .field("hash", &self.hash())
+            .finish()
+    }
+}
+
 /// Any possible message.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Any {

@@ -236,12 +236,12 @@ impl TransactionError {
     }
 
     /// Creates a new `TransactionError` instance with the specified error code and description.
-    fn code(code: u8, description: Option<String>) -> Self {
+    pub(crate) fn code(code: u8, description: Option<String>) -> Self {
         Self::new(TransactionErrorType::Code(code), description)
     }
 
     /// Creates a new `TransactionError` representing panic with the given description.
-    fn panic(description: Option<String>) -> Self {
+    pub(crate) fn panic(description: Option<String>) -> Self {
         Self::new(TransactionErrorType::Panic, description)
     }
 

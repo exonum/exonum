@@ -5,24 +5,28 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Bug fixes
+
+#### exonum-cryptocurrency-advanced
+
+- Frontend has been updated to reflect latest backend changes. (#602)
+
+## 0.7 - 2018-04-11
+
 ### Breaking changes
 
-#### Exonum core
+#### exonum
 
-- `ExecutionError::with_description` method now takes `Into<String>`
-  instead of `String` which allows to pass `&str` directly. (#592)
-
-- POST-requests are now handled with `bodyparser` crate,
-  so all the parameters must be passed in the body. (#529)
+- POST-requests are now handled with `bodyparser` crate, so all the parameters
+  must be passed in the body. (#529)
 
 - `ProofListIndex` and `ProofMapIndex` `root_hash` method has been renamed to
   `merkle_root`. (#547)
 
-- Proofs of existence / absence for `ProofMapIndex`s have been reworked.
-  They now have a linear structure with two components: key-value pairs,
-  and additional *proof* information allowing to restore the Merkle root
-  of the entire index. `MapProof` interface has been reworked
-  correspondingly. (#380)
+- Proofs of existence / absence for `ProofMapIndex`s have been reworked. They
+  now have a linear structure with two components: key-value pairs, and
+  additional *proof* information allowing to restore the Merkle root of the
+  entire index. `MapProof` interface has been reworked correspondingly. (#380)
 
   Migration path:
 
@@ -63,13 +67,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   `HEADER_LENGTH` remains the same, first byte of `RawMessage` is now reserved and
   always set to `0`. (#579)
 
-- `exonum::explorer` module has been reworked to add new functionality. (#535)
-  In particular:
+- `exonum::explorer` module has been reworked to add new functionality.
+  (#535, #600) In particular:
 
-  - The explorer now allows to iterate over blocks in the blockchain
-    in the given height range, replacing old `blocks_range` method.
-  - `block_info` and `tx_info` methods of the explorer are renamed to
-    `block` and `transaction` respectively.
+  - The explorer now allows to iterate over blocks in the blockchain in the
+    given height range, replacing old `blocks_range` method.
+  - `block_info` and `tx_info` methods of the explorer are renamed to `block`
+    and `transaction` respectively.
   - `TransactionInfo` moved from the `api::public` module to the `explorer` module.
   - `BlocksRange` moved from the `explorer` module to the `api::public` module.
   - `TxInfo` is renamed to `CommittedTransaction`.
@@ -78,7 +82,18 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   Migration path:
 
   - Rename imported types and methods as specified above
-  - Consult `explorer` module docs for further possible changes in API
+  - Use explicit type parameter in `TransactionInfo` and `CommittedTransaction`
+    (e.g., `TransactionInfo<serde_json::Value>` or `TransactionInfo<MyTransaction>`)
+    if you need to deserialize transaction-related data returned from
+    the explorer HTTP API.
+  - Consult `explorer` module docs for further possible changes in API.
+
+- `validators-count` command-line parameter has been added. Now, when generating
+  config template using `generate-template` command, you must specify the number
+  of validators. (#586)
+
+- `majority_count` parameter has been added to the `StoredConfiguration`. See
+  `exonum-configuration` changes for more details. (#546)
 
 #### exonum-testkit
 
@@ -99,20 +114,16 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - Instead of calling `mempool()`, one should use `is_tx_in_pool`
   or `add_tx` methods.
 
-- `TestKitApi::get_err` method now returns `ApiError`, rather than
-  a deserialized object, as it is for `get`. For checking such results
+- `TestKitApi::get_err` method now returns `ApiError`, rather than a deserialized
+  object, as it is for `get`. For checking such results
   in tests you may want to use `assert_matches`.
 
 #### exonum-configuration
 
-- `majority_count: Option<u16>` configuration parameter is introduced.
-  Allows to increase the threshold amount of votes required to commit
-  a new configuration proposal. By default the number of votes is calculated
-  as 2/3 + 1 of total validators count. (#546)
-
-- `validators-count` command-line parameter has been added. Now, when
-  generating config template using `generate-template` command, you must
-  specify the number of validators. (#586)
+- `majority_count: Option<u16>` configuration parameter is introduced. Allows to
+  increase the threshold amount of votes required to commit a new configuration
+  proposal. By default the number of votes is calculated as 2/3 + 1 of total
+  validators count. (#546)
 
 #### exonum-time
 
@@ -121,14 +132,16 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### New features
 
-#### Exonum core
+#### exonum
 
-- New `database` field added to the `NodeConfig`.
-  This optional setting adjusts database-specific settings,
-  like number of simultaneously opened files. (#538)
+- `ExecutionError::with_description` method now takes `Into<String>` instead of
+  `String` which allows to pass `&str` directly. (#592)
 
-- Added `v1/user_agent` endpoint with information about Exonum, Rust
-  and OS versions. (#548)
+- New `database` field added to the `NodeConfig`. This optional setting adjusts
+  database-specific settings, like number of simultaneously opened files. (#538)
+
+- Added `v1/user_agent` endpoint with information about Exonum, Rust and OS
+  versions. (#548)
 
 - `ProofMapIndex` now allows to retrieve a proof of presence / absence for an
   arbitrary number of elements at one time with the help of `get_multiproof`
@@ -162,10 +175,15 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Internal improvements
 
-#### Exonum core
+#### exonum
 
-- Non-committed transactions are now stored persistently in the storage
-  instead of memory pool. (#549)
+- `RawTransaction` now has its own implementation of `fmt::Debug` trait instead
+  of `#[derive(Debug)]`. The template of `RawTransaction`’s debug message is
+  `Transaction { version: #, service_id: #, message_type: #, length: #,
+  hash: Hash(###) }`. (#603)
+
+- Non-committed transactions are now stored persistently in the storage instead
+  of memory pool. (#549)
 
 - Sandbox tests have been moved inside of the exonum core. (#568)
 
@@ -173,11 +191,16 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   rather than one by one. The number of batches depends on the size limits
   of the message. (#583)
 
+#### exonum-testkit
+
+- Request logging for `TestKitApi` now encompasses all requests. The log format
+  is slightly changed to allow for the generic request / response form. (#601)
+
 ## 0.6 - 2018-03-06
 
 ### Breaking changes
 
-#### Exonum core
+#### exonum
 
 - `exonum::crypto::CryptoHash` trait is introduced, and `StorageValue::hash`
   and `Message::hash` methods are removed. (#442)
@@ -308,7 +331,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### New features
 
-#### Exonum core
+#### exonum
 
 - `StorageKey` and `StorageValue` traits are implemented for `SystemTime`. (#456)
 
@@ -343,7 +366,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Bug fixes
 
-#### Exonum core
+#### exonum
 
 - `ExonumJsonDeserialize` trait is implemented for `F32` and `F64`. (#461)
 
@@ -355,7 +378,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Internal improvements
 
-#### Exonum core
+#### exonum
 
 - Consensus messages are stored persistently (in the database), so restart will
   not affect the node's behavior. (#322)

@@ -16,5 +16,5 @@ new Vue({
   el: '#app',
   router,
   store,
-  render: (createElement) => createElement(App)
+  render: createElement => createElement(App)
 })

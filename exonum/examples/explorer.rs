@@ -115,7 +115,7 @@ fn main() {
     assert_eq!(tx.location().position_in_block(), 0);
 
     // It is possible to access transaction content
-    let content: &Transaction = tx.content();
+    let content: &Transaction = tx.content().as_ref();
     println!("{:?}", content);
     // ...and transaction status as well
     let status: Result<(), &TransactionError> = tx.status();

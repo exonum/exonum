@@ -15,7 +15,7 @@ impl<T: AsRef<Snapshot>> TimeSchema<T> {
         TimeSchema { view }
     }
 
-    /// Returns the table that stores `SystemTime` for every validator.
+    /// Returns the table that stores `DateTime` for every validator.
     pub fn validators_times(&self) -> ProofMapIndex<&Snapshot, PublicKey, DateTime<Utc>> {
         ProofMapIndex::new("exonum_time.validators_times", self.view.as_ref())
     }
