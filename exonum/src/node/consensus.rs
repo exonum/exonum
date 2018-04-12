@@ -169,9 +169,11 @@ impl NodeHandler {
                 };
 
                 let hash = tx.hash();
-                if schema.transactions().contains(&hash) {
+                if schema.transactions().contains(&hash)
+                    && !schema.transactions_pool().contains(&hash)
+                {
                     error!(
-                        "Received block with already known transaction, block={:?}",
+                        "Received block with already committed transaction, block={:?}",
                         block
                     );
                     return None;

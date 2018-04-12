@@ -39,20 +39,20 @@
       visible: Boolean
     },
     watch: {
-      visible: function(value) {
+      visible(value) {
         this.toggle(value)
       }
     },
     methods: {
-      close: function() {
+      close() {
         this.$emit('close')
       },
 
-      submit: function() {
+      submit() {
         this.$emit('submit')
       },
 
-      toggle: function(state) {
+      toggle(state) {
         if (state) {
           document.body.classList.add(className)
         } else {
@@ -60,7 +60,7 @@
         }
       }
     },
-    mounted: function() {
+    mounted() {
       this.$nextTick(function() {
         this.toggle(false)
       })

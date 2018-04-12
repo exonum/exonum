@@ -5,7 +5,7 @@
     <div class="container">
       <div class="row">
         <div class="col-sm-12">
-          <nav class="mt-5" aria-label="breadcrumb">
+          <nav v-if="location.block_height" class="mt-5" aria-label="breadcrumb">
             <ol class="breadcrumb">
               <li class="breadcrumb-item">
                 <router-link :to="{ name: 'blockchain' }">Blockchain</router-link>
@@ -22,6 +22,14 @@
             <ul class="list-group list-group-flush">
               <li class="list-group-item">
                 <div class="row">
+                  <div class="col-sm-3"><strong>Hash:</strong></div>
+                  <div class="col-sm-9">
+                    <code>{{ hash }}</code>
+                  </div>
+                </div>
+              </li>
+              <li v-if="location.block_height" class="list-group-item">
+                <div class="row">
                   <div class="col-sm-3"><strong>Block:</strong></div>
                   <div class="col-sm-9">
                     <router-link :to="{ name: 'block', params: { height: location.block_height } }">{{ location.block_height }}</router-link>
@@ -31,7 +39,17 @@
               <li class="list-group-item">
                 <div class="row">
                   <div class="col-sm-3"><strong>Type:</strong></div>
-                  <div class="col-sm-9">{{ type }}</div>
+                  <div class="col-sm-9">
+                    <code>{{ type }}</code>
+                  </div>
+                </div>
+              </li>
+              <li class="list-group-item">
+                <div class="row">
+                  <div class="col-sm-3"><strong>Status:</strong></div>
+                  <div class="col-sm-9">
+                    <code>{{ status.type }}</code>
+                  </div>
                 </div>
               </li>
               <li class="list-group-item">
@@ -61,13 +79,17 @@
               <li class="list-group-item">
                 <div class="row">
                   <div class="col-sm-3"><strong>Signature:</strong></div>
-                  <div class="col-sm-9">{{ transaction.signature }}</div>
+                  <div class="col-sm-9">
+                    <code>{{ transaction.signature }}</code>
+                  </div>
                 </div>
               </li>
               <li class="list-group-item">
                 <div class="row">
                   <div class="col-sm-3"><strong>Body:</strong></div>
-                  <div class="col-sm-9"><pre><code>{{ JSON.stringify(transaction.body, null, 2) }}</code></pre></div>
+                  <div class="col-sm-9">
+                    <pre><code>{{ JSON.stringify(transaction.body, null, 2) }}</code></pre>
+                  </div>
                 </div>
               </li>
             </ul>
@@ -81,8 +103,8 @@
 </template>
 
 <script>
-  const Navbar = require('../components/Navbar.vue')
-  const Spinner = require('../components/Spinner.vue')
+  import Navbar from '../components/Navbar.vue'
+  import Spinner from '../components/Spinner.vue'
 
   module.exports = {
     components: {
@@ -92,27 +114,32 @@
     props: {
       hash: String
     },
-    data: function() {
+    data() {
       return {
-        transaction: Object,
-        location: Object,
-        type: String
+        transaction: {},
+        location: {},
+        status: {},
+        type: ''
       }
     },
     methods: {
-      loadTransaction: function() {
-        const self = this
+      async loadTransaction() {
+        this.isSpinnerVisible = true
 
-        this.$blockchain.getTransaction(this.hash).then(data => {
-          self.transaction = data.content
-          self.location = data.location
-          self.type = data.type
-        }).catch(error => {
-          self.$notify('error', error.toString())
-        })
+        try {
+          const data = await this.$blockchain.getTransaction(this.hash)
+          this.transaction = data.content
+          this.location = data.location
+          this.status = data.status
+          this.type = data.type
+          this.isSpinnerVisible = false
+        } catch (error) {
+          this.isSpinnerVisible = false
+          this.$notify('error', error.toString())
+        }
       }
     },
-    mounted: function() {
+    mounted() {
       this.$nextTick(function() {
         this.loadTransaction()
       })
