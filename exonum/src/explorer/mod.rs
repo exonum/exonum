@@ -23,6 +23,7 @@ use std::cell::{Ref, RefCell};
 use std::collections::Bound;
 use std::fmt;
 use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
+use std::slice;
 
 use crypto::{CryptoHash, Hash};
 use blockchain::{Block, Blockchain, Schema, Transaction, TransactionError, TransactionErrorType,
@@ -307,7 +308,7 @@ impl<T> BlockWithTransactions<T> {
 /// Iterator over transactions in [`BlockWithTransactions`].
 ///
 /// [`BlockWithTransactions`]: struct.BlockWithTransactions.html
-pub type EagerTransactions<'a, T> = ::std::slice::Iter<'a, CommittedTransaction<T>>;
+pub type EagerTransactions<'a, T> = slice::Iter<'a, CommittedTransaction<T>>;
 
 impl<T> Index<usize> for BlockWithTransactions<T> {
     type Output = CommittedTransaction<T>;
