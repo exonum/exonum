@@ -5,11 +5,17 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Bug fixes
+
+#### exonum-cryptocurrency-advanced
+
+- Frontend has been updated to reflect latest backend changes. (#602)
+
 ## 0.7 - 2018-04-11
 
 ### Breaking changes
 
-#### Exonum core
+#### exonum
 
 - POST-requests are now handled with `bodyparser` crate, so all the parameters
   must be passed in the body. (#529)
@@ -126,7 +132,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### New features
 
-#### Exonum core
+#### exonum
 
 - `ExecutionError::with_description` method now takes `Into<String>` instead of
   `String` which allows to pass `&str` directly. (#592)
@@ -169,7 +175,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Internal improvements
 
-#### Exonum core
+#### exonum
 
 - `RawTransaction` now has its own implementation of `fmt::Debug` trait instead
   of `#[derive(Debug)]`. The template of `RawTransaction`’s debug message is
@@ -194,7 +200,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Breaking changes
 
-#### Exonum core
+#### exonum
 
 - `exonum::crypto::CryptoHash` trait is introduced, and `StorageValue::hash`
   and `Message::hash` methods are removed. (#442)
@@ -325,7 +331,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### New features
 
-#### Exonum core
+#### exonum
 
 - `StorageKey` and `StorageValue` traits are implemented for `SystemTime`. (#456)
 
@@ -360,7 +366,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Bug fixes
 
-#### Exonum core
+#### exonum
 
 - `ExonumJsonDeserialize` trait is implemented for `F32` and `F64`. (#461)
 
@@ -372,7 +378,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Internal improvements
 
-#### Exonum core
+#### exonum
 
 - Consensus messages are stored persistently (in the database), so restart will
   not affect the node's behavior. (#322)
