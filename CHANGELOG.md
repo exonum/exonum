@@ -9,7 +9,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum-cryptocurrency-advanced
 
-- Frontend has been updated to reflect latest backend changes. (#602)
+- Frontend has been updated to reflect latest backend changes. (#602 #611)
 
 ### Internal improvements
 

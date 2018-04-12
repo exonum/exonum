@@ -49,10 +49,10 @@
                         <strong v-numeral="transaction.body.amount"/> funds added
                       </span>
                       <span v-else-if="transaction.message_id === 0 && transaction.body.from === keyPair.publicKey">
-                        <strong v-numeral="transaction.body.amount"/> sent
+                        <strong v-numeral="transaction.body.amount"/> funds sent
                       </span>
                       <span v-else-if="transaction.message_id === 0 && transaction.body.to === keyPair.publicKey">
-                        <strong v-numeral="transaction.body.amount"/> received
+                        <strong v-numeral="transaction.body.amount"/> funds received
                       </span>
                     </router-link>
                   </div>
