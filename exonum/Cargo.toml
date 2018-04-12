@@ -44,7 +44,7 @@ futures = "0.1.20"
 tokio-core = "0.1.9"
 tokio-io = "0.1.2"
 tokio-retry = "0.1.1"
-tokio-timer = "0.2.1"
+tokio-timer = "0.1.2"
 failure = "0.1.1"
 os_info = "0.7.0"
 chrono = { version = "0.4.0", features = ["serde"] }
