@@ -29,10 +29,12 @@ use mount::Mount;
 use iron::{Chain, Iron};
 use iron_cors::CorsMiddleware;
 use serde::{de, ser};
+use serde_json::{Value as JsonValue, self};
 use futures::{Future, Sink, sync::mpsc};
 use tokio_core::reactor::Core;
 
 use std::{fmt, io};
+use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
 use std::net::SocketAddr;
@@ -245,28 +247,12 @@ impl<'de> de::Deserialize<'de> for AllowOrigin {
     }
 }
 
-#[test]
-fn allow_origin_serde() {
-    fn check(text: &str, allow_origin: AllowOrigin) {
-        #[derive(Serialize, Deserialize)]
-        struct Config {
-            allow_origin: AllowOrigin,
-        }
-        let config_toml = format!("allow_origin = {}\n", text);
-        let config: Config = ::toml::from_str(&config_toml).unwrap();
-        assert_eq!(config.allow_origin, allow_origin);
-        assert_eq!(::toml::to_string(&config).unwrap(), config_toml);
-    }
+impl FromStr for AllowOrigin {
+    type Err = serde_json::Error;
 
-    check(r#""*""#, AllowOrigin::Any);
-    check(
-        r#""http://example.com""#,
-        AllowOrigin::Whitelist(vec!["http://example.com".to_string()]),
-    );
-    check(
-        r#"["http://a.org", "http://b.org"]"#,
-        AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
-    );
+    fn from_str(s: &str) -> Result<Self, <Self as FromStr>::Err> {
+        serde_json::from_str(s)
+    }
 }
 
 /// Events pool capacities.
@@ -1008,4 +994,51 @@ pub fn create_private_api_handler(
     mount.mount("api/system", router);
 
     Chain::new(mount)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn allow_origin_toml() {
+        fn check(text: &str, allow_origin: AllowOrigin) {
+            #[derive(Serialize, Deserialize)]
+            struct Config {
+                allow_origin: AllowOrigin,
+            }
+            let config_toml = format!("allow_origin = {}\n", text);
+            let config: Config = ::toml::from_str(&config_toml).unwrap();
+            assert_eq!(config.allow_origin, allow_origin);
+            assert_eq!(::toml::to_string(&config).unwrap(), config_toml);
+        }
+
+        check(r#""*""#, AllowOrigin::Any);
+        check(
+            r#""http://example.com""#,
+            AllowOrigin::Whitelist(vec!["http://example.com".to_string()]),
+        );
+        check(
+            r#"["http://a.org", "http://b.org"]"#,
+            AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
+        );
+    }
+
+    #[test]
+    fn allow_origin_from_str() {
+        fn check(text: &str, expected: AllowOrigin) {
+            let from_str = AllowOrigin::from_str(text).unwrap();
+            assert_eq!(from_str, expected);
+        }
+
+        check(r#""*""#, AllowOrigin::Any);
+        check(
+            r#"http://example.com"#,
+            AllowOrigin::Whitelist(vec!["http://example.com".to_string()]),
+        );
+        check(
+            r#"["http://a.org", "http://b.org"]"#,
+            AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
+        );
+    }
 }
