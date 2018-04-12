@@ -35,6 +35,8 @@ cargo install
 
 Generate template:
 
+<!-- markdownlint-disable MD013 -->
+
 ```sh
 mkdir example
 
@@ -57,8 +59,6 @@ exonum-cryptocurrency-advanced generate-config example/common.toml  example/pub_
 
 Finalize configs:
 
-<!-- markdownlint-disable MD013 -->
-
 ```sh
 exonum-cryptocurrency-advanced finalize --public-api-address 0.0.0.0:8200 --private-api-address 0.0.0.0:8091 example/sec_1.toml example/node_1_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
 
@@ -70,8 +70,6 @@ exonum-cryptocurrency-advanced finalize --public-api-address 0.0.0.0:8203 --priv
 ```
 
 Run nodes:
-
-<!-- markdownlint-disable MD013 -->
 
 ```sh
 exonum-cryptocurrency-advanced run --node-config example/node_1_cfg.toml --db-path example/db1 --public-api-address 0.0.0.0:8200
