@@ -26,7 +26,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use blockchain::{GenesisConfig, config::ValidatorKeys};
 use helpers::{generate_testnet_config, config::ConfigFile};
-use node::{NodeApiConfig, NodeConfig, AllowOrigin};
+use node::{AllowOrigin, NodeApiConfig, NodeConfig};
 use storage::{Database, DbOptions, RocksDB};
 use crypto;
 use super::internal::{CollectedCommand, Command, Feedback};

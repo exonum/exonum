@@ -23,13 +23,13 @@ pub use self::whitelist::Whitelist;
 pub mod state; // TODO: temporary solution to get access to WAIT constants (ECR-167)
 pub mod timeout_adjuster;
 
+use failure;
 use toml::Value;
 use router::Router;
 use mount::Mount;
 use iron::{Chain, Iron};
 use iron_cors::CorsMiddleware;
 use serde::{de, ser};
-use serde_json::{Value as JsonValue, self};
 use futures::{Future, Sink, sync::mpsc};
 use tokio_core::reactor::Core;
 
@@ -248,10 +248,22 @@ impl<'de> de::Deserialize<'de> for AllowOrigin {
 }
 
 impl FromStr for AllowOrigin {
-    type Err = serde_json::Error;
+    type Err = failure::Error;
 
     fn from_str(s: &str) -> Result<Self, <Self as FromStr>::Err> {
-        serde_json::from_str(s)
+        if s == "*" {
+            return Ok(AllowOrigin::Any);
+        }
+
+        let v: Vec<_> = s.split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        if v.is_empty() {
+            bail!("Invalid AllowOrigin::Whitelist value");
+        }
+
+        Ok(AllowOrigin::Whitelist(v))
     }
 }
 
@@ -1031,13 +1043,21 @@ mod tests {
             assert_eq!(from_str, expected);
         }
 
-        check(r#""*""#, AllowOrigin::Any);
+        check(r#"*"#, AllowOrigin::Any);
         check(
             r#"http://example.com"#,
             AllowOrigin::Whitelist(vec!["http://example.com".to_string()]),
         );
         check(
-            r#"["http://a.org", "http://b.org"]"#,
+            r#"http://a.org, http://b.org"#,
+            AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
+        );
+        check(
+            r#"http://a.org, http://b.org, "#,
+            AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
+        );
+        check(
+            r#"http://a.org,http://b.org"#,
             AllowOrigin::Whitelist(vec!["http://a.org".to_string(), "http://b.org".to_string()]),
         );
     }
