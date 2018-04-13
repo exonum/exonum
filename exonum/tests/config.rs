@@ -104,7 +104,8 @@ fn generate_template(folder: &str) {
     ]));
 }
 
-fn generate_config(folder: &str, i: usize) {
+fn generate_config(folder: &str, i: usize, use_ipv6: bool) {
+    let ip = if use_ipv6 { "::1" } else { "127.0.0.1" };
     assert!(!default_run_with_matches(vec![
         "exonum-config-test",
         "generate-config",
@@ -112,7 +113,7 @@ fn generate_config(folder: &str, i: usize) {
         &full_tmp_name(PUB_CONFIG[i], folder),
         &full_tmp_name(SEC_CONFIG[i], folder),
         "-a",
-        "127.0.0.1",
+        ip,
     ]));
 }
 
@@ -200,14 +201,13 @@ fn test_generate_template() {
     }
 }
 
-#[test]
 #[cfg_attr(feature = "cargo-clippy", allow(needless_range_loop))]
-fn test_generate_config() {
-    let command = "generate-config";
+fn test_generate_config(use_ipv6: bool) {
+    let command = if use_ipv6 { "generate-config-ipv6" } else { "generate-config-ipv4" };
 
     let result = panic::catch_unwind(|| {
         for i in 0..PUB_CONFIG.len() {
-            generate_config(command, i);
+            generate_config(command, i, use_ipv6);
         }
     });
 
@@ -216,6 +216,18 @@ fn test_generate_config() {
     if let Err(err) = result {
         panic::resume_unwind(err);
     }
+}
+
+#[test]
+#[cfg_attr(feature = "cargo-clippy", allow(needless_range_loop))]
+fn test_generate_config_ipv4() {
+    test_generate_config(false);
+}
+
+#[test]
+#[cfg_attr(feature = "cargo-clippy", allow(needless_range_loop))]
+fn test_generate_config_ipv6() {
+    test_generate_config(true);
 }
 
 #[test]

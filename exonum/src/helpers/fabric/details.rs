@@ -21,7 +21,7 @@ use toml;
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::net::SocketAddr;
+use std::net::{SocketAddr, IpAddr};
 use std::collections::{BTreeMap, HashMap};
 
 use blockchain::{GenesisConfig, config::ValidatorKeys};
@@ -335,22 +335,33 @@ impl GenerateNodeConfig {
     }
 
     fn addr(context: &Context) -> (SocketAddr, SocketAddr) {
-        let addr = context.arg::<String>(PEER_ADDRESS).unwrap_or_default();
+        let addr_str = &context.arg::<String>(PEER_ADDRESS).unwrap_or_default();
 
-        let mut addr_parts = addr.split(':');
-        let ip = addr_parts.next().expect("Expected ip address");
-        if ip.len() < 8 {
-            panic!("Expected ip address in {}.", PEER_ADDRESS);
+        let maybe_addr = addr_str.parse::<SocketAddr>();
+        let error_msg = &format!("Expected an ip address in {}", PEER_ADDRESS);
+
+        let listen_ip: (IpAddr, IpAddr) = ("0.0.0.0".parse().unwrap(), "::".parse().unwrap());
+
+        if maybe_addr.is_ok() {
+            let external_addr = maybe_addr.expect(error_msg);
+            let listen_ip = match external_addr {
+                SocketAddr::V4(_) => listen_ip.0,
+                SocketAddr::V6(_) => listen_ip.1,
+            };
+            let listen_addr = SocketAddr::new(listen_ip, external_addr.port());
+            (external_addr, listen_addr)
+        } else {
+            let ip = addr_str.parse::<IpAddr>().expect(error_msg);
+            let port = DEFAULT_EXONUM_LISTEN_PORT;
+            let listen_ip = match ip {
+                IpAddr::V4(_) => listen_ip.0,
+                IpAddr::V6(_) => listen_ip.1,
+            };
+
+            let external_addr = SocketAddr::new(ip, port);
+            let listen_addr = SocketAddr::new(listen_ip, external_addr.port());
+            (external_addr, listen_addr)
         }
-        let port = addr_parts.next().map_or(DEFAULT_EXONUM_LISTEN_PORT, |s| {
-            s.parse().expect("could not parse port")
-        });
-        let external_address = format!("{}:{}", ip, port);
-        let listen_address = format!("0.0.0.0:{}", port);
-        (
-            external_address.parse().unwrap(),
-            listen_address.parse().unwrap(),
-        )
     }
 }
 
