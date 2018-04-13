@@ -1,27 +1,39 @@
-# Timestamping service on Exonum blockchain platform
+# Timestamping demo
 
-### Install
+This project demonstrates how to create simple timestamping service
+using [Exonum blockchain](https://github.com/exonum/exonum).
 
-Switch to `app` folder.
+## Install and run
 
-Install npm dependencies:
+TODO set up backend
 
-```
+Install frontend dependencies:
+
+```sh
+cd frontend
+
 npm install
 ```
 
-Install bower components:
+Build sources:
 
-```
-bower install
-```
-
-### Run
-
-Run application:
-
-```
-DEBUG=timestamping:* npm start
+```sh
+npm run build
 ```
 
-Reach application on [localhost:2268](http://localhost:2268/).
+Run the application:
+
+```sh
+npm start -- --port=2268 --api-root=http://127.0.0.1:8200
+```
+
+`--port` is a port for Node.JS app.
+
+`--api-root` is a root URL of public API address of one of nodes.
+
+Ready! Find demo at [http://127.0.0.1:2268](http://127.0.0.1:2268).
+
+## License
+
+Timestamping demo is licensed under the Apache License (Version 2.0).
+See [LICENSE](LICENSE) for details.

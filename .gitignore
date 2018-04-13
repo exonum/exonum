@@ -18,9 +18,3 @@ Cargo.lock
 __pycache__/
 *.py[cod]
 *$py.class
-
-npm-debug.log
-app/public/bower_components
-app/node_modules
-app/npm-debug.log
-app/db/*
