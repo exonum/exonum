@@ -2,7 +2,7 @@
   <div>
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
       <div class="container">
-        <router-link :to="{ name: 'home' }" class="navbar-brand">Timestamping</router-link>
+        <router-link :to="{ name: 'index' }" class="navbar-brand">Timestamping</router-link>
       </div>
     </nav>
 

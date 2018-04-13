@@ -3,14 +3,35 @@
 This project demonstrates how to create simple timestamping service
 using [Exonum blockchain](https://github.com/exonum/exonum).
 
+## Getting started
+
+Be sure you installed necessary packages:
+
+* [git](https://git-scm.com/downloads)
+* [Rust](https://rustup.rs/)
+* [Node.js & npm](https://nodejs.org/en/download/)
+
 ## Install and run
+
+Below you will find a step-by-step guide to start the service
+on 4 nodes on the local machine.
+
+Clone the project and install Rust dependencies:
+
+```sh
+git clone https://github.com/exonum/timestamping-demo
+
+cd timestamping-demo/backend
+
+cargo install
+```
 
 TODO set up backend
 
 Install frontend dependencies:
 
 ```sh
-cd frontend
+cd ../frontend
 
 npm install
 ```
