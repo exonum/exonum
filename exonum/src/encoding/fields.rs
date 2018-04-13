@@ -327,13 +327,13 @@ impl<'a> Field<'a> for SocketAddr {
                 let mut octets: [u8; ADDR_SIZE] = mem::uninitialized();
                 octets.copy_from_slice(&buffer[addr_start..addr_start + ADDR_SIZE]);
                 IpAddr::V4(Ipv4Addr::from(octets))
-            },
+            }
             IPV6_HEADER => {
                 const ADDR_SIZE: usize = mem::size_of::<Ipv6Addr>();
                 let mut octets: [u8; ADDR_SIZE] = mem::uninitialized();
                 octets.copy_from_slice(&buffer[addr_start..addr_start + ADDR_SIZE]);
                 IpAddr::V6(Ipv6Addr::from(octets))
-            },
+            }
             header => panic!("Unknown header `{:X}` for SocketAddr", header),
         };
         let port = LittleEndian::read_u16(&buffer[to as usize - PORT_SIZE..to as usize]);
@@ -344,15 +344,22 @@ impl<'a> Field<'a> for SocketAddr {
         match *self {
             SocketAddr::V4(ref addr) => {
                 buffer[from as usize] = IPV4_HEADER;
-                let diff = (mem::size_of::<Ipv4Addr>() as isize - mem::size_of::<Ipv6Addr>() as isize).abs() as usize;
-                buffer[from as usize + HEADER_SIZE..to as usize - diff - PORT_SIZE].copy_from_slice(&addr.ip().octets());
+                let diff = (mem::size_of::<Ipv4Addr>() as isize
+                    - mem::size_of::<Ipv6Addr>() as isize)
+                    .abs() as usize;
+                buffer[from as usize + HEADER_SIZE..to as usize - diff - PORT_SIZE]
+                    .copy_from_slice(&addr.ip().octets());
             }
             SocketAddr::V6(ref addr) => {
                 buffer[from as usize] = IPV6_HEADER;
-                buffer[from as usize + HEADER_SIZE..to as usize - PORT_SIZE].copy_from_slice(&addr.ip().octets());
+                buffer[from as usize + HEADER_SIZE..to as usize - PORT_SIZE]
+                    .copy_from_slice(&addr.ip().octets());
             }
         }
-        LittleEndian::write_u16(&mut buffer[to as usize - PORT_SIZE..to as usize], self.port());
+        LittleEndian::write_u16(
+            &mut buffer[to as usize - PORT_SIZE..to as usize],
+            self.port(),
+        );
     }
 
     fn check(
@@ -363,7 +370,9 @@ impl<'a> Field<'a> for SocketAddr {
     ) -> Result {
         debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
         let from_offset = from.unchecked_offset();
-        if buffer[from_offset as usize] != IPV4_HEADER && buffer[from_offset as usize] != IPV6_HEADER {
+        if buffer[from_offset as usize] != IPV4_HEADER
+            && buffer[from_offset as usize] != IPV6_HEADER
+        {
             Err(Error::IncorrectSocketAddrHeader {
                 position: from.unchecked_offset(),
                 value: buffer[from_offset as usize],

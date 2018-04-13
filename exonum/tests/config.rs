@@ -203,7 +203,11 @@ fn test_generate_template() {
 
 #[cfg_attr(feature = "cargo-clippy", allow(needless_range_loop))]
 fn test_generate_config(use_ipv6: bool) {
-    let command = if use_ipv6 { "generate-config-ipv6" } else { "generate-config-ipv4" };
+    let command = if use_ipv6 {
+        "generate-config-ipv6"
+    } else {
+        "generate-config-ipv4"
+    };
 
     let result = panic::catch_unwind(|| {
         for i in 0..PUB_CONFIG.len() {

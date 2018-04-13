@@ -49,7 +49,7 @@ pub enum Error {
         /// Position in buffer where error appears.
         position: Offset,
         /// Header value.
-        value: u8
+        value: u8,
     },
     /// Segment reference is incorrect
     IncorrectSegmentReference {

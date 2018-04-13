@@ -21,7 +21,7 @@ use toml;
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::net::{SocketAddr, IpAddr};
+use std::net::{IpAddr, SocketAddr};
 use std::collections::{BTreeMap, HashMap};
 
 use blockchain::{GenesisConfig, config::ValidatorKeys};
