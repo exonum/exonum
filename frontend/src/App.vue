@@ -6,7 +6,10 @@
           <img src="images/exonum.png" width="41" height="36" class="align-middle mr-2" alt="">
           Timestamping
         </router-link>
-        <div class="collapse navbar-collapse">
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbar">
           <ul class="navbar-nav">
             <li class="nav-item">
               <router-link :to="{ name: 'blockchain' }" class="nav-link">Blockchain</router-link>
