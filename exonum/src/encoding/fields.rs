@@ -305,6 +305,7 @@ impl<'a> Field<'a> for DateTime<Utc> {
 }
 
 const HEADER_SIZE: usize = 1;
+const BODY_SIZE: usize = mem::size_of::<Ipv6Addr>();
 const PORT_SIZE: usize = 2;
 
 const IPV4_HEADER: u8 = 0;
@@ -315,7 +316,7 @@ const IPV6_HEADER: u8 = 1;
 impl<'a> Field<'a> for SocketAddr {
     fn field_size() -> Offset {
         // FIXME: reserve space for future compatibility (ECR-156)
-        (HEADER_SIZE + mem::size_of::<IpAddr>() + PORT_SIZE) as Offset
+        (HEADER_SIZE + BODY_SIZE + PORT_SIZE) as Offset
     }
 
     unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
@@ -341,11 +342,12 @@ impl<'a> Field<'a> for SocketAddr {
 
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
         match *self {
-            SocketAddr::V4(addr) => {
+            SocketAddr::V4(ref addr) => {
                 buffer[from as usize] = IPV4_HEADER;
-                buffer[from as usize + HEADER_SIZE..to as usize - PORT_SIZE].copy_from_slice(&addr.ip().octets());
+                let diff = (mem::size_of::<Ipv4Addr>() as isize - mem::size_of::<Ipv6Addr>() as isize).abs() as usize;
+                buffer[from as usize + HEADER_SIZE..to as usize - diff - PORT_SIZE].copy_from_slice(&addr.ip().octets());
             }
-            SocketAddr::V6(addr) => {
+            SocketAddr::V6(ref addr) => {
                 buffer[from as usize] = IPV6_HEADER;
                 buffer[from as usize + HEADER_SIZE..to as usize - PORT_SIZE].copy_from_slice(&addr.ip().octets());
             }
