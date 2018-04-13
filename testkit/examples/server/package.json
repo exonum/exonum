@@ -23,7 +23,7 @@
   "homepage": "https://github.com/exonum/exonum-testkit/tree/master/examples/server#readme",
   "dependencies": {
     "chai": "^4.1.2",
-    "exonum-client": "^0.6.0",
+    "exonum-client": "^0.7.2",
     "mocha": "^4.0.1",
     "node-fetch": "^1.7.3"
   },
