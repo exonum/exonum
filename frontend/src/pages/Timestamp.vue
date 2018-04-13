@@ -8,13 +8,15 @@
             <li class="list-group-item">
               <div class="row">
                 <div class="col-sm-3"><strong>Content hash:</strong></div>
-                <div class="col-sm-9">{{ timestamp.content_hash }}</div>
+                <div class="col-sm-9">
+                  <code>{{ timestamp.content_hash }}</code>
+                </div>
               </div>
             </li>
             <li class="list-group-item">
               <div class="row">
                 <div class="col-sm-3"><strong>Metadata:</strong></div>
-                <div class="col-sm-9">{{ timestamp.metadata }}</div>
+                <div class="col-sm-9 break-word">{{ timestamp.metadata }}</div>
               </div>
             </li>
             <li class="list-group-item">
@@ -49,6 +51,7 @@
     components: {
       Spinner
     },
+    props: ['hash'],
     data() {
       return {
         isSpinnerVisible: false
@@ -60,14 +63,6 @@
 
         try {
           const data = await this.$blockchain.getTimestampProof(this.hash)
-          if (data === 'Content hash already exists') {
-            this.isSpinnerVisible = false
-            this.$notify('error', error.toString())
-            this.$nextTick(function() {
-              this.$router.push({ name: 'index' })
-            })
-            return
-          }
           this.timestamp = data.timestamp
           this.transactionHash = data.tx_hash
           this.time = data.time
@@ -78,7 +73,7 @@
         }
       }
     },
-    mounted: function() {
+    mounted() {
       this.$nextTick(function() {
         this.loadTimestamp()
       })

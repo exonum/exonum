@@ -7,7 +7,11 @@
           <form @submit.prevent="timestamp">
             <div class="form-group">
               <label class="control-label">Hash:</label>
-              <input v-model="hash" type="text" class="form-control" placeholder="Enter name" maxlength="260" required>
+              <input v-model="hash" type="text" class="form-control" placeholder="Enter hash" required>
+            </div>
+            <div class="form-group">
+              <label class="control-label">Metadata:</label>
+              <input v-model="metadata" type="text" class="form-control" placeholder="Enter metadata" required>
             </div>
             <button type="submit" class="btn btn-lg btn-block btn-primary">Timestamp</button>
           </form>
@@ -36,8 +40,11 @@
         this.isSpinnerVisible = true
 
         try {
-          const keyPair = await this.$blockchain.createTimestamp(this.name)
+          await this.$blockchain.createTimestamp(this.hash, this.metadata)
           this.isSpinnerVisible = false
+          this.$nextTick(function() {
+            this.$router.push({ name: 'timestamp', params: { hash: this.hash } })
+          })
         } catch (error) {
           this.isSpinnerVisible = false
           this.$notify('error', error.toString())
