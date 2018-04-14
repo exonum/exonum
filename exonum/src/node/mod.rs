@@ -250,7 +250,7 @@ impl<'de> de::Deserialize<'de> for AllowOrigin {
 impl FromStr for AllowOrigin {
     type Err = failure::Error;
 
-    fn from_str(s: &str) -> Result<Self, <Self as FromStr>::Err> {
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s == "*" {
             return Ok(AllowOrigin::Any);
         }
