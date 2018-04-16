@@ -10,4 +10,4 @@ install:
 build: false
 
 test_script:
-  - cargo test --all --all-features
+  - cargo test --all
