@@ -8,7 +8,7 @@
           <form class="mt-5" @submit.prevent="timestamp">
             <div class="form-group">
               <label class="control-label">File:</label>
-              <input v-model="hash" type="text" class="form-control" placeholder="Enter hash" required>
+              <input type="file" class="form-control-file" required @change="processFile">
             </div>
             <div class="form-group">
               <label class="control-label">Metadata:</label>
@@ -38,6 +38,18 @@
       }
     },
     methods: {
+      async processFile(event) {
+        this.isSpinnerVisible = true
+
+        try {
+          this.hash = await this.$crypto.getHash(event.target.files[0])
+          this.isSpinnerVisible = false
+        } catch (error) {
+          this.isSpinnerVisible = false
+          this.$notify('error', error.toString())
+        }
+      },
+
       async timestamp() {
         this.isSpinnerVisible = true
 
