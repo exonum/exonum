@@ -1,10 +1,11 @@
 <template>
   <div>
-    <div class="container">
+    <div class="container mt-5">
       <div class="row justify-content-sm-center">
         <div class="col-md-6 col-md-offset-3">
-          <h1 class="mt-5 mb-4">Timestamp file</h1>
-          <form @submit.prevent="timestamp">
+          <h1>Timestamp the file</h1>
+
+          <form class="mt-5" @submit.prevent="timestamp">
             <div class="form-group">
               <label class="control-label">Hash:</label>
               <input v-model="hash" type="text" class="form-control" placeholder="Enter hash" required>
@@ -13,7 +14,7 @@
               <label class="control-label">Metadata:</label>
               <input v-model="metadata" type="text" class="form-control" placeholder="Enter metadata" required>
             </div>
-            <button type="submit" class="btn btn-lg btn-block btn-primary">Timestamp</button>
+            <button type="submit" class="btn btn-lg btn-block btn-primary">Make a timestamp</button>
           </form>
         </div>
       </div>

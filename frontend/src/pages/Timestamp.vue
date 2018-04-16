@@ -1,10 +1,11 @@
 <template>
   <div>
-    <div v-if="timestamp" class="container">
+    <div v-if="timestamp" class="container mt-5">
       <div class="row justify-content-sm-center">
         <div class="col-md-6 col-md-offset-3">
-          <h1 class="mt-5 mb-4">File is stamped</h1>
-          <ul class="list-group mt-3">
+          <h1>File is stamped</h1>
+
+          <ul class="list-group mt-5">
             <li class="list-group-item">
               <div class="row">
                 <div class="col-sm-3"><strong>Content hash:</strong></div>

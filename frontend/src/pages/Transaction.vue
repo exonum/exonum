@@ -1,8 +1,8 @@
 <template>
   <div>
     <div class="container mt-5">
-      <div class="row">
-        <div class="col-sm-12">
+      <div class="row justify-content-sm-center">
+        <div class="col-md-6 col-md-offset-3">
           <h1>Transaction</h1>
 
           <div class="card mt-5">

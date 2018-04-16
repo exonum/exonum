@@ -1,8 +1,8 @@
 <template>
   <div>
     <div class="container mt-5">
-      <div class="row">
-        <div class="col-sm-12">
+      <div class="row justify-content-sm-center">
+        <div class="col-md-6 col-md-offset-3">
           <h1>Latest blocks</h1>
 
           <ul class="list-group mt-5">
@@ -22,7 +22,7 @@
             </li>
           </ul>
 
-          <button class="btn btn-primary mt-3" @click.prevent="loadMore">Previous blocks</button>
+          <button class="btn btn-lg btn-block btn-primary mt-3" @click.prevent="loadMore">Show previous blocks</button>
         </div>
       </div>
     </div>

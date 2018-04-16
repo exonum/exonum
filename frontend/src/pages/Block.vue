@@ -1,21 +1,22 @@
 <template>
   <div>
     <div class="container mt-5">
-      <div class="row">
-        <div class="col-sm-12">
+      <div class="row justify-content-sm-center">
+        <div class="col-md-6 col-md-offset-3">
           <h1>Block {{ height }}</h1>
 
-          <h2 class="mt-5">Transactions</h2>
-          <ul class="list-group mt-3">
+          <ul class="list-group mt-5">
             <li class="list-group-item font-weight-bold">
               <div class="row">
-                <div class="col-sm-12">Hash</div>
+                <div class="col-sm-12">Transactions</div>
               </div>
             </li>
             <li v-for="transaction in transactions" class="list-group-item">
               <div class="row">
                 <div class="col-sm-12">
-                  <router-link :to="{ name: 'transaction', params: { hash: transaction } }">{{ transaction }}</router-link>
+                  <code>
+                    <router-link :to="{ name: 'transaction', params: { hash: transaction } }">{{ transaction }}</router-link>
+                  </code>
                 </div>
               </div>
             </li>
