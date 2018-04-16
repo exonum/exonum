@@ -1,0 +1,42 @@
+{
+  "name": "timestamping-demo",
+  "version": "1.0.0",
+  "description": "Timestamping demo",
+  "author": "Exonum Team <exonum@bitfury.com>",
+  "license": "Apache-2.0",
+  "scripts": {
+    "build": "grunt",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "axios": "^0.18.0",
+    "big-integer": "^1.6.28",
+    "bootstrap": "^4.1.0",
+    "crypto-js": "^3.1.9-1",
+    "exonum-client": "^0.6.1",
+    "jquery": "^3.3.1",
+    "moment": "^2.22.0",
+    "noty": "^3.2.0-beta",
+    "popper.js": "^1.14.3",
+    "vue": "^2.5.16",
+    "vue-router": "^3.0.1"
+  },
+  "devDependencies": {
+    "babel-core": "^6.26.0",
+    "babel-plugin-transform-runtime": "^6.23.0",
+    "babel-preset-es2015": "^6.24.1",
+    "babelify": "^8.0.0",
+    "body-parser": "^1.18.2",
+    "browserify": "^16.2.0",
+    "express": "^4.16.3",
+    "grunt": "^1.0.2",
+    "grunt-browserify": "^5.3.0",
+    "grunt-cli": "^1.2.0",
+    "grunt-contrib-clean": "^1.1.0",
+    "grunt-contrib-watch": "^1.0.0",
+    "load-grunt-tasks": "^3.5.2",
+    "request": "^2.85.0",
+    "vueify": "^9.4.1",
+    "yargs-parser": "^10.0.0"
+  }
+}

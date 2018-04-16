@@ -1,13 +1,8 @@
 # vim files
 *.swp
+
 # macos files
 *.DS_Store
-
-# cargo
-target
-*/target
-*.rs.bk
-Cargo.lock
 
 # IDE files
 .idea
@@ -18,9 +13,3 @@ Cargo.lock
 __pycache__/
 *.py[cod]
 *$py.class
-
-npm-debug.log
-app/public/bower_components
-app/node_modules
-app/npm-debug.log
-app/db/*
