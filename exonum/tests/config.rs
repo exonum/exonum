@@ -232,13 +232,11 @@ fn test_generate_config(mode: IpMode) {
 }
 
 #[test]
-#[cfg_attr(feature = "cargo-clippy", allow(needless_range_loop))]
 fn test_generate_config_ipv4() {
     test_generate_config(IpMode::V4);
 }
 
 #[test]
-#[cfg_attr(feature = "cargo-clippy", allow(needless_range_loop))]
 fn test_generate_config_ipv6() {
     test_generate_config(IpMode::V6);
 }
