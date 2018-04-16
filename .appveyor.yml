@@ -4,6 +4,7 @@ install:
   - appveyor DownloadFile https://win.rustup.rs/ -FileName rustup-init.exe
   - rustup-init -yv --default-toolchain stable --default-host x86_64-pc-windows-msvc
   - set PATH=%PATH%;%USERPROFILE%\.cargo\bin
+  - set RUST_BACKTRACE=1
   - rustc -vV
   - cargo -vV
 
