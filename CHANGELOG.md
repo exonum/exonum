@@ -5,6 +5,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### New features
+
+#### exonum
+
+- The `--allow-origin` parameter has been added to the `finalize` command.
+
 ### Bug fixes
 
 #### exonum-cryptocurrency-advanced
