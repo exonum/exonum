@@ -305,8 +305,10 @@ impl<'a> Field<'a> for DateTime<Utc> {
 }
 
 const HEADER_SIZE: usize = 1;
-const BODY_SIZE: usize = mem::size_of::<Ipv6Addr>();
 const PORT_SIZE: usize = 2;
+
+const IPV4_SIZE: usize = 4;
+const IPV6_SIZE: usize = 16;
 
 const IPV4_HEADER: u8 = 0;
 const IPV6_HEADER: u8 = 1;
@@ -316,22 +318,20 @@ const IPV6_HEADER: u8 = 1;
 impl<'a> Field<'a> for SocketAddr {
     fn field_size() -> Offset {
         // FIXME: reserve space for future compatibility (ECR-156)
-        (HEADER_SIZE + BODY_SIZE + PORT_SIZE) as Offset
+        (HEADER_SIZE + IPV6_SIZE + PORT_SIZE) as Offset
     }
 
     unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
         let addr_start = from as usize + HEADER_SIZE;
         let ip = match buffer[from as usize] {
             IPV4_HEADER => {
-                const ADDR_SIZE: usize = mem::size_of::<Ipv4Addr>();
-                let mut octets: [u8; ADDR_SIZE] = mem::uninitialized();
-                octets.copy_from_slice(&buffer[addr_start..addr_start + ADDR_SIZE]);
+                let mut octets: [u8; IPV4_SIZE] = mem::uninitialized();
+                octets.copy_from_slice(&buffer[addr_start..addr_start + IPV4_SIZE]);
                 IpAddr::V4(Ipv4Addr::from(octets))
             }
             IPV6_HEADER => {
-                const ADDR_SIZE: usize = mem::size_of::<Ipv6Addr>();
-                let mut octets: [u8; ADDR_SIZE] = mem::uninitialized();
-                octets.copy_from_slice(&buffer[addr_start..addr_start + ADDR_SIZE]);
+                let mut octets: [u8; IPV6_SIZE] = mem::uninitialized();
+                octets.copy_from_slice(&buffer[addr_start..addr_start + IPV6_SIZE]);
                 IpAddr::V6(Ipv6Addr::from(octets))
             }
             header => panic!("Unknown header `{:X}` for SocketAddr", header),
@@ -344,9 +344,7 @@ impl<'a> Field<'a> for SocketAddr {
         match *self {
             SocketAddr::V4(ref addr) => {
                 buffer[from as usize] = IPV4_HEADER;
-                let diff = (mem::size_of::<Ipv4Addr>() as isize
-                    - mem::size_of::<Ipv6Addr>() as isize)
-                    .abs() as usize;
+                let diff = (IPV4_SIZE as isize - IPV6_SIZE as isize).abs() as usize;
                 buffer[from as usize + HEADER_SIZE..to as usize - diff - PORT_SIZE]
                     .copy_from_slice(&addr.ip().octets());
             }

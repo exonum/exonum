@@ -336,32 +336,20 @@ impl GenerateNodeConfig {
 
     fn addr(context: &Context) -> (SocketAddr, SocketAddr) {
         let addr_str = &context.arg::<String>(PEER_ADDRESS).unwrap_or_default();
-
-        let maybe_addr = addr_str.parse::<SocketAddr>();
         let error_msg = &format!("Expected an ip address in {}", PEER_ADDRESS);
 
-        let listen_ip: (IpAddr, IpAddr) = ("0.0.0.0".parse().unwrap(), "::".parse().unwrap());
-
-        if maybe_addr.is_ok() {
-            let external_addr = maybe_addr.expect(error_msg);
-            let listen_ip = match external_addr {
-                SocketAddr::V4(_) => listen_ip.0,
-                SocketAddr::V6(_) => listen_ip.1,
-            };
-            let listen_addr = SocketAddr::new(listen_ip, external_addr.port());
-            (external_addr, listen_addr)
-        } else {
+        let external_addr = addr_str.parse::<SocketAddr>().unwrap_or_else(|_| {
             let ip = addr_str.parse::<IpAddr>().expect(error_msg);
-            let port = DEFAULT_EXONUM_LISTEN_PORT;
-            let listen_ip = match ip {
-                IpAddr::V4(_) => listen_ip.0,
-                IpAddr::V6(_) => listen_ip.1,
-            };
+            SocketAddr::new(ip, DEFAULT_EXONUM_LISTEN_PORT)
+        });
 
-            let external_addr = SocketAddr::new(ip, port);
-            let listen_addr = SocketAddr::new(listen_ip, external_addr.port());
-            (external_addr, listen_addr)
-        }
+        let listen_ip = match external_addr {
+            SocketAddr::V4(_) => "0.0.0.0".parse().unwrap(),
+            SocketAddr::V6(_) => "::".parse().unwrap(),
+        };
+        let listen_addr = SocketAddr::new(listen_ip, external_addr.port());
+
+        (external_addr, listen_addr)
     }
 }
 
