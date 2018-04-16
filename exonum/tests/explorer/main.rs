@@ -414,3 +414,20 @@ fn test_transaction_info_roundtrip() {
 
     assert_eq!(*info.content(), tx_json);
 }
+
+#[test]
+fn test_block_with_transactions_roundtrip() {
+    let mut blockchain = create_blockchain();
+    let (pk_alice, key_alice) = crypto::gen_keypair();
+    let tx = CreateWallet::new(&pk_alice, "Alice", &key_alice);
+    create_block(&mut blockchain, vec![tx.clone().into()]);
+
+    let explorer = BlockchainExplorer::new(&blockchain);
+    let block = explorer.block_with_txs(Height(1)).unwrap();
+    let block_json = serde_json::to_value(&block).unwrap();
+    let block_copy: BlockWithTransactions<JsonValue> = serde_json::from_value(block_json).unwrap();
+    assert_eq!(
+        *block_copy[0].content(),
+        block[0].content().serialize_field().unwrap()
+    );
+}
