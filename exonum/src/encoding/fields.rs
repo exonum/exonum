@@ -45,13 +45,17 @@ pub trait Field<'a> {
 
     /// Checks if data in the buffer could be deserialized.
     /// Returns an index of latest data seen.
+    /// Default implementation simply checks that the length of segment equals field size.
     #[allow(unused_variables)]
     fn check(
         buffer: &'a [u8],
         from: CheckedOffset,
         to: CheckedOffset,
         latest_segment: CheckedOffset,
-    ) -> ::std::result::Result<CheckedOffset, Error>;
+    ) -> Result {
+        debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
+        Ok(latest_segment)
+    }
 }
 
 /// implement field for all types that has writer and reader functions
@@ -78,16 +82,6 @@ macro_rules! implement_std_field {
                         to: $crate::encoding::Offset) {
                 $fn_write(&mut buffer[from as usize..to as usize], *self)
             }
-
-            fn check(_: &'a [u8],
-                        from: $crate::encoding::CheckedOffset,
-                        to: $crate::encoding::CheckedOffset,
-                        latest_segment: CheckedOffset)
-            ->  $crate::encoding::Result
-            {
-                debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
-                Ok(latest_segment)
-            }
         }
     )
 }
@@ -111,16 +105,6 @@ macro_rules! implement_std_typedef_field {
                         from: $crate::encoding::Offset,
                         to: $crate::encoding::Offset) {
                 $fn_write(&mut buffer[from as usize..to as usize], self.to_owned().into())
-            }
-
-            fn check(_: &'a [u8],
-                        from: $crate::encoding::CheckedOffset,
-                        to: $crate::encoding::CheckedOffset,
-                        latest_segment: CheckedOffset)
-            ->  $crate::encoding::Result
-            {
-                debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
-                Ok(latest_segment)
             }
         }
     )
@@ -155,16 +139,6 @@ macro_rules! implement_pod_as_ref_field {
                     ::std::slice::from_raw_parts(ptr as * const u8,
                                                         ::std::mem::size_of::<$name>())};
                 buffer[from as usize..to as usize].copy_from_slice(slice);
-            }
-
-            fn check(_: &'a [u8],
-                        from:  $crate::encoding::CheckedOffset,
-                        to:  $crate::encoding::CheckedOffset,
-                        latest_segment: $crate::encoding::CheckedOffset)
-            ->  $crate::encoding::Result
-            {
-                debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
-                Ok(latest_segment)
             }
         }
 
@@ -217,16 +191,6 @@ impl<'a> Field<'a> for u8 {
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, _: Offset) {
         buffer[from as usize] = *self;
     }
-
-    fn check(
-        _: &'a [u8],
-        from: CheckedOffset,
-        to: CheckedOffset,
-        latest_segment: CheckedOffset,
-    ) -> Result {
-        debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
-        Ok(latest_segment)
-    }
 }
 
 // TODO expect some codding of signed integers (ECR-156) ?
@@ -241,16 +205,6 @@ impl<'a> Field<'a> for i8 {
 
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, _: Offset) {
         buffer[from as usize] = *self as u8;
-    }
-
-    fn check(
-        _: &'a [u8],
-        from: CheckedOffset,
-        to: CheckedOffset,
-        latest_segment: CheckedOffset,
-    ) -> Result {
-        debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
-        Ok(latest_segment)
     }
 }
 
@@ -292,16 +246,6 @@ impl<'a> Field<'a> for DateTime<Utc> {
             nanos,
         );
     }
-
-    fn check(
-        _: &'a [u8],
-        from: CheckedOffset,
-        to: CheckedOffset,
-        latest_segment: CheckedOffset,
-    ) -> Result {
-        debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
-        Ok(latest_segment)
-    }
 }
 
 // TODO add socketaddr check, for now with only ipv4
@@ -331,16 +275,6 @@ impl<'a> Field<'a> for SocketAddr {
             }
         }
         LittleEndian::write_u16(&mut buffer[to as usize - 2..to as usize], self.port());
-    }
-
-    fn check(
-        _: &'a [u8],
-        from: CheckedOffset,
-        to: CheckedOffset,
-        latest_segment: CheckedOffset,
-    ) -> Result {
-        debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
-        Ok(latest_segment)
     }
 }
 
