@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::num::ParseIntError;
-use std::sync::{Arc, RwLock};
-
 use bodyparser;
 use exonum::api::ApiError;
 use exonum::crypto;
@@ -26,6 +23,9 @@ use iron::status::Status;
 use router::Router;
 use serde::Serialize;
 use serde_json;
+
+use std::num::ParseIntError;
+use std::sync::{Arc, RwLock};
 
 use super::{TestKit, TestNetworkConfiguration};
 
@@ -427,7 +427,7 @@ mod tests {
         ).unwrap_err();
         assert!(
             response::extract_body_to_string(err.response)
-                .contains("Cannot rollback past genesis block",)
+                .contains("Cannot rollback past genesis block")
         );
     }
 }
