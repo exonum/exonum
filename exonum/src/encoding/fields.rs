@@ -26,6 +26,16 @@ use crypto::{Hash, PublicKey, Signature};
 use helpers::{Height, Round, ValidatorId};
 use super::{CheckedOffset, Error, Offset, Result};
 
+const SOCKET_ADDR_HEADER_SIZE: usize = 1;
+const PORT_SIZE: usize = 2;
+
+const IPV4_SIZE: usize = 4;
+const IPV6_SIZE: usize = 16;
+const SIZE_DIFF: usize = 12;
+
+const IPV4_HEADER: u8 = 0;
+const IPV6_HEADER: u8 = 1;
+
 /// Trait for all types that could be a field in `encoding`.
 pub trait Field<'a> {
     // TODO: use Read and Cursor (ECR-156)
@@ -304,25 +314,16 @@ impl<'a> Field<'a> for DateTime<Utc> {
     }
 }
 
-const HEADER_SIZE: usize = 1;
-const PORT_SIZE: usize = 2;
-
-const IPV4_SIZE: usize = 4;
-const IPV6_SIZE: usize = 16;
-
-const IPV4_HEADER: u8 = 0;
-const IPV6_HEADER: u8 = 1;
-
 // TODO add socketaddr check, for now with only ipv4
 // all possible (>6 bytes long) sequences is a valid addr (ECR-156).
 impl<'a> Field<'a> for SocketAddr {
     fn field_size() -> Offset {
         // FIXME: reserve space for future compatibility (ECR-156)
-        (HEADER_SIZE + IPV6_SIZE + PORT_SIZE) as Offset
+        (SOCKET_ADDR_HEADER_SIZE + IPV6_SIZE + PORT_SIZE) as Offset
     }
 
     unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
-        let addr_start = from as usize + HEADER_SIZE;
+        let addr_start = from as usize + SOCKET_ADDR_HEADER_SIZE;
         let ip = match buffer[from as usize] {
             IPV4_HEADER => {
                 let mut octets: [u8; IPV4_SIZE] = mem::uninitialized();
@@ -344,13 +345,13 @@ impl<'a> Field<'a> for SocketAddr {
         match *self {
             SocketAddr::V4(ref addr) => {
                 buffer[from as usize] = IPV4_HEADER;
-                let diff = (IPV4_SIZE as isize - IPV6_SIZE as isize).abs() as usize;
-                buffer[from as usize + HEADER_SIZE..to as usize - diff - PORT_SIZE]
+                buffer
+                    [from as usize + SOCKET_ADDR_HEADER_SIZE..to as usize - SIZE_DIFF - PORT_SIZE]
                     .copy_from_slice(&addr.ip().octets());
             }
             SocketAddr::V6(ref addr) => {
                 buffer[from as usize] = IPV6_HEADER;
-                buffer[from as usize + HEADER_SIZE..to as usize - PORT_SIZE]
+                buffer[from as usize + SOCKET_ADDR_HEADER_SIZE..to as usize - PORT_SIZE]
                     .copy_from_slice(&addr.ip().octets());
             }
         }

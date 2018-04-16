@@ -104,8 +104,17 @@ fn generate_template(folder: &str) {
     ]));
 }
 
-fn generate_config(folder: &str, i: usize, use_ipv6: bool) {
-    let ip = if use_ipv6 { "::1" } else { "127.0.0.1" };
+#[derive(Debug, Clone, Copy)]
+enum IpMode {
+    V4,
+    V6,
+}
+
+fn generate_config(folder: &str, i: usize, mode: IpMode) {
+    let ip = match mode {
+        IpMode::V4 => "127.0.0.1",
+        IpMode::V6 => "::1",
+    };
     assert!(!default_run_with_matches(vec![
         "exonum-config-test",
         "generate-config",
@@ -202,16 +211,16 @@ fn test_generate_template() {
 }
 
 #[cfg_attr(feature = "cargo-clippy", allow(needless_range_loop))]
-fn test_generate_config(use_ipv6: bool) {
-    let command = if use_ipv6 {
-        "generate-config-ipv6"
-    } else {
-        "generate-config-ipv4"
+fn test_generate_config(mode: IpMode) {
+    // Important because tests run in parallel.
+    let command = match mode {
+        IpMode::V4 => "generate-config-ipv4",
+        IpMode::V6 => "generate-config-ipv6",
     };
 
     let result = panic::catch_unwind(|| {
         for i in 0..PUB_CONFIG.len() {
-            generate_config(command, i, use_ipv6);
+            generate_config(command, i, mode);
         }
     });
 
@@ -225,13 +234,13 @@ fn test_generate_config(use_ipv6: bool) {
 #[test]
 #[cfg_attr(feature = "cargo-clippy", allow(needless_range_loop))]
 fn test_generate_config_ipv4() {
-    test_generate_config(false);
+    test_generate_config(IpMode::V4);
 }
 
 #[test]
 #[cfg_attr(feature = "cargo-clippy", allow(needless_range_loop))]
 fn test_generate_config_ipv6() {
-    test_generate_config(true);
+    test_generate_config(IpMode::V6);
 }
 
 #[test]
