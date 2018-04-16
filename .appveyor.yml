@@ -10,7 +10,7 @@ install:
 build: false
 
 test_script:
-  - cargo test --all
+  - cargo test --all --features "float_serialize"
 
 cache:
   - '%USERPROFILE%\.cargo'
