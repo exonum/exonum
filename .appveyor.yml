@@ -11,3 +11,6 @@ build: false
 
 test_script:
   - cargo test --all
+
+cache:
+  - '%USERPROFILE%\.cargo'
