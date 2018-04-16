@@ -35,6 +35,15 @@ extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
 
+/// Node API.
+pub mod api;
+/// Database schema.
+pub mod schema;
+/// Node transactions.
+pub mod transactions;
+/// System time provider.
+pub mod time_provider;
+
 use exonum::api::Api;
 use exonum::blockchain::{ApiContext, ExecutionError, Service, ServiceContext, Transaction,
                          TransactionSet};
@@ -50,15 +59,6 @@ use router::Router;
 use schema::TimeSchema;
 use time_provider::{SystemTimeProvider, TimeProvider};
 use transactions::*;
-
-/// Node API.
-pub mod api;
-/// Database schema.
-pub mod schema;
-/// Node transactions.
-pub mod transactions;
-/// System time provider.
-pub mod time_provider;
 
 /// Time service id.
 pub const SERVICE_ID: u16 = 4;

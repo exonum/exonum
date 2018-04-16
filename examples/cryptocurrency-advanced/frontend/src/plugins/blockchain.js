@@ -181,11 +181,11 @@ function getWallet(publicKey) {
   })
 }
 
-function waitForAcceptance(keyPair, hash) {
+function waitForAcceptance(publicKey, hash) {
   let attempt = ATTEMPTS
 
   return (function makeAttempt() {
-    return getWallet(keyPair).then(data => {
+    return getWallet(publicKey).then(data => {
       // find transaction in a wallet proof
       if (typeof data.transactions.find(transaction => transaction.hash === hash) === 'undefined') {
         if (--attempt > 0) {
@@ -243,7 +243,7 @@ module.exports = {
           message_id: TX_ISSUE_ID,
           signature: signature,
           body: data
-        }).then(response => waitForAcceptance(keyPair, response.data.tx_hash))
+        }).then(response => waitForAcceptance(keyPair.publicKey, response.data.tx_hash))
       },
 
       transfer(keyPair, receiver, amountToTransfer) {
@@ -264,7 +264,7 @@ module.exports = {
           message_id: TX_TRANSFER_ID,
           signature: signature,
           body: data
-        }).then(response => waitForAcceptance(keyPair, response.data.tx_hash))
+        }).then(response => waitForAcceptance(keyPair.publicKey, response.data.tx_hash))
       },
 
       getWallet: getWallet,

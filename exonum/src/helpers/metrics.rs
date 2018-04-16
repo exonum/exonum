@@ -14,7 +14,7 @@
 
 //! Utilities for collecting metrics.
 
-use std::time::SystemTime;
+use chrono::offset::Utc;
 
 /// Adds given metric with given value.
 ///
@@ -48,7 +48,7 @@ macro_rules! metric {
 #[allow(unused_variables)]
 pub fn add_metric(metric_name: &str, value: i64) {
     // TODO: Convert time to some meaningful format.
-    let time = format!("{:?}", SystemTime::now());
+    let time = format!("{:?}", Utc::now());
 
     #[cfg(feature = "metrics-log")]
     {
