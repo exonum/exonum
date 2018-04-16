@@ -212,7 +212,7 @@ fn test_generate_template() {
 
 #[cfg_attr(feature = "cargo-clippy", allow(needless_range_loop))]
 fn test_generate_config(mode: IpMode) {
-    // Important because tests run in parallel.
+    // Important because tests run in parallel, folder names should be different.
     let command = match mode {
         IpMode::V4 => "generate-config-ipv4",
         IpMode::V6 => "generate-config-ipv6",
