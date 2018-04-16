@@ -171,6 +171,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `transactions!` macro now allows empty body. (#593)
 
+- IPv6 addressing is now supported by exonum. (#615)
+
 #### exonum-testkit
 
 - `create_block*` methods of the `TestKit` now return the information about
