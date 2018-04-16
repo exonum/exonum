@@ -8,7 +8,7 @@
           <ul class="list-group mt-5">
             <li class="list-group-item">
               <div class="row">
-                <div class="col-sm-3"><strong>Content hash:</strong></div>
+                <div class="col-sm-3"><strong>Hash:</strong></div>
                 <div class="col-sm-9">
                   <code>{{ timestamp.content_hash }}</code>
                 </div>
@@ -32,7 +32,7 @@
             </li>
             <li class="list-group-item">
               <div class="row">
-                <div class="col-sm-3"><strong>Time:</strong></div>
+                <div class="col-sm-3"><strong>Date:</strong></div>
                 <div class="col-sm-9">{{ $moment(time) }}</div>
               </div>
             </li>

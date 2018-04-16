@@ -7,12 +7,13 @@
 
           <form class="mt-5" @submit.prevent="timestamp">
             <div class="form-group">
-              <label class="control-label">Hash:</label>
+              <label class="control-label">File:</label>
               <input v-model="hash" type="text" class="form-control" placeholder="Enter hash" required>
             </div>
             <div class="form-group">
               <label class="control-label">Metadata:</label>
-              <input v-model="metadata" type="text" class="form-control" placeholder="Enter metadata" required>
+              <input v-model="metadata" type="text" class="form-control" placeholder="Enter metadata">
+              <small class="form-text text-muted">Optional field.</small>
             </div>
             <button type="submit" class="btn btn-lg btn-block btn-primary">Make a timestamp</button>
           </form>
