@@ -5,6 +5,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### New features
+
+- IPv6 addressing is now supported. (#615)
+
 ### Bug fixes
 
 #### exonum-cryptocurrency-advanced
@@ -12,8 +16,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Frontend has been updated to reflect latest backend changes. (#602 #611)
 
 ### Internal improvements
-
-- IPv6 addressing is now supported. (#615)
 
 #### exonum-time
 
