@@ -382,8 +382,9 @@ impl<'a> Field<'a> for SocketAddr {
             });
         }
 
-        if !(buffer[to_unchecked - SIZE_DIFF - PORT_SIZE..to_unchecked - PORT_SIZE]
-            == [0u8; SIZE_DIFF])
+        if buffer[from_unchecked] == IPV4_HEADER
+            && !(buffer[to_unchecked - SIZE_DIFF - PORT_SIZE..to_unchecked - PORT_SIZE]
+                == [0u8; SIZE_DIFF])
         {
             let mut value: [u8; SIZE_DIFF] = unsafe { mem::uninitialized() };
             value.copy_from_slice(&buffer[to_unchecked - SIZE_DIFF..to_unchecked]);
