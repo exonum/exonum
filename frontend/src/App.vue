@@ -55,11 +55,16 @@
     },
     data() {
       return {
-        isSpinnerVisible: false
+        isSpinnerVisible: false,
+        hash: ''
       }
     },
     methods: {
       async search() {
+        if (!this.$validate.hex(this.hash)) {
+          return this.$notify('error', 'Invalid hash is passed')
+        }
+
         this.isSpinnerVisible = true
 
         try {
@@ -72,6 +77,7 @@
           }
           this.$nextTick(function() {
             this.$router.push({ name: 'timestamp', params: { hash: this.hash } })
+            this.hash = ''
           })
         } catch (error) {
           this.isSpinnerVisible = false

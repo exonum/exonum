@@ -35,11 +35,15 @@ const TimestampEntry = Exonum.newType({
   ]
 })
 
-function waitForAcceptance(hash) {
+function waitForAcceptance(response) {
   let attempt = ATTEMPTS
 
+  if (response.data.debug) {
+    throw new Error(response.data.description)
+  }
+
   return (function makeAttempt() {
-    return axios.get(`/api/explorer/v1/transactions/${hash}`).then(response => {
+    return axios.get(`/api/explorer/v1/transactions/${response.data}`).then(response => {
       if (response.data.type === 'committed') {
         return response.data
       } else {
@@ -94,7 +98,7 @@ module.exports = {
           message_id: TX_ID,
           body: data,
           signature: signature
-        }).then(response => waitForAcceptance(response.data))
+        }).then(waitForAcceptance)
       },
 
       getTimestamp: hash => {
