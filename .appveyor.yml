@@ -11,7 +11,13 @@ install:
 build: false
 
 test_script:
-  - cargo test --all --features "float_serialize"
+  - cargo test --all
+  - cargo run -p exonum --example explorer
+  - cargo run -p exonum-testkit --example timestamping
+  - cargo run -p exonum-testkit --example configuration_change
+  - cargo run -p exonum-time --example simple_service
+  - cd %APPVEYOR_BUILD_FOLDER%/examples/cryptocurrency/examples && test.ps1
+  - cd %APPVEYOR_BUILD_FOLDER%/testkit/examples/server && npm test
 
 cache:
   - '%USERPROFILE%\.cargo'
