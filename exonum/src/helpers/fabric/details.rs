@@ -26,7 +26,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use blockchain::{GenesisConfig, config::ValidatorKeys};
 use helpers::{generate_testnet_config, config::ConfigFile};
-use node::{NodeApiConfig, NodeConfig};
+use node::{AllowOrigin, NodeApiConfig, NodeConfig};
 use storage::{Database, DbOptions, RocksDB};
 use crypto;
 use super::internal::{CollectedCommand, Command, Feedback};
@@ -39,6 +39,10 @@ use super::keys;
 const DATABASE_PATH: &str = "DATABASE_PATH";
 const OUTPUT_DIR: &str = "OUTPUT_DIR";
 const PEER_ADDRESS: &str = "PEER_ADDRESS";
+const NODE_CONFIG_PATH: &str = "NODE_CONFIG_PATH";
+const PUBLIC_API_ADDRESS: &str = "PUBLIC_API_ADDRESS";
+const PRIVATE_API_ADDRESS: &str = "PRIVATE_API_ADDRESS";
+const ALLOW_ORIGIN: &str = "ALLOW_ORIGIN";
 
 /// Run command.
 pub struct Run;
@@ -57,17 +61,17 @@ impl Run {
     }
 
     fn node_config(ctx: &Context) -> NodeConfig {
-        let path = ctx.arg::<String>("NODE_CONFIG_PATH")
-            .expect("NODE_CONFIG_PATH not found.");
+        let path = ctx.arg::<String>(NODE_CONFIG_PATH)
+            .expect(&format!("{} not found.", NODE_CONFIG_PATH));
         ConfigFile::load(path).unwrap()
     }
 
     fn public_api_address(ctx: &Context) -> Option<SocketAddr> {
-        ctx.arg("PUBLIC_API_ADDRESS").ok()
+        ctx.arg(PUBLIC_API_ADDRESS).ok()
     }
 
     fn private_api_address(ctx: &Context) -> Option<SocketAddr> {
-        ctx.arg("PRIVATE_API_ADDRESS").ok()
+        ctx.arg(PRIVATE_API_ADDRESS).ok()
     }
 }
 
@@ -75,7 +79,7 @@ impl Command for Run {
     fn args(&self) -> Vec<Argument> {
         vec![
             Argument::new_named(
-                "NODE_CONFIG_PATH",
+                NODE_CONFIG_PATH,
                 true,
                 "Path to node configuration file.",
                 "c",
@@ -91,7 +95,7 @@ impl Command for Run {
                 false,
             ),
             Argument::new_named(
-                "PUBLIC_API_ADDRESS",
+                PUBLIC_API_ADDRESS,
                 false,
                 "Listen address for public api.",
                 None,
@@ -99,7 +103,7 @@ impl Command for Run {
                 false,
             ),
             Argument::new_named(
-                "PRIVATE_API_ADDRESS",
+                PRIVATE_API_ADDRESS,
                 false,
                 "Listen address for private api.",
                 None,
@@ -250,7 +254,7 @@ impl Command for RunDev {
         Self::cleanup(&context);
 
         let node_config_path = Self::generate_config(commands, &context);
-        context.set_arg("NODE_CONFIG_PATH", node_config_path);
+        context.set_arg(NODE_CONFIG_PATH, node_config_path);
 
         let new_context = exts(context);
         commands
@@ -498,6 +502,10 @@ impl Finalize {
             map.get(&our_config.consensus_public_key).cloned(),
         )
     }
+
+    fn allow_origin(context: &Context) -> Option<AllowOrigin> {
+        context.arg(ALLOW_ORIGIN).ok()
+    }
 }
 
 impl Command for Finalize {
@@ -512,7 +520,7 @@ impl Command for Finalize {
                 true,
             ),
             Argument::new_named(
-                "PUBLIC_API_ADDRESS",
+                PUBLIC_API_ADDRESS,
                 false,
                 "Listen address for public api.",
                 None,
@@ -520,11 +528,19 @@ impl Command for Finalize {
                 false,
             ),
             Argument::new_named(
-                "PRIVATE_API_ADDRESS",
+                PRIVATE_API_ADDRESS,
                 false,
                 "Listen address for private api.",
                 None,
                 "private-api-address",
+                false,
+            ),
+            Argument::new_named(
+                ALLOW_ORIGIN,
+                false,
+                "Cross-origin resource sharing options for responses returned by API handlers.",
+                None,
+                "allow-origin",
                 false,
             ),
             Argument::new_positional("SECRET_CONFIG", true, "Path to our secret config."),
@@ -556,8 +572,9 @@ impl Command for Finalize {
             .arg::<String>("OUTPUT_CONFIG_PATH")
             .expect("output config path not found");
 
-        let public_addr = Run::public_api_address(&context);
-        let private_addr = Run::private_api_address(&context);
+        let public_api_address = Run::public_api_address(&context);
+        let private_api_address = Run::private_api_address(&context);
+        let allow_origin = Self::allow_origin(&context);
 
         let secret_config: NodePrivateConfig =
             ConfigFile::load(secret_config_path).expect("Failed to load key config.");
@@ -600,8 +617,9 @@ impl Command for Finalize {
                 service_secret_key: secret_config.service_secret_key,
                 genesis,
                 api: NodeApiConfig {
-                    public_api_address: public_addr,
-                    private_api_address: private_addr,
+                    public_api_address,
+                    private_api_address,
+                    allow_origin,
                     ..Default::default()
                 },
                 mempool: Default::default(),

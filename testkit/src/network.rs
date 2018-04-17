@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 
 /// Emulated test network.
-#[derive(Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TestNetwork {
     us: TestNode,
     validators: Vec<TestNode>,
@@ -108,7 +108,7 @@ impl TestNetwork {
 }
 
 /// An emulated node in the test network.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TestNode {
     consensus_secret_key: crypto::SecretKey,
     consensus_public_key: crypto::PublicKey,
@@ -226,7 +226,7 @@ impl From<TestNode> for ValidatorKeys {
 }
 
 /// A configuration of the test network.
-#[derive(Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TestNetworkConfiguration {
     us: TestNode,
     validators: Vec<TestNode>,

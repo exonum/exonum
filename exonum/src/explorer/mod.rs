@@ -23,6 +23,7 @@ use std::cell::{Ref, RefCell};
 use std::collections::Bound;
 use std::fmt;
 use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
+use std::slice;
 
 use crypto::{CryptoHash, Hash};
 use blockchain::{Block, Blockchain, Schema, Transaction, TransactionError, TransactionErrorType,
@@ -264,18 +265,23 @@ impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
 }
 
 /// Information about a block in the blockchain with info on transactions eagerly loaded.
-#[derive(Debug, Serialize)]
-pub struct BlockWithTransactions {
+///
+/// The type parameter corresponds to some representation of `Box<Transaction>`.
+/// This generalization is needed to deserialize the type, e.g.,
+/// by using `BlockWithTransactions<serde_json::Value>`.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(bound(serialize = "T: SerializeContent"))]
+pub struct BlockWithTransactions<T = Box<Transaction>> {
     /// Block header as recorded in the blockchain.
     #[serde(rename = "block")]
     pub header: Block,
     /// Precommits.
     pub precommits: Vec<Precommit>,
     /// Transactions in the order they appear in the block.
-    pub transactions: Vec<CommittedTransaction>,
+    pub transactions: Vec<CommittedTransaction<T>>,
 }
 
-impl BlockWithTransactions {
+impl<T> BlockWithTransactions<T> {
     /// Returns the height of this block.
     ///
     /// This method is equivalent to calling `block.header.height()`.
@@ -294,7 +300,7 @@ impl BlockWithTransactions {
     }
 
     /// Iterates over transactions in the block.
-    pub fn iter(&self) -> EagerTransactions {
+    pub fn iter(&self) -> EagerTransactions<T> {
         self.transactions.iter()
     }
 }
@@ -302,12 +308,12 @@ impl BlockWithTransactions {
 /// Iterator over transactions in [`BlockWithTransactions`].
 ///
 /// [`BlockWithTransactions`]: struct.BlockWithTransactions.html
-pub type EagerTransactions<'a> = ::std::slice::Iter<'a, CommittedTransaction>;
+pub type EagerTransactions<'a, T> = slice::Iter<'a, CommittedTransaction<T>>;
 
-impl Index<usize> for BlockWithTransactions {
-    type Output = CommittedTransaction;
+impl<T> Index<usize> for BlockWithTransactions<T> {
+    type Output = CommittedTransaction<T>;
 
-    fn index(&self, index: usize) -> &CommittedTransaction {
+    fn index(&self, index: usize) -> &CommittedTransaction<T> {
         self.transactions.get(index).expect(&format!(
             "Index exceeds number of transactions in block {}",
             self.len()
@@ -315,11 +321,11 @@ impl Index<usize> for BlockWithTransactions {
     }
 }
 
-impl<'a> IntoIterator for &'a BlockWithTransactions {
-    type Item = &'a CommittedTransaction;
-    type IntoIter = EagerTransactions<'a>;
+impl<'a, T> IntoIterator for &'a BlockWithTransactions<T> {
+    type Item = &'a CommittedTransaction<T>;
+    type IntoIter = EagerTransactions<'a, T>;
 
-    fn into_iter(self) -> EagerTransactions<'a> {
+    fn into_iter(self) -> EagerTransactions<'a, T> {
         self.iter()
     }
 }

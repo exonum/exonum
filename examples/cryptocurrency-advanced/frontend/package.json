@@ -13,8 +13,10 @@
     "big-integer": "^1.6.27",
     "bootstrap": "^4.0.0",
     "exonum-client": "^0.7.2",
+    "jquery": "^3.3.1",
     "noty": "^3.2.0-beta",
     "numeral": "^2.0.6",
+    "popper.js": "^1.14.3",
     "vue": "^2.5.16",
     "vue-router": "^3.0.1",
     "vuex": "^3.0.1"

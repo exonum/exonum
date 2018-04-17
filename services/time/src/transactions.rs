@@ -22,7 +22,7 @@ pub enum Error {
 }
 
 transactions! {
-    /// Define TimeService transaction
+    /// Define TimeService transaction.
     pub TimeTransactions {
         const SERVICE_ID = SERVICE_ID;
 

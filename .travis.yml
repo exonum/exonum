@@ -27,6 +27,7 @@ cache:
   - $HOME/.cargo
   - $HOME/.local
   - $TRAVIS_BUILD_DIR/target
+  - $TRAVIS_BUILD_DIR/testkit/examples/server/node_modules
 
 dist: trusty
 sudo: required
@@ -125,6 +126,9 @@ jobs:
         - libsnappy-dev
         - librocksdb
         - powershell
+    install:
+    - nvm install 8 && nvm use 8
+    - cd $TRAVIS_BUILD_DIR/testkit/examples/server && npm install && cd $TRAVIS_BUILD_DIR
     script:
     - cargo test --all
     - cargo run -p exonum --example explorer
@@ -133,6 +137,7 @@ jobs:
     - cargo run -p exonum-time --example simple_service
     - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
     - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
+    - cd $TRAVIS_BUILD_DIR/testkit/examples/server && npm run test:unix
 
   # Benchmarks (compilation only)
   - env: FEATURE=benchmarks

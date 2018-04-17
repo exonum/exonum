@@ -20,18 +20,20 @@ circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
 exonum = { version = "0.7.0", path = "../exonum" }
+bodyparser = "0.8.0"
 futures = "0.1.20"
 log = "0.4.1"
+mount = "0.4.0"
 serde = "1.0.0"
+serde_derive = "1.0.0"
 serde_json = "1.0.0"
 iron = "0.6.0"
 iron-test = "0.6.0"
+tokio-core = "0.1.9"
 router = "0.6.0"
-bodyparser = "0.8.0"
 
 [dev-dependencies]
-bodyparser = "0.8.0"
-serde_derive = "1.0.0"
+exonum-cryptocurrency = { version = "0.0.0", path = "../examples/cryptocurrency" }
 rand = "0.4.2"
 pretty_assertions = "0.5.0"
 assert_matches = "1.2.0"
