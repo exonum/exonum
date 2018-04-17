@@ -34,7 +34,8 @@
     },
     data() {
       return {
-        isSpinnerVisible: false
+        isSpinnerVisible: false,
+        metadata: ''
       }
     },
     methods: {
