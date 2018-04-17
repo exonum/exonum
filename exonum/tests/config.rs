@@ -104,7 +104,17 @@ fn generate_template(folder: &str) {
     ]));
 }
 
-fn generate_config(folder: &str, i: usize) {
+#[derive(Debug, Clone, Copy)]
+enum IpMode {
+    V4,
+    V6,
+}
+
+fn generate_config(folder: &str, i: usize, mode: IpMode) {
+    let ip = match mode {
+        IpMode::V4 => "127.0.0.1",
+        IpMode::V6 => "::1",
+    };
     assert!(!default_run_with_matches(vec![
         "exonum-config-test",
         "generate-config",
@@ -112,11 +122,10 @@ fn generate_config(folder: &str, i: usize) {
         &full_tmp_name(PUB_CONFIG[i], folder),
         &full_tmp_name(SEC_CONFIG[i], folder),
         "-a",
-        "127.0.0.1",
+        ip,
     ]));
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(needless_range_loop))]
 fn finalize_config(folder: &str, config: &str, i: usize, count: usize) {
     let mut variables = vec![
         "exonum-config-test".to_owned(),
@@ -128,9 +137,9 @@ fn finalize_config(folder: &str, config: &str, i: usize, count: usize) {
 
     fs::create_dir_all(full_tmp_name("", folder)).expect("Can't create temp folder");
 
-    for n in 0..count {
-        override_validators_count(PUB_CONFIG[n], count, folder);
-        variables.push(full_tmp_name(PUB_CONFIG[n], folder));
+    for &conf in PUB_CONFIG.iter().take(count) {
+        override_validators_count(conf, count, folder);
+        variables.push(full_tmp_name(conf, folder));
     }
     assert!(!default_run_with_matches(variables));
 }
@@ -200,14 +209,16 @@ fn test_generate_template() {
     }
 }
 
-#[test]
-#[cfg_attr(feature = "cargo-clippy", allow(needless_range_loop))]
-fn test_generate_config() {
-    let command = "generate-config";
+fn test_generate_config(mode: IpMode) {
+    // Important because tests run in parallel, folder names should be different.
+    let command = match mode {
+        IpMode::V4 => "generate-config-ipv4",
+        IpMode::V6 => "generate-config-ipv6",
+    };
 
     let result = panic::catch_unwind(|| {
         for i in 0..PUB_CONFIG.len() {
-            generate_config(command, i);
+            generate_config(command, i, mode);
         }
     });
 
@@ -219,7 +230,16 @@ fn test_generate_config() {
 }
 
 #[test]
-#[cfg_attr(feature = "cargo-clippy", allow(needless_range_loop))]
+fn test_generate_config_ipv4() {
+    test_generate_config(IpMode::V4);
+}
+
+#[test]
+fn test_generate_config_ipv6() {
+    test_generate_config(IpMode::V6);
+}
+
+#[test]
 fn test_generate_full_config_run() {
     let command = "finalize";
     let result = panic::catch_unwind(|| {

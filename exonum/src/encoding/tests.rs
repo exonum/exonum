@@ -253,11 +253,10 @@ fn test_segments_of_status_messages() {
     assert_write_check_read(dat, 8);
 }
 
-#[test]
-fn test_connect() {
+fn test_connect(addr: &str) {
     use std::str::FromStr;
 
-    let socket_address = SocketAddr::from_str("18.34.3.4:7777").unwrap();
+    let socket_address = SocketAddr::from_str(addr).unwrap();
     let time = Utc::now();
     let (public_key, secret_key) = gen_keypair();
 
@@ -274,6 +273,16 @@ fn test_connect() {
     assert_eq!(connect.addr(), socket_address);
     assert_eq!(connect.time(), time);
     assert!(connect.verify_signature(&public_key));
+}
+
+#[test]
+fn test_connect_ipv4() {
+    test_connect("18.34.3.4:7777");
+}
+
+#[test]
+fn test_connect_ipv6() {
+    test_connect("[::1]:7777");
 }
 
 #[test]

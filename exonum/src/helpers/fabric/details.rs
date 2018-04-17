@@ -21,7 +21,7 @@ use toml;
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::collections::{BTreeMap, HashMap};
 
 use blockchain::{GenesisConfig, config::ValidatorKeys};
@@ -339,22 +339,21 @@ impl GenerateNodeConfig {
     }
 
     fn addr(context: &Context) -> (SocketAddr, SocketAddr) {
-        let addr = context.arg::<String>(PEER_ADDRESS).unwrap_or_default();
+        let addr_str = &context.arg::<String>(PEER_ADDRESS).unwrap_or_default();
+        let error_msg = &format!("Expected an ip address in {}", PEER_ADDRESS);
 
-        let mut addr_parts = addr.split(':');
-        let ip = addr_parts.next().expect("Expected ip address");
-        if ip.len() < 8 {
-            panic!("Expected ip address in {}.", PEER_ADDRESS);
-        }
-        let port = addr_parts.next().map_or(DEFAULT_EXONUM_LISTEN_PORT, |s| {
-            s.parse().expect("could not parse port")
+        let external_addr = addr_str.parse::<SocketAddr>().unwrap_or_else(|_| {
+            let ip = addr_str.parse::<IpAddr>().expect(error_msg);
+            SocketAddr::new(ip, DEFAULT_EXONUM_LISTEN_PORT)
         });
-        let external_address = format!("{}:{}", ip, port);
-        let listen_address = format!("0.0.0.0:{}", port);
-        (
-            external_address.parse().unwrap(),
-            listen_address.parse().unwrap(),
-        )
+
+        let listen_ip = match external_addr {
+            SocketAddr::V4(_) => "0.0.0.0".parse().unwrap(),
+            SocketAddr::V6(_) => "::".parse().unwrap(),
+        };
+        let listen_addr = SocketAddr::new(listen_ip, external_addr.port());
+
+        (external_addr, listen_addr)
     }
 }
 

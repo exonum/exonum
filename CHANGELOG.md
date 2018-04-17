@@ -11,6 +11,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - The `--allow-origin` parameter has been added to the `finalize` command.
 
+- IPv6 addressing is now supported. (#615)
+
 ### Bug fixes
 
 #### exonum-cryptocurrency-advanced
