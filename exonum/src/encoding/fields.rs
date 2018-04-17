@@ -31,7 +31,7 @@ const PORT_SIZE: usize = 2;
 
 const IPV4_SIZE: usize = 4;
 const IPV6_SIZE: usize = 16;
-const SIZE_DIFF: usize = 12;
+const SIZE_DIFF: usize = IPV6_SIZE - IPV4_SIZE;
 
 const IPV4_HEADER: u8 = 0;
 const IPV6_HEADER: u8 = 1;
@@ -348,6 +348,9 @@ impl<'a> Field<'a> for SocketAddr {
                 buffer
                     [from as usize + SOCKET_ADDR_HEADER_SIZE..to as usize - SIZE_DIFF - PORT_SIZE]
                     .copy_from_slice(&addr.ip().octets());
+                // Padding.
+                buffer[to as usize - SIZE_DIFF - PORT_SIZE..to as usize - PORT_SIZE]
+                    .copy_from_slice(&[0u8; SIZE_DIFF]);
             }
             SocketAddr::V6(ref addr) => {
                 buffer[from as usize] = IPV6_HEADER;
@@ -368,17 +371,28 @@ impl<'a> Field<'a> for SocketAddr {
         latest_segment: CheckedOffset,
     ) -> Result {
         debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
-        let from_offset = from.unchecked_offset();
-        if buffer[from_offset as usize] != IPV4_HEADER
-            && buffer[from_offset as usize] != IPV6_HEADER
-        {
-            Err(Error::IncorrectSocketAddrHeader {
+
+        let from_unchecked = from.unchecked_offset() as usize;
+        let to_unchecked = to.unchecked_offset() as usize;
+
+        if buffer[from_unchecked] != IPV4_HEADER && buffer[from_unchecked] != IPV6_HEADER {
+            return Err(Error::IncorrectSocketAddrHeader {
                 position: from.unchecked_offset(),
-                value: buffer[from_offset as usize],
-            })
-        } else {
-            Ok(latest_segment)
+                value: buffer[from_unchecked],
+            });
         }
+
+        if !(buffer[to_unchecked - SIZE_DIFF - PORT_SIZE..to_unchecked - PORT_SIZE]
+            == [0u8; SIZE_DIFF])
+        {
+            let mut value: [u8; SIZE_DIFF] = unsafe { mem::uninitialized() };
+            value.copy_from_slice(&buffer[to_unchecked - SIZE_DIFF..to_unchecked]);
+            return Err(Error::IncorrectSocketAddrPadding {
+                position: (to_unchecked - SIZE_DIFF) as Offset,
+                value,
+            });
+        }
+        Ok(latest_segment)
     }
 }
 

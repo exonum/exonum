@@ -51,6 +51,13 @@ pub enum Error {
         /// Header value.
         value: u8,
     },
+    /// SocketAddr padding for IPv4 addresses must be 12 bytes of 0s.
+    IncorrectSocketAddrPadding {
+        /// Position in buffer where error appears.
+        position: Offset,
+        /// Padding value.
+        value: [u8; 12],
+    },
     /// Segment reference is incorrect
     IncorrectSegmentReference {
         /// position in buffer where error appears.
@@ -138,6 +145,7 @@ impl StdError for Error {
             Error::IncorrectBoolean { .. } => "Incorrect boolean value",
             Error::UnsupportedFloat { .. } => "Unsupported float value",
             Error::IncorrectSocketAddrHeader { .. } => "Incorrect SocketAddr header value",
+            Error::IncorrectSocketAddrPadding { .. } => "Incorrect SocketAddr padding",
             Error::IncorrectSegmentReference { .. } => "Incorrect segment reference",
             Error::IncorrectSegmentSize { .. } => "Incorrect segment size",
             Error::UnexpectedlyShortRawMessage { .. } => "Unexpectedly short RawMessage",

@@ -126,7 +126,6 @@ fn generate_config(folder: &str, i: usize, mode: IpMode) {
     ]));
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(needless_range_loop))]
 fn finalize_config(folder: &str, config: &str, i: usize, count: usize) {
     let mut variables = vec![
         "exonum-config-test".to_owned(),
@@ -138,9 +137,9 @@ fn finalize_config(folder: &str, config: &str, i: usize, count: usize) {
 
     fs::create_dir_all(full_tmp_name("", folder)).expect("Can't create temp folder");
 
-    for n in 0..count {
-        override_validators_count(PUB_CONFIG[n], count, folder);
-        variables.push(full_tmp_name(PUB_CONFIG[n], folder));
+    for &conf in PUB_CONFIG.iter().take(count) {
+        override_validators_count(conf, count, folder);
+        variables.push(full_tmp_name(conf, folder));
     }
     assert!(!default_run_with_matches(variables));
 }
@@ -210,7 +209,6 @@ fn test_generate_template() {
     }
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(needless_range_loop))]
 fn test_generate_config(mode: IpMode) {
     // Important because tests run in parallel, folder names should be different.
     let command = match mode {
@@ -242,7 +240,6 @@ fn test_generate_config_ipv6() {
 }
 
 #[test]
-#[cfg_attr(feature = "cargo-clippy", allow(needless_range_loop))]
 fn test_generate_full_config_run() {
     let command = "finalize";
     let result = panic::catch_unwind(|| {
