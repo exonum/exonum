@@ -13,6 +13,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Internal improvements
 
+- IPv6 addressing is now supported. (#615)
+
 #### exonum-time
 
 - Split service components to separate modules. (#604)
@@ -170,8 +172,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `Display` trait is implemented for types from the `crypto` module. (#590)
 
 - `transactions!` macro now allows empty body. (#593)
-
-- IPv6 addressing is now supported by exonum. (#615)
 
 #### exonum-testkit
 
