@@ -617,13 +617,9 @@ impl NodeHandler {
         let mut fork = self.blockchain.fork();
         {
             let mut schema = Schema::new(&mut fork);
-            if schema.transactions().contains(&hash)
-                && !schema.transactions_pool().contains(&hash)
+            if schema.transactions().contains(&hash) && !schema.transactions_pool().contains(&hash)
             {
-                error!(
-                    "Received already committed transaction, hash={:?}",
-                    hash
-                );
+                error!("Received already committed transaction, hash={:?}", hash);
                 return;
             }
 
