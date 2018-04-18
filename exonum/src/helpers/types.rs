@@ -238,7 +238,7 @@ impl Round {
 }
 
 /// Validators identifier.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct ValidatorId(pub u16);
 
 impl ValidatorId {

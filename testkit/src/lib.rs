@@ -125,15 +125,21 @@
 #![deny(missing_debug_implementations, missing_docs)]
 
 extern crate bodyparser;
+#[cfg_attr(test, macro_use)]
 extern crate exonum;
 extern crate futures;
 extern crate iron;
 extern crate iron_test;
 #[macro_use]
 extern crate log;
+extern crate mount;
 extern crate router;
 extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+#[cfg_attr(test, macro_use)]
 extern crate serde_json;
+extern crate tokio_core;
 
 #[cfg(test)]
 #[macro_use]
@@ -145,10 +151,15 @@ pub use network::{TestNetwork, TestNetworkConfiguration, TestNode};
 
 pub mod compare;
 
-use futures::Stream;
+use futures::{Future, Stream};
 use futures::sync::mpsc;
+use iron::Iron;
+use tokio_core::reactor::Core;
 
 use std::fmt;
+use std::net::SocketAddr;
+use std::sync::{Arc, RwLock};
+use std::thread;
 
 use exonum::blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfiguration,
                          Transaction};
@@ -160,16 +171,65 @@ use exonum::storage::{MemoryDB, Patch, Snapshot};
 use exonum::messages::RawMessage;
 
 use checkpoint_db::{CheckpointDb, CheckpointDbHandler};
+use handler::create_testkit_handler;
 use poll_events::poll_events;
 
 #[macro_use]
 mod macros;
 mod api;
 mod checkpoint_db;
+mod handler;
 mod network;
 mod poll_events;
 
 /// Builder for `TestKit`.
+///
+/// # Testkit server
+///
+/// By calling the [`serve`] method, you can transform testkit into a web server useful for
+/// client-side testing. The testkit-specific APIs are exposed on the private address
+/// with the `/api/testkit` prefix (hereinafter denoted as `{baseURL}`).
+/// In all APIs, the request body (if applicable) and response are JSON-encoded.
+///
+/// ## Testkit status
+///
+/// GET `{baseURL}/v1/status`
+///
+/// Outputs the status of the testkit, which includes:
+///
+/// - Current blockchain height
+/// - Current [test network configuration][cfg]
+/// - Next network configuration if it is scheduled with [`commit_configuration_change`].
+///
+/// ## Create block
+///
+/// POST `{baseURL}/v1/blocks`
+///
+/// Creates a new block in the testkit blockchain. If the
+/// JSON body of the request is an empty object, the call is functionally equivalent
+/// to [`create_block`]. Otherwise, if the body has the `tx_hashes` field specifying an array
+/// of transaction hashes, the call is equivalent to [`create_block_with_tx_hashes`] supplied
+/// with these hashes.
+///
+/// Returns the latest block from the blockchain on success.
+///
+/// ## Roll back
+///
+/// DELETE `{baseURL}/v1/blocks/:height`
+///
+/// Acts as a rough [`rollback`] equivalent. The blocks are rolled back up and including the block
+/// at the specified `height` (a positive integer), so that after the request the blockchain height
+/// is equal to `height - 1`. If the specified height is greater than the blockchain height,
+/// the request performs no action.
+///
+/// Returns the latest block from the blockchain on success.
+///
+/// [`serve`]: #method.serve
+/// [cfg]: struct.TestNetworkConfiguration.html
+/// [`create_block`]: struct.TestKit.html#method.create_block
+/// [`create_block_with_tx_hashes`]: struct.TestKit.html#method.create_block_with_tx_hashes
+/// [`commit_configuration_change`]: struct.TestKit.html#method.commit_configuration_change
+/// [`rollback`]: struct.TestKit.html#method.rollback
 ///
 /// # Example
 ///
@@ -288,6 +348,18 @@ impl TestKitBuilder {
             self.services,
             TestNetwork::with_our_role(self.our_validator_id, self.validator_count.unwrap_or(1)),
         )
+    }
+
+    /// Starts a testkit web server, which listens to public and private APIs exposed by
+    /// the testkit, on the respective addresses. The private address also exposes the testkit
+    /// APIs with the `/api/testkit` URL prefix.
+    ///
+    /// Unlike real Exonum nodes, the testkit web server does not create peer-to-peer connections
+    /// with other nodes, and does not create blocks automatically. The only way to commit
+    /// transactions is thus to use the [testkit API](#testkit-server).
+    pub fn serve(self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
+        let testkit = self.create();
+        testkit.run(public_api_address, private_api_address);
     }
 }
 
@@ -584,6 +656,16 @@ impl TestKit {
         None
     }
 
+    /// Returns a reference to the scheduled configuration proposal, or `None` if
+    /// there is no such proposal.
+    pub fn next_configuration(&self) -> Option<&TestNetworkConfiguration> {
+        use ConfigurationProposalState::*;
+
+        self.cfg_proposal.as_ref().map(|p| match *p {
+            Committed(ref proposal) | Uncommitted(ref proposal) => proposal,
+        })
+    }
+
     /// Creates a block with the given transactions.
     /// Transactions that are in the pool will be ignored.
     ///
@@ -852,6 +934,45 @@ impl TestKit {
             "There is an active configuration change proposal."
         );
         self.cfg_proposal = Some(Uncommitted(proposal));
+    }
+
+    fn run(mut self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
+        let api = self.api();
+        let events_stream = self.remove_events_stream();
+        let testkit_ref = Arc::new(RwLock::new(self));
+        let (public_handler, private_handler) =
+            api.into_handlers(create_testkit_handler(&testkit_ref));
+
+        let public_api_thread = thread::spawn(move || {
+            Iron::new(public_handler).http(public_api_address).unwrap();
+        });
+        let private_api_thread = thread::spawn(move || {
+            Iron::new(private_handler)
+                .http(private_api_address)
+                .unwrap();
+        });
+
+        // Run the event stream in a separate thread in order to put transactions to mempool
+        // when they are received. Otherwise, a client would need to call a `poll_events` analogue
+        // each time after a transaction is posted.
+        let mut core = Core::new().unwrap();
+        core.run(events_stream).unwrap();
+
+        public_api_thread.join().unwrap();
+        private_api_thread.join().unwrap();
+    }
+
+    /// Extracts the event stream from this testkit, replacing it with `futures::stream::empty()`.
+    /// This makes the testkit after the replacement pretty much unusable unless
+    /// the old event stream (which is still capable of processing current and future events)
+    /// is employed to run to completion.
+    ///
+    /// # Returned value
+    ///
+    /// Future that runs the event stream of this testkit to completion.
+    fn remove_events_stream(&mut self) -> Box<Future<Item = (), Error = ()>> {
+        let stream = std::mem::replace(&mut self.events_stream, Box::new(futures::stream::empty()));
+        Box::new(stream.for_each(|_| Ok(())))
     }
 
     /// Returns the node in the emulated network, from whose perspective the testkit operates.
