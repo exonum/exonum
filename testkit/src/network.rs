@@ -167,7 +167,7 @@ impl TestNode {
         height: Height,
         last_hash: &crypto::Hash,
         tx_hashes: &[crypto::Hash],
-    ) -> Propose {
+    ) -> ProtocolMessage<Propose> {
         Propose::new(
             self.validator_id
                 .expect("An attempt to create propose from a non-validator node."),
@@ -180,7 +180,7 @@ impl TestNode {
     }
 
     /// Creates a `Precommit` message signed by this validator.
-    pub fn create_precommit(&self, propose: &Propose, block_hash: &crypto::Hash) -> Precommit {
+    pub fn create_precommit(&self, propose: &Propose, block_hash: &crypto::Hash) -> ProtocolMessage<Precommit> {
         use std::time::SystemTime;
 
         Precommit::new(

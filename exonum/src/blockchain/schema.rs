@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crypto::{CryptoHash, Hash, PublicKey};
-use messages::{Connect, Precommit, RawMessage};
+use messages::{Connect, Precommit, Message, SignedMessage};
 use storage::{Entry, Fork, KeySetIndex, ListIndex, MapIndex, MapProof, ProofListIndex,
               ProofMapIndex, Snapshot};
 use helpers::{Height, Round};
@@ -84,7 +84,7 @@ where
     }
 
     /// Returns table that represents a map from transaction hash into raw transaction message.
-    pub fn transactions(&self) -> MapIndex<&T, Hash, RawMessage> {
+    pub fn transactions(&self) -> MapIndex<&T, Hash, Message<Protocol>> {
         MapIndex::new(TRANSACTIONS, &self.view)
     }
 
@@ -130,7 +130,7 @@ where
     }
 
     /// Returns table that saves a list of precommits for block with given hash.
-    pub fn precommits(&self, hash: &Hash) -> ListIndex<&T, Precommit> {
+    pub fn precommits(&self, hash: &Hash) -> ListIndex<&T, Message<Protocol>> {
         ListIndex::new_in_family(PRECOMMITS, hash, &self.view)
     }
 
@@ -167,13 +167,14 @@ where
 
     /// Returns peers that have to be recovered in case of process' restart
     /// after abnormal termination.
-    pub(crate) fn peers_cache(&self) -> MapIndex<&T, PublicKey, Connect> {
+    pub(crate) fn peers_cache(&self) -> MapIndex<&T, PublicKey, Message<Protocol>> {
+        //Map<PublicKey, Connect>
         MapIndex::new(PEERS_CACHE, &self.view)
     }
 
     /// Returns consensus messages that have to be recovered in case of process' restart
     /// after abnormal termination.
-    pub(crate) fn consensus_messages_cache(&self) -> ListIndex<&T, RawMessage> {
+    pub(crate) fn consensus_messages_cache(&self) -> ListIndex<&T, Message<Protocol>> {
         ListIndex::new(CONSENSUS_MESSAGES_CACHE, &self.view)
     }
 
@@ -358,7 +359,7 @@ impl<'a> Schema<&'a mut Fork> {
     /// Mutable reference to the [`transactions`][1] index.
     ///
     /// [1]: struct.Schema.html#method.transactions
-    pub(crate) fn transactions_mut(&mut self) -> MapIndex<&mut Fork, Hash, RawMessage> {
+    pub(crate) fn transactions_mut(&mut self) -> MapIndex<&mut Fork, Hash, Message<Protocol>> {
         MapIndex::new(TRANSACTIONS, self.view)
     }
 
@@ -413,7 +414,7 @@ impl<'a> Schema<&'a mut Fork> {
     /// Mutable reference to the [`precommits`][1] index.
     ///
     /// [1]: struct.Schema.html#method.precommits
-    pub(crate) fn precommits_mut(&mut self, hash: &Hash) -> ListIndex<&mut Fork, Precommit> {
+    pub(crate) fn precommits_mut(&mut self, hash: &Hash) -> ListIndex<&mut Fork, Message<Protocol>> {
         ListIndex::new_in_family(PRECOMMITS, hash, self.view)
     }
 
@@ -441,14 +442,14 @@ impl<'a> Schema<&'a mut Fork> {
     /// Mutable reference to the [`peers_cache`][1] index.
     ///
     /// [1]: struct.Schema.html#method.peers_cache
-    pub(crate) fn peers_cache_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Connect> {
+    pub(crate) fn peers_cache_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Message<Protocol>> {
         MapIndex::new(PEERS_CACHE, self.view)
     }
 
     /// Mutable reference to the [`consensus_messages_cache`][1] index.
     ///
     /// [1]: struct.Schema.html#method.consensus_messages
-    pub(crate) fn consensus_messages_cache_mut(&mut self) -> ListIndex<&mut Fork, RawMessage> {
+    pub(crate) fn consensus_messages_cache_mut(&mut self) -> ListIndex<&mut Fork, Message<Protocol>> {
         ListIndex::new(CONSENSUS_MESSAGES_CACHE, self.view)
     }
 

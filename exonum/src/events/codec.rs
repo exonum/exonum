@@ -15,10 +15,8 @@
 use bytes::BytesMut;
 use byteorder::{ByteOrder, LittleEndian};
 use tokio_io::codec::{Decoder, Encoder};
-
-use std::io;
-
-use messages::{MessageBuffer, RawMessage, HEADER_LENGTH};
+use failure::Error;
+use messages::{HEADER_LENGTH, MessageBuffer, SignedMessage};
 use super::error::other_error;
 
 #[derive(Debug)]
@@ -34,10 +32,10 @@ impl MessagesCodec {
 }
 
 impl Decoder for MessagesCodec {
-    type Item = RawMessage;
-    type Error = io::Error;
+    type Item = UncheckedBuffer;
+    type Error = Error;
 
-    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, io::Error> {
+    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         // Read header
         if buf.len() < HEADER_LENGTH {
             return Ok(None);
@@ -48,27 +46,30 @@ impl Decoder for MessagesCodec {
         }
 
         // Check payload len
-        let total_len = LittleEndian::read_u32(&buf[6..10]) as usize;
+        let total_len = LittleEndian::read_u32(&buf) as usize;
 
         if total_len as u32 > self.max_message_len {
-            return Err(other_error(format!(
+            bail!(
                 "Received message is too long: {}, maximum allowed length is {} bytes",
-                total_len, self.max_message_len,
-            )));
+                total_len,
+                self.max_message_len,
+            );
         }
 
         if total_len < HEADER_LENGTH {
-            return Err(other_error(format!(
+            bail!(
                 "Received malicious message with insufficient \
-                 size in header: {}, expected header size {}",
-                total_len, HEADER_LENGTH
-            )));
+                size in header: {}, expected header size {}",
+                total_len,
+                HEADER_LENGTH
+            );
         }
 
         // Read message
-        if buf.len() >= total_len {
+        if buf.len() + 4 >= total_len {
+            buf.advance(4); //ignore total_len
             let data = buf.split_to(total_len).to_vec();
-            let raw = RawMessage::new(MessageBuffer::from_vec(data));
+            let raw = UncheckedBuffer::new(data);
             return Ok(Some(raw));
         }
         Ok(None)
@@ -76,11 +77,13 @@ impl Decoder for MessagesCodec {
 }
 
 impl Encoder for MessagesCodec {
-    type Item = RawMessage;
-    type Error = io::Error;
+    type Item = SignedMessage;
+    type Error = Error;
 
-    fn encode(&mut self, msg: Self::Item, buf: &mut BytesMut) -> io::Result<()> {
-        buf.extend_from_slice(msg.as_ref());
+    fn encode(&mut self, msg: Self::Item, buf: &mut BytesMut) -> Result<(), Self::Error> {
+        let buffer = msg.into_buffer()?;
+        buf.write_u32::<LittleEndian>(buffer.len() as u32);
+        buf.extend_from_slice(&buffer);
         Ok(())
     }
 }

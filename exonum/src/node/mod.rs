@@ -44,7 +44,7 @@ use std::collections::{BTreeMap, HashSet};
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use blockchain::{Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction};
 use api::{private, public, Api};
-use messages::{Connect, Message, RawMessage};
+use messages::{Connect, Message, CONSENSUS, Protocol, SignedMessage};
 use events::{HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkConfiguration,
              NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest};
 use events::error::{into_other, log_error, other_error, LogError};
@@ -405,13 +405,11 @@ impl NodeHandler {
             .position(|pk| pk.consensus_key == config.listener.consensus_public_key)
             .map(|id| ValidatorId(id as u16));
         info!("Validator id = '{:?}'", validator_id);
-        let connect = Connect::new(
-            &config.listener.consensus_public_key,
+        let connect = self.sign_message(Connect::new(
             external_address,
             system_state.current_time().into(),
             &user_agent::get(),
-            &config.listener.consensus_secret_key,
-        );
+        ));
 
         let mut whitelist = config.listener.whitelist;
         whitelist.set_validators(stored.validator_keys.iter().map(|x| x.consensus_key));
@@ -443,6 +441,13 @@ impl NodeHandler {
             peer_discovery: config.peer_discovery,
             is_enabled: true,
         }
+    }
+
+    fn sign_message<T: Into<Protocol>>(&self, message: T) -> SignedMessage {
+        SignedMessage::new(T,
+                           CONSENSUS,
+                           *self.state.consensus_public_key(),
+                           self.state.consensus_secret_key())
     }
 
     /// Return internal `SharedNodeState`
@@ -514,7 +519,7 @@ impl NodeHandler {
     }
 
     /// Sends the given message to a peer by its id.
-    pub fn send_to_validator(&mut self, id: u32, message: &RawMessage) {
+    pub fn send_to_validator(&mut self, id: u32, message: &SignedMessage) {
         if id as usize >= self.state.validators().len() {
             error!("Invalid validator id: {}", id);
         } else {
@@ -524,7 +529,7 @@ impl NodeHandler {
     }
 
     /// Sends the given message to a peer by its public key.
-    pub fn send_to_peer(&mut self, public_key: PublicKey, message: &RawMessage) {
+    pub fn send_to_peer(&mut self, public_key: PublicKey, message: &SignedMessage) {
         if let Some(conn) = self.state.peers().get(&public_key) {
             let address = conn.addr();
             trace!("Send to address: {}", address);
@@ -535,15 +540,15 @@ impl NodeHandler {
         }
     }
 
-    /// Sends `RawMessage` to the specified address.
-    pub fn send_to_addr(&mut self, address: &SocketAddr, message: &RawMessage) {
+    /// Sends `SignedMessage` to the specified address.
+    pub fn send_to_addr(&mut self, address: &SocketAddr, message: &SignedMessage) {
         trace!("Send to address: {}", address);
         let request = NetworkRequest::SendMessage(*address, message.clone());
         self.channel.network_requests.send(request).log_error();
     }
 
     /// Broadcasts given message to all peers.
-    pub fn broadcast(&mut self, message: &RawMessage) {
+    pub fn broadcast(&mut self, message: &SignedMessage) {
         for conn in self.state.peers().values() {
             let address = conn.addr();
             trace!("Send to address: {}", address);

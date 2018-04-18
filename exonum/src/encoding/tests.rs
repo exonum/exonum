@@ -22,13 +22,12 @@ use rust_decimal::Decimal;
 
 use std::net::SocketAddr;
 use std::str::FromStr;
-
-use crypto::{gen_keypair, hash};
-use blockchain::{self, Block, BlockProof};
-use messages::{BlockRequest, BlockResponse, Connect, Message, Precommit, Prevote, Propose,
-               RawMessage, Status};
-use helpers::{user_agent, Height, Round, ValidatorId};
-use super::{CheckedOffset, Field, Offset};
+use crypto::{hash, gen_keypair};
+use blockchain::{self, BlockProof, Block};
+use messages::{Connect, Propose, Prevote, Precommit, Status, BlockResponse,
+               BlockRequest};
+use helpers::{Height, Round, ValidatorId, user_agent};
+use super::{Field, Offset};
 
 static VALIDATOR: ValidatorId = ValidatorId(65_123);
 static HEIGHT: Height = Height(123_123_123);

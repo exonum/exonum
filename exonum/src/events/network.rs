@@ -26,7 +26,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-use messages::{Any, Connect, Message, RawMessage};
+use messages::{Protocol, Connect, Message, SignedMessage};
 use helpers::Milliseconds;
 use super::to_box;
 use super::error::{into_other, log_error, other_error, result_ok};
@@ -36,7 +36,7 @@ const OUTGOING_CHANNEL_SIZE: usize = 10;
 
 #[derive(Debug)]
 pub enum NetworkEvent {
-    MessageReceived(SocketAddr, RawMessage),
+    MessageReceived(SocketAddr, UncheckedBuffer),
     PeerConnected(SocketAddr, Connect),
     PeerDisconnected(SocketAddr),
     UnableConnectToPeer(SocketAddr),
@@ -44,7 +44,7 @@ pub enum NetworkEvent {
 
 #[derive(Debug, Clone)]
 pub enum NetworkRequest {
-    SendMessage(SocketAddr, RawMessage),
+    SendMessage(SocketAddr, SignedMessage),
     DisconnectWithPeer(SocketAddr),
     Shutdown,
 }
@@ -85,7 +85,7 @@ pub struct NetworkPart {
 
 #[derive(Debug, Default, Clone)]
 struct ConnectionsPool {
-    inner: Rc<RefCell<HashMap<SocketAddr, mpsc::Sender<RawMessage>>>>,
+    inner: Rc<RefCell<HashMap<SocketAddr, mpsc::Sender<UncheckedBuffer>>>>,
 }
 
 impl ConnectionsPool {
@@ -93,18 +93,17 @@ impl ConnectionsPool {
         ConnectionsPool::default()
     }
 
-    fn insert(&self, peer: SocketAddr, sender: &mpsc::Sender<RawMessage>) {
+    fn insert(&self, peer: SocketAddr, sender: &mpsc::Sender<UncheckedBuffer>) {
         self.inner.borrow_mut().insert(peer, sender.clone());
     }
 
-    fn remove(&self, peer: &SocketAddr) -> Result<mpsc::Sender<RawMessage>, &'static str> {
-        self.inner
-            .borrow_mut()
-            .remove(peer)
-            .ok_or("there is no sender in the connection pool")
+    fn remove(&self, peer: &SocketAddr) -> Result<mpsc::Sender<UncheckedBuffer>, &'static str> {
+        self.inner.borrow_mut().remove(peer).ok_or(
+            "there is no sender in the connection pool",
+        )
     }
 
-    fn get(&self, peer: SocketAddr) -> Option<mpsc::Sender<RawMessage>> {
+    fn get(&self, peer: SocketAddr) -> Option<mpsc::Sender<UncheckedBuffer>> {
         self.inner.borrow_mut().get(&peer).cloned()
     }
 

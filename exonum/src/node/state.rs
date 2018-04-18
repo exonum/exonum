@@ -22,7 +22,7 @@ use std::collections::{BTreeMap, HashMap, HashSet, hash_map::Entry};
 use std::net::SocketAddr;
 use std::time::{Duration, SystemTime};
 
-use messages::{Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawMessage};
+use messages::{Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, SignedMessage};
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
 use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 use blockchain::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
@@ -69,8 +69,8 @@ pub struct State {
     // messages
     proposes: HashMap<Hash, ProposeState>,
     blocks: HashMap<Hash, BlockState>,
-    prevotes: HashMap<(Round, Hash), Votes<Prevote>>,
-    precommits: HashMap<(Round, Hash), Votes<Precommit>>,
+    prevotes: HashMap<(Round, Hash), Votes<ProtocolMessage<Prevote>>>,
+    precommits: HashMap<(Round, Hash), Votes<ProtocolMessage<Precommit>>>,
 
     queued: Vec<ConsensusMessage>,
 
@@ -93,8 +93,8 @@ pub struct State {
 #[derive(Debug, Clone)]
 pub struct ValidatorState {
     id: ValidatorId,
-    our_prevotes: HashMap<Round, Prevote>,
-    our_precommits: HashMap<Round, Precommit>,
+    our_prevotes: HashMap<Round, ProtocolMessage<Prevote>>,
+    our_precommits: HashMap<Round, ProtocolMessage<Precommit>>,
 }
 
 /// `RequestData` represents a request for some data to other nodes. Each enum variant will be
@@ -123,7 +123,7 @@ struct RequestState {
 #[derive(Debug)]
 /// transactions.
 pub struct ProposeState {
-    propose: Propose,
+    propose: ProtocolMessage<Propose>,
     unknown_txs: HashSet<Hash>,
     block_hash: Option<Hash>,
     // Whether the message has been saved to the consensus messages' cache or not.
@@ -146,13 +146,13 @@ pub trait VoteMessage: Message + Clone {
     fn validator(&self) -> ValidatorId;
 }
 
-impl VoteMessage for Precommit {
+impl VoteMessage for ProtocolMessage<Precommit> {
     fn validator(&self) -> ValidatorId {
         self.validator()
     }
 }
 
-impl VoteMessage for Prevote {
+impl VoteMessage for ProtocolMessage<Prevote> {
     fn validator(&self) -> ValidatorId {
         self.validator()
     }
@@ -294,7 +294,7 @@ impl ProposeState {
     }
 
     /// Returns propose-message.
-    pub fn message(&self) -> &Propose {
+    pub fn message(&self) -> &ProtocolMessage<Propose> {
         &self.propose
     }
 
@@ -767,7 +767,7 @@ impl State {
     }
 
     /// Returns pre-commits for the specified round and propose hash.
-    pub fn precommits(&self, round: Round, propose_hash: Hash) -> &[Precommit] {
+    pub fn precommits(&self, round: Round, propose_hash: Hash) -> &[ProtocolMessage<Precommit>] {
         self.precommits
             .get(&(round, propose_hash))
             .map(|votes| votes.messages().as_slice())
@@ -789,7 +789,7 @@ impl State {
 
     /// Adds propose from this node to the proposes list for the current height. Such propose
     /// cannot contain unknown transactions. Returns hash of the propose.
-    pub fn add_self_propose(&mut self, msg: Propose) -> Hash {
+    pub fn add_self_propose(&mut self, msg: ProtocolMessage<Propose>) -> Hash {
         debug_assert!(self.validator_state().is_some());
         let propose_hash = msg.hash();
         self.proposes.insert(
@@ -810,8 +810,8 @@ impl State {
     /// Adds propose from other node. Returns `ProposeState` if it is a new propose.
     pub fn add_propose(
         &mut self,
-        msg: &Propose,
-        transactions: &MapIndex<&&Snapshot, Hash, RawMessage>,
+        msg: &ProtocolMessage<Propose>,
+        transactions: &MapIndex<&&Snapshot, Hash, ProtocolMessage<RawTransaction>>,
         transaction_pool: &KeySetIndex<&&Snapshot, Hash>,
     ) -> Result<&ProposeState, failure::Error> {
         let propose_hash = msg.hash();
@@ -933,7 +933,7 @@ impl State {
     /// # Panics
     ///
     /// A node panics if it has already sent a different `Precommit` for the same round.
-    pub fn add_precommit(&mut self, msg: &Precommit) -> bool {
+    pub fn add_precommit(&mut self, msg: &ProtocolMessage<Precommit>) -> bool {
         let majority_count = self.majority_count();
         if let Some(ref mut validator_state) = self.validator_state {
             if validator_state.id == msg.validator() {

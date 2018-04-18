@@ -21,7 +21,7 @@ use std::time::Duration;
 use std::collections::BTreeMap;
 
 use messages::{BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
-               PrevotesRequest, Propose, ProposeRequest, RawMessage, Status, TransactionsRequest,
+               PrevotesRequest, Propose, ProposeRequest, SignedMessage, Status, TransactionsRequest,
                TransactionsResponse, CONSENSUS};
 use crypto::{gen_keypair, gen_keypair_from_seed, CryptoHash, Hash, Seed};
 use blockchain::{Blockchain, Schema};

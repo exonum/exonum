@@ -17,9 +17,8 @@ use std::error::Error;
 
 use crypto::{CryptoHash, Hash, PublicKey};
 use blockchain::{Schema, Transaction};
-use messages::{BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote,
-               PrevotesRequest, Propose, ProposeRequest, RawTransaction, TransactionsRequest,
-               TransactionsResponse};
+use messages::{BlockRequest, BlockResponse, ConsensusMessage, Precommit, Prevote,
+               PrevotesRequest, Propose, ProposeRequest, RawTransaction, TransactionsRequest};
 use helpers::{Height, Round, ValidatorId};
 use storage::Patch;
 use node::{NodeHandler, RequestData};
@@ -29,7 +28,7 @@ use events::InternalRequest;
 impl NodeHandler {
     /// Validates consensus message, then redirects it to the corresponding `handle_...` function.
     #[cfg_attr(feature = "flame_profile", flame)]
-    pub fn handle_consensus(&mut self, msg: ConsensusMessage) {
+    pub fn handle_consensus(&mut self, msg: ProtocolMessage<ConsensusMessage>) {
         if !self.is_enabled {
             info!(
                 "Ignoring a consensus message {:?} because the node is disabled",
@@ -89,15 +88,19 @@ impl NodeHandler {
         };
 
         trace!("Handle message={:?}", msg);
-        match msg {
-            ConsensusMessage::Propose(msg) => self.handle_propose(key, &msg),
-            ConsensusMessage::Prevote(msg) => self.handle_prevote(key, &msg),
-            ConsensusMessage::Precommit(msg) => self.handle_precommit(key, &msg),
+        let (consensus_msg, signed) = msg.into_parts();
+        match *consensus_msg {
+            ConsensusMessage::Propose(msg) => self.handle_propose(key,
+                                                  ProtocolMessage::from_parts(msg, signed) ),
+            ConsensusMessage::Prevote(msg) => self.handle_prevote(key,
+                                                  ProtocolMessage::from_parts(msg, signed) ),
+            ConsensusMessage::Precommit(msg) => self.handle_precommit(key,
+                                                  ProtocolMessage::from_parts(msg, signed)),
         }
     }
 
     /// Handles the `Propose` message. For details see the message documentation.
-    pub fn handle_propose(&mut self, from: PublicKey, msg: &Propose) {
+    pub fn handle_propose(&mut self, from: PublicKey, msg: ProtocolMessage<Propose>) {
         debug_assert_eq!(
             Some(from),
             self.state.consensus_public_key_of(msg.validator())
@@ -194,7 +197,7 @@ impl NodeHandler {
     /// Handles the `Block` message. For details see the message documentation.
     // TODO write helper function which returns Result (ECR-123)
     #[cfg_attr(feature = "flame_profile", flame)]
-    pub fn handle_block(&mut self, msg: &BlockResponse) {
+    pub fn handle_block(&mut self, msg: ProtocolMessage<BlockResponse>) {
         // Request are sent to us
         if msg.to() != self.state.consensus_public_key() {
             error!(
@@ -313,7 +316,7 @@ impl NodeHandler {
     }
 
     /// Handles the `Prevote` message. For details see the message documentation.
-    pub fn handle_prevote(&mut self, from: PublicKey, msg: &Prevote) {
+    pub fn handle_prevote(&mut self, from: PublicKey, msg: ProtocolMessage<Prevote>) {
         trace!("Handle prevote");
 
         debug_assert_eq!(
@@ -435,7 +438,7 @@ impl NodeHandler {
     }
 
     /// Handles the `Precommit` message. For details see the message documentation.
-    pub fn handle_precommit(&mut self, from: PublicKey, msg: &Precommit) {
+    pub fn handle_precommit(&mut self, from: PublicKey, msg: ProtocolMessage<Precommit>) {
         trace!("Handle precommit");
 
         debug_assert_eq!(
@@ -533,7 +536,9 @@ impl NodeHandler {
     }
 
     /// Checks if the transaction is new and adds it to the pool.
-    fn handle_tx_inner(&mut self, msg: RawTransaction) -> Result<(), String> {
+    #[cfg_attr(feature = "flame_profile", flame)]
+    pub fn handle_tx(&mut self, msg: ProtocolMessage<RawTransaction>) {
+        //trace!("Handle transaction");
         let hash = msg.hash();
 
         profiler_span!("Make sure that it is new transaction", {
@@ -713,20 +718,18 @@ impl NodeHandler {
             let max_count = ::std::cmp::min(self.txs_block_limit() as usize, pool_len);
 
             let txs: Vec<Hash> = pool.iter().take(max_count).collect();
-            let propose = Propose::new(
+            let propose = self.sign_message(Propose::new(
                 validator_id,
                 self.state.height(),
                 round,
                 self.state.last_hash(),
-                &txs,
-                self.state.consensus_secret_key(),
-            );
+                &txs));
 
             // Put our propose to the consensus messages cache
-            self.blockchain.save_message(round, propose.raw());
+            self.blockchain.save_message(round, &propose);
 
             trace!("Broadcast propose: {:?}", propose);
-            self.broadcast(propose.raw());
+            self.broadcast(&propose);
 
             // Save our propose into state
             let hash = self.state.add_self_propose(propose);

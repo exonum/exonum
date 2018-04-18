@@ -24,7 +24,7 @@ use super::NodeHandler;
 
 impl NodeHandler {
     /// Validates request, then redirects it to the corresponding `handle_...` function.
-    pub fn handle_request(&mut self, msg: RequestMessage) {
+    pub fn handle_request(&mut self, msg: ProtocolMessage<RequestMessage>) {
         // Request are sent to us
         if msg.to() != self.state.consensus_public_key() {
             return;
@@ -42,18 +42,23 @@ impl NodeHandler {
             error!("Received request with incorrect signature, msg={:?}", msg);
             return;
         }
-
+        let (msg, signed) = msg.into_parts();
         match msg {
-            RequestMessage::Propose(msg) => self.handle_request_propose(&msg),
-            RequestMessage::Transactions(msg) => self.handle_request_txs(&msg),
-            RequestMessage::Prevotes(msg) => self.handle_request_prevotes(&msg),
-            RequestMessage::Peers(msg) => self.handle_request_peers(&msg),
-            RequestMessage::Block(msg) => self.handle_request_block(&msg),
+            RequestMessage::Propose(msg) =>
+                self.handle_request_propose(Protocol::from_parts(msg, signed)),
+            RequestMessage::Transactions(msg) =>
+                self.handle_request_txs(Protocol::from_parts(msg, signed)),
+            RequestMessage::Prevotes(msg) =>
+                self.handle_request_prevotes(Protocol::from_parts(msg, signed)),
+            RequestMessage::Peers(msg) =>
+                self.handle_request_peers(Protocol::from_parts(msg, signed)),
+            RequestMessage::Block(msg) =>
+                self.handle_request_block(Protocol::from_parts(msg, signed)),
         }
     }
 
     /// Handles `ProposeRequest` message. For details see the message documentation.
-    pub fn handle_request_propose(&mut self, msg: &ProposeRequest) {
+    pub fn handle_request_propose(&mut self, msg: ProtocolMessage<ProposeRequest>) {
         trace!("HANDLE PROPOSE REQUEST");
         if msg.height() != self.state.height() {
             return;
@@ -73,7 +78,7 @@ impl NodeHandler {
     }
 
     /// Handles `TransactionsRequest` message. For details see the message documentation.
-    pub fn handle_request_txs(&mut self, msg: &TransactionsRequest) {
+    pub fn handle_request_txs(&mut self, msg: ProtocolMessage<TransactionsRequest>) {
         use std::mem;
         trace!("HANDLE TRANSACTIONS REQUEST");
         let snapshot = self.blockchain.snapshot();
@@ -90,12 +95,10 @@ impl NodeHandler {
             let tx = schema.transactions().get(hash);
             if let Some(tx) = tx {
                 if txs_size + tx.raw().len() as u32 > unoccupied_message_size {
-                    let txs_response = TransactionsResponse::new(
-                        self.state.consensus_public_key(),
+                    let txs_response = self.sign_message(TransactionsResponse::new(
                         msg.from(),
                         mem::replace(&mut txs, vec![]),
-                        self.state.consensus_secret_key(),
-                    );
+                    ));
 
                     self.send_to_peer(*msg.from(), txs_response.raw());
                     txs_size = 0;
@@ -106,19 +109,17 @@ impl NodeHandler {
         }
 
         if !txs.is_empty() {
-            let txs_response = TransactionsResponse::new(
-                self.state.consensus_public_key(),
+            let txs_response = self.sign_message(TransactionsResponse::new(
                 msg.from(),
                 txs,
-                self.state.consensus_secret_key(),
-            );
+            ));
 
-            self.send_to_peer(*msg.from(), txs_response.raw());
+            self.send_to_peer(*msg.from(), txs_response);
         }
     }
 
     /// Handles `PrevotesRequest` message. For details see the message documentation.
-    pub fn handle_request_prevotes(&mut self, msg: &PrevotesRequest) {
+    pub fn handle_request_prevotes(&mut self, msg: ProtocolMessage<PrevotesRequest>) {
         trace!("HANDLE PREVOTES REQUEST");
         if msg.height() != self.state.height() {
             return;
@@ -138,7 +139,7 @@ impl NodeHandler {
     }
 
     /// Handles `BlockRequest` message. For details see the message documentation.
-    pub fn handle_request_block(&mut self, msg: &BlockRequest) {
+    pub fn handle_request_block(&mut self, msg: ProtocolMessage<BlockRequest>) {
         trace!(
             "Handle block request with height:{}, our height: {}",
             msg.height(),
@@ -158,8 +159,7 @@ impl NodeHandler {
         let precommits = schema.precommits(&block_hash);
         let transactions = schema.block_transactions(height);
 
-        let block_msg = BlockResponse::new(
-            self.state.consensus_public_key(),
+        let block_msg = self.sign_message(BlockResponse::new(
             msg.from(),
             block,
             precommits.iter().collect(),
@@ -167,8 +167,7 @@ impl NodeHandler {
                 .iter()
                 .map(|tx_hash| schema.transactions().get(&tx_hash).unwrap())
                 .collect(),
-            self.state.consensus_secret_key(),
-        );
-        self.send_to_peer(*msg.from(), block_msg.raw());
+        ));
+        self.send_to_peer(*msg.from(), block_msg);
     }
 }

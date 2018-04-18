@@ -17,36 +17,42 @@ use rand::{self, Rng};
 use std::net::SocketAddr;
 use std::error::Error;
 
-use messages::{Any, Connect, Message, PeersRequest, RawMessage, Status};
+use messages::{Protocol, Connect, Message, PeersRequest, SignedMessage, Status};
 use helpers::Height;
 use super::{NodeHandler, RequestData};
 
 impl NodeHandler {
     /// Redirects message to the corresponding `handle_...` function.
-    pub fn handle_message(&mut self, raw: RawMessage) {
+    pub fn handle_message(&mut self, raw: SignedMessage) {
         // TODO: check message headers (network id, protocol version)
         // FIXME: call message.verify method
         //     if !raw.verify() {
         //         return;
         //     }
+        let msg: Message<Protocol> =
+        if let Ok(msg) = Message::deserialize(raw){
+            msg
+        } else {
+            error!("Received unknown message.");
+            return;
+        };
 
-        match Any::from_raw(raw) {
-            Ok(Any::Connect(msg)) => self.handle_connect(msg),
-            Ok(Any::Status(msg)) => self.handle_status(&msg),
-            Ok(Any::Consensus(msg)) => self.handle_consensus(msg),
-            Ok(Any::Request(msg)) => self.handle_request(msg),
-            Ok(Any::Block(msg)) => self.handle_block(&msg),
-            Ok(Any::Transaction(msg)) => self.handle_tx(msg),
-            Ok(Any::TransactionsBatch(msg)) => self.handle_txs_batch(&msg),
-            Err(err) => {
-                error!("Invalid message received: {:?}", err.description());
-            }
+        let borrowed = msg.borrow();
+
+        match *borrowed.inner() {
+            Protocol::Connect(ref msg) => self.handle_connect(borrowed.reborrow(msg)),
+            Protocol::Status(ref msg) => self.handle_status(borrowed.reborrow(msg)),
+            Protocol::Consensus(ref msg) => self.handle_consensus(borrowed.reborrow(msg)),
+            Protocol::Request(ref msg) => self.handle_request(borrowed.reborrow(msg)),
+            Protocol::Block(ref msg) => self.handle_block(borrowed.reborrow(msg)),
+            Protocol::Transaction(ref msg) => self.handle_tx(borrowed.reborrow(msg)),
+            Protocol::TransactionsBatch(ref msg) => self.handle_txs_batch(borrowed.reborrow(msg)),
         }
     }
 
     /// Handles the `Connected` event. Node's `Connect` message is sent as response
     /// if received `Connect` message is correct.
-    pub fn handle_connected(&mut self, addr: SocketAddr, connect: Connect) {
+    pub fn handle_connected(&mut self, addr: SocketAddr, connect: ProtocolMessage<Connect>) {
         info!("Received Connect message from peer: {}", addr);
         self.handle_connect(connect);
     }
@@ -76,7 +82,7 @@ impl NodeHandler {
     }
 
     /// Handles the `Connect` message and connects to a peer as result.
-    pub fn handle_connect(&mut self, message: Connect) {
+    pub fn handle_connect(&mut self, message: ProtocolMessage<Connect>) {
         // TODO add spam protection (ECR-170)
         let address = message.addr();
         if address == self.state.our_connect_message().addr() {
@@ -137,7 +143,7 @@ impl NodeHandler {
 
     /// Handles the `Status` message. Node sends `BlockRequest` as response if height in the
     /// message is higher than node's height.
-    pub fn handle_status(&mut self, msg: &Status) {
+    pub fn handle_status(&mut self, msg: ProtocolMessage<Status>) {
         let height = self.state.height();
         trace!(
             "HANDLE STATUS: current height = {}, msg height = {}",
@@ -177,7 +183,7 @@ impl NodeHandler {
     }
 
     /// Handles the `PeersRequest` message. Node sends `Connect` messages of other peers as result.
-    pub fn handle_request_peers(&mut self, msg: &PeersRequest) {
+    pub fn handle_request_peers(&mut self, msg: ProtocolMessage<PeersRequest>) {
         let peers: Vec<Connect> = self.state.peers().iter().map(|(_, b)| b.clone()).collect();
         trace!(
             "HANDLE REQUEST PEERS: Sending {:?} peers to {:?}",

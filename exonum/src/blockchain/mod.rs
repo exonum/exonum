@@ -54,7 +54,7 @@ use std::net::SocketAddr;
 use std::error::Error as StdError;
 
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
-use messages::{CONSENSUS as CORE_SERVICE, Connect, Precommit, RawMessage};
+use messages::{CONSENSUS as CORE_SERVICE, Connect, Precommit, SignedMessage};
 use storage::{Database, Error, Fork, Patch, Snapshot};
 use helpers::{Height, Round, ValidatorId};
 use node::ApiSender;
@@ -139,7 +139,7 @@ impl Blockchain {
     ///
     /// - Blockchain has service with the `service_id` of given raw message.
     /// - Service can deserialize given raw message.
-    pub fn tx_from_raw(&self, raw: RawMessage) -> Result<Box<Transaction>, MessageError> {
+    pub fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
         let id = raw.service_id() as usize;
         let service = self.service_map
             .get(id)
@@ -418,7 +418,7 @@ impl Blockchain {
         precommits: I,
     ) -> Result<(), Error>
     where
-        I: Iterator<Item = &'a Precommit>,
+        I: Iterator<Item = &'a ProtocolMessage<Precommit>>,
     {
         let patch = {
             let mut fork = {
@@ -526,15 +526,15 @@ impl Blockchain {
     }
 
     /// Saves the given raw message to the consensus messages cache.
-    pub fn save_message(&mut self, round: Round, raw: &RawMessage) {
+    pub fn save_message(&mut self, round: Round, raw: &SignedMessage) {
         self.save_messages(round, iter::once(raw.clone()));
     }
 
-    /// Saves a collection of RawMessage to the consensus messages cache with single access to the
+    /// Saves a collection of SignedMessage to the consensus messages cache with single access to the
     /// `Fork` instance.
     pub fn save_messages<I>(&mut self, round: Round, iter: I)
     where
-        I: IntoIterator<Item = RawMessage>,
+        I: IntoIterator<Item = SignedMessage>,
     {
         let mut fork = self.fork();
 

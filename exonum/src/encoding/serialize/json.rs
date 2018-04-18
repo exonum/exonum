@@ -33,7 +33,6 @@ use std::error::Error;
 
 use crypto::{Hash, PublicKey, Signature};
 use helpers::{Height, Round, ValidatorId};
-use messages::RawMessage;
 use encoding::{Field, Offset};
 use super::WriteBufferWrapper;
 // TODO: should we implement serialize for: `SecretKey`, `Seed` (ECR-156)?
@@ -323,7 +322,7 @@ impl<'a> ExonumJson for &'a [u8] {
         Ok(Value::String(::encoding::serialize::encode_hex(self)))
     }
 }
-
+/*
 impl ExonumJson for Vec<RawMessage> {
     fn deserialize_field<B: WriteBufferWrapper>(
         value: &Value,
@@ -350,7 +349,7 @@ impl ExonumJson for Vec<RawMessage> {
         Ok(Value::Array(vec))
     }
 }
-
+*/
 impl<T> ExonumJsonDeserialize for Vec<T>
 where
     T: ExonumJsonDeserialize,

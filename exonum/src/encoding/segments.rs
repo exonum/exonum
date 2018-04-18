@@ -17,7 +17,7 @@
 use byteorder::{ByteOrder, LittleEndian};
 use bit_vec::BitVec;
 
-use messages::{MessageBuffer, RawMessage, HEADER_LENGTH};
+use messages::{HEADER_LENGTH};
 use crypto::Hash;
 use super::{CheckedOffset, Error, Field, Offset, Result};
 
@@ -149,7 +149,7 @@ impl<'a> SegmentField<'a> for &'a str {
         Ok(latest_segment)
     }
 }
-
+/*
 impl<'a> SegmentField<'a> for RawMessage {
     fn item_size() -> Offset {
         1
@@ -196,7 +196,7 @@ impl<'a> SegmentField<'a> for RawMessage {
         Ok(latest_segment)
     }
 }
-
+*/
 impl<'a, T> SegmentField<'a> for Vec<T>
 where
     T: Field<'a>,

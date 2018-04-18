@@ -20,7 +20,11 @@ pub use hex::{decode as decode_hex, encode as encode_hex, FromHex, FromHexError,
 
 use super::Offset;
 use encoding::Field;
+<<<<<<< HEAD
 use messages::MessageWriter;
+=======
+use super::Offset;
+>>>>>>> Refactor message
 
 /// implement exonum serialization\deserialization based on serde `Serialize`\ `Deserialize`
 ///
