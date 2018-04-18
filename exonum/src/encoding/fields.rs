@@ -306,7 +306,15 @@ impl<'a> Field<'a> for SocketAddr {
             &mut buffer[to as usize - PORT_SIZE..to as usize],
             self.port(),
         );
-        _: &'a [u8],
+    }
+
+    fn check(
+        buffer: &'a [u8],
+        from: CheckedOffset,
+        to: CheckedOffset,
+        latest_segment: CheckedOffset,
+    ) -> Result {
+        debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
 
         let from_unchecked = from.unchecked_offset() as usize;
         let to_unchecked = to.unchecked_offset() as usize;
@@ -329,6 +337,7 @@ impl<'a> Field<'a> for SocketAddr {
                 value,
             });
         }
+        Ok(latest_segment)
     }
 }
 
