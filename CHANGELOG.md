@@ -21,6 +21,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Internal improvements
 
+#### exonum
+
+- Default implementation of `check` method was added to `Field` trait (#639)
+
 #### exonum-time
 
 - Split service components to separate modules. (#604)
