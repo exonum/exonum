@@ -97,119 +97,89 @@ pub enum RequestMessage {
     Block(BlockRequest),
 }
 
+/// Creates wrapper for the inner message with call to the provided method
+macro_rules! delegate_to_request_message {
+    ($func:ident, $self:ident $( $x:expr ),*) => (
+        match *$self {
+            RequestMessage::Propose(ref msg) => msg.$func( $( $x ),* ),
+            RequestMessage::Transactions(ref msg) => msg.$func( $( $x ),* ),
+            RequestMessage::Prevotes(ref msg) => msg.$func( $( $x ),* ),
+            RequestMessage::Peers(ref msg) => msg.$func( $( $x ),* ),
+            RequestMessage::Block(ref msg) => msg.$func( $( $x ),* ),
+        }
+    )
+}
+
+/// Creates wrapper for the inner message with call to the provided method
+macro_rules! delegate_to_consensus_message {
+    ($func:ident, $self:ident $( $x:expr ),*) => (
+        match *$self {
+            ConsensusMessage::Propose(ref msg) => msg.$func( $( $x ),* ),
+            ConsensusMessage::Prevote(ref msg) => msg.$func( $( $x ),* ),
+            ConsensusMessage::Precommit(ref msg) => msg.$func( $( $x ),* ),
+        }
+    )
+}
+
 impl RequestMessage {
     /// Returns public key of the message sender.
     pub fn from(&self) -> &PublicKey {
-        match *self {
-            RequestMessage::Propose(ref msg) => msg.from(),
-            RequestMessage::Transactions(ref msg) => msg.from(),
-            RequestMessage::Prevotes(ref msg) => msg.from(),
-            RequestMessage::Peers(ref msg) => msg.from(),
-            RequestMessage::Block(ref msg) => msg.from(),
-        }
+        delegate_to_request_message!(from, self)
     }
 
     /// Returns public key of the message recipient.
     pub fn to(&self) -> &PublicKey {
-        match *self {
-            RequestMessage::Propose(ref msg) => msg.to(),
-            RequestMessage::Transactions(ref msg) => msg.to(),
-            RequestMessage::Prevotes(ref msg) => msg.to(),
-            RequestMessage::Peers(ref msg) => msg.to(),
-            RequestMessage::Block(ref msg) => msg.to(),
-        }
+        delegate_to_request_message!(to, self)
     }
 
     /// Verifies the message signature with given public key.
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn verify(&self, public_key: &PublicKey) -> bool {
-        match *self {
-            RequestMessage::Propose(ref msg) => msg.verify_signature(public_key),
-            RequestMessage::Transactions(ref msg) => msg.verify_signature(public_key),
-            RequestMessage::Prevotes(ref msg) => msg.verify_signature(public_key),
-            RequestMessage::Peers(ref msg) => msg.verify_signature(public_key),
-            RequestMessage::Block(ref msg) => msg.verify_signature(public_key),
-        }
+        delegate_to_request_message!(verify_signature, self public_key)
     }
 
     /// Returns raw message.
     pub fn raw(&self) -> &RawMessage {
-        match *self {
-            RequestMessage::Propose(ref msg) => msg.raw(),
-            RequestMessage::Transactions(ref msg) => msg.raw(),
-            RequestMessage::Prevotes(ref msg) => msg.raw(),
-            RequestMessage::Peers(ref msg) => msg.raw(),
-            RequestMessage::Block(ref msg) => msg.raw(),
-        }
+        delegate_to_request_message!(raw, self)
     }
 }
 
 impl fmt::Debug for RequestMessage {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match *self {
-            RequestMessage::Propose(ref msg) => write!(fmt, "{:?}", msg),
-            RequestMessage::Transactions(ref msg) => write!(fmt, "{:?}", msg),
-            RequestMessage::Prevotes(ref msg) => write!(fmt, "{:?}", msg),
-            RequestMessage::Peers(ref msg) => write!(fmt, "{:?}", msg),
-            RequestMessage::Block(ref msg) => write!(fmt, "{:?}", msg),
-        }
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        delegate_to_request_message!(fmt, self formatter)
     }
 }
 
 impl ConsensusMessage {
     /// Returns validator id of the message sender.
     pub fn validator(&self) -> ValidatorId {
-        match *self {
-            ConsensusMessage::Propose(ref msg) => msg.validator(),
-            ConsensusMessage::Prevote(ref msg) => msg.validator(),
-            ConsensusMessage::Precommit(ref msg) => msg.validator(),
-        }
+        delegate_to_consensus_message!(validator, self)
     }
 
     /// Returns height of the message.
     pub fn height(&self) -> Height {
-        match *self {
-            ConsensusMessage::Propose(ref msg) => msg.height(),
-            ConsensusMessage::Prevote(ref msg) => msg.height(),
-            ConsensusMessage::Precommit(ref msg) => msg.height(),
-        }
+        delegate_to_consensus_message!(height, self)
     }
 
     /// Returns round of the message.
     pub fn round(&self) -> Round {
-        match *self {
-            ConsensusMessage::Propose(ref msg) => msg.round(),
-            ConsensusMessage::Prevote(ref msg) => msg.round(),
-            ConsensusMessage::Precommit(ref msg) => msg.round(),
-        }
+        delegate_to_consensus_message!(round, self)
     }
 
     /// Returns raw message.
     pub fn raw(&self) -> &RawMessage {
-        match *self {
-            ConsensusMessage::Propose(ref msg) => msg.raw(),
-            ConsensusMessage::Prevote(ref msg) => msg.raw(),
-            ConsensusMessage::Precommit(ref msg) => msg.raw(),
-        }
+        delegate_to_consensus_message!(raw, self)
     }
 
     /// Verifies the message signature with given public key.
     pub fn verify(&self, public_key: &PublicKey) -> bool {
-        match *self {
-            ConsensusMessage::Propose(ref msg) => msg.verify_signature(public_key),
-            ConsensusMessage::Prevote(ref msg) => msg.verify_signature(public_key),
-            ConsensusMessage::Precommit(ref msg) => msg.verify_signature(public_key),
-        }
+        delegate_to_consensus_message!(verify_signature, self public_key)
     }
 }
 
 impl fmt::Debug for ConsensusMessage {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match *self {
-            ConsensusMessage::Propose(ref msg) => write!(fmt, "{:?}", msg),
-            ConsensusMessage::Prevote(ref msg) => write!(fmt, "{:?}", msg),
-            ConsensusMessage::Precommit(ref msg) => write!(fmt, "{:?}", msg),
-        }
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        delegate_to_consensus_message!(fmt, self formatter)
     }
 }
 
