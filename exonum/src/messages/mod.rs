@@ -98,7 +98,7 @@ pub enum RequestMessage {
 }
 
 /// Creates wrapper for the inner message with call to the provided method
-macro_rules! build_function_body_for_request_message {
+macro_rules! delegate_to_request_message {
     ($func:ident, $self:ident $( $x:expr ),*) => (
         match *$self {
             RequestMessage::Propose(ref msg) => msg.$func( $( $x ),* ),
@@ -111,7 +111,7 @@ macro_rules! build_function_body_for_request_message {
 }
 
 /// Creates wrapper for the inner message with call to the provided method
-macro_rules! build_function_body_for_consensus_message {
+macro_rules! delegate_to_consensus_message {
     ($func:ident, $self:ident $( $x:expr ),*) => (
         match *$self {
             ConsensusMessage::Propose(ref msg) => msg.$func( $( $x ),* ),
@@ -124,62 +124,62 @@ macro_rules! build_function_body_for_consensus_message {
 impl RequestMessage {
     /// Returns public key of the message sender.
     pub fn from(&self) -> &PublicKey {
-        build_function_body_for_request_message!(from, self)
+        delegate_to_request_message!(from, self)
     }
 
     /// Returns public key of the message recipient.
     pub fn to(&self) -> &PublicKey {
-        build_function_body_for_request_message!(to, self)
+        delegate_to_request_message!(to, self)
     }
 
     /// Verifies the message signature with given public key.
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn verify(&self, public_key: &PublicKey) -> bool {
-        build_function_body_for_request_message!(verify_signature, self public_key)
+        delegate_to_request_message!(verify_signature, self public_key)
     }
 
     /// Returns raw message.
     pub fn raw(&self) -> &RawMessage {
-        build_function_body_for_request_message!(raw, self)
+        delegate_to_request_message!(raw, self)
     }
 }
 
 impl fmt::Debug for RequestMessage {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        build_function_body_for_request_message!(fmt, self formatter)
+        delegate_to_request_message!(fmt, self formatter)
     }
 }
 
 impl ConsensusMessage {
     /// Returns validator id of the message sender.
     pub fn validator(&self) -> ValidatorId {
-        build_function_body_for_consensus_message!(validator, self)
+        delegate_to_consensus_message!(validator, self)
     }
 
     /// Returns height of the message.
     pub fn height(&self) -> Height {
-        build_function_body_for_consensus_message!(height, self)
+        delegate_to_consensus_message!(height, self)
     }
 
     /// Returns round of the message.
     pub fn round(&self) -> Round {
-        build_function_body_for_consensus_message!(round, self)
+        delegate_to_consensus_message!(round, self)
     }
 
     /// Returns raw message.
     pub fn raw(&self) -> &RawMessage {
-        build_function_body_for_consensus_message!(raw, self)
+        delegate_to_consensus_message!(raw, self)
     }
 
     /// Verifies the message signature with given public key.
     pub fn verify(&self, public_key: &PublicKey) -> bool {
-        build_function_body_for_consensus_message!(verify_signature, self public_key)
+        delegate_to_consensus_message!(verify_signature, self public_key)
     }
 }
 
 impl fmt::Debug for ConsensusMessage {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        build_function_body_for_consensus_message!(fmt, self formatter)
+        delegate_to_consensus_message!(fmt, self formatter)
     }
 }
 
