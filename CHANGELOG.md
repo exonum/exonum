@@ -23,7 +23,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
-- Default implementation of `check` method was added to `Field` trait (#639)
+- Default implementation of `check` method was added to `Field` trait to
+  reduce boilerplate. (#639)
 
 #### exonum-time
 
