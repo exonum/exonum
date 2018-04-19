@@ -68,8 +68,12 @@ pub struct ConsensusConfig {
     pub txs_block_limit: u32,
     /// Maximum message length (in bytes).
     pub max_message_len: u32,
-    /// `TimeoutAdjuster` configuration.
-    pub timeout_adjuster: TimeoutAdjusterConfig,
+    /// Minimal propose timeout.
+    pub min_propose_timeout: Milliseconds,
+    /// Maximal propose timeout.
+    pub max_propose_timeout: Milliseconds,
+    /// Transactions threshold starting from which the `min_propose_timeout` value is used.
+    pub propose_timeout_threshold: u32,
 }
 
 impl ConsensusConfig {
@@ -79,17 +83,11 @@ impl ConsensusConfig {
     /// Checks if propose timeout is less than round timeout. Warns if fails.
     #[doc(hidden)]
     pub fn validate_configuration(&self) {
-        let propose_timeout = match self.timeout_adjuster {
-            TimeoutAdjusterConfig::Constant { timeout } => timeout,
-            TimeoutAdjusterConfig::Dynamic { max, .. }
-            | TimeoutAdjusterConfig::MovingAverage { max, .. } => max,
-        };
-
-        if self.round_timeout <= 2 * propose_timeout {
+        if self.round_timeout <= 2 * self.max_propose_timeout {
             warn!(
                 "It is recommended that round_timeout ({}) be at least twice as large \
-                 as propose_timeout ({})",
-                self.round_timeout, propose_timeout
+                 as max_propose_timeout ({})",
+                self.round_timeout, self.max_propose_timeout
             );
         }
     }
@@ -103,7 +101,9 @@ impl Default for ConsensusConfig {
             peers_timeout: 10_000,
             txs_block_limit: 1000,
             max_message_len: Self::DEFAULT_MAX_MESSAGE_LEN,
-            timeout_adjuster: TimeoutAdjusterConfig::Constant { timeout: 500 },
+            min_propose_timeout: 500,
+            max_propose_timeout: 1500,
+            propose_timeout_threshold: 1,
         }
     }
 }
@@ -132,53 +132,18 @@ impl StoredConfiguration {
             }
         }
 
-        // Check timeout adjuster.
-        let propose_timeout = match config.consensus.timeout_adjuster {
-            // There is no need to validate `Constant` timeout adjuster.
-            TimeoutAdjusterConfig::Constant { timeout } => timeout,
-            TimeoutAdjusterConfig::Dynamic { min, max, .. } => {
-                if min >= max {
-                    return Err(JsonError::custom(format!(
-                        "Dynamic adjuster: minimal timeout should be less then maximal: \
-                         min = {}, max = {}",
-                        min, max
-                    )));
-                }
-                max
-            }
-            TimeoutAdjusterConfig::MovingAverage {
-                min,
-                max,
-                adjustment_speed,
-                optimal_block_load,
-            } => {
-                if min >= max {
-                    return Err(JsonError::custom(format!(
-                        "Moving average adjuster: minimal timeout must be less then maximal: \
-                         min = {}, max = {}",
-                        min, max
-                    )));
-                }
-                if adjustment_speed <= 0. || adjustment_speed > 1. {
-                    return Err(JsonError::custom(format!(
-                        "Moving average adjuster: adjustment speed must be in the (0..1] range: {}",
-                        adjustment_speed,
-                    )));
-                }
-                if optimal_block_load <= 0. || optimal_block_load > 1. {
-                    return Err(JsonError::custom(format!(
-                        "Moving average adjuster: block load must be in the (0..1] range: {}",
-                        adjustment_speed,
-                    )));
-                }
-                max
-            }
-        };
-
-        if config.consensus.round_timeout <= propose_timeout {
+        if config.consensus.min_propose_timeout > config.consensus.max_propose_timeout {
             return Err(JsonError::custom(format!(
-                "round_timeout({}) must be strictly larger than propose_timeout({})",
-                config.consensus.round_timeout, propose_timeout
+                "Invalid propose timeouts: min_propose_timeout should be less or equal then \
+                max_propose_timeout: min = {}, max = {}",
+                config.consensus.min_propose_timeout, config.consensus.max_propose_timeout
+            )));
+        }
+
+        if config.consensus.round_timeout <= config.consensus.max_propose_timeout {
+            return Err(JsonError::custom(format!(
+                "round_timeout({}) must be strictly larger than max_propose_timeout({})",
+                config.consensus.round_timeout, config.consensus.max_propose_timeout
             )));
         }
 
