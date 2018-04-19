@@ -12,10 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Cryptography related types and functions.
+//! Cryptography related types, constants, traits and functions. The functions
+//! in this module are used for key generation, hashing, sighing and signature
+//! verification.
+//!
+//! Cryptography is the practice of secure communication in the presence of
+//! third parties which may be willing to intercept data. It comprises the
+//! protocols that prevent third parties or the public from accessing private
+//! information.
+//!
+//! The SHA-256 function applied in Exonum splits the input data into blocks
+//! and runs each block though a cycle of 64 iterations. The result of the
+//! function is a cryptographic hash sum 256 bits or 32 bytes in length. This
+//! hash can later be used to verify the integrity of data without accessing the
+//! data itself.
+//!
+//! Exonum also makes use of Ed25519 keys. Ed25519 is a signature system that ensures
+//! fast signing and key generation, as well as security and collision
+//! resilience. The keys in the system consume only 32 bytes, while the
+//! signature fits into 64 bytes.
 //!
 //! [Sodium library](https://github.com/jedisct1/libsodium) is used under the hood through
-//! [sodiumoxide rust bindings](https://github.com/dnaq/sodiumoxide).
+//! [sodiumoxide rust bindings](https://github.com/dnaq/sodiumoxide). The
+//! Sodium library is used for potential changes to cryptography and adding
+//! abstractions which are best suited for Exonum.
 
 // spell-checker:disable
 pub use sodiumoxide::crypto::sign::ed25519::{PUBLICKEYBYTES as PUBLIC_KEY_LENGTH,
@@ -51,7 +71,7 @@ use helpers::Round;
 /// The size to crop the string in debug messages.
 const BYTES_IN_DEBUG: usize = 4;
 
-/// Signs slice of bytes using the signer's secret key. Returns the resulting `Signature`.
+/// Signs a slice of bytes using the signer's secret key. Returns the resulting `Signature`.
 ///
 /// # Examples
 ///
@@ -143,7 +163,7 @@ pub trait CryptoHash {
     fn hash(&self) -> Hash;
 }
 
-/// Initializes the sodium library and chooses faster versions of the primitives if possible.
+/// Initializes the sodium library and selects faster versions of the primitives if possible.
 ///
 /// # Panics
 ///
@@ -163,7 +183,14 @@ pub fn init() {
 }
 
 /// This structure provides a possibility to calculate a SHA-256 hash digest
-/// for a stream of data.
+/// for a stream of data. Unlike the
+/// [Hash structure](https://docs.rs/exonum/0.7.0/exonum/crypto/struct.Hash.html),
+/// the given structure lets the code process several data chunks without
+/// the need to copy them into a single buffer.
+///
+/// The example below indicates the data the code is working with, runs the
+/// system hash update as many times as required to process all the data chunks
+/// and calculates the hash of the system after processing all the chunks.
 ///
 /// # Example
 ///
@@ -192,7 +219,8 @@ impl HashStream {
         self
     }
 
-    /// Returns the hash of data supplied to the stream so far.
+    /// Returns the hash of the system calculated after all currently supplied
+    /// data have been committed to it.
     pub fn hash(self) -> Hash {
         let dig = self.0.finalize();
         Hash(dig)
@@ -261,16 +289,16 @@ macro_rules! implement_public_sodium_wrapper {
 
     impl $name {
         /// Creates a new instance from bytes array.
-        pub fn new(ba: [u8; $size]) -> Self {
-            $name($name_from(ba))
+        pub fn new(bytes_array: [u8; $size]) -> Self {
+            $name($name_from(bytes_array))
         }
 
         /// Creates a new instance from bytes slice.
-        pub fn from_slice(bs: &[u8]) -> Option<Self> {
-            $name_from::from_slice(bs).map($name)
+        pub fn from_slice(bytes_slice: &[u8]) -> Option<Self> {
+            $name_from::from_slice(bytes_slice).map($name)
         }
 
-        /// Returns the hex representation of the binary data.
+        /// Returns the hex representation of binary data.
         /// Lower case letters are used (e.g. f9b4ca).
         pub fn to_hex(&self) -> String {
             encode_hex(self)
@@ -324,16 +352,16 @@ macro_rules! implement_private_sodium_wrapper {
 
     impl $name {
         /// Creates a new instance from bytes array.
-        pub fn new(ba: [u8; $size]) -> Self {
-            $name($name_from(ba))
+        pub fn new(bytes_array: [u8; $size]) -> Self {
+            $name($name_from(bytes_array))
         }
 
         /// Creates a new instance from bytes slice.
-        pub fn from_slice(bs: &[u8]) -> Option<Self> {
-            $name_from::from_slice(bs).map($name)
+        pub fn from_slice(bytes_slice: &[u8]) -> Option<Self> {
+            $name_from::from_slice(bytes_slice).map($name)
         }
 
-        /// Returns the hex representation of the binary data.
+        /// Returns the hex representation of binary data.
         /// Lower case letters are used (e.g. f9b4ca).
         pub fn to_hex(&self) -> String {
             encode_hex(&self[..])
@@ -364,9 +392,14 @@ macro_rules! implement_private_sodium_wrapper {
 }
 
 implement_public_sodium_wrapper! {
-/// Ed25519 public key used to verify digital signatures.
+/// Ed25519 public key used to verify digital signatures. In public-key cryptography, the system uses a a mathematically related pair of keys: a public key which is openly distributed and a private key which should remain confidential and know only by its owner. Data encrypted with a public key can be decrypted only using the corresponding private key.
 ///
-/// # Examples
+///
+/// Ed25519 is a signature system that ensures fast signing and key generation,\
+/// as well as security and collision resilience. The keys in the system
+/// consume only 32 bytes, while the signature fits into 64 bytes.
+///
+/// # Example
 ///
 /// ```
 /// use exonum::crypto;
@@ -378,7 +411,10 @@ implement_public_sodium_wrapper! {
 }
 
 implement_private_sodium_wrapper! {
-/// Ed25519 secret key used to create digital signatures over messages.
+/// Ed25519 secret key used to create digital signatures over messages. Exonum also makes use of Ed25519 keys. It is a signature system that ensures
+//! fast signing and key generation, as well as security and collision
+//! resilience. The keys in the system consume only 32 bytes, while the
+//! signature fits into 64 bytes.
 ///
 /// # Examples
 ///
@@ -392,9 +428,14 @@ implement_private_sodium_wrapper! {
 }
 
 implement_public_sodium_wrapper! {
-/// SHA-256 hash.
+/// The given structure is the result of applying the SHA-256 hash function to
+/// data. This function splits the input data into blocks and runs each block
+/// though a cycle of 64 iterations. The result of the function is a hash sum
+/// 256 bits or 32 bytes in length.
 ///
-/// # Examples
+/// The example below generates the hash of the indicated data.
+///
+/// # Example
 ///
 /// ```
 /// use exonum::crypto::{self, Hash};
