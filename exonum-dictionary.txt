@@ -1,4 +1,5 @@
 addrs
+appveyor
 atomicity
 backend
 bigint
@@ -130,6 +131,5 @@ uuids
 validator
 validator's
 validators
-veyor
 whitelisted
 writeln
