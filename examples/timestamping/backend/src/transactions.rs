@@ -19,7 +19,7 @@ use exonum::storage::Fork;
 use exonum::blockchain::{ExecutionResult, ExecutionError, Transaction};
 use exonum::messages::Message;
 use exonum::crypto::{PublicKey, CryptoHash};
-use exonum_time::TimeSchema;
+use exonum_time::schema::TimeSchema;
 
 use schema::{Timestamp, Schema, TimestampEntry};
 use TIMESTAMPING_SERVICE;

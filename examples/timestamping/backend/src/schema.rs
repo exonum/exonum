@@ -14,8 +14,7 @@
 
 use exonum::crypto::Hash;
 use exonum::storage::{ProofMapIndex, Snapshot, Fork};
-
-use std::time::SystemTime;
+use chrono::{DateTime, Utc};
 
 encoding_struct! {
     /// Stores content's hash and some metadata about it.
@@ -38,7 +37,7 @@ encoding_struct! {
         tx_hash: &Hash,
 
         /// Timestamp time.
-        time: SystemTime,
+        time: DateTime<Utc>,
     }
 }
 
@@ -63,7 +62,7 @@ where
     }
 
     pub fn state_hash(&self) -> Vec<Hash> {
-        vec![self.timestamps().root_hash()]
+        vec![self.timestamps().merkle_root()]
     }
 }
 

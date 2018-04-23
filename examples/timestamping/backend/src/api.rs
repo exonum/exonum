@@ -29,8 +29,8 @@ use transactions::TxTimestamp;
 #[derive(Debug, Serialize)]
 pub struct TimestampProof {
     pub block_info: BlockProof,
-    pub state_proof: MapProof<Hash>,
-    pub timestamp_proof: MapProof<TimestampEntry>,
+    pub state_proof: MapProof<Hash, Hash>,
+    pub timestamp_proof: MapProof<Hash, TimestampEntry>,
 }
 
 #[derive(Clone)]
@@ -63,7 +63,7 @@ impl<T: TransactionSend + Clone + 'static> PublicApi<T> {
             (state_proof, block_proof)
         };
         let schema = Schema::new(&snapshot);
-        let timestamp_proof = schema.timestamps().get_proof(content_hash);
+        let timestamp_proof = schema.timestamps().get_proof(*content_hash);
         Ok(TimestampProof {
             block_info,
             state_proof,

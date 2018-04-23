@@ -27,6 +27,7 @@ extern crate router;
 extern crate failure;
 #[macro_use]
 extern crate log;
+extern crate chrono;
 
 pub mod api;
 pub mod transactions;

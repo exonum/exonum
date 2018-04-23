@@ -24,6 +24,7 @@ failure = "0.1.1"
 iron = "0.6"
 bodyparser = "0.8"
 log = "0.4.1"
+chrono = { version = "0.4.0", features = ["serde"] }
 
 [dev-dependencies]
 exonum-testkit = { version = "0.7.0", path = "../../../testkit" }
