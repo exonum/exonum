@@ -12,22 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+extern crate bodyparser;
+extern crate chrono;
 #[macro_use]
 extern crate exonum;
 extern crate exonum_time;
+#[macro_use]
+extern crate failure;
+extern crate iron;
+#[macro_use]
+extern crate log;
+extern crate router;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
-extern crate bodyparser;
-extern crate iron;
-extern crate router;
-#[macro_use]
-extern crate failure;
-#[macro_use]
-extern crate log;
-extern crate chrono;
 
 pub mod api;
 pub mod transactions;
@@ -37,7 +37,7 @@ use exonum::api::Api;
 use exonum::helpers::fabric;
 use exonum::crypto::Hash;
 use exonum::storage::Snapshot;
-use exonum::blockchain::{self, Transaction, ApiContext, TransactionSet};
+use exonum::blockchain::{self, ApiContext, Transaction, TransactionSet};
 use exonum::messages::RawTransaction;
 use exonum::encoding::Error as StreamStructError;
 

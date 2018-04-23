@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum::crypto::Hash;
-use exonum::storage::{ProofMapIndex, Snapshot, Fork};
+use exonum::storage::{Fork, ProofMapIndex, Snapshot};
 use chrono::{DateTime, Utc};
 
 encoding_struct! {

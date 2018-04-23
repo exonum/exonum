@@ -13,17 +13,17 @@
 // limitations under the License.
 
 use exonum::crypto::Hash;
-use exonum::blockchain::{self, Blockchain, Transaction, BlockProof};
+use exonum::blockchain::{self, BlockProof, Blockchain, Transaction};
 use exonum::node::TransactionSend;
 use exonum::api::{Api, ApiError};
 use exonum::storage::MapProof;
 
-use iron::{IronResult, Response, Request, Plugin};
+use iron::{IronResult, Plugin, Request, Response};
 use router::Router;
 use bodyparser;
 
 use TIMESTAMPING_SERVICE;
-use schema::{TimestampEntry, Schema};
+use schema::{Schema, TimestampEntry};
 use transactions::TxTimestamp;
 
 #[derive(Debug, Serialize)]

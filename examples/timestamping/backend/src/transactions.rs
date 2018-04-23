@@ -16,12 +16,12 @@
 #![cfg_attr(feature = "cargo-clippy", allow(redundant_field_names))]
 
 use exonum::storage::Fork;
-use exonum::blockchain::{ExecutionResult, ExecutionError, Transaction};
+use exonum::blockchain::{ExecutionError, ExecutionResult, Transaction};
 use exonum::messages::Message;
-use exonum::crypto::{PublicKey, CryptoHash};
+use exonum::crypto::{CryptoHash, PublicKey};
 use exonum_time::schema::TimeSchema;
 
-use schema::{Timestamp, Schema, TimestampEntry};
+use schema::{Schema, Timestamp, TimestampEntry};
 use TIMESTAMPING_SERVICE;
 
 /// Error codes emitted by wallet transactions during execution.
@@ -61,9 +61,10 @@ impl Transaction for TxTimestamp {
     }
 
     fn execute(&self, fork: &mut Fork) -> ExecutionResult {
-        let time = TimeSchema::new(&fork).time().get().expect(
-            "Can't get the time",
-        );
+        let time = TimeSchema::new(&fork)
+            .time()
+            .get()
+            .expect("Can't get the time");
 
         let content = self.content();
         let hash = content.content_hash();
