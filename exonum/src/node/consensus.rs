@@ -539,7 +539,7 @@ impl NodeHandler {
         profiler_span!("Make sure that it is new transaction", {
             let snapshot = self.blockchain.snapshot();
             if Schema::new(&snapshot).transactions().contains(&hash) {
-                let err = format!("Received already commited transaction, hash {:?}", hash);
+                let err = format!("Received already committed transaction, hash {:?}", hash);
                 return Err(err);
             }
         });
