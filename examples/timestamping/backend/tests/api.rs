@@ -27,7 +27,7 @@ use exonum::helpers::{init_logger, Height};
 use exonum::crypto::CryptoHash;
 use exonum::blockchain::Transaction;
 use exonum_testkit::{TestKitBuilder, TestKitApi, TestKit, ApiKind};
-use exonum_time::{MockTimeProvider, TimeService};
+use exonum_time::{TimeService, time_provider::MockTimeProvider};
 
 use std::time::SystemTime;
 
@@ -37,7 +37,7 @@ use timestamping::schema::{Timestamp, TimestampEntry};
 
 fn init_testkit() -> (TestKit, MockTimeProvider) {
     let _ = init_logger();
-    let mock_provider = MockTimeProvider::new(SystemTime::now());
+    let mock_provider = MockTimeProvider::new(SystemTime::now().into());
     let mut testkit = TestKitBuilder::validator()
         .with_service(Service::new())
         .with_service(TimeService::with_provider(mock_provider.clone()))
