@@ -566,15 +566,12 @@ impl NodeHandler {
     /// added to the transactions pool.
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_tx(&mut self, msg: RawTransaction) {
-        //trace!("Handle transaction");
-        let tx = {
-            match self.blockchain.tx_from_raw(msg.clone()) {
-                Ok(tx) => tx,
-                Err(e) => {
-                    let service_id = msg.service_id();
-                    error!("{}, service_id={}", e.description(), service_id);
-                    return;
-                }
+        let tx = match self.blockchain.tx_from_raw(msg.clone()) {
+            Ok(tx) => tx,
+            Err(e) => {
+                let service_id = msg.service_id();
+                error!("{}, service_id={}", e.description(), service_id);
+                return;
             }
         };
 
