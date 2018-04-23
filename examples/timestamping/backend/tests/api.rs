@@ -20,7 +20,7 @@ extern crate exonum_testkit;
 
 extern crate exonum;
 extern crate exonum_time;
-extern crate timestamping;
+extern crate exonum_timestamping;
 
 use exonum::crypto::{gen_keypair, hash, Hash};
 use exonum::helpers::{init_logger, Height};
@@ -31,9 +31,9 @@ use exonum_time::{TimeService, time_provider::MockTimeProvider};
 
 use std::time::SystemTime;
 
-use timestamping::Service;
-use timestamping::transactions::TxTimestamp;
-use timestamping::schema::{Timestamp, TimestampEntry};
+use exonum_timestamping::Service;
+use exonum_timestamping::transactions::TxTimestamp;
+use exonum_timestamping::schema::{Timestamp, TimestampEntry};
 
 fn init_testkit() -> (TestKit, MockTimeProvider) {
     let _ = init_logger();

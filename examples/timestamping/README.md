@@ -19,9 +19,9 @@ on 4 nodes on the local machine.
 Clone the project and install Rust dependencies:
 
 ```sh
-git clone https://github.com/exonum/timestamping-demo
+git clone https://github.com/exonum/exonum
 
-cd timestamping-demo/backend
+cd exonum/examples/timestamping/backend
 
 cargo install
 ```
@@ -31,7 +31,7 @@ Generate blockchain configuration:
 ```sh
 mkdir example
 
-timestamping generate-template example/common.toml
+exonum-timestamping generate-template example/common.toml
 ```
 
 Generate templates of nodes configurations:
@@ -39,37 +39,37 @@ Generate templates of nodes configurations:
 <!-- markdownlint-disable MD013 -->
 
 ```sh
-timestamping generate-config example/common.toml  example/pub_1.toml example/sec_1.toml --peer-address 127.0.0.1:6331
+exonum-timestamping generate-config example/common.toml  example/pub_1.toml example/sec_1.toml --peer-address 127.0.0.1:6331
 
-timestamping generate-config example/common.toml  example/pub_2.toml example/sec_2.toml --peer-address 127.0.0.1:6332
+exonum-timestamping generate-config example/common.toml  example/pub_2.toml example/sec_2.toml --peer-address 127.0.0.1:6332
 
-timestamping generate-config example/common.toml  example/pub_3.toml example/sec_3.toml --peer-address 127.0.0.1:6333
+exonum-timestamping generate-config example/common.toml  example/pub_3.toml example/sec_3.toml --peer-address 127.0.0.1:6333
 
-timestamping generate-config example/common.toml  example/pub_4.toml example/sec_4.toml --peer-address 127.0.0.1:6334
+exonum-timestamping generate-config example/common.toml  example/pub_4.toml example/sec_4.toml --peer-address 127.0.0.1:6334
 ```
 
 Finalize generation of nodes configurations:
 
 ```sh
-timestamping finalize --public-api-address 0.0.0.0:8200 --private-api-address 0.0.0.0:8091 example/sec_1.toml example/node_1_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
+exonum-timestamping finalize --public-api-address 0.0.0.0:8200 --private-api-address 0.0.0.0:8091 example/sec_1.toml example/node_1_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
 
-timestamping finalize --public-api-address 0.0.0.0:8201 --private-api-address 0.0.0.0:8092 example/sec_2.toml example/node_2_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
+exonum-timestamping finalize --public-api-address 0.0.0.0:8201 --private-api-address 0.0.0.0:8092 example/sec_2.toml example/node_2_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
 
-timestamping finalize --public-api-address 0.0.0.0:8202 --private-api-address 0.0.0.0:8093 example/sec_3.toml example/node_3_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
+exonum-timestamping finalize --public-api-address 0.0.0.0:8202 --private-api-address 0.0.0.0:8093 example/sec_3.toml example/node_3_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
 
-timestamping finalize --public-api-address 0.0.0.0:8203 --private-api-address 0.0.0.0:8094 example/sec_4.toml example/node_4_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
+exonum-timestamping finalize --public-api-address 0.0.0.0:8203 --private-api-address 0.0.0.0:8094 example/sec_4.toml example/node_4_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
 ```
 
 Run nodes:
 
 ```sh
-timestamping run --node-config example/node_1_cfg.toml --db-path example/db1 --public-api-address 0.0.0.0:8200
+exonum-timestamping run --node-config example/node_1_cfg.toml --db-path example/db1 --public-api-address 0.0.0.0:8200
 
-timestamping run --node-config example/node_2_cfg.toml --db-path example/db2 --public-api-address 0.0.0.0:8201
+exonum-timestamping run --node-config example/node_2_cfg.toml --db-path example/db2 --public-api-address 0.0.0.0:8201
 
-timestamping run --node-config example/node_3_cfg.toml --db-path example/db3 --public-api-address 0.0.0.0:8202
+exonum-timestamping run --node-config example/node_3_cfg.toml --db-path example/db3 --public-api-address 0.0.0.0:8202
 
-timestamping run --node-config example/node_4_cfg.toml --db-path example/db4 --public-api-address 0.0.0.0:8203
+exonum-timestamping run --node-config example/node_4_cfg.toml --db-path example/db4 --public-api-address 0.0.0.0:8203
 ```
 
 <!-- markdownlint-enable MD013 -->
