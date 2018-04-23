@@ -13,6 +13,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - IPv6 addressing is now supported. (#615)
 
+#### exonum-timestamping
+
+- Additional service example has been added along with frontend. (#646)
+
 ### Bug fixes
 
 #### exonum-cryptocurrency-advanced
@@ -20,6 +24,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Frontend has been updated to reflect latest backend changes. (#602 #611)
 
 ### Internal improvements
+
+#### exonum
+
+- Default implementation of `check` method was added to `Field` trait to
+  reduce boilerplate. (#639)
 
 #### exonum-time
 
