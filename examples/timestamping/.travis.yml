@@ -1,0 +1,87 @@
+language: rust
+
+addons:
+  apt:
+    packages:
+    - gcc
+    - g++
+    - libleveldb-dev
+    - libssl-dev
+    - libcurl4-openssl-dev
+    - libelf-dev
+    - libdw-dev
+    - binutils-dev
+    - libiberty-dev
+
+rust:
+  - stable
+matrix:
+  include:
+    - rust: nightly-2018-03-06
+      env: FEATURE=clippy
+
+cache:
+  directories:
+  - $HOME/.cargo
+  - $HOME/.local
+  - $TRAVIS_BUILD_DIR/target
+
+dist: trusty
+sudo: false
+
+env:
+  global:
+  - NIGHTLY_RUST=nightly-2018-03-06
+  - CLIPPY_VERS=0.0.187
+  - RUSTFMT_VERS=0.9.0
+  - SODIUM_VERS=1.0.13
+  - CARGO_INCREMENTAL=1
+  - RUSTFLAGS="-C link-dead-code"
+  matrix:
+  - FEATURE=fmt
+  - FEATURE=test
+
+install:
+- |
+  if [ ! -f "$HOME/.local/lib/libsodium.a" ]; then
+    wget "https://github.com/jedisct1/libsodium/releases/download/$SODIUM_VERS/libsodium-$SODIUM_VERS.tar.gz" -t 5 -O "libsodium.tar.gz"
+    tar xvf libsodium.tar.gz
+    cd libsodium-$SODIUM_VERS
+    ./configure --prefix=$HOME/.local
+    make
+    make install
+    cd ..
+  fi
+- export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.local/lib
+- export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$HOME/.local/lib/pkgconfig
+- |
+  if [[ "$FEATURE" == "fmt" ]]; then
+    cargo-audit -V || cargo install cargo-audit --force
+    rustfmt -V | grep $RUSTFMT_VERS || cargo install rustfmt --vers $RUSTFMT_VERS --force
+    cd backend && cargo update && cd ..
+    fi
+- |
+  case "$FEATURE" in
+  clippy* )
+    cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
+  ;;
+  esac
+- cargo install --list
+
+script: |
+  case "$FEATURE" in
+  "fmt" )
+      cd backend && cargo fmt -- --write-mode=diff
+  ;;
+  "clippy" )
+      cd backend && cargo clippy -- -D warnings
+  ;;
+  "test" )
+      cd backend && RUST_LOG=off cargo test
+  ;;
+  esac
+
+notifications:
+  slack:
+    rooms:
+      secure: G18kKYYFHLgW97wOoaqVUxFdL1mxL8fPFJXPLMBdZOy8k2K7Ex7xR9Uh6bogu5cKV2zUbIe6sQu/FgpxwW5Ep0dEqiQbKX0GF40R5w5miquiaeoTqIoeirAQagp26mjWS44t9wYo+lq1jXbw+FbJLMhDYNvUti3xr8bcwjPEsfg6E6YLXZiZnJAZ2nTiQFV0BYH5btkzKm0VqzdBDFzDmG66strptzUxR0yzjs6w4vl6S0m3MWvClvFjhvXiKFExF/62g0uN7qHV/54mXneih+N1sxysGXgGsr30KRchI0bTCybfJY29jsrkZiE6oC6/QRVFVaRQcR09rQBx+abCZmzv0dYT9+cPobwb4ljnxeWLIRLzOxlOfBZ5OQbuBDKddclW5s+FS/7dM5rkkN6ffMIZMdJ2tAYLxFF+WBo9MAGn57xjiUZ8a8Lk0mw4i1IYLdasz6MZWLnrc2FpAD/lNKRceJ5tzq7kvIyqxhp1XV/pG8+VdOLaR+kWdu2P2neZXCyWIvXeeY9F8WuVloo7k8YNm4te3PyRfWwJxDcxSKg1Pb5xdHBpfpe5ChCP0t+mG88z6wiY9LkxV3QP9WdmPSgWIUDAxZu4WwURIjGnbW03CwOZW8/tU4qM5JokeuB+PAMKcnGE1Cd6PBCAn+ExRhegaFbey8C3iNSXTNmSIHk=

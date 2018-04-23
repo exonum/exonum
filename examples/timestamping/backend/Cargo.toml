@@ -1,0 +1,25 @@
+[package]
+name = "timestamping"
+version = "0.6.0"
+authors = ["Exonum Team <exonum@bitfury.com>"]
+
+[dependencies]
+exonum = "0.6.0"
+exonum-configuration = "0.6"
+exonum-btc-anchoring = { version = "0.6.0", optional = true }
+exonum-time = "0.6"
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+router = "0.6"
+failure = "0.1.1"
+iron = "0.6"
+bodyparser = "0.8"
+log = "0.4.1"
+
+[dev-dependencies]
+exonum-testkit = "0.6"
+
+[features]
+default = []
+anchoring = ["exonum-btc-anchoring"]
