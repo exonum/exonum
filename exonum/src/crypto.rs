@@ -32,8 +32,9 @@
 //! resilience. The keys in the system consume only 32 bytes, while the
 //! signature fits into 64 bytes.
 //!
-//! [Sodium library](https://github.com/jedisct1/libsodium) is used under the hood through
-//! [sodiumoxide rust bindings](https://github.com/dnaq/sodiumoxide). The
+//! [Sodium library](https://github.com/jedisct1/libsodium) is used under the
+//! hood through [sodiumoxide rust bindings](https://github.com/dnaq/sodiumoxide).
+//! The constants in this module are imported from Sodium. The
 //! Sodium library is used for potential changes to cryptography and adding
 //! abstractions which are best suited for Exonum.
 
@@ -71,9 +72,14 @@ use helpers::Round;
 /// The size to crop the string in debug messages.
 const BYTES_IN_DEBUG: usize = 4;
 
-/// Signs a slice of bytes using the signer's secret key. Returns the resulting `Signature`.
+/// Signs a slice of bytes using the signer's private key and returns the
+/// resulting `Signature`.
 ///
-/// # Examples
+/// The example below generates a pair of private and public keys, indicates
+/// certain data, signs the data using the private key and using the public key
+/// verifies that the data were signed with a corresponding private key.
+///
+/// # Example
 ///
 /// ```
 /// use exonum::crypto;
@@ -89,9 +95,12 @@ pub fn sign(data: &[u8], secret_key: &SecretKey) -> Signature {
     Signature(sodium_signature)
 }
 
-/// Computes a secret key and a corresponding public key from a `Seed`.
+/// Computes a private key and a corresponding public key from a `Seed`.
 ///
-/// # Examples
+/// The example below generates a keypair that depends on the indicated seed.
+/// Indicating the same seed value always results in the same keypair.
+///
+/// # Example
 ///
 /// ```
 /// use exonum::crypto::{self, Seed};
@@ -104,10 +113,12 @@ pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
     (PublicKey(sod_pub_key), SecretKey(sod_secret_key))
 }
 
-/// Generates a secret key and a corresponding public key using a cryptographically secure
+/// Generates a private key and a corresponding public key using a cryptographically secure
 /// pseudo-random number generator.
 ///
-/// # Examples
+/// The example below generates a unique keypair.
+///
+/// # Example
 ///
 /// ```
 /// use exonum::crypto;
@@ -120,9 +131,14 @@ pub fn gen_keypair() -> (PublicKey, SecretKey) {
     (PublicKey(pubkey), SecretKey(secret_key))
 }
 
-/// Verifies that `data` is signed with a secret key corresponding to the given public key.
+/// Verifies that `data` is signed with a private key corresponding to the
+/// given public key.
 ///
-/// # Examples
+/// The example below generates a pair of private and public keys, indicates
+/// certain data, signs the data using the private key and using the public key
+/// verifies that the data were signed with a corresponding private key.
+///
+/// # Example
 ///
 /// ```
 /// use exonum::crypto;
@@ -137,9 +153,11 @@ pub fn verify(sig: &Signature, data: &[u8], pubkey: &PublicKey) -> bool {
     verify_detached(&sig.0, data, &pubkey.0)
 }
 
-/// Calculates an SHA-256 hash digest of a bytes slice.
+/// Calculates an SHA-256 hash of a bytes slice.
 ///
-/// # Examples
+/// The example below calculates the hash sum of the indicated data.
+///
+/// # Example
 ///
 /// ```
 /// use exonum::crypto;
@@ -163,13 +181,14 @@ pub trait CryptoHash {
     fn hash(&self) -> Hash;
 }
 
-/// Initializes the sodium library and selects faster versions of the primitives if possible.
+/// Initializes the sodium library and automatically selects faster versions
+/// of the primitives if possible.
 ///
-/// # Panics
+/// # Panic
 ///
 /// Panics if sodium initialization is failed.
 ///
-/// # Examples
+/// # Example
 ///
 /// ```
 /// use exonum::crypto;
@@ -182,7 +201,7 @@ pub fn init() {
     }
 }
 
-/// This structure provides a possibility to calculate a SHA-256 hash digest
+/// This structure provides a possibility to calculate an SHA-256 hash digest
 /// for a stream of data. Unlike the
 /// [Hash structure](https://docs.rs/exonum/0.7.0/exonum/crypto/struct.Hash.html),
 /// the given structure lets the code process several data chunks without
@@ -227,8 +246,16 @@ impl HashStream {
     }
 }
 
-/// This structure provides a possibility to create and/or verify Ed25519 digital signatures
-/// for a stream of data.
+/// This structure provides a possibility to create and/or verify Ed25519
+/// digital signatures for a stream of data. If the data are split into several
+/// chunks, the indicated chunks are added to the system and after adding all
+/// the chunks, the data is signed.
+///
+/// Ed25519 is a signature system that ensures fast signing and key generation,
+/// as well as security and collision resilience.
+///
+/// The example below adds several data chunks to the system, generates a pair
+/// of random public and private keys, signs the data and verifies the signature.
 ///
 /// # Example
 ///
@@ -236,7 +263,7 @@ impl HashStream {
 /// use exonum::crypto::{SignStream, gen_keypair};
 ///
 /// let data: Vec<[u8; 5]> = vec![[1, 2, 3, 4, 5], [6, 7, 8, 9, 10]];
-/// let (pk, sk) = gen_keypair();
+/// let (public_key, secret_key) = gen_keypair();
 /// let mut create_stream = SignStream::new();
 /// let mut verify_stream = SignStream::new();
 /// for chunk in data {
@@ -244,7 +271,7 @@ impl HashStream {
 ///     verify_stream = verify_stream.update(&chunk);
 /// }
 /// let file_sign = create_stream.sign(&sk);
-/// assert!(verify_stream.verify(&file_sign, &pk));
+/// assert!(verify_stream.verify(&file_sign, &public_key));
 /// ```
 #[derive(Debug, Default)]
 pub struct SignStream(SignState);
@@ -392,12 +419,23 @@ macro_rules! implement_private_sodium_wrapper {
 }
 
 implement_public_sodium_wrapper! {
-/// Ed25519 public key used to verify digital signatures. In public-key cryptography, the system uses a a mathematically related pair of keys: a public key which is openly distributed and a private key which should remain confidential and know only by its owner. Data encrypted with a public key can be decrypted only using the corresponding private key.
+/// Ed25519 public key used to verify digital signatures.
 ///
+/// In public-key cryptography, the system uses a a mathematically related pair
+/// of keys: a public key, which is openly distributed, and a private key,
+/// which should remain confidential. The public key is used to encrypt a
+/// message, which can only be decrypted using the corresponding private key.
+/// The private key is also used for digital signatures over messages.
+/// Knowing the sender's public key, the recipient can check  whether the
+/// message was made by the owner of the corresponding private key. If the
+/// message was changed by a third party, the verification will fail.
 ///
-/// Ed25519 is a signature system that ensures fast signing and key generation,\
+/// Ed25519 is a signature system that ensures fast signing and key generation,
 /// as well as security and collision resilience. The keys in the system
 /// consume only 32 bytes, while the signature fits into 64 bytes.
+///
+/// In the example below, the function generates a pair of random public and
+/// private keys.
 ///
 /// # Example
 ///
@@ -411,12 +449,25 @@ implement_public_sodium_wrapper! {
 }
 
 implement_private_sodium_wrapper! {
-/// Ed25519 secret key used to create digital signatures over messages. Exonum also makes use of Ed25519 keys. It is a signature system that ensures
-//! fast signing and key generation, as well as security and collision
-//! resilience. The keys in the system consume only 32 bytes, while the
-//! signature fits into 64 bytes.
+/// Ed25519 private key used to create digital signatures over messages.
 ///
-/// # Examples
+/// In public-key cryptography, the system uses a a mathematically related pair
+/// of keys: a public key, which is openly distributed, and a private key,
+/// which should remain confidential. Data encrypted with a public key can be
+/// decrypted only using the corresponding private key. The sender signs a
+/// message using their private key. Knowing the sender's public key, the
+/// recipient can check  whether the message was made by the owner of the
+/// corresponding private key. If the message was changed by a third party,
+/// the verification will fail.
+///
+/// Ed25519 is a signature system that ensures fast signing and key generation,
+/// as well as security and collision resilience. The keys in the system
+/// consume only 32 bytes, while the signature fits into 64 bytes.
+///
+/// In the example below, the function generates a pair of random public and
+/// private keys.
+///
+/// # Example
 ///
 /// ```
 /// use exonum::crypto;
@@ -448,9 +499,19 @@ implement_public_sodium_wrapper! {
 }
 
 implement_public_sodium_wrapper! {
-/// Ed25519 digital signature.
+/// Ed25519 digital signature. This structure creates a signature over data
+/// using a private key. Later it is possible to verify, using the corresponding
+/// public key, that the data have indeed been signed with that private key.
 ///
-/// # Examples
+/// Ed25519 is a signature system that ensures fast signing and key generation,
+/// as well as security and collision resilience.
+///
+/// The example below generates a pair of random public and private keys,
+/// adds certain data, signs the data using the private key and verifies,
+/// using the signature, data and corresponding public key, that the data have
+/// been signed with that public key.
+///
+/// # Example
 ///
 /// ```
 /// use exonum::crypto;
@@ -465,9 +526,21 @@ implement_public_sodium_wrapper! {
 }
 
 implement_private_sodium_wrapper! {
-/// Ed25519 seed that can be used for deterministic keypair generation.
+/// Ed25519 seed that can be used for deterministic keypair generation. The
+/// seed is a succession of bytes which can be used to generate a certain
+/// keypair. If the same seed is indicated in the generator multiple times,
+/// the generated keys will be the same each time.
 ///
-/// # Examples
+/// Note that this is not the seed added to Exonum transactions for additional
+/// security, this is a separate entity. This structure is useful for testing,
+/// to receive repeatable results. The seed in this structure is either set
+/// manually or selected using the methods below.
+///
+/// The example below generates a pair of a public and private keys taking
+/// into account the selected seed. The same seed will always lead to the
+/// generation of the same keypair.
+///
+/// # Example
 ///
 /// ```
 /// use exonum::crypto::{self, Seed};
