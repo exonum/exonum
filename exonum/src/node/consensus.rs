@@ -532,14 +532,14 @@ impl NodeHandler {
         }
     }
 
-    /// Checks if transaction is new and adds it into pool.
+    /// Checks if the transaction is new and adds it to the pool.
     fn handle_tx_inner(&mut self, msg: RawTransaction) -> Result<(), String> {
         let hash = msg.hash();
 
         profiler_span!("Make sure that it is new transaction", {
             let snapshot = self.blockchain.snapshot();
             if Schema::new(&snapshot).transactions().contains(&hash) {
-                let err = format!("Received already committed transaction, hash {:?}", hash);
+                let err = format!("Received already processed transaction, hash {:?}", hash);
                 return Err(err);
             }
         });
@@ -581,9 +581,10 @@ impl NodeHandler {
             }
         });
 
+        // We don't care about result, because situation when transaction received twice
+        // is normal for internal messages (transaction may be received from 2+ nodes).
         match self.handle_tx_inner(msg) {
-            Ok(_) => return,
-            Err(e) => error!("{}", e),
+            _ => return,
         }
     }
 
