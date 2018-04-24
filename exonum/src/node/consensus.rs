@@ -583,9 +583,7 @@ impl NodeHandler {
 
         // We don't care about result, because situation when transaction received twice
         // is normal for internal messages (transaction may be received from 2+ nodes).
-        match self.handle_tx_inner(msg) {
-            _ => return,
-        }
+        let _ = self.handle_tx_inner(msg);
     }
 
     /// Handles raw transactions.
