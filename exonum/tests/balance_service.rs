@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! This is a basic balance service. The only available operation is a wallet balance update.
+//! Regression test for transactions processing is built on a base of this service.
 extern crate bodyparser;
 #[macro_use]
 extern crate exonum;
@@ -98,7 +100,6 @@ pub mod service {
     use std::thread;
     use std::time;
 
-    /// Service ID for the `Service` trait.
     pub const SERVICE_ID: u16 = 1;
 
     pub struct BalanceService();
@@ -135,7 +136,7 @@ pub mod service {
         let db = Arc::from(Box::new(MemoryDB::new()) as Box<Database>) as Arc<Database>;
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
 
-        // Override timeouts to little values, so we won't have to wait for consensus too long
+        // Override timeouts to little values, so we won't have to wait for consensus too long.
         node_cfg.genesis.consensus.timeout_adjuster =
             TimeoutAdjusterConfig::Constant { timeout: 10 };
         node_cfg.genesis.consensus.round_timeout = 20;
@@ -149,14 +150,14 @@ pub mod service {
         });
 
         let tx_orig = Box::new(TxAddBalance::new(10, 0, &private_key));
-        let tx_copy = Box::new(TxAddBalance::new(10, 0, &private_key));
+        let tx_copy = tx_orig.clone();
 
-        // Send two identical transactions
+        // Send two identical transactions.
         api_tx.send(tx_orig).unwrap();
 
         api_tx.send(tx_copy).unwrap();
 
-        // Wait to be sure that transaction was processed
+        // Wait to be sure that transaction was processed.
         thread::sleep(time::Duration::from_millis(100));
 
         // Shut down the node
@@ -166,7 +167,7 @@ pub mod service {
 
         node_thread.join().unwrap();
 
-        // Check that only one transaction was accepted
+        // Check that only one transaction was accepted.
         let schema = BalanceSchema::new(db.snapshot());
         let balance = schema.balance().get().unwrap();
 
