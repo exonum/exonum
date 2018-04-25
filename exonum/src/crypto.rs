@@ -79,7 +79,7 @@ const BYTES_IN_DEBUG: usize = 4;
 /// certain data, signs the data using the private key and using the public key
 /// verifies that the data were signed with a corresponding private key.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// use exonum::crypto;
@@ -100,7 +100,7 @@ pub fn sign(data: &[u8], secret_key: &SecretKey) -> Signature {
 /// The example below generates a keypair that depends on the indicated seed.
 /// Indicating the same seed value always results in the same keypair.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// use exonum::crypto::{self, Seed};
@@ -118,7 +118,7 @@ pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
 ///
 /// The example below generates a unique keypair.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// use exonum::crypto;
@@ -138,7 +138,7 @@ pub fn gen_keypair() -> (PublicKey, SecretKey) {
 /// certain data, signs the data using the private key and using the public key
 /// verifies that the data were signed with a corresponding private key.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// use exonum::crypto;
@@ -157,7 +157,7 @@ pub fn verify(sig: &Signature, data: &[u8], pubkey: &PublicKey) -> bool {
 ///
 /// The example below calculates the hash sum of the indicated data.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// use exonum::crypto;
@@ -184,11 +184,11 @@ pub trait CryptoHash {
 /// Initializes the sodium library and automatically selects faster versions
 /// of the primitives if possible.
 ///
-/// # Panic
+/// # Panics
 ///
 /// Panics if sodium initialization is failed.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// use exonum::crypto;
@@ -211,7 +211,7 @@ pub fn init() {
 /// system hash update as many times as required to process all the data chunks
 /// and calculates the hash of the system after processing all the chunks.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```rust
 /// use exonum::crypto::HashStream;
@@ -257,7 +257,7 @@ impl HashStream {
 /// The example below adds several data chunks to the system, generates a pair
 /// of random public and private keys, signs the data and verifies the signature.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```rust
 /// use exonum::crypto::{SignStream, gen_keypair};
@@ -437,7 +437,7 @@ implement_public_sodium_wrapper! {
 /// In the example below, the function generates a pair of random public and
 /// private keys.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// use exonum::crypto;
@@ -467,7 +467,7 @@ implement_private_sodium_wrapper! {
 /// In the example below, the function generates a pair of random public and
 /// private keys.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// use exonum::crypto;
@@ -486,7 +486,7 @@ implement_public_sodium_wrapper! {
 ///
 /// The example below generates the hash of the indicated data.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// use exonum::crypto::{self, Hash};
@@ -511,7 +511,7 @@ implement_public_sodium_wrapper! {
 /// using the signature, data and corresponding public key, that the data have
 /// been signed with that public key.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// use exonum::crypto;
@@ -540,7 +540,7 @@ implement_private_sodium_wrapper! {
 /// into account the selected seed. The same seed will always lead to the
 /// generation of the same keypair.
 ///
-/// # Example
+/// # Examples
 ///
 /// ```
 /// use exonum::crypto::{self, Seed};
