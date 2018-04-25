@@ -816,10 +816,7 @@ impl State {
                 for hash in msg.transactions() {
                     if transactions.get(hash).is_some() {
                         if !transaction_pool.contains(hash) {
-                            bail!(
-                                "Received propose with already\
-                                 committed transaction"
-                            )
+                            warn!("Received propose with already committed transaction");
                         }
                     } else {
                         unknown_txs.insert(*hash);
