@@ -13,7 +13,7 @@
 // limitations under the License.
 
 //! Cryptography related types, constants, traits and functions. The functions
-//! in this module are used for key generation, hashing, sighing and signature
+//! in this module are used for key generation, hashing, signing and signature
 //! verification.
 //!
 //! Cryptography is the practice of secure communication in the presence of
@@ -270,7 +270,7 @@ impl HashStream {
 ///     create_stream = create_stream.update(&chunk);
 ///     verify_stream = verify_stream.update(&chunk);
 /// }
-/// let file_sign = create_stream.sign(&sk);
+/// let file_sign = create_stream.sign(&secret_key);
 /// assert!(verify_stream.verify(&file_sign, &public_key));
 /// ```
 #[derive(Debug, Default)]
