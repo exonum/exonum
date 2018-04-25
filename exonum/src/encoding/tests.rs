@@ -161,7 +161,7 @@ fn test_check_inconstructible_duration_too_big() {
     let secs = i64::max_value();
     let nanos = i32::max_value();
 
-    except_duration_check_error(secs, nanos);
+    expect_duration_check_error(secs, nanos);
 }
 
 #[test]
@@ -169,7 +169,7 @@ fn test_check_inconstructible_duration_too_low() {
     let secs = i64::min_value();
     let nanos = i32::min_value();
 
-    except_duration_check_error(secs, nanos);
+    expect_duration_check_error(secs, nanos);
 }
 
 #[test]
@@ -179,10 +179,10 @@ fn test_check_constructible_duration_that_exceeds_max_value() {
     let mut nanos: i32 = max_duration_nanos.num_nanoseconds().unwrap() as i32;
     nanos += 1;
 
-    except_duration_check_error(secs, nanos);
+    expect_duration_check_error(secs, nanos);
 }
 
-fn except_duration_check_error(secs: i64, nanos: i32) {
+fn expect_duration_check_error(secs: i64, nanos: i32) {
     // Size of duration is sizeof(i64) + sizeof(i32)
     let header_size = 12;
 
