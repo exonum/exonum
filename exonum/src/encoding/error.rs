@@ -126,6 +126,8 @@ pub enum Error {
     },
     /// Overflow in Offsets
     OffsetOverflow,
+    /// Overflow in Duration,
+    DurationOverflow,
     /// Basic error support, for custom fields.
     Basic(Cow<'static, str>),
     /// Other error for custom fields
@@ -157,6 +159,7 @@ impl StdError for Error {
             Error::SpaceBetweenSegments { .. } => "Space between segments",
             Error::Utf8 { .. } => "Utf8 error in parsing string",
             Error::OffsetOverflow => "Offset pointers overflow",
+            Error::DurationOverflow => "Overflow in Duration object",
             Error::Basic(ref x) => x.as_ref(),
             Error::Other(_) => "Other error",
         }

@@ -14,7 +14,7 @@
 
 #![allow(unsafe_code)]
 
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, Duration, TimeZone, Utc};
 use byteorder::{ByteOrder, LittleEndian};
 use uuid::{self, Uuid};
 
@@ -255,6 +255,64 @@ impl<'a> Field<'a> for DateTime<Utc> {
             &mut buffer[from as usize + mem::size_of_val(&secs)..to as usize],
             nanos,
         );
+    }
+}
+
+impl<'a> Field<'a> for Duration {
+    fn field_size() -> Offset {
+        (mem::size_of::<i64>() + mem::size_of::<i32>()) as Offset
+    }
+
+    unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
+        let secs = LittleEndian::read_i64(&buffer[from as usize..from as usize + 8]);
+        let nanos = LittleEndian::read_i32(&buffer[from as usize + 8..to as usize]);
+
+        // Assuming that buffer was checked and Duration object can be constructed.
+        Duration::seconds(secs) + Duration::nanoseconds(i64::from(nanos))
+    }
+
+    fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
+        let secs = self.num_seconds();
+        let nanos_as_duration = *self - Duration::seconds(secs);
+        // Since we're working with only nanos, no overflow is expected here.
+        let nanos = nanos_as_duration.num_nanoseconds().unwrap() as i32;
+        LittleEndian::write_i64(
+            &mut buffer[from as usize..to as usize - mem::size_of_val(&nanos)],
+            secs,
+        );
+        LittleEndian::write_i32(
+            &mut buffer[from as usize + mem::size_of_val(&secs)..to as usize],
+            nanos,
+        );
+    }
+
+    fn check(
+        buffer: &'a [u8],
+        from: CheckedOffset,
+        to: CheckedOffset,
+        latest_segment: CheckedOffset,
+    ) -> Result {
+        debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
+        let from_unchecked = from.unchecked_offset() as usize;
+        let to_unchecked = to.unchecked_offset() as usize;
+
+        let secs = LittleEndian::read_i64(&buffer[from_unchecked..from_unchecked + 8]);
+        let nanos = LittleEndian::read_i32(&buffer[from_unchecked + 8..to_unchecked]);
+
+        let max_duration = Duration::max_value();
+        let min_duration = Duration::min_value();
+
+        // Duration::seconds() panics if amount of seconds exceeds limits.
+        if secs > max_duration.num_seconds() || secs < min_duration.num_seconds() {
+            return Err(Error::DurationOverflow);
+        }
+
+        // Result will be None in case of overflow.
+        let result = Duration::seconds(secs).checked_add(&Duration::nanoseconds(i64::from(nanos)));
+        match result {
+            Some(_) => Ok(latest_segment),
+            None => Err(Error::DurationOverflow),
+        }
     }
 }
 

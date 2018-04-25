@@ -15,7 +15,8 @@
 #![allow(unsafe_code)]
 
 use bit_vec::BitVec;
-use chrono::Utc;
+use chrono::{Duration, Utc};
+use byteorder::{ByteOrder, LittleEndian};
 use uuid::Uuid;
 
 use std::net::SocketAddr;
@@ -25,7 +26,7 @@ use blockchain::{self, Block, BlockProof};
 use messages::{BlockRequest, BlockResponse, Connect, Message, Precommit, Prevote, Propose,
                RawMessage, Status};
 use helpers::{user_agent, Height, Round, ValidatorId};
-use super::{Field, Offset};
+use super::{CheckedOffset, Error, Field, Offset};
 
 static VALIDATOR: ValidatorId = ValidatorId(65_123);
 static HEIGHT: Height = Height(123_123_123);
@@ -153,6 +154,73 @@ fn test_uuid_segment() {
 
     let uuid = Uuid::parse_str("936DA01F9ABD4d9d80C702AF85C822A8").unwrap();
     assert_write_check_read(uuid, 16);
+}
+
+#[test]
+fn test_check_inconstructible_duration_too_big() {
+    let secs = i64::max_value();
+    let nanos = i32::max_value();
+
+    except_duration_check_error(secs, nanos);
+}
+
+#[test]
+fn test_check_inconstructible_duration_too_low() {
+    let secs = i64::min_value();
+    let nanos = i32::min_value();
+
+    except_duration_check_error(secs, nanos);
+}
+
+#[test]
+fn test_check_constructible_duration_that_exceeds_max_value() {
+    let secs: i64 = Duration::max_value().num_seconds();
+    let max_duration_nanos = Duration::max_value() - Duration::seconds(secs);
+    let mut nanos: i32 = max_duration_nanos.num_nanoseconds().unwrap() as i32;
+    nanos += 1;
+
+    except_duration_check_error(secs, nanos);
+}
+
+fn except_duration_check_error(secs: i64, nanos: i32) {
+    // Size of duration is sizeof(i64) + sizeof(i32)
+    let header_size = 12;
+
+    let mut raw_duration: Vec<u8> = vec![0; header_size];
+
+    LittleEndian::write_i64(&mut raw_duration[0 as usize..8 as usize], secs);
+    LittleEndian::write_i32(&mut raw_duration[8 as usize..header_size as usize], nanos);
+
+    let start_offset = CheckedOffset::new(0 as Offset);
+    let end_offset = CheckedOffset::new(header_size as Offset);
+    let check_result =
+        <Duration as Field>::check(&raw_duration, start_offset, end_offset, end_offset);
+    match check_result {
+        Err(Error::DurationOverflow) => assert!(true),
+        _ => assert!(
+            false,
+            "Check should return DurationOverflow error for incorrect buffer"
+        ),
+    }
+}
+
+#[test]
+fn test_duration_segment() {
+    // Size of duration is sizeof(i64) + sizeof(i32)
+    let header_size = 12;
+
+    let zero_duration = Duration::zero();
+    assert_write_check_read(zero_duration, header_size);
+
+    // Random complex duration
+    let nonzero_duration = Duration::seconds(42) + Duration::nanoseconds(55);
+    assert_write_check_read(nonzero_duration, header_size);
+
+    let max_duration = Duration::max_value();
+    assert_write_check_read(max_duration, header_size);
+
+    let min_duration = Duration::min_value();
+    assert_write_check_read(min_duration, header_size);
 }
 
 #[test]
