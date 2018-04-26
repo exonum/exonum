@@ -126,13 +126,13 @@ pub enum Error {
     },
     /// Overflow in Offsets
     OffsetOverflow,
-    /// Overflow in Duration
+    /// Overflow in Duration.
     DurationOverflow,
-    /// Incorrect duration representation
+    /// Incorrect duration representation.
     IncorrectDuration {
-        /// Seconds in gotten duration
+        /// Seconds in gotten duration.
         secs: i64,
-        /// Nanoseconds in gotten duration
+        /// Nanoseconds in gotten duration.
         nanos: i32,
     },
     /// Basic error support, for custom fields.
