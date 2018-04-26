@@ -130,9 +130,9 @@ pub enum Error {
     DurationOverflow,
     /// Incorrect duration representation
     IncorrectDuration {
-        // Seconds in gotten duration
+        /// Seconds in gotten duration
         secs: i64,
-        // Nanoseconds in gotten duration
+        /// Nanoseconds in gotten duration
         nanos: i32,
     },
     /// Basic error support, for custom fields.

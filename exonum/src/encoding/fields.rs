@@ -336,10 +336,7 @@ impl<'a> Field<'a> for Duration {
         }
 
         if !is_duration_representation_valid(secs, nanos) {
-            return Err(Error::IncorrectDuration {
-                secs: secs,
-                nanos: nanos,
-            });
+            return Err(Error::IncorrectDuration { secs, nanos });
         }
 
         // Result will be None in case of overflow.
