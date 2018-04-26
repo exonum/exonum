@@ -1,4 +1,5 @@
 addrs
+appveyor
 atomicity
 backend
 bigint

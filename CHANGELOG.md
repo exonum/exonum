@@ -19,6 +19,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Bug fixes
 
+#### exonum
+
+- Already processed transactions are rejected now in
+  `NodeHandler::handle_incoming_tx` method. (#642)
+
 #### exonum-cryptocurrency-advanced
 
 - Frontend has been updated to reflect latest backend changes. (#602 #611)
