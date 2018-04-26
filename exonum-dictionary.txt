@@ -18,7 +18,6 @@ clippy
 clonned
 compat
 concat
-constructible
 counterintuitive
 cryptocurrency
 cryptographically
@@ -41,7 +40,6 @@ gitter
 hashable
 healthcheck
 idempotence
-inconstructible
 keepalive
 keypair
 keypairs

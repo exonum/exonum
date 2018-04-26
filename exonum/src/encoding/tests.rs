@@ -26,7 +26,7 @@ use blockchain::{self, Block, BlockProof};
 use messages::{BlockRequest, BlockResponse, Connect, Message, Precommit, Prevote, Propose,
                RawMessage, Status};
 use helpers::{user_agent, Height, Round, ValidatorId};
-use super::{CheckedOffset, Error, Field, Offset};
+use super::{CheckedOffset, Field, Offset};
 
 static VALIDATOR: ValidatorId = ValidatorId(65_123);
 static HEIGHT: Height = Height(123_123_123);
@@ -157,7 +157,7 @@ fn test_uuid_segment() {
 }
 
 #[test]
-fn test_check_inconstructible_duration_too_big() {
+fn test_check_invalid_duration_too_big() {
     let secs = i64::max_value();
     let nanos = i32::max_value();
 
@@ -165,7 +165,7 @@ fn test_check_inconstructible_duration_too_big() {
 }
 
 #[test]
-fn test_check_inconstructible_duration_too_low() {
+fn test_check_invalid_duration_too_low() {
     let secs = i64::min_value();
     let nanos = i32::min_value();
 
@@ -173,7 +173,28 @@ fn test_check_inconstructible_duration_too_low() {
 }
 
 #[test]
-fn test_check_constructible_duration_that_exceeds_max_value() {
+fn test_check_invalid_duration_wrong_representation() {
+    // Different signs of values are forbidden to avoid multiple representations of same duration.
+    let secs = 1;
+    let nanos = -1;
+    expect_duration_check_error(secs, nanos);
+
+    let secs = -1;
+    let nanos = 1;
+    expect_duration_check_error(secs, nanos);
+
+    // Amount of nanoseconds greater of equal to one second is forbidden.
+    let secs = 0;
+    let nanos = 1_000_000_000;
+    expect_duration_check_error(secs, nanos);
+
+    let secs = 0;
+    let nanos = -1_000_000_000;
+    expect_duration_check_error(secs, nanos);    
+}
+
+#[test]
+fn test_check_valid_duration_that_exceeds_max_value() {
     let secs: i64 = Duration::max_value().num_seconds();
     let max_duration_nanos = Duration::max_value() - Duration::seconds(secs);
     let mut nanos: i32 = max_duration_nanos.num_nanoseconds().unwrap() as i32;
@@ -183,7 +204,7 @@ fn test_check_constructible_duration_that_exceeds_max_value() {
 }
 
 fn expect_duration_check_error(secs: i64, nanos: i32) {
-    // Size of duration is sizeof(i64) + sizeof(i32)
+    // Size of duration is sizeof(i64) + sizeof(i32).
     let header_size = 12;
 
     let mut raw_duration: Vec<u8> = vec![0; header_size];
@@ -193,34 +214,38 @@ fn expect_duration_check_error(secs: i64, nanos: i32) {
 
     let start_offset = CheckedOffset::new(0 as Offset);
     let end_offset = CheckedOffset::new(header_size as Offset);
-    let check_result =
-        <Duration as Field>::check(&raw_duration, start_offset, end_offset, end_offset);
-    match check_result {
-        Err(Error::DurationOverflow) => assert!(true),
-        _ => assert!(
-            false,
-            "Check should return DurationOverflow error for incorrect buffer"
-        ),
-    }
+    <Duration as Field>::check(&raw_duration, start_offset, end_offset, end_offset)
+        .expect_err("Check should return DurationOverflow error for incorrect buffer");
 }
 
 #[test]
 fn test_duration_segment() {
-    // Size of duration is sizeof(i64) + sizeof(i32)
+    // Size of duration is sizeof(i64) + sizeof(i32).
     let header_size = 12;
 
     let zero_duration = Duration::zero();
     assert_write_check_read(zero_duration, header_size);
-
-    // Random complex duration
-    let nonzero_duration = Duration::seconds(42) + Duration::nanoseconds(55);
-    assert_write_check_read(nonzero_duration, header_size);
 
     let max_duration = Duration::max_value();
     assert_write_check_read(max_duration, header_size);
 
     let min_duration = Duration::min_value();
     assert_write_check_read(min_duration, header_size);
+
+    // Composite durations for all correct combination of values sign.
+    let durations = [
+        (10, 0),
+        (0, 10),
+        (10, 10),
+        (0, -10),
+        (-10, 0),
+        (-10, -10)
+    ];
+
+    for value in durations.iter() {
+        let duration = Duration::seconds(value.0) + Duration::nanoseconds(value.1);
+        assert_write_check_read(duration, header_size);
+    }
 }
 
 #[test]

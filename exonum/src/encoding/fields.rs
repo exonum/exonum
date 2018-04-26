@@ -239,8 +239,10 @@ impl<'a> Field<'a> for DateTime<Utc> {
     }
 
     unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
-        let secs = LittleEndian::read_i64(&buffer[from as usize..from as usize + 8]);
-        let nanos = LittleEndian::read_u32(&buffer[from as usize + 8..to as usize]);
+        let secs =
+            LittleEndian::read_i64(&buffer[from as usize..from as usize + mem::size_of::<i64>()]);
+        let nanos =
+            LittleEndian::read_u32(&buffer[from as usize + mem::size_of::<i64>()..to as usize]);
         Utc.timestamp(secs, nanos)
     }
 
@@ -248,14 +250,30 @@ impl<'a> Field<'a> for DateTime<Utc> {
         let secs = self.timestamp();
         let nanos = self.timestamp_subsec_nanos();
         LittleEndian::write_i64(
-            &mut buffer[from as usize..to as usize - mem::size_of_val(&nanos)],
+            &mut buffer[from as usize..from as usize + mem::size_of::<i64>()],
             secs,
         );
         LittleEndian::write_u32(
-            &mut buffer[from as usize + mem::size_of_val(&secs)..to as usize],
+            &mut buffer[from as usize + mem::size_of::<i64>()..to as usize],
             nanos,
         );
     }
+}
+
+fn is_duration_representation_valid(secs: i64, nanos: i32) -> bool {
+    // Signs are checked to avoid multiple representations for same duration.
+    // Example: 4 s + 4e8 ns = 5 s - 6e8 ns.
+    if (secs < 0 && nanos > 0) || (secs > 0 && nanos < 0) {
+        return false;
+    }
+
+    // Absolute value of nanoseconds must less than 10 ** 9.
+    let nanos_per_sec = 1_000_000_000;
+    if nanos <= -nanos_per_sec || nanos >= nanos_per_sec {
+        return false;
+    }
+
+    true
 }
 
 impl<'a> Field<'a> for Duration {
@@ -264,8 +282,10 @@ impl<'a> Field<'a> for Duration {
     }
 
     unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
-        let secs = LittleEndian::read_i64(&buffer[from as usize..from as usize + 8]);
-        let nanos = LittleEndian::read_i32(&buffer[from as usize + 8..to as usize]);
+        let secs =
+            LittleEndian::read_i64(&buffer[from as usize..from as usize + mem::size_of::<i64>()]);
+        let nanos =
+            LittleEndian::read_i32(&buffer[from as usize + mem::size_of::<i64>()..to as usize]);
 
         // Assuming that buffer was checked and Duration object can be constructed.
         Duration::seconds(secs) + Duration::nanoseconds(i64::from(nanos))
@@ -276,12 +296,20 @@ impl<'a> Field<'a> for Duration {
         let nanos_as_duration = *self - Duration::seconds(secs);
         // Since we're working with only nanos, no overflow is expected here.
         let nanos = nanos_as_duration.num_nanoseconds().unwrap() as i32;
+
+        if !is_duration_representation_valid(secs, nanos) {
+            error!(
+                "Got Duration object with incorrect representation in Field::write: {}s {}ns",
+                secs, nanos
+            );
+        }
+
         LittleEndian::write_i64(
-            &mut buffer[from as usize..to as usize - mem::size_of_val(&nanos)],
+            &mut buffer[from as usize..from as usize + mem::size_of::<i64>()],
             secs,
         );
         LittleEndian::write_i32(
-            &mut buffer[from as usize + mem::size_of_val(&secs)..to as usize],
+            &mut buffer[from as usize + mem::size_of::<i64>()..to as usize],
             nanos,
         );
     }
@@ -305,6 +333,13 @@ impl<'a> Field<'a> for Duration {
         // Duration::seconds() panics if amount of seconds exceeds limits.
         if secs > max_duration.num_seconds() || secs < min_duration.num_seconds() {
             return Err(Error::DurationOverflow);
+        }
+
+        if !is_duration_representation_valid(secs, nanos) {
+            return Err(Error::IncorrectDuration {
+                secs: secs,
+                nanos: nanos,
+            });
         }
 
         // Result will be None in case of overflow.
