@@ -168,37 +168,6 @@ impl StorageValue for StoredConfiguration {
     }
 }
 
-/// `TimeoutAdjuster` config.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-#[serde(tag = "type")]
-pub enum TimeoutAdjusterConfig {
-    /// Constant timeout adjuster config.
-    Constant {
-        /// Timeout value.
-        timeout: Milliseconds,
-    },
-    /// Dynamic timeout adjuster configuration.
-    Dynamic {
-        /// Minimal timeout.
-        min: Milliseconds,
-        /// Maximal timeout.
-        max: Milliseconds,
-        /// Transactions threshold starting from which the adjuster returns the minimal timeout.
-        threshold: u32,
-    },
-    /// Moving average timeout adjuster configuration.
-    MovingAverage {
-        /// Minimal timeout.
-        min: Milliseconds,
-        /// Maximal timeout.
-        max: Milliseconds,
-        /// Speed of the adjustment.
-        adjustment_speed: f64,
-        /// Optimal block load depending on the `txs_block_limit` from the `ConsensusConfig`.
-        optimal_block_load: f64,
-    },
-}
-
 #[cfg(test)]
 mod tests {
     use toml;

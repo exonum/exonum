@@ -25,10 +25,9 @@ use std::time::{Duration, SystemTime};
 use messages::{Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawMessage};
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
 use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
-use blockchain::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
+use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 use node::whitelist::Whitelist;
-use node::timeout_adjuster::{Constant, Dynamic, MovingAverage, TimeoutAdjuster};
 
 // TODO: move request timeouts into node configuration (ECR-171)
 
@@ -66,7 +65,7 @@ pub struct State {
     locked_propose: Option<Hash>,
     last_hash: Hash,
 
-    // messages
+    // Messages.
     proposes: HashMap<Hash, ProposeState>,
     blocks: HashMap<Hash, BlockState>,
     prevotes: HashMap<(Round, Hash), Votes<Prevote>>,
@@ -80,12 +79,12 @@ pub struct State {
     // Our requests state.
     requests: HashMap<RequestData, RequestState>,
 
-    // maximum of node height in consensus messages
+    // Maximum of node height in consensus messages.
     nodes_max_height: BTreeMap<PublicKey, Height>,
 
     validators_rounds: BTreeMap<ValidatorId, Round>,
 
-    timeout_adjuster: Box<TimeoutAdjuster>,
+    // Current value of the propose timeout.
     propose_timeout: Milliseconds,
 }
 
@@ -403,7 +402,6 @@ impl State {
 
             requests: HashMap::new(),
 
-            timeout_adjuster: make_timeout_adjuster(&stored.consensus),
             propose_timeout: 0,
             config: stored,
         }
@@ -496,7 +494,6 @@ impl State {
         self.renew_validator_id(validator_id);
         trace!("Validator={:#?}", self.validator_state());
 
-        self.timeout_adjuster = make_timeout_adjuster(&config.consensus);
         self.config = config;
     }
 
@@ -1044,28 +1041,5 @@ impl State {
     /// Updates the `Connect` message of the current node.
     pub fn set_our_connect_message(&mut self, msg: Connect) {
         self.our_connect_message = msg;
-    }
-}
-
-fn make_timeout_adjuster(config: &ConsensusConfig) -> Box<TimeoutAdjuster> {
-    match config.timeout_adjuster {
-        TimeoutAdjusterConfig::Constant { timeout } => Box::new(Constant::new(timeout)),
-        TimeoutAdjusterConfig::Dynamic {
-            min,
-            max,
-            threshold,
-        } => Box::new(Dynamic::new(min, max, threshold)),
-        TimeoutAdjusterConfig::MovingAverage {
-            min,
-            max,
-            adjustment_speed,
-            optimal_block_load,
-        } => Box::new(MovingAverage::new(
-            min,
-            max,
-            adjustment_speed,
-            config.txs_block_limit,
-            optimal_block_load,
-        )),
     }
 }

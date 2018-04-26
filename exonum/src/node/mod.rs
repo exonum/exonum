@@ -21,7 +21,6 @@ pub use self::state::{RequestData, State, ValidatorState};
 pub use self::whitelist::Whitelist;
 
 pub mod state; // TODO: temporary solution to get access to WAIT constants (ECR-167)
-pub mod timeout_adjuster;
 
 use failure;
 use toml::Value;
