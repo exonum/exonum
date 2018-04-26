@@ -817,7 +817,7 @@ impl State {
                     if transactions.get(hash).is_some() {
                         if !transaction_pool.contains(hash) {
                             bail!(
-                                "Received propose with already\
+                                "Received propose with already \
                                  committed transaction"
                             )
                         }
