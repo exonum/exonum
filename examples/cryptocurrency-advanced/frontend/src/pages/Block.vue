@@ -59,8 +59,8 @@
 </template>
 
 <script>
-  const Navbar = require('../components/Navbar.vue')
-  const Spinner = require('../components/Spinner.vue')
+  import Navbar from '../components/Navbar.vue'
+  import Spinner from '../components/Spinner.vue'
 
   module.exports = {
     components: {
@@ -70,41 +70,41 @@
     props: {
       height: String
     },
-    data: function() {
+    data() {
       return {
-        block: Object,
-        transactions: Array
+        block: {},
+        transactions: [],
       }
     },
     computed: {
-      previous: function() {
+      previous() {
         return (parseInt(this.height) - 1).toString()
       },
-      next: function() {
+      next() {
         return (parseInt(this.height) + 1).toString()
       }
     },
     watch: {
-      height: function() {
+      height() {
         this.loadBlock()
       }
     },
     methods: {
-      loadBlock: function() {
-        const self = this
-
+      async loadBlock() {
         this.isSpinnerVisible = true
 
-        this.$blockchain.getBlock(this.height).then(data => {
-          self.isSpinnerVisible = false
-          self.block = data.block
-          self.transactions = data.txs
-        }).catch(error => {
-          self.$notify('error', error.toString())
-        })
+        try {
+          const data = await this.$blockchain.getBlock(this.height)
+          this.block = data.block
+          this.transactions = data.txs
+          this.isSpinnerVisible = false
+        } catch (error) {
+          this.isSpinnerVisible = false
+          this.$notify('error', error.toString())
+        }
       }
     },
-    mounted: function() {
+    mounted() {
       this.$nextTick(function() {
         this.loadBlock()
       })

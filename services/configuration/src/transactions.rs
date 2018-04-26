@@ -16,8 +16,7 @@
 
 use exonum::blockchain::{ExecutionResult, Schema as CoreSchema, StoredConfiguration, Transaction};
 use exonum::crypto::{CryptoHash, Hash, PublicKey};
-use exonum::encoding::Error as EncodingError;
-use exonum::messages::{Message, RawTransaction};
+use exonum::messages::Message;
 use exonum::node::State;
 use exonum::storage::{Fork, Snapshot};
 
@@ -25,7 +24,8 @@ use errors::Error as ServiceError;
 use schema::{MaybeVote, ProposeData, Schema};
 
 transactions! {
-    Any {
+    /// Configuration Service transactions.
+    pub ConfigurationTransactions {
         const SERVICE_ID = super::SERVICE_ID;
 
         /// Propose a new configuration.
@@ -289,7 +289,7 @@ impl Vote {
         let propose_data = {
             let mut votes = schema.votes_by_config_hash_mut(cfg_hash);
             votes.set(validator_id as u64, MaybeVote::some(self.clone()));
-            propose_data.set_history_hash(&votes.merkle_root())
+            ProposeData::new(propose, &votes.merkle_root(), propose_data.num_validators())
         };
 
         schema
@@ -320,11 +320,4 @@ impl Transaction for Vote {
         }
         Ok(())
     }
-}
-
-/// Parses a transaction from its raw representation.
-pub(crate) fn tx_from_raw(raw: RawTransaction) -> Result<Box<Transaction>, EncodingError> {
-    use exonum::blockchain::TransactionSet;
-
-    Any::tx_from_raw(raw).map(Any::into)
 }

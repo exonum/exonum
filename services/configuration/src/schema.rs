@@ -15,7 +15,6 @@
 //! Storage schema for the configuration service.
 
 use exonum::crypto::{self, CryptoHash, Hash, PublicKey, Signature};
-use exonum::encoding::Field;
 use exonum::storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot, StorageValue};
 
 use std::borrow::Cow;
@@ -44,14 +43,6 @@ encoding_struct! {
         votes_history_hash: &Hash,
         /// Number of eligible voting validators.
         num_validators: u64,
-    }
-}
-
-impl ProposeData {
-    /// Changes the `votes_history_hash` field of this structure, leaving other fields intact.
-    pub fn set_history_hash(mut self, hash: &Hash) -> Self {
-        Field::write(&hash, &mut self.raw, 8, 40);
-        self
     }
 }
 

@@ -169,9 +169,11 @@ impl NodeHandler {
                 };
 
                 let hash = tx.hash();
-                if schema.transactions().contains(&hash) {
+                if schema.transactions().contains(&hash)
+                    && !schema.transactions_pool().contains(&hash)
+                {
                     error!(
-                        "Received block with already known transaction, block={:?}",
+                        "Received block with already committed transaction, block={:?}",
                         block
                     );
                     return None;
@@ -530,35 +532,18 @@ impl NodeHandler {
         }
     }
 
-    /// Handles raw transaction. Transaction is ignored if it is already known, otherwise it is
-    /// added to the transactions pool.
-    #[cfg_attr(feature = "flame_profile", flame)]
-    pub fn handle_tx(&mut self, msg: RawTransaction) {
-        //trace!("Handle transaction");
+    /// Checks if the transaction is new and adds it to the pool.
+    fn handle_tx_inner(&mut self, msg: RawTransaction) -> Result<(), String> {
         let hash = msg.hash();
-        let tx = {
-            let service_id = msg.service_id();
-            match self.blockchain.tx_from_raw(msg.clone()) {
-                Ok(tx) => tx,
-                Err(e) => {
-                    error!("{}, service_id={}", e.description(), service_id);
-                    return;
-                }
-            }
-        };
 
         profiler_span!("Make sure that it is new transaction", {
             let snapshot = self.blockchain.snapshot();
             if Schema::new(&snapshot).transactions().contains(&hash) {
-                return;
+                let err = format!("Received already processed transaction, hash {:?}", hash);
+                return Err(err);
             }
         });
 
-        profiler_span!("tx.verify()", {
-            if !tx.verify() {
-                return;
-            }
-        });
         let mut fork = self.blockchain.fork();
         {
             let mut schema = Schema::new(&mut fork);
@@ -574,6 +559,31 @@ impl NodeHandler {
             self.remove_request(&RequestData::Transactions(hash));
             self.has_full_propose(hash, round);
         }
+        Ok(())
+    }
+
+    /// Handles raw transaction. Transaction is ignored if it is already known, otherwise it is
+    /// added to the transactions pool.
+    #[cfg_attr(feature = "flame_profile", flame)]
+    pub fn handle_tx(&mut self, msg: RawTransaction) {
+        let tx = match self.blockchain.tx_from_raw(msg.clone()) {
+            Ok(tx) => tx,
+            Err(e) => {
+                let service_id = msg.service_id();
+                error!("{}, service_id={}", e.description(), service_id);
+                return;
+            }
+        };
+
+        profiler_span!("tx.verify()", {
+            if !tx.verify() {
+                return;
+            }
+        });
+
+        // We don't care about result, because situation when transaction received twice
+        // is normal for internal messages (transaction may be received from 2+ nodes).
+        let _ = self.handle_tx_inner(msg);
     }
 
     /// Handles raw transactions.
@@ -611,24 +621,9 @@ impl NodeHandler {
     #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
     pub fn handle_incoming_tx(&mut self, msg: Box<Transaction>) {
         trace!("Handle incoming transaction");
-        let hash = msg.hash();
-        let mut fork = self.blockchain.fork();
-        {
-            let mut schema = Schema::new(&mut fork);
-            schema.add_transaction_into_pool(msg.raw().clone());
-        }
-        self.blockchain
-            .merge(fork.into_patch())
-            .expect("Unable to save transaction to persistent pool.");
-        // Broadcast transaction to validators
-        trace!("Broadcast transactions: {:?}", msg.raw());
-        self.broadcast(msg.raw());
-
-        let full_proposes = self.state.check_incomplete_proposes(hash);
-        // Go to has full propose if we get last transaction
-        for (hash, round) in full_proposes {
-            self.remove_request(&RequestData::Transactions(hash));
-            self.has_full_propose(hash, round);
+        match self.handle_tx_inner(msg.raw().clone()) {
+            Ok(_) => self.broadcast(msg.raw()),
+            Err(e) => error!("{}", e),
         }
     }
 

@@ -7,7 +7,7 @@
 <script>
   module.exports = {
     name: 'tab',
-    data: function() {
+    data() {
       return {
         active: false
       }
@@ -20,10 +20,10 @@
         default: false
       }
     },
-    created: function() {
+    created() {
       this.active = this.isActive
     },
-    mounted: function() {
+    mounted() {
       this.$parent.addTab(this)
     }
   }
