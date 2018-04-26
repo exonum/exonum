@@ -324,8 +324,10 @@ impl<'a> Field<'a> for Duration {
         let from_unchecked = from.unchecked_offset() as usize;
         let to_unchecked = to.unchecked_offset() as usize;
 
-        let secs = LittleEndian::read_i64(&buffer[from_unchecked..from_unchecked + 8]);
-        let nanos = LittleEndian::read_i32(&buffer[from_unchecked + 8..to_unchecked]);
+        let secs =
+            LittleEndian::read_i64(&buffer[from_unchecked..from_unchecked + mem::size_of::<i64>()]);
+        let nanos =
+            LittleEndian::read_i32(&buffer[from_unchecked + mem::size_of::<i64>()..to_unchecked]);
 
         let max_duration = Duration::max_value();
         let min_duration = Duration::min_value();
