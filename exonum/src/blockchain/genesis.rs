@@ -14,12 +14,12 @@
 
 use super::config::{ConsensusConfig, ValidatorKeys};
 
-/// The initial `exonum-core` configuration which is committed into the genesis block.
+/// The initial configuration which is committed into the genesis block.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct GenesisConfig {
     /// Configuration of consensus.
     pub consensus: ConsensusConfig,
-    /// List of public keys for validators.
+    /// List of public keys of validators.
     pub validator_keys: Vec<ValidatorKeys>,
 }
 

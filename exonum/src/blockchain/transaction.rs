@@ -106,7 +106,7 @@ pub trait Transaction: Message + ExonumJson + 'static {
     ///   returned or even if panic occurred during execution.
     /// - Changes made by the transaction are discarded if `Err` is returned or panic occurred.
     /// - A transaction execution status (see `ExecutionResult` and `TransactionResult` for the
-    ///   details) is stored in the blockchain and can be accessed through api.
+    ///   details) is stored in the blockchain and can be accessed through API.
     /// - Blockchain state hash is affected by the transactions execution status.
     ///
     /// # Examples
@@ -189,7 +189,7 @@ pub enum TransactionErrorType {
 ///
 /// # Notes:
 ///
-/// - Content of `description`' field is excluded from hash calculation (see `StorageValue`
+/// - Content of the `description`' field is excluded from hash calculation (see `StorageValue`
 ///   implementation for the details).
 /// - `TransactionErrorType::Panic` is set by the framework if panic is raised during transaction
 ///   execution.

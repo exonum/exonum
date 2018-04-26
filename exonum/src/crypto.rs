@@ -12,7 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+<<<<<<< Updated upstream
 //! Cryptography related types and functions.
+=======
+//! Cryptography related types, constants, traits and functions. The functions
+//! in this module are used for key generation, hashing, signing and signature
+//! verification.
+>>>>>>> Stashed changes
 //!
 //! [Sodium library](https://github.com/jedisct1/libsodium) is used under the hood through
 //! [sodiumoxide rust bindings](https://github.com/dnaq/sodiumoxide).
@@ -215,8 +221,8 @@ impl HashStream {
 ///     create_stream = create_stream.update(&chunk);
 ///     verify_stream = verify_stream.update(&chunk);
 /// }
-/// let file_sign = create_stream.sign(&sk);
-/// assert!(verify_stream.verify(&file_sign, &pk));
+/// let file_sign = create_stream.sign(&secret_key);
+/// assert!(verify_stream.verify(&file_sign, &public_key));
 /// ```
 #[derive(Debug, Default)]
 pub struct SignStream(SignState);

@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Exonum global variables which stored in blockchain as utf8 encoded json.
+//! Exonum global variables which are stored in the blockchain as utf8 encoded
+//! json.
 
 use serde::de::Error;
 use serde_json::{self, Error as JsonError};
@@ -33,21 +34,24 @@ pub struct ValidatorKeys {
     pub service_key: PublicKey,
 }
 
-/// Exonum blockchain global configuration.
-/// This configuration must be same for any exonum node in the certain network on given height.
+/// Exonum blockchain global configuration, including validator public keys,
+/// the number of votes required to commit the new configuration, etc.
+/// This configuration must be the same for any Exonum node in a certain 
+/// network on the given height.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct StoredConfiguration {
     /// Link to the previous configuration.
-    /// For configuration in the genesis block `hash` is just an array of zeros.
+    /// For the configuration in the genesis block, `hash` is just an array of zeros.
     pub previous_cfg_hash: Hash,
     /// The height, starting from which this configuration becomes actual.
     pub actual_from: Height,
-    /// List of validators' consensus and service public keys.
+    /// List of validator consensus and service public keys.
     pub validator_keys: Vec<ValidatorKeys>,
     /// Consensus algorithm parameters.
     pub consensus: ConsensusConfig,
-    /// Number of votes required to commit new configuration.
-    /// Should be greater than 2/3 and less or equal to the validators count.
+    /// Number of votes required to commit the new configuration.
+    /// This value should be greater than 2/3 and less or equal to the
+    /// validators count.
     pub majority_count: Option<u16>,
     /// Services specific variables.
     /// Keys are `service_name` from `Service` trait and values are the serialized json.
@@ -55,7 +59,11 @@ pub struct StoredConfiguration {
     pub services: BTreeMap<String, serde_json::Value>,
 }
 
-/// Consensus algorithm parameters.
+/// Consensus algorithm parameters, including several types of timeouts,
+/// maximum number of transactions per block, etc.
+///
+/// The example above sets values for all configurable consensus related
+/// parameters.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct ConsensusConfig {
     /// Interval between rounds.
@@ -109,7 +117,7 @@ impl Default for ConsensusConfig {
 }
 
 impl StoredConfiguration {
-    /// Tries to serialize given configuration into the utf8 encoded json.
+    /// Tries to serialize the given configuration into a utf8 encoded json.
     pub fn try_serialize(&self) -> Result<Vec<u8>, JsonError> {
         serde_json::to_vec(&self)
     }

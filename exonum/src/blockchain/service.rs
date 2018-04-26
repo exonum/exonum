@@ -198,7 +198,7 @@ pub trait Service: Send + Sync + 'static {
     }
 }
 
-/// The current node state on which the blockchain is running, or in other words
+/// The current state of the node on which the blockchain is running, or in other words,
 /// execution context.
 #[derive(Debug)]
 pub struct ServiceContext {
@@ -213,8 +213,8 @@ pub struct ServiceContext {
 impl ServiceContext {
     /// Creates the service context for the given node.
     ///
-    /// This method is necessary if you want to implement an alternative exonum node.
-    /// For example, you can implement special node without consensus for regression
+    /// This method is necessary if you want to implement an alternative Exonum node.
+    /// For example, you can implement a special node without consensus for regression
     /// testing of services business logic.
     pub fn new(
         service_public_key: PublicKey,
@@ -244,8 +244,8 @@ impl ServiceContext {
         }
     }
 
-    /// If the current node is validator returns its identifier.
-    /// For other nodes return `None`.
+    /// If the current node is a validator, returns its identifier.
+    /// For other nodes returns `None`.
     pub fn validator_id(&self) -> Option<ValidatorId> {
         self.validator_id
     }
@@ -255,7 +255,7 @@ impl ServiceContext {
         self.fork.as_ref()
     }
 
-    /// Returns the current blockchain height. This height is "height of the last committed block".
+    /// Returns the current blockchain height. This is the height of the last committed block.
     pub fn height(&self) -> Height {
         self.height
     }
@@ -265,12 +265,12 @@ impl ServiceContext {
         self.stored_configuration.validator_keys.as_slice()
     }
 
-    /// Returns current node's public key.
+    /// Returns the current node's public key.
     pub fn public_key(&self) -> &PublicKey {
         &self.service_keypair.0
     }
 
-    /// Returns current node's secret key.
+    /// Returns current node's private key.
     pub fn secret_key(&self) -> &SecretKey {
         &self.service_keypair.1
     }
@@ -280,12 +280,12 @@ impl ServiceContext {
         &self.stored_configuration.consensus
     }
 
-    /// Returns service specific global variables as json value.
+    /// Returns service specific global variables as a json value.
     pub fn actual_service_config(&self, service: &Service) -> &Value {
         &self.stored_configuration.services[service.service_name()]
     }
 
-    /// Returns reference to the transaction sender.
+    /// Returns the reference to the transaction sender.
     pub fn transaction_sender(&self) -> &TransactionSend {
         &self.api_sender
     }
@@ -312,8 +312,8 @@ impl ApiNodeState {
     }
 }
 
-/// Shared part of the context, used to take some values from the `Node`s `State`
-/// should be used to take some metrics.
+/// Shared part of the context, used to take some values from the `Node` `State`,
+/// which should be used to take some metrics.
 #[derive(Clone, Debug)]
 pub struct SharedNodeState {
     state: Arc<RwLock<ApiNodeState>>,
@@ -322,14 +322,14 @@ pub struct SharedNodeState {
 }
 
 impl SharedNodeState {
-    /// Creates new `SharedNodeState`
+    /// Creates new `SharedNodeState`.
     pub fn new(state_update_timeout: Milliseconds) -> SharedNodeState {
         SharedNodeState {
             state: Arc::new(RwLock::new(ApiNodeState::new())),
             state_update_timeout,
         }
     }
-    /// Return list of connected sockets
+    /// Returns the list of connected sockets.
     pub fn incoming_connections(&self) -> Vec<SocketAddr> {
         self.state
             .read()
@@ -339,7 +339,7 @@ impl SharedNodeState {
             .cloned()
             .collect()
     }
-    /// Return list of our connection sockets
+    /// Returns the list of our connection sockets.
     pub fn outgoing_connections(&self) -> Vec<SocketAddr> {
         self.state
             .read()
@@ -349,7 +349,7 @@ impl SharedNodeState {
             .cloned()
             .collect()
     }
-    /// Return reconnects list
+    /// Returns the reconnects list.
     pub fn reconnects_timeout(&self) -> Vec<(SocketAddr, Milliseconds)> {
         self.state
             .read()
@@ -455,7 +455,7 @@ impl SharedNodeState {
     }
 }
 
-/// Provides the current node state to api handlers.
+/// Provides the current node state to API handlers.
 pub struct ApiContext {
     blockchain: Blockchain,
     node_channel: ApiSender,
@@ -463,7 +463,7 @@ pub struct ApiContext {
     secret_key: SecretKey,
 }
 
-/// Provides the current node state to api handlers.
+/// Provides the current node state to API handlers.
 impl ApiContext {
     /// Constructs context for the given `Node`.
     pub fn new(node: &Node) -> ApiContext {
@@ -501,12 +501,12 @@ impl ApiContext {
         &self.node_channel
     }
 
-    /// Returns the public key of current node.
+    /// Returns the public key of the current node.
     pub fn public_key(&self) -> &PublicKey {
         &self.public_key
     }
 
-    /// Returns the secret key of current node.
+    /// Returns the private key of the current node.
     pub fn secret_key(&self) -> &SecretKey {
         &self.secret_key
     }

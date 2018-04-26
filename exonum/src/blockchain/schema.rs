@@ -68,7 +68,7 @@ encoding_struct! (
     }
 );
 
-/// Information schema for `exonum-core`.
+/// Information schema for `exonum`.
 #[derive(Debug)]
 pub struct Schema<T> {
     view: T,
@@ -83,22 +83,22 @@ where
         Schema { view: snapshot }
     }
 
-    /// Returns table that represents a map from transaction hash into raw transaction message.
+    /// Returns a table that represents a map from transaction hash into raw transaction message.
     pub fn transactions(&self) -> MapIndex<&T, Hash, RawMessage> {
         MapIndex::new(TRANSACTIONS, &self.view)
     }
 
-    /// Returns table that represents a map from transaction hash into execution result.
+    /// Returns a table that represents a map from transaction hash into execution result.
     pub fn transaction_results(&self) -> ProofMapIndex<&T, Hash, TransactionResult> {
         ProofMapIndex::new(TRANSACTION_RESULTS, &self.view)
     }
 
-    /// Returns table that represents a set of uncommitted transactions hashes.
+    /// Returns a table that represents a set of uncommitted transactions hashes.
     pub fn transactions_pool(&self) -> KeySetIndex<&T, Hash> {
         KeySetIndex::new(TRANSACTIONS_POOL, &self.view)
     }
 
-    /// Returns number of transactions in the pool
+    /// Returns the number of transactions in the pool.
     #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
     pub fn transactions_pool_len(&self) -> usize {
         let pool = self.transactions_pool();
@@ -107,41 +107,41 @@ where
         count
     }
 
-    /// Returns table that keeps the block height and tx position inside block for every
+    /// Returns a table that keeps the block height and tx position inside the block for every
     /// transaction hash.
     pub fn transactions_locations(&self) -> MapIndex<&T, Hash, TxLocation> {
         MapIndex::new(TRANSACTIONS_LOCATIONS, &self.view)
     }
 
-    /// Returns table that stores block object for every block height.
+    /// Returns a table that stores block object for every block height.
     pub fn blocks(&self) -> MapIndex<&T, Hash, Block> {
         MapIndex::new(BLOCKS, &self.view)
     }
 
-    /// Returns table that keeps block hash for the corresponding height.
+    /// Returns a table that keeps block hash for the corresponding height.
     pub fn block_hashes_by_height(&self) -> ListIndex<&T, Hash> {
         ListIndex::new(BLOCK_HASHES_BY_HEIGHT, &self.view)
     }
 
-    /// Returns table that keeps a list of transactions for the each block.
+    /// Returns a table that keeps a list of transactions for each block.
     pub fn block_transactions(&self, height: Height) -> ProofListIndex<&T, Hash> {
         let height: u64 = height.into();
         ProofListIndex::new_in_family(BLOCK_TRANSACTIONS, &height, &self.view)
     }
 
-    /// Returns table that saves a list of precommits for block with given hash.
+    /// Returns a table that saves a list of precommits for the block with the given hash.
     pub fn precommits(&self, hash: &Hash) -> ListIndex<&T, Precommit> {
         ListIndex::new_in_family(PRECOMMITS, hash, &self.view)
     }
 
-    /// Returns table that represents a map from configuration hash into contents.
+    /// Returns a table that represents a map from configuration hash into contents.
     pub fn configs(&self) -> ProofMapIndex<&T, Hash, StoredConfiguration> {
         // configs patricia merkle tree <block height> json
         ProofMapIndex::new(CONFIGS, &self.view)
     }
 
-    /// Returns auxiliary table that keeps hash references to configurations in order
-    /// of increasing their `actual_from` height.
+    /// Returns an auxiliary table that keeps hash references to configurations in the order
+    /// of their increasing `actual_from` height.
     pub fn configs_actual_from(&self) -> ListIndex<&T, ConfigReference> {
         ListIndex::new(CONFIGS_ACTUAL_FROM, &self.view)
     }
@@ -149,42 +149,42 @@ where
     /// Returns the accessory `ProofMapIndex` for calculating
     /// patches in the DBView layer.
     ///
-    /// Table calculates "aggregation" of root hashes of individual
+    /// The table calculates "aggregation" of root hashes of individual
     /// service tables, in effect summing the state of various entities,
     /// scattered across distinct services and their tables. Sum is performed by
-    /// means of computing root hash of this table.
+    /// means of computing the root hash of this table.
     ///
     /// - Table **key** is 32 bytes of normalized coordinates of a service
     /// table, as returned by `service_table_unique_key` helper function.
-    /// - Table **value** is root hash of a service table, which contributes
+    /// - Table **value** is the root hash of a service table, which contributes
     /// to the resulting block's `state_hash`.
     ///
     /// Core tables participate in resulting state_hash with `CORE_SERVICE`
-    /// service_id. Their vector is returned by `core_state_hash` method.
+    /// service_id. Their vector is returned by the `core_state_hash` method.
     pub fn state_hash_aggregator(&self) -> ProofMapIndex<&T, Hash, Hash> {
         ProofMapIndex::new(STATE_HASH_AGGREGATOR, &self.view)
     }
 
-    /// Returns peers that have to be recovered in case of process' restart
+    /// Returns peers that have to be recovered in case of process restart
     /// after abnormal termination.
     pub(crate) fn peers_cache(&self) -> MapIndex<&T, PublicKey, Connect> {
         MapIndex::new(PEERS_CACHE, &self.view)
     }
 
-    /// Returns consensus messages that have to be recovered in case of process' restart
+    /// Returns consensus messages that have to be recovered in case of process restart
     /// after abnormal termination.
     pub(crate) fn consensus_messages_cache(&self) -> ListIndex<&T, RawMessage> {
         ListIndex::new(CONSENSUS_MESSAGES_CACHE, &self.view)
     }
 
-    /// Returns saved value of the consensus round. Returns first round if it wasn't saved.
+    /// Returns the saved value of the consensus round. Returns the first round if it wasn't saved.
     pub(crate) fn consensus_round(&self) -> Round {
         Entry::new(CONSENSUS_ROUND, &self.view)
             .get()
             .unwrap_or_else(Round::first)
     }
 
-    /// Returns block hash for the given height.
+    /// Returns the block hash for the given height.
     pub fn block_hash_by_height(&self, height: Height) -> Option<Hash> {
         self.block_hashes_by_height().get(height.into())
     }
@@ -202,7 +202,7 @@ where
         Some(res)
     }
 
-    /// Returns latest committed block.
+    /// Returns the latest committed block.
     ///
     /// # Panics
     ///
@@ -214,7 +214,7 @@ where
         self.blocks().get(&hash).unwrap()
     }
 
-    /// Returns height of the latest committed block.
+    /// Returns the height of the latest committed block.
     ///
     /// # Panics
     ///
@@ -228,7 +228,7 @@ where
         Height(len - 1)
     }
 
-    /// Returns configuration for the latest height of blockchain.
+    /// Returns the configuration for the latest height of blockchain.
     ///
     /// # Panics
     ///
@@ -276,7 +276,7 @@ where
         }
     }
 
-    /// Returns the configuration that is the actual for the given height.
+    /// Returns the configuration that is actual for the given height.
     pub fn configuration_by_height(&self, height: Height) -> StoredConfiguration {
         let idx = self.find_configurations_index_by_height(height);
         let cfg_ref = self.configs_actual_from()
@@ -289,7 +289,7 @@ where
         ))
     }
 
-    /// Returns configuration for given configuration hash.
+    /// Returns the configuration for the given configuration hash.
     pub fn configuration_by_hash(&self, hash: &Hash) -> Option<StoredConfiguration> {
         self.configs().get(hash)
     }
@@ -302,19 +302,19 @@ where
         ]
     }
 
-    /// Constructs a proof of inclusion of root hash of a specific service
-    /// table into block's `state_hash`.
+    /// Constructs a proof of inclusion of the root hash of a specific service
+    /// table into block `state_hash`.
     ///
     /// Searched key for proof is uniquely identified by (`u16`, `u16`) tuple
-    /// of table's coordinates.
+    /// of table coordinates.
     ///
     /// If found, root hash is returned as a value of proof's leaf
-    /// corresponding to searched key. Otherwise, partial path to searched key
+    /// corresponding to the searched key. Otherwise, partial path to the searched key
     /// is returned, which proves its exclusion.
     ///
     /// The returned proof is used as a component of proof of state of any
-    /// entity, stored in `exonum` db at specific height, as identified
-    /// by corresponding block's `state_hash`. State of some meta tables
+    /// entity, stored in `exonum` DB at specific height, as identified
+    /// by corresponding block `state_hash`. State of some meta tables
     /// of core and services isn't tracked.
     ///
     /// # Arguments
@@ -458,7 +458,7 @@ impl<'a> Schema<&'a mut Fork> {
         entry.set(round);
     }
 
-    /// Adds a new configuration to the blockchain, which will become an actual at
+    /// Adds a new configuration to the blockchain, which will become actual at
     /// the `actual_from` height in `config_data`.
     pub fn commit_configuration(&mut self, config_data: StoredConfiguration) {
         let actual_from = config_data.actual_from;
@@ -508,7 +508,7 @@ impl<'a> Schema<&'a mut Fork> {
         self.transactions_pool_mut().remove(hash)
     }
 
-    /// Remove transaction from persistent pool.
+    /// Removes transaction from persistent pool.
     #[doc(hidden)]
     pub fn reject_transaction(&mut self, hash: &Hash) -> Result<(), ()> {
         let contains = self.transactions_pool_mut().contains(hash);

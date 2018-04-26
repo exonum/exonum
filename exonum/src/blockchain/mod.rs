@@ -69,9 +69,9 @@ mod transaction;
 #[cfg(test)]
 mod tests;
 
-/// Exonum blockchain instance with the concrete services set and data storage.
-/// Only blockchains with the identical set of services and genesis block can be combined
-/// into the single network.
+/// Exonum blockchain instance with a certain services set and data storage.
+/// Only blockchains with an identical set of services and genesis block can be combined
+/// into a single network.
 pub struct Blockchain {
     db: Arc<Database>,
     service_map: Arc<VecMap<Box<Service>>>,
@@ -122,23 +122,23 @@ impl Blockchain {
         &self.service_map
     }
 
-    /// Creates a readonly snapshot of the current storage state.
+    /// Creates a read-only snapshot of the current storage state.
     pub fn snapshot(&self) -> Box<Snapshot> {
         self.db.snapshot()
     }
 
-    /// Creates snapshot of the current storage state that can be later committed into storage
-    /// via `merge` method.
+    /// Creates a snapshot of the current storage state that can be later committed into storage
+    /// via the `merge` method.
     pub fn fork(&self) -> Fork {
         self.db.fork()
     }
 
     /// Tries to create a `Transaction` object from the given raw message.
-    /// Raw message can be converted into `Transaction` object only
-    /// if following conditions are met.
+    /// A raw message can be converted into a `Transaction` object only
+    /// if the following conditions are met.
     ///
-    /// - Blockchain has service with the `service_id` of given raw message.
-    /// - Service can deserialize given raw message.
+    /// - Blockchain has a service with the `service_id` of the given raw message.
+    /// - Service can deserialize the given raw message.
     pub fn tx_from_raw(&self, raw: RawMessage) -> Result<Box<Transaction>, MessageError> {
         let id = raw.service_id() as usize;
         let service = self.service_map
@@ -153,7 +153,7 @@ impl Blockchain {
         self.db.merge(patch)
     }
 
-    /// Returns the hash of latest committed block.
+    /// Returns the hash of the latest committed block.
     ///
     /// # Panics
     ///
@@ -229,14 +229,14 @@ impl Blockchain {
     }
 
     /// Helper function to map tuple (`u16`, `u16`) of service table coordinates
-    /// to 32 byte value for use as `MerklePatriciaTable` key (it currently
-    /// supports only fixed size keys). `hash` function is used to distribute
+    /// to a 32 byte value to be used as `MerklePatriciaTable` key (it currently
+    /// supports only fixed size keys). The `hash` function is used to distribute
     /// keys uniformly (compared to padding).
     /// # Arguments
     ///
     /// * `service_id` - `service_id` as returned by instance of type of
     /// `Service` trait
-    /// * `table_idx` - index of service table in `Vec`, returned by
+    /// * `table_idx` - index of service table in `Vec`, returned by the
     /// `state_hash` method of instance of type of `Service` trait
     // also, it was the first idea around, to use `hash`
     pub fn service_table_unique_key(service_id: u16, table_idx: usize) -> Hash {
@@ -400,7 +400,7 @@ impl Blockchain {
     }
 
     /// Commits to the storage block that proposes by node `State`.
-    /// After that invokes `handle_commit` for each service in order of their identifiers
+    /// After that invokes `handle_commit` for each service in the order of their identifiers
     /// and returns the list of transactions which were created by the `handle_commit` event.
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn commit<'a, I>(
@@ -446,7 +446,7 @@ impl Blockchain {
         Ok(())
     }
 
-    /// Returns `Mount` object that aggregates public api handlers.
+    /// Returns the `Mount` object that aggregates public API handlers.
     pub fn mount_public_api(&self) -> Mount {
         let context = self.api_context();
         let mut mount = Mount::new();
@@ -458,7 +458,7 @@ impl Blockchain {
         mount
     }
 
-    /// Returns `Mount` object that aggregates private api handlers.
+    /// Returns the `Mount` object that aggregates private API handlers.
     pub fn mount_private_api(&self) -> Mount {
         let context = self.api_context();
         let mut mount = Mount::new();
@@ -479,7 +479,7 @@ impl Blockchain {
         )
     }
 
-    /// Saves peer to the peers cache
+    /// Saves peer to the peers cache.
     pub fn save_peer(&mut self, pubkey: &PublicKey, peer: Connect) {
         let mut fork = self.fork();
 
@@ -492,7 +492,7 @@ impl Blockchain {
             .expect("Unable to save peer to the peers cache");
     }
 
-    /// Removes peer from the peers cache
+    /// Removes peer from the peers cache.
     pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) {
         let mut fork = self.fork();
 
@@ -509,7 +509,7 @@ impl Blockchain {
             .expect("Unable to remove peer from the peers cache");
     }
 
-    /// Recover cached peers if any.
+    /// Recovers cached peers if any.
     pub fn get_saved_peers(&self) -> HashMap<PublicKey, Connect> {
         let schema = Schema::new(self.snapshot());
         let peers_cache = schema.peers_cache();
