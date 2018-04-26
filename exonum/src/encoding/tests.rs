@@ -190,7 +190,7 @@ fn test_check_invalid_duration_wrong_representation() {
 
     let secs = 0;
     let nanos = -1_000_000_000;
-    expect_duration_check_error(secs, nanos);    
+    expect_duration_check_error(secs, nanos);
 }
 
 #[test]
@@ -233,14 +233,7 @@ fn test_duration_segment() {
     assert_write_check_read(min_duration, header_size);
 
     // Composite durations for all correct combination of values sign.
-    let durations = [
-        (10, 0),
-        (0, 10),
-        (10, 10),
-        (0, -10),
-        (-10, 0),
-        (-10, -10)
-    ];
+    let durations = [(10, 0), (0, 10), (10, 10), (0, -10), (-10, 0), (-10, -10)];
 
     for value in durations.iter() {
         let duration = Duration::seconds(value.0) + Duration::nanoseconds(value.1);
