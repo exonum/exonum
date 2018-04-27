@@ -453,8 +453,10 @@ mod tests {
             Duration::zero(),
             Duration::max_value(),
             Duration::min_value(),
-            Duration::seconds(42) + Duration::nanoseconds(15),
             Duration::nanoseconds(999_999_999),
+            Duration::nanoseconds(-999_999_999),
+            Duration::seconds(42) + Duration::nanoseconds(15),
+            Duration::seconds(-42) + Duration::nanoseconds(-15),
         ];
 
         for duration in durations.iter() {
