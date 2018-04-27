@@ -13,6 +13,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - IPv6 addressing is now supported. (#615)
 
+- `Field`, `CryptoHash`, `StorageValue` and `ExonumJson` traits have been
+  implemented for `chrono::Duration` structure. (#653)
+
 #### exonum-timestamping
 
 - Additional service example has been added along with frontend. (#646)
