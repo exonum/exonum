@@ -661,7 +661,7 @@ impl CryptoHash for DateTime<Utc> {
 
 impl CryptoHash for Duration {
     fn hash(&self) -> Hash {
-        let mut buffer = vec![0; 12];
+        let mut buffer = vec![0; Duration::field_size() as usize];
         let from: Offset = 0;
         let to: Offset = Duration::field_size();
         self.write(&mut buffer, from, to);
