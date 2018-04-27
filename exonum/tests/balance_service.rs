@@ -158,7 +158,7 @@ pub mod service {
         api_tx.send(tx_copy).unwrap();
 
         // Wait to be sure that transaction was processed.
-        thread::sleep(time::Duration::from_millis(100));
+        thread::sleep(time::Duration::from_millis(200));
 
         // Shut down the node
         api_tx
