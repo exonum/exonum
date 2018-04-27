@@ -148,7 +148,7 @@ impl NodeHandler {
                 self.request(RequestData::Transactions(hash), node);
             }
         } else {
-            self.has_full_propose(hash, msg.round());
+            self.handle_full_propose(hash, msg.round());
         }
     }
 
@@ -276,7 +276,7 @@ impl NodeHandler {
     }
 
     /// Executes and commits block. This function is called when node has full propose information.
-    pub fn has_full_propose(&mut self, hash: Hash, propose_round: Round) {
+    pub fn handle_full_propose(&mut self, hash: Hash, propose_round: Round) {
         // Send prevote
         if self.state.locked_round() == Round::zero() {
             if self.state.is_validator() && !self.state.have_prevote(propose_round) {
@@ -291,7 +291,7 @@ impl NodeHandler {
         let start_round = ::std::cmp::max(self.state.locked_round().next(), propose_round);
         for round in start_round.iter_to(self.state.round().next()) {
             if self.state.has_majority_prevotes(round, hash) {
-                self.has_majority_prevotes(round, &hash);
+                self.handle_majority_prevotes(round, &hash);
             }
         }
 
@@ -337,13 +337,13 @@ impl NodeHandler {
 
         // Lock to propose
         if has_consensus && has_propose_with_txs {
-            self.has_majority_prevotes(msg.round(), msg.propose_hash());
+            self.handle_majority_prevotes(msg.round(), msg.propose_hash());
         }
     }
 
     /// Locks to the propose by calling `lock`. This function is called when node receives
     /// +2/3 pre-votes.
-    pub fn has_majority_prevotes(&mut self, prevote_round: Round, propose_hash: &Hash) {
+    pub fn handle_majority_prevotes(&mut self, prevote_round: Round, propose_hash: &Hash) {
         // Remove request info
         self.remove_request(&RequestData::Prevotes(prevote_round, *propose_hash));
         // Lock to propose
@@ -353,7 +353,7 @@ impl NodeHandler {
     }
 
     /// Executes and commits block. This function is called when the node has +2/3 pre-commits.
-    pub fn has_majority_precommits(
+    pub fn handle_majority_precommits(
         &mut self,
         round: Round,
         propose_hash: &Hash,
@@ -424,7 +424,7 @@ impl NodeHandler {
                     self.broadcast_precommit(round, &propose_hash, &block_hash);
                     // Commit if has consensus
                     if self.state.has_majority_precommits(round, block_hash) {
-                        self.has_majority_precommits(round, &propose_hash, &block_hash);
+                        self.handle_majority_precommits(round, &propose_hash, &block_hash);
                         return;
                     }
                 }
@@ -463,7 +463,7 @@ impl NodeHandler {
 
         // Has majority precommits
         if has_consensus {
-            self.has_majority_precommits(msg.round(), msg.propose_hash(), msg.block_hash());
+            self.handle_majority_precommits(msg.round(), msg.propose_hash(), msg.block_hash());
         }
     }
 
@@ -554,10 +554,10 @@ impl NodeHandler {
             .expect("Unable to save transaction to persistent pool.");
 
         let full_proposes = self.state.check_incomplete_proposes(hash);
-        // Go to has full propose if we get last transaction
+        // Go to handle full propose if we get last transaction
         for (hash, round) in full_proposes {
             self.remove_request(&RequestData::Transactions(hash));
-            self.has_full_propose(hash, round);
+            self.handle_full_propose(hash, round);
         }
         Ok(())
     }
@@ -651,7 +651,7 @@ impl NodeHandler {
                 let round = self.state.round();
                 let has_majority_prevotes = self.broadcast_prevote(round, &hash);
                 if has_majority_prevotes {
-                    self.has_majority_prevotes(round, &hash);
+                    self.handle_majority_prevotes(round, &hash);
                 }
             } else if self.state.is_leader() {
                 self.add_propose_timeout();
@@ -733,7 +733,7 @@ impl NodeHandler {
             // Send prevote
             let has_majority_prevotes = self.broadcast_prevote(round, &hash);
             if has_majority_prevotes {
-                self.has_majority_prevotes(round, &hash);
+                self.handle_majority_prevotes(round, &hash);
             }
         }
     }
