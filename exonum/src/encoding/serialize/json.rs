@@ -24,7 +24,7 @@
 use serde_json::{self, value::Value};
 use bit_vec::BitVec;
 use hex::FromHex;
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, Duration, TimeZone, Utc};
 use uuid::Uuid;
 
 use std::net::SocketAddr;
@@ -82,6 +82,12 @@ pub trait ExonumJsonDeserialize {
 struct TimestampHelper {
     secs: String,
     nanos: u32,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct DurationHelper {
+    secs: String,
+    nanos: i32,
 }
 
 // implementation of deserialization
@@ -211,6 +217,46 @@ impl ExonumJson for DateTime<Utc> {
         let timestamp = TimestampHelper {
             secs: self.timestamp().to_string(),
             nanos: self.timestamp_subsec_nanos(),
+        };
+        Ok(serde_json::to_value(&timestamp)?)
+    }
+}
+
+impl ExonumJson for Duration {
+    fn deserialize_field<B: WriteBufferWrapper>(
+        value: &Value,
+        buffer: &mut B,
+        from: Offset,
+        to: Offset,
+    ) -> Result<(), Box<Error>> {
+        let helper: DurationHelper = serde_json::from_value(value.clone())?;
+        let seconds = helper.secs.parse()?;
+
+        let seconds_duration = Duration::seconds(seconds);
+        let nanos_duration = Duration::nanoseconds(helper.nanos as i64);
+
+        let result = seconds_duration.checked_add(&nanos_duration);
+        match result {
+            Some(duration) => {
+                buffer.write(from, to, duration);
+                Ok(())
+            }
+            None => Err(format!(
+                "Can't deserialize Duration: {} secs, {} nanos",
+                seconds, helper.nanos
+            ))?,
+        }
+    }
+
+    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+        let secs = self.num_seconds();
+        let nanos_as_duration = *self - Duration::seconds(secs);
+        // Since we're working with only nanos, no overflow is expected here.
+        let nanos = nanos_as_duration.num_nanoseconds().unwrap() as i32;
+
+        let timestamp = DurationHelper {
+            secs: secs.to_string(),
+            nanos: nanos,
         };
         Ok(serde_json::to_value(&timestamp)?)
     }
@@ -466,4 +512,53 @@ impl ExonumJson for Uuid {
 pub mod reexport {
     pub use serde_json::{from_str, from_value, to_string, to_value, Error, Value};
     pub use serde_json::map::Map;
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(unsafe_code)]
+
+    use super::*;
+    use encoding::CheckedOffset;
+
+    #[test]
+    fn exonum_json_for_duration_round_trip() {
+        let durations = [
+            Duration::zero(),
+            Duration::max_value(),
+            Duration::min_value(),
+            Duration::nanoseconds(999_999_999),
+            Duration::nanoseconds(-999_999_999),
+            Duration::seconds(42) + Duration::nanoseconds(15),
+            Duration::seconds(-42) + Duration::nanoseconds(-15),
+        ];
+
+        // Variables for serialization/deserialization
+        let mut buffer = vec![0; Duration::field_size() as usize];
+        let from: Offset = 0;
+        let to: Offset = Duration::field_size();
+        let checked_from = CheckedOffset::new(from);
+        let checked_to = CheckedOffset::new(to);
+
+        for duration in durations.iter() {
+            let serialized = duration
+                .serialize_field()
+                .expect("Can't serialize duration");
+
+            Duration::deserialize_field(&serialized, &mut buffer, from, to)
+                .expect("Can't deserialize duration");
+
+            Duration::check(&buffer, checked_from, checked_to, checked_to)
+                .expect("Incorrect result of deserialization");
+
+            let result_duration;
+
+            unsafe {
+                result_duration = Duration::read(&buffer, from, to);
+            }
+
+            assert_eq!(*duration, result_duration);
+        }
+    }
+
 }
