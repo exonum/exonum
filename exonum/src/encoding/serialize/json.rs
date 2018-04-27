@@ -233,7 +233,7 @@ impl ExonumJson for Duration {
         let seconds = helper.secs.parse()?;
 
         let seconds_duration = Duration::seconds(seconds);
-        let nanos_duration = Duration::nanoseconds(helper.nanos as i64);
+        let nanos_duration = Duration::nanoseconds(i64::from(helper.nanos));
 
         let result = seconds_duration.checked_add(&nanos_duration);
         match result {
@@ -256,7 +256,7 @@ impl ExonumJson for Duration {
 
         let timestamp = DurationHelper {
             secs: secs.to_string(),
-            nanos: nanos,
+            nanos,
         };
         Ok(serde_json::to_value(&timestamp)?)
     }
