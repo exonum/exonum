@@ -294,11 +294,10 @@ impl StorageValue for Duration {
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
-        // Assuming that stored value must be correct.
-        let secs = LittleEndian::read_i64(&value[0 as usize..mem::size_of::<i64>()]);
-        let nanos =
-            LittleEndian::read_i32(&value[mem::size_of::<i64>()..Duration::field_size() as usize]);
-        Duration::seconds(secs) + Duration::nanoseconds(i64::from(nanos))
+        #![allow(unsafe_code)]
+        let from: Offset = 0;
+        let to: Offset = Duration::field_size();
+        unsafe { Duration::read(&value, from, to) }
     }
 }
 
