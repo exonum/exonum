@@ -35,6 +35,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Default implementation of `check` method was added to `Field` trait to
   reduce boilerplate. (#639)
 
+- Metrics are now using `chrono::DateTime<Utc>` instead of `SystemTime`. (#620)
+
 #### exonum-time
 
 - Split service components to separate modules. (#604)
