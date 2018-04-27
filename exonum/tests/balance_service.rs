@@ -138,8 +138,8 @@ pub mod service {
 
         // Override timeouts to little values, so we won't have to wait for consensus too long.
         node_cfg.genesis.consensus.timeout_adjuster =
-            TimeoutAdjusterConfig::Constant { timeout: 10 };
-        node_cfg.genesis.consensus.round_timeout = 20;
+            TimeoutAdjusterConfig::Constant { timeout: 20 };
+        node_cfg.genesis.consensus.round_timeout = 40;
 
         let service = Box::new(BalanceService());
         let node = Node::new(db.clone(), vec![service], node_cfg.clone());
