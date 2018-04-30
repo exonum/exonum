@@ -40,6 +40,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Metrics are now using `chrono::DateTime<Utc>` instead of `SystemTime`. (#620)
 
+### Internal improvements
+
+#### exonum
+
+- Default implementation of `check` method was added to `Field` trait to
+  reduce boilerplate. (#639)
+
 #### exonum-time
 
 - Split service components to separate modules. (#604)
@@ -170,6 +177,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 ### New features
 
 #### exonum
+
+- `ExecutionError::with_description` method now takes `Into<String>` instead of
+  `String` which allows to pass `&str` directly. (#592)
+
+- New `database` field added to the `NodeConfig`. This optional setting adjusts
+  database-specific settings, like number of simultaneously opened files. (#538)
+
 
 - `ExecutionError::with_description` method now takes `Into<String>` instead of
   `String` which allows to pass `&str` directly. (#592)
