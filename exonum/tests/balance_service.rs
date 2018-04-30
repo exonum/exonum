@@ -138,8 +138,8 @@ pub mod service {
 
         // Override timeouts to little values, so we won't have to wait for consensus too long.
         node_cfg.genesis.consensus.timeout_adjuster =
-            TimeoutAdjusterConfig::Constant { timeout: 10 };
-        node_cfg.genesis.consensus.round_timeout = 20;
+            TimeoutAdjusterConfig::Constant { timeout: 20 };
+        node_cfg.genesis.consensus.round_timeout = 40;
 
         let service = Box::new(BalanceService());
         let node = Node::new(db.clone(), vec![service], node_cfg.clone());
@@ -158,7 +158,7 @@ pub mod service {
         api_tx.send(tx_copy).unwrap();
 
         // Wait to be sure that transaction was processed.
-        thread::sleep(time::Duration::from_millis(100));
+        thread::sleep(time::Duration::from_millis(200));
 
         // Shut down the node
         api_tx
