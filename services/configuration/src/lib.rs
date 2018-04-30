@@ -79,10 +79,10 @@ extern crate pretty_assertions;
 
 pub use errors::ErrorCode;
 pub use schema::{MaybeVote, ProposeData, Schema};
-pub use transactions::{Propose, Vote};
+pub use transactions::{ConfigurationTransactions, Propose, Vote};
 
 use exonum::api::Api;
-use exonum::blockchain::{self, ApiContext, Transaction};
+use exonum::blockchain::{self, ApiContext, Transaction, TransactionSet};
 use exonum::crypto::Hash;
 use exonum::encoding::Error as EncodingError;
 use exonum::helpers::fabric::{self, Context};
@@ -120,7 +120,7 @@ impl blockchain::Service for Service {
     }
 
     fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, EncodingError> {
-        transactions::tx_from_raw(raw)
+        ConfigurationTransactions::tx_from_raw(raw).map(Into::into)
     }
 
     fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {

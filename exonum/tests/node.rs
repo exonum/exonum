@@ -173,7 +173,7 @@ fn test_node_restart_regression() {
     };
 
     let db = Arc::from(Box::new(MemoryDB::new()) as Box<Database>) as Arc<Database>;
-    let node_cfg = helpers::generate_testnet_config(1, 16_310)[0].clone();
+    let node_cfg = helpers::generate_testnet_config(1, 3600)[0].clone();
 
     let init_times = Arc::new(Mutex::new(0));
     // First launch

@@ -53,7 +53,7 @@ use sodiumoxide;
 use serde::{Serialize, Serializer};
 use serde::de::{self, Deserialize, Deserializer, Visitor};
 use byteorder::{ByteOrder, LittleEndian};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use uuid::Uuid;
 
 use std::default::Default;
@@ -62,6 +62,7 @@ use std::fmt;
 use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use encoding::{Field, Offset};
 use encoding::serialize::{encode_hex, FromHex, FromHexError, ToHex};
 use helpers::Round;
 
@@ -754,6 +755,16 @@ impl CryptoHash for DateTime<Utc> {
         let mut buffer = vec![0; 12];
         LittleEndian::write_i64(&mut buffer[0..8], secs);
         LittleEndian::write_u32(&mut buffer[8..12], nanos);
+        buffer.hash()
+    }
+}
+
+impl CryptoHash for Duration {
+    fn hash(&self) -> Hash {
+        let mut buffer = vec![0; Duration::field_size() as usize];
+        let from: Offset = 0;
+        let to: Offset = Duration::field_size();
+        self.write(&mut buffer, from, to);
         buffer.hash()
     }
 }

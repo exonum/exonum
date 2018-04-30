@@ -38,15 +38,14 @@ Define transaction:
 
 ```javascript
 const TxCreateWallet = Exonum.newMessage({
-  size: 40,
   network_id: 0,
   protocol_version: 0,
   service_id: 128,
-  message_id: 130,
-  fields: {
-    pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-    name: {type: Exonum.String, size: 8, from: 32, to: 40}
-  }
+  message_id: 2,
+  fields: [
+    { name: 'pub_key', type: Exonum.PublicKey },
+    { name: 'name', type: Exonum.String }
+  ]
 })
 ```
 
@@ -72,7 +71,7 @@ axios.post('/api/services/cryptocurrency/v1/wallets/transaction', {
   network_id: 0,
   protocol_version: 0,
   service_id: 128,
-  message_id: 130,
+  message_id: 2,
   signature: signature,
   body: data
 })
@@ -84,16 +83,15 @@ Define transaction:
 
 ```javascript
 const TxIssue = Exonum.newMessage({
-  size: 48,
   network_id: 0,
   protocol_version: 0,
   service_id: 128,
-  message_id: 129,
-  fields: {
-    wallet: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-    amount: {type: Exonum.Uint64, size: 8, from: 32, to: 40},
-    seed: {type: Exonum.Uint64, size: 8, from: 40, to: 48}
-  }
+  message_id: 1,
+  fields: [
+    { name: 'wallet', type: Exonum.PublicKey },
+    { name: 'amount', type: Exonum.Uint64 },
+    { name: 'seed', type: Exonum.Uint64 }
+  ]
 })
 ```
 
@@ -120,7 +118,7 @@ axios.post('/api/services/cryptocurrency/v1/wallets/transaction', {
   network_id: 0,
   protocol_version: 0,
   service_id: 128,
-  message_id: 129,
+  message_id: 1,
   signature: signature,
   body: data
 })
@@ -132,17 +130,16 @@ Define transaction:
 
 ```javascript
 const TxTransfer = Exonum.newMessage({
-  size: 80,
   network_id: 0,
   protocol_version: 0,
   service_id: 128,
-  message_id: 128,
-  fields: {
-    from: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-    to: {type: Exonum.PublicKey, size: 32, from: 32, to: 64},
-    amount: {type: Exonum.Uint64, size: 8, from: 64, to: 72},
-    seed: {type: Exonum.Uint64, size: 8, from: 72, to: 80}
-  }
+  message_id: 0,
+  fields: [
+    { name: 'from', type: Exonum.PublicKey },
+    { name: 'to', type: Exonum.PublicKey },
+    { name: 'amount', type: Exonum.Uint64 },
+    { name: 'seed', type: Exonum.Uint64 }
+  ]
 })
 ```
 
@@ -170,7 +167,7 @@ axios.post(TX_URL, {
   network_id: 0,
   protocol_version: 0,
   service_id: 128,
-  message_id: 128,
+  message_id: 0,
   signature: signature,
   body: data
 })
@@ -182,17 +179,17 @@ Here is how the proof of the user's existence looks:
 
 ```javascript
 const data = {
-  block_info: {
+  block_proof: {
     block: {...},
     precommits: [...]
   },
-  wallet: {
-    mpt_proof: {...},
-    value: {...}
+  wallet_proof: {
+    to_table: {...},
+    to_wallet: {...}
   },
   wallet_history: {
-    mt_proof: {...},
-    values: [...]
+    proof: {...},
+    transactions: [...]
   }
 }
 ```
@@ -200,7 +197,7 @@ const data = {
 Verify the block and its precommits:
 
 ```javascript
-if (Exonum.verifyBlock(data.block_info, validators, 0)) {...}
+if (Exonum.verifyBlock(data.block_proof, validators, 0)) {...}
 ```
 
 `validators` is actual list of public keys of validators:
@@ -219,11 +216,10 @@ Use `state_hash` as a root hash of the tree.
 
 ```javascript
 const TableKey = Exonum.newType({
-  size: 4,
-  fields: {
-    service_id: {type: Exonum.Uint16, size: 2, from: 0, to: 2},
-    table_index: {type: Exonum.Uint16, size: 2, from: 2, to: 4}
-  }
+  fields: [
+    { name: 'service_id', type: Exonum.Uint16 },
+    { name: 'table_index', type: Exonum.Uint16 }
+  ]
 })
 
 const tableKey = TableKey.hash({
@@ -231,7 +227,7 @@ const tableKey = TableKey.hash({
   table_index: 0
 })
 
-const walletsHash = Exonum.merklePatriciaProof(data.block_info.block.state_hash, data.wallet.mpt_proof, tableKey)
+const walletsHash = Exonum.merklePatriciaProof(data.block_proof.block.state_hash, data.wallet_proof.to_table, tableKey)
 ```
 
 Extracted value is a root hash of the wallets Merkle Patricia tree (`data.wallet.value`).
@@ -239,17 +235,16 @@ Extract wallet from the tree:
 
 ```javascript
 const Wallet = Exonum.newType({
-  size: 88,
-  fields: {
-    pub_key: {type: Exonum.PublicKey, size: 32, from: 0, to: 32},
-    name: {type: Exonum.String, size: 8, from: 32, to: 40},
-    balance: {type: Exonum.Uint64, size: 8, from: 40, to: 48},
-    history_len: {type: Exonum.Uint64, size: 8, from: 48, to: 56},
-    history_hash: {type: Exonum.Hash, size: 32, from: 56, to: 88}
-  }
+  fields: [
+    { name: 'pub_key', type: Exonum.PublicKey },
+    { name: 'name', type: Exonum.String },
+    { name: 'balance', type: Exonum.Uint64 },
+    { name: 'history_len', type: Exonum.Uint64 },
+    { name: 'history_hash', type: Exonum.Hash }
+  ]
 })
 
-const wallet = Exonum.merklePatriciaProof(walletsHash, data.wallet.value, publicKey, Wallet)
+const wallet = Exonum.merklePatriciaProof(walletsHash, data.wallet_proof.to_wallet, publicKey, Wallet)
 ```
 
 Extract transactions meta data from the Merkle tree:
@@ -258,7 +253,7 @@ Extract transactions meta data from the Merkle tree:
 const transactionsMetaData = Exonum.merkleProof(
   wallet.history_hash,
   wallet.history_len,
-  data.wallet_history.mt_proof,
+  data.wallet_history.proof,
   [0, wallet.history_len],
   TransactionMetaData
 )
@@ -267,17 +262,17 @@ const transactionsMetaData = Exonum.merkleProof(
 Verify each transaction:
 
 ```javascript
-for (let i = 0; i < data.wallet_history.values.length; i++) {
-  let Transaction = getTransaction(data.wallet_history.values[i].message_id)
-  const publicKeyOfTransaction = getPublicKeyOfTransaction(data.wallet_history.values[i].message_id, data.wallet_history.values[i].body)
+for (let i = 0; i < data.wallet_history.transactions.length; i++) {
+  let Transaction = getTransaction(data.wallet_history.transactions[i].message_id)
+  const publicKeyOfTransaction = getPublicKeyOfTransaction(data.wallet_history.transactions[i].message_id, data.wallet_history.transactions[i].body)
 
-  Transaction.signature = data.wallet_history.values[i].signature
+  Transaction.signature = data.wallet_history.transactions[i].signature
 
-  if (Transaction.hash(data.wallet_history.values[i].body) !== transactionsMetaData[i].tx_hash) {
+  if (Transaction.hash(data.wallet_history.transactions[i].body) !== transactionsMetaData[i].tx_hash) {
     throw new Error('Invalid transaction hash has been found')
   }
 
-  if (!Transaction.verifySignature(data.wallet_history.values[i].signature, publicKeyOfTransaction, data.wallet_history.values[i].body)) {
+  if (!Transaction.verifySignature(data.wallet_history.transactions[i].signature, publicKeyOfTransaction, data.wallet_history.transactions[i].body)) {
     throw new Error('Invalid transaction signature has been found')
   }
 }

@@ -44,6 +44,20 @@ pub enum Error {
         /// Value represented as `f64`.
         value: f64,
     },
+    /// SocketAddr header is neither 0 nor 1.
+    IncorrectSocketAddrHeader {
+        /// Position in buffer where error appears.
+        position: Offset,
+        /// Header value.
+        value: u8,
+    },
+    /// SocketAddr padding for IPv4 addresses must be 12 bytes of 0s.
+    IncorrectSocketAddrPadding {
+        /// Position in buffer where error appears.
+        position: Offset,
+        /// Padding value.
+        value: [u8; 12],
+    },
     /// Segment reference is incorrect
     IncorrectSegmentReference {
         /// position in buffer where error appears.
@@ -112,6 +126,15 @@ pub enum Error {
     },
     /// Overflow in Offsets
     OffsetOverflow,
+    /// Overflow in Duration.
+    DurationOverflow,
+    /// Incorrect duration representation.
+    IncorrectDuration {
+        /// Seconds in gotten duration.
+        secs: i64,
+        /// Nanoseconds in gotten duration.
+        nanos: i32,
+    },
     /// Basic error support, for custom fields.
     Basic(Cow<'static, str>),
     /// Other error for custom fields
@@ -130,6 +153,8 @@ impl StdError for Error {
             Error::UnexpectedlyShortPayload { .. } => "Unexpectedly short payload",
             Error::IncorrectBoolean { .. } => "Incorrect boolean value",
             Error::UnsupportedFloat { .. } => "Unsupported float value",
+            Error::IncorrectSocketAddrHeader { .. } => "Incorrect SocketAddr header value",
+            Error::IncorrectSocketAddrPadding { .. } => "Incorrect SocketAddr padding",
             Error::IncorrectSegmentReference { .. } => "Incorrect segment reference",
             Error::IncorrectSegmentSize { .. } => "Incorrect segment size",
             Error::UnexpectedlyShortRawMessage { .. } => "Unexpectedly short RawMessage",
@@ -141,6 +166,8 @@ impl StdError for Error {
             Error::SpaceBetweenSegments { .. } => "Space between segments",
             Error::Utf8 { .. } => "Utf8 error in parsing string",
             Error::OffsetOverflow => "Offset pointers overflow",
+            Error::DurationOverflow => "Overflow in Duration object",
+            Error::IncorrectDuration { .. } => "Incorrect Duration object representation",
             Error::Basic(ref x) => x.as_ref(),
             Error::Other(_) => "Other error",
         }

@@ -20,12 +20,14 @@ use bit_vec::BitVec;
 use std::time::Duration;
 use std::collections::BTreeMap;
 
-use messages::{Connect, Message, PeersRequest, Precommit, Prevote, PrevotesRequest, Propose,
-               ProposeRequest, RawMessage, TransactionsRequest, TransactionsResponse, CONSENSUS};
+use messages::{BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
+               PrevotesRequest, Propose, ProposeRequest, RawMessage, Status, TransactionsRequest,
+               TransactionsResponse, CONSENSUS};
 use crypto::{gen_keypair, gen_keypair_from_seed, CryptoHash, Hash, Seed};
 use blockchain::{Blockchain, Schema};
 use node;
-use node::state::{PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT};
+use node::state::{BLOCK_REQUEST_TIMEOUT, PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT,
+                  TRANSACTIONS_REQUEST_TIMEOUT};
 use helpers::{user_agent, Height, Round};
 use super::timestamping::{TimestampTx, TimestampingTxGenerator, TIMESTAMPING_SERVICE};
 use super::sandbox::{sandbox_with_services_uninitialized, timestamping_sandbox};
@@ -832,7 +834,7 @@ fn test_ignore_message_from_prev_height() {
 }
 
 /// check scenario:
-/// HAS FULL PROPOSE
+/// HANDLE FULL PROPOSE
 /// - send prevote when lock=0 for known propose
 #[test]
 fn positive_get_propose_send_prevote() {
@@ -844,7 +846,7 @@ fn positive_get_propose_send_prevote() {
     sandbox.recv(&propose);
 
     // check scenario:
-    // HAS FULL PROPOSE
+    // HANDLE FULL PROPOSE
     // - send prevote when lock=0 for known propose
     sandbox.assert_lock(LOCK_ZERO, None);
     sandbox.broadcast(&Prevote::new(
@@ -983,7 +985,7 @@ fn handle_propose_that_sends_before_than_propose_timeout_exceeded() {
     ));
 }
 
-// HAS FULL PROPOSE
+// HANDLE FULL PROPOSE
 
 // - send prevote when lock=0 for known propose//covered in positive_get_propose_send_prevote()
 // - not send prevote if lock > 0
@@ -2089,7 +2091,7 @@ fn handle_precommit_different_block_hash() {
     sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
 
     sandbox.recv(&precommit_2);
-    // Here consensus.rs->has_majority_precommits()->//Commit is achieved
+    // Here consensus.rs->handle_majority_precommits()->//Commit is achieved
     sandbox.recv(&precommit_3);
 }
 
@@ -2168,7 +2170,7 @@ fn handle_precommit_positive_scenario_commit() {
 
     // Here covered negative scenario for requirement: commit only If has +2/3 precommit
     sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
-    // Here consensus.rs->has_majority_precommits()->//Commit is achieved
+    // Here consensus.rs->handle_majority_precommits()->//Commit is achieved
     sandbox.recv(&precommit_3);
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
     sandbox.check_broadcast_status(HEIGHT_TWO, &block.hash());
@@ -2387,8 +2389,7 @@ fn do_not_commit_if_propose_is_unknown() {
     //    sandbox.recv(&propose);
 
     sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
-    // Here consensus.rs->has_majority_precommits()->//Commit is achieved
-    // Here consensus.rs->has_majority_precommits()->//Commit is achieved
+    // Here consensus.rs->handle_majority_precommits()->//Commit is achieved
     sandbox.recv(&precommit_3);
     sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
     sandbox.add_time(Duration::from_millis(0));
@@ -2471,7 +2472,7 @@ fn do_not_commit_if_tx_is_unknown() {
     //    sandbox.recv(&tx);
 
     sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
-    // Here consensus.rs->has_majority_precommits()->//Commit is achieved
+    // Here consensus.rs->handle_majority_precommits()->//Commit is achieved
     sandbox.recv(&precommit_3);
     sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
     sandbox.add_time(Duration::from_millis(0));
@@ -2482,7 +2483,7 @@ fn do_not_commit_if_tx_is_unknown() {
 ///         - scenario:
 ///             - get 3 precommits => majority precommits are observed =>
 ///               `add_unknown_propose_with_precommits()` is called
-///             - then receive valid tx and Propose in order to call `has_full_propose()` =>
+///             - then receive valid tx and Propose in order to call `handle_full_propose()` =>
 ///               commit using `state.unknown_propose_with_precommits`
 ///         - it appeared that this test is almost the same as
 ///         `handle_precommit_positive_scenario_commit` the only difference that is in
@@ -2559,7 +2560,7 @@ fn commit_using_unknown_propose_with_precommits() {
         &make_request_prevote_from_precommit(&sandbox, &precommit_2),
     );
 
-    //here consensus.rs->has_majority_precommits()->//Commit is achieved
+    //here consensus.rs->handle_majority_precommits()->//Commit is achieved
     sandbox.recv(&precommit_3);
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
@@ -2595,7 +2596,7 @@ fn commit_using_unknown_propose_with_precommits() {
 ///         - scenario:
 ///             - get 3 precommits (!! with block with wrong state hash) => majority precommits
 ///               are observed => `add_unknown_propose_with_precommits()` is called
-///             - then receive valid tx and Propose in order to call `has_full_propose()` =>
+///             - then receive valid tx and Propose in order to call `handle_full_propose()` =>
 ///               fall with "Full propose: wrong state hash"
 ///         - it appeared that this test is almost the same as
 ///         `handle_precommit_positive_scenario_commit` the only difference that is in
@@ -2603,7 +2604,7 @@ fn commit_using_unknown_propose_with_precommits() {
 ///         precommit and here propose and tx are received after third precommit
 #[test]
 #[should_panic(expected = "Full propose: wrong state hash")]
-fn has_full_propose_wrong_state_hash() {
+fn handle_full_propose_wrong_state_hash() {
     let sandbox = timestamping_sandbox();
 
     // option: with transaction
@@ -2673,7 +2674,7 @@ fn has_full_propose_wrong_state_hash() {
         &make_request_prevote_from_precommit(&sandbox, &precommit_2),
     );
 
-    // Here consensus.rs->has_majority_precommits()->//Commit is achieved
+    // Here consensus.rs->handle_majority_precommits()->//Commit is achieved
     sandbox.recv(&precommit_3);
     sandbox.add_time(Duration::from_millis(PROPOSE_REQUEST_TIMEOUT));
     sandbox.send(
@@ -2896,7 +2897,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     ));
 
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
-    // Here consensus.rs->has_majority_precommits()->//Commit is achieved
+    // Here consensus.rs->handle_majority_precommits()->//Commit is achieved
     sandbox.recv(&precommit_3);
     sandbox.assert_state(HEIGHT_THREE, ROUND_ONE);
     sandbox.check_broadcast_status(HEIGHT_THREE, &second_block.hash());
@@ -3013,7 +3014,7 @@ fn commit_as_leader_send_propose_round_timeout() {
 
     // receive precommit 3 and start commit process
     sandbox.assert_state(current_height, current_round);
-    // Here consensus.rs->has_majority_precommits()->//Commit is achieved
+    // Here consensus.rs->handle_majority_precommits()->//Commit is achieved
     sandbox.recv(&precommit_3);
 
     let new_height = current_height.next();
@@ -3037,13 +3038,13 @@ fn commit_as_leader_send_propose_round_timeout() {
 /// HANDLE TX
 
 /// - if get full propose:
-///     - all in has full propose
+///     - all in handle full propose
 /// idea of test is:
 /// - to receive propose with unknown tx
 /// - receive that tx, so, all required txs are present
-/// - call `node/consensus.rs->has_full_propose()` => broadcast prevote
+/// - call `node/consensus.rs->handle_full_propose()` => broadcast prevote
 #[test]
-fn handle_tx_has_full_propose() {
+fn handle_tx_handle_full_propose() {
     let sandbox = timestamping_sandbox();
 
     // option: with transaction
@@ -3066,12 +3067,101 @@ fn handle_tx_has_full_propose() {
         ),
     );
 
-    // !! here handle_tx()->has_full_propose() is called => broadcast(Prevote) is observed
+    // !! here handle_tx()->handle_full_propose() is called => broadcast(Prevote) is observed
     sandbox.recv(&tx);
 
     sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
 
     sandbox.add_time(Duration::from_millis(0));
+}
+
+/// HANDLE block response
+
+/// - should process block even if tx in pool
+/// idea of test is:
+/// - receive some tx A
+/// - getting Status from other node with later height, send BlockRequest to this node
+/// - receive BlockResponse with already known tx A
+/// - Block should be executed and committed
+#[test]
+fn handle_block_response_tx_in_pool() {
+    let sandbox = timestamping_sandbox();
+
+    let tx = gen_timestamping_tx();
+
+    let propose = ProposeBuilder::new(&sandbox)
+        .with_duration_since_sandbox_time(sandbox.propose_timeout())
+        .build();
+
+    let block = BlockBuilder::new(&sandbox)
+        .with_duration_since_sandbox_time(sandbox.propose_timeout())
+        .with_tx_hash(&tx.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .build();
+
+    let precommit_1 = Precommit::new(
+        VALIDATOR_1,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        &block.hash(),
+        sandbox.time().into(),
+        sandbox.s(VALIDATOR_1),
+    );
+    let precommit_2 = Precommit::new(
+        VALIDATOR_2,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        &block.hash(),
+        sandbox.time().into(),
+        sandbox.s(VALIDATOR_2),
+    );
+    let precommit_3 = Precommit::new(
+        VALIDATOR_3,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        &block.hash(),
+        sandbox.time().into(),
+        sandbox.s(VALIDATOR_3),
+    );
+
+    sandbox.recv(&Status::new(
+        &sandbox.p(VALIDATOR_3),
+        HEIGHT_TWO,
+        &block.hash(),
+        sandbox.s(VALIDATOR_3),
+    ));
+
+    sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
+    sandbox.send(
+        sandbox.a(VALIDATOR_3),
+        &BlockRequest::new(
+            &sandbox.p(VALIDATOR_0),
+            &sandbox.p(VALIDATOR_3),
+            HEIGHT_ONE,
+            sandbox.s(VALIDATOR_0),
+        ),
+    );
+    sandbox.recv(&tx);
+
+    sandbox.recv(&BlockResponse::new(
+        &sandbox.p(VALIDATOR_3),
+        &sandbox.p(VALIDATOR_0),
+        block.clone(),
+        vec![precommit_1, precommit_2, precommit_3],
+        vec![tx.raw().clone()],
+        sandbox.s(VALIDATOR_3),
+    ));
+
+    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox.broadcast(&Status::new(
+        &sandbox.p(VALIDATOR_0),
+        HEIGHT_TWO,
+        &block.hash(),
+        sandbox.s(VALIDATOR_0),
+    ));
 }
 
 // - ignore existed transaction (in both blockchain and pool)
@@ -3097,7 +3187,7 @@ fn broadcast_prevote_with_tx_positive() {
     sandbox.recv(&propose);
 
     // check scenario:
-    // HAS FULL PROPOSE
+    // HANDLE FULL PROPOSE
     // - send prevote when lock=0 for known propose
     sandbox.assert_lock(LOCK_ZERO, None);
     sandbox.broadcast(&Prevote::new(
@@ -3222,7 +3312,7 @@ fn handle_round_timeout_ignore_if_height_and_round_are_not_the_same() {
     sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
 
     sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
-    // Here consensus.rs->has_majority_precommits()->//Commit is achieved
+    // Here consensus.rs->handle_majority_precommits()->//Commit is achieved
     sandbox.recv(&precommit_3);
     sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
     sandbox.check_broadcast_status(HEIGHT_TWO, &block.hash());
@@ -3501,7 +3591,7 @@ fn test_schema_config_changes() {
 //         where RequestPrecommit is added
 //         - remove precommit request
 //         - COMMIT //covered in test_reach_one_height
-//         - We are fucked up   //covered in has_full_propose_we_are_fucked_up()
+//         - We are fucked up   //covered in handle_full_propose_we_are_fucked_up()
 //         - not send prevotes after commit     //covered in lock_not_send_prevotes_after_commit()
 // - Send prevote       //covered in lock_to_propose_and_send_prevote()
 //     - round > locked + 1     //covered in lock_to_propose_when_get_2_3_prevote_positive
@@ -3549,7 +3639,7 @@ fn test_schema_config_changes() {
 // - verify signature   //covered in handle_tx_verify_signature
 // - if get full propose:
 //     - remove tx request      //covered in not_request_txs_when_get_tx_and_propose
-//     - all in has full propose    //covered in handle_tx_has_full_propose()
+//     - all in handle full propose    //covered in handle_tx_handle_full_propose()
 
 // HANDLE ROUND TIMEOUT:
 
@@ -3573,7 +3663,7 @@ fn test_schema_config_changes() {
 //      send(RequestPropose):       test_queue_prevote_message_from_next_height
 //      recv(RequestTransactions):  response_to_request_txs
 // - if we have another known node:
-//     - send new request message//for RequestTransaction is covered in handle_tx_has_full_propose()
-//     - add timeout             //for RequestTransaction is covered in handle_tx_has_full_propose()
+//     - send new request message//for RequestTransaction is covered in handle_tx_handle_full_propose()
+//     - add timeout             //for RequestTransaction is covered in handle_tx_handle_full_propose()
 
 // todo add scenario for single node network

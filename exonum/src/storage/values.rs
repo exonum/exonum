@@ -15,13 +15,14 @@
 //! A definition of `StorageValue` trait and implementations for common types.
 
 use byteorder::{ByteOrder, LittleEndian};
-use chrono::{DateTime, NaiveDateTime, Utc};
+use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use uuid::Uuid;
 
 use std::mem;
 use std::borrow::Cow;
 
 use crypto::{Hash, PublicKey};
+use encoding::{Field, Offset};
 use messages::{MessageBuffer, RawMessage};
 use helpers::Round;
 use super::UniqueHash;
@@ -282,6 +283,24 @@ impl StorageValue for DateTime<Utc> {
     }
 }
 
+/// Uses little-endian encoding.
+impl StorageValue for Duration {
+    fn into_bytes(self) -> Vec<u8> {
+        let mut buffer = vec![0; Duration::field_size() as usize];
+        let from: Offset = 0;
+        let to: Offset = Duration::field_size();
+        self.write(&mut buffer, from, to);
+        buffer
+    }
+
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        #![allow(unsafe_code)]
+        let from: Offset = 0;
+        let to: Offset = Duration::field_size();
+        unsafe { Duration::read(&value, from, to) }
+    }
+}
+
 impl StorageValue for Round {
     fn into_bytes(self) -> Vec<u8> {
         self.0.into_bytes()
@@ -410,7 +429,7 @@ mod tests {
 
     #[test]
     fn storage_value_for_system_time_round_trip() {
-        use chrono::{Duration, TimeZone};
+        use chrono::TimeZone;
 
         let times = [
             Utc.timestamp(0, 0),
@@ -424,6 +443,24 @@ mod tests {
         for time in times.iter() {
             let buffer = time.into_bytes();
             assert_eq!(*time, DateTime::from_bytes(Cow::Borrowed(&buffer)));
+        }
+    }
+
+    #[test]
+    fn storage_value_for_duration_round_trip() {
+        let durations = [
+            Duration::zero(),
+            Duration::max_value(),
+            Duration::min_value(),
+            Duration::nanoseconds(999_999_999),
+            Duration::nanoseconds(-999_999_999),
+            Duration::seconds(42) + Duration::nanoseconds(15),
+            Duration::seconds(-42) + Duration::nanoseconds(-15),
+        ];
+
+        for duration in durations.iter() {
+            let buffer = duration.into_bytes();
+            assert_eq!(*duration, Duration::from_bytes(Cow::Borrowed(&buffer)));
         }
     }
 
