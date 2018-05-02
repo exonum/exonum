@@ -90,6 +90,8 @@ where
     }
 
     /// Returns a table that represents a map from transaction hash into execution result.
+    /// This method can be used to retrieve a proof that a certain transaction
+    /// result is present in the blockchain.
     pub fn transaction_results(&self) -> ProofMapIndex<&T, Hash, TransactionResult> {
         ProofMapIndex::new(TRANSACTION_RESULTS, &self.view)
     }
@@ -241,7 +243,8 @@ where
         res
     }
 
-    /// Returns the nearest following configuration if it exists.
+    /// Returns the nearest following configuration which will be applied after
+    /// the current one, if it exists.
     pub fn following_configuration(&self) -> Option<StoredConfiguration> {
         let next_height = self.next_height();
         let idx = self.find_configurations_index_by_height(next_height);
@@ -303,19 +306,21 @@ where
         ]
     }
 
-    /// Constructs a proof of inclusion of the root hash of a specific service
-    /// table into block `state_hash`.
+    /// Constructs a proof of inclusion of a root hash of a specific service
+    /// table into the block `state_hash`.
     ///
-    /// Searched key for proof is uniquely identified by (`u16`, `u16`) tuple
+    /// The service_id and table_idx are automatically combined to form the key of the
+    /// required service table; this key serves as a search query for the method.
+    /// The service table key is uniquely identified by (`u16`, `u16`) tuple
     /// of table coordinates.
     ///
-    /// If found, root hash is returned as a value of proof's leaf
-    /// corresponding to the searched key. Otherwise, partial path to the searched key
-    /// is returned, which proves its exclusion.
+    /// If found, the method returns the root hash as a value of the proof leaf
+    /// corresponding to the required service table key. Otherwise, a partial
+    /// path to the service table key is returned, which proves its exclusion.
     ///
-    /// The returned proof is used as a component of proof of state of any
-    /// entity, stored in `exonum` DB at specific height, as identified
-    /// by corresponding block `state_hash`. State of some meta tables
+    /// The resulting proof is used as a component of proof of state of any
+    /// entity, stored in `exonum` DB at a specific height, as identified
+    /// by the corresponding block `state_hash`. State of some meta tables
     /// of core and services isn't tracked.
     ///
     /// # Arguments
