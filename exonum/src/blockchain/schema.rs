@@ -61,7 +61,7 @@ encoding_struct! (
 encoding_struct! (
     /// Transaction location in a block.
     /// The given entity defines the block into which the transaction was
-    /// included and the number of this transaction in that block.
+    /// included and the position of this transaction in that block.
     struct TxLocation {
         /// Returns the height of the block into which the transaction was
         /// included.
@@ -71,8 +71,8 @@ encoding_struct! (
     }
 );
 
-/// Information schema for `exonum core`. This is the interface using which data can
-/// be retrieved or written to the blockchain.
+/// Information schema for `exonum core`. This structure provides helper
+/// functions for retrieving service information from the blockchain.
 #[derive(Debug)]
 pub struct Schema<T> {
     view: T,

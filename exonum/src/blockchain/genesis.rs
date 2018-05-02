@@ -15,7 +15,7 @@
 use super::config::{ConsensusConfig, ValidatorKeys};
 
 /// The initial configuration which is committed into the genesis block.
-/// 
+///
 /// The genesis block is the first block in the blockchain which is created
 /// when the blockchain is initially launched. This block can contain some service
 /// data, but does not include transactions.

@@ -29,20 +29,20 @@ encoding_struct!(
     /// The header only contains the amount of transactions and the transactions root hash as well as
     /// other information, but not the transactions themselves.
     struct Block {
-        /// Returns the schema version.
+        /// Schema version.
         schema_version: u16,
-        /// Returns the identifier of the leader node which has proposed the block.
+        /// Identifier of the leader node which has proposed the block.
         proposer_id: ValidatorId,
-        /// Returns the height of the block, which is also the number of this particular
+        /// Height of the block, which is also the number of this particular
         /// block in the blockchain.
         height: Height,
-        /// Returns the number of transactions this block.
+        /// Number of transactions this block.
         tx_count: u32,
-        /// Returns the hash link to the previous block in the blockchain.
+        /// Hash link to the previous block in the blockchain.
         prev_hash: &Hash,
-        /// Returns the root hash of the Merkle tree of transactions in this block.
+        /// Root hash of the Merkle tree of transactions in this block.
         tx_hash: &Hash,
-        /// Returns the hash of the blockchain state after applying transactions in the block.
+        /// Hash of the blockchain state after applying transactions in the block.
         state_hash: &Hash,
     }
 );

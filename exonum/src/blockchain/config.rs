@@ -15,7 +15,7 @@
 //! Exonum global variables which are stored in the blockchain as utf8 encoded
 //! json.
 //!
-//! This module includes all the elements of the StoredConfiguration which is
+//! This module includes all the elements of the `StoredConfiguration` which is
 //! used as the global configuration of the blockchain and should be the same for
 //! all validators in the network. The configuration includes the public keys of
 //! validators, consensus related parameters, hash of the previous configuration,
@@ -37,13 +37,12 @@ use helpers::{Height, Milliseconds};
 pub struct ValidatorKeys {
     /// Consensus key is used for messages related to the consensus algorithm.
     pub consensus_key: PublicKey,
-    /// Service key is used for services. This key is used by the configuration
+    /// Service key is used for services, for example, the configuration
     /// updater service, the anchoring service, etc.
     pub service_key: PublicKey,
 }
 
-/// Exonum blockchain global configuration, including validator public keys,
-/// the number of votes required to commit the new configuration, etc. Services
+/// Exonum blockchain global configuration. Services
 /// and their parameters are also included into this configuration.
 ///
 /// This configuration must be the same for any Exonum node in a certain
@@ -74,17 +73,15 @@ pub struct StoredConfiguration {
     pub services: BTreeMap<String, serde_json::Value>,
 }
 
-/// Consensus algorithm parameters, including several types of timeouts,
-/// maximum number of transactions per block, maximum message length, etc.
-/// These parameters should be the same for all nodes in the network and can
+/// Consensus algorithm parameters.
+///
+/// This configuration is initially created with default recommended values.
+/// The parameters in this configuration should be the same for all nodes in the network and can
 /// be changed using the
 /// [configuration updater service](https://exonum.com/doc/advanced/configuration-updater/).
 ///
-/// This configuration is initially created with default recommended values,
-/// which can later be changed, if required.
-///
 /// For additional information on the Exonum consensus algorithm, refer to
-/// [Consensus in Exonum](https://exonum.com/doc/architecture/consensus/)
+/// [Consensus in Exonum](https://exonum.com/doc/architecture/consensus/).
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct ConsensusConfig {
     /// Interval between rounds. This interval defines the time that passes
@@ -107,7 +104,7 @@ pub struct ConsensusConfig {
     /// Maximum message length (in bytes). This parameter determines the maximum
     /// size of both consensus messages and transactions. The default value of the
     /// parameter is 1 MB (1024 * 1024 bytes). The range of possible values for this
-    /// parameter is between 1MB and 2^32 bytes.
+    /// parameter is between 1MB and 2^32-1 bytes.
     pub max_message_len: u32,
     /// `TimeoutAdjuster` configuration.
     pub timeout_adjuster: TimeoutAdjusterConfig,

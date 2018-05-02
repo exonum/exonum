@@ -37,10 +37,10 @@ const TRANSACTION_STATUS_OK: u16 = MAX_ERROR_CODE + 1;
 // `Err(TransactionErrorType::Panic)`.
 const TRANSACTION_STATUS_PANIC: u16 = TRANSACTION_STATUS_OK + 1;
 
-/// Returns the outcome of the `Transaction` `execute` method.
+/// Returns the result of the `Transaction` `execute` method.
 ///
-/// This outcome may be
-/// either the result of transaction execution or an `ExecutionError`, if execution has
+/// This result may be
+/// either an empty `unit` type, in case of success, or an `ExecutionError`, if execution has
 /// failed. Errors consist of an error code and an optional description.
 pub type ExecutionResult = Result<(), ExecutionError>;
 /// Extended version of `ExecutionResult` (with additional values set exclusively by Exonum
@@ -63,7 +63,7 @@ pub trait Transaction: Message + ExonumJson + 'static {
     /// other internal constraints. `verify` has no access to the blockchain state;
     /// checks involving the blockchain state must be preformed in [`execute`](#tymethod.execute).
     ///
-    /// If a transaction fails, `verify` is considered incorrect and cannot be included into
+    /// If a transaction fails `verify`, it is considered incorrect and cannot be included into
     /// any correct block proposal. Incorrect transactions are never included into the blockchain.
     ///
     /// *This method should not use external data, that is, it must be a pure function.*
@@ -110,7 +110,7 @@ pub trait Transaction: Message + ExonumJson + 'static {
     /// # Notes
     ///
     /// - Transaction itself is considered committed regardless whether `Ok` or `Err` has been
-    ///   returned or even if panic occurrs during execution.
+    ///   returned or even if panic occurs during execution.
     /// - Changes made by the transaction are discarded if `Err` is returned or panic occurs.
     /// - A transaction execution status (see `ExecutionResult` and `TransactionResult` for the
     ///   details) is stored in the blockchain and can be accessed through API.
@@ -157,10 +157,8 @@ pub trait Transaction: Message + ExonumJson + 'static {
 ///
 /// An execution error consists
 /// of an error code and optional description. The error code effects the blockchain
-/// state hash, while the description does not. Error codes are used to define
-/// different types of errors and the messages which front-end will display to the
-/// user in case of an error. As descriptions do not effect the state hash,
-/// they are mostly used for developer purposes, not for interaction of
+/// state hash, while the description does not. Therefore,
+/// descriptions are mostly used for developer purposes, not for interaction of
 /// the system with users.
 ///
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]

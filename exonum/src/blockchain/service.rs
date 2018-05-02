@@ -38,11 +38,6 @@ use super::transaction::Transaction;
 /// Exonum does not provide specific transaction processing rules or business
 /// logic, they are implemented with the help of services.
 ///
-/// The code above indicates the other traits on which the `Service` trait is
-/// dependent and the functions required for this trait. The first four functions
-/// are mandatory for implementation of the trait, while the last four functions
-/// are optional as they have some default values.
-///
 /// See also [the documentation page on services][doc:services].
 ///
 /// # Examples
@@ -158,17 +153,18 @@ pub trait Service: Send + Sync + 'static {
     /// Tries to create a `Transaction` from the given raw message.
     ///
     /// Exonum framework only guarantees that `SERVICE_ID` of the message is equal to the
-    /// identifier of this service, therefore, the implementation should be ready to handle invalid
-    /// transactions that may come from byzantine nodes.
+    /// identifier of this service, therefore, the implementation should be ready to handle
+    /// invalid transactions that may come from byzantine nodes.
     ///
-    /// Service should return an error in the following cases (see `MessageError` for more details):
+    /// Service should return an error in the following cases (see `MessageError` for more
+    /// details):
     ///
     /// - Incorrect transaction identifier.
     /// - Incorrect data layout.
     ///
-    /// Service _shouldn't_ perform a signature check or logical validation of the transaction; these
-    /// operations should be performed in the `Transaction::verify` and `Transaction::execute`
-    /// methods.
+    /// Service _shouldn't_ perform a signature check or logical validation of the transaction;
+    /// these operations should be performed in the `Transaction::verify` and
+    /// `Transaction::execute` methods.
     ///
     /// `transactions!` macro generates code that allows simple implementation, see
     /// [the `Service` example above](#examples).
@@ -210,9 +206,7 @@ pub trait Service: Send + Sync + 'static {
 /// The current node state on which the blockchain is running, or in other words
 /// execution context. This structure is passed to the `handle_commit` method
 /// of the `Service` trait and is used for the interaction between service
-/// business logic and the current node state. `ServiceContext` connects the
-/// node entity and the user code of services. When writing a services, developers can
-/// apply the 'ServiceContext' to retrieve information about the current node.
+/// business logic and the current node state.
 #[derive(Debug)]
 pub struct ServiceContext {
     validator_id: Option<ValidatorId>,
@@ -367,7 +361,7 @@ impl SharedNodeState {
             .collect()
     }
     /// Returns the list of other nodes to which the connection has failed
-    /// and a reconnection is required. The method also indicates the time
+    /// and a reconnect attempt is required. The method also indicates the time
     /// after which a new attempt at connection is performed.
     pub fn reconnects_timeout(&self) -> Vec<(SocketAddr, Milliseconds)> {
         self.state
