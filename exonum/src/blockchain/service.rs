@@ -476,7 +476,8 @@ impl ApiContext {
         }
     }
 
-    /// Constructs context from raw parts.
+    /// Constructs context from raw parts. In this case, the public_key is the service_key from the
+    /// [blockchain configuration](https://docs.rs/exonum/0.7.0/exonum/blockchain/config/struct.ValidatorKeys.html)
     pub fn from_parts(
         blockchain: &Blockchain,
         node_channel: ApiSender,
@@ -496,7 +497,8 @@ impl ApiContext {
         &self.blockchain
     }
 
-    /// Returns reference to the transaction sender.
+    /// Returns a reference to the transaction sender. This function enables
+    /// sending new transactions into the node.
     pub fn node_channel(&self) -> &ApiSender {
         &self.node_channel
     }

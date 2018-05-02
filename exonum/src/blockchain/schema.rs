@@ -68,7 +68,8 @@ encoding_struct! (
     }
 );
 
-/// Information schema for `exonum`.
+/// Information schema for `exonum core`. This is the interface using which data can
+/// be retrieved or written to the blockchain.
 #[derive(Debug)]
 pub struct Schema<T> {
     view: T,

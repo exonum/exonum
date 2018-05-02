@@ -37,8 +37,9 @@ const TRANSACTION_STATUS_OK: u16 = MAX_ERROR_CODE + 1;
 // `Err(TransactionErrorType::Panic)`.
 const TRANSACTION_STATUS_PANIC: u16 = TRANSACTION_STATUS_OK + 1;
 
-/// Return value of the `Transaction`'s `execute' method. Changes made by the transaction are
-/// discarded if `Err` is returned, see `Transaction` documentation for the details.
+/// Returns the outcome of the `Transaction`'s `execute` method. This may be
+/// either the result of transaction execution or an `ExecutionError` if execution has
+/// failed. Errors consist of an error code and an optional description.
 pub type ExecutionResult = Result<(), ExecutionError>;
 /// Extended version of `ExecutionResult` (with additional values set exclusively by Exonum
 /// framework) that can be obtained through `Schema`'s `transaction_statuses` method.
@@ -146,11 +147,18 @@ pub trait Transaction: Message + ExonumJson + 'static {
     fn execute(&self, fork: &mut Fork) -> ExecutionResult;
 }
 
-/// Result of unsuccessful transaction execution.
+/// Result of unsuccessful transaction execution. An execution error consists
+/// of an error code and optional description. The error code effects the blockchain
+/// state hash, while the description does not. Error codes are used to define
+/// different types of errors and the messages which front-end will display to the
+/// user in case of an error. As descriptions do not effect the state hash,
+/// they are mostly used for developer purposes, but not for interaction of
+/// the system with users.
+///
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ExecutionError {
-    /// User-defined error code. Can have different meanings for different transactions and
-    /// services.
+    /// User-defined error code. Error codes can have different meanings for different
+    /// transactions and services.
     code: u8,
     /// Optional error description.
     description: Option<String>,
@@ -185,11 +193,11 @@ pub enum TransactionErrorType {
 }
 
 /// Result of unsuccessful transaction execution encompassing both service and framework-wide error
-/// handling.
+/// handling. This error indicates whether a panic or a user error has occured.
 ///
 /// # Notes:
 ///
-/// - Content of the `description`' field is excluded from hash calculation (see `StorageValue`
+/// - Content of the `description` field is excluded from hash calculation (see `StorageValue`
 ///   implementation for the details).
 /// - `TransactionErrorType::Panic` is set by the framework if panic is raised during transaction
 ///   execution.

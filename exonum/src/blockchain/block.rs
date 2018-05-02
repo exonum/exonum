@@ -29,27 +29,32 @@ encoding_struct!(
     /// The header only contains the amount of transactions and the transactions root hash as well as
     /// other information, but not the transactions themselves.
     struct Block {
-        /// Information schema version.
+        /// Returns the schema version.
         schema_version: u16,
-        /// Identifier of the block proposer.
+        /// Returns the identifier of the leader node which has proposed the block.
         proposer_id: ValidatorId,
-        /// Height of the block.
+        /// Returns the height of the block, which is also the number of the
+        /// block in the blockchain.
         height: Height,
-        /// Number of transactions in block.
+        /// Returns the number of transactions in a block.
         tx_count: u32,
-        /// Hash link to the previous block in the blockchain.
+        /// Returns the hash link to the previous block in the blockchain.
         prev_hash: &Hash,
-        /// Root hash of the Merkle tree of transactions in this block.
+        /// Returns the root hash of the Merkle tree of transactions in this block.
         tx_hash: &Hash,
-        /// Hash of the blockchain state after applying transactions in the block.
+        /// Returns the hash of the blockchain state after applying transactions in the block.
         state_hash: &Hash,
     }
 );
 
-/// Block with pre-commits.
+/// The structure which contains enough information to prove the correctness of
+/// a block. This structure consists of the block itself and the pre-commit
+/// messages related to this block.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BlockProof {
-    /// Block.
+    /// Block header containing such information as the ID of the node which
+    /// proposed the block, the height of the block, the number of transactions
+    /// in the block, etc.
     pub block: Block,
     /// List of pre-commits for the block.
     pub precommits: Vec<Precommit>,

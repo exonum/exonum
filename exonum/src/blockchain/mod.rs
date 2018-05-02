@@ -70,7 +70,7 @@ mod transaction;
 mod tests;
 
 /// Exonum blockchain instance with a certain services set and data storage.
-/// Only blockchains with an identical set of services and genesis block can be combined
+/// Only nodes with an identical set of services and genesis block can be combined
 /// into a single network.
 pub struct Blockchain {
     db: Arc<Database>,
@@ -117,7 +117,9 @@ impl Blockchain {
         }
     }
 
-    /// Returns service `VecMap` for all our services.
+    /// Returns the `VecMap` for all our services. This is a table which
+    /// contains service identifiers and service interfaces. The VecMap
+    /// allows proceeding from the service identifier to the service itself.
     pub fn service_map(&self) -> &Arc<VecMap<Box<Service>>> {
         &self.service_map
     }
@@ -399,9 +401,9 @@ impl Blockchain {
         Ok(())
     }
 
-    /// Commits to the storage block that proposes by node `State`.
-    /// After that invokes `handle_commit` for each service in the order of their identifiers
-    /// and returns the list of transactions which were created by the `handle_commit` event.
+    /// Commits to the blockchain a new block with the indicated changes (patch),
+    /// hash and precommit messages. After that invokes `handle_commit`
+    /// for each service in the order of their identifiers.
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn commit<'a, I>(
         &mut self,
@@ -479,7 +481,7 @@ impl Blockchain {
         )
     }
 
-    /// Saves peer to the peers cache.
+    /// Saves the `Connect` message from a peer to the cache.
     pub fn save_peer(&mut self, pubkey: &PublicKey, peer: Connect) {
         let mut fork = self.fork();
 
@@ -492,7 +494,7 @@ impl Blockchain {
             .expect("Unable to save peer to the peers cache");
     }
 
-    /// Removes peer from the peers cache.
+    /// Removes from the cache the `Connect` message from a peer.
     pub fn remove_peer_with_addr(&mut self, addr: &SocketAddr) {
         let mut fork = self.fork();
 
@@ -509,7 +511,7 @@ impl Blockchain {
             .expect("Unable to remove peer from the peers cache");
     }
 
-    /// Recovers cached peers if any.
+    /// Returns `Connect` messages from peers saved in the cache, if any.
     pub fn get_saved_peers(&self) -> HashMap<PublicKey, Connect> {
         let schema = Schema::new(self.snapshot());
         let peers_cache = schema.peers_cache();
