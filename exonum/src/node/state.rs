@@ -22,7 +22,8 @@ use std::collections::{BTreeMap, HashMap, HashSet, hash_map::Entry};
 use std::net::SocketAddr;
 use std::time::{Duration, SystemTime};
 
-use messages::{Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawMessage};
+use messages::{BlockResponse, Connect, ConsensusMessage, Message, Precommit, Prevote, Propose,
+               RawMessage};
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
 use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 use blockchain::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
@@ -87,6 +88,8 @@ pub struct State {
 
     timeout_adjuster: Box<TimeoutAdjuster>,
     propose_timeout: Milliseconds,
+
+    incomplete_blocks: HashMap<Hash, IncompleteBlock>,
 }
 
 /// State of a validator-node.
@@ -103,8 +106,10 @@ pub struct ValidatorState {
 pub enum RequestData {
     /// Represents `ProposeRequest` message.
     Propose(Hash),
-    /// Represents `TransactionsRequest` message.
-    Transactions(Hash),
+    /// Represents `TransactionsRequest` message for `Propose`.
+    TransactionsForPropose(Hash),
+    /// Represents `TransactionsRequest` message for `BlockResponse`.
+    TransactionsForBlock(Hash),
     /// Represents `PrevotesRequest` message.
     Prevotes(Round, Hash),
     /// Represents `BlockRequest` message.
@@ -138,6 +143,13 @@ pub struct BlockState {
     patch: Patch,
     txs: Vec<Hash>,
     proposer_id: ValidatorId,
+}
+
+/// Incomplete block.
+#[derive(Clone, Debug)]
+pub struct IncompleteBlock {
+    msg: BlockResponse,
+    unknown_txs: HashSet<Hash>,
 }
 
 /// `VoteMessage` trait represents voting messages such as `Precommit` and `Prevote`.
@@ -243,7 +255,8 @@ impl RequestData {
         #![cfg_attr(feature = "cargo-clippy", allow(match_same_arms))]
         let ms = match *self {
             RequestData::Propose(..) => PROPOSE_REQUEST_TIMEOUT,
-            RequestData::Transactions(..) => TRANSACTIONS_REQUEST_TIMEOUT,
+            RequestData::TransactionsForPropose(..) => TRANSACTIONS_REQUEST_TIMEOUT,
+            RequestData::TransactionsForBlock(..) => TRANSACTIONS_REQUEST_TIMEOUT,
             RequestData::Prevotes(..) => PREVOTES_REQUEST_TIMEOUT,
             RequestData::Block(..) => BLOCK_REQUEST_TIMEOUT,
         };
@@ -351,6 +364,23 @@ impl BlockState {
     }
 }
 
+impl IncompleteBlock {
+    /// Returns `BlockResponse` message.
+    pub fn message(&self) -> &BlockResponse {
+        &self.msg
+    }
+
+    /// Returns unknown transactions of the block.
+    pub fn unknown_txs(&self) -> &HashSet<Hash> {
+        &self.unknown_txs
+    }
+
+    /// Returns `true` if there are unknown transactions in the block.
+    pub fn has_unknown_txs(&self) -> bool {
+        !self.unknown_txs.is_empty()
+    }
+}
+
 impl State {
     /// Creates state with the given parameters.
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
@@ -406,6 +436,8 @@ impl State {
             timeout_adjuster: make_timeout_adjuster(&stored.consensus),
             propose_timeout: 0,
             config: stored,
+
+            incomplete_blocks: HashMap::new(),
         }
     }
 
@@ -690,6 +722,11 @@ impl State {
         self.blocks.get(hash)
     }
 
+    /// Returns incomplete block with the specified hash.
+    pub fn incomplete_block(&self, hash: &Hash) -> Option<&IncompleteBlock> {
+        self.incomplete_blocks.get(hash)
+    }
+
     /// Updates mode's round.
     pub fn jump_round(&mut self, round: Round) {
         self.round = round;
@@ -719,6 +756,7 @@ impl State {
             validator_state.clear();
         }
         self.requests.clear(); // FIXME: clear all timeouts (ECR-171)
+        self.incomplete_blocks.clear();
     }
 
     /// Returns a list of queued consensus messages.
@@ -750,6 +788,25 @@ impl State {
         }
 
         full_proposes
+    }
+
+    /// Checks whether some blocks are waiting for this transaction.
+    /// Returns a list of blocks that don't contain unknown transactions.
+    ///
+    /// Transaction is ignored if the following criteria are fulfilled:
+    ///
+    /// - transaction isn't contained in unknown transaction list of any blocks
+    /// - transaction isn't a part of block
+    pub fn check_incomplete_blocks(&mut self, tx_hash: Hash) -> Vec<(Hash, IncompleteBlock)> {
+        let mut full_blocks = Vec::new();
+        for (hash, block) in &mut self.incomplete_blocks {
+            block.unknown_txs.remove(&tx_hash);
+            if block.unknown_txs.is_empty() {
+                full_blocks.push((*hash, block.clone()))
+            }
+        }
+
+        full_blocks
     }
 
     /// Returns pre-votes for the specified round and propose hash.
@@ -860,6 +917,38 @@ impl State {
                 txs,
                 proposer_id,
             })),
+        }
+    }
+
+    /// Finds unknown transactions in the block.
+    pub fn unknown_block_txs(
+        &mut self,
+        msg: &BlockResponse,
+        txs: &MapIndex<&&Snapshot, Hash, RawMessage>,
+        txs_pool: &KeySetIndex<&&Snapshot, Hash>,
+    ) -> Result<&IncompleteBlock, failure::Error> {
+        match self.incomplete_blocks.entry(msg.block().hash()) {
+            Entry::Occupied(..) => bail!("Block already found"),
+            Entry::Vacant(e) => {
+                let mut unknown_txs = HashSet::new();
+                for hash in msg.transactions() {
+                    if txs.get(hash).is_some() {
+                        if !txs_pool.contains(hash) {
+                            bail!(
+                                "Received block with already \
+                                 committed transaction"
+                            )
+                        }
+                    } else {
+                        unknown_txs.insert(msg.block().hash());
+                    }
+                }
+
+                Ok(e.insert(IncompleteBlock {
+                    msg: msg.clone(),
+                    unknown_txs,
+                }))
+            }
         }
     }
 

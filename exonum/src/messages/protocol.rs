@@ -233,7 +233,7 @@ messages! {
         /// List of pre-commits.
         precommits: Vec<Precommit>,
         /// List of the transactions.
-        transactions: Vec<RawMessage>,
+        transactions: &[Hash],
     }
 
     /// Information about the transactions.
@@ -253,7 +253,7 @@ messages! {
         from: &PublicKey,
         /// Public key of the recipient.
         to: &PublicKey,
-        /// List of the transactions.
+        /// List of transactions.
         transactions: Vec<RawMessage>,
     }
 

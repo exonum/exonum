@@ -142,53 +142,14 @@ impl NodeHandler {
 
         if has_unknown_txs {
             trace!("REQUEST TRANSACTIONS");
-            self.request(RequestData::Transactions(hash), from);
+            self.request(RequestData::TransactionsForPropose(hash), from);
 
             for node in known_nodes {
-                self.request(RequestData::Transactions(hash), node);
+                self.request(RequestData::TransactionsForPropose(hash), node);
             }
         } else {
             self.handle_full_propose(hash, msg.round());
         }
-    }
-
-    // Validates transaction from the block and appends them into the pool.
-    // Returns tuple of transaction hashes and Patch of changes in the pool.
-    fn validate_block_transactions(&self, block: &BlockResponse) -> Option<(Vec<Hash>, Patch)> {
-        let mut fork = self.blockchain.fork();
-        let mut tx_hashes = Vec::new();
-        {
-            let mut schema = Schema::new(&mut fork);
-            for raw in block.transactions() {
-                let tx = match self.blockchain.tx_from_raw(raw) {
-                    Ok(tx) => tx,
-                    Err(e) => {
-                        error!("{}, block={:?}", e.description(), block);
-                        return None;
-                    }
-                };
-
-                let hash = tx.hash();
-                if schema.transactions().contains(&hash)
-                    && !schema.transactions_pool().contains(&hash)
-                {
-                    error!(
-                        "Received block with already committed transaction, block={:?}",
-                        block
-                    );
-                    return None;
-                }
-                profiler_span!("tx.verify()", {
-                    if !tx.verify() {
-                        error!("Incorrect transaction in block detected, block={:?}", block);
-                        return None;
-                    }
-                });
-                schema.add_transaction_into_pool(tx.raw().clone());
-                tx_hashes.push(hash);
-            }
-        }
-        Some((tx_hashes, fork.into_patch()))
     }
 
     /// Handles the `Block` message. For details see the message documentation.
@@ -246,33 +207,36 @@ impl NodeHandler {
         }
 
         if self.state.block(&block_hash).is_none() {
-            // Verify transactions
-            let tx_hashes = if let Some(res) = self.validate_block_transactions(msg) {
-                self.blockchain
-                    .merge(res.1)
-                    .expect("Unable to save transaction to persistent pool.");
-                res.0
-            } else {
-                return;
+            let snapshot = self.blockchain.snapshot();
+            let schema = Schema::new(&*snapshot);
+            let has_unknown_txs = match self.state.unknown_block_txs(
+                msg,
+                &schema.transactions(),
+                &schema.transactions_pool(),
+            ) {
+                Ok(state) => state.has_unknown_txs(),
+                Err(err) => {
+                    warn!("{}, msg={:?}", err, msg);
+                    return;
+                }
             };
 
-            let (block_hash, patch) =
-                self.create_block(block.proposer_id(), block.height(), tx_hashes.as_slice());
-            // Verify block_hash
-            if block_hash != block.hash() {
-                panic!(
-                    "Block_hash incorrect in the received block={:?}. Either a node's \
-                     implementation is incorrect or validators majority works incorrectly",
-                    msg
-                );
-            }
+            let known_nodes = self.remove_request(&RequestData::Block(block.height()));
 
-            // Commit block
-            self.state
-                .add_block(block_hash, patch, tx_hashes, block.proposer_id());
+            if has_unknown_txs {
+                trace!("REQUEST TRANSACTIONS");
+                self.request(RequestData::TransactionsForBlock(block_hash), *msg.from());
+
+                for node in known_nodes {
+                    self.request(RequestData::TransactionsForBlock(block_hash), node);
+                }
+            } else {
+                self.handle_full_block(msg);
+            }
+        } else {
+            self.commit(block_hash, msg.precommits().iter(), None);
+            self.request_next_block();
         }
-        self.commit(block_hash, msg.precommits().iter(), None);
-        self.request_next_block();
     }
 
     /// Executes and commits block. This function is called when node has full propose information.
@@ -310,6 +274,36 @@ impl NodeHandler {
             let precommits = self.state.precommits(round, our_block_hash).to_vec();
             self.commit(our_block_hash, precommits.iter(), Some(propose_round));
         }
+    }
+
+    /// Executes and commits block. This function is called when node has full block information.
+    pub fn handle_full_block(&mut self, msg: &BlockResponse) {
+        let block = msg.block();
+        let block_hash = block.hash();
+
+        if self.state.block(&block_hash).is_none() {
+            let (block_hash, patch) =
+                self.create_block(block.proposer_id(), block.height(), msg.transactions());
+            // Verify block_hash
+            if block_hash != block.hash() {
+                panic!(
+                    "Block_hash incorrect in the received block={:?}. Either a node's \
+                     implementation is incorrect or validators majority works incorrectly",
+                    msg
+                );
+            }
+
+            // Commit block
+            self.state.add_block(
+                block_hash,
+                patch,
+                msg.transactions().to_vec(),
+                block.proposer_id(),
+            );
+        }
+
+        self.commit(block_hash, msg.precommits().iter(), None);
+        self.request_next_block();
     }
 
     /// Handles the `Prevote` message. For details see the message documentation.
@@ -380,7 +374,7 @@ impl NodeHandler {
             }
         };
         if let Some(proposer) = proposer {
-            self.request(RequestData::Transactions(*propose_hash), proposer);
+            self.request(RequestData::TransactionsForPropose(*propose_hash), proposer);
             return;
         }
 
@@ -556,8 +550,15 @@ impl NodeHandler {
         let full_proposes = self.state.check_incomplete_proposes(hash);
         // Go to handle full propose if we get last transaction
         for (hash, round) in full_proposes {
-            self.remove_request(&RequestData::Transactions(hash));
+            self.remove_request(&RequestData::TransactionsForPropose(hash));
             self.handle_full_propose(hash, round);
+        }
+
+        let full_blocks = self.state.check_incomplete_blocks(hash);
+        // Go to handle full block if we get last transaction
+        for (hash, block) in full_blocks {
+            self.remove_request(&RequestData::TransactionsForBlock(hash));
+            self.handle_full_block(block.message());
         }
         Ok(())
     }
@@ -754,9 +755,25 @@ impl NodeHandler {
                     self.state.consensus_secret_key(),
                 ).raw()
                     .clone(),
-                RequestData::Transactions(ref propose_hash) => {
+                RequestData::TransactionsForPropose(ref propose_hash) => {
                     let txs: Vec<_> = self.state
                         .propose(propose_hash)
+                        .unwrap()
+                        .unknown_txs()
+                        .iter()
+                        .cloned()
+                        .collect();
+                    TransactionsRequest::new(
+                        self.state.consensus_public_key(),
+                        &peer,
+                        &txs,
+                        self.state.consensus_secret_key(),
+                    ).raw()
+                        .clone()
+                }
+                RequestData::TransactionsForBlock(ref block_hash) => {
+                    let txs: Vec<_> = self.state
+                        .incomplete_block(block_hash)
                         .unwrap()
                         .unknown_txs()
                         .iter()
@@ -835,7 +852,7 @@ impl NodeHandler {
             Some(state) => {
                 // Request transactions
                 if state.has_unknown_txs() {
-                    Some(RequestData::Transactions(*propose_hash))
+                    Some(RequestData::TransactionsForPropose(*propose_hash))
                 } else {
                     None
                 }

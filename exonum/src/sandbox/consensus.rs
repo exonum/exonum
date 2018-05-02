@@ -3151,7 +3151,7 @@ fn handle_block_response_tx_in_pool() {
         &sandbox.p(VALIDATOR_0),
         block.clone(),
         vec![precommit_1, precommit_2, precommit_3],
-        vec![tx.raw().clone()],
+        &[tx.hash()],
         sandbox.s(VALIDATOR_3),
     ));
 
