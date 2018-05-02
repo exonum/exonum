@@ -20,7 +20,8 @@ use exonum_testkit::{TestKit, TestKitBuilder, TestNode};
 
 use std::str;
 
-use {Propose, Schema as ConfigurationSchema, Service as ConfigurationService, Vote};
+use {Propose, Schema as ConfigurationSchema, Service as ConfigurationService, Vote, VoteAgainst,
+     VotingDecision};
 
 mod api;
 
@@ -42,12 +43,17 @@ pub fn new_tx_config_vote(node: &TestNode, cfg_proposal_hash: Hash) -> Vote {
     Vote::new(keypair.0, &cfg_proposal_hash, keypair.1)
 }
 
+pub fn new_tx_config_vote_against(node: &TestNode, cfg_proposal_hash: Hash) -> VoteAgainst {
+    let keypair = node.service_keypair();
+    VoteAgainst::new(keypair.0, &cfg_proposal_hash, keypair.1)
+}
+
 pub trait ConfigurationTestKit {
     fn configuration_default() -> Self;
 
     fn apply_configuration(&mut self, proposer: ValidatorId, cfg_proposal: StoredConfiguration);
 
-    fn votes_for_propose(&self, config_hash: Hash) -> Vec<Option<Vote>>;
+    fn votes_for_propose(&self, config_hash: Hash) -> Vec<Option<VotingDecision>>;
 
     fn find_propose(&self, config_hash: Hash) -> Option<Propose>;
 }
@@ -86,7 +92,7 @@ impl ConfigurationTestKit for TestKit {
         );
     }
 
-    fn votes_for_propose(&self, config_hash: Hash) -> Vec<Option<Vote>> {
+    fn votes_for_propose(&self, config_hash: Hash) -> Vec<Option<VotingDecision>> {
         let snapshot = self.snapshot();
         let schema = ConfigurationSchema::new(&snapshot);
         schema.votes(&config_hash)
@@ -332,8 +338,32 @@ fn test_discard_vote_for_absent_propose() {
     testkit.create_block_with_transactions(txvec![legal_vote.clone(), illegal_vote.clone()]);
 
     let votes = testkit.votes_for_propose(new_cfg.hash());
-    assert!(votes.contains(&Some(legal_vote)));
-    assert!(!votes.contains(&Some(illegal_vote)));
+    assert!(votes.contains(&Some(VotingDecision::Vote(legal_vote))));
+    assert!(!votes.contains(&Some(VotingDecision::Vote(illegal_vote))));
+}
+
+#[test]
+fn test_vote_against_for_propose() {
+    let mut testkit: TestKit = TestKit::configuration_default();
+
+    let cfg_change_height = Height(5);
+    let new_cfg = {
+        let mut cfg = testkit.configuration_change_proposal();
+        cfg.set_service_config("dummy", "First cfg");
+        cfg.set_actual_from(cfg_change_height);
+        cfg.stored_configuration().clone()
+    };
+
+    let propose_tx = new_tx_config_propose(&testkit.network().validators()[1], new_cfg.clone());
+    testkit.create_block_with_transactions(txvec![propose_tx]);
+
+    let legal_vote = new_tx_config_vote_against(&testkit.network().validators()[3], new_cfg.hash());
+    let illegal_vote = new_tx_config_vote(&testkit.network().validators()[3], new_cfg.hash());
+    testkit.create_block_with_transactions(txvec![legal_vote.clone(), illegal_vote.clone()]);
+
+    let votes = testkit.votes_for_propose(new_cfg.hash());
+    assert!(votes.contains(&Some(VotingDecision::VoteAgainst(legal_vote))));
+    assert!(!votes.contains(&Some(VotingDecision::Vote(illegal_vote))));
 }
 
 #[test]
@@ -381,7 +411,7 @@ fn test_discard_votes_with_expired_actual_from() {
     testkit.create_block_with_transactions(txvec![illegal_vote.clone()]);
     assert!(!testkit
         .votes_for_propose(new_cfg.hash())
-        .contains(&Some(illegal_vote)));
+        .contains(&Some(VotingDecision::Vote(illegal_vote))));
 }
 
 #[test]
@@ -492,7 +522,7 @@ fn test_config_txs_discarded_when_not_referencing_actual_config_or_sent_by_illeg
         testkit.create_block_with_transactions(txvec![illegal_validator_vote.clone()]);
         assert!(!testkit
             .votes_for_propose(discarded_votes_cfg.hash())
-            .contains(&Some(illegal_validator_vote)))
+            .contains(&Some(VotingDecision::Vote(illegal_validator_vote))))
     }
     {
         let votes = (0..3)
@@ -534,7 +564,7 @@ fn test_config_txs_discarded_when_not_referencing_actual_config_or_sent_by_illeg
 
         let actual_votes = testkit.votes_for_propose(discarded_votes_cfg.hash());
         for expected_vote in expected_votes {
-            assert!(!actual_votes.contains(&Some(expected_vote)));
+            assert!(!actual_votes.contains(&Some(VotingDecision::Vote(expected_vote))));
         }
     }
 }

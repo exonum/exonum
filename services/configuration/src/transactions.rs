@@ -21,7 +21,7 @@ use exonum::node::State;
 use exonum::storage::{Fork, Snapshot};
 
 use errors::Error as ServiceError;
-use schema::{MaybeVote, ProposeData, Schema};
+use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
 
 transactions! {
     /// Configuration Service transactions.
@@ -71,6 +71,30 @@ transactions! {
             /// See [crate docs](index.html) for more details on how the hash is calculated.
             cfg_hash: &Hash,
         }
+
+        /// VoteAgainst for the new configuration.
+        ///
+        /// # Notes
+        ///
+        /// The stored version of the transaction has a special variant corresponding to absence
+        /// of a vote. See [f`MaybeVote`] for details.
+        ///
+        /// See [`ErrorCode`] for the description of error codes emitted by the `execute()`
+        /// method.
+        ///
+        /// [`MaybeVote`]: struct.MaybeVote.html
+        /// [`ErrorCode`]: enum.ErrorCode.html
+        struct VoteAgainst {
+            /// Sender of the transaction.
+            ///
+            /// Should be one of validators as per the active configuration.
+            from: &PublicKey,
+
+            /// Hash of the configuration that this vote is for.
+            ///
+            /// See [crate docs](index.html) for more details on how the hash is calculated.
+            cfg_hash: &Hash,
+        }
     }
 }
 
@@ -92,7 +116,7 @@ fn enough_votes_to_commit(snapshot: &Snapshot, cfg_hash: &Hash) -> bool {
 
     let schema = Schema::new(snapshot);
     let votes = schema.votes_by_config_hash(cfg_hash);
-    let votes_count = votes.iter().filter(|vote| vote.is_some()).count();
+    let votes_count = votes.iter().filter(|vote| vote.is_consent()).count();
     let majority_count = match actual_config.majority_count {
         Some(majority_count) => majority_count as usize,
         _ => State::byzantine_majority_count(actual_config.validator_keys.len()),
@@ -223,12 +247,18 @@ impl Transaction for Propose {
     }
 }
 
-impl Vote {
-    /// Checks context-dependent conditions for a `Vote` transaction.
+trait TxVoteUtil: Clone {
+    fn sender(&self) -> &PublicKey;
+
+    fn target_cfg_hash(&self) -> &Hash;
+
+    fn into_maybe(self) -> MaybeVote;
+
+    /// Checks context-dependent conditions for a `Vote`/`VoteAgainst` transaction.
     ///
     /// # Return value
     ///
-    /// Returns a configuration this vote is for on success, or an error (if any).
+    /// Returns a configuration this transaction is for on success, or an error (if any).
     fn precheck(&self, snapshot: &Snapshot) -> Result<StoredConfiguration, ServiceError> {
         use self::ServiceError::*;
 
@@ -237,9 +267,10 @@ impl Vote {
             Err(AlreadyScheduled(following))?;
         }
 
-        if let Some(validator_id) = validator_index(snapshot, self.from()) {
-            let vote = Schema::new(snapshot)
-                .votes_by_config_hash(self.cfg_hash())
+        let schema = Schema::new(snapshot);
+        if let Some(validator_id) = validator_index(snapshot, self.sender()) {
+            let vote = schema
+                .votes_by_config_hash(self.target_cfg_hash())
                 .get(validator_id as u64)
                 .unwrap();
             if vote.is_some() {
@@ -249,23 +280,22 @@ impl Vote {
             Err(UnknownSender)?;
         }
 
-        let propose = Schema::new(snapshot)
-            .propose(self.cfg_hash())
-            .ok_or_else(|| UnknownConfigRef(*self.cfg_hash()))?;
+        let propose = schema
+            .propose(self.target_cfg_hash())
+            .ok_or_else(|| UnknownConfigRef(*self.target_cfg_hash()))?;
 
         let parsed = StoredConfiguration::try_deserialize(propose.cfg().as_bytes()).unwrap();
         propose.check_config_candidate(&parsed, snapshot)?;
         Ok(parsed)
     }
 
-    /// Saves this vote into the service schema.
     fn save(&self, fork: &mut Fork) {
         use exonum::storage::StorageValue;
 
-        let cfg_hash = self.cfg_hash();
+        let cfg_hash = self.target_cfg_hash();
         let propose_data: ProposeData = Schema::new(fork.as_ref())
             .propose_data_by_config_hash()
-            .get(cfg_hash)
+            .get(self.target_cfg_hash())
             .unwrap();
 
         let propose = propose_data.tx_propose();
@@ -278,7 +308,7 @@ impl Vote {
         let validator_id = prev_cfg
             .validator_keys
             .iter()
-            .position(|pk| pk.service_key == *self.from())
+            .position(|pk| pk.service_key == *self.sender())
             .unwrap();
 
         // Start writing to storage.
@@ -288,13 +318,31 @@ impl Vote {
 
         let propose_data = {
             let mut votes = schema.votes_by_config_hash_mut(cfg_hash);
-            votes.set(validator_id as u64, MaybeVote::some(self.clone()));
-            ProposeData::new(propose, &votes.merkle_root(), propose_data.num_validators())
+            votes.set(validator_id as u64, self.clone().into_maybe());
+            ProposeData::new(
+                propose_data.tx_propose(),
+                &votes.merkle_root(),
+                propose_data.num_validators(),
+            )
         };
 
         schema
             .propose_data_by_config_hash_mut()
             .put(cfg_hash, propose_data);
+    }
+}
+
+impl TxVoteUtil for Vote {
+    fn sender(&self) -> &PublicKey {
+        self.from()
+    }
+
+    fn target_cfg_hash(&self) -> &Hash {
+        self.cfg_hash()
+    }
+
+    fn into_maybe(self) -> MaybeVote {
+        MaybeVote::some(VotingDecision::Vote(self))
     }
 }
 
@@ -318,6 +366,41 @@ impl Transaction for Vote {
         if enough_votes_to_commit(fork.as_ref(), self.cfg_hash()) {
             CoreSchema::new(fork).commit_configuration(parsed_config);
         }
+        Ok(())
+    }
+}
+
+impl TxVoteUtil for VoteAgainst {
+    fn sender(&self) -> &PublicKey {
+        self.from()
+    }
+
+    fn target_cfg_hash(&self) -> &Hash {
+        self.cfg_hash()
+    }
+
+    fn into_maybe(self) -> MaybeVote {
+        MaybeVote::some(VotingDecision::VoteAgainst(self))
+    }
+}
+
+impl Transaction for VoteAgainst {
+    fn verify(&self) -> bool {
+        self.verify_signature(self.from())
+    }
+
+    fn execute(&self, fork: &mut Fork) -> ExecutionResult {
+        let _parsed_config = self.precheck(fork.as_ref()).map_err(|err| {
+            error!("Discarding dissenting vote {:?}: {}", self, err);
+            err
+        })?;
+
+        self.save(fork);
+        trace!(
+            "Put VoteAgainst:{:?} to corresponding cfg dissenting_votes_by_config_hash table",
+            self
+        );
+
         Ok(())
     }
 }

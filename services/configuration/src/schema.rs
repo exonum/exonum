@@ -19,7 +19,7 @@ use exonum::storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot, StorageValu
 
 use std::borrow::Cow;
 
-use transactions::{Propose, Vote};
+use transactions::{Propose, Vote, VoteAgainst};
 
 // Defines `&str` constants with given name and value.
 macro_rules! define_names {
@@ -52,15 +52,70 @@ lazy_static! {
         &Hash::zero(),
         &Signature::zero(),
     ).into_bytes();
+    static ref VOTE_DECISION_BYTES_MARKER: Vec<u8> = b"consent".to_vec();
+    static ref VOTE_AGAINST_DECISION_BYTES_MARKER: Vec<u8> = b"dissent".to_vec();
 }
 
-/// A functional equivalent to `Option<Vote>` used to store votes in the service schema.
+/// A enum used to represent different kinds of vote, `Vote` and `VoteAgainst` transactions.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub enum VotingDecision {
+    /// `Vote` transaction variant
+    Vote(Vote),
+    /// `VoteAgainst` transaction variant
+    VoteAgainst(VoteAgainst),
+}
+
+impl CryptoHash for VotingDecision {
+    fn hash(&self) -> Hash {
+        match *self {
+            VotingDecision::Vote(ref vote) => vote.hash(),
+            VotingDecision::VoteAgainst(ref vote_against) => vote_against.hash(),
+        }
+    }
+}
+
+trait VotingDecisionBytes: StorageValue {
+    fn decision_marker() -> Vec<u8>;
+
+    fn has_decision_marker(bytes: &Cow<[u8]>) -> bool {
+        let marker = Self::decision_marker();
+        let idx = marker.len();
+        let (marker_bytes, _tx_bytes) = bytes.split_at(idx);
+        marker.as_slice().eq(marker_bytes)
+    }
+
+    fn into_decision_bytes(self) -> Vec<u8> {
+        let mut decision_bytes = Self::decision_marker();
+        decision_bytes.extend(self.into_bytes());
+        decision_bytes
+    }
+
+    fn from_decision_bytes(bytes: Cow<[u8]>) -> Self {
+        let idx = Self::decision_marker().len();
+        let (_marker_bytes, tx_bytes) = bytes.split_at(idx);
+        Self::from_bytes(Cow::from(tx_bytes))
+    }
+}
+
+impl VotingDecisionBytes for Vote {
+    fn decision_marker() -> Vec<u8> {
+        VOTE_DECISION_BYTES_MARKER.clone()
+    }
+}
+
+impl VotingDecisionBytes for VoteAgainst {
+    fn decision_marker() -> Vec<u8> {
+        VOTE_AGAINST_DECISION_BYTES_MARKER.clone()
+    }
+}
+
+/// A functional equivalent to `Option<T>` used to store votes in the service schema.
 ///
 /// # Notes
 ///
-/// The `None` variant of the type is represented by a `Vote` with all bytes set to zero.
+/// The `None` variant of the type is represented by a `T` with all bytes set to zero.
 #[derive(Clone, Debug, PartialEq)]
-pub struct MaybeVote(Option<Vote>);
+pub struct MaybeVote(Option<VotingDecision>);
 
 impl MaybeVote {
     /// Creates a `None` variant.
@@ -69,21 +124,29 @@ impl MaybeVote {
     }
 
     /// Creates a `Some` variant.
-    pub fn some(vote: Vote) -> Self {
+    pub fn some(vote: VotingDecision) -> Self {
         MaybeVote(Some(vote))
+    }
+
+    /// Returns true if it's a `Some` variant hold `Vote`.
+    pub fn is_consent(&self) -> bool {
+        match self.0 {
+            Some(VotingDecision::Vote(_)) => true,
+            _ => false,
+        }
     }
 }
 
-impl From<MaybeVote> for Option<Vote> {
-    fn from(value: MaybeVote) -> Option<Vote> {
-        value.0
+impl From<MaybeVote> for Option<VotingDecision> {
+    fn from(vote: MaybeVote) -> Option<VotingDecision> {
+        vote.0
     }
 }
 
 impl ::std::ops::Deref for MaybeVote {
-    type Target = Option<Vote>;
+    type Target = Option<VotingDecision>;
 
-    fn deref(&self) -> &Option<Vote> {
+    fn deref(&self) -> &Option<VotingDecision> {
         &self.0
     }
 }
@@ -100,7 +163,8 @@ impl CryptoHash for MaybeVote {
 impl StorageValue for MaybeVote {
     fn into_bytes(self) -> Vec<u8> {
         match self.0 {
-            Some(vote) => vote.into_bytes(),
+            Some(VotingDecision::Vote(vote)) => vote.into_decision_bytes(),
+            Some(VotingDecision::VoteAgainst(vote_against)) => vote_against.into_decision_bytes(),
             None => NO_VOTE_BYTES.clone(),
         }
     }
@@ -108,8 +172,12 @@ impl StorageValue for MaybeVote {
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         if NO_VOTE_BYTES.as_slice().eq(bytes.as_ref()) {
             MaybeVote::none()
+        } else if Vote::has_decision_marker(&bytes) {
+            MaybeVote::some(VotingDecision::Vote(Vote::from_decision_bytes(bytes)))
         } else {
-            MaybeVote::some(Vote::from_bytes(bytes))
+            MaybeVote::some(VotingDecision::VoteAgainst(
+                VoteAgainst::from_decision_bytes(bytes),
+            ))
         }
     }
 }
@@ -159,7 +227,7 @@ where
 
     /// Returns a list of votes for the proposal corresponding to the given configuration hash.
     #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
-    pub fn votes(&self, cfg_hash: &Hash) -> Vec<Option<Vote>> {
+    pub fn votes(&self, cfg_hash: &Hash) -> Vec<Option<VotingDecision>> {
         let votes_by_config_hash = self.votes_by_config_hash(cfg_hash);
         let votes = votes_by_config_hash.iter().map(MaybeVote::into).collect();
         votes
@@ -220,19 +288,36 @@ mod tests {
         let (pubkey, key) = crypto::gen_keypair();
         let vote = Vote::new(&pubkey, &Hash::new([1; 32]), &key);
         assert_eq!(
-            vote.clone().into_bytes(),
-            MaybeVote::some(vote.clone()).into_bytes()
+            vote.clone().into_decision_bytes(),
+            MaybeVote::some(VotingDecision::Vote(vote.clone())).into_bytes()
         );
-        assert_eq!(vote.hash(), MaybeVote::some(vote.clone()).hash());
+        assert_eq!(
+            vote.hash(),
+            MaybeVote::some(VotingDecision::Vote(vote.clone())).hash()
+        );
+
+        let vote_against = VoteAgainst::new(&pubkey, &Hash::new([1; 32]), &key);
+        assert_eq!(
+            vote_against.clone().into_decision_bytes(),
+            MaybeVote::some(VotingDecision::VoteAgainst(vote_against.clone())).into_bytes()
+        );
+        assert_eq!(
+            vote_against.hash(),
+            MaybeVote::some(VotingDecision::VoteAgainst(vote_against.clone())).hash()
+        );
 
         let db = MemoryDB::new();
         let mut fork = db.fork();
         let merkle_root = {
-            let mut index: ProofListIndex<_, Vote> = ProofListIndex::new("index", &mut fork);
+            let mut index: ProofListIndex<_, MaybeVote> = ProofListIndex::new("index", &mut fork);
             for _ in 0..VALIDATORS {
-                index.push(NO_VOTE.clone());
+                index.push(MaybeVote::none());
             }
-            index.set(1, vote.clone());
+            index.set(1, MaybeVote::some(VotingDecision::Vote(vote.clone())));
+            index.set(
+                3,
+                MaybeVote::some(VotingDecision::VoteAgainst(vote_against.clone())),
+            );
             index.merkle_root()
         };
         db.merge(fork.into_patch()).unwrap();
@@ -243,7 +328,9 @@ mod tests {
             assert_eq!(
                 stored_vote,
                 if i == 1 {
-                    MaybeVote::some(vote.clone())
+                    MaybeVote::some(VotingDecision::Vote(vote.clone()))
+                } else if i == 3 {
+                    MaybeVote::some(VotingDecision::VoteAgainst(vote_against.clone()))
                 } else {
                     MaybeVote::none()
                 }
@@ -254,7 +341,7 @@ mod tests {
         let new_merkle_root = {
             let mut fork = db.fork();
             let mut index: ProofListIndex<_, MaybeVote> = ProofListIndex::new("index", &mut fork);
-            index.set(2, MaybeVote::some(vote.clone()));
+            index.set(2, MaybeVote::some(VotingDecision::Vote(vote.clone())));
             index.set(2, MaybeVote::none());
             index.merkle_root()
         };

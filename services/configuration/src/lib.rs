@@ -78,8 +78,8 @@ extern crate exonum_testkit;
 extern crate pretty_assertions;
 
 pub use errors::ErrorCode;
-pub use schema::{MaybeVote, ProposeData, Schema};
-pub use transactions::{ConfigurationTransactions, Propose, Vote};
+pub use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
+pub use transactions::{ConfigurationTransactions, Propose, Vote, VoteAgainst};
 
 use exonum::api::Api;
 use exonum::blockchain::{self, ApiContext, Transaction, TransactionSet};
