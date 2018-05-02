@@ -71,7 +71,7 @@ jobs:
     - rustup component add rustfmt-preview
     - rustfmt -V
     - nvm install 8 && nvm use 8
-    - npm install cspell
+    - npm install cspell@"=2.1.12" # last working version
     - ./node_modules/.bin/cspell --version
     - npm install markdownlint-cli
     - ./node_modules/.bin/markdownlint --version
