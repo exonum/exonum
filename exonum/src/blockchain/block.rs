@@ -33,10 +33,10 @@ encoding_struct!(
         schema_version: u16,
         /// Returns the identifier of the leader node which has proposed the block.
         proposer_id: ValidatorId,
-        /// Returns the height of the block, which is also the number of the
+        /// Returns the height of the block, which is also the number of this particular
         /// block in the blockchain.
         height: Height,
-        /// Returns the number of transactions in a block.
+        /// Returns the number of transactions this block.
         tx_count: u32,
         /// Returns the hash link to the previous block in the blockchain.
         prev_hash: &Hash,
@@ -47,8 +47,10 @@ encoding_struct!(
     }
 );
 
-/// The structure which contains enough information to prove the correctness of
-/// a block. This structure consists of the block itself and the pre-commit
+/// Block with its Precommit messages.
+///
+/// This structure contains enough information to prove the correctness of
+/// a block. This structure consists of the block itself and the Precommit
 /// messages related to this block.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BlockProof {
@@ -56,7 +58,7 @@ pub struct BlockProof {
     /// proposed the block, the height of the block, the number of transactions
     /// in the block, etc.
     pub block: Block,
-    /// List of pre-commits for the block.
+    /// List of Precommit messages for the block.
     pub precommits: Vec<Precommit>,
 }
 

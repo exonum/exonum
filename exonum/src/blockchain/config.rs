@@ -38,7 +38,7 @@ pub struct ValidatorKeys {
     /// Consensus key is used for messages related to the consensus algorithm.
     pub consensus_key: PublicKey,
     /// Service key is used for services. This key is used by the configuration
-    /// updater service, the anchoring services, etc.
+    /// updater service, the anchoring service, etc.
     pub service_key: PublicKey,
 }
 
@@ -51,7 +51,7 @@ pub struct ValidatorKeys {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct StoredConfiguration {
     /// Hash of the previous configuration, which can be used to find that
-    /// previous configuration. For the configuration in the genesis block,
+    /// configuration. For the configuration in the genesis block,
     /// `hash` is just an array of zeros.
     pub previous_cfg_hash: Hash,
     /// The height, starting from which this configuration becomes actual. Note
@@ -69,22 +69,21 @@ pub struct StoredConfiguration {
     /// validators count.
     pub majority_count: Option<u16>,
     /// Services specific variables.
-    /// Keys are `service_name` from `Service` trait and values are the serialized json.
+    /// Keys are `service_name` from the `Service` trait and values are the serialized json.
     #[serde(default)]
     pub services: BTreeMap<String, serde_json::Value>,
 }
 
 /// Consensus algorithm parameters, including several types of timeouts,
 /// maximum number of transactions per block, maximum message length, etc.
-/// These parameters should be the same for all nodes in the networks and can
-/// be changes using the
+/// These parameters should be the same for all nodes in the network and can
+/// be changed using the
 /// [configuration updater service](https://exonum.com/doc/advanced/configuration-updater/).
 ///
-/// This configuration is initially created with default recommended values
-/// which can later be changed if required. However, we do not recommend
-/// setting the max_message_len parameter to a value smaller that the default one.
+/// This configuration is initially created with default recommended values,
+/// which can later be changed, if required.
 ///
-/// For detailed information on the consensus in Exonum, refer to
+/// For additional information on the Exonum consensus algorithm, refer to
 /// [Consensus in Exonum](https://exonum.com/doc/architecture/consensus/)
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct ConsensusConfig {
@@ -92,7 +91,7 @@ pub struct ConsensusConfig {
     /// between the moment a new block is committed to the blockchain and the
     /// time when a new round starts, regardless of whether a new block has
     /// been committed during this period or not. Note that rounds in Exonum
-    /// do not have a defined time when they end. Nodes in a new round can
+    /// do not have a defined end time. Nodes in a new round can
     /// continue to vote for proposals and process messages related to previous
     /// rounds.
     pub round_timeout: Milliseconds,
@@ -100,13 +99,15 @@ pub struct ConsensusConfig {
     /// with which a node broadcasts its status message to the network.
     pub status_timeout: Milliseconds,
     /// Peer exchange timeout. This parameter defines the frequency with which
-    /// a node requests collected Connect messages from a random peer.
+    /// a node requests collected `Connect` messages from a random peer.
     /// node in the network.
     pub peers_timeout: Milliseconds,
     /// Maximum number of transactions per block.
     pub txs_block_limit: u32,
-    /// Maximum message length (in bytes). This parameter applies to messages
-    /// of all types in Exonum.
+    /// Maximum message length (in bytes). This parameter determines the maximum
+    /// size of both consensus messages and transactions. The default value of the
+    /// parameter is 1 MB (1024 * 1024 bytes). The range of possible values for this
+    /// parameter is between 1MB and 2^32 bytes.
     pub max_message_len: u32,
     /// `TimeoutAdjuster` configuration.
     pub timeout_adjuster: TimeoutAdjusterConfig,
@@ -116,7 +117,7 @@ impl ConsensusConfig {
     /// Default value for max_message_len.
     pub const DEFAULT_MAX_MESSAGE_LEN: u32 = 1024 * 1024; // 1 MB
 
-    /// Checks if propose timeout is less than round timeout. Warns if fails.
+    /// Checks if propose_timeout is less than round_timeout. Warns if fails.
     #[doc(hidden)]
     pub fn validate_configuration(&self) {
         let propose_timeout = match self.timeout_adjuster {

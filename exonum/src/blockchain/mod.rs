@@ -16,7 +16,7 @@
 //! the Exonum framework.
 //!
 //! Services are the main extension point for the Exonum framework. To create
-//! your service on top of Exonum blockchain you need to do the following:
+//! your service on top of Exonum blockchain you need to perform the following steps:
 //!
 //! - Define your own information schema.
 //! - Create one or more transaction types using the [`transactions!`] macro and
@@ -24,8 +24,8 @@
 //! - Create a data structure implementing the [`Service`] trait.
 //! - Write API handlers for the service, if required.
 //!
-//! You may consult [the service creation tutorial][doc:create-service] for a more detailed
-//! manual on how to create services.
+//! You may consult [the service creation tutorial][doc:create-service] for a detailed
+//! instruction on how to create services.
 //!
 //! [`transactions!`]: ../macro.transactions.html
 //! [`Transaction`]: ./trait.Transaction.html
@@ -70,6 +70,7 @@ mod transaction;
 mod tests;
 
 /// Exonum blockchain instance with a certain services set and data storage.
+/// 
 /// Only nodes with an identical set of services and genesis block can be combined
 /// into a single network.
 pub struct Blockchain {
@@ -129,7 +130,7 @@ impl Blockchain {
         self.db.snapshot()
     }
 
-    /// Creates a snapshot of the current storage state that can be later committed into storage
+    /// Creates a snapshot of the current storage state that can be later committed into the storage
     /// via the `merge` method.
     pub fn fork(&self) -> Fork {
         self.db.fork()
@@ -137,7 +138,7 @@ impl Blockchain {
 
     /// Tries to create a `Transaction` object from the given raw message.
     /// A raw message can be converted into a `Transaction` object only
-    /// if the following conditions are met.
+    /// if the following conditions are met:
     ///
     /// - Blockchain has a service with the `service_id` of the given raw message.
     /// - Service can deserialize the given raw message.
@@ -159,7 +160,7 @@ impl Blockchain {
     ///
     /// # Panics
     ///
-    /// - If the genesis block was not committed.
+    /// If the genesis block was not committed.
     pub fn last_hash(&self) -> Hash {
         Schema::new(&self.snapshot())
             .block_hashes_by_height()
@@ -171,13 +172,13 @@ impl Blockchain {
     ///
     /// # Panics
     ///
-    /// - If the genesis block was not committed.
+    /// If the genesis block was not committed.
     pub fn last_block(&self) -> Block {
         Schema::new(&self.snapshot()).last_block()
     }
 
-    /// Creates and commits the genesis block for the given genesis configuration
-    /// if the blockchain was not initialized.
+    /// Creates and commits the genesis block with the given genesis configuration
+    /// if the blockchain has not been initialized.
     pub fn initialize(&mut self, cfg: GenesisConfig) -> Result<(), Error> {
         let has_genesis_block = !Schema::new(&self.snapshot())
             .block_hashes_by_height()
@@ -188,7 +189,7 @@ impl Blockchain {
         Ok(())
     }
 
-    /// Creates and commits the genesis block for the given genesis configuration.
+    /// Creates and commits the genesis block with the given genesis configuration.
     fn create_genesis_block(&mut self, cfg: GenesisConfig) -> Result<(), Error> {
         let mut config_propose = StoredConfiguration {
             previous_cfg_hash: Hash::zero(),
@@ -230,8 +231,8 @@ impl Blockchain {
         Ok(())
     }
 
-    /// Helper function to map tuple (`u16`, `u16`) of service table coordinates
-    /// to a 32 byte value to be used as `MerklePatriciaTable` key (it currently
+    /// Helper function to map a tuple (`u16`, `u16`) of service table coordinates
+    /// to a 32 byte value to be used as the `MerklePatriciaTable` key (it currently
     /// supports only fixed size keys). The `hash` function is used to distribute
     /// keys uniformly (compared to padding).
     /// # Arguments
@@ -250,9 +251,9 @@ impl Blockchain {
         crypto::hash(&vec)
     }
 
-    /// Executes the given transactions from pool.
-    /// Then it collects the resulting changes from the current storage state and returns them
-    /// with the hash of resulting block.
+    /// Executes the given transactions from the pool.
+    /// Then collects the resulting changes from the current storage state and returns them
+    /// with the hash of the resulting block.
     pub fn create_patch(
         &self,
         proposer_id: ValidatorId,
@@ -402,7 +403,7 @@ impl Blockchain {
     }
 
     /// Commits to the blockchain a new block with the indicated changes (patch),
-    /// hash and precommit messages. After that invokes `handle_commit`
+    /// hash and Precommit messages. After that invokes `handle_commit`
     /// for each service in the order of their identifiers.
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn commit<'a, I>(

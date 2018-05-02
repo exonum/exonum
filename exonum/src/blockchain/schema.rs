@@ -51,7 +51,7 @@ define_names!(
 encoding_struct! (
     /// Configuration index.
     struct ConfigReference {
-        /// The height, starting from which this configuration becomes actual.
+        /// Height, starting from which this configuration becomes actual.
         actual_from: Height,
         /// Hash of the configuration contents that serialized as raw bytes vec.
         cfg_hash: &Hash,
@@ -59,11 +59,14 @@ encoding_struct! (
 );
 
 encoding_struct! (
-    /// Transaction location in block.
+    /// Transaction location in a block.
+    /// The given entity defines the block into which the transaction was
+    /// included and the number of this transaction in that block.
     struct TxLocation {
-        /// Height of block in the blockchain.
+        /// Returns the height of the block into which the transaction was
+        /// included.
         block_height: Height,
-        /// Index in block.
+        /// Returns the number designated to this transaction in the block.
         position_in_block: u64,
     }
 );
@@ -110,29 +113,29 @@ where
         count
     }
 
-    /// Returns a table that keeps the block height and tx position inside the block for every
+    /// Returns a table that keeps the block height and transaction position inside the block for every
     /// transaction hash.
     pub fn transactions_locations(&self) -> MapIndex<&T, Hash, TxLocation> {
         MapIndex::new(TRANSACTIONS_LOCATIONS, &self.view)
     }
 
-    /// Returns a table that stores block object for every block height.
+    /// Returns a table that stores a block object for every block height.
     pub fn blocks(&self) -> MapIndex<&T, Hash, Block> {
         MapIndex::new(BLOCKS, &self.view)
     }
 
-    /// Returns a table that keeps block hash for the corresponding height.
+    /// Returns a table that keeps block hashes for corresponding block heights.
     pub fn block_hashes_by_height(&self) -> ListIndex<&T, Hash> {
         ListIndex::new(BLOCK_HASHES_BY_HEIGHT, &self.view)
     }
 
-    /// Returns a table that keeps a list of transactions for each block.
+    /// Returns a table that keeps the list of transactions for each block.
     pub fn block_transactions(&self, height: Height) -> ProofListIndex<&T, Hash> {
         let height: u64 = height.into();
         ProofListIndex::new_in_family(BLOCK_TRANSACTIONS, &height, &self.view)
     }
 
-    /// Returns a table that saves a list of precommits for the block with the given hash.
+    /// Returns a table that keeps a list of precommits for the block with the given hash.
     pub fn precommits(&self, hash: &Hash) -> ListIndex<&T, Precommit> {
         ListIndex::new_in_family(PRECOMMITS, hash, &self.view)
     }
@@ -152,17 +155,17 @@ where
     /// Returns the accessory `ProofMapIndex` for calculating
     /// patches in the DBView layer.
     ///
-    /// The table calculates "aggregation" of root hashes of individual
+    /// The table calculates the "aggregation" of root hashes of individual
     /// service tables, in effect summing the state of various entities,
     /// scattered across distinct services and their tables. Sum is performed by
     /// means of computing the root hash of this table.
     ///
     /// - Table **key** is 32 bytes of normalized coordinates of a service
-    /// table, as returned by `service_table_unique_key` helper function.
+    /// table, as returned by the `service_table_unique_key` helper function.
     /// - Table **value** is the root hash of a service table, which contributes
-    /// to the resulting block's `state_hash`.
+    /// to the `state_hash` of the resulting block.
     ///
-    /// Core tables participate in resulting state_hash with `CORE_SERVICE`
+    /// Core tables participate in the resulting state_hash with `CORE_SERVICE`
     /// service_id. Their vector is returned by the `core_state_hash` method.
     pub fn state_hash_aggregator(&self) -> ProofMapIndex<&T, Hash, Hash> {
         ProofMapIndex::new(STATE_HASH_AGGREGATOR, &self.view)
@@ -231,7 +234,7 @@ where
         Height(len - 1)
     }
 
-    /// Returns the configuration for the latest height of blockchain.
+    /// Returns the configuration for the latest height of the blockchain.
     ///
     /// # Panics
     ///
@@ -319,16 +322,16 @@ where
     /// path to the service table key is returned, which proves its exclusion.
     ///
     /// The resulting proof is used as a component of proof of state of any
-    /// entity, stored in `exonum` DB at a specific height, as identified
+    /// entity, stored in the `exonum` data base at a specific height, as identified
     /// by the corresponding block `state_hash`. State of some meta tables
     /// of core and services isn't tracked.
     ///
     /// # Arguments
     ///
     /// * `service_id` - `service_id` as returned by instance of type of
-    /// `Service` trait
-    /// * `table_idx` - index of service table in `Vec`, returned by
-    /// `state_hash` method of instance of type of `Service` trait
+    /// `Service` trait.
+    /// * `table_idx` - index of the service table in `Vec`, returned by the
+    /// `state_hash` method of an instance of a type of the `Service` trait.
     pub fn get_proof_to_service_table(
         &self,
         service_id: u16,
@@ -458,7 +461,7 @@ impl<'a> Schema<&'a mut Fork> {
         ListIndex::new(CONSENSUS_MESSAGES_CACHE, self.view)
     }
 
-    /// Saves the given consensus round value into storage.
+    /// Saves the given consensus round value into the storage.
     pub(crate) fn set_consensus_round(&mut self, round: Round) {
         let mut entry: Entry<&mut Fork, _> = Entry::new(CONSENSUS_ROUND, self.view);
         entry.set(round);
@@ -509,7 +512,7 @@ impl<'a> Schema<&'a mut Fork> {
         self.transactions_mut().put(&tx.hash(), tx);
     }
 
-    /// Changes transaction status from `in_pool`, to `committed`.
+    /// Changes the transaction status from `in_pool`, to `committed`.
     pub(crate) fn commit_transaction(&mut self, hash: &Hash) {
         self.transactions_pool_mut().remove(hash)
     }
