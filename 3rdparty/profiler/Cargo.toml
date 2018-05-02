@@ -7,7 +7,7 @@ description = "A profiling / flamegraph library."
 license = "Apache-2.0"
 
 [dependencies]
-lazy_static = "0.2.8"
+lazy_static = "1.0.0"
 ctrlc = "3.0.3"
 [features]
 nomock = []

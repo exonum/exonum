@@ -17,10 +17,6 @@
             <tab title="Log in">
               <form @submit.prevent="login">
                 <div class="form-group">
-                  <label class="control-label">Public key:</label>
-                  <input v-model="publicKey" type="text" class="form-control" placeholder="Enter public key" required>
-                </div>
-                <div class="form-group">
                   <label class="control-label">Secret key:</label>
                   <input v-model="secretKey" type="text" class="form-control" placeholder="Enter secret key" required>
                 </div>
@@ -33,11 +29,7 @@
     </div>
 
     <modal :visible="isModalVisible" title="Wallet has been created" action-btn="Log in" @close="closeModal" @submit="proceed">
-      <div class="alert alert-warning" role="alert">Save the key pair in a safe place. You will need it to log in to the demo next time.</div>
-      <div class="form-group">
-        <label>Public key:</label>
-        <div><code>{{ keyPair.publicKey }}</code></div>
-      </div>
+      <div class="alert alert-warning" role="alert">Save the secret key in a safe place. You will need it to log in to the demo next time.</div>
       <div class="form-group">
         <label>Secret key:</label>
         <div><code>{{ keyPair.secretKey }}</code></div>
@@ -49,10 +41,10 @@
 </template>
 
 <script>
-  const Tab = require('../components/Tab.vue')
-  const Tabs = require('../components/Tabs.vue')
-  const Modal = require('../components/Modal.vue')
-  const Spinner = require('../components/Spinner.vue')
+  import Tab from '../components/Tab.vue'
+  import Tabs from '../components/Tabs.vue'
+  import Modal from '../components/Modal.vue'
+  import Spinner from '../components/Spinner.vue'
 
   module.exports = {
     components: {
@@ -61,7 +53,7 @@
       Modal,
       Spinner
     },
-    data: function() {
+    data() {
       return {
         isModalVisible: false,
         isSpinnerVisible: false,
@@ -69,11 +61,7 @@
       }
     },
     methods: {
-      login: function() {
-        if (!this.$validateHex(this.publicKey)) {
-          return this.$notify('error', 'Invalid public key is passed')
-        }
-
+      login() {
         if (!this.$validateHex(this.secretKey, 64)) {
           return this.$notify('error', 'Invalid secret key is passed')
         }
@@ -81,46 +69,45 @@
         this.isSpinnerVisible = true
 
         this.$store.commit('login', {
-          publicKey: this.publicKey,
+          publicKey: this.secretKey.substr(64),
           secretKey: this.secretKey
         })
 
         this.$nextTick(function() {
-          this.$router.push({name: 'user'})
+          this.$router.push({ name: 'user' })
         })
       },
 
-      register: function() {
-        const self = this
-
+      async register() {
         if (!this.name) {
           return this.$notify('error', 'The name is a required field')
         }
 
         this.isSpinnerVisible = true
 
-        this.$blockchain.createWallet(this.name).then(keyPair => {
-          self.name = ''
-          self.keyPair = keyPair
-          self.isSpinnerVisible = false
-          self.isModalVisible = true
-        }).catch(function(error) {
-          self.isSpinnerVisible = false
-          self.$notify('error', error.toString())
-        })
+        try {
+          const keyPair = await this.$blockchain.createWallet(this.name)
+          this.name = ''
+          this.keyPair = keyPair
+          this.isSpinnerVisible = false
+          this.isModalVisible = true
+        } catch (error) {
+          this.isSpinnerVisible = false
+          this.$notify('error', error.toString())
+        }
       },
 
-      closeModal: function() {
+      closeModal() {
         this.isModalVisible = false
       },
 
-      proceed: function() {
+      proceed() {
         this.isModalVisible = false
 
         this.$store.commit('login', this.keyPair)
 
         this.$nextTick(function() {
-          this.$router.push({name: 'user'})
+          this.$router.push({ name: 'user' })
         })
       }
     }

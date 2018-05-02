@@ -19,6 +19,10 @@ exonum/fuzz/artifacts
 /npm-debug.log
 /package-lock.json
 
+# node (for testkit example)
+/testkit/examples/server/node_modules
+/testkit/examples/server/npm-debug.log
+
 # IDE files
 .idea
 .vscode

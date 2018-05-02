@@ -36,8 +36,8 @@
 </template>
 
 <script>
-  const Navbar = require('../components/Navbar.vue')
-  const Spinner = require('../components/Spinner.vue')
+  import Navbar from '../components/Navbar.vue'
+  import Spinner from '../components/Spinner.vue'
 
   module.exports = {
     components: {
@@ -51,25 +51,24 @@
       }
     },
     methods: {
-      loadBlocks: function(latest) {
-        const self = this
-
+      async loadBlocks(latest) {
         this.isSpinnerVisible = true
 
-        this.$blockchain.getBlocks(latest).then(data => {
-          self.isSpinnerVisible = false
-          self.blocks = self.blocks.concat(data)
-        }).catch(error => {
-          self.isSpinnerVisible = true
-          self.$notify('error', error.toString())
-        })
+        try {
+          const data = await this.$blockchain.getBlocks(latest)
+          this.blocks = this.blocks.concat(data.blocks)
+          this.isSpinnerVisible = false
+        } catch (error) {
+          this.isSpinnerVisible = false
+          this.$notify('error', error.toString())
+        }
       },
 
-      loadMore: function() {
-        this.loadBlocks(this.blocks[this.blocks.length - 1].height)
+      loadMore() {
+        this.loadBlocks(this.blocks[this.blocks.length - 1].height - 1)
       }
     },
-    mounted: function() {
+    mounted() {
       this.$nextTick(function() {
         this.loadBlocks()
       })

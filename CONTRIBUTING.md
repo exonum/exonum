@@ -23,7 +23,7 @@ cargo test --all
 
 ## Finding something to fix or improve
 
-The [good first issue] label can be used to find the easy issues.
+The [good first issue :heart:] label can be used to find the easy issues.
 
 ## Linters
 
@@ -78,7 +78,7 @@ but we have several additional conventions:
 [gitter]: https://gitter.im/exonum/exonum
 [gitter-ru]: https://gitter.im/exonum/ruExonum
 [installation guide]: https://exonum.com/doc/get-started/install/
-[good first issue]: https://github.com/exonum/exonum/labels/good%20first%20issue
+[good first issue :heart:]: https://github.com/exonum/exonum/labels/good%20first%20issue%20%3Aheart%3A
 [clippy]: https://github.com/rust-lang-nursery/rust-clippy
 [cargo audit]: https://github.com/RustSec/cargo-audit
 [cargo-deadlinks]: https://github.com/deadlinks/cargo-deadlinks

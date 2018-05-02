@@ -14,17 +14,27 @@
 
 #![allow(unsafe_code)]
 
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, Duration, TimeZone, Utc};
 use byteorder::{ByteOrder, LittleEndian};
 use uuid::{self, Uuid};
 
 use std::mem;
 use std::result::Result as StdResult;
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 use crypto::{Hash, PublicKey, Signature};
 use helpers::{Height, Round, ValidatorId};
 use super::{CheckedOffset, Error, Offset, Result};
+
+const SOCKET_ADDR_HEADER_SIZE: usize = 1;
+const PORT_SIZE: usize = 2;
+
+const IPV4_SIZE: usize = 4;
+const IPV6_SIZE: usize = 16;
+const SIZE_DIFF: usize = IPV6_SIZE - IPV4_SIZE;
+
+const IPV4_HEADER: u8 = 0;
+const IPV6_HEADER: u8 = 1;
 
 /// Trait for all types that could be a field in `encoding`.
 pub trait Field<'a> {
@@ -45,13 +55,17 @@ pub trait Field<'a> {
 
     /// Checks if data in the buffer could be deserialized.
     /// Returns an index of latest data seen.
+    /// Default implementation simply checks that the length of segment equals field size.
     #[allow(unused_variables)]
     fn check(
         buffer: &'a [u8],
         from: CheckedOffset,
         to: CheckedOffset,
         latest_segment: CheckedOffset,
-    ) -> ::std::result::Result<CheckedOffset, Error>;
+    ) -> Result {
+        debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
+        Ok(latest_segment)
+    }
 }
 
 /// implement field for all types that has writer and reader functions
@@ -78,16 +92,6 @@ macro_rules! implement_std_field {
                         to: $crate::encoding::Offset) {
                 $fn_write(&mut buffer[from as usize..to as usize], *self)
             }
-
-            fn check(_: &'a [u8],
-                        from: $crate::encoding::CheckedOffset,
-                        to: $crate::encoding::CheckedOffset,
-                        latest_segment: CheckedOffset)
-            ->  $crate::encoding::Result
-            {
-                debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
-                Ok(latest_segment)
-            }
         }
     )
 }
@@ -111,16 +115,6 @@ macro_rules! implement_std_typedef_field {
                         from: $crate::encoding::Offset,
                         to: $crate::encoding::Offset) {
                 $fn_write(&mut buffer[from as usize..to as usize], self.to_owned().into())
-            }
-
-            fn check(_: &'a [u8],
-                        from: $crate::encoding::CheckedOffset,
-                        to: $crate::encoding::CheckedOffset,
-                        latest_segment: CheckedOffset)
-            ->  $crate::encoding::Result
-            {
-                debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
-                Ok(latest_segment)
             }
         }
     )
@@ -155,16 +149,6 @@ macro_rules! implement_pod_as_ref_field {
                     ::std::slice::from_raw_parts(ptr as * const u8,
                                                         ::std::mem::size_of::<$name>())};
                 buffer[from as usize..to as usize].copy_from_slice(slice);
-            }
-
-            fn check(_: &'a [u8],
-                        from:  $crate::encoding::CheckedOffset,
-                        to:  $crate::encoding::CheckedOffset,
-                        latest_segment: $crate::encoding::CheckedOffset)
-            ->  $crate::encoding::Result
-            {
-                debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
-                Ok(latest_segment)
             }
         }
 
@@ -217,16 +201,6 @@ impl<'a> Field<'a> for u8 {
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, _: Offset) {
         buffer[from as usize] = *self;
     }
-
-    fn check(
-        _: &'a [u8],
-        from: CheckedOffset,
-        to: CheckedOffset,
-        latest_segment: CheckedOffset,
-    ) -> Result {
-        debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
-        Ok(latest_segment)
-    }
 }
 
 // TODO expect some codding of signed integers (ECR-156) ?
@@ -241,16 +215,6 @@ impl<'a> Field<'a> for i8 {
 
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, _: Offset) {
         buffer[from as usize] = *self as u8;
-    }
-
-    fn check(
-        _: &'a [u8],
-        from: CheckedOffset,
-        to: CheckedOffset,
-        latest_segment: CheckedOffset,
-    ) -> Result {
-        debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
-        Ok(latest_segment)
     }
 }
 
@@ -275,8 +239,10 @@ impl<'a> Field<'a> for DateTime<Utc> {
     }
 
     unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
-        let secs = LittleEndian::read_i64(&buffer[from as usize..from as usize + 8]);
-        let nanos = LittleEndian::read_u32(&buffer[from as usize + 8..to as usize]);
+        let secs =
+            LittleEndian::read_i64(&buffer[from as usize..from as usize + mem::size_of::<i64>()]);
+        let nanos =
+            LittleEndian::read_u32(&buffer[from as usize + mem::size_of::<i64>()..to as usize]);
         Utc.timestamp(secs, nanos)
     }
 
@@ -284,23 +250,103 @@ impl<'a> Field<'a> for DateTime<Utc> {
         let secs = self.timestamp();
         let nanos = self.timestamp_subsec_nanos();
         LittleEndian::write_i64(
-            &mut buffer[from as usize..to as usize - mem::size_of_val(&nanos)],
+            &mut buffer[from as usize..from as usize + mem::size_of::<i64>()],
             secs,
         );
         LittleEndian::write_u32(
-            &mut buffer[from as usize + mem::size_of_val(&secs)..to as usize],
+            &mut buffer[from as usize + mem::size_of::<i64>()..to as usize],
+            nanos,
+        );
+    }
+}
+
+fn is_duration_representation_valid(secs: i64, nanos: i32) -> bool {
+    // Signs are checked to avoid multiple representations for same duration.
+    // Example: 4 s + 4e8 ns = 5 s - 6e8 ns.
+    if (secs < 0 && nanos > 0) || (secs > 0 && nanos < 0) {
+        return false;
+    }
+
+    // Absolute value of nanoseconds must less than 10 ** 9.
+    let nanos_per_sec = 1_000_000_000;
+    if nanos <= -nanos_per_sec || nanos >= nanos_per_sec {
+        return false;
+    }
+
+    true
+}
+
+impl<'a> Field<'a> for Duration {
+    fn field_size() -> Offset {
+        (mem::size_of::<i64>() + mem::size_of::<i32>()) as Offset
+    }
+
+    unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
+        let secs =
+            LittleEndian::read_i64(&buffer[from as usize..from as usize + mem::size_of::<i64>()]);
+        let nanos =
+            LittleEndian::read_i32(&buffer[from as usize + mem::size_of::<i64>()..to as usize]);
+
+        // Assuming that buffer was checked and Duration object can be constructed.
+        Duration::seconds(secs) + Duration::nanoseconds(i64::from(nanos))
+    }
+
+    fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
+        let secs = self.num_seconds();
+        let nanos_as_duration = *self - Duration::seconds(secs);
+        // Since we're working with only nanos, no overflow is expected here.
+        let nanos = nanos_as_duration.num_nanoseconds().unwrap() as i32;
+
+        if !is_duration_representation_valid(secs, nanos) {
+            error!(
+                "Got Duration object with incorrect representation in Field::write: {}s {}ns",
+                secs, nanos
+            );
+        }
+
+        LittleEndian::write_i64(
+            &mut buffer[from as usize..from as usize + mem::size_of::<i64>()],
+            secs,
+        );
+        LittleEndian::write_i32(
+            &mut buffer[from as usize + mem::size_of::<i64>()..to as usize],
             nanos,
         );
     }
 
     fn check(
-        _: &'a [u8],
+        buffer: &'a [u8],
         from: CheckedOffset,
         to: CheckedOffset,
         latest_segment: CheckedOffset,
     ) -> Result {
         debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
-        Ok(latest_segment)
+        let from_unchecked = from.unchecked_offset() as usize;
+        let to_unchecked = to.unchecked_offset() as usize;
+
+        let secs =
+            LittleEndian::read_i64(&buffer[from_unchecked..from_unchecked + mem::size_of::<i64>()]);
+        let nanos =
+            LittleEndian::read_i32(&buffer[from_unchecked + mem::size_of::<i64>()..to_unchecked]);
+
+        let max_duration = Duration::max_value();
+        let min_duration = Duration::min_value();
+
+        // Duration::seconds() panics if amount of seconds exceeds limits.
+        if secs > max_duration.num_seconds() || secs < min_duration.num_seconds() {
+            return Err(Error::DurationOverflow);
+        }
+
+        if !is_duration_representation_valid(secs, nanos) {
+            return Err(Error::IncorrectDuration { secs, nanos });
+        }
+
+        // Result will be None in case of overflow.
+        let result = Duration::seconds(secs).checked_add(&Duration::nanoseconds(i64::from(nanos)));
+        match result {
+            Some(_) => Ok(latest_segment),
+            None => Err(Error::DurationOverflow),
+        }
     }
 }
 
@@ -309,37 +355,80 @@ impl<'a> Field<'a> for DateTime<Utc> {
 impl<'a> Field<'a> for SocketAddr {
     fn field_size() -> Offset {
         // FIXME: reserve space for future compatibility (ECR-156)
-        6
+        (SOCKET_ADDR_HEADER_SIZE + IPV6_SIZE + PORT_SIZE) as Offset
     }
 
     unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
-        let mut octets = [0u8; 4];
-        octets.copy_from_slice(&buffer[from as usize..from as usize + 4]);
-        let ip = Ipv4Addr::from(octets);
-        let port = LittleEndian::read_u16(&buffer[from as usize + 4..to as usize]);
-        SocketAddr::V4(SocketAddrV4::new(ip, port))
+        let addr_start = from as usize + SOCKET_ADDR_HEADER_SIZE;
+        let ip = match buffer[from as usize] {
+            IPV4_HEADER => {
+                let mut octets: [u8; IPV4_SIZE] = mem::uninitialized();
+                octets.copy_from_slice(&buffer[addr_start..addr_start + IPV4_SIZE]);
+                IpAddr::V4(Ipv4Addr::from(octets))
+            }
+            IPV6_HEADER => {
+                let mut octets: [u8; IPV6_SIZE] = mem::uninitialized();
+                octets.copy_from_slice(&buffer[addr_start..addr_start + IPV6_SIZE]);
+                IpAddr::V6(Ipv6Addr::from(octets))
+            }
+            header => panic!("Unknown header `{:X}` for SocketAddr", header),
+        };
+        let port = LittleEndian::read_u16(&buffer[to as usize - PORT_SIZE..to as usize]);
+        SocketAddr::new(ip, port)
     }
 
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
         match *self {
-            SocketAddr::V4(addr) => {
-                buffer[from as usize..to as usize - 2].copy_from_slice(&addr.ip().octets());
+            SocketAddr::V4(ref addr) => {
+                buffer[from as usize] = IPV4_HEADER;
+                buffer
+                    [from as usize + SOCKET_ADDR_HEADER_SIZE..to as usize - SIZE_DIFF - PORT_SIZE]
+                    .copy_from_slice(&addr.ip().octets());
+                // Padding.
+                buffer[to as usize - SIZE_DIFF - PORT_SIZE..to as usize - PORT_SIZE]
+                    .copy_from_slice(&[0u8; SIZE_DIFF]);
             }
-            SocketAddr::V6(_) => {
-                // FIXME: Supporting Ipv6 (ECR-156, ECR-158)
-                panic!("Ipv6 are currently unsupported")
+            SocketAddr::V6(ref addr) => {
+                buffer[from as usize] = IPV6_HEADER;
+                buffer[from as usize + SOCKET_ADDR_HEADER_SIZE..to as usize - PORT_SIZE]
+                    .copy_from_slice(&addr.ip().octets());
             }
         }
-        LittleEndian::write_u16(&mut buffer[to as usize - 2..to as usize], self.port());
+        LittleEndian::write_u16(
+            &mut buffer[to as usize - PORT_SIZE..to as usize],
+            self.port(),
+        );
     }
 
     fn check(
-        _: &'a [u8],
+        buffer: &'a [u8],
         from: CheckedOffset,
         to: CheckedOffset,
         latest_segment: CheckedOffset,
     ) -> Result {
         debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
+
+        let from_unchecked = from.unchecked_offset() as usize;
+        let to_unchecked = to.unchecked_offset() as usize;
+
+        if buffer[from_unchecked] != IPV4_HEADER && buffer[from_unchecked] != IPV6_HEADER {
+            return Err(Error::IncorrectSocketAddrHeader {
+                position: from.unchecked_offset(),
+                value: buffer[from_unchecked],
+            });
+        }
+
+        if buffer[from_unchecked] == IPV4_HEADER
+            && !(buffer[to_unchecked - SIZE_DIFF - PORT_SIZE..to_unchecked - PORT_SIZE]
+                == [0u8; SIZE_DIFF])
+        {
+            let mut value: [u8; SIZE_DIFF] = unsafe { mem::uninitialized() };
+            value.copy_from_slice(&buffer[to_unchecked - SIZE_DIFF..to_unchecked]);
+            return Err(Error::IncorrectSocketAddrPadding {
+                position: (to_unchecked - SIZE_DIFF) as Offset,
+                value,
+            });
+        }
         Ok(latest_segment)
     }
 }
