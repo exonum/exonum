@@ -48,15 +48,6 @@
               </li>
               <li class="list-group-item">
                 <div class="row">
-<<<<<<< HEAD
-=======
-                  <div class="col-sm-3"><strong>Network ID:</strong></div>
-                  <div class="col-sm-9">{{ transaction.network_id }}</div>
-                </div>
-              </li>
-              <li class="list-group-item">
-                <div class="row">
->>>>>>> remove-exonum-json-ecr-1170
                   <div class="col-sm-3"><strong>Service ID:</strong></div>
                   <div class="col-sm-9">{{ transaction.service_id }}</div>
                 </div>
