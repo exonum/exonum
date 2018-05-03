@@ -1,0 +1,17 @@
+
+[package]
+name = "exonum-fuzz"
+version = "0.0.1"
+authors = ["Automatically generated"]
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+exonum = { path = ".." }
+libfuzzer-sys = { git = "https://github.com/rust-fuzz/libfuzzer-sys.git" }
+
+[[bin]]
+name = "raw_message"
+path = "fuzz_targets/raw_message.rs"

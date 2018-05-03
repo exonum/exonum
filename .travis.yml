@@ -1,0 +1,155 @@
+language: rust
+
+addons:
+  apt:
+    sources:
+    - sourceline: 'ppa:giskou/librocksdb'
+    packages:
+    - gcc
+    - g++
+    - libssl-dev
+    - libcurl4-openssl-dev
+    - libelf-dev
+    - libdw-dev
+    - binutils-dev
+    - libiberty-dev
+    - libsnappy-dev
+    - librocksdb
+
+rust:
+  # Feel free to bump this version if you need features of newer Rust.
+  # Sync with badge in README.md
+  - 1.25.0
+
+cache:
+  directories:
+  - node_modules
+  - $HOME/.cargo
+  - $HOME/.local
+  - $TRAVIS_BUILD_DIR/target
+  - $TRAVIS_BUILD_DIR/testkit/examples/server/node_modules
+
+dist: trusty
+sudo: required
+
+env:
+  global:
+  - CLIPPY_VERS=0.0.187
+  - DEADLINKS_VERS=0.3.0
+  - SODIUM_VERS=1.0.13
+  - CARGO_INCREMENTAL=1
+  - RUSTFLAGS="-D warnings"
+  - ROCKSDB_LIB_DIR=/usr/lib/x86_64-linux-gnu
+  - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
+  matrix:
+  - FEATURE=test
+
+# Separate jobs should use `install` hook in order not to override these common
+# instructions.
+before_install:
+- |
+  if [ ! -f "$HOME/.local/lib/libsodium.a" ]; then
+    wget "https://github.com/jedisct1/libsodium/releases/download/$SODIUM_VERS/libsodium-$SODIUM_VERS.tar.gz" -t 5 -O "libsodium.tar.gz"
+    tar xvf libsodium.tar.gz
+    cd libsodium-$SODIUM_VERS
+    ./configure --prefix=$HOME/.local
+    make
+    make install
+    cd ..
+  fi
+- export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.local/lib
+- export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$HOME/.local/lib/pkgconfig
+
+jobs:
+  include:
+  # Formatting & other lints that do not require compilation
+  - env: FEATURE=lints
+    install:
+    - cargo-audit -V || cargo install cargo-audit --force
+    - cargo deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
+    - cargo install --list
+    - rustup component add rustfmt-preview
+    - rustfmt -V
+    - nvm install 8 && nvm use 8
+    - npm install cspell@"=2.1.12" # last working version
+    - ./node_modules/.bin/cspell --version
+    - npm install markdownlint-cli
+    - ./node_modules/.bin/markdownlint --version
+    script:
+    - cargo fmt --all -- --write-mode=diff
+    - ./node_modules/.bin/cspell sandbox/{src,examples,tests}/**/*.rs
+    - ./node_modules/.bin/cspell exonum/{src,benches,tests}/**/*.rs
+    - ./node_modules/.bin/cspell exonum/fuzz/fuzz_targets/*.rs
+    - ./node_modules/.bin/cspell testkit/{src,examples,tests}/**/*.rs
+    - ./node_modules/.bin/cspell services/configuration/{src,examples}/**/*.rs
+    - ./node_modules/.bin/cspell services/time/{src,examples,tests}/**/*.rs
+    - ./node_modules/.bin/cspell examples/cryptocurrency/{src,examples,tests}/**/*.rs
+    - ./node_modules/.bin/cspell examples/cryptocurrency-advanced/{src,examples,tests}/**/*.rs
+    - ./node_modules/.bin/cspell examples/timestamping/{src,examples,tests}/**/*.rs
+    - find . -not -path "./3rdparty/*" -and -not -path "./node_modules/*" -name "*.md" | xargs ./node_modules/.bin/cspell
+    - find . -not -path "./3rdparty/*" -and -not -path "./node_modules/*" -name "*.md" | xargs ./node_modules/.bin/markdownlint --config .markdownlintrc
+    - cargo doc --no-deps
+    # TODO: a tmp hack to ignore warnings about missing pages [ECR-703]
+    - mkdir -p target/std/string
+    - touch target/std/primitive.usize.html
+    - touch target/std/string/struct.String.html
+    - touch target/doc/exonum/encoding/serialize/trait.Serialize.html
+    - touch target/doc/exonum/encoding/serialize/reexport/serde/index.html
+    - touch target/doc/exonum_configuration/enum.Option.html
+    - mkdir -p target/doc/exonum/encoding/serialize/reexport/serde/ts_seconds
+    - touch target/doc/exonum/encoding/serialize/reexport/serde/ts_seconds/index.html
+    - cargo deadlinks --dir target/doc
+
+  # Clippy linting
+  - env: FEATURE=clippy
+    rust: nightly-2018-03-06
+    install:
+    - cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
+    script:
+    - cargo clippy --all -- -D warnings
+
+  # Tests
+  - env: FEATURE=test
+    addons:
+      apt:
+        sources:
+        - sourceline: 'ppa:giskou/librocksdb'
+        - sourceline: 'deb [arch=amd64] https://packages.microsoft.com/ubuntu/14.04/prod trusty main'
+          key_url: https://packages.microsoft.com/keys/microsoft.asc
+        packages:
+        - gcc
+        - g++
+        - libssl-dev
+        - libcurl4-openssl-dev
+        - libelf-dev
+        - libdw-dev
+        - binutils-dev
+        - libiberty-dev
+        - libsnappy-dev
+        - librocksdb
+        - powershell
+    install:
+    - nvm install 8 && nvm use 8
+    - cd $TRAVIS_BUILD_DIR/testkit/examples/server && npm install && cd $TRAVIS_BUILD_DIR
+    script:
+    - cargo test --all
+    - cargo run -p exonum --example explorer
+    - cargo run -p exonum-testkit --example timestamping
+    - cargo run -p exonum-testkit --example configuration_change
+    - cargo run -p exonum-time --example simple_service
+    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
+    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
+    - cd $TRAVIS_BUILD_DIR/testkit/examples/server && npm run test:unix
+
+  # Benchmarks (compilation only)
+  - env: FEATURE=benchmarks
+    rust: nightly-2018-03-06
+    script:
+    - RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
+
+notifications:
+  slack:
+    secure: ufnH5/ilJ/GkfzU28GguFgQzL1Jb7gGGVaBytCi1VW9cvME7wHC/Pf3ZDM9cVv7t8Cq6K423J8pSkT8vErB7GzHLGRJK8EsBkuGxiAJiHJIVNf/a20gjyqtS2wSyoVDDFz1LRtCNvQanSy2psSWyJcWtnAllluwRNHKXZWYFOpU6uqt2XIi1s3vuMyVw177alNyQkUJ6mhnt9ZDGoMXfcwXIvZ1bt3GPwAbuvAiHsShIrtVGJYTbIBDBsFsGgc1313xdz670xa1JrvZpIl0ZF91Z/0rxtQZjYos859ARnP+v5TfMpsOZbhVHtLI81/o/dOu/Dnrv2xo4VgLaHCTPfhO7LE7kGZ1OyEFqzsadL+k97JQnfkyyFRA84FrVNvgn5NStJtNRJu593v0zuI1OpmY5Xcu/XG2X3dpYZJGciKywoI8gFCc18taIqWY8P3uL/KdxX3VLikMkmYX+cXxHwhH/RvNLbfxD+hTepz+sGWBnLg/dFNpy3WdzJrSNKE9OAH3Gy53z32fT7XiGF8+juN3RB7MmoLA+sOKnGnjal+o44Ga7KDxHe9lOjRVWAQFH6lIEVNwpdEp+2zqu2QAyCIbYcyEdxo8oKXMwAOPFeIqFGshAYGSQAYbT9V75J2Hfcpqb+EXhiBluCSjoaacg4Yhsc/tFhqI7B5+tq7Z5KVU=
+  webhooks:
+    urls:
+    - https://webhooks.gitter.im/e/9599da7e3a500810190d

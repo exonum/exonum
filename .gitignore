@@ -1,0 +1,29 @@
+# vim files
+*.swp
+# macos files
+*.DS_Store
+
+# cargo
+target
+*/target
+*.rs.bk
+Cargo.lock
+
+# fuzz testing
+exonum/fuzz/target
+exonum/fuzz/corpus
+exonum/fuzz/artifacts
+
+# node (for cspell)
+/node_modules
+/npm-debug.log
+/package-lock.json
+
+# node (for testkit example)
+/testkit/examples/server/node_modules
+/testkit/examples/server/npm-debug.log
+
+# IDE files
+.idea
+.vscode
+*.iml
