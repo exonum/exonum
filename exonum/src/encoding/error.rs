@@ -72,7 +72,7 @@ pub enum Error {
         /// value that was parsed as size
         value: Offset,
     },
-    /// `RawMessage` is to short
+    /// `RawMessage` is too short
     UnexpectedlyShortRawMessage {
         /// position in buffer where error appears.
         position: Offset,
