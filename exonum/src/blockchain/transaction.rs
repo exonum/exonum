@@ -602,7 +602,6 @@ macro_rules! transactions {
             {
                 match self {$(
                     &$transaction_set::$name(ref tx) => tx.serialize(serializer),
->>>>>>> remove-exonum-json-ecr-1170
                 )*}
             }
         }
