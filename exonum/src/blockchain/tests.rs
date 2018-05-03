@@ -99,7 +99,7 @@ fn test_u64() {
             some_test: u64,
         }
     }
-    let test_data = r##"{"some_test":"1234"}"##;
+    let test_data = r##"{"some_test":1234}"##;
     let test = Test::new(1234);
     let data = serde_json::to_string(&test).unwrap();
     assert_eq!(data, test_data);

@@ -31,7 +31,11 @@ Generate blockchain configuration:
 ```sh
 mkdir example
 
+<<<<<<< HEAD
 exonum-timestamping generate-template example/common.toml --validators-count 4
+=======
+exonum-timestamping generate-template example/common.toml
+>>>>>>> remove-exonum-json-ecr-1170
 ```
 
 Generate templates of nodes configurations:

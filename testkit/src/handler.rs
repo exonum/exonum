@@ -171,7 +171,7 @@ impl TestKitHandler for TestKit {
 mod tests {
     use exonum::blockchain::{ExecutionResult, Service, Transaction};
     use exonum::crypto::{CryptoHash, Hash, PublicKey};
-    use exonum::encoding::{Error as EncodingError, serialize::json::ExonumJson};
+    use exonum::encoding::{Error as EncodingError};
     use exonum::explorer::BlockWithTransactions;
     use exonum::helpers::Height;
     use exonum::messages::{Message, RawTransaction};
@@ -297,7 +297,7 @@ mod tests {
         assert_eq!(block_info.transactions.len(), 1);
         assert_eq!(
             *block_info.transactions[0].content(),
-            tx.serialize_field().unwrap()
+            serde_json::to_value(tx.clone()).unwrap()
         );
 
         // Requests with a body that invoke `create_block`
@@ -319,7 +319,7 @@ mod tests {
             assert_eq!(block_info.transactions.len(), 1);
             assert_eq!(
                 *block_info.transactions[0].content(),
-                tx.serialize_field().unwrap()
+                serde_json::to_value(tx.clone()).unwrap()
             );
         }
     }
@@ -345,7 +345,7 @@ mod tests {
         assert_eq!(block_info.transactions.len(), 1);
         assert_eq!(
             *block_info.transactions[0].content(),
-            tx_foo.serialize_field().unwrap()
+            serde_json::to_value(tx_foo).unwrap()
         );
 
         let body = json!({ "tx_hashes": [ tx_bar.hash().to_string() ] });
@@ -356,7 +356,7 @@ mod tests {
         assert_eq!(block_info.transactions.len(), 1);
         assert_eq!(
             *block_info.transactions[0].content(),
-            tx_bar.serialize_field().unwrap()
+            serde_json::to_value(tx_bar).unwrap()
         );
     }
 

@@ -79,7 +79,7 @@ fn test_explorer_basics() {
         };
         assert_eq!(*tx_info.location(), TxLocation::new(Height(1), 0));
         assert_eq!(
-            serde_json::to_value(&tx_info).unwrap(),
+            serde_json::to_value(tx_info.content().as_ref()).unwrap(),
             json!({
                 "content": tx_alice,
                 "location": {
@@ -129,8 +129,9 @@ fn test_explorer_basics() {
     let err = tx_info.status().unwrap_err();
     assert_eq!(err.error_type(), TransactionErrorType::Panic);
     assert_eq!(err.description(), Some("oops"));
+    let tx_content = tx_info.content().as_ref();
     assert_eq!(
-        serde_json::to_value(&tx_info).unwrap(),
+        serde_json::to_value(&tx_content).unwrap(),
         json!({
             "content": tx_transfer,
             "location": {
@@ -383,7 +384,7 @@ fn test_block_with_transactions_index_overflow() {
 fn test_committed_transaction_roundtrip() {
     let mut blockchain = create_blockchain();
     let tx = tx_generator().next().unwrap();
-    let tx_json = tx.serialize_field().unwrap();
+    let tx_json = serde_json::to_value(&tx).unwrap();
     create_block(&mut blockchain, vec![tx]);
 
     let explorer = BlockchainExplorer::new(&blockchain);
@@ -398,7 +399,7 @@ fn test_committed_transaction_roundtrip() {
 fn test_transaction_info_roundtrip() {
     let mut blockchain = create_blockchain();
     let tx = tx_generator().next().unwrap();
-    let tx_json = tx.serialize_field().unwrap();
+    let tx_json = serde_json::to_value(&tx).unwrap();
 
     let mut fork = blockchain.fork();
     {
@@ -409,7 +410,8 @@ fn test_transaction_info_roundtrip() {
 
     let explorer = BlockchainExplorer::new(&blockchain);
     let info: TransactionInfo = explorer.transaction(&tx.hash()).unwrap();
-    let json = serde_json::to_value(&info).unwrap();
+    let content = info.content().as_ref();
+    let json = serde_json::to_value(&content).unwrap();
     let info: TransactionInfo<JsonValue> = serde_json::from_value(json).unwrap();
 
     assert_eq!(*info.content(), tx_json);
@@ -428,6 +430,6 @@ fn test_block_with_transactions_roundtrip() {
     let block_copy: BlockWithTransactions<JsonValue> = serde_json::from_value(block_json).unwrap();
     assert_eq!(
         *block_copy[0].content(),
-        block[0].content().serialize_field().unwrap()
+        serde_json::to_value(block[0].content()).unwrap()
     );
 }

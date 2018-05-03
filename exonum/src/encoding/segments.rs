@@ -15,8 +15,9 @@
 #![allow(unsafe_code)]
 
 use byteorder::{ByteOrder, LittleEndian};
-use bit_vec::BitVec;
+use serde_json::value::Value;
 
+use messages::BitVec;
 use messages::{MessageBuffer, RawMessage, HEADER_LENGTH};
 use crypto::Hash;
 use super::{CheckedOffset, Error, Field, Offset, Result};
@@ -66,6 +67,21 @@ where
             self.count() as u32,
         );
         self.extend_buffer(buffer);
+    }
+
+    fn from_value(value: Value,
+                  buffer: &mut Vec<u8>,
+                  from: Offset,
+                  to: Offset) {
+        /*let f = from_value::<T>(value).unwrap();
+        let pos = buf.len() as u32;
+        LittleEndian::write_u32(&mut buf[0 as usize..0 as usize + 4], pos);
+        LittleEndian::write_u32(
+            &mut buf[0 as usize + 4..mem::size_of::<T>() as usize],
+            f.count() as u32,
+        );
+        f.extend_buffer(buf);*/
+        unimplemented!()
     }
 
     fn check(

@@ -18,9 +18,12 @@ pub use self::raw::{Message, MessageBuffer, MessageWriter, RawMessage, ServiceMe
                     HEADER_LENGTH, PROTOCOL_MAJOR_VERSION};
 pub use self::protocol::*;
 
-use bit_vec::BitVec;
+use serde::{Serialize, Serializer};
+
+use bit_vec::BitVec as BV;
 
 use std::fmt;
+use std::ops::{Deref, DerefMut};
 
 use crypto::PublicKey;
 use encoding::Error;
@@ -33,6 +36,60 @@ mod protocol;
 
 #[cfg(test)]
 mod tests;
+
+/// `bit_vec::BitVec` wrap for `serde::Serialize` implementation
+#[derive(Debug, Clone, PartialEq)]
+pub struct BitVec(BV);
+
+impl BitVec {
+    /// `bit_vec::BitVec::new` delegation
+    pub fn new() -> Self {
+        BitVec(BV::new())
+    }
+
+    /// `bit_vec::BitVec::from_elem` delegation
+    pub fn from_elem(nbits: usize, bit: bool) -> Self {
+        BitVec(BV::from_elem(nbits, bit))
+    }
+
+    /// `bit_vec::BitVec::with_capacity` delegation
+    pub fn with_capacity(nbits: usize) -> Self {
+        BitVec(BV::with_capacity(nbits))
+    }
+
+    /// `bit_vec::BitVec::from_bytes` delegation
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        BitVec(BV::from_bytes(bytes))
+    }
+
+    /// `bit_vec::BitVec::from_fn` delegation
+    pub fn from_fn<F>(len: usize, mut f: F) -> Self
+        where F: FnMut(usize) -> bool
+    {
+        BitVec(BV::from_fn(len, f))
+    }
+}
+
+impl Deref for BitVec {
+    type Target = BV;
+    fn deref(&self) -> &BV {
+        &self.0
+    }
+}
+
+impl DerefMut for BitVec {
+    fn deref_mut(&mut self) -> &mut BV {
+        &mut self.0
+    }
+}
+
+impl Serialize for BitVec {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        unimplemented!()
+    }
+}
 
 // TODO: implement common methods for enum types (hash, raw, from_raw, verify)
 // TODO: use macro for implementing enums (ECR-166)

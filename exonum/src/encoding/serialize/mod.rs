@@ -95,7 +95,12 @@ impl WriteBufferWrapper for Vec<u8> {
 /// Reexport of `serde` specific traits, this reexports
 /// provide compatibility layer with important `serde` version.
 pub mod reexport {
-    pub use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    /// Reexport of `erased_serde` specific traits
+    pub mod erased {
+        pub use erased_serde::{Serialize, Serializer};
+    }
+    pub use serde::{Deserialize, Deserializer, Serializer};
+    pub use serde::Serialize;
     pub use serde::de::Error as DeError;
     pub use serde::ser::Error as SerError;
     pub use serde::ser::SerializeStruct;

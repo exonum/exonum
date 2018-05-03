@@ -33,7 +33,7 @@ use exonum::blockchain::{Transaction, TransactionErrorType as ErrorType};
 use exonum::crypto::{self, CryptoHash, PublicKey};
 use exonum::helpers::Height;
 use exonum::messages::Message;
-use exonum::encoding::serialize::{FromHex, json::ExonumJson};
+use exonum::encoding::serialize::{FromHex};
 use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};
 use serde_json::Value;
 
@@ -572,7 +572,7 @@ fn test_explorer_transaction_info() {
         info,
         json!({
             "type": "in-pool",
-            "content": tx.serialize_field().unwrap(),
+            "content": serde_json::to_value(&tx).unwrap(),
         })
     );
 

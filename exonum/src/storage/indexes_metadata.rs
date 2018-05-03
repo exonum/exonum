@@ -14,13 +14,14 @@
 
 #![allow(unsafe_code)]
 
+use serde_json::{Value, from_value};
+
 use std::borrow::Cow;
-use std::error::Error;
 
 use storage::{BaseIndex, Fork, Snapshot, StorageValue};
 use crypto::{CryptoHash, Hash};
 use encoding::{CheckedOffset, Error as EncodingError, Field, Offset};
-use encoding::serialize::{json, WriteBufferWrapper};
+use encoding::serialize::{WriteBufferWrapper};
 
 pub const INDEXES_METADATA_TABLE_NAME: &str = "__INDEXES_METADATA__";
 
@@ -31,7 +32,7 @@ encoding_struct!(
     }
 );
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[repr(u8)]
 pub enum IndexType {
     Entry,
@@ -82,6 +83,10 @@ impl StorageValue for IndexType {
 }
 
 impl<'a> Field<'a> for IndexType {
+    fn field_size() -> Offset {
+        u8::field_size()
+    }
+
     unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
         u8::read(buffer, from, to).into()
     }
@@ -90,8 +95,12 @@ impl<'a> Field<'a> for IndexType {
         (*self as u8).write(buffer, from, to)
     }
 
-    fn field_size() -> Offset {
-        u8::field_size()
+    fn from_value(value: Value,
+                  buffer: &mut Vec<u8>,
+                  from: Offset,
+                  to: Offset) {
+        let _self = from_value::<IndexType>(value).unwrap();
+        _self.write(buffer, from, to);
     }
 
     fn check(
@@ -101,26 +110,6 @@ impl<'a> Field<'a> for IndexType {
         latest_segment: CheckedOffset,
     ) -> ::std::result::Result<CheckedOffset, EncodingError> {
         u8::check(buffer, from, to, latest_segment)
-    }
-}
-
-impl json::ExonumJson for IndexType {
-    fn deserialize_field<B: WriteBufferWrapper>(
-        value: &json::reexport::Value,
-        buffer: &mut B,
-        from: Offset,
-        to: Offset,
-    ) -> Result<(), Box<Error>>
-    where
-        Self: Sized,
-    {
-        let v = value.as_u64().ok_or("Can't cast json as u64")? as u8;
-        buffer.write(from, to, v);
-        Ok(())
-    }
-
-    fn serialize_field(&self) -> Result<json::reexport::Value, Box<Error + Send + Sync>> {
-        Ok(json::reexport::Value::from(*self as u8))
     }
 }
 

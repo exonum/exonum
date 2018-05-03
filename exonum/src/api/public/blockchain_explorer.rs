@@ -122,7 +122,11 @@ impl ExplorerApi {
 
             match self.transaction_info(&hash) {
                 None => self.not_found_response(&json!({ "type": "unknown" })),
-                Some(info) => self.ok_response(&::serde_json::to_value(info).unwrap()),
+                Some(info) => {
+                    let content = info.content().as_ref();
+                    //serialize(&content, serializer)
+                    self.ok_response(&::serde_json::to_value(&content).unwrap())
+                },
             }
         };
 

@@ -123,10 +123,10 @@ fn main() {
 
     // `CommittedTransaction` JSON presentation
     assert_eq!(
-        serde_json::to_value(&tx).unwrap(),
+        serde_json::to_value(tx.content().as_ref()).unwrap(),
         json!({
             // `Transaction` JSON presentation
-            "content": tx.content().serialize_field().unwrap(),
+            "content": serde_json::to_value(tx.content().as_ref()).unwrap(),
             // Position in block
             "location": {
                 "block_height": "1",
@@ -142,7 +142,7 @@ fn main() {
     // JSON for erroneous transactions
     let erroneous_tx = explorer.block(Height(1)).unwrap().transaction(1).unwrap();
     assert_eq!(
-        serde_json::to_value(&erroneous_tx).unwrap(),
+        serde_json::to_value(erroneous_tx.content().as_ref()).unwrap(),
         json!({
             "status": {
                 "type": "error",
@@ -150,7 +150,7 @@ fn main() {
                 "description": "Not allowed",
             },
             // Other fields...
-            "content": erroneous_tx.content().serialize_field().unwrap(),
+            "content": serde_json::to_value(erroneous_tx.content().as_ref()).unwrap(),
             "location": erroneous_tx.location(),
             "location_proof": erroneous_tx.location_proof(),
         })
@@ -158,12 +158,13 @@ fn main() {
 
     // JSON for panicking transactions
     let panicked_tx = explorer.block(Height(1)).unwrap().transaction(2).unwrap();
+    let panicked_content = panicked_tx.content().as_ref();
     assert_eq!(
         serde_json::to_value(&panicked_tx).unwrap(),
         json!({
             "status": { "type": "panic", "description": "oops" },
             // Other fields...
-            "content": panicked_tx.content().serialize_field().unwrap(),
+            "content": serde_json::to_value(&panicked_content).unwrap(),
             "location": panicked_tx.location(),
             "location_proof": panicked_tx.location_proof(),
         })
@@ -182,7 +183,7 @@ fn main() {
         serde_json::to_value(&committed_tx).unwrap(),
         json!({
             "type": "committed",
-            "content": committed_tx.content().serialize_field().unwrap(),
+            "content": serde_json::to_value(&committed_tx.content()).unwrap(),
             "status": { "type": "success" },
             "location": tx_ref.location(),
             "location_proof": tx_ref.location_proof(),
@@ -195,7 +196,7 @@ fn main() {
         serde_json::to_value(&tx_in_pool).unwrap(),
         json!({
             "type": "in-pool",
-            "content": tx_in_pool.content().serialize_field().unwrap(),
+            "content": serde_json::to_value(&tx_in_pool.content()).unwrap(),
         })
     );
 
