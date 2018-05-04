@@ -148,6 +148,8 @@ pub struct NodeApiConfig {
     pub state_update_timeout: usize,
     /// Enable api endpoints for the `blockchain_explorer` on public api address.
     pub enable_blockchain_explorer: bool,
+    /// Enable private unsafe api
+    pub enable_unsafe_api: bool,
     /// Listen address for public api endpoints.
     pub public_api_address: Option<SocketAddr>,
     /// Listen address for private api endpoints.
@@ -164,6 +166,7 @@ impl Default for NodeApiConfig {
         NodeApiConfig {
             state_update_timeout: 10_000,
             enable_blockchain_explorer: true,
+            enable_unsafe_api: false,
             public_api_address: None,
             private_api_address: None,
             allow_origin: None,
@@ -872,8 +875,12 @@ impl Node {
         // Start private api.
         if let Some(listen_address) = self.api_options.private_api_address {
             let api_sender = self.channel();
-            let handler =
-                create_private_api_handler(blockchain.clone(), api_state.clone(), api_sender);
+            let handler = create_private_api_handler(
+                blockchain.clone(),
+                api_state.clone(),
+                api_sender,
+                &self.api_options,
+            );
             let listener = Iron::new(handler).http(listen_address).unwrap();
             api_handlers.push(listener);
 
@@ -983,9 +990,17 @@ pub fn create_private_api_handler(
     blockchain: Blockchain,
     shared_api_state: SharedNodeState,
     api_sender: ApiSender,
+    config: &NodeApiConfig,
 ) -> Chain {
     let mut mount = Mount::new();
     mount.mount("api/services", blockchain.mount_private_api());
+
+    if config.enable_unsafe_api {
+        let mut router = Router::new();
+        let unsafe_api = private::UnsafeApi::new(blockchain.clone());
+        unsafe_api.wire(&mut router);
+        mount.mount("api/unsafe", router);
+    }
 
     let mut router = Router::new();
     let node_info = private::NodeInfo::new(blockchain.service_map().iter().map(|(_, s)| s));

@@ -15,5 +15,7 @@
 //! Private part of the Exonum rest api.
 
 pub use self::system::{NodeInfo, SystemApi};
+pub use self::unsafe_api::UnsafeApi;
 
 mod system;
+mod unsafe_api;
