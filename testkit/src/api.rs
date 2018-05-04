@@ -40,6 +40,8 @@ use super::TestKit;
 pub enum ApiKind {
     /// `api/system` endpoints of the built-in Exonum REST API.
     System,
+    /// `api/unsafe` endpoints of the built-in Exonum REST API.
+    Unsafe,
     /// `api/explorer` endpoints of the built-in Exonum REST API.
     Explorer,
     /// Endpoints corresponding to a service with the specified string identifier.
@@ -50,6 +52,7 @@ impl ApiKind {
     fn into_prefix(self) -> String {
         match self {
             ApiKind::System => "api/system".to_string(),
+            ApiKind::Unsafe => "api/unsafe".to_string(),
             ApiKind::Explorer => "api/explorer".to_string(),
             ApiKind::Service(name) => format!("api/services/{}", name),
         }
@@ -94,6 +97,7 @@ impl TestKitApi {
                     blockchain.clone(),
                     api_state,
                     testkit.api_sender.clone(),
+                    &testkit.api_config,
                 );
                 handler.link_after(|req: &mut Request, resp| {
                     log_request(&ApiAccess::Private, req, resp)

@@ -153,6 +153,12 @@ impl Blockchain {
         self.db.merge(patch)
     }
 
+    /// Commits changes from the patch to the blockchain storage with fsync.
+    /// See [`Fork`](../storage/struct.Fork.html) for details.
+    pub fn merge_sync(&mut self, patch: Patch) -> Result<(), Error> {
+        self.db.merge_sync(patch)
+    }
+
     /// Returns the hash of latest committed block.
     ///
     /// # Panics
