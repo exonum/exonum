@@ -130,9 +130,7 @@ fn test_node_run() {
     }
 }
 
-// See ECR-907 for the details.
 #[test]
-#[ignore]
 fn test_node_shutdown_twice() {
     let (nodes, commit_rxs) = run_nodes(1, 16_400);
 
