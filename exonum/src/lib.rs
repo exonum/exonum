@@ -70,6 +70,7 @@ extern crate tokio_codec;
 extern crate tokio_core;
 extern crate tokio_io;
 extern crate tokio_retry;
+extern crate tokio_threadpool;
 extern crate toml;
 extern crate uuid;
 extern crate vec_map;
