@@ -19,6 +19,7 @@ pub mod codec;
 pub mod error;
 pub mod network;
 pub mod internal;
+pub mod noise;
 
 use futures::{Async, Future, Poll, Stream};
 use futures::sink::Wait;
@@ -30,8 +31,8 @@ use std::cmp::Ordering;
 use node::{ExternalMessage, NodeTimeout};
 use helpers::{Height, Round};
 
-#[cfg(test)]
-mod tests;
+//#[cfg(test)]
+pub mod tests;
 #[cfg(all(test, feature = "long_benchmarks"))]
 mod benches;
 

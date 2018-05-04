@@ -837,17 +837,18 @@ impl Node {
 
     /// Launches only consensus messages handler.
     /// This may be used if you want to customize api with the `ApiContext`.
-    pub fn run_handler(mut self) -> io::Result<()> {
+    pub fn run_handler(mut self, consensus_key: &PublicKey) -> io::Result<()> {
         self.handler.initialize();
 
         let (handler_part, network_part, timeouts_part) = self.into_reactor();
+        let consensus_key = consensus_key.clone();
 
         let network_thread = thread::spawn(move || {
             let mut core = Core::new()?;
             let handle = core.handle();
             core.handle()
                 .spawn(timeouts_part.run(handle).map_err(log_error));
-            let network_handler = network_part.run(&core.handle());
+            let network_handler = network_part.run(&core.handle(), &consensus_key);
             core.run(network_handler).map(drop).map_err(|e| {
                 other_error(&format!("An error in the `Network` thread occurred: {}", e))
             })
@@ -867,6 +868,7 @@ impl Node {
     pub fn run(self) -> io::Result<()> {
         let api_state = self.handler.api_state.clone();
         let blockchain = self.handler.blockchain.clone();
+        let consensus_key = self.handler().state().consensus_public_key().clone();
         let mut api_handlers: Vec<Listening> = Vec::new();
 
         // Start private api.
@@ -889,7 +891,8 @@ impl Node {
             info!("Public exonum api started on {}", listen_address);
         };
 
-        self.run_handler()?;
+        //TODO: find better way to provide key to Noise configuration
+        self.run_handler(&consensus_key)?;
 
         // Stop all api handlers.
         for mut handler in api_handlers {

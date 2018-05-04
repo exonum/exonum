@@ -22,11 +22,13 @@ use messages::{MessageBuffer, RawMessage, HEADER_LENGTH};
 use super::error::other_error;
 
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct MessagesCodec {
     /// Maximum message length (in bytes), gets populated from `ConsensusConfig`.
     max_message_len: u32,
 }
 
+#[allow(dead_code)]
 impl MessagesCodec {
     pub fn new(max_message_len: u32) -> MessagesCodec {
         MessagesCodec { max_message_len }
