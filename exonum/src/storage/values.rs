@@ -328,7 +328,6 @@ impl StorageValue for Decimal {
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
-        assert_eq!(value.len(), 16);
         let mut buf: [u8; 16] = [0; 16];
         buf.copy_from_slice(&value);
         Self::deserialize(buf)
@@ -518,8 +517,8 @@ mod tests {
             Decimal::new(9497628354687268, 12),
         ];
 
-        for value in values.iter() {
-            let bytes = value.clone().into_bytes();
+        for value in values.into_iter() {
+            let bytes = value.into_bytes();
             assert_eq!(
                 *value,
                 <Decimal as StorageValue>::from_bytes(Cow::Borrowed(&bytes))
