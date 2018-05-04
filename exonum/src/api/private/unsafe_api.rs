@@ -31,9 +31,7 @@ pub struct UnsafeApi {
 impl UnsafeApi {
     /// Creates a new `private::UnsafeApi` instance.
     pub fn new(blockchain: Blockchain) -> UnsafeApi {
-        UnsafeApi {
-            blockchain,
-        }
+        UnsafeApi { blockchain }
     }
 
     fn handle_unsafe_shutdown(self, router: &mut Router) {
