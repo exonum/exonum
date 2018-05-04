@@ -474,21 +474,11 @@ impl<'a> Field<'a> for Decimal {
 
     unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
         let mut bytes: [u8; DECIMAL_SIZE] = mem::uninitialized();
-        bytes.copy_from_slice(&buffer[from as usize ..to as usize]);
+        bytes.copy_from_slice(&buffer[from as usize..to as usize]);
         Decimal::deserialize(bytes)
     }
 
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
         buffer[from as usize..to as usize].copy_from_slice(&self.serialize());
-    }
-
-    fn check(
-        buffer: &'a [u8],
-        from: CheckedOffset,
-        to: CheckedOffset,
-        latest_segment: CheckedOffset,
-    ) -> Result {
-        debug_assert_eq!((to - from)?.unchecked_offset(), Self::field_size());
-        Ok(latest_segment)
     }
 }

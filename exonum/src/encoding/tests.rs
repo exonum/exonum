@@ -166,7 +166,6 @@ fn test_decimal() {
     assert_write_check_read(pi, 16);
 }
 
-
 #[test]
 fn test_check_invalid_duration_too_big() {
     let secs = i64::max_value();

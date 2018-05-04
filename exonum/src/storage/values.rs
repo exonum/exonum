@@ -21,7 +21,6 @@ use rust_decimal::Decimal;
 
 use std::mem;
 use std::borrow::Cow;
-use std::str::FromStr;
 
 use crypto::{Hash, PublicKey};
 use encoding::{Field, Offset};
@@ -330,16 +329,16 @@ impl StorageValue for Decimal {
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
         assert_eq!(value.len(), 16);
-        let mut buf: [u8; 16]  = [0; 16];
+        let mut buf: [u8; 16] = [0; 16];
         buf.copy_from_slice(&value);
         Self::deserialize(buf)
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::str::FromStr;
 
     #[test]
     fn u8_round_trip() {
@@ -516,7 +515,7 @@ mod tests {
         let values = [
             Decimal::from_str("3.14").unwrap(),
             Decimal::from_parts(1102470952, 185874565, 1703060790, false, 28),
-            Decimal::new(983712497628354687268, 12),
+            Decimal::new(9497628354687268, 12),
         ];
 
         for value in values.iter() {
