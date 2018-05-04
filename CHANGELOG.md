@@ -27,6 +27,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Already processed transactions are rejected now in
   `NodeHandler::handle_incoming_tx` method. (#642)
 
+- Fixed bug with shutdown requests handling. (#666)
+
 #### exonum-cryptocurrency-advanced
 
 - Frontend has been updated to reflect latest backend changes. (#602 #611)
@@ -39,13 +41,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   reduce boilerplate. (#639)
 
 - Metrics are now using `chrono::DateTime<Utc>` instead of `SystemTime`. (#620)
-
-### Internal improvements
-
-#### exonum
-
-- Default implementation of `check` method was added to `Field` trait to
-  reduce boilerplate. (#639)
 
 #### exonum-time
 
