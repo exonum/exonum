@@ -16,6 +16,9 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 
+use serde::{Serialize, Serializer};
+use serde::ser::SerializeStruct;
+
 use std::{convert, mem, sync};
 use std::fmt::Debug;
 use std::ops::Deref;
@@ -303,5 +306,21 @@ impl Message for RawMessage {
 
     fn verify_signature(&self, pub_key: &PublicKey) -> bool {
         verify(self.signature(), self.body(), pub_key)
+    }
+}
+
+impl Serialize for RawMessage {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        use serde::ser::SerializeStruct;
+        let mut structure = serializer.serialize_struct(stringify!($name), 4)?;
+
+        structure.serialize_field("signature", &self.signature())?;
+        structure.serialize_field("message_id", &self.message_type())?;
+        structure.serialize_field("service_id", &self.service_id())?;
+        structure.serialize_field("protocol_version", &self.version())?;
+
+        structure.end()
     }
 }

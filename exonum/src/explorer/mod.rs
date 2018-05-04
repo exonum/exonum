@@ -17,7 +17,8 @@
 //!
 //! See the `explorer` example in the crate for examples of usage.
 
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Serialize, Serializer};
+use serde::ser::SerializeStruct;
 
 use std::cell::{Ref, RefCell};
 use std::collections::Bound;
@@ -270,10 +271,10 @@ impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
 /// This generalization is needed to deserialize the type, e.g.,
 /// by using `BlockWithTransactions<serde_json::Value>`.
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(bound(serialize = "T: SerializeContent"))]
+//#[serde(bound(serialize = "T: SerializeContent"))]
 pub struct BlockWithTransactions<T = Box<Transaction>> {
     /// Block header as recorded in the blockchain.
-    #[serde(rename = "block")]
+    //#[serde(rename = "block")]
     pub header: Block,
     /// Precommits.
     pub precommits: Vec<Precommit>,
@@ -433,41 +434,21 @@ impl<'a, T> IntoIterator for &'a BlockWithTransactions<T> {
 /// # } // main
 /// ```
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(bound(serialize = "T: SerializeContent"))]
+//#[serde(bound(serialize = "T: ErasedSerialize"))]
 pub struct CommittedTransaction<T = Box<Transaction>> {
-    #[serde(serialize_with = "SerializeContent::serialize_content")]
+    //#[serde(with = "ErasedSerialize::erased_serialize")]
     content: T,
     location: TxLocation,
     location_proof: ListProof<Hash>,
-    #[serde(with = "TxStatus")]
+    //#[serde(with = "TxStatus")]
     status: TransactionResult,
 }
 
-/// Transaction execution status. Simplified version of `TransactionResult`.
-#[serde(tag = "type", rename_all = "kebab-case")]
 #[derive(Debug, Serialize, Deserialize)]
 enum TxStatus<'a> {
     Success,
     Panic { description: &'a str },
     Error { code: u8, description: &'a str },
-}
-
-impl<'a> TxStatus<'a> {
-    fn serialize<S>(result: &TransactionResult, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let status = TxStatus::from(result);
-        status.serialize(serializer)
-    }
-
-    fn deserialize<D>(deserializer: D) -> Result<TransactionResult, D::Error>
-    where
-        D: Deserializer<'a>,
-    {
-        let tx_status = <Self as Deserialize>::deserialize(deserializer)?;
-        Ok(TransactionResult::from(tx_status))
-    }
 }
 
 impl<'a> From<&'a TransactionResult> for TxStatus<'a> {
@@ -604,63 +585,17 @@ impl<T> CommittedTransaction<T> {
 /// # } // main
 /// ```
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "kebab-case", bound(serialize = "T: SerializeContent"))]
+//#[serde(tag = "type", rename_all = "kebab-case", bound(serialize = "T: Serialize"))]
 pub enum TransactionInfo<T = Box<Transaction>> {
     /// Transaction is in the memory pool, but not yet committed to the blockchain.
     InPool {
         /// Transaction contents.
-        #[serde(serialize_with = "SerializeContent::serialize_content")]
+        //#[serde(serialize_with = "SerializeContent::serialize_content")]
         content: T,
     },
 
     /// Transaction is already committed to the blockchain.
     Committed(CommittedTransaction<T>),
-}
-
-/// A helper trait functionally equivalent to `serde`'s `Serialize`.
-///
-/// The trait is used to specify bounds on the `Serialize` implementation
-/// in transaction-related types in the `explorer` module, such as [`TransactionInfo`]
-/// and [`CommittedTransaction`].
-///
-/// # Why separate trait?
-///
-/// It is impossible to implement `Serialize` for `Box<Transaction>` (per Rust restrictions).
-/// Similarly, it is impossible to specify `Serialize` as a super-trait for `Transaction`,
-/// as it would render `Transaction` not object-safe. Thus, `SerializeContent` makes
-/// `Box<Transaction>` (as well as types containing transactions) serializable without
-/// needing a manual implementation of `Serialize`.
-///
-/// [`TransactionInfo`]: enum.TransactionInfo.html
-/// [`CommittedTransaction`]: struct.CommittedTransaction.html
-pub trait SerializeContent {
-    /// Serializes content of a transaction with the given serializer.
-    fn serialize_content<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer;
-}
-
-impl<T: Serialize> SerializeContent for T {
-    fn serialize_content<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        self.serialize(serializer)
-    }
-}
-
-impl SerializeContent for Box<Transaction> {
-    fn serialize_content<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        use serde::ser::Error;
-
-        let value = self.as_ref()
-            .serialize_field()
-            .map_err(|err| S::Error::custom(err.description()))?;
-        value.serialize(serializer)
-    }
 }
 
 impl<T> TransactionInfo<T> {

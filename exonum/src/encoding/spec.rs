@@ -87,6 +87,16 @@ macro_rules! encoding_struct {
                 $crate::encoding::Field::write(&self.raw, buffer, from, to);
             }
 
+            fn from_value(value: $crate::encoding::serialize::json::reexport::Value,
+                            buffer: &mut Vec<u8>,
+                            from: $crate::encoding::Offset,
+                            to: $crate::encoding::Offset)
+            {
+                use $crate::encoding::serialize::json::reexport::from_value;
+                let _self = from_value::<$name>(value).unwrap();
+                _self.write(buffer, from, to);
+            }
+
             #[allow(unused_variables)]
             #[allow(unused_comparisons)]
             fn check(buffer: &'a [u8],
@@ -183,77 +193,40 @@ macro_rules! encoding_struct {
             }
         }
 
-        impl $crate::encoding::serialize::json::ExonumJson for $name {
-            #[allow(unused_variables)]
-            fn deserialize_field<B> (value: &$crate::encoding::serialize::json::reexport::Value,
-                                        buffer: & mut B,
-                                        from: $crate::encoding::Offset,
-                                        to: $crate::encoding::Offset )
-                -> Result<(), Box<::std::error::Error>>
-                where B: $crate::encoding::serialize::WriteBufferWrapper
-            {
-                use $crate::encoding::serialize::json::ExonumJsonDeserialize;
-                // deserialize full field
-                let structure = <Self as ExonumJsonDeserialize>::deserialize(value)?;
-                // then write it
-                buffer.write(from, to, structure);
-
-                Ok(())
-            }
-
-
-            #[allow(unused_mut)]
-            fn serialize_field(&self)
-                -> Result<$crate::encoding::serialize::json::reexport::Value,
-                          Box<::std::error::Error + Send + Sync>>
-            {
-                use $crate::encoding::serialize::json::reexport::Value;
-                let mut map = $crate::encoding::serialize::json::reexport::Map::new();
-                $(
-                    map.insert(stringify!($field_name).to_string(),
-                        self.$field_name().serialize_field()?);
-                )*
-                Ok(Value::Object(map))
-            }
-        }
-        impl $crate::encoding::serialize::json::ExonumJsonDeserialize for $name {
-            #[allow(unused_imports, unused_mut)]
-            fn deserialize(value: &$crate::encoding::serialize::json::reexport::Value)
-                -> Result<Self, Box<::std::error::Error>> {
-                use $crate::encoding::serialize::json::ExonumJson as ExonumJson;
-                let mut buf = vec![0; $name::__ex_header_size() as usize];
-                let _obj = value.as_object().ok_or("Can't cast json as object.")?;
-                __ex_for_each_field!(
-                    __ex_deserialize_field, (_obj, buf),
-                    $( ($(#[$field_attr])*, $field_name, $field_type) )*
-                );
-                Ok($name { raw: buf })
-            }
-        }
-
         // TODO: Rewrite Deserialize and Serialize implementation (ECR-156)
+        #[allow(unsafe_code)]
         impl<'de> $crate::encoding::serialize::reexport::Deserialize<'de> for $name {
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
                 where D: $crate::encoding::serialize::reexport::Deserializer<'de>
             {
-                use $crate::encoding::serialize::json::reexport::Value;
-                use $crate::encoding::serialize::reexport::{DeError, Deserialize};
-                let value = <Value as Deserialize>::deserialize(deserializer)?;
-                <Self as $crate::encoding::serialize::json::ExonumJsonDeserialize>::deserialize(
-                    &value).map_err(|_| D::Error::custom("Can not deserialize value."))
+                use $crate::encoding::serialize::json::reexport::Map;
+                use $crate::encoding::Field;
+
+                let mut obj = Map::deserialize(deserializer)?;
+                let buf = &mut vec![0; $name::__ex_header_size() as usize];
+
+                __ex_for_each_field!(
+                    __ex_deserialize_field, (obj, buf),
+                    $( ($(#[$field_attr])*, $field_name, $field_type) )*
+                );
+
+                Ok(Self { raw: buf.to_vec() })
             }
         }
 
         impl $crate::encoding::serialize::reexport::Serialize for $name {
-            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            fn serialize<S>(&self, serializer: S) -> ::std::result::Result<S::Ok, S::Error>
                 where S: $crate::encoding::serialize::reexport::Serializer
             {
-                use $crate::encoding::serialize::reexport::SerError;
-                use $crate::encoding::serialize::json::ExonumJson;
-                self.serialize_field()
-                    .map_err(|_| S::Error::custom(
-                                concat!("Can not serialize structure: ", stringify!($name))))?
-                    .serialize(serializer)
+                use $crate::encoding::serialize::json::reexport::{Map, to_value};
+
+                let mut map = Map::new();
+
+                $(
+                    map.insert(stringify!($field_name).to_string(), to_value(self.$field_name()).unwrap());
+                )*
+
+                map.serialize(serializer)
             }
         }
     )
@@ -404,11 +377,10 @@ macro_rules! __ex_struct_mk_field {
 #[macro_export]
 macro_rules! __ex_deserialize_field {
     (
-        ($obj:ident, $writer:ident),
+        ($obj:ident, $buf:ident),
         $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr
     ) => {
-        let val = $obj.get(stringify!($field_name))
-                      .ok_or("Can't get object from json.")?;
-        <$field_type as ExonumJson>::deserialize_field(val, &mut $writer, $from, $to)?;
+        let val = $obj.remove(stringify!($field_name)).unwrap();
+        <$field_type as Field>::from_value(val, $buf, $from, $to);
     }
 }

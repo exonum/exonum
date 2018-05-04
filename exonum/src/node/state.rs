@@ -15,14 +15,13 @@
 //! State of the `NodeHandler`.
 
 use serde_json::Value;
-use bit_vec::BitVec;
 use failure;
 
 use std::collections::{BTreeMap, HashMap, HashSet, hash_map::Entry};
 use std::net::SocketAddr;
 use std::time::{Duration, SystemTime};
 
-use messages::{Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawMessage};
+use messages::{Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawMessage, BitVec};
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
 use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 use blockchain::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};

@@ -17,6 +17,7 @@
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use byteorder::{ByteOrder, LittleEndian};
 use uuid::{self, Uuid};
+use serde_json::value::{Value, from_value};
 
 use std::mem;
 use std::result::Result as StdResult;
@@ -52,6 +53,9 @@ pub trait Field<'a> {
     /// Write Field to buffer, in given position
     /// `write` doesn't lead to memory unsafety.
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset);
+
+    /// Deserialize `value` to `Field`
+    fn from_value(value: Value, buffer: &mut Vec<u8>, from: Offset, to: Offset);
 
     /// Checks if data in the buffer could be deserialized.
     /// Returns an index of latest data seen.
@@ -92,6 +96,14 @@ macro_rules! implement_std_field {
                         to: $crate::encoding::Offset) {
                 $fn_write(&mut buffer[from as usize..to as usize], *self)
             }
+
+            fn from_value(value: Value,
+                        buffer: &mut Vec<u8>,
+                        from: $crate::encoding::Offset,
+                        to: $crate::encoding::Offset) {
+                let _self = from_value::<$name>(value).unwrap();
+                _self.write(buffer, from, to);
+            }
         }
     )
 }
@@ -115,6 +127,14 @@ macro_rules! implement_std_typedef_field {
                         from: $crate::encoding::Offset,
                         to: $crate::encoding::Offset) {
                 $fn_write(&mut buffer[from as usize..to as usize], self.to_owned().into())
+            }
+
+            fn from_value(value: Value,
+                            buffer: &mut Vec<u8>,
+                            from: $crate::encoding::Offset,
+                            to: $crate::encoding::Offset) {
+                let _self = $name(from_value::<$t>(value).unwrap());
+                _self.write(buffer, from, to);
             }
         }
     )
@@ -150,9 +170,16 @@ macro_rules! implement_pod_as_ref_field {
                                                         ::std::mem::size_of::<$name>())};
                 buffer[from as usize..to as usize].copy_from_slice(slice);
             }
+
+            fn from_value(value: Value,
+                            buffer: &mut Vec<u8>,
+                            from: $crate::encoding::Offset,
+                            to: $crate::encoding::Offset) {
+                println!("from_value: {:?}", value);
+                let _self = &from_value::<$name>(value).unwrap();
+                _self.write(buffer, from, to);
+            }
         }
-
-
     )
 }
 
@@ -167,6 +194,14 @@ impl<'a> Field<'a> for bool {
 
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, _: Offset) {
         buffer[from as usize] = if *self { 1 } else { 0 }
+    }
+
+    fn from_value(value: Value,
+                  buffer: &mut Vec<u8>,
+                  from: Offset,
+                  to: Offset) {
+        let _self = from_value::<bool>(value).unwrap();
+        _self.write(buffer, from, to);
     }
 
     fn check(
@@ -201,6 +236,15 @@ impl<'a> Field<'a> for u8 {
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, _: Offset) {
         buffer[from as usize] = *self;
     }
+
+    fn from_value(value: Value,
+                  buffer: &mut Vec<u8>,
+                  from: Offset,
+                  to: Offset) {
+        let _self = from_value::<u8>(value).unwrap();
+        _self.write(buffer, from, to);
+    }
+
 }
 
 // TODO expect some codding of signed integers (ECR-156) ?
@@ -215,6 +259,14 @@ impl<'a> Field<'a> for i8 {
 
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, _: Offset) {
         buffer[from as usize] = *self as u8;
+    }
+
+    fn from_value(value: Value,
+                  buffer: &mut Vec<u8>,
+                  from: Offset,
+                  to: Offset) {
+        let _self = from_value::<i8>(value).unwrap();
+        _self.write(buffer, from, to);
     }
 }
 
@@ -257,6 +309,14 @@ impl<'a> Field<'a> for DateTime<Utc> {
             &mut buffer[from as usize + mem::size_of::<i64>()..to as usize],
             nanos,
         );
+    }
+
+    fn from_value(value: Value,
+                  buffer: &mut Vec<u8>,
+                  from: Offset,
+                  to: Offset) {
+        let _self = from_value::<DateTime<Utc>>(value).unwrap();
+        _self.write(buffer, from, to);
     }
 }
 
@@ -312,6 +372,15 @@ impl<'a> Field<'a> for Duration {
             &mut buffer[from as usize + mem::size_of::<i64>()..to as usize],
             nanos,
         );
+    }
+
+    fn from_value(value: Value,
+                  buffer: &mut Vec<u8>,
+                  from: Offset,
+                  to: Offset) {
+        unimplemented!() // TODO: delete it
+//        let _self = from_value::<Duration>(value).unwrap();
+//        _self.write(buffer, from, to);
     }
 
     fn check(
@@ -400,6 +469,14 @@ impl<'a> Field<'a> for SocketAddr {
         );
     }
 
+    fn from_value(value: Value,
+                  buffer: &mut Vec<u8>,
+                  from: Offset,
+                  to: Offset) {
+        let _self = from_value::<SocketAddr>(value).unwrap();
+        _self.write(buffer, from, to);
+    }
+
     fn check(
         buffer: &'a [u8],
         from: CheckedOffset,
@@ -444,6 +521,14 @@ impl<'a> Field<'a> for Uuid {
 
     fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
         buffer[from as usize..to as usize].copy_from_slice(self.as_bytes());
+    }
+
+    fn from_value(value: Value,
+                  buffer: &mut Vec<u8>,
+                  from: Offset,
+                  to: Offset) {
+        let _self = from_value::<Uuid>(value).unwrap();
+        _self.write(buffer, from, to);
     }
 
     fn check(

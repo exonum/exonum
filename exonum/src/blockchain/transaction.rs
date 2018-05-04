@@ -15,6 +15,7 @@
 //! `Transaction` related types.
 
 use serde::Serialize;
+use erased_serde::Serialize as ErasedSerialize;
 use serde::de::DeserializeOwned;
 
 use std::borrow::Cow;
@@ -27,7 +28,6 @@ use messages::{Message, RawTransaction};
 use storage::{Fork, StorageValue};
 use crypto::{CryptoHash, Hash};
 use encoding;
-use encoding::serialize::json::ExonumJson;
 
 //  User-defined error codes (`TransactionErrorType::Code(u8)`) have a `0...255` range.
 #[cfg_attr(feature = "cargo-clippy", allow(cast_lossless))]
@@ -50,7 +50,7 @@ pub type TransactionResult = Result<(), TransactionError>;
 /// See also [the documentation page on transactions][doc:transactions].
 ///
 /// [doc:transactions]: https://exonum.com/doc/architecture/transactions/
-pub trait Transaction: Message + ExonumJson + 'static {
+pub trait Transaction: Message + ErasedSerialize + 'static { // TODO: deleted ExonumJson. Added serde::Serialize. Deal with it
     /// Verifies the internal consistency of the transaction. `verify` should usually include
     /// checking the message signature (via [`verify_signature`]) and, possibly,
     /// other internal constraints. `verify` has no access to the blockchain state;
@@ -146,6 +146,8 @@ pub trait Transaction: Message + ExonumJson + 'static {
     fn execute(&self, fork: &mut Fork) -> ExecutionResult;
 }
 
+serialize_trait_object!(Transaction);
+
 /// Result of unsuccessful transaction execution.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ExecutionError {
@@ -175,7 +177,7 @@ impl ExecutionError {
 }
 
 /// Type of the transaction error.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum TransactionErrorType {
     /// Panic occurred during transaction execution.
     Panic,
@@ -218,7 +220,7 @@ pub enum TransactionErrorType {
 ///     }
 /// }
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct TransactionError {
     /// Error type, see `TransactionErrorType` for the details.
     error_type: TransactionErrorType,
@@ -581,10 +583,10 @@ macro_rules! transactions {
                 match message_id {
                     $(
                     <$name as $crate::messages::ServiceMessage>::MESSAGE_ID =>
-                        <$name as $crate::encoding::serialize::json::ExonumJsonDeserialize>
+                        <$name as Deserialize>
                             ::deserialize(&value)
                             .map_err(|e| D::Error::custom(
-                                format!("Can't deserialize a value: {}", e.description())
+                                format!("Can't deserialize a value: {}", e)
                             ))
                             .map($transaction_set::$name),
                     )*
@@ -598,10 +600,8 @@ macro_rules! transactions {
             where
                 S: $crate::encoding::serialize::reexport::Serializer,
             {
-                use $crate::encoding::serialize::reexport::Serialize;
-
                 match self {$(
-                    &$transaction_set::$name(ref tx) => Serialize::serialize(tx, serializer),
+                    &$transaction_set::$name(ref tx) => tx.serialize(serializer),
                 )*}
             }
         }

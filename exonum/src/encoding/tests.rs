@@ -14,7 +14,6 @@
 
 #![allow(unsafe_code)]
 
-use bit_vec::BitVec;
 use chrono::{Duration, Utc};
 use byteorder::{ByteOrder, LittleEndian};
 use uuid::Uuid;
@@ -23,7 +22,7 @@ use std::net::SocketAddr;
 
 use crypto::{gen_keypair, hash};
 use blockchain::{self, Block, BlockProof};
-use messages::{BlockRequest, BlockResponse, Connect, Message, Precommit, Prevote, Propose,
+use messages::{BlockRequest, BlockResponse, BitVec, Connect, Message, Precommit, Prevote, Propose,
                RawMessage, Status};
 use helpers::{user_agent, Height, Round, ValidatorId};
 use super::{CheckedOffset, Field, Offset};

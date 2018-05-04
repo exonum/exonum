@@ -15,14 +15,12 @@
 // spell-checker:ignore precommiters, uncommented, uncomment, commited
 
 use rand::{thread_rng, Rng};
-use bit_vec::BitVec;
-
 use std::time::Duration;
 use std::collections::BTreeMap;
 
 use messages::{BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
                PrevotesRequest, Propose, ProposeRequest, RawMessage, Status, TransactionsRequest,
-               TransactionsResponse, CONSENSUS};
+               TransactionsResponse, CONSENSUS, BitVec};
 use crypto::{gen_keypair, gen_keypair_from_seed, CryptoHash, Hash, Seed};
 use blockchain::{Blockchain, Schema};
 use node;
