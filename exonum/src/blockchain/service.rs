@@ -172,6 +172,10 @@ pub trait Service: Send + Sync + 'static {
         Value::Null
     }
 
+    /// A service execution. This method is invoked for each service after execution
+    /// of all transactions in the mempool but before `handle_commit` handler.
+    fn execute(&self, fork: &mut Fork) {}
+
     /// Handles block commit. This handler is invoked for each service after commit of the block.
     /// For example, a service can create one or more transactions if a specific condition
     /// has occurred.

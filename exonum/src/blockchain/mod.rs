@@ -271,6 +271,11 @@ impl Blockchain {
                     .expect("Transaction not found in the database.");
             }
 
+            // Invoke execute method for all services.
+            self.service_map
+                .values()
+                .for_each(|service| service_execute(service, &mut fork));
+
             // Get tx & state hash.
             let (tx_hash, state_hash) = {
                 let state_hashes = {
@@ -538,6 +543,25 @@ impl Blockchain {
 
         self.merge(fork.into_patch())
             .expect("Unable to save messages to the consensus cache");
+    }
+}
+
+fn service_execute(service: &Box<Service>, mut fork: &mut Fork) {
+    fork.checkpoint();
+    match panic::catch_unwind(panic::AssertUnwindSafe(|| service.execute(&mut fork))) {
+        Ok(..) => fork.commit(),
+        Err(err) => {
+            if err.is::<Error>() {
+                // Continue panic unwind if the reason is StorageError.
+                panic::resume_unwind(err);
+            }
+            fork.rollback();
+            error!(
+                "{} service execute failed with error: {:?}",
+                service.service_name(),
+                err
+            );
+        }
     }
 }
 
