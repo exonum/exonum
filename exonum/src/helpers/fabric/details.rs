@@ -341,7 +341,10 @@ impl GenerateNodeConfig {
 
     fn addr(context: &Context) -> (SocketAddr, SocketAddr) {
         let addr_str = &context.arg::<String>(PEER_ADDRESS).unwrap_or_default();
-        let error_msg = &format!(r#"Expected an ip address in {}: {:?}"#, PEER_ADDRESS, addr_str);
+        let error_msg = &format!(
+            "Expected an ip address in {}: {:?}",
+            PEER_ADDRESS, addr_str
+        );
 
         let external_addr = addr_str.parse::<SocketAddr>().unwrap_or_else(|_| {
             let ip = addr_str.parse::<IpAddr>().expect(error_msg);
