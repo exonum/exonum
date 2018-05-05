@@ -515,6 +515,8 @@ mod tests {
             Decimal::from_str("3.14").unwrap(),
             Decimal::from_parts(1102470952, 185874565, 1703060790, false, 28),
             Decimal::new(9497628354687268, 12),
+            Decimal::from_str("0").unwrap(),
+            Decimal::from_str("-0.000000000000000000019").unwrap(),
         ];
 
         for value in values.into_iter() {
