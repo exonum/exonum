@@ -311,7 +311,7 @@ impl StorageKey for Decimal {
 
     fn read(buffer: &[u8]) -> Self::Owned {
         let mut bytes = [0u8; 16];
-        bytes.copy_from_slice(&buffer);
+        bytes.copy_from_slice(buffer);
         Decimal::deserialize(bytes)
     }
 }
