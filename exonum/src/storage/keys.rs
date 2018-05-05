@@ -19,6 +19,7 @@
 use byteorder::{BigEndian, ByteOrder};
 use chrono::{DateTime, NaiveDateTime, Utc};
 use uuid::Uuid;
+use rust_decimal::Decimal;
 
 use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 
@@ -299,11 +300,28 @@ impl StorageKey for Uuid {
     }
 }
 
+impl StorageKey for Decimal {
+    fn size(&self) -> usize {
+        16
+    }
+
+    fn write(&self, buffer: &mut [u8]) {
+        buffer.copy_from_slice(&self.serialize());
+    }
+
+    fn read(buffer: &[u8]) -> Self::Owned {
+        let mut bytes = [0u8; 16];
+        bytes.copy_from_slice(&buffer);
+        Decimal::deserialize(bytes)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     use chrono::{Duration, TimeZone};
+    use std::str::FromStr;
 
     // Number of samples for fuzz testing
     const FUZZ_SAMPLES: usize = 100_000;
@@ -581,6 +599,23 @@ mod tests {
         for uuid in uuids.iter() {
             uuid.write(&mut buffer);
             assert_eq!(*uuid, Uuid::read(&buffer));
+        }
+    }
+
+    #[test]
+    fn decimal_round_trip() {
+        let values = [
+            Decimal::from_str("3.14").unwrap(),
+            Decimal::from_parts(1102470952, 185874565, 1703060790, false, 28),
+            Decimal::new(9497628354687268, 12),
+            Decimal::from_str("0").unwrap(),
+            Decimal::from_str("-0.000000000000000000019").unwrap(),
+        ];
+
+        let mut buffer = [0u8; 16];
+        for value in values.iter() {
+            value.write(&mut buffer);
+            assert_eq!(*value, Decimal::read(&buffer));
         }
     }
 
