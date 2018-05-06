@@ -38,6 +38,7 @@ use serde::de::{self, Deserialize, Deserializer, Visitor};
 use byteorder::{ByteOrder, LittleEndian};
 use chrono::{DateTime, Duration, Utc};
 use uuid::Uuid;
+use rust_decimal::Decimal;
 
 use std::default::Default;
 use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
@@ -678,6 +679,12 @@ impl CryptoHash for Round {
 impl CryptoHash for Uuid {
     fn hash(&self) -> Hash {
         hash(self.as_bytes())
+    }
+}
+
+impl CryptoHash for Decimal {
+    fn hash(&self) -> Hash {
+        hash(&self.serialize())
     }
 }
 
