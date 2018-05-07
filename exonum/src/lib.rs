@@ -51,6 +51,7 @@ extern crate os_info;
 extern crate params;
 extern crate rand;
 extern crate router;
+extern crate rust_decimal;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;

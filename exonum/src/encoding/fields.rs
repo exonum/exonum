@@ -17,6 +17,7 @@
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use byteorder::{ByteOrder, LittleEndian};
 use uuid::{self, Uuid};
+use rust_decimal::Decimal;
 
 use std::mem;
 use std::result::Result as StdResult;
@@ -35,6 +36,8 @@ const SIZE_DIFF: usize = IPV6_SIZE - IPV4_SIZE;
 
 const IPV4_HEADER: u8 = 0;
 const IPV6_HEADER: u8 = 1;
+
+const DECIMAL_SIZE: usize = 16;
 
 /// Trait for all types that could be a field in `encoding`.
 pub trait Field<'a> {
@@ -462,4 +465,20 @@ impl<'a> Field<'a> for Uuid {
 
 fn try_read_uuid(buffer: &[u8], from: Offset, to: Offset) -> StdResult<Uuid, uuid::ParseError> {
     Uuid::from_bytes(&buffer[from as usize..to as usize])
+}
+
+impl<'a> Field<'a> for Decimal {
+    fn field_size() -> Offset {
+        DECIMAL_SIZE as Offset
+    }
+
+    unsafe fn read(buffer: &'a [u8], from: Offset, to: Offset) -> Self {
+        let mut bytes: [u8; DECIMAL_SIZE] = mem::uninitialized();
+        bytes.copy_from_slice(&buffer[from as usize..to as usize]);
+        Decimal::deserialize(bytes)
+    }
+
+    fn write(&self, buffer: &mut Vec<u8>, from: Offset, to: Offset) {
+        buffer[from as usize..to as usize].copy_from_slice(&self.serialize());
+    }
 }
