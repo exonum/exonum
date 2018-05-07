@@ -565,7 +565,7 @@ mod rocksdb_tests {
             ApiSender::new(api_channel.0),
         )
     }
-    
+
     fn create_temp_dir() -> TempDir {
         TempDir::new(super::gen_tempdir_name().as_str()).unwrap()
     }
