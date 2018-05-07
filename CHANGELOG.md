@@ -16,7 +16,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `Field`, `CryptoHash`, `StorageValue` and `ExonumJson` traits have been
   implemented for `chrono::Duration` structure. (#653)
 
-- Added a method `execute` in `Service` trait. (#667)
+- `execute` method has been added in `Service` trait. (#667)
 
 #### exonum-timestamping
 

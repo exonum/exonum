@@ -272,9 +272,9 @@ impl Blockchain {
             }
 
             // Invoke execute method for all services.
-            self.service_map
-                .values()
-                .for_each(|service| service_execute(service.as_ref(), &mut fork));
+            for service in self.service_map.values() {
+                service_execute(service.as_ref(), &mut fork);
+            }
 
             // Get tx & state hash.
             let (tx_hash, state_hash) = {
@@ -546,9 +546,9 @@ impl Blockchain {
     }
 }
 
-fn service_execute(service: &Service, mut fork: &mut Fork) {
+fn service_execute(service: &Service, fork: &mut Fork) {
     fork.checkpoint();
-    match panic::catch_unwind(panic::AssertUnwindSafe(|| service.execute(&mut fork))) {
+    match panic::catch_unwind(panic::AssertUnwindSafe(|| service.execute(fork))) {
         Ok(..) => fork.commit(),
         Err(err) => {
             if err.is::<Error>() {
