@@ -267,9 +267,12 @@ mod tests {
         let vote = Vote::new(&pubkey, &Hash::new([1; 32]), &key);
         assert_eq!(
             vote.clone().into_bytes(),
-            MaybeVote::some(vote.clone()).into_bytes()
+            MaybeVote::some(VotingDecision::Vote(vote.clone())).into_bytes()
         );
-        assert_eq!(vote.hash(), MaybeVote::some(vote.clone()).hash());
+        assert_eq!(
+            vote.hash(),
+            MaybeVote::some(VotingDecision::Vote(vote.clone())).hash()
+        );
 
         let db = MemoryDB::new();
         let mut fork = db.fork();
@@ -289,7 +292,7 @@ mod tests {
             assert_eq!(
                 stored_vote,
                 if i == 1 {
-                    MaybeVote::some(vote.clone())
+                    MaybeVote::some(VotingDecision::Vote(vote.clone()))
                 } else {
                     MaybeVote::none()
                 }
@@ -300,7 +303,7 @@ mod tests {
         let new_merkle_root = {
             let mut fork = db.fork();
             let mut index: ProofListIndex<_, MaybeVote> = ProofListIndex::new("index", &mut fork);
-            index.set(2, MaybeVote::some(vote.clone()));
+            index.set(2, MaybeVote::some(VotingDecision::Vote(vote.clone())));
             index.set(2, MaybeVote::none());
             index.merkle_root()
         };
