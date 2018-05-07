@@ -70,7 +70,6 @@ extern crate vec_map;
 #[macro_use]
 extern crate lazy_static;
 extern crate snow;
-extern crate tokio;
 
 // Test dependencies.
 #[cfg(test)]

@@ -30,9 +30,8 @@ use helpers::Milliseconds;
 use super::to_box;
 use super::error::{into_other, log_error, other_error, result_ok};
 
-use super::noise;
 use crypto::PublicKey;
-use events::noise::NoiseWrapper;
+use events::noise::NoiseHandshake;
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 
@@ -156,8 +155,8 @@ impl ConnectionsPool {
                 Ok(sock)
             })
             .and_then(move |sock| {
-                let wrapper = NoiseWrapper { max_message_len };
-                wrapper.send_handshake(sock, &consensus_key).and_then(|framed|{
+                let handshake = NoiseHandshake { max_message_len };
+                handshake.send(sock, &consensus_key).and_then(|framed|{
                     Ok(framed)
                 })
             })
@@ -377,11 +376,9 @@ impl Listener {
             }
             trace!("Accepted incoming connection with peer={}", addr);
             let network_tx = network_tx.clone();
+            let wrapper = NoiseHandshake { max_message_len };
 
-            let wrapper = NoiseWrapper { max_message_len };
-            wrapper.wrap();
-
-            let connection_handler = wrapper.listen_handshake(sock, &stored)
+            let connection_handler = wrapper.listen(sock, &stored)
                 .and_then(move |framed| {
                     let (_, stream) = framed.split();
                     stream

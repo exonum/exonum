@@ -1,5 +1,19 @@
+// Copyright 2018 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 use bytes::BytesMut;
-use byteorder::{BigEndian, ByteOrder, LittleEndian};
+use byteorder::{ByteOrder, LittleEndian};
 use tokio_io::codec::{Decoder, Encoder};
 use snow::Session;
 
@@ -28,7 +42,6 @@ impl Decoder for NoiseCodec {
         };
 
         let len = LittleEndian::read_u32(buf) as usize;
-//        println!("message len {}", len);
 
         if len > buf.len() {
             return Ok(None);
@@ -41,7 +54,6 @@ impl Decoder for NoiseCodec {
 
         data.chunks(65535).for_each(|chunk| {
             let mut read_to = vec![0u8; chunk.len()];
-//            println!("chunk len {:?}", chunk.len());
             readed_len += self.session.read_message(chunk, &mut read_to).unwrap();
             readed_data.extend_from_slice(&read_to);
         });
