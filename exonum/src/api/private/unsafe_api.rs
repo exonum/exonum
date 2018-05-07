@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Unsafe Exonum api that provides functionality for emergency cases.
+//! Unsafe Exonum API provides functionality for emergency cases.
 
 use router::Router;
 use iron::prelude::*;
@@ -30,7 +30,7 @@ pub struct UnsafeApi {
 
 impl UnsafeApi {
     /// Creates a new `private::UnsafeApi` instance.
-    pub fn new(blockchain: Blockchain) -> UnsafeApi {
+    pub fn new(blockchain: Blockchain) -> Self {
         UnsafeApi { blockchain }
     }
 
@@ -49,8 +49,8 @@ impl UnsafeApi {
                 .merge_sync(fork.into_patch())
                 .map_err(ApiError::Storage)?;
 
-            // Desrtoy this process.
-            process::exit(1);
+            // Destroy this process.
+            process::abort();
         };
 
         router.post("/v1/shutdown", shutdown_unsafe, "unsafe_shutdown");
