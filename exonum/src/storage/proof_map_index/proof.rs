@@ -81,7 +81,11 @@ impl<'de> Deserialize<'de> for ProofPath {
                     }
                 }
 
-                Ok(ProofPath::new(&bytes).prefix(len as u16))
+                Ok(if len == 8 * KEY_SIZE {
+                    ProofPath::new(&bytes)
+                } else {
+                    ProofPath::new(&bytes).prefix(len as u16)
+                })
             }
         }
 
@@ -247,7 +251,7 @@ impl<K, V> Into<(K, Option<V>)> for OptionalEntry<K, V> {
 /// [`get_multiproof()`]: struct.ProofMapIndex.html#method.get_multiproof
 /// [`check()`]: #method.check
 /// [`ProofPath`]: struct.ProofPath.html
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MapProof<K, V> {
     entries: Vec<OptionalEntry<K, V>>,
     proof: Vec<MapProofEntry>,
