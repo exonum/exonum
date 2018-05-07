@@ -267,35 +267,18 @@ mod tests {
         let vote = Vote::new(&pubkey, &Hash::new([1; 32]), &key);
         assert_eq!(
             vote.clone().into_bytes(),
-            MaybeVote::some(VotingDecision::Vote(vote.clone())).into_bytes()
+            MaybeVote::some(vote.clone()).into_bytes()
         );
-        assert_eq!(
-            vote.hash(),
-            MaybeVote::some(VotingDecision::Vote(vote.clone())).hash()
-        );
-
-        let vote_against = VoteAgainst::new(&pubkey, &Hash::new([1; 32]), &key);
-        assert_eq!(
-            vote_against.clone().into_bytes(),
-            MaybeVote::some(VotingDecision::VoteAgainst(vote_against.clone())).into_bytes()
-        );
-        assert_eq!(
-            vote_against.hash(),
-            MaybeVote::some(VotingDecision::VoteAgainst(vote_against.clone())).hash()
-        );
+        assert_eq!(vote.hash(), MaybeVote::some(vote.clone()).hash());
 
         let db = MemoryDB::new();
         let mut fork = db.fork();
         let merkle_root = {
-            let mut index: ProofListIndex<_, MaybeVote> = ProofListIndex::new("index", &mut fork);
+            let mut index: ProofListIndex<_, Vote> = ProofListIndex::new("index", &mut fork);
             for _ in 0..VALIDATORS {
-                index.push(MaybeVote::none());
+                index.push(NO_VOTE.clone());
             }
-            index.set(1, MaybeVote::some(VotingDecision::Vote(vote.clone())));
-            index.set(
-                3,
-                MaybeVote::some(VotingDecision::VoteAgainst(vote_against.clone())),
-            );
+            index.set(1, vote.clone());
             index.merkle_root()
         };
         db.merge(fork.into_patch()).unwrap();
@@ -306,9 +289,7 @@ mod tests {
             assert_eq!(
                 stored_vote,
                 if i == 1 {
-                    MaybeVote::some(VotingDecision::Vote(vote.clone()))
-                } else if i == 3 {
-                    MaybeVote::some(VotingDecision::VoteAgainst(vote_against.clone()))
+                    MaybeVote::some(vote.clone())
                 } else {
                     MaybeVote::none()
                 }
@@ -319,7 +300,7 @@ mod tests {
         let new_merkle_root = {
             let mut fork = db.fork();
             let mut index: ProofListIndex<_, MaybeVote> = ProofListIndex::new("index", &mut fork);
-            index.set(2, MaybeVote::some(VotingDecision::Vote(vote.clone())));
+            index.set(2, MaybeVote::some(vote.clone()));
             index.set(2, MaybeVote::none());
             index.merkle_root()
         };
