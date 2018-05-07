@@ -873,7 +873,7 @@ impl Node {
         if let Some(listen_address) = self.api_options.private_api_address {
             let api_sender = self.channel();
             let handler =
-                create_private_api_handler(blockchain.clone(), api_state.clone(), api_sender);
+                create_private_api_handler(blockchain.clone(), api_state.clone(), api_sender, &self.api_options);
             let listener = Iron::new(handler).http(listen_address).unwrap();
             api_handlers.push(listener);
 
@@ -983,6 +983,7 @@ pub fn create_private_api_handler(
     blockchain: Blockchain,
     shared_api_state: SharedNodeState,
     api_sender: ApiSender,
+    config: &NodeApiConfig,
 ) -> Chain {
     let mut mount = Mount::new();
     mount.mount("api/services", blockchain.mount_private_api());
@@ -993,7 +994,11 @@ pub fn create_private_api_handler(
     system_api.wire(&mut router);
     mount.mount("api/system", router);
 
-    Chain::new(mount)
+    let mut chain = Chain::new(mount);
+    if let Some(ref allow_origin) = config.allow_origin {
+        chain.link_around(CorsMiddleware::from(allow_origin.clone()));
+    }
+    chain
 }
 
 #[cfg(test)]
