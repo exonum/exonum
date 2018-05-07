@@ -94,7 +94,7 @@ impl InternalPart {
                     InternalRequest::VerifyTx(tx) => {
                         if !txs_in_verification.insert(tx.raw().hash()) {
                             let f = future::ok::<(), ()>(());
-                            rto_box(f)
+                            to_box(f)
                         } else {
                             let f = futures::lazy(move || {
                                 pool_tx
