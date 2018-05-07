@@ -91,11 +91,12 @@ impl StorageValue for VotingDecision {
     }
 }
 
-/// A functional equivalent to `Option<T>` used to store votes in the service schema.
+/// A functional equivalent to `Option<VotingDecision>` used to store votes in the service
+/// schema.
 ///
 /// # Notes
 ///
-/// The `None` variant of the type is represented by a `T` with all bytes set to zero.
+/// The `None` variant of the type is represented by a `Vote` with all bytes set to zero.
 #[derive(Clone, Debug, PartialEq)]
 pub struct MaybeVote(Option<VotingDecision>);
 
