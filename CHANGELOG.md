@@ -182,6 +182,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - New `database` field added to the `NodeConfig`. This optional setting adjusts
   database-specific settings, like number of simultaneously opened files. (#538)
 
+- `ExecutionError::with_description` method now takes `Into<String>` instead of
+  `String` which allows to pass `&str` directly. (#592)
+
+- New `database` field added to the `NodeConfig`. This optional setting adjusts
+  database-specific settings, like number of simultaneously opened files. (#538)
+
 - Added `v1/user_agent` endpoint with information about Exonum, Rust and OS
   versions. (#548)
 
