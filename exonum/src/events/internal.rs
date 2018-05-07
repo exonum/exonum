@@ -94,15 +94,16 @@ impl InternalPart {
                     InternalRequest::VerifyTx(tx) => {
                         if !txs_in_verification.insert(tx.raw().hash()) {
                             let f = future::ok::<(), ()>(());
-                            return to_box(f);
+                            rto_box(f)
+                        } else {
+                            let f = futures::lazy(move || {
+                                pool_tx
+                                    .send(tx)
+                                    .map(drop)
+                                    .map_err(into_other)
+                            }).map_err(|_| panic!("Can't send tx for verification to the thread pool"));
+                            to_box(f)
                         }
-                        let f = futures::lazy(move || {
-                            pool_tx
-                                .send(tx)
-                                .map(drop)
-                                .map_err(into_other)
-                        }).map_err(|_| panic!("Can't send tx for verification to the thread pool"));
-                        to_box(f)
                     }
                 };
 
