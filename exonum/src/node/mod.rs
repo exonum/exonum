@@ -872,8 +872,12 @@ impl Node {
         // Start private api.
         if let Some(listen_address) = self.api_options.private_api_address {
             let api_sender = self.channel();
-            let handler =
-                create_private_api_handler(blockchain.clone(), api_state.clone(), api_sender, &self.api_options);
+            let handler = create_private_api_handler(
+                blockchain.clone(),
+                api_state.clone(),
+                api_sender,
+                &self.api_options,
+            );
             let listener = Iron::new(handler).http(listen_address).unwrap();
             api_handlers.push(listener);
 
