@@ -997,6 +997,10 @@ pub fn create_private_api_handler(
     mount.mount("api/services", blockchain.mount_private_api());
 
     if config.enable_unsafe_api {
+        warn!(
+            "Node has been launched with support of unsafe API. If that's not what you want, \
+             disable unsafe API in node config."
+        );
         let mut router = Router::new();
         let unsafe_api = private::UnsafeApi::new(blockchain.clone());
         unsafe_api.wire(&mut router);
