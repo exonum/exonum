@@ -309,4 +309,58 @@ mod tests {
         };
         assert_eq!(merkle_root, new_merkle_root);
     }
+
+    #[test]
+    fn test_serialization_of_voting_decision() {
+        const VALIDATORS: usize = 5;
+
+        let (pubkey, key) = crypto::gen_keypair();
+        let vote = Vote::new(&pubkey, &Hash::new([1; 32]), &key);
+        let vote_against = VoteAgainst::new(&pubkey, &Hash::new([1; 32]), &key);
+        assert_eq!(
+            vote.clone().into_bytes(),
+            VotingDecision::Vote(vote.clone()).into_bytes()
+        );
+        assert_eq!(vote.hash(), VotingDecision::Vote(vote.clone()).hash());
+        assert_eq!(
+            vote_against.clone().into_bytes(),
+            VotingDecision::VoteAgainst(vote_against.clone()).into_bytes()
+        );
+        assert_eq!(
+            vote_against.hash(),
+            VotingDecision::VoteAgainst(vote_against.clone()).hash()
+        );
+
+        let db = MemoryDB::new();
+        let mut fork = db.fork();
+        let merkle_root = {
+            let mut index: ProofListIndex<_, VotingDecision> =
+                ProofListIndex::new("index", &mut fork);
+            for _ in 0..VALIDATORS {
+                index.push(VotingDecision::Vote(NO_VOTE.clone()));
+            }
+            index.set(1, VotingDecision::Vote(vote.clone()));
+            index.set(2, VotingDecision::VoteAgainst(vote_against.clone()));
+            index.merkle_root()
+        };
+        db.merge(fork.into_patch()).unwrap();
+
+        let snapshot = db.snapshot();
+        let index: ProofListIndex<_, VotingDecision> = ProofListIndex::new("index", &snapshot);
+        assert_eq!(index.get(1).unwrap(), VotingDecision::Vote(vote.clone()));
+        assert_eq!(
+            index.get(2).unwrap(),
+            VotingDecision::VoteAgainst(vote_against.clone())
+        );
+
+        let new_merkle_root = {
+            let mut fork = db.fork();
+            let mut index: ProofListIndex<_, VotingDecision> =
+                ProofListIndex::new("index", &mut fork);
+            index.set(3, VotingDecision::VoteAgainst(vote_against.clone()));
+            index.set(3, VotingDecision::Vote(NO_VOTE.clone()));
+            index.merkle_root()
+        };
+        assert_eq!(merkle_root, new_merkle_root);
+    }
 }
