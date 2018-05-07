@@ -44,7 +44,7 @@ fn test_user_agent_info() {
 #[test]
 #[should_panic(expected = "Cannot send data")]
 fn test_unsafe_api_inaccessible_by_default() {
-    let testkit = TestKitBuilder::validator().with_validators(1).create();
+    let testkit = TestKitBuilder::validator().create();
     let api = testkit.api();
     let empty_request = "".to_string();
     let _info: String = api.post_private(ApiKind::Unsafe, "v1/shutdown", &empty_request);
