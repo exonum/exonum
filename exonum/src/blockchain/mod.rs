@@ -148,13 +148,13 @@ impl Blockchain {
     }
 
     /// Commits changes from the patch to the blockchain storage.
-    /// See [`merge`](../trait.Database.html#tymethod.merge) for details.
+    /// See [`merge`](../storage/trait.Database.html#tymethod.merge) for details.
     pub fn merge(&mut self, patch: Patch) -> Result<(), Error> {
         self.db.merge(patch)
     }
 
     /// Commits changes from the patch to the blockchain storage with fsync.
-    /// See [`merge_sync`](../trait.Database.html#tymethod.merge_sync) for details.
+    /// See [`merge_sync`](../storage/trait.Database.html#tymethod.merge_sync) for details.
     pub fn merge_sync(&mut self, patch: Patch) -> Result<(), Error> {
         self.db.merge_sync(patch)
     }
