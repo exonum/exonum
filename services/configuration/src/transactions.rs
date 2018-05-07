@@ -21,7 +21,7 @@ use exonum::node::State;
 use exonum::storage::{Fork, Snapshot};
 
 use errors::Error as ServiceError;
-use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
+use schema::{MaybeVote, ProposeData, Schema};
 
 transactions! {
     /// Configuration Service transactions.
@@ -342,7 +342,7 @@ impl TxVoteUtil for Vote {
     }
 
     fn into_maybe(self) -> MaybeVote {
-        MaybeVote::some(VotingDecision::Vote(self))
+        MaybeVote::from(self)
     }
 }
 
@@ -380,7 +380,7 @@ impl TxVoteUtil for VoteAgainst {
     }
 
     fn into_maybe(self) -> MaybeVote {
-        MaybeVote::some(VotingDecision::VoteAgainst(self))
+        MaybeVote::from(self)
     }
 }
 

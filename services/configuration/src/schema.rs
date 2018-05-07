@@ -125,6 +125,18 @@ impl From<MaybeVote> for Option<VotingDecision> {
     }
 }
 
+impl From<Vote> for MaybeVote {
+    fn from(vote: Vote) -> MaybeVote {
+        MaybeVote::some(VotingDecision::Vote(vote))
+    }
+}
+
+impl From<VoteAgainst> for MaybeVote {
+    fn from(vote_against: VoteAgainst) -> MaybeVote {
+        MaybeVote::some(VotingDecision::VoteAgainst(vote_against))
+    }
+}
+
 impl ::std::ops::Deref for MaybeVote {
     type Target = Option<VotingDecision>;
 
@@ -267,12 +279,9 @@ mod tests {
         let vote = Vote::new(&pubkey, &Hash::new([1; 32]), &key);
         assert_eq!(
             vote.clone().into_bytes(),
-            MaybeVote::some(VotingDecision::Vote(vote.clone())).into_bytes()
+            MaybeVote::from(vote.clone()).into_bytes()
         );
-        assert_eq!(
-            vote.hash(),
-            MaybeVote::some(VotingDecision::Vote(vote.clone())).hash()
-        );
+        assert_eq!(vote.hash(), MaybeVote::from(vote.clone()).hash());
 
         let db = MemoryDB::new();
         let mut fork = db.fork();
@@ -292,7 +301,7 @@ mod tests {
             assert_eq!(
                 stored_vote,
                 if i == 1 {
-                    MaybeVote::some(VotingDecision::Vote(vote.clone()))
+                    MaybeVote::from(vote.clone())
                 } else {
                     MaybeVote::none()
                 }
@@ -303,7 +312,7 @@ mod tests {
         let new_merkle_root = {
             let mut fork = db.fork();
             let mut index: ProofListIndex<_, MaybeVote> = ProofListIndex::new("index", &mut fork);
-            index.set(2, MaybeVote::some(VotingDecision::Vote(vote.clone())));
+            index.set(2, MaybeVote::from(vote.clone()));
             index.set(2, MaybeVote::none());
             index.merkle_root()
         };
