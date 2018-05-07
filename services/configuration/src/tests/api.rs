@@ -329,7 +329,7 @@ fn test_dissenting_votes_for_propose() {
         assert!(
             Schema::new(&testkit.snapshot())
                 .transactions()
-                .contains(&tx.hash(),),
+                .contains(&tx.hash()),
             "Transaction is absent in blockchain: {:?}",
             tx
         );
