@@ -148,7 +148,8 @@ pub struct NodeApiConfig {
     pub state_update_timeout: usize,
     /// Enable api endpoints for the `blockchain_explorer` on public api address.
     pub enable_blockchain_explorer: bool,
-    /// Enable private unsafe api
+    /// Enable private unsafe api (disabled by default).
+    #[serde(default)]
     pub enable_unsafe_api: bool,
     /// Listen address for public api endpoints.
     pub public_api_address: Option<SocketAddr>,
