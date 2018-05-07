@@ -436,7 +436,7 @@ impl Service for ServicePanicStorageError {
 
 fn assert_service_execute(blockchain: &Blockchain, db: &mut Box<Database>) {
     let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height::zero(), &[]);
-    let _ = db.merge(patch);
+    db.merge(patch).unwrap();
     let snapshot = db.snapshot();
     let index = ListIndex::new(IDX_NAME, &snapshot);
     assert_eq!(index.len(), 1);
@@ -445,7 +445,7 @@ fn assert_service_execute(blockchain: &Blockchain, db: &mut Box<Database>) {
 
 fn assert_service_execute_panic(blockchain: &Blockchain, db: &mut Box<Database>) {
     let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height::zero(), &[]);
-    let _ = db.merge(patch);
+    db.merge(patch).unwrap();
     let snapshot = db.snapshot();
     let index: ListIndex<_, u32> = ListIndex::new(IDX_NAME, &snapshot);
     assert!(index.is_empty());
@@ -565,10 +565,14 @@ mod rocksdb_tests {
             ApiSender::new(api_channel.0),
         )
     }
+    
+    fn create_temp_dir() -> TempDir {
+        TempDir::new(super::gen_tempdir_name().as_str()).unwrap()
+    }
 
     #[test]
     fn test_handling_tx_panic() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = create_temp_dir();
         let mut blockchain = create_blockchain(dir.path());
         super::handling_tx_panic(&mut blockchain);
     }
@@ -576,25 +580,25 @@ mod rocksdb_tests {
     #[test]
     #[should_panic]
     fn test_handling_tx_panic_storage_error() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = create_temp_dir();
         let mut blockchain = create_blockchain(dir.path());
         super::handling_tx_panic_storage_error(&mut blockchain);
     }
 
     #[test]
     fn test_service_execute() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = create_temp_dir();
         let blockchain = create_blockchain_with_service(dir.path(), Box::new(ServiceGood));
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = create_temp_dir();
         let mut db = create_database(dir.path());
         super::assert_service_execute(&blockchain, &mut db);
     }
 
     #[test]
     fn test_service_execute_panic() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = create_temp_dir();
         let blockchain = create_blockchain_with_service(dir.path(), Box::new(ServicePanic));
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = create_temp_dir();
         let mut db = create_database(dir.path());
         super::assert_service_execute_panic(&blockchain, &mut db);
     }
@@ -602,10 +606,10 @@ mod rocksdb_tests {
     #[test]
     #[should_panic]
     fn test_service_execute_panic_storage_error() {
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = create_temp_dir();
         let blockchain =
             create_blockchain_with_service(dir.path(), Box::new(ServicePanicStorageError));
-        let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
+        let dir = create_temp_dir();
         let mut db = create_database(dir.path());
         super::assert_service_execute(&blockchain, &mut db);
     }
