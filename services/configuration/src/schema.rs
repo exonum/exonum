@@ -16,6 +16,7 @@
 
 use exonum::crypto::{self, CryptoHash, Hash, PublicKey, Signature};
 use exonum::storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot, StorageValue};
+use exonum::messages::{RawMessage, ServiceMessage};
 
 use std::borrow::Cow;
 
@@ -52,8 +53,6 @@ lazy_static! {
         &Hash::zero(),
         &Signature::zero(),
     ).into_bytes();
-    static ref VOTE_DECISION_BYTES_MARKER: Vec<u8> = b"consent".to_vec();
-    static ref VOTE_AGAINST_DECISION_BYTES_MARKER: Vec<u8> = b"dissent".to_vec();
 }
 
 /// A enum used to represent different kinds of vote, `Vote` and `VoteAgainst` transactions.
@@ -74,38 +73,21 @@ impl CryptoHash for VotingDecision {
     }
 }
 
-trait VotingDecisionBytes: StorageValue {
-    fn decision_marker() -> Vec<u8>;
-
-    fn has_decision_marker(bytes: &Cow<[u8]>) -> bool {
-        let marker = Self::decision_marker();
-        let idx = marker.len();
-        let (marker_bytes, _tx_bytes) = bytes.split_at(idx);
-        marker.as_slice().eq(marker_bytes)
+impl StorageValue for VotingDecision {
+    fn into_bytes(self) -> Vec<u8> {
+        match self {
+            VotingDecision::Vote(vote) => vote.into_bytes(),
+            VotingDecision::VoteAgainst(vote_against) => vote_against.into_bytes(),
+        }
     }
 
-    fn into_decision_bytes(self) -> Vec<u8> {
-        let mut decision_bytes = Self::decision_marker();
-        decision_bytes.extend(self.into_bytes());
-        decision_bytes
-    }
-
-    fn from_decision_bytes(bytes: Cow<[u8]>) -> Self {
-        let idx = Self::decision_marker().len();
-        let (_marker_bytes, tx_bytes) = bytes.split_at(idx);
-        Self::from_bytes(Cow::from(tx_bytes))
-    }
-}
-
-impl VotingDecisionBytes for Vote {
-    fn decision_marker() -> Vec<u8> {
-        VOTE_DECISION_BYTES_MARKER.clone()
-    }
-}
-
-impl VotingDecisionBytes for VoteAgainst {
-    fn decision_marker() -> Vec<u8> {
-        VOTE_AGAINST_DECISION_BYTES_MARKER.clone()
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        let raw_msg = RawMessage::from_vec(bytes.to_vec());
+        if raw_msg.message_type() == <Vote as ServiceMessage>::MESSAGE_ID {
+            VotingDecision::Vote(Vote::from_bytes(bytes))
+        } else {
+            VotingDecision::VoteAgainst(VoteAgainst::from_bytes(bytes))
+        }
     }
 }
 
@@ -163,8 +145,8 @@ impl CryptoHash for MaybeVote {
 impl StorageValue for MaybeVote {
     fn into_bytes(self) -> Vec<u8> {
         match self.0 {
-            Some(VotingDecision::Vote(vote)) => vote.into_decision_bytes(),
-            Some(VotingDecision::VoteAgainst(vote_against)) => vote_against.into_decision_bytes(),
+            Some(VotingDecision::Vote(vote)) => vote.into_bytes(),
+            Some(VotingDecision::VoteAgainst(vote_against)) => vote_against.into_bytes(),
             None => NO_VOTE_BYTES.clone(),
         }
     }
@@ -172,12 +154,8 @@ impl StorageValue for MaybeVote {
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         if NO_VOTE_BYTES.as_slice().eq(bytes.as_ref()) {
             MaybeVote::none()
-        } else if Vote::has_decision_marker(&bytes) {
-            MaybeVote::some(VotingDecision::Vote(Vote::from_decision_bytes(bytes)))
         } else {
-            MaybeVote::some(VotingDecision::VoteAgainst(
-                VoteAgainst::from_decision_bytes(bytes),
-            ))
+            MaybeVote::some(VotingDecision::from_bytes(bytes))
         }
     }
 }
@@ -288,7 +266,7 @@ mod tests {
         let (pubkey, key) = crypto::gen_keypair();
         let vote = Vote::new(&pubkey, &Hash::new([1; 32]), &key);
         assert_eq!(
-            vote.clone().into_decision_bytes(),
+            vote.clone().into_bytes(),
             MaybeVote::some(VotingDecision::Vote(vote.clone())).into_bytes()
         );
         assert_eq!(
@@ -298,7 +276,7 @@ mod tests {
 
         let vote_against = VoteAgainst::new(&pubkey, &Hash::new([1; 32]), &key);
         assert_eq!(
-            vote_against.clone().into_decision_bytes(),
+            vote_against.clone().into_bytes(),
             MaybeVote::some(VotingDecision::VoteAgainst(vote_against.clone())).into_bytes()
         );
         assert_eq!(
