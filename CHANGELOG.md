@@ -16,7 +16,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `Field`, `CryptoHash`, `StorageValue` and `ExonumJson` traits have been
   implemented for `chrono::Duration` structure. (#653)
 
-- Unsafe api for emergency cases has been implemented. (#668)
+- Unsafe Exonum API that allows to restore node without recompilation
+  in emergency cases (e.g. internal node errors) 
+  has been implemented. (#668)
 
 #### exonum-timestamping
 
