@@ -173,7 +173,9 @@ pub trait Service: Send + Sync + 'static {
     }
 
     /// A service execution. This method is invoked for each service after execution
-    /// of all transactions in the block but before `handle_commit` handler.
+    /// of all transactions in the block but before `handle_commit` handler. The order of
+    /// invoking `execute` method for every service depends on the service ID. `execute` for
+    /// the service with the smallest ID is invoked first up to the largest one.
     fn execute(&self, fork: &mut Fork) {}
 
     /// Handles block commit. This handler is invoked for each service after commit of the block.

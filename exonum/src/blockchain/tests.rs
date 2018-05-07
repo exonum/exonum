@@ -603,7 +603,8 @@ mod rocksdb_tests {
     #[should_panic]
     fn test_service_execute_panic_storage_error() {
         let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
-        let blockchain = create_blockchain_with_service(dir.path(), Box::new(ServicePanicStorageError));
+        let blockchain =
+            create_blockchain_with_service(dir.path(), Box::new(ServicePanicStorageError));
         let dir = TempDir::new(super::gen_tempdir_name().as_str()).unwrap();
         let mut db = create_database(dir.path());
         super::assert_service_execute(&blockchain, &mut db);
