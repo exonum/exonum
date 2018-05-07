@@ -31,6 +31,7 @@ use std::{cmp::Ordering, time::SystemTime};
 
 use helpers::{Height, Round};
 use node::{ExternalMessage, NodeTimeout};
+use blockchain::Transaction;
 
 #[cfg(all(test, feature = "long_benchmarks"))]
 mod benches;
@@ -49,13 +50,17 @@ pub enum InternalEvent {
     Timeout(NodeTimeout),
     /// Shutdown the node.
     Shutdown,
+    /// Transaction has been successfully verified.
+    TxVerified(Box<dyn Transaction>),
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub enum InternalRequest {
     Timeout(TimeoutRequest),
     JumpToRound(Height, Round),
     Shutdown,
+    /// Async request to verify a transaction in the thread pool.
+    VerifyTx(Box<Transaction>),
 }
 
 #[derive(Debug, PartialEq, Eq)]
