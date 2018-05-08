@@ -262,7 +262,7 @@ pub struct MapProof<K, V> {
 /// See [`MapProof`] for an example of usage.
 ///
 /// [`MapProof`]: struct.MapProof.html#workflow
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CheckedMapProof<K, V> {
     entries: Vec<(K, Option<V>)>,
     hash: Hash,

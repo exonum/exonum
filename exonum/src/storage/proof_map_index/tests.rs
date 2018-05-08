@@ -298,7 +298,6 @@ fn check_map_proof<K, V>(
 {
     let serialized_proof = serde_json::to_value(&proof).unwrap();
     let deserialized_proof: MapProof<K, V> = serde_json::from_value(serialized_proof).unwrap();
-    assert_eq!(deserialized_proof, proof);
 
     let entries = match key {
         Some(key) => {
@@ -317,6 +316,10 @@ fn check_map_proof<K, V>(
             .collect::<Vec<_>>()
     );
     assert_eq!(proof.merkle_root(), table.merkle_root());
+
+    let deserialized_proof = deserialized_proof.check().unwrap();
+    assert_eq!(deserialized_proof.entries(), proof.entries());
+    assert_eq!(deserialized_proof.merkle_root(), proof.merkle_root());
 }
 
 fn check_map_multiproof<K, V>(
