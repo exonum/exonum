@@ -357,12 +357,9 @@ mod tests {
         db.merge(fork.into_patch()).unwrap();
 
         let snapshot = db.snapshot();
-        let index: ProofListIndex<_, VotingDecision> = ProofListIndex::new("index", &snapshot);
-        assert_eq!(index.get(1).unwrap(), VotingDecision::Yea(vote.clone()));
-        assert_eq!(
-            index.get(2).unwrap(),
-            VotingDecision::Nay(vote_against.clone())
-        );
+        let index: ProofListIndex<_, MaybeVote> = ProofListIndex::new("index", &snapshot);
+        assert_eq!(index.get(1).unwrap(), MaybeVote::from(vote.clone()));
+        assert_eq!(index.get(2).unwrap(), MaybeVote::from(vote_against.clone()));
 
         let new_merkle_root = {
             let mut fork = db.fork();
