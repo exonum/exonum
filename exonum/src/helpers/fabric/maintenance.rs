@@ -27,8 +27,11 @@ use node::NodeConfig;
 use super::internal::{CollectedCommand, Command, Feedback};
 use super::{Argument, CommandName, Context};
 
+// Conext entry for the path to the node config.
 const NODE_CONFIG_PATH: &str = "NODE_CONFIG_PATH";
+// Context entry for the path to the database.
 const DATABASE_PATH: &str = "DATABASE_PATH";
+// Context entry for the type of action to be performed.
 const MAINTENANCE_ACTION_PATH: &str = "MAINTENANCE_ACTION_PATH";
 
 /// Maintenance command.
