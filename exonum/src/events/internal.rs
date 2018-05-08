@@ -47,7 +47,7 @@ impl InternalPart {
                         .clone()
                         .send(InternalEvent::TxVerified(tx))
                         .wait()
-                        .map_err(|_| panic!("Cannot send tx to thread pool."));
+                        .expect("Cannot send tx to the thread pool.");
                 }
                 Ok(())
             })
@@ -97,15 +97,15 @@ impl InternalPart {
                         to_box(f)
                     }
                     InternalRequest::VerifyTx(tx) => {
-                        if !txs_in_verification.insert(tx.raw().hash()) {
-                            let f = future::ok::<(), ()>(());
-                            to_box(f)
-                        } else {
+                        if txs_in_verification.insert(tx.raw().hash()) {
                             let f = futures::lazy(move || {
                                 pool_tx.send(tx).map(drop).map_err(into_other)
                             }).map_err(|_| {
                                 panic!("Can't send tx for verification to the thread pool")
                             });
+                            to_box(f)
+                        } else {
+                            let f = future::ok::<(), ()>(());
                             to_box(f)
                         }
                     }
