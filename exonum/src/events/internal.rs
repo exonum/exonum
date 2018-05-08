@@ -14,7 +14,7 @@
 
 use futures::{self, sync::mpsc, Future, Sink, Stream, future};
 use tokio_core::reactor::{Handle, Timeout};
-use tokio_threadpool::{Builder as ThreadPoolBuilder};
+use tokio_threadpool::Builder as ThreadPoolBuilder;
 
 use std::{
     io, time::{Duration, SystemTime},
@@ -41,9 +41,13 @@ impl InternalPart {
         let (pool_tx, pool_rx) = mpsc::channel::<Box<Transaction>>(0);
         let internal_tx = self.internal_tx.clone();
         thread_pool.spawn(futures::lazy(move || {
-            pool_rx.for_each(|tx| {
+            pool_rx.for_each(move |tx| {
                 if tx.verify() {
-                    internal_tx.send(InternalEvent::TxVerified(tx));
+                    internal_tx
+                        .clone()
+                        .send(InternalEvent::TxVerified(tx))
+                        .wait()
+                        .map_err(|_| panic!("Cannot send tx to thread pool."));
                 }
                 Ok(())
             })
@@ -54,6 +58,7 @@ impl InternalPart {
         let internal_tx = self.internal_tx.clone();
         let fut = self.internal_requests_rx
             .for_each(move |request| {
+                let pool_tx = pool_tx.clone();
                 let event = match request {
                     InternalRequest::Timeout(TimeoutRequest(time, timeout)) => {
                         let duration = time.duration_since(SystemTime::now())
@@ -97,11 +102,10 @@ impl InternalPart {
                             to_box(f)
                         } else {
                             let f = futures::lazy(move || {
-                                pool_tx
-                                    .send(tx)
-                                    .map(drop)
-                                    .map_err(into_other)
-                            }).map_err(|_| panic!("Can't send tx for verification to the thread pool"));
+                                pool_tx.send(tx).map(drop).map_err(into_other)
+                            }).map_err(|_| {
+                                panic!("Can't send tx for verification to the thread pool")
+                            });
                             to_box(f)
                         }
                     }
