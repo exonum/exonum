@@ -27,7 +27,7 @@ use failure;
 use toml::Value;
 use router::Router;
 use mount::Mount;
-use iron::{Chain, Iron};
+use iron::{Chain, Iron, Listening};
 use iron_cors::CorsMiddleware;
 use serde::{de, ser};
 use futures::{Future, Sink, sync::mpsc};
@@ -865,47 +865,35 @@ impl Node {
     /// Public api prefix is `/api/services/{service_name}`
     /// Private api prefix is `/api/services/{service_name}`
     pub fn run(self) -> io::Result<()> {
-        let blockchain = self.handler().blockchain.clone();
-        let api_sender = self.channel();
+        let api_state = self.handler.api_state.clone();
+        let blockchain = self.handler.blockchain.clone();
+        let mut api_handlers: Vec<Listening> = Vec::new();
 
-        let private_config_api_thread = match self.api_options.private_api_address {
-            Some(listen_address) => {
-                let handler = create_private_api_handler(
-                    blockchain.clone(),
-                    self.handler().api_state().clone(),
-                    api_sender,
-                );
-                let thread = thread::spawn(move || {
-                    info!("Private exonum api started on {}", listen_address);
-                    Iron::new(handler).http(listen_address).unwrap();
-                });
-                Some(thread)
-            }
-            None => None,
+        // Start private api.
+        if let Some(listen_address) = self.api_options.private_api_address {
+            let api_sender = self.channel();
+            let handler =
+                create_private_api_handler(blockchain.clone(), api_state.clone(), api_sender);
+            let listener = Iron::new(handler).http(listen_address).unwrap();
+            api_handlers.push(listener);
+
+            info!("Private exonum api started on {}", listen_address);
         };
-        let public_config_api_thread = match self.api_options.public_api_address {
-            Some(listen_address) => {
-                let handler = create_public_api_handler(
-                    blockchain,
-                    self.handler.api_state().clone(),
-                    &self.api_options,
-                );
-                let thread = thread::spawn(move || {
-                    info!("Public exonum api started on {}", listen_address);
-                    Iron::new(handler).http(listen_address).unwrap();
-                });
-                Some(thread)
-            }
-            None => None,
+
+        // Start public api.
+        if let Some(listen_address) = self.api_options.public_api_address {
+            let handler = create_public_api_handler(blockchain, api_state, &self.api_options);
+            let listener = Iron::new(handler).http(listen_address).unwrap();
+            api_handlers.push(listener);
+
+            info!("Public exonum api started on {}", listen_address);
         };
 
         self.run_handler()?;
 
-        if let Some(private_config_api_thread) = private_config_api_thread {
-            private_config_api_thread.join().unwrap();
-        }
-        if let Some(public_config_api_thread) = public_config_api_thread {
-            public_config_api_thread.join().unwrap();
+        // Stop all api handlers.
+        for mut handler in api_handlers {
+            handler.close().unwrap();
         }
 
         Ok(())

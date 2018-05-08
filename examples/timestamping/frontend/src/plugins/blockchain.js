@@ -4,7 +4,6 @@ import axios from 'axios'
 const PER_PAGE = 10
 const ATTEMPTS = 10
 const ATTEMPT_TIMEOUT = 500
-const NETWORK_ID = 0
 const PROTOCOL_VERSION = 0
 const SERVICE_ID = 130
 const TX_ID = 0
@@ -68,7 +67,6 @@ module.exports = {
 
         // Describe transaction
         const TxTimestamp = Exonum.newMessage({
-          network_id: NETWORK_ID,
           protocol_version: PROTOCOL_VERSION,
           service_id: SERVICE_ID,
           message_id: TX_ID,
@@ -92,7 +90,6 @@ module.exports = {
 
         // Send transaction into blockchain
         return axios.post('/api/services/timestamping/v1/timestamps', {
-          network_id: NETWORK_ID,
           protocol_version: PROTOCOL_VERSION,
           service_id: SERVICE_ID,
           message_id: TX_ID,
@@ -113,23 +110,31 @@ module.exports = {
           return axios.get(`/api/services/timestamping/v1/timestamps/proof/${hash}`)
             .then(response => response.data)
             .then(data => {
-              if (!Exonum.verifyBlock(data.block_info, validators, NETWORK_ID)) {
+              if (!Exonum.verifyBlock(data.block_info, validators)) {
                 throw new Error('Block can not be verified')
               }
 
-              // find root hash of table with wallets in the tree of all tables
+              // find root hash of table with all tables
               const tableKey = TableKey.hash({
                 service_id: SERVICE_ID,
                 table_index: 0
               })
-              const rootHash = Exonum.merklePatriciaProof(data.block_info.block.state_hash, data.state_proof, tableKey)
-              if (rootHash === null) {
-                throw new Error('State hash does not match')
+              const stateProof = new Exonum.MapProof(data.state_proof, Exonum.Hash, Exonum.Hash)
+              if (stateProof.merkleRoot !== data.block_info.block.state_hash) {
+                throw new Error('State proof is corrupted')
+              }
+              const timestampsHash = stateProof.entries.get(tableKey)
+              if (typeof timestampsHash === 'undefined') {
+                throw new Error('Timestamps table not found')
               }
 
-              // find wallet in the tree of all wallets
-              const timestamp = Exonum.merklePatriciaProof(rootHash, data.timestamp_proof, hash, TimestampEntry)
-              if (timestamp === null) {
+              // find timestamp in the tree of all timestamps
+              const timestampProof = new Exonum.MapProof(data.timestamp_proof, Exonum.Hash, TimestampEntry)
+              if (timestampProof.merkleRoot !== timestampsHash) {
+                throw new Error('Timestamp proof is corrupted')
+              }
+              const timestamp = timestampProof.entries.get(hash)
+              if (typeof timestamp === 'undefined') {
                 throw new Error('Timestamp not found')
               }
 

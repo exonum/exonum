@@ -17,6 +17,7 @@
 use byteorder::{ByteOrder, LittleEndian};
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use uuid::Uuid;
+use rust_decimal::Decimal;
 
 use std::mem;
 use std::borrow::Cow;
@@ -321,9 +322,22 @@ impl StorageValue for Uuid {
     }
 }
 
+impl StorageValue for Decimal {
+    fn into_bytes(self) -> Vec<u8> {
+        self.serialize().to_vec()
+    }
+
+    fn from_bytes(value: Cow<[u8]>) -> Self {
+        let mut buf: [u8; 16] = [0; 16];
+        buf.copy_from_slice(&value);
+        Self::deserialize(buf)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::str::FromStr;
 
     #[test]
     fn u8_round_trip() {
@@ -491,6 +505,25 @@ mod tests {
             assert_eq!(
                 *value,
                 <Uuid as StorageValue>::from_bytes(Cow::Borrowed(&bytes))
+            );
+        }
+    }
+
+    #[test]
+    fn decimal_round_trip() {
+        let values = [
+            Decimal::from_str("3.14").unwrap(),
+            Decimal::from_parts(1102470952, 185874565, 1703060790, false, 28),
+            Decimal::new(9497628354687268, 12),
+            Decimal::from_str("0").unwrap(),
+            Decimal::from_str("-0.000000000000000000019").unwrap(),
+        ];
+
+        for value in values.into_iter() {
+            let bytes = value.into_bytes();
+            assert_eq!(
+                *value,
+                <Decimal as StorageValue>::from_bytes(Cow::Borrowed(&bytes))
             );
         }
     }
