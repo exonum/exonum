@@ -297,6 +297,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Maintenance CLI command for node management has been added. Currently the only
   supported command is `clear-cache` which clears node message cache. (#676)
+- Transactions are now verified in a thread pool. (#673)
 
 - `StoredConfiguration` validation has been extended with `txs_block_limit`
   parameter check. (#690)
