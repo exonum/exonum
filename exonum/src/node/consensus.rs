@@ -575,7 +575,7 @@ impl NodeHandler {
 
     /// Handles raw transaction. Transaction is ignored if it is already known, otherwise it is
     /// added to the transactions pool.
-    pub fn handle_tx(&mut self, msg: RawTransaction) {
+    pub fn handle_tx(&mut self, msg: &RawTransaction) {
         let tx = match self.blockchain.tx_from_raw(msg.clone()) {
             Ok(tx) => tx,
             Err(e) => {
@@ -589,13 +589,14 @@ impl NodeHandler {
     }
 
     /// Handles an already verified transaction.
-    pub fn handle_verified_tx(&mut self, tx: Box<Transaction>) {
+    pub fn handle_verified_tx(&mut self, tx: &Box<Transaction>) {
         // We don't care about result, because situation when transaction received twice
         // is normal for internal messages (transaction may be received from 2+ nodes).
         let _ = self.handle_tx_inner(tx.raw().clone());
     }
 
     /// Handles raw transactions.
+    #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_txs_batch(&mut self, msg: &TransactionsResponse) {
         if msg.to() != self.state.consensus_public_key() {
             error!(
@@ -620,7 +621,7 @@ impl NodeHandler {
         }
 
         for tx in msg.transactions() {
-            self.handle_tx(tx);
+            self.handle_tx(&tx);
         }
     }
 

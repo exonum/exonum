@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// spell-checker:ignore threadpool
+
 use futures::{self, sync::mpsc, Future, Sink, Stream, future};
 use tokio_core::reactor::{Handle, Timeout};
 use tokio_threadpool::Builder as ThreadPoolBuilder;

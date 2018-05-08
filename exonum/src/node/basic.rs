@@ -29,7 +29,7 @@ impl NodeHandler {
             Ok(Any::Consensus(msg)) => self.handle_consensus(msg),
             Ok(Any::Request(msg)) => self.handle_request(msg),
             Ok(Any::Block(msg)) => self.handle_block(&msg),
-            Ok(Any::Transaction(msg)) => self.handle_tx(msg),
+            Ok(Any::Transaction(msg)) => self.handle_tx(&msg),
             Ok(Any::TransactionsBatch(msg)) => self.handle_txs_batch(&msg),
             Err(err) => {
                 error!("Invalid message received: {:?}", err.description());
