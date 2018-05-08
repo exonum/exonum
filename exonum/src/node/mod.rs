@@ -157,7 +157,7 @@ pub struct NodeApiConfig {
     ///
     /// [cors]: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
     pub public_allow_origin: Option<AllowOrigin>,
-    /// Cross-origin resource sharing ([CORS][cors]) options for responses returend
+    /// Cross-origin resource sharing ([CORS][cors]) options for responses returned
     /// by private API handlers.
     ///
     /// [cors]: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
