@@ -397,13 +397,13 @@ impl Transaction for VoteAgainst {
     fn execute(&self, fork: &mut Fork) -> ExecutionResult {
         let vote_against = VotingDecisionRef::from(self);
         let _parsed_config = vote_against.precheck(fork.as_ref()).map_err(|err| {
-            error!("Discarding dissenting vote {:?}: {}", self, err);
+            error!("Discarding vote against {:?}: {}", self, err);
             err
         })?;
 
         vote_against.save(fork);
         trace!(
-            "Put VoteAgainst:{:?} to corresponding cfg dissenting_votes_by_config_hash table",
+            "Put VoteAgainst:{:?} to corresponding cfg votes_by_config_hash table",
             self
         );
 
