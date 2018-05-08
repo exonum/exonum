@@ -47,7 +47,7 @@ impl InternalPart {
                         .clone()
                         .send(InternalEvent::TxVerified(tx))
                         .wait()
-                        .expect("Cannot send tx to the thread pool.");
+                        .expect("Cannot send TxVerified event.");
                 }
                 Ok(())
             })
