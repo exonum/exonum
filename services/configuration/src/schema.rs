@@ -323,8 +323,6 @@ mod tests {
 
     #[test]
     fn test_serialization_of_voting_decision() {
-        const VALIDATORS: usize = 5;
-
         let (pubkey, key) = crypto::gen_keypair();
         let vote = Vote::new(&pubkey, &Hash::new([1; 32]), &key);
         let vote_against = VoteAgainst::new(&pubkey, &Hash::new([1; 32]), &key);
@@ -341,34 +339,5 @@ mod tests {
             vote_against.hash(),
             VotingDecision::Nay(vote_against.clone()).hash()
         );
-
-        let db = MemoryDB::new();
-        let mut fork = db.fork();
-        let merkle_root = {
-            let mut index: ProofListIndex<_, VotingDecision> =
-                ProofListIndex::new("index", &mut fork);
-            for _ in 0..VALIDATORS {
-                index.push(VotingDecision::Yea(NO_VOTE.clone()));
-            }
-            index.set(1, VotingDecision::Yea(vote.clone()));
-            index.set(2, VotingDecision::Nay(vote_against.clone()));
-            index.merkle_root()
-        };
-        db.merge(fork.into_patch()).unwrap();
-
-        let snapshot = db.snapshot();
-        let index: ProofListIndex<_, MaybeVote> = ProofListIndex::new("index", &snapshot);
-        assert_eq!(index.get(1).unwrap(), MaybeVote::from(vote.clone()));
-        assert_eq!(index.get(2).unwrap(), MaybeVote::from(vote_against.clone()));
-
-        let new_merkle_root = {
-            let mut fork = db.fork();
-            let mut index: ProofListIndex<_, VotingDecision> =
-                ProofListIndex::new("index", &mut fork);
-            index.set(3, VotingDecision::Nay(vote_against.clone()));
-            index.set(3, VotingDecision::Yea(NO_VOTE.clone()));
-            index.merkle_root()
-        };
-        assert_eq!(merkle_root, new_merkle_root);
     }
 }
