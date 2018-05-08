@@ -77,7 +77,7 @@ transactions! {
         /// # Notes
         ///
         /// The stored version of the transaction has a special variant corresponding to absence
-        /// of a vote. See [f`MaybeVote`] for details.
+        /// of a vote. See [`MaybeVote`] for details.
         ///
         /// See [`ErrorCode`] for the description of error codes emitted by the `execute()`
         /// method.
