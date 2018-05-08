@@ -338,8 +338,8 @@ fn test_discard_vote_for_absent_propose() {
     testkit.create_block_with_transactions(txvec![legal_vote.clone(), illegal_vote.clone()]);
 
     let votes = testkit.votes_for_propose(new_cfg.hash());
-    assert!(votes.contains(&Some(VotingDecision::Vote(legal_vote))));
-    assert!(!votes.contains(&Some(VotingDecision::Vote(illegal_vote))));
+    assert!(votes.contains(&Some(VotingDecision::Yea(legal_vote))));
+    assert!(!votes.contains(&Some(VotingDecision::Yea(illegal_vote))));
 }
 
 #[test]
@@ -362,8 +362,8 @@ fn test_vote_against_for_propose() {
     testkit.create_block_with_transactions(txvec![legal_vote.clone(), illegal_vote.clone()]);
 
     let votes = testkit.votes_for_propose(new_cfg.hash());
-    assert!(votes.contains(&Some(VotingDecision::VoteAgainst(legal_vote))));
-    assert!(!votes.contains(&Some(VotingDecision::Vote(illegal_vote))));
+    assert!(votes.contains(&Some(VotingDecision::Nay(legal_vote))));
+    assert!(!votes.contains(&Some(VotingDecision::Yea(illegal_vote))));
 }
 
 #[test]
@@ -411,7 +411,7 @@ fn test_discard_votes_with_expired_actual_from() {
     testkit.create_block_with_transactions(txvec![illegal_vote.clone()]);
     assert!(!testkit
         .votes_for_propose(new_cfg.hash())
-        .contains(&Some(VotingDecision::Vote(illegal_vote))));
+        .contains(&Some(VotingDecision::Yea(illegal_vote))));
 }
 
 #[test]
@@ -522,7 +522,7 @@ fn test_config_txs_discarded_when_not_referencing_actual_config_or_sent_by_illeg
         testkit.create_block_with_transactions(txvec![illegal_validator_vote.clone()]);
         assert!(!testkit
             .votes_for_propose(discarded_votes_cfg.hash())
-            .contains(&Some(VotingDecision::Vote(illegal_validator_vote))))
+            .contains(&Some(VotingDecision::Yea(illegal_validator_vote))))
     }
     {
         let votes = (0..3)
@@ -564,7 +564,7 @@ fn test_config_txs_discarded_when_not_referencing_actual_config_or_sent_by_illeg
 
         let actual_votes = testkit.votes_for_propose(discarded_votes_cfg.hash());
         for expected_vote in expected_votes {
-            assert!(!actual_votes.contains(&Some(VotingDecision::Vote(expected_vote))));
+            assert!(!actual_votes.contains(&Some(VotingDecision::Yea(expected_vote))));
         }
     }
 }

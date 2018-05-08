@@ -59,16 +59,16 @@ lazy_static! {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum VotingDecision {
     /// `Vote` transaction variant
-    Vote(Vote),
+    Yea(Vote),
     /// `VoteAgainst` transaction variant
-    VoteAgainst(VoteAgainst),
+    Nay(VoteAgainst),
 }
 
 impl CryptoHash for VotingDecision {
     fn hash(&self) -> Hash {
         match *self {
-            VotingDecision::Vote(ref vote) => vote.hash(),
-            VotingDecision::VoteAgainst(ref vote_against) => vote_against.hash(),
+            VotingDecision::Yea(ref vote) => vote.hash(),
+            VotingDecision::Nay(ref vote_against) => vote_against.hash(),
         }
     }
 }
@@ -76,17 +76,17 @@ impl CryptoHash for VotingDecision {
 impl StorageValue for VotingDecision {
     fn into_bytes(self) -> Vec<u8> {
         match self {
-            VotingDecision::Vote(vote) => vote.into_bytes(),
-            VotingDecision::VoteAgainst(vote_against) => vote_against.into_bytes(),
+            VotingDecision::Yea(vote) => vote.into_bytes(),
+            VotingDecision::Nay(vote_against) => vote_against.into_bytes(),
         }
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
         let raw_msg = RawMessage::from_vec(bytes.to_vec());
         if raw_msg.message_type() == <Vote as ServiceMessage>::MESSAGE_ID {
-            VotingDecision::Vote(Vote::from_bytes(bytes))
+            VotingDecision::Yea(Vote::from_bytes(bytes))
         } else {
-            VotingDecision::VoteAgainst(VoteAgainst::from_bytes(bytes))
+            VotingDecision::Nay(VoteAgainst::from_bytes(bytes))
         }
     }
 }
@@ -114,7 +114,7 @@ impl MaybeVote {
     /// Returns true if it's a `Some` variant hold `Vote`.
     pub fn is_consent(&self) -> bool {
         match self.0 {
-            Some(VotingDecision::Vote(_)) => true,
+            Some(VotingDecision::Yea(_)) => true,
             _ => false,
         }
     }
@@ -128,13 +128,13 @@ impl From<MaybeVote> for Option<VotingDecision> {
 
 impl From<Vote> for MaybeVote {
     fn from(vote: Vote) -> MaybeVote {
-        MaybeVote::some(VotingDecision::Vote(vote))
+        MaybeVote::some(VotingDecision::Yea(vote))
     }
 }
 
 impl From<VoteAgainst> for MaybeVote {
     fn from(vote_against: VoteAgainst) -> MaybeVote {
-        MaybeVote::some(VotingDecision::VoteAgainst(vote_against))
+        MaybeVote::some(VotingDecision::Nay(vote_against))
     }
 }
 
@@ -158,8 +158,8 @@ impl CryptoHash for MaybeVote {
 impl StorageValue for MaybeVote {
     fn into_bytes(self) -> Vec<u8> {
         match self.0 {
-            Some(VotingDecision::Vote(vote)) => vote.into_bytes(),
-            Some(VotingDecision::VoteAgainst(vote_against)) => vote_against.into_bytes(),
+            Some(VotingDecision::Yea(vote)) => vote.into_bytes(),
+            Some(VotingDecision::Nay(vote_against)) => vote_against.into_bytes(),
             None => NO_VOTE_BYTES.clone(),
         }
     }
@@ -329,16 +329,16 @@ mod tests {
         let vote_against = VoteAgainst::new(&pubkey, &Hash::new([1; 32]), &key);
         assert_eq!(
             vote.clone().into_bytes(),
-            VotingDecision::Vote(vote.clone()).into_bytes()
+            VotingDecision::Yea(vote.clone()).into_bytes()
         );
-        assert_eq!(vote.hash(), VotingDecision::Vote(vote.clone()).hash());
+        assert_eq!(vote.hash(), VotingDecision::Yea(vote.clone()).hash());
         assert_eq!(
             vote_against.clone().into_bytes(),
-            VotingDecision::VoteAgainst(vote_against.clone()).into_bytes()
+            VotingDecision::Nay(vote_against.clone()).into_bytes()
         );
         assert_eq!(
             vote_against.hash(),
-            VotingDecision::VoteAgainst(vote_against.clone()).hash()
+            VotingDecision::Nay(vote_against.clone()).hash()
         );
 
         let db = MemoryDB::new();
@@ -347,28 +347,28 @@ mod tests {
             let mut index: ProofListIndex<_, VotingDecision> =
                 ProofListIndex::new("index", &mut fork);
             for _ in 0..VALIDATORS {
-                index.push(VotingDecision::Vote(NO_VOTE.clone()));
+                index.push(VotingDecision::Yea(NO_VOTE.clone()));
             }
-            index.set(1, VotingDecision::Vote(vote.clone()));
-            index.set(2, VotingDecision::VoteAgainst(vote_against.clone()));
+            index.set(1, VotingDecision::Yea(vote.clone()));
+            index.set(2, VotingDecision::Nay(vote_against.clone()));
             index.merkle_root()
         };
         db.merge(fork.into_patch()).unwrap();
 
         let snapshot = db.snapshot();
         let index: ProofListIndex<_, VotingDecision> = ProofListIndex::new("index", &snapshot);
-        assert_eq!(index.get(1).unwrap(), VotingDecision::Vote(vote.clone()));
+        assert_eq!(index.get(1).unwrap(), VotingDecision::Yea(vote.clone()));
         assert_eq!(
             index.get(2).unwrap(),
-            VotingDecision::VoteAgainst(vote_against.clone())
+            VotingDecision::Nay(vote_against.clone())
         );
 
         let new_merkle_root = {
             let mut fork = db.fork();
             let mut index: ProofListIndex<_, VotingDecision> =
                 ProofListIndex::new("index", &mut fork);
-            index.set(3, VotingDecision::VoteAgainst(vote_against.clone()));
-            index.set(3, VotingDecision::Vote(NO_VOTE.clone()));
+            index.set(3, VotingDecision::Nay(vote_against.clone()));
+            index.set(3, VotingDecision::Yea(NO_VOTE.clone()));
             index.merkle_root()
         };
         assert_eq!(merkle_root, new_merkle_root);
