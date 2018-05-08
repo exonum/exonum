@@ -20,14 +20,15 @@ use snow::Session;
 use std::io;
 use messages::RawMessage;
 use messages::MessageBuffer;
+use super::wrapper::{NOISE_MAX_MESSAGE_LEN, TAGLEN, Wrapper};
 
 #[allow(missing_debug_implementations)]
 pub struct NoiseCodec {
-    session: Session,
+    session: Wrapper,
 }
 
 impl NoiseCodec {
-    pub fn new(session: Session) -> Self {
+    pub fn new(session: Wrapper) -> Self {
         NoiseCodec { session }
     }
 }
@@ -52,10 +53,10 @@ impl Decoder for NoiseCodec {
         let mut readed_data = vec![0u8; 0];
         let mut readed_len = 0usize;
 
-        data.chunks(65535).for_each(|chunk| {
-            let mut read_to = vec![0u8; chunk.len()];
-            readed_len += self.session.read_message(chunk, &mut read_to).unwrap();
+        data.chunks(NOISE_MAX_MESSAGE_LEN).for_each(|chunk| {
+            let (readed_bytes, read_to) = self.session.read(Vec::from(chunk));
             readed_data.extend_from_slice(&read_to);
+            readed_len += readed_bytes;
         });
 
         let total_len = LittleEndian::read_u32(&readed_data[6..10]) as usize;
@@ -75,12 +76,12 @@ impl Encoder for NoiseCodec {
 
         let mut write_to_buf = vec![0u8; 0];
 
-        msg.as_ref().chunks(65535 - 16).for_each(|chunk| {
-            let mut tmp_buf = vec![0u8; 65535];
-            len += self.session
-                .write_message( chunk,&mut tmp_buf)
+        msg.as_ref().chunks(NOISE_MAX_MESSAGE_LEN - TAGLEN).for_each(|chunk| {
+            let (written_bytes, buf) = self.session
+                .write(chunk.to_vec())
                 .unwrap();
-            write_to_buf.extend_from_slice(&tmp_buf);
+            write_to_buf.extend_from_slice(&buf);
+            len += written_bytes;
         });
 
         let mut msg_len_buf = vec![0u8; 4];
