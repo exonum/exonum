@@ -311,7 +311,7 @@ fn test_dissenting_votes_for_propose() {
     let tx_propose = new_tx_config_propose(&testkit.network().validators()[0], new_cfg.clone());
     let cfg_proposal_hash = new_cfg.hash();
     assert_eq!(None, api.votes_for_propose(&new_cfg.hash()));
-    testkit.create_block_with_transactions(txvec![tx_propose]);
+    testkit.create_block_with_transaction(tx_propose);
     assert_eq!(
         Some(vec![None; testkit.network().validators().len()]),
         api.votes_for_propose(&new_cfg.hash())
@@ -531,7 +531,7 @@ fn test_post_vote_against_tx() {
         cfg.stored_configuration().clone()
     };
     let tx = new_tx_config_propose(&testkit.network().validators()[0], new_cfg.clone());
-    testkit.create_block_with_transactions(txvec![tx]);
+    testkit.create_block_with_transaction(tx);
 
     let info = api.post_config_vote_against(&new_cfg.hash());
     testkit.poll_events();
