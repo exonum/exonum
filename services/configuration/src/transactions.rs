@@ -267,7 +267,7 @@ impl<'a> VotingDecisionRef<'a> {
         }
     }
 
-    fn into_maybe(&self) -> MaybeVote {
+    fn to_maybe_vote(&self) -> MaybeVote {
         match *self {
             VotingDecisionRef::Vote(vote) => MaybeVote::from(vote.clone()),
             VotingDecisionRef::VoteAgainst(vote) => MaybeVote::from(vote.clone()),
@@ -338,7 +338,7 @@ impl<'a> VotingDecisionRef<'a> {
 
         let propose_data = {
             let mut votes = schema.votes_by_config_hash_mut(cfg_hash);
-            votes.set(validator_id as u64, self.clone().into_maybe());
+            votes.set(validator_id as u64, self.to_maybe_vote());
             ProposeData::new(
                 propose_data.tx_propose(),
                 &votes.merkle_root(),
