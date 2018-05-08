@@ -396,7 +396,7 @@ impl Transaction for VoteAgainst {
 
     fn execute(&self, fork: &mut Fork) -> ExecutionResult {
         let vote_against = VotingDecisionRef::from(self);
-        let _parsed_config = vote_against.precheck(fork.as_ref()).map_err(|err| {
+        vote_against.precheck(fork.as_ref()).map_err(|err| {
             error!("Discarding vote against {:?}: {}", self, err);
             err
         })?;
