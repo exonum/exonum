@@ -72,6 +72,9 @@ extern crate serde_derive;
 
 #[cfg(test)]
 #[macro_use]
+extern crate assert_matches;
+#[cfg(test)]
+#[macro_use]
 extern crate exonum_testkit;
 #[cfg(test)]
 #[macro_use]

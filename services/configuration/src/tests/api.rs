@@ -295,7 +295,6 @@ fn test_votes_for_propose() {
 
 #[test]
 fn test_dissenting_votes_for_propose() {
-    use std::mem::discriminant;
     use schema::VotingDecision;
 
     let mut testkit: TestKit = TestKit::configuration_default();
@@ -325,17 +324,13 @@ fn test_dissenting_votes_for_propose() {
         .map(to_boxed)
         .collect::<Vec<_>>();
     testkit.create_block_with_transactions(tx_dissenting_votes);
-    let vote_against_variant = discriminant(&VotingDecision::Nay(new_tx_config_vote_against(
-        &testkit.network().validators()[0],
-        cfg_proposal_hash,
-    )));
     let response = api.votes_for_propose(&new_cfg.hash())
         .expect("Dissenting votes for config is absent");
     for entry in response.into_iter().take(testkit.majority_count()) {
         let tx = entry.expect("VoteAgainst for config is absent");
-        assert_eq!(
-            discriminant(&tx),
-            vote_against_variant,
+        assert_matches!(
+            tx,
+            VotingDecision::Nay(_),
             "Transaction {:?} is not VoteAgainst variant",
             tx
         );
