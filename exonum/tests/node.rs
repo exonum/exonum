@@ -131,6 +131,7 @@ fn test_node_run() {
 }
 
 #[test]
+#[ignore]
 fn test_node_shutdown_twice() {
     let (nodes, commit_rxs) = run_nodes(1, 16_400);
 

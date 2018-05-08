@@ -5,18 +5,21 @@ use snow::Session;
 use snow::NoiseBuilder;
 use snow::params::NoiseParams;
 
-pub static NOISE_MAX_MESSAGE_LEN: usize = 65535;
-pub static TAGLEN : usize = 16;
+pub const NOISE_MAX_MESSAGE_LEN: usize = 65535;
+pub const TAGLEN : usize = 16;
+pub const HEADER_LEN : usize = 4;
+pub const HANDSHAKE_HEADER_LEN: usize = 2;
 
 lazy_static! {
     static ref PARAMS: NoiseParams = "Noise_XX_25519_ChaChaPoly_BLAKE2s".parse().unwrap();
 }
 
-pub struct Wrapper {
-    session: Session,
+#[allow(missing_debug_implementations)]
+pub struct NoiseWrapper {
+    pub session: Session,
 }
 
-impl Wrapper {
+impl NoiseWrapper {
     pub fn responder() -> Self {
         let builder: NoiseBuilder = NoiseBuilder::new(PARAMS.clone());
         let mut static_i: Dh25519 = Default::default();
@@ -29,7 +32,7 @@ impl Wrapper {
             .build_responder()
             .unwrap();
 
-        Wrapper {
+        NoiseWrapper {
             session
         }
     }
@@ -46,13 +49,13 @@ impl Wrapper {
             .build_initiator()
             .unwrap();
 
-        Wrapper {
+        NoiseWrapper {
             session
         }
     }
 
-    pub fn read(&mut self, input: Vec<u8>) -> (usize, Vec<u8>) {
-        let mut buf = vec![0u8; NOISE_MAX_MESSAGE_LEN];
+    pub fn read(&mut self, input: Vec<u8>, len:usize) -> (usize, Vec<u8>) {
+        let mut buf = vec![0u8; len];
         let len = self.session.read_message(&input, &mut buf).unwrap();
         (len, buf)
     }
@@ -63,11 +66,15 @@ impl Wrapper {
         Some((len, buf))
     }
 
+    pub fn red_handshake_msg(&mut self, input: Vec<u8>) -> (usize, Vec<u8>) {
+        self.read(input, NOISE_MAX_MESSAGE_LEN)
+    }
+
     pub fn write_handshake_msg(&mut self) -> Option<(usize, Vec<u8>)> {
         self.write(vec![0u8])
     }
 
     pub fn into_transport_mode(self) -> Result<Self, ()> {
-        Ok(Wrapper { session: self.session.into_transport_mode().unwrap() })
+        Ok(NoiseWrapper { session: self.session.into_transport_mode().unwrap() })
     }
 }
