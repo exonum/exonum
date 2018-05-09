@@ -19,6 +19,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `Field`, `CryptoHash`, `StorageKey`, `StorageValue` and `ExonumJson` traits
   have been implemented for `rust_decimal::Decimal`. (#671)
 
+- Maintenance CLI command for node management has been added. Currently the only
+  supported command is `clear-cache` which clears node message cache. (#676)
+
 #### exonum-timestamping
 
 - Additional service example has been added along with frontend. (#646)
