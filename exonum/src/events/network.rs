@@ -141,8 +141,7 @@ impl ConnectionsPool {
             .map(jitter)
             .take(max_tries);
         let handle_clonned = handle.clone();
-
-        let noise = noise.clone();
+        let noise = *noise;
 
         let action = move || TcpStream::connect(&peer, &handle_clonned);
         let connect_handle = Retry::spawn(handle.clone(), strategy, action)
@@ -228,7 +227,7 @@ impl NetworkPart {
             handle.clone(),
             self.network_requests.1,
             cancel_sender,
-            &noise,
+            noise,
         );
         // TODO Don't use unwrap here!
         let server = Listener::bind(
@@ -237,7 +236,7 @@ impl NetworkPart {
             self.listen_address,
             handle.clone(),
             &self.network_tx,
-            &noise,
+            noise,
         ).unwrap();
 
         let cancel_handler = cancel_handler.or_else(|e| {
@@ -270,7 +269,7 @@ impl RequestHandler {
         noise: &NoiseKeyWrapper,
     ) -> RequestHandler {
         let mut cancel_sender = Some(cancel_sender);
-        let noise = noise.clone();
+        let noise = *noise;
         let outgoing_connections = ConnectionsPool::new();
         let requests_handler = receiver
             .map_err(|_| other_error("no network requests"))
@@ -362,7 +361,7 @@ impl Listener {
         // Incoming connections handler
         let listener = TcpListener::bind(&listen_address, &handle)?;
         let network_tx = network_tx.clone();
-        let noise = noise.clone();
+        let noise = *noise;
         let server = listener.incoming().for_each(move |(sock, addr)| {
             let holder = Rc::downgrade(&incoming_connections_counter);
             // Check incoming connections count
@@ -385,7 +384,7 @@ impl Listener {
                     let (_, stream) = framed.split();
                     stream
                         .into_future()
-                        .and_then(move |raw| Ok(raw))
+                        .and_then(Ok)
                         .map_err(|e| e.0)
                         .and_then(move |(raw, stream)| match raw.map(Any::from_raw) {
                             Some(Ok(Any::Connect(msg))) => Ok((msg, stream)),

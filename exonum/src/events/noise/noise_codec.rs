@@ -74,7 +74,7 @@ impl Decoder for NoiseCodec {
                 msg.len()
             };
 
-            let (_, read_to) = self.session.read(Vec::from(msg), len_to_read).unwrap();
+            let (_, read_to) = self.session.read(msg, len_to_read).unwrap();
             decoded_message.extend_from_slice(&read_to);
         });
 
@@ -97,7 +97,7 @@ impl Encoder for NoiseCodec {
         msg.as_ref()
             .chunks(NOISE_MAX_MESSAGE_LEN - TAGLEN)
             .for_each(|msg| {
-                let (written_bytes, written) = self.session.write(msg.to_vec()).unwrap();
+                let (written_bytes, written) = self.session.write(msg).unwrap();
                 encoded_message.extend_from_slice(&written);
                 len += written_bytes;
             });

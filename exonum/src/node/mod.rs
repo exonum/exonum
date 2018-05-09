@@ -842,8 +842,7 @@ impl Node {
         self.handler.initialize();
 
         let (handler_part, network_part, timeouts_part) = self.into_reactor();
-
-        let noise = noise.clone();
+        let noise = *noise;
 
         let network_thread = thread::spawn(move || {
             let mut core = Core::new()?;
@@ -870,7 +869,7 @@ impl Node {
     pub fn run(self) -> io::Result<()> {
         let api_state = self.handler.api_state.clone();
         let blockchain = self.handler.blockchain.clone();
-        let consensus_public_key = self.handler().state().consensus_public_key().clone();
+        let consensus_public_key = *self.handler().state().consensus_public_key();
         let mut api_handlers: Vec<Listening> = Vec::new();
 
         // Start private api.
