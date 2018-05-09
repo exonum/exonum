@@ -32,6 +32,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Fixed bug with shutdown requests handling. (#666)
 
+- Fixed deserialization of the `MapProof` data structure. (#674)
+
 #### exonum-cryptocurrency-advanced
 
 - Frontend has been updated to reflect latest backend changes. (#602 #611)

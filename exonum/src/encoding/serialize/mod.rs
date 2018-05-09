@@ -18,9 +18,9 @@
 
 pub use hex::{decode as decode_hex, encode as encode_hex, FromHex, FromHexError, ToHex};
 
+use super::Offset;
 use encoding::Field;
 use messages::MessageWriter;
-use super::Offset;
 
 /// implement exonum serialization\deserialization based on serde `Serialize`\ `Deserialize`
 ///
@@ -35,8 +35,9 @@ use super::Offset;
 macro_rules! implement_exonum_serializer {
     ($name:ident) => {
         impl $crate::encoding::serialize::json::ExonumJsonDeserialize for $name {
-            fn deserialize(value: &$crate::encoding::serialize::json::reexport::Value)
-                                                        -> Result<$name, Box<::std::error::Error>> {
+            fn deserialize(
+                value: &$crate::encoding::serialize::json::reexport::Value,
+            ) -> Result<$name, Box<::std::error::Error>> {
                 use $crate::encoding::serialize::json::reexport::from_value;
                 Ok(from_value(value.clone())?)
             }
@@ -45,11 +46,12 @@ macro_rules! implement_exonum_serializer {
         impl $crate::encoding::serialize::json::ExonumJson for $name {
             fn deserialize_field<B>(
                 value: &$crate::encoding::serialize::json::reexport::Value,
-                                                        buffer: &mut B,
-                                                        from: $crate::encoding::Offset,
-                                                        to: $crate::encoding::Offset)
-                                                        -> Result<(), Box<::std::error::Error>>
-            where B: $crate::encoding::serialize::WriteBufferWrapper
+                buffer: &mut B,
+                from: $crate::encoding::Offset,
+                to: $crate::encoding::Offset,
+            ) -> Result<(), Box<::std::error::Error>>
+            where
+                B: $crate::encoding::serialize::WriteBufferWrapper,
             {
                 use $crate::encoding::serialize::json::reexport::from_value;
                 let value: $name = from_value(value.clone())?;
@@ -57,16 +59,16 @@ macro_rules! implement_exonum_serializer {
                 Ok(())
             }
 
-            fn serialize_field(&self) ->
-                Result<$crate::encoding::serialize::json::reexport::Value,
-                        Box<::std::error::Error + Send + Sync>>
-            {
+            fn serialize_field(
+                &self,
+            ) -> Result<
+                $crate::encoding::serialize::json::reexport::Value,
+                Box<::std::error::Error + Send + Sync>,
+            > {
                 use $crate::encoding::serialize::json::reexport::to_value;
                 Ok(to_value(self)?)
             }
         }
-
-
     };
 }
 
@@ -95,8 +97,8 @@ impl WriteBufferWrapper for Vec<u8> {
 /// Reexport of `serde` specific traits, this reexports
 /// provide compatibility layer with important `serde` version.
 pub mod reexport {
-    pub use serde::{Deserialize, Deserializer, Serialize, Serializer};
-    pub use serde::de::Error as DeError;
+    pub use serde::de::{DeserializeOwned, Error as DeError};
     pub use serde::ser::Error as SerError;
     pub use serde::ser::SerializeStruct;
+    pub use serde::{Deserialize, Deserializer, Serialize, Serializer};
 }
