@@ -30,8 +30,8 @@ use helpers::Milliseconds;
 use super::to_box;
 use super::error::{into_other, log_error, other_error, result_ok};
 
-use crypto::PublicKey;
 use events::noise::NoiseHandshake;
+use events::noise::wrapper::NoiseKeyWrapper;
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 
@@ -120,7 +120,7 @@ impl ConnectionsPool {
         peer: SocketAddr,
         network_tx: mpsc::Sender<NetworkEvent>,
         handle: &Handle,
-        consensus_key: &PublicKey,
+        noise: &NoiseKeyWrapper
     ) -> Option<mpsc::Sender<RawMessage>> {
         let limit = network_config.max_outgoing_connections;
         if self.len() >= limit {
@@ -141,7 +141,8 @@ impl ConnectionsPool {
             .map(jitter)
             .take(max_tries);
         let handle_clonned = handle.clone();
-        let consensus_key = consensus_key.clone();
+
+        let noise = noise.clone();
 
         let action = move || TcpStream::connect(&peer, &handle_clonned);
         let connect_handle = Retry::spawn(handle.clone(), strategy, action)
@@ -156,7 +157,7 @@ impl ConnectionsPool {
             })
             .and_then(move |sock| {
                 let handshake = NoiseHandshake { max_message_len };
-                handshake.send(sock, &consensus_key).and_then(|framed|{
+                handshake.send(&noise, sock).and_then(|framed|{
                     Ok(framed)
                 })
             })
@@ -213,7 +214,7 @@ impl NetworkPart {
     pub fn run(
         self,
         handle: &Handle,
-        consensus_key: &PublicKey,
+        noise: &NoiseKeyWrapper,
     ) -> Box<Future<Item = (), Error = io::Error>> {
         let network_config = self.network_config;
         // Cancellation token
@@ -227,7 +228,7 @@ impl NetworkPart {
             handle.clone(),
             self.network_requests.1,
             cancel_sender,
-            consensus_key,
+            &noise,
         );
         // TODO Don't use unwrap here!
         let server = Listener::bind(
@@ -236,7 +237,7 @@ impl NetworkPart {
             self.listen_address,
             handle.clone(),
             &self.network_tx,
-            consensus_key,
+            &noise,
         ).unwrap();
 
         let cancel_handler = cancel_handler.or_else(|e| {
@@ -266,11 +267,11 @@ impl RequestHandler {
         handle: Handle,
         receiver: mpsc::Receiver<NetworkRequest>,
         cancel_sender: unsync::oneshot::Sender<()>,
-        consensus_key: &PublicKey,
+        noise: &NoiseKeyWrapper,
     ) -> RequestHandler {
         let mut cancel_sender = Some(cancel_sender);
+        let noise = noise.clone();
         let outgoing_connections = ConnectionsPool::new();
-        let consensus_key = consensus_key.clone();
         let requests_handler = receiver
             .map_err(|_| other_error("no network requests"))
             .for_each(move |request| {
@@ -288,7 +289,7 @@ impl RequestHandler {
                                         peer,
                                         network_tx.clone(),
                                         &handle,
-                                        &consensus_key
+                                        &noise
                                     )
                                     .map(|conn_tx|
                                         // if we create new connect, we should send connect message
@@ -352,7 +353,7 @@ impl Listener {
         listen_address: SocketAddr,
         handle: Handle,
         network_tx: &mpsc::Sender<NetworkEvent>,
-        stored: &PublicKey,
+        noise: &NoiseKeyWrapper,
     ) -> Result<Listener, io::Error> {
         // Incoming connections limiter
         let incoming_connections_limit = network_config.max_incoming_connections;
@@ -361,7 +362,7 @@ impl Listener {
         // Incoming connections handler
         let listener = TcpListener::bind(&listen_address, &handle)?;
         let network_tx = network_tx.clone();
-        let stored = stored.clone();
+        let noise = noise.clone();
         let server = listener.incoming().for_each(move |(sock, addr)| {
             let holder = Rc::downgrade(&incoming_connections_counter);
             // Check incoming connections count
@@ -376,9 +377,9 @@ impl Listener {
             }
             trace!("Accepted incoming connection with peer={}", addr);
             let network_tx = network_tx.clone();
-            let wrapper = NoiseHandshake { max_message_len };
+            let handshake = NoiseHandshake { max_message_len };
 
-            let connection_handler = wrapper.listen(sock, &stored)
+            let connection_handler = handshake.listen(&noise, sock)
                 .and_then(move |framed| {
                     let (_, stream) = framed.split();
                     stream
