@@ -120,7 +120,7 @@ impl ConnectionsPool {
         peer: SocketAddr,
         network_tx: mpsc::Sender<NetworkEvent>,
         handle: &Handle,
-        noise: &NoiseKeyWrapper
+        noise: &NoiseKeyWrapper,
     ) -> Option<mpsc::Sender<RawMessage>> {
         let limit = network_config.max_outgoing_connections;
         if self.len() >= limit {
@@ -379,7 +379,8 @@ impl Listener {
             let network_tx = network_tx.clone();
             let handshake = NoiseHandshake { max_message_len };
 
-            let connection_handler = handshake.listen(&noise, sock)
+            let connection_handler = handshake
+                .listen(&noise, sock)
                 .and_then(move |framed| {
                     let (_, stream) = framed.split();
                     stream

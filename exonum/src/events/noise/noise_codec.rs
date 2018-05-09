@@ -19,20 +19,23 @@ use tokio_io::codec::{Decoder, Encoder};
 use std::io;
 use messages::RawMessage;
 use messages::MessageBuffer;
-use super::wrapper::{NOISE_MAX_MESSAGE_LEN, TAGLEN, HEADER_LEN, HANDSHAKE_HEADER_LEN, NoiseWrapper};
+use super::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LEN, HEADER_LEN, NOISE_MAX_MESSAGE_LEN, TAGLEN};
 use events::error::other_error;
 
 #[allow(missing_debug_implementations)]
 #[allow(dead_code)]
 pub struct NoiseCodec {
     session: NoiseWrapper,
-    max_message_len:u32,
+    max_message_len: u32,
 }
 
 impl NoiseCodec {
     #[allow(dead_code)]
     pub fn new(session: NoiseWrapper, max_message_len: u32) -> Self {
-        NoiseCodec { session, max_message_len }
+        NoiseCodec {
+            session,
+            max_message_len,
+        }
     }
 }
 
@@ -91,13 +94,13 @@ impl Encoder for NoiseCodec {
         let mut len = 0usize;
         let mut encoded_message = vec![0u8; 0];
 
-        msg.as_ref().chunks(NOISE_MAX_MESSAGE_LEN - TAGLEN).for_each(|msg| {
-            let (written_bytes, written) = self.session
-                .write(msg.to_vec())
-                .unwrap();
-            encoded_message.extend_from_slice(&written);
-            len += written_bytes;
-        });
+        msg.as_ref()
+            .chunks(NOISE_MAX_MESSAGE_LEN - TAGLEN)
+            .for_each(|msg| {
+                let (written_bytes, written) = self.session.write(msg.to_vec()).unwrap();
+                encoded_message.extend_from_slice(&written);
+                len += written_bytes;
+            });
 
         let mut msg_len_buf = vec![0u8; HEADER_LEN];
 

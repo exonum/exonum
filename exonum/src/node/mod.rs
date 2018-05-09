@@ -46,7 +46,8 @@ use blockchain::{Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Tr
 use api::{private, public, Api};
 use messages::{Connect, Message, RawMessage};
 use events::{HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkConfiguration,
-             NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest, noise::wrapper::NoiseKeyWrapper};
+             NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
+             noise::wrapper::NoiseKeyWrapper};
 use events::error::{into_other, log_error, other_error, LogError};
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
 use storage::{Database, DbOptions};
@@ -893,7 +894,9 @@ impl Node {
         };
 
         //TODO: find better way to provide key to Noise configuration
-        let noise = NoiseKeyWrapper { public_key: consensus_public_key };
+        let noise = NoiseKeyWrapper {
+            public_key: consensus_public_key,
+        };
         self.run_handler(&noise)?;
 
         // Stop all api handlers.

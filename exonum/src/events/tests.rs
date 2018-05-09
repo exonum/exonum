@@ -147,7 +147,9 @@ impl TestEvents {
         let (mut handler_part, network_part) = self.into_reactor();
         let handle = thread::spawn(move || {
             let mut core = Core::new().unwrap();
-            let noise = NoiseKeyWrapper { public_key: gen_keypair_from_seed(&Seed::new([0; 32])).0 };
+            let noise = NoiseKeyWrapper {
+                public_key: gen_keypair_from_seed(&Seed::new([0; 32])).0,
+            };
             let fut = network_part.run(&core.handle(), &noise);
             core.run(fut).map_err(log_error).unwrap();
         });

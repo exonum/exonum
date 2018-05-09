@@ -32,9 +32,7 @@ impl NoiseWrapper {
             .build_responder()
             .unwrap();
 
-        NoiseWrapper {
-            session
-        }
+        NoiseWrapper { session }
     }
 
     pub fn initiator(keys: &NoiseKeyWrapper) -> Self {
@@ -46,24 +44,22 @@ impl NoiseWrapper {
             .build_initiator()
             .unwrap();
 
-        NoiseWrapper {
-            session,
-        }
+        NoiseWrapper { session }
     }
 
-    pub fn read(&mut self, input: Vec<u8>, len: usize) ->  Result<(usize, Vec<u8>), NoiseError> {
+    pub fn read(&mut self, input: Vec<u8>, len: usize) -> Result<(usize, Vec<u8>), NoiseError> {
         let mut buf = vec![0u8; len];
-        let len = self.session.read_message(&input, &mut buf).map_err(|_e| {
-            NoiseError::new("Error while reading noise message.")
-        })?;
+        let len = self.session
+            .read_message(&input, &mut buf)
+            .map_err(|_e| NoiseError::new("Error while reading noise message."))?;
         Ok((len, buf))
     }
 
-    pub fn write(&mut self, msg: Vec<u8>) -> Result<(usize, Vec<u8>), NoiseError>  {
+    pub fn write(&mut self, msg: Vec<u8>) -> Result<(usize, Vec<u8>), NoiseError> {
         let mut buf = vec![0u8; NOISE_MAX_MESSAGE_LEN];
-        let len = self.session.write_message(&msg, &mut buf).map_err(|_e| {
-            NoiseError::new("Error while writing noise message.")
-        })?;
+        let len = self.session
+            .write_message(&msg, &mut buf)
+            .map_err(|_e| NoiseError::new("Error while writing noise message."))?;
         Ok((len, buf))
     }
 
@@ -76,12 +72,11 @@ impl NoiseWrapper {
     }
 
     pub fn into_transport_mode(self) -> Result<Self, NoiseError> {
-        let session = self.session.into_transport_mode().map_err(|_| {
-           NoiseError::new("Error when converting session into transport mode.")
-        })?;
+        let session = self.session
+            .into_transport_mode()
+            .map_err(|_| NoiseError::new("Error when converting session into transport mode."))?;
         Ok(NoiseWrapper { session })
     }
-
 }
 #[derive(Fail, Debug, Clone)]
 #[fail(display = "{}", message)]
