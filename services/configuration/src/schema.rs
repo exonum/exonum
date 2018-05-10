@@ -19,6 +19,7 @@ use exonum::storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot, StorageValu
 use exonum::messages::{RawMessage, ServiceMessage};
 
 use std::borrow::Cow;
+use std::ops::Deref;
 
 use transactions::{Propose, Vote, VoteAgainst};
 
@@ -139,7 +140,7 @@ impl From<VoteAgainst> for MaybeVote {
     }
 }
 
-impl ::std::ops::Deref for MaybeVote {
+impl Deref for MaybeVote {
     type Target = Option<VotingDecision>;
 
     fn deref(&self) -> &Option<VotingDecision> {
