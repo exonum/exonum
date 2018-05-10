@@ -70,7 +70,7 @@ mod transaction;
 mod tests;
 
 /// Exonum blockchain instance with a certain services set and data storage.
-/// 
+///
 /// Only nodes with an identical set of services and genesis block can be combined
 /// into a single network.
 pub struct Blockchain {
