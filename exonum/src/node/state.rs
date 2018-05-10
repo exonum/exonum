@@ -586,7 +586,10 @@ impl State {
             }
             *known_round = round;
         }
-        let max_byzantine_count = self.validators().len() / 3;
+
+        // At max we can have (1/3) - 1 byzantine nodes.
+        // (1/3) is calculated via rounded up integer division.
+        let max_byzantine_count = (self.validators().len() + 2) / 3 - 1;
         if self.validators_rounds.len() <= max_byzantine_count {
             trace!("Count of validators, lower then max byzantine count.");
             return None;
