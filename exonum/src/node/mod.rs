@@ -47,7 +47,7 @@ use api::{private, public, Api};
 use messages::{Connect, Message, RawMessage};
 use events::{HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkConfiguration,
              NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
-             noise::wrapper::NoiseKeyWrapper};
+             noise::NoiseKeyWrapper};
 use events::error::{into_other, log_error, other_error, LogError};
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
 use storage::{Database, DbOptions};

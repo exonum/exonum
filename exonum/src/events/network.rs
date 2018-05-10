@@ -31,7 +31,7 @@ use super::to_box;
 use super::error::{into_other, log_error, other_error, result_ok};
 
 use events::noise::NoiseHandshake;
-use events::noise::wrapper::NoiseKeyWrapper;
+use events::noise::NoiseKeyWrapper;
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 

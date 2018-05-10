@@ -29,7 +29,7 @@ use events::error::log_error;
 use node::{EventsPoolCapacity, NodeChannel};
 use blockchain::ConsensusConfig;
 use helpers::user_agent;
-use events::noise::wrapper::NoiseKeyWrapper;
+use events::noise::NoiseKeyWrapper;
 
 #[derive(Debug)]
 pub struct TestHandler {

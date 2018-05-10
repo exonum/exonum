@@ -17,13 +17,20 @@ use events::codec::MessagesCodec;
 use tokio_core::net::TcpStream;
 use tokio_io::{AsyncRead, codec::Framed};
 use futures::future::{ok, Future};
-use events::noise::wrapper::NoiseKeyWrapper;
+use crypto::PublicKey;
 
-#[cfg(all(feature = "noise_protocol"))]
+#[cfg(feature = "noise_protocol")]
 use noise::noise_codec::NoiseCodec;
 
+#[cfg(feature = "noise_protocol")]
 pub mod wrapper;
+#[cfg(feature = "noise_protocol")]
 mod noise_codec;
+
+#[derive(Debug, Copy, Clone)]
+pub struct NoiseKeyWrapper {
+    pub public_key: PublicKey,
+}
 
 #[derive(Debug)]
 pub struct NoiseHandshake {
@@ -76,7 +83,7 @@ impl NoiseHandshake {
     }
 }
 
-#[cfg(all(feature = "noise_protocol"))]
+#[cfg(feature = "noise_protocol")]
 mod internal {
     use std::io;
     use events::noise::{noise_codec::NoiseCodec, wrapper::NoiseWrapper};

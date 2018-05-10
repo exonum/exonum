@@ -1,21 +1,15 @@
 use snow::NoiseBuilder;
 use snow::params::NoiseParams;
 use snow::Session;
-use crypto::PublicKey;
+use events::noise::NoiseKeyWrapper;
 
 pub const NOISE_MAX_MESSAGE_LEN: usize = 65_535;
 pub const TAGLEN: usize = 16;
 pub const HEADER_LEN: usize = 4;
 pub const HANDSHAKE_HEADER_LEN: usize = 2;
 
-lazy_static! {
-    static ref PARAMS: NoiseParams = "Noise_XX_25519_ChaChaPoly_BLAKE2s".parse().unwrap();
-}
+static PARAMS: &str = "Noise_XX_25519_ChaChaPoly_BLAKE2s";
 
-#[derive(Debug, Copy, Clone)]
-pub struct NoiseKeyWrapper {
-    pub public_key: PublicKey,
-}
 
 #[allow(missing_debug_implementations)]
 pub struct NoiseWrapper {
@@ -25,7 +19,7 @@ pub struct NoiseWrapper {
 impl NoiseWrapper {
     pub fn responder(keys: &NoiseKeyWrapper) -> Self {
         let builder: NoiseBuilder =
-            NoiseBuilder::new(PARAMS.clone()).remote_public_key(keys.public_key.as_ref());
+            NoiseBuilder::new(PARAMS.parse().unwrap()).remote_public_key(keys.public_key.as_ref());
         let private_key = builder.generate_private_key().unwrap();
         let session = builder
             .local_private_key(&private_key)
@@ -37,7 +31,7 @@ impl NoiseWrapper {
 
     pub fn initiator(keys: &NoiseKeyWrapper) -> Self {
         let builder: NoiseBuilder =
-            NoiseBuilder::new(PARAMS.clone()).remote_public_key(keys.public_key.as_ref());
+            NoiseBuilder::new(PARAMS.parse().unwrap()).remote_public_key(keys.public_key.as_ref());
         let private_key = builder.generate_private_key().unwrap();
         let session = builder
             .local_private_key(&private_key)
