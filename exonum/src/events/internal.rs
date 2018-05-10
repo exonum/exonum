@@ -48,8 +48,8 @@ impl InternalPart {
                 if tx.verify() {
                     internal_tx
                         .clone()
-                        .send(InternalEvent::TxVerified(tx))
                         .wait()
+                        .send(InternalEvent::TxVerified(tx))
                         .expect("Cannot send TxVerified event.");
                 }
                 Ok(())
