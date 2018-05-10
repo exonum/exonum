@@ -116,7 +116,6 @@ impl ConnectionsPool {
     fn connect_to_peer(
         self,
         network_config: NetworkConfiguration,
-        max_message_len: u32,
         peer: SocketAddr,
         network_tx: mpsc::Sender<NetworkEvent>,
         handle: &Handle,
@@ -155,8 +154,7 @@ impl ConnectionsPool {
                 Ok(sock)
             })
             .and_then(move |sock| {
-                let handshake = NoiseHandshake { max_message_len };
-                handshake.send(&noise, sock).and_then(|framed|{
+                NoiseHandshake::send(&noise, sock).and_then(|framed|{
                     Ok(framed)
                 })
             })
@@ -222,7 +220,6 @@ impl NetworkPart {
         let requests_handle = RequestHandler::new(
             self.our_connect_message,
             network_config,
-            self.max_message_len,
             self.network_tx.clone(),
             handle.clone(),
             self.network_requests.1,
@@ -232,7 +229,6 @@ impl NetworkPart {
         // TODO Don't use unwrap here!
         let server = Listener::bind(
             network_config,
-            self.max_message_len,
             self.listen_address,
             handle.clone(),
             &self.network_tx,
@@ -261,7 +257,6 @@ impl RequestHandler {
     fn new(
         connect_message: Connect,
         network_config: NetworkConfiguration,
-        max_message_len: u32,
         network_tx: mpsc::Sender<NetworkEvent>,
         handle: Handle,
         receiver: mpsc::Receiver<NetworkRequest>,
@@ -284,7 +279,6 @@ impl RequestHandler {
                                     .clone()
                                     .connect_to_peer(
                                         network_config,
-                                        max_message_len,
                                         peer,
                                         network_tx.clone(),
                                         &handle,
@@ -348,7 +342,6 @@ struct Listener(Box<Future<Item = (), Error = io::Error>>);
 impl Listener {
     fn bind(
         network_config: NetworkConfiguration,
-        max_message_len: u32,
         listen_address: SocketAddr,
         handle: Handle,
         network_tx: &mpsc::Sender<NetworkEvent>,
@@ -376,10 +369,8 @@ impl Listener {
             }
             trace!("Accepted incoming connection with peer={}", addr);
             let network_tx = network_tx.clone();
-            let handshake = NoiseHandshake { max_message_len };
 
-            let connection_handler = handshake
-                .listen(&noise, sock)
+            let connection_handler = NoiseHandshake::listen(&noise, sock)
                 .and_then(move |framed| {
                     let (_, stream) = framed.split();
                     stream

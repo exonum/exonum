@@ -57,6 +57,7 @@ extern crate serde;
 extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
+extern crate snow;
 extern crate term;
 extern crate tokio_core;
 extern crate tokio_io;
@@ -66,7 +67,6 @@ extern crate tokio_timer;
 extern crate toml;
 extern crate uuid;
 extern crate vec_map;
-extern crate snow;
 
 // Test dependencies.
 #[cfg(test)]

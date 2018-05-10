@@ -10,7 +10,6 @@ pub const HANDSHAKE_HEADER_LEN: usize = 2;
 
 static PARAMS: &str = "Noise_XX_25519_ChaChaPoly_BLAKE2s";
 
-
 #[allow(missing_debug_implementations)]
 pub struct NoiseWrapper {
     pub session: Session,

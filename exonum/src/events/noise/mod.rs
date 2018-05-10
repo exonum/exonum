@@ -30,55 +30,50 @@ mod noise_codec;
 #[derive(Debug, Copy, Clone)]
 pub struct NoiseKeyWrapper {
     pub public_key: PublicKey,
+    pub max_message_len: u32,
 }
 
 #[derive(Debug)]
-pub struct NoiseHandshake {
-    pub max_message_len: u32,
-}
+pub struct NoiseHandshake {}
 
 #[cfg(all(feature = "noise_protocol"))]
 impl NoiseHandshake {
     pub fn listen(
-        &self,
         noise: &NoiseKeyWrapper,
         stream: TcpStream,
     ) -> Box<Future<Item = Framed<TcpStream, NoiseCodec>, Error = io::Error>> {
-        internal::listen_handshake(stream, noise, self.max_message_len)
+        internal::listen_handshake(stream, noise)
     }
 
     pub fn send(
-        &self,
         noise: &NoiseKeyWrapper,
         stream: TcpStream,
     ) -> Box<Future<Item = Framed<TcpStream, NoiseCodec>, Error = io::Error>> {
-        internal::send_handshake(stream, noise, self.max_message_len)
+        internal::send_handshake(stream, noise)
     }
 }
 
 #[cfg(not(feature = "noise_protocol"))]
 impl NoiseHandshake {
     pub fn listen(
-        &self,
-        _noise: &NoiseKeyWrapper,
+        noise: &NoiseKeyWrapper,
         stream: TcpStream,
     ) -> Box<Future<Item = Framed<TcpStream, MessagesCodec>, Error = io::Error>> {
-        self.framed_stream(stream)
+        Self::framed_stream(stream, noise.max_message_len)
     }
 
     pub fn send(
-        &self,
-        _noise: &NoiseKeyWrapper,
+        noise: &NoiseKeyWrapper,
         stream: TcpStream,
     ) -> Box<Future<Item = Framed<TcpStream, MessagesCodec>, Error = io::Error>> {
-        self.framed_stream(stream)
+        Self::framed_stream(stream, noise.max_message_len)
     }
 
-    pub fn framed_stream(
-        &self,
+    fn framed_stream(
         stream: TcpStream,
+        max_message_len: u32,
     ) -> Box<Future<Item = Framed<TcpStream, MessagesCodec>, Error = io::Error>> {
-        let framed = stream.framed(MessagesCodec::new(self.max_message_len));
+        let framed = stream.framed(MessagesCodec::new(max_message_len));
         Box::new(ok(framed))
     }
 }
@@ -98,8 +93,8 @@ mod internal {
     pub fn listen_handshake(
         stream: TcpStream,
         noise: &NoiseKeyWrapper,
-        max_message_len: u32,
     ) -> Box<Future<Item = Framed<TcpStream, NoiseCodec>, Error = io::Error>> {
+        let max_message_len = noise.max_message_len;
         let mut noise = NoiseWrapper::responder(noise);
         let framed = read(stream).and_then(move |(stream, msg)| {
             let _buf = noise.red_handshake_msg(msg).unwrap();
@@ -120,8 +115,8 @@ mod internal {
     pub fn send_handshake(
         stream: TcpStream,
         noise: &NoiseKeyWrapper,
-        max_message_len: u32,
     ) -> Box<Future<Item = Framed<TcpStream, NoiseCodec>, Error = io::Error>> {
+        let max_message_len = noise.max_message_len;
         let mut noise = NoiseWrapper::initiator(noise);
         let (len, buf) = noise.write_handshake_msg().unwrap();
         let framed = write(stream, buf, len)

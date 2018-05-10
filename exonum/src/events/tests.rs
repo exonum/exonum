@@ -149,6 +149,7 @@ impl TestEvents {
             let mut core = Core::new().unwrap();
             let noise = NoiseKeyWrapper {
                 public_key: gen_keypair_from_seed(&Seed::new([0; 32])).0,
+                max_message_len: network_part.max_message_len,
             };
             let fut = network_part.run(&core.handle(), &noise);
             core.run(fut).map_err(log_error).unwrap();

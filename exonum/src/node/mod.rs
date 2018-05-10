@@ -895,6 +895,7 @@ impl Node {
         //TODO: find better way to provide key to Noise configuration
         let noise = NoiseKeyWrapper {
             public_key: consensus_public_key,
+            max_message_len: self.max_message_len,
         };
         self.run_handler(&noise)?;
 
