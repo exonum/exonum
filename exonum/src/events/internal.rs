@@ -27,6 +27,7 @@ use super::{
 };
 use blockchain::Transaction;
 use crypto::Hash;
+use events::error::log_error;
 
 #[derive(Debug)]
 pub struct InternalPart {
@@ -102,9 +103,7 @@ impl InternalPart {
                         if txs_in_verification.insert(tx.raw().hash()) {
                             let f = futures::lazy(move || {
                                 pool_tx.send(tx).map(drop).map_err(into_other)
-                            }).map_err(|_| {
-                                panic!("Can't send tx for verification to the thread pool")
-                            });
+                            }).map_err(log_error);
                             to_box(f)
                         } else {
                             let f = future::ok::<(), ()>(());
