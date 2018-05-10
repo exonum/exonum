@@ -346,11 +346,10 @@ fn test_discard_vote_for_absent_propose() {
 fn test_vote_against_for_propose() {
     let mut testkit: TestKit = TestKit::configuration_default();
 
-    let cfg_change_height = Height(5);
     let new_cfg = {
         let mut cfg = testkit.configuration_change_proposal();
         cfg.set_service_config("dummy", "First cfg");
-        cfg.set_actual_from(cfg_change_height);
+        cfg.set_actual_from(Height(5));
         cfg.stored_configuration().clone()
     };
 

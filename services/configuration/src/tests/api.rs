@@ -300,11 +300,10 @@ fn test_dissenting_votes_for_propose() {
     let mut testkit: TestKit = TestKit::configuration_default();
     let api = testkit.api();
     // Apply a new configuration.
-    let cfg_change_height = Height(5);
     let new_cfg = {
         let mut cfg = testkit.configuration_change_proposal();
         cfg.set_service_config("message", "First config change");
-        cfg.set_actual_from(cfg_change_height);
+        cfg.set_actual_from(Height(5));
         cfg.stored_configuration().clone()
     };
     let tx_propose = new_tx_config_propose(&testkit.network().validators()[0], new_cfg.clone());
