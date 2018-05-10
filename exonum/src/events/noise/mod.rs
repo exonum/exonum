@@ -14,8 +14,8 @@
 
 use std::io;
 use tokio_core::net::TcpStream;
-use tokio_io::{codec::Framed};
-use futures::future::{Future};
+use tokio_io::codec::Framed;
+use futures::future::Future;
 use crypto::{PublicKey, SecretKey};
 
 #[cfg(not(feature = "noise_protocol"))]
@@ -44,14 +44,14 @@ impl NoiseHandshake {
     pub fn listen(
         params: &HandshakeParams,
         stream: TcpStream,
-    ) -> Box<Future<Item=Framed<TcpStream, NoiseCodec>, Error=io::Error>> {
+    ) -> Box<Future<Item = Framed<TcpStream, NoiseCodec>, Error = io::Error>> {
         internal::listen_handshake(stream, params)
     }
 
     pub fn send(
         params: &HandshakeParams,
         stream: TcpStream,
-    ) -> Box<Future<Item=Framed<TcpStream, NoiseCodec>, Error=io::Error>> {
+    ) -> Box<Future<Item = Framed<TcpStream, NoiseCodec>, Error = io::Error>> {
         internal::send_handshake(stream, params)
     }
 }
@@ -61,14 +61,14 @@ impl NoiseHandshake {
     pub fn listen(
         params: &HandshakeParams,
         stream: TcpStream,
-    ) -> Box<Future<Item=Framed<TcpStream, MessagesCodec>, Error=io::Error>> {
+    ) -> Box<Future<Item = Framed<TcpStream, MessagesCodec>, Error = io::Error>> {
         internal::send(params, stream)
     }
 
     pub fn send(
         params: &HandshakeParams,
         stream: TcpStream,
-    ) -> Box<Future<Item=Framed<TcpStream, MessagesCodec>, Error=io::Error>> {
+    ) -> Box<Future<Item = Framed<TcpStream, MessagesCodec>, Error = io::Error>> {
         internal::listen(params, stream)
     }
 }
@@ -88,7 +88,7 @@ mod internal {
     pub fn listen_handshake(
         stream: TcpStream,
         noise: &HandshakeParams,
-    ) -> Box<Future<Item=Framed<TcpStream, NoiseCodec>, Error=io::Error>> {
+    ) -> Box<Future<Item = Framed<TcpStream, NoiseCodec>, Error = io::Error>> {
         let max_message_len = noise.max_message_len;
         let mut noise = NoiseWrapper::responder(noise);
         let framed = read(stream).and_then(move |(stream, msg)| {
@@ -110,7 +110,7 @@ mod internal {
     pub fn send_handshake(
         stream: TcpStream,
         noise: &HandshakeParams,
-    ) -> Box<Future<Item=Framed<TcpStream, NoiseCodec>, Error=io::Error>> {
+    ) -> Box<Future<Item = Framed<TcpStream, NoiseCodec>, Error = io::Error>> {
         let max_message_len = noise.max_message_len;
         let mut noise = NoiseWrapper::initiator(noise);
         let (len, buf) = noise.write_handshake_msg().unwrap();
@@ -129,7 +129,7 @@ mod internal {
         Box::new(framed)
     }
 
-    fn read(sock: TcpStream) -> Box<Future<Item=(TcpStream, Vec<u8>), Error=io::Error>> {
+    fn read(sock: TcpStream) -> Box<Future<Item = (TcpStream, Vec<u8>), Error = io::Error>> {
         let buf = vec![0u8; HANDSHAKE_HEADER_LEN];
         Box::new(
             read_exact(sock, buf)
@@ -141,14 +141,13 @@ mod internal {
         sock: TcpStream,
         buf: Vec<u8>,
         len: usize,
-    ) -> Box<Future<Item=(TcpStream, Vec<u8>), Error=io::Error>> {
+    ) -> Box<Future<Item = (TcpStream, Vec<u8>), Error = io::Error>> {
         let mut message = vec![0u8; HANDSHAKE_HEADER_LEN];
         LittleEndian::write_u16(&mut message, len as u16);
         message.extend_from_slice(&buf[0..len]);
         Box::new(write_all(sock, message))
     }
 }
-
 
 #[cfg(not(feature = "noise_protocol"))]
 mod internal {
@@ -162,21 +161,21 @@ mod internal {
     pub fn listen(
         params: &HandshakeParams,
         stream: TcpStream,
-    ) -> Box<Future<Item=Framed<TcpStream, MessagesCodec>, Error=io::Error>> {
+    ) -> Box<Future<Item = Framed<TcpStream, MessagesCodec>, Error = io::Error>> {
         framed_stream(stream, params.max_message_len)
     }
 
     pub fn send(
         params: &HandshakeParams,
         stream: TcpStream,
-    ) -> Box<Future<Item=Framed<TcpStream, MessagesCodec>, Error=io::Error>> {
+    ) -> Box<Future<Item = Framed<TcpStream, MessagesCodec>, Error = io::Error>> {
         framed_stream(stream, params.max_message_len)
     }
 
     fn framed_stream(
         stream: TcpStream,
         max_message_len: u32,
-    ) -> Box<Future<Item=Framed<TcpStream, MessagesCodec>, Error=io::Error>> {
+    ) -> Box<Future<Item = Framed<TcpStream, MessagesCodec>, Error = io::Error>> {
         let framed = stream.framed(MessagesCodec::new(max_message_len));
         Box::new(ok(framed))
     }

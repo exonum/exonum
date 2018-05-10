@@ -869,8 +869,6 @@ impl Node {
     pub fn run(self) -> io::Result<()> {
         let api_state = self.handler.api_state.clone();
         let blockchain = self.handler.blockchain.clone();
-        let consensus_public_key = self.handler().state().consensus_public_key().clone();
-        let consensus_secret_key = self.handler().state().consensus_secret_key().clone();
         let mut api_handlers: Vec<Listening> = Vec::new();
 
         // Start private api.
@@ -894,8 +892,8 @@ impl Node {
         };
 
         let handshake_params = HandshakeParams {
-            public_key: consensus_public_key,
-            secret_key: consensus_secret_key,
+            public_key: *self.handler().state().consensus_public_key(),
+            secret_key: self.handler().state().consensus_secret_key().clone(),
             max_message_len: self.max_message_len,
         };
         self.run_handler(&handshake_params)?;

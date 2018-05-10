@@ -38,7 +38,7 @@ impl NoiseWrapper {
     }
 
     fn noise_builder(params: &HandshakeParams) -> NoiseBuilder {
-        let public_key =  params.public_key.as_ref();
+        let public_key = params.public_key.as_ref();
         NoiseBuilder::new(PARAMS.parse().unwrap()).remote_public_key(public_key)
     }
 
