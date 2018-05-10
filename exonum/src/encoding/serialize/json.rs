@@ -26,6 +26,7 @@ use bit_vec::BitVec;
 use hex::FromHex;
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use uuid::Uuid;
+use rust_decimal::Decimal;
 
 use std::net::SocketAddr;
 use std::error::Error;
@@ -499,6 +500,23 @@ impl ExonumJson for Uuid {
     ) -> Result<(), Box<Error>> {
         let uuid: Self = serde_json::from_value(value.clone())?;
         buffer.write(from, to, uuid);
+        Ok(())
+    }
+
+    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+        Ok(serde_json::to_value(&self)?)
+    }
+}
+
+impl ExonumJson for Decimal {
+    fn deserialize_field<B: WriteBufferWrapper>(
+        value: &Value,
+        buffer: &mut B,
+        from: Offset,
+        to: Offset,
+    ) -> Result<(), Box<Error>> {
+        let decimal: Self = serde_json::from_value(value.clone())?;
+        buffer.write(from, to, decimal);
         Ok(())
     }
 

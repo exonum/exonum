@@ -18,8 +18,10 @@ use bit_vec::BitVec;
 use chrono::{Duration, Utc};
 use byteorder::{ByteOrder, LittleEndian};
 use uuid::Uuid;
+use rust_decimal::Decimal;
 
 use std::net::SocketAddr;
+use std::str::FromStr;
 
 use crypto::{gen_keypair, hash};
 use blockchain::{self, Block, BlockProof};
@@ -154,6 +156,14 @@ fn test_uuid_segment() {
 
     let uuid = Uuid::parse_str("936DA01F9ABD4d9d80C702AF85C822A8").unwrap();
     assert_write_check_read(uuid, 16);
+}
+
+#[test]
+fn test_decimal() {
+    let decimal = Decimal::new(202, 2);
+    assert_write_check_read(decimal, 16);
+    let pi = Decimal::from_str("3.1415926535897932384626433832").unwrap();
+    assert_write_check_read(pi, 16);
 }
 
 #[test]

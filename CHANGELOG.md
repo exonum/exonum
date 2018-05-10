@@ -16,6 +16,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `Field`, `CryptoHash`, `StorageValue` and `ExonumJson` traits have been
   implemented for `chrono::Duration` structure. (#653)
 
+- `Field`, `CryptoHash`, `StorageKey`, `StorageValue` and `ExonumJson` traits
+  have been implemented for `rust_decimal::Decimal`. (#671)
+
 #### exonum-timestamping
 
 - Additional service example has been added along with frontend. (#646)
@@ -26,6 +29,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Already processed transactions are rejected now in
   `NodeHandler::handle_incoming_tx` method. (#642)
+
+- Fixed bug with shutdown requests handling. (#666)
 
 #### exonum-cryptocurrency-advanced
 
@@ -170,6 +175,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 ### New features
 
 #### exonum
+
+- `ExecutionError::with_description` method now takes `Into<String>` instead of
+  `String` which allows to pass `&str` directly. (#592)
+
+- New `database` field added to the `NodeConfig`. This optional setting adjusts
+  database-specific settings, like number of simultaneously opened files. (#538)
 
 - `ExecutionError::with_description` method now takes `Into<String>` instead of
   `String` which allows to pass `&str` directly. (#592)
