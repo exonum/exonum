@@ -29,7 +29,7 @@ use events::error::log_error;
 use node::{EventsPoolCapacity, NodeChannel};
 use blockchain::ConsensusConfig;
 use helpers::user_agent;
-use events::noise::NoiseKeyWrapper;
+use events::noise::HandshakeParams;
 
 #[derive(Debug)]
 pub struct TestHandler {
@@ -147,11 +147,13 @@ impl TestEvents {
         let (mut handler_part, network_part) = self.into_reactor();
         let handle = thread::spawn(move || {
             let mut core = Core::new().unwrap();
-            let noise = NoiseKeyWrapper {
-                public_key: gen_keypair_from_seed(&Seed::new([0; 32])).0,
+            let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([0; 32]));
+            let handshake_params = HandshakeParams {
+                public_key,
+                secret_key,
                 max_message_len: network_part.max_message_len,
             };
-            let fut = network_part.run(&core.handle(), &noise);
+            let fut = network_part.run(&core.handle(), &handshake_params);
             core.run(fut).map_err(log_error).unwrap();
         });
         handler_part.handle = Some(handle);

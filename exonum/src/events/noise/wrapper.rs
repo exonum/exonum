@@ -1,7 +1,6 @@
 use snow::NoiseBuilder;
-use snow::params::NoiseParams;
 use snow::Session;
-use events::noise::NoiseKeyWrapper;
+use events::noise::HandshakeParams;
 
 pub const NOISE_MAX_MESSAGE_LEN: usize = 65_535;
 pub const TAGLEN: usize = 16;
@@ -16,9 +15,8 @@ pub struct NoiseWrapper {
 }
 
 impl NoiseWrapper {
-    pub fn responder(keys: &NoiseKeyWrapper) -> Self {
-        let builder: NoiseBuilder =
-            NoiseBuilder::new(PARAMS.parse().unwrap()).remote_public_key(keys.public_key.as_ref());
+    pub fn responder(params: &HandshakeParams) -> Self {
+        let builder: NoiseBuilder = Self::noise_builder(params);
         let private_key = builder.generate_private_key().unwrap();
         let session = builder
             .local_private_key(&private_key)
@@ -28,9 +26,8 @@ impl NoiseWrapper {
         NoiseWrapper { session }
     }
 
-    pub fn initiator(keys: &NoiseKeyWrapper) -> Self {
-        let builder: NoiseBuilder =
-            NoiseBuilder::new(PARAMS.parse().unwrap()).remote_public_key(keys.public_key.as_ref());
+    pub fn initiator(params: &HandshakeParams) -> Self {
+        let builder: NoiseBuilder = Self::noise_builder(params);
         let private_key = builder.generate_private_key().unwrap();
         let session = builder
             .local_private_key(&private_key)
@@ -38,6 +35,11 @@ impl NoiseWrapper {
             .unwrap();
 
         NoiseWrapper { session }
+    }
+
+    fn noise_builder(params: &HandshakeParams) -> NoiseBuilder {
+        let public_key =  params.public_key.as_ref();
+        NoiseBuilder::new(PARAMS.parse().unwrap()).remote_public_key(public_key)
     }
 
     pub fn read(&mut self, input: &[u8], len: usize) -> Result<(usize, Vec<u8>), NoiseError> {
@@ -56,7 +58,7 @@ impl NoiseWrapper {
         Ok((len, buf))
     }
 
-    pub fn red_handshake_msg(&mut self, input: &[u8]) -> Result<(usize, Vec<u8>), NoiseError> {
+    pub fn read_handshake_msg(&mut self, input: &[u8]) -> Result<(usize, Vec<u8>), NoiseError> {
         self.read(input, NOISE_MAX_MESSAGE_LEN)
     }
 
