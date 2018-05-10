@@ -72,14 +72,17 @@ extern crate serde_derive;
 
 #[cfg(test)]
 #[macro_use]
+extern crate assert_matches;
+#[cfg(test)]
+#[macro_use]
 extern crate exonum_testkit;
 #[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;
 
 pub use errors::ErrorCode;
-pub use schema::{MaybeVote, ProposeData, Schema};
-pub use transactions::{ConfigurationTransactions, Propose, Vote};
+pub use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
+pub use transactions::{ConfigurationTransactions, Propose, Vote, VoteAgainst};
 
 use exonum::api::Api;
 use exonum::blockchain::{self, ApiContext, Transaction, TransactionSet};
