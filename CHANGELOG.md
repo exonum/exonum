@@ -23,7 +23,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Maintenance CLI command for node management has been added. Currently the only
   supported command is `clear-cache` which clears node message cache. (#676)
-  
+
 - Network connections are now encrypted using Noise Protocol. (#678)
 
 #### exonum-timestamping

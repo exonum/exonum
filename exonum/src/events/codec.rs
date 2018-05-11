@@ -26,7 +26,7 @@ use events::noise::wrapper::NoiseWrapper;
 pub struct MessagesCodec {
     /// Maximum message length (in bytes), gets populated from `ConsensusConfig`.
     max_message_len: u32,
-    /// Noise session to encrypt/decrypt messages
+    /// Noise session to encrypt/decrypt messages.
     session: NoiseWrapper,
 }
 
@@ -51,6 +51,7 @@ impl Decoder for MessagesCodec {
 
         let len = LittleEndian::read_u32(buf) as usize;
 
+        // To fix some weird `buf.len()` behaviour https://github.com/carllerche/bytes/issues/104
         if len > buf.len() {
             return Ok(None);
         }
@@ -163,17 +164,24 @@ mod test {
 
         // Simple handshake for testing.
         let len = initiator.write_message(&[0u8; 0], &mut buffer_msg).unwrap();
-        responder.read_message(&buffer_msg[..len], &mut buffer_out)
+        responder
+            .read_message(&buffer_msg[..len], &mut buffer_out)
             .unwrap();
         let len = responder.write_message(&[0u8; 0], &mut buffer_msg).unwrap();
-        initiator.read_message(&buffer_msg[..len], &mut buffer_out)
+        initiator
+            .read_message(&buffer_msg[..len], &mut buffer_out)
             .unwrap();
         let len = initiator.write_message(&[0u8; 0], &mut buffer_msg).unwrap();
-        responder.read_message(&buffer_msg[..len], &mut buffer_out)
+        responder
+            .read_message(&buffer_msg[..len], &mut buffer_out)
             .unwrap();
 
-        let responder = NoiseWrapper { session: responder.into_transport_mode().unwrap() };
-        let initiator = NoiseWrapper { session: initiator.into_transport_mode().unwrap() };
+        let responder = NoiseWrapper {
+            session: responder.into_transport_mode().unwrap(),
+        };
+        let initiator = NoiseWrapper {
+            session: initiator.into_transport_mode().unwrap(),
+        };
 
         let responder_codec = MessagesCodec {
             max_message_len: 10000,

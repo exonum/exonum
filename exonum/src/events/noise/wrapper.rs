@@ -123,7 +123,6 @@ impl NoiseWrapper {
         let public_key = params.public_key.as_ref();
         NoiseBuilder::new(PARAMS.parse().unwrap()).remote_public_key(public_key)
     }
-
 }
 
 impl fmt::Debug for NoiseWrapper {
