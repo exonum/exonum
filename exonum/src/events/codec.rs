@@ -51,7 +51,7 @@ impl Decoder for MessagesCodec {
 
         let len = LittleEndian::read_u32(buf) as usize;
 
-        // To fix some weird `buf.len()` behaviour https://github.com/carllerche/bytes/issues/104
+        // To fix some weird `buf.len()` behavior https://github.com/carllerche/bytes/issues/104
         if len > buf.len() {
             return Ok(None);
         }

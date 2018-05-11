@@ -8,7 +8,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use std::io;
 
 pub const NOISE_MAX_MESSAGE_LEN: usize = 65_535;
-pub const TAGLEN: usize = 16;
+pub const TAG_LEN: usize = 16;
 pub const HEADER_LEN: usize = 4;
 pub const HANDSHAKE_HEADER_LEN: usize = 2;
 
@@ -72,7 +72,7 @@ impl NoiseWrapper {
 
         data.chunks(NOISE_MAX_MESSAGE_LEN).for_each(|msg| {
             let len_to_read = if msg.len() == NOISE_MAX_MESSAGE_LEN {
-                msg.len() - TAGLEN
+                msg.len() - TAG_LEN
             } else {
                 msg.len()
             };
@@ -88,7 +88,7 @@ impl NoiseWrapper {
         let mut len = 0usize;
         let mut encoded_message = vec![0u8; 0];
 
-        msg.chunks(NOISE_MAX_MESSAGE_LEN - TAGLEN).for_each(|msg| {
+        msg.chunks(NOISE_MAX_MESSAGE_LEN - TAG_LEN).for_each(|msg| {
             let (written_bytes, written) = self.write(msg).unwrap();
             encoded_message.extend_from_slice(&written);
             len += written_bytes;
