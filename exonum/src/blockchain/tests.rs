@@ -435,7 +435,7 @@ impl Service for ServicePanicStorageError {
 }
 
 fn assert_service_execute(blockchain: &Blockchain, db: &mut Box<Database>) {
-    let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height::zero(), &[]);
+    let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(1), &[]);
     db.merge(patch).unwrap();
     let snapshot = db.snapshot();
     let index = ListIndex::new(IDX_NAME, &snapshot);
@@ -444,7 +444,7 @@ fn assert_service_execute(blockchain: &Blockchain, db: &mut Box<Database>) {
 }
 
 fn assert_service_execute_panic(blockchain: &Blockchain, db: &mut Box<Database>) {
-    let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height::zero(), &[]);
+    let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height(1), &[]);
     db.merge(patch).unwrap();
     let snapshot = db.snapshot();
     let index: ListIndex<_, u32> = ListIndex::new(IDX_NAME, &snapshot);
