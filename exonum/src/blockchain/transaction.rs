@@ -353,20 +353,20 @@ pub trait TransactionSet
 /// `transactions!` is used to declare a set of transactions of a particular service.
 ///
 /// The macro generates a type for each transaction and a helper enum which can hold
-/// any of the transactions. You must implement `Transaction` trait for each of the
+/// any of the transactions. You need to implement the `Transaction` trait for each of the
 /// transactions yourself.
 ///
 /// See [`Service`] trait documentation for a full example of usage.
 ///
-/// Each transaction is specified as a Rust struct. For additional reference about
-/// data layout see the documentation of the [`encoding` module](./encoding/index.html).
+/// Each transaction is specified as a Rust struct. For additional information about
+/// data layout see the documentation on the [`encoding` module](./encoding/index.html).
 ///
-/// Additionally, the macro must define identifier of a service, which will be used
+/// Additionally, the macro must define the identifier of a service, which will be used
 /// [in parsing messages][parsing], as `const SERVICE_ID`. Service ID should be unique
 /// within the Exonum blockchain.
 ///
 /// For each transaction the macro creates getter methods for all fields with the same names as
-/// fields. In addition, two constructors are defined:
+/// the fields themselves. In addition, two constructors are defined:
 ///
 /// - `new` takes all fields in the order of their declaration in the macro, and a [`SecretKey`]
 ///   to sign the message as the last argument.
