@@ -63,7 +63,7 @@ impl NodeHandler {
             let round = msg.round();
             self.state.add_queued(msg);
             trace!("Trying to reach actual round.");
-            if let Some(r) = self.state.get_actual_round(validator, round) {
+            if let Some(r) = self.state.update_validator_round(validator, round) {
                 trace!("Scheduling jump to round.");
                 let height = self.state.height();
                 self.execute_later(InternalRequest::JumpToRound(height, r));
@@ -640,6 +640,7 @@ impl NodeHandler {
 
         info!("Jump to a new round = {}", round);
         self.state.jump_round(round);
+        self.add_round_timeout();
         self.process_new_round();
     }
 
