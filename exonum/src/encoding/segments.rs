@@ -311,10 +311,20 @@ impl<'a> SegmentField<'a> for &'a [u8] {
     }
 }
 
-/// Implement field helper for all array of POD types
-/// it writes POD type as bytearray in place.
+/// Implement field helper for all all arrays of POD type. This macro enables to
+/// convert POD type data into byte array.
 ///
-/// **Beware of platform specific data representation.**
+/// Additionally, this macro implements the
+/// [`ExonumJson`] and [`Field`] traits for data of POD type, so that they can
+/// be used as an internal entity in Exonum.
+///
+/// For additional information, refer to the [`encoding`] section.
+///
+/// **Note.** Beware of platform specific data representation.
+///
+/// [`encoding`]: ./encoding/index.html
+/// [`ExonumJson`]: ./encoding/serialize/json/trait.ExonumJson.html
+/// [`Field`]: ./encoding/trait.Field.html
 #[macro_export]
 macro_rules! implement_pod_array_field {
     ($name:ident) => (

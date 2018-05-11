@@ -22,15 +22,24 @@ use encoding::Field;
 use messages::MessageWriter;
 use super::Offset;
 
-/// implement exonum serialization\deserialization based on serde `Serialize`\ `Deserialize`
+/// Implements Exonum serialization\deserialization based on Serde `Serialize`\`Deserialize`.
 ///
-/// Item should implement:
+/// Under this macro, an item should implement the following entities:
 ///
 /// - `serde::Serialize`
 /// - `serde::Deserialize`
 /// - `exonum::encoding::Field`
 ///
-/// **Beware, this macros probably implement traits in not optimal way.**
+/// Additionally, this macro implements the [`ExonumJson`] trait. `ExonumJson`
+/// together with [`Field`] allow using data as an internal entity in Exonum.
+///
+/// For additional information, refer to the [`encoding`] section.
+///
+/// **Note.** The way this macros implements traits might not be optimal.
+///
+/// [`ExonumJson`]: ./encoding/serialize/json/trait.ExonumJson.html
+/// [`Field`]: ./encoding/trait.Field.html
+/// [`encoding`]: ./encoding/index.html
 #[macro_export]
 macro_rules! implement_exonum_serializer {
     ($name:ident) => {

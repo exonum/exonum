@@ -356,7 +356,7 @@ pub trait TransactionSet
 /// any of the transactions. You must implement `Transaction` trait for each of the
 /// transactions yourself.
 ///
-/// See `Service` trait documentation for a full example of usage.
+/// See [`Service`] trait documentation for a full example of usage.
 ///
 /// Each transaction is specified as a Rust struct. For additional reference about
 /// data layout see the documentation of the [`encoding` module](./encoding/index.html).
@@ -377,7 +377,7 @@ pub trait TransactionSet
 /// [`ExonumJson`] and [`StorageValue`] traits for the declared datatype.
 ///
 ///
-/// **NB.** `transactions!` uses other macros in the `exonum` crate internally.
+/// **Note.** `transactions!` uses other macros in the `exonum` crate internally.
 /// Be sure to add them to the global scope.
 ///
 /// [`Transaction`]: ./blockchain/trait.Transaction.html
@@ -389,7 +389,11 @@ pub trait TransactionSet
 /// [`StorageValue`]: ./storage/trait.StorageValue.html
 /// [`Message`]: ./messages/trait.Message.html
 /// [`ServiceMessage`]: ./messages/trait.ServiceMessage.html
+/// [`Service`]: ./blockchain/trait.Service.html
 /// # Examples
+///
+/// The example below uses the `transactions!` macro; declares a set of
+/// transactions for a service with the indicated ID and adds two transactions.
 ///
 /// ```
 /// #[macro_use] extern crate exonum;

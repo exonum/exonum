@@ -14,7 +14,8 @@
 
 /// `encoding_struct!` macro implements a structure that can be saved in the Exonum blockchain.
 ///
-/// The macro creates getter methods for all fields with the same names as fields.
+/// The macro creates getter methods for all fields; these getter methods will
+/// have the same names as the fields themselves.
 /// In addition, the macro declares a `new` constructor, which accepts all fields
 /// in the order of their declaration in the macro.
 /// The macro also implements [`Field`], [`ExonumJson`] and [`StorageValue`] traits
@@ -27,7 +28,7 @@
 /// For additional reference about data layout see the
 /// documentation of the [`encoding` module](./encoding/index.html).
 ///
-/// **NB.** `encoding_struct!` uses other macros in the `exonum` crate internally.
+/// **Note.** `encoding_struct!` uses other macros in the `exonum` crate internally.
 /// Be sure to add them to the global scope.
 ///
 /// [`Field`]: ./encoding/trait.Field.html
@@ -36,6 +37,9 @@
 /// [`transactions!`]: macro.transactions.html
 ///
 /// # Examples
+///
+/// The example below declares a structure using `encoding_struct`, uses it and
+/// prints out a value.
 ///
 /// ```
 /// #[macro_use] extern crate exonum;
