@@ -68,6 +68,5 @@ proptest = "0.6.0"
 default = []
 float_serialize = []
 long_benchmarks = []
-noise_protocol = []
 flame_profile = ["exonum_profiler/nomock", "exonum_flamer"]
 metrics-log = []
