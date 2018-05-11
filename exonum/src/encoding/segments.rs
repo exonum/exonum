@@ -311,7 +311,7 @@ impl<'a> SegmentField<'a> for &'a [u8] {
     }
 }
 
-/// Implement field helper for all all arrays of POD type. This macro enables to
+/// Implement field helper for all arrays of POD type. This macro enables to
 /// convert POD type data into byte array.
 ///
 /// Additionally, this macro implements the
