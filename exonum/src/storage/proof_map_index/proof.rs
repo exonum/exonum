@@ -81,7 +81,11 @@ impl<'de> Deserialize<'de> for ProofPath {
                     }
                 }
 
-                Ok(ProofPath::new(&bytes).prefix(len as u16))
+                Ok(if len == 8 * KEY_SIZE {
+                    ProofPath::new(&bytes)
+                } else {
+                    ProofPath::new(&bytes).prefix(len as u16)
+                })
             }
         }
 
@@ -122,7 +126,7 @@ struct MapProofEntry {
 }
 
 // Used instead of `(K, Option<V>)` only for the purpose of clearer (de)serialization.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 enum OptionalEntry<K, V> {
     Missing { missing: K },
@@ -258,7 +262,7 @@ pub struct MapProof<K, V> {
 /// See [`MapProof`] for an example of usage.
 ///
 /// [`MapProof`]: struct.MapProof.html#workflow
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CheckedMapProof<K, V> {
     entries: Vec<(K, Option<V>)>,
     hash: Hash,

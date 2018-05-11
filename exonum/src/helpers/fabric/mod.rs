@@ -16,6 +16,7 @@
 
 pub use self::builder::NodeBuilder;
 pub use self::details::{Finalize, GenerateCommonConfig, GenerateNodeConfig, GenerateTestnet, Run};
+pub use self::maintenance::Maintenance;
 pub use self::shared::{AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig};
 pub use self::context_key::ContextKey;
 
@@ -32,6 +33,7 @@ use blockchain::Service;
 mod shared;
 mod builder;
 mod details;
+mod maintenance;
 mod internal;
 mod clap_backend;
 #[macro_use]

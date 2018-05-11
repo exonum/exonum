@@ -9,6 +9,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
+- Private API now support CORS. (#675)
+
 - The `--allow-origin` parameter has been added to the `finalize` command.
 
 - IPv6 addressing is now supported. (#615)
@@ -18,6 +20,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `Field`, `CryptoHash`, `StorageKey`, `StorageValue` and `ExonumJson` traits
   have been implemented for `rust_decimal::Decimal`. (#671)
+
+- Maintenance CLI command for node management has been added. Currently the only
+  supported command is `clear-cache` which clears node message cache. (#676)
 
 #### exonum-timestamping
 
@@ -31,6 +36,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   `NodeHandler::handle_incoming_tx` method. (#642)
 
 - Fixed bug with shutdown requests handling. (#666)
+
+- Fixed deserialization of the `MapProof` data structure. (#674)
 
 #### exonum-cryptocurrency-advanced
 
@@ -175,6 +182,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 ### New features
 
 #### exonum
+
+- `ExecutionError::with_description` method now takes `Into<String>` instead of
+  `String` which allows to pass `&str` directly. (#592)
+
+- New `database` field added to the `NodeConfig`. This optional setting adjusts
+  database-specific settings, like number of simultaneously opened files. (#538)
 
 - `ExecutionError::with_description` method now takes `Into<String>` instead of
   `String` which allows to pass `&str` directly. (#592)

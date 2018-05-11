@@ -12,10 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Cryptography related types and functions.
+//! Cryptography related types, constants, traits and functions. The functions
+//! in this module are used for key generation, hashing, signing and signature
+//! verification.
 //!
-//! [Sodium library](https://github.com/jedisct1/libsodium) is used under the hood through
-//! [sodiumoxide rust bindings](https://github.com/dnaq/sodiumoxide).
+//! The SHA-256 function applied in Exonum splits the input data into blocks
+//! and runs each block through a cycle of 64 iterations. The result of the
+//! function is a cryptographic hash 256 bits or 32 bytes in length. This
+//! hash can later be used to verify the integrity of data without accessing the
+//! data itself.
+//!
+//! Exonum also makes use of Ed25519 keys. Ed25519 is a signature system that ensures
+//! fast signing and key generation, as well as security and collision
+//! resilience.
+//!
+//! [Sodium library](https://github.com/jedisct1/libsodium)
+//! is used under the hood through [sodiumoxide rust bindings](https://github.com/dnaq/sodiumoxide).
+//! The constants in this module are imported from Sodium.
+//!
+//! The Crypto module makes it possible to potentially change the type of
+//! cryptography applied in the system and add abstractions best
+//! suited for Exonum.
 
 // spell-checker:disable
 pub use sodiumoxide::crypto::sign::ed25519::{PUBLICKEYBYTES as PUBLIC_KEY_LENGTH,
@@ -53,9 +70,15 @@ use helpers::Round;
 /// The size to crop the string in debug messages.
 const BYTES_IN_DEBUG: usize = 4;
 
-/// Signs slice of bytes using the signer's secret key. Returns the resulting `Signature`.
+/// Signs a slice of bytes using the signer's secret key and returns the
+/// resulting `Signature`.
 ///
 /// # Examples
+///
+/// The example below generates a pair of secret and public keys, indicates
+/// certain data, signs the data using the secret key and with the help of
+/// the public key verifies that the data have been signed with the corresponding
+/// secret key.
 ///
 /// ```
 /// use exonum::crypto;
@@ -75,6 +98,9 @@ pub fn sign(data: &[u8], secret_key: &SecretKey) -> Signature {
 ///
 /// # Examples
 ///
+/// The example below generates a keypair that depends on the indicated seed.
+/// Indicating the same seed value always results in the same keypair.
+///
 /// ```
 /// use exonum::crypto::{self, Seed};
 ///
@@ -91,6 +117,8 @@ pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
 ///
 /// # Examples
 ///
+/// The example below generates a unique keypair.
+///
 /// ```
 /// use exonum::crypto;
 ///
@@ -102,9 +130,14 @@ pub fn gen_keypair() -> (PublicKey, SecretKey) {
     (PublicKey(pubkey), SecretKey(secret_key))
 }
 
-/// Verifies that `data` is signed with a secret key corresponding to the given public key.
+/// Verifies that `data` is signed with a secret key corresponding to the
+/// given public key.
 ///
 /// # Examples
+///
+/// The example below generates a pair of secret and public keys, indicates
+/// certain data, signs the data using the secret key and with the help of the public key
+/// verifies that the data have been signed with the corresponding secret key.
 ///
 /// ```
 /// use exonum::crypto;
@@ -119,9 +152,11 @@ pub fn verify(sig: &Signature, data: &[u8], pubkey: &PublicKey) -> bool {
     verify_detached(&sig.0, data, &pubkey.0)
 }
 
-/// Calculates an SHA-256 hash digest of a bytes slice.
+/// Calculates an SHA-256 hash of a bytes slice.
 ///
 /// # Examples
+///
+/// The example below calculates the hash of the indicated data.
 ///
 /// ```
 /// use exonum::crypto;
@@ -145,7 +180,8 @@ pub trait CryptoHash {
     fn hash(&self) -> Hash;
 }
 
-/// Initializes the sodium library and chooses faster versions of the primitives if possible.
+/// Initializes the sodium library and automatically selects faster versions
+/// of the primitives, if possible.
 ///
 /// # Panics
 ///
@@ -164,10 +200,17 @@ pub fn init() {
     }
 }
 
-/// This structure provides a possibility to calculate a SHA-256 hash digest
-/// for a stream of data.
+/// This structure provides a possibility to calculate an SHA-256 hash digest
+/// for a stream of data. Unlike the
+/// [`Hash` structure](https://docs.rs/exonum/0.7.0/exonum/crypto/struct.Hash.html),
+/// the given structure lets the code process several data chunks without
+/// the need to copy them into a single buffer.
 ///
-/// # Example
+/// # Examples
+///
+/// The example below indicates the data the code is working with; runs the
+/// system hash update as many times as required to process all the data chunks
+/// and calculates the resulting hash of the system.
 ///
 /// ```rust
 /// use exonum::crypto::HashStream;
@@ -194,31 +237,40 @@ impl HashStream {
         self
     }
 
-    /// Returns the hash of data supplied to the stream so far.
+    /// Returns the resulting hash of the system calculated upon the commit
+    /// of currently supplied data.
     pub fn hash(self) -> Hash {
         let dig = self.0.finalize();
         Hash(dig)
     }
 }
 
-/// This structure provides a possibility to create and/or verify Ed25519 digital signatures
-/// for a stream of data.
+/// This structure provides a possibility to create and/or verify Ed25519
+/// digital signatures for a stream of data. If the data are split into several
+/// chunks, the indicated chunks are added to the system and when adding is
+/// complete, the data is signed.
 ///
-/// # Example
+/// Ed25519 is a signature system that ensures fast signing and key generation,
+/// as well as security and collision resilience.
+///
+/// # Examples
+///
+/// The example below adds several data chunks to the system, generates a pair
+/// of random public and secret keys, signs the data and verifies the signature.
 ///
 /// ```rust
 /// use exonum::crypto::{SignStream, gen_keypair};
 ///
 /// let data: Vec<[u8; 5]> = vec![[1, 2, 3, 4, 5], [6, 7, 8, 9, 10]];
-/// let (pk, sk) = gen_keypair();
+/// let (public_key, secret_key) = gen_keypair();
 /// let mut create_stream = SignStream::new();
 /// let mut verify_stream = SignStream::new();
 /// for chunk in data {
 ///     create_stream = create_stream.update(&chunk);
 ///     verify_stream = verify_stream.update(&chunk);
 /// }
-/// let file_sign = create_stream.sign(&sk);
-/// assert!(verify_stream.verify(&file_sign, &pk));
+/// let file_sign = create_stream.sign(&secret_key);
+/// assert!(verify_stream.verify(&file_sign, &public_key));
 /// ```
 #[derive(Debug, Default)]
 pub struct SignStream(SignState);
@@ -263,16 +315,16 @@ macro_rules! implement_public_sodium_wrapper {
 
     impl $name {
         /// Creates a new instance from bytes array.
-        pub fn new(ba: [u8; $size]) -> Self {
-            $name($name_from(ba))
+        pub fn new(bytes_array: [u8; $size]) -> Self {
+            $name($name_from(bytes_array))
         }
 
         /// Creates a new instance from bytes slice.
-        pub fn from_slice(bs: &[u8]) -> Option<Self> {
-            $name_from::from_slice(bs).map($name)
+        pub fn from_slice(bytes_slice: &[u8]) -> Option<Self> {
+            $name_from::from_slice(bytes_slice).map($name)
         }
 
-        /// Returns the hex representation of the binary data.
+        /// Returns a hex representation of binary data.
         /// Lower case letters are used (e.g. f9b4ca).
         pub fn to_hex(&self) -> String {
             encode_hex(self)
@@ -326,16 +378,16 @@ macro_rules! implement_private_sodium_wrapper {
 
     impl $name {
         /// Creates a new instance from bytes array.
-        pub fn new(ba: [u8; $size]) -> Self {
-            $name($name_from(ba))
+        pub fn new(bytes_array: [u8; $size]) -> Self {
+            $name($name_from(bytes_array))
         }
 
         /// Creates a new instance from bytes slice.
-        pub fn from_slice(bs: &[u8]) -> Option<Self> {
-            $name_from::from_slice(bs).map($name)
+        pub fn from_slice(bytes_slice: &[u8]) -> Option<Self> {
+            $name_from::from_slice(bytes_slice).map($name)
         }
 
-        /// Returns the hex representation of the binary data.
+        /// Returns a hex representation of binary data.
         /// Lower case letters are used (e.g. f9b4ca).
         pub fn to_hex(&self) -> String {
             encode_hex(&self[..])
@@ -368,7 +420,18 @@ macro_rules! implement_private_sodium_wrapper {
 implement_public_sodium_wrapper! {
 /// Ed25519 public key used to verify digital signatures.
 ///
+/// In public-key cryptography, the system uses a a mathematically related pair
+/// of keys: a public key, which is openly distributed, and a secret key,
+/// which should remain confidential. For more information, refer to
+/// [Public-key cryptography](https://en.wikipedia.org/wiki/Public-key_cryptography).
+///
+/// Ed25519 is a signature system that ensures fast signing and key generation,
+/// as well as security and collision resilience.
+///
 /// # Examples
+///
+/// In the example below, the function generates a pair of random public and
+/// secret keys.
 ///
 /// ```
 /// use exonum::crypto;
@@ -382,7 +445,18 @@ implement_public_sodium_wrapper! {
 implement_private_sodium_wrapper! {
 /// Ed25519 secret key used to create digital signatures over messages.
 ///
+/// In public-key cryptography, the system uses a a mathematically related pair
+/// of keys: a public key, which is openly distributed, and a secret key,
+/// which should remain confidential. For more information, refer to
+/// [Public-key cryptography](https://en.wikipedia.org/wiki/Public-key_cryptography).
+///
+/// Ed25519 is a signature system that ensures fast signing and key generation,
+/// as well as security and collision resilience.
+///
 /// # Examples
+///
+/// In the example below, the function generates a pair of random public and
+/// secret keys.
 ///
 /// ```
 /// use exonum::crypto;
@@ -394,9 +468,15 @@ implement_private_sodium_wrapper! {
 }
 
 implement_public_sodium_wrapper! {
-/// SHA-256 hash.
+/// The result of applying the SHA-256 hash function to data.
+///
+/// This function splits the input data into blocks and runs each block
+/// through a cycle of 64 iterations. The result of the function is a hash
+/// 256 bits or 32 bytes in length.
 ///
 /// # Examples
+///
+/// The example below generates the hash of the indicated data.
 ///
 /// ```
 /// use exonum::crypto::{self, Hash};
@@ -409,9 +489,18 @@ implement_public_sodium_wrapper! {
 }
 
 implement_public_sodium_wrapper! {
-/// Ed25519 digital signature.
+/// Ed25519 digital signature. This structure creates a signature over data
+/// using a secret key. Later it is possible to verify, using the corresponding
+/// public key, that the data have indeed been signed with that secret key.
+///
+/// Ed25519 is a signature system that ensures fast signing and key generation,
+/// as well as security and collision resilience.
 ///
 /// # Examples
+///
+/// The example below generates a pair of random public and secret keys,
+/// adds certain data, signs the data using the secret key and verifies
+/// that the data have been signed with that secret key.
 ///
 /// ```
 /// use exonum::crypto;
@@ -426,9 +515,20 @@ implement_public_sodium_wrapper! {
 }
 
 implement_private_sodium_wrapper! {
-/// Ed25519 seed that can be used for deterministic keypair generation.
+/// Ed25519 seed representing a succession of bytes that can be used for
+/// deterministic keypair generation. If the same seed is indicated in the
+/// generator multiple times, the generated keys will be the same each time.
+///
+/// Note that this is not the seed added to Exonum transactions for additional
+/// security, this is a separate entity. This structure is useful for testing,
+/// to receive repeatable results. The seed in this structure is either set
+/// manually or selected using the methods below.
 ///
 /// # Examples
+///
+/// The example below generates a pair of public and secret keys taking
+/// into account the selected seed. The same seed will always lead to
+/// generation of the same keypair.
 ///
 /// ```
 /// use exonum::crypto::{self, Seed};
