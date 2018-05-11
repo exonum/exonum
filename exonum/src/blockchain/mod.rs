@@ -273,7 +273,9 @@ impl Blockchain {
 
             // Invoke execute method for all services.
             for service in self.service_map.values() {
-                service_execute(service.as_ref(), &mut fork);
+                if height > 0 {
+                    service_execute(service.as_ref(), &mut fork);
+                }
             }
 
             // Get tx & state hash.
