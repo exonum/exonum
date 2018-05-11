@@ -640,6 +640,7 @@ impl NodeHandler {
 
         info!("Jump to a new round = {}", round);
         self.state.jump_round(round);
+        self.add_round_timeout();
         self.process_new_round();
     }
 
