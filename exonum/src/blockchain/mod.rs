@@ -273,7 +273,8 @@ impl Blockchain {
 
             // Invoke execute method for all services.
             for service in self.service_map.values() {
-                if height > Height(0) { // Skip execution for genesis block.
+                // Skip execution for genesis block.
+                if height > Height(0) {
                     service_execute(service.as_ref(), &mut fork);
                 }
             }
