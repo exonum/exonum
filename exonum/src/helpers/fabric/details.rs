@@ -42,7 +42,8 @@ const PEER_ADDRESS: &str = "PEER_ADDRESS";
 const NODE_CONFIG_PATH: &str = "NODE_CONFIG_PATH";
 const PUBLIC_API_ADDRESS: &str = "PUBLIC_API_ADDRESS";
 const PRIVATE_API_ADDRESS: &str = "PRIVATE_API_ADDRESS";
-const ALLOW_ORIGIN: &str = "ALLOW_ORIGIN";
+const PUBLIC_ALLOW_ORIGIN: &str = "PUBLIC_ALLOW_ORIGIN";
+const PRIVATE_ALLOW_ORIGIN: &str = "PRIVATE_ALLOW_ORIGIN";
 
 /// Run command.
 pub struct Run;
@@ -503,8 +504,12 @@ impl Finalize {
         )
     }
 
-    fn allow_origin(context: &Context) -> Option<AllowOrigin> {
-        context.arg(ALLOW_ORIGIN).ok()
+    fn public_allow_origin(context: &Context) -> Option<AllowOrigin> {
+        context.arg(PUBLIC_ALLOW_ORIGIN).ok()
+    }
+
+    fn private_allow_origin(context: &Context) -> Option<AllowOrigin> {
+        context.arg(PRIVATE_ALLOW_ORIGIN).ok()
     }
 }
 
@@ -536,11 +541,19 @@ impl Command for Finalize {
                 false,
             ),
             Argument::new_named(
-                ALLOW_ORIGIN,
+                PUBLIC_ALLOW_ORIGIN,
                 false,
-                "Cross-origin resource sharing options for responses returned by API handlers.",
+                "Cross-origin resource sharing options for responses returned by public API handlers.",
                 None,
-                "allow-origin",
+                "public-allow-origin",
+                false,
+            ),
+            Argument::new_named(
+                PRIVATE_ALLOW_ORIGIN,
+                false,
+                "Cross-origin resource sharing options for responses returned by private API handlers.",
+                None,
+                "private-allow-origin",
                 false,
             ),
             Argument::new_positional("SECRET_CONFIG", true, "Path to our secret config."),
@@ -574,7 +587,8 @@ impl Command for Finalize {
 
         let public_api_address = Run::public_api_address(&context);
         let private_api_address = Run::private_api_address(&context);
-        let allow_origin = Self::allow_origin(&context);
+        let public_allow_origin = Self::public_allow_origin(&context);
+        let private_allow_origin = Self::private_allow_origin(&context);
 
         let secret_config: NodePrivateConfig =
             ConfigFile::load(secret_config_path).expect("Failed to load key config.");
@@ -619,7 +633,8 @@ impl Command for Finalize {
                 api: NodeApiConfig {
                     public_api_address,
                     private_api_address,
-                    allow_origin,
+                    public_allow_origin,
+                    private_allow_origin,
                     ..Default::default()
                 },
                 mempool: Default::default(),

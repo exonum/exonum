@@ -9,6 +9,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
+- Private API now support CORS. (#675)
+
 - The `--allow-origin` parameter has been added to the `finalize` command.
 
 - IPv6 addressing is now supported. (#615)

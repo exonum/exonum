@@ -153,10 +153,15 @@ pub struct NodeApiConfig {
     /// Listen address for private api endpoints.
     pub private_api_address: Option<SocketAddr>,
     /// Cross-origin resource sharing ([CORS][cors]) options for responses returned
-    /// by API handlers.
+    /// by public API handlers.
     ///
     /// [cors]: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
-    pub allow_origin: Option<AllowOrigin>,
+    pub public_allow_origin: Option<AllowOrigin>,
+    /// Cross-origin resource sharing ([CORS][cors]) options for responses returned
+    /// by private API handlers.
+    ///
+    /// [cors]: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
+    pub private_allow_origin: Option<AllowOrigin>,
 }
 
 impl Default for NodeApiConfig {
@@ -166,7 +171,8 @@ impl Default for NodeApiConfig {
             enable_blockchain_explorer: true,
             public_api_address: None,
             private_api_address: None,
-            allow_origin: None,
+            public_allow_origin: None,
+            private_allow_origin: None,
         }
     }
 }
@@ -872,8 +878,12 @@ impl Node {
         // Start private api.
         if let Some(listen_address) = self.api_options.private_api_address {
             let api_sender = self.channel();
-            let handler =
-                create_private_api_handler(blockchain.clone(), api_state.clone(), api_sender);
+            let handler = create_private_api_handler(
+                blockchain.clone(),
+                api_state.clone(),
+                api_sender,
+                &self.api_options,
+            );
             let listener = Iron::new(handler).http(listen_address).unwrap();
             api_handlers.push(listener);
 
@@ -971,7 +981,7 @@ pub fn create_public_api_handler(
     mount.mount("api/system", router);
 
     let mut chain = Chain::new(mount);
-    if let Some(ref allow_origin) = config.allow_origin {
+    if let Some(ref allow_origin) = config.public_allow_origin {
         chain.link_around(CorsMiddleware::from(allow_origin.clone()));
     }
     chain
@@ -983,6 +993,7 @@ pub fn create_private_api_handler(
     blockchain: Blockchain,
     shared_api_state: SharedNodeState,
     api_sender: ApiSender,
+    config: &NodeApiConfig,
 ) -> Chain {
     let mut mount = Mount::new();
     mount.mount("api/services", blockchain.mount_private_api());
@@ -993,7 +1004,11 @@ pub fn create_private_api_handler(
     system_api.wire(&mut router);
     mount.mount("api/system", router);
 
-    Chain::new(mount)
+    let mut chain = Chain::new(mount);
+    if let Some(ref allow_origin) = config.private_allow_origin {
+        chain.link_around(CorsMiddleware::from(allow_origin.clone()));
+    }
+    chain
 }
 
 #[cfg(test)]
