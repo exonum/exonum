@@ -22,7 +22,7 @@ use encoding::Field;
 use messages::MessageWriter;
 use super::Offset;
 
-/// Implements Exonum serialization\deserialization based on Serde `Serialize`\`Deserialize`.
+/// Implements Exonum serialization\deserialization based on Serde `Serialize`\ `Deserialize`.
 ///
 /// Under this macro, an item should implement the following entities:
 ///
