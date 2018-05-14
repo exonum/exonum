@@ -581,9 +581,10 @@ impl State {
     }
 
     /// Updates known round for a validator and returns
-    /// a new actual round if at least one non byzantine validators are on a higher round.
+    /// a new actual round if at least one non byzantine validators is guaranteed to be on a higher round.
     /// Otherwise returns None.
-    pub fn get_actual_round(&mut self, id: ValidatorId, round: Round) -> Option<Round> {
+    pub fn update_validator_round(&mut self, id: ValidatorId, round: Round) -> Option<Round> {
+        // Update known round.
         {
             let known_round = self.validators_rounds.entry(id).or_insert_with(Round::zero);
             if round <= *known_round {
@@ -599,7 +600,12 @@ impl State {
             }
             *known_round = round;
         }
-        let max_byzantine_count = self.validators().len() / 3;
+
+        // Find highest non-byzantine round.
+
+        // At max we can have (N - 1) / 3 byzantine nodes.
+        // It is calculated via rounded up integer division.
+        let max_byzantine_count = (self.validators().len() + 2) / 3 - 1;
         if self.validators_rounds.len() <= max_byzantine_count {
             trace!("Count of validators, lower then max byzantine count.");
             return None;
@@ -608,7 +614,7 @@ impl State {
         let mut rounds: Vec<_> = self.validators_rounds.iter().map(|(_, v)| v).collect();
         rounds.sort_unstable_by(|a, b| b.cmp(a));
 
-        if rounds[max_byzantine_count] > &self.round {
+        if *rounds[max_byzantine_count] > self.round {
             Some(*rounds[max_byzantine_count])
         } else {
             None
