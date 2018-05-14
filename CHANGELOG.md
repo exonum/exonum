@@ -5,6 +5,21 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## 0.7.1 - 2018-05-15
+
+### New features
+
+#### exonum
+
+- Maintenance CLI command for node management has been added. Currently the only
+  supported command is `clear-cache` which clears node message cache. (#676)
+
+### Bug fixes
+
+#### exonum
+
+- Fixed a bug in which the node was unable to reach the current round. (#680 #681)
+
 ## 0.7 - 2018-04-11
 
 ### Breaking changes
