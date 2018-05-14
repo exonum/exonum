@@ -53,13 +53,13 @@ impl Run {
     pub fn db_helper(ctx: &Context, options: &DbOptions) -> Box<Database> {
         let path = ctx.arg::<String>(DATABASE_PATH)
             .expect(&format!("{} not found.", DATABASE_PATH));
-        Box::new(RocksDB::open(Path::new(&path), options).unwrap())
+        Box::new(RocksDB::open(Path::new(&path), options).expect("Can't load database file"))
     }
 
     fn node_config(ctx: &Context) -> NodeConfig {
         let path = ctx.arg::<String>("NODE_CONFIG_PATH")
             .expect("NODE_CONFIG_PATH not found.");
-        ConfigFile::load(path).unwrap()
+        ConfigFile::load(path).expect("Can't load node config file")
     }
 
     fn public_api_address(ctx: &Context) -> Option<SocketAddr> {
