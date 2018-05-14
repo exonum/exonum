@@ -21,9 +21,7 @@ use std::path::Path;
 use std::collections::HashMap;
 
 use blockchain::Schema;
-use helpers::config::ConfigFile;
-use storage::{Database, DbOptions, RocksDB};
-use node::NodeConfig;
+use storage::{Database, RocksDB, RocksDBOptions};
 use super::internal::{CollectedCommand, Command, Feedback};
 use super::{Argument, CommandName, Context};
 
@@ -45,23 +43,17 @@ impl Maintenance {
         "maintenance"
     }
 
-    fn node_config(ctx: &Context) -> NodeConfig {
-        let path = ctx.arg::<String>(NODE_CONFIG_PATH)
-            .expect(&format!("{} not found.", NODE_CONFIG_PATH));
-        ConfigFile::load(path).expect("Can't load node config file")
-    }
-
-    fn database(ctx: &Context, options: &DbOptions) -> Box<Database> {
+    fn database(ctx: &Context) -> Box<Database> {
         let path = ctx.arg::<String>(DATABASE_PATH)
             .expect(&format!("{} not found.", DATABASE_PATH));
-        Box::new(RocksDB::open(Path::new(&path), options).expect("Can't load database file"))
+        let mut options = RocksDBOptions::default();
+        options.create_if_missing(true);
+        Box::new(RocksDB::open(Path::new(&path), &options).expect("Can't load database file"))
     }
 
     fn clear_cache(context: &Context) {
         info!("Clearing node cache");
-
-        let config = Self::node_config(context);
-        let db = Self::database(context, &config.database);
+        let db = Self::database(context);
         let mut fork = db.fork();
         {
             let mut schema = Schema::new(&mut fork);
