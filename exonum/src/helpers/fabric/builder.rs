@@ -25,6 +25,7 @@ use super::clap_backend::ClapBackend;
 use super::ServiceFactory;
 use super::details::{Run, RunDev, Finalize, GenerateNodeConfig, GenerateCommonConfig,
                      GenerateTestnet};
+use super::maintenance::Maintenance;
 use super::keys;
 use super::CommandName;
 
@@ -128,6 +129,10 @@ impl NodeBuilder {
             CollectedCommand::new(Box::new(GenerateCommonConfig)),
         );
         commands.insert(Finalize::name(), CollectedCommand::new(Box::new(Finalize)));
+        commands.insert(
+            Maintenance::name(),
+            CollectedCommand::new(Box::new(Maintenance)),
+        );
         commands
     }
 }

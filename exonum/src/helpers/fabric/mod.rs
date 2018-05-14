@@ -16,6 +16,7 @@
 
 use std::str::FromStr;
 use std::collections::BTreeMap;
+pub use self::maintenance::Maintenance;
 
 use clap;
 use toml::Value;
@@ -32,6 +33,7 @@ pub use self::context_key::ContextKey;
 mod shared;
 mod builder;
 mod details;
+mod maintenance;
 mod internal;
 mod clap_backend;
 #[macro_use]
