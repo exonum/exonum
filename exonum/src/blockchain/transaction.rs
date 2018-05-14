@@ -384,8 +384,9 @@ pub trait TransactionSet
 /// [in parsing messages][parsing], as `const SERVICE_ID`. Service ID should be unique
 /// within the Exonum blockchain.
 ///
-/// For each transaction, the macro creates getter methods for all fields with the same names as
-/// the fields. In addition, two constructors are defined:
+/// For each transaction, the macro creates getter methods for all defined fields.
+/// The name of the getter method coincides with the field name. In addition, two
+/// constructors are defined:
 ///
 /// - `new` takes all fields in the order of their declaration in the macro, and a [`SecretKey`]
 ///   to sign the message as the last argument.

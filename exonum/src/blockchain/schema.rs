@@ -87,12 +87,14 @@ where
         Schema { view: snapshot }
     }
 
-    /// Returns a table that represents a map from transaction hash into raw transaction message.
+    /// Returns a table that represents a map with a key-value pair of a
+    /// transaction hash and raw transaction message.
     pub fn transactions(&self) -> MapIndex<&T, Hash, RawMessage> {
         MapIndex::new(TRANSACTIONS, &self.view)
     }
 
-    /// Returns a table that represents a map from transaction hash into execution result.
+    /// Returns a table that represents a map with a key-value pair of a transaction
+    /// hash and execution result.
     /// This method can be used to retrieve a proof that a certain transaction
     /// result is present in the blockchain.
     pub fn transaction_results(&self) -> ProofMapIndex<&T, Hash, TransactionResult> {
@@ -140,7 +142,8 @@ where
         ListIndex::new_in_family(PRECOMMITS, hash, &self.view)
     }
 
-    /// Returns a table that represents a map from configuration hash into contents.
+    /// Returns a table that represents a map with a key-value pair of a
+    /// configuration hash and contents.
     pub fn configs(&self) -> ProofMapIndex<&T, Hash, StoredConfiguration> {
         // configs patricia merkle tree <block height> json
         ProofMapIndex::new(CONFIGS, &self.view)
