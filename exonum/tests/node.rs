@@ -130,32 +130,6 @@ fn test_node_run() {
     }
 }
 
-// See ECR-907 for the details.
-#[test]
-#[ignore]
-fn test_node_shutdown_twice() {
-    let (nodes, commit_rxs) = run_nodes(1, 16_400);
-
-    let timer = Timer::default();
-    let duration = Duration::from_secs(60);
-    for rx in commit_rxs {
-        let rx = timer.timeout(rx.map_err(drop), duration);
-        rx.wait().unwrap();
-    }
-
-    for handle in nodes {
-        handle
-            .api_tx
-            .send_external_message(ExternalMessage::Shutdown)
-            .unwrap();
-        handle
-            .api_tx
-            .send_external_message(ExternalMessage::Shutdown)
-            .unwrap();
-        handle.node_thread.join().unwrap();
-    }
-}
-
 #[test]
 fn test_node_restart_regression() {
     let start_node = |node_cfg, db, init_times| {
