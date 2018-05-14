@@ -118,7 +118,7 @@ impl Blockchain {
         }
     }
 
-    /// Returns the `VecMap` for all our services. This is a table which
+    /// Returns the `VecMap` for all services. This is a map which
     /// contains service identifiers and service interfaces. The VecMap
     /// allows proceeding from the service identifier to the service itself.
     pub fn service_map(&self) -> &Arc<VecMap<Box<Service>>> {
@@ -232,7 +232,7 @@ impl Blockchain {
     }
 
     /// Helper function to map a tuple (`u16`, `u16`) of service table coordinates
-    /// to a 32 byte value to be used as the `MerklePatriciaTable` key (it currently
+    /// to a 32-byte value to be used as the `ProofMapIndex` key (it currently
     /// supports only fixed size keys). The `hash` function is used to distribute
     /// keys uniformly (compared to padding).
     /// # Arguments
@@ -404,7 +404,7 @@ impl Blockchain {
 
     /// Commits to the blockchain a new block with the indicated changes (patch),
     /// hash and Precommit messages. After that invokes `handle_commit`
-    /// for each service in the order of their identifiers.
+    /// for each service in the increasing order of their identifiers.
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn commit<'a, I>(
         &mut self,

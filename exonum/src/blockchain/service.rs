@@ -258,7 +258,7 @@ impl ServiceContext {
     }
 
     /// Returns the current database snapshot. This snapshot is used to
-    /// retrieve schema information from the data base.
+    /// retrieve schema information from the database.
     pub fn snapshot(&self) -> &Snapshot {
         self.fork.as_ref()
     }
@@ -328,7 +328,7 @@ impl ApiNodeState {
 #[derive(Clone, Debug)]
 pub struct SharedNodeState {
     state: Arc<RwLock<ApiNodeState>>,
-    /// Timeout to update api state.
+    /// Timeout to update API state.
     pub state_update_timeout: Milliseconds,
 }
 
@@ -340,7 +340,7 @@ impl SharedNodeState {
             state_update_timeout,
         }
     }
-    /// Returns the list of connected addresses of other nodes.
+    /// Returns a list of connected addresses of other nodes.
     pub fn incoming_connections(&self) -> Vec<SocketAddr> {
         self.state
             .read()
@@ -350,7 +350,7 @@ impl SharedNodeState {
             .cloned()
             .collect()
     }
-    /// Returns the list of our connection sockets.
+    /// Returns a list of our connection sockets.
     pub fn outgoing_connections(&self) -> Vec<SocketAddr> {
         self.state
             .read()
@@ -360,9 +360,9 @@ impl SharedNodeState {
             .cloned()
             .collect()
     }
-    /// Returns the list of other nodes to which the connection has failed
+    /// Returns a list of other nodes to which the connection has failed
     /// and a reconnect attempt is required. The method also indicates the time
-    /// after which a new attempt at connection is performed.
+    /// after which a new connection attempt is performed.
     pub fn reconnects_timeout(&self) -> Vec<(SocketAddr, Milliseconds)> {
         self.state
             .read()
@@ -372,7 +372,7 @@ impl SharedNodeState {
             .map(|(c, e)| (*c, *e))
             .collect()
     }
-    /// Returns the list of addresses and public keys of peers from which the
+    /// Returns a list of addresses and public keys of peers from which the
     /// node has received `Connect` messages.
     pub fn peers_info(&self) -> Vec<(SocketAddr, PublicKey)> {
         self.state

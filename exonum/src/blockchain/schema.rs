@@ -51,7 +51,7 @@ define_names!(
 encoding_struct! (
     /// Configuration index.
     struct ConfigReference {
-        /// Height, starting from which this configuration becomes actual.
+        /// Height since which this configuration becomes actual.
         actual_from: Height,
         /// Hash of the configuration contents that serialized as raw bytes vec.
         cfg_hash: &Hash,
@@ -60,10 +60,10 @@ encoding_struct! (
 
 encoding_struct! (
     /// Transaction location in a block.
-    /// The given entity defines the block into which the transaction was
+    /// The given entity defines the block where the transaction was
     /// included and the position of this transaction in that block.
     struct TxLocation {
-        /// Returns the height of the block into which the transaction was
+        /// Returns the height of the block where the transaction was
         /// included.
         block_height: Height,
         /// Returns the number designated to this transaction in the block.
@@ -129,7 +129,7 @@ where
         ListIndex::new(BLOCK_HASHES_BY_HEIGHT, &self.view)
     }
 
-    /// Returns a table that keeps the list of transactions for each block.
+    /// Returns a table that keeps a list of transactions for each block.
     pub fn block_transactions(&self, height: Height) -> ProofListIndex<&T, Hash> {
         let height: u64 = height.into();
         ProofListIndex::new_in_family(BLOCK_TRANSACTIONS, &height, &self.view)
@@ -146,8 +146,8 @@ where
         ProofMapIndex::new(CONFIGS, &self.view)
     }
 
-    /// Returns an auxiliary table that keeps hash references to configurations in the order
-    /// of their increasing `actual_from` height.
+    /// Returns an auxiliary table that keeps hash references to configurations in
+    /// the increasing order of their `actual_from` height.
     pub fn configs_actual_from(&self) -> ListIndex<&T, ConfigReference> {
         ListIndex::new(CONFIGS_ACTUAL_FROM, &self.view)
     }
@@ -183,7 +183,8 @@ where
         ListIndex::new(CONSENSUS_MESSAGES_CACHE, &self.view)
     }
 
-    /// Returns the saved value of the consensus round. Returns the first round if it wasn't saved.
+    /// Returns the saved value of the consensus round. Returns the first round
+    /// if it has not been saved.
     pub(crate) fn consensus_round(&self) -> Round {
         Entry::new(CONSENSUS_ROUND, &self.view)
             .get()
@@ -312,9 +313,9 @@ where
     /// Constructs a proof of inclusion of a root hash of a specific service
     /// table into the block `state_hash`.
     ///
-    /// The service_id and table_idx are automatically combined to form the key of the
+    /// The `service_id` and `table_idx` are automatically combined to form the key of the
     /// required service table; this key serves as a search query for the method.
-    /// The service table key is uniquely identified by (`u16`, `u16`) tuple
+    /// The service table key is uniquely identified by a (`u16`, `u16`) tuple
     /// of table coordinates.
     ///
     /// If found, the method returns the root hash as a value of the proof leaf
@@ -322,7 +323,7 @@ where
     /// path to the service table key is returned, which proves its exclusion.
     ///
     /// The resulting proof is used as a component of proof of state of any
-    /// entity, stored in the `exonum` data base at a specific height, as identified
+    /// entity, stored in the `exonum` database at a specific height, as identified
     /// by the corresponding block `state_hash`. State of some meta tables
     /// of core and services isn't tracked.
     ///
@@ -505,7 +506,7 @@ impl<'a> Schema<&'a mut Fork> {
         // TODO: clear storages
     }
 
-    /// Adds transaction into persistent pool.
+    /// Adds transaction into the persistent pool.
     #[doc(hidden)]
     pub fn add_transaction_into_pool(&mut self, tx: RawMessage) {
         self.transactions_pool_mut().insert(tx.hash());
@@ -517,7 +518,7 @@ impl<'a> Schema<&'a mut Fork> {
         self.transactions_pool_mut().remove(hash)
     }
 
-    /// Removes transaction from persistent pool.
+    /// Removes transaction from the persistent pool.
     #[doc(hidden)]
     pub fn reject_transaction(&mut self, hash: &Hash) -> Result<(), ()> {
         let contains = self.transactions_pool_mut().contains(hash);

@@ -37,10 +37,8 @@ const TRANSACTION_STATUS_OK: u16 = MAX_ERROR_CODE + 1;
 // `Err(TransactionErrorType::Panic)`.
 const TRANSACTION_STATUS_PANIC: u16 = TRANSACTION_STATUS_OK + 1;
 
-/// Returns the result of the `Transaction` `execute` method.
-///
-/// This result may be
-/// either an empty `unit` type, in case of success, or an `ExecutionError`, if execution has
+/// Returns a result of the `Transaction` `execute` method. This result may be
+/// either an empty unit [type], in case of success, or an `ExecutionError`, if execution has
 /// failed. Errors consist of an error code and an optional description.
 pub type ExecutionResult = Result<(), ExecutionError>;
 /// Extended version of `ExecutionResult` (with additional values set exclusively by Exonum
@@ -50,7 +48,7 @@ pub type TransactionResult = Result<(), TransactionError>;
 /// Transaction processing functionality for `Message`, which allows applying authenticated, atomic,
 /// constraint-preserving groups of changes to the blockchain storage.
 ///
-/// A transaction in Exonum, is a group of sequential operations with the data.
+/// A transaction in Exonum is a group of sequential operations with the data.
 /// Transaction processing rules are defined in services; these rules determine
 /// the business logic of any Exonum-powered blockchain.
 ///
@@ -156,7 +154,7 @@ pub trait Transaction: Message + ExonumJson + 'static {
 /// Result of unsuccessful transaction execution.
 ///
 /// An execution error consists
-/// of an error code and optional description. The error code effects the blockchain
+/// of an error code and optional description. The error code affects the blockchain
 /// state hash, while the description does not. Therefore,
 /// descriptions are mostly used for developer purposes, not for interaction of
 /// the system with users.
@@ -216,7 +214,7 @@ pub enum TransactionErrorType {
 /// The example below creates a schema; retrieves the table
 /// with transaction results from this schema; using a hash takes the result
 /// of a certain transaction and returns a message that depends on whether the
-/// transaction was successful or not.
+/// transaction is successful or not.
 ///
 /// ```
 /// # use exonum::storage::{MemoryDB, Database};
@@ -270,7 +268,7 @@ impl TransactionError {
         Self::panic(panic_description(panic))
     }
 
-    /// Returns the error type of this `TransactionError` instance. This can be
+    /// Returns an error type of this `TransactionError` instance. This can be
     /// either a panic or a user-defined error code.
     pub fn error_type(&self) -> TransactionErrorType {
         self.error_type

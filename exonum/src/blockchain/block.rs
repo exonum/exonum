@@ -36,7 +36,7 @@ encoding_struct!(
         /// Height of the block, which is also the number of this particular
         /// block in the blockchain.
         height: Height,
-        /// Number of transactions this block.
+        /// Number of transactions in this block.
         tx_count: u32,
         /// Hash link to the previous block in the blockchain.
         prev_hash: &Hash,
@@ -47,10 +47,10 @@ encoding_struct!(
     }
 );
 
-/// Block with its Precommit messages.
+/// Block with its `Precommit` messages.
 ///
 /// This structure contains enough information to prove the correctness of
-/// a block. This structure consists of the block itself and the Precommit
+/// a block. It consists of the block itself and the `Precommit`
 /// messages related to this block.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BlockProof {

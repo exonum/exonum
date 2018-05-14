@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Exonum global variables which are stored in the blockchain as utf8 encoded
-//! json.
+//! Exonum global variables which are stored in the blockchain as UTF-8 encoded
+//! JSON.
 //!
 //! This module includes all the elements of the `StoredConfiguration` which is
 //! used as the global configuration of the blockchain and should be the same for
@@ -59,7 +59,7 @@ pub struct StoredConfiguration {
     /// configuration will not take effect at all; the old configuration will
     /// remain actual.
     pub actual_from: Height,
-    /// List of validator consensus and service public keys.
+    /// List of validators consensus and service public keys.
     pub validator_keys: Vec<ValidatorKeys>,
     /// Consensus algorithm parameters.
     pub consensus: ConsensusConfig,
@@ -75,7 +75,8 @@ pub struct StoredConfiguration {
 
 /// Consensus algorithm parameters.
 ///
-/// This configuration is initially created with default recommended values.
+/// This configuration is initially created with default recommended values,
+/// which can later be edited as required.
 /// The parameters in this configuration should be the same for all nodes in the network and can
 /// be changed using the
 /// [configuration updater service](https://exonum.com/doc/advanced/configuration-updater/).
@@ -87,7 +88,9 @@ pub struct ConsensusConfig {
     /// Interval between rounds. This interval defines the time that passes
     /// between the moment a new block is committed to the blockchain and the
     /// time when a new round starts, regardless of whether a new block has
-    /// been committed during this period or not. Note that rounds in Exonum
+    /// been committed during this period or not.
+    ///
+    /// Note that rounds in Exonum
     /// do not have a defined end time. Nodes in a new round can
     /// continue to vote for proposals and process messages related to previous
     /// rounds.
@@ -96,7 +99,7 @@ pub struct ConsensusConfig {
     /// with which a node broadcasts its status message to the network.
     pub status_timeout: Milliseconds,
     /// Peer exchange timeout. This parameter defines the frequency with which
-    /// a node requests collected `Connect` messages from a random peer.
+    /// a node requests collected `Connect` messages from a random peer
     /// node in the network.
     pub peers_timeout: Milliseconds,
     /// Maximum number of transactions per block.
@@ -114,7 +117,8 @@ impl ConsensusConfig {
     /// Default value for max_message_len.
     pub const DEFAULT_MAX_MESSAGE_LEN: u32 = 1024 * 1024; // 1 MB
 
-    /// Checks if propose_timeout is less than round_timeout. Warns if fails.
+    /// Checks if propose_timeout is less than round_timeout. Returns a warning
+    /// in case of a failure.
     #[doc(hidden)]
     pub fn validate_configuration(&self) {
         let propose_timeout = match self.timeout_adjuster {
