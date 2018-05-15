@@ -174,9 +174,6 @@ impl StorageValue for StoredConfiguration {
 #[cfg(test)]
 mod tests {
     use toml;
-    use serde::{Deserialize, Serialize};
-
-    use std::fmt::Debug;
 
     use crypto::{gen_keypair_from_seed, Seed};
     use super::*;
@@ -214,10 +211,9 @@ mod tests {
             peers_timeout = 10000
             txs_block_limit = 1000
             max_message_len = 1048576
-
-            [consensus.timeout_adjuster]
-            type = "Constant"
-            timeout = 500
+            min_propose_timeout = 10
+            max_propose_timeout = 200
+            propose_timeout_threshold = 1
             "#;
 
         let origin = create_test_configuration();
@@ -251,103 +247,12 @@ mod tests {
         serialize_deserialize(&configuration);
     }
 
-    // TODO: Remove `#[rustfmt_skip]` after https://github.com/rust-lang-nursery/rustfmt/issues/1777
-    // is fixed.
-    #[cfg_attr(rustfmt, rustfmt_skip)]
     #[test]
-    #[should_panic(expected = "Moving average adjuster: adjustment speed must be in the (0..1]")]
-    fn moving_average_adjuster_negative_adjustment_speed() {
-        let mut configuration = create_test_configuration();
-        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::MovingAverage {
-            min: 1,
-            max: 20,
-            adjustment_speed: -0.7,
-            optimal_block_load: 0.5,
-        };
-        serialize_deserialize(&configuration);
-    }
-
-    // TODO: Remove `#[rustfmt_skip]` after https://github.com/rust-lang-nursery/rustfmt/issues/1777
-    // is fixed.
-    #[cfg_attr(rustfmt, rustfmt_skip)]
-    #[test]
-    #[should_panic(expected = "Moving average adjuster: adjustment speed must be in the (0..1]")]
-    fn moving_average_adjuster_invalid_adjustment_speed() {
-        let mut configuration = create_test_configuration();
-        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::MovingAverage {
-            min: 10,
-            max: 20,
-            adjustment_speed: 1.5,
-            optimal_block_load: 0.5,
-        };
-        serialize_deserialize(&configuration);
-    }
-
-    // TODO: Remove `#[rustfmt_skip]` after https://github.com/rust-lang-nursery/rustfmt/issues/1777
-    // is fixed.
-    #[cfg_attr(rustfmt, rustfmt_skip)]
-    #[test]
-    #[should_panic(expected = "Moving average adjuster: block load must be in the (0..1] range")]
-    fn moving_average_adjuster_negative_block_load() {
-        let mut configuration = create_test_configuration();
-        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::MovingAverage {
-            min: 10,
-            max: 20,
-            adjustment_speed: 0.7,
-            optimal_block_load: -0.5,
-        };
-        serialize_deserialize(&configuration);
-    }
-
-    // TODO: Remove `#[rustfmt_skip]` after https://github.com/rust-lang-nursery/rustfmt/issues/1777
-    // is fixed.
-    #[cfg_attr(rustfmt, rustfmt_skip)]
-    #[test]
-    #[should_panic(expected = "Moving average adjuster: block load must be in the (0..1] range")]
-    fn moving_average_adjuster_invalid_block_load() {
-        let mut configuration = create_test_configuration();
-        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::MovingAverage {
-            min: 10,
-            max: 20,
-            adjustment_speed: 0.7,
-            optimal_block_load: 2.0,
-        };
-        serialize_deserialize(&configuration);
-    }
-
-    #[test]
-    #[should_panic(expected = "round_timeout(50) must be strictly larger than propose_timeout(50)")]
-    fn constant_adjuster_invalid_timeout() {
+    #[should_panic(expected = "round_timeout(50) must be strictly larger than max_propose_timeout(50)")]
+    fn invalid_round_timeout() {
         let mut configuration = create_test_configuration();
         configuration.consensus.round_timeout = 50;
-        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::Constant { timeout: 50 };
-        serialize_deserialize(&configuration);
-    }
-
-    #[test]
-    #[should_panic(expected = "round_timeout(50) must be strictly larger than propose_timeout(50)")]
-    fn dynamic_adjuster_invalid_timeout() {
-        let mut configuration = create_test_configuration();
-        configuration.consensus.round_timeout = 50;
-        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::Dynamic {
-            min: 10,
-            max: 50,
-            threshold: 1,
-        };
-        serialize_deserialize(&configuration);
-    }
-
-    #[test]
-    #[should_panic(expected = "round_timeout(50) must be strictly larger than propose_timeout(50)")]
-    fn moving_average_adjuster_invalid_timeout() {
-        let mut configuration = create_test_configuration();
-        configuration.consensus.round_timeout = 50;
-        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::MovingAverage {
-            min: 10,
-            max: 50,
-            adjustment_speed: 0.7,
-            optimal_block_load: 0.2,
-        };
+        configuration.consensus.max_propose_timeout = 50;
         serialize_deserialize(&configuration);
     }
 
