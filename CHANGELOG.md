@@ -9,12 +9,16 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
+- Private API now support CORS. (#675)
+
 - The `--allow-origin` parameter has been added to the `finalize` command.
 
 - IPv6 addressing is now supported. (#615)
 
 - `Field`, `CryptoHash`, `StorageValue` and `ExonumJson` traits have been
   implemented for `chrono::Duration` structure. (#653)
+
+- `execute` method has been added in `Service` trait. (#667)
 
 - `Field`, `CryptoHash`, `StorageKey`, `StorageValue` and `ExonumJson` traits
   have been implemented for `rust_decimal::Decimal`. (#671)
