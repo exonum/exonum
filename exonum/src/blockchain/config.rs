@@ -357,9 +357,6 @@ mod tests {
         serialize_deserialize(&configuration);
     }
 
-    // TODO: Remove `#[rustfmt_skip]` after https://github.com/rust-lang-nursery/rustfmt/issues/1777
-    // is fixed.
-    #[cfg_attr(rustfmt, rustfmt_skip)]
     #[test]
     #[should_panic(expected = "Moving average adjuster: adjustment speed must be in the (0..1]")]
     fn moving_average_adjuster_negative_adjustment_speed() {
@@ -373,9 +370,6 @@ mod tests {
         serialize_deserialize(&configuration);
     }
 
-    // TODO: Remove `#[rustfmt_skip]` after https://github.com/rust-lang-nursery/rustfmt/issues/1777
-    // is fixed.
-    #[cfg_attr(rustfmt, rustfmt_skip)]
     #[test]
     #[should_panic(expected = "Moving average adjuster: adjustment speed must be in the (0..1]")]
     fn moving_average_adjuster_invalid_adjustment_speed() {
@@ -389,9 +383,6 @@ mod tests {
         serialize_deserialize(&configuration);
     }
 
-    // TODO: Remove `#[rustfmt_skip]` after https://github.com/rust-lang-nursery/rustfmt/issues/1777
-    // is fixed.
-    #[cfg_attr(rustfmt, rustfmt_skip)]
     #[test]
     #[should_panic(expected = "Moving average adjuster: block load must be in the (0..1] range")]
     fn moving_average_adjuster_negative_block_load() {
@@ -405,9 +396,6 @@ mod tests {
         serialize_deserialize(&configuration);
     }
 
-    // TODO: Remove `#[rustfmt_skip]` after https://github.com/rust-lang-nursery/rustfmt/issues/1777
-    // is fixed.
-    #[cfg_attr(rustfmt, rustfmt_skip)]
     #[test]
     #[should_panic(expected = "Moving average adjuster: block load must be in the (0..1] range")]
     fn moving_average_adjuster_invalid_block_load() {
