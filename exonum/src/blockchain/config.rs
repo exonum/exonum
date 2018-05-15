@@ -56,6 +56,9 @@ pub struct StoredConfiguration {
 }
 
 /// Consensus algorithm parameters.
+///
+/// Default propose timeout values along with threshold are chosen for maximal performance. In order
+/// to slow down blocks generation (hence consume less disk space) these values can be increased.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct ConsensusConfig {
     /// Interval between rounds.
@@ -101,8 +104,8 @@ impl Default for ConsensusConfig {
             peers_timeout: 10_000,
             txs_block_limit: 1000,
             max_message_len: Self::DEFAULT_MAX_MESSAGE_LEN,
-            min_propose_timeout: 500,
-            max_propose_timeout: 1500,
+            min_propose_timeout: 10,
+            max_propose_timeout: 200,
             propose_timeout_threshold: 1,
         }
     }
@@ -135,7 +138,7 @@ impl StoredConfiguration {
         if config.consensus.min_propose_timeout > config.consensus.max_propose_timeout {
             return Err(JsonError::custom(format!(
                 "Invalid propose timeouts: min_propose_timeout should be less or equal then \
-                max_propose_timeout: min = {}, max = {}",
+                 max_propose_timeout: min = {}, max = {}",
                 config.consensus.min_propose_timeout, config.consensus.max_propose_timeout
             )));
         }
