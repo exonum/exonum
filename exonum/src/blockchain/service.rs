@@ -288,7 +288,7 @@ impl ServiceContext {
         &self.stored_configuration.consensus
     }
 
-    /// Returns service specific global variables as a json value.
+    /// Returns service specific global variables as a JSON value.
     pub fn actual_service_config(&self, service: &Service) -> &Value {
         &self.stored_configuration.services[service.service_name()]
     }
@@ -383,7 +383,7 @@ impl SharedNodeState {
             .map(|(c, e)| (*c, *e))
             .collect()
     }
-    /// Updates internal state, from `Node State`.
+    /// Updates internal state, from `State` of a blockchain node.
     pub fn update_node_state(&self, state: &State) {
         for (p, c) in state.peers().iter() {
             self.state

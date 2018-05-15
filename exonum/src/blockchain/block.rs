@@ -58,7 +58,7 @@ pub struct BlockProof {
     /// proposed the block, the height of the block, the number of transactions
     /// in the block, etc.
     pub block: Block,
-    /// List of Precommit messages for the block.
+    /// List of `Precommit` messages for the block.
     pub precommits: Vec<Precommit>,
 }
 

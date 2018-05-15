@@ -63,10 +63,9 @@ encoding_struct! (
     /// The given entity defines the block where the transaction was
     /// included and the position of this transaction in that block.
     struct TxLocation {
-        /// Returns the height of the block where the transaction was
-        /// included.
+        /// Height of the block where the transaction was included.
         block_height: Height,
-        /// Returns the number designated to this transaction in the block.
+        /// Number designated to this transaction in the block.
         position_in_block: u64,
     }
 );
@@ -95,6 +94,7 @@ where
 
     /// Returns a table that represents a map with a key-value pair of a transaction
     /// hash and execution result.
+    ///
     /// This method can be used to retrieve a proof that a certain transaction
     /// result is present in the blockchain.
     pub fn transaction_results(&self) -> ProofMapIndex<&T, Hash, TransactionResult> {
@@ -318,7 +318,7 @@ where
     ///
     /// The `service_id` and `table_idx` are automatically combined to form the key of the
     /// required service table; this key serves as a search query for the method.
-    /// The service table key is uniquely identified by a (`u16`, `u16`) tuple
+    /// The service table key is uniquely identified by a `(u16, u16)` tuple
     /// of table coordinates.
     ///
     /// If found, the method returns the root hash as a value of the proof leaf

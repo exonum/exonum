@@ -117,7 +117,7 @@ impl ConsensusConfig {
     /// Default value for max_message_len.
     pub const DEFAULT_MAX_MESSAGE_LEN: u32 = 1024 * 1024; // 1 MB
 
-    /// Checks if propose_timeout is less than round_timeout. Returns a warning
+    /// Checks if `propose_timeout` is less than `round_timeout`. Returns a warning
     /// in case of a failure.
     #[doc(hidden)]
     pub fn validate_configuration(&self) {
@@ -151,14 +151,14 @@ impl Default for ConsensusConfig {
 }
 
 impl StoredConfiguration {
-    /// Tries to serialize the given configuration into a utf8 encoded json.
+    /// Tries to serialize the given configuration into a UTF-8 encoded JSON.
     /// The method returns either the result of execution or an error.
     pub fn try_serialize(&self) -> Result<Vec<u8>, JsonError> {
         serde_json::to_vec(&self)
     }
 
-    /// Tries to deserialize `StorageConfiguration` from the given utf8 encoded
-    /// json. Additionally, this method performs a logic validation of the
+    /// Tries to deserialize `StorageConfiguration` from the given UTF-8 encoded
+    /// JSON. Additionally, this method performs a logic validation of the
     /// configuration. The method returns either the result of execution or an error.
     pub fn try_deserialize(serialized: &[u8]) -> Result<StoredConfiguration, JsonError> {
         let config: StoredConfiguration = serde_json::from_slice(serialized)?;
