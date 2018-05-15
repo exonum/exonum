@@ -10,8 +10,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum
 
 - `TimeoutAdjusterConfig` has been removed along with different timeout
-  adjusters. Current behaviour is similar to the `Dynamic` timeout adjuster
-  and can be modified through `min_propose_timeout`, `max_propose_timeout` and
+  adjusters. Current behavior is similar to the `Dynamic` timeout adjuster and
+  can be modified through `min_propose_timeout`, `max_propose_timeout` and
   `propose_timeout_threshold` fields in the `ConsensusConfig`. (#643)
 
   Migration path:
