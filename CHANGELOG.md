@@ -41,7 +41,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Fixed deserialization of the `MapProof` data structure. (#674)
 
-- Fixed a bug in which the node was unable to reach the actual round. (#680 #681)
+- Fixed a bug which prevented the node from reaching the actual round. (#680 #681)
 
 #### exonum-cryptocurrency-advanced
 
