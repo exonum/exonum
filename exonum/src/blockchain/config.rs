@@ -243,54 +243,11 @@ mod tests {
     }
 
     #[test]
-    fn constant_adjuster_config_toml() {
-        let config = TimeoutAdjusterConfig::Constant { timeout: 500 };
-        check_toml_roundtrip(&config);
-    }
-
-    #[test]
-    fn dynamic_adjuster_config_toml() {
-        let config = TimeoutAdjusterConfig::Dynamic {
-            min: 1,
-            max: 1000,
-            threshold: 10,
-        };
-        check_toml_roundtrip(&config);
-    }
-
-    #[test]
-    fn moving_average_adjuster_config_toml() {
-        let config = TimeoutAdjusterConfig::MovingAverage {
-            min: 1,
-            max: 1000,
-            adjustment_speed: 0.5,
-            optimal_block_load: 0.75,
-        };
-        check_toml_roundtrip(&config);
-    }
-
-    #[test]
-    #[should_panic(expected = "Dynamic adjuster: minimal timeout should be less then maximal")]
+    #[should_panic(expected = "Invalid propose timeouts: min_propose_timeout should be less or")]
     fn dynamic_adjuster_min_max() {
         let mut configuration = create_test_configuration();
-        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::Dynamic {
-            min: 10,
-            max: 0,
-            threshold: 1,
-        };
-        serialize_deserialize(&configuration);
-    }
-
-    #[test]
-    #[should_panic(expected = "Moving average adjuster: minimal timeout must be less then maximal")]
-    fn moving_average_adjuster_min_max() {
-        let mut configuration = create_test_configuration();
-        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::MovingAverage {
-            min: 10,
-            max: 0,
-            adjustment_speed: 0.7,
-            optimal_block_load: 0.5,
-        };
+        configuration.consensus.min_propose_timeout = 10;
+        configuration.consensus.max_propose_timeout = 0;
         serialize_deserialize(&configuration);
     }
 
@@ -415,14 +372,5 @@ mod tests {
     fn serialize_deserialize(configuration: &StoredConfiguration) -> StoredConfiguration {
         let serialized = configuration.try_serialize().unwrap();
         StoredConfiguration::try_deserialize(&serialized).unwrap()
-    }
-
-    fn check_toml_roundtrip<T>(original: &T)
-    where
-        for<'de> T: Serialize + Deserialize<'de> + PartialEq + Debug,
-    {
-        let toml = toml::to_string(original).unwrap();
-        let deserialized: T = toml::from_str(&toml).unwrap();
-        assert_eq!(*original, deserialized);
     }
 }

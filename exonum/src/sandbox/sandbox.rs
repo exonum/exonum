@@ -28,8 +28,7 @@ use std::iter::FromIterator;
 use node::{ApiSender, Configuration, ExternalMessage, ListenerConfig, NodeHandler, NodeSender,
            ServiceConfig, State, SystemStateProvider};
 use blockchain::{Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
-                 SharedNodeState, StoredConfiguration, TimeoutAdjusterConfig, Transaction,
-                 ValidatorKeys};
+                 SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys};
 use storage::{MapProof, MemoryDB};
 use messages::{Any, Connect, Message, RawMessage, RawTransaction, Status};
 use crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed};
