@@ -68,12 +68,12 @@ pub trait Field<'a> {
     }
 }
 
-/// Implements the [`Field`] trait for all types that have writer and reader functions.
+/// Implements the [`Field`] trait for a type that has writer and reader functions.
 ///
 /// - Reader signature is `fn (&[u8]) -> T`.
 /// - Writer signature is `fn (&mut [u8], T)`.
 ///
-/// For additional information, refer to the [`encoding`] section.
+/// For additional information, refer to the [`encoding`] module documentation.
 ///
 /// [`Field`]: ./encoding/trait.Field.html
 /// [`encoding`]: ./encoding/index.html
@@ -125,14 +125,14 @@ macro_rules! implement_std_typedef_field {
     )
 }
 
-/// Implements a field helper for all POD types. This macro enables to convert
-/// POD type data into byte array.
+/// Implements a field helper for a POD type. This macro enables to convert
+/// POD type data into a byte array.
 ///
 /// Additionally, this macro implements the
 /// [`ExonumJson`] and [`Field`] traits for data of POD type, so that they can
-/// be used as an internal entity in Exonum.
+/// be used within persistent data structures in Exonum.
 ///
-/// For additional information, refer to the [`encoding`] section.
+/// For additional information, refer to the [`encoding`] module documentation.
 ///
 /// **Note.** Beware of platform specific data representation.
 ///

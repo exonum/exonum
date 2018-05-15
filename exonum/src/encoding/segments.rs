@@ -311,14 +311,14 @@ impl<'a> SegmentField<'a> for &'a [u8] {
     }
 }
 
-/// Implement field helper for all arrays of POD type. This macro enables to
-/// convert POD type data into byte array.
+/// Implements a field helper for an array of POD type. This macro enables to
+/// convert POD type data into a byte array.
 ///
 /// Additionally, this macro implements the
 /// [`ExonumJson`] and [`Field`] traits for data of POD type, so that they can
-/// be used as an internal entity in Exonum.
+/// be used within persistent data structures in Exonum.
 ///
-/// For additional information, refer to the [`encoding`] section.
+/// For additional information, refer to the [`encoding`] module documentation.
 ///
 /// **Note.** Beware of platform specific data representation.
 ///
