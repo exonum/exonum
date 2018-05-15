@@ -98,7 +98,7 @@ where
         KeySetIndex::new(TRANSACTIONS_POOL, &self.view)
     }
 
-    /// Returns number of transactions in the pool
+    /// Returns number of transactions in the pool.
     #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
     pub fn transactions_pool_len(&self) -> usize {
         let pool = self.transactions_pool();

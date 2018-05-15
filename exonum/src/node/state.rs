@@ -402,7 +402,7 @@ impl State {
 
             requests: HashMap::new(),
 
-            propose_timeout: 0,
+            propose_timeout: stored.consensus.max_propose_timeout,
             config: stored,
         }
     }
@@ -497,9 +497,8 @@ impl State {
         self.config = config;
     }
 
-    /// Adjusts propose timeout (see `TimeoutAdjuster` for the details).
-    pub fn adjust_timeout(&mut self, snapshot: &Snapshot) {
-        let timeout = self.timeout_adjuster.adjust_timeout(snapshot);
+    /// Sets a new propose timeout value.
+    pub fn set_propose_timeout(&mut self, timeout: Milliseconds) {
         self.propose_timeout = timeout;
     }
 
