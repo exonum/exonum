@@ -18,7 +18,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
-- Fixed a bug in which the node was unable to reach the current round. (#680 #681)
+- Fixed a bug which prevented the node from reaching the actual round. (#680 #681)
 
 ## 0.7 - 2018-04-11
 
