@@ -209,7 +209,7 @@ impl NodeHandler {
         if self.state.block(&block_hash).is_none() {
             let snapshot = self.blockchain.snapshot();
             let schema = Schema::new(&*snapshot);
-            let has_unknown_txs = match self.state.unknown_block_txs(
+            let has_unknown_txs = match self.state.create_incomplete_block(
                 msg,
                 &schema.transactions(),
                 &schema.transactions_pool(),
@@ -293,7 +293,6 @@ impl NodeHandler {
                 );
             }
 
-            // Commit block
             self.state.add_block(
                 block_hash,
                 patch,
@@ -554,7 +553,7 @@ impl NodeHandler {
             self.handle_full_propose(hash, round);
         }
 
-        let full_blocks = self.state.check_incomplete_blocks(hash);
+        let full_blocks = self.state.remove_unknown_transaction(hash);
         // Go to handle full block if we get last transaction
         for (hash, block) in full_blocks {
             self.remove_request(&RequestData::TransactionsForBlock(hash));

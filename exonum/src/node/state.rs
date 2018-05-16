@@ -803,7 +803,7 @@ impl State {
     ///
     /// - transaction isn't contained in unknown transaction list of any blocks
     /// - transaction isn't a part of block
-    pub fn check_incomplete_blocks(&mut self, tx_hash: Hash) -> Vec<(Hash, IncompleteBlock)> {
+    pub fn remove_unknown_transaction(&mut self, tx_hash: Hash) -> Vec<(Hash, IncompleteBlock)> {
         let mut full_blocks = Vec::new();
         for (hash, block) in &mut self.incomplete_blocks {
             block.unknown_txs.remove(&tx_hash);
@@ -927,7 +927,7 @@ impl State {
     }
 
     /// Finds unknown transactions in the block.
-    pub fn unknown_block_txs(
+    pub fn create_incomplete_block(
         &mut self,
         msg: &BlockResponse,
         txs: &MapIndex<&&Snapshot, Hash, RawMessage>,
@@ -946,7 +946,7 @@ impl State {
                             )
                         }
                     } else {
-                        unknown_txs.insert(msg.block().hash());
+                        unknown_txs.insert(*hash);
                     }
                 }
 
