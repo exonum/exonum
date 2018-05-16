@@ -229,7 +229,11 @@ fn bench_execute_block_cryptocurrency_rocksdb(c: &mut Criterion) {
 }
 
 pub fn bench_block(c: &mut Criterion) {
-    ::exonum::crypto::init();
+    
+    // Because execute_block is not really "micro benchmark"
+    // executing it as regular benches, with 100 samples,
+    // lead to relatively big testing time (10 min on my mac).
+    // That's why, number of samples wa decreased in each test.
 
     bench_execute_block_timestamping_rocksdb(&mut *c);
     bench_execute_block_cryptocurrency_rocksdb(&mut *c);

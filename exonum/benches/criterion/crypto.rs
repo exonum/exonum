@@ -38,6 +38,11 @@ fn bench_hash(b: &mut Bencher, &count: &usize) {
 pub fn bench_crypto(c: &mut Criterion) {
     ::exonum::crypto::init();
 
+    // Testing crypto functions with different data sizes.
+    //
+    // 2^6 = 64 - is relatively small message, and our starting test point.
+    // 2^16 = 65536 - is relatively big message, and our end point.
+
     c.bench(
         "hash",
         ParameterizedBenchmark::new("hash", bench_hash, (6..16).map(|i| pow(2, i)))
@@ -56,4 +61,6 @@ pub fn bench_crypto(c: &mut Criterion) {
             .throughput(|s| Throughput::Bytes(*s as u32))
             .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic)),
     );
+
+
 }
