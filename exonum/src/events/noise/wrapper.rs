@@ -65,6 +65,12 @@ impl NoiseWrapper {
         Ok(NoiseWrapper { session })
     }
 
+    /// Decrypts `msg` using Noise session.
+    ///
+    /// Decryption consists of the following steps:
+    /// 1. Message splits to packets of length smaller or equal to 65_535 bytes.
+    /// 2. Then each packet is decrypted by selected noise algorithm.
+    /// 3. Append all decrypted packets to `decoded_message`.
     pub fn decrypt_msg(&mut self, len: usize, buf: &mut BytesMut) -> Result<BytesMut, io::Error> {
         let data = buf.split_to(len + HEADER_LEN).to_vec();
         let data = &data[HEADER_LEN..];
@@ -84,6 +90,14 @@ impl NoiseWrapper {
         Ok(BytesMut::from(decoded_message))
     }
 
+    /// Encrypts `msg` using Noise session
+    ///
+    /// Encryption consists of the following steps:
+    /// 1. Message splits to packets of length smaller or equal to 65_535 bytes.
+    /// 2. Then each packet is encrypted by selected noise algorithm.
+    /// 3. Result message: first 4 bytes is message length(`len').
+    /// 4. Append all encrypted packets in corresponding order.
+    /// 5. Write result message to `buf`
     pub fn encrypt_msg(&mut self, msg: &[u8], buf: &mut BytesMut) -> Result<Option<()>, io::Error> {
         let mut len = 0usize;
         let mut encoded_message = vec![0u8; 0];
