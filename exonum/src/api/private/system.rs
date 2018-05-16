@@ -30,7 +30,7 @@ struct ServiceInfo {
     id: u16,
 }
 
-/// `DTO` is used to transfer information about node.
+/// `DTO` is used to transfer information about a node.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NodeInfo {
     protocol_version: u8,

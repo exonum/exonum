@@ -12,7 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! `RESTful` API and corresponding utilities.
+//! `RESTful` API and corresponding utilities. This module does not describe
+//! the API itself, but rather the entities which the service author needs to
+//! add private and public API endpoints to the service.
+//!
+//! The REST architectural style encompasses a list of constrains and properties
+//! based on HTTP. The most common operations available are GET, POST, PUT and
+//! DELETE. The requests are placed to a URL which represents a resource. The
+//! requests either retrieve information or define a change that is to be made.
 
 pub mod public;
 pub mod private;
@@ -42,10 +49,13 @@ use storage;
 #[cfg(test)]
 mod tests;
 
-/// List of possible Api errors.
+/// List of possible API errors, which can be returned when processing an API
+/// request.
 #[derive(Fail, Debug)]
 pub enum ApiError {
-    /// Storage error.
+    /// Storage error. This error is returned, for example, if the requested data
+    /// do not exist in the database; or if the requested data exists in the
+    /// database but additional permissions are required to access it.
     #[fail(display = "Storage error: {}", _0)]
     Storage(#[cause] storage::Error),
 
@@ -53,19 +63,22 @@ pub enum ApiError {
     #[fail(display = "IO error: {}", _0)]
     Io(#[cause] ::std::io::Error),
 
-    /// Bad request.
+    /// Bad request. This error is returned when the submitted request contains an
+    /// invalid parameter.
     #[fail(display = "Bad request: {}", _0)]
     BadRequest(String),
 
-    /// Not found.
+    /// Not found. This error is returned when the path in the URL of the request
+    /// is incorrect.
     #[fail(display = "Not found: {}", _0)]
     NotFound(String),
 
-    /// Internal error.
+    /// Internal error. This this type of error can be defined
     #[fail(display = "Internal server error: {}", _0)]
     InternalError(Box<::std::error::Error + Send + Sync>),
 
-    /// Unauthorized error.
+    /// Unauthorized error. This error is returned when a user is not authorized
+    /// in the system and does not have permissions to perform the API request.
     #[fail(display = "Unauthorized")]
     Unauthorized,
 }
@@ -177,7 +190,7 @@ where
 
 /// `Api` trait defines `RESTful` API.
 pub trait Api {
-    /// Deserializes an url fragment as `T`
+    /// Deserializes a URL fragment as `T`.
     fn url_fragment<T>(&self, request: &Request, name: &str) -> Result<T, ApiError>
     where
         T: FromStr,
@@ -192,7 +205,7 @@ pub trait Api {
         Ok(value)
     }
 
-    /// Deserializes an optional parameter from request body or get-parameters
+    /// Deserializes an optional parameter from a request body or `GET` parameters.
     fn optional_param<T>(&self, request: &mut Request, name: &str) -> Result<Option<T>, ApiError>
     where
         T: FromStr,
@@ -211,7 +224,7 @@ pub trait Api {
         Ok(value)
     }
 
-    /// Deserializes a required parameter from request body or get-parameters
+    /// Deserializes a required parameter from a request body or `GET` parameters.
     fn required_param<T>(&self, request: &mut Request, name: &str) -> Result<T, ApiError>
     where
         T: FromStr,
@@ -222,7 +235,7 @@ pub trait Api {
         })
     }
 
-    /// Deserializes request's body as a struct of type `T`.
+    /// Deserializes a request body as a structure of type `T`.
     fn parse_body<T: 'static>(&self, req: &mut Request) -> Result<T, ApiError>
     where
         T: Clone + for<'de> Deserialize<'de>,
@@ -234,7 +247,7 @@ pub trait Api {
         }
     }
 
-    /// Loads hex value from the cookies.
+    /// Loads a hex value from the cookies.
     fn load_hex_value_from_cookie<'a>(
         &self,
         request: &'a Request,
@@ -277,7 +290,7 @@ pub trait Api {
     }
 
     //TODO: Remove duplicate code
-    /// Returns NotFound and some response with cookies.
+    /// Returns NotFound and a certain with cookies.
     fn not_found_response_with_cookies(
         &self,
         json: &serde_json::Value,
@@ -294,7 +307,7 @@ pub trait Api {
         Ok(resp)
     }
 
-    /// Returns OK and some response with cookies.
+    /// Returns OK and a certain response with cookies.
     fn ok_response_with_cookies(
         &self,
         json: &serde_json::Value,
@@ -308,15 +321,15 @@ pub trait Api {
         Ok(resp)
     }
 
-    /// Returns OK and some response.
+    /// Returns OK and a certain response.
     fn ok_response(&self, json: &serde_json::Value) -> IronResult<Response> {
         self.ok_response_with_cookies(json, None)
     }
-    /// Returns NotFound and some response.
+    /// Returns NotFound and a certain response.
     fn not_found_response(&self, json: &serde_json::Value) -> IronResult<Response> {
         self.not_found_response_with_cookies(json, None)
     }
 
-    /// Used to extend Api.
+    /// Defines the URL through which certain internal methods can be applied.
     fn wire<'b>(&self, router: &'b mut Router);
 }

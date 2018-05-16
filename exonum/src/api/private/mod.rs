@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Private part of the Exonum rest api.
+//! Private part of the Exonum REST API. Private API is used for the management
+//! of the system and is intended for the administrators of the nodes, e.g.
+//! for switching nodes on/off.
 
 pub use self::system::{NodeInfo, SystemApi};
 
