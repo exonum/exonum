@@ -75,7 +75,7 @@ pub struct ConsensusConfig {
     pub min_propose_timeout: Milliseconds,
     /// Maximal propose timeout.
     pub max_propose_timeout: Milliseconds,
-    /// Transactions threshold starting from which the `min_propose_timeout` value is used.
+    /// Amount of transactions in pool to start use `min_propose_timeout`.
     pub propose_timeout_threshold: u32,
 }
 
