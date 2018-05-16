@@ -61,6 +61,4 @@ pub fn bench_crypto(c: &mut Criterion) {
             .throughput(|s| Throughput::Bytes(*s as u32))
             .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic)),
     );
-
-
 }
