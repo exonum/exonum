@@ -1,11 +1,26 @@
-use snow::NoiseBuilder;
-use snow::Session;
-use events::noise::HandshakeParams;
+// Copyright 2018 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+use byteorder::{ByteOrder, LittleEndian};
+use bytes::BytesMut;
+use snow::{NoiseBuilder, Session};
+
 use std::fmt;
 use std::fmt::{Error, Formatter};
-use bytes::BytesMut;
-use byteorder::{ByteOrder, LittleEndian};
 use std::io;
+
+use events::noise::HandshakeParams;
 
 pub const NOISE_MAX_MESSAGE_LEN: usize = 65_535;
 pub const TAG_LEN: usize = 16;
@@ -14,7 +29,7 @@ pub const HANDSHAKE_HEADER_LEN: usize = 2;
 
 // We choose XX pattern since it provides mutual authentication and
 // transmission of static public keys.
-// see: https://noiseprotocol.org/noise.html#interactive-patterns
+// See: https://noiseprotocol.org/noise.html#interactive-patterns
 static PARAMS: &str = "Noise_XX_25519_ChaChaPoly_BLAKE2s";
 
 /// Wrapper around noise session to provide latter convenient interface.
@@ -160,5 +175,11 @@ impl NoiseError {
         NoiseError {
             message: message.into(),
         }
+    }
+}
+
+impl From<NoiseError> for io::Error {
+    fn from(e: NoiseError) -> Self {
+        io::Error::new(io::ErrorKind::Other, e.message)
     }
 }
