@@ -213,7 +213,7 @@ mod tests {
             max_message_len = 1048576
             min_propose_timeout = 10
             max_propose_timeout = 200
-            propose_timeout_threshold = 1
+            propose_timeout_threshold = 500
             "#;
 
         let origin = create_test_configuration();
