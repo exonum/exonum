@@ -5,6 +5,25 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Breaking changes
+
+#### exonum
+
+- `TimeoutAdjusterConfig` has been removed along with different timeout
+  adjusters. Current behavior is similar to the `Dynamic` timeout adjuster and
+  can be modified through `min_propose_timeout`, `max_propose_timeout` and
+  `propose_timeout_threshold` fields in the `ConsensusConfig`. (#643)
+
+  Migration path:
+
+  - `Constant` timeout adjuster can be emulated by setting equal
+  `min_propose_timeout` and `max_propose_timeout` values.
+  - For `Dynamic` timeout adjuster simply move `min`, `max` and `threshold`
+    values into `min_propose_timeout`, `max_propose_timeout` and
+    `propose_timeout_threshold` correspondingly.
+  - There is no possibility to emulate `MovingAverage` now, so `Dynamic` should
+    be used as the closest alternative.
+
 ### New features
 
 #### exonum

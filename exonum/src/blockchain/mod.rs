@@ -35,7 +35,7 @@
 pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
 pub use self::schema::{Schema, TxLocation};
 pub use self::genesis::GenesisConfig;
-pub use self::config::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
+pub use self::config::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
 pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState};
 pub use self::transaction::{ExecutionError, ExecutionResult, Transaction, TransactionError,
                             TransactionErrorType, TransactionResult, TransactionSet};

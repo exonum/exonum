@@ -21,7 +21,6 @@ pub use self::state::{RequestData, State, ValidatorState};
 pub use self::whitelist::Whitelist;
 
 pub mod state; // TODO: temporary solution to get access to WAIT constants (ECR-167)
-pub mod timeout_adjuster;
 
 use failure;
 use toml::Value;
@@ -415,7 +414,7 @@ impl NodeHandler {
 
         let mut whitelist = config.listener.whitelist;
         whitelist.set_validators(stored.validator_keys.iter().map(|x| x.consensus_key));
-        let mut state = State::new(
+        let state = State::new(
             validator_id,
             config.listener.consensus_public_key,
             config.listener.consensus_secret_key,
@@ -430,9 +429,6 @@ impl NodeHandler {
             last_height,
             system_state.current_time(),
         );
-
-        // Adjust propose timeout for the first time.
-        state.adjust_timeout(&*snapshot);
 
         NodeHandler {
             blockchain,
@@ -468,6 +464,21 @@ impl NodeHandler {
     /// Returns value of the `txs_block_limit` field from the current `ConsensusConfig`.
     pub fn txs_block_limit(&self) -> u32 {
         self.state().consensus_config().txs_block_limit
+    }
+
+    /// Returns value of the minimal propose timeout.
+    pub fn min_propose_timeout(&self) -> Milliseconds {
+        self.state().consensus_config().min_propose_timeout
+    }
+
+    /// Returns value of the maximal propose timeout.
+    pub fn max_propose_timeout(&self) -> Milliseconds {
+        self.state().consensus_config().max_propose_timeout
+    }
+
+    /// Returns threshold starting from which the minimal propose timeout value is used.
+    pub fn propose_timeout_threshold(&self) -> u32 {
+        self.state().consensus_config().propose_timeout_threshold
     }
 
     /// Returns `State` of the node.
@@ -590,9 +601,17 @@ impl NodeHandler {
 
     /// Adds `NodeTimeout::Propose` timeout to the channel.
     pub fn add_propose_timeout(&mut self) {
-        let adjusted_timeout = self.state.propose_timeout();
-        let time =
-            self.round_start_time(self.state.round()) + Duration::from_millis(adjusted_timeout);
+        let snapshot = self.blockchain.snapshot();
+        let timeout = if Schema::new(&snapshot).transactions_pool_len()
+            >= self.propose_timeout_threshold() as usize
+        {
+            self.min_propose_timeout()
+        } else {
+            self.max_propose_timeout()
+        };
+        self.state.set_propose_timeout(timeout);
+
+        let time = self.round_start_time(self.state.round()) + Duration::from_millis(timeout);
 
         trace!(
             "ADD PROPOSE TIMEOUT: time={:?}, height={}, round={}",
