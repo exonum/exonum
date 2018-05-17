@@ -6,7 +6,7 @@ status_timeout = 5000
 txs_block_limit = 1000
 min_propose_timeout = 10
 max_propose_timeout = 200
-propose_timeout_threshold = 1
+propose_timeout_threshold = 500
 
 [common.general_config]
 validators_count = 1
