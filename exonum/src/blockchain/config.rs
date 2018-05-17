@@ -106,7 +106,7 @@ impl Default for ConsensusConfig {
             max_message_len: Self::DEFAULT_MAX_MESSAGE_LEN,
             min_propose_timeout: 10,
             max_propose_timeout: 200,
-            propose_timeout_threshold: 1,
+            propose_timeout_threshold: 500,
         }
     }
 }
