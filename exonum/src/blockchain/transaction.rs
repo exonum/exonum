@@ -369,10 +369,15 @@ pub trait TransactionSet
 /// The names of the methods coincide with the field names. In addition,
 /// two constructors are defined:
 ///
-/// - `new` takes all fields in the order of their declaration in the macro, and a [`SecretKey`]
-///   to sign the message as the last argument.
-/// - `new_with_signature` takes all fields in the order of their declaration in the macro,
-///   and a message [`Signature`].
+/// - `new` accepts as arguments all fields in the order of their declaration in
+/// the macro, and a [`SecretKey`] as the last argument. A `SecretKey` is used
+/// to sign the message. The constructor returns a transaction which contains
+/// the fields and a signature. In this case, the constructor creates a signature
+/// for the message using the secret key.
+/// - `new_with_signature` accepts as arguments all fields in the order of their
+/// declaration in the macro, and a message [`Signature`]. The constructor returns
+/// a transaction which contains the fields and a signature. In this case, the
+/// constructor signs the message using the indicated signature.
 ///
 /// Each transaction also implements [`Message`], [`ServiceMessage`], [`SegmentField`],
 /// [`ExonumJson`] and [`StorageValue`] traits for the declared datatype.

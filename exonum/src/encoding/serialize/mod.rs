@@ -30,8 +30,8 @@ use super::Offset;
 /// - `serde::Deserialize`
 /// - `exonum::encoding::Field`
 ///
-/// This macro implements the [`ExonumJson`] trait. `ExonumJson`
-/// together with [`Field`] allow using data within persistent data structures in Exonum.
+/// This macro implements the [`ExonumJson`] trait. `ExonumJson`,
+/// together with [`Field`], allows using data within persistent data structures in Exonum.
 ///
 /// For additional information, refer to the [`encoding`] module documentation.
 ///
