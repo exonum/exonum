@@ -38,7 +38,7 @@ const TRANSACTION_STATUS_OK: u16 = MAX_ERROR_CODE + 1;
 const TRANSACTION_STATUS_PANIC: u16 = TRANSACTION_STATUS_OK + 1;
 
 /// Returns a result of the `Transaction` `execute` method. This result may be
-/// either an empty unit `[type]`, in case of success, or an `ExecutionError`, if execution has
+/// either an empty unit type, in case of success, or an `ExecutionError`, if execution has
 /// failed. Errors consist of an error code and an optional description.
 pub type ExecutionResult = Result<(), ExecutionError>;
 /// Extended version of `ExecutionResult` (with additional values set exclusively by Exonum
