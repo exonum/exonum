@@ -8,10 +8,6 @@ min_propose_timeout = 10
 max_propose_timeout = 200
 propose_timeout_threshold = 1
 
-[common.consensus_config.timeout_adjuster]
-timeout = 500
-type = "Constant"
-
 [common.general_config]
 validators_count = 1
 

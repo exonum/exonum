@@ -76,6 +76,10 @@ pub struct ConsensusConfig {
     /// Maximal propose timeout.
     pub max_propose_timeout: Milliseconds,
     /// Amount of transactions in pool to start use `min_propose_timeout`.
+    ///
+    /// Default value is equal to half of the `txs_block_limit` in order to gather more transactions
+    /// in a block if the transaction pool is almost empty, and create blocks faster when there are
+    /// enough transactions in the pool.
     pub propose_timeout_threshold: u32,
 }
 
