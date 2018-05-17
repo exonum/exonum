@@ -65,13 +65,16 @@ encoding_struct! (
     struct TxLocation {
         /// Height of the block where the transaction was included.
         block_height: Height,
-        /// Number designated to this transaction in the block.
+        /// Zero-based position of this transaction in the block.
         position_in_block: u64,
     }
 );
 
-/// Information schema for `exonum core`. This structure provides helper
-/// functions for retrieving service information from the blockchain.
+/// Information schema for indices maintained by the Exonum core logic.
+///
+/// Indices defined by this schema are present in the blockchain regardless of
+/// the deployed services and store general-purpose information, such as
+/// committed transactions.
 #[derive(Debug)]
 pub struct Schema<T> {
     view: T,
@@ -325,9 +328,9 @@ where
     /// corresponding to the required service table key. Otherwise, a partial
     /// path to the service table key is returned, which proves its exclusion.
     ///
-    /// The resulting proof is used as a component of proof of state of any
-    /// entity, stored in the `exonum` database at a specific height, as identified
-    /// by the corresponding block `state_hash`. State of some meta tables
+    /// The resulting proof can be used as a component of proof of state of an
+    /// entity stored in the blockchain state at a specific height. The proof is
+    /// tied to the `state_hash` of the corresponding `Block`. State of some meta tables
     /// of core and services isn't tracked.
     ///
     /// # Arguments

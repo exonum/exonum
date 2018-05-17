@@ -401,8 +401,8 @@ impl SharedNodeState {
         state.is_enabled
     }
 
-    /// Transfers information to the node, using the SharedNodeState entity, that
-    /// the consensus process on the node should halt.
+    /// Transfers information to the node that the consensus process on the node
+    /// should halt.
     pub fn set_enabled(&self, is_enabled: bool) {
         let mut state = self.state.write().expect("Expected read lock.");
         state.is_enabled = is_enabled;
