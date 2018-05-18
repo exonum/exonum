@@ -34,5 +34,6 @@ This is the main Exonum repository that includes
 * Examples
   * [Cryptocurrency](examples/cryptocurrency/README.md).
   * [Cryptocurrency-advanced](examples/cryptocurrency-advanced/README.md).
+  * [Timestamping](examples/timestamping/README.md).
 
 See individual projects readme for the details.
