@@ -24,7 +24,8 @@ use super::Offset;
 
 /// Implements Exonum serialization / deserialization based on Serde `Serialize` / `Deserialize`.
 ///
-/// Under this macro, an item should implement the following traits:
+/// The type supplied as the argument to this macro should implement the following
+/// traits:
 ///
 /// - `serde::Serialize`
 /// - `serde::Deserialize`

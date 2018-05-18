@@ -311,8 +311,10 @@ impl<'a> SegmentField<'a> for &'a [u8] {
     }
 }
 
-/// Implements a field helper for an array of POD type. This macro enables to
-/// convert POD type data into a byte array.
+/// Implements a field helper for an array of POD type. The macro allows using
+/// fields with type `&[T]`, where `T` is the argument of the macro, in Exonum
+/// persistence mechanisms, i.e. `transactions!` and `encoding_struct!` macros.
+/// `T` needs to be a POD (plain old data) type for the conversion to work.
 ///
 /// Additionally, this macro implements the
 /// [`ExonumJson`] and [`Field`] traits for data of POD type, so that they can
@@ -341,7 +343,7 @@ macro_rules! implement_pod_array_field {
             unsafe fn from_buffer(buffer: &'a [u8], from: Offset, count: Offset) -> Self {
                 let to = from + count * Self::item_size();
                 let slice = &buffer[(from as usize)..(to as usize)];
-                ::std::slice::from_raw_parts(slice.as_ptr() as *const Hash,
+                ::std::slice::from_raw_parts(slice.as_ptr() as *const u8,
                                             slice.len() / Self::item_size() as usize)
             }
 
