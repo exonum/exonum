@@ -92,7 +92,7 @@ impl ConsensusConfig {
     /// Validation for logical correctness is performed in the `StoredConfiguration::try_deserialize`
     /// method, but some values can decrease consensus performance.
     #[doc(hidden)]
-    pub fn warn_nonoptimal(&self) {
+    pub fn warn_if_nonoptimal(&self) {
         if self.round_timeout <= 2 * self.max_propose_timeout {
             warn!(
                 "It is recommended that round_timeout ({}) be at least twice as large \
@@ -102,7 +102,7 @@ impl ConsensusConfig {
         }
 
         const MIN_TXS_BLOCK_LIMIT: u32 = 100;
-        const MAX_TXS_BLOCK_LIMIT: u32 = 10000;
+        const MAX_TXS_BLOCK_LIMIT: u32 = 10_000;
 
         if self.txs_block_limit < MIN_TXS_BLOCK_LIMIT || self.txs_block_limit > MAX_TXS_BLOCK_LIMIT
         {
