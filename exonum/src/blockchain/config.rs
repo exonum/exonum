@@ -283,7 +283,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "txs_block_limit shouldn't be equal to zero")]
+    #[should_panic(expected = "txs_block_limit shouldn\'t be equal to zero")]
     fn invalid_txs_block_limit() {
         let mut configuration = create_test_configuration();
         configuration.consensus.txs_block_limit = 0;
