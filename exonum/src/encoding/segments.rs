@@ -343,7 +343,7 @@ macro_rules! implement_pod_array_field {
             unsafe fn from_buffer(buffer: &'a [u8], from: Offset, count: Offset) -> Self {
                 let to = from + count * Self::item_size();
                 let slice = &buffer[(from as usize)..(to as usize)];
-                ::std::slice::from_raw_parts(slice.as_ptr() as *const u8,
+                ::std::slice::from_raw_parts(slice.as_ptr() as *const Hash,
                                             slice.len() / Self::item_size() as usize)
             }
 
