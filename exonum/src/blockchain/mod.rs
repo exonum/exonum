@@ -35,7 +35,7 @@
 pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
 pub use self::schema::{Schema, TxLocation};
 pub use self::genesis::GenesisConfig;
-pub use self::config::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
+pub use self::config::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
 pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState};
 pub use self::transaction::{ExecutionError, ExecutionResult, Transaction, TransactionError,
                             TransactionErrorType, TransactionResult, TransactionSet};
@@ -269,6 +269,14 @@ impl Blockchain {
                     // Execution could fail if the transaction
                     // cannot be deserialized or it isn't in the pool.
                     .expect("Transaction not found in the database.");
+            }
+
+            // Invoke execute method for all services.
+            for service in self.service_map.values() {
+                // Skip execution for genesis block.
+                if height > Height(0) {
+                    service_execute(service.as_ref(), &mut fork);
+                }
             }
 
             // Get tx & state hash.
@@ -538,6 +546,25 @@ impl Blockchain {
 
         self.merge(fork.into_patch())
             .expect("Unable to save messages to the consensus cache");
+    }
+}
+
+fn service_execute(service: &Service, fork: &mut Fork) {
+    fork.checkpoint();
+    match panic::catch_unwind(panic::AssertUnwindSafe(|| service.execute(fork))) {
+        Ok(..) => fork.commit(),
+        Err(err) => {
+            if err.is::<Error>() {
+                // Continue panic unwind if the reason is StorageError.
+                panic::resume_unwind(err);
+            }
+            fork.rollback();
+            error!(
+                "{} service execute failed with error: {:?}",
+                service.service_name(),
+                err
+            );
+        }
     }
 }
 

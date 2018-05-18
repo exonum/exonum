@@ -277,7 +277,7 @@ impl PrivateApi {
                 Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
             };
 
-            config.consensus.validate_configuration();
+            config.consensus.warn_if_nonoptimal();
 
             let cfg_hash = config.hash();
             let propose = Propose::new(

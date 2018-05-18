@@ -11,6 +11,22 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   [Noise Protocol](https://noiseprotocol.org/). Nodes compiled with old
   version will not connect to the new ones. Therefore you need to
   update all node instances for the network to work. (#678)
+#### exonum
+
+- `TimeoutAdjusterConfig` has been removed along with different timeout
+  adjusters. Current behavior is similar to the `Dynamic` timeout adjuster and
+  can be modified through `min_propose_timeout`, `max_propose_timeout` and
+  `propose_timeout_threshold` fields in the `ConsensusConfig`. (#643)
+
+  Migration path:
+
+  - `Constant` timeout adjuster can be emulated by setting equal
+  `min_propose_timeout` and `max_propose_timeout` values.
+  - For `Dynamic` timeout adjuster simply move `min`, `max` and `threshold`
+    values into `min_propose_timeout`, `max_propose_timeout` and
+    `propose_timeout_threshold` correspondingly.
+  - There is no possibility to emulate `MovingAverage` now, so `Dynamic` should
+    be used as the closest alternative.
 
 ### New features
 
@@ -24,6 +40,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `Field`, `CryptoHash`, `StorageValue` and `ExonumJson` traits have been
   implemented for `chrono::Duration` structure. (#653)
+
+- `execute` method has been added in `Service` trait. (#667)
 
 - `Field`, `CryptoHash`, `StorageKey`, `StorageValue` and `ExonumJson` traits
   have been implemented for `rust_decimal::Decimal`. (#671)
@@ -45,6 +63,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Fixed bug with shutdown requests handling. (#666)
 
 - Fixed deserialization of the `MapProof` data structure. (#674)
+
+- Fixed a bug which prevented the node from reaching the actual round. (#680 #681)
 
 #### exonum-cryptocurrency-advanced
 
