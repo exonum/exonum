@@ -23,14 +23,6 @@ pub struct Error {
 
 impl Error {
     /// Creates a new storage error with an information message about the reason.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use exonum::storage::Error;
-    ///
-    /// let error = Error::new("Oh no!");
-    /// ```
     pub(crate) fn new<T: Into<String>>(message: T) -> Error {
         Error {
             message: message.into(),
