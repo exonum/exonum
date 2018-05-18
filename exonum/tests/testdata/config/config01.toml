@@ -19,10 +19,9 @@ peers_timeout = 10000
 round_timeout = 3000
 status_timeout = 5000
 txs_block_limit = 1000
-
-[genesis.consensus.timeout_adjuster]
-type = "Constant"
-timeout = 500
+min_propose_timeout = 10
+max_propose_timeout = 200
+propose_timeout_threshold = 500
 
 [mempool]
 tx_pool_capacity = 100000

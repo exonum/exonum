@@ -81,6 +81,9 @@ pub struct StoredConfiguration {
 /// be changed using the
 /// [configuration updater service](https://exonum.com/doc/advanced/configuration-updater/).
 ///
+/// Default propose timeout value, along with the threshold, is chosen for maximal performance. In order
+/// to slow down block generation,hence consume less disk space, these values can be increased.
+///
 /// For additional information on the Exonum consensus algorithm, refer to
 /// [Consensus in Exonum](https://exonum.com/doc/architecture/consensus/).
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -109,8 +112,16 @@ pub struct ConsensusConfig {
     /// parameter is 1 MB (1024 * 1024 bytes). The range of possible values for this
     /// parameter is between 1MB and 2^32-1 bytes.
     pub max_message_len: u32,
-    /// `TimeoutAdjuster` configuration.
-    pub timeout_adjuster: TimeoutAdjusterConfig,
+    /// Minimal propose timeout.
+    pub min_propose_timeout: Milliseconds,
+    /// Maximal propose timeout.
+    pub max_propose_timeout: Milliseconds,
+    /// Amount of transactions in pool to start use `min_propose_timeout`.
+    ///
+    /// Default value is equal to half of the `txs_block_limit` in order to gather more transactions
+    /// in a block if the transaction pool is almost empty, and create blocks faster when there are
+    /// enough transactions in the pool.
+    pub propose_timeout_threshold: u32,
 }
 
 impl ConsensusConfig {
@@ -121,17 +132,11 @@ impl ConsensusConfig {
     /// in case of a failure.
     #[doc(hidden)]
     pub fn validate_configuration(&self) {
-        let propose_timeout = match self.timeout_adjuster {
-            TimeoutAdjusterConfig::Constant { timeout } => timeout,
-            TimeoutAdjusterConfig::Dynamic { max, .. }
-            | TimeoutAdjusterConfig::MovingAverage { max, .. } => max,
-        };
-
-        if self.round_timeout <= 2 * propose_timeout {
+        if self.round_timeout <= 2 * self.max_propose_timeout {
             warn!(
                 "It is recommended that round_timeout ({}) be at least twice as large \
-                 as propose_timeout ({})",
-                self.round_timeout, propose_timeout
+                 as max_propose_timeout ({})",
+                self.round_timeout, self.max_propose_timeout
             );
         }
     }
@@ -145,7 +150,9 @@ impl Default for ConsensusConfig {
             peers_timeout: 10_000,
             txs_block_limit: 1000,
             max_message_len: Self::DEFAULT_MAX_MESSAGE_LEN,
-            timeout_adjuster: TimeoutAdjusterConfig::Constant { timeout: 500 },
+            min_propose_timeout: 10,
+            max_propose_timeout: 200,
+            propose_timeout_threshold: 500,
         }
     }
 }
@@ -177,53 +184,18 @@ impl StoredConfiguration {
             }
         }
 
-        // Check timeout adjuster.
-        let propose_timeout = match config.consensus.timeout_adjuster {
-            // There is no need to validate `Constant` timeout adjuster.
-            TimeoutAdjusterConfig::Constant { timeout } => timeout,
-            TimeoutAdjusterConfig::Dynamic { min, max, .. } => {
-                if min >= max {
-                    return Err(JsonError::custom(format!(
-                        "Dynamic adjuster: minimal timeout should be less then maximal: \
-                         min = {}, max = {}",
-                        min, max
-                    )));
-                }
-                max
-            }
-            TimeoutAdjusterConfig::MovingAverage {
-                min,
-                max,
-                adjustment_speed,
-                optimal_block_load,
-            } => {
-                if min >= max {
-                    return Err(JsonError::custom(format!(
-                        "Moving average adjuster: minimal timeout must be less then maximal: \
-                         min = {}, max = {}",
-                        min, max
-                    )));
-                }
-                if adjustment_speed <= 0. || adjustment_speed > 1. {
-                    return Err(JsonError::custom(format!(
-                        "Moving average adjuster: adjustment speed must be in the (0..1] range: {}",
-                        adjustment_speed,
-                    )));
-                }
-                if optimal_block_load <= 0. || optimal_block_load > 1. {
-                    return Err(JsonError::custom(format!(
-                        "Moving average adjuster: block load must be in the (0..1] range: {}",
-                        adjustment_speed,
-                    )));
-                }
-                max
-            }
-        };
-
-        if config.consensus.round_timeout <= propose_timeout {
+        if config.consensus.min_propose_timeout > config.consensus.max_propose_timeout {
             return Err(JsonError::custom(format!(
-                "round_timeout({}) must be strictly larger than propose_timeout({})",
-                config.consensus.round_timeout, propose_timeout
+                "Invalid propose timeouts: min_propose_timeout should be less or equal then \
+                 max_propose_timeout: min = {}, max = {}",
+                config.consensus.min_propose_timeout, config.consensus.max_propose_timeout
+            )));
+        }
+
+        if config.consensus.round_timeout <= config.consensus.max_propose_timeout {
+            return Err(JsonError::custom(format!(
+                "round_timeout({}) must be strictly larger than max_propose_timeout({})",
+                config.consensus.round_timeout, config.consensus.max_propose_timeout
             )));
         }
 
@@ -248,43 +220,9 @@ impl StorageValue for StoredConfiguration {
     }
 }
 
-/// `TimeoutAdjuster` config.
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
-#[serde(tag = "type")]
-pub enum TimeoutAdjusterConfig {
-    /// Constant timeout adjuster config.
-    Constant {
-        /// Timeout value.
-        timeout: Milliseconds,
-    },
-    /// Dynamic timeout adjuster configuration.
-    Dynamic {
-        /// Minimal timeout.
-        min: Milliseconds,
-        /// Maximal timeout.
-        max: Milliseconds,
-        /// Transactions threshold starting from which the adjuster returns the minimal timeout.
-        threshold: u32,
-    },
-    /// Moving average timeout adjuster configuration.
-    MovingAverage {
-        /// Minimal timeout.
-        min: Milliseconds,
-        /// Maximal timeout.
-        max: Milliseconds,
-        /// Speed of the adjustment.
-        adjustment_speed: f64,
-        /// Optimal block load depending on the `txs_block_limit` from the `ConsensusConfig`.
-        optimal_block_load: f64,
-    },
-}
-
 #[cfg(test)]
 mod tests {
     use toml;
-    use serde::{Deserialize, Serialize};
-
-    use std::fmt::Debug;
 
     use crypto::{gen_keypair_from_seed, Seed};
     use super::*;
@@ -322,10 +260,9 @@ mod tests {
             peers_timeout = 10000
             txs_block_limit = 1000
             max_message_len = 1048576
-
-            [consensus.timeout_adjuster]
-            type = "Constant"
-            timeout = 500
+            min_propose_timeout = 10
+            max_propose_timeout = 200
+            propose_timeout_threshold = 500
             "#;
 
         let origin = create_test_configuration();
@@ -351,154 +288,20 @@ mod tests {
     }
 
     #[test]
-    fn constant_adjuster_config_toml() {
-        let config = TimeoutAdjusterConfig::Constant { timeout: 500 };
-        check_toml_roundtrip(&config);
-    }
-
-    #[test]
-    fn dynamic_adjuster_config_toml() {
-        let config = TimeoutAdjusterConfig::Dynamic {
-            min: 1,
-            max: 1000,
-            threshold: 10,
-        };
-        check_toml_roundtrip(&config);
-    }
-
-    #[test]
-    fn moving_average_adjuster_config_toml() {
-        let config = TimeoutAdjusterConfig::MovingAverage {
-            min: 1,
-            max: 1000,
-            adjustment_speed: 0.5,
-            optimal_block_load: 0.75,
-        };
-        check_toml_roundtrip(&config);
-    }
-
-    #[test]
-    #[should_panic(expected = "Dynamic adjuster: minimal timeout should be less then maximal")]
+    #[should_panic(expected = "Invalid propose timeouts: min_propose_timeout should be less or")]
     fn dynamic_adjuster_min_max() {
         let mut configuration = create_test_configuration();
-        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::Dynamic {
-            min: 10,
-            max: 0,
-            threshold: 1,
-        };
+        configuration.consensus.min_propose_timeout = 10;
+        configuration.consensus.max_propose_timeout = 0;
         serialize_deserialize(&configuration);
     }
 
     #[test]
-    #[should_panic(expected = "Moving average adjuster: minimal timeout must be less then maximal")]
-    fn moving_average_adjuster_min_max() {
-        let mut configuration = create_test_configuration();
-        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::MovingAverage {
-            min: 10,
-            max: 0,
-            adjustment_speed: 0.7,
-            optimal_block_load: 0.5,
-        };
-        serialize_deserialize(&configuration);
-    }
-
-    // TODO: Remove `#[rustfmt_skip]` after https://github.com/rust-lang-nursery/rustfmt/issues/1777
-    // is fixed.
-    #[cfg_attr(rustfmt, rustfmt_skip)]
-    #[test]
-    #[should_panic(expected = "Moving average adjuster: adjustment speed must be in the (0..1]")]
-    fn moving_average_adjuster_negative_adjustment_speed() {
-        let mut configuration = create_test_configuration();
-        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::MovingAverage {
-            min: 1,
-            max: 20,
-            adjustment_speed: -0.7,
-            optimal_block_load: 0.5,
-        };
-        serialize_deserialize(&configuration);
-    }
-
-    // TODO: Remove `#[rustfmt_skip]` after https://github.com/rust-lang-nursery/rustfmt/issues/1777
-    // is fixed.
-    #[cfg_attr(rustfmt, rustfmt_skip)]
-    #[test]
-    #[should_panic(expected = "Moving average adjuster: adjustment speed must be in the (0..1]")]
-    fn moving_average_adjuster_invalid_adjustment_speed() {
-        let mut configuration = create_test_configuration();
-        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::MovingAverage {
-            min: 10,
-            max: 20,
-            adjustment_speed: 1.5,
-            optimal_block_load: 0.5,
-        };
-        serialize_deserialize(&configuration);
-    }
-
-    // TODO: Remove `#[rustfmt_skip]` after https://github.com/rust-lang-nursery/rustfmt/issues/1777
-    // is fixed.
-    #[cfg_attr(rustfmt, rustfmt_skip)]
-    #[test]
-    #[should_panic(expected = "Moving average adjuster: block load must be in the (0..1] range")]
-    fn moving_average_adjuster_negative_block_load() {
-        let mut configuration = create_test_configuration();
-        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::MovingAverage {
-            min: 10,
-            max: 20,
-            adjustment_speed: 0.7,
-            optimal_block_load: -0.5,
-        };
-        serialize_deserialize(&configuration);
-    }
-
-    // TODO: Remove `#[rustfmt_skip]` after https://github.com/rust-lang-nursery/rustfmt/issues/1777
-    // is fixed.
-    #[cfg_attr(rustfmt, rustfmt_skip)]
-    #[test]
-    #[should_panic(expected = "Moving average adjuster: block load must be in the (0..1] range")]
-    fn moving_average_adjuster_invalid_block_load() {
-        let mut configuration = create_test_configuration();
-        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::MovingAverage {
-            min: 10,
-            max: 20,
-            adjustment_speed: 0.7,
-            optimal_block_load: 2.0,
-        };
-        serialize_deserialize(&configuration);
-    }
-
-    #[test]
-    #[should_panic(expected = "round_timeout(50) must be strictly larger than propose_timeout(50)")]
-    fn constant_adjuster_invalid_timeout() {
+    #[should_panic(expected = "round_timeout(50) must be strictly larger than max_propose_timeout(50)")]
+    fn invalid_round_timeout() {
         let mut configuration = create_test_configuration();
         configuration.consensus.round_timeout = 50;
-        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::Constant { timeout: 50 };
-        serialize_deserialize(&configuration);
-    }
-
-    #[test]
-    #[should_panic(expected = "round_timeout(50) must be strictly larger than propose_timeout(50)")]
-    fn dynamic_adjuster_invalid_timeout() {
-        let mut configuration = create_test_configuration();
-        configuration.consensus.round_timeout = 50;
-        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::Dynamic {
-            min: 10,
-            max: 50,
-            threshold: 1,
-        };
-        serialize_deserialize(&configuration);
-    }
-
-    #[test]
-    #[should_panic(expected = "round_timeout(50) must be strictly larger than propose_timeout(50)")]
-    fn moving_average_adjuster_invalid_timeout() {
-        let mut configuration = create_test_configuration();
-        configuration.consensus.round_timeout = 50;
-        configuration.consensus.timeout_adjuster = TimeoutAdjusterConfig::MovingAverage {
-            min: 10,
-            max: 50,
-            adjustment_speed: 0.7,
-            optimal_block_load: 0.2,
-        };
+        configuration.consensus.max_propose_timeout = 50;
         serialize_deserialize(&configuration);
     }
 
@@ -523,14 +326,5 @@ mod tests {
     fn serialize_deserialize(configuration: &StoredConfiguration) -> StoredConfiguration {
         let serialized = configuration.try_serialize().unwrap();
         StoredConfiguration::try_deserialize(&serialized).unwrap()
-    }
-
-    fn check_toml_roundtrip<T>(original: &T)
-    where
-        for<'de> T: Serialize + Deserialize<'de> + PartialEq + Debug,
-    {
-        let toml = toml::to_string(original).unwrap();
-        let deserialized: T = toml::from_str(&toml).unwrap();
-        assert_eq!(*original, deserialized);
     }
 }

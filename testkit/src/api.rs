@@ -94,6 +94,7 @@ impl TestKitApi {
                     blockchain.clone(),
                     api_state,
                     testkit.api_sender.clone(),
+                    &testkit.api_config,
                 );
                 handler.link_after(|req: &mut Request, resp| {
                     log_request(&ApiAccess::Private, req, resp)

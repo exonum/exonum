@@ -28,8 +28,7 @@ use std::iter::FromIterator;
 use node::{ApiSender, Configuration, ExternalMessage, ListenerConfig, NodeHandler, NodeSender,
            ServiceConfig, State, SystemStateProvider};
 use blockchain::{Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
-                 SharedNodeState, StoredConfiguration, TimeoutAdjusterConfig, Transaction,
-                 ValidatorKeys};
+                 SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys};
 use storage::{MapProof, MemoryDB};
 use messages::{Any, Connect, Message, RawMessage, RawTransaction, Status};
 use crypto::{gen_keypair, gen_keypair_from_seed, Hash, PublicKey, SecretKey, Seed};
@@ -474,10 +473,7 @@ impl Sandbox {
     }
 
     pub fn propose_timeout(&self) -> Milliseconds {
-        match self.cfg().consensus.timeout_adjuster {
-            TimeoutAdjusterConfig::Constant { timeout } => timeout,
-            _ => panic!("Unexpected timeout adjuster config type"),
-        }
+        self.node_state().propose_timeout()
     }
 
     pub fn majority_count(&self, num_validators: usize) -> usize {
@@ -698,7 +694,9 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandb
         peers_timeout: 600_000,
         txs_block_limit: 1000,
         max_message_len: 1024 * 1024,
-        timeout_adjuster: TimeoutAdjusterConfig::Constant { timeout: 200 },
+        min_propose_timeout: 200,
+        max_propose_timeout: 200,
+        propose_timeout_threshold: 0,
     };
     let genesis = GenesisConfig::new_with_consensus(
         consensus,
