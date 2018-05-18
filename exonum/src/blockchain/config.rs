@@ -172,7 +172,7 @@ impl StoredConfiguration {
         // Check transactions limit.
         if config.consensus.txs_block_limit == 0 {
             return Err(JsonError::custom(
-                "txs_block_limit shouldn't be equal to zero",
+                "txs_block_limit should not be equal to zero",
             ));
         }
 
@@ -283,7 +283,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "txs_block_limit shouldn\'t be equal to zero")]
+    #[should_panic(expected = "txs_block_limit should not be equal to zero")]
     fn invalid_txs_block_limit() {
         let mut configuration = create_test_configuration();
         configuration.consensus.txs_block_limit = 0;
