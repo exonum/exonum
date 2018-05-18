@@ -85,7 +85,7 @@ pub mod contracts {
 }
 
 pub mod service {
-    use exonum::blockchain::{Service, Transaction, TransactionSet, ServiceContext, Schema};
+    use exonum::blockchain::{Schema, Service, ServiceContext, Transaction, TransactionSet};
     use exonum::{encoding, messages::RawTransaction};
     use exonum::crypto::{gen_keypair, Hash};
     use exonum::storage::{Database, Fork, MemoryDB, Snapshot};
@@ -110,7 +110,9 @@ pub mod service {
 
     impl BalanceService {
         fn new(sender: Sender<()>) -> Self {
-            Self { sender: Mutex::new(sender) }
+            Self {
+                sender: Mutex::new(sender),
+            }
         }
     }
 
@@ -140,7 +142,7 @@ pub mod service {
 
         fn handle_commit(&self, context: &ServiceContext) {
             let core_schema = Schema::new(context.snapshot());
-            if core_schema.block_transactions(context.height()).len() > 0 {
+            if !core_schema.block_transactions(context.height()).is_empty() {
                 self.sender.lock().unwrap().send(()).unwrap();
             }
         }
@@ -178,7 +180,9 @@ pub mod service {
         api_tx.send(tx_copy).unwrap();
 
         // Wait to be sure that transaction was processed.
-        receiver.recv_timeout(time::Duration::from_secs(10)).unwrap();
+        receiver
+            .recv_timeout(time::Duration::from_secs(10))
+            .unwrap();
 
         // Shut down the node
         api_tx
