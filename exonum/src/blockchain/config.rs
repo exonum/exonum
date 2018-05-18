@@ -87,14 +87,28 @@ impl ConsensusConfig {
     /// Default value for max_message_len.
     pub const DEFAULT_MAX_MESSAGE_LEN: u32 = 1024 * 1024; // 1 MB
 
-    /// Checks if propose timeout is less than round timeout. Warns if fails.
+    /// Produces warnings if configuration contains non-optimal values.
+    ///
+    /// Validation for logical correctness is performed in the `StoredConfiguration::try_deserialize`
+    /// method, but some values can decrease consensus performance.
     #[doc(hidden)]
-    pub fn validate_configuration(&self) {
+    pub fn warn_if_nonoptimal(&self) {
         if self.round_timeout <= 2 * self.max_propose_timeout {
             warn!(
                 "It is recommended that round_timeout ({}) be at least twice as large \
                  as max_propose_timeout ({})",
                 self.round_timeout, self.max_propose_timeout
+            );
+        }
+
+        const MIN_TXS_BLOCK_LIMIT: u32 = 100;
+        const MAX_TXS_BLOCK_LIMIT: u32 = 10_000;
+
+        if self.txs_block_limit < MIN_TXS_BLOCK_LIMIT || self.txs_block_limit > MAX_TXS_BLOCK_LIMIT
+        {
+            warn!(
+                "It is recommended that txs_block_limit ({}) is in [{}..{}] range",
+                self.txs_block_limit, MIN_TXS_BLOCK_LIMIT, MAX_TXS_BLOCK_LIMIT
             );
         }
     }
@@ -139,6 +153,7 @@ impl StoredConfiguration {
             }
         }
 
+        // Check timeouts.
         if config.consensus.min_propose_timeout > config.consensus.max_propose_timeout {
             return Err(JsonError::custom(format!(
                 "Invalid propose timeouts: min_propose_timeout should be less or equal then \
@@ -152,6 +167,13 @@ impl StoredConfiguration {
                 "round_timeout({}) must be strictly larger than max_propose_timeout({})",
                 config.consensus.round_timeout, config.consensus.max_propose_timeout
             )));
+        }
+
+        // Check transactions limit.
+        if config.consensus.txs_block_limit == 0 {
+            return Err(JsonError::custom(
+                "txs_block_limit should not be equal to zero",
+            ));
         }
 
         Ok(config)
@@ -233,7 +255,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "Duplicated keys are found")]
-    fn stored_configuration_duplicated_keys() {
+    fn duplicated_validators_keys() {
         let mut configuration = create_test_configuration();
         configuration.validator_keys.push(ValidatorKeys {
             consensus_key: PublicKey::zero(),
@@ -244,7 +266,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "Invalid propose timeouts: min_propose_timeout should be less or")]
-    fn dynamic_adjuster_min_max() {
+    fn min_max_propose_timeouts() {
         let mut configuration = create_test_configuration();
         configuration.consensus.min_propose_timeout = 10;
         configuration.consensus.max_propose_timeout = 0;
@@ -257,6 +279,14 @@ mod tests {
         let mut configuration = create_test_configuration();
         configuration.consensus.round_timeout = 50;
         configuration.consensus.max_propose_timeout = 50;
+        serialize_deserialize(&configuration);
+    }
+
+    #[test]
+    #[should_panic(expected = "txs_block_limit should not be equal to zero")]
+    fn invalid_txs_block_limit() {
+        let mut configuration = create_test_configuration();
+        configuration.consensus.txs_block_limit = 0;
         serialize_deserialize(&configuration);
     }
 

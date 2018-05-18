@@ -63,6 +63,7 @@ multiproofs
 mutex
 nanos
 nodelay
+nonoptimal
 oneshot
 openssl
 peekable
