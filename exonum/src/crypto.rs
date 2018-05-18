@@ -300,7 +300,7 @@ impl SignStream {
     ///
     /// let data = [[1, 2, 3], [4, 5, 6], [7, 8, 9]];
     /// for chunk in &data {
-    ///     stream = create_stream.update(&chunk);
+    ///     stream = stream.update(&chunk);
     /// }
     /// ```
     pub fn update(mut self, chunk: &[u8]) -> Self {
@@ -320,12 +320,11 @@ impl SignStream {
     ///
     /// let data = [[1, 2, 3], [4, 5, 6], [7, 8, 9]];
     /// for chunk in &data {
-    ///     stream = create_stream.update(&chunk);
+    ///     stream = stream.update(&chunk);
     /// }
     ///
     /// let (public_key, secret_key) = gen_keypair();
     /// let signature = stream.sign(&secret_key);
-    /// assert!(verify_stream.verify(&file_sign, &public_key));
     /// ```
     pub fn sign(&mut self, secret_key: &SecretKey) -> Signature {
         Signature(self.0.finalize(&secret_key.0))
@@ -340,15 +339,17 @@ impl SignStream {
     /// use exonum::crypto::{SignStream, gen_keypair};
     ///
     /// let stream = SignStream::new();
+    /// let mut verify_stream = SignStream::new();
     ///
     /// let data = [[1, 2, 3], [4, 5, 6], [7, 8, 9]];
     /// for chunk in &data {
-    ///     stream = create_stream.update(&chunk);
+    ///     stream = stream.update(&chunk);
+    ///     verify_stream = verify_stream.update(&chunk);
     /// }
     ///
     /// let (public_key, secret_key) = gen_keypair();
     /// let signature = stream.sign(&secret_key);
-    /// assert!(verify_stream.verify(&file_sign, &public_key));
+    /// assert!(verify_stream.verify(&signature, &public_key));
     /// ```
     pub fn verify(&mut self, sig: &Signature, public_key: &PublicKey) -> bool {
         self.0.verify(&sig.0, &public_key.0)
