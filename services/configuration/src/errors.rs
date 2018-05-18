@@ -120,6 +120,6 @@ impl Error {
 
 impl From<Error> for ExecutionError {
     fn from(value: Error) -> ExecutionError {
-        ExecutionError::new(value.code() as u8)
+        ExecutionError::with_description(value.code() as u8, value.to_string())
     }
 }
