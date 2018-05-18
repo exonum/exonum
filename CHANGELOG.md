@@ -7,10 +7,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Breaking changes
 
-- Network connections are now encrypted using
-  [Noise Protocol](https://noiseprotocol.org/). Nodes compiled with old
-  version will not connect to the new ones. Therefore you need to
-  update all node instances for the network to work. (#678)
 #### exonum
 
 - `TimeoutAdjusterConfig` has been removed along with different timeout
@@ -27,6 +23,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
     `propose_timeout_threshold` correspondingly.
   - There is no possibility to emulate `MovingAverage` now, so `Dynamic` should
     be used as the closest alternative.
+
+- Network connections are now encrypted using
+  [Noise Protocol](https://noiseprotocol.org/). Nodes compiled with old
+  version will not connect to the new ones. Therefore you need to
+  update all node instances for the network to work. (#678)
 
 ### New features
 
