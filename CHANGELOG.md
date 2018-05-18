@@ -5,6 +5,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Breaking changes
+
+- Network connections are now encrypted using
+  [Noise Protocol](https://noiseprotocol.org/). Nodes compiled with old
+  version will not connect to the new ones. Therefore you need to
+  update all node instances for the network to work. (#678)
+
 ### New features
 
 #### exonum
@@ -23,9 +30,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Maintenance CLI command for node management has been added. Currently the only
   supported command is `clear-cache` which clears node message cache. (#676)
-
-- Network connections are now encrypted using
-  [Noise Protocol](https://noiseprotocol.org/). (#678)
 
 #### exonum-timestamping
 

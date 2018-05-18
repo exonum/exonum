@@ -22,10 +22,10 @@ use std::io;
 
 use events::noise::HandshakeParams;
 
-pub const NOISE_MAX_MESSAGE_LEN: usize = 65_535;
-pub const TAG_LEN: usize = 16;
-pub const HEADER_LEN: usize = 4;
-pub const HANDSHAKE_HEADER_LEN: usize = 2;
+pub const NOISE_MAX_MESSAGE_LENGTH: usize = 65_535;
+pub const TAG_LENGTH: usize = 16;
+pub const NOISE_HEADER_LENGTH: usize = 4;
+pub const HANDSHAKE_HEADER_LENGTH: usize = 2;
 
 // We choose XX pattern since it provides mutual authentication and
 // transmission of static public keys.
@@ -61,7 +61,7 @@ impl NoiseWrapper {
     }
 
     pub fn read_handshake_msg(&mut self, input: &[u8]) -> Result<(usize, Vec<u8>), NoiseError> {
-        self.read(input, NOISE_MAX_MESSAGE_LEN)
+        self.read(input, NOISE_MAX_MESSAGE_LENGTH)
     }
 
     pub fn write_handshake_msg(&mut self) -> Result<(usize, Vec<u8>), NoiseError> {
@@ -87,13 +87,13 @@ impl NoiseWrapper {
     /// 2. Then each packet is decrypted by selected noise algorithm.
     /// 3. Append all decrypted packets to `decoded_message`.
     pub fn decrypt_msg(&mut self, len: usize, buf: &mut BytesMut) -> Result<BytesMut, io::Error> {
-        let data = buf.split_to(len + HEADER_LEN).to_vec();
-        let data = &data[HEADER_LEN..];
+        let data = buf.split_to(len + NOISE_HEADER_LENGTH).to_vec();
+        let data = &data[NOISE_HEADER_LENGTH..];
         let mut decoded_message = vec![0u8; 0];
 
-        data.chunks(NOISE_MAX_MESSAGE_LEN).for_each(|msg| {
-            let len_to_read = if msg.len() == NOISE_MAX_MESSAGE_LEN {
-                msg.len() - TAG_LEN
+        data.chunks(NOISE_MAX_MESSAGE_LENGTH).for_each(|msg| {
+            let len_to_read = if msg.len() == NOISE_MAX_MESSAGE_LENGTH {
+                msg.len() - TAG_LENGTH
             } else {
                 msg.len()
             };
@@ -117,13 +117,14 @@ impl NoiseWrapper {
         let mut len = 0usize;
         let mut encoded_message = vec![0u8; 0];
 
-        msg.chunks(NOISE_MAX_MESSAGE_LEN - TAG_LEN).for_each(|msg| {
-            let (written_bytes, written) = self.write(msg).unwrap();
-            encoded_message.extend_from_slice(&written);
-            len += written_bytes;
-        });
+        msg.chunks(NOISE_MAX_MESSAGE_LENGTH - TAG_LENGTH)
+            .for_each(|msg| {
+                let (written_bytes, written) = self.write(msg).unwrap();
+                encoded_message.extend_from_slice(&written);
+                len += written_bytes;
+            });
 
-        let mut msg_len_buf = vec![0u8; HEADER_LEN];
+        let mut msg_len_buf = vec![0u8; NOISE_HEADER_LENGTH];
 
         LittleEndian::write_u32(&mut msg_len_buf, len as u32);
         let encoded_message = &encoded_message[0..len];
@@ -141,7 +142,7 @@ impl NoiseWrapper {
     }
 
     fn write(&mut self, msg: &[u8]) -> Result<(usize, Vec<u8>), NoiseError> {
-        let mut buf = vec![0u8; NOISE_MAX_MESSAGE_LEN];
+        let mut buf = vec![0u8; NOISE_MAX_MESSAGE_LENGTH];
         let len = self.session
             .write_message(msg, &mut buf)
             .map_err(|e| NoiseError::new(format!("Error while writing noise message: {:?}", e.0)))?;

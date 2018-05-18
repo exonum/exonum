@@ -21,7 +21,7 @@ use std::io;
 
 use crypto::{PublicKey, SecretKey};
 use events::codec::MessagesCodec;
-use events::noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LEN};
+use events::noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH};
 
 pub mod wrapper;
 
@@ -88,7 +88,7 @@ fn send_handshake(stream: TcpStream, params: &HandshakeParams) -> HandshakeResul
 }
 
 fn read(sock: TcpStream) -> Box<Future<Item = (TcpStream, Vec<u8>), Error = io::Error>> {
-    let buf = vec![0u8; HANDSHAKE_HEADER_LEN];
+    let buf = vec![0u8; HANDSHAKE_HEADER_LENGTH];
     Box::new(
         read_exact(sock, buf)
             .and_then(|(stream, msg)| read_exact(stream, vec![0u8; msg[0] as usize])),
@@ -100,7 +100,7 @@ fn write(
     buf: &[u8],
     len: usize,
 ) -> Box<Future<Item = (TcpStream, Vec<u8>), Error = io::Error>> {
-    let mut message = vec![0u8; HANDSHAKE_HEADER_LEN];
+    let mut message = vec![0u8; HANDSHAKE_HEADER_LENGTH];
     LittleEndian::write_u16(&mut message, len as u16);
     message.extend_from_slice(&buf[0..len]);
     Box::new(write_all(sock, message))

@@ -370,37 +370,35 @@ impl Listener {
             trace!("Accepted incoming connection with peer={}", addr);
             let network_tx = network_tx.clone();
 
-            let connection_handler = NoiseHandshake::listen(&handshake_params, sock)
-                .and_then(move |framed| {
-                    let (_, stream) = framed.split();
-                    stream
-                        .into_future()
-                        .and_then(Ok)
-                        .map_err(|e| e.0)
-                        .and_then(move |(raw, stream)| match raw.map(Any::from_raw) {
-                            Some(Ok(Any::Connect(msg))) => Ok((msg, stream)),
-                            Some(Ok(other)) => Err(other_error(&format!(
-                                "First message is not Connect, got={:?}",
-                                other
-                            ))),
-                            Some(Err(e)) => Err(into_other(e)),
-                            None => Err(other_error("Incoming socket closed")),
-                        })
-                        .and_then(move |(connect, stream)| {
-                            trace!("Received handshake message={:?}", connect);
-                            let event = NetworkEvent::PeerConnected(addr, connect);
-                            let stream = network_tx
-                                .clone()
-                                .send(event)
-                                .map_err(into_other)
-                                .and_then(move |_| Ok(stream))
-                                .flatten_stream();
+            let stream = NoiseHandshake::listen(&handshake_params, sock).flatten_stream();
 
-                            stream.for_each(move |raw| {
-                                let event = NetworkEvent::MessageReceived(addr, raw);
-                                network_tx.clone().send(event).map_err(into_other).map(drop)
-                            })
-                        })
+            let connection_handler = stream
+                .into_future()
+                .and_then(Ok)
+                .map_err(|e| e.0)
+                .and_then(move |(raw, stream)| match raw.map(Any::from_raw) {
+                    Some(Ok(Any::Connect(msg))) => Ok((msg, stream)),
+                    Some(Ok(other)) => Err(other_error(&format!(
+                        "First message is not Connect, got={:?}",
+                        other
+                    ))),
+                    Some(Err(e)) => Err(into_other(e)),
+                    None => Err(other_error("Incoming socket closed")),
+                })
+                .and_then(move |(connect, stream)| {
+                    trace!("Received handshake message={:?}", connect);
+                    let event = NetworkEvent::PeerConnected(addr, connect);
+                    let stream = network_tx
+                        .clone()
+                        .send(event)
+                        .map_err(into_other)
+                        .and_then(move |_| Ok(stream))
+                        .flatten_stream();
+
+                    stream.for_each(move |raw| {
+                        let event = NetworkEvent::MessageReceived(addr, raw);
+                        network_tx.clone().send(event).map_err(into_other).map(drop)
+                    })
                 })
                 .map(|_| {
                     // Ensure that holder lives until the stream ends.

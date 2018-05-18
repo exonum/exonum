@@ -21,6 +21,7 @@ use std::io;
 use messages::{MessageBuffer, RawMessage, HEADER_LENGTH};
 use super::error::other_error;
 use events::noise::wrapper::NoiseWrapper;
+use events::noise::wrapper::NOISE_HEADER_LENGTH;
 
 #[derive(Debug)]
 pub struct MessagesCodec {
@@ -51,8 +52,8 @@ impl Decoder for MessagesCodec {
 
         let len = LittleEndian::read_u32(buf) as usize;
 
-        // To fix some weird `buf.len()` behavior https://github.com/carllerche/bytes/issues/104
-        if len > buf.len() {
+        // To fix some weird `decode()` behavior https://github.com/carllerche/bytes/issues/104
+        if buf.len() < len + NOISE_HEADER_LENGTH {
             return Ok(None);
         }
 
@@ -115,7 +116,7 @@ mod test {
     fn decode_message_valid_header_size() {
         let data = vec![0u8, 0, 0, 0, 0, 0, 10, 0, 0, 0];
         let mut bytes: BytesMut = BytesMut::new();
-        let (ref mut responder, ref mut initiator) = codecs();
+        let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
         let raw = RawMessage::new(MessageBuffer::from_vec(data.clone()));
         initiator.encode(raw, &mut bytes).unwrap();
 
@@ -129,7 +130,7 @@ mod test {
     fn decode_message_small_size_in_header() {
         let data = vec![0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0];
         let mut bytes: BytesMut = BytesMut::new();
-        let (ref mut responder, ref mut initiator) = codecs();
+        let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
         let raw = RawMessage::new(MessageBuffer::from_vec(data));
         initiator.encode(raw, &mut bytes).unwrap();
 
@@ -140,14 +141,14 @@ mod test {
     fn decode_message_zero_byte() {
         let data = vec![1u8, 0, 0, 0, 0, 0, 10, 0, 0, 0];
         let mut bytes: BytesMut = BytesMut::new();
-        let (ref mut responder, ref mut initiator) = codecs();
+        let (ref mut responder, ref mut initiator) = create_encrypted_codecs();
         let raw = RawMessage::new(MessageBuffer::from_vec(data));
 
         initiator.encode(raw, &mut bytes).unwrap();
         assert!(responder.decode(&mut bytes).is_err());
     }
 
-    fn codecs() -> (MessagesCodec, MessagesCodec) {
+    fn create_encrypted_codecs() -> (MessagesCodec, MessagesCodec) {
         let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([0; 32]));
 
         let params = HandshakeParams {
