@@ -298,9 +298,9 @@ impl SignStream {
     ///
     /// let stream = SignStream::new();
     ///
-    /// let data = [[1, 2, 3], [4, 5, 6], [7, 8, 9]];
-    /// for chunk in &data {
-    ///     stream = stream.update(&chunk);
+    /// let data = &[[1, 2, 3], [4, 5, 6], [7, 8, 9]];
+    /// for chunk in data.iter() {
+    ///     stream = stream.update(chunk);
     /// }
     /// ```
     pub fn update(mut self, chunk: &[u8]) -> Self {
@@ -318,9 +318,9 @@ impl SignStream {
     ///
     /// let stream = SignStream::new();
     ///
-    /// let data = [[1, 2, 3], [4, 5, 6], [7, 8, 9]];
-    /// for chunk in &data {
-    ///     stream = stream.update(&chunk);
+    /// let data = &[[1, 2, 3], [4, 5, 6], [7, 8, 9]];
+    /// for chunk in data.iter() {
+    ///     stream = stream.update(chunk);
     /// }
     ///
     /// let (public_key, secret_key) = gen_keypair();
@@ -341,10 +341,10 @@ impl SignStream {
     /// let stream = SignStream::new();
     /// let mut verify_stream = SignStream::new();
     ///
-    /// let data = [[1, 2, 3], [4, 5, 6], [7, 8, 9]];
-    /// for chunk in &data {
-    ///     stream = stream.update(&chunk);
-    ///     verify_stream = verify_stream.update(&chunk);
+    /// let data = &[[1, 2, 3], [4, 5, 6], [7, 8, 9]];
+    /// for chunk in data.iter() {
+    ///     stream = stream.update(chunk);
+    ///     verify_stream = verify_stream.update(chunk);
     /// }
     ///
     /// let (public_key, secret_key) = gen_keypair();
