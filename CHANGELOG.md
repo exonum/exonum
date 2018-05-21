@@ -24,6 +24,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - There is no possibility to emulate `MovingAverage` now, so `Dynamic` should
     be used as the closest alternative.
 
+- Network connections are now encrypted using
+  [Noise Protocol](https://noiseprotocol.org/). Nodes compiled with old
+  version will not connect to the new ones. Therefore you need to
+  update all node instances for the network to work. (#678)
 - `storage::Error` constructor has been made private. (#689)
 
 - `ConsensusConfig::validate_configuration` method has been renamed to the

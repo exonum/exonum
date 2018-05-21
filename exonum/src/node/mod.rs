@@ -45,7 +45,8 @@ use blockchain::{Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Tr
 use api::{private, public, Api};
 use messages::{Connect, Message, RawMessage};
 use events::{HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkConfiguration,
-             NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest};
+             NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
+             noise::HandshakeParams};
 use events::error::{into_other, log_error, other_error, LogError};
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
 use storage::{Database, DbOptions};
@@ -862,17 +863,18 @@ impl Node {
 
     /// Launches only consensus messages handler.
     /// This may be used if you want to customize api with the `ApiContext`.
-    pub fn run_handler(mut self) -> io::Result<()> {
+    pub fn run_handler(mut self, handshake_params: &HandshakeParams) -> io::Result<()> {
         self.handler.initialize();
 
         let (handler_part, network_part, timeouts_part) = self.into_reactor();
+        let handshake_params = handshake_params.clone();
 
         let network_thread = thread::spawn(move || {
             let mut core = Core::new()?;
             let handle = core.handle();
             core.handle()
                 .spawn(timeouts_part.run(handle).map_err(log_error));
-            let network_handler = network_part.run(&core.handle());
+            let network_handler = network_part.run(&core.handle(), &handshake_params);
             core.run(network_handler).map(drop).map_err(|e| {
                 other_error(&format!("An error in the `Network` thread occurred: {}", e))
             })
@@ -918,7 +920,12 @@ impl Node {
             info!("Public exonum api started on {}", listen_address);
         };
 
-        self.run_handler()?;
+        let handshake_params = HandshakeParams {
+            public_key: *self.handler().state().consensus_public_key(),
+            secret_key: self.handler().state().consensus_secret_key().clone(),
+            max_message_len: self.max_message_len,
+        };
+        self.run_handler(&handshake_params)?;
 
         // Stop all api handlers.
         for mut handler in api_handlers {
