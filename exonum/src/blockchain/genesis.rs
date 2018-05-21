@@ -40,7 +40,7 @@ impl GenesisConfig {
     where
         I: Iterator<Item = ValidatorKeys>,
     {
-        consensus.validate_configuration();
+        consensus.warn_if_nonoptimal();
         GenesisConfig {
             consensus,
             validator_keys: validator_keys.collect(),

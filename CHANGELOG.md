@@ -24,6 +24,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - There is no possibility to emulate `MovingAverage` now, so `Dynamic` should
     be used as the closest alternative.
 
+- `storage::Error` constructor has been made private. (#689)
+
+- `ConsensusConfig::validate_configuration` method has been renamed to the
+  `warn_if_nonoptimal`. (#690)
+
 ### New features
 
 #### exonum
@@ -45,6 +50,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Maintenance CLI command for node management has been added. Currently the only
   supported command is `clear-cache` which clears node message cache. (#676)
 
+- `StoredConfiguration` validation has been extended with `txs_block_limit`
+  parameter check. (#690)
+
+- A warning for non-optimal `StoredConfiguration::txs_block_limit` value has been
+  added. (#690)
+
 #### exonum-timestamping
 
 - Additional service example has been added along with frontend. (#646)
@@ -61,6 +72,14 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Fixed deserialization of the `MapProof` data structure. (#674)
 
 - Fixed a bug which prevented the node from reaching the actual round. (#680 #681)
+
+#### exonum-configuration
+
+- Error description has been added to the return value of the transactions. (#695)
+
+#### exonum-time
+
+- Error description has been added to the return value of the transactions. (#695)
 
 #### exonum-cryptocurrency-advanced
 

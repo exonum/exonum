@@ -34,9 +34,9 @@ const DATABASE_PATH: &str = "DATABASE_PATH";
 // Context entry for the type of action to be performed.
 const MAINTENANCE_ACTION_PATH: &str = "MAINTENANCE_ACTION_PATH";
 
-/// Maintenance command.
-/// Supported actions:
-/// * clear-cache - clear message cache.
+/// Maintenance command. Supported actions:
+///
+/// - `clear-cache` - clear message cache.
 pub struct Maintenance;
 
 impl Maintenance {

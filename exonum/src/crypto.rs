@@ -277,11 +277,32 @@ pub struct SignStream(SignState);
 
 impl SignStream {
     /// Creates a new instance of `SignStream`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::crypto::SignStream;
+    ///
+    /// let stream = SignStream::new();
+    /// ```
     pub fn new() -> Self {
         SignStream(SignState::init())
     }
 
     /// Adds a new `chunk` to the message that will eventually be signed and/or verified.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::crypto::SignStream;
+    ///
+    /// let mut stream = SignStream::new();
+    ///
+    /// let data = &[[1, 2, 3], [4, 5, 6], [7, 8, 9]];
+    /// for chunk in data.iter() {
+    ///     stream = stream.update(chunk);
+    /// }
+    /// ```
     pub fn update(mut self, chunk: &[u8]) -> Self {
         self.0.update(chunk);
         self
@@ -289,12 +310,47 @@ impl SignStream {
 
     /// Computes and returns a signature for the previously supplied message
     /// using the given `secret_key`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::crypto::{SignStream, gen_keypair};
+    ///
+    /// let mut stream = SignStream::new();
+    ///
+    /// let data = &[[1, 2, 3], [4, 5, 6], [7, 8, 9]];
+    /// for chunk in data.iter() {
+    ///     stream = stream.update(chunk);
+    /// }
+    ///
+    /// let (public_key, secret_key) = gen_keypair();
+    /// let signature = stream.sign(&secret_key);
+    /// ```
     pub fn sign(&mut self, secret_key: &SecretKey) -> Signature {
         Signature(self.0.finalize(&secret_key.0))
     }
 
     /// Verifies that `sig` is a valid signature for the previously supplied message
     /// using the given `public_key`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::crypto::{SignStream, gen_keypair};
+    ///
+    /// let mut stream = SignStream::new();
+    /// let mut verify_stream = SignStream::new();
+    ///
+    /// let data = &[[1, 2, 3], [4, 5, 6], [7, 8, 9]];
+    /// for chunk in data.iter() {
+    ///     stream = stream.update(chunk);
+    ///     verify_stream = verify_stream.update(chunk);
+    /// }
+    ///
+    /// let (public_key, secret_key) = gen_keypair();
+    /// let signature = stream.sign(&secret_key);
+    /// assert!(verify_stream.verify(&signature, &public_key));
+    /// ```
     pub fn verify(&mut self, sig: &Signature, public_key: &PublicKey) -> bool {
         self.0.verify(&sig.0, &public_key.0)
     }
