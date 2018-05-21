@@ -296,7 +296,7 @@ impl SignStream {
     /// ```
     /// use exonum::crypto::SignStream;
     ///
-    /// let stream = SignStream::new();
+    /// let mut stream = SignStream::new();
     ///
     /// let data = &[[1, 2, 3], [4, 5, 6], [7, 8, 9]];
     /// for chunk in data.iter() {
@@ -316,7 +316,7 @@ impl SignStream {
     /// ```
     /// use exonum::crypto::{SignStream, gen_keypair};
     ///
-    /// let stream = SignStream::new();
+    /// let mut stream = SignStream::new();
     ///
     /// let data = &[[1, 2, 3], [4, 5, 6], [7, 8, 9]];
     /// for chunk in data.iter() {
@@ -338,7 +338,7 @@ impl SignStream {
     /// ```
     /// use exonum::crypto::{SignStream, gen_keypair};
     ///
-    /// let stream = SignStream::new();
+    /// let mut stream = SignStream::new();
     /// let mut verify_stream = SignStream::new();
     ///
     /// let data = &[[1, 2, 3], [4, 5, 6], [7, 8, 9]];
