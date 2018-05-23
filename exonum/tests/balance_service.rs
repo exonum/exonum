@@ -85,7 +85,7 @@ pub mod contracts {
 }
 
 pub mod service {
-    use exonum::blockchain::{Service, Transaction, TransactionSet};
+    use exonum::blockchain::{Schema, Service, ServiceContext, Transaction, TransactionSet};
     use exonum::{encoding, messages::RawTransaction};
     use exonum::crypto::{gen_keypair, Hash};
     use exonum::storage::{Database, Fork, MemoryDB, Snapshot};
@@ -99,10 +99,22 @@ pub mod service {
     use std::sync::Arc;
     use std::thread;
     use std::time;
+    use std::sync::Mutex;
+    use std::sync::mpsc::{self, Sender};
 
     pub const SERVICE_ID: u16 = 1;
 
-    pub struct BalanceService();
+    pub struct BalanceService {
+        sender: Mutex<Sender<()>>,
+    }
+
+    impl BalanceService {
+        fn new(sender: Sender<()>) -> Self {
+            Self {
+                sender: Mutex::new(sender),
+            }
+        }
+    }
 
     impl Service for BalanceService {
         fn service_id(&self) -> u16 {
@@ -127,6 +139,13 @@ pub mod service {
             schema.balance_mut().set(0);
             Value::Null
         }
+
+        fn handle_commit(&self, context: &ServiceContext) {
+            let core_schema = Schema::new(context.snapshot());
+            if !core_schema.block_transactions(context.height()).is_empty() {
+                self.sender.lock().unwrap().send(()).unwrap();
+            }
+        }
     }
 
     #[test]
@@ -142,7 +161,9 @@ pub mod service {
         node_cfg.genesis.consensus.propose_timeout_threshold = 0;
         node_cfg.genesis.consensus.round_timeout = 40;
 
-        let service = Box::new(BalanceService());
+        let (sender, receiver) = mpsc::channel();
+
+        let service = Box::new(BalanceService::new(sender));
         let node = Node::new(db.clone(), vec![service], node_cfg.clone());
         let api_tx = node.channel();
 
@@ -159,7 +180,9 @@ pub mod service {
         api_tx.send(tx_copy).unwrap();
 
         // Wait to be sure that transaction was processed.
-        thread::sleep(time::Duration::from_millis(200));
+        receiver
+            .recv_timeout(time::Duration::from_secs(10))
+            .unwrap();
 
         // Shut down the node
         api_tx
