@@ -63,8 +63,12 @@ impl NoiseWrapper {
 
     pub fn read_handshake_msg(&mut self, input: &[u8]) -> Result<(usize, Vec<u8>), NoiseError> {
         if input.len() < NOISE_MIN_HANDSHAKE_MESSAGE_LENGTH
-            || input.len() > NOISE_MAX_MESSAGE_LENGTH  {
-            return Err(NoiseError::new(format!("Wrong handshake message length {:?}", input.len())))
+            || input.len() > NOISE_MAX_MESSAGE_LENGTH
+        {
+            return Err(NoiseError::new(format!(
+                "Wrong handshake message length {:?}",
+                input.len()
+            )));
         }
 
         self.read(input, NOISE_MAX_MESSAGE_LENGTH)

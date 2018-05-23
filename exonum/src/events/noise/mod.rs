@@ -25,7 +25,7 @@ use events::noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH};
 
 pub mod wrapper;
 
-type HandshakeResult = Box<Future<Item=Framed<TcpStream, MessagesCodec>, Error=io::Error>>;
+type HandshakeResult = Box<Future<Item = Framed<TcpStream, MessagesCodec>, Error = io::Error>>;
 
 #[derive(Debug, Clone)]
 /// Params needed to establish secured connection using Noise Protocol.
@@ -52,18 +52,17 @@ fn listen_handshake(stream: TcpStream, params: &HandshakeParams) -> HandshakeRes
     let max_message_len = params.max_message_len;
     let mut noise = NoiseWrapper::responder(params);
     let framed = read(stream).and_then(move |(stream, msg)| {
-        read_handshake_msg(&msg, &mut noise)
-            .and_then(move |_| {
-                write_handshake_msg(&mut noise)
-                    .and_then(|(len, buf)| write(stream, &buf, len))
-                    .and_then(|(stream, _msg)| read(stream))
-                    .and_then(move |(stream, msg)| {
-                        noise.read_handshake_msg(&msg)?;
-                        let noise = noise.into_transport_mode()?;
-                        let framed = stream.framed(MessagesCodec::new(max_message_len, noise));
-                        Ok(framed)
-                    })
-            })
+        read_handshake_msg(&msg, &mut noise).and_then(move |_| {
+            write_handshake_msg(&mut noise)
+                .and_then(|(len, buf)| write(stream, &buf, len))
+                .and_then(|(stream, _msg)| read(stream))
+                .and_then(move |(stream, msg)| {
+                    noise.read_handshake_msg(&msg)?;
+                    let noise = noise.into_transport_mode()?;
+                    let framed = stream.framed(MessagesCodec::new(max_message_len, noise));
+                    Ok(framed)
+                })
+        })
     });
 
     Box::new(framed)
@@ -76,22 +75,21 @@ fn send_handshake(stream: TcpStream, params: &HandshakeParams) -> HandshakeResul
         .and_then(|(len, buf)| write(stream, &buf, len))
         .and_then(|(stream, _msg)| read(stream))
         .and_then(move |(stream, msg)| {
-            read_handshake_msg(&msg, &mut noise)
-                .and_then(move |_| {
-                    write_handshake_msg(&mut noise)
-                        .and_then(|(len, buf)| write(stream, &buf, len))
-                        .and_then(move |(stream, _msg)| {
-                            let noise = noise.into_transport_mode()?;
-                            let framed = stream.framed(MessagesCodec::new(max_message_len, noise));
-                            Ok(framed)
-                        })
-                })
+            read_handshake_msg(&msg, &mut noise).and_then(move |_| {
+                write_handshake_msg(&mut noise)
+                    .and_then(|(len, buf)| write(stream, &buf, len))
+                    .and_then(move |(stream, _msg)| {
+                        let noise = noise.into_transport_mode()?;
+                        let framed = stream.framed(MessagesCodec::new(max_message_len, noise));
+                        Ok(framed)
+                    })
+            })
         });
 
     Box::new(framed)
 }
 
-fn read(sock: TcpStream) -> impl Future<Item=(TcpStream, Vec<u8>), Error=io::Error> {
+fn read(sock: TcpStream) -> impl Future<Item = (TcpStream, Vec<u8>), Error = io::Error> {
     let buf = vec![0u8; HANDSHAKE_HEADER_LENGTH];
     Box::new(
         read_exact(sock, buf)
@@ -103,7 +101,7 @@ fn write(
     sock: TcpStream,
     buf: &[u8],
     len: usize,
-) -> impl Future<Item=(TcpStream, Vec<u8>), Error=io::Error> {
+) -> impl Future<Item = (TcpStream, Vec<u8>), Error = io::Error> {
     let mut message = vec![0u8; HANDSHAKE_HEADER_LENGTH];
     LittleEndian::write_u16(&mut message, len as u16);
     message.extend_from_slice(&buf[0..len]);
@@ -112,7 +110,7 @@ fn write(
 
 fn write_handshake_msg(
     noise: &mut NoiseWrapper,
-) -> impl Future<Item=(usize, Vec<u8>), Error=io::Error> {
+) -> impl Future<Item = (usize, Vec<u8>), Error = io::Error> {
     let res = noise.write_handshake_msg();
     Box::new(done(res.map_err(|e| e.into())))
 }
@@ -120,33 +118,27 @@ fn write_handshake_msg(
 pub fn read_handshake_msg(
     input: &[u8],
     noise: &mut NoiseWrapper,
-) -> impl Future<Item=(usize, Vec<u8>), Error=io::Error> {
+) -> impl Future<Item = (usize, Vec<u8>), Error = io::Error> {
     let res = noise.read_handshake_msg(input);
     Box::new(done(res.map_err(|e| e.into())))
 }
 
 #[cfg(test)]
 mod tests {
-    use events::noise::wrapper::{NOISE_MAX_MESSAGE_LENGTH, NOISE_MIN_HANDSHAKE_MESSAGE_LENGTH};
+    use tokio_core::reactor::Core;
+    use tokio_core::net::{TcpStream, TcpListener};
+    use tokio_io::AsyncRead;
+    use futures::{done, Future, Stream};
+
     use std::net::SocketAddr;
     use std::thread;
-    use tokio_core::reactor::Core;
-    use events::noise::wrapper::NoiseWrapper;
-    use tokio_core::net::TcpStream;
     use std::io;
-    use tokio_core::net::TcpListener;
-    use events::noise::NoiseHandshake;
-    use events::error::log_error;
-    use events::error::into_other;
-    use events::noise::HandshakeParams;
-    use events::noise::HandshakeResult;
+
+    use events::noise::wrapper::{NoiseWrapper, NOISE_MAX_MESSAGE_LENGTH, NOISE_MIN_HANDSHAKE_MESSAGE_LENGTH};
+    use events::noise::{write, read, read_handshake_msg, NoiseHandshake, HandshakeParams, HandshakeResult};
+    use events::error::{log_error, into_other};
     use events::codec::MessagesCodec;
-    use tokio_io::AsyncRead;
-    use futures::{done, Stream, Future};
-    use crypto::{Seed, gen_keypair_from_seed};
-    use events::noise::write;
-    use events::noise::read;
-    use events::noise::read_handshake_msg;
+    use crypto::{gen_keypair_from_seed, Seed};
 
     #[derive(Debug, PartialEq, Copy, Clone)]
     pub enum HandshakeStep {
@@ -188,9 +180,7 @@ mod tests {
         let addr: SocketAddr = "127.0.0.1:45002".parse().unwrap();
         let addr2 = addr.clone();
 
-        thread::spawn(move || {
-            run_handshake_listener(&addr2)
-        });
+        thread::spawn(move || run_handshake_listener(&addr2));
 
         let res = send_handshake(&addr, HandshakeStep::One(1, EMPTY_MESSAGE));
         assert!(res.is_err());
@@ -217,15 +207,15 @@ mod tests {
         let params = HandshakeParams::default();
 
         let fut_stream = TcpListener::bind(addr, &handle).unwrap();
-        let fut = fut_stream.incoming()
+        let fut = fut_stream
+            .incoming()
             .for_each(|(stream, _)| {
                 let handshake = NoiseHandshake::listen(&params, stream);
-                let reader = handshake.and_then(|_| { Ok(()) }).map_err(log_error);
+                let reader = handshake.and_then(|_| Ok(())).map_err(log_error);
                 handle.spawn(reader);
                 Ok(())
             })
             .map_err(into_other);
-
 
         core.run(fut)
     }
@@ -236,37 +226,36 @@ mod tests {
         let params = HandshakeParams::default();
 
         let stream = TcpStream::connect(&addr, &handle)
-            .and_then(|sock| {
-                match step {
-                    HandshakeStep::Default => NoiseHandshake::send(&params, sock),
-                    _ => send_corrupted_handshake(&params, sock, step)
-                }
+            .and_then(|sock| match step {
+                HandshakeStep::Default => NoiseHandshake::send(&params, sock),
+                _ => send_corrupted_handshake(&params, sock, step),
             })
-            .map(|_| {
-                ()
-            })
+            .map(|_| ())
             .map_err(into_other);
 
         core.run(stream)
     }
 
-    fn send_corrupted_handshake(params: &HandshakeParams, stream: TcpStream, step: HandshakeStep) -> HandshakeResult {
+    fn send_corrupted_handshake(
+        params: &HandshakeParams,
+        stream: TcpStream,
+        step: HandshakeStep,
+    ) -> HandshakeResult {
         let max_message_len = params.max_message_len;
         let mut noise = NoiseWrapper::initiator(params);
         let framed = write_corrupted_handshake_msg(&mut noise, 1, &step)
             .and_then(|(len, buf)| write(stream, &buf, len))
             .and_then(|(stream, _msg)| read(stream))
             .and_then(move |(stream, msg)| {
-                read_handshake_msg(&msg, &mut noise)
-                    .and_then(move |_| {
-                        write_corrupted_handshake_msg(&mut noise, 2, &step)
-                            .and_then(|(len, buf)| write(stream, &buf, len))
-                            .and_then(move |(stream, _msg)| {
-                                let noise = noise.into_transport_mode()?;
-                                let framed = stream.framed(MessagesCodec::new(max_message_len, noise));
-                                Ok(framed)
-                            })
-                    })
+                read_handshake_msg(&msg, &mut noise).and_then(move |_| {
+                    write_corrupted_handshake_msg(&mut noise, 2, &step)
+                        .and_then(|(len, buf)| write(stream, &buf, len))
+                        .and_then(move |(stream, _msg)| {
+                            let noise = noise.into_transport_mode()?;
+                            let framed = stream.framed(MessagesCodec::new(max_message_len, noise));
+                            Ok(framed)
+                        })
+                })
             });
 
         Box::new(framed)
@@ -276,12 +265,12 @@ mod tests {
         noise: &mut NoiseWrapper,
         current_step: u8,
         step: &HandshakeStep,
-    ) -> Box<Future<Item=(usize, Vec<u8>), Error=io::Error>> {
+    ) -> Box<Future<Item = (usize, Vec<u8>), Error = io::Error>> {
         let res = match step {
             HandshakeStep::One(cs, size) | HandshakeStep::Two(cs, size) if *cs == current_step => {
                 Ok((*size, vec![0; *size]))
             }
-            _ => noise.write_handshake_msg()
+            _ => noise.write_handshake_msg(),
         };
 
         Box::new(done(res.map_err(|e| e.into())))
