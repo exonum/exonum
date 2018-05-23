@@ -28,7 +28,7 @@ struct MemPoolInfo {
 #[derive(Serialize, Deserialize)]
 struct MetaInfo<'a> {
     pub version: &'a str,
-    pub services: Vec<&'a str>
+    pub services: Vec<&'a str>,
 }
 
 #[doc(hidden)]
