@@ -19,6 +19,7 @@ pub mod codec;
 pub mod error;
 pub mod network;
 pub mod internal;
+pub mod noise;
 
 use futures::{Async, Future, Poll, Stream};
 use futures::sink::Wait;
