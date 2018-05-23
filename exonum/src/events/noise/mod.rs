@@ -101,7 +101,7 @@ fn write(
     sock: TcpStream,
     buf: &[u8],
     len: usize,
-) -> impl Future<Item = (TcpStream, Vec<u8>), Error = io::Error> {
+) -> Box<Future<Item = (TcpStream, Vec<u8>), Error = io::Error>> {
     let mut message = vec![0u8; HANDSHAKE_HEADER_LENGTH];
     LittleEndian::write_u16(&mut message, len as u16);
     message.extend_from_slice(&buf[0..len]);
@@ -110,7 +110,7 @@ fn write(
 
 fn write_handshake_msg(
     noise: &mut NoiseWrapper,
-) -> impl Future<Item = (usize, Vec<u8>), Error = io::Error> {
+) -> Box<Future<Item = (usize, Vec<u8>), Error = io::Error>> {
     let res = noise.write_handshake_msg();
     Box::new(done(res.map_err(|e| e.into())))
 }
@@ -118,7 +118,7 @@ fn write_handshake_msg(
 pub fn read_handshake_msg(
     input: &[u8],
     noise: &mut NoiseWrapper,
-) -> impl Future<Item = (usize, Vec<u8>), Error = io::Error> {
+) -> Box<Future<Item = (usize, Vec<u8>), Error = io::Error>> {
     let res = noise.read_handshake_msg(input);
     Box::new(done(res.map_err(|e| e.into())))
 }
