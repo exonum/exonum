@@ -93,7 +93,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
-- Api now has `/v1/meta/` endpoint for meta-information about core and services. (#701)
+- Api now has `/v1/meta/` endpoint for meta-information about core
+  and services. (#701)
 
 - Default implementation of `check` method was added to `Field` trait to
   reduce boilerplate. (#639)
