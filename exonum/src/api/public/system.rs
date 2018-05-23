@@ -59,6 +59,21 @@ impl SystemApi {
         router.get("/v1/mempool", mempool, "mempool");
     }
 
+    fn meta_info(self, router: &mut Router) {
+        let meta = move |_: &mut Request| -> IronResult<Response> {
+            let version = option_env!("CARGO_PKG_VERSION").unwrap_or("?");
+            let services = self.blockchain
+                .service_map()
+                .values()
+                .into_iter()
+                .map(|x| x.service_name())
+                .collect::<Vec<_>>();
+            let info = MetaInfo { version, services };
+            self.ok_response(&serde_json::to_value(info).unwrap())
+        };
+        router.get("/v1/meta", meta, "meta");
+    }
+
     fn healthcheck_info(self, router: &mut Router) {
         let healthcheck = move |_: &mut Request| -> IronResult<Response> {
             let info = HealthCheckInfo {
@@ -83,5 +98,6 @@ impl Api for SystemApi {
         self.clone().mempool_info(router);
         self.clone().healthcheck_info(router);
         self.clone().user_agent_info(router);
+        self.clone().meta_info(router);
     }
 }
