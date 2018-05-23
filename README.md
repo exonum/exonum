@@ -14,7 +14,9 @@
 
 **Community:**
 [![Join the chat at https://gitter.im/exonum/exonum](https://img.shields.io/gitter/room/exonum/exonum.svg?label=Chat)](https://gitter.im/exonum/exonum)
+[![Join the chat at https://t.me/exonum_blockchain](https://img.shields.io/badge/Chat-on%20telegram-brightgreen.svg)](https://t.me/exonum_blockchain)
 [![Join the chat at https://gitter.im/exonum/ruExonum](https://img.shields.io/gitter/room/exonum/ruExonum.svg?label=Russian%20chat)](https://gitter.im/exonum/ruExonum)
+[![Join the chat at https://t.me/ExonumRU](https://img.shields.io/badge/Russian%20chat-on%20telegram-brightgreen.svg)](https://t.me/ExonumRU)
 [![Website](https://img.shields.io/website/http/exonum.com.svg?label=Website)](https://exonum.com)
 
 [Exonum](https://exonum.com/) is an extensible open-source framework for
