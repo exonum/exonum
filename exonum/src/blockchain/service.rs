@@ -32,13 +32,17 @@ use blockchain::{Blockchain, ConsensusConfig, Schema, StoredConfiguration, Valid
 use helpers::{Height, Milliseconds, ValidatorId};
 use super::transaction::Transaction;
 
-/// A trait that describes business logic of a concrete service.
+/// A trait that describes the business logic of a certain service.
+///
+/// Services are the main extension point for the Exonum framework. Initially,
+/// Exonum does not provide specific transaction processing rules or business
+/// logic, they are implemented with the help of services.
 ///
 /// See also [the documentation page on services][doc:services].
 ///
 /// # Examples
 ///
-/// The following example provides a bare-bones foundation for implementing a service.
+/// The example below provides a bare-bones foundation for implementing a service.
 ///
 /// ```
 /// #[macro_use] extern crate exonum;
@@ -127,10 +131,10 @@ use super::transaction::Transaction;
 #[allow(unused_variables, unused_mut)]
 pub trait Service: Send + Sync + 'static {
     /// Service identifier for database schema and service messages.
-    /// Must be unique within the blockchain.
+    /// This ID must be unique within the blockchain.
     fn service_id(&self) -> u16;
 
-    /// A comprehensive string service name. Must be unique within the
+    /// A comprehensive string service name. This name must be unique within the
     /// blockchain.
     fn service_name(&self) -> &str;
 
@@ -149,17 +153,18 @@ pub trait Service: Send + Sync + 'static {
     /// Tries to create a `Transaction` from the given raw message.
     ///
     /// Exonum framework only guarantees that `SERVICE_ID` of the message is equal to the
-    /// identifier of this service, therefore the implementation should be ready to handle invalid
-    /// transactions that may come from byzantine nodes.
+    /// identifier of this service, therefore, the implementation should be ready to handle
+    /// invalid transactions that may come from byzantine nodes.
     ///
-    /// Service should return an error in the following cases (see `MessageError` for more details):
+    /// Service should return an error in the following cases (see `MessageError` for more
+    /// details):
     ///
     /// - Incorrect transaction identifier.
     /// - Incorrect data layout.
     ///
-    /// Service _shouldn't_ perform signature check or logical validation of the transaction: these
-    /// operations should be performed in the `Transaction::verify` and `Transaction::execute`
-    /// methods.
+    /// Service _shouldn't_ perform a signature check or logical validation of the transaction;
+    /// these operations should be performed in the `Transaction::verify` and
+    /// `Transaction::execute` methods.
     ///
     /// `transactions!` macro generates code that allows simple implementation, see
     /// [the `Service` example above](#examples).
@@ -167,7 +172,7 @@ pub trait Service: Send + Sync + 'static {
 
     /// Initializes the information schema of the service
     /// and generates an initial service configuration.
-    /// Called on genesis block creation.
+    /// This method is called on genesis block creation.
     fn initialize(&self, fork: &mut Fork) -> Value {
         Value::Null
     }
@@ -208,7 +213,9 @@ pub trait Service: Send + Sync + 'static {
 }
 
 /// The current node state on which the blockchain is running, or in other words
-/// execution context.
+/// execution context. This structure is passed to the `handle_commit` method
+/// of the `Service` trait and is used for the interaction between service
+/// business logic and the current node state.
 #[derive(Debug)]
 pub struct ServiceContext {
     validator_id: Option<ValidatorId>,
@@ -220,10 +227,10 @@ pub struct ServiceContext {
 }
 
 impl ServiceContext {
-    /// Creates the service context for the given node.
+    /// Creates service context for the given node.
     ///
     /// This method is necessary if you want to implement an alternative exonum node.
-    /// For example, you can implement special node without consensus for regression
+    /// For example, you can implement a special node without consensus for regression
     /// testing of services business logic.
     pub fn new(
         service_public_key: PublicKey,
@@ -253,13 +260,14 @@ impl ServiceContext {
         }
     }
 
-    /// If the current node is validator returns its identifier.
+    /// If the current node is a validator, returns its identifier.
     /// For other nodes return `None`.
     pub fn validator_id(&self) -> Option<ValidatorId> {
         self.validator_id
     }
 
-    /// Returns the current database snapshot.
+    /// Returns the current database snapshot. This snapshot is used to
+    /// retrieve schema information from the database.
     pub fn snapshot(&self) -> &Snapshot {
         self.fork.as_ref()
     }
@@ -269,17 +277,17 @@ impl ServiceContext {
         self.height
     }
 
-    /// Returns the current list of validators.
+    /// Returns the current list of validator public keys.
     pub fn validators(&self) -> &[ValidatorKeys] {
         self.stored_configuration.validator_keys.as_slice()
     }
 
-    /// Returns current node's public key.
+    /// Returns the public key of the current node.
     pub fn public_key(&self) -> &PublicKey {
         &self.service_keypair.0
     }
 
-    /// Returns current node's secret key.
+    /// Returns the secret key of the current node.
     pub fn secret_key(&self) -> &SecretKey {
         &self.service_keypair.1
     }
@@ -289,12 +297,13 @@ impl ServiceContext {
         &self.stored_configuration.consensus
     }
 
-    /// Returns service specific global variables as json value.
+    /// Returns service specific global variables as a JSON value.
     pub fn actual_service_config(&self, service: &Service) -> &Value {
         &self.stored_configuration.services[service.service_name()]
     }
 
-    /// Returns reference to the transaction sender.
+    /// Returns a reference to the transaction sender, which can then be used
+    /// to broadcast a transaction to other nodes in the network.
     pub fn transaction_sender(&self) -> &TransactionSend {
         &self.api_sender
     }
@@ -321,24 +330,26 @@ impl ApiNodeState {
     }
 }
 
-/// Shared part of the context, used to take some values from the `Node`s `State`
-/// should be used to take some metrics.
+/// Shared part of the context, used to take some values from the `Node`
+/// `State`. As there is no way to directly access
+/// the node state, this entity is regularly updated with information about the
+/// node and transfers this information to API.
 #[derive(Clone, Debug)]
 pub struct SharedNodeState {
     state: Arc<RwLock<ApiNodeState>>,
-    /// Timeout to update api state.
+    /// Timeout to update API state.
     pub state_update_timeout: Milliseconds,
 }
 
 impl SharedNodeState {
-    /// Creates new `SharedNodeState`
+    /// Creates a new `SharedNodeState` instance.
     pub fn new(state_update_timeout: Milliseconds) -> SharedNodeState {
         SharedNodeState {
             state: Arc::new(RwLock::new(ApiNodeState::new())),
             state_update_timeout,
         }
     }
-    /// Return list of connected sockets
+    /// Returns a list of connected addresses of other nodes.
     pub fn incoming_connections(&self) -> Vec<SocketAddr> {
         self.state
             .read()
@@ -348,7 +359,7 @@ impl SharedNodeState {
             .cloned()
             .collect()
     }
-    /// Return list of our connection sockets
+    /// Returns a list of our connection sockets.
     pub fn outgoing_connections(&self) -> Vec<SocketAddr> {
         self.state
             .read()
@@ -358,7 +369,9 @@ impl SharedNodeState {
             .cloned()
             .collect()
     }
-    /// Return reconnects list
+    /// Returns a list of other nodes to which the connection has failed
+    /// and a reconnect attempt is required. The method also indicates the time
+    /// after which a new connection attempt is performed.
     pub fn reconnects_timeout(&self) -> Vec<(SocketAddr, Milliseconds)> {
         self.state
             .read()
@@ -368,7 +381,8 @@ impl SharedNodeState {
             .map(|(c, e)| (*c, *e))
             .collect()
     }
-    /// Return peers info list
+    /// Returns a list of addresses and public keys of peers from which the
+    /// node has received `Connect` messages.
     pub fn peers_info(&self) -> Vec<(SocketAddr, PublicKey)> {
         self.state
             .read()
@@ -378,7 +392,7 @@ impl SharedNodeState {
             .map(|(c, e)| (*c, *e))
             .collect()
     }
-    /// Update internal state, from `Node` State`
+    /// Updates internal state, from `State` of a blockchain node.
     pub fn update_node_state(&self, state: &State) {
         for (p, c) in state.peers().iter() {
             self.state
@@ -389,24 +403,26 @@ impl SharedNodeState {
         }
     }
 
-    /// Is the node enabled?
+    /// Returns a boolean value which indicates whether the node is enabled
+    /// or not.
     pub fn is_enabled(&self) -> bool {
         let state = self.state.read().expect("Expected read lock.");
         state.is_enabled
     }
 
-    /// Informs internal state about node's halting.
+    /// Transfers information to the node that the consensus process on the node
+    /// should halt.
     pub fn set_enabled(&self, is_enabled: bool) {
         let mut state = self.state.write().expect("Expected read lock.");
         state.is_enabled = is_enabled;
     }
 
-    /// Returns value of the `state_update_timeout`.
+    /// Returns the value of the `state_update_timeout`.
     pub fn state_update_timeout(&self) -> Milliseconds {
         self.state_update_timeout
     }
 
-    /// add incoming connection into state
+    /// Adds an incoming connection into the state.
     pub fn add_incoming_connection(&self, addr: SocketAddr) {
         self.state
             .write()
@@ -414,7 +430,7 @@ impl SharedNodeState {
             .incoming_connections
             .insert(addr);
     }
-    /// add outgoing connection into state
+    /// Adds an outgoing connection into the state.
     pub fn add_outgoing_connection(&self, addr: SocketAddr) {
         self.state
             .write()
@@ -423,7 +439,7 @@ impl SharedNodeState {
             .insert(addr);
     }
 
-    /// remove incoming connection from state
+    /// Removes an incoming connection from the state.
     pub fn remove_incoming_connection(&self, addr: &SocketAddr) -> bool {
         self.state
             .write()
@@ -432,7 +448,7 @@ impl SharedNodeState {
             .remove(addr)
     }
 
-    /// remove outgoing connection from state
+    /// Removes an outgoing connection from the state.
     pub fn remove_outgoing_connection(&self, addr: &SocketAddr) -> bool {
         self.state
             .write()
@@ -441,7 +457,7 @@ impl SharedNodeState {
             .remove(addr)
     }
 
-    /// Add reconnect timeout
+    /// Adds a reconnect timeout.
     pub fn add_reconnect_timeout(
         &self,
         addr: SocketAddr,
@@ -454,7 +470,7 @@ impl SharedNodeState {
             .insert(addr, timeout)
     }
 
-    /// Removes reconnect timeout and returns the previous value.
+    /// Removes the reconnect timeout and returns the previous value.
     pub fn remove_reconnect_timeout(&self, addr: &SocketAddr) -> Option<Milliseconds> {
         self.state
             .write()
@@ -464,7 +480,7 @@ impl SharedNodeState {
     }
 }
 
-/// Provides the current node state to api handlers.
+/// Provides the current node state to API handlers.
 pub struct ApiContext {
     blockchain: Blockchain,
     node_channel: ApiSender,
@@ -472,7 +488,7 @@ pub struct ApiContext {
     secret_key: SecretKey,
 }
 
-/// Provides the current node state to api handlers.
+/// Provides the current node state to API handlers.
 impl ApiContext {
     /// Constructs context for the given `Node`.
     pub fn new(node: &Node) -> ApiContext {
@@ -500,22 +516,22 @@ impl ApiContext {
         }
     }
 
-    /// Returns reference to the node's blockchain.
+    /// Returns a reference to the blockchain of this node.
     pub fn blockchain(&self) -> &Blockchain {
         &self.blockchain
     }
 
-    /// Returns reference to the transaction sender.
+    /// Returns a reference to the transaction sender.
     pub fn node_channel(&self) -> &ApiSender {
         &self.node_channel
     }
 
-    /// Returns the public key of current node.
+    /// Returns the public key of the current node.
     pub fn public_key(&self) -> &PublicKey {
         &self.public_key
     }
 
-    /// Returns the secret key of current node.
+    /// Returns the secret key of the current node.
     pub fn secret_key(&self) -> &SecretKey {
         &self.secret_key
     }
