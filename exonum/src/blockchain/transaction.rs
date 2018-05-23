@@ -17,17 +17,17 @@
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
-use std::borrow::Cow;
 use std::any::Any;
+use std::borrow::Cow;
+use std::convert::Into;
 use std::error::Error;
 use std::{fmt, u8};
-use std::convert::Into;
 
-use messages::{Message, RawTransaction};
-use storage::{Fork, StorageValue};
 use crypto::{CryptoHash, Hash};
 use encoding;
 use encoding::serialize::json::ExonumJson;
+use messages::{Message, RawTransaction};
+use storage::{Fork, StorageValue};
 
 //  User-defined error codes (`TransactionErrorType::Code(u8)`) have a `0...255` range.
 #[cfg_attr(feature = "cargo-clippy", allow(cast_lossless))]
@@ -363,8 +363,7 @@ fn status_as_u16(status: &TransactionResult) -> u16 {
 /// `TransactionSet` trait describes a type which is an `enum` of several transactions.
 /// The implementation of this trait is generated automatically by the `transactions!`
 /// macro.
-pub trait TransactionSet
-    : Into<Box<Transaction>> + DeserializeOwned + Serialize + Clone {
+pub trait TransactionSet: Into<Box<Transaction>> + DeserializeOwned + Serialize + Clone {
     /// Parses a transaction from this set from a `RawMessage`.
     fn tx_from_raw(raw: RawTransaction) -> Result<Self, encoding::Error>;
 }
@@ -654,16 +653,16 @@ fn panic_description(any: &Box<Any + Send>) -> Option<String> {
 mod tests {
     use futures::sync::mpsc;
 
-    use std::sync::Mutex;
     use std::panic;
+    use std::sync::Mutex;
 
     use super::*;
+    use blockchain::{Blockchain, Schema, Service};
     use crypto;
     use encoding;
-    use blockchain::{Blockchain, Schema, Service};
-    use storage::{Database, Entry, MemoryDB, Snapshot};
-    use node::ApiSender;
     use helpers::{Height, ValidatorId};
+    use node::ApiSender;
+    use storage::{Database, Entry, MemoryDB, Snapshot};
 
     const TX_RESULT_SERVICE_ID: u16 = 255;
 

@@ -17,9 +17,9 @@ extern crate exonum_testkit;
 extern crate serde;
 extern crate serde_json;
 
-use exonum::helpers::{Height, ValidatorId};
 use exonum::blockchain::Schema;
 use exonum::crypto::CryptoHash;
+use exonum::helpers::{Height, ValidatorId};
 use exonum_testkit::TestKitBuilder;
 
 fn main() {

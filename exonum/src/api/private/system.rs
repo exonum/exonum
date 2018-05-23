@@ -12,17 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde_json;
-use router::Router;
 use iron::prelude::*;
+use router::Router;
+use serde_json;
 
 use std::{collections::HashMap, net::SocketAddr};
 
-use crypto::PublicKey;
-use node::{ApiSender, ExternalMessage};
-use blockchain::{Blockchain, Service, SharedNodeState};
 use api::{Api, ApiError};
+use blockchain::{Blockchain, Service, SharedNodeState};
+use crypto::PublicKey;
 use messages::PROTOCOL_MAJOR_VERSION;
+use node::{ApiSender, ExternalMessage};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct ServiceInfo {

@@ -14,11 +14,11 @@
 
 //! An implementation of key-value map.
 
-use std::marker::PhantomData;
 use std::borrow::Borrow;
+use std::marker::PhantomData;
 
-use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey, StorageValue};
 use super::indexes_metadata::IndexType;
+use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey, StorageValue};
 
 /// A map of keys and values.
 ///
@@ -462,9 +462,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use rand::{thread_rng, Rng};
-    use super::*;
     use super::super::{Database, MemoryDB};
+    use super::*;
+    use rand::{thread_rng, Rng};
 
     const IDX_NAME: &'static str = "idx_name";
 

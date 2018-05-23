@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use router::Router;
 use iron::prelude::*;
+use router::Router;
 use serde_json;
 
-use blockchain::{Blockchain, Schema, SharedNodeState};
 use api::Api;
+use blockchain::{Blockchain, Schema, SharedNodeState};
 use helpers::user_agent;
 
 #[derive(Serialize, Deserialize, PartialEq)]

@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use super::config::StoredConfiguration;
+use super::{Block, BlockProof, Blockchain, TransactionResult};
 use crypto::{CryptoHash, Hash, PublicKey};
+use helpers::{Height, Round};
 use messages::{Connect, Precommit, RawMessage};
 use storage::{Entry, Fork, KeySetIndex, ListIndex, MapIndex, MapProof, ProofListIndex,
               ProofMapIndex, Snapshot};
-use helpers::{Height, Round};
-use super::{Block, BlockProof, Blockchain, TransactionResult};
-use super::config::StoredConfiguration;
 
 /// Defines `&str` constants with given name and value.
 macro_rules! define_names {
@@ -48,27 +48,23 @@ define_names!(
     CONSENSUS_ROUND => "consensus_round";
 );
 
-encoding_struct! (
-    /// Configuration index.
-    struct ConfigReference {
-        /// Height since which this configuration becomes actual.
-        actual_from: Height,
-        /// Hash of the configuration contents that serialized as raw bytes vec.
-        cfg_hash: &Hash,
-    }
-);
+encoding_struct!(/// Configuration index.
+struct ConfigReference {
+    /// Height since which this configuration becomes actual.
+    actual_from: Height,
+    /// Hash of the configuration contents that serialized as raw bytes vec.
+    cfg_hash: &Hash,
+});
 
-encoding_struct! (
-    /// Transaction location in a block.
-    /// The given entity defines the block where the transaction was
-    /// included and the position of this transaction in that block.
-    struct TxLocation {
-        /// Height of the block where the transaction was included.
-        block_height: Height,
-        /// Zero-based position of this transaction in the block.
-        position_in_block: u64,
-    }
-);
+encoding_struct!(/// Transaction location in a block.
+/// The given entity defines the block where the transaction was
+/// included and the position of this transaction in that block.
+struct TxLocation {
+    /// Height of the block where the transaction was included.
+    block_height: Height,
+    /// Zero-based position of this transaction in the block.
+    position_in_block: u64,
+});
 
 /// Information schema for indices maintained by the Exonum core logic.
 ///

@@ -21,15 +21,15 @@ use std::net::SocketAddr;
 use std::thread;
 use std::time::{self, Duration};
 
-use crypto::{gen_keypair, gen_keypair_from_seed, PublicKey, Seed, Signature};
-use messages::{Connect, Message, MessageWriter, RawMessage};
-use events::{NetworkEvent, NetworkRequest};
-use events::network::{NetworkConfiguration, NetworkPart};
-use events::error::log_error;
-use node::{EventsPoolCapacity, NodeChannel};
 use blockchain::ConsensusConfig;
-use helpers::user_agent;
+use crypto::{gen_keypair, gen_keypair_from_seed, PublicKey, Seed, Signature};
+use events::error::log_error;
+use events::network::{NetworkConfiguration, NetworkPart};
 use events::noise::HandshakeParams;
+use events::{NetworkEvent, NetworkRequest};
+use helpers::user_agent;
+use messages::{Connect, Message, MessageWriter, RawMessage};
+use node::{EventsPoolCapacity, NodeChannel};
 
 #[derive(Debug)]
 pub struct TestHandler {

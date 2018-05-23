@@ -15,14 +15,14 @@
 use byteorder::{ByteOrder, LittleEndian};
 use serde_json::value::{Number, Value};
 
-use std::mem;
 use std::error::Error;
+use std::mem;
 
-use encoding::{CheckedOffset, Field, Offset};
+use super::Error as EncodingError;
+use super::Result as EncodingResult;
 use encoding::serialize::WriteBufferWrapper;
 use encoding::serialize::json::{ExonumJson, ExonumJsonDeserialize};
-use super::Result as EncodingResult;
-use super::Error as EncodingError;
+use encoding::{CheckedOffset, Field, Offset};
 
 /// Wrapper for the `f32` type that restricts non-finite
 /// (NaN, Infinity, negative zero and subnormal) values.
@@ -283,12 +283,12 @@ impl ExonumJsonDeserialize for F64 {
 #[cfg(test)]
 mod tests {
     use super::{F32, F64};
-    use std::num::FpCategory;
-    use std::{f32, f64};
-    use std::panic;
-    use encoding::fields::Field;
     use byteorder::{ByteOrder, LittleEndian};
     use encoding::Offset;
+    use encoding::fields::Field;
+    use std::num::FpCategory;
+    use std::panic;
+    use std::{f32, f64};
 
     fn validate_constructor<T, V, C: Fn(V) -> T>(
         constructor: C,
@@ -353,12 +353,10 @@ mod tests {
     #[test]
     #[allow(dead_code)]
     fn test_f32_struct() {
-        encoding_struct!(
-            struct Msg {
-                single_float: F32,
-                vec: Vec<F32>,
-            }
-        );
+        encoding_struct!(struct Msg {
+            single_float: F32,
+            vec: Vec<F32>,
+        });
         let test_vec = vec![F32::new(0.0), F32::new(3.14), F32::new(5.82)];
 
         let msg = Msg::new(F32::new(0.0), test_vec.clone());
@@ -369,12 +367,10 @@ mod tests {
     #[test]
     #[allow(dead_code)]
     fn test_f64_struct() {
-        encoding_struct!(
-            struct Msg {
-                single_float: F64,
-                vec: Vec<F64>,
-            }
-        );
+        encoding_struct!(struct Msg {
+            single_float: F64,
+            vec: Vec<F64>,
+        });
 
         let test_vec = vec![F64::new(0.0), F64::new(3.14), F64::new(5.82)];
 

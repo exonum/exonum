@@ -14,9 +14,9 @@
 
 //! Consensus and other messages and related utilities.
 
+pub use self::protocol::*;
 pub use self::raw::{Message, MessageBuffer, MessageWriter, RawMessage, ServiceMessage,
                     HEADER_LENGTH, PROTOCOL_MAJOR_VERSION};
-pub use self::protocol::*;
 
 use bit_vec::BitVec;
 
@@ -28,8 +28,8 @@ use helpers::{Height, Round, ValidatorId};
 
 #[macro_use]
 mod spec;
-mod raw;
 mod protocol;
+mod raw;
 
 #[cfg(test)]
 mod tests;

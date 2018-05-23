@@ -14,11 +14,11 @@
 
 use rand::{Rng, SeedableRng, XorShiftRng};
 
-use messages::{Message, RawTransaction};
-use encoding::Error as MessageError;
-use crypto::{gen_keypair, Hash, PublicKey, SecretKey};
-use storage::{Fork, Snapshot};
 use blockchain::{ExecutionResult, Service, Transaction, TransactionSet};
+use crypto::{gen_keypair, Hash, PublicKey, SecretKey};
+use encoding::Error as MessageError;
+use messages::{Message, RawTransaction};
+use storage::{Fork, Snapshot};
 
 pub const TIMESTAMPING_SERVICE: u16 = 129;
 

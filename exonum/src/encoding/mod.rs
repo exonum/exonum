@@ -105,11 +105,11 @@
 //!
 //! [`field_size()`]: ./trait.Field.html#tymethod.field_size
 
-pub use self::fields::Field;
-pub use self::segments::SegmentField;
 pub use self::error::Error;
+pub use self::fields::Field;
 #[cfg(feature = "float_serialize")]
 pub use self::float::{F32, F64};
+pub use self::segments::SegmentField;
 
 #[macro_use]
 pub mod serialize;
@@ -157,24 +157,26 @@ impl CheckedOffset {
 }
 
 macro_rules! implement_default_ops_checked {
-    ($trait_name: ident $function:ident $checked_function:ident) => (
+    ($trait_name:ident $function:ident $checked_function:ident) => {
         impl $trait_name<CheckedOffset> for CheckedOffset {
             type Output = ::std::result::Result<CheckedOffset, Error>;
             fn $function(self, rhs: CheckedOffset) -> Self::Output {
-                self.offset.$checked_function(rhs.offset)
-                        .map(CheckedOffset::new)
-                        .ok_or(Error::OffsetOverflow)
+                self.offset
+                    .$checked_function(rhs.offset)
+                    .map(CheckedOffset::new)
+                    .ok_or(Error::OffsetOverflow)
             }
         }
         impl $trait_name<Offset> for CheckedOffset {
             type Output = ::std::result::Result<CheckedOffset, Error>;
             fn $function(self, rhs: Offset) -> Self::Output {
-                self.offset.$checked_function(rhs)
-                        .map(CheckedOffset::new)
-                        .ok_or(Error::OffsetOverflow)
+                self.offset
+                    .$checked_function(rhs)
+                    .map(CheckedOffset::new)
+                    .ok_or(Error::OffsetOverflow)
             }
         }
-    )
+    };
 }
 
 implement_default_ops_checked!{Add add checked_add }

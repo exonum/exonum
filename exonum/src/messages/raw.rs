@@ -16,9 +16,9 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 
-use std::{convert, mem, sync};
 use std::fmt::Debug;
 use std::ops::Deref;
+use std::{convert, mem, sync};
 
 use crypto::{hash, sign, verify, CryptoHash, Hash, PublicKey, SecretKey, Signature,
              SIGNATURE_LENGTH};

@@ -18,8 +18,8 @@
 
 use byteorder::{BigEndian, ByteOrder};
 use chrono::{DateTime, NaiveDateTime, Utc};
-use uuid::Uuid;
 use rust_decimal::Decimal;
+use uuid::Uuid;
 
 use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 
@@ -160,18 +160,15 @@ macro_rules! storage_key_for_ints {
             }
 
             fn write(&self, buffer: &mut [u8]) {
-                BigEndian::$write_method(
-                    buffer,
-                    self.wrapping_add($itype::min_value()) as $utype,
-                );
+                BigEndian::$write_method(buffer, self.wrapping_add($itype::min_value()) as $utype);
             }
 
             fn read(buffer: &[u8]) -> Self {
-                BigEndian::$read_method(buffer)
-                    .wrapping_sub($itype::min_value() as $utype) as $itype
+                BigEndian::$read_method(buffer).wrapping_sub($itype::min_value() as $utype)
+                    as $itype
             }
         }
-    }
+    };
 }
 
 storage_key_for_ints!{u16, i16, 2, read_u16, write_u16}
@@ -355,13 +352,16 @@ mod tests {
         (fuzz $type:ident, $size:expr => $test_name:ident) => {
             #[test]
             fn $test_name() {
-                use rand::{Rng, thread_rng};
+                use rand::{thread_rng, Rng};
                 let mut rng = thread_rng();
 
                 // Fuzzed roundtrip
                 let mut buffer = [0u8; $size];
                 let handpicked_vals = vec![$type::min_value(), $type::max_value()];
-                for x in rng.gen_iter::<$type>().take(FUZZ_SAMPLES).chain(handpicked_vals) {
+                for x in rng.gen_iter::<$type>()
+                    .take(FUZZ_SAMPLES)
+                    .chain(handpicked_vals)
+                {
                     x.write(&mut buffer);
                     assert_eq!($type::read(&buffer), x);
                 }
@@ -372,14 +372,16 @@ mod tests {
                 vals.sort();
                 for w in vals.windows(2) {
                     let (x, y) = (w[0], w[1]);
-                    if x == y { continue; }
+                    if x == y {
+                        continue;
+                    }
 
                     x.write(&mut x_buffer);
                     y.write(&mut y_buffer);
                     assert!(x_buffer < y_buffer);
                 }
             }
-        }
+        };
     }
 
     test_storage_key_for_int_type!{full  u8, 1 => test_storage_key_for_u8}

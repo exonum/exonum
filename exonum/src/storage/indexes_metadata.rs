@@ -17,19 +17,17 @@
 use std::borrow::Cow;
 use std::error::Error;
 
-use storage::{BaseIndex, Fork, Snapshot, StorageValue};
 use crypto::{CryptoHash, Hash};
-use encoding::{CheckedOffset, Error as EncodingError, Field, Offset};
 use encoding::serialize::{json, WriteBufferWrapper};
+use encoding::{CheckedOffset, Error as EncodingError, Field, Offset};
+use storage::{BaseIndex, Fork, Snapshot, StorageValue};
 
 pub const INDEXES_METADATA_TABLE_NAME: &str = "__INDEXES_METADATA__";
 
-encoding_struct!(
-    struct IndexMetadata {
-        index_type: IndexType,
-        is_family: bool,
-    }
-);
+encoding_struct!(struct IndexMetadata {
+    index_type: IndexType,
+    is_family: bool,
+});
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[repr(u8)]

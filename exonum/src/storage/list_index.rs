@@ -17,8 +17,8 @@
 use std::cell::Cell;
 use std::marker::PhantomData;
 
-use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey, StorageValue};
 use super::indexes_metadata::IndexType;
+use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey, StorageValue};
 
 /// A list of items that implement `StorageValue` trait.
 ///
@@ -456,8 +456,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use rand::{thread_rng, Rng};
     use super::{Fork, ListIndex};
+    use rand::{thread_rng, Rng};
 
     fn gen_tempdir_name() -> String {
         thread_rng().gen_ascii_chars().take(10).collect()
@@ -517,8 +517,8 @@ mod tests {
 
     mod memorydb_tests {
         use std::path::Path;
-        use tempdir::TempDir;
         use storage::{Database, ListIndex, MemoryDB};
+        use tempdir::TempDir;
 
         const IDX_NAME: &'static str = "idx_name";
 
@@ -569,8 +569,8 @@ mod tests {
 
     mod rocksdb_tests {
         use std::path::Path;
-        use tempdir::TempDir;
         use storage::{Database, DbOptions, ListIndex, RocksDB};
+        use tempdir::TempDir;
 
         const IDX_NAME: &'static str = "idx_name";
 

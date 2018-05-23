@@ -29,8 +29,8 @@ extern crate serde_derive;
 extern crate serde_json;
 extern crate thread_local;
 
-use exonum::crypto::{self, CryptoHash, Hash};
 use exonum::api::public::BlocksRange;
+use exonum::crypto::{self, CryptoHash, Hash};
 use exonum::helpers::Height;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use log::{set_boxed_logger, set_max_level, Level, Log, Metadata, Record};
