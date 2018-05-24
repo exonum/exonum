@@ -34,7 +34,7 @@ mod proof;
 /// A Merkelized version of an array list that provides proofs of existence for the list items.
 ///
 /// `ProofListIndex` implements a Merkle tree, storing elements as leaves and using `u64` as
-/// an index. `ProofListIndex` requires that the elements implement the [`StorageValue`] trait.
+/// an index. `ProofListIndex` requires that elements implement the [`StorageValue`] trait.
 ///
 /// [`StorageValue`]: ../trait.StorageValue.html
 #[derive(Debug)]
@@ -47,7 +47,7 @@ pub struct ProofListIndex<T, V> {
 /// An iterator over the items of a `ProofListIndex`.
 ///
 /// This struct is created by the [`iter`] or
-/// [`iter_from`] methods on [`ProofListIndex`]. See its documentation for more.
+/// [`iter_from`] method on [`ProofListIndex`]. See its documentation for details.
 ///
 /// [`iter`]: struct.ProofListIndex.html#method.iter
 /// [`iter_from`]: struct.ProofListIndex.html#method.iter_from
@@ -71,8 +71,8 @@ where
 {
     /// Creates a new index representation based on the name and storage view.
     ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
-    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
+    /// immutable methods are available. In the second case, both immutable and mutable methods are
     /// available.
     ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
@@ -103,8 +103,8 @@ where
     /// Creates a new index representation based on the name, common prefix of its keys
     /// and storage view.
     ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
-    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
+    /// immutable methods are available. In the second case, both immutable and mutable methods are
     /// available.
     ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
@@ -186,7 +186,8 @@ where
         }
     }
 
-    /// Returns an element at that position or `None` if out of bounds.
+    /// Returns the element at the indicated position or `None` if the indicated position
+    /// is out of bounds.
     ///
     /// # Examples
     ///
@@ -206,7 +207,7 @@ where
         self.base.get(&ProofListKey::leaf(index))
     }
 
-    /// Returns the last element of the proof list, or `None` if it is empty.
+    /// Returns the last element of the proof list or `None` if it is empty.
     ///
     /// # Examples
     ///
@@ -297,7 +298,8 @@ where
         self.len().next_power_of_two().trailing_zeros() as u8 + 1
     }
 
-    /// Returns the Merkle root hash of the proof list or default hash value if it is empty.
+    /// Returns the Merkle root hash of the proof list or the default hash value
+    /// if it is empty. The default hash consists solely of zeroes.
     ///
     /// # Examples
     ///
@@ -514,7 +516,7 @@ where
     ///
     /// # Panics
     ///
-    /// Panics if `index` is equal or greater than the proof list's current length.
+    /// Panics if `index` is equal or greater than the current length of the proof list.
     ///
     /// # Examples
     ///
@@ -562,8 +564,8 @@ where
     ///
     /// # Notes
     ///
-    /// Currently this method is not optimized to delete large set of data. During the execution of
-    /// this method the amount of allocated memory is linearly dependent on the number of elements
+    /// Currently, this method is not optimized to delete a large set of data. During the execution of
+    /// this method, the amount of allocated memory is linearly dependent on the number of elements
     /// in the index.
     ///
     /// # Examples

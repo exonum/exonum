@@ -22,7 +22,7 @@ use std::iter::{Iterator as StdIterator, Peekable};
 use super::Result;
 use self::NextIterValue::*;
 
-/// Map containing changes with corresponding key.
+/// Map containing changes with a corresponding key.
 #[derive(Debug, Clone)]
 pub struct Changes {
     data: BTreeMap<Vec<u8>, Change>,
@@ -36,7 +36,7 @@ impl Changes {
         }
     }
 
-    /// Returns iterator over changes.
+    /// Returns an iterator over the changes.
     pub fn iter(&self) -> BtmIter<Vec<u8>, Change> {
         self.data.iter()
     }
@@ -68,6 +68,9 @@ impl IntoIterator for Changes {
 }
 
 /// A set of serial changes that should be applied to a storage atomically.
+/// This set can contain changes from multiple tables. When a block is added to
+/// the blockchain, changes are first collected into a patch and then applied to
+/// the storage.
 #[derive(Debug, Clone)]
 pub struct Patch {
     changes: HashMap<String, Changes>,
@@ -147,7 +150,7 @@ impl IntoIterator for Patch {
 /// A generalized iterator over the storage views.
 pub type Iter<'a> = Box<Iterator + 'a>;
 
-/// An enum that represents a kind of change to some key in the storage.
+/// An enum that represents a type of change made to some key in the storage.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Change {
     /// Put the specified value into the storage for the corresponding key.

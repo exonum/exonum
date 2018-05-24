@@ -37,11 +37,11 @@ mod proof;
 /// keys.
 ///
 /// `ProofMapIndex` implements a Merkle Patricia tree, storing the values as leaves.
-/// `ProofMapIndex` requires that the keys implement [`ProofMapKey`] and values implement the
-/// [`StorageValue`] trait.
+/// `ProofMapIndex` requires that keys implement the [`ProofMapKey`] trait and
+/// values implement the [`StorageValue`] trait.
 ///
 /// **The size of the proof map keys must be exactly 32 bytes and the keys must have a uniform
-/// distribution.** Usually [`Hash`] and [`PublicKey`] are used as types of proof map keys.
+/// distribution.** Usually, [`Hash`] and [`PublicKey`] are used as types of proof map keys.
 ///
 /// [`ProofMapKey`]: trait.ProofMapKey.html
 /// [`StorageValue`]: ../trait.StorageValue.html
@@ -56,7 +56,7 @@ pub struct ProofMapIndex<T, K, V> {
 /// An iterator over the entries of a `ProofMapIndex`.
 ///
 /// This struct is created by the [`iter`] or
-/// [`iter_from`] methods on [`ProofMapIndex`]. See its documentation for more.
+/// [`iter_from`] method on [`ProofMapIndex`]. See its documentation for details.
 ///
 /// [`iter`]: struct.ProofMapIndex.html#method.iter
 /// [`iter_from`]: struct.ProofMapIndex.html#method.iter_from
@@ -70,7 +70,7 @@ pub struct ProofMapIndexIter<'a, K, V> {
 /// An iterator over the keys of a `ProofMapIndex`.
 ///
 /// This struct is created by the [`keys`] or
-/// [`keys_from`] methods on [`ProofMapIndex`]. See its documentation for more.
+/// [`keys_from`] method on [`ProofMapIndex`]. See its documentation for details.
 ///
 /// [`keys`]: struct.ProofMapIndex.html#method.keys
 /// [`keys_from`]: struct.ProofMapIndex.html#method.keys_from
@@ -84,7 +84,7 @@ pub struct ProofMapIndexKeys<'a, K> {
 /// An iterator over the values of a `ProofMapIndex`.
 ///
 /// This struct is created by the [`values`] or
-/// [`values_from`] methods on [`ProofMapIndex`]. See its documentation for more.
+/// [`values_from`] method on [`ProofMapIndex`]. See its documentation for details.
 ///
 /// [`values`]: struct.ProofMapIndex.html#method.values
 /// [`values_from`]: struct.ProofMapIndex.html#method.values_from
@@ -109,8 +109,8 @@ where
 {
     /// Creates a new index representation based on the name and storage view.
     ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
-    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
+    /// immutable methods are available. In the second case, both immutable and mutable methods are
     /// available.
     ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
@@ -141,8 +141,8 @@ where
     /// Creates a new index representation based on the name, common prefix of its keys
     /// and storage view.
     ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
-    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
+    /// immutable methods are available. In the second case, both immutable and mutable methods are
     /// available.
     ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
@@ -208,6 +208,7 @@ where
     }
 
     /// Returns the root hash of the proof map or default hash value if it is empty.
+    /// The default hash consists solely of zeroes.
     ///
     /// # Examples
     ///
@@ -670,7 +671,7 @@ where
         RemoveResult::KeyNotFound
     }
 
-    /// Removes the key from the proof map.
+    /// Removes a key from the proof map.
     ///
     /// # Examples
     ///
@@ -728,8 +729,8 @@ where
     ///
     /// # Notes
     ///
-    /// Currently this method is not optimized to delete large set of data. During the execution of
-    /// this method the amount of allocated memory is linearly dependent on the number of elements
+    /// Currently, this method is not optimized to delete a large set of data. During the execution of
+    /// this method, the amount of allocated memory is linearly dependent on the number of elements
     /// in the index.
     ///
     /// # Examples

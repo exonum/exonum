@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! An implementation of array list of items with spaces.
+//! An implementation of an array list of items with spaces.
 
 // TODO: Remove when https://github.com/rust-lang-nursery/rust-clippy/issues/2190 is fixed.
 #![cfg_attr(feature="cargo-clippy", allow(doc_markdown))]
@@ -63,9 +63,9 @@ impl StorageValue for SparseListSize {
     }
 }
 
-/// A list of items similar to the [`ListIndex`]. However, it may contain "spaces". For instance,
+/// A list of items similar to the [`ListIndex`], however, it may contain "spaces". For instance,
 /// a list might contain six elements with indices: "1, 2, 3, 5, 7, 8" (missing 4 and 6). And if you
-/// try to get the element for index 4 or 6 you'll get None. Later, elements can be added to the
+/// try to get the element for index 4 or 6, you'll get None. Later, elements can be added to the
 /// spaces, if required. Elements in this list are added to the back of the list and are
 /// removed either from the back of the list or from certain indices.
 ///
@@ -73,9 +73,9 @@ impl StorageValue for SparseListSize {
 /// elements in the list. Capacity is the number of all elements in the list, both
 /// empty and non-empty.
 ///
-/// `SparseListIndex` implements an array list, storing the element as values and using `u64`
+/// `SparseListIndex` implements an array list, storing an element as a value and using `u64`
 /// as an index.
-/// `SparseListIndex` requires that the elements implement the [`StorageValue`] trait.
+/// `SparseListIndex` requires that elements implement the [`StorageValue`] trait.
 ///
 /// [`StorageValue`]: ../trait.StorageValue.html
 /// [`ListIndex`]: <../list_index/struct.ListIndex.html>
@@ -86,10 +86,10 @@ pub struct SparseListIndex<T, V> {
     _v: PhantomData<V>,
 }
 
-/// An iterator over the items of a `SparseListIndex`.
+/// Returns an iterator over the items of a `SparseListIndex`.
 ///
 /// This struct is created by the [`iter`] method on [`SparseListIndex`].
-/// See its documentation for more.
+/// See its documentation for details.
 ///
 /// [`iter`]: struct.SparseListIndex.html#method.iter
 /// [`SparseListIndex`]: struct.SparseListIndex.html
@@ -98,7 +98,7 @@ pub struct SparseListIndexIter<'a, V> {
     base_iter: BaseIndexIter<'a, u64, V>,
 }
 
-/// An iterator over the indices of a `SparseListIndex`.
+/// Returns an iterator over the indices of a `SparseListIndex`.
 ///
 /// This struct is created by the [`indices`] method on [`SparseListIndex`].
 /// See its documentation for more.
@@ -110,10 +110,10 @@ pub struct SparseListIndexKeys<'a> {
     base_iter: BaseIndexIter<'a, u64, ()>,
 }
 
-/// An iterator over the values of a `SparseListIndex`.
+/// Returns an iterator over the values of a `SparseListIndex`.
 ///
 /// This struct is created by the [`values`] method on [`SparseListIndex`].
-/// See its documentation for more.
+/// See its documentation for details.
 ///
 /// [`values`]: struct.SparseListIndex.html#method.values
 /// [`SparseListIndex`]: struct.SparseListIndex.html
@@ -129,8 +129,8 @@ where
 {
     /// Creates a new index representation based on the name and storage view.
     ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
-    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
+    /// immutable methods are available. In the second case, both immutable and mutable methods are
     /// available.
     ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
@@ -154,11 +154,11 @@ where
         }
     }
 
-    /// Creates a new index representation based on the name, index id in family
+    /// Creates a new index representation based on the name, index ID in family
     /// and storage view.
     ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
-    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
+    /// immutable methods are available. In the second case, both immutable and mutable methods are
     /// available.
     ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
@@ -200,7 +200,8 @@ where
         size
     }
 
-    /// Returns an element at that position or `None` if out of bounds or it does not exist.
+    /// Returns an element at the indicated position or `None` if the indicated
+    /// position is out of bounds or it does not exist.
     ///
     /// # Examples
     ///
@@ -242,8 +243,8 @@ where
         self.len() == 0
     }
 
-    /// Returns the total amount of elements (including "empty" elements) in the list. The value of
-    /// capacity is determined by the maximum index of the element ever inserted into the index.
+    /// Returns the total amount of elements, including empty elements, in the list. The value of
+    /// capacity is determined by the maximum index of an element ever inserted into the given index.
     ///
     /// # Examples
     ///
@@ -420,7 +421,7 @@ where
     }
 
     /// Removes the element with the given index from the list and returns it,
-    /// or None if it is empty.
+    /// or returns None if it is empty.
     ///
     /// # Examples
     ///
@@ -485,12 +486,12 @@ where
         self.set_size(size);
     }
 
-    /// Changes a value at the specified position. If the position contains empty value it
-    /// also increments elements count. If a value of the index of new element is greater than
-    /// current capacity, the capacity of the list considered index + 1 and all further elements
-    /// without specific index value will be appended after this index.
+    /// Changes a value at a specified position. If the position contains an empty value, it
+    /// also increments the elements count. If the index value of the new element is greater than
+    /// the current capacity, the capacity of the list is considered index + 1 and all further elements
+    /// without specific index values will be appended after this index.
     ///
-    /// Returns the value of an old element at this position or `None` if it was empty.
+    /// Returns the value of an old element at the indicated position or `None` if it was empty.
     ///
     /// # Examples
     ///
@@ -526,8 +527,8 @@ where
     ///
     /// # Notes
     ///
-    /// Currently this method is not optimized to delete a large set of data.
-    /// During the execution of this method the amount of allocated memory
+    /// Currently, this method is not optimized to delete a large set of data.
+    /// During the execution of this method, the amount of allocated memory
     /// is linearly dependent on the number of elements
     /// in the index.
     ///
@@ -551,7 +552,8 @@ where
         self.base.clear()
     }
 
-    /// Removes the first element from the 'SparseListIndex' and returns it, or None if it is empty.
+    /// Removes the first element from the 'SparseListIndex' and returns it, or
+    /// returns None if it is empty.
     ///
     /// # Examples
     ///

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! An implementation of set for items that implement `StorageValue` trait.
+//! An implementation of a set of items that utilize the `StorageValue` trait.
 
 use std::marker::PhantomData;
 
@@ -20,9 +20,9 @@ use crypto::Hash;
 use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey, StorageValue};
 use super::indexes_metadata::IndexType;
 
-/// A set of items that implement `StorageValue` trait.
+/// A set of value items.
 ///
-/// `ValueSetIndex` implements a set, storing the element as values using its hash as a key.
+/// `ValueSetIndex` implements a set, storing an element as a value using its hash as a key.
 /// `ValueSetIndex` requires that the elements implement the [`StorageValue`] trait.
 ///
 /// [`StorageValue`]: ../trait.StorageValue.html
@@ -32,10 +32,10 @@ pub struct ValueSetIndex<T, V> {
     _v: PhantomData<V>,
 }
 
-/// An iterator over the items of a `ValueSetIndex`.
+/// Returns an iterator over the items of a `ValueSetIndex`.
 ///
 /// This struct is created by the [`iter`] or
-/// [`iter_from`] methods on [`ValueSetIndex`]. See its documentation for more.
+/// [`iter_from`] method on [`ValueSetIndex`]. See its documentation for details.
 ///
 /// [`iter`]: struct.ValueSetIndex.html#method.iter
 /// [`iter_from`]: struct.ValueSetIndex.html#method.iter_from
@@ -45,10 +45,10 @@ pub struct ValueSetIndexIter<'a, V> {
     base_iter: BaseIndexIter<'a, Hash, V>,
 }
 
-/// An iterator over the hashes of items of a `ValueSetIndex`.
+/// Returns an iterator over the hashes of items of a `ValueSetIndex`.
 ///
 /// This struct is created by the [`hashes`] or
-/// [`hashes_from`] methods on [`ValueSetIndex`]. See its documentation for more.
+/// [`hashes_from`] method on [`ValueSetIndex`]. See its documentation for details.
 ///
 /// [`hashes`]: struct.ValueSetIndex.html#method.iter
 /// [`hashes_from`]: struct.ValueSetIndex.html#method.iter_from
@@ -65,8 +65,8 @@ where
 {
     /// Creates a new index representation based on the name and storage view.
     ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
-    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
+    /// immutable methods are available. In the second case, both immutable and mutable methods are
     /// available.
     ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
@@ -89,11 +89,11 @@ where
         }
     }
 
-    /// Creates a new index representation based on the name, index id in family
+    /// Creates a new index representation based on the name, index ID in family
     /// and storage view.
     ///
-    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case only
-    /// immutable methods are available. In the second case both immutable and mutable methods are
+    /// Storage view can be specified as [`&Snapshot`] or [`&mut Fork`]. In the first case, only
+    /// immutable methods are available. In the second case, both immutable and mutable methods are
     /// available.
     ///
     /// [`&Snapshot`]: ../trait.Snapshot.html
@@ -121,7 +121,7 @@ where
         }
     }
 
-    /// Returns `true` if the set contains a value.
+    /// Returns `true` if the set contains the indicated value.
     ///
     /// # Examples
     ///
@@ -164,7 +164,7 @@ where
         self.base.contains(hash)
     }
 
-    /// An iterator visiting all elements in arbitrary order. The iterator element type is V.
+    /// Returns an iterator visiting all elements in arbitrary order. The iterator element type is V.
     ///
     /// # Examples
     ///
@@ -186,7 +186,7 @@ where
         }
     }
 
-    /// An iterator visiting all elements in arbitrary order starting from the specified hash of
+    /// Returns an iterator visiting all elements in arbitrary order starting from the specified hash of
     /// a value. The iterator element type is V.
     ///
     /// # Examples
@@ -212,7 +212,7 @@ where
         }
     }
 
-    /// An iterator visiting hashes of all elements in ascending order. The iterator element type
+    /// Returns an iterator visiting hashes of all elements in ascending order. The iterator element type
     /// is [Hash](../../crypto/struct.Hash.html).
     ///
     /// # Examples
@@ -235,7 +235,7 @@ where
         }
     }
 
-    /// An iterator visiting hashes of all elements in ascending order starting from the specified
+    /// Returns an iterator visiting hashes of all elements in ascending order starting from the specified
     /// hash. The iterator element type is [Hash](../../crypto/struct.Hash.html).
     ///
     /// # Examples
@@ -307,7 +307,7 @@ where
         self.remove_by_hash(&item.hash())
     }
 
-    /// Removes a value from the set by the specified hash.
+    /// Removes a value corresponding to the specified hash from the set.
     ///
     /// # Examples
     ///
@@ -334,8 +334,8 @@ where
     /// Clears the set, removing all values.
     ///
     /// # Notes
-    /// Currently this method is not optimized to delete large set of data. During the execution of
-    /// this method the amount of allocated memory is linearly dependent on the number of elements
+    /// Currently, this method is not optimized to delete a large set of data. During the execution of
+    /// this method, the amount of allocated memory is linearly dependent on the number of elements
     /// in the index.
     ///
     /// # Examples

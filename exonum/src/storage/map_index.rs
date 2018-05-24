@@ -34,10 +34,10 @@ pub struct MapIndex<T, K, V> {
     _v: PhantomData<V>,
 }
 
-/// An iterator over the entries of a `MapIndex`.
+/// Returns an iterator over the entries of a `MapIndex`.
 ///
 /// This struct is created by the [`iter`] or
-/// [`iter_from`] method of [`MapIndex`]. See its documentation for additional details.
+/// [`iter_from`] method on [`MapIndex`]. See its documentation for additional details.
 ///
 /// [`iter`]: struct.MapIndex.html#method.iter
 /// [`iter_from`]: struct.MapIndex.html#method.iter_from
@@ -47,10 +47,10 @@ pub struct MapIndexIter<'a, K, V> {
     base_iter: BaseIndexIter<'a, K, V>,
 }
 
-/// An iterator over the keys of a `MapIndex`.
+/// Returns an iterator over the keys of a `MapIndex`.
 ///
 /// This struct is created by the [`keys`] or
-/// [`keys_from`] method of [`MapIndex`]. See its documentation for additional details.
+/// [`keys_from`] method on [`MapIndex`]. See its documentation for additional details.
 ///
 /// [`keys`]: struct.MapIndex.html#method.keys
 /// [`keys_from`]: struct.MapIndex.html#method.keys_from
@@ -60,10 +60,10 @@ pub struct MapIndexKeys<'a, K> {
     base_iter: BaseIndexIter<'a, K, ()>,
 }
 
-/// An iterator over the values of a `MapIndex`.
+/// Returns an iterator over the values of a `MapIndex`.
 ///
 /// This struct is created by the [`values`] or
-/// [`values_from`] method of [`MapIndex`]. See its documentation for additional details.
+/// [`values_from`] method on [`MapIndex`]. See its documentation for additional details.
 ///
 /// [`values`]: struct.MapIndex.html#method.values
 /// [`values_from`]: struct.MapIndex.html#method.values_from
@@ -388,8 +388,8 @@ where
     /// Clears a map, removing all entries.
     ///
     /// # Notes
-    /// Currently this method is not optimized to delete a large set of data. During the execution of
-    /// this method the amount of allocated memory is linearly dependent on the number of elements
+    /// Currently, this method is not optimized to delete a large set of data. During the execution of
+    /// this method, the amount of allocated memory is linearly dependent on the number of elements
     /// in the index.
     ///
     /// # Examples
