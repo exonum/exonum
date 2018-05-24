@@ -141,6 +141,7 @@ mod tests {
     use events::error::{into_other, log_error};
     use events::codec::MessagesCodec;
     use crypto::{gen_keypair_from_seed, Seed};
+    use std::time::Duration;
 
     #[derive(Debug, PartialEq, Copy, Clone)]
     pub enum HandshakeStep {
@@ -173,6 +174,9 @@ mod tests {
             run_handshake_listener(&addr2).unwrap();
         });
 
+        // Wait until listener is initialized.
+        thread::sleep(Duration::from_millis(500));
+
         let res = send_handshake(&addr, HandshakeStep::Default);
         assert!(res.is_ok());
     }
@@ -181,6 +185,9 @@ mod tests {
     fn test_noise_handshake_errors() {
         let addr: SocketAddr = "127.0.0.1:45002".parse().unwrap();
         let addr2 = addr.clone();
+
+        // Wait until listener is initialized.
+        thread::sleep(Duration::from_millis(500));
 
         thread::spawn(move || run_handshake_listener(&addr2));
 
