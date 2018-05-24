@@ -21,7 +21,7 @@ use std::net::SocketAddr;
 use std::thread;
 use std::time::{self, Duration};
 
-use crypto::{gen_keypair, gen_keypair_from_seed, PublicKey, Seed, Signature};
+use crypto::{gen_keypair, gen_keypair_from_seed, PublicKey, SecretKey, Seed, Signature};
 use messages::{Connect, Message, MessageWriter, RawMessage};
 use events::{NetworkEvent, NetworkRequest};
 use events::network::{NetworkConfiguration, NetworkPart};
@@ -30,6 +30,8 @@ use node::{EventsPoolCapacity, NodeChannel};
 use blockchain::ConsensusConfig;
 use helpers::user_agent;
 use events::noise::HandshakeParams;
+use env_logger;
+use node::ConnectList;
 
 #[derive(Debug)]
 pub struct TestHandler {
@@ -132,6 +134,7 @@ pub struct TestEvents {
     pub listen_address: SocketAddr,
     pub network_config: NetworkConfiguration,
     pub events_config: EventsPoolCapacity,
+    pub connect_list: ConnectList,
 }
 
 impl TestEvents {
@@ -140,18 +143,55 @@ impl TestEvents {
             listen_address,
             network_config: NetworkConfiguration::default(),
             events_config: EventsPoolCapacity::default(),
+            connect_list: ConnectList::default(),
+        }
+    }
+
+    pub fn with_connect_list(listen_address: SocketAddr, connect_list: ConnectList) -> TestEvents {
+        TestEvents {
+            listen_address,
+            network_config: NetworkConfiguration::default(),
+            events_config: EventsPoolCapacity::default(),
+            connect_list
         }
     }
 
     pub fn spawn(self) -> TestHandler {
+        let connect_list = self.connect_list.clone();
         let (mut handler_part, network_part) = self.into_reactor();
         let handle = thread::spawn(move || {
             let mut core = Core::new().unwrap();
             let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([0; 32]));
+            let secret_key2 = secret_key.clone();
+            let secret_key2 = &secret_key2[0..];
+            info!("secret key {:?}", secret_key2);
             let handshake_params = HandshakeParams {
                 public_key,
                 secret_key,
                 max_message_len: network_part.max_message_len,
+                connect_list,
+            };
+            let fut = network_part.run(&core.handle(), &handshake_params);
+            core.run(fut).map_err(log_error).unwrap();
+        });
+        handler_part.handle = Some(handle);
+        handler_part
+    }
+
+    pub fn spawn2(self, secret_key: SecretKey) -> TestHandler {
+        let connect_list = self.connect_list.clone();
+        let (mut handler_part, network_part) = self.into_reactor();
+        let handle = thread::spawn(move || {
+            let mut core = Core::new().unwrap();
+            let (public_key, _) = gen_keypair_from_seed(&Seed::new([0; 32]));
+            let secret_key2 = secret_key.clone();
+            let secret_key2 = &secret_key2[0..];
+            info!("secret key2 {:?}", secret_key2);
+            let handshake_params = HandshakeParams {
+                public_key,
+                secret_key,
+                max_message_len: network_part.max_message_len,
+                connect_list,
             };
             let fut = network_part.run(&core.handle(), &handshake_params);
             core.run(fut).map_err(log_error).unwrap();

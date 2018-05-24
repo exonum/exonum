@@ -19,6 +19,7 @@
 
 pub use self::state::{RequestData, State, ValidatorState};
 pub use self::whitelist::Whitelist;
+pub use self::connect_list::ConnectList;
 
 pub mod state; // TODO: temporary solution to get access to WAIT constants (ECR-167)
 
@@ -56,6 +57,7 @@ mod basic;
 mod consensus;
 mod requests;
 mod whitelist;
+mod connect_list;
 
 /// External messages.
 #[derive(Debug)]
@@ -924,6 +926,7 @@ impl Node {
             public_key: *self.handler().state().consensus_public_key(),
             secret_key: self.handler().state().consensus_secret_key().clone(),
             max_message_len: self.max_message_len,
+            connect_list: ConnectList::default(),
         };
         self.run_handler(&handshake_params)?;
 

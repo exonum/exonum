@@ -111,6 +111,7 @@ mod test {
     use events::noise::wrapper::NoiseWrapper;
     use events::noise::HandshakeParams;
     use crypto::{gen_keypair_from_seed, Seed};
+    use node::ConnectList;
 
     #[test]
     fn decode_message_valid_header_size() {
@@ -155,9 +156,12 @@ mod test {
             public_key,
             secret_key,
             max_message_len: 1024,
+            connect_list: ConnectList::default(),
         };
 
-        let mut initiator = NoiseWrapper::initiator(&params).session;
+        let peer = "127.0.0.1".parse().unwrap();
+
+        let mut initiator = NoiseWrapper::initiator(&params, &peer).session;
         let mut responder = NoiseWrapper::responder(&params).session;
 
         let mut buffer_msg = vec![0u8; 1024];

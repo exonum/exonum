@@ -154,7 +154,7 @@ impl ConnectionsPool {
                 Ok(sock)
             })
             .and_then(move |sock| {
-                NoiseHandshake::send(&handshake_params, sock).and_then(|framed|{
+                NoiseHandshake::send(&handshake_params, sock, &peer).and_then(|framed|{
                     Ok(framed)
                 })
             })

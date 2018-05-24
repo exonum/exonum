@@ -15,12 +15,14 @@
 use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
 use snow::{NoiseBuilder, Session};
+use crypto::PUBLIC_KEY_LENGTH;
 
 use std::fmt;
 use std::fmt::{Error, Formatter};
 use std::io;
 
 use events::noise::HandshakeParams;
+use std::net::SocketAddr;
 
 pub const NOISE_MAX_MESSAGE_LENGTH: usize = 65_535;
 pub const TAG_LENGTH: usize = 16;
@@ -30,7 +32,7 @@ pub const HANDSHAKE_HEADER_LENGTH: usize = 2;
 // We choose XX pattern since it provides mutual authentication and
 // transmission of static public keys.
 // See: https://noiseprotocol.org/noise.html#interactive-patterns
-static PARAMS: &str = "Noise_XX_25519_ChaChaPoly_BLAKE2s";
+static PARAMS: &str = "Noise_XK_25519_ChaChaPoly_BLAKE2s";
 
 /// Wrapper around noise session to provide latter convenient interface.
 pub struct NoiseWrapper {
@@ -38,23 +40,34 @@ pub struct NoiseWrapper {
 }
 
 impl NoiseWrapper {
-    pub fn responder(params: &HandshakeParams) -> Self {
+
+    pub fn initiator(params: &HandshakeParams, peer: &SocketAddr) -> Self {
         let builder: NoiseBuilder = Self::noise_builder(params);
-        let private_key = builder.generate_private_key().unwrap();
+        let private_key = &params.secret_key[..PUBLIC_KEY_LENGTH];
+
+
+        info!("connect list {:?}", params.connect_list);
+
+        let remote_key = params.connect_list.peers.get(peer).expect("Peer is not in the connect list.");
+
+        info!("remote key {:?}", remote_key.as_ref());
         let session = builder
             .local_private_key(&private_key)
-            .build_responder()
+            .remote_public_key(remote_key.as_ref())
+            .build_initiator()
             .unwrap();
 
         NoiseWrapper { session }
     }
 
-    pub fn initiator(params: &HandshakeParams) -> Self {
+    pub fn responder(params: &HandshakeParams) -> Self {
         let builder: NoiseBuilder = Self::noise_builder(params);
-        let private_key = builder.generate_private_key().unwrap();
+        let private_key = &params.secret_key[..PUBLIC_KEY_LENGTH];
+        info!("responder secret key {:?}", private_key);
+
         let session = builder
             .local_private_key(&private_key)
-            .build_initiator()
+            .build_responder()
             .unwrap();
 
         NoiseWrapper { session }
@@ -183,4 +196,51 @@ impl From<NoiseError> for io::Error {
     fn from(e: NoiseError) -> Self {
         io::Error::new(io::ErrorKind::Other, e.message)
     }
+}
+
+
+#[cfg(test)]
+mod test {
+
+    use events::tests::TestEvents;
+    use node::ConnectList;
+    use std::collections::HashMap;
+    use crypto::{Seed, gen_keypair_from_seed};
+    use std::net::SocketAddr;
+    use events::tests::connect_message;
+    use env_logger;
+
+    #[test]
+    fn test_connect_list() {
+        env_logger::init();
+        let first: SocketAddr = "127.0.0.1:17230".parse().unwrap();
+        let second:SocketAddr = "127.0.0.1:17231".parse().unwrap();
+
+        let mut peers = HashMap::new();
+
+        let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([0; 32]));
+
+        let addr = second.clone();
+        peers.insert(addr, public_key);
+
+        info!("remote public_key {:?}", public_key.as_ref());
+
+        let connect_list = ConnectList { peers };
+
+        info!("connect list {:?}", connect_list);
+
+        let e1 = TestEvents::with_connect_list(first, connect_list);
+        let e2 = TestEvents::with_addr(second);
+        let c1 = connect_message(first);
+
+        let mut e1 = e1.spawn();
+        let mut e2 = e2.spawn2(secret_key);
+
+        e1.connect_with(second);
+
+        assert_eq!(e2.wait_for_connect(), c1);
+
+
+    }
+
 }

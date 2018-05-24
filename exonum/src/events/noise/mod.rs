@@ -20,8 +20,10 @@ use tokio_io::{AsyncRead, codec::Framed, io::{read_exact, write_all}};
 use std::io;
 
 use crypto::{PublicKey, SecretKey};
+use node::ConnectList;
 use events::codec::MessagesCodec;
 use events::noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH};
+use std::net::SocketAddr;
 
 pub mod wrapper;
 
@@ -33,6 +35,7 @@ pub struct HandshakeParams {
     pub public_key: PublicKey,
     pub secret_key: SecretKey,
     pub max_message_len: u32,
+    pub connect_list: ConnectList,
 }
 
 #[derive(Debug)]
@@ -43,8 +46,8 @@ impl NoiseHandshake {
         listen_handshake(stream, params)
     }
 
-    pub fn send(params: &HandshakeParams, stream: TcpStream) -> HandshakeResult {
-        send_handshake(stream, params)
+    pub fn send(params: &HandshakeParams, stream: TcpStream, peer: &SocketAddr) -> HandshakeResult {
+        send_handshake(stream, params, peer)
     }
 }
 
@@ -67,9 +70,9 @@ fn listen_handshake(stream: TcpStream, params: &HandshakeParams) -> HandshakeRes
     Box::new(framed)
 }
 
-fn send_handshake(stream: TcpStream, params: &HandshakeParams) -> HandshakeResult {
+fn send_handshake(stream: TcpStream, params: &HandshakeParams, peer: &SocketAddr) -> HandshakeResult {
     let max_message_len = params.max_message_len;
-    let mut noise = NoiseWrapper::initiator(params);
+    let mut noise = NoiseWrapper::initiator(params, peer);
     let framed = write_handshake_msg(&mut noise)
         .and_then(|(len, buf)| write(stream, &buf, len))
         .and_then(|(stream, _msg)| read(stream))
