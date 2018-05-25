@@ -45,12 +45,10 @@ impl NoiseWrapper {
         let builder: NoiseBuilder = Self::noise_builder(params);
         let private_key = &params.secret_key[..PUBLIC_KEY_LENGTH];
 
-
-        info!("connect list {:?}", params.connect_list);
-
         let remote_key = params.connect_list.peers.get(peer).expect("Peer is not in the connect list.");
 
-        info!("remote key {:?}", remote_key.as_ref());
+        info!("initiator public key {:?}, secret key {:?}", params.public_key, params.secret_key);
+        info!("remote public key {:?}", remote_key);
         let session = builder
             .local_private_key(&private_key)
             .remote_public_key(remote_key.as_ref())
@@ -63,7 +61,7 @@ impl NoiseWrapper {
     pub fn responder(params: &HandshakeParams) -> Self {
         let builder: NoiseBuilder = Self::noise_builder(params);
         let private_key = &params.secret_key[..PUBLIC_KEY_LENGTH];
-        info!("responder secret key {:?}", private_key);
+        info!("responder public key {:?}, secret key {:?}", params.public_key, private_key);
 
         let session = builder
             .local_private_key(&private_key)
@@ -209,6 +207,21 @@ mod test {
     use std::net::SocketAddr;
     use events::tests::connect_message;
     use env_logger;
+    use std::io;
+    use tokio_core::reactor::Core;
+    use snow::NoiseBuilder;
+    use crypto::gen_keypair;
+    use snow::DefaultResolver;
+    use snow::CryptoResolver;
+    use snow::types::Random;
+    use snow::params::DHChoice;
+    use snow::types::Dh;
+    use snow::params::HashChoice;
+    use snow::types::Hash;
+    use snow::params::CipherChoice;
+    use snow::types::Cipher;
+    use std::marker::Send;
+    use snow::wrappers::rand_wrapper::RandomOs;
 
     #[test]
     fn test_connect_list() {
@@ -218,23 +231,18 @@ mod test {
 
         let mut peers = HashMap::new();
 
-        let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([0; 32]));
-
+        // Create connect list
+        let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([2; 32]));
         let addr = second.clone();
         peers.insert(addr, public_key);
-
-        info!("remote public_key {:?}", public_key.as_ref());
-
         let connect_list = ConnectList { peers };
-
-        info!("connect list {:?}", connect_list);
 
         let e1 = TestEvents::with_connect_list(first, connect_list);
         let e2 = TestEvents::with_addr(second);
         let c1 = connect_message(first);
 
         let mut e1 = e1.spawn();
-        let mut e2 = e2.spawn2(secret_key);
+        let mut e2 = e2.spawn2(public_key, secret_key);
 
         e1.connect_with(second);
 
@@ -242,5 +250,6 @@ mod test {
 
 
     }
+
 
 }

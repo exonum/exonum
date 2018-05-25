@@ -138,6 +138,7 @@ pub struct TestEvents {
 }
 
 impl TestEvents {
+
     pub fn with_addr(listen_address: SocketAddr) -> TestEvents {
         TestEvents {
             listen_address,
@@ -161,10 +162,7 @@ impl TestEvents {
         let (mut handler_part, network_part) = self.into_reactor();
         let handle = thread::spawn(move || {
             let mut core = Core::new().unwrap();
-            let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([0; 32]));
-            let secret_key2 = secret_key.clone();
-            let secret_key2 = &secret_key2[0..];
-            info!("secret key {:?}", secret_key2);
+            let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
             let handshake_params = HandshakeParams {
                 public_key,
                 secret_key,
@@ -178,15 +176,11 @@ impl TestEvents {
         handler_part
     }
 
-    pub fn spawn2(self, secret_key: SecretKey) -> TestHandler {
+    pub fn spawn2(self, public_key: PublicKey, secret_key: SecretKey) -> TestHandler {
         let connect_list = self.connect_list.clone();
         let (mut handler_part, network_part) = self.into_reactor();
         let handle = thread::spawn(move || {
             let mut core = Core::new().unwrap();
-            let (public_key, _) = gen_keypair_from_seed(&Seed::new([0; 32]));
-            let secret_key2 = secret_key.clone();
-            let secret_key2 = &secret_key2[0..];
-            info!("secret key2 {:?}", secret_key2);
             let handshake_params = HandshakeParams {
                 public_key,
                 secret_key,

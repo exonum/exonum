@@ -141,6 +141,8 @@ pub struct ListenerConfig {
     pub whitelist: Whitelist,
     /// Socket address.
     pub address: SocketAddr,
+    /// Connect list
+    pub connect_list: ConnectList,
 }
 
 /// An api configuration options.
@@ -352,6 +354,8 @@ pub struct NodeConfig {
     /// Optional database configuration.
     #[serde(default)]
     pub database: DbOptions,
+    /// Connect list
+    pub connect_list: ConnectList,
 }
 
 /// Configuration for the `NodeHandler`.
@@ -431,6 +435,7 @@ impl NodeHandler {
             last_hash,
             last_height,
             system_state.current_time(),
+            config.listener.connect_list,
         );
 
         NodeHandler {
@@ -827,6 +832,7 @@ impl Node {
                 consensus_secret_key: node_cfg.consensus_secret_key,
                 whitelist: node_cfg.whitelist,
                 address: node_cfg.listen_address,
+                connect_list: node_cfg.connect_list,
             },
             service: ServiceConfig {
                 service_public_key: node_cfg.service_public_key,
@@ -923,10 +929,10 @@ impl Node {
         };
 
         let handshake_params = HandshakeParams {
-            public_key: *self.handler().state().consensus_public_key(),
-            secret_key: self.handler().state().consensus_secret_key().clone(),
+            public_key: *self.state().consensus_public_key(),
+            secret_key: self.state().consensus_secret_key().clone(),
             max_message_len: self.max_message_len,
-            connect_list: ConnectList::default(),
+            connect_list: self.state().connect_list().clone(),
         };
         self.run_handler(&handshake_params)?;
 

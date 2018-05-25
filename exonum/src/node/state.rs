@@ -28,6 +28,7 @@ use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 use node::whitelist::Whitelist;
+use node::ConnectList;
 
 // TODO: move request timeouts into node configuration (ECR-171)
 
@@ -86,6 +87,8 @@ pub struct State {
 
     // Current value of the propose timeout.
     propose_timeout: Milliseconds,
+
+    connect_list: ConnectList,
 }
 
 /// State of a validator-node.
@@ -367,6 +370,7 @@ impl State {
         last_hash: Hash,
         last_height: Height,
         height_start_time: SystemTime,
+        connect_list: ConnectList,
     ) -> Self {
         State {
             validator_state: validator_id.map(ValidatorState::new),
@@ -404,6 +408,7 @@ impl State {
 
             propose_timeout: stored.consensus.max_propose_timeout,
             config: stored,
+            connect_list,
         }
     }
 
@@ -1046,5 +1051,10 @@ impl State {
     /// Updates the `Connect` message of the current node.
     pub fn set_our_connect_message(&mut self, msg: Connect) {
         self.our_connect_message = msg;
+    }
+
+    /// Returns node's whitelist.
+    pub fn connect_list(&self) -> &ConnectList {
+        &self.connect_list
     }
 }

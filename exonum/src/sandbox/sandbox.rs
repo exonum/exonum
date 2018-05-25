@@ -584,6 +584,7 @@ impl Sandbox {
                 consensus_public_key: *inner.handler.state.consensus_public_key(),
                 consensus_secret_key: inner.handler.state.consensus_secret_key().clone(),
                 whitelist: Default::default(),
+                connect_list: Default::default(),
             },
             service: ServiceConfig {
                 service_public_key: *inner.handler.state.service_public_key(),
@@ -716,6 +717,7 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandb
             consensus_public_key: validators[0].0,
             consensus_secret_key: validators[0].1.clone(),
             whitelist: Default::default(),
+            connect_list: Default::default(),
         },
         service: ServiceConfig {
             service_public_key: service_keys[0].0,

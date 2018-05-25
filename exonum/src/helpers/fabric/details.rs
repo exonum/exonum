@@ -614,6 +614,9 @@ impl Command for Finalize {
 
         context.set(keys::AUDITOR_MODE, our.is_none());
 
+        //TODO: добавить в результирующий конфиг connect list
+        info!("validators list: {:?}", list);
+
         let peers = list.iter().map(|c| c.addr).collect();
 
         let genesis = Self::genesis_from_template(common.clone(), &list);
@@ -640,6 +643,8 @@ impl Command for Finalize {
                 mempool: Default::default(),
                 services_configs: Default::default(),
                 database: Default::default(),
+                //TODO: Вставить сюда формирование конфига
+                connect_list: Default::default(),
             }
         };
 

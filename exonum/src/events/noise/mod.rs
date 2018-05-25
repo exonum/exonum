@@ -55,16 +55,17 @@ fn listen_handshake(stream: TcpStream, params: &HandshakeParams) -> HandshakeRes
     let max_message_len = params.max_message_len;
     let mut noise = NoiseWrapper::responder(params);
     let framed = read(stream).and_then(move |(stream, msg)| {
-        let _buf = noise.read_handshake_msg(&msg);
-        write_handshake_msg(&mut noise)
-            .and_then(|(len, buf)| write(stream, &buf, len))
-            .and_then(|(stream, _msg)| read(stream))
-            .and_then(move |(stream, msg)| {
-                let _buf = noise.read_handshake_msg(&msg);
-                let noise = noise.into_transport_mode()?;
-                let framed = stream.framed(MessagesCodec::new(max_message_len, noise));
-                Ok(framed)
-            })
+        read_handshake_msg(&msg, &mut noise).and_then(move |_| {
+            write_handshake_msg(&mut noise)
+                .and_then(|(len, buf)| write(stream, &buf, len))
+                .and_then(|(stream, _msg)| read(stream))
+                .and_then(move |(stream, msg)| {
+                    noise.read_handshake_msg(&msg)?;
+                    let noise = noise.into_transport_mode()?;
+                    let framed = stream.framed(MessagesCodec::new(max_message_len, noise));
+                    Ok(framed)
+                })
+        })
     });
 
     Box::new(framed)
@@ -77,14 +78,15 @@ fn send_handshake(stream: TcpStream, params: &HandshakeParams, peer: &SocketAddr
         .and_then(|(len, buf)| write(stream, &buf, len))
         .and_then(|(stream, _msg)| read(stream))
         .and_then(move |(stream, msg)| {
-            let _buf = noise.read_handshake_msg(&msg);
-            write_handshake_msg(&mut noise)
-                .and_then(|(len, buf)| write(stream, &buf, len))
-                .and_then(move |(stream, _msg)| {
-                    let noise = noise.into_transport_mode()?;
-                    let framed = stream.framed(MessagesCodec::new(max_message_len, noise));
-                    Ok(framed)
-                })
+            read_handshake_msg(&msg, &mut noise).and_then(move |_| {
+                write_handshake_msg(&mut noise)
+                    .and_then(|(len, buf)| write(stream, &buf, len))
+                    .and_then(move |(stream, _msg)| {
+                        let noise = noise.into_transport_mode()?;
+                        let framed = stream.framed(MessagesCodec::new(max_message_len, noise));
+                        Ok(framed)
+                    })
+            })
         });
 
     Box::new(framed)
@@ -113,5 +115,13 @@ fn write_handshake_msg(
     noise: &mut NoiseWrapper,
 ) -> Box<Future<Item = (usize, Vec<u8>), Error = io::Error>> {
     let res = noise.write_handshake_msg();
+    Box::new(done(res.map_err(|e| e.into())))
+}
+
+pub fn read_handshake_msg(
+    input: &[u8],
+    noise: &mut NoiseWrapper,
+) -> Box<Future<Item = (usize, Vec<u8>), Error = io::Error>> {
+    let res = noise.read_handshake_msg(input);
     Box::new(done(res.map_err(|e| e.into())))
 }
