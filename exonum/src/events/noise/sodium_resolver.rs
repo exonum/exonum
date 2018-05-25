@@ -1,8 +1,8 @@
 // use byteorder::{ByteOrder, BigEndian, LittleEndian};
 // use snow::constants::TAGLEN;
 use snow::{CryptoResolver, DefaultResolver};
-use snow::params::{DHChoice, HashChoice, CipherChoice};
-use snow::types::{Random, Dh, Hash, Cipher};
+use snow::params::{CipherChoice, DHChoice, HashChoice};
+use snow::types::{Cipher, Dh, Hash, Random};
 
 use rand::{thread_rng, Rng};
 
@@ -18,7 +18,9 @@ pub struct SodiumResolver {
 
 impl SodiumResolver {
     pub fn new() -> Self {
-        SodiumResolver { parent: DefaultResolver }
+        SodiumResolver {
+            parent: DefaultResolver,
+        }
     }
 }
 
@@ -30,7 +32,7 @@ impl CryptoResolver for SodiumResolver {
     fn resolve_dh(&self, choice: &DHChoice) -> Option<Box<Dh + Send>> {
         match *choice {
             DHChoice::Curve25519 => Some(Box::new(SodiumDh25519::default())),
-            _                    => self.parent.resolve_dh(choice),
+            _ => self.parent.resolve_dh(choice),
         }
     }
 
@@ -54,14 +56,14 @@ impl Default for SodiumRandom {
 
 impl Random for SodiumRandom {
     fn fill_bytes(&mut self, out: &mut [u8]) {
-        thread_rng().fill(out); 
+        thread_rng().fill(out);
     }
 }
 
 // Elliptic curve 25519.
 pub struct SodiumDh25519 {
     privkey: sodium_curve25519::Scalar,
-    pubkey:  sodium_curve25519::GroupElement,
+    pubkey: sodium_curve25519::GroupElement,
 }
 
 impl Default for SodiumDh25519 {
@@ -88,17 +90,19 @@ impl Dh for SodiumDh25519 {
     }
 
     fn set(&mut self, privkey: &[u8]) {
-        self.privkey = sodium_curve25519::Scalar::from_slice(privkey).expect("Can't construct private key for Dh25519");
+        self.privkey = sodium_curve25519::Scalar::from_slice(privkey)
+            .expect("Can't construct private key for Dh25519");
         self.pubkey = sodium_curve25519::scalarmult_base(&self.privkey);
     }
 
     fn generate(&mut self, rng: &mut Random) {
         let mut privkey_bytes: [u8; 32];
         rng.fill_bytes(&mut privkey_bytes);
-        privkey_bytes[0]  &= 248;
+        privkey_bytes[0] &= 248;
         privkey_bytes[31] &= 127;
         privkey_bytes[31] |= 64;
-        self.privkey = sodium_curve25519::Scalar::from_slice(&privkey_bytes).expect("Can't construct private key for Dh25519");
+        self.privkey = sodium_curve25519::Scalar::from_slice(&privkey_bytes)
+            .expect("Can't construct private key for Dh25519");
         self.pubkey = sodium_curve25519::scalarmult_base(&self.privkey);
     }
 
@@ -111,9 +115,10 @@ impl Dh for SodiumDh25519 {
     }
 
     fn dh(&self, pubkey: &[u8], out: &mut [u8]) {
-        let pubkey = sodium_curve25519::GroupElement::from_slice(pubkey).expect("Can't construct public key for Dh25519");
-        let result = sodium_curve25519::scalarmult(&self.privkey, &pubkey).expect("Can't calculate dh");
+        let pubkey = sodium_curve25519::GroupElement::from_slice(pubkey)
+            .expect("Can't construct public key for Dh25519");
+        let result =
+            sodium_curve25519::scalarmult(&self.privkey, &pubkey).expect("Can't calculate dh");
         out.clone_from_slice(&result[0..32])
     }
-
 }

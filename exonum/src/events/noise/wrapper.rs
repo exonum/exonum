@@ -152,7 +152,8 @@ impl NoiseWrapper {
 
     fn noise_builder(params: &HandshakeParams) -> NoiseBuilder {
         let public_key = params.public_key.as_ref();
-        NoiseBuilder::with_resolver(PARAMS.parse().unwrap(), Box::new(SodiumResolver::new())).remote_public_key(public_key)
+        NoiseBuilder::with_resolver(PARAMS.parse().unwrap(), Box::new(SodiumResolver::new()))
+            .remote_public_key(public_key)
     }
 }
 
