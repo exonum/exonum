@@ -12,7 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Exonum global variables which stored in blockchain as utf8 encoded json.
+//! Exonum global variables which are stored in the blockchain as UTF-8 encoded
+//! JSON.
+//!
+//! This module includes all the elements of the `StoredConfiguration` which is
+//! used as the global configuration of the blockchain and should be the same for
+//! all validators in the network. The configuration includes the public keys of
+//! validators, consensus related parameters, hash of the previous configuration,
+//! etc.
 
 use serde::de::Error;
 use serde_json::{self, Error as JsonError};
@@ -23,53 +30,87 @@ use storage::StorageValue;
 use crypto::{hash, CryptoHash, Hash, PublicKey};
 use helpers::{Height, Milliseconds};
 
-/// Public keys of a validator.
+/// Public keys of a validator. Each validator has two public keys: the
+/// `consensus_key` is used for internal operations in the consensus process,
+/// while the `service_key` is used in services.
 #[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ValidatorKeys {
     /// Consensus key is used for messages related to the consensus algorithm.
-    #[doc(hidden)]
     pub consensus_key: PublicKey,
-    /// Service key is used for services.
+    /// Service key is used for services, for example, the configuration
+    /// updater service, the anchoring service, etc.
     pub service_key: PublicKey,
 }
 
-/// Exonum blockchain global configuration.
-/// This configuration must be same for any exonum node in the certain network on given height.
+/// Exonum blockchain global configuration. Services
+/// and their parameters are also included into this configuration.
+///
+/// This configuration must be the same for any Exonum node in a certain
+/// network on the given height.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct StoredConfiguration {
-    /// Link to the previous configuration.
-    /// For configuration in the genesis block `hash` is just an array of zeros.
+    /// Hash of the previous configuration, which can be used to find that
+    /// configuration. For the configuration in the genesis block,
+    /// `hash` is just an array of zeros.
     pub previous_cfg_hash: Hash,
-    /// The height, starting from which this configuration becomes actual.
+    /// The height, starting from which this configuration becomes actual. Note
+    /// that this height should be big enough for the nodes to accept the new
+    /// configuration before this height is reached. Otherwise, the new
+    /// configuration will not take effect at all; the old configuration will
+    /// remain actual.
     pub actual_from: Height,
-    /// List of validators' consensus and service public keys.
+    /// List of validators consensus and service public keys.
     pub validator_keys: Vec<ValidatorKeys>,
     /// Consensus algorithm parameters.
     pub consensus: ConsensusConfig,
-    /// Number of votes required to commit new configuration.
-    /// Should be greater than 2/3 and less or equal to the validators count.
+    /// Number of votes required to commit the new configuration.
+    /// This value should be greater than 2/3 and less or equal to the
+    /// validators count.
     pub majority_count: Option<u16>,
     /// Services specific variables.
-    /// Keys are `service_name` from `Service` trait and values are the serialized json.
+    /// Keys are `service_name` from the `Service` trait and values are the serialized JSON.
     #[serde(default)]
     pub services: BTreeMap<String, serde_json::Value>,
 }
 
 /// Consensus algorithm parameters.
 ///
-/// Default propose timeout values along with threshold are chosen for maximal performance. In order
-/// to slow down blocks generation (hence consume less disk space) these values can be increased.
+/// This configuration is initially created with default recommended values,
+/// which can later be edited as required.
+/// The parameters in this configuration should be the same for all nodes in the network and can
+/// be changed using the
+/// [configuration updater service](https://exonum.com/doc/advanced/configuration-updater/).
+///
+/// Default propose timeout value, along with the threshold, is chosen for maximal performance. In order
+/// to slow down block generation,hence consume less disk space, these values can be increased.
+///
+/// For additional information on the Exonum consensus algorithm, refer to
+/// [Consensus in Exonum](https://exonum.com/doc/architecture/consensus/).
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct ConsensusConfig {
-    /// Interval between rounds.
+    /// Interval between rounds. This interval defines the time that passes
+    /// between the moment a new block is committed to the blockchain and the
+    /// time when a new round starts, regardless of whether a new block has
+    /// been committed during this period or not.
+    ///
+    /// Note that rounds in Exonum
+    /// do not have a defined end time. Nodes in a new round can
+    /// continue to vote for proposals and process messages related to previous
+    /// rounds.
     pub round_timeout: Milliseconds,
-    /// Period of sending a Status message.
+    /// Period of sending a Status message. This parameter defines the frequency
+    /// with which a node broadcasts its status message to the network.
     pub status_timeout: Milliseconds,
-    /// Peer exchange timeout.
+    /// Peer exchange timeout. This parameter defines the frequency with which
+    /// a node requests collected `Connect` messages from a random peer
+    /// node in the network.
     pub peers_timeout: Milliseconds,
     /// Maximum number of transactions per block.
     pub txs_block_limit: u32,
-    /// Maximum message length (in bytes).
+    /// Maximum message length (in bytes). This parameter determines the maximum
+    /// size of both consensus messages and transactions. The default value of the
+    /// parameter is 1 MB (1024 * 1024 bytes). The range of possible values for this
+    /// parameter is between 1MB and 2^32-1 bytes.
     pub max_message_len: u32,
     /// Minimal propose timeout.
     pub min_propose_timeout: Milliseconds,
@@ -130,12 +171,15 @@ impl Default for ConsensusConfig {
 }
 
 impl StoredConfiguration {
-    /// Tries to serialize given configuration into the utf8 encoded json.
+    /// Tries to serialize the given configuration into a UTF-8 encoded JSON.
+    /// The method returns either the result of execution or an error.
     pub fn try_serialize(&self) -> Result<Vec<u8>, JsonError> {
         serde_json::to_vec(&self)
     }
 
-    /// Tries to deserialize `StorageConfiguration` from the given utf8 encoded json.
+    /// Tries to deserialize `StorageConfiguration` from the given UTF-8 encoded
+    /// JSON. Additionally, this method performs a logic validation of the
+    /// configuration. The method returns either the result of execution or an error.
     pub fn try_deserialize(serialized: &[u8]) -> Result<StoredConfiguration, JsonError> {
         let config: StoredConfiguration = serde_json::from_slice(serialized)?;
 

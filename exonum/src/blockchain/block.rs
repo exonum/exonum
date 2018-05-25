@@ -22,22 +22,23 @@ pub const SCHEMA_MAJOR_VERSION: u16 = 0;
 encoding_struct!(
     /// Exonum block header data structure.
     ///
-    /// Block is essentially a list of transactions, which is
+    /// A block is essentially a list of transactions, which is
     /// a result of the consensus algorithm (thus authenticated by the supermajority of validators)
     /// and is applied atomically to the blockchain state.
     ///
-    /// Header only contains the amount of transactions and the transactions root hash as well as
+    /// The header only contains the amount of transactions and the transactions root hash as well as
     /// other information, but not the transactions themselves.
     struct Block {
-        /// Information schema version.
+        /// Schema version.
         schema_version: u16,
-        /// Identifier of the block proposer.
+        /// Identifier of the leader node which has proposed the block.
         proposer_id: ValidatorId,
-        /// Height of the block.
+        /// Height of the block, which is also the number of this particular
+        /// block in the blockchain.
         height: Height,
-        /// Number of transactions in block.
+        /// Number of transactions in this block.
         tx_count: u32,
-        /// Hash link to the previous block in blockchain.
+        /// Hash link to the previous block in the blockchain.
         prev_hash: &Hash,
         /// Root hash of the Merkle tree of transactions in this block.
         tx_hash: &Hash,
@@ -46,12 +47,18 @@ encoding_struct!(
     }
 );
 
-/// Block with pre-commits.
+/// Block with its `Precommit` messages.
+///
+/// This structure contains enough information to prove the correctness of
+/// a block. It consists of the block itself and the `Precommit`
+/// messages related to this block.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BlockProof {
-    /// Block.
+    /// Block header containing such information as the ID of the node which
+    /// proposed the block, the height of the block, the number of transactions
+    /// in the block, etc.
     pub block: Block,
-    /// List of pre-commits for the block.
+    /// List of `Precommit` messages for the block.
     pub precommits: Vec<Precommit>,
 }
 
