@@ -21,6 +21,7 @@ use std::fmt::{Error, Formatter};
 use std::io;
 
 use events::noise::HandshakeParams;
+use events::noise::sodium_resolver::SodiumResolver;
 
 pub const NOISE_MAX_MESSAGE_LENGTH: usize = 65_535;
 pub const TAG_LENGTH: usize = 16;
@@ -151,7 +152,7 @@ impl NoiseWrapper {
 
     fn noise_builder(params: &HandshakeParams) -> NoiseBuilder {
         let public_key = params.public_key.as_ref();
-        NoiseBuilder::new(PARAMS.parse().unwrap()).remote_public_key(public_key)
+        NoiseBuilder::with_resolver(PARAMS.parse().unwrap(), Box::new(SodiumResolver::new())).remote_public_key(public_key)
     }
 }
 
