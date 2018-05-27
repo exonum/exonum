@@ -17,9 +17,9 @@ extern crate exonum_testkit;
 #[macro_use]
 extern crate pretty_assertions;
 
-use exonum_testkit::{ApiKind, TestKitBuilder};
 use exonum::api::public::HealthCheckInfo;
 use exonum::helpers::user_agent;
+use exonum_testkit::{ApiKind, TestKitBuilder};
 
 #[test]
 fn test_healthcheck_connectivity_false() {

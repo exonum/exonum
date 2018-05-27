@@ -88,8 +88,8 @@ pub mod node;
 pub mod storage;
 #[macro_use]
 pub mod blockchain;
-pub mod explorer;
 pub mod api;
+pub mod explorer;
 
 mod events;
 #[cfg(test)]

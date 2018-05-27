@@ -15,20 +15,20 @@
 #![allow(unsafe_code)]
 
 use bit_vec::BitVec;
-use chrono::{Duration, Utc};
 use byteorder::{ByteOrder, LittleEndian};
-use uuid::Uuid;
+use chrono::{Duration, Utc};
 use rust_decimal::Decimal;
+use uuid::Uuid;
 
 use std::net::SocketAddr;
 use std::str::FromStr;
 
-use crypto::{gen_keypair, hash};
+use super::{CheckedOffset, Field, Offset};
 use blockchain::{self, Block, BlockProof};
+use crypto::{gen_keypair, hash};
+use helpers::{user_agent, Height, Round, ValidatorId};
 use messages::{BlockRequest, BlockResponse, Connect, Message, Precommit, Prevote, Propose,
                RawMessage, Status};
-use helpers::{user_agent, Height, Round, ValidatorId};
-use super::{CheckedOffset, Field, Offset};
 
 static VALIDATOR: ValidatorId = ValidatorId(65_123);
 static HEIGHT: Height = Height(123_123_123);

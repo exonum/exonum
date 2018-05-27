@@ -14,12 +14,12 @@
 
 use clap;
 
-use std::ffi::OsString;
 use std::collections::HashMap;
+use std::ffi::OsString;
 
-use super::{ArgumentType, Context};
-use super::internal::{CollectedCommand, Feedback};
 use super::CommandName;
+use super::internal::{CollectedCommand, Feedback};
+use super::{ArgumentType, Context};
 
 pub struct ClapBackend;
 

@@ -12,22 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use serde_json;
-use rand::{self, Rng, XorShiftRng};
 use rand::seq::sample_iter;
+use rand::{self, Rng, XorShiftRng};
+use serde_json;
 
 use std::cmp;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::hash::Hash as StdHash;
 
-use crypto::{hash, CryptoHash, Hash, HashStream};
-use storage::{Database, Fork, StorageValue};
-use encoding::serialize::reexport::{DeserializeOwned, Serialize};
-use super::{HashedKey, MapProof, MapProofError, ProofMapIndex, ProofMapKey, ProofPath};
 use super::key::{BitsRange, ChildKind, KEY_SIZE, LEAF_KEY_PREFIX};
 use super::node::BranchNode;
 use super::proof::MapProofBuilder;
+use super::{HashedKey, MapProof, MapProofError, ProofMapIndex, ProofMapKey, ProofPath};
+use crypto::{hash, CryptoHash, Hash, HashStream};
+use encoding::serialize::reexport::{DeserializeOwned, Serialize};
+use storage::{Database, Fork, StorageValue};
 
 const IDX_NAME: &'static str = "idx_name";
 
@@ -1339,8 +1339,8 @@ macro_rules! common_tests {
 
 mod memorydb_tests {
     use std::path::Path;
-    use tempdir::TempDir;
     use storage::{Database, MemoryDB};
+    use tempdir::TempDir;
 
     fn create_database(_: &Path) -> Box<Database> {
         Box::new(MemoryDB::new())
@@ -1351,8 +1351,8 @@ mod memorydb_tests {
 
 mod rocksdb_tests {
     use std::path::Path;
-    use tempdir::TempDir;
     use storage::{Database, DbOptions, RocksDB};
+    use tempdir::TempDir;
 
     fn create_database(path: &Path) -> Box<Database> {
         let opts = DbOptions::default();
