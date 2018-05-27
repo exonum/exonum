@@ -48,7 +48,7 @@ impl BranchNode {
                 ChildKind::Right => HASH_SIZE,
                 ChildKind::Left => 0,
             };
-            &*(&self.raw[from] as *const u8 as *const crypto::Hash)
+            &*(&self.raw[from] as *const u8 as *const Hash)
         }
     }
 
