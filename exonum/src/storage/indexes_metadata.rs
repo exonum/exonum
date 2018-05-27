@@ -77,7 +77,7 @@ impl StorageValue for IndexType {
     }
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
-        u8::from_bytes(value).into()
+        <u8 as StorageValue>::from_bytes(value).into()
     }
 }
 

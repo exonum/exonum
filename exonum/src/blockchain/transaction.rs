@@ -334,7 +334,7 @@ impl StorageValue for TransactionResult {
     }
 
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        let main_part = u16::from_bytes(Cow::Borrowed(&bytes));
+        let main_part = <u16 as StorageValue>::from_bytes(Cow::Borrowed(&bytes));
         let description = if bool::from_bytes(Cow::Borrowed(&bytes[2..3])) {
             Some(String::from_bytes(Cow::Borrowed(&bytes[3..])))
         } else {
