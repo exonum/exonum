@@ -166,7 +166,7 @@ macro_rules! implement_pod_as_ref_field {
                 from: $crate::encoding::Offset,
                 _: $crate::encoding::Offset,
             ) -> &'a $name {
-                ::std::mem::transmute(&buffer[from as usize])
+                &*(&buffer[from as usize] as *const u8 as *const $name)
             }
 
             fn write(
@@ -448,8 +448,8 @@ impl<'a> Field<'a> for SocketAddr {
         }
 
         if buffer[from_unchecked] == IPV4_HEADER
-            && !(buffer[to_unchecked - SIZE_DIFF - PORT_SIZE..to_unchecked - PORT_SIZE]
-                == [0u8; SIZE_DIFF])
+            && buffer[to_unchecked - SIZE_DIFF - PORT_SIZE..to_unchecked - PORT_SIZE]
+                != [0u8; SIZE_DIFF]
         {
             let mut value: [u8; SIZE_DIFF] = unsafe { mem::uninitialized() };
             value.copy_from_slice(&buffer[to_unchecked - SIZE_DIFF..to_unchecked]);

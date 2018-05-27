@@ -145,7 +145,7 @@ impl MessageBuffer {
     /// Returns signature of the message.
     pub fn signature(&self) -> &Signature {
         let sign_idx = self.raw.len() - SIGNATURE_LENGTH;
-        unsafe { mem::transmute(&self.raw[sign_idx]) }
+        unsafe { &*(&self.raw[sign_idx] as *const u8 as *const crypto::Signature) }
     }
 
     /// Checks that `Field` can be safely got with specified `from` and `to` offsets.

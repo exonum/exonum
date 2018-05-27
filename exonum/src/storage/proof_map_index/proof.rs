@@ -348,9 +348,9 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
                 let new_prefix_len = new_prefix.len();
 
                 while contour.len() > 1 && new_prefix_len < last_prefix.len() {
-                    fold(&mut contour, last_prefix).map(|prefix| {
+                    if let Some(prefix) = fold(&mut contour, last_prefix) {
                         last_prefix = prefix;
-                    });
+                    }
                 }
 
                 contour.push(*entry);
@@ -358,9 +358,9 @@ fn collect(entries: &[MapProofEntry]) -> Result<Hash, MapProofError> {
             }
 
             while contour.len() > 1 {
-                fold(&mut contour, last_prefix).map(|prefix| {
+                if let Some(prefix) = fold(&mut contour, last_prefix) {
                     last_prefix = prefix;
-                });
+                }
             }
 
             Ok(contour[0].hash)
