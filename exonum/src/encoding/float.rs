@@ -353,10 +353,12 @@ mod tests {
     #[test]
     #[allow(dead_code)]
     fn test_f32_struct() {
-        encoding_struct!(struct Msg {
-            single_float: F32,
-            vec: Vec<F32>,
-        });
+        encoding_struct! {
+            struct Msg {
+                single_float: F32,
+                vec: Vec<F32>,
+            }
+        }
         let test_vec = vec![F32::new(0.0), F32::new(3.14), F32::new(5.82)];
 
         let msg = Msg::new(F32::new(0.0), test_vec.clone());
@@ -367,10 +369,12 @@ mod tests {
     #[test]
     #[allow(dead_code)]
     fn test_f64_struct() {
-        encoding_struct!(struct Msg {
-            single_float: F64,
-            vec: Vec<F64>,
-        });
+        encoding_struct! {
+            struct Msg {
+                single_float: F64,
+                vec: Vec<F64>,
+            }
+        }
 
         let test_vec = vec![F64::new(0.0), F64::new(3.14), F64::new(5.82)];
 

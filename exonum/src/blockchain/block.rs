@@ -19,31 +19,33 @@ use messages::Precommit;
 /// Current core information schema version.
 pub const SCHEMA_MAJOR_VERSION: u16 = 0;
 
-encoding_struct!(/// Exonum block header data structure.
-///
-/// A block is essentially a list of transactions, which is
-/// a result of the consensus algorithm (thus authenticated by the supermajority of validators)
-/// and is applied atomically to the blockchain state.
-///
-/// The header only contains the amount of transactions and the transactions root hash as well as
-/// other information, but not the transactions themselves.
-struct Block {
-    /// Schema version.
-    schema_version: u16,
-    /// Identifier of the leader node which has proposed the block.
-    proposer_id: ValidatorId,
-    /// Height of the block, which is also the number of this particular
-    /// block in the blockchain.
-    height: Height,
-    /// Number of transactions in this block.
-    tx_count: u32,
-    /// Hash link to the previous block in the blockchain.
-    prev_hash: &Hash,
-    /// Root hash of the Merkle tree of transactions in this block.
-    tx_hash: &Hash,
-    /// Hash of the blockchain state after applying transactions in the block.
-    state_hash: &Hash,
-});
+encoding_struct! {
+    /// Exonum block header data structure.
+    ///
+    /// A block is essentially a list of transactions, which is
+    /// a result of the consensus algorithm (thus authenticated by the supermajority of validators)
+    /// and is applied atomically to the blockchain state.
+    ///
+    /// The header only contains the amount of transactions and the transactions root hash as well as
+    /// other information, but not the transactions themselves.
+    struct Block {
+        /// Schema version.
+        schema_version: u16,
+        /// Identifier of the leader node which has proposed the block.
+        proposer_id: ValidatorId,
+        /// Height of the block, which is also the number of this particular
+        /// block in the blockchain.
+        height: Height,
+        /// Number of transactions in this block.
+        tx_count: u32,
+        /// Hash link to the previous block in the blockchain.
+        prev_hash: &Hash,
+        /// Root hash of the Merkle tree of transactions in this block.
+        tx_hash: &Hash,
+        /// Hash of the blockchain state after applying transactions in the block.
+        state_hash: &Hash,
+    }
+}
 
 /// Block with its `Precommit` messages.
 ///

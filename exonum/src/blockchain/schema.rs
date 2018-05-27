@@ -48,23 +48,27 @@ define_names!(
     CONSENSUS_ROUND => "consensus_round";
 );
 
-encoding_struct!(/// Configuration index.
-struct ConfigReference {
-    /// Height since which this configuration becomes actual.
-    actual_from: Height,
-    /// Hash of the configuration contents that serialized as raw bytes vec.
-    cfg_hash: &Hash,
-});
+encoding_struct! {
+    /// Configuration index.
+    struct ConfigReference {
+        /// Height since which this configuration becomes actual.
+        actual_from: Height,
+        /// Hash of the configuration contents that serialized as raw bytes vec.
+        cfg_hash: &Hash,
+    }
+}
 
-encoding_struct!(/// Transaction location in a block.
-/// The given entity defines the block where the transaction was
-/// included and the position of this transaction in that block.
-struct TxLocation {
-    /// Height of the block where the transaction was included.
-    block_height: Height,
-    /// Zero-based position of this transaction in the block.
-    position_in_block: u64,
-});
+encoding_struct! {
+    /// Transaction location in a block.
+    /// The given entity defines the block where the transaction was
+    /// included and the position of this transaction in that block.
+    struct TxLocation {
+        /// Height of the block where the transaction was included.
+        block_height: Height,
+        /// Zero-based position of this transaction in the block.
+        position_in_block: u64,
+    }
+}
 
 /// Information schema for indices maintained by the Exonum core logic.
 ///

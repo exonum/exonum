@@ -24,10 +24,12 @@ use storage::{BaseIndex, Fork, Snapshot, StorageValue};
 
 pub const INDEXES_METADATA_TABLE_NAME: &str = "__INDEXES_METADATA__";
 
-encoding_struct!(struct IndexMetadata {
-    index_type: IndexType,
-    is_family: bool,
-});
+encoding_struct! {
+    struct IndexMetadata {
+        index_type: IndexType,
+        is_family: bool,
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[repr(u8)]
