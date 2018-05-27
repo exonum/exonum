@@ -337,8 +337,8 @@ impl StorageValue for Decimal {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::str::FromStr;
     use std::fmt::Debug;
+    use std::str::FromStr;
 
     #[test]
     fn u8_round_trip() {
@@ -378,10 +378,8 @@ mod tests {
     #[test]
     fn i32_round_trip() {
         let values = [i32::min_value(), -1, 0, 1, i32::max_value()];
-        for value in values.iter() {
-            let bytes = value.into_bytes();
-            assert_eq!(*value, i32::from_bytes(Cow::Borrowed(&bytes)));
-        }
+
+        assert_round_trip_eq(&values);
     }
 
     #[test]
@@ -492,7 +490,10 @@ mod tests {
     fn assert_round_trip_eq<T: StorageValue + Clone + PartialEq + Debug>(values: &[T]) {
         for value in values.into_iter() {
             let bytes = value.clone().into_bytes();
-            assert_eq!(*value, <T as StorageValue>::from_bytes(Cow::Borrowed(&bytes)));
+            assert_eq!(
+                *value,
+                <T as StorageValue>::from_bytes(Cow::Borrowed(&bytes))
+            );
         }
     }
 }
