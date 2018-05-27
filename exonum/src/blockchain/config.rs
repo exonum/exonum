@@ -26,9 +26,9 @@ use serde_json::{self, Error as JsonError};
 
 use std::collections::{BTreeMap, HashSet};
 
-use storage::StorageValue;
 use crypto::{hash, CryptoHash, Hash, PublicKey};
 use helpers::{Height, Milliseconds};
+use storage::StorageValue;
 
 /// Public keys of a validator. Each validator has two public keys: the
 /// `consensus_key` is used for internal operations in the consensus process,
@@ -245,8 +245,8 @@ impl StorageValue for StoredConfiguration {
 mod tests {
     use toml;
 
-    use crypto::{gen_keypair_from_seed, Seed};
     use super::*;
+    use crypto::{gen_keypair_from_seed, Seed};
 
     // TOML doesn't support all rust types, but `StoredConfiguration` must be able to save as TOML.
     #[test]

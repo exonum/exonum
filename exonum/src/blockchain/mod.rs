@@ -33,36 +33,36 @@
 //! [doc:create-service]: https://exonum.com/doc/get-started/create-service
 
 pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
-pub use self::schema::{Schema, TxLocation};
-pub use self::genesis::GenesisConfig;
 pub use self::config::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
+pub use self::genesis::GenesisConfig;
+pub use self::schema::{Schema, TxLocation};
 pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState};
 pub use self::transaction::{ExecutionError, ExecutionResult, Transaction, TransactionError,
                             TransactionErrorType, TransactionResult, TransactionSet};
 
 pub mod config;
 
-use vec_map::VecMap;
 use byteorder::{ByteOrder, LittleEndian};
-use mount::Mount;
 use failure;
+use mount::Mount;
+use vec_map::VecMap;
 
-use std::{fmt, iter, mem, panic};
-use std::sync::Arc;
 use std::collections::{BTreeMap, HashMap};
-use std::net::SocketAddr;
 use std::error::Error as StdError;
+use std::net::SocketAddr;
+use std::sync::Arc;
+use std::{fmt, iter, mem, panic};
 
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
-use messages::{CONSENSUS as CORE_SERVICE, Connect, Precommit, RawMessage};
-use storage::{Database, Error, Fork, Patch, Snapshot};
-use helpers::{Height, Round, ValidatorId};
-use node::ApiSender;
 use encoding::Error as MessageError;
+use helpers::{Height, Round, ValidatorId};
+use messages::{CONSENSUS as CORE_SERVICE, Connect, Precommit, RawMessage};
+use node::ApiSender;
+use storage::{Database, Error, Fork, Patch, Snapshot};
 
 mod block;
-mod schema;
 mod genesis;
+mod schema;
 mod service;
 #[macro_use]
 mod transaction;

@@ -30,23 +30,23 @@ extern crate serde_derive;
 extern crate serde_json;
 
 pub mod api;
-pub mod transactions;
 pub mod schema;
+pub mod transactions;
 
 use exonum::api::Api;
-use exonum::helpers::fabric;
-use exonum::crypto::Hash;
-use exonum::storage::Snapshot;
 use exonum::blockchain::{self, ApiContext, Transaction, TransactionSet};
-use exonum::messages::RawTransaction;
+use exonum::crypto::Hash;
 use exonum::encoding::Error as StreamStructError;
+use exonum::helpers::fabric;
+use exonum::messages::RawTransaction;
+use exonum::storage::Snapshot;
 
 use iron::Handler;
 use router::Router;
 
-use transactions::TimeTransactions;
-use schema::Schema;
 use api::PublicApi;
+use schema::Schema;
+use transactions::TimeTransactions;
 
 const TIMESTAMPING_SERVICE: u16 = 130;
 
