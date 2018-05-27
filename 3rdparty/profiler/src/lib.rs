@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 #![allow(unused_variables)]
+#[cfg_attr(feature = "cargo-clippy", allow(clippy))]
+
 #[macro_use]
 extern crate lazy_static;
 extern crate ctrlc;
