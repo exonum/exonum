@@ -108,7 +108,7 @@ impl ThreadFrame {
 
 fn ns_since_epoch(epoch: Instant) -> u64 {
     let elapsed = epoch.elapsed();
-    elapsed.as_secs() * 1000_000_000 + elapsed.subsec_nanos() as u64
+    elapsed.as_secs() * 1_000_000_000 + elapsed.subsec_nanos() as u64
 }
 
 
