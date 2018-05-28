@@ -66,8 +66,8 @@ pub mod contracts {
     use exonum::blockchain::{ExecutionResult, Transaction};
     use exonum::storage::Fork;
 
-    use transactions::TxAddBalance;
     use schema::BalanceSchema;
+    use transactions::TxAddBalance;
 
     impl Transaction for TxAddBalance {
         fn verify(&self) -> bool {
@@ -86,15 +86,15 @@ pub mod contracts {
 
 pub mod service {
     use exonum::blockchain::{Service, Transaction, TransactionSet};
-    use exonum::{encoding, messages::RawTransaction};
     use exonum::crypto::{gen_keypair, Hash};
-    use exonum::storage::{Database, Fork, MemoryDB, Snapshot};
-    use exonum::node::{ExternalMessage, Node, TransactionSend};
     use exonum::helpers;
+    use exonum::node::{ExternalMessage, Node, TransactionSend};
+    use exonum::storage::{Database, Fork, MemoryDB, Snapshot};
+    use exonum::{encoding, messages::RawTransaction};
     use serde_json::Value;
 
-    use transactions::{BalanceTransactions, TxAddBalance};
     use schema::BalanceSchema;
+    use transactions::{BalanceTransactions, TxAddBalance};
 
     use std::sync::Arc;
     use std::thread;

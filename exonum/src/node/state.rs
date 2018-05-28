@@ -14,20 +14,20 @@
 
 //! State of the `NodeHandler`.
 
-use serde_json::Value;
 use bit_vec::BitVec;
 use failure;
+use serde_json::Value;
 
 use std::collections::{BTreeMap, HashMap, HashSet, hash_map::Entry};
 use std::net::SocketAddr;
 use std::time::{Duration, SystemTime};
 
-use messages::{Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawMessage};
-use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
-use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
+use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
+use messages::{Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawMessage};
 use node::whitelist::Whitelist;
+use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 
 // TODO: move request timeouts into node configuration (ECR-171)
 

@@ -20,20 +20,20 @@ extern crate tokio_timer;
 
 use futures::Future;
 use futures::sync::oneshot;
-use tokio_timer::Timer;
 use serde_json::Value;
+use tokio_timer::Timer;
 
+use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
-use std::sync::{Arc, Mutex};
 
 use exonum::blockchain::{Service, ServiceContext, Transaction};
+use exonum::crypto::Hash;
 use exonum::encoding::Error as EncodingError;
+use exonum::helpers;
 use exonum::messages::RawTransaction;
 use exonum::node::{ApiSender, ExternalMessage, Node};
 use exonum::storage::{Database, Fork, MemoryDB, Snapshot};
-use exonum::helpers;
-use exonum::crypto::Hash;
 
 struct CommitWatcherService(pub Mutex<Option<oneshot::Sender<()>>>);
 

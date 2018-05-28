@@ -15,15 +15,15 @@
 use std::collections::HashSet;
 use std::error::Error;
 
-use crypto::{CryptoHash, Hash, PublicKey};
 use blockchain::{Schema, Transaction};
+use crypto::{CryptoHash, Hash, PublicKey};
+use events::InternalRequest;
+use helpers::{Height, Round, ValidatorId};
 use messages::{BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote,
                PrevotesRequest, Propose, ProposeRequest, RawTransaction, TransactionsRequest,
                TransactionsResponse};
-use helpers::{Height, Round, ValidatorId};
-use storage::Patch;
 use node::{NodeHandler, RequestData};
-use events::InternalRequest;
+use storage::Patch;
 
 // TODO reduce view invocations (ECR-171)
 impl NodeHandler {

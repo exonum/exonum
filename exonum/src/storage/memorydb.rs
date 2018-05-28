@@ -14,12 +14,12 @@
 
 //! An implementation of `MemoryDB` database.
 
-use std::sync::{Arc, RwLock};
 use std::clone::Clone;
 use std::collections::{BTreeMap, HashMap};
+use std::sync::{Arc, RwLock};
 
-use super::{Database, Iter, Iterator, Patch, Result, Snapshot};
 use super::db::Change;
+use super::{Database, Iter, Iterator, Patch, Result, Snapshot};
 
 type DB = HashMap<String, BTreeMap<Vec<u8>, Vec<u8>>>;
 

@@ -14,16 +14,16 @@
 
 #![allow(dead_code, unsafe_code)]
 
+use chrono::{DateTime, TimeZone, Utc};
 use rand::{thread_rng, Rng};
 use serde_json;
-use chrono::{DateTime, TimeZone, Utc};
 
 use blockchain::{Blockchain, ExecutionResult, Schema, Service, Transaction};
 use crypto::{gen_keypair, CryptoHash, Hash};
-use storage::{Database, Error, Fork, ListIndex, Snapshot};
-use messages::{Message, RawTransaction};
 use encoding::Error as MessageError;
 use helpers::{Height, ValidatorId};
+use messages::{Message, RawTransaction};
+use storage::{Database, Error, Fork, ListIndex, Snapshot};
 
 const IDX_NAME: &'static str = "idx_name";
 const TEST_SERVICE_ID: u16 = 255;
@@ -269,10 +269,10 @@ fn handling_tx_panic_storage_error(blockchain: &mut Blockchain) {
 
 mod transactions_tests {
     use blockchain::{ExecutionResult, Transaction, TransactionSet};
-    use storage::Fork;
     use crypto::gen_keypair;
     use serde::Serialize;
     use serde_json;
+    use storage::Fork;
 
     transactions! {
         MyTransactions {
@@ -452,11 +452,11 @@ fn assert_service_execute_panic(blockchain: &Blockchain, db: &mut Box<Database>)
 }
 
 mod memorydb_tests {
-    use futures::sync::mpsc;
-    use storage::{Database, MemoryDB};
     use blockchain::{Blockchain, Service};
     use crypto::gen_keypair;
+    use futures::sync::mpsc;
     use node::ApiSender;
+    use storage::{Database, MemoryDB};
 
     use super::{ServiceGood, ServicePanic, ServicePanicStorageError};
 
@@ -525,13 +525,13 @@ mod memorydb_tests {
 }
 
 mod rocksdb_tests {
-    use futures::sync::mpsc;
-    use tempdir::TempDir;
-    use storage::{Database, DbOptions, RocksDB};
     use blockchain::{Blockchain, Service};
     use crypto::gen_keypair;
-    use std::path::Path;
+    use futures::sync::mpsc;
     use node::ApiSender;
+    use std::path::Path;
+    use storage::{Database, DbOptions, RocksDB};
+    use tempdir::TempDir;
 
     use super::{ServiceGood, ServicePanic, ServicePanicStorageError};
 

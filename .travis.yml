@@ -19,7 +19,7 @@ addons:
 rust:
   # Feel free to bump this version if you need features of newer Rust.
   # Sync with badge in README.md
-  - 1.25.0
+  - 1.26.0
 
 cache:
   directories:
@@ -34,7 +34,7 @@ sudo: required
 
 env:
   global:
-  - CLIPPY_VERS=0.0.187
+  - CLIPPY_VERS=0.0.205
   - DEADLINKS_VERS=0.3.0
   - SODIUM_VERS=1.0.13
   - CARGO_INCREMENTAL=1
@@ -102,7 +102,7 @@ jobs:
 
   # Clippy linting
   - env: FEATURE=clippy
-    rust: nightly-2018-03-06
+    rust: nightly-2018-05-26
     install:
     - cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
     script:
@@ -143,7 +143,7 @@ jobs:
 
   # Benchmarks (compilation only)
   - env: FEATURE=benchmarks
-    rust: nightly-2018-03-06
+    rust: nightly-2018-05-26
     script:
     - RUST_LOG=off cargo bench --verbose --manifest-path exonum/Cargo.toml --features long_benchmarks --no-run
 

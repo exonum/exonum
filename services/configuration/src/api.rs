@@ -14,8 +14,8 @@
 
 use bodyparser;
 use exonum::api::{Api, ApiError};
-use exonum::crypto::{CryptoHash, Hash, PublicKey, SecretKey};
 use exonum::blockchain::{ApiContext, Blockchain, Schema as CoreSchema, StoredConfiguration};
+use exonum::crypto::{CryptoHash, Hash, PublicKey, SecretKey};
 use exonum::encoding::serialize::json::reexport as serde_json;
 use exonum::helpers::Height;
 use exonum::node::{ApiSender, TransactionSend};
