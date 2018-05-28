@@ -54,7 +54,8 @@ snow = "0.1.9"
 rust_decimal = "0.8.1"
 
 exonum_rocksdb = "0.7"
-exonum_sodiumoxide = "0.0.16"
+# exonum_sodiumoxide = "0.0.16" # Until changes are merged.
+exonum_sodiumoxide = { git = "https://github.com/exonum/exonum_sodiumoxide.git", branch = "add-chacha20poly1305" }
 exonum_profiler = { path = "../3rdparty/profiler", version = "0.1.2" }
 exonum_flamer = { path = "../3rdparty/flamer", version = "0.1.6", optional = true }
 

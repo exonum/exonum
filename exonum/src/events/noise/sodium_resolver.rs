@@ -1,16 +1,12 @@
-// use byteorder::{ByteOrder, BigEndian, LittleEndian};
-// use snow::constants::TAGLEN;
+use byteorder::{ByteOrder,  LittleEndian};
 use snow::{CryptoResolver, DefaultResolver};
 use snow::params::{CipherChoice, DHChoice, HashChoice};
 use snow::types::{Cipher, Dh, Hash, Random};
 
 use rand::{thread_rng, Rng};
 
-// use sodiumoxide::crypto::onetimeauth::poly1305 as sodium_poly1305;
 use sodiumoxide::crypto::scalarmult::curve25519 as sodium_curve25519;
-
-// TODO REMOVE
-#[allow(dead_code)]
+use sodiumoxide::crypto::aead::chacha20poly1305 as sodium_chacha20poly1305;
 
 pub struct SodiumResolver {
     parent: DefaultResolver,
@@ -41,7 +37,10 @@ impl CryptoResolver for SodiumResolver {
     }
 
     fn resolve_cipher(&self, choice: &CipherChoice) -> Option<Box<Cipher + Send>> {
-        self.parent.resolve_cipher(choice)
+        match *choice {
+            CipherChoice::ChaChaPoly => Some(Box::new(CipherChaChaPoly::default())),
+            _ => self.parent.resolve_cipher(choice),
+        }
     }
 }
 
@@ -125,34 +124,54 @@ impl Dh for SodiumDh25519 {
     }
 }
 
+// Chacha20poly1305 cipher.
 
-// Blake2b hasher.
-// struct HashBLAKE2b;
+pub struct CipherChaChaPoly {
+    key: sodium_chacha20poly1305::Key,
+}
 
-// impl Hash for HashBLAKE2b {
+impl Default for CipherChaChaPoly {
+    fn default() -> CipherChaChaPoly {
+        CipherChaChaPoly {
+            key: sodium_chacha20poly1305::Key([0; 32]),
+        }
+    }
+}
 
-//     fn name(&self) -> &'static str {
-//         "BLAKE2b"
-//     }
+impl Cipher for CipherChaChaPoly {
 
-//     fn block_len(&self) -> usize {
-//         128
-//     }
+    fn name(&self) -> &'static str {
+        "ChaChaPoly"
+    }
 
-//     fn hash_len(&self) -> usize {
-//         64
-//     }
+    fn set(&mut self, key: &[u8]) {
+        self.key = sodium_chacha20poly1305::Key::from_slice(&key[0..32]).expect("Can't get key for ChaChaPoly");
+    }
 
-//     fn reset(&mut self) {
-//         self.hasher = Blake2b::new(64);
-//     }   
+    fn encrypt(&self, nonce: u64, authtext: &[u8], plaintext: &[u8], out: &mut [u8]) -> usize {
+        let mut nonce_bytes = [0u8; 8];
+        LittleEndian::write_u64(&mut nonce_bytes[..], nonce);
+        let nonce = sodium_chacha20poly1305::Nonce(nonce_bytes);
 
-//     fn input(&mut self, data: &[u8]) {
-//         self.hasher.update(data);
-//     }
+        let buf = sodium_chacha20poly1305::seal(plaintext, Some(authtext), &nonce, &self.key);
 
-//     fn result(&mut self, out: &mut [u8]) {
-//         let hash = self.hasher.clone().finalize();
-//         out[..64].copy_from_slice(hash.as_bytes());
-//     }
-// }
+        out[..buf.len()].copy_from_slice(&buf);
+        buf.len()
+    }
+
+    fn decrypt(&self, nonce: u64, authtext: &[u8], ciphertext: &[u8], out: &mut [u8]) -> Result<usize, ()> {
+        let mut nonce_bytes = [0u8; 8];
+        LittleEndian::write_u64(&mut nonce_bytes[..], nonce);
+        let nonce = sodium_chacha20poly1305::Nonce(nonce_bytes);
+
+        let result = sodium_chacha20poly1305::open(ciphertext, Some(authtext), &nonce, &self.key);
+
+        match result {
+            Ok(ref buf) => {
+                out[..buf.len()].copy_from_slice(&buf);
+                Ok(buf.len())
+            }
+            Err(_) => Err(()),
+        }
+    }
+}
