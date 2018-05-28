@@ -23,8 +23,8 @@ use crypto::{PublicKey, SecretKey};
 use events::codec::MessagesCodec;
 use events::noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH};
 
-pub mod wrapper;
 pub mod sodium_resolver;
+pub mod wrapper;
 
 type HandshakeResult = Box<Future<Item = Framed<TcpStream, MessagesCodec>, Error = io::Error>>;
 
