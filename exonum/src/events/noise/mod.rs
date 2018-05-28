@@ -125,23 +125,27 @@ pub fn read_handshake_msg(
 
 #[cfg(test)]
 mod tests {
-    use tokio_core::reactor::Core;
-    use tokio_core::net::{TcpListener, TcpStream};
-    use tokio_io::AsyncRead;
-    use futures::{done, Future, Sink, Stream};
     use futures::sync::{mpsc, mpsc::Sender};
+    use futures::{done, Future, Sink, Stream};
+    use tokio_core::net::{TcpListener, TcpStream};
+    use tokio_core::reactor::Core;
+    use tokio_io::AsyncRead;
+    use tokio_timer::Timer;
 
+    use std::io;
     use std::net::SocketAddr;
     use std::thread;
-    use std::io;
+    use std::time::Duration;
 
+    use crypto::{gen_keypair_from_seed, Seed};
+    use events::codec::MessagesCodec;
+    use events::error::{into_other, log_error};
     use events::noise::wrapper::{NoiseWrapper, NOISE_MAX_MESSAGE_LENGTH,
                                  NOISE_MIN_HANDSHAKE_MESSAGE_LENGTH};
     use events::noise::{read, read_handshake_msg, write, HandshakeParams, HandshakeResult,
                         NoiseHandshake};
-    use events::error::{into_other, log_error};
-    use events::codec::MessagesCodec;
-    use crypto::{gen_keypair_from_seed, Seed};
+    use futures::sync::mpsc::Receiver;
+    use tokio_timer::TimeoutStream;
 
     #[derive(Debug, PartialEq, Copy, Clone)]
     pub enum HandshakeStep {
@@ -170,7 +174,8 @@ mod tests {
         let addr: SocketAddr = "127.0.0.1:45001".parse().unwrap();
         let addr2 = addr.clone();
 
-        let (sender, receiver) = mpsc::channel(1);
+        let (sender, receiver) = mpsc::channel(0);
+        let receiver = add_timeout_millis(receiver, 500);
         thread::spawn(move || run_handshake_listener(&addr2, sender));
 
         // Use first handshake only to connect.
@@ -186,7 +191,8 @@ mod tests {
         let addr: SocketAddr = "127.0.0.1:45002".parse().unwrap();
         let addr2 = addr.clone();
 
-        let (sender, receiver) = mpsc::channel(1);
+        let (sender, receiver) = mpsc::channel(0);
+        let receiver = add_timeout_millis(receiver, 500);
         thread::spawn(move || run_handshake_listener(&addr2, sender));
 
         // Use first handshake only to connect.
@@ -210,6 +216,11 @@ mod tests {
 
         let res = send_handshake(&addr, HandshakeStep::Two(2, BIG_MESSAGE));
         assert!(res.is_err());
+    }
+
+    fn add_timeout_millis(receiver: Receiver<()>, millis: u64) -> TimeoutStream<Receiver<()>> {
+        let timer = Timer::default();
+        timer.timeout_stream(receiver, Duration::from_millis(millis))
     }
 
     fn run_handshake_listener(addr: &SocketAddr, sender: Sender<()>) -> Result<(), io::Error> {
