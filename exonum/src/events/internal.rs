@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use futures::{self, Future, Sink, Stream};
 use futures::sync::mpsc;
+use futures::{self, Future, Sink, Stream};
 use tokio_core::reactor::{Handle, Timeout};
 
 use std::io;

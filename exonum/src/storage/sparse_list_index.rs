@@ -23,9 +23,9 @@ use std::borrow::Cow;
 use std::cell::Cell;
 use std::marker::PhantomData;
 
-use crypto::{hash, CryptoHash, Hash};
-use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey, StorageValue};
 use super::indexes_metadata::IndexType;
+use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey, StorageValue};
+use crypto::{hash, CryptoHash, Hash};
 
 #[derive(Debug, Default, Clone, Copy)]
 struct SparseListSize {
@@ -619,8 +619,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use rand::{thread_rng, Rng};
     use super::SparseListIndex;
+    use rand::{thread_rng, Rng};
     use storage::db::Database;
 
     const IDX_NAME: &'static str = "idx_name";
@@ -734,8 +734,8 @@ mod tests {
 
     mod memorydb_tests {
         use std::path::Path;
-        use tempdir::TempDir;
         use storage::{Database, MemoryDB};
+        use tempdir::TempDir;
 
         fn create_database(_: &Path) -> Box<Database> {
             Box::new(MemoryDB::new())
@@ -760,8 +760,8 @@ mod tests {
 
     mod rocksdb_tests {
         use std::path::Path;
-        use tempdir::TempDir;
         use storage::{Database, DbOptions, RocksDB};
+        use tempdir::TempDir;
 
         fn create_database(path: &Path) -> Box<Database> {
             let opts = DbOptions::default();

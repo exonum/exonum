@@ -132,8 +132,8 @@ impl Propose {
     ///
     /// Configuration parsed from the transaction together with its hash.
     fn precheck(&self, snapshot: &Snapshot) -> Result<(StoredConfiguration, Hash), ServiceError> {
-        use exonum::storage::StorageValue;
         use self::ServiceError::*;
+        use exonum::storage::StorageValue;
 
         let following_config = CoreSchema::new(snapshot).following_configuration();
         if let Some(following) = following_config {

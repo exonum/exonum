@@ -25,9 +25,9 @@ use std::fmt;
 use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
 use std::slice;
 
-use crypto::{CryptoHash, Hash};
 use blockchain::{Block, Blockchain, Schema, Transaction, TransactionError, TransactionErrorType,
                  TransactionResult, TxLocation};
+use crypto::{CryptoHash, Hash};
 use encoding;
 use helpers::Height;
 use messages::{Precommit, RawMessage};

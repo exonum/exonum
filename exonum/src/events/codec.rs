@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use bytes::BytesMut;
 use byteorder::{ByteOrder, LittleEndian};
+use bytes::BytesMut;
 use tokio_io::codec::{Decoder, Encoder};
 
 use std::io;
 
-use messages::{MessageBuffer, RawMessage, HEADER_LENGTH};
 use super::error::other_error;
-use events::noise::wrapper::NoiseWrapper;
 use events::noise::wrapper::NOISE_HEADER_LENGTH;
+use events::noise::wrapper::NoiseWrapper;
+use messages::{MessageBuffer, RawMessage, HEADER_LENGTH};
 
 #[derive(Debug)]
 pub struct MessagesCodec {
@@ -105,12 +105,12 @@ impl Encoder for MessagesCodec {
 mod test {
     use super::MessagesCodec;
 
-    use messages::{MessageBuffer, RawMessage};
     use bytes::BytesMut;
-    use tokio_io::codec::{Decoder, Encoder};
-    use events::noise::wrapper::NoiseWrapper;
-    use events::noise::HandshakeParams;
     use crypto::{gen_keypair_from_seed, Seed};
+    use events::noise::HandshakeParams;
+    use events::noise::wrapper::NoiseWrapper;
+    use messages::{MessageBuffer, RawMessage};
+    use tokio_io::codec::{Decoder, Encoder};
 
     #[test]
     fn decode_message_valid_header_size() {

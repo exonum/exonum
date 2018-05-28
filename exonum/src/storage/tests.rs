@@ -198,9 +198,9 @@ mod memorydb_tests {
 }
 
 mod rocksdb_tests {
+    use super::super::{DbOptions, RocksDB};
     use std::path::Path;
     use tempdir::TempDir;
-    use super::super::{DbOptions, RocksDB};
 
     fn rocksdb_database(path: &Path) -> RocksDB {
         let options = DbOptions::default();

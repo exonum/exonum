@@ -14,12 +14,18 @@
 
 use super::config::{ConsensusConfig, ValidatorKeys};
 
-/// The initial `exonum-core` configuration which is committed into the genesis block.
+/// The initial configuration which is committed into the genesis block.
+///
+/// The genesis block is the first block in the blockchain which is created
+/// when the blockchain is initially launched. This block can contain some service
+/// data, but does not include transactions.
+///
+/// `GenesisConfig` includes consensus related configuration and the public keys of validators.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct GenesisConfig {
-    /// Configuration of consensus.
+    /// Consensus configuration.
     pub consensus: ConsensusConfig,
-    /// List of public keys for validators.
+    /// List of public keys of validators.
     pub validator_keys: Vec<ValidatorKeys>,
 }
 

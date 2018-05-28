@@ -14,25 +14,25 @@
 
 // spell-checker:ignore precommiters, uncommented, uncomment, commited
 
-use rand::{thread_rng, Rng};
 use bit_vec::BitVec;
+use rand::{thread_rng, Rng};
 
-use std::time::Duration;
 use std::collections::BTreeMap;
+use std::time::Duration;
 
+use super::config_updater::TxConfig;
+use super::sandbox::{sandbox_with_services_uninitialized, timestamping_sandbox};
+use super::sandbox_tests_helper::*;
+use super::timestamping::{TimestampTx, TimestampingTxGenerator, TIMESTAMPING_SERVICE};
+use blockchain::{Blockchain, Schema};
+use crypto::{gen_keypair, gen_keypair_from_seed, CryptoHash, Hash, Seed};
+use helpers::{user_agent, Height, Round};
 use messages::{BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
                PrevotesRequest, Propose, ProposeRequest, RawMessage, Status, TransactionsRequest,
                TransactionsResponse, CONSENSUS};
-use crypto::{gen_keypair, gen_keypair_from_seed, CryptoHash, Hash, Seed};
-use blockchain::{Blockchain, Schema};
 use node;
 use node::state::{BLOCK_REQUEST_TIMEOUT, PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT,
                   TRANSACTIONS_REQUEST_TIMEOUT};
-use helpers::{user_agent, Height, Round};
-use super::timestamping::{TimestampTx, TimestampingTxGenerator, TIMESTAMPING_SERVICE};
-use super::sandbox::{sandbox_with_services_uninitialized, timestamping_sandbox};
-use super::sandbox_tests_helper::*;
-use super::config_updater::TxConfig;
 
 // HANDLE CONSENSUS BASIC
 
@@ -1160,9 +1160,9 @@ fn incorrect_tx_in_request() {
 
 #[test]
 fn response_size_larger_than_max_message_len() {
-    use storage::StorageValue;
-    use messages::HEADER_LENGTH;
     use crypto::{PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
+    use messages::HEADER_LENGTH;
+    use storage::StorageValue;
 
     const EMPTY_RESPONSE_SIZE: usize =
         (HEADER_LENGTH + SIGNATURE_LENGTH + 2 * PUBLIC_KEY_LENGTH + 8);
