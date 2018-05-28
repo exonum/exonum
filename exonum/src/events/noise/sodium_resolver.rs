@@ -116,15 +116,12 @@ impl Dh for SodiumDh25519 {
     }
 
     fn dh(&self, pubkey: &[u8], out: &mut [u8]) {
-        println!("Len of public key is {}", pubkey.len());
         let pubkey = sodium_curve25519::GroupElement::from_slice(&pubkey[0..32])
             .expect("Can't construct public key for Dh25519");
         let result =
             sodium_curve25519::scalarmult(&self.privkey, &pubkey).expect("Can't calculate dh");
 
-        // Can't use clone_from_slice here because out length may differ.
-        
-        out.clone_from_slice(&result[0..32])
+        out[..32].copy_from_slice(&result[0..32]);
     }
 }
 
