@@ -128,7 +128,8 @@ mod tests {
     use tokio_core::reactor::Core;
     use tokio_core::net::{TcpListener, TcpStream};
     use tokio_io::AsyncRead;
-    use futures::{done, Future, Stream};
+    use futures::{done, Future, Sink, Stream};
+    use futures::sync::{mpsc, mpsc::Sender};
 
     use std::net::SocketAddr;
     use std::thread;
@@ -141,7 +142,6 @@ mod tests {
     use events::error::{into_other, log_error};
     use events::codec::MessagesCodec;
     use crypto::{gen_keypair_from_seed, Seed};
-    use std::time::Duration;
 
     #[derive(Debug, PartialEq, Copy, Clone)]
     pub enum HandshakeStep {
@@ -170,12 +170,12 @@ mod tests {
         let addr: SocketAddr = "127.0.0.1:45001".parse().unwrap();
         let addr2 = addr.clone();
 
-        thread::spawn(move || {
-            run_handshake_listener(&addr2).unwrap();
-        });
+        let (sender, receiver) = mpsc::channel(1);
+        thread::spawn(move || run_handshake_listener(&addr2, sender));
 
-        // Wait until listener is initialized.
-        thread::sleep(Duration::from_millis(500));
+        // Use first handshake only to connect.
+        let _res = send_handshake(&addr, HandshakeStep::Default);
+        receiver.wait().next();
 
         let res = send_handshake(&addr, HandshakeStep::Default);
         assert!(res.is_ok());
@@ -186,10 +186,12 @@ mod tests {
         let addr: SocketAddr = "127.0.0.1:45002".parse().unwrap();
         let addr2 = addr.clone();
 
-        // Wait until listener is initialized.
-        thread::sleep(Duration::from_millis(500));
+        let (sender, receiver) = mpsc::channel(1);
+        thread::spawn(move || run_handshake_listener(&addr2, sender));
 
-        thread::spawn(move || run_handshake_listener(&addr2));
+        // Use first handshake only to connect.
+        let _res = send_handshake(&addr, HandshakeStep::Default);
+        receiver.wait().next();
 
         let res = send_handshake(&addr, HandshakeStep::One(1, EMPTY_MESSAGE));
         assert!(res.is_err());
@@ -210,7 +212,7 @@ mod tests {
         assert!(res.is_err());
     }
 
-    fn run_handshake_listener(addr: &SocketAddr) -> Result<(), io::Error> {
+    fn run_handshake_listener(addr: &SocketAddr, sender: Sender<()>) -> Result<(), io::Error> {
         let mut core = Core::new().unwrap();
         let handle = core.handle();
         let params = HandshakeParams::default();
@@ -219,6 +221,10 @@ mod tests {
         let fut = fut_stream
             .incoming()
             .for_each(|(stream, _)| {
+                let sender = sender.clone();
+                let send = sender.send(()).map(|_| ()).map_err(log_error);
+                handle.spawn(send);
+
                 let handshake = NoiseHandshake::listen(&params, stream);
                 let reader = handshake.and_then(|_| Ok(())).map_err(log_error);
                 handle.spawn(reader);
