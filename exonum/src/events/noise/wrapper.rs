@@ -31,7 +31,7 @@ pub const HANDSHAKE_HEADER_LENGTH: usize = 2;
 // We choose XX pattern since it provides mutual authentication and
 // transmission of static public keys.
 // See: https://noiseprotocol.org/noise.html#interactive-patterns
-static PARAMS: &str = "Noise_XX_25519_ChaChaPoly_BLAKE2s";
+static PARAMS: &str = "Noise_XX_25519_ChaChaPoly_SHA256";
 
 /// Wrapper around noise session to provide latter convenient interface.
 pub struct NoiseWrapper {
