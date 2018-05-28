@@ -56,7 +56,8 @@ impl Default for SodiumRandom {
 
 impl Random for SodiumRandom {
     fn fill_bytes(&mut self, out: &mut [u8]) {
-        thread_rng().fill(out);
+        let bytes: Vec<u8> = thread_rng().gen_iter::<u8>().take(out.len()).collect();
+        out.copy_from_slice(&bytes);
     }
 }
 
@@ -96,7 +97,7 @@ impl Dh for SodiumDh25519 {
     }
 
     fn generate(&mut self, rng: &mut Random) {
-        let mut privkey_bytes: [u8; 32];
+        let mut privkey_bytes = [0; 32];
         rng.fill_bytes(&mut privkey_bytes);
         privkey_bytes[0] &= 248;
         privkey_bytes[31] &= 127;
@@ -115,10 +116,46 @@ impl Dh for SodiumDh25519 {
     }
 
     fn dh(&self, pubkey: &[u8], out: &mut [u8]) {
-        let pubkey = sodium_curve25519::GroupElement::from_slice(pubkey)
+        println!("Len of public key is {}", pubkey.len());
+        let pubkey = sodium_curve25519::GroupElement::from_slice(&pubkey[0..32])
             .expect("Can't construct public key for Dh25519");
         let result =
             sodium_curve25519::scalarmult(&self.privkey, &pubkey).expect("Can't calculate dh");
+
+        // Can't use clone_from_slice here because out length may differ.
+        
         out.clone_from_slice(&result[0..32])
     }
 }
+
+
+// Blake2b hasher.
+// struct HashBLAKE2b;
+
+// impl Hash for HashBLAKE2b {
+
+//     fn name(&self) -> &'static str {
+//         "BLAKE2b"
+//     }
+
+//     fn block_len(&self) -> usize {
+//         128
+//     }
+
+//     fn hash_len(&self) -> usize {
+//         64
+//     }
+
+//     fn reset(&mut self) {
+//         self.hasher = Blake2b::new(64);
+//     }   
+
+//     fn input(&mut self, data: &[u8]) {
+//         self.hasher.update(data);
+//     }
+
+//     fn result(&mut self, out: &mut [u8]) {
+//         let hash = self.hasher.clone().finalize();
+//         out[..64].copy_from_slice(hash.as_bytes());
+//     }
+// }
