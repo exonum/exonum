@@ -12,30 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use bit_vec::BitVec;
+use chrono::{DateTime, Duration, TimeZone, Utc};
+use hex::FromHex;
+use rust_decimal::Decimal;
 /// trait `ExonumSerializeJson` implemented for all field that allows serializing in
 /// json format.
 ///
-
 // TODO refer to difference between json serialization and exonum_json (ECR-156).
 // TODO implement Field for float (ECR-153).
 // TODO remove WriteBufferWrapper hack (after refactor storage),
 // should be moved into storage (ECR-156).
-
 use serde_json::{self, value::Value};
-use bit_vec::BitVec;
-use hex::FromHex;
-use chrono::{DateTime, Duration, TimeZone, Utc};
 use uuid::Uuid;
-use rust_decimal::Decimal;
 
-use std::net::SocketAddr;
 use std::error::Error;
+use std::net::SocketAddr;
 
+use super::WriteBufferWrapper;
 use crypto::{Hash, PublicKey, Signature};
+use encoding::{Field, Offset};
 use helpers::{Height, Round, ValidatorId};
 use messages::RawMessage;
-use encoding::{Field, Offset};
-use super::WriteBufferWrapper;
 // TODO: should we implement serialize for: `SecretKey`, `Seed` (ECR-156)?
 
 macro_rules! impl_default_deserialize_owned {
@@ -528,8 +526,8 @@ impl ExonumJson for Decimal {
 /// Reexport of `serde` specific traits, this reexports
 /// provide compatibility layer with important `serde_json` version.
 pub mod reexport {
-    pub use serde_json::{from_str, from_value, to_string, to_value, Error, Value};
     pub use serde_json::map::Map;
+    pub use serde_json::{from_str, from_value, to_string, to_value, Error, Value};
 }
 
 #[cfg(test)]

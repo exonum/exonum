@@ -14,12 +14,12 @@
 
 use rand::{thread_rng, Rng};
 
+use self::ListProof::*;
+use super::{pair_hash, ListProof, ProofListIndex};
 use crypto::{hash, CryptoHash, Hash};
-use storage::Database;
 use encoding::serialize::json::reexport::{from_str, to_string};
 use encoding::serialize::reexport::Serialize;
-use super::{pair_hash, ListProof, ProofListIndex};
-use self::ListProof::*;
+use storage::Database;
 
 const IDX_NAME: &'static str = "idx_name";
 
@@ -546,8 +546,8 @@ struct ProofInfo<'a, V: Serialize + 'a> {
 
 mod memorydb_tests {
     use std::path::Path;
-    use tempdir::TempDir;
     use storage::{Database, MemoryDB};
+    use tempdir::TempDir;
 
     fn create_database(_: &Path) -> Box<Database> {
         Box::new(MemoryDB::new())
@@ -658,8 +658,8 @@ mod memorydb_tests {
 
 mod rocksdb_tests {
     use std::path::Path;
-    use tempdir::TempDir;
     use storage::{Database, DbOptions, RocksDB};
+    use tempdir::TempDir;
 
     fn create_database(path: &Path) -> Box<Database> {
         let opts = DbOptions::default();

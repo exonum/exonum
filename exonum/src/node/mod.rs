@@ -24,37 +24,37 @@ pub use self::connect_list::ConnectList;
 pub mod state; // TODO: temporary solution to get access to WAIT constants (ECR-167)
 
 use failure;
-use toml::Value;
-use router::Router;
-use mount::Mount;
+use futures::{Future, Sink, sync::mpsc};
 use iron::{Chain, Iron, Listening};
 use iron_cors::CorsMiddleware;
+use mount::Mount;
+use router::Router;
 use serde::{de, ser};
-use futures::{Future, Sink, sync::mpsc};
 use tokio_core::reactor::Core;
+use toml::Value;
 
-use std::{fmt, io};
+use std::collections::{BTreeMap, HashSet};
+use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
-use std::net::SocketAddr;
 use std::time::{Duration, SystemTime};
-use std::collections::{BTreeMap, HashSet};
+use std::{fmt, io};
 
-use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
-use blockchain::{Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction};
 use api::{private, public, Api};
-use messages::{Connect, Message, RawMessage};
+use blockchain::{Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction};
+use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
+use events::error::{into_other, log_error, other_error, LogError};
 use events::{HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkConfiguration,
              NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
              noise::HandshakeParams};
-use events::error::{into_other, log_error, other_error, LogError};
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
+use messages::{Connect, Message, RawMessage};
 use storage::{Database, DbOptions};
 
-mod events;
 mod basic;
 mod consensus;
+mod events;
 mod requests;
 mod whitelist;
 mod connect_list;

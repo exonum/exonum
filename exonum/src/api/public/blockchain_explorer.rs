@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use router::Router;
 use iron::prelude::*;
+use router::Router;
 
 use std::ops::Range;
 
-use blockchain::{Block, Blockchain};
-use explorer::{BlockchainExplorer, TransactionInfo};
 use api::{Api, ApiError};
+use blockchain::{Block, Blockchain};
 use crypto::Hash;
+use explorer::{BlockchainExplorer, TransactionInfo};
 use helpers::Height;
 
 const MAX_BLOCKS_PER_REQUEST: usize = 1000;

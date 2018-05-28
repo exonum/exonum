@@ -439,10 +439,14 @@ macro_rules! __ex_message_mk_field {
 macro_rules! __ex_message_write_field {
     (
         ($writer:ident),
-        $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr
+        $(#[$field_attr:meta])*,
+        $field_name:ident,
+        $field_type:ty,
+        $from:expr,
+        $to:expr
     ) => {
         $writer.write($field_name, $from, $to);
-    }
+    };
 }
 
 #[doc(hidden)]
@@ -450,12 +454,13 @@ macro_rules! __ex_message_write_field {
 macro_rules! __ex_message_check_field {
     (
         ($latest_segment:ident, $raw_message:ident),
-        $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr
+        $(#[$field_attr:meta])*,
+        $field_name:ident,
+        $field_type:ty,
+        $from:expr,
+        $to:expr
     ) => {
-        let $latest_segment = $raw_message.check::<$field_type>(
-            $from.into(),
-            $to.into(),
-            $latest_segment
-        )?;
-    }
+        let $latest_segment =
+            $raw_message.check::<$field_type>($from.into(), $to.into(), $latest_segment)?;
+    };
 }

@@ -39,8 +39,8 @@ extern crate serde_json;
 
 /// Persistent data.
 pub mod schema {
-    use exonum::storage::{Fork, MapIndex, Snapshot};
     use exonum::crypto::PublicKey;
+    use exonum::storage::{Fork, MapIndex, Snapshot};
 
     // Declare the data to be stored in the blockchain, namely wallets with balances.
     // See [serialization docs][1] for details.
@@ -200,9 +200,9 @@ pub mod contracts {
     use exonum::blockchain::{ExecutionResult, Transaction};
     use exonum::{messages::Message, storage::Fork};
 
+    use errors::Error;
     use schema::{CurrencySchema, Wallet};
     use transactions::{TxCreateWallet, TxTransfer};
-    use errors::Error;
 
     /// Initial balance of a newly created wallet.
     const INIT_BALANCE: u64 = 100;
@@ -274,18 +274,18 @@ pub mod contracts {
 
 /// REST API.
 pub mod api {
+    use exonum::api::{Api, ApiError};
     use exonum::blockchain::{Blockchain, Transaction};
+    use exonum::crypto::{Hash, PublicKey};
     use exonum::encoding::serialize::FromHex;
     use exonum::node::{ApiSender, TransactionSend};
-    use exonum::crypto::{Hash, PublicKey};
-    use exonum::api::{Api, ApiError};
     use iron::prelude::*;
     use iron::{headers::ContentType, modifiers::Header, status::Status};
     use router::Router;
 
     use bodyparser;
-    use serde_json;
     use schema::{CurrencySchema, Wallet};
+    use serde_json;
     use transactions::CurrencyTransactions;
 
     /// Container for the service API.
@@ -396,8 +396,8 @@ pub mod service {
     use iron::Handler;
     use router::Router;
 
-    use transactions::CurrencyTransactions;
     use api::CryptocurrencyApi;
+    use transactions::CurrencyTransactions;
 
     /// Service ID for the `Service` trait.
     pub const SERVICE_ID: u16 = 1;

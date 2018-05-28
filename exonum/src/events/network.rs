@@ -18,20 +18,20 @@ use tokio_core::net::{TcpListener, TcpStream};
 use tokio_core::reactor::Handle;
 use tokio_retry::{Retry, strategy::{jitter, FixedInterval}};
 
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::io;
 use std::net::SocketAddr;
-use std::time::Duration;
-use std::collections::HashMap;
 use std::rc::Rc;
-use std::cell::RefCell;
+use std::time::Duration;
 
-use messages::{Any, Connect, Message, RawMessage};
-use helpers::Milliseconds;
-use super::to_box;
 use super::error::{into_other, log_error, other_error, result_ok};
+use super::to_box;
+use helpers::Milliseconds;
+use messages::{Any, Connect, Message, RawMessage};
 
-use events::noise::NoiseHandshake;
 use events::noise::HandshakeParams;
+use events::noise::NoiseHandshake;
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 

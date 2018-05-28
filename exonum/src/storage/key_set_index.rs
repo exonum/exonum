@@ -14,11 +14,11 @@
 
 //! An implementation of set for items that implement `StorageKey` trait.
 
-use std::marker::PhantomData;
 use std::borrow::Borrow;
+use std::marker::PhantomData;
 
-use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey};
 use super::indexes_metadata::IndexType;
+use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey};
 
 /// A set of items that implement `StorageKey` trait.
 ///
@@ -282,8 +282,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::{Database, MemoryDB};
+    use super::*;
 
     const INDEX_NAME: &str = "test_index_name";
 

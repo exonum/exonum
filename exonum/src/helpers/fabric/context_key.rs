@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::marker::PhantomData;
 use std::fmt;
+use std::marker::PhantomData;
 
 /// `ContextKey` provides strongly typed access to data inside `Context`.
 /// See `exonum::fabric::keys` for keys used by the exonum itself.
@@ -79,9 +79,9 @@ macro_rules! context_key {
     ($name:expr) => {{
         $crate::helpers::fabric::ContextKey {
             __name: $name,
-            __phantom: ::std::marker::PhantomData
+            __phantom: ::std::marker::PhantomData,
         }
-    }}
+    }};
 }
 
 #[test]
