@@ -463,8 +463,8 @@ impl PartialOrd for ProofPath {
 
 #[cfg(test)]
 mod tests {
-    use serde_json::{self, Value};
     use rand::{self, Rng};
+    use serde_json::{self, Value};
 
     use super::*;
 

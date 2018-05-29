@@ -15,8 +15,8 @@
 //! Common widely used type definitions.
 
 use std::fmt;
-use std::str::FromStr;
 use std::num::ParseIntError;
+use std::str::FromStr;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 

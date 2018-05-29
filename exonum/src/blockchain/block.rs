@@ -13,13 +13,13 @@
 // limitations under the License.
 
 use crypto::Hash;
-use messages::Precommit;
 use helpers::{Height, ValidatorId};
+use messages::Precommit;
 
 /// Current core information schema version.
 pub const SCHEMA_MAJOR_VERSION: u16 = 0;
 
-encoding_struct!(
+encoding_struct! {
     /// Exonum block header data structure.
     ///
     /// A block is essentially a list of transactions, which is
@@ -45,7 +45,7 @@ encoding_struct!(
         /// Hash of the blockchain state after applying transactions in the block.
         state_hash: &Hash,
     }
-);
+}
 
 /// Block with its `Precommit` messages.
 ///
@@ -64,8 +64,8 @@ pub struct BlockProof {
 
 #[cfg(test)]
 mod tests {
-    use crypto::hash;
     use super::*;
+    use crypto::hash;
 
     #[test]
     fn test_block() {

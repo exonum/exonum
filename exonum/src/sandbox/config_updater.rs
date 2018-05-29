@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crypto::{Hash, PublicKey};
+use blockchain::StoredConfiguration;
 use blockchain::{ExecutionResult, Schema, Service, Transaction, TransactionSet};
+use crypto::{Hash, PublicKey};
+use encoding::Error as MessageError;
+use helpers::Height;
 use messages::{Message, RawTransaction};
 use storage::{Fork, Snapshot};
-use encoding::Error as MessageError;
-use blockchain::StoredConfiguration;
-use helpers::Height;
 
 pub const CONFIG_SERVICE: u16 = 1;
 

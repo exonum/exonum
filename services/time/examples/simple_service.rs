@@ -30,8 +30,8 @@ use exonum::encoding;
 use exonum::helpers::Height;
 use exonum::messages::{Message, RawTransaction};
 use exonum::storage::{Fork, ProofMapIndex, Snapshot};
-use exonum_time::{TimeService, schema::TimeSchema, time_provider::MockTimeProvider};
 use exonum_testkit::TestKitBuilder;
+use exonum_time::{TimeService, schema::TimeSchema, time_provider::MockTimeProvider};
 
 /// Marker service id.
 const SERVICE_ID: u16 = 128;
