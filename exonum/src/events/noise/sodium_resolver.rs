@@ -2,7 +2,6 @@ use byteorder::{ByteOrder, LittleEndian};
 use snow::params::{CipherChoice, DHChoice, HashChoice};
 use snow::types::{Cipher, Dh, Hash, Random};
 use snow::{CryptoResolver, DefaultResolver};
-
 use rand::{thread_rng, Rng};
 
 use sodiumoxide::crypto::aead::chacha20poly1305 as sodium_chacha20poly1305;
@@ -213,5 +212,33 @@ impl Hash for SodiumSha256 {
     fn result(&mut self, out: &mut [u8]) {
         let digest = self.0.clone().finalize();
         out[..32].copy_from_slice(digest.as_ref());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use hex::FromHex;
+
+    #[test]
+    fn test_curve25519() {
+        // Curve25519 test - draft-curves-10
+        let mut keypair: SodiumDh25519 = Default::default();
+        let scalar = Vec::<u8>::from_hex(
+            "a546e36bf0527c9d3b16154b82465edd62144c0ac1fc5a18506a2244ba449ac4",
+        ).unwrap();
+        keypair.set(&scalar);
+        let public = Vec::<u8>::from_hex(
+            "e6db6867583030db3594c1a424b15f7c726624ec26b3353b10a903a6d0ab1c4c",
+        ).unwrap();
+        let mut output = [0u8; 32];
+        keypair.dh(&public, &mut output);
+
+        assert_eq!(
+            output,
+            Vec::<u8>::from_hex("c3da55379de9c6908e94ea4df28d084f32eccf03491c71f754b4075577a28552")
+                .unwrap()
+                .as_ref()
+        );
     }
 }
