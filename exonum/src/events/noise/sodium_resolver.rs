@@ -1,8 +1,8 @@
 use byteorder::{ByteOrder, LittleEndian};
+use rand::{thread_rng, Rng};
 use snow::params::{CipherChoice, DHChoice, HashChoice};
 use snow::types::{Cipher, Dh, Hash, Random};
 use snow::{CryptoResolver, DefaultResolver};
-use rand::{thread_rng, Rng};
 
 use sodiumoxide::crypto::aead::chacha20poly1305 as sodium_chacha20poly1305;
 use sodiumoxide::crypto::hash::sha256 as sodium_sha256;
