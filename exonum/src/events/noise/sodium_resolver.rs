@@ -81,8 +81,7 @@ impl Default for SodiumDh25519 {
 
 impl Dh for SodiumDh25519 {
     fn name(&self) -> &'static str {
-        static NAME: &'static str = "25519";
-        NAME
+        "25519"
     }
 
     fn pub_len(&self) -> usize {
