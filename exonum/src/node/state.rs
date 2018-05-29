@@ -26,9 +26,9 @@ use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
 use messages::{Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawMessage};
+use node::ConnectList;
 use node::whitelist::Whitelist;
 use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
-use node::ConnectList;
 
 // TODO: move request timeouts into node configuration (ECR-171)
 

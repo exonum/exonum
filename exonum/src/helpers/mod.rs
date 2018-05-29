@@ -69,7 +69,7 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
         })
         .collect::<Vec<_>>();
 
-    let connect_list = ConnectList::from(&genesis.validator_keys, &peers);
+    let connect_list = ConnectList::from_keys(&genesis.validator_keys, &peers);
 
     validators
         .into_iter()

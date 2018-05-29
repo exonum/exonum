@@ -35,6 +35,7 @@ use crypto;
 use helpers::{generate_testnet_config, config::ConfigFile};
 use node::{AllowOrigin, NodeApiConfig, NodeConfig};
 use storage::{Database, DbOptions, RocksDB};
+use node::ConnectList;
 
 const DATABASE_PATH: &str = "DATABASE_PATH";
 const OUTPUT_DIR: &str = "OUTPUT_DIR";
@@ -599,6 +600,8 @@ impl Command for Finalize {
 
         let (common, list, our) = Self::reduce_configs(public_configs, &secret_config);
 
+        let connect_list = ConnectList::from_node_config(&list);
+
         let validators_count = common
             .general_config
             .get("validators_count")
@@ -613,9 +616,6 @@ impl Command for Finalize {
         }
 
         context.set(keys::AUDITOR_MODE, our.is_none());
-
-        //TODO: добавить в результирующий конфиг connect list
-        info!("validators list: {:?}", list);
 
         let peers = list.iter().map(|c| c.addr).collect();
 
@@ -644,7 +644,7 @@ impl Command for Finalize {
                 services_configs: Default::default(),
                 database: Default::default(),
                 //TODO: Вставить сюда формирование конфига
-                connect_list: Default::default(),
+                connect_list,
             }
         };
 

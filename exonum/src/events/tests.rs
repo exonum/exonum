@@ -23,15 +23,15 @@ use std::time::{self, Duration};
 
 use blockchain::ConsensusConfig;
 use crypto::{gen_keypair, gen_keypair_from_seed, PublicKey, SecretKey, Seed, Signature};
+use env_logger;
 use events::error::log_error;
 use events::network::{NetworkConfiguration, NetworkPart};
 use events::noise::HandshakeParams;
 use events::{NetworkEvent, NetworkRequest};
 use helpers::user_agent;
 use messages::{Connect, Message, MessageWriter, RawMessage};
-use node::{EventsPoolCapacity, NodeChannel};
-use env_logger;
 use node::ConnectList;
+use node::{EventsPoolCapacity, NodeChannel};
 
 #[derive(Debug)]
 pub struct TestHandler {
@@ -138,7 +138,6 @@ pub struct TestEvents {
 }
 
 impl TestEvents {
-
     pub fn with_addr(listen_address: SocketAddr) -> TestEvents {
         TestEvents {
             listen_address,
@@ -153,7 +152,7 @@ impl TestEvents {
             listen_address,
             network_config: NetworkConfiguration::default(),
             events_config: EventsPoolCapacity::default(),
-            connect_list
+            connect_list,
         }
     }
 

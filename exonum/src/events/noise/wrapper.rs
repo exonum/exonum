@@ -14,8 +14,8 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
-use snow::{NoiseBuilder, Session};
 use crypto::PUBLIC_KEY_LENGTH;
+use snow::{NoiseBuilder, Session};
 
 use std::fmt;
 use std::fmt::{Error, Formatter};
@@ -40,14 +40,20 @@ pub struct NoiseWrapper {
 }
 
 impl NoiseWrapper {
-
     pub fn initiator(params: &HandshakeParams, peer: &SocketAddr) -> Self {
         let builder: NoiseBuilder = Self::noise_builder(params);
         let private_key = &params.secret_key[..PUBLIC_KEY_LENGTH];
 
-        let remote_key = params.connect_list.peers.get(peer).expect("Peer is not in the connect list.");
+        let remote_key = params
+            .connect_list
+            .peers
+            .get(peer)
+            .expect("Peer is not in the connect list.");
 
-        info!("initiator public key {:?}, secret key {:?}", params.public_key, params.secret_key);
+        info!(
+            "initiator public key {:?}, secret key {:?}",
+            params.public_key, params.secret_key
+        );
         info!("remote public key {:?}", remote_key);
         let session = builder
             .local_private_key(&private_key)
@@ -61,7 +67,10 @@ impl NoiseWrapper {
     pub fn responder(params: &HandshakeParams) -> Self {
         let builder: NoiseBuilder = Self::noise_builder(params);
         let private_key = &params.secret_key[..PUBLIC_KEY_LENGTH];
-        info!("responder public key {:?}, secret key {:?}", params.public_key, private_key);
+        info!(
+            "responder public key {:?}, secret key {:?}",
+            params.public_key, private_key
+        );
 
         let session = builder
             .local_private_key(&private_key)
@@ -196,38 +205,37 @@ impl From<NoiseError> for io::Error {
     }
 }
 
-
 #[cfg(test)]
 mod test {
 
-    use events::tests::TestEvents;
-    use node::ConnectList;
-    use std::collections::HashMap;
-    use crypto::{Seed, gen_keypair_from_seed};
-    use std::net::SocketAddr;
-    use events::tests::connect_message;
-    use env_logger;
-    use std::io;
-    use tokio_core::reactor::Core;
-    use snow::NoiseBuilder;
     use crypto::gen_keypair;
-    use snow::DefaultResolver;
+    use crypto::{gen_keypair_from_seed, Seed};
+    use env_logger;
+    use events::tests::TestEvents;
+    use events::tests::connect_message;
+    use node::ConnectList;
     use snow::CryptoResolver;
-    use snow::types::Random;
-    use snow::params::DHChoice;
-    use snow::types::Dh;
-    use snow::params::HashChoice;
-    use snow::types::Hash;
+    use snow::DefaultResolver;
+    use snow::NoiseBuilder;
     use snow::params::CipherChoice;
+    use snow::params::DHChoice;
+    use snow::params::HashChoice;
     use snow::types::Cipher;
-    use std::marker::Send;
+    use snow::types::Dh;
+    use snow::types::Hash;
+    use snow::types::Random;
     use snow::wrappers::rand_wrapper::RandomOs;
+    use std::collections::HashMap;
+    use std::io;
+    use std::marker::Send;
+    use std::net::SocketAddr;
+    use tokio_core::reactor::Core;
 
     #[test]
     fn test_connect_list() {
         env_logger::init();
         let first: SocketAddr = "127.0.0.1:17230".parse().unwrap();
-        let second:SocketAddr = "127.0.0.1:17231".parse().unwrap();
+        let second: SocketAddr = "127.0.0.1:17231".parse().unwrap();
 
         let mut peers = HashMap::new();
 
@@ -247,9 +255,6 @@ mod test {
         e1.connect_with(second);
 
         assert_eq!(e2.wait_for_connect(), c1);
-
-
     }
-
 
 }

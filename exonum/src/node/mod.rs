@@ -17,9 +17,9 @@
 //! For details about consensus message handling see messages module documentation.
 // spell-checker:ignore cors
 
+pub use self::connect_list::ConnectList;
 pub use self::state::{RequestData, State, ValidatorState};
 pub use self::whitelist::Whitelist;
-pub use self::connect_list::ConnectList;
 
 pub mod state; // TODO: temporary solution to get access to WAIT constants (ECR-167)
 
@@ -53,11 +53,11 @@ use messages::{Connect, Message, RawMessage};
 use storage::{Database, DbOptions};
 
 mod basic;
+mod connect_list;
 mod consensus;
 mod events;
 mod requests;
 mod whitelist;
-mod connect_list;
 
 /// External messages.
 #[derive(Debug)]
@@ -727,6 +727,15 @@ impl fmt::Debug for ApiSender {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.pad("ApiSender { .. }")
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+/// Connect Info
+pub struct ConnectInfo {
+    /// Peer addr
+    pub addr: SocketAddr,
+    /// Peer public key
+    pub public_key: PublicKey,
 }
 
 /// Default system state provider implementation which just uses `SystemTime::now`
