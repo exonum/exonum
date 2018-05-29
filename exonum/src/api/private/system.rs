@@ -33,6 +33,7 @@ struct ServiceInfo {
 /// `DTO` is used to transfer information about node.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct NodeInfo {
+    core_version: String,
     protocol_version: u8,
     services: Vec<ServiceInfo>,
 }
@@ -43,7 +44,9 @@ impl NodeInfo {
     where
         I: IntoIterator<Item = &'a Box<Service>>,
     {
+        let core_version = option_env!("CARGO_PKG_VERSION").unwrap_or("?").to_owned();
         NodeInfo {
+            core_version,
             protocol_version: PROTOCOL_MAJOR_VERSION,
             services: services
                 .into_iter()
