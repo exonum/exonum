@@ -94,7 +94,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum
 
 - Private api `/v1/network/` endpoint now returns core version in addition to
-service info. (#701)
+  service info. (#701)
 
 - Default implementation of `check` method was added to `Field` trait to
   reduce boilerplate. (#639)
