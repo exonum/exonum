@@ -12,7 +12,22 @@ It implements most basic operations:
 - Add funds to the user's balance
 - Transfer funds between users
 
-## Getting started
+## Install and run
+
+### Using docker
+
+Simply run the following command to start the cryptocurrency service on 4 nodes
+on the local machine:
+
+```bash
+docker run -p 8280:8280 serhiioryshych/exonum-cryptocurrency-advanced-example
+```
+
+Ready! Find demo at [http://127.0.0.1:8280](http://127.0.0.1:8280).
+
+### Manualy
+
+#### Getting started
 
 Be sure you installed necessary packages:
 
@@ -20,7 +35,7 @@ Be sure you installed necessary packages:
 - [Node.js with npm](https://nodejs.org/en/download/)
 - [Rust compiler](https://rustup.rs/)
 
-## Install and run
+#### Install and run
 
 Below you will find a step-by-step guide to starting the cryptocurrency
 service on 4 nodes on the local machine.
