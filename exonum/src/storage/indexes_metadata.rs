@@ -26,7 +26,7 @@ pub const INDEXES_METADATA_TABLE_NAME: &str = "__INDEXES_METADATA__";
 
 // Value of this constant is to be incremented manually
 // upon the introduction of breaking changes to the storage.
-const CORE_STORAGE_VERSION: Version = 534;
+const CORE_STORAGE_VERSION: Version = 0;
 const CORE_STORAGE_VERSION_KEY: &str = "__STORAGE_VERSION__";
 
 pub type Version = u64;
@@ -163,8 +163,13 @@ pub fn assert_index_type(name: &str, index_type: IndexType, is_family: bool, vie
 
 #[derive(Debug, Clone)]
 pub(crate) enum VersionStatus {
-    Unsupported { core_ver: Version, storage_ver: Version },
-    Unspecified { core_ver: Version },
+    Unsupported {
+        core_ver: Version,
+        storage_ver: Version,
+    },
+    Unspecified {
+        core_ver: Version,
+    },
     Supported(Version),
 }
 
@@ -172,8 +177,13 @@ pub(crate) fn storage_version_status<T: AsRef<Snapshot>>(view: T) -> VersionStat
     let metadata = BaseIndex::indexes_metadata(view);
     match metadata.get::<_, Version>(CORE_STORAGE_VERSION_KEY) {
         Some(ver) if ver == CORE_STORAGE_VERSION => VersionStatus::Supported(ver),
-        Some(ver) => VersionStatus::Unsupported {core_ver: ver, storage_ver: CORE_STORAGE_VERSION},
-        None => VersionStatus::Unspecified {core_ver: CORE_STORAGE_VERSION},
+        Some(ver) => VersionStatus::Unsupported {
+            core_ver: CORE_STORAGE_VERSION,
+            storage_ver: ver,
+        },
+        None => VersionStatus::Unspecified {
+            core_ver: CORE_STORAGE_VERSION,
+        },
     }
 }
 
@@ -196,9 +206,11 @@ pub fn set_index_type(name: &str, index_type: IndexType, is_family: bool, view: 
 
 #[cfg(test)]
 mod tests {
-    use super::{IndexMetadata, IndexType, INDEXES_METADATA_TABLE_NAME, initialize_storage_version, storage_version_status, VersionStatus};
+    use super::{initialize_storage_version, storage_version_status, IndexMetadata, IndexType,
+                Version, VersionStatus, CORE_STORAGE_VERSION, CORE_STORAGE_VERSION_KEY,
+                INDEXES_METADATA_TABLE_NAME};
     use crypto::{Hash, PublicKey};
-    use storage::{Database, MapIndex, MemoryDB, ProofMapIndex};
+    use storage::{BaseIndex, Database, Fork, MapIndex, MemoryDB, ProofMapIndex};
 
     #[test]
     fn index_metadata_roundtrip() {
@@ -360,5 +372,45 @@ mod tests {
             storage_version_status(snap),
             VersionStatus::Supported(ver) if ver == core_ver
         );
+    }
+
+    #[test]
+    fn test_version_status() {
+        use super::VersionStatus::*;
+
+        let database = MemoryDB::new();
+        {
+            let mut fork = database.fork();
+            set_storage_version(&mut fork, 1337);
+
+            assert_matches!(
+                storage_version_status(fork),
+                Unsupported{ core_ver, storage_ver: 1337 } if core_ver == CORE_STORAGE_VERSION
+            );
+        }
+
+        {
+            let mut fork = database.fork();
+            set_storage_version(&mut fork, CORE_STORAGE_VERSION);
+
+            assert_matches!(
+                storage_version_status(fork),
+                Supported(ver) if ver == CORE_STORAGE_VERSION
+            );
+        }
+
+        {
+            let snap = database.snapshot();
+
+            assert_matches!(
+                storage_version_status(snap),
+                Unspecified{ core_ver } if core_ver == CORE_STORAGE_VERSION
+            );
+        }
+    }
+
+    fn set_storage_version(view: &mut Fork, ver: Version) {
+        let mut metadata = BaseIndex::indexes_metadata(view);
+        metadata.put(&CORE_STORAGE_VERSION_KEY.to_owned(), ver);
     }
 }

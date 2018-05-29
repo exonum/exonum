@@ -198,7 +198,10 @@ impl Blockchain {
         let mut fork = self.db.fork();
         let ver = storage::initialize_storage_version(&mut fork);
         if let Ok(_) = self.merge(fork.into_patch()) {
-            info!("Storage version successfully initialized with value [{}].", ver)
+            info!(
+                "Storage version successfully initialized with value [{}].",
+                ver
+            )
         } else {
             panic!("Could not set database version.")
         }
@@ -214,15 +217,17 @@ impl Blockchain {
 
         match storage::storage_version_status(self.db.snapshot()) {
             Supported(ver) => info!("Storage version is supported with value [{}].", ver),
-            Unsupported {core_ver, storage_ver} => panic!(
-                "Unsupported storage version: [{}]. Current storage version: [{}].",
-                storage_ver,
+            Unsupported {
                 core_ver,
+                storage_ver,
+            } => panic!(
+                "Unsupported storage version: [{}]. Current storage version: [{}].",
+                storage_ver, core_ver,
             ),
-            Unspecified {core_ver} => panic!(
+            Unspecified { core_ver } => panic!(
                 "Storage version is not specified. Current storage version: [{}].",
                 core_ver
-            )
+            ),
         }
     }
 
