@@ -56,6 +56,8 @@ extern crate tokio_timer;
 extern crate toml;
 extern crate uuid;
 extern crate vec_map;
+#[macro_use]
+extern crate assert_matches;
 
 // Test dependencies.
 #[cfg(test)]
