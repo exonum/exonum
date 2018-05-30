@@ -130,6 +130,7 @@ pub mod service {
     }
 
     #[test]
+    #[ignore]
     fn test_duplicated_transaction() {
         let (_, private_key) = gen_keypair();
 
