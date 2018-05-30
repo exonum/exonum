@@ -14,22 +14,20 @@
 
 //! State of the `NodeHandler`.
 
-use serde_json::Value;
 use bit_vec::BitVec;
 use failure;
+use serde_json::Value;
 
 use std::collections::{BTreeMap, HashMap, HashSet, hash_map::Entry};
 use std::net::SocketAddr;
 use std::time::{Duration, SystemTime};
 
-use messages::{BlockResponse, Connect, ConsensusMessage, Message, Precommit, Prevote, Propose,
-               RawMessage};
+use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
-use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
-use blockchain::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
+use messages::{Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawMessage, BlockResponse};
 use node::whitelist::Whitelist;
-use node::timeout_adjuster::{Constant, Dynamic, MovingAverage, TimeoutAdjuster};
+use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 
 // TODO: move request timeouts into node configuration (ECR-171)
 
@@ -67,7 +65,7 @@ pub struct State {
     locked_propose: Option<Hash>,
     last_hash: Hash,
 
-    // messages
+    // Messages.
     proposes: HashMap<Hash, ProposeState>,
     blocks: HashMap<Hash, BlockState>,
     prevotes: HashMap<(Round, Hash), Votes<Prevote>>,
@@ -81,15 +79,15 @@ pub struct State {
     // Our requests state.
     requests: HashMap<RequestData, RequestState>,
 
-    // maximum of node height in consensus messages
+    // Maximum of node height in consensus messages.
     nodes_max_height: BTreeMap<PublicKey, Height>,
 
     validators_rounds: BTreeMap<ValidatorId, Round>,
 
-    timeout_adjuster: Box<TimeoutAdjuster>,
+    // Current value of the propose timeout.
     propose_timeout: Milliseconds,
 
-    incomplete_blocks: HashMap<Hash, IncompleteBlock>,
+    incomplete_block: Option<IncompleteBlock>,
 }
 
 /// State of a validator-node.
@@ -109,7 +107,7 @@ pub enum RequestData {
     /// Represents `TransactionsRequest` message for `Propose`.
     TransactionsForPropose(Hash),
     /// Represents `TransactionsRequest` message for `BlockResponse`.
-    TransactionsForBlock(Hash),
+    TransactionsForBlock,
     /// Represents `PrevotesRequest` message.
     Prevotes(Round, Hash),
     /// Represents `BlockRequest` message.
@@ -256,7 +254,7 @@ impl RequestData {
         let ms = match *self {
             RequestData::Propose(..) => PROPOSE_REQUEST_TIMEOUT,
             RequestData::TransactionsForPropose(..) => TRANSACTIONS_REQUEST_TIMEOUT,
-            RequestData::TransactionsForBlock(..) => TRANSACTIONS_REQUEST_TIMEOUT,
+            RequestData::TransactionsForBlock => TRANSACTIONS_REQUEST_TIMEOUT,
             RequestData::Prevotes(..) => PREVOTES_REQUEST_TIMEOUT,
             RequestData::Block(..) => BLOCK_REQUEST_TIMEOUT,
         };
@@ -433,11 +431,10 @@ impl State {
 
             requests: HashMap::new(),
 
-            timeout_adjuster: make_timeout_adjuster(&stored.consensus),
-            propose_timeout: 0,
+            propose_timeout: stored.consensus.max_propose_timeout,
             config: stored,
 
-            incomplete_blocks: HashMap::new(),
+            incomplete_block: None,
         }
     }
 
@@ -528,13 +525,11 @@ impl State {
         self.renew_validator_id(validator_id);
         trace!("Validator={:#?}", self.validator_state());
 
-        self.timeout_adjuster = make_timeout_adjuster(&config.consensus);
         self.config = config;
     }
 
-    /// Adjusts propose timeout (see `TimeoutAdjuster` for the details).
-    pub fn adjust_timeout(&mut self, snapshot: &Snapshot) {
-        let timeout = self.timeout_adjuster.adjust_timeout(snapshot);
+    /// Sets a new propose timeout value.
+    pub fn set_propose_timeout(&mut self, timeout: Milliseconds) {
         self.propose_timeout = timeout;
     }
 
@@ -728,11 +723,6 @@ impl State {
         self.blocks.get(hash)
     }
 
-    /// Returns incomplete block with the specified hash.
-    pub fn incomplete_block(&self, hash: &Hash) -> Option<&IncompleteBlock> {
-        self.incomplete_blocks.get(hash)
-    }
-
     /// Updates mode's round.
     pub fn jump_round(&mut self, round: Round) {
         self.round = round;
@@ -741,6 +731,11 @@ impl State {
     /// Increments node's round by one.
     pub fn new_round(&mut self) {
         self.round.increment();
+    }
+
+    /// Return incomplete block.
+    pub fn incomplete_block(&self) -> Option<IncompleteBlock> {
+        self.incomplete_block.clone()
     }
 
     /// Increments the node height by one and resets previous height data.
@@ -762,7 +757,7 @@ impl State {
             validator_state.clear();
         }
         self.requests.clear(); // FIXME: clear all timeouts (ECR-171)
-        self.incomplete_blocks.clear();
+        self.incomplete_block = None;
     }
 
     /// Returns a list of queued consensus messages.
@@ -803,16 +798,14 @@ impl State {
     ///
     /// - transaction isn't contained in unknown transaction list of any blocks
     /// - transaction isn't a part of block
-    pub fn remove_unknown_transaction(&mut self, tx_hash: Hash) -> Vec<(Hash, IncompleteBlock)> {
-        let mut full_blocks = Vec::new();
-        for (hash, block) in &mut self.incomplete_blocks {
-            block.unknown_txs.remove(&tx_hash);
-            if block.unknown_txs.is_empty() {
-                full_blocks.push((*hash, block.clone()))
+    pub fn remove_unknown_transaction(&mut self, tx_hash: Hash) -> Option<IncompleteBlock> {
+        if let Some(ref mut incomplete_block) = self.incomplete_block {
+            incomplete_block.unknown_txs.remove(&tx_hash);
+            if incomplete_block.unknown_txs.is_empty() {
+                return Some(incomplete_block.clone());
             }
         }
-
-        full_blocks
+        None
     }
 
     /// Returns pre-votes for the specified round and propose hash.
@@ -932,29 +925,34 @@ impl State {
         msg: &BlockResponse,
         txs: &MapIndex<&&Snapshot, Hash, RawMessage>,
         txs_pool: &KeySetIndex<&&Snapshot, Hash>,
-    ) -> Result<&IncompleteBlock, failure::Error> {
-        match self.incomplete_blocks.entry(msg.block().hash()) {
-            Entry::Occupied(..) => bail!("Block already found"),
-            Entry::Vacant(e) => {
-                let mut unknown_txs = HashSet::new();
-                for hash in msg.transactions() {
-                    if txs.get(hash).is_some() {
-                        if !txs_pool.contains(hash) {
-                            bail!(
-                                "Received block with already \
-                                 committed transaction"
-                            )
-                        }
-                    } else {
-                        unknown_txs.insert(*hash);
-                    }
-                }
-
-                Ok(e.insert(IncompleteBlock {
-                    msg: msg.clone(),
-                    unknown_txs,
-                }))
+    ) -> Result<bool, failure::Error> {
+        if let Some(ref incomplete_block) = self.incomplete_block {
+            if incomplete_block.msg.block().hash() == msg.block().hash() {
+                bail!("Block already found")
+            } else {
+                panic!("Two incomplete blocks with different hash")
             }
+        } else {
+            let mut unknown_txs = HashSet::new();
+            for hash in msg.transactions() {
+                if txs.get(hash).is_some() {
+                    if !txs_pool.contains(hash) {
+                        panic!(
+                            "Received block with already \
+                            committed transaction"
+                        )
+                    }
+                } else {
+                    unknown_txs.insert(*hash);
+                }
+            }
+
+            self.incomplete_block = Some(IncompleteBlock {
+                msg: msg.clone(),
+                unknown_txs: unknown_txs.clone(),
+            });
+
+            Ok(!unknown_txs.is_empty())
         }
     }
 
@@ -1139,28 +1137,5 @@ impl State {
     /// Updates the `Connect` message of the current node.
     pub fn set_our_connect_message(&mut self, msg: Connect) {
         self.our_connect_message = msg;
-    }
-}
-
-fn make_timeout_adjuster(config: &ConsensusConfig) -> Box<TimeoutAdjuster> {
-    match config.timeout_adjuster {
-        TimeoutAdjusterConfig::Constant { timeout } => Box::new(Constant::new(timeout)),
-        TimeoutAdjusterConfig::Dynamic {
-            min,
-            max,
-            threshold,
-        } => Box::new(Dynamic::new(min, max, threshold)),
-        TimeoutAdjusterConfig::MovingAverage {
-            min,
-            max,
-            adjustment_speed,
-            optimal_block_load,
-        } => Box::new(MovingAverage::new(
-            min,
-            max,
-            adjustment_speed,
-            config.txs_block_limit,
-            optimal_block_load,
-        )),
     }
 }

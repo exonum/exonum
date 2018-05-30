@@ -14,12 +14,12 @@
 
 #![allow(unsafe_code)]
 
-use byteorder::{ByteOrder, LittleEndian};
 use bit_vec::BitVec;
+use byteorder::{ByteOrder, LittleEndian};
 
-use messages::{MessageBuffer, RawMessage, HEADER_LENGTH};
-use crypto::Hash;
 use super::{CheckedOffset, Error, Field, Offset, Result};
+use crypto::Hash;
+use messages::{MessageBuffer, RawMessage, HEADER_LENGTH};
 
 /// Trait for fields, that has unknown `compile-time` size.
 /// Usually important for arrays,
@@ -311,14 +311,25 @@ impl<'a> SegmentField<'a> for &'a [u8] {
     }
 }
 
-/// Implement field helper for all array of POD types
-/// it writes POD type as bytearray in place.
+/// Implements a field helper for an array of POD type. The macro allows using
+/// fields with type `&[T]`, where `T` is the argument of the macro, in Exonum
+/// persistence mechanisms, i.e. `transactions!` and `encoding_struct!` macros.
+/// `T` needs to be a POD (plain old data) type for the conversion to work.
 ///
-/// **Beware of platform specific data representation.**
+/// Additionally, this macro implements the
+/// [`ExonumJson`] and [`Field`] traits for data of POD type, so that they can
+/// be used within persistent data structures in Exonum.
+///
+/// For additional information, refer to the [`encoding`] module documentation.
+///
+/// **Note.** Beware of platform specific data representation.
+///
+/// [`encoding`]: ./encoding/index.html
+/// [`ExonumJson`]: ./encoding/serialize/json/trait.ExonumJson.html
+/// [`Field`]: ./encoding/trait.Field.html
 #[macro_export]
 macro_rules! implement_pod_array_field {
-    ($name:ident) => (
-
+    ($name:ident) => {
         impl<'a> SegmentField<'a> for &'a [$name] {
             fn item_size() -> Offset {
                 ::std::mem::size_of::<$name>() as Offset
@@ -331,26 +342,32 @@ macro_rules! implement_pod_array_field {
             unsafe fn from_buffer(buffer: &'a [u8], from: Offset, count: Offset) -> Self {
                 let to = from + count * Self::item_size();
                 let slice = &buffer[(from as usize)..(to as usize)];
-                ::std::slice::from_raw_parts(slice.as_ptr() as *const Hash,
-                                            slice.len() / Self::item_size() as usize)
+                ::std::slice::from_raw_parts(
+                    slice.as_ptr() as *const Hash,
+                    slice.len() / Self::item_size() as usize,
+                )
             }
 
             fn extend_buffer(&self, buffer: &mut Vec<u8>) {
                 let slice = unsafe {
-                    ::std::slice::from_raw_parts(self.as_ptr() as *const u8,
-                                                self.len() * Self::item_size() as usize)
+                    ::std::slice::from_raw_parts(
+                        self.as_ptr() as *const u8,
+                        self.len() * Self::item_size() as usize,
+                    )
                 };
                 buffer.extend_from_slice(slice)
             }
 
-            fn check_data(_: &'a [u8],
-                        _: CheckedOffset,
-                        _: CheckedOffset,
-                        latest_segment: CheckedOffset) -> Result {
+            fn check_data(
+                _: &'a [u8],
+                _: CheckedOffset,
+                _: CheckedOffset,
+                latest_segment: CheckedOffset,
+            ) -> Result {
                 Ok(latest_segment)
             }
         }
-    )
+    };
 }
 
 implement_pod_array_field!{Hash}

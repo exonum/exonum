@@ -30,10 +30,10 @@ use chrono::{DateTime, Utc};
 
 use std::net::SocketAddr;
 
-use crypto::{Hash, PublicKey};
-use blockchain;
-use helpers::{Height, Round, ValidatorId};
 use super::{BitVec, RawMessage, ServiceMessage};
+use blockchain;
+use crypto::{Hash, PublicKey};
+use helpers::{Height, Round, ValidatorId};
 
 /// Consensus message type.
 pub const CONSENSUS: u16 = 0;

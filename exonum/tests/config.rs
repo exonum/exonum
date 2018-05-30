@@ -18,14 +18,14 @@ extern crate exonum;
 extern crate pretty_assertions;
 extern crate toml;
 
-use toml::Value;
 use exonum::helpers::fabric::NodeBuilder;
+use toml::Value;
 
 use std::ffi::OsString;
 use std::fs::{File, OpenOptions};
-use std::{fs, panic};
-use std::path::Path;
 use std::io::{Read, Write};
+use std::path::Path;
+use std::{fs, panic};
 
 const CONFIG_TMP_FOLDER: &str = "/tmp/";
 const CONFIG_TESTDATA_FOLDER: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/testdata/config/");

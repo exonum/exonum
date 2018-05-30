@@ -14,8 +14,8 @@
 
 use bodyparser;
 use exonum::api::{Api, ApiError};
-use exonum::crypto::{CryptoHash, Hash, PublicKey, SecretKey};
 use exonum::blockchain::{ApiContext, Blockchain, Schema as CoreSchema, StoredConfiguration};
+use exonum::crypto::{CryptoHash, Hash, PublicKey, SecretKey};
 use exonum::encoding::serialize::json::reexport as serde_json;
 use exonum::helpers::Height;
 use exonum::node::{ApiSender, TransactionSend};
@@ -277,7 +277,7 @@ impl PrivateApi {
                 Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
             };
 
-            config.consensus.validate_configuration();
+            config.consensus.warn_if_nonoptimal();
 
             let cfg_hash = config.hash();
             let propose = Propose::new(

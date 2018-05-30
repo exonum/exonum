@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use super::config::StoredConfiguration;
+use super::{Block, BlockProof, Blockchain, TransactionResult};
 use crypto::{CryptoHash, Hash, PublicKey};
+use helpers::{Height, Round};
 use messages::{Connect, Precommit, RawMessage};
 use storage::{Entry, Fork, KeySetIndex, ListIndex, MapIndex, MapProof, ProofListIndex,
               ProofMapIndex, Snapshot};
-use helpers::{Height, Round};
-use super::{Block, BlockProof, Blockchain, TransactionResult};
-use super::config::StoredConfiguration;
 
 /// Defines `&str` constants with given name and value.
 macro_rules! define_names {
@@ -48,27 +48,33 @@ define_names!(
     CONSENSUS_ROUND => "consensus_round";
 );
 
-encoding_struct! (
+encoding_struct! {
     /// Configuration index.
     struct ConfigReference {
-        /// The height, starting from which this configuration becomes actual.
+        /// Height since which this configuration becomes actual.
         actual_from: Height,
         /// Hash of the configuration contents that serialized as raw bytes vec.
         cfg_hash: &Hash,
     }
-);
+}
 
-encoding_struct! (
-    /// Transaction location in block.
+encoding_struct! {
+    /// Transaction location in a block.
+    /// The given entity defines the block where the transaction was
+    /// included and the position of this transaction in that block.
     struct TxLocation {
-        /// Height of block in the blockchain.
+        /// Height of the block where the transaction was included.
         block_height: Height,
-        /// Index in block.
+        /// Zero-based position of this transaction in the block.
         position_in_block: u64,
     }
-);
+}
 
-/// Information schema for `exonum-core`.
+/// Information schema for indices maintained by the Exonum core logic.
+///
+/// Indices defined by this schema are present in the blockchain regardless of
+/// the deployed services and store general-purpose information, such as
+/// committed transactions.
 #[derive(Debug)]
 pub struct Schema<T> {
     view: T,
@@ -83,22 +89,27 @@ where
         Schema { view: snapshot }
     }
 
-    /// Returns table that represents a map from transaction hash into raw transaction message.
+    /// Returns a table that represents a map with a key-value pair of a
+    /// transaction hash and raw transaction message.
     pub fn transactions(&self) -> MapIndex<&T, Hash, RawMessage> {
         MapIndex::new(TRANSACTIONS, &self.view)
     }
 
-    /// Returns table that represents a map from transaction hash into execution result.
+    /// Returns a table that represents a map with a key-value pair of a transaction
+    /// hash and execution result.
+    ///
+    /// This method can be used to retrieve a proof that a certain transaction
+    /// result is present in the blockchain.
     pub fn transaction_results(&self) -> ProofMapIndex<&T, Hash, TransactionResult> {
         ProofMapIndex::new(TRANSACTION_RESULTS, &self.view)
     }
 
-    /// Returns table that represents a set of uncommitted transactions hashes.
+    /// Returns a table that represents a set of uncommitted transactions hashes.
     pub fn transactions_pool(&self) -> KeySetIndex<&T, Hash> {
         KeySetIndex::new(TRANSACTIONS_POOL, &self.view)
     }
 
-    /// Returns number of transactions in the pool
+    /// Returns the number of transactions in the pool.
     #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
     pub fn transactions_pool_len(&self) -> usize {
         let pool = self.transactions_pool();
@@ -107,41 +118,42 @@ where
         count
     }
 
-    /// Returns table that keeps the block height and tx position inside block for every
+    /// Returns a table that keeps the block height and transaction position inside the block for every
     /// transaction hash.
     pub fn transactions_locations(&self) -> MapIndex<&T, Hash, TxLocation> {
         MapIndex::new(TRANSACTIONS_LOCATIONS, &self.view)
     }
 
-    /// Returns table that stores block object for every block height.
+    /// Returns a table that stores a block object for every block height.
     pub fn blocks(&self) -> MapIndex<&T, Hash, Block> {
         MapIndex::new(BLOCKS, &self.view)
     }
 
-    /// Returns table that keeps block hash for the corresponding height.
+    /// Returns a table that keeps block hashes for corresponding block heights.
     pub fn block_hashes_by_height(&self) -> ListIndex<&T, Hash> {
         ListIndex::new(BLOCK_HASHES_BY_HEIGHT, &self.view)
     }
 
-    /// Returns table that keeps a list of transactions for the each block.
+    /// Returns a table that keeps a list of transactions for each block.
     pub fn block_transactions(&self, height: Height) -> ProofListIndex<&T, Hash> {
         let height: u64 = height.into();
         ProofListIndex::new_in_family(BLOCK_TRANSACTIONS, &height, &self.view)
     }
 
-    /// Returns table that saves a list of precommits for block with given hash.
+    /// Returns a table that keeps a list of precommits for the block with the given hash.
     pub fn precommits(&self, hash: &Hash) -> ListIndex<&T, Precommit> {
         ListIndex::new_in_family(PRECOMMITS, hash, &self.view)
     }
 
-    /// Returns table that represents a map from configuration hash into contents.
+    /// Returns a table that represents a map with a key-value pair of a
+    /// configuration hash and contents.
     pub fn configs(&self) -> ProofMapIndex<&T, Hash, StoredConfiguration> {
         // configs patricia merkle tree <block height> json
         ProofMapIndex::new(CONFIGS, &self.view)
     }
 
-    /// Returns auxiliary table that keeps hash references to configurations in order
-    /// of increasing their `actual_from` height.
+    /// Returns an auxiliary table that keeps hash references to configurations in
+    /// the increasing order of their `actual_from` height.
     pub fn configs_actual_from(&self) -> ListIndex<&T, ConfigReference> {
         ListIndex::new(CONFIGS_ACTUAL_FROM, &self.view)
     }
@@ -149,42 +161,43 @@ where
     /// Returns the accessory `ProofMapIndex` for calculating
     /// patches in the DBView layer.
     ///
-    /// Table calculates "aggregation" of root hashes of individual
+    /// The table calculates the "aggregation" of root hashes of individual
     /// service tables, in effect summing the state of various entities,
     /// scattered across distinct services and their tables. Sum is performed by
-    /// means of computing root hash of this table.
+    /// means of computing the root hash of this table.
     ///
     /// - Table **key** is 32 bytes of normalized coordinates of a service
-    /// table, as returned by `service_table_unique_key` helper function.
-    /// - Table **value** is root hash of a service table, which contributes
-    /// to the resulting block's `state_hash`.
+    /// table, as returned by the `service_table_unique_key` helper function.
+    /// - Table **value** is the root hash of a service table, which contributes
+    /// to the `state_hash` of the resulting block.
     ///
-    /// Core tables participate in resulting state_hash with `CORE_SERVICE`
-    /// service_id. Their vector is returned by `core_state_hash` method.
+    /// Core tables participate in the resulting state_hash with `CORE_SERVICE`
+    /// service_id. Their vector is returned by the `core_state_hash` method.
     pub fn state_hash_aggregator(&self) -> ProofMapIndex<&T, Hash, Hash> {
         ProofMapIndex::new(STATE_HASH_AGGREGATOR, &self.view)
     }
 
-    /// Returns peers that have to be recovered in case of process' restart
+    /// Returns peers that have to be recovered in case of process restart
     /// after abnormal termination.
     pub(crate) fn peers_cache(&self) -> MapIndex<&T, PublicKey, Connect> {
         MapIndex::new(PEERS_CACHE, &self.view)
     }
 
-    /// Returns consensus messages that have to be recovered in case of process' restart
+    /// Returns consensus messages that have to be recovered in case of process restart
     /// after abnormal termination.
     pub(crate) fn consensus_messages_cache(&self) -> ListIndex<&T, RawMessage> {
         ListIndex::new(CONSENSUS_MESSAGES_CACHE, &self.view)
     }
 
-    /// Returns saved value of the consensus round. Returns first round if it wasn't saved.
+    /// Returns the saved value of the consensus round. Returns the first round
+    /// if it has not been saved.
     pub(crate) fn consensus_round(&self) -> Round {
         Entry::new(CONSENSUS_ROUND, &self.view)
             .get()
             .unwrap_or_else(Round::first)
     }
 
-    /// Returns block hash for the given height.
+    /// Returns the block hash for the given height.
     pub fn block_hash_by_height(&self, height: Height) -> Option<Hash> {
         self.block_hashes_by_height().get(height.into())
     }
@@ -202,7 +215,7 @@ where
         Some(res)
     }
 
-    /// Returns latest committed block.
+    /// Returns the latest committed block.
     ///
     /// # Panics
     ///
@@ -214,7 +227,7 @@ where
         self.blocks().get(&hash).unwrap()
     }
 
-    /// Returns height of the latest committed block.
+    /// Returns the height of the latest committed block.
     ///
     /// # Panics
     ///
@@ -228,7 +241,7 @@ where
         Height(len - 1)
     }
 
-    /// Returns configuration for the latest height of blockchain.
+    /// Returns the configuration for the latest height of the blockchain.
     ///
     /// # Panics
     ///
@@ -240,7 +253,8 @@ where
         res
     }
 
-    /// Returns the nearest following configuration if it exists.
+    /// Returns the nearest following configuration which will be applied after
+    /// the current one, if it exists.
     pub fn following_configuration(&self) -> Option<StoredConfiguration> {
         let next_height = self.next_height();
         let idx = self.find_configurations_index_by_height(next_height);
@@ -276,7 +290,7 @@ where
         }
     }
 
-    /// Returns the configuration that is the actual for the given height.
+    /// Returns the configuration that is actual for the given height.
     pub fn configuration_by_height(&self, height: Height) -> StoredConfiguration {
         let idx = self.find_configurations_index_by_height(height);
         let cfg_ref = self.configs_actual_from()
@@ -289,7 +303,7 @@ where
         ))
     }
 
-    /// Returns configuration for given configuration hash.
+    /// Returns the configuration for the given configuration hash.
     pub fn configuration_by_hash(&self, hash: &Hash) -> Option<StoredConfiguration> {
         self.configs().get(hash)
     }
@@ -302,27 +316,29 @@ where
         ]
     }
 
-    /// Constructs a proof of inclusion of root hash of a specific service
-    /// table into block's `state_hash`.
+    /// Constructs a proof of inclusion of a root hash of a specific service
+    /// table into the block `state_hash`.
     ///
-    /// Searched key for proof is uniquely identified by (`u16`, `u16`) tuple
-    /// of table's coordinates.
+    /// The `service_id` and `table_idx` are automatically combined to form the key of the
+    /// required service table; this key serves as a search query for the method.
+    /// The service table key is uniquely identified by a `(u16, u16)` tuple
+    /// of table coordinates.
     ///
-    /// If found, root hash is returned as a value of proof's leaf
-    /// corresponding to searched key. Otherwise, partial path to searched key
-    /// is returned, which proves its exclusion.
+    /// If found, the method returns the root hash as a value of the proof leaf
+    /// corresponding to the required service table key. Otherwise, a partial
+    /// path to the service table key is returned, which proves its exclusion.
     ///
-    /// The returned proof is used as a component of proof of state of any
-    /// entity, stored in `exonum` db at specific height, as identified
-    /// by corresponding block's `state_hash`. State of some meta tables
+    /// The resulting proof can be used as a component of proof of state of an
+    /// entity stored in the blockchain state at a specific height. The proof is
+    /// tied to the `state_hash` of the corresponding `Block`. State of some meta tables
     /// of core and services isn't tracked.
     ///
     /// # Arguments
     ///
     /// * `service_id` - `service_id` as returned by instance of type of
-    /// `Service` trait
-    /// * `table_idx` - index of service table in `Vec`, returned by
-    /// `state_hash` method of instance of type of `Service` trait
+    /// `Service` trait.
+    /// * `table_idx` - index of the service table in `Vec`, returned by the
+    /// `state_hash` method of an instance of a type of the `Service` trait.
     pub fn get_proof_to_service_table(
         &self,
         service_id: u16,
@@ -452,13 +468,13 @@ impl<'a> Schema<&'a mut Fork> {
         ListIndex::new(CONSENSUS_MESSAGES_CACHE, self.view)
     }
 
-    /// Saves the given consensus round value into storage.
+    /// Saves the given consensus round value into the storage.
     pub(crate) fn set_consensus_round(&mut self, round: Round) {
         let mut entry: Entry<&mut Fork, _> = Entry::new(CONSENSUS_ROUND, self.view);
         entry.set(round);
     }
 
-    /// Adds a new configuration to the blockchain, which will become an actual at
+    /// Adds a new configuration to the blockchain, which will become actual at
     /// the `actual_from` height in `config_data`.
     pub fn commit_configuration(&mut self, config_data: StoredConfiguration) {
         let actual_from = config_data.actual_from;
@@ -496,19 +512,19 @@ impl<'a> Schema<&'a mut Fork> {
         // TODO: clear storages
     }
 
-    /// Adds transaction into persistent pool.
+    /// Adds transaction into the persistent pool.
     #[doc(hidden)]
     pub fn add_transaction_into_pool(&mut self, tx: RawMessage) {
         self.transactions_pool_mut().insert(tx.hash());
         self.transactions_mut().put(&tx.hash(), tx);
     }
 
-    /// Changes transaction status from `in_pool`, to `committed`.
+    /// Changes the transaction status from `in_pool`, to `committed`.
     pub(crate) fn commit_transaction(&mut self, hash: &Hash) {
         self.transactions_pool_mut().remove(hash)
     }
 
-    /// Remove transaction from persistent pool.
+    /// Removes transaction from the persistent pool.
     #[doc(hidden)]
     pub fn reject_transaction(&mut self, hash: &Hash) -> Result<(), ()> {
         let contains = self.transactions_pool_mut().contains(hash);

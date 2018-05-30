@@ -21,39 +21,39 @@ pub use self::state::{RequestData, State, ValidatorState};
 pub use self::whitelist::Whitelist;
 
 pub mod state; // TODO: temporary solution to get access to WAIT constants (ECR-167)
-pub mod timeout_adjuster;
 
 use failure;
-use toml::Value;
-use router::Router;
-use mount::Mount;
+use futures::{Future, Sink, sync::mpsc};
 use iron::{Chain, Iron, Listening};
 use iron_cors::CorsMiddleware;
+use mount::Mount;
+use router::Router;
 use serde::{de, ser};
-use futures::{Future, Sink, sync::mpsc};
 use tokio_core::reactor::Core;
+use toml::Value;
 
-use std::{fmt, io};
+use std::collections::{BTreeMap, HashSet};
+use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
-use std::net::SocketAddr;
 use std::time::{Duration, SystemTime};
-use std::collections::{BTreeMap, HashSet};
+use std::{fmt, io};
 
-use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
-use blockchain::{Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction};
 use api::{private, public, Api};
-use messages::{Connect, Message, RawMessage};
-use events::{HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkConfiguration,
-             NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest};
+use blockchain::{Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction};
+use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use events::error::{into_other, log_error, other_error, LogError};
+use events::{HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkConfiguration,
+             NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
+             noise::HandshakeParams};
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
+use messages::{Connect, Message, RawMessage};
 use storage::{Database, DbOptions};
 
-mod events;
 mod basic;
 mod consensus;
+mod events;
 mod requests;
 mod whitelist;
 
@@ -415,7 +415,7 @@ impl NodeHandler {
 
         let mut whitelist = config.listener.whitelist;
         whitelist.set_validators(stored.validator_keys.iter().map(|x| x.consensus_key));
-        let mut state = State::new(
+        let state = State::new(
             validator_id,
             config.listener.consensus_public_key,
             config.listener.consensus_secret_key,
@@ -430,9 +430,6 @@ impl NodeHandler {
             last_height,
             system_state.current_time(),
         );
-
-        // Adjust propose timeout for the first time.
-        state.adjust_timeout(&*snapshot);
 
         NodeHandler {
             blockchain,
@@ -468,6 +465,21 @@ impl NodeHandler {
     /// Returns value of the `txs_block_limit` field from the current `ConsensusConfig`.
     pub fn txs_block_limit(&self) -> u32 {
         self.state().consensus_config().txs_block_limit
+    }
+
+    /// Returns value of the minimal propose timeout.
+    pub fn min_propose_timeout(&self) -> Milliseconds {
+        self.state().consensus_config().min_propose_timeout
+    }
+
+    /// Returns value of the maximal propose timeout.
+    pub fn max_propose_timeout(&self) -> Milliseconds {
+        self.state().consensus_config().max_propose_timeout
+    }
+
+    /// Returns threshold starting from which the minimal propose timeout value is used.
+    pub fn propose_timeout_threshold(&self) -> u32 {
+        self.state().consensus_config().propose_timeout_threshold
     }
 
     /// Returns `State` of the node.
@@ -590,9 +602,17 @@ impl NodeHandler {
 
     /// Adds `NodeTimeout::Propose` timeout to the channel.
     pub fn add_propose_timeout(&mut self) {
-        let adjusted_timeout = self.state.propose_timeout();
-        let time =
-            self.round_start_time(self.state.round()) + Duration::from_millis(adjusted_timeout);
+        let snapshot = self.blockchain.snapshot();
+        let timeout = if Schema::new(&snapshot).transactions_pool_len()
+            >= self.propose_timeout_threshold() as usize
+        {
+            self.min_propose_timeout()
+        } else {
+            self.max_propose_timeout()
+        };
+        self.state.set_propose_timeout(timeout);
+
+        let time = self.round_start_time(self.state.round()) + Duration::from_millis(timeout);
 
         trace!(
             "ADD PROPOSE TIMEOUT: time={:?}, height={}, round={}",
@@ -843,17 +863,18 @@ impl Node {
 
     /// Launches only consensus messages handler.
     /// This may be used if you want to customize api with the `ApiContext`.
-    pub fn run_handler(mut self) -> io::Result<()> {
+    pub fn run_handler(mut self, handshake_params: &HandshakeParams) -> io::Result<()> {
         self.handler.initialize();
 
         let (handler_part, network_part, timeouts_part) = self.into_reactor();
+        let handshake_params = handshake_params.clone();
 
         let network_thread = thread::spawn(move || {
             let mut core = Core::new()?;
             let handle = core.handle();
             core.handle()
                 .spawn(timeouts_part.run(handle).map_err(log_error));
-            let network_handler = network_part.run(&core.handle());
+            let network_handler = network_part.run(&core.handle(), &handshake_params);
             core.run(network_handler).map(drop).map_err(|e| {
                 other_error(&format!("An error in the `Network` thread occurred: {}", e))
             })
@@ -899,7 +920,12 @@ impl Node {
             info!("Public exonum api started on {}", listen_address);
         };
 
-        self.run_handler()?;
+        let handshake_params = HandshakeParams {
+            public_key: *self.handler().state().consensus_public_key(),
+            secret_key: self.handler().state().consensus_secret_key().clone(),
+            max_message_len: self.max_message_len,
+        };
+        self.run_handler(&handshake_params)?;
 
         // Stop all api handlers.
         for mut handler in api_handlers {

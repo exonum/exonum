@@ -5,6 +5,34 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Breaking changes
+
+#### exonum
+
+- `TimeoutAdjusterConfig` has been removed along with different timeout
+  adjusters. Current behavior is similar to the `Dynamic` timeout adjuster and
+  can be modified through `min_propose_timeout`, `max_propose_timeout` and
+  `propose_timeout_threshold` fields in the `ConsensusConfig`. (#643)
+
+  Migration path:
+
+  - `Constant` timeout adjuster can be emulated by setting equal
+  `min_propose_timeout` and `max_propose_timeout` values.
+  - For `Dynamic` timeout adjuster simply move `min`, `max` and `threshold`
+    values into `min_propose_timeout`, `max_propose_timeout` and
+    `propose_timeout_threshold` correspondingly.
+  - There is no possibility to emulate `MovingAverage` now, so `Dynamic` should
+    be used as the closest alternative.
+
+- Network connections are now encrypted using
+  [Noise Protocol](https://noiseprotocol.org/). Nodes compiled with old
+  version will not connect to the new ones. Therefore you need to
+  update all node instances for the network to work. (#678)
+- `storage::Error` constructor has been made private. (#689)
+
+- `ConsensusConfig::validate_configuration` method has been renamed to the
+  `warn_if_nonoptimal`. (#690)
+
 ### New features
 
 #### exonum
@@ -26,6 +54,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Maintenance CLI command for node management has been added. Currently the only
   supported command is `clear-cache` which clears node message cache. (#676)
 
+- `StoredConfiguration` validation has been extended with `txs_block_limit`
+  parameter check. (#690)
+
+- A warning for non-optimal `StoredConfiguration::txs_block_limit` value has been
+  added. (#690)
+
 #### exonum-timestamping
 
 - Additional service example has been added along with frontend. (#646)
@@ -40,6 +74,16 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Fixed bug with shutdown requests handling. (#666)
 
 - Fixed deserialization of the `MapProof` data structure. (#674)
+
+- Fixed a bug which prevented the node from reaching the actual round. (#680 #681)
+
+#### exonum-configuration
+
+- Error description has been added to the return value of the transactions. (#695)
+
+#### exonum-time
+
+- Error description has been added to the return value of the transactions. (#695)
 
 #### exonum-cryptocurrency-advanced
 

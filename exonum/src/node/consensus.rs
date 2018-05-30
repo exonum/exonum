@@ -15,15 +15,15 @@
 use std::collections::HashSet;
 use std::error::Error;
 
-use crypto::{CryptoHash, Hash, PublicKey};
 use blockchain::{Schema, Transaction};
+use crypto::{CryptoHash, Hash, PublicKey};
+use events::InternalRequest;
+use helpers::{Height, Round, ValidatorId};
 use messages::{BlockRequest, BlockResponse, ConsensusMessage, Message, Precommit, Prevote,
                PrevotesRequest, Propose, ProposeRequest, RawTransaction, TransactionsRequest,
                TransactionsResponse};
-use helpers::{Height, Round, ValidatorId};
-use storage::Patch;
 use node::{NodeHandler, RequestData};
-use events::InternalRequest;
+use storage::Patch;
 
 // TODO reduce view invocations (ECR-171)
 impl NodeHandler {
@@ -152,55 +152,54 @@ impl NodeHandler {
         }
     }
 
-    /// Handles the `Block` message. For details see the message documentation.
-    // TODO write helper function which returns Result (ECR-123)
-    #[cfg_attr(feature = "flame_profile", flame)]
-    pub fn handle_block(&mut self, msg: &BlockResponse) {
+    fn validate_block_response(&self, msg: &BlockResponse) -> Result<(), String> {
         // Request are sent to us
         if msg.to() != self.state.consensus_public_key() {
-            error!(
-                "Received block intended for another peer, to={}, from={}",
-                msg.to().to_hex(),
-                msg.from().to_hex()
-            );
-            return;
+            return Err(format!("Received block intended for another peer, to={}, from={}",
+                               msg.to().to_hex(),
+                               msg.from().to_hex()));
         }
 
         if !self.state.whitelist().allow(msg.from()) {
-            error!(
-                "Received request message from peer = {} which not in whitelist.",
-                msg.from().to_hex()
-            );
-            return;
+            return Err(format!("Received request message from peer = {} which not in whitelist.",
+                               msg.from().to_hex()));
         }
 
         if !msg.verify_signature(msg.from()) {
-            error!("Received block with incorrect signature, msg={:?}", msg);
-            return;
+            return Err(format!("Received block with incorrect signature, msg={:?}", msg));
         }
 
-        trace!("Handle block");
-
         let block = msg.block();
-        let block_hash = block.hash();
 
         // TODO add block with greater height to queue (ECR-171)
         if self.state.height() != block.height() {
-            return;
+            return Err("Received block hash another height".to_string());
         }
 
         // Check block content
         if block.prev_hash() != &self.last_block_hash() {
-            error!(
+            return Err(format!(
                 "Received block prev_hash is distinct from the one in db, \
                  block={:?}, block.prev_hash={:?}, db.last_block_hash={:?}",
                 msg,
                 *block.prev_hash(),
                 self.last_block_hash()
-            );
-            return;
+            ));
         }
 
+        Ok(())
+    }
+
+    /// Handles the `Block` message. For details see the message documentation.
+    // TODO write helper function which returns Result (ECR-123)
+    #[cfg_attr(feature = "flame_profile", flame)]
+    pub fn handle_block(&mut self, msg: &BlockResponse) {
+        if let Err(err) = self.validate_block_response(msg) {
+            error!("{}, block={:?}", err, msg);
+        }
+
+        let block = msg.block();
+        let block_hash = block.hash();
         if let Err(err) = self.verify_precommits(&msg.precommits(), &block_hash, block.height()) {
             error!("{}, block={:?}", err, msg);
             return;
@@ -214,7 +213,7 @@ impl NodeHandler {
                 &schema.transactions(),
                 &schema.transactions_pool(),
             ) {
-                Ok(state) => state.has_unknown_txs(),
+                Ok(has_unknown_txs) => has_unknown_txs,
                 Err(err) => {
                     warn!("{}, msg={:?}", err, msg);
                     return;
@@ -225,10 +224,10 @@ impl NodeHandler {
 
             if has_unknown_txs {
                 trace!("REQUEST TRANSACTIONS");
-                self.request(RequestData::TransactionsForBlock(block_hash), *msg.from());
+                self.request(RequestData::TransactionsForBlock, *msg.from());
 
                 for node in known_nodes {
-                    self.request(RequestData::TransactionsForBlock(block_hash), node);
+                    self.request(RequestData::TransactionsForBlock, node);
                 }
             } else {
                 self.handle_full_block(msg);
@@ -509,9 +508,6 @@ impl NodeHandler {
         self.broadcast_status();
         self.add_status_timeout();
 
-        // Adjust propose timeout after accepting a new block.
-        self.state.adjust_timeout(&*self.blockchain.snapshot());
-
         // Add timeout for first round
         self.add_round_timeout();
         // Send propose we is leader
@@ -553,11 +549,11 @@ impl NodeHandler {
             self.handle_full_propose(hash, round);
         }
 
-        let full_blocks = self.state.remove_unknown_transaction(hash);
+        let full_block = self.state.remove_unknown_transaction(hash);
         // Go to handle full block if we get last transaction
-        for (hash, block) in full_blocks {
-            self.remove_request(&RequestData::TransactionsForBlock(hash));
-            self.handle_full_block(block.message());
+        if full_block.is_some() {
+            self.remove_request(&RequestData::TransactionsForBlock);
+            self.handle_full_block(full_block.unwrap().message());
         }
         Ok(())
     }
@@ -771,9 +767,9 @@ impl NodeHandler {
                     ).raw()
                         .clone()
                 }
-                RequestData::TransactionsForBlock(ref block_hash) => {
+                RequestData::TransactionsForBlock => {
                     let txs: Vec<_> = self.state
-                        .incomplete_block(block_hash)
+                        .incomplete_block()
                         .unwrap()
                         .unknown_txs()
                         .iter()

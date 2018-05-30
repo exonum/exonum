@@ -14,7 +14,8 @@
 
 /// `encoding_struct!` macro implements a structure that can be saved in the Exonum blockchain.
 ///
-/// The macro creates getter methods for all fields with the same names as fields.
+/// The macro creates getter methods for all defined fields. The names of the methods
+/// coincide with the field names.
 /// In addition, the macro declares a `new` constructor, which accepts all fields
 /// in the order of their declaration in the macro.
 /// The macro also implements [`Field`], [`ExonumJson`] and [`StorageValue`] traits
@@ -27,7 +28,7 @@
 /// For additional reference about data layout see the
 /// documentation of the [`encoding` module](./encoding/index.html).
 ///
-/// **NB.** `encoding_struct!` uses other macros in the `exonum` crate internally.
+/// **Note.** `encoding_struct!` uses other macros in the `exonum` crate internally.
 /// Be sure to add them to the global scope.
 ///
 /// [`Field`]: ./encoding/trait.Field.html
@@ -36,6 +37,9 @@
 /// [`transactions!`]: macro.transactions.html
 ///
 /// # Examples
+///
+/// The example below declares a structure using `encoding_struct`, applies it and
+/// prints out a value.
 ///
 /// ```
 /// #[macro_use] extern crate exonum;
@@ -360,7 +364,11 @@ macro_rules! __ex_for_each_field {
 macro_rules! __ex_struct_check_field {
     (
         ($latest_segment:ident, $vec:ident),
-        $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr
+        $(#[$field_attr:meta])*,
+        $field_name:ident,
+        $field_type:ty,
+        $from:expr,
+        $to:expr
     ) => {
         let $latest_segment = <$field_type as $crate::encoding::Field>::check(
             &$vec,
@@ -368,7 +376,7 @@ macro_rules! __ex_struct_check_field {
             $to.into(),
             $latest_segment,
         )?;
-    }
+    };
 }
 
 #[doc(hidden)]
@@ -376,10 +384,14 @@ macro_rules! __ex_struct_check_field {
 macro_rules! __ex_struct_write_field {
     (
         ($buf:ident),
-        $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr
+        $(#[$field_attr:meta])*,
+        $field_name:ident,
+        $field_type:ty,
+        $from:expr,
+        $to:expr
     ) => {
         $crate::encoding::Field::write(&$field_name, &mut $buf, $from, $to);
-    }
+    };
 }
 
 #[doc(hidden)]
@@ -405,10 +417,14 @@ macro_rules! __ex_struct_mk_field {
 macro_rules! __ex_deserialize_field {
     (
         ($obj:ident, $writer:ident),
-        $(#[$field_attr:meta])*, $field_name:ident, $field_type:ty, $from:expr, $to:expr
+        $(#[$field_attr:meta])*,
+        $field_name:ident,
+        $field_type:ty,
+        $from:expr,
+        $to:expr
     ) => {
         let val = $obj.get(stringify!($field_name))
-                      .ok_or("Can't get object from json.")?;
+            .ok_or("Can't get object from json.")?;
         <$field_type as ExonumJson>::deserialize_field(val, &mut $writer, $from, $to)?;
-    }
+    };
 }

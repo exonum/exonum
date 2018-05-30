@@ -15,8 +15,8 @@
 //! Storage schema for the configuration service.
 
 use exonum::crypto::{self, CryptoHash, Hash, PublicKey, Signature};
-use exonum::storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot, StorageValue};
 use exonum::messages::{RawMessage, ServiceMessage};
+use exonum::storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot, StorageValue};
 
 use std::borrow::Cow;
 use std::ops::Deref;
@@ -49,11 +49,9 @@ encoding_struct! {
 }
 
 lazy_static! {
-    static ref NO_VOTE_BYTES: Vec<u8> = Vote::new_with_signature(
-        &PublicKey::zero(),
-        &Hash::zero(),
-        &Signature::zero(),
-    ).into_bytes();
+    static ref NO_VOTE_BYTES: Vec<u8> =
+        Vote::new_with_signature(&PublicKey::zero(), &Hash::zero(), &Signature::zero(),)
+            .into_bytes();
 }
 
 /// A enum used to represent different kinds of vote, `Vote` and `VoteAgainst` transactions.
@@ -259,15 +257,12 @@ impl<'a> Schema<&'a mut Fork> {
 
 #[cfg(test)]
 mod tests {
-    use exonum::storage::{Database, MemoryDB};
     use super::*;
+    use exonum::storage::{Database, MemoryDB};
 
     lazy_static! {
-        static ref NO_VOTE: Vote = Vote::new_with_signature(
-            &PublicKey::zero(),
-            &Hash::zero(),
-            &Signature::zero(),
-        );
+        static ref NO_VOTE: Vote =
+            Vote::new_with_signature(&PublicKey::zero(), &Hash::zero(), &Signature::zero(),);
     }
 
     /// Check compatibility of old and new implementations of "absence of vote" signaling.

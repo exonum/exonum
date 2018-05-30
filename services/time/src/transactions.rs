@@ -1,4 +1,4 @@
-use exonum::blockchain::{ExecutionResult, Schema, Transaction};
+use exonum::blockchain::{ExecutionError, ExecutionResult, Schema, Transaction};
 use exonum::crypto::PublicKey;
 use exonum::messages::Message;
 use exonum::storage::{Fork, Snapshot};
@@ -19,6 +19,13 @@ pub enum Error {
     /// The validator time that is stored in storage is greater than the proposed one.
     #[fail(display = "The validator time is greater than the proposed one")]
     ValidatorTimeIsGreater = 1,
+}
+
+impl From<Error> for ExecutionError {
+    fn from(value: Error) -> ExecutionError {
+        let description = value.to_string();
+        ExecutionError::with_description(value as u8, description)
+    }
 }
 
 transactions! {

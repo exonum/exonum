@@ -66,8 +66,8 @@ pub mod contracts {
     use exonum::blockchain::{ExecutionResult, Transaction};
     use exonum::storage::Fork;
 
-    use transactions::TxAddBalance;
     use schema::BalanceSchema;
+    use transactions::TxAddBalance;
 
     impl Transaction for TxAddBalance {
         fn verify(&self) -> bool {
@@ -85,16 +85,16 @@ pub mod contracts {
 }
 
 pub mod service {
-    use exonum::blockchain::{Service, TimeoutAdjusterConfig, Transaction, TransactionSet};
-    use exonum::{encoding, messages::RawTransaction};
+    use exonum::blockchain::{Service, Transaction, TransactionSet};
     use exonum::crypto::{gen_keypair, Hash};
-    use exonum::storage::{Database, Fork, MemoryDB, Snapshot};
-    use exonum::node::{ExternalMessage, Node, TransactionSend};
     use exonum::helpers;
+    use exonum::node::{ExternalMessage, Node, TransactionSend};
+    use exonum::storage::{Database, Fork, MemoryDB, Snapshot};
+    use exonum::{encoding, messages::RawTransaction};
     use serde_json::Value;
 
-    use transactions::{BalanceTransactions, TxAddBalance};
     use schema::BalanceSchema;
+    use transactions::{BalanceTransactions, TxAddBalance};
 
     use std::sync::Arc;
     use std::thread;
@@ -137,8 +137,9 @@ pub mod service {
         let mut node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
 
         // Override timeouts to little values, so we won't have to wait for consensus too long.
-        node_cfg.genesis.consensus.timeout_adjuster =
-            TimeoutAdjusterConfig::Constant { timeout: 20 };
+        node_cfg.genesis.consensus.min_propose_timeout = 0;
+        node_cfg.genesis.consensus.max_propose_timeout = 0;
+        node_cfg.genesis.consensus.propose_timeout_threshold = 0;
         node_cfg.genesis.consensus.round_timeout = 40;
 
         let service = Box::new(BalanceService());
