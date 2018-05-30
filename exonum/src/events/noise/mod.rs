@@ -174,6 +174,7 @@ mod tests {
         wait_for_connect(&addr);
 
         let res = send_handshake(&addr, HandshakeStep::Default);
+        println!("Send handshake result {:?}", res);
         assert!(res.is_ok());
     }
 
