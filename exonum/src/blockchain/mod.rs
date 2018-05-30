@@ -197,7 +197,7 @@ impl Blockchain {
     fn initialize_metadata(&mut self) {
         let mut fork = self.db.fork();
         let ver = storage::initialize_storage_version(&mut fork);
-        if let Ok(_) = self.merge(fork.into_patch()) {
+        if self.merge(fork.into_patch()).is_ok() {
             info!(
                 "Storage version successfully initialized with value [{}].",
                 ver

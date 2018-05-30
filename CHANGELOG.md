@@ -154,6 +154,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   `TimeProvider` and `MockTimeProvider` to `exonum_time::time_provider`,
   `ValidatorTime` to `exonum_time::api`. (#604)
 - Storage in exonum is now versioned. Old databases will not work with this update. (#707)
+- Storage in exonum is now versioned. Old databases will not work with this
+  update. (#707)
 
 ### New features
 
