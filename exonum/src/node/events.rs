@@ -66,16 +66,16 @@ impl NodeHandler {
                 }
                 self.handle_incoming_tx(tx);
             }
-            ExternalMessage::PeerAdd(address) => {
+            ExternalMessage::PeerAdd(info) => {
                 if !self.is_enabled {
                     info!(
                         "Ignoring a connect message to {} because the node is disabled",
-                        address
+                        info
                     );
                     return;
                 }
-                info!("Send Connect message to {}", address);
-                self.connect(&address);
+                info!("Send Connect message to {}", info);
+                self.connect(&info.addr);
             }
             ExternalMessage::Enable(value) => {
                 let s = if value { "enabled" } else { "disabled" };

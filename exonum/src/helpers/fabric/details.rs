@@ -33,9 +33,9 @@ use super::{Argument, CommandName, Context};
 use blockchain::{GenesisConfig, config::ValidatorKeys};
 use crypto;
 use helpers::{generate_testnet_config, config::ConfigFile};
+use node::ConnectList;
 use node::{AllowOrigin, NodeApiConfig, NodeConfig};
 use storage::{Database, DbOptions, RocksDB};
-use node::ConnectList;
 
 const DATABASE_PATH: &str = "DATABASE_PATH";
 const OUTPUT_DIR: &str = "OUTPUT_DIR";

@@ -21,7 +21,10 @@ use std::io;
 
 use crypto::{PublicKey, SecretKey};
 use events::codec::MessagesCodec;
+use events::error::into_other;
+use events::noise::wrapper::NoiseError;
 use events::noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH};
+use futures::future::err;
 use node::ConnectList;
 use std::net::SocketAddr;
 
@@ -53,6 +56,7 @@ impl NoiseHandshake {
 
 fn listen_handshake(stream: TcpStream, params: &HandshakeParams) -> HandshakeResult {
     let max_message_len = params.max_message_len;
+
     let mut noise = NoiseWrapper::responder(params);
     let framed = read(stream).and_then(move |(stream, msg)| {
         read_handshake_msg(&msg, &mut noise).and_then(move |_| {
@@ -77,23 +81,34 @@ fn send_handshake(
     peer: &SocketAddr,
 ) -> HandshakeResult {
     let max_message_len = params.max_message_len;
-    let mut noise = NoiseWrapper::initiator(params, peer);
-    let framed = write_handshake_msg(&mut noise)
-        .and_then(|(len, buf)| write(stream, &buf, len))
-        .and_then(|(stream, _msg)| read(stream))
-        .and_then(move |(stream, msg)| {
-            read_handshake_msg(&msg, &mut noise).and_then(move |_| {
-                write_handshake_msg(&mut noise)
-                    .and_then(|(len, buf)| write(stream, &buf, len))
-                    .and_then(move |(stream, _msg)| {
-                        let noise = noise.into_transport_mode()?;
-                        let framed = stream.framed(MessagesCodec::new(max_message_len, noise));
-                        Ok(framed)
-                    })
-            })
-        });
 
-    Box::new(framed)
+    match check_connect_list() {
+        Ok(()) => {
+            let mut noise = NoiseWrapper::initiator(params, peer);
+            let framed = write_handshake_msg(&mut noise)
+                .and_then(|(len, buf)| write(stream, &buf, len))
+                .and_then(|(stream, _msg)| read(stream))
+                .and_then(move |(stream, msg)| {
+                    read_handshake_msg(&msg, &mut noise).and_then(move |_| {
+                        write_handshake_msg(&mut noise)
+                            .and_then(|(len, buf)| write(stream, &buf, len))
+                            .and_then(move |(stream, _msg)| {
+                                let noise = noise.into_transport_mode()?;
+                                let framed =
+                                    stream.framed(MessagesCodec::new(max_message_len, noise));
+                                Ok(framed)
+                            })
+                    })
+                });
+
+            Box::new(framed)
+        }
+        Err(e) => Box::new(err(e.into())),
+    }
+}
+
+fn check_connect_list() -> Result<(), NoiseError> {
+    Err(NoiseError::new("not in connect list"))
 }
 
 fn read(sock: TcpStream) -> Box<Future<Item = (TcpStream, Vec<u8>), Error = io::Error>> {

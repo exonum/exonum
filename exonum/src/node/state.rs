@@ -1053,7 +1053,7 @@ impl State {
         self.our_connect_message = msg;
     }
 
-    /// Returns node's whitelist.
+    /// Returns node's connect list.
     pub fn connect_list(&self) -> &ConnectList {
         &self.connect_list
     }

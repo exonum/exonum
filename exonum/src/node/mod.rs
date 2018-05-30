@@ -63,7 +63,7 @@ mod whitelist;
 #[derive(Debug)]
 pub enum ExternalMessage {
     /// Add a new connection.
-    PeerAdd(SocketAddr),
+    PeerAdd(ConnectInfo),
     /// Transaction that implements the `Transaction` trait.
     Transaction(Box<Transaction>),
     /// Enable or disable the node.
@@ -696,7 +696,7 @@ impl ApiSender {
     }
 
     /// Add peer to peer list
-    pub fn peer_add(&self, addr: SocketAddr) -> io::Result<()> {
+    pub fn peer_add(&self, addr: ConnectInfo) -> io::Result<()> {
         let msg = ExternalMessage::PeerAdd(addr);
         self.send_external_message(msg)
     }
@@ -729,13 +729,19 @@ impl fmt::Debug for ApiSender {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 /// Connect Info
 pub struct ConnectInfo {
     /// Peer addr
     pub addr: SocketAddr,
     /// Peer public key
     pub public_key: PublicKey,
+}
+
+impl fmt::Display for ConnectInfo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.addr)
+    }
 }
 
 /// Default system state provider implementation which just uses `SystemTime::now`

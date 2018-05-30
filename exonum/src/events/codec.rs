@@ -155,7 +155,7 @@ mod test {
             public_key,
             secret_key,
             max_message_len: 1024,
-            connect_list: ConnectList::default(),
+            connect_list: Default::default(),
         };
 
         let peer = "127.0.0.1".parse().unwrap();

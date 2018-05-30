@@ -1,8 +1,8 @@
 use blockchain::ValidatorKeys;
 use crypto::PublicKey;
+use helpers::fabric::NodePublicConfig;
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use helpers::fabric::NodePublicConfig;
 
 /// doc will be here
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -25,9 +25,9 @@ impl ConnectList {
 
     /// Create ConnectList from NodePublicConfigs
     pub fn from_node_config(list: &Vec<NodePublicConfig>) -> Self {
-        let peers: HashMap<SocketAddr, PublicKey> = list
-            .iter()
-            .map(|config| (config.addr, config.validator_keys.consensus_key)).collect();
+        let peers: HashMap<SocketAddr, PublicKey> = list.iter()
+            .map(|config| (config.addr, config.validator_keys.consensus_key))
+            .collect();
         ConnectList { peers }
     }
 }

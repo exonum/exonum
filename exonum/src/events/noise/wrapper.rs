@@ -32,7 +32,7 @@ pub const HANDSHAKE_HEADER_LENGTH: usize = 2;
 // We choose XX pattern since it provides mutual authentication and
 // transmission of static public keys.
 // See: https://noiseprotocol.org/noise.html#interactive-patterns
-static PARAMS: &str = "Noise_XK_25519_ChaChaPoly_BLAKE2s";
+static PARAMS: &str = "Noise_XX_25519_ChaChaPoly_BLAKE2s";
 
 /// Wrapper around noise session to provide latter convenient interface.
 pub struct NoiseWrapper {
@@ -50,11 +50,6 @@ impl NoiseWrapper {
             .get(peer)
             .expect("Peer is not in the connect list.");
 
-        info!(
-            "initiator public key {:?}, secret key {:?}",
-            params.public_key, params.secret_key
-        );
-        info!("remote public key {:?}", remote_key);
         let session = builder
             .local_private_key(&private_key)
             .remote_public_key(remote_key.as_ref())
@@ -67,10 +62,6 @@ impl NoiseWrapper {
     pub fn responder(params: &HandshakeParams) -> Self {
         let builder: NoiseBuilder = Self::noise_builder(params);
         let private_key = &params.secret_key[..PUBLIC_KEY_LENGTH];
-        info!(
-            "responder public key {:?}, secret key {:?}",
-            params.public_key, private_key
-        );
 
         let session = builder
             .local_private_key(&private_key)
@@ -214,17 +205,6 @@ mod test {
     use events::tests::TestEvents;
     use events::tests::connect_message;
     use node::ConnectList;
-    use snow::CryptoResolver;
-    use snow::DefaultResolver;
-    use snow::NoiseBuilder;
-    use snow::params::CipherChoice;
-    use snow::params::DHChoice;
-    use snow::params::HashChoice;
-    use snow::types::Cipher;
-    use snow::types::Dh;
-    use snow::types::Hash;
-    use snow::types::Random;
-    use snow::wrappers::rand_wrapper::RandomOs;
     use std::collections::HashMap;
     use std::io;
     use std::marker::Send;
@@ -232,7 +212,7 @@ mod test {
     use tokio_core::reactor::Core;
 
     #[test]
-    fn test_connect_list() {
+    fn test_peer_is_not_in_connect_list() {
         env_logger::init();
         let first: SocketAddr = "127.0.0.1:17230".parse().unwrap();
         let second: SocketAddr = "127.0.0.1:17231".parse().unwrap();
@@ -241,8 +221,6 @@ mod test {
 
         // Create connect list
         let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([2; 32]));
-        let addr = second.clone();
-        peers.insert(addr, public_key);
         let connect_list = ConnectList { peers };
 
         let e1 = TestEvents::with_connect_list(first, connect_list);
