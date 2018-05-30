@@ -25,12 +25,6 @@ struct MemPoolInfo {
     pub size: usize,
 }
 
-#[derive(Serialize, Deserialize)]
-struct MetaInfo<'a> {
-    pub version: &'a str,
-    pub services: Vec<&'a str>,
-}
-
 #[doc(hidden)]
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct HealthCheckInfo {
