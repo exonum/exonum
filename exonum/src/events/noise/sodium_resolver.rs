@@ -127,7 +127,6 @@ impl Dh for SodiumDh25519 {
 }
 
 // Chacha20poly1305 cipher.
-
 pub struct SodiumChaChaPoly {
     key: sodium_chacha20poly1305::Key,
 }
