@@ -278,7 +278,7 @@ impl Blockchain {
             for service in self.service_map.values() {
                 // Skip execution for genesis block.
                 if height > Height(0) {
-                    service_execute(service.as_ref(), &mut fork);
+                    before_commit(service.as_ref(), &mut fork);
                 }
             }
 
@@ -411,7 +411,7 @@ impl Blockchain {
     }
 
     /// Commits to the blockchain a new block with the indicated changes (patch),
-    /// hash and Precommit messages. After that invokes `handle_commit`
+    /// hash and Precommit messages. After that invokes `after_commit`
     /// for each service in the increasing order of their identifiers.
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn commit<'a, I>(
@@ -450,9 +450,9 @@ impl Blockchain {
             self.api_sender.clone(),
             self.fork(),
         );
-        // Invokes `handle_commit` for each service in order of their identifiers
+        // Invokes `after_commit` for each service in order of their identifiers
         for service in self.service_map.values() {
-            service.handle_commit(&context);
+            service.after_commit(&context);
         }
         Ok(())
     }
@@ -552,9 +552,9 @@ impl Blockchain {
     }
 }
 
-fn service_execute(service: &Service, fork: &mut Fork) {
+fn before_commit(service: &Service, fork: &mut Fork) {
     fork.checkpoint();
-    match panic::catch_unwind(panic::AssertUnwindSafe(|| service.execute(fork))) {
+    match panic::catch_unwind(panic::AssertUnwindSafe(|| service.before_commit(fork))) {
         Ok(..) => fork.commit(),
         Err(err) => {
             if err.is::<Error>() {
@@ -563,7 +563,7 @@ fn service_execute(service: &Service, fork: &mut Fork) {
             }
             fork.rollback();
             error!(
-                "{} service execute failed with error: {:?}",
+                "{} service before_commit failed with error: {:?}",
                 service.service_name(),
                 err
             );

@@ -9,6 +9,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Breaking changes
 
+- `handle_commit` method in `Service` trait  has been renamed to
+  `after_commit`. (#715)
+
 #### exonum
 
 - `TimeoutAdjusterConfig` has been removed along with different timeout
@@ -49,7 +52,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `Field`, `CryptoHash`, `StorageValue` and `ExonumJson` traits have been
   implemented for `chrono::Duration` structure. (#653)
 
-- `execute` method has been added in `Service` trait. (#667)
+- `before_commit` method has been added in `Service` trait. (#667) (#715)
 
 - `Field`, `CryptoHash`, `StorageKey`, `StorageValue` and `ExonumJson` traits
   have been implemented for `rust_decimal::Decimal`. (#671)
