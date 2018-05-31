@@ -2,9 +2,13 @@
 name = "exonum-cryptocurrency-advanced"
 version = "0.8.0"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
+homepage = "https://exonum.com/"
 repository = "https://github.com/exonum/exonum"
 readme = "README.md"
 license = "Apache-2.0"
+keywords = ["exonum", "blockchain", "example"]
+categories = ["rust-patterns"]
+description = "Exonum blockchain example implementing a cryptocurrency."
 
 [badges]
 travis-ci = { repository = "exonum/exonum" }
