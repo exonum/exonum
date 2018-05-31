@@ -33,7 +33,7 @@ tokio-core = "=0.1.17"
 router = "=0.6.0"
 
 [dev-dependencies]
-exonum-cryptocurrency = { version = "0.0.0", path = "../examples/cryptocurrency" }
+exonum-cryptocurrency = { version = "0.8.0", path = "../examples/cryptocurrency" }
 rand = "=0.4.2"
 pretty_assertions = "=0.5.1"
 assert_matches = "1.2.0"
