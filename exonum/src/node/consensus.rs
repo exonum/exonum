@@ -155,25 +155,32 @@ impl NodeHandler {
     fn validate_block_response(&self, msg: &BlockResponse) -> Result<(), String> {
         // Request are sent to us
         if msg.to() != self.state.consensus_public_key() {
-            return Err(format!("Received block intended for another peer, to={}, from={}",
-                               msg.to().to_hex(),
-                               msg.from().to_hex()));
+            return Err(format!(
+                "Received block intended for another peer, to={}, from={}",
+                msg.to().to_hex(),
+                msg.from().to_hex()
+            ));
         }
 
         if !self.state.whitelist().allow(msg.from()) {
-            return Err(format!("Received request message from peer = {} which not in whitelist.",
-                               msg.from().to_hex()));
+            return Err(format!(
+                "Received request message from peer = {} which not in whitelist.",
+                msg.from().to_hex()
+            ));
         }
 
         if !msg.verify_signature(msg.from()) {
-            return Err(format!("Received block with incorrect signature, msg={:?}", msg));
+            return Err(format!(
+                "Received block with incorrect signature, msg={:?}",
+                msg
+            ));
         }
 
         let block = msg.block();
 
         // TODO add block with greater height to queue (ECR-171)
         if self.state.height() != block.height() {
-            return Err("Received block hash another height".to_string());
+            return Err(format!("Received block hash another height, msg={:?}", msg));
         }
 
         // Check block content
@@ -190,12 +197,28 @@ impl NodeHandler {
         Ok(())
     }
 
+    fn verify_block_root_hash(&mut self, msg: &BlockResponse) -> Result<(), String> {
+        let mut fork = self.blockchain.fork();
+        let mut schema = Schema::new(&mut fork);
+        for tx_hash in msg.transactions() {
+            schema
+                .block_transactions_mut(self.state.height())
+                .push(*tx_hash);
+        }
+        let tx_hashes = schema.block_transactions(self.state.height()).merkle_root();
+        if tx_hashes != *msg.block().tx_hash() {
+            return Err(format!("Received block has wrong root hash, msg={:?}", msg));
+        }
+        Ok(())
+    }
+
     /// Handles the `Block` message. For details see the message documentation.
     // TODO write helper function which returns Result (ECR-123)
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_block(&mut self, msg: &BlockResponse) {
         if let Err(err) = self.validate_block_response(msg) {
-            error!("{}, block={:?}", err, msg);
+            error!("{}", err);
+            return;
         }
 
         let block = msg.block();
@@ -206,6 +229,11 @@ impl NodeHandler {
         }
 
         if self.state.block(&block_hash).is_none() {
+            if let Err(err) = self.verify_block_root_hash(msg) {
+                error!("{}", err);
+                return;
+            }
+
             let snapshot = self.blockchain.snapshot();
             let schema = Schema::new(&*snapshot);
             let has_unknown_txs = match self.state.create_incomplete_block(

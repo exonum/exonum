@@ -25,7 +25,8 @@ use std::time::{Duration, SystemTime};
 use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
-use messages::{Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawMessage, BlockResponse};
+use messages::{BlockResponse, Connect, ConsensusMessage, Message, Precommit, Prevote, Propose,
+               RawMessage};
 use node::whitelist::Whitelist;
 use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 
@@ -733,6 +734,11 @@ impl State {
         self.round.increment();
     }
 
+    /// Set incomplete block.
+    pub fn set_incomplete_block(&mut self, incomplete_block: IncompleteBlock) {
+        self.incomplete_block = Some(incomplete_block);
+    }
+
     /// Return incomplete block.
     pub fn incomplete_block(&self) -> Option<IncompleteBlock> {
         self.incomplete_block.clone()
@@ -939,7 +945,7 @@ impl State {
                     if !txs_pool.contains(hash) {
                         panic!(
                             "Received block with already \
-                            committed transaction"
+                             committed transaction"
                         )
                     }
                 } else {
@@ -947,7 +953,7 @@ impl State {
                 }
             }
 
-            self.incomplete_block = Some(IncompleteBlock {
+            self.set_incomplete_block(IncompleteBlock {
                 msg: msg.clone(),
                 unknown_txs: unknown_txs.clone(),
             });

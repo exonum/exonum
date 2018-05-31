@@ -253,7 +253,7 @@ messages! {
         from: &PublicKey,
         /// Public key of the recipient.
         to: &PublicKey,
-        /// List of transactions.
+        /// List of the transactions.
         transactions: Vec<RawMessage>,
     }
 
