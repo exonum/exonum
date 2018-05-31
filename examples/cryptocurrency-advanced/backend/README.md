@@ -1,1 +1,1 @@
-/home/stkach/code/exonum/examples/cryptocurrency-advanced/README.md
+../README.md
