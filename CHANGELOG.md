@@ -7,7 +7,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Breaking changes
 
-- `handle_commit` method in `Service` trait  has been renamed to `after_commit`. (#715)
+- `handle_commit` method in `Service` trait  has been renamed to 
+  `after_commit`. (#715)
 
 #### exonum
 
