@@ -41,7 +41,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Private API now support CORS. (#675)
 
-- The `--public-allow-origin` and `--private-alow-origin` parameters have been
+- The `--public-allow-origin` and `--private-allow-origin` parameters have been
   added to the `finalize` command. (#675)
 
 - IPv6 addressing is now supported. (#615)
