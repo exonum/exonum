@@ -178,7 +178,7 @@ pub trait Service: Send + Sync + 'static {
     }
 
     /// A service execution. This method is invoked for each service after execution
-    /// of all transactions in the block but before `on_commit` handler.
+    /// of all transactions in the block but before `after_commit` handler.
     ///
     /// The order of invoking `before_commit` method for every service depends on the
     /// service ID. `before_commit` for the service with the smallest ID is invoked
@@ -192,7 +192,7 @@ pub trait Service: Send + Sync + 'static {
     /// has occurred.
     ///
     /// *Try not to perform long operations in this handler*.
-    fn on_commit(&self, context: &ServiceContext) {}
+    fn after_commit(&self, context: &ServiceContext) {}
 
     /// Returns an API handler for public requests. The handler is mounted on
     /// the `/api/services/{service_name}` path at [the public listen address][pub-addr]
@@ -214,7 +214,7 @@ pub trait Service: Send + Sync + 'static {
 }
 
 /// The current node state on which the blockchain is running, or in other words
-/// execution context. This structure is passed to the `on_commit` method
+/// execution context. This structure is passed to the `after_commit` method
 /// of the `Service` trait and is used for the interaction between service
 /// business logic and the current node state.
 #[derive(Debug)]

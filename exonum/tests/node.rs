@@ -54,7 +54,7 @@ impl Service for CommitWatcherService {
         unreachable!("An unknown transaction received");
     }
 
-    fn on_commit(&self, _context: &ServiceContext) {
+    fn after_commit(&self, _context: &ServiceContext) {
         if let Some(oneshot) = self.0.lock().unwrap().take() {
             oneshot.send(()).unwrap();
         }

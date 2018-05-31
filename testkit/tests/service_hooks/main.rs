@@ -19,7 +19,7 @@ extern crate serde;
 extern crate serde_json;
 
 // HACK: Silent "dead_code" warning.
-pub use hooks::{OnCommitService, TxAfterCommit};
+pub use hooks::{AfterCommitService, TxAfterCommit};
 
 use exonum::crypto::{CryptoHash, Signature};
 use exonum::helpers::Height;
@@ -29,12 +29,12 @@ use exonum_testkit::TestKitBuilder;
 mod hooks;
 
 #[test]
-fn test_on_commit() {
+fn test_after_commit() {
     let mut testkit = TestKitBuilder::validator()
-        .with_service(OnCommitService)
+        .with_service(AfterCommitService)
         .create();
 
-    // Check that `on_commit` invoked on the correct height.
+    // Check that `after_commit` invoked on the correct height.
     for i in 1..5 {
         let block = testkit.create_block();
         if i > 1 {

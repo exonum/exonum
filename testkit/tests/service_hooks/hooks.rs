@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! A special service which generates transactions on `on_commit` events.
+//! A special service which generates transactions on `after_commit` events.
 
 use exonum::blockchain::{ExecutionResult, Service, ServiceContext, Transaction, TransactionSet};
 use exonum::crypto::{Hash, Signature};
@@ -43,11 +43,11 @@ impl Transaction for TxAfterCommit {
     }
 }
 
-pub struct OnCommitService;
+pub struct AfterCommitService;
 
-impl Service for OnCommitService {
+impl Service for AfterCommitService {
     fn service_name(&self) -> &str {
-        "on_commit"
+        "after_commit"
     }
 
     fn state_hash(&self, _: &Snapshot) -> Vec<Hash> {
@@ -63,7 +63,7 @@ impl Service for OnCommitService {
         Ok(tx.into())
     }
 
-    fn on_commit(&self, context: &ServiceContext) {
+    fn after_commit(&self, context: &ServiceContext) {
         let tx = TxAfterCommit::new_with_signature(context.height(), &Signature::zero());
         context.transaction_sender().send(Box::new(tx)).unwrap();
     }

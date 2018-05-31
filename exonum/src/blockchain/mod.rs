@@ -411,7 +411,7 @@ impl Blockchain {
     }
 
     /// Commits to the blockchain a new block with the indicated changes (patch),
-    /// hash and Precommit messages. After that invokes `on_commit`
+    /// hash and Precommit messages. After that invokes `after_commit`
     /// for each service in the increasing order of their identifiers.
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn commit<'a, I>(
@@ -450,9 +450,9 @@ impl Blockchain {
             self.api_sender.clone(),
             self.fork(),
         );
-        // Invokes `on_commit` for each service in order of their identifiers
+        // Invokes `after_commit` for each service in order of their identifiers
         for service in self.service_map.values() {
-            service.on_commit(&context);
+            service.after_commit(&context);
         }
         Ok(())
     }
