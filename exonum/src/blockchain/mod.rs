@@ -278,7 +278,7 @@ impl Blockchain {
             for service in self.service_map.values() {
                 // Skip execution for genesis block.
                 if height > Height(0) {
-                    service_execute(service.as_ref(), &mut fork);
+                    service_execute_before_commit(service.as_ref(), &mut fork);
                 }
             }
 
@@ -552,9 +552,11 @@ impl Blockchain {
     }
 }
 
-fn service_execute(service: &Service, fork: &mut Fork) {
+fn service_execute_before_commit(service: &Service, fork: &mut Fork) {
     fork.checkpoint();
-    match panic::catch_unwind(panic::AssertUnwindSafe(|| service.execute(fork))) {
+    match panic::catch_unwind(panic::AssertUnwindSafe(|| {
+        service.execute_before_commit(fork)
+    })) {
         Ok(..) => fork.commit(),
         Err(err) => {
             if err.is::<Error>() {
@@ -563,7 +565,7 @@ fn service_execute(service: &Service, fork: &mut Fork) {
             }
             fork.rollback();
             error!(
-                "{} service execute failed with error: {:?}",
+                "{} service execute_before_commit failed with error: {:?}",
                 service.service_name(),
                 err
             );
