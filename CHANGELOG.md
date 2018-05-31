@@ -5,6 +5,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## 0.8 - 2018-05-31
+
 ### Breaking changes
 
 - `handle_commit` method in `Service` trait  has been renamed to
@@ -42,7 +44,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Private API now support CORS. (#675)
 
-- The `--allow-origin` parameter has been added to the `finalize` command.
+- The `--public-allow-origin` and `--private-allow-origin` parameters have been
+  added to the `finalize` command. (#675)
 
 - IPv6 addressing is now supported. (#615)
 
@@ -63,9 +66,17 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - A warning for non-optimal `StoredConfiguration::txs_block_limit` value has been
   added. (#690)
 
+- Private api `/v1/network/` endpoint now returns core version in addition to
+  service info. (#701)
+
 #### exonum-timestamping
 
 - Additional service example has been added along with frontend. (#646)
+
+#### exonum-cryptocurrency-advanced
+
+- Advanced cryptocurrency example becomes a public library (is published on
+  crates.io). (#709)
 
 ### Bug fixes
 
@@ -95,9 +106,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 ### Internal improvements
 
 #### exonum
-
-- Private api `/v1/network/` endpoint now returns core version in addition to
-  service info. (#701)
 
 - Default implementation of `check` method was added to `Field` trait to
   reduce boilerplate. (#639)
