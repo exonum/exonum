@@ -116,7 +116,7 @@ impl Service for TimeService {
     }
 
     /// Creates transaction after commit of the block.
-    fn handle_commit(&self, context: &ServiceContext) {
+    fn on_commit(&self, context: &ServiceContext) {
         // The transaction must be created by the validator.
         if context.validator_id().is_none() {
             return;
