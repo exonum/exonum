@@ -200,7 +200,8 @@ pub fn set_index_type(name: &str, index_type: IndexType, is_family: bool, view: 
 
 #[cfg(test)]
 mod tests {
-    use super::{StorageVersion, VersionValue, IndexMetadata, IndexType, CORE_STORAGE_VERSION, CORE_STORAGE_VERSION_KEY, INDEXES_METADATA_TABLE_NAME};
+    use super::{IndexMetadata, IndexType, StorageVersion, VersionValue, CORE_STORAGE_VERSION,
+                CORE_STORAGE_VERSION_KEY, INDEXES_METADATA_TABLE_NAME};
     use crypto::{Hash, PublicKey};
     use storage::{BaseIndex, Database, Fork, MapIndex, MemoryDB, ProofMapIndex};
 
@@ -397,10 +398,7 @@ mod tests {
         {
             let snap = database.snapshot();
 
-            assert_matches!(
-                StorageVersion::read(snap),
-                Unspecified
-            );
+            assert_matches!(StorageVersion::read(snap), Unspecified);
         }
     }
 
