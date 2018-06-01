@@ -2,7 +2,7 @@
   "name": "testkit-server",
   "version": "0.0.0",
   "description": "Client-side testkit-based service testing",
-  "main": "index.js",
+  "main": "test/index.js",
   "engines": {
     "node": ">=8"
   },
@@ -10,8 +10,8 @@
   "scripts": {
     "lint": "standard",
     "pretest:unix": "npm run posttest:unix && cargo run & sleep 10",
-    "test": "mocha index.js",
-    "test:unix": "mocha index.js",
+    "test": "mocha test/index.js",
+    "test:unix": "mocha test/index.js",
     "posttest:unix": "lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null | awk '{ if ($9 == \"*:8000\") { print $2 } }' | xargs -r kill -KILL"
   },
   "repository": {
