@@ -1,6 +1,7 @@
 [package]
 name = "exonum-cryptocurrency"
-version = "0.8.0"
+publish = false
+version = "0.0.0"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 homepage = "https://exonum.com/"
 repository = "https://github.com/exonum/exonum"
