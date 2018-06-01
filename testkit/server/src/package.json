@@ -9,7 +9,7 @@
   "private": true,
   "scripts": {
     "lint": "standard",
-    "pretest:unix": "npm run posttest:unix && cargo run --example server & sleep 10",
+    "pretest:unix": "npm run posttest:unix && cargo run & sleep 10",
     "test": "mocha index.js",
     "test:unix": "mocha index.js",
     "posttest:unix": "lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null | awk '{ if ($9 == \"*:8000\") { print $2 } }' | xargs -r kill -KILL"
