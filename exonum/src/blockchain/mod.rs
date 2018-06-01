@@ -185,7 +185,7 @@ impl Blockchain {
             .block_hashes_by_height()
             .is_empty();
         if has_genesis_block {
-            self.check_storage_version();
+            self.assert_storage_version();
         } else {
             self.initialize_metadata();
             self.create_genesis_block(cfg)?;
@@ -212,7 +212,7 @@ impl Blockchain {
     /// # Panics
     ///
     /// Panics if version is not supported or is not specified.
-    fn check_storage_version(&self) {
+    fn assert_storage_version(&self) {
         use storage::VersionStatus::*;
 
         match storage::storage_version_status(self.db.snapshot()) {
