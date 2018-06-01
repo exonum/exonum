@@ -196,11 +196,11 @@ impl Blockchain {
     /// Initialized node-local metadata.
     fn initialize_metadata(&mut self) {
         let mut fork = self.db.fork();
-        let ver = storage::initialize_storage_version(&mut fork);
+        storage::StorageVersion::write_current(&mut fork);
         if self.merge(fork.into_patch()).is_ok() {
             info!(
                 "Storage version successfully initialized with value [{}].",
-                ver
+                storage::StorageVersion::current(),
             )
         } else {
             panic!("Could not set database version.")
@@ -213,18 +213,16 @@ impl Blockchain {
     ///
     /// Panics if version is not supported or is not specified.
     fn assert_storage_version(&self) {
-        use storage::VersionStatus::*;
+        use storage::StorageVersion::*;
 
-        match storage::storage_version_status(self.db.snapshot()) {
+        let core_ver = storage::StorageVersion::current();
+        match storage::StorageVersion::read(self.db.snapshot()) {
             Supported(ver) => info!("Storage version is supported with value [{}].", ver),
-            Unsupported {
-                core_ver,
-                storage_ver,
-            } => panic!(
+            Unsupported(ver) => panic!(
                 "Unsupported storage version: [{}]. Current storage version: [{}].",
-                storage_ver, core_ver,
+                ver, core_ver,
             ),
-            Unspecified { core_ver } => panic!(
+            Unspecified => panic!(
                 "Storage version is not specified. Current storage version: [{}].",
                 core_ver
             ),
@@ -240,6 +238,7 @@ impl Blockchain {
             consensus: cfg.consensus,
             services: BTreeMap::new(),
             majority_count: None,
+            storage_version: storage::StorageVersion::current(),
         };
 
         let patch = {
