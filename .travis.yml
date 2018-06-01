@@ -81,7 +81,7 @@ jobs:
     - ./node_modules/.bin/cspell exonum/{src,benches,tests}/**/*.rs
     - ./node_modules/.bin/cspell exonum/fuzz/fuzz_targets/*.rs
     - ./node_modules/.bin/cspell testkit/{src,examples,tests}/**/*.rs
-    - ./node_modules/.bin/cspell testkit/server{src,examples,tests}/**/*.rs
+    - ./node_modules/.bin/cspell testkit/server/{src,examples,tests}/**/*.rs
     - ./node_modules/.bin/cspell services/configuration/{src,examples}/**/*.rs
     - ./node_modules/.bin/cspell services/time/{src,examples,tests}/**/*.rs
     - ./node_modules/.bin/cspell examples/cryptocurrency/{src,examples,tests}/**/*.rs
