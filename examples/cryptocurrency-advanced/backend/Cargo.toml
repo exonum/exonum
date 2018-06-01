@@ -7,7 +7,7 @@ repository = "https://github.com/exonum/exonum"
 readme = "README.md"
 license = "Apache-2.0"
 keywords = ["exonum", "blockchain", "example"]
-categories = ["rust-patterns"]
+categories = ["rust-patterns", "development-tools::testing"]
 description = "Exonum blockchain example implementing a cryptocurrency."
 
 [badges]
