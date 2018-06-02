@@ -27,12 +27,16 @@ use super::timestamping::{TimestampTx, TimestampingTxGenerator, TIMESTAMPING_SER
 use blockchain::{Blockchain, Schema};
 use crypto::{gen_keypair, gen_keypair_from_seed, CryptoHash, Hash, Seed};
 use helpers::{user_agent, Height, Round};
-use messages::{BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
-               PrevotesRequest, Propose, ProposeRequest, RawMessage, Status, TransactionsRequest,
-               TransactionsResponse, CONSENSUS};
+use messages::{
+    BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
+    PrevotesRequest, Propose, ProposeRequest, RawMessage, Status, TransactionsRequest,
+    TransactionsResponse, CONSENSUS,
+};
 use node;
-use node::state::{BLOCK_REQUEST_TIMEOUT, PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT,
-                  TRANSACTIONS_REQUEST_TIMEOUT};
+use node::state::{
+    BLOCK_REQUEST_TIMEOUT, PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT,
+    TRANSACTIONS_REQUEST_TIMEOUT,
+};
 
 // HANDLE CONSENSUS BASIC
 
@@ -2796,9 +2800,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     // Precommits with this block will be received during get 1st height in
     // fn add_one_height_with_transaction()
     let first_block = BlockBuilder::new(&sandbox)
-        .with_duration_since_sandbox_time(
-            2 * sandbox.round_timeout() + PROPOSE_TIMEOUT + 1,
-        )
+        .with_duration_since_sandbox_time(2 * sandbox.round_timeout() + PROPOSE_TIMEOUT + 1)
         .with_proposer_id(VALIDATOR_0)
         .with_tx_hash(&tx.hash())
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
@@ -2808,9 +2810,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     let height_one_propose = ProposeBuilder::new(&sandbox)
         .with_validator(VALIDATOR_3)
         .with_height(HEIGHT_TWO)
-        .with_duration_since_sandbox_time(
-            2 * PROPOSE_TIMEOUT + 2 * sandbox.round_timeout() + 1,
-        )
+        .with_duration_since_sandbox_time(2 * PROPOSE_TIMEOUT + 2 * sandbox.round_timeout() + 1)
         .with_prev_hash(&first_block.hash())
         .build();
 
@@ -2818,9 +2818,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     let second_block = BlockBuilder::new(&sandbox)
         .with_proposer_id(VALIDATOR_3)
         .with_height(HEIGHT_TWO)
-        .with_duration_since_sandbox_time(
-            2 * PROPOSE_TIMEOUT + 2 * sandbox.round_timeout() + 1,
-        )
+        .with_duration_since_sandbox_time(2 * PROPOSE_TIMEOUT + 2 * sandbox.round_timeout() + 1)
         .with_prev_hash(&first_block.hash())
         .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
         .build();
