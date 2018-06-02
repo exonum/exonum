@@ -724,7 +724,7 @@ fn test_store_txs_positions() {
 /// - handle queued Prevote
 /// - and observe `ProposeRequest` for queued `Prevote`
 #[test]
-#[should_panic(expected = "Send unexpected message Request(ProposeRequest" ])]
+#[should_panic(expected = "Send unexpected message Request(ProposeRequest")]
 fn test_queue_prevote_message_from_next_height() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
@@ -752,7 +752,7 @@ fn test_queue_prevote_message_from_next_height() {
 /// check line from `NodeHandler.handle_consensus()`
 /// case `msg.height() == self.state.height() + 1`
 #[test]
-#[should_panic(expected = "Send unexpected message Consensus(Prevote" ])]
+#[should_panic(expected = "Send unexpected message Consensus(Prevote")]
 fn test_queue_propose_message_from_next_height() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
@@ -1105,7 +1105,7 @@ fn duplicate_tx_in_pool() {
 }
 
 #[test]
-#[should_panic(expected = "Send unexpected message Request(TransactionsRequest" ])]
+#[should_panic(expected = "Send unexpected message Request(TransactionsRequest")]
 fn incorrect_tx_in_request() {
     let sandbox = timestamping_sandbox();
 
@@ -3443,7 +3443,7 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
 ///  - trigger `round_timeout`
 ///  - observe broadcasted prevote
 #[test]
-#[should_panic(expected = "Send unexpected message Request(ProposeRequest" ])]
+#[should_panic(expected = "Send unexpected message Request(ProposeRequest")]
 fn test_handle_round_timeout_queue_prevote_message_from_next_round() {
     let sandbox = timestamping_sandbox();
 
