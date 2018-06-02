@@ -27,16 +27,12 @@ use super::timestamping::{TimestampTx, TimestampingTxGenerator, TIMESTAMPING_SER
 use blockchain::{Blockchain, Schema};
 use crypto::{gen_keypair, gen_keypair_from_seed, CryptoHash, Hash, Seed};
 use helpers::{user_agent, Height, Round};
-use messages::{
-    BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
-    PrevotesRequest, Propose, ProposeRequest, RawMessage, Status, TransactionsRequest,
-    TransactionsResponse, CONSENSUS,
-};
+use messages::{BlockRequest, BlockResponse, Connect, Message, PeersRequest, Precommit, Prevote,
+               PrevotesRequest, Propose, ProposeRequest, RawMessage, Status, TransactionsRequest,
+               TransactionsResponse, CONSENSUS};
 use node;
-use node::state::{
-    BLOCK_REQUEST_TIMEOUT, PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT,
-    TRANSACTIONS_REQUEST_TIMEOUT,
-};
+use node::state::{BLOCK_REQUEST_TIMEOUT, PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT,
+                  TRANSACTIONS_REQUEST_TIMEOUT};
 
 // HANDLE CONSENSUS BASIC
 
@@ -82,7 +78,8 @@ fn test_check_leader() {
     // TODO would be nice to check also for RequestPeers message which will appear
     // after 10 time units (at 11th round)
     let n_rounds_without_request_peers = Round(
-        (sandbox.cfg().consensus.peers_timeout / sandbox.cfg().consensus.round_timeout) as u32,
+        (sandbox.cfg().consensus.peers_timeout /
+             sandbox.cfg().consensus.round_timeout) as u32,
     );
 
     for round in Round::first().iter_to(n_rounds_without_request_peers) {
@@ -288,11 +285,9 @@ fn test_retrieve_block_and_precommits() {
     for precommit in precommits {
         assert_eq!(expected_height, precommit.height());
         assert_eq!(expected_block_hash, *precommit.block_hash());
-        assert!(
-            precommit
-                .raw()
-                .verify_signature(&sandbox.p(precommit.validator()),)
-        );
+        assert!(precommit.raw().verify_signature(
+            &sandbox.p(precommit.validator()),
+        ));
     }
     let bl_proof_option = sandbox.block_and_precommits(target_height);
     assert!(bl_proof_option.is_none());
@@ -729,7 +724,7 @@ fn test_store_txs_positions() {
 /// - handle queued Prevote
 /// - and observe `ProposeRequest` for queued `Prevote`
 #[test]
-#[should_panic(expected = "Send unexpected message Request(ProposeRequest")]
+#[should_panic(expected = "Send unexpected message Request(ProposeRequest" ])]
 fn test_queue_prevote_message_from_next_height() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
@@ -757,7 +752,7 @@ fn test_queue_prevote_message_from_next_height() {
 /// check line from `NodeHandler.handle_consensus()`
 /// case `msg.height() == self.state.height() + 1`
 #[test]
-#[should_panic(expected = "Send unexpected message Consensus(Prevote")]
+#[should_panic(expected = "Send unexpected message Consensus(Prevote" ])]
 fn test_queue_propose_message_from_next_height() {
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
@@ -1110,7 +1105,7 @@ fn duplicate_tx_in_pool() {
 }
 
 #[test]
-#[should_panic(expected = "Send unexpected message Request(TransactionsRequest")]
+#[should_panic(expected = "Send unexpected message Request(TransactionsRequest" ])]
 fn incorrect_tx_in_request() {
     let sandbox = timestamping_sandbox();
 
@@ -1168,8 +1163,8 @@ fn response_size_larger_than_max_message_len() {
     use messages::HEADER_LENGTH;
     use storage::StorageValue;
 
-    const EMPTY_RESPONSE_SIZE: usize =
-        (HEADER_LENGTH + SIGNATURE_LENGTH + 2 * PUBLIC_KEY_LENGTH + 8);
+    const EMPTY_RESPONSE_SIZE: usize = (HEADER_LENGTH + SIGNATURE_LENGTH + 2 * PUBLIC_KEY_LENGTH +
+                                            8);
 
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
@@ -3448,7 +3443,7 @@ fn handle_round_timeout_send_prevote_if_locked_to_propose() {
 ///  - trigger `round_timeout`
 ///  - observe broadcasted prevote
 #[test]
-#[should_panic(expected = "Send unexpected message Request(ProposeRequest")]
+#[should_panic(expected = "Send unexpected message Request(ProposeRequest" ])]
 fn test_handle_round_timeout_queue_prevote_message_from_next_round() {
     let sandbox = timestamping_sandbox();
 
