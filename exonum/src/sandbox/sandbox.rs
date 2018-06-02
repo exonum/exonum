@@ -26,8 +26,8 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use super::config_updater::ConfigUpdateService;
-use super::sandbox_tests_helper::VALIDATOR_0;
 use super::sandbox_tests_helper::PROPOSE_TIMEOUT;
+use super::sandbox_tests_helper::VALIDATOR_0;
 use super::timestamping::TimestampingService;
 use blockchain::{Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
                  SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys};

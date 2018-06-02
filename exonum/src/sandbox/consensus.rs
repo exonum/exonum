@@ -78,8 +78,7 @@ fn test_check_leader() {
     // TODO would be nice to check also for RequestPeers message which will appear
     // after 10 time units (at 11th round)
     let n_rounds_without_request_peers = Round(
-        (sandbox.cfg().consensus.peers_timeout /
-             sandbox.cfg().consensus.round_timeout) as u32,
+        (sandbox.cfg().consensus.peers_timeout / sandbox.cfg().consensus.round_timeout) as u32,
     );
 
     for round in Round::first().iter_to(n_rounds_without_request_peers) {
@@ -285,9 +284,11 @@ fn test_retrieve_block_and_precommits() {
     for precommit in precommits {
         assert_eq!(expected_height, precommit.height());
         assert_eq!(expected_block_hash, *precommit.block_hash());
-        assert!(precommit.raw().verify_signature(
-            &sandbox.p(precommit.validator()),
-        ));
+        assert!(
+            precommit
+                .raw()
+                .verify_signature(&sandbox.p(precommit.validator()),)
+        );
     }
     let bl_proof_option = sandbox.block_and_precommits(target_height);
     assert!(bl_proof_option.is_none());
@@ -1163,8 +1164,8 @@ fn response_size_larger_than_max_message_len() {
     use messages::HEADER_LENGTH;
     use storage::StorageValue;
 
-    const EMPTY_RESPONSE_SIZE: usize = (HEADER_LENGTH + SIGNATURE_LENGTH + 2 * PUBLIC_KEY_LENGTH +
-                                            8);
+    const EMPTY_RESPONSE_SIZE: usize =
+        (HEADER_LENGTH + SIGNATURE_LENGTH + 2 * PUBLIC_KEY_LENGTH + 8);
 
     let sandbox = timestamping_sandbox();
     let sandbox_state = SandboxState::new();
