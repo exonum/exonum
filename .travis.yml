@@ -81,6 +81,7 @@ jobs:
     - ./node_modules/.bin/cspell exonum/{src,benches,tests}/**/*.rs
     - ./node_modules/.bin/cspell exonum/fuzz/fuzz_targets/*.rs
     - ./node_modules/.bin/cspell testkit/{src,examples,tests}/**/*.rs
+    - ./node_modules/.bin/cspell testkit/server/{src,examples,tests}/**/*.rs
     - ./node_modules/.bin/cspell services/configuration/{src,examples}/**/*.rs
     - ./node_modules/.bin/cspell services/time/{src,examples,tests}/**/*.rs
     - ./node_modules/.bin/cspell examples/cryptocurrency/{src,examples,tests}/**/*.rs
@@ -130,7 +131,7 @@ jobs:
         - powershell
     install:
     - nvm install 8 && nvm use 8
-    - cd $TRAVIS_BUILD_DIR/testkit/examples/server && npm install && cd $TRAVIS_BUILD_DIR
+    - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm install && cd $TRAVIS_BUILD_DIR
     script:
     - cargo test --all
     - cargo run -p exonum --example explorer
@@ -139,7 +140,7 @@ jobs:
     - cargo run -p exonum-time --example simple_service
     - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
     - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
-    - cd $TRAVIS_BUILD_DIR/testkit/examples/server && npm run test:unix
+    - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm run test:unix
 
   # Benchmarks (compilation only)
   - env: FEATURE=benchmarks

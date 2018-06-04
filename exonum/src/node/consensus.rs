@@ -846,7 +846,6 @@ impl NodeHandler {
 
     /// Calls `create_block` with transactions from the corresponding `Propose` and returns the
     /// block hash.
-    // FIXME: remove this bull shit
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn execute(&mut self, propose_hash: &Hash) -> Hash {
         // if we already execute this block, return hash
