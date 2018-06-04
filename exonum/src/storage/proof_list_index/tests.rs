@@ -17,8 +17,8 @@ use rand::{thread_rng, Rng};
 use self::ListProof::*;
 use super::{pair_hash, ListProof, ProofListIndex};
 use crypto::{hash, CryptoHash, Hash};
-use encoding::serialize::json::reexport::{from_str, to_string};
-use encoding::serialize::reexport::Serialize;
+use encoding::serialize::{json::reexport::{from_str, to_string},
+                          reexport::Serialize};
 use storage::Database;
 
 const IDX_NAME: &'static str = "idx_name";

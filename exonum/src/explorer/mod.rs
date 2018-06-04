@@ -19,11 +19,11 @@
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use std::cell::{Ref, RefCell};
-use std::collections::Bound;
-use std::fmt;
-use std::ops::{Index, Range, RangeFrom, RangeFull, RangeTo};
-use std::slice;
+use std::{cell::{Ref, RefCell},
+          collections::Bound,
+          fmt,
+          ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
+          slice};
 
 use blockchain::{Block, Blockchain, Schema, Transaction, TransactionError, TransactionErrorType,
                  TransactionResult, TxLocation};

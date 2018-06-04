@@ -14,8 +14,7 @@
 
 use rand::{self, Rng};
 
-use std::error::Error;
-use std::net::SocketAddr;
+use std::{error::Error, net::SocketAddr};
 
 use super::{NodeHandler, RequestData};
 use helpers::Height;

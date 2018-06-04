@@ -13,13 +13,13 @@
 // limitations under the License.
 
 use bodyparser;
-use exonum::api::{Api, ApiError};
-use exonum::blockchain::{ApiContext, Blockchain, Schema as CoreSchema, StoredConfiguration};
-use exonum::crypto::{CryptoHash, Hash, PublicKey, SecretKey};
-use exonum::encoding::serialize::json::reexport as serde_json;
-use exonum::helpers::Height;
-use exonum::node::{ApiSender, TransactionSend};
-use exonum::storage::StorageValue;
+use exonum::{api::{Api, ApiError},
+             blockchain::{ApiContext, Blockchain, Schema as CoreSchema, StoredConfiguration},
+             crypto::{CryptoHash, Hash, PublicKey, SecretKey},
+             encoding::serialize::json::reexport as serde_json,
+             helpers::Height,
+             node::{ApiSender, TransactionSend},
+             storage::StorageValue};
 use iron::prelude::*;
 use router::Router;
 
