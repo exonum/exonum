@@ -30,6 +30,4 @@ do
 done
 
 cd ../../frontend
-npm install
-npm run build
 npm start -- --port=8280 --api-root=http://127.0.0.1:${start_public_port}

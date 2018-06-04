@@ -12,13 +12,13 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
 RUN curl -sL https://deb.nodesource.com/setup_8.x | bash \
   && apt-get install -y nodejs
 
-RUN mv /root/.cargo/bin/* /usr/bin
-
 WORKDIR /usr/src
 RUN git clone https://github.com/exonum/exonum.git \
+  && mv /root/.cargo/bin/* /usr/bin \
   && cd exonum/examples/cryptocurrency-advanced/backend \
-  && cargo update && cargo install
+  && cargo update && cargo install \
+  && cd ../frontend && npm install && npm run build
 WORKDIR /usr/src/exonum/examples/cryptocurrency-advanced
 COPY launch.sh .
 
-ENTRYPOINT ["sh", "./launch.sh"]
+ENTRYPOINT ["./launch.sh"]
