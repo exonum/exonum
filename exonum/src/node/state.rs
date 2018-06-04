@@ -734,14 +734,12 @@ impl State {
         self.round.increment();
     }
 
-    /// Set incomplete block.
-    pub fn set_incomplete_block(&mut self, incomplete_block: IncompleteBlock) {
-        self.incomplete_block = Some(incomplete_block);
-    }
-
     /// Return incomplete block.
-    pub fn incomplete_block(&self) -> Option<IncompleteBlock> {
-        self.incomplete_block.clone()
+    pub fn incomplete_block(&self) -> Option<&IncompleteBlock> {
+        match self.incomplete_block {
+            Some(ref incomplete_block) => Some(&incomplete_block),
+            None => None,
+        }
     }
 
     /// Increments the node height by one and resets previous height data.
@@ -797,12 +795,12 @@ impl State {
         full_proposes
     }
 
-    /// Checks whether some blocks are waiting for this transaction.
-    /// Returns a list of blocks that don't contain unknown transactions.
+    /// Checks if there is an incomplete block that waits for this transaction.
+    /// Returns a block that don't contain unknown transactions.
     ///
     /// Transaction is ignored if the following criteria are fulfilled:
     ///
-    /// - transaction isn't contained in unknown transaction list of any blocks
+    /// - transaction isn't contained in the unknown transactions list of block
     /// - transaction isn't a part of block
     pub fn remove_unknown_transaction(&mut self, tx_hash: Hash) -> Option<IncompleteBlock> {
         if let Some(ref mut incomplete_block) = self.incomplete_block {
@@ -932,34 +930,26 @@ impl State {
         txs: &MapIndex<&&Snapshot, Hash, RawMessage>,
         txs_pool: &KeySetIndex<&&Snapshot, Hash>,
     ) -> Result<bool, failure::Error> {
-        if let Some(ref incomplete_block) = self.incomplete_block {
-            if incomplete_block.msg.block().hash() == msg.block().hash() {
-                bail!("Block already found")
-            } else {
-                panic!("Two incomplete blocks with different hash")
-            }
-        } else {
-            let mut unknown_txs = HashSet::new();
-            for hash in msg.transactions() {
-                if txs.get(hash).is_some() {
-                    if !txs_pool.contains(hash) {
-                        panic!(
-                            "Received block with already \
-                             committed transaction"
-                        )
-                    }
-                } else {
-                    unknown_txs.insert(*hash);
+        let mut unknown_txs = HashSet::new();
+        for hash in msg.transactions() {
+            if txs.get(hash).is_some() {
+                if !txs_pool.contains(hash) {
+                    panic!(
+                        "Received block with already \
+                         committed transaction"
+                    )
                 }
+            } else {
+                unknown_txs.insert(*hash);
             }
-
-            self.set_incomplete_block(IncompleteBlock {
-                msg: msg.clone(),
-                unknown_txs: unknown_txs.clone(),
-            });
-
-            Ok(!unknown_txs.is_empty())
         }
+
+        self.incomplete_block = Some(IncompleteBlock {
+            msg: msg.clone(),
+            unknown_txs: unknown_txs.clone(),
+        });
+
+        Ok(!unknown_txs.is_empty())
     }
 
     /// Adds pre-vote. Returns `true` there are +2/3 pre-votes.

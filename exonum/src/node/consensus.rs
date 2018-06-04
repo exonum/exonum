@@ -197,7 +197,7 @@ impl NodeHandler {
         Ok(())
     }
 
-    fn verify_block_root_hash(&mut self, msg: &BlockResponse) -> Result<(), String> {
+    fn verify_block_tx_hash(&mut self, msg: &BlockResponse) -> Result<(), String> {
         let mut fork = self.blockchain.fork();
         let mut schema = Schema::new(&mut fork);
         for tx_hash in msg.transactions() {
@@ -216,20 +216,30 @@ impl NodeHandler {
     // TODO write helper function which returns Result (ECR-123)
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_block(&mut self, msg: &BlockResponse) {
+        let block = msg.block();
+        let block_hash = block.hash();
+
+        if let Some(ref incomplete_block) = self.state.incomplete_block() {
+            if incomplete_block.message().block().hash() == block_hash {
+                warn!("Block already found, block={:?}", msg);
+            } else {
+                warn!("Two blocks with different hash, block={:?}", msg);
+            }
+            return;
+        }
+
         if let Err(err) = self.validate_block_response(msg) {
             error!("{}", err);
             return;
         }
 
-        let block = msg.block();
-        let block_hash = block.hash();
         if let Err(err) = self.verify_precommits(&msg.precommits(), &block_hash, block.height()) {
             error!("{}, block={:?}", err, msg);
             return;
         }
 
         if self.state.block(&block_hash).is_none() {
-            if let Err(err) = self.verify_block_root_hash(msg) {
+            if let Err(err) = self.verify_block_tx_hash(msg) {
                 error!("{}", err);
                 return;
             }
@@ -796,13 +806,12 @@ impl NodeHandler {
                         .clone()
                 }
                 RequestData::TransactionsForBlock => {
-                    let txs: Vec<_> = self.state
-                        .incomplete_block()
-                        .unwrap()
-                        .unknown_txs()
-                        .iter()
-                        .cloned()
-                        .collect();
+                    let txs: Vec<_> = match self.state.incomplete_block() {
+                        Some(incomplete_block) => {
+                            incomplete_block.unknown_txs().iter().cloned().collect()
+                        }
+                        None => Vec::new(),
+                    };
                     TransactionsRequest::new(
                         self.state.consensus_public_key(),
                         &peer,
