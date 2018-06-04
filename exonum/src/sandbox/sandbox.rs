@@ -824,11 +824,11 @@ mod tests {
         }
     }
 
-    struct HandleCommitService;
+    struct AfterCommitService;
 
-    impl Service for HandleCommitService {
+    impl Service for AfterCommitService {
         fn service_name(&self) -> &str {
-            "handle_commit"
+            "after_commit"
         }
 
         fn service_id(&self) -> u16 {
@@ -844,7 +844,7 @@ mod tests {
             Ok(tx.into())
         }
 
-        fn handle_commit(&self, context: &ServiceContext) {
+        fn after_commit(&self, context: &ServiceContext) {
             let tx = TxAfterCommit::new_with_height(context.height());
             context.transaction_sender().send(Box::new(tx)).unwrap();
         }
@@ -982,9 +982,9 @@ mod tests {
     }
 
     #[test]
-    fn test_sandbox_service_handle_commit() {
+    fn test_sandbox_service_after_commit() {
         let sandbox = sandbox_with_services(vec![
-            Box::new(HandleCommitService),
+            Box::new(AfterCommitService),
             Box::new(TimestampingService::new()),
         ]);
         let state = SandboxState::new();
