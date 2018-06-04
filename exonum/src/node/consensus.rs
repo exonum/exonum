@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashSet;
-use std::error::Error;
+use std::{collections::HashSet, error::Error};
 
 use blockchain::{Schema, Transaction};
 use crypto::{CryptoHash, Hash, PublicKey};
@@ -803,7 +802,6 @@ impl NodeHandler {
 
     /// Calls `create_block` with transactions from the corresponding `Propose` and returns the
     /// block hash.
-    // FIXME: remove this bull shit
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn execute(&mut self, propose_hash: &Hash) -> Hash {
         // if we already execute this block, return hash

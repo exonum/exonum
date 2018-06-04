@@ -132,7 +132,7 @@ encoding_struct! {
 #[test]
 fn test_correct_encoding_struct() {
     let dat: Vec<u8> = vec![
-        8u8, 0, 0, 0, 18, 0, 0, 0, 16, 0, 0, 0, 1, 0, 0, 0, 17, 0, 0, 0, 1, 0, 0, 0, 1, 2
+        8u8, 0, 0, 0, 18, 0, 0, 0, 16, 0, 0, 0, 1, 0, 0, 0, 17, 0, 0, 0, 1, 0, 0, 0, 1, 2,
     ];
     let test = vec![16u8, 0, 0, 0, 1, 0, 0, 0, 17, 0, 0, 0, 1, 0, 0, 0, 1, 2];
     let mut buffer = vec![0; 8];
@@ -380,7 +380,7 @@ impl Service for ServiceGood {
         unimplemented!()
     }
 
-    fn execute(&self, fork: &mut Fork) {
+    fn before_commit(&self, fork: &mut Fork) {
         let mut index = ListIndex::new(IDX_NAME, fork);
         index.push(1);
     }
@@ -405,7 +405,7 @@ impl Service for ServicePanic {
         unimplemented!()
     }
 
-    fn execute(&self, _fork: &mut Fork) {
+    fn before_commit(&self, _fork: &mut Fork) {
         panic!("42");
     }
 }
@@ -429,7 +429,7 @@ impl Service for ServicePanicStorageError {
         unimplemented!()
     }
 
-    fn execute(&self, _fork: &mut Fork) {
+    fn before_commit(&self, _fork: &mut Fork) {
         panic!(Error::new("42"));
     }
 }

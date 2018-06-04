@@ -15,12 +15,10 @@
 /// purpose of this module is to keep functions with reusable code used for sandbox tests
 use bit_vec::BitVec;
 
-use std::cell::RefCell;
-use std::collections::BTreeMap;
-use std::time::Duration;
+use std::{cell::RefCell, collections::BTreeMap, time::Duration};
 
-use super::sandbox::Sandbox;
-use super::timestamping::{TimestampTx, TimestampingTxGenerator};
+use super::{sandbox::Sandbox,
+            timestamping::{TimestampTx, TimestampingTxGenerator}};
 use blockchain::{Block, SCHEMA_MAJOR_VERSION};
 use crypto::{CryptoHash, Hash, HASH_SIZE};
 use helpers::{Height, Milliseconds, Round, ValidatorId};

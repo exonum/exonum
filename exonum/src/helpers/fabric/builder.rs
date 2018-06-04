@@ -12,22 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
-use std::ffi::OsString;
-use std::fmt;
-use std::panic::{self, PanicInfo};
+use std::{collections::HashMap,
+          ffi::OsString,
+          fmt,
+          panic::{self, PanicInfo}};
 
+use super::{clap_backend::ClapBackend,
+            details::{Finalize, GenerateCommonConfig, GenerateNodeConfig, GenerateTestnet, Run,
+                      RunDev},
+            internal::{CollectedCommand, Feedback},
+            keys,
+            maintenance::Maintenance,
+            CommandName,
+            ServiceFactory};
 use blockchain::Service;
 use node::Node;
-
-use super::CommandName;
-use super::ServiceFactory;
-use super::clap_backend::ClapBackend;
-use super::details::{Finalize, GenerateCommonConfig, GenerateNodeConfig, GenerateTestnet, Run,
-                     RunDev};
-use super::internal::{CollectedCommand, Feedback};
-use super::keys;
-use super::maintenance::Maintenance;
 
 /// `NodeBuilder` is a high level object,
 /// usable for fast prototyping and creating app from services list.

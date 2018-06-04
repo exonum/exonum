@@ -14,19 +14,18 @@
 
 //! Command line commands utilities.
 
-pub use self::builder::NodeBuilder;
-pub use self::context_key::ContextKey;
-pub use self::details::{Finalize, GenerateCommonConfig, GenerateNodeConfig, GenerateTestnet, Run};
-pub use self::maintenance::Maintenance;
-pub use self::shared::{AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig};
+pub use self::{builder::NodeBuilder,
+               context_key::ContextKey,
+               details::{Finalize, GenerateCommonConfig, GenerateNodeConfig, GenerateTestnet, Run},
+               maintenance::Maintenance,
+               shared::{AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig}};
 
 use clap;
 use failure;
 use serde::{Deserialize, Serialize};
 use toml::Value;
 
-use std::collections::BTreeMap;
-use std::str::FromStr;
+use std::{collections::BTreeMap, str::FromStr};
 
 use blockchain::Service;
 
@@ -120,8 +119,8 @@ pub mod keys {
 
     use toml;
 
-    use super::ContextKey;
     use super::shared::{AbstractConfig, CommonConfigTemplate, NodePublicConfig};
+    use super::ContextKey;
     use node::NodeConfig;
 
     /// Configuration for this node.

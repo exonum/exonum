@@ -32,13 +32,13 @@
 //! [`Service`]: ./trait.Service.html
 //! [doc:create-service]: https://exonum.com/doc/get-started/create-service
 
-pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
-pub use self::config::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
-pub use self::genesis::GenesisConfig;
-pub use self::schema::{Schema, TxLocation};
-pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState};
-pub use self::transaction::{ExecutionError, ExecutionResult, Transaction, TransactionError,
-                            TransactionErrorType, TransactionResult, TransactionSet};
+pub use self::{block::{Block, BlockProof, SCHEMA_MAJOR_VERSION},
+               config::{ConsensusConfig, StoredConfiguration, ValidatorKeys},
+               genesis::GenesisConfig,
+               schema::{Schema, TxLocation},
+               service::{ApiContext, Service, ServiceContext, SharedNodeState},
+               transaction::{ExecutionError, ExecutionResult, Transaction, TransactionError,
+                             TransactionErrorType, TransactionResult, TransactionSet}};
 
 pub mod config;
 
@@ -47,16 +47,19 @@ use failure;
 use mount::Mount;
 use vec_map::VecMap;
 
-use std::collections::{BTreeMap, HashMap};
-use std::error::Error as StdError;
-use std::net::SocketAddr;
-use std::sync::Arc;
-use std::{fmt, iter, mem, panic};
+use std::{collections::{BTreeMap, HashMap},
+          error::Error as StdError,
+          fmt,
+          iter,
+          mem,
+          net::SocketAddr,
+          panic,
+          sync::Arc};
 
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
 use helpers::{Height, Round, ValidatorId};
-use messages::{CONSENSUS as CORE_SERVICE, Connect, Precommit, RawMessage};
+use messages::{Connect, Precommit, RawMessage, CONSENSUS as CORE_SERVICE};
 use node::ApiSender;
 use storage::{Database, Error, Fork, Patch, Snapshot};
 
@@ -278,7 +281,7 @@ impl Blockchain {
             for service in self.service_map.values() {
                 // Skip execution for genesis block.
                 if height > Height(0) {
-                    service_execute(service.as_ref(), &mut fork);
+                    before_commit(service.as_ref(), &mut fork);
                 }
             }
 
@@ -411,7 +414,7 @@ impl Blockchain {
     }
 
     /// Commits to the blockchain a new block with the indicated changes (patch),
-    /// hash and Precommit messages. After that invokes `handle_commit`
+    /// hash and Precommit messages. After that invokes `after_commit`
     /// for each service in the increasing order of their identifiers.
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn commit<'a, I>(
@@ -450,9 +453,9 @@ impl Blockchain {
             self.api_sender.clone(),
             self.fork(),
         );
-        // Invokes `handle_commit` for each service in order of their identifiers
+        // Invokes `after_commit` for each service in order of their identifiers
         for service in self.service_map.values() {
-            service.handle_commit(&context);
+            service.after_commit(&context);
         }
         Ok(())
     }
@@ -552,9 +555,9 @@ impl Blockchain {
     }
 }
 
-fn service_execute(service: &Service, fork: &mut Fork) {
+fn before_commit(service: &Service, fork: &mut Fork) {
     fork.checkpoint();
-    match panic::catch_unwind(panic::AssertUnwindSafe(|| service.execute(fork))) {
+    match panic::catch_unwind(panic::AssertUnwindSafe(|| service.before_commit(fork))) {
         Ok(..) => fork.commit(),
         Err(err) => {
             if err.is::<Error>() {
@@ -563,7 +566,7 @@ fn service_execute(service: &Service, fork: &mut Fork) {
             }
             fork.rollback();
             error!(
-                "{} service execute failed with error: {:?}",
+                "{} service before_commit failed with error: {:?}",
                 service.service_name(),
                 err
             );

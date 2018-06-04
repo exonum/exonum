@@ -84,13 +84,13 @@ pub use errors::ErrorCode;
 pub use schema::{MaybeVote, ProposeData, Schema, VotingDecision};
 pub use transactions::{ConfigurationTransactions, Propose, Vote, VoteAgainst};
 
-use exonum::api::Api;
-use exonum::blockchain::{self, ApiContext, Transaction, TransactionSet};
-use exonum::crypto::Hash;
-use exonum::encoding::Error as EncodingError;
-use exonum::helpers::fabric::{self, Context};
-use exonum::messages::RawTransaction;
-use exonum::storage::Snapshot;
+use exonum::{api::Api,
+             blockchain::{self, ApiContext, Transaction, TransactionSet},
+             crypto::Hash,
+             encoding::Error as EncodingError,
+             helpers::fabric::{self, Context},
+             messages::RawTransaction,
+             storage::Snapshot};
 use iron::Handler;
 use router::Router;
 

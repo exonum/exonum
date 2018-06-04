@@ -18,10 +18,10 @@
 use iron::Handler;
 use serde_json::Value;
 
-use std::collections::{HashMap, HashSet};
-use std::fmt;
-use std::net::SocketAddr;
-use std::sync::{Arc, RwLock};
+use std::{collections::{HashMap, HashSet},
+          fmt,
+          net::SocketAddr,
+          sync::{Arc, RwLock}};
 
 use super::transaction::Transaction;
 use blockchain::{Blockchain, ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
@@ -178,20 +178,21 @@ pub trait Service: Send + Sync + 'static {
     }
 
     /// A service execution. This method is invoked for each service after execution
-    /// of all transactions in the block but before `handle_commit` handler.
+    /// of all transactions in the block but before `after_commit` handler.
     ///
-    /// The order of invoking `execute` method for every service depends on the service ID.
-    /// `execute` for the service with the smallest ID is invoked first up to the largest one.
+    /// The order of invoking `before_commit` method for every service depends on the
+    /// service ID. `before_commit` for the service with the smallest ID is invoked
+    /// first up to the largest one.
     /// Effectively, this means that services should not rely on a particular ordering of
     /// Service::execute invocations.
-    fn execute(&self, fork: &mut Fork) {}
+    fn before_commit(&self, fork: &mut Fork) {}
 
     /// Handles block commit. This handler is invoked for each service after commit of the block.
     /// For example, a service can create one or more transactions if a specific condition
     /// has occurred.
     ///
     /// *Try not to perform long operations in this handler*.
-    fn handle_commit(&self, context: &ServiceContext) {}
+    fn after_commit(&self, context: &ServiceContext) {}
 
     /// Returns an API handler for public requests. The handler is mounted on
     /// the `/api/services/{service_name}` path at [the public listen address][pub-addr]
@@ -213,7 +214,7 @@ pub trait Service: Send + Sync + 'static {
 }
 
 /// The current node state on which the blockchain is running, or in other words
-/// execution context. This structure is passed to the `handle_commit` method
+/// execution context. This structure is passed to the `after_commit` method
 /// of the `Service` trait and is used for the interaction between service
 /// business logic and the current node state.
 #[derive(Debug)]
