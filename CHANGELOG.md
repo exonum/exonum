@@ -5,6 +5,14 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Internal improvements
+
+#### exonum
+
+- `BlockResponse` sends transactions by hash.
+  If the node does not have some transactions,
+  requests are created with the corresponding transactions. (#664)
+
 ## 0.8 - 2018-05-31
 
 ### Breaking changes
