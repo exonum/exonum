@@ -28,7 +28,7 @@ use std::collections::{BTreeMap, HashSet};
 
 use crypto::{hash, CryptoHash, Hash, PublicKey};
 use helpers::{Height, Milliseconds};
-use storage::StorageValue;
+use storage::{self, StorageValue};
 
 /// Public keys of a validator. Each validator has two public keys: the
 /// `consensus_key` is used for internal operations in the consensus process,
@@ -219,6 +219,15 @@ impl StoredConfiguration {
         if config.consensus.txs_block_limit == 0 {
             return Err(JsonError::custom(
                 "txs_block_limit should not be equal to zero",
+            ));
+        }
+
+        // Checkout storage_version.
+        if config.storage_version != storage::StorageVersion::current() {
+            return Err(JsonError::curstom(
+                "storage_version({}) must be the same with storage version set in the core ({})",
+                config.storage_version,
+                storage::StorageVersion::current(),
             ));
         }
 
