@@ -224,11 +224,11 @@ impl StoredConfiguration {
 
         // Checkout storage_version.
         if config.storage_version != storage::StorageVersion::current() {
-            return Err(JsonError::curstom(
+            return Err(JsonError::custom(format!(
                 "storage_version({}) must be the same with storage version set in the core ({})",
                 config.storage_version,
                 storage::StorageVersion::current(),
-            ));
+            )));
         }
 
         Ok(config)
