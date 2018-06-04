@@ -33,14 +33,13 @@ pub mod api;
 pub mod schema;
 pub mod transactions;
 
-use exonum::api::Api;
-use exonum::blockchain::{self, ApiContext, Transaction, TransactionSet};
-use exonum::crypto::Hash;
-use exonum::encoding::Error as StreamStructError;
-use exonum::helpers::fabric;
-use exonum::messages::RawTransaction;
-use exonum::storage::Snapshot;
-
+use exonum::{api::Api,
+             blockchain::{self, ApiContext, Transaction, TransactionSet},
+             crypto::Hash,
+             encoding::Error as StreamStructError,
+             helpers::fabric,
+             messages::RawTransaction,
+             storage::Snapshot};
 use iron::Handler;
 use router::Router;
 

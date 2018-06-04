@@ -63,8 +63,8 @@ pub mod transactions {
 }
 
 pub mod contracts {
-    use exonum::blockchain::{ExecutionResult, Transaction};
-    use exonum::storage::Fork;
+    use exonum::{blockchain::{ExecutionResult, Transaction},
+                 storage::Fork};
 
     use schema::BalanceSchema;
     use transactions::TxAddBalance;
@@ -85,20 +85,19 @@ pub mod contracts {
 }
 
 pub mod service {
-    use exonum::blockchain::{Service, Transaction, TransactionSet};
-    use exonum::crypto::{gen_keypair, Hash};
-    use exonum::helpers;
-    use exonum::node::{ExternalMessage, Node, TransactionSend};
-    use exonum::storage::{Database, Fork, MemoryDB, Snapshot};
-    use exonum::{encoding, messages::RawTransaction};
+    use exonum::{blockchain::{Service, Transaction, TransactionSet},
+                 crypto::{gen_keypair, Hash},
+                 encoding,
+                 helpers,
+                 messages::RawTransaction,
+                 node::{ExternalMessage, Node, TransactionSend},
+                 storage::{Database, Fork, MemoryDB, Snapshot}};
     use serde_json::Value;
+
+    use std::{sync::Arc, thread, time};
 
     use schema::BalanceSchema;
     use transactions::{BalanceTransactions, TxAddBalance};
-
-    use std::sync::Arc;
-    use std::thread;
-    use std::time;
 
     pub const SERVICE_ID: u16 = 1;
 

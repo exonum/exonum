@@ -14,18 +14,12 @@
 
 //! `Transaction` related types.
 
-use serde::Serialize;
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Serialize};
 
-use std::any::Any;
-use std::borrow::Cow;
-use std::convert::Into;
-use std::error::Error;
-use std::{fmt, u8};
+use std::{any::Any, borrow::Cow, convert::Into, error::Error, fmt, u8};
 
 use crypto::{CryptoHash, Hash};
-use encoding;
-use encoding::serialize::json::ExonumJson;
+use encoding::{self, serialize::json::ExonumJson};
 use messages::{Message, RawTransaction};
 use storage::{Fork, StorageValue};
 

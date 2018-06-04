@@ -18,9 +18,9 @@ use bit_vec::BitVec;
 use failure;
 use serde_json::Value;
 
-use std::collections::{BTreeMap, HashMap, HashSet, hash_map::Entry};
-use std::net::SocketAddr;
-use std::time::{Duration, SystemTime};
+use std::{collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},
+          net::SocketAddr,
+          time::{Duration, SystemTime}};
 
 use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey};

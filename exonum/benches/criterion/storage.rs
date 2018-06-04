@@ -11,12 +11,13 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use exonum::storage::proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE;
-use exonum::storage::{Database, DbOptions, ProofListIndex, ProofMapIndex, RocksDB};
+
+use criterion::{Bencher, Criterion};
+use exonum::{storage::proof_map_index::PROOF_MAP_KEY_SIZE as KEY_SIZE, Database, DbOptions,
+             ProofListIndex, ProofMapIndex, RocksDB};
 use rand::{Rng, SeedableRng, XorShiftRng};
 use tempdir::TempDir;
 
-use criterion::{Bencher, Criterion};
 use std::collections::HashSet;
 
 const NAME: &str = "name";

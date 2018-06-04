@@ -14,11 +14,9 @@
 
 //! An implementation of set for items that implement `StorageKey` trait.
 
-use std::borrow::Borrow;
-use std::marker::PhantomData;
+use std::{borrow::Borrow, marker::PhantomData};
 
-use super::indexes_metadata::IndexType;
-use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey};
+use super::{indexes_metadata::IndexType, BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey};
 
 /// A set of items that implement `StorageKey` trait.
 ///

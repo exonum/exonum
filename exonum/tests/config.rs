@@ -21,11 +21,12 @@ extern crate toml;
 use exonum::helpers::fabric::NodeBuilder;
 use toml::Value;
 
-use std::ffi::OsString;
-use std::fs::{File, OpenOptions};
-use std::io::{Read, Write};
-use std::path::Path;
-use std::{fs, panic};
+use std::{ffi::OsString,
+          fs,
+          fs::{File, OpenOptions},
+          io::{Read, Write},
+          panic,
+          path::Path};
 
 const CONFIG_TMP_FOLDER: &str = "/tmp/";
 const CONFIG_TESTDATA_FOLDER: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/testdata/config/");

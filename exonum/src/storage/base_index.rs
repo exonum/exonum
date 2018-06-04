@@ -15,8 +15,7 @@
 //! An implementation of base index with most common features.
 // spell-checker:ignore subprefix
 
-use std::borrow::Cow;
-use std::marker::PhantomData;
+use std::{borrow::Cow, marker::PhantomData};
 
 use super::{Fork, Iter, Snapshot, StorageKey, StorageValue};
 use storage::indexes_metadata::{self, IndexType, INDEXES_METADATA_TABLE_NAME};

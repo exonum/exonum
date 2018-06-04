@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::crypto::{Hash, PublicKey};
-use exonum::storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot};
+use exonum::{crypto::{Hash, PublicKey},
+             storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot}};
 
-use INITIAL_BALANCE;
 use wallet::Wallet;
+use INITIAL_BALANCE;
 
 /// Database schema for the cryptocurrency.
 #[derive(Debug)]

@@ -18,10 +18,10 @@
 use iron::Handler;
 use serde_json::Value;
 
-use std::collections::{HashMap, HashSet};
-use std::fmt;
-use std::net::SocketAddr;
-use std::sync::{Arc, RwLock};
+use std::{collections::{HashMap, HashSet},
+          fmt,
+          net::SocketAddr,
+          sync::{Arc, RwLock}};
 
 use super::transaction::Transaction;
 use blockchain::{Blockchain, ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
