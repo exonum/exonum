@@ -54,7 +54,8 @@ use sodiumoxide::crypto::sign::ed25519::{gen_keypair as gen_keypair_sodium, keyp
                                          sign_detached, verify_detached,
                                          PublicKey as PublicKeySodium,
                                          SecretKey as SecretKeySodium, Seed as SeedSodium,
-                                         Signature as SignatureSodium, State as SignState};
+                                         Signature as SignatureSodium, State as SignState,
+                                         convert_ed_keypair_to_curve25519};
 use uuid::Uuid;
 
 use std::default::Default;
@@ -150,6 +151,27 @@ pub fn gen_keypair() -> (PublicKey, SecretKey) {
 /// ```
 pub fn verify(sig: &Signature, data: &[u8], pubkey: &PublicKey) -> bool {
     verify_detached(&sig.0, data, &pubkey.0)
+}
+
+/// Converts Ed25519 keys to Curve25519.
+///
+/// Ed25519 keys are used for signing, Curve25519 are used for DH key exchange.
+///
+/// ```
+/// use exonum::crypto;
+/// let (pk, sk) = crypto::gen_keypair();
+/// let (public_key, secret_key) = crypto::convert_keypair_for_handshake(pk, sk).unwrap();
+/// ```
+pub fn convert_keypair_for_handshake(
+    pk: PublicKey,
+    sk: SecretKey,
+) -> Option<(PublicKey, SecretKey)> {
+    let pk_sod = PublicKeySodium::from_slice(&pk[..])?;
+    let sk_sod = SecretKeySodium::from_slice(&sk[..])?;
+
+    let (pk, sk) = convert_ed_keypair_to_curve25519(pk_sod, sk_sod);
+
+    Some((PublicKey(pk), SecretKey(sk)))
 }
 
 /// Calculates an SHA-256 hash of a bytes slice.

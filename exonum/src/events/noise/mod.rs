@@ -25,6 +25,9 @@ use events::noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH};
 
 pub mod wrapper;
 
+#[cfg(test)]
+mod tests;
+
 type HandshakeResult = Box<Future<Item = Framed<TcpStream, MessagesCodec>, Error = io::Error>>;
 
 #[derive(Debug, Clone)]
