@@ -162,7 +162,7 @@ pub fn verify(sig: &Signature, data: &[u8], pubkey: &PublicKey) -> bool {
 ///
 /// # Examples
 ///
-/// The example below generate a pair of secret and public Ed25519 keys and
+/// The example below generates a pair of secret and public Ed25519 keys and
 /// converts it to pair of Curve25519 keys.
 ///
 /// ```
