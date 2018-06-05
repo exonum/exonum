@@ -25,7 +25,8 @@ use std::{cell::{Ref, RefCell, RefMut},
           sync::{Arc, Mutex},
           time::{Duration, SystemTime, UNIX_EPOCH}};
 
-use super::{config_updater::ConfigUpdateService, sandbox_tests_helper::{VALIDATOR_0, PROPOSE_TIMEOUT},
+use super::{config_updater::ConfigUpdateService,
+            sandbox_tests_helper::{VALIDATOR_0, PROPOSE_TIMEOUT},
             timestamping::TimestampingService};
 use blockchain::{Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
                  SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys};
