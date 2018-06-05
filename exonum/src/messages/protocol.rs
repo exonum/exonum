@@ -34,6 +34,7 @@ use super::{BitVec, RawMessage, ServiceMessage};
 use blockchain;
 use crypto::{Hash, PublicKey};
 use helpers::{Height, Round, ValidatorId};
+use storage::{Database, MemoryDB, ProofListIndex};
 
 /// Consensus message type.
 pub const CONSENSUS: u16 = 0;
@@ -359,5 +360,19 @@ messages! {
         to: &PublicKey,
         /// The height to which the message is related.
         height: Height,
+    }
+}
+
+impl BlockResponse {
+    /// Verify Merkle root of transactions in the block.
+    pub fn verify_tx_hash(&self) -> bool {
+        let db = MemoryDB::new();
+        let mut fork = db.fork();
+        let mut index = ProofListIndex::new("verify_tx_hash", &mut fork);
+        for tx_hash in self.transactions() {
+            index.push(*tx_hash);
+        }
+        let tx_hashes = index.merkle_root();
+        tx_hashes == *self.block().tx_hash()
     }
 }

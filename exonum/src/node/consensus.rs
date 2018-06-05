@@ -197,21 +197,6 @@ impl NodeHandler {
         Ok(())
     }
 
-    fn verify_block_tx_hash(&mut self, msg: &BlockResponse) -> Result<(), String> {
-        let mut fork = self.blockchain.fork();
-        let mut schema = Schema::new(&mut fork);
-        for tx_hash in msg.transactions() {
-            schema
-                .block_transactions_mut(self.state.height())
-                .push(*tx_hash);
-        }
-        let tx_hashes = schema.block_transactions(self.state.height()).merkle_root();
-        if tx_hashes != *msg.block().tx_hash() {
-            return Err(format!("Received block has wrong root hash, msg={:?}", msg));
-        }
-        Ok(())
-    }
-
     /// Handles the `Block` message. For details see the message documentation.
     // TODO write helper function which returns Result (ECR-123)
     #[cfg_attr(feature = "flame_profile", flame)]
@@ -239,8 +224,8 @@ impl NodeHandler {
         }
 
         if self.state.block(&block_hash).is_none() {
-            if let Err(err) = self.verify_block_tx_hash(msg) {
-                error!("{}", err);
+            if !msg.verify_tx_hash() {
+                error!("Received block has wrong root hash, msg={:?}", msg);
                 return;
             }
 
