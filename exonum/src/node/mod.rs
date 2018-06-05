@@ -619,7 +619,6 @@ impl NodeHandler {
         } else {
             self.max_propose_timeout()
         };
-        self.state.set_propose_timeout(timeout);
 
         let time = self.round_start_time(self.state.round()) + Duration::from_millis(timeout);
 

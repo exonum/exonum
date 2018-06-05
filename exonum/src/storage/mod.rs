@@ -79,8 +79,6 @@
 //! - [`KeySetIndex`] and [`ValueSetIndex`] is a set of items, similar to [`BTreeSet`] and
 //!   [`HashSet`].
 //!
-//! To implement a new index type, you should create a wrapper around [`BaseIndex`].
-//!
 //! [`Database`]: trait.Database.html
 //! [`RocksDB`]: struct.RocksDB.html
 //! [`MemoryDB`]: struct.MemoryDB.html
@@ -100,7 +98,6 @@
 //! [`ProofMapIndex`]: proof_map_index/struct.ProofMapIndex.html
 //! [`KeySetIndex`]: key_set_index/struct.KeySetIndex.html
 //! [`ValueSetIndex`]: value_set_index/struct.ValueSetIndex.html
-//! [`BaseIndex`]: base_index/struct.BaseIndex.html
 //! [doc:storage]: https://exonum.com/doc/architecture/storage
 //! [`Option`]: https://doc.rust-lang.org/std/option/enum.Option.html
 //! [`Box`]: https://doc.rust-lang.org/std/boxed/struct.Box.html
@@ -111,8 +108,7 @@
 
 #[doc(no_inline)]
 pub use self::proof_map_index::{HashedKey, MapProof, ProofMapIndex};
-pub use self::{base_index::{BaseIndex, BaseIndexIter},
-               db::{Change, Changes, ChangesIterator, Database, Fork, Iter, Iterator, Patch,
+pub use self::{db::{Change, Changes, ChangesIterator, Database, Fork, Iter, Iterator, Patch,
                     PatchIterator, Snapshot},
                entry::Entry,
                error::Error,
@@ -132,18 +128,17 @@ pub use self::{base_index::{BaseIndex, BaseIndexIter},
 /// A specialized `Result` type for I/O operations with storage.
 pub type Result<T> = ::std::result::Result<T, Error>;
 
+mod base_index;
 mod db;
 mod entry;
 mod error;
 mod hash;
+mod indexes_metadata;
 mod keys;
 mod memorydb;
 mod options;
 mod rocksdb;
 mod values;
-
-pub mod base_index;
-mod indexes_metadata;
 
 pub mod key_set_index;
 pub mod list_index;

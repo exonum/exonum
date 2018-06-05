@@ -45,6 +45,7 @@ pub const VALIDATOR_1: ValidatorId = ValidatorId(1);
 pub const VALIDATOR_2: ValidatorId = ValidatorId(2);
 pub const VALIDATOR_3: ValidatorId = ValidatorId(3);
 pub const INCORRECT_VALIDATOR_ID: ValidatorId = ValidatorId(64_999);
+pub const PROPOSE_TIMEOUT: Milliseconds = 200;
 
 // Idea of ProposeBuilder is to implement Builder pattern in order to get Block with
 // default data from sandbox and, possibly, update few fields with custom data.
@@ -475,7 +476,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
         add_round_with_transactions(sandbox, sandbox_state, hashes.as_ref());
         let round = sandbox.current_round();
         if VALIDATOR_1 == sandbox.leader(round) {
-            sandbox.add_time(Duration::from_millis(sandbox.propose_timeout()));
+            sandbox.add_time(Duration::from_millis(PROPOSE_TIMEOUT));
             // ok, we are leader
             trace!("ok, validator 1 leader, round: {:?}", round);
             let propose =
@@ -572,13 +573,13 @@ fn try_check_and_broadcast_propose_and_prevote(
     sandbox_state: &SandboxState,
     transactions: &[Hash],
 ) -> Result<Option<Propose>, String> {
-    if *sandbox_state.time_millis_since_round_start.borrow() > sandbox.propose_timeout() {
+    if *sandbox_state.time_millis_since_round_start.borrow() > PROPOSE_TIMEOUT {
         return Ok(None);
     }
 
     let time_millis_since_round_start_copy =
         { *sandbox_state.time_millis_since_round_start.borrow() };
-    let time_increment_millis = sandbox.propose_timeout() - time_millis_since_round_start_copy + 1;
+    let time_increment_millis = PROPOSE_TIMEOUT - time_millis_since_round_start_copy + 1;
 
     trace!(
         "time elapsed in current round: {:?}",
