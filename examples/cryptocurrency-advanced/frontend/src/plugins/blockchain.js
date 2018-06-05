@@ -205,9 +205,11 @@ function waitForAcceptance(publicKey, hash) {
 module.exports = {
   install(Vue) {
     Vue.prototype.$blockchain = {
-      createWallet(name) {
-        const keyPair = Exonum.keyPair()
+      generateKeyPair() {
+        return Exonum.keyPair()
+      },
 
+      createWallet(keyPair, name) {
         const TxCreateWallet = getTransaction(TX_WALLET_ID)
 
         const data = {
@@ -223,7 +225,7 @@ module.exports = {
           message_id: TX_WALLET_ID,
           signature: signature,
           body: data
-        }).then(() => keyPair)
+        })
       },
 
       addFunds(keyPair, amountToAdd) {
