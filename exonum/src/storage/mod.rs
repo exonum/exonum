@@ -98,6 +98,7 @@
 //! [`ProofMapIndex`]: proof_map_index/struct.ProofMapIndex.html
 //! [`KeySetIndex`]: key_set_index/struct.KeySetIndex.html
 //! [`ValueSetIndex`]: value_set_index/struct.ValueSetIndex.html
+//! [`BaseIndex`]: base_index/struct.BaseIndex.html
 //! [doc:storage]: https://exonum.com/doc/architecture/storage
 //! [`Option`]: https://doc.rust-lang.org/std/option/enum.Option.html
 //! [`Box`]: https://doc.rust-lang.org/std/boxed/struct.Box.html
@@ -106,6 +107,8 @@
 //! [`BTreeSet`]: https://doc.rust-lang.org/std/collections/struct.BTreeSet.html
 //! [`HashSet`]: https://doc.rust-lang.org/std/collections/struct.HashSet.html
 
+pub(crate) use self::indexes_metadata::{initialize_storage_version, storage_version_status,
+                                        VersionStatus};
 #[doc(no_inline)]
 pub use self::proof_map_index::{HashedKey, MapProof, ProofMapIndex};
 pub use self::{
