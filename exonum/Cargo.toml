@@ -50,11 +50,11 @@ os_info = "1.0.1"
 chrono = { version = "=0.4.2", features = ["serde"] }
 bodyparser = "=0.8.0"
 uuid = { version = "=0.6.5", features = ["serde"] }
-snow = "=0.1.9"
+snow = "=0.1.12"
 rust_decimal = "=0.9.0"
 
 exonum_rocksdb = "0.7.2"
-exonum_sodiumoxide = { git = "https://github.com/exonum/exonum_sodiumoxide.git", branch = "convert-keys" }
+exonum_sodiumoxide = "0.0.18"
 exonum_profiler = { path = "../3rdparty/profiler", version = "0.1.2" }
 exonum_flamer = { path = "../3rdparty/flamer", version = "0.1.6", optional = true }
 
