@@ -5,6 +5,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### exonum
+
+- `exonum::crypto::convert_keypair_for_handshake` method to convert from Ed25519
+  keys to Curve25519 keys is introduced.
+
 ## 0.8 - 2018-05-31
 
 ### Breaking changes

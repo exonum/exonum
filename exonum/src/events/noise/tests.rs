@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod test {
-    use snow::NoiseBuilder;
     use snow::types::Dh;
     use snow::wrappers::crypto_wrapper::Dh25519;
+    use snow::NoiseBuilder;
 
     use crypto::PUBLIC_KEY_LENGTH;
     use crypto::{convert_keypair_for_handshake, gen_keypair};

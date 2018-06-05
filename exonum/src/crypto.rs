@@ -51,9 +51,9 @@ use serde::{de::{self, Deserialize, Deserializer, Visitor},
 use sodiumoxide::{self,
                   crypto::{hash::sha256::{hash as hash_sodium, Digest as DigestSodium,
                                           State as HashState},
-                           sign::ed25519::{gen_keypair as gen_keypair_sodium, keypair_from_seed,
+                           sign::ed25519::{convert_ed_keypair_to_curve25519,
+                                           gen_keypair as gen_keypair_sodium, keypair_from_seed,
                                            sign_detached, verify_detached,
-                                           convert_ed_keypair_to_curve25519,
                                            PublicKey as PublicKeySodium,
                                            SecretKey as SecretKeySodium, Seed as SeedSodium,
                                            Signature as SignatureSodium, State as SignState}}};
@@ -164,6 +164,7 @@ pub fn verify(sig: &Signature, data: &[u8], pubkey: &PublicKey) -> bool {
 /// let (pk, sk) = crypto::gen_keypair();
 /// let (public_key, secret_key) = crypto::convert_keypair_for_handshake(pk, sk).unwrap();
 /// ```
+#[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
 pub fn convert_keypair_for_handshake(
     pk: PublicKey,
     sk: SecretKey,
