@@ -83,9 +83,6 @@ pub struct State {
     nodes_max_height: BTreeMap<PublicKey, Height>,
 
     validators_rounds: BTreeMap<ValidatorId, Round>,
-
-    // Current value of the propose timeout.
-    propose_timeout: Milliseconds,
 }
 
 /// State of a validator-node.
@@ -402,7 +399,6 @@ impl State {
 
             requests: HashMap::new(),
 
-            propose_timeout: stored.consensus.max_propose_timeout,
             config: stored,
         }
     }
@@ -495,16 +491,6 @@ impl State {
         trace!("Validator={:#?}", self.validator_state());
 
         self.config = config;
-    }
-
-    /// Sets a new propose timeout value.
-    pub fn set_propose_timeout(&mut self, timeout: Milliseconds) {
-        self.propose_timeout = timeout;
-    }
-
-    /// Returns adjusted (see `TimeoutAdjuster` for the details) value of the propose timeout.
-    pub fn propose_timeout(&self) -> Milliseconds {
-        self.propose_timeout
     }
 
     /// Adds the public key, address, and `Connect` message of a validator.

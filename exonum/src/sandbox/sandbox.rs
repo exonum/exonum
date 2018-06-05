@@ -25,7 +25,8 @@ use std::{cell::{Ref, RefCell, RefMut},
           sync::{Arc, Mutex},
           time::{Duration, SystemTime, UNIX_EPOCH}};
 
-use super::{config_updater::ConfigUpdateService, sandbox_tests_helper::VALIDATOR_0,
+use super::{config_updater::ConfigUpdateService,
+            sandbox_tests_helper::{VALIDATOR_0, PROPOSE_TIMEOUT},
             timestamping::TimestampingService};
 use blockchain::{Block, BlockProof, Blockchain, ConsensusConfig, GenesisConfig, Schema, Service,
                  SharedNodeState, StoredConfiguration, Transaction, ValidatorKeys};
@@ -470,10 +471,6 @@ impl Sandbox {
         schema.actual_configuration()
     }
 
-    pub fn propose_timeout(&self) -> Milliseconds {
-        self.node_state().propose_timeout()
-    }
-
     pub fn majority_count(&self, num_validators: usize) -> usize {
         num_validators * 2 / 3 + 1
     }
@@ -692,8 +689,8 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandb
         peers_timeout: 600_000,
         txs_block_limit: 1000,
         max_message_len: 1024 * 1024,
-        min_propose_timeout: 200,
-        max_propose_timeout: 200,
+        min_propose_timeout: PROPOSE_TIMEOUT,
+        max_propose_timeout: PROPOSE_TIMEOUT,
         propose_timeout_threshold: 0,
     };
     let genesis = GenesisConfig::new_with_consensus(
@@ -770,7 +767,7 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandb
     };
 
     // General assumption; necessary for correct work of consensus algorithm
-    assert!(sandbox.propose_timeout() < sandbox.round_timeout());
+    assert!(PROPOSE_TIMEOUT < sandbox.round_timeout());
     sandbox.process_events();
     sandbox
 }
