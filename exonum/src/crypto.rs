@@ -157,24 +157,32 @@ pub fn verify(sig: &Signature, data: &[u8], pubkey: &PublicKey) -> bool {
 
 /// Converts Ed25519 keys to Curve25519.
 ///
-/// Ed25519 keys are used for signing, Curve25519 are used for DH key exchange.
+/// Ed25519 keys used for signatures can be converted to Curve25519 and used for
+/// Diffie-Hellman key exchange.
+///
+/// # Examples
+///
+/// The example below generate a pair of secret and public Ed25519 keys and
+/// converts it to pair of Curve25519 keys.
 ///
 /// ```
 /// use exonum::crypto;
+/// # crypto::init();
+///
 /// let (pk, sk) = crypto::gen_keypair();
-/// let (public_key, secret_key) = crypto::convert_keypair_for_handshake(pk, sk).unwrap();
+/// let (public_key, secret_key) = crypto::into_x25519_keypair(pk, sk).unwrap();
 /// ```
 #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
-pub fn convert_keypair_for_handshake(
+pub fn into_x25519_keypair(
     pk: PublicKey,
     sk: SecretKey,
-) -> Option<(PublicKey, SecretKey)> {
+) -> Option<(PublicKeyX25519, SecretKeyX25519)> {
     let pk_sod = PublicKeySodium::from_slice(&pk[..])?;
     let sk_sod = SecretKeySodium::from_slice(&sk[..])?;
 
     let (pk, sk) = convert_ed_keypair_to_curve25519(pk_sod, sk_sod);
 
-    Some((PublicKey(pk), SecretKey(sk)))
+    Some((PublicKeyX25519(pk), SecretKeyX25519(sk)))
 }
 
 /// Calculates an SHA-256 hash of a bytes slice.
@@ -549,6 +557,28 @@ implement_private_sodium_wrapper! {
 }
 
 implement_public_sodium_wrapper! {
+/// Curve25519 public key used in key exchange.
+/// This key cannot be directly generated and can only be converted
+/// from Ed25519 `PublicKey`.
+///
+/// See: [`into_x25519_keypair()`][1]
+///
+/// [1]: fn.into_x25519_keypair.html
+    struct PublicKeyX25519, PublicKeySodium, PUBLIC_KEY_LENGTH
+}
+
+implement_private_sodium_wrapper! {
+/// Curve25519 secret key used in key exchange.
+/// This key cannot be directly generated and can only be converted
+/// from Ed25519 `SecretKey`.
+///
+/// See: [`into_x25519_keypair()`][1]
+///
+/// [1]: fn.into_x25519_keypair.html
+    struct SecretKeyX25519, SecretKeySodium, SECRET_KEY_LENGTH
+}
+
+implement_public_sodium_wrapper! {
 /// The result of applying the SHA-256 hash function to data.
 ///
 /// This function splits the input data into blocks and runs each block
@@ -673,6 +703,8 @@ macro_rules! implement_serde {
 implement_serde! {Hash}
 implement_serde! {PublicKey}
 implement_serde! {SecretKey}
+implement_serde! {PublicKeyX25519}
+implement_serde! {SecretKeyX25519}
 implement_serde! {Seed}
 implement_serde! {Signature}
 
@@ -711,6 +743,8 @@ macro_rules! implement_index_traits {
 implement_index_traits! {Hash}
 implement_index_traits! {PublicKey}
 implement_index_traits! {SecretKey}
+implement_index_traits! {PublicKeyX25519}
+implement_index_traits! {SecretKeyX25519}
 implement_index_traits! {Seed}
 implement_index_traits! {Signature}
 
