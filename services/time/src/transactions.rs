@@ -1,9 +1,9 @@
-use exonum::blockchain::{ExecutionError, ExecutionResult, Schema, Transaction};
-use exonum::crypto::PublicKey;
-use exonum::messages::Message;
-use exonum::storage::{Fork, Snapshot};
-
 use chrono::{DateTime, Utc};
+use exonum::{blockchain::{ExecutionError, ExecutionResult, Schema, Transaction},
+             crypto::PublicKey,
+             messages::Message,
+             storage::{Fork, Snapshot}};
+
 use schema::TimeSchema;
 
 use super::SERVICE_ID;

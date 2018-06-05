@@ -25,6 +25,7 @@ use block::bench_block;
 use criterion::Criterion;
 use crypto::bench_crypto;
 use storage::bench_storage;
+
 mod block;
 mod crypto;
 mod storage;

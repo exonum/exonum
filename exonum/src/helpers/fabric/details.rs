@@ -19,20 +19,22 @@
 
 use toml;
 
-use std::collections::{BTreeMap, HashMap};
-use std::fs;
-use std::net::{IpAddr, SocketAddr};
-use std::path::{Path, PathBuf};
+use std::{collections::{BTreeMap, HashMap},
+          fs,
+          net::{IpAddr, SocketAddr},
+          path::{Path, PathBuf}};
 
-use super::DEFAULT_EXONUM_LISTEN_PORT;
-use super::internal::{CollectedCommand, Command, Feedback};
-use super::keys;
-use super::shared::{AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig,
-                    SharedConfig};
-use super::{Argument, CommandName, Context};
-use blockchain::{GenesisConfig, config::ValidatorKeys};
+use super::{internal::{CollectedCommand, Command, Feedback},
+            keys,
+            shared::{AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig,
+                     SharedConfig},
+            Argument,
+            CommandName,
+            Context,
+            DEFAULT_EXONUM_LISTEN_PORT};
+use blockchain::{config::ValidatorKeys, GenesisConfig};
 use crypto;
-use helpers::{generate_testnet_config, config::ConfigFile};
+use helpers::{config::ConfigFile, generate_testnet_config};
 use node::{AllowOrigin, NodeApiConfig, NodeConfig};
 use storage::{Database, DbOptions, RocksDB};
 
@@ -224,16 +226,14 @@ impl RunDev {
 
 impl Command for RunDev {
     fn args(&self) -> Vec<Argument> {
-        vec![
-            Argument::new_named(
-                "ARTIFACTS_DIR",
-                false,
-                "The path where configuration and db files will be generated.",
-                "a",
-                "artifacts-dir",
-                false,
-            ),
-        ]
+        vec![Argument::new_named(
+            "ARTIFACTS_DIR",
+            false,
+            "The path where configuration and db files will be generated.",
+            "a",
+            "artifacts-dir",
+            false,
+        )]
     }
 
     fn name(&self) -> CommandName {

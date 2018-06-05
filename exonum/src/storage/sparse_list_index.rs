@@ -19,12 +19,10 @@
 
 use byteorder::{BigEndian, ByteOrder};
 
-use std::borrow::Cow;
-use std::cell::Cell;
-use std::marker::PhantomData;
+use std::{borrow::Cow, cell::Cell, marker::PhantomData};
 
-use super::indexes_metadata::IndexType;
-use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey, StorageValue};
+use super::{indexes_metadata::IndexType, BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey,
+            StorageValue};
 use crypto::{hash, CryptoHash, Hash};
 
 #[derive(Debug, Default, Clone, Copy)]
