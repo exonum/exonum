@@ -9,7 +9,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
-- `storage::base_index` module becomes private along with `BaseIndex` and
+- `storage::base_index` module has become private along with `BaseIndex` and
   `BaseIndexIter` types. (#723)
 
 ## 0.8 - 2018-05-31
