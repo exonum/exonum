@@ -22,7 +22,11 @@ use std::{fmt, marker::PhantomData};
 use self::{key::{BitsRange, ChildKind, LEAF_KEY_PREFIX},
            node::{BranchNode, Node},
            proof::{create_multiproof, create_proof}};
-use super::{indexes_metadata::IndexType, BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey,
+use super::{base_index::{BaseIndex, BaseIndexIter},
+            indexes_metadata::IndexType,
+            Fork,
+            Snapshot,
+            StorageKey,
             StorageValue};
 use crypto::{CryptoHash, Hash, HashStream};
 
