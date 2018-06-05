@@ -233,7 +233,7 @@ messages! {
         block: blockchain::Block,
         /// List of pre-commits.
         precommits: Vec<Precommit>,
-        /// List of the transactions.
+        /// List of the transaction hashes.
         transactions: &[Hash],
     }
 

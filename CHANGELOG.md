@@ -9,9 +9,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
-- `BlockResponse` sends transactions by hash.
-  If the node does not have some transactions,
-  requests are created with the corresponding transactions. (#664)
+- `BlockResponse` sends transactions by `Hash` instead of `RawMessage`.
+  If the node does not have some transactions, requests are created
+  with the corresponding transactions. Due to these changes,
+  the block size became significantly smaller. (#664)
 
 ## 0.8 - 2018-05-31
 

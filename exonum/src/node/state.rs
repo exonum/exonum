@@ -103,9 +103,9 @@ pub enum RequestData {
     /// Represents `ProposeRequest` message.
     Propose(Hash),
     /// Represents `TransactionsRequest` message for `Propose`.
-    TransactionsForPropose(Hash),
+    ProposeTransactions(Hash),
     /// Represents `TransactionsRequest` message for `BlockResponse`.
-    TransactionsForBlock,
+    BlockTransactions,
     /// Represents `PrevotesRequest` message.
     Prevotes(Round, Hash),
     /// Represents `BlockRequest` message.
@@ -251,8 +251,9 @@ impl RequestData {
         #![cfg_attr(feature = "cargo-clippy", allow(match_same_arms))]
         let ms = match *self {
             RequestData::Propose(..) => PROPOSE_REQUEST_TIMEOUT,
-            RequestData::TransactionsForPropose(..) => TRANSACTIONS_REQUEST_TIMEOUT,
-            RequestData::TransactionsForBlock => TRANSACTIONS_REQUEST_TIMEOUT,
+            RequestData::ProposeTransactions(..) | RequestData::BlockTransactions => {
+                TRANSACTIONS_REQUEST_TIMEOUT
+            }
             RequestData::Prevotes(..) => PREVOTES_REQUEST_TIMEOUT,
             RequestData::Block(..) => BLOCK_REQUEST_TIMEOUT,
         };
@@ -920,7 +921,7 @@ impl State {
         for hash in msg.transactions() {
             if txs.get(hash).is_some() {
                 if !txs_pool.contains(hash) {
-                    panic!(
+                    bail!(
                         "Received block with already \
                          committed transaction"
                     )
@@ -930,12 +931,13 @@ impl State {
             }
         }
 
+        let response = Ok(!unknown_txs.is_empty());
         self.incomplete_block = Some(IncompleteBlock {
             msg: msg.clone(),
-            unknown_txs: unknown_txs.clone(),
+            unknown_txs,
         });
 
-        Ok(!unknown_txs.is_empty())
+        response
     }
 
     /// Adds pre-vote. Returns `true` there are +2/3 pre-votes.
