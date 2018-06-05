@@ -18,9 +18,9 @@ use bit_vec::BitVec;
 use failure;
 use serde_json::Value;
 
-use std::collections::{BTreeMap, HashMap, HashSet, hash_map::Entry};
-use std::net::SocketAddr;
-use std::time::{Duration, SystemTime};
+use std::{collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},
+          net::SocketAddr,
+          time::{Duration, SystemTime}};
 
 use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
@@ -84,9 +84,6 @@ pub struct State {
     nodes_max_height: BTreeMap<PublicKey, Height>,
 
     validators_rounds: BTreeMap<ValidatorId, Round>,
-
-    // Current value of the propose timeout.
-    propose_timeout: Milliseconds,
 
     incomplete_block: Option<IncompleteBlock>,
 }
@@ -432,7 +429,6 @@ impl State {
 
             requests: HashMap::new(),
 
-            propose_timeout: stored.consensus.max_propose_timeout,
             config: stored,
 
             incomplete_block: None,
@@ -527,16 +523,6 @@ impl State {
         trace!("Validator={:#?}", self.validator_state());
 
         self.config = config;
-    }
-
-    /// Sets a new propose timeout value.
-    pub fn set_propose_timeout(&mut self, timeout: Milliseconds) {
-        self.propose_timeout = timeout;
-    }
-
-    /// Returns adjusted (see `TimeoutAdjuster` for the details) value of the propose timeout.
-    pub fn propose_timeout(&self) -> Milliseconds {
-        self.propose_timeout
     }
 
     /// Adds the public key, address, and `Connect` message of a validator.

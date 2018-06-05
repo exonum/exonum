@@ -13,19 +13,14 @@
 // limitations under the License.
 
 use bodyparser;
-use exonum::api::ApiError;
-use exonum::crypto;
-use exonum::explorer::BlockchainExplorer;
-use iron::headers::ContentType;
-use iron::modifiers::Header;
-use iron::prelude::*;
-use iron::status::Status;
+use exonum::{api::ApiError, crypto, explorer::BlockchainExplorer};
+use iron::{headers::ContentType, modifiers::Header, prelude::*, status::Status};
 use router::Router;
 use serde::Serialize;
 use serde_json;
 
-use std::num::ParseIntError;
-use std::sync::{Arc, RwLock};
+use std::{num::ParseIntError,
+          sync::{Arc, RwLock}};
 
 use super::{TestKit, TestNetworkConfiguration};
 
@@ -171,13 +166,13 @@ impl TestKitHandler for TestKit {
 mod tests {
     use exonum::blockchain::{ExecutionResult, Service, Transaction};
     use exonum::crypto::{CryptoHash, Hash, PublicKey};
-    use exonum::encoding::{Error as EncodingError, serialize::json::ExonumJson};
+    use exonum::encoding::{serialize::json::ExonumJson, Error as EncodingError};
     use exonum::explorer::BlockWithTransactions;
     use exonum::helpers::Height;
     use exonum::messages::{Message, RawTransaction};
     use exonum::storage::{Fork, Snapshot};
-    use iron::Handler;
     use iron::headers::{ContentType, Headers};
+    use iron::Handler;
     use iron_test::{request, response};
 
     use super::*;

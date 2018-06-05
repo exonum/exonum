@@ -14,12 +14,14 @@
 
 #![allow(unsafe_code)]
 
-use std::borrow::Cow;
-use std::error::Error;
+use std::{borrow::Cow, error::Error};
 
 use crypto::{CryptoHash, Hash};
-use encoding::serialize::{json, WriteBufferWrapper};
-use encoding::{CheckedOffset, Error as EncodingError, Field, Offset};
+use encoding::{serialize::{json, WriteBufferWrapper},
+               CheckedOffset,
+               Error as EncodingError,
+               Field,
+               Offset};
 use storage::{BaseIndex, Fork, Snapshot, StorageValue};
 
 pub const INDEXES_METADATA_TABLE_NAME: &str = "__INDEXES_METADATA__";
@@ -175,7 +177,7 @@ mod tests {
         use self::IndexType::*;
 
         let index_types = [
-            Entry, KeySet, List, SparseList, Map, ProofList, ProofMap, ValueSet
+            Entry, KeySet, List, SparseList, Map, ProofList, ProofMap, ValueSet,
         ];
         let is_family = [true, true, false, false, true, false, true, false];
         for (t, f) in index_types.iter().zip(&is_family) {
@@ -205,8 +207,10 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Attempt to access index 'test_index' of type Map, \
-                               while said index was initially created with type ProofMap")]
+    #[should_panic(
+        expected = "Attempt to access index 'test_index' of type Map, \
+                    while said index was initially created with type ProofMap"
+    )]
     fn invalid_index_type() {
         let database = MemoryDB::new();
         let mut fork = database.fork();
@@ -231,8 +235,10 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Attempt to access index family 'test_index' \
-                               while it's an ordinary index")]
+    #[should_panic(
+        expected = "Attempt to access index family 'test_index' \
+                    while it's an ordinary index"
+    )]
     fn ordinary_index_as_index_family() {
         let database = MemoryDB::new();
         let mut fork = database.fork();
@@ -247,8 +253,10 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Attempt to access an ordinary index 'test_index' \
-                               while it's index family")]
+    #[should_panic(
+        expected = "Attempt to access an ordinary index 'test_index' \
+                    while it's index family"
+    )]
     fn index_family_as_ordinary_index() {
         let database = MemoryDB::new();
         let mut fork = database.fork();
@@ -276,8 +284,10 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Attempt to access index 'test_index' of type Map, \
-                               while said index was initially created with type ProofMap")]
+    #[should_panic(
+        expected = "Attempt to access index 'test_index' of type Map, \
+                    while said index was initially created with type ProofMap"
+    )]
     fn multiple_read_before_write() {
         let database = MemoryDB::new();
         let mut fork = database.fork();

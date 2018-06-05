@@ -14,8 +14,7 @@
 
 // spell-checker:ignore exts
 
-use std::collections::HashMap;
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
 use super::{Argument, CommandExtension, CommandName, Context};
 
