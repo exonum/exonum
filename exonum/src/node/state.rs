@@ -723,10 +723,7 @@ impl State {
 
     /// Return incomplete block.
     pub fn incomplete_block(&self) -> Option<&IncompleteBlock> {
-        match self.incomplete_block {
-            Some(ref incomplete_block) => Some(&incomplete_block),
-            None => None,
-        }
+        self.incomplete_block.as_ref()
     }
 
     /// Increments the node height by one and resets previous height data.
@@ -910,7 +907,8 @@ impl State {
         }
     }
 
-    /// Finds unknown transactions in the block.
+    /// Finds unknown transactions in the block and persists transactions along
+    /// with other info as a pending block.
     pub fn create_incomplete_block(
         &mut self,
         msg: &BlockResponse,

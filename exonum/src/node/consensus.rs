@@ -176,6 +176,7 @@ impl NodeHandler {
         }
 
         let block = msg.block();
+        let block_hash = block.hash();
 
         // TODO add block with greater height to queue (ECR-171)
         if self.state.height() != block.height() {
@@ -193,6 +194,21 @@ impl NodeHandler {
             ));
         }
 
+        if let Some(ref incomplete_block) = self.state.incomplete_block() {
+            if incomplete_block.message().block().hash() == block_hash {
+                return Err(format!(
+                    "Received a duplicate BlockResponse message, ignoring, msg={:?}",
+                    msg
+                ));
+            } else {
+                return Err(format!("Two blocks with different hash, msg={:?}", msg));
+            }
+        }
+
+        if !msg.verify_tx_hash() {
+            return Err(format!("Received block has wrong root hash, msg={:?}", msg));
+        }
+
         Ok(())
     }
 
@@ -202,15 +218,6 @@ impl NodeHandler {
     pub fn handle_block(&mut self, msg: &BlockResponse) {
         let block = msg.block();
         let block_hash = block.hash();
-
-        if let Some(ref incomplete_block) = self.state.incomplete_block() {
-            if incomplete_block.message().block().hash() == block_hash {
-                warn!("Block already found, block={:?}", msg);
-            } else {
-                warn!("Two blocks with different hash, block={:?}", msg);
-            }
-            return;
-        }
 
         if let Err(err) = self.validate_block_response(msg) {
             error!("{}", err);
@@ -223,11 +230,6 @@ impl NodeHandler {
         }
 
         if self.state.block(&block_hash).is_none() {
-            if !msg.verify_tx_hash() {
-                error!("Received block has wrong root hash, msg={:?}", msg);
-                return;
-            }
-
             let snapshot = self.blockchain.snapshot();
             let schema = Schema::new(&*snapshot);
             let has_unknown_txs = match self.state.create_incomplete_block(
@@ -303,10 +305,10 @@ impl NodeHandler {
         let block_hash = block.hash();
 
         if self.state.block(&block_hash).is_none() {
-            let (block_hash, patch) =
+            let (new_block_hash, patch) =
                 self.create_block(block.proposer_id(), block.height(), msg.transactions());
             // Verify block_hash.
-            if block_hash != block.hash() {
+            if new_block_hash != block.hash() {
                 panic!(
                     "Block_hash incorrect in the received block={:?}. Either a node's \
                      implementation is incorrect or validators majority works incorrectly",
@@ -315,7 +317,7 @@ impl NodeHandler {
             }
 
             self.state.add_block(
-                block_hash,
+                new_block_hash,
                 patch,
                 msg.transactions().to_vec(),
                 block.proposer_id(),
@@ -573,9 +575,9 @@ impl NodeHandler {
 
         let full_block = self.state.remove_unknown_transaction(hash);
         // Go to handle full block if we get last transaction
-        if full_block.is_some() {
+        if let Some(block) = full_block {
             self.remove_request(&RequestData::BlockTransactions);
-            self.handle_full_block(full_block.unwrap().message());
+            self.handle_full_block(block.message());
         }
         Ok(())
     }
