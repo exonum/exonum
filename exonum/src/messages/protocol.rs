@@ -369,9 +369,7 @@ impl BlockResponse {
         let db = MemoryDB::new();
         let mut fork = db.fork();
         let mut index = ProofListIndex::new("verify_tx_hash", &mut fork);
-        for tx_hash in self.transactions() {
-            index.push(*tx_hash);
-        }
+        index.extend(self.transactions().iter().cloned());
         let tx_hashes = index.merkle_root();
         tx_hashes == *self.block().tx_hash()
     }
