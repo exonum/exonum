@@ -48,10 +48,7 @@ fn test_network() {
     let api = testkit.api();
     let info: NodeInfo = api.get_private(ApiKind::System, "/v1/network");
 
-    assert_eq!(
-        info.core_version,
-        option_env!("CARGO_PKG_VERSION").map(|ver| ver.to_owned())
-    );
+    assert_eq!(info.core_version.is_some());
     assert_eq!(info.protocol_version, PROTOCOL_MAJOR_VERSION);
     assert!(info.services.is_empty());
 }
