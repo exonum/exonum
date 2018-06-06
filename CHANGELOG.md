@@ -5,14 +5,21 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Breaking changes
+
+#### exonum
+
+- `storage::base_index` module has become private along with `BaseIndex` and
+  `BaseIndexIter` types. (#723)
+
 ## 0.8 - 2018-05-31
 
 ### Breaking changes
 
+#### exonum
+
 - `handle_commit` method in `Service` trait  has been renamed to
   `after_commit`. (#715)
-
-#### exonum
 
 - `TimeoutAdjusterConfig` has been removed along with different timeout
   adjusters. Current behavior is similar to the `Dynamic` timeout adjuster and
@@ -33,6 +40,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   [Noise Protocol](https://noiseprotocol.org/). Nodes compiled with old
   version will not connect to the new ones. Therefore you need to
   update all node instances for the network to work. (#678)
+
 - `storage::Error` constructor has been made private. (#689)
 
 - `ConsensusConfig::validate_configuration` method has been renamed to the

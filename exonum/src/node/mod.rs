@@ -17,13 +17,13 @@
 //! For details about consensus message handling see messages module documentation.
 // spell-checker:ignore cors
 
-pub use self::state::{RequestData, State, ValidatorState};
-pub use self::whitelist::Whitelist;
+pub use self::{state::{RequestData, State, ValidatorState},
+               whitelist::Whitelist};
 
 pub mod state; // TODO: temporary solution to get access to WAIT constants (ECR-167)
 
 use failure;
-use futures::{Future, Sink, sync::mpsc};
+use futures::{sync::mpsc, Future, Sink};
 use iron::{Chain, Iron, Listening};
 use iron_cors::CorsMiddleware;
 use mount::Mount;
@@ -32,21 +32,30 @@ use serde::{de, ser};
 use tokio_core::reactor::Core;
 use toml::Value;
 
-use std::collections::{BTreeMap, HashSet};
-use std::net::SocketAddr;
-use std::str::FromStr;
-use std::sync::Arc;
-use std::thread;
-use std::time::{Duration, SystemTime};
-use std::{fmt, io};
+use std::{collections::{BTreeMap, HashSet},
+          fmt,
+          io,
+          net::SocketAddr,
+          str::FromStr,
+          sync::Arc,
+          thread,
+          time::{Duration, SystemTime}};
 
 use api::{private, public, Api};
 use blockchain::{Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction};
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
-use events::error::{into_other, log_error, other_error, LogError};
-use events::{HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkConfiguration,
-             NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
-             noise::HandshakeParams};
+use events::{error::{into_other, log_error, other_error, LogError},
+             noise::HandshakeParams,
+             HandlerPart,
+             InternalEvent,
+             InternalPart,
+             InternalRequest,
+             NetworkConfiguration,
+             NetworkEvent,
+             NetworkPart,
+             NetworkRequest,
+             SyncSender,
+             TimeoutRequest};
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
 use messages::{Connect, Message, RawMessage};
 use storage::{Database, DbOptions};
@@ -610,7 +619,6 @@ impl NodeHandler {
         } else {
             self.max_propose_timeout()
         };
-        self.state.set_propose_timeout(timeout);
 
         let time = self.round_start_time(self.state.round()) + Duration::from_millis(timeout);
 

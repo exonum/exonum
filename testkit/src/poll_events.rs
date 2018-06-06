@@ -80,8 +80,8 @@ mod tests {
 
     #[test]
     fn test_take_while_ready() {
-        use futures::Async;
         use futures::stream::{iter_ok, poll_fn};
+        use futures::Async;
 
         let mut waiting = false;
         let stream = iter_ok::<_, ()>(1..4).chain(poll_fn(move || {

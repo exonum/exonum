@@ -14,11 +14,14 @@
 
 //! An implementation of key-value map.
 
-use std::borrow::Borrow;
-use std::marker::PhantomData;
+use std::{borrow::Borrow, marker::PhantomData};
 
-use super::indexes_metadata::IndexType;
-use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey, StorageValue};
+use super::{base_index::{BaseIndex, BaseIndexIter},
+            indexes_metadata::IndexType,
+            Fork,
+            Snapshot,
+            StorageKey,
+            StorageValue};
 
 /// A map of keys and values.
 ///

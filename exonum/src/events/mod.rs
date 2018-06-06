@@ -21,12 +21,14 @@ pub mod internal;
 pub mod network;
 pub mod noise;
 
-use futures::sink::Wait;
-use futures::sync::mpsc::{self, Sender};
-use futures::{Async, Future, Poll, Stream};
+use futures::{sink::Wait,
+              sync::mpsc::{self, Sender},
+              Async,
+              Future,
+              Poll,
+              Stream};
 
-use std::cmp::Ordering;
-use std::time::SystemTime;
+use std::{cmp::Ordering, time::SystemTime};
 
 use helpers::{Height, Round};
 use node::{ExternalMessage, NodeTimeout};
