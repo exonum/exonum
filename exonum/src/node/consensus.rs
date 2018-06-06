@@ -180,7 +180,7 @@ impl NodeHandler {
 
         // TODO add block with greater height to queue (ECR-171)
         if self.state.height() != block.height() {
-            return Err(format!("Received block hash another height, msg={:?}", msg));
+            return Err(format!("Received block has another height, msg={:?}", msg));
         }
 
         // Check block content.
@@ -206,7 +206,14 @@ impl NodeHandler {
         }
 
         if !msg.verify_tx_hash() {
-            return Err(format!("Received block has wrong root hash, msg={:?}", msg));
+            return Err(format!(
+                "Received block has invalid tx_hashes, msg={:?}",
+                msg
+            ));
+        }
+
+        if let Err(err) = self.verify_precommits(&msg.precommits(), &block_hash, block.height()) {
+            return Err(format!("{}, block={:?}", err, msg));
         }
 
         Ok(())
@@ -216,33 +223,21 @@ impl NodeHandler {
     // TODO write helper function which returns Result (ECR-123)
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_block(&mut self, msg: &BlockResponse) {
-        let block = msg.block();
-        let block_hash = block.hash();
-
         if let Err(err) = self.validate_block_response(msg) {
             error!("{}", err);
             return;
         }
 
-        if let Err(err) = self.verify_precommits(&msg.precommits(), &block_hash, block.height()) {
-            error!("{}, block={:?}", err, msg);
-            return;
-        }
-
+        let block = msg.block();
+        let block_hash = block.hash();
         if self.state.block(&block_hash).is_none() {
             let snapshot = self.blockchain.snapshot();
             let schema = Schema::new(&*snapshot);
-            let has_unknown_txs = match self.state.create_incomplete_block(
+            let has_unknown_txs = self.state.create_incomplete_block(
                 msg,
                 &schema.transactions(),
                 &schema.transactions_pool(),
-            ) {
-                Ok(has_unknown_txs) => has_unknown_txs,
-                Err(err) => {
-                    warn!("{}, msg={:?}", err, msg);
-                    return;
-                }
-            };
+            );
 
             let known_nodes = self.remove_request(&RequestData::Block(block.height()));
 

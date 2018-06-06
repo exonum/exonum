@@ -909,17 +909,24 @@ impl State {
 
     /// Finds unknown transactions in the block and persists transactions along
     /// with other info as a pending block.
+    ///
+    ///  # Panics
+    ///
+    /// - Already there is an incomplete block.
+    /// - Received block has already committed transction.
     pub fn create_incomplete_block(
         &mut self,
         msg: &BlockResponse,
         txs: &MapIndex<&&Snapshot, Hash, RawMessage>,
         txs_pool: &KeySetIndex<&&Snapshot, Hash>,
-    ) -> Result<bool, failure::Error> {
+    ) -> bool {
+        assert!(self.incomplete_block().is_none());
+
         let mut unknown_txs = HashSet::new();
         for hash in msg.transactions() {
             if txs.get(hash).is_some() {
                 if !txs_pool.contains(hash) {
-                    bail!(
+                    panic!(
                         "Received block with already \
                          committed transaction"
                     )
@@ -929,13 +936,12 @@ impl State {
             }
         }
 
-        let response = Ok(!unknown_txs.is_empty());
         self.incomplete_block = Some(IncompleteBlock {
             msg: msg.clone(),
             unknown_txs,
         });
 
-        response
+        self.incomplete_block().unwrap().has_unknown_txs()
     }
 
     /// Adds pre-vote. Returns `true` there are +2/3 pre-votes.

@@ -22,7 +22,7 @@ use encoding::{serialize::{json, WriteBufferWrapper},
                Error as EncodingError,
                Field,
                Offset};
-use storage::{BaseIndex, Fork, Snapshot, StorageValue};
+use storage::{base_index::BaseIndex, Fork, Snapshot, StorageValue};
 
 pub const INDEXES_METADATA_TABLE_NAME: &str = "__INDEXES_METADATA__";
 

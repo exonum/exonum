@@ -3371,7 +3371,7 @@ fn handle_block_response_with_invalid_precommits() {
         sandbox.s(VALIDATOR_2),
     );
     // Precommit with invalid block hash.
-    let precommit_3 = Precommit::new(
+    let precommit_for_other_block = Precommit::new(
         VALIDATOR_3,
         HEIGHT_ONE,
         ROUND_ONE,
@@ -3404,7 +3404,7 @@ fn handle_block_response_with_invalid_precommits() {
         &sandbox.p(VALIDATOR_3),
         &sandbox.p(VALIDATOR_0),
         block1.clone(),
-        vec![precommit_1, precommit_2, precommit_3],
+        vec![precommit_1, precommit_2, precommit_for_other_block],
         &[tx.hash()],
         sandbox.s(VALIDATOR_3),
     ));

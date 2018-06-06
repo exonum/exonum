@@ -19,7 +19,11 @@ pub use self::proof::{ListProof, ListProofError};
 use std::{cell::Cell, marker::PhantomData};
 
 use self::key::ProofListKey;
-use super::{indexes_metadata::IndexType, BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey,
+use super::{base_index::{BaseIndex, BaseIndexIter},
+            indexes_metadata::IndexType,
+            Fork,
+            Snapshot,
+            StorageKey,
             StorageValue};
 use crypto::{hash, Hash, HashStream};
 
