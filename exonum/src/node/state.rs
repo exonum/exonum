@@ -919,7 +919,7 @@ impl State {
         msg: &BlockResponse,
         txs: &MapIndex<&&Snapshot, Hash, RawMessage>,
         txs_pool: &KeySetIndex<&&Snapshot, Hash>,
-    ) -> bool {
+    ) -> &IncompleteBlock {
         assert!(self.incomplete_block().is_none());
 
         let mut unknown_txs = HashSet::new();
@@ -941,7 +941,7 @@ impl State {
             unknown_txs,
         });
 
-        self.incomplete_block().unwrap().has_unknown_txs()
+        self.incomplete_block().unwrap()
     }
 
     /// Adds pre-vote. Returns `true` there are +2/3 pre-votes.

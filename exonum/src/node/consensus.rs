@@ -168,19 +168,19 @@ impl NodeHandler {
             ));
         }
 
-        if !msg.verify_signature(msg.from()) {
-            return Err(format!(
-                "Received block with incorrect signature, msg={:?}",
-                msg
-            ));
-        }
-
         let block = msg.block();
         let block_hash = block.hash();
 
         // TODO add block with greater height to queue (ECR-171)
         if self.state.height() != block.height() {
             return Err(format!("Received block has another height, msg={:?}", msg));
+        }
+
+        if !msg.verify_signature(msg.from()) {
+            return Err(format!(
+                "Received block with incorrect signature, msg={:?}",
+                msg
+            ));
         }
 
         // Check block content.
@@ -194,22 +194,15 @@ impl NodeHandler {
             ));
         }
 
-        if let Some(ref incomplete_block) = self.state.incomplete_block() {
-            if incomplete_block.message().block().hash() == block_hash {
-                return Err(format!(
-                    "Received a duplicate BlockResponse message, ignoring, msg={:?}",
-                    msg
-                ));
-            } else {
-                return Err(format!("Two blocks with different hash, msg={:?}", msg));
-            }
+        if self.state.incomplete_block().is_some() {
+            return Err(format!(
+                "Already there is an incomplete block, msg={:?}",
+                msg
+            ));
         }
 
         if !msg.verify_tx_hash() {
-            return Err(format!(
-                "Received block has invalid tx_hashes, msg={:?}",
-                msg
-            ));
+            return Err(format!("Received block has invalid tx_hash, msg={:?}", msg));
         }
 
         if let Err(err) = self.verify_precommits(&msg.precommits(), &block_hash, block.height()) {
@@ -233,11 +226,9 @@ impl NodeHandler {
         if self.state.block(&block_hash).is_none() {
             let snapshot = self.blockchain.snapshot();
             let schema = Schema::new(&*snapshot);
-            let has_unknown_txs = self.state.create_incomplete_block(
-                msg,
-                &schema.transactions(),
-                &schema.transactions_pool(),
-            );
+            let has_unknown_txs = self.state
+                .create_incomplete_block(msg, &schema.transactions(), &schema.transactions_pool())
+                .has_unknown_txs();
 
             let known_nodes = self.remove_request(&RequestData::Block(block.height()));
 
@@ -300,10 +291,10 @@ impl NodeHandler {
         let block_hash = block.hash();
 
         if self.state.block(&block_hash).is_none() {
-            let (new_block_hash, patch) =
+            let (computed_block_hash, patch) =
                 self.create_block(block.proposer_id(), block.height(), msg.transactions());
             // Verify block_hash.
-            if new_block_hash != block.hash() {
+            if computed_block_hash != block_hash {
                 panic!(
                     "Block_hash incorrect in the received block={:?}. Either a node's \
                      implementation is incorrect or validators majority works incorrectly",
@@ -312,7 +303,7 @@ impl NodeHandler {
             }
 
             self.state.add_block(
-                new_block_hash,
+                computed_block_hash,
                 patch,
                 msg.transactions().to_vec(),
                 block.proposer_id(),
