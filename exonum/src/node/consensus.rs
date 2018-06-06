@@ -791,7 +791,7 @@ impl NodeHandler {
                         Some(incomplete_block) => {
                             incomplete_block.unknown_txs().iter().cloned().collect()
                         }
-                        None => Vec::new(),
+                        None => return,
                     };
                     TransactionsRequest::new(
                         self.state.consensus_public_key(),

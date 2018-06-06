@@ -913,7 +913,7 @@ impl State {
     ///  # Panics
     ///
     /// - Already there is an incomplete block.
-    /// - Received block has already committed transction.
+    /// - Received block has already committed transaction.
     pub fn create_incomplete_block(
         &mut self,
         msg: &BlockResponse,
