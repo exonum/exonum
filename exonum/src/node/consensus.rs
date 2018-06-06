@@ -152,7 +152,6 @@ impl NodeHandler {
     }
 
     fn validate_block_response(&self, msg: &BlockResponse) -> Result<(), String> {
-        // Request are sent to us.
         if msg.to() != self.state.consensus_public_key() {
             return Err(format!(
                 "Received block intended for another peer, to={}, from={}",
@@ -286,6 +285,10 @@ impl NodeHandler {
     }
 
     /// Executes and commits block. This function is called when node has full block information.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the received block has incorrect `block_hash`.
     pub fn handle_full_block(&mut self, msg: &BlockResponse) {
         let block = msg.block();
         let block_hash = block.hash();
