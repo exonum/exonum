@@ -167,8 +167,10 @@
       async addFunds() {
         this.isSpinnerVisible = true
 
+        const seed = this.$blockchain.generateSeed()
+
         try {
-          const data = await this.$blockchain.addFunds(this.keyPair, this.amountToAdd)
+          const data = await this.$blockchain.addFunds(this.keyPair, this.amountToAdd, seed)
           this.balance = data.wallet.balance
           this.transactions = data.transactions
           this.isSpinnerVisible = false
@@ -190,8 +192,10 @@
 
         this.isSpinnerVisible = true
 
+        const seed = this.$blockchain.generateSeed()
+
         try {
-          const data = await this.$blockchain.transfer(this.keyPair, this.receiver, this.amountToTransfer)
+          const data = await this.$blockchain.transfer(this.keyPair, this.receiver, this.amountToTransfer, seed)
           this.balance = data.wallet.balance
           this.transactions = data.transactions
           this.isSpinnerVisible = false

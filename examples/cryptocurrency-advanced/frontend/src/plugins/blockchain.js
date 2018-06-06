@@ -209,6 +209,10 @@ module.exports = {
         return Exonum.keyPair()
       },
 
+      generateSeed() {
+        return Exonum.randomUint64()
+      },
+
       createWallet(keyPair, name) {
         const TxCreateWallet = getTransaction(TX_WALLET_ID)
 
@@ -228,13 +232,13 @@ module.exports = {
         })
       },
 
-      addFunds(keyPair, amountToAdd) {
+      addFunds(keyPair, amountToAdd, seed) {
         const TxIssue = getTransaction(TX_ISSUE_ID)
 
         const data = {
           pub_key: keyPair.publicKey,
           amount: amountToAdd.toString(),
-          seed: Exonum.randomUint64()
+          seed: seed
         }
 
         const signature = TxIssue.sign(keyPair.secretKey, data)
@@ -248,14 +252,14 @@ module.exports = {
         }).then(response => waitForAcceptance(keyPair.publicKey, response.data.tx_hash))
       },
 
-      transfer(keyPair, receiver, amountToTransfer) {
+      transfer(keyPair, receiver, amountToTransfer, seed) {
         const TxTransfer = getTransaction(TX_TRANSFER_ID)
 
         const data = {
           from: keyPair.publicKey,
           to: receiver,
           amount: amountToTransfer,
-          seed: Exonum.randomUint64()
+          seed: seed
         }
 
         const signature = TxTransfer.sign(keyPair.secretKey, data)
