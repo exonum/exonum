@@ -69,10 +69,10 @@ oneshot
 openssl
 peekable
 permissioned
+postagainst
 postcondition
 postpropose
 postvote
-postagainst
 precheck
 precommit
 precommits

@@ -89,6 +89,7 @@ pub mod storage;
 #[macro_use]
 pub mod blockchain;
 pub mod api;
+pub mod api_ng;
 pub mod explorer;
 
 mod events;
