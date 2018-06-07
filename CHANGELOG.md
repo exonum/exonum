@@ -18,6 +18,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `handle_consensus` now does not write warning for message from previous
   height. (#729)
+
 ### Bug fixes
 
 #### exonum
@@ -57,7 +58,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `ConsensusConfig::validate_configuration` method has been renamed to the
   `warn_if_nonoptimal`. (#690)
-  
+
 #### exonum-time
 
 - The service has been refactored and the following public structs has been
