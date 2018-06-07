@@ -29,9 +29,7 @@ use super::error::{into_other, log_error, other_error, result_ok};
 use super::to_box;
 use helpers::Milliseconds;
 use messages::{Any, Connect, Message, RawMessage};
-
-use events::noise::HandshakeParams;
-use events::noise::NoiseHandshake;
+use events::noise::{HandshakeParams, NoiseHandshake, Handshake};
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 
@@ -154,7 +152,8 @@ impl ConnectionsPool {
                 Ok(sock)
             })
             .and_then(move |sock| {
-                NoiseHandshake::send(&handshake_params, sock).and_then(|framed|{
+                let handshake = NoiseHandshake::new();
+                handshake.send(&handshake_params, sock).and_then(|framed|{
                     Ok(framed)
                 })
             })
@@ -370,7 +369,8 @@ impl Listener {
             trace!("Accepted incoming connection with peer={}", addr);
             let network_tx = network_tx.clone();
 
-            let stream = NoiseHandshake::listen(&handshake_params, sock).flatten_stream();
+            let handshake = NoiseHandshake::new();
+            let stream = handshake.listen(&handshake_params, sock).flatten_stream();
 
             let connection_handler = stream
                 .into_future()
