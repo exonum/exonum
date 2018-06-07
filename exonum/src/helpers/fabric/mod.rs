@@ -32,6 +32,7 @@ use blockchain::Service;
 mod builder;
 mod clap_backend;
 mod details;
+mod info;
 mod internal;
 mod maintenance;
 mod shared;
@@ -292,6 +293,9 @@ pub trait ServiceFactory: 'static {
     // `service_name` and `service_id` from `Service` trait into this one
     //fn name() -> &'static str;
     // ECR-76?
+
+    /// Returns name of the service.
+    fn service_name(&self) -> &str;
 
     /// Returns `CommandExtension` for the specific `CommandName`.
     #[allow(unused_variables)]

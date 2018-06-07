@@ -12,6 +12,19 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `storage::base_index` module has become private along with `BaseIndex` and
   `BaseIndexIter` types. (#723)
 
+- `ServiceFactory` trait has been extended with `service_name` function.(#730)
+
+### New features
+
+#### exonum
+
+- New kind of CLI commands has been added: `info` command that can be used for
+  getting various information from not running node. (#730)
+  Currently supported sub-commands:
+  - `core-version` - prints Exonum version as a plain string.
+  - `list-services` - prints the list of the services the node is build with in
+    the JSON format.
+
 ## 0.8 - 2018-05-31
 
 ### Breaking changes

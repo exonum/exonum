@@ -48,6 +48,7 @@ use schema::Schema;
 use transactions::TimeTransactions;
 
 const TIMESTAMPING_SERVICE: u16 = 130;
+pub const SERVICE_NAME: &str = "timestamping";
 
 #[derive(Debug, Default)]
 pub struct Service;
@@ -64,7 +65,7 @@ impl blockchain::Service for Service {
     }
 
     fn service_name(&self) -> &'static str {
-        "timestamping"
+        SERVICE_NAME
     }
 
     fn state_hash(&self, view: &Snapshot) -> Vec<Hash> {
@@ -90,6 +91,10 @@ impl blockchain::Service for Service {
 pub struct ServiceFactory;
 
 impl fabric::ServiceFactory for ServiceFactory {
+    fn service_name(&self) -> &str {
+        SERVICE_NAME
+    }
+
     fn make_service(&mut self, _: &fabric::Context) -> Box<blockchain::Service> {
         Box::new(Service::new())
     }

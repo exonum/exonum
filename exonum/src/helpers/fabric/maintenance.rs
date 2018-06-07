@@ -15,7 +15,6 @@
 #![allow(missing_debug_implementations)]
 
 //! This module implements node maintenance actions.
-// spell-checker:ignore exts
 
 use std::{collections::HashMap, path::Path};
 
@@ -116,7 +115,7 @@ impl Command for Maintenance {
         &self,
         _commands: &HashMap<CommandName, CollectedCommand>,
         context: Context,
-        _exts: &Fn(Context) -> Context,
+        _: &Fn(Context) -> Context,
     ) -> Feedback {
         let action = context
             .arg::<String>(MAINTENANCE_ACTION_PATH)

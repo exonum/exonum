@@ -20,6 +20,7 @@ use std::{collections::HashMap,
 use super::{clap_backend::ClapBackend,
             details::{Finalize, GenerateCommonConfig, GenerateNodeConfig, GenerateTestnet, Run,
                       RunDev},
+            info::Info,
             internal::{CollectedCommand, Feedback},
             keys,
             maintenance::Maintenance,
@@ -97,7 +98,17 @@ impl NodeBuilder {
     }
 
     /// Runs application.
-    pub fn run(self) {
+    pub fn run(mut self) {
+        // This should be moved into `commands` method, but services list can be obtained only here.
+        let services: Vec<_> = self.service_factories
+            .iter()
+            .map(|f| f.service_name().to_owned())
+            .collect();
+        self.commands.insert(
+            Info::name(),
+            CollectedCommand::new(Box::new(Info::new(services))),
+        );
+
         let old_hook = panic::take_hook();
         panic::set_hook(Box::new(Self::panic_hook));
         let feedback = self.parse_cmd();
