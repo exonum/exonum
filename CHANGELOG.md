@@ -18,6 +18,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `exonum::crypto::x25519` module to convert from Ed25519 keys to X25519 keys
   has been introduced.
+
 ### Bug fixes
 
 #### exonum
@@ -57,7 +58,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `ConsensusConfig::validate_configuration` method has been renamed to the
   `warn_if_nonoptimal`. (#690)
-  
+
 #### exonum-time
 
 - The service has been refactored and the following public structs has been
