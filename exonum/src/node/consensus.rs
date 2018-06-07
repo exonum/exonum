@@ -121,7 +121,7 @@ impl NodeHandler {
         trace!("Handle propose");
 
         let snapshot = self.blockchain.snapshot();
-        let schema = Schema::new(&*snapshot);
+        let schema = Schema::new(snapshot);
         //TODO: remove this match after errors refactor. (ECR-979)
         let has_unknown_txs =
             match self.state

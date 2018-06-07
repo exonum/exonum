@@ -846,11 +846,11 @@ impl State {
     }
 
     /// Adds propose from other node. Returns `ProposeState` if it is a new propose.
-    pub fn add_propose(
+    pub fn add_propose<S: AsRef<Snapshot>>(
         &mut self,
         msg: &Propose,
-        transactions: &MapIndex<&&Snapshot, Hash, RawMessage>,
-        transaction_pool: &KeySetIndex<&&Snapshot, Hash>,
+        transactions: &MapIndex<S, Hash, RawMessage>,
+        transaction_pool: &KeySetIndex<S, Hash>,
     ) -> Result<&ProposeState, failure::Error> {
         let propose_hash = msg.hash();
         match self.proposes.entry(propose_hash) {
