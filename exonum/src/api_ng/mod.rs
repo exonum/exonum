@@ -12,7 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! `RESTful` API and corresponding utilities.
+//! API and corresponding utilities.
+
+pub use self::with::{FutureResult, NamedWith, Result, With};
+
+pub mod error;
+mod with;
 
 use std::fmt;
 use std::ops::Deref;
