@@ -46,7 +46,7 @@ pub enum NetworkRequest {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub struct NetworkConfiguration {
-    // TODO: Rhink more about config parameters. (ECR-162)
+    // TODO: Think more about config parameters. (ECR-162)
     pub max_incoming_connections: usize,
     pub max_outgoing_connections: usize,
     pub tcp_nodelay: bool,

@@ -221,7 +221,7 @@ impl Blockchain {
             {
                 let mut schema = Schema::new(&mut fork);
                 if schema.block_hash_by_height(Height::zero()).is_some() {
-                    // TODO create genesis block for MemoryDB and compare in hash with zero block. (ECR-1630)
+                    // TODO create genesis block for MemoryDB and compare it hash with zero block. (ECR-1630)
                     return Ok(());
                 }
                 schema.commit_configuration(config_propose);
