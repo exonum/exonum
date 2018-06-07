@@ -11,6 +11,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `storage::base_index` module has become private along with `BaseIndex` and
   `BaseIndexIter` types. (#723)
+  
+### Internal improvements
+
+#### exonum
+
+- `handle_consensus` now not writing warning for message from previous height. (#729)
 
 ## 0.8 - 2018-05-31
 
