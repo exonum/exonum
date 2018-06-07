@@ -66,7 +66,7 @@ pub trait HandshakeChannel {
     fn write_handshake_msg(&mut self, noise: &mut NoiseWrapper) -> Box<Future<Item=(usize, Vec<u8>), Error=io::Error>>;
 }
 
-#[derive(Debug, Default, Copy, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct NoiseHandshakeChannel {}
 
 impl HandshakeChannel for NoiseHandshakeChannel {
@@ -172,17 +172,17 @@ mod tests {
 
     #[derive(Debug, PartialEq, Copy, Clone)]
     pub enum HandshakeStep {
-        Default,
-        One(u8, usize),
-        Two(u8, usize),
+        None,
+        EphemeralKeyExchange(u8, usize),
+        StaticKeyExchange(u8, usize),
     }
 
     const EMPTY_MESSAGE: usize = 0;
     const SMALL_MESSAGE: usize = NOISE_MIN_HANDSHAKE_MESSAGE_LENGTH - 1;
     const BIG_MESSAGE: usize = NOISE_MAX_MESSAGE_LENGTH + 1;
 
-    impl Default for HandshakeParams {
-        fn default() -> Self {
+    impl HandshakeParams {
+        fn default_test_params() -> Self {
             let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([0; 32]));
             HandshakeParams {
                 max_message_len: 1024,
@@ -202,11 +202,10 @@ mod tests {
         thread::spawn(move || run_handshake_listener(&addr2, sender));
 
         // Use first handshake only to connect.
-        let _res = send_handshake(&addr, HandshakeStep::Default);
+        let _res = send_handshake(&addr, HandshakeStep::None);
         receiver.wait().next();
 
-        let res = send_handshake(&addr, HandshakeStep::Default);
-        println!("Send handshake result {:?}", res);
+        let res = send_handshake(&addr, HandshakeStep::None);
         assert!(res.is_ok());
     }
 
@@ -220,25 +219,25 @@ mod tests {
         thread::spawn(move || run_handshake_listener(&addr2, sender));
 
         // Use first handshake only to connect.
-        let _res = send_handshake(&addr, HandshakeStep::Default);
+        let _res = send_handshake(&addr, HandshakeStep::None);
         receiver.wait().next();
 
-        let res = send_handshake(&addr, HandshakeStep::One(1, EMPTY_MESSAGE));
+        let res = send_handshake(&addr, HandshakeStep::EphemeralKeyExchange(1, EMPTY_MESSAGE));
         assert!(res.is_err());
 
-        let res = send_handshake(&addr, HandshakeStep::Two(2, EMPTY_MESSAGE));
+        let res = send_handshake(&addr, HandshakeStep::StaticKeyExchange(2, EMPTY_MESSAGE));
         assert!(res.is_err());
 
-        let res = send_handshake(&addr, HandshakeStep::One(1, SMALL_MESSAGE));
+        let res = send_handshake(&addr, HandshakeStep::EphemeralKeyExchange(1, SMALL_MESSAGE));
         assert!(res.is_err());
 
-        let res = send_handshake(&addr, HandshakeStep::Two(2, SMALL_MESSAGE));
+        let res = send_handshake(&addr, HandshakeStep::StaticKeyExchange(2, SMALL_MESSAGE));
         assert!(res.is_err());
 
-        let res = send_handshake(&addr, HandshakeStep::One(1, BIG_MESSAGE));
+        let res = send_handshake(&addr, HandshakeStep::EphemeralKeyExchange(1, BIG_MESSAGE));
         assert!(res.is_err());
 
-        let res = send_handshake(&addr, HandshakeStep::Two(2, BIG_MESSAGE));
+        let res = send_handshake(&addr, HandshakeStep::StaticKeyExchange(2, BIG_MESSAGE));
         assert!(res.is_err());
     }
 
@@ -250,7 +249,7 @@ mod tests {
     fn run_handshake_listener(addr: &SocketAddr, sender: Sender<()>) -> Result<(), io::Error> {
         let mut core = Core::new().unwrap();
         let handle = core.handle();
-        let params = HandshakeParams::default();
+        let params = HandshakeParams::default_test_params();
 
         let fut_stream = TcpListener::bind(addr, &handle).unwrap();
         let fut = fut_stream
@@ -274,11 +273,11 @@ mod tests {
     fn send_handshake(addr: &SocketAddr, step: HandshakeStep) -> Result<(), io::Error> {
         let mut core = Core::new().unwrap();
         let handle = core.handle();
-        let params = HandshakeParams::default();
+        let params = HandshakeParams::default_test_params();
 
         let stream = TcpStream::connect(&addr, &handle)
             .and_then(|sock| match step {
-                HandshakeStep::Default => {
+                HandshakeStep::None => {
                     let handshake = NoiseHandshake::new();
                     handshake.send(&params, sock)
                 },
@@ -319,7 +318,9 @@ mod tests {
                                noise: &mut NoiseWrapper,
         ) -> Box<Future<Item = (usize, Vec<u8>), Error = io::Error>> {
             let res = match &self.step {
-                &HandshakeStep::One(cs, size) | &HandshakeStep::Two(cs, size) if cs == self.current_step => {
+                // Write message filled with zeros, instead of real handshake message.
+                &HandshakeStep::EphemeralKeyExchange(cs, size) |
+                &HandshakeStep::StaticKeyExchange(cs, size) if cs == self.current_step => {
                     Ok((size, vec![0; size]))
                 }
                 _ => noise.write_handshake_msg(),
