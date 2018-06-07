@@ -22,6 +22,7 @@ use std::io;
 use crypto::{PublicKey, SecretKey};
 use events::codec::MessagesCodec;
 use events::noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH};
+use events::noise::wrapper::NoiseError;
 
 pub mod wrapper;
 
@@ -178,7 +179,7 @@ mod tests {
     }
 
     const EMPTY_MESSAGE: usize = 0;
-    const SMALL_MESSAGE: usize = NOISE_MIN_HANDSHAKE_MESSAGE_LENGTH - 1;
+    const SMALL_MESSAGE: usize = NOISE_MIN_HANDSHAKE_MESSAGE_LENGTH + 1;
     const BIG_MESSAGE: usize = NOISE_MAX_MESSAGE_LENGTH + 1;
 
     impl HandshakeParams {
@@ -198,8 +199,9 @@ mod tests {
         let addr2 = addr.clone();
 
         let (sender, receiver) = mpsc::channel(0);
+        let (err_sender, err_receiver) = mpsc::channel::<io::Error>(0);
         let receiver = add_timeout_millis(receiver, 500);
-        thread::spawn(move || run_handshake_listener(&addr2, sender));
+        thread::spawn(move || run_handshake_listener(&addr2, sender.clone(), err_sender));
 
         // Use first handshake only to connect.
         let _res = send_handshake(&addr, HandshakeStep::None);
@@ -210,43 +212,90 @@ mod tests {
     }
 
     #[test]
-    fn test_noise_handshake_errors() {
-        let addr: SocketAddr = "127.0.0.1:45002".parse().unwrap();
+    fn test_noise_handshake_errors_2() {
+        let addr: SocketAddr = "127.0.0.1:45003".parse().unwrap();
+        let step = HandshakeStep::EphemeralKeyExchange(1, EMPTY_MESSAGE);
+
+        let error = error_handshake_variant(&addr, step).unwrap();
+
+
+        println!("error {:?}", error);
+    }
+
+    #[test]
+    fn test_noise_handshake_errors_3() {
+        let addr: SocketAddr = "127.0.0.1:45004".parse().unwrap();
+        let step = HandshakeStep::StaticKeyExchange(2, EMPTY_MESSAGE);
+
+        let error = error_handshake_variant(&addr, step).unwrap();
+
+        println!("error {:?}", error);
+    }
+
+    #[test]
+    fn test_noise_handshake_errors_6() {
+        let addr: SocketAddr = "127.0.0.1:45005".parse().unwrap();
+        let step = HandshakeStep::EphemeralKeyExchange(1, SMALL_MESSAGE);
+
+        let error = error_handshake_variant(&addr, step).unwrap();
+
+        println!("error {:?}", error);
+    }
+
+    #[test]
+    fn test_noise_handshake_errors_7() {
+        let addr: SocketAddr = "127.0.0.1:45006".parse().unwrap();
+        let step = HandshakeStep::StaticKeyExchange(2, SMALL_MESSAGE);
+
+        let error = error_handshake_variant(&addr, step).unwrap();
+
+        println!("error {:?}", error);
+    }
+
+    #[test]
+    fn test_noise_handshake_errors_4() {
+        let addr: SocketAddr = "127.0.0.1:45007".parse().unwrap();
+        let step = HandshakeStep::EphemeralKeyExchange(1, BIG_MESSAGE);
+
+        let error = error_handshake_variant(&addr, step).unwrap();
+
+        println!("error {:?}", error);
+    }
+
+    #[test]
+    fn test_noise_handshake_errors_5() {
+        let addr: SocketAddr = "127.0.0.1:45008".parse().unwrap();
+        let step = HandshakeStep::StaticKeyExchange(2, BIG_MESSAGE);
+        let error = error_handshake_variant(&addr, step).unwrap();
+
+        println!("error {:?}", error);
+    }
+
+    fn error_handshake_variant(addr:&SocketAddr, step:HandshakeStep) -> Result<io::Error, ()> {
         let addr2 = addr.clone();
 
         let (sender, receiver) = mpsc::channel(0);
+        let (err_sender, err_receiver) = mpsc::channel::<io::Error>(0);
         let receiver = add_timeout_millis(receiver, 500);
-        thread::spawn(move || run_handshake_listener(&addr2, sender));
+        let err_receiver = add_timeout_millis(err_receiver, 500);
+        thread::spawn(move || run_handshake_listener(&addr2, sender, err_sender));
 
         // Use first handshake only to connect.
         let _res = send_handshake(&addr, HandshakeStep::None);
         receiver.wait().next();
 
-        let res = send_handshake(&addr, HandshakeStep::EphemeralKeyExchange(1, EMPTY_MESSAGE));
+        let res = send_handshake(&addr, step);
         assert!(res.is_err());
 
-        let res = send_handshake(&addr, HandshakeStep::StaticKeyExchange(2, EMPTY_MESSAGE));
-        assert!(res.is_err());
-
-        let res = send_handshake(&addr, HandshakeStep::EphemeralKeyExchange(1, SMALL_MESSAGE));
-        assert!(res.is_err());
-
-        let res = send_handshake(&addr, HandshakeStep::StaticKeyExchange(2, SMALL_MESSAGE));
-        assert!(res.is_err());
-
-        let res = send_handshake(&addr, HandshakeStep::EphemeralKeyExchange(1, BIG_MESSAGE));
-        assert!(res.is_err());
-
-        let res = send_handshake(&addr, HandshakeStep::StaticKeyExchange(2, BIG_MESSAGE));
-        assert!(res.is_err());
+        err_receiver.wait().next().unwrap()
     }
 
-    fn add_timeout_millis(receiver: Receiver<()>, millis: u64) -> TimeoutStream<Receiver<()>> {
+    fn add_timeout_millis<T>(receiver: Receiver<T>, millis: u64) -> TimeoutStream<Receiver<T>> {
         let timer = Timer::default();
         timer.timeout_stream(receiver, Duration::from_millis(millis))
     }
 
-    fn run_handshake_listener(addr: &SocketAddr, sender: Sender<()>) -> Result<(), io::Error> {
+    fn run_handshake_listener(addr: &SocketAddr, sender: Sender<()>, err_sender: Sender<io::Error>) -> Result<(), io::Error> {
         let mut core = Core::new().unwrap();
         let handle = core.handle();
         let params = HandshakeParams::default_test_params();
@@ -256,16 +305,24 @@ mod tests {
             .incoming()
             .for_each(|(stream, _)| {
                 let sender = sender.clone();
+                let err_sender = err_sender.clone();
                 let send = sender.send(()).map(|_| ()).map_err(log_error);
                 handle.spawn(send);
 
                 let handshake = NoiseHandshake::new();
                 let handshake = handshake.listen(&params, stream);
-                let reader = handshake.and_then(|_| Ok(())).map_err(log_error);
+                let reader = handshake.and_then(|_| Ok(())).or_else(|e| {
+                    err_sender.send(e).map(|_| ())
+                }).map_err(|e| {
+                    println!("into_other {:?}", e);
+                    log_error(e)
+                });
                 handle.spawn(reader);
                 Ok(())
             })
-            .map_err(into_other);
+            .map_err(|e| {
+                into_other(e)
+            });
 
         core.run(fut)
     }

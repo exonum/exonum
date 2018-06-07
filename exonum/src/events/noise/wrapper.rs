@@ -14,6 +14,7 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
+use failure;
 use snow::{NoiseBuilder, Session};
 
 use std::fmt;
@@ -62,13 +63,11 @@ impl NoiseWrapper {
     }
 
     pub fn read_handshake_msg(&mut self, input: &[u8]) -> Result<(usize, Vec<u8>), NoiseError> {
+        println!("message len {:?}", input.len());
         if input.len() < NOISE_MIN_HANDSHAKE_MESSAGE_LENGTH
             || input.len() > NOISE_MAX_MESSAGE_LENGTH
         {
-            return Err(NoiseError::new(format!(
-                "Wrong handshake message length {:?}",
-                input.len()
-            )));
+            return Err(NoiseError::WrongMessageLength(input.len()));
         }
 
         self.read(input, NOISE_MAX_MESSAGE_LENGTH)
@@ -81,12 +80,7 @@ impl NoiseWrapper {
 
     pub fn into_transport_mode(self) -> Result<Self, NoiseError> {
         // Transition into transport mode after handshake is finished.
-        let session = self.session.into_transport_mode().map_err(|e| {
-            NoiseError::new(format!(
-                "Error when converting session into transport mode {}.",
-                e
-            ))
-        })?;
+        let session = self.session.into_transport_mode()?;
         Ok(NoiseWrapper { session })
     }
 
@@ -146,16 +140,14 @@ impl NoiseWrapper {
     fn read(&mut self, input: &[u8], len: usize) -> Result<(usize, Vec<u8>), NoiseError> {
         let mut buf = vec![0u8; len];
         let len = self.session
-            .read_message(input, &mut buf)
-            .map_err(|e| NoiseError::new(format!("Error while reading noise message: {:?}", e.0)))?;
+            .read_message(input, &mut buf)?;
         Ok((len, buf))
     }
 
     fn write(&mut self, msg: &[u8]) -> Result<(usize, Vec<u8>), NoiseError> {
         let mut buf = vec![0u8; NOISE_MAX_MESSAGE_LENGTH];
         let len = self.session
-            .write_message(msg, &mut buf)
-            .map_err(|e| NoiseError::new(format!("Error while writing noise message: {:?}", e.0)))?;
+            .write_message(msg, &mut buf)?;
         Ok((len, buf))
     }
 
@@ -176,21 +168,28 @@ impl fmt::Debug for NoiseWrapper {
 }
 
 #[derive(Fail, Debug, Clone)]
-#[fail(display = "{}", message)]
-pub struct NoiseError {
-    message: String,
-}
+pub enum NoiseError {
+    #[fail(display = "Wrong handshake message length {}", _0)]
+    WrongMessageLength(usize),
 
-impl NoiseError {
-    pub fn new<T: Into<String>>(message: T) -> Self {
-        NoiseError {
-            message: message.into(),
-        }
-    }
+    #[fail(display = "{}", _0)]
+    Other(String),
 }
 
 impl From<NoiseError> for io::Error {
     fn from(e: NoiseError) -> Self {
-        io::Error::new(io::ErrorKind::Other, e.message)
+        let message = match e {
+            NoiseError::Other(message) =>
+                message,
+            _ => format!("{:?}", e),
+        };
+
+        io::Error::new(io::ErrorKind::Other, message)
+    }
+}
+
+impl From<failure::Error> for NoiseError {
+    fn from(e: failure::Error) -> Self {
+        NoiseError::Other(format!("{:?}", e))
     }
 }

@@ -50,7 +50,7 @@ os_info = "1.0.1"
 chrono = { version = "=0.4.2", features = ["serde"] }
 bodyparser = "=0.8.0"
 uuid = { version = "=0.6.0", features = ["serde"] }
-snow = "=0.1.9"
+snow = "=0.1.12"
 rust_decimal = "=0.8.1"
 
 exonum_rocksdb = "0.7"
