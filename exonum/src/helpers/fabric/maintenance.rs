@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![allow(missing_debug_implementations)]
-
 //! This module implements node maintenance actions.
 
 use std::{collections::HashMap, path::Path};
@@ -37,6 +35,7 @@ const MAINTENANCE_ACTION_PATH: &str = "MAINTENANCE_ACTION_PATH";
 /// Maintenance command. Supported actions:
 ///
 /// - `clear-cache` - clear message cache.
+#[derive(Debug)]
 pub struct Maintenance;
 
 impl Maintenance {
