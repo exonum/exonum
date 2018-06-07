@@ -32,7 +32,7 @@ mod proof;
 #[cfg(test)]
 mod tests;
 
-// TODO: implement pop and truncate methods for Merkle tree (ECR-173)
+// TODO: Implement pop and truncate methods for Merkle tree. (ECR-173)
 
 /// A Merkelized version of an array list that provides proofs of existence for the list items.
 ///

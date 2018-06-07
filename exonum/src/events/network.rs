@@ -46,7 +46,7 @@ pub enum NetworkRequest {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub struct NetworkConfiguration {
-    // TODO: think more about config parameters (ECR-162)
+    // TODO: Rhink more about config parameters. (ECR-162)
     pub max_incoming_connections: usize,
     pub max_outgoing_connections: usize,
     pub tcp_nodelay: bool,
@@ -220,7 +220,7 @@ impl NetworkPart {
             cancel_sender,
             handshake_params,
         );
-        // TODO Don't use unwrap here!
+        // TODO Don't use unwrap here! (ECR-1633)
         let server = Listener::bind(
             network_config,
             self.listen_address,
@@ -243,7 +243,7 @@ impl NetworkPart {
 }
 
 struct RequestHandler(
-    // TODO: Replace with concrete type
+    // TODO: Replace with concrete type. (ECR-1634)
     Box<Future<Item = (), Error = io::Error>>,
 );
 

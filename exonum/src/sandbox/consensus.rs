@@ -74,8 +74,8 @@ fn test_check_leader() {
     let tx = gen_timestamping_tx();
     sandbox.recv(&tx);
 
-    // TODO would be nice to check also for RequestPeers message which will appear
-    // after 10 time units (at 11th round)
+    // TODO: Would be nice to check also for RequestPeers message which will appear
+    // after 10 time units (at 11th round). (ECR-1627)
     let n_rounds_without_request_peers = Round(
         (sandbox.cfg().consensus.peers_timeout / sandbox.cfg().consensus.round_timeout) as u32,
     );
@@ -760,7 +760,7 @@ fn test_queue_propose_message_from_next_height() {
     // get some tx
     let tx = gen_timestamping_tx();
 
-    // TODO: this commented code is saved because it may be used later
+    // TODO: This commented code is saved because it may be used later. (ECR-1627)
     //    let block_at_first_height = Block::new(HEIGHT_ZERO, ROUND_FOUR, future_propose_time,
     //          &sandbox.last_block().unwrap().map_or(hash(&[]), |block| block.hash()), &tx.hash(),
     //          &hash(&[]));
@@ -959,10 +959,11 @@ fn ignore_propose_with_commited_transaction() {
     //    broadcast here is absent
 }
 
-// TODO: ask Ivan how to test this scenario in terms of messages
-// - remove propose request when getting propose and request txs from known nodes
-//     - not only leader, but also prevotes
-//     - not only leader, but also precommiters
+// TODO: Ask Ivan how to test this scenario in terms of messages:
+// - remove propose request when getting propose and request txs from known nodes;
+//     - not only leader, but also prevotes;
+//     - not only leader, but also precommiters.
+// (ECR-1627)
 
 #[test]
 fn handle_propose_that_sends_before_than_propose_timeout_exceeded() {
@@ -1029,7 +1030,7 @@ fn request_propose_when_get_prevote() {
 
 /// idea of the test is to verify request transaction scenario: other node requests
 /// transaction from our node
-// TODO: add scenario with manually created and signed tx
+// TODO: Add scenario with manually created and signed tx. (ECR-1627)
 #[test]
 fn response_to_request_txs() {
     let sandbox = timestamping_sandbox();
@@ -1481,7 +1482,7 @@ fn handle_tx_verify_signature() {
     let (public_key1, _) = gen_keypair();
     let (_, secret_key2) = gen_keypair();
 
-    let data = vec![0; 64]; // todo find the way how to get rid of hard-coded value
+    let data = vec![0; 64]; // TODO: Find the way how to get rid of hard-coded value. (ECR-1627)
     let tx = TimestampTx::new(&public_key1, &data, &secret_key2);
     sandbox.recv(&tx);
 
@@ -2179,8 +2180,8 @@ fn handle_precommit_positive_scenario_commit() {
 /// - Send precommit during the lock   // covered in `lock_to_propose_when_get_2_3_prevote_positive`
 /// - if there aren't incompatible prevotes
 ///     - if there're +2/3 precommits
-///         - remove precommit request //todo this idea is unreachable because there are no
-///           other places in the code where `PrecommitRequest` is added
+///         - remove precommit request // TODO: This idea is unreachable because there are no
+///           other places in the code where `PrecommitRequest` is added. (ECR-1627)
 ///         - COMMIT // covered in `test_reach_one_height`
 ///         -> do not send prevotes after the commit
 ///
@@ -3578,8 +3579,8 @@ fn test_schema_config_changes() {
 // - Send precommit when get lock   //covered in lock_to_propose_when_get_2_3_prevote_positive()
 // - if haven’t incompatible prevotes
 //     - if has +2/3 precommits
-//         TODO this idea is unreachable because there are no any places in the code
-//         where RequestPrecommit is added
+//         TODO: This idea is unreachable because there are no any places in the code
+//         where RequestPrecommit is added. (ECR-1627)
 //         - remove precommit request
 //         - COMMIT //covered in test_reach_one_height
 //         - We are fucked up   //covered in handle_full_propose_we_are_fucked_up()
@@ -3599,8 +3600,8 @@ fn test_schema_config_changes() {
 // - Request prevotes           //covered in commit_using_unknown_propose_with_precommits()
 //     - if msg.round > locked round    //covered in handle_precommit_remove_request_prevotes()
 // - If has +2/3 precommit      //covered in handle_precommit_positive_scenario_commit()
-//     TODO: this idea is unreachable because there are no any places in the code where
-//     RequestPrecommit is added
+//     TODO: This idea is unreachable because there are no any places in the code where
+//     RequestPrecommit is added. (ECR-1627)
 //     - remove precommit request
 //     - COMMIT
 //         - if propose is known    //covered in do_not_commit_if_propose_is_unknown()
@@ -3648,7 +3649,7 @@ fn test_schema_config_changes() {
 
 // HANDLE REQUEST TIMEOUT:
 
-// TODO: investigate how check this and come back when '// FIXME: check height?' is fixed
+// TODO: Investigate how check this and come back when '// FIXME: check height?' is fixed. (ECR-1627)
 // - check height?
 // - Propose/Tx/Prevotes/Precommits/Commit  //looks like that all these are covered
 //      send(RequestPropose):       test_queue_prevote_message_from_next_height
@@ -3657,4 +3658,4 @@ fn test_schema_config_changes() {
 //     - send new request message//for RequestTransaction is covered in handle_tx_handle_full_propose()
 //     - add timeout             //for RequestTransaction is covered in handle_tx_handle_full_propose()
 
-// todo add scenario for single node network
+// TODO: Add scenario for single node network. (ECR-1627)

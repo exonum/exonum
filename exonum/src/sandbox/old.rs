@@ -220,9 +220,6 @@ fn test_commit() {
     sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
 }
 
-// TODO: Remove `#[rustfmt_skip]` after https://github.com/rust-lang-nursery/rustfmt/issues/1777
-// is fixed.
-#[cfg_attr(rustfmt, rustfmt_skip)]
 #[test]
 #[should_panic(expected = "Expected to broadcast the message Consensus(Prevote")]
 fn received_unexpected_propose() {

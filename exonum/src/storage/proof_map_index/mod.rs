@@ -202,7 +202,7 @@ where
     }
 
     fn get_node_unchecked(&self, key: &ProofPath) -> Node<V> {
-        // TODO: unwraps (ECR-84)?
+        // TODO: Unwraps? (ECR-84)
         if key.is_leaf() {
             Node::Leaf(self.base.get(key).unwrap())
         } else {

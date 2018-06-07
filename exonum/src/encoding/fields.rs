@@ -41,8 +41,8 @@ const DECIMAL_SIZE: usize = 16;
 
 /// Trait for all types that could be a field in `encoding`.
 pub trait Field<'a> {
-    // TODO: use Read and Cursor (ECR-156)
-    // TODO: debug_assert_eq!(to-from == size of Self) (ECR-156)
+    // TODO: Use Read and Cursor. (ECR-156)
+    // TODO: Debug_assert_eq!(to-from == size of Self). (ECR-156)
 
     /// Field's header size.
     fn field_size() -> Offset;
@@ -232,7 +232,7 @@ impl<'a> Field<'a> for u8 {
     }
 }
 
-// TODO expect some codding of signed integers (ECR-156) ?
+// TODO: Expect some codding of signed integers? (ECR-156)
 impl<'a> Field<'a> for i8 {
     fn field_size() -> Offset {
         mem::size_of::<Self>() as Offset
@@ -379,11 +379,8 @@ impl<'a> Field<'a> for Duration {
     }
 }
 
-// TODO add socketaddr check, for now with only ipv4
-// all possible (>6 bytes long) sequences is a valid addr (ECR-156).
 impl<'a> Field<'a> for SocketAddr {
     fn field_size() -> Offset {
-        // FIXME: reserve space for future compatibility (ECR-156)
         (SOCKET_ADDR_HEADER_SIZE + IPV6_SIZE + PORT_SIZE) as Offset
     }
 

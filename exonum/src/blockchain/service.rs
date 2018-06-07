@@ -320,7 +320,7 @@ pub struct ApiNodeState {
     incoming_connections: HashSet<SocketAddr>,
     outgoing_connections: HashSet<SocketAddr>,
     reconnects_timeout: HashMap<SocketAddr, Milliseconds>,
-    //TODO: update on event?
+    // TODO: Update on event? (ECR-1632)
     peers_info: HashMap<SocketAddr, PublicKey>,
     is_enabled: bool,
 }
