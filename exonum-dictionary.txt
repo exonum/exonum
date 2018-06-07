@@ -1,7 +1,9 @@
+actix
 addrs
 appveyor
 atomicity
 backend
+backends
 bigint
 bitfury
 bitvec

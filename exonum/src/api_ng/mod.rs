@@ -14,22 +14,43 @@
 
 //! API and corresponding utilities.
 
+use serde::de::DeserializeOwned;
+use serde::Serialize;
+
+pub use self::state::{ServiceApiState, ServiceApiStateMut};
 pub use self::with::{FutureResult, NamedWith, Result, With};
 
+pub mod backends;
 pub mod error;
+mod state;
 mod with;
-
-use std::fmt;
-use std::ops::Deref;
-
-use blockchain::Blockchain;
-use crypto::{PublicKey, SecretKey};
-use node::ApiSender;
 
 /// TODO
 pub trait ServiceApi {
     /// TODO
     fn wire(&self, _builder: &mut ServiceApiBuilder) {}
+}
+
+/// Trait defines object that could be used as an API backend.
+pub trait ServiceApiBackend: Sized {
+    /// Concrete endpoint handler in the backend.
+    type Handler;
+
+    /// Adds the given endpoint handler to the backend.
+    fn endpoint<S, Q, I, R, F, E>(&mut self, name: &'static str, endpoint: E) -> &mut Self
+    where
+        Q: DeserializeOwned + 'static,
+        I: Serialize + 'static,
+        F: for<'r> Fn(&'r S, Q) -> R + 'static + Clone,
+        E: Into<With<S, Q, I, R, F>>,
+        Self::Handler: From<NamedWith<S, Q, I, R, F>>,
+    {
+        let named_with = NamedWith::new(name, endpoint);
+        self.raw_handler(Self::Handler::from(named_with))
+    }
+
+    /// Adds the raw endpoint handler for the given backend.
+    fn raw_handler(&mut self, handler: Self::Handler) -> &mut Self;
 }
 
 /// TODO
@@ -38,76 +59,7 @@ pub struct ServiceApiScope;
 
 /// TODO
 #[derive(Debug)]
-pub struct ServiceApiBuilder;
-
-/// Provides the current blockchain state to API handlers.
-#[derive(Clone)]
-pub struct ServiceApiState {
-    blockchain: Blockchain,
-    service_keypair: (PublicKey, SecretKey),
-}
-
-impl ServiceApiState {
-    /// Returns a reference to the blockchain of this node.
-    pub fn blockchain(&self) -> &Blockchain {
-        &self.blockchain
-    }
-
-    /// Returns the public key of the current node.
-    pub fn public_key(&self) -> &PublicKey {
-        &self.service_keypair.0
-    }
-
-    /// Returns the secret key of the current node.
-    pub fn secret_key(&self) -> &SecretKey {
-        &self.service_keypair.1
-    }
-}
-
-/// Mutable version of the `ServiceApiState` that also provides
-/// the current node state to API handlers.
-#[derive(Debug, Clone)]
-pub struct ServiceApiStateMut {
-    inner: ServiceApiState,
-    sender: ApiSender,
-}
-
-impl ServiceApiStateMut {
-    /// Constructs state from given parts.
-    pub fn new(
-        blockchain: Blockchain,
-        sender: ApiSender,
-        public_key: PublicKey,
-        secret_key: SecretKey,
-    ) -> ServiceApiStateMut {
-        ServiceApiStateMut {
-            inner: ServiceApiState {
-                blockchain,
-                service_keypair: (public_key, secret_key),
-            },
-            sender,
-        }
-    }
-
-    /// Returns a reference to the api sender.
-    pub fn sender(&self) -> &ApiSender {
-        &self.sender
-    }
-}
-
-impl fmt::Debug for ServiceApiState {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("ServiceApiState")
-            .field("blockchain", &self.blockchain)
-            .field("service_public_key", &self.service_keypair.0)
-            .finish()
-    }
-}
-
-impl Deref for ServiceApiStateMut {
-    type Target = ServiceApiState;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
+pub struct ServiceApiBuilder {
+    public_scope: ServiceApiScope,
+    private_scope: ServiceApiScope,
 }
