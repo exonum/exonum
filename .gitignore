@@ -13,13 +13,7 @@ exonum/fuzz/artifacts
 
 # node
 node_modules
-
-# node (for cspell)
-/npm-debug.log
-/package-lock.json
-
-# node (for testkit example)
-/testkit/examples/server/npm-debug.log
+npm-debug.log
 
 # IDE files
 .idea
