@@ -14,11 +14,13 @@
 
 //! API and corresponding utilities.
 
+pub use self::state::{ServiceApiState, ServiceApiStateMut};
+pub use self::with::{FutureResult, NamedWith, Result, With};
+
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-pub use self::state::{ServiceApiState, ServiceApiStateMut};
-pub use self::with::{FutureResult, NamedWith, Result, With};
+use self::backends::actix;
 
 pub mod backends;
 pub mod error;
@@ -54,12 +56,58 @@ pub trait ServiceApiBackend: Sized {
 }
 
 /// TODO
-#[derive(Debug)]
-pub struct ServiceApiScope;
+#[derive(Debug, Default)]
+pub struct ServiceApiScope
+{
+    actix_backend: actix::ApiBuilder,
+}
 
-/// TODO
-#[derive(Debug)]
+impl ServiceApiScope {
+    /// Creates a new service api scope.
+    pub fn new() -> ServiceApiScope {
+        ServiceApiScope::default()
+    }
+
+    /// Adds the given endpoint handler to the api scope.
+    pub fn endpoint<S, Q, I, R, F, E>(&mut self, name: &'static str, endpoint: E) -> &mut Self
+    where
+        Q: DeserializeOwned + 'static,
+        I: Serialize + 'static,
+        F: for<'r> Fn(&'r S, Q) -> R + 'static + Clone,
+        E: Into<With<S, Q, I, R, F>>,
+        actix::RequestHandler: From<NamedWith<S, Q, I, R, F>>,
+    {
+        self.actix_backend.endpoint(name, endpoint);
+        self
+    }
+
+    /// Adds the raw endpoint handler for the actix-web backend.
+    pub fn raw_web_handler(&mut self, handler: actix::RequestHandler) -> &mut Self {
+        self.actix_backend.raw_handler(handler);
+        self
+    }
+}
+
+/// Service API builder.
+#[derive(Debug, Default)]
 pub struct ServiceApiBuilder {
     public_scope: ServiceApiScope,
     private_scope: ServiceApiScope,
+}
+
+impl ServiceApiBuilder {
+    /// Creates a new service API builder.
+    pub fn new() -> ServiceApiScope {
+        ServiceApiScope::default()
+    }
+
+    /// Returns reference to the public api scope builder.
+    pub fn public_scope(&mut self) -> &mut ServiceApiScope {
+        &mut self.public_scope
+    }
+
+    /// Returns reference to the private api scope builder.
+    pub fn private_scope(&mut self) -> &mut ServiceApiScope {
+        &mut self.private_scope
+    }
 }
