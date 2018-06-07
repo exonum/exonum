@@ -179,7 +179,7 @@ mod tests {
     }
 
     const EMPTY_MESSAGE: usize = 0;
-    const SMALL_MESSAGE: usize = NOISE_MIN_HANDSHAKE_MESSAGE_LENGTH + 1;
+    const SMALL_MESSAGE: usize = NOISE_MIN_HANDSHAKE_MESSAGE_LENGTH - 1;
     const BIG_MESSAGE: usize = NOISE_MAX_MESSAGE_LENGTH + 1;
 
     impl HandshakeParams {
