@@ -16,7 +16,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
-- `handle_consensus` now not writing warning for message from previous height. (#729)
+- `handle_consensus` now does not write warning for message from previous height. (#729)
 
 ## 0.8 - 2018-05-31
 
