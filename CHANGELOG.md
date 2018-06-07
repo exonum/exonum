@@ -16,7 +16,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
-- `exonum::crypto::into_x25519_keypair` method to convert from Ed25519
+- `exonum::crypto::x25519::into_x25519_keypair` method to convert from Ed25519
   keys to X25519 keys has been introduced.
 
 ## 0.8 - 2018-05-31
