@@ -55,9 +55,11 @@
     },
     data() {
       return {
+        name: '',
+        secretKey: '',
+        keyPair: {},
         isModalVisible: false,
-        isSpinnerVisible: false,
-        keyPair: {}
+        isSpinnerVisible: false
       }
     },
     methods: {
@@ -84,11 +86,11 @@
         }
 
         this.isSpinnerVisible = true
+        this.keyPair = this.$blockchain.generateKeyPair()
 
         try {
-          const keyPair = await this.$blockchain.createWallet(this.name)
+          await this.$blockchain.createWallet(this.keyPair, this.name)
           this.name = ''
-          this.keyPair = keyPair
           this.isSpinnerVisible = false
           this.isModalVisible = true
         } catch (error) {

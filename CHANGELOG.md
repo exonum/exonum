@@ -18,6 +18,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `handle_consensus` now does not write warning for message from previous
   height. (#729)
+### Bug fixes
+
+#### exonum
+
+- Fixed bug with incorrect peer status for turned off node. (#730)
 
 ## 0.8 - 2018-05-31
 
@@ -52,6 +57,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `ConsensusConfig::validate_configuration` method has been renamed to the
   `warn_if_nonoptimal`. (#690)
+  
+#### exonum-time
+
+- The service has been refactored and the following public structs has been
+  moved to separate modules: `TimeSchema` to `exonum_time::schema`,
+  `TimeProvider` and `MockTimeProvider` to `exonum_time::time_provider`,
+  `ValidatorTime` to `exonum_time::api`. (#604)
 
 ### New features
 
@@ -126,10 +138,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   reduce boilerplate. (#639)
 
 - Metrics are now using `chrono::DateTime<Utc>` instead of `SystemTime`. (#620)
-
-#### exonum-time
-
-- Split service components to separate modules. (#604)
 
 #### exonum-configuration
 
