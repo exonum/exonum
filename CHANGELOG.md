@@ -45,6 +45,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `ConsensusConfig::validate_configuration` method has been renamed to the
   `warn_if_nonoptimal`. (#690)
+  
+#### exonum-time
+
+- The service has been refactored and the following public structs has been
+  moved to separate modules: `TimeSchema` to `exonum_time::schema`,
+  `TimeProvider` and `MockTimeProvider` to `exonum_time::time_provider`,
+  `ValidatorTime` to `exonum_time::api`. (#604)
 
 ### New features
 
@@ -119,10 +126,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   reduce boilerplate. (#639)
 
 - Metrics are now using `chrono::DateTime<Utc>` instead of `SystemTime`. (#620)
-
-#### exonum-time
-
-- Split service components to separate modules. (#604)
 
 #### exonum-configuration
 
