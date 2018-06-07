@@ -1,0 +1,131 @@
+{
+  "block_proof": {
+    "block": {
+      "height": "48417",
+      "prev_hash": "35f0f88be280a45f4df84d195117a1e238e8ace60a4e3a6cbbf76a41d6e35372",
+      "proposer_id": 2,
+      "schema_version":0,
+      "state_hash": "f3065e4a3d260e3a6002357a214e184ded8f1c40428728f63eefff213302f4f5",
+      "tx_count":0,
+      "tx_hash": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "precommits": [
+      {
+        "body": {
+          "block_hash": "48a5812b588e38951451deeba3b52a94970e73b02a660a74d7982579e1ae2b73",
+          "height": "48417",
+          "propose_hash": "651e30955309a04f8f24bcca3576564a16f2073a41e1a41c0287f38b40cfeb03",
+          "round": 1,
+          "time": {
+            "nanos": 470053000,
+            "secs": "1528283334"
+          },
+          "validator": 1
+        },
+        "message_id": 4,
+        "protocol_version":0,
+        "service_id":0,
+        "signature": "98c998a4aad83f3b332defd78bce8351cd82abbea269dfdc6eb5ae22e313af3b34afde6f4c337f87b46ea7ede447279e68da136b9dcd19cd35669a177c7f8d02"
+      },
+      {
+        "body": {
+          "block_hash": "48a5812b588e38951451deeba3b52a94970e73b02a660a74d7982579e1ae2b73",
+          "height": "48417",
+          "propose_hash": "651e30955309a04f8f24bcca3576564a16f2073a41e1a41c0287f38b40cfeb03",
+          "round": 1,
+          "time": {
+            "nanos": 470057000,
+            "secs": "1528283334"
+          },
+          "validator": 2
+        },
+        "message_id": 4,
+        "protocol_version":0,
+        "service_id":0,
+        "signature": "8fcd5b5eeb163a68561b24858c7e3c51f6fa982707941f76184b862bdda4c3e0b83e835d126d7a0753b9db22432e5ff4d5fe99b0c9af421ac91ca0eb9b78f60d"
+      },
+      {
+        "body": {
+          "block_hash": "48a5812b588e38951451deeba3b52a94970e73b02a660a74d7982579e1ae2b73",
+          "height": "48417",
+          "propose_hash": "651e30955309a04f8f24bcca3576564a16f2073a41e1a41c0287f38b40cfeb03",
+          "round": 1,
+          "time": {
+            "nanos": 470046000,
+            "secs": "1528283334"
+          },
+          "validator": 3
+        },
+        "message_id": 4,
+        "protocol_version":0,
+        "service_id":0,
+        "signature": "0e60f072e334b8aa86393b3f47b9ea421c8bd4389aef42140fa6c5f5b963d3a7a8f229208d3352d2679922f36aa55a0a9a5a2a2c2dfc51eec963111e2a6d430b"
+      }
+    ]
+  },
+  "wallet_history": {
+    "proof": {
+      "val": "deb6cc887d84a0973fe60cd23958d94af64fda8e768283c52d44e2864d3c4585"
+    },
+    "transactions": [
+      {
+        "body": {
+          "name": "Rembo",
+          "pub_key": "3aaf1c6da235ac90aee412c505457fd4a43562f7fd5cb71aa883f2c729986d93"
+        },
+        "message_id": 2,
+        "protocol_version":0,
+        "service_id": 128,
+        "signature": "0235995ce5ae5ddc40b7b924b33a768d671d6d702724ba4b144ecaf56c124ea2912dd34a048af3ffcb60193e0ebeeb2998f6b563fec31cf19ba584d4a6ecc30e"
+      }
+    ]
+  },
+  "wallet_proof": {
+    "to_table": {
+      "entries": [
+        {
+          "key": "50c8ba3a6170f0a2fb6736ece8a603576ef6309a35e810911599bc6211b554a9",
+          "value": "4fb0f9475ecdbe6c10ebd59e4dada80eb9550f2dac704347843b1d9dd8ee0342"
+        }
+      ],
+      "proof": [
+        {
+          "hash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "path": "0000101010101110110000001010110110011000000001100011001110110111000101011001101100100100000010011111001000011101110010101110111001111111101111101110100011111110000111011111101111110011011010100100110101110010101000101110101000100110011100100010101101100001"
+        },
+        {
+          "hash": "d185a93dca22258f7efe934f0e57f1fe5da285f743523d8c7143b9209e34287d",
+          "path": "11"
+        }
+      ]
+    },
+    "to_wallet": {
+      "entries": [
+        {
+          "key": "3aaf1c6da235ac90aee412c505457fd4a43562f7fd5cb71aa883f2c729986d93",
+          "value": {
+            "balance": "100",
+            "history_hash": "deb6cc887d84a0973fe60cd23958d94af64fda8e768283c52d44e2864d3c4585",
+            "history_len": "1",
+            "name": "Rembo",
+            "pub_key": "3aaf1c6da235ac90aee412c505457fd4a43562f7fd5cb71aa883f2c729986d93"
+          }
+        }
+      ],
+      "proof": [
+        {
+          "hash": "287b4e8a945a4fe34222c5c802723b225a95bf79b38a3017c2f1f17271d4b11a",
+          "path": "00"
+        },
+        {
+          "hash": "6deafd72bb6a2c93ecb9e0c704ff1a6f4d699855a8dc06cfde0c2640f423b677",
+          "path": "0101110100111111110001011000101011001100000001001011001110100110010101101100001101110000110000010010110111001101101001010100110000100100011101100101010111000001111100110010000001000110011101011100011100101110011111010101010010010000100110111100110001011010"
+        },
+        {
+          "hash": "cfc7f4a24c2c832c4d1f62557a28cb281e6b33ae4e950b0b8402e9412287fb74",
+          "path": "1"
+        }
+      ]
+    }
+  }
+}

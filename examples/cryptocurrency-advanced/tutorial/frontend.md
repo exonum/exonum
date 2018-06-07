@@ -95,13 +95,19 @@ const TxIssue = Exonum.newMessage({
 })
 ```
 
+Generate random seed:
+
+```javascript
+const seed = Exonum.randomUint64()
+```
+
 Prepare transaction data:
 
 ```javascript
 const data = {
   wallet: keyPair.publicKey,
   amount: amountToAdd.toString(),
-  seed: Exonum.randomUint64()
+  seed: seed
 }
 ```
 
@@ -143,6 +149,12 @@ const TxTransfer = Exonum.newMessage({
 })
 ```
 
+Generate random seed:
+
+```javascript
+const seed = Exonum.randomUint64()
+```
+
 Prepare transaction data:
 
 ```javascript
@@ -150,7 +162,7 @@ const data = {
   from: keyPair.publicKey,
   to: receiver,
   amount: amountToTransfer,
-  seed: Exonum.randomUint64()
+  seed: seed
 }
 ```
 
@@ -209,10 +221,23 @@ const validators = [
 ]
 ```
 
-Extract the value from the Merkle Patricia tree of all tables (`data.wallet.mpt_proof`).
-Use `state_hash` as a root hash of the tree.
+Extract the root hash of wallets tree from the Map proof of all tables (`data.wallet_proof.to_table`).
 
 <!-- markdownlint-disable MD013 -->
+
+```javascript
+const tableProof = new Exonum.MapProof(data.wallet_proof.to_table, Exonum.Hash, Exonum.Hash)
+```
+
+Check either `state_hash` is equal to the `merkleRoot`.
+
+```javascript
+if (tableProof.merkleRoot !== data.block_proof.block.state_hash) {
+  // throw error
+}
+```
+
+Extract root hash of the wallets tree from the `tableProof`.
 
 ```javascript
 const TableKey = Exonum.newType({
@@ -227,11 +252,10 @@ const tableKey = TableKey.hash({
   table_index: 0
 })
 
-const walletsHash = Exonum.merklePatriciaProof(data.block_proof.block.state_hash, data.wallet_proof.to_table, tableKey)
+const walletsHash = tableProof.entries.get(tableKey)
 ```
 
-Extracted value is a root hash of the wallets Merkle Patricia tree (`data.wallet.value`).
-Extract wallet from the tree:
+Extract wallet from the tree of all wallets:
 
 ```javascript
 const Wallet = Exonum.newType({
@@ -244,10 +268,24 @@ const Wallet = Exonum.newType({
   ]
 })
 
-const wallet = Exonum.merklePatriciaProof(walletsHash, data.wallet_proof.to_wallet, publicKey, Wallet)
+const walletProof = new Exonum.MapProof(data.wallet_proof.to_wallet, Exonum.PublicKey, Wallet)
 ```
 
-Extract transactions meta data from the Merkle tree:
+Compare `merkleRoot` with expected value.
+
+```javascript
+if (walletProof.merkleRoot !== walletsHash) {
+  // throw error
+}
+```
+
+Extract wallet data.
+
+```javascript
+const wallet = walletProof.entries.get(publicKey)
+```
+
+Extract transactions meta data from the Merkle tree.
 
 ```javascript
 const transactionsMetaData = Exonum.merkleProof(
