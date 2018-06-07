@@ -297,13 +297,12 @@ impl NodeHandler {
             let (computed_block_hash, patch) =
                 self.create_block(block.proposer_id(), block.height(), msg.transactions());
             // Verify block_hash.
-            if computed_block_hash != block_hash {
-                panic!(
-                    "Block_hash incorrect in the received block={:?}. Either a node's \
-                     implementation is incorrect or validators majority works incorrectly",
-                    msg
-                );
-            }
+            assert!(
+                computed_block_hash == block_hash,
+                "Block_hash incorrect in the received block={:?}. Either a node's \
+                 implementation is incorrect or validators majority works incorrectly",
+                msg
+            );
 
             self.state.add_block(
                 computed_block_hash,

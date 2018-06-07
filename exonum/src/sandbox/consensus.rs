@@ -3316,8 +3316,6 @@ fn handle_block_response_with_invalid_txs_order() {
             sandbox.s(VALIDATOR_0),
         ),
     );
-    sandbox.recv(&tx1);
-    sandbox.recv(&tx2);
 
     // Invalid transactions order.
     sandbox.recv(&BlockResponse::new(
