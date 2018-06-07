@@ -914,11 +914,11 @@ impl State {
     ///
     /// - Already there is an incomplete block.
     /// - Received block has already committed transaction.
-    pub fn create_incomplete_block(
+    pub fn create_incomplete_block<S: AsRef<Snapshot>>(
         &mut self,
         msg: &BlockResponse,
-        txs: &MapIndex<&&Snapshot, Hash, RawMessage>,
-        txs_pool: &KeySetIndex<&&Snapshot, Hash>,
+        txs: &MapIndex<S, Hash, RawMessage>,
+        txs_pool: &KeySetIndex<S, Hash>,
     ) -> &IncompleteBlock {
         assert!(self.incomplete_block().is_none());
 

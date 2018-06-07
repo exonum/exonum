@@ -224,7 +224,7 @@ impl NodeHandler {
         let block_hash = block.hash();
         if self.state.block(&block_hash).is_none() {
             let snapshot = self.blockchain.snapshot();
-            let schema = Schema::new(&*snapshot);
+            let schema = Schema::new(snapshot);
             let has_unknown_txs = self.state
                 .create_incomplete_block(msg, &schema.transactions(), &schema.transactions_pool())
                 .has_unknown_txs();
