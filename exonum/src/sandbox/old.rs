@@ -225,10 +225,22 @@ fn test_commit() {
 fn received_unexpected_propose() {
     let sandbox = timestamping_sandbox();
 
-    let propose = Propose::new(VALIDATOR_1, Height::zero(), ROUND_ONE,
-                               &sandbox.last_hash(), &[], sandbox.s(VALIDATOR_1));
+    let propose = Propose::new(
+        VALIDATOR_1,
+        Height::zero(),
+        ROUND_ONE,
+        &sandbox.last_hash(),
+        &[],
+        sandbox.s(VALIDATOR_1),
+    );
 
     sandbox.recv(&propose);
-    sandbox.broadcast(&Prevote::new(VALIDATOR_0, Height::zero(), ROUND_ONE, &propose.hash(),
-                                   Round::zero(), sandbox.s(VALIDATOR_0)));
+    sandbox.broadcast(&Prevote::new(
+        VALIDATOR_0,
+        Height::zero(),
+        ROUND_ONE,
+        &propose.hash(),
+        Round::zero(),
+        sandbox.s(VALIDATOR_0)
+    ));
 }
