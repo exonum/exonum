@@ -16,7 +16,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
-- Fixed bug with incorrect peer status for turned off node.
+- Fixed bug with incorrect peer status for turned off node. (#730)
 
 ## 0.8 - 2018-05-31
 
