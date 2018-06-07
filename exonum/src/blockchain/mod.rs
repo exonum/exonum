@@ -354,7 +354,7 @@ impl Blockchain {
         index: usize,
         fork: &mut Fork,
     ) -> Result<(), failure::Error> {
-        let tx = {
+        let (tx, service_name) = {
             let schema = Schema::new(&fork);
 
             let tx = schema
@@ -362,13 +362,22 @@ impl Blockchain {
                 .get(&tx_hash)
                 .ok_or_else(|| failure::err_msg("BUG: Cannot find transaction in database."))?;
 
-            self.tx_from_raw(tx).or_else(|error| {
-                Err(failure::err_msg(format!(
-                    "{}, tx: {:?}",
-                    error.description(),
-                    tx_hash
-                )))
-            })?
+            let sn = self.service_map
+                .get( tx.service_id() as usize)
+                .ok_or_else(|| failure::err_msg("Service not found."))?
+                .service_name();
+            (
+                self.tx_from_raw(tx).or_else(|error| {
+                    Err(failure::err_msg(format!(
+                        "Service <{}>: {}, tx: {:?}",
+                        sn,
+                        error.description(),
+                        tx_hash
+                    )))
+                })?
+                ,
+                sn
+            )
         };
 
         fork.checkpoint();
@@ -384,7 +393,7 @@ impl Blockchain {
                     Err(ref e) => {
                         // Unlike panic, transaction failure isn't that rare, so logging the
                         // whole transaction body is an overkill: it can be relatively big.
-                        info!("{:?} transaction execution failed: {:?}", tx_hash, e);
+                        info!("Service <{}>: {:?} transaction execution failed: {:?}", service_name, tx_hash, e);
                         fork.rollback();
                     }
                 }
@@ -396,7 +405,7 @@ impl Blockchain {
                     panic::resume_unwind(err);
                 }
                 fork.rollback();
-                error!("{:?} transaction execution panicked: {:?}", tx, err);
+                error!("Service <{}>: {:?} transaction execution panicked: {:?}", service_name, tx, err);
                 Err(TransactionError::from_panic(&err))
             }
         };
