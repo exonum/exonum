@@ -366,7 +366,7 @@ impl Blockchain {
                 .get(tx.service_id() as usize)
                 .ok_or_else(|| failure::err_msg("Service not found."))?
                 .service_name();
-            
+
             let tx = self.tx_from_raw(tx).or_else(|error| {
                 Err(failure::err_msg(format!(
                     "Service <{}>: {}, tx: {:?}",
