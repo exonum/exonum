@@ -37,7 +37,8 @@ impl NodeHandler {
             return;
         }
 
-        if (msg.height() - self.state.height()).abs() > 1 {
+        // Ignore messages from previous and future height
+        if msg.height() < self.state.height().previous() || msg.height() > self.state.height().next() {
             warn!(
                 "Received consensus message from other height: msg.height={}, self.height={}",
                 msg.height(),
