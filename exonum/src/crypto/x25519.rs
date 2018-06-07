@@ -40,7 +40,7 @@ const BYTES_IN_DEBUG: usize = 4;
 /// # crypto::init();
 ///
 /// let (pk, sk) = crypto::gen_keypair();
-/// let (public_key, secret_key) = crypto::into_x25519_keypair(pk, sk).unwrap();
+/// let (public_key, secret_key) = crypto::x25519::into_x25519_keypair(pk, sk).unwrap();
 /// ```
 #[cfg_attr(feature = "cargo-clippy", allow(needless_pass_by_value))]
 pub fn into_x25519_keypair(
