@@ -138,15 +138,13 @@ impl NoiseWrapper {
 
     fn read(&mut self, input: &[u8], len: usize) -> Result<(usize, Vec<u8>), NoiseError> {
         let mut buf = vec![0u8; len];
-        let len = self.session
-            .read_message(input, &mut buf)?;
+        let len = self.session.read_message(input, &mut buf)?;
         Ok((len, buf))
     }
 
     fn write(&mut self, msg: &[u8]) -> Result<(usize, Vec<u8>), NoiseError> {
         let mut buf = vec![0u8; NOISE_MAX_MESSAGE_LENGTH];
-        let len = self.session
-            .write_message(msg, &mut buf)?;
+        let len = self.session.write_message(msg, &mut buf)?;
         Ok((len, buf))
     }
 
@@ -178,8 +176,7 @@ pub enum NoiseError {
 impl From<NoiseError> for io::Error {
     fn from(e: NoiseError) -> Self {
         let message = match e {
-            NoiseError::Other(message) =>
-                message,
+            NoiseError::Other(message) => message,
             _ => format!("{:?}", e),
         };
 

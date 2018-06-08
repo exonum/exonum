@@ -22,9 +22,9 @@ use std::{cell::RefCell, collections::HashMap, io, net::SocketAddr, rc::Rc, time
 
 use super::{error::{into_other, log_error, other_error, result_ok},
             to_box};
+use events::noise::{Handshake, HandshakeParams, NoiseHandshake};
 use helpers::Milliseconds;
 use messages::{Any, Connect, Message, RawMessage};
-use events::noise::{HandshakeParams, NoiseHandshake};
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 
