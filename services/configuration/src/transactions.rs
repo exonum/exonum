@@ -296,7 +296,7 @@ impl<'a> VotingDecisionRef<'a> {
             let vote = schema
                 .votes_by_config_hash(self.cfg_hash())
                 .get(validator_id as u64)
-                .expect("Can't get for precheck");
+                .expect("Can't get vote for precheck");
 
             if vote.is_some() {
                 return Err(AlreadyVoted);
