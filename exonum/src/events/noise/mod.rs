@@ -23,6 +23,8 @@ use crypto::{PublicKey, SecretKey};
 use events::codec::MessagesCodec;
 use events::noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH};
 use events::noise::wrapper::NoiseError;
+use futures::future::err;
+use events::noise::wrapper::HANDSHAKE_HEADER_MAX;
 
 pub mod wrapper;
 
@@ -134,8 +136,7 @@ where T: HandshakeChannel + Clone + 'static {
 
 fn read(sock: TcpStream) -> Box<Future<Item = (TcpStream, Vec<u8>), Error = io::Error>> {
     let buf = vec![0u8; HANDSHAKE_HEADER_LENGTH];
-    Box::new(
-        read_exact(sock, buf)
+    Box::new(read_exact(sock, buf)
             .and_then(|(stream, msg)| read_exact(stream, vec![0u8; msg[0] as usize])),
     )
 }
@@ -146,6 +147,11 @@ fn write(
     len: usize,
 ) -> Box<Future<Item = (TcpStream, Vec<u8>), Error = io::Error>> {
     let mut message = vec![0u8; HANDSHAKE_HEADER_LENGTH];
+
+    if len > HANDSHAKE_HEADER_MAX {
+        return Box::new(err(io::Error::new(io::ErrorKind::Other, "Wrong message size")))
+    }
+
     LittleEndian::write_u16(&mut message, len as u16);
     message.extend_from_slice(&buf[0..len]);
     Box::new(write_all(sock, message))
@@ -159,7 +165,7 @@ mod tests {
     use tokio_core::reactor::Core;
     use tokio_timer::{TimeoutStream, Timer};
 
-    use std::io;
+    use std::io::{self, Result as IoResult};
     use std::net::SocketAddr;
     use std::thread;
     use std::time::Duration;
@@ -178,15 +184,17 @@ mod tests {
         StaticKeyExchange(u8, usize),
     }
 
+    const MAX_MESSAGE_LEN: usize = 1024;
+
     const EMPTY_MESSAGE: usize = 0;
-    const SMALL_MESSAGE: usize = NOISE_MIN_HANDSHAKE_MESSAGE_LENGTH - 1;
-    const BIG_MESSAGE: usize = NOISE_MAX_MESSAGE_LENGTH + 1;
+    const STANDARD_MESSAGE: usize = MAX_MESSAGE_LEN;
+    const LARGE_MESSAGE: usize = NOISE_MAX_MESSAGE_LENGTH + 1;
 
     impl HandshakeParams {
         fn default_test_params() -> Self {
             let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([0; 32]));
             HandshakeParams {
-                max_message_len: 1024,
+                max_message_len: MAX_MESSAGE_LEN as u32,
                 public_key,
                 secret_key,
             }
@@ -199,7 +207,7 @@ mod tests {
         let addr2 = addr.clone();
 
         let (sender, receiver) = mpsc::channel(0);
-        let (err_sender, err_receiver) = mpsc::channel::<io::Error>(0);
+        let (err_sender, err_receiver) = mpsc::channel::<IoResult<()>>(0);
         let receiver = add_timeout_millis(receiver, 500);
         thread::spawn(move || run_handshake_listener(&addr2, sender.clone(), err_sender));
 
@@ -212,70 +220,64 @@ mod tests {
     }
 
     #[test]
-    fn test_noise_handshake_errors_2() {
+    #[should_panic(expected = "WrongMessageLength(0)")]
+    fn test_noise_handshake_errors_ee_empty() {
         let addr: SocketAddr = "127.0.0.1:45003".parse().unwrap();
         let step = HandshakeStep::EphemeralKeyExchange(1, EMPTY_MESSAGE);
-
-        let error = error_handshake_variant(&addr, step).unwrap();
-
-
-        println!("error {:?}", error);
+        let res = wait_for_handshake_result(&addr, step);
+        res.unwrap()
     }
 
     #[test]
-    fn test_noise_handshake_errors_3() {
+    #[should_panic(expected = "WrongMessageLength(0)")]
+    fn test_noise_handshake_errors_es_empty() {
         let addr: SocketAddr = "127.0.0.1:45004".parse().unwrap();
         let step = HandshakeStep::StaticKeyExchange(2, EMPTY_MESSAGE);
-
-        let error = error_handshake_variant(&addr, step).unwrap();
-
-        println!("error {:?}", error);
+        let res = wait_for_handshake_result(&addr, step);
+        res.unwrap()
     }
 
     #[test]
-    fn test_noise_handshake_errors_6() {
+    #[should_panic(expected = "early eof")]
+    fn test_noise_handshake_errors_ee_standard() {
         let addr: SocketAddr = "127.0.0.1:45005".parse().unwrap();
-        let step = HandshakeStep::EphemeralKeyExchange(1, SMALL_MESSAGE);
-
-        let error = error_handshake_variant(&addr, step).unwrap();
-
-        println!("error {:?}", error);
+        let step = HandshakeStep::EphemeralKeyExchange(1, STANDARD_MESSAGE);
+        let res = wait_for_handshake_result(&addr, step);
+        res.unwrap()
     }
 
     #[test]
-    fn test_noise_handshake_errors_7() {
+    #[should_panic(expected = "early eof")]
+    fn test_noise_handshake_errors_es_standard() {
         let addr: SocketAddr = "127.0.0.1:45006".parse().unwrap();
-        let step = HandshakeStep::StaticKeyExchange(2, SMALL_MESSAGE);
-
-        let error = error_handshake_variant(&addr, step).unwrap();
-
-        println!("error {:?}", error);
+        let step = HandshakeStep::StaticKeyExchange(2, STANDARD_MESSAGE);
+        let res = wait_for_handshake_result(&addr, step);
+        res.unwrap()
     }
 
     #[test]
-    fn test_noise_handshake_errors_4() {
+    #[should_panic(expected = "early eof")]
+    fn test_noise_handshake_errors_ee_large() {
         let addr: SocketAddr = "127.0.0.1:45007".parse().unwrap();
-        let step = HandshakeStep::EphemeralKeyExchange(1, BIG_MESSAGE);
-
-        let error = error_handshake_variant(&addr, step).unwrap();
-
-        println!("error {:?}", error);
+        let step = HandshakeStep::EphemeralKeyExchange(1, LARGE_MESSAGE);
+        let res = wait_for_handshake_result(&addr, step);
+        res.unwrap()
     }
 
     #[test]
-    fn test_noise_handshake_errors_5() {
+    #[should_panic(expected = "early eof")]
+    fn test_noise_handshake_errors_se_large() {
         let addr: SocketAddr = "127.0.0.1:45008".parse().unwrap();
-        let step = HandshakeStep::StaticKeyExchange(2, BIG_MESSAGE);
-        let error = error_handshake_variant(&addr, step).unwrap();
-
-        println!("error {:?}", error);
+        let step = HandshakeStep::StaticKeyExchange(2, LARGE_MESSAGE);
+        let res = wait_for_handshake_result(&addr, step);
+        res.unwrap()
     }
 
-    fn error_handshake_variant(addr:&SocketAddr, step:HandshakeStep) -> Result<io::Error, ()> {
+    fn wait_for_handshake_result(addr:&SocketAddr, step:HandshakeStep) -> IoResult<()> {
         let addr2 = addr.clone();
 
         let (sender, receiver) = mpsc::channel(0);
-        let (err_sender, err_receiver) = mpsc::channel::<io::Error>(0);
+        let (err_sender, err_receiver) = mpsc::channel::<IoResult<()>>(0);
         let receiver = add_timeout_millis(receiver, 500);
         let err_receiver = add_timeout_millis(err_receiver, 500);
         thread::spawn(move || run_handshake_listener(&addr2, sender, err_sender));
@@ -287,7 +289,7 @@ mod tests {
         let res = send_handshake(&addr, step);
         assert!(res.is_err());
 
-        err_receiver.wait().next().unwrap()
+        err_receiver.wait().next().unwrap().unwrap()
     }
 
     fn add_timeout_millis<T>(receiver: Receiver<T>, millis: u64) -> TimeoutStream<Receiver<T>> {
@@ -295,7 +297,7 @@ mod tests {
         timer.timeout_stream(receiver, Duration::from_millis(millis))
     }
 
-    fn run_handshake_listener(addr: &SocketAddr, sender: Sender<()>, err_sender: Sender<io::Error>) -> Result<(), io::Error> {
+    fn run_handshake_listener(addr: &SocketAddr, sender: Sender<()>, err_sender: Sender<IoResult<()>>) -> Result<(), io::Error> {
         let mut core = Core::new().unwrap();
         let handle = core.handle();
         let params = HandshakeParams::default_test_params();
@@ -312,9 +314,8 @@ mod tests {
                 let handshake = NoiseHandshake::new();
                 let handshake = handshake.listen(&params, stream);
                 let reader = handshake.and_then(|_| Ok(())).or_else(|e| {
-                    err_sender.send(e).map(|_| ())
+                    err_sender.send(Err(e)).map(|_| ())
                 }).map_err(|e| {
-                    println!("into_other {:?}", e);
                     log_error(e)
                 });
                 handle.spawn(reader);
@@ -378,6 +379,7 @@ mod tests {
                 // Write message filled with zeros, instead of real handshake message.
                 &HandshakeStep::EphemeralKeyExchange(cs, size) |
                 &HandshakeStep::StaticKeyExchange(cs, size) if cs == self.current_step => {
+                    println!("size {:?}", size);
                     Ok((size, vec![0; size]))
                 }
                 _ => noise.write_handshake_msg(),
