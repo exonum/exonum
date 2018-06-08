@@ -16,6 +16,7 @@ travis-ci = { repository = "exonum/exonum" }
 circle-ci = { repository = "exonum/exonum" }
 
 [dependencies]
+actix = "=0.5.7"
 actix-web = "=0.6.11"
 log = "=0.4.1"
 byteorder = "1.2.3"

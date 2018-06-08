@@ -73,10 +73,20 @@ impl ApiBuilder {
 
 impl ServiceApiBackend for ApiBuilder {
     type Handler = RequestHandler;
+    type Scope = actix_web::Scope<ServiceApiStateMut>;
 
     fn raw_handler(&mut self, handler: Self::Handler) -> &mut Self {
         self.handlers.push(handler);
         self
+    }
+
+    fn wire(&self, mut output: Self::Scope) -> Self::Scope {
+        for handler in self.handlers.clone() {
+            output = output.route(handler.name, handler.method.clone(), move |request| {
+                (handler.inner)(request)
+            });
+        }
+        output
     }
 }
 

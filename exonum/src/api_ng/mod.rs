@@ -33,6 +33,8 @@ mod with;
 pub trait ServiceApiBackend: Sized {
     /// Concrete endpoint handler in the backend.
     type Handler;
+    /// Concrete output API scope.
+    type Scope;
 
     /// Adds the given endpoint handler to the backend.
     fn endpoint<S, Q, I, R, F, E>(&mut self, name: &'static str, endpoint: E) -> &mut Self
@@ -49,6 +51,9 @@ pub trait ServiceApiBackend: Sized {
 
     /// Adds the raw endpoint handler for the given backend.
     fn raw_handler(&mut self, handler: Self::Handler) -> &mut Self;
+
+    /// TODO
+    fn wire(&self, output: Self::Scope) -> Self::Scope;
 }
 
 /// TODO
@@ -76,10 +81,9 @@ impl ServiceApiScope {
         self
     }
 
-    /// Adds the raw endpoint handler for the actix-web backend.
-    pub fn raw_web_handler(&mut self, handler: actix::RequestHandler) -> &mut Self {
-        self.actix_backend.raw_handler(handler);
-        self
+    /// Returns reference to the underlying web backend
+    pub fn web_backend(&mut self) -> &mut actix::ApiBuilder {
+        &mut self.actix_backend
     }
 }
 

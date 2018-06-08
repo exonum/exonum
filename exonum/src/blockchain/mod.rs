@@ -79,8 +79,8 @@ mod tests;
 pub struct Blockchain {
     db: Arc<Database>,
     service_map: Arc<VecMap<Box<Service>>>,
-    service_keypair: (PublicKey, SecretKey),
-    api_sender: ApiSender,
+    pub(crate) service_keypair: (PublicKey, SecretKey),
+    pub(crate) api_sender: ApiSender,
 }
 
 impl Blockchain {

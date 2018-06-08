@@ -22,6 +22,7 @@
 #![cfg_attr(feature = "flame_profile", plugin(exonum_flamer))]
 #![cfg_attr(feature = "long_benchmarks", feature(test))]
 
+extern crate actix;
 extern crate actix_web;
 extern crate atty;
 extern crate bit_vec;

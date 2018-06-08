@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::fmt;
 use std::ops::Deref;
 
 use blockchain::Blockchain;
@@ -20,10 +19,9 @@ use crypto::{PublicKey, SecretKey};
 use node::ApiSender;
 
 /// Provides the current blockchain state to API handlers.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct ServiceApiState {
     blockchain: Blockchain,
-    service_keypair: (PublicKey, SecretKey),
 }
 
 impl ServiceApiState {
@@ -34,12 +32,12 @@ impl ServiceApiState {
 
     /// Returns the public key of the current node.
     pub fn public_key(&self) -> &PublicKey {
-        &self.service_keypair.0
+        &self.blockchain.service_keypair.0
     }
 
     /// Returns the secret key of the current node.
     pub fn secret_key(&self) -> &SecretKey {
-        &self.service_keypair.1
+        &self.blockchain.service_keypair.1
     }
 }
 
@@ -48,38 +46,19 @@ impl ServiceApiState {
 #[derive(Debug, Clone)]
 pub struct ServiceApiStateMut {
     inner: ServiceApiState,
-    sender: ApiSender,
 }
 
 impl ServiceApiStateMut {
     /// Constructs state from given parts.
-    pub fn new(
-        blockchain: Blockchain,
-        sender: ApiSender,
-        public_key: PublicKey,
-        secret_key: SecretKey,
-    ) -> ServiceApiStateMut {
+    pub fn new(blockchain: Blockchain) -> ServiceApiStateMut {
         ServiceApiStateMut {
-            inner: ServiceApiState {
-                blockchain,
-                service_keypair: (public_key, secret_key),
-            },
-            sender,
+            inner: ServiceApiState { blockchain },
         }
     }
 
     /// Returns a reference to the api sender.
     pub fn sender(&self) -> &ApiSender {
-        &self.sender
-    }
-}
-
-impl fmt::Debug for ServiceApiState {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("ServiceApiState")
-            .field("blockchain", &self.blockchain)
-            .field("service_public_key", &self.service_keypair.0)
-            .finish()
+        &self.blockchain.api_sender
     }
 }
 
