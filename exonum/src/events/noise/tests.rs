@@ -128,13 +128,7 @@ fn test_noise_handshake_errors_ee_empty() {
     let step = HandshakeStep::EphemeralKeyExchange(1, EMPTY_MESSAGE);
     let (sender_err, listener_err) = wait_for_handshake_result(&addr, step);
 
-    assert!(
-        sender_err
-            .err()
-            .unwrap()
-            .description()
-            .contains("early eof")
-    );
+    assert!(sender_err.is_err());
     listener_err.unwrap()
 }
 
@@ -145,13 +139,7 @@ fn test_noise_handshake_errors_es_empty() {
     let step = HandshakeStep::StaticKeyExchange(2, EMPTY_MESSAGE);
     let (sender_err, listener_err) = wait_for_handshake_result(&addr, step);
 
-    assert!(
-        sender_err
-            .err()
-            .unwrap()
-            .description()
-            .contains("HandshakeNotFinished")
-    );
+    assert!(sender_err.is_err());
     listener_err.unwrap()
 }
 
@@ -162,13 +150,7 @@ fn test_noise_handshake_errors_ee_standard() {
     let step = HandshakeStep::EphemeralKeyExchange(1, STANDARD_MESSAGE);
     let (sender_err, listener_err) = wait_for_handshake_result(&addr, step);
 
-    assert!(
-        listener_err
-            .err()
-            .unwrap()
-            .description()
-            .contains("HandshakeNotFinished")
-    );
+    assert!(listener_err.is_err());
     sender_err.unwrap()
 }
 
@@ -179,13 +161,7 @@ fn test_noise_handshake_errors_es_standard() {
     let step = HandshakeStep::StaticKeyExchange(2, STANDARD_MESSAGE);
     let (sender_err, listener_err) = wait_for_handshake_result(&addr, step);
 
-    assert!(
-        listener_err
-            .err()
-            .unwrap()
-            .description()
-            .contains("Decrypt")
-    );
+    assert!(listener_err.is_err());
     sender_err.unwrap()
 }
 
@@ -196,13 +172,7 @@ fn test_noise_handshake_errors_ee_large() {
     let step = HandshakeStep::EphemeralKeyExchange(1, LARGE_MESSAGE);
     let (sender_err, listener_err) = wait_for_handshake_result(&addr, step);
 
-    assert!(
-        listener_err
-            .err()
-            .unwrap()
-            .description()
-            .contains("early eof")
-    );
+    assert!(listener_err.is_err());
     sender_err.unwrap()
 }
 
@@ -213,13 +183,7 @@ fn test_noise_handshake_errors_se_large() {
     let step = HandshakeStep::StaticKeyExchange(2, LARGE_MESSAGE);
     let (sender_err, listener_err) = wait_for_handshake_result(&addr, step);
 
-    assert!(
-        listener_err
-            .err()
-            .unwrap()
-            .description()
-            .contains("early eof")
-    );
+    assert!(listener_err.is_err());
     sender_err.unwrap()
 }
 
