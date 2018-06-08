@@ -117,12 +117,12 @@ impl SystemApi {
 
     /// Adds system API endpoints to the corresponding scope.
     pub fn wire_api(self, api_scope: &mut ServiceApiScope) -> &mut ServiceApiScope {
-        self.handle_peers_info("peers", api_scope)
-            .handle_peer_add("peers", api_scope)
-            .handle_network_info("network", api_scope)
-            .handle_is_consensus_enabled("consensus_enabled", api_scope)
-            .handle_set_consensus_enabled("consensus_enabled", api_scope)
-            .handle_shutdown("shutdown", api_scope);
+        self.handle_peers_info("v1/peers", api_scope)
+            .handle_peer_add("v1/peers", api_scope)
+            .handle_network_info("v1/network", api_scope)
+            .handle_is_consensus_enabled("v1/consensus_enabled", api_scope)
+            .handle_set_consensus_enabled("v1/consensus_enabled", api_scope)
+            .handle_shutdown("v1/shutdown", api_scope);
         api_scope
     }
 

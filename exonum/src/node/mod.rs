@@ -1050,7 +1050,7 @@ pub fn create_actix_private_api(
     };
 
     actix_web::App::with_state(state.clone())
-        .prefix("api/v2")
+        .prefix("api")
         .scope("system", move |scope| {
             system_api_backend.web_backend().wire(scope)
         })
