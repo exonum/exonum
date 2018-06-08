@@ -291,9 +291,8 @@ impl<'a> VotingDecisionRef<'a> {
         if let Some(validator_id) = validator_index(snapshot, self.sender()) {
             let vote = schema
                 .votes_by_config_hash(self.cfg_hash())
-                .get(validator_id as u64)
-                .unwrap();
-            if vote.is_some() {
+                .get(validator_id as u64);
+            if vote.is_some() && vote.unwrap().is_some() {
                 Err(AlreadyVoted)?;
             }
         } else {
