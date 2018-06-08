@@ -288,20 +288,22 @@ impl<'a> VotingDecisionRef<'a> {
         }
 
         let schema = Schema::new(snapshot);
-        if let Some(validator_id) = validator_index(snapshot, self.sender()) {
-            let vote = schema
-                .votes_by_config_hash(self.cfg_hash())
-                .get(validator_id as u64);
-            if vote.is_some() && vote.unwrap().is_some() {
-                Err(AlreadyVoted)?;
-            }
-        } else {
-            Err(UnknownSender)?;
-        }
-
         let propose = schema
             .propose(self.cfg_hash())
             .ok_or_else(|| UnknownConfigRef(*self.cfg_hash()))?;
+
+        if let Some(validator_id) = validator_index(snapshot, self.sender()) {
+            let vote = schema
+                .votes_by_config_hash(self.cfg_hash())
+                .get(validator_id as u64)
+                .expect("Can't get for precheck");
+
+            if vote.is_some() {
+                return Err(AlreadyVoted);
+            }
+        } else {
+            return Err(UnknownSender);
+        }
 
         let parsed = StoredConfiguration::try_deserialize(propose.cfg().as_bytes()).unwrap();
         propose.check_config_candidate(&parsed, snapshot)?;
@@ -407,5 +409,37 @@ impl Transaction for VoteAgainst {
         );
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::tests::{new_tx_config_vote, new_tx_config_vote_against};
+    use super::super::Service as ConfigurationService;
+    use super::{Hash, VotingDecisionRef};
+    use errors::Error as ServiceError;
+
+    use exonum_testkit::{TestKit, TestKitBuilder};
+
+    #[test]
+    fn test_vote_without_propose() {
+        let testkit: TestKit = TestKitBuilder::validator()
+            .with_validators(4)
+            .with_service(ConfigurationService {})
+            .create();
+
+        let hash = Hash::default();
+
+        let illegal_vote = new_tx_config_vote(&testkit.network().validators()[3], hash);
+        let vote = VotingDecisionRef::from(&illegal_vote);
+        let vote_result = vote.precheck(testkit.snapshot().as_ref());
+
+        let illegal_vote_against =
+            new_tx_config_vote_against(&testkit.network().validators()[3], hash);
+        let vote_against = VotingDecisionRef::from(&illegal_vote_against);
+        let vote_against_result = vote_against.precheck(testkit.snapshot().as_ref());
+
+        assert_matches!(vote_result, Err(ServiceError::UnknownConfigRef(_)));
+        assert_matches!(vote_against_result, Err(ServiceError::UnknownConfigRef(_)));
     }
 }
