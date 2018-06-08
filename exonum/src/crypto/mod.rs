@@ -69,6 +69,8 @@ use encoding::{serialize::{encode_hex, FromHex, FromHexError, ToHex},
                Offset};
 use helpers::Round;
 
+pub mod x25519;
+
 /// The size to crop the string in debug messages.
 const BYTES_IN_DEBUG: usize = 4;
 
