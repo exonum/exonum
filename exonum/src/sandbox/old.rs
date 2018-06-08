@@ -241,6 +241,6 @@ fn received_unexpected_propose() {
         ROUND_ONE,
         &propose.hash(),
         Round::zero(),
-        sandbox.s(VALIDATOR_0)
+        sandbox.s(VALIDATOR_0),
     ));
 }
