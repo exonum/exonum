@@ -27,6 +27,8 @@ docker run -p 8280:8280 serhiioryshych/exonum-cryptocurrency-advanced-example
 
 Ready! Find demo at [http://127.0.0.1:8280](http://127.0.0.1:8280).
 
+To stop docker container, use `docker stop <container id>` command.
+
 ### Manually
 
 #### Getting started

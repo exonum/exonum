@@ -25,8 +25,9 @@ done
 for i in $(seq 0 $((node_count - 1)))
 do
   public_port=$((start_public_port + i))
+  private_port=$((start_private_port + i))
   $path_to_app run --node-config node_$((i + 1))_cfg.toml --db-path db$((i + 1)) --public-api-address 0.0.0.0:${public_port} &
-  echo "new node with ports: $public_port (public)"
+  echo "new node with ports: $public_port (public) & $private_port (private)"
 done
 
 cd ../../frontend
