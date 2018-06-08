@@ -1045,7 +1045,13 @@ pub fn create_actix_private_api(
         let node_info =
             api_ng::node::private::NodeInfo::new(blockchain.service_map().iter().map(|(_, s)| s));
         let system_api = api_ng::node::private::SystemApi::new(node_info, shared_api_state);
-        system_api.wire_api(&mut scope);
+        system_api.wire(&mut scope);
+        scope
+    };
+
+    let mut explorer_api_backend = {
+        let mut scope = api_ng::ServiceApiScope::new();
+        api_ng::node::public::explorer::ExplorerApi::wire(state.as_ref(), &mut scope);
         scope
     };
 
@@ -1053,6 +1059,9 @@ pub fn create_actix_private_api(
         .prefix("api")
         .scope("system", move |scope| {
             system_api_backend.web_backend().wire(scope)
+        })
+        .scope("explorer", move |scope| {
+            explorer_api_backend.web_backend().wire(scope)
         })
 }
 

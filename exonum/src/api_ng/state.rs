@@ -69,3 +69,9 @@ impl Deref for ServiceApiStateMut {
         &self.inner
     }
 }
+
+impl AsRef<ServiceApiState> for ServiceApiStateMut {
+    fn as_ref(&self) -> &ServiceApiState {
+        &self.inner
+    }
+}

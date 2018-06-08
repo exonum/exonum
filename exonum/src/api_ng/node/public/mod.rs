@@ -13,3 +13,5 @@
 // limitations under the License.
 
 //! Public part of the Exonum rest api.
+
+pub mod explorer;
