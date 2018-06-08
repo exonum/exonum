@@ -18,6 +18,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `exonum::crypto::x25519` module to convert from Ed25519 keys to X25519 keys
   has been introduced.
+### Internal improvements
+
+#### exonum
+
+- `handle_consensus` now does not write warning for message from previous
+  height. (#729)
 
 ### Bug fixes
 
