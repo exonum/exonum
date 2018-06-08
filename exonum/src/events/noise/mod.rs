@@ -15,13 +15,15 @@
 use byteorder::{ByteOrder, LittleEndian};
 use futures::future::{done, Future};
 use tokio_core::net::TcpStream;
-use tokio_io::{AsyncRead, codec::Framed, io::{read_exact, write_all}};
+use tokio_io::{codec::Framed,
+               io::{read_exact, write_all},
+               AsyncRead};
 
 use std::io;
 
 use crypto::{PublicKey, SecretKey};
-use events::codec::MessagesCodec;
-use events::noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH};
+use events::{codec::MessagesCodec,
+             noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH}};
 use events::noise::wrapper::NoiseError;
 use futures::future::err;
 use events::noise::wrapper::HANDSHAKE_HEADER_MAX;
@@ -74,15 +76,15 @@ pub struct NoiseHandshakeChannel {}
 
 impl HandshakeChannel for NoiseHandshakeChannel {
     fn read_handshake_msg(&self,
-        input: &[u8],
-        noise: &mut NoiseWrapper,
+                          input: &[u8],
+                          noise: &mut NoiseWrapper,
     ) -> Box<Future<Item = (usize, Vec<u8>), Error = io::Error>> {
         let res = noise.read_handshake_msg(input);
         Box::new(done(res.map_err(|e| e.into())))
     }
 
     fn write_handshake_msg(&mut self,
-        noise: &mut NoiseWrapper,
+                           noise: &mut NoiseWrapper,
     ) -> Box<Future<Item = (usize, Vec<u8>), Error = io::Error>> {
         let res = noise.write_handshake_msg();
         Box::new(done(res.map_err(|e| e.into())))
@@ -90,7 +92,7 @@ impl HandshakeChannel for NoiseHandshakeChannel {
 }
 
 fn listen_handshake<T>(stream: TcpStream, params: &HandshakeParams, channel: &T) -> HandshakeResult
-where T: HandshakeChannel + Clone + 'static {
+    where T: HandshakeChannel + Clone + 'static {
     let max_message_len = params.max_message_len;
     let mut noise = NoiseWrapper::responder(params);
     let mut channel = channel.clone();
@@ -104,7 +106,7 @@ where T: HandshakeChannel + Clone + 'static {
                         let noise = noise.into_transport_mode()?;
                         let framed = stream.framed(MessagesCodec::new(max_message_len, noise));
                         Ok(framed)
-                }))
+                    }))
         })
     });
 
@@ -112,7 +114,7 @@ where T: HandshakeChannel + Clone + 'static {
 }
 
 fn send_handshake<T>(stream: TcpStream, params: &HandshakeParams, channel: &T) -> HandshakeResult
-where T: HandshakeChannel + Clone + 'static {
+    where T: HandshakeChannel + Clone + 'static {
     let max_message_len = params.max_message_len;
     let mut noise = NoiseWrapper::initiator(params);
     let mut channel = channel.clone();
@@ -137,7 +139,7 @@ where T: HandshakeChannel + Clone + 'static {
 fn read(sock: TcpStream) -> Box<Future<Item = (TcpStream, Vec<u8>), Error = io::Error>> {
     let buf = vec![0u8; HANDSHAKE_HEADER_LENGTH];
     Box::new(read_exact(sock, buf)
-            .and_then(|(stream, msg)| read_exact(stream, vec![0u8; msg[0] as usize])),
+                 .and_then(|(stream, msg)| read_exact(stream, vec![0u8; msg[0] as usize])),
     )
 }
 

@@ -119,7 +119,8 @@
         transaction: {},
         location: {},
         status: {},
-        type: ''
+        type: '',
+        isSpinnerVisible: false
       }
     },
     methods: {

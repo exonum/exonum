@@ -1,0 +1,25 @@
+{
+  "name": "exonum",
+  "version": "0.0.0",
+  "private": true,
+  "description": "JS dependencies for Exonum",
+  "dependencies": {},
+  "devDependencies": {
+    "cspell": "^2.1.12",
+    "markdownlint-cli": "^0.10.0"
+  },
+  "scripts": {
+    "cspell": "./cspell.sh",
+    "md": "find . -not -path \"./3rdparty/*\" -and -not -path \"./node_modules/*\" -name \"*.md\" | xargs ./node_modules/.bin/markdownlint --config .markdownlintrc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/exonum/exonum.git"
+  },
+  "author": "Exonum Team <exonum@bitfury.com>",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/exonum/exonum/issues"
+  },
+  "homepage": "https://github.com/exonum/exonum#readme"
+}

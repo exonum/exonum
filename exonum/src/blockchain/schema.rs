@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::config::StoredConfiguration;
-use super::{Block, BlockProof, Blockchain, TransactionResult};
+use super::{config::StoredConfiguration, Block, BlockProof, Blockchain, TransactionResult};
 use crypto::{CryptoHash, Hash, PublicKey};
 use helpers::{Height, Round};
 use messages::{Connect, Precommit, RawMessage};

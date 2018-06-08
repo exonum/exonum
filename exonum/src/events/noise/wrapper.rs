@@ -17,9 +17,8 @@ use bytes::BytesMut;
 use failure;
 use snow::{NoiseBuilder, Session};
 
-use std::fmt;
-use std::fmt::{Error, Formatter};
-use std::io;
+use std::{fmt::{self, Error, Formatter},
+          io};
 
 use events::noise::HandshakeParams;
 

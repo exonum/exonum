@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use blockchain::StoredConfiguration;
-use blockchain::{ExecutionResult, Schema, Service, Transaction, TransactionSet};
+use blockchain::{ExecutionResult, Schema, Service, StoredConfiguration, Transaction,
+                 TransactionSet};
 use crypto::{Hash, PublicKey};
 use encoding::Error as MessageError;
 use helpers::Height;

@@ -12,24 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use futures::{future, unsync, Future, IntoFuture, Poll, Sink, Stream};
-use futures::{future::Either, sync::mpsc};
-use tokio_core::net::{TcpListener, TcpStream};
-use tokio_core::reactor::Handle;
-use tokio_retry::{Retry, strategy::{jitter, FixedInterval}};
+use futures::{future, future::Either, sync::mpsc, unsync, Future, IntoFuture, Poll, Sink, Stream};
+use tokio_core::{net::{TcpListener, TcpStream},
+                 reactor::Handle};
+use tokio_retry::{strategy::{jitter, FixedInterval},
+                  Retry};
 
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::io;
-use std::net::SocketAddr;
-use std::rc::Rc;
-use std::time::Duration;
+use std::{cell::RefCell, collections::HashMap, io, net::SocketAddr, rc::Rc, time::Duration};
 
-use super::error::{into_other, log_error, other_error, result_ok};
-use super::to_box;
+use super::{error::{into_other, log_error, other_error, result_ok},
+            to_box};
 use helpers::Milliseconds;
 use messages::{Any, Connect, Message, RawMessage};
-use events::noise::{HandshakeParams, NoiseHandshake, Handshake};
+use events::noise::{HandshakeParams, NoiseHandshake};
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 
