@@ -22,7 +22,7 @@ use tokio_io::{codec::Framed,
 use std::io;
 
 use crypto::{PublicKey, SecretKey};
-use events::noise::wrapper::HANDSHAKE_HEADER_MAX;
+use events::noise::wrapper::NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH;
 use events::{codec::MessagesCodec,
              noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH}};
 
@@ -109,6 +109,7 @@ where
 {
     let max_message_len = params.max_message_len;
     let mut noise = NoiseWrapper::responder(params);
+
     let mut channel = channel.clone();
     let framed = read(stream).and_then(move |(stream, msg)| {
         channel
@@ -178,10 +179,9 @@ fn write(
 ) -> Box<Future<Item = (TcpStream, Vec<u8>), Error = io::Error>> {
     let mut message = vec![0u8; HANDSHAKE_HEADER_LENGTH];
 
-    if len > HANDSHAKE_HEADER_MAX {
+    if len > NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH {
         return Box::new(err(io::Error::new(
-            io::ErrorKind::Other,
-            "Wrong message size",
+            io::ErrorKind::Other, "Message size exceeds max handshake message size"
         )));
     }
 

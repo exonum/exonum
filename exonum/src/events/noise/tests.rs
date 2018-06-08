@@ -22,6 +22,7 @@ use tokio_timer::{TimeoutStream, Timer};
 use std::io::{self, Result as IoResult};
 use std::net::SocketAddr;
 use std::thread;
+use std::error::Error;
 use std::time::Duration;
 
 use crypto::{gen_keypair, gen_keypair_from_seed, x25519::into_x25519_keypair, Seed,
@@ -103,7 +104,7 @@ pub enum HandshakeStep {
     StaticKeyExchange(u8, usize),
 }
 
-const MAX_MESSAGE_LEN: usize = 1024;
+const MAX_MESSAGE_LEN: usize = 128;
 
 const EMPTY_MESSAGE: usize = 0;
 const STANDARD_MESSAGE: usize = MAX_MESSAGE_LEN;
@@ -121,30 +122,14 @@ impl HandshakeParams {
 }
 
 #[test]
-fn test_noise_normal_handshake() {
-    let addr: SocketAddr = "127.0.0.1:45001".parse().unwrap();
-    let addr2 = addr.clone();
-
-    let (sender, receiver) = mpsc::channel(0);
-    let (err_sender, _) = mpsc::channel::<IoResult<()>>(0);
-    let receiver = add_timeout_millis(receiver, 500);
-    thread::spawn(move || run_handshake_listener(&addr2, sender.clone(), err_sender));
-
-    // Use first handshake only to connect.
-    let _res = send_handshake(&addr, HandshakeStep::None);
-    receiver.wait().next();
-
-    let res = send_handshake(&addr, HandshakeStep::None);
-    assert!(res.is_ok());
-}
-
-#[test]
 #[should_panic(expected = "WrongMessageLength(0)")]
 fn test_noise_handshake_errors_ee_empty() {
     let addr: SocketAddr = "127.0.0.1:45003".parse().unwrap();
     let step = HandshakeStep::EphemeralKeyExchange(1, EMPTY_MESSAGE);
-    let res = wait_for_handshake_result(&addr, step);
-    res.unwrap()
+    let (sender_err, listener_err) = wait_for_handshake_result(&addr, step);
+
+    assert!(sender_err.err().unwrap().description().contains("early eof"));
+    listener_err.unwrap()
 }
 
 #[test]
@@ -152,63 +137,72 @@ fn test_noise_handshake_errors_ee_empty() {
 fn test_noise_handshake_errors_es_empty() {
     let addr: SocketAddr = "127.0.0.1:45004".parse().unwrap();
     let step = HandshakeStep::StaticKeyExchange(2, EMPTY_MESSAGE);
-    let res = wait_for_handshake_result(&addr, step);
-    res.unwrap()
+    let (sender_err, listener_err) = wait_for_handshake_result(&addr, step);
+
+    assert!(sender_err.err().unwrap().description().contains("HandshakeNotFinished"));
+    listener_err.unwrap()
 }
 
 #[test]
-#[should_panic(expected = "early eof")]
+#[should_panic(expected = "HandshakeNotFinished")]
 fn test_noise_handshake_errors_ee_standard() {
     let addr: SocketAddr = "127.0.0.1:45005".parse().unwrap();
     let step = HandshakeStep::EphemeralKeyExchange(1, STANDARD_MESSAGE);
-    let res = wait_for_handshake_result(&addr, step);
-    res.unwrap()
+    let (sender_err, listener_err) = wait_for_handshake_result(&addr, step);
+
+    assert!(listener_err.err().unwrap().description().contains("HandshakeNotFinished"));
+    sender_err.unwrap()
 }
 
 #[test]
-#[should_panic(expected = "early eof")]
+#[should_panic(expected = "HandshakeNotFinished")]
 fn test_noise_handshake_errors_es_standard() {
     let addr: SocketAddr = "127.0.0.1:45006".parse().unwrap();
     let step = HandshakeStep::StaticKeyExchange(2, STANDARD_MESSAGE);
-    let res = wait_for_handshake_result(&addr, step);
-    res.unwrap()
+    let (sender_err, listener_err) = wait_for_handshake_result(&addr, step);
+
+    assert!(listener_err.err().unwrap().description().contains("Decrypt"));
+    sender_err.unwrap()
 }
 
 #[test]
-#[should_panic(expected = "early eof")]
+#[should_panic(expected = "Message size exceeds max handshake message size")]
 fn test_noise_handshake_errors_ee_large() {
     let addr: SocketAddr = "127.0.0.1:45007".parse().unwrap();
     let step = HandshakeStep::EphemeralKeyExchange(1, LARGE_MESSAGE);
-    let res = wait_for_handshake_result(&addr, step);
-    res.unwrap()
+    let (sender_err, listener_err) = wait_for_handshake_result(&addr, step);
+
+    assert!(listener_err.err().unwrap().description().contains("early eof"));
+    sender_err.unwrap()
 }
 
 #[test]
-#[should_panic(expected = "early eof")]
+#[should_panic(expected = "Message size exceeds max handshake message size")]
 fn test_noise_handshake_errors_se_large() {
     let addr: SocketAddr = "127.0.0.1:45008".parse().unwrap();
     let step = HandshakeStep::StaticKeyExchange(2, LARGE_MESSAGE);
-    let res = wait_for_handshake_result(&addr, step);
-    res.unwrap()
+    let (sender_err, listener_err) = wait_for_handshake_result(&addr, step);
+
+    assert!(listener_err.err().unwrap().description().contains("early eof"));
+    sender_err.unwrap()
 }
 
-fn wait_for_handshake_result(addr: &SocketAddr, step: HandshakeStep) -> IoResult<()> {
+// We need check result from both: sender and responder.
+fn wait_for_handshake_result(addr: &SocketAddr, step: HandshakeStep) -> (IoResult<()>, IoResult<()>) {
     let addr2 = addr.clone();
 
-    let (sender, receiver) = mpsc::channel(0);
-    let (err_sender, err_receiver) = mpsc::channel::<IoResult<()>>(0);
-    let receiver = add_timeout_millis(receiver, 500);
-    let err_receiver = add_timeout_millis(err_receiver, 500);
-    thread::spawn(move || run_handshake_listener(&addr2, sender, err_sender));
+    let (tx, rx) = mpsc::channel(0);
+    let (err_tx, err_rx) = mpsc::channel::<IoResult<()>>(0);
+    let rx = add_timeout_millis(rx, 500);
+    let err_rx = add_timeout_millis(err_rx, 500);
+    thread::spawn(move || run_handshake_listener(&addr2, tx, err_tx));
 
     // Use first handshake only to connect.
     let _res = send_handshake(&addr, HandshakeStep::None);
-    receiver.wait().next();
+    rx.wait().next();
 
     let res = send_handshake(&addr, step);
-    assert!(res.is_err());
-
-    err_receiver.wait().next().unwrap().unwrap()
+    (res, err_rx.wait().next().unwrap().unwrap())
 }
 
 fn add_timeout_millis<T>(receiver: Receiver<T>, millis: u64) -> TimeoutStream<Receiver<T>> {
@@ -301,7 +295,6 @@ impl HandshakeChannel for ErrorChannel {
             &HandshakeStep::EphemeralKeyExchange(cs, size)
             | &HandshakeStep::StaticKeyExchange(cs, size) if cs == self.current_step =>
             {
-                println!("size {:?}", size);
                 Ok((size, vec![0; size]))
             }
             _ => noise.write_handshake_msg(),
