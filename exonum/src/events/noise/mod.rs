@@ -181,7 +181,8 @@ fn write(
 
     if len > NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH {
         return Box::new(err(io::Error::new(
-            io::ErrorKind::Other, "Message size exceeds max handshake message size"
+            io::ErrorKind::Other,
+            "Message size exceeds max handshake message size",
         )));
     }
 
