@@ -14,6 +14,7 @@
 
 //! API and corresponding utilities.
 
+pub use self::error::Error;
 pub use self::state::{ServiceApiState, ServiceApiStateMut};
 pub use self::with::{FutureResult, NamedWith, Result, With};
 
@@ -24,14 +25,9 @@ use self::backends::actix;
 
 pub mod backends;
 pub mod error;
+pub mod node;
 mod state;
 mod with;
-
-/// TODO
-pub trait ServiceApi {
-    /// TODO
-    fn wire(&self, _builder: &mut ServiceApiBuilder) {}
-}
 
 /// Trait defines object that could be used as an API backend.
 pub trait ServiceApiBackend: Sized {
@@ -57,8 +53,7 @@ pub trait ServiceApiBackend: Sized {
 
 /// TODO
 #[derive(Debug, Default)]
-pub struct ServiceApiScope
-{
+pub struct ServiceApiScope {
     actix_backend: actix::ApiBuilder,
 }
 

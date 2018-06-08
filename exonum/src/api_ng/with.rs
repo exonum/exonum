@@ -54,6 +54,8 @@ impl<S, Q, I, R, F> NamedWith<S, Q, I, R, F> {
     }
 }
 
+// Implementations for Result and query params.
+
 impl<Q, I, F> From<F> for With<ServiceApiState, Q, I, Result<I>, F>
 where
     F: for<'r> Fn(&'r ServiceApiState, Q) -> Result<I>,
@@ -83,6 +85,8 @@ where
         }
     }
 }
+
+// Implementations for FutureResult and query params.
 
 impl<Q, I, F> From<F> for With<ServiceApiState, Q, I, FutureResult<I>, F>
 where
