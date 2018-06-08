@@ -12,6 +12,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `storage::base_index` module has become private along with `BaseIndex` and
   `BaseIndexIter` types. (#723)
 
+### New features
+
+#### exonum
+
+- `exonum::crypto::x25519` module to convert from Ed25519 keys to X25519 keys
+  has been introduced.
+
 ### Internal improvements
 
 #### exonum
