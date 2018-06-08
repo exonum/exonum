@@ -395,6 +395,12 @@ impl SharedNodeState {
     }
     /// Updates internal state, from `State` of a blockchain node.
     pub fn update_node_state(&self, state: &State) {
+        self.state
+            .write()
+            .expect("Expected write lock.")
+            .peers_info
+            .clear();
+
         for (p, c) in state.peers().iter() {
             self.state
                 .write()

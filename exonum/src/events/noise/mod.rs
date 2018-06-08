@@ -27,6 +27,9 @@ use events::{codec::MessagesCodec,
 
 pub mod wrapper;
 
+#[cfg(test)]
+mod tests;
+
 type HandshakeResult = Box<Future<Item = Framed<TcpStream, MessagesCodec>, Error = io::Error>>;
 
 #[derive(Debug, Clone)]
