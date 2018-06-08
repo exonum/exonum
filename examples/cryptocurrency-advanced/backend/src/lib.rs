@@ -32,16 +32,15 @@ pub mod schema;
 pub mod transactions;
 pub mod wallet;
 
+use exonum::{blockchain::{ApiContext, Service, Transaction, TransactionSet},
+             crypto::Hash,
+             encoding::serialize::json::reexport as serde_json,
+             encoding::Error as EncodingError,
+             helpers::fabric::{self, Context},
+             messages::RawTransaction,
+             storage::Snapshot};
 use iron::Handler;
 use router::Router;
-
-use exonum::blockchain::{ApiContext, Service, Transaction, TransactionSet};
-use exonum::crypto::Hash;
-use exonum::encoding::Error as EncodingError;
-use exonum::encoding::serialize::json::reexport as serde_json;
-use exonum::helpers::fabric::{self, Context};
-use exonum::messages::RawTransaction;
-use exonum::storage::Snapshot;
 
 use transactions::WalletTransactions;
 

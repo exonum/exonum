@@ -18,10 +18,10 @@
 use iron::Handler;
 use serde_json::Value;
 
-use std::collections::{HashMap, HashSet};
-use std::fmt;
-use std::net::SocketAddr;
-use std::sync::{Arc, RwLock};
+use std::{collections::{HashMap, HashSet},
+          fmt,
+          net::SocketAddr,
+          sync::{Arc, RwLock}};
 
 use super::transaction::Transaction;
 use blockchain::{Blockchain, ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
@@ -395,6 +395,12 @@ impl SharedNodeState {
     }
     /// Updates internal state, from `State` of a blockchain node.
     pub fn update_node_state(&self, state: &State) {
+        self.state
+            .write()
+            .expect("Expected write lock.")
+            .peers_info
+            .clear();
+
         for (p, c) in state.peers().iter() {
             self.state
                 .write()

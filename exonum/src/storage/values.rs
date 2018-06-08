@@ -19,8 +19,7 @@ use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
-use std::borrow::Cow;
-use std::mem;
+use std::{borrow::Cow, mem};
 
 use super::UniqueHash;
 use crypto::{Hash, PublicKey};

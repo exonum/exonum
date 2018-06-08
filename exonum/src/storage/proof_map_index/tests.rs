@@ -12,19 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use rand::seq::sample_iter;
-use rand::{self, Rng, XorShiftRng};
+use rand::{self, seq::sample_iter, Rng, XorShiftRng};
 use serde_json;
 
-use std::cmp;
-use std::collections::HashSet;
-use std::fmt::Debug;
-use std::hash::Hash as StdHash;
+use std::{cmp, collections::HashSet, fmt::Debug, hash::Hash as StdHash};
 
-use super::key::{BitsRange, ChildKind, KEY_SIZE, LEAF_KEY_PREFIX};
-use super::node::BranchNode;
-use super::proof::MapProofBuilder;
-use super::{HashedKey, MapProof, MapProofError, ProofMapIndex, ProofMapKey, ProofPath};
+use super::{key::{BitsRange, ChildKind, KEY_SIZE, LEAF_KEY_PREFIX},
+            node::BranchNode,
+            proof::MapProofBuilder,
+            HashedKey,
+            MapProof,
+            MapProofError,
+            ProofMapIndex,
+            ProofMapKey,
+            ProofPath};
 use crypto::{hash, CryptoHash, Hash, HashStream};
 use encoding::serialize::reexport::{DeserializeOwned, Serialize};
 use storage::{Database, Fork, StorageValue};

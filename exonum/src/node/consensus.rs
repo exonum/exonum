@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashSet;
-use std::error::Error;
+use std::{collections::HashSet, error::Error};
 
 use blockchain::{Schema, Transaction};
 use crypto::{CryptoHash, Hash, PublicKey};
@@ -38,13 +37,19 @@ impl NodeHandler {
             return;
         }
 
-        // Ignore messages from previous and future height
-        if msg.height() < self.state.height() || msg.height() > self.state.height().next() {
+        // Warning for messages from previous and future height
+        if msg.height() < self.state.height().previous()
+            || msg.height() > self.state.height().next()
+        {
             warn!(
                 "Received consensus message from other height: msg.height={}, self.height={}",
                 msg.height(),
                 self.state.height()
             );
+        }
+
+        // Ignore messages from previous and future height
+        if msg.height() < self.state.height() || msg.height() > self.state.height().next() {
             return;
         }
 

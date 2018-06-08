@@ -16,9 +16,8 @@ use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
 use snow::{NoiseBuilder, Session};
 
-use std::fmt;
-use std::fmt::{Error, Formatter};
-use std::io;
+use std::{fmt::{self, Error, Formatter},
+          io};
 
 use events::noise::HandshakeParams;
 
@@ -137,7 +136,7 @@ impl NoiseWrapper {
         let mut buf = vec![0u8; len];
         let len = self.session
             .read_message(input, &mut buf)
-            .map_err(|e| NoiseError::new(format!("Error while reading noise message: {:?}", e.0)))?;
+            .map_err(|e| NoiseError::new(format!("Error while reading noise message: {:?}", e)))?;
         Ok((len, buf))
     }
 
@@ -145,7 +144,7 @@ impl NoiseWrapper {
         let mut buf = vec![0u8; NOISE_MAX_MESSAGE_LENGTH];
         let len = self.session
             .write_message(msg, &mut buf)
-            .map_err(|e| NoiseError::new(format!("Error while writing noise message: {:?}", e.0)))?;
+            .map_err(|e| NoiseError::new(format!("Error while writing noise message: {:?}", e)))?;
         Ok((len, buf))
     }
 

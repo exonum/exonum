@@ -14,12 +14,11 @@
 
 //! Storage schema for the configuration service.
 
-use exonum::crypto::{self, CryptoHash, Hash, PublicKey, Signature};
-use exonum::messages::{RawMessage, ServiceMessage};
-use exonum::storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot, StorageValue};
+use exonum::{crypto::{self, CryptoHash, Hash, PublicKey, Signature},
+             messages::{RawMessage, ServiceMessage},
+             storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot, StorageValue}};
 
-use std::borrow::Cow;
-use std::ops::Deref;
+use std::{borrow::Cow, ops::Deref};
 
 use transactions::{Propose, Vote, VoteAgainst};
 

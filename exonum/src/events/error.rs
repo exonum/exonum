@@ -15,8 +15,7 @@
 // These functions transform source error types into other.
 #![cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
 
-use std::error::Error as StdError;
-use std::io;
+use std::{error::Error as StdError, io};
 
 // Common error helpers (TODO move to helpers)
 

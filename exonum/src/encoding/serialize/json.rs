@@ -16,18 +16,11 @@ use bit_vec::BitVec;
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use hex::FromHex;
 use rust_decimal::Decimal;
-/// trait `ExonumSerializeJson` implemented for all field that allows serializing in
-/// json format.
-///
-// TODO refer to difference between json serialization and exonum_json (ECR-156).
-// TODO implement Field for float (ECR-153).
-// TODO remove WriteBufferWrapper hack (after refactor storage),
-// should be moved into storage (ECR-156).
+/// trait `ExonumSerializeJson` implemented for all field that allows serializing in json format.
 use serde_json::{self, value::Value};
 use uuid::Uuid;
 
-use std::error::Error;
-use std::net::SocketAddr;
+use std::{error::Error, net::SocketAddr};
 
 use super::WriteBufferWrapper;
 use crypto::{Hash, PublicKey, Signature};

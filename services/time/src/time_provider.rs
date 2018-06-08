@@ -1,4 +1,5 @@
 use chrono::{DateTime, Duration, TimeZone, Utc};
+
 use std::sync::{Arc, RwLock};
 
 /// A helper trait that provides the node with a current time.

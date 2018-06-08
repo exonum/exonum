@@ -32,13 +32,13 @@
 //! [`Service`]: ./trait.Service.html
 //! [doc:create-service]: https://exonum.com/doc/get-started/create-service
 
-pub use self::block::{Block, BlockProof, SCHEMA_MAJOR_VERSION};
-pub use self::config::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
-pub use self::genesis::GenesisConfig;
-pub use self::schema::{Schema, TxLocation};
-pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState};
-pub use self::transaction::{ExecutionError, ExecutionResult, Transaction, TransactionError,
-                            TransactionErrorType, TransactionResult, TransactionSet};
+pub use self::{block::{Block, BlockProof, SCHEMA_MAJOR_VERSION},
+               config::{ConsensusConfig, StoredConfiguration, ValidatorKeys},
+               genesis::GenesisConfig,
+               schema::{Schema, TxLocation},
+               service::{ApiContext, Service, ServiceContext, SharedNodeState},
+               transaction::{ExecutionError, ExecutionResult, Transaction, TransactionError,
+                             TransactionErrorType, TransactionResult, TransactionSet}};
 
 pub mod config;
 
@@ -47,16 +47,19 @@ use failure;
 use mount::Mount;
 use vec_map::VecMap;
 
-use std::collections::{BTreeMap, HashMap};
-use std::error::Error as StdError;
-use std::net::SocketAddr;
-use std::sync::Arc;
-use std::{fmt, iter, mem, panic};
+use std::{collections::{BTreeMap, HashMap},
+          error::Error as StdError,
+          fmt,
+          iter,
+          mem,
+          net::SocketAddr,
+          panic,
+          sync::Arc};
 
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
 use helpers::{Height, Round, ValidatorId};
-use messages::{CONSENSUS as CORE_SERVICE, Connect, Precommit, RawMessage};
+use messages::{Connect, Precommit, RawMessage, CONSENSUS as CORE_SERVICE};
 use node::ApiSender;
 use storage::{Database, Error, Fork, Patch, Snapshot};
 
@@ -354,7 +357,7 @@ impl Blockchain {
         index: usize,
         fork: &mut Fork,
     ) -> Result<(), failure::Error> {
-        let tx = {
+        let (tx, service_name) = {
             let schema = Schema::new(&fork);
 
             let tx = schema
@@ -362,13 +365,21 @@ impl Blockchain {
                 .get(&tx_hash)
                 .ok_or_else(|| failure::err_msg("BUG: Cannot find transaction in database."))?;
 
-            self.tx_from_raw(tx).or_else(|error| {
+            let service_name = self.service_map
+                .get(tx.service_id() as usize)
+                .ok_or_else(|| failure::err_msg("Service not found."))?
+                .service_name();
+
+            let tx = self.tx_from_raw(tx).or_else(|error| {
                 Err(failure::err_msg(format!(
-                    "{}, tx: {:?}",
+                    "Service <{}>: {}, tx: {:?}",
+                    service_name,
                     error.description(),
                     tx_hash
                 )))
-            })?
+            })?;
+
+            (tx, service_name)
         };
 
         fork.checkpoint();
@@ -384,7 +395,10 @@ impl Blockchain {
                     Err(ref e) => {
                         // Unlike panic, transaction failure isn't that rare, so logging the
                         // whole transaction body is an overkill: it can be relatively big.
-                        info!("{:?} transaction execution failed: {:?}", tx_hash, e);
+                        info!(
+                            "Service <{}>: {:?} transaction execution failed: {:?}",
+                            service_name, tx_hash, e
+                        );
                         fork.rollback();
                     }
                 }
@@ -396,7 +410,10 @@ impl Blockchain {
                     panic::resume_unwind(err);
                 }
                 fork.rollback();
-                error!("{:?} transaction execution panicked: {:?}", tx, err);
+                error!(
+                    "Service <{}>: {:?} transaction execution panicked: {:?}",
+                    service_name, tx, err
+                );
                 Err(TransactionError::from_panic(&err))
             }
         };
