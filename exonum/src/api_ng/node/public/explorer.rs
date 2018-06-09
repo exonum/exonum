@@ -90,7 +90,7 @@ pub trait ExplorerApi {
 
     /// Returns the content for a block of a specific height.
     fn block(&self, query: BlockQuery) -> Result<Option<BlockInfo>, Self::Error>;
-    
+
     /// Adds explorer API endpoints to the corresponding scope.
     fn wire<'a>(&self, api_scope: &'a mut ServiceApiScope) -> &'a mut ServiceApiScope {
         api_scope

@@ -17,9 +17,8 @@
 //! For details about consensus message handling see messages module documentation.
 // spell-checker:ignore cors
 
-pub use self::{
-    state::{RequestData, State, ValidatorState}, whitelist::Whitelist,
-};
+pub use self::{state::{RequestData, State, ValidatorState},
+               whitelist::Whitelist};
 
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 pub mod state;
@@ -37,19 +36,30 @@ use serde::{de, ser};
 use tokio_core::reactor::Core;
 use toml::Value;
 
-use std::{
-    collections::{BTreeMap, HashSet}, fmt, io, net::SocketAddr, str::FromStr, sync::Arc, thread,
-    time::{Duration, SystemTime},
-};
+use std::{collections::{BTreeMap, HashSet},
+          fmt,
+          io,
+          net::SocketAddr,
+          str::FromStr,
+          sync::Arc,
+          thread,
+          time::{Duration, SystemTime}};
 
 use api::{private, public, Api};
 use blockchain::{Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction};
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
-use events::{
-    error::{into_other, log_error, other_error, LogError}, noise::HandshakeParams, HandlerPart,
-    InternalEvent, InternalPart, InternalRequest, NetworkConfiguration, NetworkEvent, NetworkPart,
-    NetworkRequest, SyncSender, TimeoutRequest,
-};
+use events::{error::{into_other, log_error, other_error, LogError},
+             noise::HandshakeParams,
+             HandlerPart,
+             InternalEvent,
+             InternalPart,
+             InternalRequest,
+             NetworkConfiguration,
+             NetworkEvent,
+             NetworkPart,
+             NetworkRequest,
+             SyncSender,
+             TimeoutRequest};
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
 use messages::{Connect, Message, RawMessage};
 use storage::{Database, DbOptions};
@@ -263,8 +273,7 @@ impl FromStr for AllowOrigin {
             return Ok(AllowOrigin::Any);
         }
 
-        let v: Vec<_> = s
-            .split(',')
+        let v: Vec<_> = s.split(',')
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
             .collect();
@@ -902,21 +911,40 @@ impl Node {
         let actix_api_thread = thread::spawn(move || -> Result<(), failure::Error> {
             let sys = actix::System::new("http-server");
 
-            let api_state = api_state.clone();
+            let node_state = api_state.clone();
             let blockchain = blockchain.clone();
+            let aggregator = api_ng::ApiAggregator::new(blockchain.clone(), node_state.clone());
+
+            let a = aggregator.clone();
+            let b = blockchain.clone();
             let private_api_factory = move || {
-                let api_state = api_state.clone();
-                let blockchain = blockchain.clone();
-                create_actix_private_api(blockchain, api_state)
+                let a = a.clone();
+                let b = b.clone();
+                actix_web::App::with_state(api_ng::ServiceApiStateMut::new(b.clone()))
+                    .scope("api", move |scope| a.extend_private_api(scope))
+            };
+
+            let a = aggregator.clone();
+            let b = blockchain.clone();
+            let public_api_factory = move || {
+                let a = a.clone();
+                let b = b.clone();
+                actix_web::App::with_state(api_ng::ServiceApiStateMut::new(b.clone()))
+                    .scope("api", move |scope| a.extend_public_api(scope))
             };
 
             let private_api_addr = actix_web::server::new(private_api_factory)
                 .disable_signals()
-                .shutdown_timeout(3)
                 .bind("localhost:18080")?
                 .start();
 
+            let public_api_addr = actix_web::server::new(public_api_factory)
+                .disable_signals()
+                .bind("localhost:28080")?
+                .start();
+
             tx.send(private_api_addr)?;
+            tx.send(public_api_addr)?;
             let code = sys.run();
             debug!("Actix runtime finished: {}", code);
             if code != 0 {
@@ -929,6 +957,7 @@ impl Node {
             }
         });
         let actix_private_api_addr = rx.recv().unwrap();
+        let actix_public_api_addr = rx.recv().unwrap();
 
         let api_state = self.handler.api_state.clone();
         let blockchain = self.handler.blockchain.clone();
@@ -967,7 +996,11 @@ impl Node {
 
         // Stop all APIs
         actix_private_api_addr
-            .send(actix_web::server::StopServer { graceful: false })
+            .send(actix_web::server::StopServer { graceful: true })
+            .wait()?
+            .unwrap();
+        actix_public_api_addr
+            .send(actix_web::server::StopServer { graceful: true })
             .wait()?
             .unwrap();
         debug!("Sent stop signal to the actix system");

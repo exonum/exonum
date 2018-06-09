@@ -23,8 +23,8 @@ use std::fmt;
 use std::sync::Arc;
 
 use api_ng::error::Error as ApiError;
-use api_ng::{FutureResult, NamedWith, Result, ServiceApiBackend, ServiceApiState,
-             ServiceApiStateMut};
+use api_ng::{FutureResult, IntoApiBackend, NamedWith, Result, ServiceApiBackend, ServiceApiScope,
+             ServiceApiState, ServiceApiStateMut};
 
 /// Type alias for the concrete API http response
 pub type FutureResponse = actix_web::FutureResponse<HttpResponse, actix_web::Error>;
@@ -54,7 +54,7 @@ impl fmt::Debug for RequestHandler {
 }
 
 /// API builder for the actix-web backend,
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct ApiBuilder {
     handlers: Vec<RequestHandler>,
 }
@@ -214,5 +214,17 @@ impl From<ApiError> for actix_web::Error {
             ApiError::NotFound(err) => error::ErrorNotFound(err),
             ApiError::Unauthorized => error::ErrorUnauthorized(""),
         }
+    }
+}
+
+impl IntoApiBackend for actix_web::Scope<ServiceApiStateMut> {
+    fn extend<'a, I>(mut self, items: I) -> Self
+    where
+        I: IntoIterator<Item = &'a (&'static str, ServiceApiScope)>,
+    {
+        for mut item in items {
+            self = self.nested(item.0, move |scope| item.1.actix_backend.wire(scope))
+        }
+        self
     }
 }
