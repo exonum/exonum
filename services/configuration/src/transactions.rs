@@ -414,12 +414,12 @@ impl Transaction for VoteAgainst {
 
 #[cfg(test)]
 mod tests {
-    use super::{super::tests::{new_tx_config_vote, new_tx_config_vote_against},
-                super::Service as ConfigurationService,
-                Hash,
-                VotingDecisionRef};
-    use errors::Error as ServiceError;
     use exonum_testkit::{TestKit, TestKitBuilder};
+
+    use super::{Hash, VotingDecisionRef};
+    use errors::Error as ServiceError;
+    use tests::{new_tx_config_vote, new_tx_config_vote_against};
+    use Service as ConfigurationService;
 
     #[test]
     fn test_vote_without_propose() {
