@@ -19,7 +19,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum
 
 - New kind of CLI commands has been added: `info` command that can be used for
-  getting various information from not running node. (#730)
+  getting various information from not running node. (#731)
   Currently supported sub-commands:
   - `core-version` - prints Exonum version as a plain string.
   - `list-services` - prints the list of the services the node is build with in
