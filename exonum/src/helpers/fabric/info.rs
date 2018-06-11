@@ -40,11 +40,6 @@ impl Info {
         Self { services }
     }
 
-    /// Returns the name of the `Maintenance` command.
-    pub fn name() -> CommandName {
-        "info"
-    }
-
     fn core_version() {
         println!("{}", option_env!("CARGO_PKG_VERSION").unwrap_or("?"));
     }
@@ -68,7 +63,7 @@ impl Command for Info {
     }
 
     fn name(&self) -> CommandName {
-        Self::name()
+        "info"
     }
 
     fn about(&self) -> &str {

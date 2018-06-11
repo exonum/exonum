@@ -14,6 +14,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `ServiceFactory` trait has been extended with `service_name` function.(#730)
 
+- Method `name` has been removed from `Run`, `GenerateCommonConfig`,
+  `GenerateNodeConfig`, `Finalize`, `GenerateTestnet` and `Maintenance` structures
+  (`helpers/fabric` module). (#731)
+
 ### New features
 
 #### exonum

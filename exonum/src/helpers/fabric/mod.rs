@@ -289,7 +289,6 @@ pub trait CommandExtension {
 ///
 /// Services should provide implementation of this trait.
 pub trait ServiceFactory: 'static {
-
     /// Returns name of the service.
     fn service_name(&self) -> &str;
     /// Returns `CommandExtension` for the specific `CommandName`.

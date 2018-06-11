@@ -39,11 +39,6 @@ const MAINTENANCE_ACTION_PATH: &str = "MAINTENANCE_ACTION_PATH";
 pub struct Maintenance;
 
 impl Maintenance {
-    /// Returns the name of the `Maintenance` command.
-    pub fn name() -> CommandName {
-        "maintenance"
-    }
-
     fn node_config(ctx: &Context) -> NodeConfig {
         let path = ctx.arg::<String>(NODE_CONFIG_PATH)
             .expect(&format!("{} not found.", NODE_CONFIG_PATH));
@@ -103,7 +98,7 @@ impl Command for Maintenance {
     }
 
     fn name(&self) -> CommandName {
-        Self::name()
+        "maintenance"
     }
 
     fn about(&self) -> &str {
