@@ -162,8 +162,8 @@ macro_rules! __ex_message {
                                                                 from,
                                                                 count,
                                                                 latest_segment)?;
-                // TODO: remove this allocation,
-                // by allowing creating message from borrowed data (ECR-156)
+                // TODO: Remove this allocation,
+                // by allowing creating message from borrowed data. (ECR-156)
                 let raw_message: $crate::messages::RawMessage =
                                     unsafe { $crate::encoding::SegmentField::from_buffer(buffer,
                                                                 from.unchecked_offset(),
@@ -377,7 +377,7 @@ macro_rules! __ex_message {
             }
         }
 
-        // TODO: Rewrite Deserialize and Serialize implementation (ECR-156)
+        // TODO: Rewrite Deserialize and Serialize implementation. (ECR-156)
         impl<'de> $crate::encoding::serialize::reexport::Deserialize<'de> for $name {
             #[allow(unused_mut)]
             fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>

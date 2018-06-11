@@ -363,7 +363,7 @@ where
     /// assert_eq!(3, index.len());
     /// ```
     pub fn truncate(&mut self, len: u64) {
-        // TODO: optimize this (ECR-175)
+        // TODO: Optimize this. (ECR-175)
         while self.len() > len {
             self.pop();
         }

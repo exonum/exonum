@@ -479,7 +479,7 @@ impl<'a> Schema<&'a mut Fork> {
         let actual_from = config_data.actual_from;
         if let Some(last_cfg) = self.configs_actual_from().last() {
             if last_cfg.cfg_hash() != &config_data.previous_cfg_hash {
-                // TODO: Replace panic with errors (ECR-123).
+                // TODO: Replace panic with errors. (ECR-123)
                 panic!(
                     "Attempting to commit configuration with incorrect previous hash: {:?}, \
                      expected: {:?}",
@@ -508,7 +508,6 @@ impl<'a> Schema<&'a mut Fork> {
 
         let cfg_ref = ConfigReference::new(actual_from, &cfg_hash);
         self.configs_actual_from_mut().push(cfg_ref);
-        // TODO: clear storages
     }
 
     /// Adds transaction into the persistent pool.

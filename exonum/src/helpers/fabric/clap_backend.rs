@@ -24,7 +24,7 @@ use super::{internal::{CollectedCommand, Feedback},
 pub struct ClapBackend;
 
 impl ClapBackend {
-    // TODO: remove code duplication (ECR-164)
+    // TODO: Remove code duplication. (ECR-164)
     #[doc(hidden)]
     pub fn execute_cmd_string<I, T>(
         commands: &HashMap<CommandName, CollectedCommand>,

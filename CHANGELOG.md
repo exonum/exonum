@@ -34,12 +34,15 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Fixed bug with incorrect peer status for turned off node. (#730)
 
-### Internal improvements
-
-#### exonum
-
 - `handle_consensus` now does not write warning for message from previous
   height. (#729)
+
+### Internal improvements
+
+- `BlockResponse` sends transactions by `Hash` instead of `RawMessage`.
+  If the node does not have some transactions, requests are created
+  with the corresponding transactions. Due to these changes,
+  the block size became significantly smaller. (#664)
 
 ## 0.8 - 2018-05-31
 

@@ -272,7 +272,7 @@ pub trait Api {
         Ok((public_key, secret_key))
     }
 
-    //TODO: Remove duplicate code
+    // TODO: Remove duplicate code. (ECR-1629)
     /// Returns NotFound and some response with cookies.
     fn not_found_response_with_cookies(
         &self,
