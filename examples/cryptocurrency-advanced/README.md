@@ -22,10 +22,14 @@ Simply run the following command to start the cryptocurrency service on 4 nodes
 on the local machine:
 
 ```bash
-docker run -p 8280:8280 serhiioryshych/exonum-cryptocurrency-advanced-example
+docker run -p 8000-8008:8000-8008 serhiioryshych/exonum-cryptocurrency-advanced-example
 ```
 
-Ready! Find demo at [http://127.0.0.1:8280](http://127.0.0.1:8280).
+Ready! Find demo at [http://127.0.0.1:8008](http://127.0.0.1:8008).
+
+Docker will automatically pull image from the repository and
+run 4 nodes with public endpoints at `127.0.0.1:8000`, ..., `127.0.0.1:8003`
+and private ones at `127.0.0.1:8004`, ..., `127.0.0.1:8007`.
 
 To stop docker container, use `docker stop <container id>` command.
 
