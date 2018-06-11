@@ -12,30 +12,41 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `storage::base_index` module has become private along with `BaseIndex` and
   `BaseIndexIter` types. (#723)
 
+- `ServiceFactory` trait has been extended with `service_name` function.(#730)
+
+- Method `name` has been removed from `Run`, `GenerateCommonConfig`,
+  `GenerateNodeConfig`, `Finalize`, `GenerateTestnet` and `Maintenance` structures
+  (`helpers/fabric` module). (#731)
+
 ### New features
 
 #### exonum
 
+- New kind of CLI commands has been added: `info` command that can be used for
+  getting various information from not running node. (#731)
+  Currently supported sub-commands:
+  - `core-version` - prints Exonum version as a plain string.
+  - `list-services` - prints the list of the services the node is build with in
+    the JSON format.
+
 - `exonum::crypto::x25519` module to convert from Ed25519 keys to X25519 keys
-  has been introduced.
-
-### Internal improvements
-
-#### exonum
-
-- `handle_consensus` now does not write warning for message from previous
-  height. (#729)
-
-- `BlockResponse` sends transactions by `Hash` instead of `RawMessage`.
-  If the node does not have some transactions, requests are created
-  with the corresponding transactions. Due to these changes,
-  the block size became significantly smaller. (#664)
+  has been introduced. (#722)
 
 ### Bug fixes
 
 #### exonum
 
 - Fixed bug with incorrect peer status for turned off node. (#730)
+
+- `handle_consensus` now does not write warning for message from previous
+  height. (#729)
+
+### Internal improvements
+
+- `BlockResponse` sends transactions by `Hash` instead of `RawMessage`.
+  If the node does not have some transactions, requests are created
+  with the corresponding transactions. Due to these changes,
+  the block size became significantly smaller. (#664)
 
 ## 0.8 - 2018-05-31
 

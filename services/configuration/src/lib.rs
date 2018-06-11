@@ -103,6 +103,8 @@ mod transactions;
 
 /// Service identifier for the configuration service.
 pub const SERVICE_ID: u16 = 1;
+/// Configuration service name.
+pub const SERVICE_NAME: &str = "configuration";
 
 /// Configuration service.
 #[derive(Debug, Default)]
@@ -110,7 +112,7 @@ pub struct Service {}
 
 impl blockchain::Service for Service {
     fn service_name(&self) -> &'static str {
-        "configuration"
+        SERVICE_NAME
     }
 
     fn service_id(&self) -> u16 {
@@ -146,6 +148,10 @@ impl blockchain::Service for Service {
 pub struct ServiceFactory;
 
 impl fabric::ServiceFactory for ServiceFactory {
+    fn service_name(&self) -> &str {
+        SERVICE_NAME
+    }
+
     fn make_service(&mut self, _: &Context) -> Box<blockchain::Service> {
         Box::new(Service {})
     }

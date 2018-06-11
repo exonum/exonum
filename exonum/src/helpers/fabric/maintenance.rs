@@ -12,10 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![allow(missing_debug_implementations)]
-
 //! This module implements node maintenance actions.
-// spell-checker:ignore exts
 
 use std::{collections::HashMap, path::Path};
 
@@ -38,14 +35,10 @@ const MAINTENANCE_ACTION_PATH: &str = "MAINTENANCE_ACTION_PATH";
 /// Maintenance command. Supported actions:
 ///
 /// - `clear-cache` - clear message cache.
+#[derive(Debug)]
 pub struct Maintenance;
 
 impl Maintenance {
-    /// Returns the name of the `Maintenance` command.
-    pub fn name() -> CommandName {
-        "maintenance"
-    }
-
     fn node_config(ctx: &Context) -> NodeConfig {
         let path = ctx.arg::<String>(NODE_CONFIG_PATH)
             .expect(&format!("{} not found.", NODE_CONFIG_PATH));
@@ -105,7 +98,7 @@ impl Command for Maintenance {
     }
 
     fn name(&self) -> CommandName {
-        Self::name()
+        "maintenance"
     }
 
     fn about(&self) -> &str {
@@ -116,7 +109,7 @@ impl Command for Maintenance {
         &self,
         _commands: &HashMap<CommandName, CollectedCommand>,
         context: Context,
-        _exts: &Fn(Context) -> Context,
+        _: &Fn(Context) -> Context,
     ) -> Feedback {
         let action = context
             .arg::<String>(MAINTENANCE_ACTION_PATH)
