@@ -125,9 +125,9 @@ macro_rules! encoding_struct {
             fn field_size() -> $crate::encoding::Offset {
                 // We write `encoding_struct` as regular buffer,
                 // so real `field_size` is 8.
-                // TODO: maybe we should write it as sub structure in place?
+                // TODO: Maybe we should write it as sub structure in place?
                 // We could get benefit from it: we limit indirection
-                // in deserializing sub fields, by only one calculation (ECR-156).
+                // in deserializing sub fields, by only one calculation. (ECR-156)
 
                 // $body as $crate::encoding::Offset
 
@@ -153,7 +153,7 @@ macro_rules! encoding_struct {
             }
         }
 
-        // TODO extract some fields like hash and from_raw into trait (ECR-156)
+        // TODO: Extract some fields like hash and from_raw into trait. (ECR-156)
         impl $name {
             #[cfg_attr(feature="cargo-clippy", allow(too_many_arguments))]
             #[allow(unused_imports, unused_mut)]
@@ -235,7 +235,7 @@ macro_rules! encoding_struct {
             }
         }
 
-        // TODO: Rewrite Deserialize and Serialize implementation (ECR-156)
+        // TODO: Rewrite Deserialize and Serialize implementation. (ECR-156)
         impl<'de> $crate::encoding::serialize::reexport::Deserialize<'de> for $name {
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
                 where D: $crate::encoding::serialize::reexport::Deserializer<'de>

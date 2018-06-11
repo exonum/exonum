@@ -34,8 +34,8 @@ mod raw;
 #[cfg(test)]
 mod tests;
 
-// TODO: implement common methods for enum types (hash, raw, from_raw, verify)
-// TODO: use macro for implementing enums (ECR-166)
+// TODO: Implement common methods for enum types (hash, raw, from_raw, verify). (ECR-166)
+// TODO: Use macro for implementing enums. (ECR-166)
 
 /// Raw transaction type.
 pub type RawTransaction = RawMessage;

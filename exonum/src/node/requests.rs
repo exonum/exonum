@@ -18,9 +18,8 @@ use crypto::{PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
 use messages::{BlockRequest, BlockResponse, Message, PrevotesRequest, ProposeRequest,
                RequestMessage, TransactionsRequest, TransactionsResponse, HEADER_LENGTH};
 
-// TODO: height should be updated after any message, not only after status (if signature is correct)
-// TODO: Request propose makes sense only if we know that node is on our height.
-// (ECR-171)
+// TODO: Height should be updated after any message, not only after status (if signature is correct). (ECR-171)
+// TODO: Request propose makes sense only if we know that node is on our height. (ECR-171)
 
 impl NodeHandler {
     /// Validates request, then redirects it to the corresponding `handle_...` function.

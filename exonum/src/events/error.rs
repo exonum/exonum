@@ -17,8 +17,6 @@
 
 use std::{error::Error as StdError, io};
 
-// Common error helpers (TODO move to helpers)
-
 pub fn other_error<S: AsRef<str>>(s: S) -> io::Error {
     io::Error::new(io::ErrorKind::Other, s.as_ref())
 }

@@ -190,7 +190,8 @@ pub enum Change {
 /// [`checkpoint`]: #method.checkpoint
 /// [`commit`]: #method.commit
 /// [`rollback`]: #method.rollback
-// FIXME: make &mut Fork "unwind safe" (ECR-176)
+
+// FIXME: make &mut Fork "unwind safe". (ECR-176)
 pub struct Fork {
     snapshot: Box<Snapshot>,
     patch: Patch,

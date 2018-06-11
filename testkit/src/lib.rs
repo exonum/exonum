@@ -765,7 +765,6 @@ impl TestKit {
         let schema = CoreSchema::new(&snapshot);
         let txs = schema.transactions_pool();
         let tx_hashes: Vec<_> = txs.iter().collect();
-        //TODO: every block should contain two merges (ECR-975)
         {
             let blockchain = self.blockchain_mut();
             let fork = blockchain.fork();

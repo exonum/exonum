@@ -62,7 +62,7 @@ pub struct WalletInfo {
     wallet_history: Option<WalletHistory>,
 }
 
-/// TODO: Add documentation.
+/// TODO: Add documentation. (ECR-1638)
 #[derive(Clone)]
 pub struct CryptocurrencyApi<T: TransactionSend + Clone> {
     /// Exonum blockchain.

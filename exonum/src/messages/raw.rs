@@ -62,10 +62,9 @@ impl AsRef<[u8]> for RawMessage {
     }
 }
 
-// TODO: reduce `to` argument from `write`, `read` and `check` methods
-// TODO: payload_length as a first value into message header
-// TODO: make sure that message length is enough when using mem::transmute
-// (ECR-166)
+// TODO: Reduce `to` argument from `write`, `read` and `check` methods. (ECR-166)
+// TODO: Payload_length as a first value into message header. (ECR-166)
+// TODO: Make sure that message length is enough when using mem::transmute. (ECR-166)
 
 /// A raw message represented by the bytes buffer.
 #[derive(Debug, PartialEq)]
@@ -85,9 +84,8 @@ impl MessageBuffer {
     /// assert!(!message_buffer.is_empty());
     /// ```
     pub fn from_vec(raw: Vec<u8>) -> MessageBuffer {
-        // TODO: check that size >= HEADER_LENGTH
-        // TODO: check that payload_length == raw.len()
-        // ECR-166
+        // TODO: Check that size >= HEADER_LENGTH. (ECR-166)
+        // TODO: Check that payload_length == raw.len(). (ECR-166)
         MessageBuffer { raw }
     }
 

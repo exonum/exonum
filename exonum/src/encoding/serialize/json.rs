@@ -27,7 +27,8 @@ use crypto::{Hash, PublicKey, Signature};
 use encoding::{Field, Offset};
 use helpers::{Height, Round, ValidatorId};
 use messages::RawMessage;
-// TODO: should we implement serialize for: `SecretKey`, `Seed` (ECR-156)?
+
+// TODO: Should we implement serialize for: `SecretKey`, `Seed`. (ECR-156)
 
 macro_rules! impl_default_deserialize_owned {
     (@impl $name:ty) => {
@@ -359,8 +360,8 @@ where
     }
 }
 
-// TODO remove `ExonumJsonDeserialize` needs
-// after it remove impl `ExonumJsonDeserialize` for all types expect struct (ECR-156)
+// TODO: Remove `ExonumJsonDeserialize` needs
+// after it remove impl `ExonumJsonDeserialize` for all types expect struct. (ECR-156)
 impl<T> ExonumJson for Vec<T>
 where
     T: ExonumJsonDeserialize + ExonumJson,
@@ -427,7 +428,7 @@ impl ExonumJson for BitVec {
     }
 }
 
-// TODO: Make a macro for tuple struct type definitions (ECR-154)?
+// TODO: Make a macro for tuple struct type definitions? (ECR-154)
 impl ExonumJson for Height {
     fn deserialize_field<B: WriteBufferWrapper>(
         value: &Value,

@@ -20,7 +20,8 @@
 pub use self::{state::{RequestData, State, ValidatorState},
                whitelist::Whitelist};
 
-pub mod state; // TODO: temporary solution to get access to WAIT constants (ECR-167)
+// TODO: Temporary solution to get access to WAIT constants. (ECR-167)
+pub mod state;
 
 use failure;
 use futures::{sync::mpsc, Future, Sink};
@@ -122,7 +123,6 @@ pub struct NodeHandler {
     /// Blockchain.
     pub blockchain: Blockchain,
     /// Known peer addresses.
-    // TODO: move this into peer exchange service
     pub peer_discovery: Vec<SocketAddr>,
     /// Does this node participate in the consensus?
     is_enabled: bool,
@@ -397,7 +397,6 @@ impl NodeHandler {
         config: Configuration,
         api_state: SharedNodeState,
     ) -> Self {
-        // FIXME: remove unwraps here, use FATAL log level instead
         let (last_hash, last_height) = {
             let block = blockchain.last_block();
             (block.hash(), block.height().next())

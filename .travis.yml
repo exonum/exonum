@@ -80,7 +80,7 @@ jobs:
     - npm run cspell
     - npm run md
     - cargo doc --no-deps
-    # TODO: a tmp hack to ignore warnings about missing pages [ECR-703]
+    # TODO: Temporary hack to ignore warnings about missing pages. (ECR-703)
     - mkdir -p target/std/string
     - touch target/std/primitive.usize.html
     - touch target/std/string/struct.String.html

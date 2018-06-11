@@ -47,7 +47,7 @@ impl NodeBuilder {
 
     /// Appends service to the `NodeBuilder` context.
     pub fn with_service(mut self, mut factory: Box<ServiceFactory>) -> NodeBuilder {
-        //TODO: take endpoints, etc... (ECR-164)
+        //TODO: Take endpoints, etc... (ECR-164)
 
         for (name, command) in &mut self.commands {
             command.extend(factory.command(name))

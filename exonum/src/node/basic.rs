@@ -23,12 +23,6 @@ use messages::{Any, Connect, Message, PeersRequest, RawMessage, Status};
 impl NodeHandler {
     /// Redirects message to the corresponding `handle_...` function.
     pub fn handle_message(&mut self, raw: RawMessage) {
-        // TODO: check message headers (network id, protocol version)
-        // FIXME: call message.verify method
-        //     if !raw.verify() {
-        //         return;
-        //     }
-
         match Any::from_raw(raw) {
             Ok(Any::Connect(msg)) => self.handle_connect(msg),
             Ok(Any::Status(msg)) => self.handle_status(&msg),
@@ -76,7 +70,7 @@ impl NodeHandler {
 
     /// Handles the `Connect` message and connects to a peer as result.
     pub fn handle_connect(&mut self, message: Connect) {
-        // TODO add spam protection (ECR-170)
+        // TODO Add spam protection. (ECR-170)
         let address = message.addr();
         if address == self.state.our_connect_message().addr() {
             trace!("Received Connect with same address as our external_address.");
@@ -128,7 +122,6 @@ impl NodeHandler {
         );
         self.blockchain.save_peer(&public_key, message);
         if need_connect {
-            // TODO: reduce double sending of connect message
             info!("Send Connect message to {}", address);
             self.connect(&address);
         }

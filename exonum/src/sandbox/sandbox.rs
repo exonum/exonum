@@ -231,7 +231,7 @@ impl Sandbox {
 
     pub fn recv<T: Message>(&self, msg: &T) {
         self.check_unexpected_message();
-        // TODO Think about addresses.
+        // TODO Think about addresses. (ECR-1627)
         let dummy_addr = SocketAddr::from(([127, 0, 0, 1], 12_039));
         let event = NetworkEvent::MessageReceived(dummy_addr, msg.raw().clone());
         self.inner.borrow_mut().handle_event(event);
@@ -269,7 +269,7 @@ impl Sandbox {
         self.try_broadcast_to_addrs(msg, self.addresses.iter().skip(1))
     }
 
-    // TODO: add self-test for broadcasting?
+    // TODO: Add self-test for broadcasting? (ECR-1627)
     pub fn broadcast_to_addrs<'a, T: Message, I>(&self, msg: &T, addresses: I)
     where
         I: IntoIterator<Item = &'a SocketAddr>,
@@ -277,7 +277,7 @@ impl Sandbox {
         self.try_broadcast_to_addrs(msg, addresses).unwrap();
     }
 
-    // TODO: add self-test for broadcasting?
+    // TODO: Add self-test for broadcasting? (ECR-1627)
     pub fn try_broadcast_to_addrs<'a, T: Message, I>(
         &self,
         msg: &T,
@@ -721,7 +721,7 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandb
         mempool: Default::default(),
     };
 
-    // TODO use factory or other solution like set_handler or run
+    // TODO: Use factory or other solution like set_handler or run. (ECR-1627)
     let system_state = SandboxSystemStateProvider {
         listen_address: addresses[0],
         shared_time: SharedTime::new(Mutex::new(
@@ -875,7 +875,7 @@ mod tests {
 
     #[test]
     fn test_sandbox_assert_status() {
-        // TODO: remove this?
+        // TODO: Remove this? (ECR-1627)
         let s = timestamping_sandbox();
         s.assert_state(HEIGHT_ONE, ROUND_ONE);
         s.add_time(Duration::from_millis(999));

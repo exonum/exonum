@@ -30,7 +30,7 @@ use messages::{BlockResponse, Connect, ConsensusMessage, Message, Precommit, Pre
 use node::whitelist::Whitelist;
 use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 
-// TODO: move request timeouts into node configuration (ECR-171)
+// TODO: Move request timeouts into node configuration. (ECR-171)
 
 /// Timeout value for the `ProposeRequest` message.
 pub const PROPOSE_REQUEST_TIMEOUT: Milliseconds = 100;
@@ -727,7 +727,6 @@ impl State {
     }
 
     /// Increments the node height by one and resets previous height data.
-    // FIXME use block_hash
     pub fn new_height(&mut self, block_hash: &Hash, height_start_time: SystemTime) {
         self.height.increment();
         self.height_start_time = height_start_time;
@@ -735,7 +734,7 @@ impl State {
         self.locked_round = Round::zero();
         self.locked_propose = None;
         self.last_hash = *block_hash;
-        // TODO: destruct/construct structure HeightState instead of call clear (ECR-171)
+        // TODO: Destruct/construct structure HeightState instead of call clear. (ECR-171)
         self.blocks.clear();
         self.proposes.clear();
         self.prevotes.clear();
@@ -744,7 +743,7 @@ impl State {
         if let Some(ref mut validator_state) = self.validator_state {
             validator_state.clear();
         }
-        self.requests.clear(); // FIXME: clear all timeouts (ECR-171)
+        self.requests.clear(); // FIXME: Clear all timeouts. (ECR-171)
         self.incomplete_block = None;
     }
 
@@ -836,8 +835,9 @@ impl State {
                 propose: msg,
                 unknown_txs: HashSet::new(),
                 block_hash: None,
-                // TODO:: for the moment it's true because this code gets called immediately after
-                // saving a propose to the cache. Think about making this approach less error-prone
+                // TODO: For the moment it's true because this code gets called immediately after
+                // saving a propose to the cache. Think about making this approach less error-prone.
+                // (ECR-1635)
                 is_saved: true,
             },
         );
@@ -1070,7 +1070,7 @@ impl State {
             match self.validator_state {
                 Some(ref validator_state) => {
                     if let Some(msg) = validator_state.our_prevotes.get(&round) {
-                        // TODO: inefficient (ECR-171)
+                        // TODO: Inefficient. (ECR-171)
                         if Some(*msg.propose_hash()) != self.locked_propose {
                             return true;
                         }
