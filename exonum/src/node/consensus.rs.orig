@@ -127,8 +127,13 @@ impl NodeHandler {
         trace!("Handle propose");
 
         let snapshot = self.blockchain.snapshot();
-        let schema = Schema::new(snapshot);
+<<<<<<< HEAD
+        let schema = Schema::new(&*snapshot);
         //TODO: Remove this match after errors refactor. (ECR-979)
+=======
+        let schema = Schema::new(snapshot);
+        //TODO: remove this match after errors refactor. (ECR-979)
+>>>>>>> master
         let has_unknown_txs =
             match self.state
                 .add_propose(msg, &schema.transactions(), &schema.transactions_pool())
@@ -157,7 +162,54 @@ impl NodeHandler {
         }
     }
 
+<<<<<<< HEAD
+    // Validates transaction from the block and appends them into the pool.
+    // Returns tuple of transaction hashes and Patch of changes in the pool.
+    fn validate_block_transactions(&self, block: &BlockResponse) -> Option<(Vec<Hash>, Patch)> {
+        let mut fork = self.blockchain.fork();
+        let mut tx_hashes = Vec::new();
+        {
+            let mut schema = Schema::new(&mut fork);
+            for raw in block.transactions() {
+                let tx = match self.blockchain.tx_from_raw(raw) {
+                    Ok(tx) => tx,
+                    Err(e) => {
+                        error!("{}, block={:?}", e.description(), block);
+                        return None;
+                    }
+                };
+
+                let hash = tx.hash();
+                if schema.transactions().contains(&hash)
+                    && !schema.transactions_pool().contains(&hash)
+                {
+                    error!(
+                        "Received block with already committed transaction, block={:?}",
+                        block
+                    );
+                    return None;
+                }
+                profiler_span!("tx.verify()", {
+                    if !tx.verify() {
+                        error!("Incorrect transaction in block detected, block={:?}", block);
+                        return None;
+                    }
+                });
+                schema.add_transaction_into_pool(tx.raw().clone());
+                tx_hashes.push(hash);
+            }
+        }
+        Some((tx_hashes, fork.into_patch()))
+    }
+
+    /// Handles the `Block` message. For details see the message documentation.
+    // TODO: Write helper function which returns Result. (ECR-123)
+    #[cfg_attr(feature = "flame_profile", flame)]
+    pub fn handle_block(&mut self, msg: &BlockResponse) {
+        // Request are sent to us
+=======
     fn validate_block_response(&self, msg: &BlockResponse) -> Result<(), String> {
+>>>>>>> master
         if msg.to() != self.state.consensus_public_key() {
             return Err(format!(
                 "Received block intended for another peer, to={}, from={}",
@@ -218,7 +270,7 @@ impl NodeHandler {
     }
 
     /// Handles the `Block` message. For details see the message documentation.
-    // TODO: Write helper function which returns Result. (ECR-123)
+    // TODO write helper function which returns Result (ECR-123)
     #[cfg_attr(feature = "flame_profile", flame)]
     pub fn handle_block(&mut self, msg: &BlockResponse) {
         if let Err(err) = self.validate_block_response(msg) {

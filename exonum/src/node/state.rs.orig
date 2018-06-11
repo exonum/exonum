@@ -743,8 +743,12 @@ impl State {
         if let Some(ref mut validator_state) = self.validator_state {
             validator_state.clear();
         }
+<<<<<<< HEAD
         self.requests.clear(); // FIXME: Clear all timeouts. (ECR-171)
+=======
+        self.requests.clear(); // FIXME: clear all timeouts (ECR-171)
         self.incomplete_block = None;
+>>>>>>> master
     }
 
     /// Returns a list of queued consensus messages.

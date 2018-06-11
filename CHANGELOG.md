@@ -12,6 +12,31 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `storage::base_index` module has become private along with `BaseIndex` and
   `BaseIndexIter` types. (#723)
 
+### New features
+
+#### exonum
+
+- `exonum::crypto::x25519` module to convert from Ed25519 keys to X25519 keys
+  has been introduced.
+
+### Internal improvements
+
+#### exonum
+
+- `handle_consensus` now does not write warning for message from previous
+  height. (#729)
+
+- `BlockResponse` sends transactions by `Hash` instead of `RawMessage`.
+  If the node does not have some transactions, requests are created
+  with the corresponding transactions. Due to these changes,
+  the block size became significantly smaller. (#664)
+
+### Bug fixes
+
+#### exonum
+
+- Fixed bug with incorrect peer status for turned off node. (#730)
+
 ## 0.8 - 2018-05-31
 
 ### Breaking changes
@@ -45,6 +70,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `ConsensusConfig::validate_configuration` method has been renamed to the
   `warn_if_nonoptimal`. (#690)
+
+#### exonum-time
+
+- The service has been refactored and the following public structs has been
+  moved to separate modules: `TimeSchema` to `exonum_time::schema`,
+  `TimeProvider` and `MockTimeProvider` to `exonum_time::time_provider`,
+  `ValidatorTime` to `exonum_time::api`. (#604)
 
 ### New features
 
@@ -119,10 +151,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   reduce boilerplate. (#639)
 
 - Metrics are now using `chrono::DateTime<Utc>` instead of `SystemTime`. (#620)
-
-#### exonum-time
-
-- Split service components to separate modules. (#604)
 
 #### exonum-configuration
 
