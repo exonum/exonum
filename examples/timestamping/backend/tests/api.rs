@@ -104,7 +104,7 @@ fn test_api_get_timestamp_proof() {
         &format!("/v1/timestamps/proof/{}", Hash::zero().to_hex()),
     );
 
-    // TODO implement proof validation
+    // TODO: Implement proof validation. (ECR-1639)
 }
 
 #[test]

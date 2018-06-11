@@ -20,7 +20,7 @@ use super::Offset;
 /// This structure represent `encoding` specific errors.
 /// This errors returned by function `check` of each `Field`.
 pub enum Error {
-    // TODO: Check this message after refactor buffer (ECR-156).
+    // TODO: Check this message after refactor buffer. (ECR-156)
     /// Payload is short for this message.
     UnexpectedlyShortPayload {
         /// real message size.

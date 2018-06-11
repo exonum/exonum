@@ -129,7 +129,7 @@ pub mod service {
     }
 
     #[test]
-    #[ignore] // FIXME: Test fails at random condition [ECR-1410]
+    #[ignore] // FIXME: Test fails at random condition. (ECR-1410)
     fn test_duplicated_transaction() {
         let (_, private_key) = gen_keypair();
 

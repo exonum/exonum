@@ -24,7 +24,7 @@ use std::{net::SocketAddr, str::FromStr};
 
 use super::{CheckedOffset, Field, Offset};
 use blockchain::{self, Block, BlockProof};
-use crypto::{gen_keypair, hash};
+use crypto::{gen_keypair, hash, CryptoHash};
 use helpers::{user_agent, Height, Round, ValidatorId};
 use messages::{BlockRequest, BlockResponse, Connect, Message, Precommit, Prevote, Propose,
                RawMessage, Status};
@@ -534,22 +534,16 @@ fn test_block() {
         ),
     ];
     let transactions = vec![
-        Status::new(&pub_key, Height(2), &hash(&[]), &secret_key)
-            .raw()
-            .clone(),
-        Status::new(&pub_key, Height(4), &hash(&[2]), &secret_key)
-            .raw()
-            .clone(),
-        Status::new(&pub_key, Height(7), &hash(&[3]), &secret_key)
-            .raw()
-            .clone(),
+        Status::new(&pub_key, Height(2), &hash(&[]), &secret_key).hash(),
+        Status::new(&pub_key, Height(4), &hash(&[2]), &secret_key).hash(),
+        Status::new(&pub_key, Height(7), &hash(&[3]), &secret_key).hash(),
     ];
     let block = BlockResponse::new(
         &pub_key,
         &pub_key,
         content.clone(),
         precommits.clone(),
-        transactions.clone(),
+        &transactions,
         &secret_key,
     );
 
@@ -557,14 +551,14 @@ fn test_block() {
     assert_eq!(block.to(), &pub_key);
     assert_eq!(block.block(), content);
     assert_eq!(block.precommits(), precommits);
-    assert_eq!(block.transactions(), transactions);
+    assert_eq!(block.transactions().to_vec(), transactions);
 
     let block2 = BlockResponse::from_raw(block.raw().clone()).unwrap();
     assert_eq!(block2.from(), &pub_key);
     assert_eq!(block2.to(), &pub_key);
     assert_eq!(block2.block(), content);
     assert_eq!(block2.precommits(), precommits);
-    assert_eq!(block2.transactions(), transactions);
+    assert_eq!(block2.transactions().to_vec(), transactions);
     let block_proof = BlockProof {
         block: content.clone(),
         precommits: precommits.clone(),
@@ -595,7 +589,7 @@ fn test_empty_block() {
         &pub_key,
         content.clone(),
         precommits.clone(),
-        transactions.clone(),
+        &transactions,
         &secret_key,
     );
 
@@ -603,14 +597,14 @@ fn test_empty_block() {
     assert_eq!(block.to(), &pub_key);
     assert_eq!(block.block(), content);
     assert_eq!(block.precommits(), precommits);
-    assert_eq!(block.transactions(), transactions);
+    assert_eq!(block.transactions().to_vec(), transactions);
 
     let block2 = BlockResponse::from_raw(block.raw().clone()).unwrap();
     assert_eq!(block2.from(), &pub_key);
     assert_eq!(block2.to(), &pub_key);
     assert_eq!(block2.block(), content);
     assert_eq!(block2.precommits(), precommits);
-    assert_eq!(block2.transactions(), transactions);
+    assert_eq!(block2.transactions().to_vec(), transactions);
 }
 
 #[test]

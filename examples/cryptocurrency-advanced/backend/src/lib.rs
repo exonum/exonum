@@ -46,6 +46,8 @@ use transactions::WalletTransactions;
 
 /// Unique service ID.
 const CRYPTOCURRENCY_SERVICE_ID: u16 = 128;
+/// Name of the service.
+pub const SERVICE_NAME: &str = "cryptocurrency";
 /// Initial balance of the wallet.
 const INITIAL_BALANCE: u64 = 100;
 
@@ -55,7 +57,7 @@ pub struct CurrencyService;
 
 impl Service for CurrencyService {
     fn service_name(&self) -> &str {
-        "cryptocurrency"
+        SERVICE_NAME
     }
 
     fn service_id(&self) -> u16 {
@@ -87,6 +89,10 @@ impl Service for CurrencyService {
 pub struct ServiceFactory;
 
 impl fabric::ServiceFactory for ServiceFactory {
+    fn service_name(&self) -> &str {
+        SERVICE_NAME
+    }
+
     fn make_service(&mut self, _: &Context) -> Box<Service> {
         Box::new(CurrencyService)
     }

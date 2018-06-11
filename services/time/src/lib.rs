@@ -155,6 +155,10 @@ impl Service for TimeService {
 pub struct TimeServiceFactory;
 
 impl ServiceFactory for TimeServiceFactory {
+    fn service_name(&self) -> &str {
+        SERVICE_NAME
+    }
+
     fn make_service(&mut self, _: &Context) -> Box<Service> {
         Box::new(TimeService::new())
     }
