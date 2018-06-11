@@ -19,7 +19,6 @@ use tokio_core::net::{TcpListener, TcpStream};
 use tokio_core::reactor::Core;
 use tokio_timer::{TimeoutStream, Timer};
 
-use std::error::Error;
 use std::io::{self, Result as IoResult};
 use std::net::SocketAddr;
 use std::thread;
@@ -27,9 +26,13 @@ use std::time::Duration;
 
 use crypto::{gen_keypair, gen_keypair_from_seed, x25519::into_x25519_keypair, Seed,
              PUBLIC_KEY_LENGTH};
+use events::codec::MessagesCodec;
 use events::error::{into_other, log_error};
-use events::noise::wrapper::{NoiseWrapper, NOISE_MAX_MESSAGE_LENGTH};
+use events::noise::{read,
+                    wrapper::{NoiseWrapper, NOISE_MAX_MESSAGE_LENGTH},
+                    write};
 use events::noise::{Handshake, HandshakeChannel, HandshakeParams, HandshakeResult, NoiseHandshake};
+use tokio_io::{codec::Framed, AsyncRead, AsyncWrite};
 
 #[test]
 fn test_convert_ed_to_curve_dh() {
@@ -139,6 +142,9 @@ fn test_noise_handshake_errors_es_empty() {
     let step = HandshakeStep::StaticKeyExchange(2, EMPTY_MESSAGE);
     let (sender_err, listener_err) = wait_for_handshake_result(&addr, step);
 
+    println!("sender err {:?}", sender_err);
+    println!("listener err {:?}", listener_err);
+
     assert!(sender_err.is_err());
     listener_err.unwrap()
 }
@@ -204,8 +210,10 @@ fn wait_for_handshake_result(
     let _res = send_handshake(&addr, HandshakeStep::None);
     rx.wait().next();
 
-    let res = send_handshake(&addr, step);
-    (res, err_rx.wait().next().unwrap().unwrap())
+    let sender_err = send_handshake(&addr, step);
+    let listener_err = err_rx.wait().next().unwrap().unwrap();
+
+    (sender_err, listener_err)
 }
 
 fn add_timeout_millis<T>(receiver: Receiver<T>, millis: u64) -> TimeoutStream<Receiver<T>> {
@@ -267,66 +275,88 @@ fn send_handshake(addr: &SocketAddr, step: HandshakeStep) -> Result<(), io::Erro
     core.run(stream)
 }
 
-#[derive(Debug, Copy, Clone)]
 pub struct ErrorChannel {
-    step: HandshakeStep,
+    noise: NoiseWrapper,
+    max_message_len: u32,
     current_step: u8,
-}
-
-impl ErrorChannel {
-    fn new(step: HandshakeStep, current_step: u8) -> Self {
-        ErrorChannel { step, current_step }
-    }
+    step: HandshakeStep,
 }
 
 impl HandshakeChannel for ErrorChannel {
-    fn read_handshake_msg(
-        &self,
-        input: &[u8],
-        noise: &mut NoiseWrapper,
-    ) -> Box<Future<Item = (usize, Vec<u8>), Error = io::Error>> {
-        let res = noise.read_handshake_msg(input);
-        Box::new(done(res.map_err(|e| e.into())))
+    fn read_handshake_msg<S: AsyncRead + 'static>(
+        mut self,
+        stream: S,
+    ) -> Box<Future<Item = (S, Self), Error = io::Error>> {
+        Box::new(read(stream).and_then(move |(stream, msg)| {
+            self.noise.read_handshake_msg(&msg)?;
+            Ok((stream, self))
+        }))
     }
 
-    fn write_handshake_msg(
-        &mut self,
-        noise: &mut NoiseWrapper,
-    ) -> Box<Future<Item = (usize, Vec<u8>), Error = io::Error>> {
-        let res = match &self.step {
-            // Write message filled with zeros, instead of real handshake message.
-            &HandshakeStep::EphemeralKeyExchange(cs, size)
-            | &HandshakeStep::StaticKeyExchange(cs, size) if cs == self.current_step =>
-            {
-                Ok((size, vec![0; size]))
-            }
-            _ => noise.write_handshake_msg(),
-        };
+    fn write_handshake_msg<S: AsyncWrite + 'static>(
+        mut self,
+        stream: S,
+    ) -> Box<Future<Item = (S, Self), Error = io::Error>> {
+        Box::new(
+            done({
+                let res = match &self.step {
+                    // Write message filled with zeros, instead of real handshake message.
+                    &HandshakeStep::EphemeralKeyExchange(cs, size)
+                    | &HandshakeStep::StaticKeyExchange(cs, size) if cs == self.current_step =>
+                    {
+                        Ok((size, vec![0; size]))
+                    }
+                    _ => self.noise.write_handshake_msg(),
+                };
+                self.current_step += 1;
+                res
+            }).map_err(|e| e.into())
+                .and_then(|(len, buf)| write(stream, &buf, len))
+                .map(move |(stream, _)| (stream, self)),
+        )
+    }
 
-        self.current_step += 1;
-        Box::new(done(res.map_err(|e| e.into())))
+    fn finalize<S: AsyncRead + AsyncWrite + 'static>(
+        self,
+        stream: S,
+    ) -> Result<Framed<S, MessagesCodec>, io::Error> {
+        let noise = self.noise.into_transport_mode()?;
+        let framed = stream.framed(MessagesCodec::new(self.max_message_len, noise));
+        Ok(framed)
     }
 }
 
 #[derive(Debug)]
 pub struct NoiseErrorHandshake {
-    channel: ErrorChannel,
+    step: HandshakeStep,
 }
 
 impl NoiseErrorHandshake {
-    fn new(step: HandshakeStep) -> Self {
-        NoiseErrorHandshake {
-            channel: ErrorChannel::new(step, 1),
-        }
+    pub fn new(step: HandshakeStep) -> Self {
+        NoiseErrorHandshake { step }
     }
 }
 
 impl Handshake for NoiseErrorHandshake {
     fn listen(self, params: &HandshakeParams, stream: TcpStream) -> HandshakeResult {
-        super::listen_handshake(stream, &params, &self.channel)
+        let channel = ErrorChannel {
+            noise: NoiseWrapper::responder(params),
+            max_message_len: params.max_message_len,
+            step: self.step,
+            current_step: 1,
+        };
+
+        super::listen_handshake(stream, channel)
     }
 
     fn send(self, params: &HandshakeParams, stream: TcpStream) -> HandshakeResult {
-        super::send_handshake(stream, &params, &self.channel)
+        let channel = ErrorChannel {
+            noise: NoiseWrapper::initiator(params),
+            max_message_len: params.max_message_len,
+            step: self.step,
+            current_step: 1,
+        };
+
+        super::send_handshake(stream, channel)
     }
 }
