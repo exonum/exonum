@@ -283,16 +283,27 @@ pub struct NoiseErrorHandshake {
 impl NoiseErrorHandshake {
     pub fn initiator(params: &HandshakeParams, step: HandshakeStep) -> Self {
         let noise = NoiseWrapper::initiator(&params);
-        NoiseErrorHandshake { step, noise, max_message_len: params.max_message_len, current_step: 1 }
+        NoiseErrorHandshake {
+            step,
+            noise,
+            max_message_len: params.max_message_len,
+            current_step: 1,
+        }
     }
 }
 
 impl Handshake for NoiseErrorHandshake {
-    fn listen(self, stream: TcpStream) -> HandshakeResult {
+    fn listen<S>(self, stream: S) -> HandshakeResult<S>
+    where
+        S: AsyncRead + AsyncWrite + 'static,
+    {
         super::listen_handshake(stream, self)
     }
 
-    fn send(self, stream: TcpStream) -> HandshakeResult {
+    fn send<S>(self, stream: S) -> HandshakeResult<S>
+    where
+        S: AsyncRead + AsyncWrite + 'static,
+    {
         super::send_handshake(stream, self)
     }
 

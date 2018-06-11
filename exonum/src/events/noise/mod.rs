@@ -14,7 +14,6 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use futures::future::{done, err, Future};
-use tokio_core::net::TcpStream;
 use tokio_io::{codec::Framed,
                io::{read_exact, write_all},
                AsyncRead,
@@ -32,7 +31,7 @@ pub mod wrapper;
 #[cfg(test)]
 mod tests;
 
-type HandshakeResult = Box<Future<Item = Framed<TcpStream, MessagesCodec>, Error = io::Error>>;
+type HandshakeResult<S> = Box<Future<Item = Framed<S, MessagesCodec>, Error = io::Error>>;
 
 #[derive(Debug, Clone)]
 /// Params needed to establish secured connection using Noise Protocol.
@@ -43,8 +42,9 @@ pub struct HandshakeParams {
 }
 
 pub trait Handshake {
-    fn listen(self, stream: TcpStream) -> HandshakeResult;
-    fn send(self, stream: TcpStream) -> HandshakeResult;
+    fn listen<S: AsyncRead + AsyncWrite + 'static>(self, stream: S) -> HandshakeResult<S>;
+
+    fn send<S: AsyncRead + AsyncWrite + 'static>(self, stream: S) -> HandshakeResult<S>;
 
     fn read_handshake_msg<S: AsyncRead + 'static>(
         self,
@@ -64,29 +64,40 @@ pub trait Handshake {
 
 #[derive(Debug)]
 pub struct NoiseHandshake {
-    noise:NoiseWrapper,
-    max_message_len:u32,
+    noise: NoiseWrapper,
+    max_message_len: u32,
 }
 
 impl NoiseHandshake {
     pub fn initiator(params: &HandshakeParams) -> Self {
         let noise = NoiseWrapper::initiator(params);
-        NoiseHandshake { noise, max_message_len: params.max_message_len }
+        NoiseHandshake {
+            noise,
+            max_message_len: params.max_message_len,
+        }
     }
 
     pub fn responder(params: &HandshakeParams) -> Self {
         let noise = NoiseWrapper::responder(params);
-        NoiseHandshake { noise, max_message_len: params.max_message_len }
+        NoiseHandshake {
+            noise,
+            max_message_len: params.max_message_len,
+        }
     }
 }
 
 impl Handshake for NoiseHandshake {
-    // stream could be abstracted to `AsyncRead + AsyncWrite + 'static`
-    fn listen(self, stream: TcpStream) -> HandshakeResult {
+    fn listen<S>(self, stream: S) -> HandshakeResult<S>
+    where
+        S: AsyncRead + AsyncWrite + 'static,
+    {
         listen_handshake(stream, self)
     }
 
-    fn send(self, stream: TcpStream) -> HandshakeResult {
+    fn send<S>(self, stream: S) -> HandshakeResult<S>
+    where
+        S: AsyncRead + AsyncWrite + 'static,
+    {
         send_handshake(stream, self)
     }
 
@@ -123,8 +134,9 @@ impl Handshake for NoiseHandshake {
 }
 
 // may be made generic on `stream`
-fn listen_handshake<T>(stream: TcpStream, handshake: T) -> HandshakeResult
+fn listen_handshake<S, T>(stream: S, handshake: T) -> HandshakeResult<S>
 where
+    S: AsyncRead + AsyncWrite + 'static,
     T: Handshake + 'static,
 {
     let framed = handshake
@@ -136,8 +148,9 @@ where
 }
 
 // may be made generic on `stream`
-fn send_handshake<T>(stream: TcpStream, handshake: T) -> HandshakeResult
+fn send_handshake<S, T>(stream: S, handshake: T) -> HandshakeResult<S>
 where
+    S: AsyncRead + AsyncWrite + 'static,
     T: Handshake + 'static,
 {
     let framed = handshake
