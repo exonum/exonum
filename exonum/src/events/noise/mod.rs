@@ -25,6 +25,7 @@ use crypto::{PublicKey, SecretKey};
 use events::noise::wrapper::NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH;
 use events::{codec::MessagesCodec,
              noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH}};
+use futures::future::Either;
 
 pub mod wrapper;
 
@@ -133,7 +134,6 @@ impl Handshake for NoiseHandshake {
     }
 }
 
-// may be made generic on `stream`
 fn listen_handshake<S, T>(stream: S, handshake: T) -> HandshakeResult<S>
 where
     S: AsyncRead + AsyncWrite + 'static,
@@ -147,7 +147,6 @@ where
     Box::new(framed)
 }
 
-// may be made generic on `stream`
 fn send_handshake<S, T>(stream: S, handshake: T) -> HandshakeResult<S>
 where
     S: AsyncRead + AsyncWrite + 'static,
@@ -170,12 +169,11 @@ fn write<S: AsyncWrite + 'static>(
     sock: S,
     buf: &[u8],
     len: usize,
-) -> Box<Future<Item = (S, Vec<u8>), Error = io::Error>> {
-    // should be changed into `impl Future`
+) -> impl Future<Item = (S, Vec<u8>), Error = io::Error> {
     let mut message = vec![0u8; HANDSHAKE_HEADER_LENGTH];
 
     if len > NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH {
-        return Box::new(err(io::Error::new(
+        return Either::A(err(io::Error::new(
             io::ErrorKind::Other,
             "Message size exceeds max handshake message size",
         )));
@@ -183,5 +181,5 @@ fn write<S: AsyncWrite + 'static>(
 
     LittleEndian::write_u16(&mut message, len as u16);
     message.extend_from_slice(&buf[0..len]);
-    Box::new(write_all(sock, message))
+    Either::B(write_all(sock, message))
 }
