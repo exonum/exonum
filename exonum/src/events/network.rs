@@ -147,8 +147,8 @@ impl ConnectionsPool {
                 Ok(sock)
             })
             .and_then(move |sock| {
-                let handshake = NoiseHandshake::new();
-                handshake.send(&handshake_params, sock).and_then(|framed|{
+                let handshake = NoiseHandshake::initiator(&handshake_params);
+                handshake.send(sock).and_then(|framed|{
                     Ok(framed)
                 })
             })
@@ -364,8 +364,8 @@ impl Listener {
             trace!("Accepted incoming connection with peer={}", addr);
             let network_tx = network_tx.clone();
 
-            let handshake = NoiseHandshake::new();
-            let stream = handshake.listen(&handshake_params, sock).flatten_stream();
+            let handshake = NoiseHandshake::responder(&handshake_params);
+            let stream = handshake.listen(sock).flatten_stream();
 
             let connection_handler = stream
                 .into_future()

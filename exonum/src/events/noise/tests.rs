@@ -31,7 +31,7 @@ use events::error::{into_other, log_error};
 use events::noise::{read,
                     wrapper::{NoiseWrapper, NOISE_MAX_MESSAGE_LENGTH},
                     write};
-use events::noise::{Handshake, HandshakeChannel, HandshakeParams, HandshakeResult, NoiseHandshake};
+use events::noise::{Handshake, HandshakeParams, HandshakeResult, NoiseHandshake};
 use tokio_io::{codec::Framed, AsyncRead, AsyncWrite};
 
 #[test]
@@ -142,9 +142,6 @@ fn test_noise_handshake_errors_es_empty() {
     let step = HandshakeStep::StaticKeyExchange(2, EMPTY_MESSAGE);
     let (sender_err, listener_err) = wait_for_handshake_result(&addr, step);
 
-    println!("sender err {:?}", sender_err);
-    println!("listener err {:?}", listener_err);
-
     assert!(sender_err.is_err());
     listener_err.unwrap()
 }
@@ -239,8 +236,8 @@ fn run_handshake_listener(
             let send = sender.send(()).map(|_| ()).map_err(log_error);
             handle.spawn(send);
 
-            let handshake = NoiseHandshake::new();
-            let handshake = handshake.listen(&params, stream);
+            let handshake = NoiseHandshake::responder(&params);
+            let handshake = handshake.listen(stream);
             let reader = handshake
                 .and_then(|_| Ok(()))
                 .or_else(|e| err_sender.send(Err(e)).map(|_| ()))
@@ -261,12 +258,12 @@ fn send_handshake(addr: &SocketAddr, step: HandshakeStep) -> Result<(), io::Erro
     let stream = TcpStream::connect(&addr, &handle)
         .and_then(|sock| match step {
             HandshakeStep::None => {
-                let handshake = NoiseHandshake::new();
-                handshake.send(&params, sock)
+                let handshake = NoiseHandshake::initiator(&params);
+                handshake.send(sock)
             }
             _ => {
-                let error_handshake = NoiseErrorHandshake::new(step);
-                error_handshake.send(&params, sock)
+                let error_handshake = NoiseErrorHandshake::initiator(&params, step);
+                error_handshake.send(sock)
             }
         })
         .map(|_| ())
@@ -275,14 +272,30 @@ fn send_handshake(addr: &SocketAddr, step: HandshakeStep) -> Result<(), io::Erro
     core.run(stream)
 }
 
-pub struct ErrorChannel {
+#[derive(Debug)]
+pub struct NoiseErrorHandshake {
+    step: HandshakeStep,
     noise: NoiseWrapper,
     max_message_len: u32,
     current_step: u8,
-    step: HandshakeStep,
 }
 
-impl HandshakeChannel for ErrorChannel {
+impl NoiseErrorHandshake {
+    pub fn initiator(params: &HandshakeParams, step: HandshakeStep) -> Self {
+        let noise = NoiseWrapper::initiator(&params);
+        NoiseErrorHandshake { step, noise, max_message_len: params.max_message_len, current_step: 1 }
+    }
+}
+
+impl Handshake for NoiseErrorHandshake {
+    fn listen(self, stream: TcpStream) -> HandshakeResult {
+        super::listen_handshake(stream, self)
+    }
+
+    fn send(self, stream: TcpStream) -> HandshakeResult {
+        super::send_handshake(stream, self)
+    }
+
     fn read_handshake_msg<S: AsyncRead + 'static>(
         mut self,
         stream: S,
@@ -323,40 +336,5 @@ impl HandshakeChannel for ErrorChannel {
         let noise = self.noise.into_transport_mode()?;
         let framed = stream.framed(MessagesCodec::new(self.max_message_len, noise));
         Ok(framed)
-    }
-}
-
-#[derive(Debug)]
-pub struct NoiseErrorHandshake {
-    step: HandshakeStep,
-}
-
-impl NoiseErrorHandshake {
-    pub fn new(step: HandshakeStep) -> Self {
-        NoiseErrorHandshake { step }
-    }
-}
-
-impl Handshake for NoiseErrorHandshake {
-    fn listen(self, params: &HandshakeParams, stream: TcpStream) -> HandshakeResult {
-        let channel = ErrorChannel {
-            noise: NoiseWrapper::responder(params),
-            max_message_len: params.max_message_len,
-            step: self.step,
-            current_step: 1,
-        };
-
-        super::listen_handshake(stream, channel)
-    }
-
-    fn send(self, params: &HandshakeParams, stream: TcpStream) -> HandshakeResult {
-        let channel = ErrorChannel {
-            noise: NoiseWrapper::initiator(params),
-            max_message_len: params.max_message_len,
-            step: self.step,
-            current_step: 1,
-        };
-
-        super::send_handshake(stream, channel)
     }
 }

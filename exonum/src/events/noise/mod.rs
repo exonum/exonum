@@ -43,42 +43,9 @@ pub struct HandshakeParams {
 }
 
 pub trait Handshake {
-    fn listen(self, params: &HandshakeParams, stream: TcpStream) -> HandshakeResult;
-    fn send(self, params: &HandshakeParams, stream: TcpStream) -> HandshakeResult;
-}
+    fn listen(self, stream: TcpStream) -> HandshakeResult;
+    fn send(self, stream: TcpStream) -> HandshakeResult;
 
-// may need refactoring (e.g., are `HandshakeParams` specific for the `NoiseHandshake`?
-// if yes, `HandshakeParams` could be passed to constructor of `NoiseHandshake` instead of them
-// being a part of `listen` / `send` methods
-#[derive(Debug)]
-pub struct NoiseHandshake {}
-
-impl NoiseHandshake {
-    pub fn new() -> Self {
-        NoiseHandshake {}
-    }
-}
-
-impl Handshake for NoiseHandshake {
-    // stream could be abstracted to `AsyncRead + AsyncWrite + 'static`
-    fn listen(self, params: &HandshakeParams, stream: TcpStream) -> HandshakeResult {
-        let channel = NoiseHandshakeChannel {
-            noise: NoiseWrapper::responder(params),
-            max_message_len: params.max_message_len,
-        };
-        listen_handshake(stream, channel)
-    }
-
-    fn send(self, params: &HandshakeParams, stream: TcpStream) -> HandshakeResult {
-        let channel = NoiseHandshakeChannel {
-            noise: NoiseWrapper::initiator(params),
-            max_message_len: params.max_message_len,
-        };
-        send_handshake(stream, channel)
-    }
-}
-
-trait HandshakeChannel {
     fn read_handshake_msg<S: AsyncRead + 'static>(
         self,
         stream: S,
@@ -96,12 +63,33 @@ trait HandshakeChannel {
 }
 
 #[derive(Debug)]
-struct NoiseHandshakeChannel {
-    noise: NoiseWrapper,
-    max_message_len: u32,
+pub struct NoiseHandshake {
+    noise:NoiseWrapper,
+    max_message_len:u32,
 }
 
-impl HandshakeChannel for NoiseHandshakeChannel {
+impl NoiseHandshake {
+    pub fn initiator(params: &HandshakeParams) -> Self {
+        let noise = NoiseWrapper::initiator(params);
+        NoiseHandshake { noise, max_message_len: params.max_message_len }
+    }
+
+    pub fn responder(params: &HandshakeParams) -> Self {
+        let noise = NoiseWrapper::responder(params);
+        NoiseHandshake { noise, max_message_len: params.max_message_len }
+    }
+}
+
+impl Handshake for NoiseHandshake {
+    // stream could be abstracted to `AsyncRead + AsyncWrite + 'static`
+    fn listen(self, stream: TcpStream) -> HandshakeResult {
+        listen_handshake(stream, self)
+    }
+
+    fn send(self, stream: TcpStream) -> HandshakeResult {
+        send_handshake(stream, self)
+    }
+
     fn read_handshake_msg<S: AsyncRead + 'static>(
         mut self,
         stream: S,
@@ -135,28 +123,28 @@ impl HandshakeChannel for NoiseHandshakeChannel {
 }
 
 // may be made generic on `stream`
-fn listen_handshake<T>(stream: TcpStream, channel: T) -> HandshakeResult
+fn listen_handshake<T>(stream: TcpStream, handshake: T) -> HandshakeResult
 where
-    T: HandshakeChannel + 'static,
+    T: Handshake + 'static,
 {
-    let framed = channel
+    let framed = handshake
         .read_handshake_msg(stream)
-        .and_then(|(stream, channel)| channel.write_handshake_msg(stream))
-        .and_then(|(stream, channel)| channel.read_handshake_msg(stream))
-        .and_then(|(stream, channel)| channel.finalize(stream));
+        .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
+        .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
+        .and_then(|(stream, handshake)| handshake.finalize(stream));
     Box::new(framed)
 }
 
 // may be made generic on `stream`
-fn send_handshake<T>(stream: TcpStream, channel: T) -> HandshakeResult
+fn send_handshake<T>(stream: TcpStream, handshake: T) -> HandshakeResult
 where
-    T: HandshakeChannel + 'static,
+    T: Handshake + 'static,
 {
-    let framed = channel
+    let framed = handshake
         .write_handshake_msg(stream)
-        .and_then(|(stream, channel)| channel.read_handshake_msg(stream))
-        .and_then(|(stream, channel)| channel.write_handshake_msg(stream))
-        .and_then(|(stream, channel)| channel.finalize(stream));
+        .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
+        .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
+        .and_then(|(stream, handshake)| handshake.finalize(stream));
     Box::new(framed)
 }
 
