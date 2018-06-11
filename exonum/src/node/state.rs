@@ -25,7 +25,8 @@ use std::{collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},
 use blockchain::{ConsensusConfig, StoredConfiguration, ValidatorKeys};
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
 use helpers::{Height, Milliseconds, Round, ValidatorId};
-use messages::{Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, RawMessage};
+use messages::{BlockResponse, Connect, ConsensusMessage, Message, Precommit, Prevote, Propose,
+               RawMessage};
 use node::whitelist::Whitelist;
 use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 
@@ -83,6 +84,8 @@ pub struct State {
     nodes_max_height: BTreeMap<PublicKey, Height>,
 
     validators_rounds: BTreeMap<ValidatorId, Round>,
+
+    incomplete_block: Option<IncompleteBlock>,
 }
 
 /// State of a validator-node.
@@ -99,8 +102,10 @@ pub struct ValidatorState {
 pub enum RequestData {
     /// Represents `ProposeRequest` message.
     Propose(Hash),
-    /// Represents `TransactionsRequest` message.
-    Transactions(Hash),
+    /// Represents `TransactionsRequest` message for `Propose`.
+    ProposeTransactions(Hash),
+    /// Represents `TransactionsRequest` message for `BlockResponse`.
+    BlockTransactions,
     /// Represents `PrevotesRequest` message.
     Prevotes(Round, Hash),
     /// Represents `BlockRequest` message.
@@ -134,6 +139,13 @@ pub struct BlockState {
     patch: Patch,
     txs: Vec<Hash>,
     proposer_id: ValidatorId,
+}
+
+/// Incomplete block.
+#[derive(Clone, Debug)]
+pub struct IncompleteBlock {
+    msg: BlockResponse,
+    unknown_txs: HashSet<Hash>,
 }
 
 /// `VoteMessage` trait represents voting messages such as `Precommit` and `Prevote`.
@@ -239,7 +251,9 @@ impl RequestData {
         #![cfg_attr(feature = "cargo-clippy", allow(match_same_arms))]
         let ms = match *self {
             RequestData::Propose(..) => PROPOSE_REQUEST_TIMEOUT,
-            RequestData::Transactions(..) => TRANSACTIONS_REQUEST_TIMEOUT,
+            RequestData::ProposeTransactions(..) | RequestData::BlockTransactions => {
+                TRANSACTIONS_REQUEST_TIMEOUT
+            }
             RequestData::Prevotes(..) => PREVOTES_REQUEST_TIMEOUT,
             RequestData::Block(..) => BLOCK_REQUEST_TIMEOUT,
         };
@@ -347,6 +361,23 @@ impl BlockState {
     }
 }
 
+impl IncompleteBlock {
+    /// Returns `BlockResponse` message.
+    pub fn message(&self) -> &BlockResponse {
+        &self.msg
+    }
+
+    /// Returns unknown transactions of the block.
+    pub fn unknown_txs(&self) -> &HashSet<Hash> {
+        &self.unknown_txs
+    }
+
+    /// Returns `true` if there are unknown transactions in the block.
+    pub fn has_unknown_txs(&self) -> bool {
+        !self.unknown_txs.is_empty()
+    }
+}
+
 impl State {
     /// Creates state with the given parameters.
     #[cfg_attr(feature = "cargo-clippy", allow(too_many_arguments))]
@@ -400,6 +431,8 @@ impl State {
             requests: HashMap::new(),
 
             config: stored,
+
+            incomplete_block: None,
         }
     }
 
@@ -688,6 +721,11 @@ impl State {
         self.round.increment();
     }
 
+    /// Return incomplete block.
+    pub fn incomplete_block(&self) -> Option<&IncompleteBlock> {
+        self.incomplete_block.as_ref()
+    }
+
     /// Increments the node height by one and resets previous height data.
     // FIXME use block_hash
     pub fn new_height(&mut self, block_hash: &Hash, height_start_time: SystemTime) {
@@ -707,6 +745,7 @@ impl State {
             validator_state.clear();
         }
         self.requests.clear(); // FIXME: clear all timeouts (ECR-171)
+        self.incomplete_block = None;
     }
 
     /// Returns a list of queued consensus messages.
@@ -738,6 +777,23 @@ impl State {
         }
 
         full_proposes
+    }
+
+    /// Checks if there is an incomplete block that waits for this transaction.
+    /// Returns a block that don't contain unknown transactions.
+    ///
+    /// Transaction is ignored if the following criteria are fulfilled:
+    ///
+    /// - transaction isn't contained in the unknown transactions list of block
+    /// - transaction isn't a part of block
+    pub fn remove_unknown_transaction(&mut self, tx_hash: Hash) -> Option<IncompleteBlock> {
+        if let Some(ref mut incomplete_block) = self.incomplete_block {
+            incomplete_block.unknown_txs.remove(&tx_hash);
+            if incomplete_block.unknown_txs.is_empty() {
+                return Some(incomplete_block.clone());
+            }
+        }
+        None
     }
 
     /// Returns pre-votes for the specified round and propose hash.
@@ -790,11 +846,11 @@ impl State {
     }
 
     /// Adds propose from other node. Returns `ProposeState` if it is a new propose.
-    pub fn add_propose(
+    pub fn add_propose<S: AsRef<Snapshot>>(
         &mut self,
         msg: &Propose,
-        transactions: &MapIndex<&&Snapshot, Hash, RawMessage>,
-        transaction_pool: &KeySetIndex<&&Snapshot, Hash>,
+        transactions: &MapIndex<S, Hash, RawMessage>,
+        transaction_pool: &KeySetIndex<S, Hash>,
     ) -> Result<&ProposeState, failure::Error> {
         let propose_hash = msg.hash();
         match self.proposes.entry(propose_hash) {
@@ -849,6 +905,43 @@ impl State {
                 proposer_id,
             })),
         }
+    }
+
+    /// Finds unknown transactions in the block and persists transactions along
+    /// with other info as a pending block.
+    ///
+    ///  # Panics
+    ///
+    /// - Already there is an incomplete block.
+    /// - Received block has already committed transaction.
+    pub fn create_incomplete_block<S: AsRef<Snapshot>>(
+        &mut self,
+        msg: &BlockResponse,
+        txs: &MapIndex<S, Hash, RawMessage>,
+        txs_pool: &KeySetIndex<S, Hash>,
+    ) -> &IncompleteBlock {
+        assert!(self.incomplete_block().is_none());
+
+        let mut unknown_txs = HashSet::new();
+        for hash in msg.transactions() {
+            if txs.get(hash).is_some() {
+                if !txs_pool.contains(hash) {
+                    panic!(
+                        "Received block with already \
+                         committed transaction"
+                    )
+                }
+            } else {
+                unknown_txs.insert(*hash);
+            }
+        }
+
+        self.incomplete_block = Some(IncompleteBlock {
+            msg: msg.clone(),
+            unknown_txs,
+        });
+
+        self.incomplete_block().unwrap()
     }
 
     /// Adds pre-vote. Returns `true` there are +2/3 pre-votes.

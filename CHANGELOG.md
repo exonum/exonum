@@ -26,6 +26,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `handle_consensus` now does not write warning for message from previous
   height. (#729)
 
+- `BlockResponse` sends transactions by `Hash` instead of `RawMessage`.
+  If the node does not have some transactions, requests are created
+  with the corresponding transactions. Due to these changes,
+  the block size became significantly smaller. (#664)
+
 ### Bug fixes
 
 #### exonum

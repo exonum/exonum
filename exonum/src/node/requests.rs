@@ -163,10 +163,7 @@ impl NodeHandler {
             msg.from(),
             block,
             precommits.iter().collect(),
-            transactions
-                .iter()
-                .map(|tx_hash| schema.transactions().get(&tx_hash).unwrap())
-                .collect(),
+            &transactions.iter().collect::<Vec<_>>(),
             self.state.consensus_secret_key(),
         );
         self.send_to_peer(*msg.from(), block_msg.raw());

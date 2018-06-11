@@ -3143,6 +3143,104 @@ fn handle_block_response_tx_in_pool() {
         &sandbox.p(VALIDATOR_0),
         block.clone(),
         vec![precommit_1, precommit_2, precommit_3],
+        &[tx.hash()],
+        sandbox.s(VALIDATOR_3),
+    ));
+
+    sandbox.assert_state(HEIGHT_TWO, ROUND_ONE);
+    sandbox.broadcast(&Status::new(
+        &sandbox.p(VALIDATOR_0),
+        HEIGHT_TWO,
+        &block.hash(),
+        sandbox.s(VALIDATOR_0),
+    ));
+}
+
+#[test]
+fn handle_block_response_with_unknown_tx() {
+    let sandbox = timestamping_sandbox();
+
+    let tx = gen_timestamping_tx();
+
+    let propose = ProposeBuilder::new(&sandbox)
+        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
+        .build();
+
+    let block = BlockBuilder::new(&sandbox)
+        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
+        .with_tx_hash(&tx.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .build();
+
+    let precommit_1 = Precommit::new(
+        VALIDATOR_1,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        &block.hash(),
+        sandbox.time().into(),
+        sandbox.s(VALIDATOR_1),
+    );
+    let precommit_2 = Precommit::new(
+        VALIDATOR_2,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        &block.hash(),
+        sandbox.time().into(),
+        sandbox.s(VALIDATOR_2),
+    );
+    let precommit_3 = Precommit::new(
+        VALIDATOR_3,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        &block.hash(),
+        sandbox.time().into(),
+        sandbox.s(VALIDATOR_3),
+    );
+
+    sandbox.recv(&Status::new(
+        &sandbox.p(VALIDATOR_3),
+        HEIGHT_TWO,
+        &block.hash(),
+        sandbox.s(VALIDATOR_3),
+    ));
+
+    sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
+    sandbox.send(
+        sandbox.a(VALIDATOR_3),
+        &BlockRequest::new(
+            &sandbox.p(VALIDATOR_0),
+            &sandbox.p(VALIDATOR_3),
+            HEIGHT_ONE,
+            sandbox.s(VALIDATOR_0),
+        ),
+    );
+
+    sandbox.recv(&BlockResponse::new(
+        &sandbox.p(VALIDATOR_3),
+        &sandbox.p(VALIDATOR_0),
+        block.clone(),
+        vec![precommit_1, precommit_2, precommit_3],
+        &[tx.hash()],
+        sandbox.s(VALIDATOR_3),
+    ));
+
+    sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
+    sandbox.send(
+        sandbox.a(VALIDATOR_3),
+        &TransactionsRequest::new(
+            &sandbox.p(VALIDATOR_0),
+            &sandbox.p(VALIDATOR_3),
+            &[tx.hash()],
+            sandbox.s(VALIDATOR_0),
+        ),
+    );
+
+    sandbox.recv(&TransactionsResponse::new(
+        &sandbox.p(VALIDATOR_3),
+        &sandbox.p(VALIDATOR_0),
         vec![tx.raw().clone()],
         sandbox.s(VALIDATOR_3),
     ));
@@ -3154,6 +3252,162 @@ fn handle_block_response_tx_in_pool() {
         &block.hash(),
         sandbox.s(VALIDATOR_0),
     ));
+}
+
+#[test]
+fn handle_block_response_with_invalid_txs_order() {
+    let sandbox = timestamping_sandbox();
+
+    let tx1 = gen_timestamping_tx();
+    let tx2 = gen_timestamping_tx();
+
+    let propose = ProposeBuilder::new(&sandbox)
+        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
+        .build();
+
+    let block = BlockBuilder::new(&sandbox)
+        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
+        .with_txs_hashes(&[tx1.hash(), tx2.hash()])
+        .with_state_hash(&sandbox.compute_state_hash(&[tx1.raw().clone(), tx2.raw().clone()]))
+        .build();
+
+    let precommit_1 = Precommit::new(
+        VALIDATOR_1,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        &block.hash(),
+        sandbox.time().into(),
+        sandbox.s(VALIDATOR_1),
+    );
+    let precommit_2 = Precommit::new(
+        VALIDATOR_2,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        &block.hash(),
+        sandbox.time().into(),
+        sandbox.s(VALIDATOR_2),
+    );
+    let precommit_3 = Precommit::new(
+        VALIDATOR_3,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        &block.hash(),
+        sandbox.time().into(),
+        sandbox.s(VALIDATOR_3),
+    );
+
+    sandbox.recv(&Status::new(
+        &sandbox.p(VALIDATOR_3),
+        HEIGHT_TWO,
+        &block.hash(),
+        sandbox.s(VALIDATOR_3),
+    ));
+
+    sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
+    sandbox.send(
+        sandbox.a(VALIDATOR_3),
+        &BlockRequest::new(
+            &sandbox.p(VALIDATOR_0),
+            &sandbox.p(VALIDATOR_3),
+            HEIGHT_ONE,
+            sandbox.s(VALIDATOR_0),
+        ),
+    );
+
+    // Invalid transactions order.
+    sandbox.recv(&BlockResponse::new(
+        &sandbox.p(VALIDATOR_3),
+        &sandbox.p(VALIDATOR_0),
+        block.clone(),
+        vec![precommit_1, precommit_2, precommit_3],
+        &[tx2.hash(), tx1.hash()],
+        sandbox.s(VALIDATOR_3),
+    ));
+
+    sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
+}
+
+#[test]
+fn handle_block_response_with_invalid_precommits() {
+    let sandbox = timestamping_sandbox();
+
+    let tx = gen_timestamping_tx();
+
+    let propose = ProposeBuilder::new(&sandbox)
+        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
+        .build();
+
+    let block1 = BlockBuilder::new(&sandbox)
+        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
+        .with_tx_hash(&tx.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .build();
+
+    let block2 = BlockBuilder::new(&sandbox)
+        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
+        .build();
+
+    let precommit_1 = Precommit::new(
+        VALIDATOR_1,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        &block1.hash(),
+        sandbox.time().into(),
+        sandbox.s(VALIDATOR_1),
+    );
+    let precommit_2 = Precommit::new(
+        VALIDATOR_2,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        &block1.hash(),
+        sandbox.time().into(),
+        sandbox.s(VALIDATOR_2),
+    );
+    // Precommit with invalid block hash.
+    let precommit_for_other_block = Precommit::new(
+        VALIDATOR_3,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        &block2.hash(),
+        sandbox.time().into(),
+        sandbox.s(VALIDATOR_3),
+    );
+
+    sandbox.recv(&Status::new(
+        &sandbox.p(VALIDATOR_3),
+        HEIGHT_TWO,
+        &block1.hash(),
+        sandbox.s(VALIDATOR_3),
+    ));
+
+    sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
+    sandbox.send(
+        sandbox.a(VALIDATOR_3),
+        &BlockRequest::new(
+            &sandbox.p(VALIDATOR_0),
+            &sandbox.p(VALIDATOR_3),
+            HEIGHT_ONE,
+            sandbox.s(VALIDATOR_0),
+        ),
+    );
+    sandbox.recv(&tx);
+
+    sandbox.recv(&BlockResponse::new(
+        &sandbox.p(VALIDATOR_3),
+        &sandbox.p(VALIDATOR_0),
+        block1.clone(),
+        vec![precommit_1, precommit_2, precommit_for_other_block],
+        &[tx.hash()],
+        sandbox.s(VALIDATOR_3),
+    ));
+
+    sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
 }
 
 // - ignore existed transaction (in both blockchain and pool)
