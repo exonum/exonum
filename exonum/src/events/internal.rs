@@ -15,11 +15,11 @@
 use futures::{self, Future, Sink, Stream};
 use futures::sync::mpsc;
 use tokio_core::reactor::{Handle, Timeout};
+use failure;
 
-use std::io;
 use std::time::{Duration, SystemTime};
 
-use super::error::{into_other, other_error};
+use super::error::into_failure;
 use super::{to_box, InternalEvent, InternalRequest, TimeoutRequest};
 
 #[derive(Debug)]
@@ -29,7 +29,7 @@ pub struct InternalPart {
 }
 
 impl InternalPart {
-    pub fn run(self, handle: Handle) -> Box<Future<Item = (), Error = io::Error>> {
+    pub fn run(self, handle: Handle) -> Box<Future<Item = (), Error = failure::Error>> {
         let internal_tx = self.internal_tx.clone();
         let fut = self.internal_requests_rx
             .for_each(move |request| {
@@ -40,12 +40,13 @@ impl InternalPart {
                         let internal_tx = internal_tx.clone();
                         let fut = Timeout::new(duration, &handle)
                             .expect("Unable to create timeout")
+                            .map_err(into_failure)
                             .and_then(move |_| {
                                 internal_tx
                                     .clone()
                                     .send(InternalEvent::Timeout(timeout))
                                     .map(drop)
-                                    .map_err(into_other)
+                                    .map_err(into_failure)
                             })
                             .map_err(|_| panic!("Can't timeout"));
                         to_box(fut)
@@ -56,7 +57,7 @@ impl InternalPart {
                             internal_tx
                                 .send(InternalEvent::JumpToRound(height, round))
                                 .map(drop)
-                                .map_err(into_other)
+                                .map_err(into_failure)
                         }).map_err(|_| panic!("Can't execute jump to round"));
                         to_box(f)
                     }
@@ -66,7 +67,7 @@ impl InternalPart {
                             internal_tx
                                 .send(InternalEvent::Shutdown)
                                 .map(drop)
-                                .map_err(into_other)
+                                .map_err(into_failure)
                         }).map_err(|_| panic!("Can't execute shutdown"));
                         to_box(f)
                     }
@@ -75,7 +76,7 @@ impl InternalPart {
                 handle.spawn(event);
                 Ok(())
             })
-            .map_err(|_| other_error("Can't handle timeout request"));
+            .map_err(|_| format_err!("Can't handle timeout request"));
         to_box(fut)
     }
 }

@@ -12,17 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::Protocol;
-
-pub(crate) struct UncheckedBuffer {
+#[derive(Debug)]
+pub struct UncheckedBuffer {
     message: Vec<u8>
 }
 
 impl UncheckedBuffer {
-    pub(crate) fn new(vec: Vec<u8>) -> UncheckedBuffer {
+    pub fn new(vec: Vec<u8>) -> UncheckedBuffer {
         UncheckedBuffer {
             message: vec
         }
+    }
+    pub fn get_vec(&self) -> &Vec<u8> {
+        &self.message
+    }
+
+}
+
+impl AsRef<[u8]> for UncheckedBuffer {
+    fn as_ref(&self) -> &[u8] {
+        &self.message
     }
 }
 

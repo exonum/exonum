@@ -34,6 +34,7 @@ use std::error::Error;
 use crypto::{Hash, PublicKey, Signature};
 use helpers::{Height, Round, ValidatorId};
 use encoding::{Field, Offset};
+use messages::SignedMessage;
 use super::WriteBufferWrapper;
 // TODO: should we implement serialize for: `SecretKey`, `Seed` (ECR-156)?
 
@@ -322,34 +323,7 @@ impl<'a> ExonumJson for &'a [u8] {
         Ok(Value::String(::encoding::serialize::encode_hex(self)))
     }
 }
-/*
-impl ExonumJson for Vec<RawMessage> {
-    fn deserialize_field<B: WriteBufferWrapper>(
-        value: &Value,
-        buffer: &mut B,
-        from: Offset,
-        to: Offset,
-    ) -> Result<(), Box<Error>> {
-        use messages::MessageBuffer;
-        let bytes = value.as_array().ok_or("Can't cast json as array")?;
-        let mut vec: Vec<_> = Vec::new();
-        for el in bytes {
-            let string = el.as_str().ok_or("Can't cast json as string")?;
-            let str_hex = <Vec<u8> as FromHex>::from_hex(string)?;
-            vec.push(RawMessage::new(MessageBuffer::from_vec(str_hex)));
-        }
-        buffer.write(from, to, vec);
-        Ok(())
-    }
 
-    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
-        let vec = self.iter()
-            .map(|slice| Value::String(::encoding::serialize::encode_hex(slice)))
-            .collect();
-        Ok(Value::Array(vec))
-    }
-}
-*/
 impl<T> ExonumJsonDeserialize for Vec<T>
 where
     T: ExonumJsonDeserialize,
@@ -521,6 +495,28 @@ impl ExonumJson for Decimal {
 
     fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
         Ok(serde_json::to_value(&self)?)
+    }
+}
+
+impl ExonumJson for SignedMessage {
+    fn deserialize_field<B: WriteBufferWrapper>(
+        value: &Value,
+        buffer: &mut B,
+        from: Offset,
+        to: Offset,
+    ) -> Result<(), Box<Error>> {
+        unimplemented!()
+    }
+
+    fn serialize_field(&self) -> Result<Value, Box<Error + Send + Sync>> {
+        unimplemented!()
+    }
+}
+
+impl ExonumJsonDeserialize for SignedMessage
+{
+    fn deserialize(value: &Value) -> Result<Self, Box<Error>> {
+        unimplemented!()
     }
 }
 

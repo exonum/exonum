@@ -51,6 +51,7 @@ chrono = { version = "0.4.0", features = ["serde"] }
 bodyparser = "0.8.0"
 uuid = { version = "0.6.0", features = ["serde"] }
 rust_decimal = "0.8.1"
+bincode = "*"
 
 exonum_rocksdb = "0.7"
 exonum_sodiumoxide = "0.0.16"

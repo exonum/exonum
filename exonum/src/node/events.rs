@@ -15,11 +15,12 @@
 use events::{Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent};
 use events::error::LogError;
 use super::{ExternalMessage, NodeHandler, NodeTimeout};
+use messages::SignedMessage;
 
 impl EventHandler for NodeHandler {
-    fn handle_event(&mut self, event: Event) {
+    fn handle_event(&mut self, event: Event){
         match event {
-            Event::Network(network) => self.handle_network_event(network),
+            Event::Network(network) => self.handle_network_event(network).unwrap(),
             Event::Api(api) => self.handle_api_event(api),
             Event::Internal(internal) => self.handle_internal_event(internal),
         }
@@ -38,20 +39,24 @@ impl NodeHandler {
         }
     }
 
-    fn handle_network_event(&mut self, event: NetworkEvent) {
+    fn handle_network_event(&mut self, event: NetworkEvent) -> Result<(), ::failure::Error> {
         if !self.is_enabled {
             info!(
                 "Ignoring a network event {:?} because the node is disabled",
                 event
             );
-            return;
+            return Ok(());
         }
         match event {
             NetworkEvent::PeerConnected(peer, connect) => self.handle_connected(peer, connect),
             NetworkEvent::PeerDisconnected(peer) => self.handle_disconnected(peer),
             NetworkEvent::UnableConnectToPeer(peer) => self.handle_unable_to_connect(peer),
-            NetworkEvent::MessageReceived(_, raw) => self.handle_message(raw),
+            NetworkEvent::MessageReceived(_, raw) => {
+                let msg = SignedMessage::verify_buffer(&raw.get_vec())?.to_message();
+                self.handle_message(msg)?;
+            },
         }
+        Ok(())
     }
 
     fn handle_api_event(&mut self, event: ExternalMessage) {

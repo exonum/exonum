@@ -38,7 +38,7 @@ pub use self::genesis::GenesisConfig;
 pub use self::config::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
 pub use self::service::{ApiContext, Service, ServiceContext, SharedNodeState};
 pub use self::transaction::{ExecutionError, ExecutionResult, Transaction, TransactionError,
-                            TransactionErrorType, TransactionResult, TransactionSet};
+                            TransactionErrorType, TransactionResult, TransactionSet, TransactionMessage};
 
 pub mod config;
 
@@ -54,7 +54,8 @@ use std::net::SocketAddr;
 use std::error::Error as StdError;
 
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
-use messages::{CONSENSUS as CORE_SERVICE, Connect, Precommit, SignedMessage};
+use messages::{Connect, Precommit, Protocol, SignedMessage,
+               Message, ProtocolMessage, RawTransaction};
 use storage::{Database, Error, Fork, Patch, Snapshot};
 use helpers::{Height, Round, ValidatorId};
 use node::ApiSender;
@@ -68,6 +69,8 @@ mod service;
 mod transaction;
 #[cfg(test)]
 mod tests;
+
+const CORE_SERVICE: u16 = 0;
 
 /// Exonum blockchain instance with the concrete services set and data storage.
 /// Only blockchains with the identical set of services and genesis block can be combined
@@ -139,12 +142,12 @@ impl Blockchain {
     ///
     /// - Blockchain has service with the `service_id` of given raw message.
     /// - Service can deserialize given raw message.
-    pub fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<Transaction>, MessageError> {
+    pub fn tx_from_raw(&self, raw: Message<RawTransaction>) -> Result<Box<Transaction>, MessageError> {
         let id = raw.service_id() as usize;
         let service = self.service_map
             .get(id)
             .ok_or_else(|| MessageError::from("Service not found."))?;
-        service.tx_from_raw(raw)
+        service.tx_from_raw(raw.into_parts().0)
     }
 
     /// Commits changes from the patch to the blockchain storage.
@@ -411,14 +414,14 @@ impl Blockchain {
     /// After that invokes `handle_commit` for each service in order of their identifiers
     /// and returns the list of transactions which were created by the `handle_commit` event.
     #[cfg_attr(feature = "flame_profile", flame)]
-    pub fn commit<'a, I>(
+    pub fn commit<I>(
         &mut self,
         patch: &Patch,
         block_hash: Hash,
         precommits: I,
     ) -> Result<(), Error>
     where
-        I: Iterator<Item = &'a ProtocolMessage<Precommit>>,
+        I: Iterator<Item = Message<Precommit>>,
     {
         let patch = {
             let mut fork = {
@@ -488,7 +491,7 @@ impl Blockchain {
     }
 
     /// Saves peer to the peers cache
-    pub fn save_peer(&mut self, pubkey: &PublicKey, peer: Connect) {
+    pub fn save_peer(&mut self, pubkey: &PublicKey, peer: Message<Connect>) {
         let mut fork = self.fork();
 
         {
@@ -518,7 +521,7 @@ impl Blockchain {
     }
 
     /// Recover cached peers if any.
-    pub fn get_saved_peers(&self) -> HashMap<PublicKey, Connect> {
+    pub fn get_saved_peers(&self) -> HashMap<PublicKey, Message<Connect>> {
         let schema = Schema::new(self.snapshot());
         let peers_cache = schema.peers_cache();
         let it = peers_cache.iter().map(|(k, v)| (k, v.clone()));
@@ -526,15 +529,15 @@ impl Blockchain {
     }
 
     /// Saves the given raw message to the consensus messages cache.
-    pub fn save_message(&mut self, round: Round, raw: &SignedMessage) {
-        self.save_messages(round, iter::once(raw.clone()));
+    pub fn save_message<T: ProtocolMessage>(&mut self, round: Round, raw: Message<T>) {
+        self.save_messages(round, iter::once(raw.downgrade()));
     }
 
     /// Saves a collection of SignedMessage to the consensus messages cache with single access to the
     /// `Fork` instance.
     pub fn save_messages<I>(&mut self, round: Round, iter: I)
     where
-        I: IntoIterator<Item = SignedMessage>,
+        I: IntoIterator<Item = Message<Protocol>>,
     {
         let mut fork = self.fork();
 

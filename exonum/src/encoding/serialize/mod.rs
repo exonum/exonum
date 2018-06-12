@@ -20,11 +20,6 @@ pub use hex::{decode as decode_hex, encode as encode_hex, FromHex, FromHexError,
 
 use super::Offset;
 use encoding::Field;
-<<<<<<< HEAD
-use messages::MessageWriter;
-=======
-use super::Offset;
->>>>>>> Refactor message
 
 /// implement exonum serialization\deserialization based on serde `Serialize`\ `Deserialize`
 ///
@@ -86,11 +81,13 @@ pub trait WriteBufferWrapper {
     fn write<'a, T: Field<'a>>(&'a mut self, from: Offset, to: Offset, val: T);
 }
 
+/*
 impl WriteBufferWrapper for MessageWriter {
     fn write<'a, T: Field<'a>>(&'a mut self, from: Offset, to: Offset, val: T) {
         self.write(val, from, to)
     }
 }
+*/
 
 impl WriteBufferWrapper for Vec<u8> {
     fn write<'a, T: Field<'a>>(&'a mut self, from: Offset, to: Offset, val: T) {

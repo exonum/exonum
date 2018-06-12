@@ -16,9 +16,7 @@ use bytes::BytesMut;
 use byteorder::{ByteOrder, LittleEndian};
 use tokio_io::codec::{Decoder, Encoder};
 use failure::Error;
-use messages::{HEADER_LENGTH, MessageBuffer, SignedMessage};
-use super::error::other_error;
-
+use messages::{UncheckedBuffer, SignedMessage};
 #[derive(Debug)]
 pub struct MessagesCodec {
     /// Maximum message length (in bytes), gets populated from `ConsensusConfig`.
@@ -36,8 +34,9 @@ impl Decoder for MessagesCodec {
     type Error = Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        unimplemented!();
         // Read header
-        if buf.len() < HEADER_LENGTH {
+        /*if buf.len() < HEADER_LENGTH {
             return Ok(None);
         }
 
@@ -72,7 +71,7 @@ impl Decoder for MessagesCodec {
             let raw = UncheckedBuffer::new(data);
             return Ok(Some(raw));
         }
-        Ok(None)
+        Ok(None) */
     }
 }
 
@@ -81,9 +80,11 @@ impl Encoder for MessagesCodec {
     type Error = Error;
 
     fn encode(&mut self, msg: Self::Item, buf: &mut BytesMut) -> Result<(), Self::Error> {
-        let buffer = msg.into_buffer()?;
+        /*let buffer = msg.into_buffer()?;
         buf.write_u32::<LittleEndian>(buffer.len() as u32);
         buf.extend_from_slice(&buffer);
+        */
+        unimplemented!();
         Ok(())
     }
 }

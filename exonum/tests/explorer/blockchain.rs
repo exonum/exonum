@@ -124,7 +124,7 @@ pub fn create_blockchain() -> Blockchain {
 
 /// Simplified compared to real life / testkit, but we don't need to test *everything*
 /// here.
-pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<Box<Transaction>>) {
+pub fn create_block(blockchain: &mut Blockchain, transactions: Vec<TransactionMessage>) {
     use std::time::SystemTime;
     use exonum::helpers::{Round, ValidatorId};
     use exonum::messages::{Precommit, Propose};

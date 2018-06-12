@@ -26,7 +26,7 @@ use params;
 use serde_json;
 use serde::{Serialize, Serializer};
 use serde::de::{self, Deserialize, Deserializer, Visitor};
-use failure::Fail;
+use failure::{Fail, self};
 use bodyparser;
 
 use std::{fmt, io};
@@ -63,7 +63,7 @@ pub enum ApiError {
 
     /// Internal error.
     #[fail(display = "Internal server error: {}", _0)]
-    InternalError(Box<::std::error::Error + Send + Sync>),
+    InternalError(failure::Error),
 
     /// Unauthorized error.
     #[fail(display = "Unauthorized")]
@@ -73,6 +73,12 @@ pub enum ApiError {
 impl From<io::Error> for ApiError {
     fn from(e: io::Error) -> ApiError {
         ApiError::Io(e)
+    }
+}
+
+impl From<failure::Error> for ApiError {
+    fn from(e: failure::Error) -> ApiError {
+        ApiError::InternalError(e)
     }
 }
 

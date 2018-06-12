@@ -18,8 +18,12 @@ use std::ops::Deref;
 
 use failure::Error;
 
-pub use authorisation::SignedMessage;
-pub use protocol::ProtocolMessage;
+use ::crypto::PublicKey;
+
+pub use self::authorisation::SignedMessage;
+pub use self::protocol::*;
+pub use self::helpers::BinaryForm;
+pub(crate) use self::raw::UncheckedBuffer;
 
 mod raw;
 mod protocol;
@@ -31,10 +35,16 @@ pub const PROTOCOL_MAJOR_VERSION: u8 = 1;
 // FIXME: Use config value.
 pub const MAX_MESSAGE_SIZE: usize  = 1024 * 1024;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct RawTransaction {
     service_id: u16,
     payload: Vec<u8>,
+}
+
+impl RawTransaction {
+    pub fn service_id(&self) -> u16 {
+        self.service_id
+    }
 }
 
 impl fmt::Debug for RawTransaction {
@@ -47,40 +57,72 @@ impl fmt::Debug for RawTransaction {
 }
 
 /// Wrappers around pair of serialized message, and its binary form
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub (crate) struct Message<T: ProtocolMessage> {
+// TODO: Rewrite using owning_ref
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Message<T=Protocol>
+where T: ProtocolMessage
+{
     payload: T,
     message: SignedMessage,
 }
 
 impl<T: ProtocolMessage> Message<T> {
-    fn deserialize(message: SignedMessage) -> Result<Self, Error>
-    where T: BinarryForm
-    {
-        let payload = <T as BinaryForm>::deserialize(&message.payload)?;
-        Ok(Message {
-            payload,
-            message
-        })
-    }
 
-    fn map<U, F>(self, func: F) -> Result<Message<U>, Error>
+    pub fn map<U, F>(self, func: F) -> Result<Message<U>, Error>
         where U: ProtocolMessage,
               F: Fn(T)-> U
     {
-        let payload = func(self.payload);
-        let message = self.message;
-        if payload != message {
-            bail("Type {} is not a part of exonum protocol", payload)
+        let (payload, message) = self.into_parts();
+        Message::from_parts(func(payload), message)
+    }
+
+    pub fn into_parts(self) -> (T, SignedMessage) {
+        (self.payload, self.message)
+    }
+
+    pub fn from_parts(payload: T, message: SignedMessage) -> Result<Message<T>, Error> {
+        if payload != message.authorised_message.protocol {
+            bail!("Type {:?} is not a part of exonum protocol", payload)
         }
         Ok(Message {
             payload,
             message,
         })
     }
+
+    pub fn downgrade(self) -> Message<Protocol> {
+        Message {
+            payload: self.message.authorised_message.protocol.clone(),
+            message: self.message
+        }
+
+    }
+
+    pub fn author(&self) -> &PublicKey {
+        &self.message.authorised_message.author
+    }
 }
 
-impl<T> Deref for Message<T> {
+impl<T: ProtocolMessage> AsRef<SignedMessage> for Message<T> {
+    fn as_ref(&self) -> &SignedMessage {
+        &self.message
+    }
+}
+
+impl<T: ProtocolMessage> AsRef<T> for Message<T> {
+    fn as_ref(&self) -> &T {
+        &self.payload
+    }
+}
+
+impl<T: ProtocolMessage> Into<SignedMessage> for Message<T> {
+
+    fn into(self) -> SignedMessage {
+        self.message
+    }
+}
+
+impl<T: ProtocolMessage> Deref for Message<T> {
     type Target = T;
     fn deref(&self) -> &T {
         &self.payload

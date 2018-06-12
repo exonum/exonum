@@ -23,7 +23,7 @@ pub use self::whitelist::Whitelist;
 pub mod state; // TODO: temporary solution to get access to WAIT constants (ECR-167)
 pub mod timeout_adjuster;
 
-use failure;
+use failure::{self, Error};
 use toml::Value;
 use router::Router;
 use mount::Mount;
@@ -42,12 +42,13 @@ use std::time::{Duration, SystemTime};
 use std::collections::{BTreeMap, HashSet};
 
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
-use blockchain::{Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction};
+use blockchain::{Blockchain, GenesisConfig, Schema, Service,
+                 SharedNodeState, Transaction, TransactionMessage};
 use api::{private, public, Api};
-use messages::{Connect, Message, CONSENSUS, Protocol, SignedMessage};
+use messages::{Connect, Message, Protocol, SignedMessage, ProtocolMessage};
 use events::{HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkConfiguration,
              NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest};
-use events::error::{into_other, log_error, other_error, LogError};
+use events::error::{into_failure, log_error, LogError};
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
 use storage::{Database, DbOptions};
 
@@ -63,7 +64,7 @@ pub enum ExternalMessage {
     /// Add a new connection.
     PeerAdd(SocketAddr),
     /// Transaction that implements the `Transaction` trait.
-    Transaction(Box<Transaction>),
+    Transaction(TransactionMessage),
     /// Enable or disable the node.
     Enable(bool),
     /// Shutdown the node.
@@ -405,11 +406,7 @@ impl NodeHandler {
             .position(|pk| pk.consensus_key == config.listener.consensus_public_key)
             .map(|id| ValidatorId(id as u16));
         info!("Validator id = '{:?}'", validator_id);
-        let connect = self.sign_message(Connect::new(
-            external_address,
-            system_state.current_time().into(),
-            &user_agent::get(),
-        ));
+        let connect = unimplemented!();
 
         let mut whitelist = config.listener.whitelist;
         whitelist.set_validators(stored.validator_keys.iter().map(|x| x.consensus_key));
@@ -443,11 +440,13 @@ impl NodeHandler {
         }
     }
 
-    fn sign_message<T: Into<Protocol>>(&self, message: T) -> SignedMessage {
-        SignedMessage::new(T,
-                           CONSENSUS,
+    fn sign_message<T: ProtocolMessage>(&self, message: T) -> Message<T> {
+        /*let message = SignedMessage::new(message,
                            *self.state.consensus_public_key(),
-                           self.state.consensus_secret_key())
+                           self.state.consensus_secret_key()).unwrap();
+
+        let (protocol, signed) = message.to_message().into_parts();*/
+        unimplemented!();
     }
 
     /// Return internal `SharedNodeState`
@@ -486,7 +485,7 @@ impl NodeHandler {
         info!("Start listening address={}", listen_address);
 
         let peers: HashSet<_> = {
-            let it = self.state.peers().values().map(Connect::addr);
+            let it = self.state.peers().values().map(|s|s.addr());
             let it = it.chain(self.peer_discovery.iter().cloned());
             let it = it.filter(|&address| address != listen_address);
             it.collect()
@@ -519,7 +518,7 @@ impl NodeHandler {
     }
 
     /// Sends the given message to a peer by its id.
-    pub fn send_to_validator(&mut self, id: u32, message: &SignedMessage) {
+    pub fn send_to_validator<M: Into<SignedMessage>>(&mut self, id: u32, message: M) {
         if id as usize >= self.state.validators().len() {
             error!("Invalid validator id: {}", id);
         } else {
@@ -529,11 +528,11 @@ impl NodeHandler {
     }
 
     /// Sends the given message to a peer by its public key.
-    pub fn send_to_peer(&mut self, public_key: PublicKey, message: &SignedMessage) {
+    pub fn send_to_peer<M: Into<SignedMessage>>(&mut self, public_key: PublicKey, message: M) {
         if let Some(conn) = self.state.peers().get(&public_key) {
             let address = conn.addr();
             trace!("Send to address: {}", address);
-            let request = NetworkRequest::SendMessage(address, message.clone());
+            let request = NetworkRequest::SendMessage(address, message.into());
             self.channel.network_requests.send(request).log_error();
         } else {
             warn!("Hasn't connection with peer {:?}", public_key);
@@ -541,14 +540,15 @@ impl NodeHandler {
     }
 
     /// Sends `SignedMessage` to the specified address.
-    pub fn send_to_addr(&mut self, address: &SocketAddr, message: &SignedMessage) {
+    pub fn send_to_addr<M: Into<SignedMessage>>(&mut self, address: &SocketAddr, message: M) {
         trace!("Send to address: {}", address);
-        let request = NetworkRequest::SendMessage(*address, message.clone());
+        let request = NetworkRequest::SendMessage(*address, message.into());
         self.channel.network_requests.send(request).log_error();
     }
 
     /// Broadcasts given message to all peers.
-    pub fn broadcast(&mut self, message: &SignedMessage) {
+    pub fn broadcast<M: Into<SignedMessage>>(&mut self, message: M) {
+        let message = message.into();
         for conn in self.state.peers().values() {
             let address = conn.addr();
             trace!("Send to address: {}", address);
@@ -560,7 +560,8 @@ impl NodeHandler {
     /// Performs connection to the specified network address.
     pub fn connect(&mut self, address: &SocketAddr) {
         let connect = self.state.our_connect_message().clone();
-        self.send_to_addr(address, connect.raw());
+        unimplemented!()
+        // self.send_to_addr(address, connect);
     }
 
     /// Add timeout request.
@@ -674,24 +675,24 @@ impl ApiSender {
     }
 
     /// Add peer to peer list
-    pub fn peer_add(&self, addr: SocketAddr) -> io::Result<()> {
+    pub fn peer_add(&self, addr: SocketAddr) -> Result<(), Error> {
         let msg = ExternalMessage::PeerAdd(addr);
         self.send_external_message(msg)
     }
 
     /// Sends an external message.
-    pub fn send_external_message(&self, message: ExternalMessage) -> io::Result<()> {
+    pub fn send_external_message(&self, message: ExternalMessage) -> Result<(), Error> {
         self.0
             .clone()
             .send(message)
             .wait()
             .map(drop)
-            .map_err(into_other)
+            .map_err(into_failure)
     }
 }
-
+/*
 impl TransactionSend for ApiSender {
-    fn send(&self, tx: Box<Transaction>) -> io::Result<()> {
+    fn send(&self, tx: UncheckedBuffer) -> io::Result<()> {
         if !tx.verify() {
             let msg = "Unable to verify transaction";
             return Err(io::Error::new(io::ErrorKind::Other, msg));
@@ -700,7 +701,7 @@ impl TransactionSend for ApiSender {
         self.send_external_message(msg)
     }
 }
-
+*/
 impl fmt::Debug for ApiSender {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.pad("ApiSender { .. }")
@@ -848,25 +849,25 @@ impl Node {
 
     /// Launches only consensus messages handler.
     /// This may be used if you want to customize api with the `ApiContext`.
-    pub fn run_handler(mut self) -> io::Result<()> {
+    pub fn run_handler(mut self) -> Result<(), Error> {
         self.handler.initialize();
 
         let (handler_part, network_part, timeouts_part) = self.into_reactor();
 
         let network_thread = thread::spawn(move || {
-            let mut core = Core::new()?;
+            let mut core = Core::new().map_err(into_failure)?;
             let handle = core.handle();
             core.handle()
                 .spawn(timeouts_part.run(handle).map_err(log_error));
             let network_handler = network_part.run(&core.handle());
             core.run(network_handler).map(drop).map_err(|e| {
-                other_error(&format!("An error in the `Network` thread occurred: {}", e))
+                format_err!("An error in the `Network` thread occurred: {}", e)
             })
         });
 
-        let mut core = Core::new()?;
+        let mut core = Core::new().map_err(into_failure)?;
         core.run(handler_part.run())
-            .map_err(|_| other_error("An error in the `Handler` thread occurred"))?;
+            .map_err(|_| format_err!("An error in the `Handler` thread occurred"))?;
         network_thread.join().unwrap()
     }
 
@@ -875,7 +876,7 @@ impl Node {
     /// Explorer api prefix is `/api/explorer`
     /// Public api prefix is `/api/services/{service_name}`
     /// Private api prefix is `/api/services/{service_name}`
-    pub fn run(self) -> io::Result<()> {
+    pub fn run(self) -> Result<(), Error> {
         let api_state = self.handler.api_state.clone();
         let blockchain = self.handler.blockchain.clone();
         let mut api_handlers: Vec<Listening> = Vec::new();

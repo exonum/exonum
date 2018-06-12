@@ -23,7 +23,7 @@ use std::error::Error;
 use std::{fmt, u8};
 use std::convert::Into;
 
-use messages::{Message, RawTransaction};
+use messages::{Message, RawTransaction, SignedMessage};
 use storage::{Fork, StorageValue};
 use crypto::{CryptoHash, Hash};
 use encoding;
@@ -44,13 +44,29 @@ pub type ExecutionResult = Result<(), ExecutionError>;
 /// framework) that can be obtained through `Schema`'s `transaction_statuses` method.
 pub type TransactionResult = Result<(), TransactionError>;
 
+
+pub struct TransactionMessage {
+    logic: Box<Transaction>,
+    originam_message: Message<RawTransaction>
+}
+impl ::std::fmt::Debug for TransactionMessage {
+    fn fmt(&self, fmt: &mut ::std::fmt::Formatter) -> Result<(), ::std::fmt::Error> {
+        unimplemented!()
+    }
+}
+impl TransactionMessage {
+    pub fn raw(&self) -> &Message<RawTransaction> {
+        unimplemented!()
+    }
+}
+
 /// Transaction processing functionality for `Message`s allowing to apply authenticated, atomic,
 /// constraint-preserving groups of changes to the blockchain storage.
 ///
 /// See also [the documentation page on transactions][doc:transactions].
 ///
 /// [doc:transactions]: https://exonum.com/doc/architecture/transactions/
-pub trait Transaction: Message + ExonumJson + 'static {
+pub trait Transaction: ::std::fmt::Debug + Send + 'static {
     /// Verifies the internal consistency of the transaction. `verify` should usually include
     /// checking the message signature (via [`verify_signature`]) and, possibly,
     /// other internal constraints. `verify` has no access to the blockchain state;
@@ -373,7 +389,7 @@ pub trait TransactionSet
 /// - `new_with_signature` takes all fields in the order of their declaration in the macro,
 ///   and a message [`Signature`].
 ///
-/// Each transaction also implements [`Message`], [`ServiceMessage`], [`SegmentField`],
+/// Each transaction also implements [`SegmentField`],
 /// [`ExonumJson`] and [`StorageValue`] traits for the declared datatype.
 ///
 ///
@@ -388,7 +404,6 @@ pub trait TransactionSet
 /// [`ExonumJson`]: ./encoding/serialize/json/trait.ExonumJson.html
 /// [`StorageValue`]: ./storage/trait.StorageValue.html
 /// [`Message`]: ./messages/trait.Message.html
-/// [`ServiceMessage`]: ./messages/trait.ServiceMessage.html
 /// # Examples
 ///
 /// ```

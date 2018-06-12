@@ -2,7 +2,7 @@ use encoding::Field;
 use storage::StorageValue;
 use failure::Error;
 //TODO: temp trait for internal purposes.
-pub trait BinaryForm {
+pub trait BinaryForm: Sized {
     fn serialize(self) -> Result<Vec<u8>, Error>;
 
     fn deserialize(buffer: &[u8]) -> Result<Self, Error>;
@@ -22,6 +22,6 @@ impl<T> BinaryForm for T
             <Self as Field>::field_size().into(),
             <Self as Field>::field_size().into())
             .map(|_| StorageValue::from_bytes(buffer.into()))
-            .map_err(|e| e)
+            .map_err(|e| unimplemented!())
     }
 }

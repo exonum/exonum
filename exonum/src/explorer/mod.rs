@@ -30,7 +30,7 @@ use blockchain::{Block, Blockchain, Schema, Transaction, TransactionError, Trans
                  TransactionResult, TxLocation};
 use encoding;
 use helpers::Height;
-use messages::{Precommit, RawMessage};
+use messages::{Precommit, Message, RawTransaction, SignedMessage};
 use storage::{ListProof, Snapshot};
 
 /// Transaction parsing result.
@@ -106,7 +106,7 @@ impl HeightRange {
 pub struct BlockInfo<'a> {
     header: Block,
     explorer: &'a BlockchainExplorer<'a>,
-    precommits: RefCell<Option<Vec<Precommit>>>,
+    precommits: RefCell<Option<Vec<Message<Precommit>>>>,
     txs: RefCell<Option<Vec<Hash>>>,
 }
 
@@ -161,7 +161,7 @@ impl<'a> BlockInfo<'a> {
     }
 
     /// Returns a list of precommits for this block.
-    pub fn precommits(&self) -> Ref<[Precommit]> {
+    pub fn precommits(&self) -> Ref<[Message<Precommit>]> {
         if self.precommits.borrow().is_none() {
             let precommits = self.explorer.precommits(&self.header);
             *self.precommits.borrow_mut() = Some(precommits);
@@ -276,7 +276,7 @@ pub struct BlockWithTransactions<T = Box<Transaction>> {
     #[serde(rename = "block")]
     pub header: Block,
     /// Precommits.
-    pub precommits: Vec<Precommit>,
+    pub precommits: Vec<Message<Precommit>>,
     /// Transactions in the order they appear in the block.
     pub transactions: Vec<CommittedTransaction<T>>,
 }
@@ -655,11 +655,8 @@ impl SerializeContent for Box<Transaction> {
         S: Serializer,
     {
         use serde::ser::Error;
+        unimplemented!();
 
-        let value = self.as_ref()
-            .serialize_field()
-            .map_err(|err| S::Error::custom(err.description()))?;
-        value.serialize(serializer)
     }
 }
 
@@ -708,7 +705,7 @@ impl<T> TransactionInfo<T> {
 /// [`Snapshot`]: ../storage/trait.Snapshot.html
 pub struct BlockchainExplorer<'a> {
     snapshot: Box<Snapshot>,
-    transaction_parser: Box<'a + Fn(RawMessage) -> ParseResult>,
+    transaction_parser: Box<'a + Fn(Message<RawTransaction>) -> ParseResult>,
 }
 
 impl<'a> fmt::Debug for BlockchainExplorer<'a> {
@@ -747,7 +744,7 @@ impl<'a> BlockchainExplorer<'a> {
     }
 
     #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
-    fn precommits(&self, block: &Block) -> Vec<Precommit> {
+    fn precommits(&self, block: &Block) -> Vec<Message<Precommit>> {
         let schema = Schema::new(&self.snapshot);
         let precommits_table = schema.precommits(&block.hash());
         let precommits = precommits_table.iter().collect();

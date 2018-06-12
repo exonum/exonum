@@ -21,8 +21,10 @@ use failure;
 use std::collections::{BTreeMap, HashMap, HashSet, hash_map::Entry};
 use std::net::SocketAddr;
 use std::time::{Duration, SystemTime};
+use std::ops::Deref;
 
-use messages::{Connect, ConsensusMessage, Message, Precommit, Prevote, Propose, SignedMessage};
+use messages::{Connect, ConsensusMessage, Message, RawTransaction,
+               Precommit, Prevote, Propose, SignedMessage};
 use crypto::{CryptoHash, Hash, PublicKey, SecretKey};
 use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 use blockchain::{ConsensusConfig, StoredConfiguration, TimeoutAdjusterConfig, ValidatorKeys};
@@ -45,7 +47,7 @@ pub const BLOCK_REQUEST_TIMEOUT: Milliseconds = 100;
 #[derive(Debug)]
 pub struct State {
     validator_state: Option<ValidatorState>,
-    our_connect_message: Connect,
+    our_connect_message: Message<Connect>,
 
     consensus_public_key: PublicKey,
     consensus_secret_key: SecretKey,
@@ -56,7 +58,7 @@ pub struct State {
     whitelist: Whitelist,
     tx_pool_capacity: usize,
 
-    peers: HashMap<PublicKey, Connect>,
+    peers: HashMap<PublicKey, Message<Connect>>,
     connections: HashMap<SocketAddr, PublicKey>,
     height_start_time: SystemTime,
     height: Height,
@@ -69,10 +71,10 @@ pub struct State {
     // messages
     proposes: HashMap<Hash, ProposeState>,
     blocks: HashMap<Hash, BlockState>,
-    prevotes: HashMap<(Round, Hash), Votes<ProtocolMessage<Prevote>>>,
-    precommits: HashMap<(Round, Hash), Votes<ProtocolMessage<Precommit>>>,
+    prevotes: HashMap<(Round, Hash), Votes<Message<Prevote>>>,
+    precommits: HashMap<(Round, Hash), Votes<Message<Precommit>>>,
 
-    queued: Vec<ConsensusMessage>,
+    queued: Vec<Message<ConsensusMessage>>,
 
     unknown_txs: HashMap<Hash, Vec<Hash>>,
     unknown_proposes_with_precommits: HashMap<Hash, Vec<(Round, Hash)>>,
@@ -93,8 +95,8 @@ pub struct State {
 #[derive(Debug, Clone)]
 pub struct ValidatorState {
     id: ValidatorId,
-    our_prevotes: HashMap<Round, ProtocolMessage<Prevote>>,
-    our_precommits: HashMap<Round, ProtocolMessage<Precommit>>,
+    our_prevotes: HashMap<Round, Message<Prevote>>,
+    our_precommits: HashMap<Round, Message<Precommit>>,
 }
 
 /// `RequestData` represents a request for some data to other nodes. Each enum variant will be
@@ -123,7 +125,7 @@ struct RequestState {
 #[derive(Debug)]
 /// transactions.
 pub struct ProposeState {
-    propose: ProtocolMessage<Propose>,
+    propose: Message<Propose>,
     unknown_txs: HashSet<Hash>,
     block_hash: Option<Hash>,
     // Whether the message has been saved to the consensus messages' cache or not.
@@ -141,20 +143,20 @@ pub struct BlockState {
 }
 
 /// `VoteMessage` trait represents voting messages such as `Precommit` and `Prevote`.
-pub trait VoteMessage: Message + Clone {
+pub trait VoteMessage: Clone {
     /// Return validator if of the message.
     fn validator(&self) -> ValidatorId;
 }
 
-impl VoteMessage for ProtocolMessage<Precommit> {
+impl VoteMessage for Message<Precommit> {
     fn validator(&self) -> ValidatorId {
-        self.validator()
+        self.deref().validator()
     }
 }
 
-impl VoteMessage for ProtocolMessage<Prevote> {
+impl VoteMessage for Message<Prevote> {
     fn validator(&self) -> ValidatorId {
-        self.validator()
+        self.deref().validator()
     }
 }
 
@@ -212,12 +214,12 @@ where
     }
 
     /// Inserts a new message if it hasn't been inserted yet.
-    pub fn insert(&mut self, message: &T) {
+    pub fn insert(&mut self, message: T) {
         let voter: usize = message.validator().into();
         if !self.validators[voter] {
             self.count += 1;
             self.validators.set(voter, true);
-            self.messages.push(message.clone());
+            self.messages.push(message);
         }
     }
 
@@ -294,7 +296,7 @@ impl ProposeState {
     }
 
     /// Returns propose-message.
-    pub fn message(&self) -> &ProtocolMessage<Propose> {
+    pub fn message(&self) -> &Message<Propose> {
         &self.propose
     }
 
@@ -363,8 +365,8 @@ impl State {
         tx_pool_capacity: usize,
         whitelist: Whitelist,
         stored: StoredConfiguration,
-        connect: Connect,
-        peers: HashMap<PublicKey, Connect>,
+        connect:  Message<Connect>,
+        peers: HashMap<PublicKey, Message<Connect>>,
         last_hash: Hash,
         last_height: Height,
         height_start_time: SystemTime,
@@ -512,7 +514,7 @@ impl State {
     }
 
     /// Adds the public key, address, and `Connect` message of a validator.
-    pub fn add_peer(&mut self, pubkey: PublicKey, msg: Connect) -> bool {
+    pub fn add_peer(&mut self, pubkey: PublicKey, msg: Message<Connect>) -> bool {
         self.connections.insert(msg.addr(), pubkey);
         self.peers.insert(pubkey, msg).is_none()
     }
@@ -530,7 +532,7 @@ impl State {
     }
 
     /// Returns the keys of known peers with their `Connect` messages.
-    pub fn peers(&self) -> &HashMap<PublicKey, Connect> {
+    pub fn peers(&self) -> &HashMap<PublicKey, Message<Connect>> {
         &self.peers
     }
 
@@ -728,14 +730,14 @@ impl State {
     }
 
     /// Returns a list of queued consensus messages.
-    pub fn queued(&mut self) -> Vec<ConsensusMessage> {
+    pub fn queued(&mut self) -> Vec<Message<ConsensusMessage>> {
         let mut queued = Vec::new();
         ::std::mem::swap(&mut self.queued, &mut queued);
         queued
     }
 
     /// Add consensus message to the queue.
-    pub fn add_queued(&mut self, msg: ConsensusMessage) {
+    pub fn add_queued(&mut self, msg: Message<ConsensusMessage>) {
         self.queued.push(msg);
     }
 
@@ -759,7 +761,7 @@ impl State {
     }
 
     /// Returns pre-votes for the specified round and propose hash.
-    pub fn prevotes(&self, round: Round, propose_hash: Hash) -> &[Prevote] {
+    pub fn prevotes(&self, round: Round, propose_hash: Hash) -> &[Message<Prevote>] {
         self.prevotes
             .get(&(round, propose_hash))
             .map(|votes| votes.messages().as_slice())
@@ -767,7 +769,7 @@ impl State {
     }
 
     /// Returns pre-commits for the specified round and propose hash.
-    pub fn precommits(&self, round: Round, propose_hash: Hash) -> &[ProtocolMessage<Precommit>] {
+    pub fn precommits(&self, round: Round, propose_hash: Hash) -> &[Message<Precommit>] {
         self.precommits
             .get(&(round, propose_hash))
             .map(|votes| votes.messages().as_slice())
@@ -789,7 +791,7 @@ impl State {
 
     /// Adds propose from this node to the proposes list for the current height. Such propose
     /// cannot contain unknown transactions. Returns hash of the propose.
-    pub fn add_self_propose(&mut self, msg: ProtocolMessage<Propose>) -> Hash {
+    pub fn add_self_propose(&mut self, msg: Message<Propose>) -> Hash {
         debug_assert!(self.validator_state().is_some());
         let propose_hash = msg.hash();
         self.proposes.insert(
@@ -810,8 +812,8 @@ impl State {
     /// Adds propose from other node. Returns `ProposeState` if it is a new propose.
     pub fn add_propose(
         &mut self,
-        msg: &ProtocolMessage<Propose>,
-        transactions: &MapIndex<&&Snapshot, Hash, ProtocolMessage<RawTransaction>>,
+        msg: Message<Propose>,
+        transactions: &MapIndex<&&Snapshot, Hash, Message<RawTransaction>>,
         transaction_pool: &KeySetIndex<&&Snapshot, Hash>,
     ) -> Result<&ProposeState, failure::Error> {
         let propose_hash = msg.hash();
@@ -840,7 +842,7 @@ impl State {
                 }
 
                 Ok(e.insert(ProposeState {
-                    propose: msg.clone(),
+                    propose: msg,
                     unknown_txs,
                     block_hash: None,
                     is_saved: false,
@@ -874,7 +876,7 @@ impl State {
     /// # Panics
     ///
     /// A node panics if it has already sent a different `Prevote` for the same round.
-    pub fn add_prevote(&mut self, msg: &Prevote) -> bool {
+    pub fn add_prevote(&mut self, msg: Message<Prevote>) -> bool {
         let majority_count = self.majority_count();
         if let Some(ref mut validator_state) = self.validator_state {
             if validator_state.id == msg.validator() {
@@ -882,7 +884,7 @@ impl State {
                     .our_prevotes
                     .insert(msg.round(), msg.clone())
                 {
-                    if &other != msg {
+                    if other != msg {
                         panic!(
                             "Trying to send different prevotes for the same round: \
                              old = {:?}, new = {:?}",
@@ -933,7 +935,7 @@ impl State {
     /// # Panics
     ///
     /// A node panics if it has already sent a different `Precommit` for the same round.
-    pub fn add_precommit(&mut self, msg: &ProtocolMessage<Precommit>) -> bool {
+    pub fn add_precommit(&mut self, msg: Message<Precommit>) -> bool {
         let majority_count = self.majority_count();
         if let Some(ref mut validator_state) = self.validator_state {
             if validator_state.id == msg.validator() {
@@ -1043,12 +1045,12 @@ impl State {
     }
 
     /// Returns the `Connect` message of the current node.
-    pub fn our_connect_message(&self) -> &Connect {
+    pub fn our_connect_message(&self) -> &Message<Connect> {
         &self.our_connect_message
     }
 
     /// Updates the `Connect` message of the current node.
-    pub fn set_our_connect_message(&mut self, msg: Connect) {
+    pub fn set_our_connect_message(&mut self, msg: Message<Connect>) {
         self.our_connect_message = msg;
     }
 }

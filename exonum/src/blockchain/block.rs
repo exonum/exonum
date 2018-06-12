@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crypto::Hash;
-use messages::Precommit;
+use messages::{Precommit, Message};
 use helpers::{Height, ValidatorId};
 
 /// Current core information schema version.
@@ -52,7 +52,7 @@ pub struct BlockProof {
     /// Block.
     pub block: Block,
     /// List of pre-commits for the block.
-    pub precommits: Vec<Message<Protocol>>,
+    pub precommits: Vec<Message<Precommit>>,
 }
 
 #[cfg(test)]

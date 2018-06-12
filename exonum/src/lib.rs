@@ -17,7 +17,7 @@
 //! For more information see the project readme.
 // spell-checker:ignore cors
 
-#![deny(missing_debug_implementations, missing_docs, unsafe_code)]
+//#![deny(missing_debug_implementations, missing_docs, unsafe_code)]
 #![cfg_attr(feature = "flame_profile", feature(plugin, custom_attribute))]
 #![cfg_attr(feature = "flame_profile", plugin(exonum_flamer))]
 #![cfg_attr(feature = "long_benchmarks", feature(test))]
@@ -26,6 +26,7 @@ extern crate atty;
 extern crate bit_vec;
 extern crate bodyparser;
 extern crate byteorder;
+extern crate bincode;
 extern crate bytes;
 extern crate chrono;
 #[macro_use(crate_version, crate_authors)]

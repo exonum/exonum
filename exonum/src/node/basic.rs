@@ -23,36 +23,24 @@ use super::{NodeHandler, RequestData};
 
 impl NodeHandler {
     /// Redirects message to the corresponding `handle_...` function.
-    pub fn handle_message(&mut self, raw: SignedMessage) {
-        // TODO: check message headers (network id, protocol version)
-        // FIXME: call message.verify method
-        //     if !raw.verify() {
-        //         return;
-        //     }
-        let msg: Message<Protocol> =
-        if let Ok(msg) = Message::deserialize(raw){
-            msg
-        } else {
-            error!("Received unknown message.");
-            return;
+    pub fn handle_message(&mut self, msg: Message<Protocol>) -> Result<(), ::failure::Error> {
+        let (payload, message) = msg.into_parts();
+
+        match payload {
+            Protocol::Connect(msg) => self.handle_connect(Message::from_parts(msg, message)?),
+            Protocol::Status(msg) => self.handle_status(Message::from_parts(msg, message)?),
+            Protocol::Consensus(msg) => self.handle_consensus(Message::from_parts(msg, message)?)?,
+            Protocol::Request(msg) => self.handle_request(Message::from_parts(msg, message)?)?,
+            Protocol::Block(msg) => self.handle_block(Message::from_parts(msg, message)?),
+            Protocol::Transaction(msg) => self.handle_tx(Message::from_parts(msg, message)?),
+            Protocol::TransactionsBatch(msg) => self.handle_txs_batch(Message::from_parts(msg, message)?),
         };
-
-        let borrowed = msg.borrow();
-
-        match *borrowed.inner() {
-            Protocol::Connect(ref msg) => self.handle_connect(borrowed.reborrow(msg)),
-            Protocol::Status(ref msg) => self.handle_status(borrowed.reborrow(msg)),
-            Protocol::Consensus(ref msg) => self.handle_consensus(borrowed.reborrow(msg)),
-            Protocol::Request(ref msg) => self.handle_request(borrowed.reborrow(msg)),
-            Protocol::Block(ref msg) => self.handle_block(borrowed.reborrow(msg)),
-            Protocol::Transaction(ref msg) => self.handle_tx(borrowed.reborrow(msg)),
-            Protocol::TransactionsBatch(ref msg) => self.handle_txs_batch(borrowed.reborrow(msg)),
-        }
+        Ok(())
     }
 
     /// Handles the `Connected` event. Node's `Connect` message is sent as response
     /// if received `Connect` message is correct.
-    pub fn handle_connected(&mut self, addr: SocketAddr, connect: ProtocolMessage<Connect>) {
+    pub fn handle_connected(&mut self, addr: SocketAddr, connect: Message<Connect>) {
         info!("Received Connect message from peer: {}", addr);
         self.handle_connect(connect);
     }
@@ -82,7 +70,7 @@ impl NodeHandler {
     }
 
     /// Handles the `Connect` message and connects to a peer as result.
-    pub fn handle_connect(&mut self, message: ProtocolMessage<Connect>) {
+    pub fn handle_connect(&mut self, message: Message<Connect>) {
         // TODO add spam protection (ECR-170)
         let address = message.addr();
         if address == self.state.our_connect_message().addr() {
@@ -90,32 +78,23 @@ impl NodeHandler {
             return;
         }
 
-        let pub_key = *message.pub_key();
-        if pub_key == *self.state.our_connect_message().pub_key() {
+        let pub_key = *message.author();
+        if pub_key == *self.state.our_connect_message().author() {
             trace!("Received Connect with same pub_key as ours.");
             return;
         }
 
-        if !self.state.whitelist().allow(message.pub_key()) {
+        if !self.state.whitelist().allow(message.author()) {
             error!(
                 "Received connect message from {:?} peer which not in whitelist.",
-                message.pub_key()
-            );
-            return;
-        }
-
-        let public_key = *message.pub_key();
-        if !message.verify_signature(&public_key) {
-            error!(
-                "Received connect-message with incorrect signature, msg={:?}",
-                message
+                message.author()
             );
             return;
         }
 
         // Check if we have another connect message from peer with the given public_key.
         let mut need_connect = true;
-        if let Some(saved_message) = self.state.peers().get(&public_key) {
+        if let Some(saved_message) = self.state.peers().get(&pub_key) {
             if saved_message.time() > message.time() {
                 error!("Received outdated Connect message from {}", address);
                 return;
@@ -128,12 +107,12 @@ impl NodeHandler {
                 need_connect = false;
             }
         }
-        self.state.add_peer(public_key, message.clone());
+        self.state.add_peer(pub_key, message.clone());
         info!(
             "Received Connect message from {}, {}",
             address, need_connect,
         );
-        self.blockchain.save_peer(&public_key, message);
+        self.blockchain.save_peer(&pub_key, message);
         if need_connect {
             // TODO: reduce double sending of connect message
             info!("Send Connect message to {}", address);
@@ -143,7 +122,7 @@ impl NodeHandler {
 
     /// Handles the `Status` message. Node sends `BlockRequest` as response if height in the
     /// message is higher than node's height.
-    pub fn handle_status(&mut self, msg: ProtocolMessage<Status>) {
+    pub fn handle_status(&mut self, msg: Message<Status>) {
         let height = self.state.height();
         trace!(
             "HANDLE STATUS: current height = {}, msg height = {}",
@@ -151,25 +130,17 @@ impl NodeHandler {
             msg.height()
         );
 
-        if !self.state.whitelist().allow(msg.from()) {
+        if !self.state.whitelist().allow(msg.author()) {
             error!(
                 "Received status message from peer = {:?} which not in whitelist.",
-                msg.from()
+                msg.author()
             );
             return;
         }
 
         // Handle message from future height
         if msg.height() > height {
-            let peer = msg.from();
-
-            if !msg.verify_signature(peer) {
-                error!(
-                    "Received status message with incorrect signature, msg={:?}",
-                    msg
-                );
-                return;
-            }
+            let peer = msg.author();
 
             // Check validator height info
             if msg.height() > self.state.node_height(peer) {
@@ -183,16 +154,18 @@ impl NodeHandler {
     }
 
     /// Handles the `PeersRequest` message. Node sends `Connect` messages of other peers as result.
-    pub fn handle_request_peers(&mut self, msg: ProtocolMessage<PeersRequest>) {
-        let peers: Vec<Connect> = self.state.peers().iter().map(|(_, b)| b.clone()).collect();
+    pub fn handle_request_peers(&mut self, msg: Message<PeersRequest>) {
+        let peers: Vec<Message<Connect>> = self.state
+            .peers()
+            .iter().map(|(_, b)| b.clone()).collect();
         trace!(
             "HANDLE REQUEST PEERS: Sending {:?} peers to {:?}",
             peers,
-            msg.from()
+            msg.author()
         );
 
         for peer in peers {
-            self.send_to_peer(*msg.from(), peer.raw());
+            self.send_to_peer(*msg.author(), peer);
         }
     }
 
@@ -221,12 +194,11 @@ impl NodeHandler {
                 .unwrap();
             let peer = peer.clone();
             let msg = PeersRequest::new(
-                self.state.consensus_public_key(),
-                peer.pub_key(),
-                self.state.consensus_secret_key(),
+                peer.author(),
             );
             trace!("Request peers from peer with addr {:?}", peer.addr());
-            self.send_to_peer(*peer.pub_key(), msg.raw());
+            let message = self.sign_message(msg);
+            self.send_to_peer(*peer.author(), message);
         }
         self.add_peer_exchange_timeout();
     }
@@ -241,12 +213,12 @@ impl NodeHandler {
     pub fn broadcast_status(&mut self) {
         let hash = self.blockchain.last_hash();
         let status = Status::new(
-            self.state.consensus_public_key(),
             self.state.height(),
             &hash,
-            self.state.consensus_secret_key(),
         );
         trace!("Broadcast status: {:?}", status);
-        self.broadcast(status.raw());
+
+        let message = self.sign_message(status);
+        self.broadcast( message);
     }
 }

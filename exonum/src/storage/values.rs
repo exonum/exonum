@@ -24,7 +24,7 @@ use std::borrow::Cow;
 
 use crypto::{Hash, PublicKey};
 use encoding::{Field, Offset};
-use messages::{MessageBuffer, RawMessage};
+use messages::SignedMessage;
 use helpers::Round;
 use super::UniqueHash;
 
@@ -231,16 +231,6 @@ impl StorageValue for PublicKey {
 
     fn from_bytes(value: Cow<[u8]>) -> Self {
         PublicKey::from_slice(value.as_ref()).unwrap()
-    }
-}
-
-impl StorageValue for RawMessage {
-    fn into_bytes(self) -> Vec<u8> {
-        self.as_ref().to_vec()
-    }
-
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        Self::new(MessageBuffer::from_vec(value.into_owned()))
     }
 }
 

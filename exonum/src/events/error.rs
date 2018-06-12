@@ -15,25 +15,22 @@
 // These functions transform source error types into other.
 #![cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
 
-use std::error::Error as StdError;
+use failure::{Error, Fail};
 use std::io;
+use std::error::Error as StdErr;
 
 // Common error helpers (TODO move to helpers)
 
-pub fn other_error<S: AsRef<str>>(s: S) -> io::Error {
-    io::Error::new(io::ErrorKind::Other, s.as_ref())
-}
-
-pub fn result_ok<T, E: StdError>(_: T) -> Result<(), E> {
+pub fn result_ok<T>(_: T) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn log_error<E: StdError>(err: E) {
+pub fn log_error(err: Error) {
     error!("An error occurred: {}", err)
 }
 
-pub fn into_other<E: StdError>(err: E) -> io::Error {
-    other_error(&format!("An error occurred, {}", err.description()))
+pub fn into_failure<E: StdErr>(err: E) -> Error {
+    format_err!("An error occurred, {}", err.description())
 }
 
 pub trait LogError {

@@ -27,6 +27,7 @@
 //!     * generation - in which cases message is generated
 
 use chrono::{DateTime, Utc};
+use bit_vec::BitVec;
 
 use std::net::SocketAddr;
 use std::fmt::{Debug, Error, Formatter};
@@ -34,11 +35,13 @@ use std::fmt::{Debug, Error, Formatter};
 use crypto::{Hash, PublicKey};
 use blockchain;
 use helpers::{Height, Round, ValidatorId};
-use super::{SignedMessage, ServiceMessage, RawTransaction};
+use super::{SignedMessage, RawTransaction};
 
 /// Any possible message.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Protocol {
+    /// Transaction.
+    Transaction(RawTransaction),
     /// `Connect` message.
     Connect(Connect),
     /// `Status` message.
@@ -51,8 +54,6 @@ pub enum Protocol {
     Request(RequestMessage),
     /// A batch of the transactions.
     TransactionsBatch(TransactionsResponse),
-    /// Transaction.
-    Transaction(RawTransaction),
 }
 
 /// Consensus message.
@@ -82,17 +83,6 @@ pub enum RequestMessage {
 }
 
 impl RequestMessage {
-    /// Returns public key of the message sender.
-    pub fn from(&self) -> &PublicKey {
-        match *self {
-            RequestMessage::Propose(ref msg) => msg.from(),
-            RequestMessage::Transactions(ref msg) => msg.from(),
-            RequestMessage::Prevotes(ref msg) => msg.from(),
-            RequestMessage::Peers(ref msg) => msg.from(),
-            RequestMessage::Block(ref msg) => msg.from(),
-        }
-    }
-
     /// Returns public key of the message recipient.
     pub fn to(&self) -> &PublicKey {
         match *self {
@@ -103,19 +93,6 @@ impl RequestMessage {
             RequestMessage::Block(ref msg) => msg.to(),
         }
     }
-
-    /// Verifies the message signature with given public key.
-    #[cfg_attr(feature = "flame_profile", flame)]
-    pub fn verify(&self, public_key: &PublicKey) -> bool {
-        match *self {
-            RequestMessage::Propose(ref msg) => msg.verify_signature(public_key),
-            RequestMessage::Transactions(ref msg) => msg.verify_signature(public_key),
-            RequestMessage::Prevotes(ref msg) => msg.verify_signature(public_key),
-            RequestMessage::Peers(ref msg) => msg.verify_signature(public_key),
-            RequestMessage::Block(ref msg) => msg.verify_signature(public_key),
-        }
-    }
-
 }
 
 impl Debug for RequestMessage {
@@ -158,15 +135,6 @@ impl ConsensusMessage {
         }
     }
 
-
-    /// Verifies the message signature with given public key.
-    pub fn verify(&self, public_key: &PublicKey) -> bool {
-        match *self {
-            ConsensusMessage::Propose(ref msg) => msg.verify_signature(public_key),
-            ConsensusMessage::Prevote(ref msg) => msg.verify_signature(public_key),
-            ConsensusMessage::Precommit(ref msg) => msg.verify_signature(public_key),
-        }
-    }
 }
 
 impl Debug for ConsensusMessage {
@@ -470,5 +438,112 @@ encoding_struct! {
 }
 
 
-pub trait ProtocolMessage: Debug + Into<Protocol> + PartialEq<Protocol>;
-impl<T: Debug + Into<Protocol> + PartialEq<Protocol>> ProtocolMessage for T;
+pub trait ProtocolMessage: Debug + Into<Protocol> + PartialEq<Protocol> {}
+impl<T: Debug + Into<Protocol> + PartialEq<Protocol>> ProtocolMessage for T {}
+/*
+pub enum Protocol {
+    /// `Connect` message.
+    Connect(Connect),
+    /// `Status` message.
+    Status(Status),
+    /// `Block` message.
+    Block(BlockResponse),
+    /// Consensus message.
+    Consensus(ConsensusMessage),
+    /// Request for the some data.
+    Request(RequestMessage),
+    /// A batch of the transactions.
+    TransactionsBatch(TransactionsResponse),
+    /// Transaction.
+    Transaction(RawTransaction),
+}
+
+/// Consensus message.
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub enum ConsensusMessage {
+    /// `Propose` message.
+    Propose(Propose),
+    /// `Prevote` message.
+    Prevote(Prevote),
+    /// `Precommit` message.
+    Precommit(Precommit),
+}
+
+/// A request for the some data.
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub enum RequestMessage {
+    /// Propose request.
+    Propose(ProposeRequest),
+    /// Transactions request.
+    Transactions(TransactionsRequest),
+    /// Prevotes request.
+    Prevotes(PrevotesRequest),
+    /// Peers request.
+    Peers(PeersRequest),
+    /// Block request.
+    Block(BlockRequest),
+}
+*/
+
+macro_rules! impl_protocol {
+    ($val:ident => $v:ident = ($($ma:tt)*) => $($ma2:tt)*) => {
+    impl PartialEq<Protocol> for $val {
+        fn eq(&self, other: &Protocol) -> bool {
+            if let $($ma2)* = *other {
+                return $v == self;
+            }
+            false
+        }
+    }
+    impl Into<Protocol> for $val {
+        fn into(self) -> Protocol {
+            let $v = self;
+            $($ma)*
+        }
+    }
+
+    };
+}
+
+//TODO: Replace by better arm parsing
+
+impl_protocol!{Connect => c =
+    (Protocol::Connect(c)) => Protocol::Connect(ref c)}
+impl_protocol!{Status => c =
+    (Protocol::Status(c)) => Protocol::Status(ref c)}
+impl_protocol!{BlockResponse => c =
+    (Protocol::Block(c)) => Protocol::Block(ref c)}
+impl_protocol!{RawTransaction => c =
+    (Protocol::Transaction(c)) => Protocol::Transaction(ref c)}
+impl_protocol!{TransactionsResponse => c =
+    (Protocol::TransactionsBatch(c)) => Protocol::TransactionsBatch(ref c)}
+
+impl_protocol!{ConsensusMessage => c =
+    (Protocol::Consensus(c)) => Protocol::Consensus(ref c)}
+impl_protocol!{Propose => c =
+    (Protocol::Consensus(ConsensusMessage::Propose(c))) =>
+    Protocol::Consensus(ConsensusMessage::Propose(ref c))}
+impl_protocol!{Prevote => c =
+    (Protocol::Consensus(ConsensusMessage::Prevote(c))) =>
+    Protocol::Consensus(ConsensusMessage::Prevote(ref c))}
+impl_protocol!{Precommit => c =
+    (Protocol::Consensus(ConsensusMessage::Precommit(c))) =>
+    Protocol::Consensus(ConsensusMessage::Precommit(ref c))}
+
+impl_protocol!{RequestMessage => c =
+    (Protocol::Request(c)) => Protocol::Request(ref c)}
+impl_protocol!{ProposeRequest => c =
+    (Protocol::Request(RequestMessage::Propose(c))) =>
+    Protocol::Request(RequestMessage::Propose(ref c))}
+impl_protocol!{TransactionsRequest => c =
+    (Protocol::Request(RequestMessage::Transactions(c))) =>
+    Protocol::Request(RequestMessage::Transactions(ref c))}
+impl_protocol!{PrevotesRequest => c =
+    (Protocol::Request(RequestMessage::Prevotes(c))) =>
+    Protocol::Request(RequestMessage::Prevotes(ref c))}
+impl_protocol!{PeersRequest => c =
+    (Protocol::Request(RequestMessage::Peers(c))) =>
+    Protocol::Request(RequestMessage::Peers(ref c))}
+impl_protocol!{BlockRequest => c =
+    (Protocol::Request(RequestMessage::Block(c))) =>
+    Protocol::Request(RequestMessage::Block(ref c))}

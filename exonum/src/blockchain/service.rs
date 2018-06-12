@@ -45,7 +45,7 @@ use super::transaction::Transaction;
 /// // Exports from `exonum` crate skipped
 /// # use exonum::blockchain::{Service, Transaction, TransactionSet, ExecutionResult};
 /// # use exonum::crypto::Hash;
-/// # use exonum::messages::{ServiceMessage, Message, RawTransaction};
+/// # use exonum::messages::{Message, RawTransaction};
 /// # use exonum::storage::{Fork, Snapshot};
 /// use exonum::encoding::Error as EncError;
 ///
@@ -294,9 +294,9 @@ impl ServiceContext {
         &self.stored_configuration.services[service.service_name()]
     }
 
-    /// Returns reference to the transaction sender.
-    pub fn transaction_sender(&self) -> &TransactionSend {
-        &self.api_sender
+    /// Broadcast new transaction signed by this service.
+    pub fn broadcast_transaction<T>(&self, val: T) {
+       unimplemented!();
     }
 
     /// Returns the actual blockchain global configuration.
