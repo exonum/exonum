@@ -911,9 +911,7 @@ impl Node {
         let actix_api_thread = thread::spawn(move || -> Result<(), failure::Error> {
             let sys = actix::System::new("http-server");
 
-            let node_state = api_state.clone();
-            let blockchain = blockchain.clone();
-            let aggregator = api_ng::ApiAggregator::new(blockchain.clone(), node_state.clone());
+            let aggregator = api_ng::ApiAggregator::new(&blockchain, api_state.clone());
 
             let a = aggregator.clone();
             let b = blockchain.clone();

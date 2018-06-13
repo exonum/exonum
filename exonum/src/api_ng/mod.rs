@@ -125,22 +125,16 @@ pub(crate) struct ApiAggregator {
 }
 
 impl ApiAggregator {
-    pub fn new(blockchain: Blockchain, shared_api_state: SharedNodeState) -> ApiAggregator {
-        let state = ServiceApiStateMut::new(blockchain);
-
+    pub fn new(blockchain: &Blockchain, shared_api_state: SharedNodeState) -> ApiAggregator {
         let mut public_scope = Vec::new();
         let mut private_scope = Vec::new();
         // Adds public built-in APIs.
-        public_scope.push(Self::public_explorer_api(&state));
+        public_scope.push(Self::public_explorer_api());
         public_scope.push(Self::public_system_api(shared_api_state.clone()));
         // Adds private built-in APIs.
-        private_scope.push(Self::private_system_api(
-            state.blockchain(),
-            shared_api_state,
-        ));
+        private_scope.push(Self::private_system_api(blockchain, shared_api_state));
         // Adds services APIs.
-        state
-            .blockchain()
+        blockchain
             .service_map()
             .iter()
             .map(|(_, s)| s)
@@ -181,9 +175,9 @@ impl ApiAggregator {
         ("system".to_owned(), scope)
     }
 
-    fn public_explorer_api(state: &ServiceApiState) -> (String, ServiceApiScope) {
+    fn public_explorer_api() -> (String, ServiceApiScope) {
         let mut scope = ServiceApiScope::new();
-        self::node::public::ExplorerApi::wire(state, &mut scope);
+        <ServiceApiState as self::node::public::ExplorerApi>::wire(&mut scope);
         ("explorer".to_owned(), scope)
     }
 

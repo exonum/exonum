@@ -92,7 +92,7 @@ pub trait ExplorerApi {
     fn block(&self, query: BlockQuery) -> Result<Option<BlockInfo>, Self::Error>;
 
     /// Adds explorer API endpoints to the corresponding scope.
-    fn wire<'a>(&self, api_scope: &'a mut ServiceApiScope) -> &'a mut ServiceApiScope {
+    fn wire(api_scope: &mut ServiceApiScope) -> &mut ServiceApiScope {
         api_scope
     }
 }
@@ -147,7 +147,7 @@ impl ExplorerApi for ServiceApiState {
         Ok(BlockchainExplorer::new(self.blockchain()).transaction(&query.hash))
     }
 
-    fn wire<'a>(&self, api_scope: &'a mut ServiceApiScope) -> &'a mut ServiceApiScope {
+    fn wire(api_scope: &mut ServiceApiScope) -> &mut ServiceApiScope {
         api_scope
             .endpoint("v1/blocks", Self::blocks)
             .endpoint("v1/block", Self::block)
