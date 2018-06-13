@@ -420,12 +420,12 @@ impl SharedNodeState {
             .expect("Expected read lock.")
             .majority_count
     }
+
     /// Updates internal majority count, from `State` of a blockchain node.
     pub fn update_majority_count(&self, state: &State) {
-
         let mut majority_count = state.majority_count();
 
-        let peers :Vec<SocketAddr> = self.peers_info()
+        let peers: Vec<SocketAddr> = self.peers_info()
             .iter()
             .map(|(s, _k)| (*s))
             .collect();

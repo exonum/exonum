@@ -32,6 +32,8 @@ pub struct HealthCheckInfo {
 }
 
 #[doc(hidden)]
+/// ConsensusStatusInfo shows the possibility to achieve the consensus between validators
+/// in current state
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct ConsensusStatusInfo {
     pub status: bool,
@@ -86,7 +88,8 @@ impl SystemApi {
     fn consensus_status_info(self, router: &mut Router) {
         let consensus_status = move |_: &mut Request| -> IronResult<Response> {
             let info = ConsensusStatusInfo {
-                status: self.shared_api_state.peers_info().len() >= self.shared_api_state.majority_count(),
+                status: self.shared_api_state.peers_info().len()
+                    >= self.shared_api_state.majority_count(),
             };
             self.ok_response(&serde_json::to_value(info).unwrap())
         };
