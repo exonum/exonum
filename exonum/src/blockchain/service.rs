@@ -323,6 +323,7 @@ pub struct ApiNodeState {
     // TODO: Update on event? (ECR-1632)
     peers_info: HashMap<SocketAddr, PublicKey>,
     is_enabled: bool,
+    majority_count: usize,
 }
 
 impl ApiNodeState {
