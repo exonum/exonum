@@ -14,7 +14,7 @@ STATUS=0
 
 # Runs docker container.
 function launch-server {
-    docker run -p 8000-8008:8000-8008 serhiioryshych/exonum-cryptocurrency-advanced-example & sleep 10
+    docker run -p 8000-8008:8000-8008 serhiioryshych/exonum-cryptocurrency-advanced-example & sleep 100
 }
 
 function kill-server {
@@ -112,6 +112,9 @@ check-transaction 8aa865f9
 echo "Transferring funds from Alice to Bob..."
 transaction tx-transfer.json
 check-transaction 5f4a5e85
+
+echo "Waiting until transactions are committed..."
+sleep 5
 
 echo "Retrieving info on Alice's wallet..."
 RESP=`curl $BASE_URL/wallets/654e61cb9632cb85fa23160a983da529a3b4bcf8e62ed05c719aaf88cd94703f 2>/dev/null`

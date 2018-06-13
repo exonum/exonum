@@ -44,93 +44,12 @@ env:
   matrix:
   - FEATURE=test
 
-# Separate jobs should use `install` hook in order not to override these common
-# instructions.
-before_install:
-- |
-  if [ ! -f "$HOME/.local/lib/libsodium.a" ]; then
-    wget "https://github.com/jedisct1/libsodium/releases/download/$SODIUM_VERS/libsodium-$SODIUM_VERS.tar.gz" -t 5 -O "libsodium.tar.gz"
-    tar xvf libsodium.tar.gz
-    cd libsodium-$SODIUM_VERS
-    ./configure --prefix=$HOME/.local
-    make
-    make install
-    cd ..
-  fi
-- export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$HOME/.local/lib
-- export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:$HOME/.local/lib/pkgconfig
-
 jobs:
   include:
-  # Formatting & other lints that do not require compilation
-  - env: FEATURE=lints
-    install:
-    - cargo-audit -V || cargo install cargo-audit --force
-    - cargo deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
-    - cargo install --list
-    - rustup component add rustfmt-preview
-    - rustfmt -V
-    - nvm install 8 && nvm use 8
-    - npm install cspell@"=2.1.12" # last working version
-    - ./node_modules/.bin/cspell --version
-    - npm install markdownlint-cli
-    - ./node_modules/.bin/markdownlint --version
-    script:
-    - cargo fmt --all -- --write-mode=diff
-    - npm run cspell
-    - npm run md
-    - cargo doc --no-deps
-    # TODO: Temporary hack to ignore warnings about missing pages. (ECR-703)
-    - mkdir -p target/std/string
-    - touch target/std/primitive.usize.html
-    - touch target/std/string/struct.String.html
-    - touch target/doc/exonum/encoding/serialize/trait.Serialize.html
-    - touch target/doc/exonum/encoding/serialize/reexport/serde/index.html
-    - touch target/doc/exonum_configuration/enum.Option.html
-    - mkdir -p target/doc/exonum/encoding/serialize/reexport/serde/ts_seconds
-    - touch target/doc/exonum/encoding/serialize/reexport/serde/ts_seconds/index.html
-    - cargo deadlinks --dir target/doc
-
-  # Clippy linting
-  - env: FEATURE=clippy
-    rust: nightly-2018-05-26
-    install:
-    - cargo clippy --version | grep $CLIPPY_VERS || cargo install clippy --force --vers $CLIPPY_VERS
-    script:
-    - cargo clippy --all -- -D warnings
-
   # Tests
   - env: FEATURE=test
-    addons:
-      apt:
-        sources:
-        - sourceline: 'ppa:giskou/librocksdb'
-        - sourceline: 'deb [arch=amd64] https://packages.microsoft.com/ubuntu/14.04/prod trusty main'
-          key_url: https://packages.microsoft.com/keys/microsoft.asc
-        packages:
-        - gcc
-        - g++
-        - libssl-dev
-        - libcurl4-openssl-dev
-        - libelf-dev
-        - libdw-dev
-        - binutils-dev
-        - libiberty-dev
-        - libsnappy-dev
-        - librocksdb
-        - powershell
-    install:
-    - nvm install 8 && nvm use 8
-    - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm install && cd $TRAVIS_BUILD_DIR
     script:
-    - cargo test --all
-    - cargo run -p exonum --example explorer
-    - cargo run -p exonum-testkit --example timestamping
-    - cargo run -p exonum-testkit --example configuration_change
-    - cargo run -p exonum-time --example simple_service
-    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
-    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
-    - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm run test:unix
+    - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency-advanced/docker/tests && ./test.sh
 
   # Benchmarks (compilation only)
   - env: FEATURE=benchmarks
