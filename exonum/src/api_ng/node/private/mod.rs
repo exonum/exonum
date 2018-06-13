@@ -158,12 +158,9 @@ impl SystemApi {
     }
 
     fn handle_peer_add(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
-        api_scope.endpoint_mut(
-            name,
-            move |state: &ServiceApiState, query: PeerAddQuery| {
-                state.sender().peer_add(query.ip).map_err(ApiError::from)
-            },
-        );
+        api_scope.endpoint_mut(name, move |state: &ServiceApiState, query: PeerAddQuery| {
+            state.sender().peer_add(query.ip).map_err(ApiError::from)
+        });
         self
     }
 

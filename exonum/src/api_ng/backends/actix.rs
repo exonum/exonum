@@ -23,8 +23,8 @@ use std::fmt;
 use std::sync::Arc;
 
 use api_ng::error::Error as ApiError;
-use api_ng::{FutureResult, IntoApiBackend, NamedWith, Result, ServiceApiBackend, ServiceApiScope,
-             ServiceApiState};
+use api_ng::{FutureResult, Immutable, IntoApiBackend, Mutable, NamedWith, Result,
+             ServiceApiBackend, ServiceApiScope, ServiceApiState};
 
 /// Type alias for the concrete API http response.
 pub type FutureResponse = actix_web::FutureResponse<HttpResponse, actix_web::Error>;
@@ -111,99 +111,115 @@ impl From<ApiError> for actix_web::Error {
     }
 }
 
-impl<Q, I, F> From<NamedWith<Q, I, Result<I>, F>> for RequestHandler
+impl<Q, I, F> From<NamedWith<Q, I, Result<I>, F, Immutable>> for RequestHandler
 where
     F: for<'r> Fn(&'r ServiceApiState, Q) -> Result<I> + 'static + Send + Sync + Clone,
     Q: DeserializeOwned + 'static,
     I: Serialize + 'static,
 {
-    fn from(f: NamedWith<Q, I, Result<I>, F>) -> Self {
+    fn from(f: NamedWith<Q, I, Result<I>, F, Immutable>) -> Self {
         let handler = f.inner.handler;
-        if f.mutable {
-            let index = move |request: HttpRequest| -> FutureResponse {
-                let handler = handler.clone();
-                let context = request.state().clone();
-                request
-                    .json()
-                    .from_err()
-                    .and_then(move |query: Q| {
-                        handler(&context, query)
-                            .map(|value| HttpResponse::Ok().json(value))
-                            .map_err(From::from)
-                    })
-                    .responder()
-            };
+        let index = move |request: HttpRequest| -> FutureResponse {
+            let context = request.state();
+            let future = Query::from_request(&request, &())
+                .map(|query: Query<Q>| query.into_inner())
+                .and_then(|query| handler(context, query).map_err(From::from))
+                .and_then(|value| Ok(HttpResponse::Ok().json(value)))
+                .into_future();
+            Box::new(future)
+        };
 
-            RequestHandler {
-                name: f.name,
-                method: actix_web::http::Method::POST,
-                inner: Arc::from(index) as Arc<RawHandler>,
-            }
-        } else {
-            let index = move |request: HttpRequest| -> FutureResponse {
-                let context = request.state();
-                let future = Query::from_request(&request, &())
-                    .map(|query: Query<Q>| query.into_inner())
-                    .and_then(|query| handler(context, query).map_err(From::from))
-                    .and_then(|value| Ok(HttpResponse::Ok().json(value)))
-                    .into_future();
-                Box::new(future)
-            };
-
-            RequestHandler {
-                name: f.name,
-                method: actix_web::http::Method::GET,
-                inner: Arc::from(index) as Arc<RawHandler>,
-            }
+        RequestHandler {
+            name: f.name,
+            method: actix_web::http::Method::GET,
+            inner: Arc::from(index) as Arc<RawHandler>,
         }
     }
 }
 
-impl<Q, I, F> From<NamedWith<Q, I, FutureResult<I>, F>> for RequestHandler
+impl<Q, I, F> From<NamedWith<Q, I, Result<I>, F, Mutable>> for RequestHandler
+where
+    F: for<'r> Fn(&'r ServiceApiState, Q) -> Result<I> + 'static + Send + Sync + Clone,
+    Q: DeserializeOwned + 'static,
+    I: Serialize + 'static,
+{
+    fn from(f: NamedWith<Q, I, Result<I>, F, Mutable>) -> Self {
+        let handler = f.inner.handler;
+        let index = move |request: HttpRequest| -> FutureResponse {
+            let handler = handler.clone();
+            let context = request.state().clone();
+            request
+                .json()
+                .from_err()
+                .and_then(move |query: Q| {
+                    handler(&context, query)
+                        .map(|value| HttpResponse::Ok().json(value))
+                        .map_err(From::from)
+                })
+                .responder()
+        };
+
+        RequestHandler {
+            name: f.name,
+            method: actix_web::http::Method::POST,
+            inner: Arc::from(index) as Arc<RawHandler>,
+        }
+    }
+}
+
+impl<Q, I, F> From<NamedWith<Q, I, FutureResult<I>, F, Immutable>> for RequestHandler
 where
     F: for<'r> Fn(&'r ServiceApiState, Q) -> FutureResult<I> + 'static + Clone + Send + Sync,
     Q: DeserializeOwned + 'static,
     I: Serialize + 'static,
 {
-    fn from(f: NamedWith<Q, I, FutureResult<I>, F>) -> Self {
+    fn from(f: NamedWith<Q, I, FutureResult<I>, F, Immutable>) -> Self {
         let handler = f.inner.handler;
-        if f.mutable {
-            let index = move |request: HttpRequest| -> FutureResponse {
-                let handler = handler.clone();
-                let context = request.state().clone();
-                request
-                    .json()
-                    .from_err()
-                    .and_then(move |query: Q| {
-                        handler(&context, query)
-                            .map(|value| HttpResponse::Ok().json(value))
-                            .map_err(From::from)
-                    })
-                    .responder()
-            };
+        let index = move |request: HttpRequest| -> FutureResponse {
+            let context = request.state().clone();
+            let handler = handler.clone();
+            Query::from_request(&request, &())
+                .map(move |query: Query<Q>| query.into_inner())
+                .into_future()
+                .and_then(move |query| handler(&context, query).map_err(From::from))
+                .map(|value| HttpResponse::Ok().json(value))
+                .responder()
+        };
 
-            RequestHandler {
-                name: f.name,
-                method: actix_web::http::Method::POST,
-                inner: Arc::from(index) as Arc<RawHandler>,
-            }
-        } else {
-            let index = move |request: HttpRequest| -> FutureResponse {
-                let context = request.state().clone();
-                let handler = handler.clone();
-                Query::from_request(&request, &())
-                    .map(move |query: Query<Q>| query.into_inner())
-                    .into_future()
-                    .and_then(move |query| handler(&context, query).map_err(From::from))
-                    .map(|value| HttpResponse::Ok().json(value))
-                    .responder()
-            };
+        RequestHandler {
+            name: f.name,
+            method: actix_web::http::Method::GET,
+            inner: Arc::from(index) as Arc<RawHandler>,
+        }
+    }
+}
 
-            RequestHandler {
-                name: f.name,
-                method: actix_web::http::Method::GET,
-                inner: Arc::from(index) as Arc<RawHandler>,
-            }
+impl<Q, I, F> From<NamedWith<Q, I, FutureResult<I>, F, Mutable>> for RequestHandler
+where
+    F: for<'r> Fn(&'r ServiceApiState, Q) -> FutureResult<I> + 'static + Clone + Send + Sync,
+    Q: DeserializeOwned + 'static,
+    I: Serialize + 'static,
+{
+    fn from(f: NamedWith<Q, I, FutureResult<I>, F, Mutable>) -> Self {
+        let handler = f.inner.handler;
+        let index = move |request: HttpRequest| -> FutureResponse {
+            let handler = handler.clone();
+            let context = request.state().clone();
+            request
+                .json()
+                .from_err()
+                .and_then(move |query: Q| {
+                    handler(&context, query)
+                        .map(|value| HttpResponse::Ok().json(value))
+                        .map_err(From::from)
+                })
+                .responder()
+        };
+
+        RequestHandler {
+            name: f.name,
+            method: actix_web::http::Method::POST,
+            inner: Arc::from(index) as Arc<RawHandler>,
         }
     }
 }

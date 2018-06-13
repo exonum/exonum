@@ -25,9 +25,7 @@ pub struct ServiceApiState {
 impl ServiceApiState {
     /// Constructs state for the given blockchain.
     pub fn new(blockchain: Blockchain) -> ServiceApiState {
-        ServiceApiState {
-            blockchain,
-        }
+        ServiceApiState { blockchain }
     }
 
     /// Returns a reference to the blockchain of this node.
@@ -48,5 +46,5 @@ impl ServiceApiState {
     /// Returns a reference to the api sender.
     pub fn sender(&self) -> &ApiSender {
         &self.blockchain.api_sender
-    }    
+    }
 }

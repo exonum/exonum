@@ -21,30 +21,37 @@ pub type Result<I> = ::std::result::Result<I, error::Error>;
 /// Type alias for the asynchronous result that will appear in future.
 pub type FutureResult<I> = Box<Future<Item = I, Error = error::Error>>;
 
+/// Immutable endpoint marker.
+#[derive(Debug)]
+pub struct Immutable;
+
+/// Mutable endpoint marker.
+#[derive(Debug)]
+pub struct Mutable;
+
 /// API endpoint handler extractor which can extract handler from various entities.
 #[derive(Debug)]
-pub struct With<Q, I, R, F> {
+pub struct With<Q, I, R, F, K> {
     /// Extracted API handler.
     pub handler: F,
     _query_type: ::std::marker::PhantomData<Q>,
     _item_type: ::std::marker::PhantomData<I>,
     _result_type: ::std::marker::PhantomData<R>,
+    _kind: ::std::marker::PhantomData<K>,
 }
 
 /// API Endpoint extractor that also contains endpoint name.
 #[derive(Debug)]
-pub struct NamedWith<Q, I, R, F> {
+pub struct NamedWith<Q, I, R, F, K> {
     /// Endpoint name.
     pub name: &'static str,
     /// Extracted endpoint handler.
-    pub inner: With<Q, I, R, F>,
-    /// Endpoint handler mutability.
-    pub mutable: bool,
+    pub inner: With<Q, I, R, F, K>,
 }
 
 // Implementations for Result and query params.
 
-impl<Q, I, F> From<F> for With<Q, I, Result<I>, F>
+impl<Q, I, F, K> From<F> for With<Q, I, Result<I>, F, K>
 where
     F: for<'r> Fn(&'r ServiceApiState, Q) -> Result<I>,
 {
@@ -54,13 +61,14 @@ where
             _query_type: ::std::marker::PhantomData,
             _item_type: ::std::marker::PhantomData,
             _result_type: ::std::marker::PhantomData,
+            _kind: ::std::marker::PhantomData,
         }
     }
 }
 
 // Implementations for FutureResult and query params.
 
-impl<Q, I, F> From<F> for With<Q, I, FutureResult<I>, F>
+impl<Q, I, F, K> From<F> for With<Q, I, FutureResult<I>, F, K>
 where
     F: for<'r> Fn(&'r ServiceApiState, Q) -> FutureResult<I>,
 {
@@ -70,6 +78,7 @@ where
             _query_type: ::std::marker::PhantomData,
             _item_type: ::std::marker::PhantomData,
             _result_type: ::std::marker::PhantomData,
+            _kind: ::std::marker::PhantomData,
         }
     }
 }
