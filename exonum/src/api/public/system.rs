@@ -19,6 +19,7 @@ use serde_json;
 use api::Api;
 use blockchain::{Blockchain, Schema, SharedNodeState};
 use helpers::user_agent;
+use std::net::SocketAddr;
 
 #[derive(Serialize, Deserialize, PartialEq)]
 struct MemPoolInfo {
@@ -29,6 +30,12 @@ struct MemPoolInfo {
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct HealthCheckInfo {
     pub connectivity: bool,
+}
+
+#[doc(hidden)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+pub struct ConsensusStatusInfo {
+    pub status: bool,
 }
 
 /// Public system API.
@@ -75,6 +82,15 @@ impl SystemApi {
             self.ok_response(&serde_json::to_value(info).unwrap())
         };
         router.get("/v1/user_agent", user_agent, "user_agent");
+    }
+    fn consensus_status_info(self, router: &mut Router) {
+        let consensus_status = move |_: &mut Request| -> IronResult<Response> {
+            let info = ConsensusStatusInfo {
+                status: self.shared_api_state.peers_info().len() >= self.shared_api_state.majority_count(),
+            };
+            self.ok_response(&serde_json::to_value(info).unwrap())
+        };
+        router.get("/v1/consensus_status", consensus_status, "consensus_status");
     }
 }
 
