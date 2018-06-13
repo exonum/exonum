@@ -1,0 +1,11 @@
+{
+  "body": {
+    "pub_key": "654e61cb9632cb85fa23160a983da529a3b4bcf8e62ed05c719aaf88cd94703f",
+    "amount": "50",
+    "seed": "3594308296026126987"
+  },
+  "protocol_version": 0,
+  "service_id": 128,
+  "message_id": 1,
+  "signature":"45a46ba4904343b0b3929cf286baf9dbc0e1594d6b01b524fc6295b4be5aeed4cbf52927dcac5ef89998a13f22c0eb4a466bfc14edd946128bb56bbc87229201"
+}

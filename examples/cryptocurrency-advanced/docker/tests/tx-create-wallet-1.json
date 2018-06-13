@@ -1,0 +1,10 @@
+{
+  "body": {
+    "pub_key": "654e61cb9632cb85fa23160a983da529a3b4bcf8e62ed05c719aaf88cd94703f",
+    "name": "Alice"
+  },
+  "protocol_version": 0,
+  "service_id": 128,
+  "message_id": 2,
+  "signature":"1ef7c7d4c20c49761cdd4d8fb1791f0587fcc1f1b7469770b6e874809e48521451322fbce6de1be06c1602a2cda2757d8aaf20576e81e23379f0742cedd9a90b"
+}

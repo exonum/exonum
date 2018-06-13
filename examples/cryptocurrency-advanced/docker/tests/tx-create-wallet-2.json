@@ -1,0 +1,10 @@
+{
+  "body": {
+    "pub_key": "ef687046e09962bb608d80f31188f1a385d17e9892a33c0396dc8c9ad11e6aa9",
+    "name": "Bob"
+  },
+  "protocol_version": 0,
+  "service_id": 128,
+  "message_id": 2,
+  "signature":"7fafacbe409ccd02fd0b5aba9ddc7357e923a142192a0ca8440d339b3ef0cfc56f14ad4fe1615b24a87f3aac0b1341a5dafd91e6422aaf45dfea47035c744000"
+}
