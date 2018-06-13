@@ -10,8 +10,8 @@ const TX_ID = 0
 
 const TableKey = Exonum.newType({
   fields: [
-    {name: 'service_id', type: Exonum.Uint16},
-    {name: 'table_index', type: Exonum.Uint16}
+    { name: 'service_id', type: Exonum.Uint16 },
+    { name: 'table_index', type: Exonum.Uint16 }
   ]
 })
 const SystemTime = Exonum.newType({
@@ -61,10 +61,11 @@ function waitForAcceptance(response) {
 module.exports = {
   install(Vue) {
     Vue.prototype.$blockchain = {
-      createTimestamp: (hash, metadata) => {
-        // Generate a new signing key pair
-        const keyPair = Exonum.keyPair()
+      generateKeyPair() {
+        return Exonum.keyPair()
+      },
 
+      createTimestamp: (keyPair, hash, metadata) => {
         // Describe transaction
         const TxTimestamp = Exonum.newMessage({
           protocol_version: PROTOCOL_VERSION,

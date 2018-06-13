@@ -5,12 +5,13 @@
         <div class="col-md-6 col-md-offset-3">
           <h1>Block {{ height }}</h1>
 
-          <ul class="list-group mt-5">
+          <ul v-if="block" class="list-group mt-5">
             <li class="list-group-item font-weight-bold">
               <div class="row">
                 <div class="col-sm-12">Transactions</div>
               </div>
             </li>
+            <!-- eslint-disable-next-line vue/require-v-for-key -->
             <li v-for="transaction in transactions" class="list-group-item">
               <div class="row">
                 <div class="col-sm-12">
@@ -41,8 +42,9 @@
     },
     data() {
       return {
-        block: {},
+        block: null,
         transactions: [],
+        isSpinnerVisible: false
       }
     },
     methods: {
