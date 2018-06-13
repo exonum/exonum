@@ -137,10 +137,10 @@ impl Propose {
 
         let following_config = CoreSchema::new(snapshot).following_configuration();
         if let Some(following) = following_config {
-            Err(AlreadyScheduled(following))?;
+            return Err(AlreadyScheduled(following));
         }
         if validator_index(snapshot, self.from()).is_none() {
-            Err(UnknownSender)?;
+            return Err(UnknownSender);
         }
 
         let config_candidate =
@@ -150,7 +150,7 @@ impl Propose {
         let cfg = StoredConfiguration::from_bytes(self.cfg().as_bytes().into());
         let cfg_hash = CryptoHash::hash(&cfg);
         if let Some(old_propose) = Schema::new(snapshot).propose(&cfg_hash) {
-            Err(AlreadyProposed(old_propose))?;
+            return Err(AlreadyProposed(old_propose));
         }
 
         Ok((cfg, cfg_hash))
@@ -284,7 +284,7 @@ impl<'a> VotingDecisionRef<'a> {
 
         let following_config = CoreSchema::new(snapshot).following_configuration();
         if let Some(following) = following_config {
-            Err(AlreadyScheduled(following))?;
+            return Err(AlreadyScheduled(following));
         }
 
         let schema = Schema::new(snapshot);
