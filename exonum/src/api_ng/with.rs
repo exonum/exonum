@@ -14,6 +14,8 @@
 
 use futures::Future;
 
+use std::marker::PhantomData;
+
 use super::{error, ServiceApiState};
 
 /// Type alias for the usual synchronous result.
@@ -34,10 +36,10 @@ pub struct Mutable;
 pub struct With<Q, I, R, F, K> {
     /// Extracted API handler.
     pub handler: F,
-    _query_type: ::std::marker::PhantomData<Q>,
-    _item_type: ::std::marker::PhantomData<I>,
-    _result_type: ::std::marker::PhantomData<R>,
-    _kind: ::std::marker::PhantomData<K>,
+    _query_type: PhantomData<Q>,
+    _item_type: PhantomData<I>,
+    _result_type: PhantomData<R>,
+    _kind: PhantomData<K>,
 }
 
 /// API Endpoint extractor that also contains endpoint name.
@@ -58,10 +60,10 @@ where
     fn from(handler: F) -> Self {
         With {
             handler,
-            _query_type: ::std::marker::PhantomData,
-            _item_type: ::std::marker::PhantomData,
-            _result_type: ::std::marker::PhantomData,
-            _kind: ::std::marker::PhantomData,
+            _query_type: PhantomData,
+            _item_type: PhantomData,
+            _result_type: PhantomData,
+            _kind: PhantomData,
         }
     }
 }
@@ -75,10 +77,10 @@ where
     fn from(handler: F) -> Self {
         With {
             handler,
-            _query_type: ::std::marker::PhantomData,
-            _item_type: ::std::marker::PhantomData,
-            _result_type: ::std::marker::PhantomData,
-            _kind: ::std::marker::PhantomData,
+            _query_type: PhantomData,
+            _item_type: PhantomData,
+            _result_type: PhantomData,
+            _kind: PhantomData,
         }
     }
 }
