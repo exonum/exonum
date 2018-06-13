@@ -97,8 +97,8 @@ pub struct ServiceApiBuilder {
 
 impl ServiceApiBuilder {
     /// Creates a new service API builder.
-    pub fn new() -> ServiceApiScope {
-        ServiceApiScope::default()
+    pub fn new() -> ServiceApiBuilder {
+        ServiceApiBuilder::default()
     }
 
     /// Returns reference to the public api scope builder.
@@ -115,13 +115,13 @@ impl ServiceApiBuilder {
 pub(crate) trait IntoApiBackend {
     fn extend<'a, I>(self, items: I) -> Self
     where
-        I: IntoIterator<Item = &'a (&'static str, ServiceApiScope)>;
+        I: IntoIterator<Item = &'a (String, ServiceApiScope)>;
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct ApiAggregator {
-    public_scope: Vec<(&'static str, ServiceApiScope)>,
-    private_scope: Vec<(&'static str, ServiceApiScope)>,
+    public_scope: Vec<(String, ServiceApiScope)>,
+    private_scope: Vec<(String, ServiceApiScope)>,
 }
 
 impl ApiAggregator {
@@ -130,9 +130,24 @@ impl ApiAggregator {
 
         let mut public_scope = Vec::new();
         let mut private_scope = Vec::new();
-
+        // Adds built-in APIs.
         public_scope.push(Self::public_explorer_api(&state));
-        private_scope.push(Self::private_system_api(blockchain, shared_api_state));
+        private_scope.push(Self::private_system_api(
+            blockchain.clone(),
+            shared_api_state,
+        ));
+        // Adds services APIs.
+        blockchain.clone()
+            .service_map()
+            .iter()
+            .map(|(_, s)| s)
+            .for_each(|service| {
+                let mut builder = ServiceApiBuilder::new();
+                service.wire_api(&mut builder);
+
+                public_scope.push((service.service_name().to_owned(), builder.public_scope));
+                private_scope.push((service.service_name().to_owned(), builder.private_scope));
+            });
 
         ApiAggregator {
             public_scope,
@@ -140,24 +155,7 @@ impl ApiAggregator {
         }
     }
 
-    fn public_explorer_api(state: &ServiceApiState) -> (&'static str, ServiceApiScope) {
-        let mut scope = ServiceApiScope::new();
-        self::node::public::explorer::ExplorerApi::wire(state, &mut scope);
-        ("explorer", scope)
-    }
-
-    fn private_system_api(
-        blockchain: Blockchain,
-        shared_api_state: SharedNodeState,
-    ) -> (&'static str, ServiceApiScope) {
-        let mut scope = ServiceApiScope::new();
-        let node_info =
-            self::node::private::NodeInfo::new(blockchain.service_map().iter().map(|(_, s)| s));
-        let system_api = self::node::private::SystemApi::new(node_info, shared_api_state);
-        system_api.wire(&mut scope);
-        ("system", scope)
-    }
-
+    /// TODO
     pub fn extend_public_api<B>(&self, backend: B) -> B
     where
         B: IntoApiBackend,
@@ -165,10 +163,36 @@ impl ApiAggregator {
         backend.extend(&self.public_scope)
     }
 
+    /// TODO
     pub fn extend_private_api<B>(&self, backend: B) -> B
     where
         B: IntoApiBackend,
     {
         backend.extend(&self.private_scope)
+    }
+
+    fn public_system_api(
+        _blockchain: Blockchain,
+        _shared_api_state: SharedNodeState,
+    ) -> (String, ServiceApiScope) {
+        unimplemented!();
+    }
+
+    fn public_explorer_api(state: &ServiceApiState) -> (String, ServiceApiScope) {
+        let mut scope = ServiceApiScope::new();
+        self::node::public::explorer::ExplorerApi::wire(state, &mut scope);
+        ("explorer".to_owned(), scope)
+    }
+
+    fn private_system_api(
+        blockchain: Blockchain,
+        shared_api_state: SharedNodeState,
+    ) -> (String, ServiceApiScope) {
+        let mut scope = ServiceApiScope::new();
+        let node_info =
+            self::node::private::NodeInfo::new(blockchain.service_map().iter().map(|(_, s)| s));
+        let system_api = self::node::private::SystemApi::new(node_info, shared_api_state);
+        system_api.wire(&mut scope);
+        ("system".to_owned(), scope)
     }
 }

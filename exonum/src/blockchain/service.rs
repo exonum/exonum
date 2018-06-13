@@ -211,6 +211,11 @@ pub trait Service: Send + Sync + 'static {
     fn private_api_handler(&self, context: &ApiContext) -> Option<Box<Handler>> {
         None
     }
+
+    /// TODO
+    fn wire_api(&self, _builder: &mut ::api_ng::ServiceApiBuilder) {
+        
+    }
 }
 
 /// The current node state on which the blockchain is running, or in other words

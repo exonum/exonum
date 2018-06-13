@@ -220,10 +220,10 @@ impl From<ApiError> for actix_web::Error {
 impl IntoApiBackend for actix_web::Scope<ServiceApiStateMut> {
     fn extend<'a, I>(mut self, items: I) -> Self
     where
-        I: IntoIterator<Item = &'a (&'static str, ServiceApiScope)>,
+        I: IntoIterator<Item = &'a (String, ServiceApiScope)>,
     {
         for mut item in items {
-            self = self.nested(item.0, move |scope| item.1.actix_backend.wire(scope))
+            self = self.nested(&item.0, move |scope| item.1.actix_backend.wire(scope))
         }
         self
     }
