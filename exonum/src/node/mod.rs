@@ -918,7 +918,7 @@ impl Node {
             let private_api_factory = move || {
                 let a = a.clone();
                 let b = b.clone();
-                actix_web::App::with_state(api_ng::ServiceApiStateMut::new(b.clone()))
+                actix_web::App::with_state(api_ng::ServiceApiState::new(b.clone()))
                     .scope("api", move |scope| a.extend_private_api(scope))
             };
 
@@ -927,7 +927,7 @@ impl Node {
             let public_api_factory = move || {
                 let a = a.clone();
                 let b = b.clone();
-                actix_web::App::with_state(api_ng::ServiceApiStateMut::new(b.clone()))
+                actix_web::App::with_state(api_ng::ServiceApiState::new(b.clone()))
                     .scope("api", move |scope| a.extend_public_api(scope))
             };
 

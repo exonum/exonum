@@ -16,7 +16,7 @@
 
 use std::{collections::HashMap, net::SocketAddr};
 
-use api_ng::{Error as ApiError, ServiceApiScope, ServiceApiState, ServiceApiStateMut};
+use api_ng::{Error as ApiError, ServiceApiScope, ServiceApiState};
 use blockchain::{Service, SharedNodeState};
 use crypto::PublicKey;
 use messages::PROTOCOL_MAJOR_VERSION;
@@ -158,9 +158,9 @@ impl SystemApi {
     }
 
     fn handle_peer_add(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
-        api_scope.endpoint(
+        api_scope.endpoint_mut(
             name,
-            move |state: &ServiceApiStateMut, query: PeerAddQuery| {
+            move |state: &ServiceApiState, query: PeerAddQuery| {
                 state.sender().peer_add(query.ip).map_err(ApiError::from)
             },
         );
@@ -192,9 +192,9 @@ impl SystemApi {
         name: &'static str,
         api_scope: &mut ServiceApiScope,
     ) -> Self {
-        api_scope.endpoint(
+        api_scope.endpoint_mut(
             name,
-            move |state: &ServiceApiStateMut, query: ConsensusEnabledQuery| {
+            move |state: &ServiceApiState, query: ConsensusEnabledQuery| {
                 state
                     .sender()
                     .send_external_message(ExternalMessage::Enable(query.enabled))
@@ -205,7 +205,7 @@ impl SystemApi {
     }
 
     fn handle_shutdown(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
-        api_scope.endpoint(name, move |state: &ServiceApiStateMut, _query: ()| {
+        api_scope.endpoint_mut(name, move |state: &ServiceApiState, _query: ()| {
             state
                 .sender()
                 .send_external_message(ExternalMessage::Shutdown)

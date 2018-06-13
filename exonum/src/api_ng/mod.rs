@@ -15,7 +15,7 @@
 //! API and corresponding utilities.
 
 pub use self::error::Error;
-pub use self::state::{ServiceApiState, ServiceApiStateMut};
+pub use self::state::{ServiceApiState};
 pub use self::with::{FutureResult, NamedWith, Result, With};
 
 use serde::de::DeserializeOwned;
@@ -38,17 +38,38 @@ pub trait ServiceApiBackend: Sized {
     type Scope;
 
     /// Adds the given endpoint handler to the backend.
-    fn endpoint<S, Q, I, R, F, E>(&mut self, name: &'static str, endpoint: E) -> &mut Self
+    fn endpoint<Q, I, R, F, E>(&mut self, name: &'static str, endpoint: E) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
-        F: for<'r> Fn(&'r S, Q) -> R + 'static + Clone,
-        E: Into<With<S, Q, I, R, F>>,
-        Self::Handler: From<NamedWith<S, Q, I, R, F>>,
+        F: for<'r> Fn(&'r ServiceApiState, Q) -> R + 'static + Clone,
+        E: Into<With<Q, I, R, F>>,
+        Self::Handler: From<NamedWith<Q, I, R, F>>,
     {
-        let named_with = NamedWith::new(name, endpoint);
+        let named_with = NamedWith {
+            name,
+            mutable: false,
+            inner: endpoint.into(),
+        };
         self.raw_handler(Self::Handler::from(named_with))
     }
+
+    /// Adds the given mutable endpoint handler to the backend.
+    fn endpoint_mut<Q, I, R, F, E>(&mut self, name: &'static str, endpoint: E) -> &mut Self
+    where
+        Q: DeserializeOwned + 'static,
+        I: Serialize + 'static,
+        F: for<'r> Fn(&'r ServiceApiState, Q) -> R + 'static + Clone,
+        E: Into<With<Q, I, R, F>>,
+        Self::Handler: From<NamedWith<Q, I, R, F>>,
+    {
+        let named_with = NamedWith {
+            name,
+            mutable: true,
+            inner: endpoint.into(),
+        };
+        self.raw_handler(Self::Handler::from(named_with))
+    }    
 
     /// Adds the raw endpoint handler for the given backend.
     fn raw_handler(&mut self, handler: Self::Handler) -> &mut Self;
@@ -70,15 +91,28 @@ impl ServiceApiScope {
     }
 
     /// Adds the given endpoint handler to the api scope.
-    pub fn endpoint<S, Q, I, R, F, E>(&mut self, name: &'static str, endpoint: E) -> &mut Self
+    pub fn endpoint<Q, I, R, F, E>(&mut self, name: &'static str, endpoint: E) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
-        F: for<'r> Fn(&'r S, Q) -> R + 'static + Clone,
-        E: Into<With<S, Q, I, R, F>>,
-        actix::RequestHandler: From<NamedWith<S, Q, I, R, F>>,
+        F: for<'r> Fn(&'r ServiceApiState, Q) -> R + 'static + Clone,
+        E: Into<With<Q, I, R, F>>,
+        actix::RequestHandler: From<NamedWith<Q, I, R, F>>,
     {
         self.actix_backend.endpoint(name, endpoint);
+        self
+    }
+
+    /// Adds the given mutable endpoint handler to the api scope.
+    pub fn endpoint_mut<Q, I, R, F, E>(&mut self, name: &'static str, endpoint: E) -> &mut Self
+    where
+        Q: DeserializeOwned + 'static,
+        I: Serialize + 'static,
+        F: for<'r> Fn(&'r ServiceApiState, Q) -> R + 'static + Clone,
+        E: Into<With<Q, I, R, F>>,
+        actix::RequestHandler: From<NamedWith<Q, I, R, F>>,
+    {
+        self.actix_backend.endpoint_mut(name, endpoint);
         self
     }
 

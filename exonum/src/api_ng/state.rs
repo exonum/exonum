@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::ops::Deref;
-
 use blockchain::Blockchain;
 use crypto::{PublicKey, SecretKey};
 use node::ApiSender;
@@ -25,6 +23,13 @@ pub struct ServiceApiState {
 }
 
 impl ServiceApiState {
+    /// Constructs state for the given blockchain.
+    pub fn new(blockchain: Blockchain) -> ServiceApiState {
+        ServiceApiState {
+            blockchain,
+        }
+    }
+
     /// Returns a reference to the blockchain of this node.
     pub fn blockchain(&self) -> &Blockchain {
         &self.blockchain
@@ -39,39 +44,9 @@ impl ServiceApiState {
     pub fn secret_key(&self) -> &SecretKey {
         &self.blockchain.service_keypair.1
     }
-}
-
-/// Mutable version of the `ServiceApiState` that also provides
-/// the current node state to API handlers.
-#[derive(Debug, Clone)]
-pub struct ServiceApiStateMut {
-    inner: ServiceApiState,
-}
-
-impl ServiceApiStateMut {
-    /// Constructs state from given parts.
-    pub fn new(blockchain: Blockchain) -> ServiceApiStateMut {
-        ServiceApiStateMut {
-            inner: ServiceApiState { blockchain },
-        }
-    }
 
     /// Returns a reference to the api sender.
     pub fn sender(&self) -> &ApiSender {
         &self.blockchain.api_sender
-    }
-}
-
-impl Deref for ServiceApiStateMut {
-    type Target = ServiceApiState;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
-    }
-}
-
-impl AsRef<ServiceApiState> for ServiceApiStateMut {
-    fn as_ref(&self) -> &ServiceApiState {
-        &self.inner
-    }
+    }    
 }

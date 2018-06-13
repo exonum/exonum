@@ -14,7 +14,7 @@
 
 use futures::Future;
 
-use super::{error, ServiceApiState, ServiceApiStateMut};
+use super::{error, ServiceApiState};
 
 /// Type alias for the usual synchronous result.
 pub type Result<I> = ::std::result::Result<I, error::Error>;
@@ -23,10 +23,9 @@ pub type FutureResult<I> = Box<Future<Item = I, Error = error::Error>>;
 
 /// API endpoint handler extractor which can extract handler from various entities.
 #[derive(Debug)]
-pub struct With<S, Q, I, R, F> {
+pub struct With<Q, I, R, F> {
     /// Extracted API handler.
     pub handler: F,
-    _context_type: ::std::marker::PhantomData<S>,
     _query_type: ::std::marker::PhantomData<Q>,
     _item_type: ::std::marker::PhantomData<I>,
     _result_type: ::std::marker::PhantomData<R>,
@@ -34,51 +33,24 @@ pub struct With<S, Q, I, R, F> {
 
 /// API Endpoint extractor that also contains endpoint name.
 #[derive(Debug)]
-pub struct NamedWith<S, Q, I, R, F> {
+pub struct NamedWith<Q, I, R, F> {
     /// Endpoint name.
     pub name: &'static str,
     /// Extracted endpoint handler.
-    pub inner: With<S, Q, I, R, F>,
-}
-
-impl<S, Q, I, R, F> NamedWith<S, Q, I, R, F> {
-    /// Creates the named endpoint extractor from the given handler.
-    pub fn new<H>(name: &'static str, handler: H) -> Self
-    where
-        H: Into<With<S, Q, I, R, F>>,
-    {
-        NamedWith {
-            name,
-            inner: handler.into(),
-        }
-    }
+    pub inner: With<Q, I, R, F>,
+    /// Endpoint handler mutability.
+    pub mutable: bool,
 }
 
 // Implementations for Result and query params.
 
-impl<Q, I, F> From<F> for With<ServiceApiState, Q, I, Result<I>, F>
+impl<Q, I, F> From<F> for With<Q, I, Result<I>, F>
 where
     F: for<'r> Fn(&'r ServiceApiState, Q) -> Result<I>,
 {
     fn from(handler: F) -> Self {
         With {
             handler,
-            _context_type: ::std::marker::PhantomData,
-            _query_type: ::std::marker::PhantomData,
-            _item_type: ::std::marker::PhantomData,
-            _result_type: ::std::marker::PhantomData,
-        }
-    }
-}
-
-impl<Q, I, F> From<F> for With<ServiceApiStateMut, Q, I, Result<I>, F>
-where
-    F: for<'r> Fn(&'r ServiceApiStateMut, Q) -> Result<I>,
-{
-    fn from(handler: F) -> Self {
-        With {
-            handler,
-            _context_type: ::std::marker::PhantomData,
             _query_type: ::std::marker::PhantomData,
             _item_type: ::std::marker::PhantomData,
             _result_type: ::std::marker::PhantomData,
@@ -88,29 +60,13 @@ where
 
 // Implementations for FutureResult and query params.
 
-impl<Q, I, F> From<F> for With<ServiceApiState, Q, I, FutureResult<I>, F>
+impl<Q, I, F> From<F> for With<Q, I, FutureResult<I>, F>
 where
     F: for<'r> Fn(&'r ServiceApiState, Q) -> FutureResult<I>,
 {
     fn from(handler: F) -> Self {
         With {
             handler,
-            _context_type: ::std::marker::PhantomData,
-            _query_type: ::std::marker::PhantomData,
-            _item_type: ::std::marker::PhantomData,
-            _result_type: ::std::marker::PhantomData,
-        }
-    }
-}
-
-impl<Q, I, F> From<F> for With<ServiceApiStateMut, Q, I, FutureResult<I>, F>
-where
-    F: for<'r> Fn(&'r ServiceApiStateMut, Q) -> FutureResult<I>,
-{
-    fn from(handler: F) -> Self {
-        With {
-            handler,
-            _context_type: ::std::marker::PhantomData,
             _query_type: ::std::marker::PhantomData,
             _item_type: ::std::marker::PhantomData,
             _result_type: ::std::marker::PhantomData,
