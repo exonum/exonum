@@ -14,4 +14,7 @@
 
 //! Public part of the Exonum rest api.
 
+pub use self::{explorer::ExplorerApi, system::SystemApi};
+
 pub mod explorer;
+pub mod system;

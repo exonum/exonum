@@ -25,7 +25,7 @@ pub mod state;
 
 use actix;
 use actix_web;
-use api_ng::{self, ServiceApiBackend};
+use api_ng;
 use failure;
 use futures::{sync::mpsc, Future, Sink};
 use iron::{Chain, Iron, Listening};
@@ -1063,39 +1063,6 @@ impl Node {
     pub fn channel(&self) -> ApiSender {
         ApiSender::new(self.channel.api_requests.0.clone())
     }
-}
-
-/// Public for testing
-#[doc(hidden)]
-pub fn create_actix_private_api(
-    blockchain: Blockchain,
-    shared_api_state: SharedNodeState,
-) -> actix_web::App<api_ng::ServiceApiStateMut> {
-    let state = api_ng::ServiceApiStateMut::new(blockchain.clone());
-
-    let mut system_api_backend = {
-        let mut scope = api_ng::ServiceApiScope::new();
-        let node_info =
-            api_ng::node::private::NodeInfo::new(blockchain.service_map().iter().map(|(_, s)| s));
-        let system_api = api_ng::node::private::SystemApi::new(node_info, shared_api_state);
-        system_api.wire(&mut scope);
-        scope
-    };
-
-    let mut explorer_api_backend = {
-        let mut scope = api_ng::ServiceApiScope::new();
-        api_ng::node::public::explorer::ExplorerApi::wire(state.as_ref(), &mut scope);
-        scope
-    };
-
-    actix_web::App::with_state(state.clone())
-        .prefix("api")
-        .scope("system", move |scope| {
-            system_api_backend.web_backend().wire(scope)
-        })
-        .scope("explorer", move |scope| {
-            explorer_api_backend.web_backend().wire(scope)
-        })
 }
 
 /// Public for testing

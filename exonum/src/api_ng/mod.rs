@@ -126,19 +126,21 @@ pub(crate) struct ApiAggregator {
 
 impl ApiAggregator {
     pub fn new(blockchain: Blockchain, shared_api_state: SharedNodeState) -> ApiAggregator {
-        let state = ServiceApiStateMut::new(blockchain.clone());
+        let state = ServiceApiStateMut::new(blockchain);
 
         let mut public_scope = Vec::new();
         let mut private_scope = Vec::new();
-        // Adds built-in APIs.
+        // Adds public built-in APIs.
         public_scope.push(Self::public_explorer_api(&state));
+        public_scope.push(Self::public_system_api(shared_api_state.clone()));
+        // Adds private built-in APIs.
         private_scope.push(Self::private_system_api(
-            blockchain.clone(),
+            state.blockchain(),
             shared_api_state,
         ));
         // Adds services APIs.
-        blockchain
-            .clone()
+        state
+            .blockchain()
             .service_map()
             .iter()
             .map(|(_, s)| s)
@@ -172,21 +174,21 @@ impl ApiAggregator {
         backend.extend(&self.private_scope)
     }
 
-    fn public_system_api(
-        _blockchain: Blockchain,
-        _shared_api_state: SharedNodeState,
-    ) -> (String, ServiceApiScope) {
-        unimplemented!();
+    fn public_system_api(shared_api_state: SharedNodeState) -> (String, ServiceApiScope) {
+        let mut scope = ServiceApiScope::new();
+        let system_api = self::node::public::SystemApi::new(shared_api_state);
+        system_api.wire(&mut scope);
+        ("system".to_owned(), scope)
     }
 
     fn public_explorer_api(state: &ServiceApiState) -> (String, ServiceApiScope) {
         let mut scope = ServiceApiScope::new();
-        self::node::public::explorer::ExplorerApi::wire(state, &mut scope);
+        self::node::public::ExplorerApi::wire(state, &mut scope);
         ("explorer".to_owned(), scope)
     }
 
     fn private_system_api(
-        blockchain: Blockchain,
+        blockchain: &Blockchain,
         shared_api_state: SharedNodeState,
     ) -> (String, ServiceApiScope) {
         let mut scope = ServiceApiScope::new();

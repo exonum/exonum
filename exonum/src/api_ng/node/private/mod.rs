@@ -115,7 +115,7 @@ impl SystemApi {
         }
     }
 
-    /// Adds system API endpoints to the corresponding scope.
+    /// Adds private system API endpoints to the corresponding scope.
     pub fn wire(self, api_scope: &mut ServiceApiScope) -> &mut ServiceApiScope {
         self.handle_peers_info("v1/peers", api_scope)
             .handle_peer_add("v1/peers", api_scope)
