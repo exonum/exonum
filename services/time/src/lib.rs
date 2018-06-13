@@ -44,6 +44,7 @@ pub mod time_provider;
 /// Node transactions.
 pub mod transactions;
 
+use exonum::api_ng;
 use exonum::{api::Api,
              blockchain::{ApiContext, Service, ServiceContext, Transaction, TransactionSet},
              crypto::Hash,
@@ -147,6 +148,11 @@ impl Service for TimeService {
         };
         api.wire(&mut router);
         Some(Box::new(router))
+    }
+
+    fn wire_api(&self, builder: &mut ::api_ng::ServiceApiBuilder) {
+        api::ng::PublicApi::wire(builder);
+        api::ng::PrivateApi::wire(builder);
     }
 }
 

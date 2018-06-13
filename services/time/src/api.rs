@@ -112,3 +112,93 @@ impl Api for PrivateApi {
         self.clone().wire_get_current_validators_times(router);
     }
 }
+
+pub mod ng {
+    //! Exonum-time API.
+
+    use chrono::{DateTime, Utc};
+
+    use exonum::{api_ng, blockchain::Schema};
+
+    use TimeSchema;
+
+    use super::ValidatorTime;
+
+    /// Implements the exonum-time public API.
+    #[derive(Debug)]
+    pub struct PublicApi;
+
+    impl PublicApi {
+        /// Endpoint for getting time values for all validators.
+        pub fn current_time(
+            state: &api_ng::ServiceApiState,
+            _query: (),
+        ) -> api_ng::Result<Option<DateTime<Utc>>> {
+            let view = state.blockchain().snapshot();
+            let schema = TimeSchema::new(&view);
+            Ok(schema.time().get())
+        }
+
+        /// Used to extend Api.
+        pub fn wire(builder: &mut api_ng::ServiceApiBuilder) {
+            builder
+                .public_scope()
+                .endpoint("v1/current_time", Self::current_time);
+        }
+    }
+
+    /// Implements the exonum-time private API.
+    #[derive(Debug)]
+    pub struct PrivateApi;
+
+    impl PrivateApi {
+        /// Endpoint for getting time values for all validators.
+        pub fn all_validators_times(
+            state: &api_ng::ServiceApiState,
+            _query: (),
+        ) -> api_ng::Result<Vec<ValidatorTime>> {
+            let view = state.blockchain().snapshot();
+            let schema = TimeSchema::new(&view);
+            let idx = schema.validators_times();
+
+            // The times of all validators for which time is known.
+            let validators_times = idx.iter()
+                .map(|(public_key, time)| ValidatorTime {
+                    public_key,
+                    time: Some(time),
+                })
+                .collect::<Vec<_>>();
+            Ok(validators_times)
+        }
+
+        /// Endpoint for getting time values for current validators.
+        pub fn current_validators_time(
+            state: &api_ng::ServiceApiState,
+            _query: (),
+        ) -> api_ng::Result<Vec<ValidatorTime>> {
+            let view = state.blockchain().snapshot();
+            let validator_keys = Schema::new(&view).actual_configuration().validator_keys;
+            let schema = TimeSchema::new(&view);
+            let idx = schema.validators_times();
+
+            // The times of current validators.
+            // `None` if the time of the validator is unknown.
+            let validators_times = validator_keys
+                .iter()
+                .map(|validator| ValidatorTime {
+                    public_key: validator.service_key,
+                    time: idx.get(&validator.service_key),
+                })
+                .collect::<Vec<_>>();
+            Ok(validators_times)
+        }
+
+        /// Used to extend Api.
+        pub fn wire(builder: &mut api_ng::ServiceApiBuilder) {
+            builder
+                .private_scope()
+                .endpoint("v1/validators_times", Self::current_validators_time)
+                .endpoint("v1/validators_times/all", Self::all_validators_times);
+        }
+    }
+}
