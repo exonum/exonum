@@ -213,9 +213,7 @@ pub trait Service: Send + Sync + 'static {
     }
 
     /// TODO
-    fn wire_api(&self, _builder: &mut ::api_ng::ServiceApiBuilder) {
-        
-    }
+    fn wire_api(&self, _builder: &mut ::api_ng::ServiceApiBuilder) {}
 }
 
 /// The current node state on which the blockchain is running, or in other words

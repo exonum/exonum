@@ -137,7 +137,8 @@ impl ApiAggregator {
             shared_api_state,
         ));
         // Adds services APIs.
-        blockchain.clone()
+        blockchain
+            .clone()
             .service_map()
             .iter()
             .map(|(_, s)| s)
