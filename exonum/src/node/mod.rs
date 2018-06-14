@@ -917,8 +917,8 @@ impl Node {
                     .into_iter(),
             )
             .collect::<Vec<_>>();
-
-        let (tx, rx) = ::std::sync::mpsc::channel();
+        let (actix_sys_tx, actix_sys_rx) = ::std::sync::mpsc::channel();
+        let (api_addr_tx, api_addr_rx) = ::std::sync::mpsc::channel();
         let api_scopes = api_handlers.clone();
         let actix_api_thread = thread::spawn(move || -> Result<(), failure::Error> {
             let sys = actix::System::new("http-server");
@@ -937,13 +937,14 @@ impl Node {
                         .map(|server| server.start())
                 });
 
+            actix_sys_tx.send(actix::Arbiter::system())?;
             for api_sys_addr in api_sys_addrs {
-                tx.send(api_sys_addr?)?;
+                api_addr_tx.send(api_sys_addr?)?;
             }
 
             let code = sys.run();
 
-            debug!("Actix runtime finished: {}", code);
+            debug!("Actix runtime finished with code: {}", code);
             if code != 0 {
                 Err(format_err!(
                     "Actix runtime finished with the non zero error code: {}",
@@ -954,10 +955,13 @@ impl Node {
             }
         });
 
+        let actix_sys_addr = actix_sys_rx
+            .recv()
+            .map_err(|_| format_err!("Unable to receive actix system address"))?;
         let api_sys_addrs = api_handlers
             .into_iter()
             .map(|(listen_addr, api_scope)| {
-                rx.recv().map_err(|_| {
+                api_addr_rx.recv().map_err(|_| {
                     format_err!(
                         "Unable to receive actix api sys address for api: listen_addr {}, scope {}",
                         listen_addr,
@@ -983,6 +987,7 @@ impl Node {
                 .wait()?
                 .map_err(|_| format_err!("Unable to send StopServer message"))?;
         }
+        actix_sys_addr.send(actix::msgs::SystemExit(0)).wait()?;
 
         debug!("Sent stop signal to the actix system");
         actix_api_thread.join().map_err(|e| {
