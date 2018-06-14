@@ -154,12 +154,9 @@ mod test {
             public_key,
             secret_key,
             max_message_len: 1024,
-            connect_list: Default::default(),
         };
 
-        let peer = "127.0.0.1".parse().unwrap();
-
-        let mut initiator = NoiseWrapper::initiator(&params, &peer).session;
+        let mut initiator = NoiseWrapper::initiator(&params).session;
         let mut responder = NoiseWrapper::responder(&params).session;
 
         let mut buffer_msg = vec![0u8; 1024];

@@ -21,7 +21,6 @@ use std::{fmt::{self, Error, Formatter},
           io};
 
 use events::noise::HandshakeParams;
-use std::net::SocketAddr;
 
 pub const NOISE_MAX_MESSAGE_LENGTH: usize = 65_535;
 pub const TAG_LENGTH: usize = 16;
@@ -39,19 +38,12 @@ pub struct NoiseWrapper {
 }
 
 impl NoiseWrapper {
-    pub fn initiator(params: &HandshakeParams, peer: &SocketAddr) -> Self {
+    pub fn initiator(params: &HandshakeParams) -> Self {
         let builder: NoiseBuilder = Self::noise_builder(params);
         let private_key = &params.secret_key[..PUBLIC_KEY_LENGTH];
 
-        let remote_key = params
-            .connect_list
-            .peers
-            .get(peer)
-            .expect("Peer is not in the connect list.");
-
         let session = builder
             .local_private_key(&private_key)
-            .remote_public_key(remote_key.as_ref())
             .build_initiator()
             .unwrap();
 
@@ -198,25 +190,19 @@ impl From<NoiseError> for io::Error {
 #[cfg(test)]
 mod test {
 
-    use crypto::gen_keypair;
     use crypto::{gen_keypair_from_seed, Seed};
     use env_logger;
     use events::tests::TestEvents;
     use events::tests::connect_message;
     use node::ConnectList;
     use std::collections::HashMap;
-    use std::io;
-    use std::marker::Send;
     use std::net::SocketAddr;
-    use tokio_core::reactor::Core;
 
     #[test]
     fn test_peer_is_not_in_connect_list() {
         env_logger::init();
         let first: SocketAddr = "127.0.0.1:17230".parse().unwrap();
         let second: SocketAddr = "127.0.0.1:17231".parse().unwrap();
-
-        let mut peers = HashMap::new();
 
         // Create connect list
         let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([2; 32]));
@@ -226,7 +212,7 @@ mod test {
         let e2 = TestEvents::with_addr(second);
         let c1 = connect_message(first);
 
-        let mut e1 = e1.spawn();
+        let e1 = e1.spawn();
         let mut e2 = e2.spawn2(public_key, secret_key);
 
         e1.connect_with(second);

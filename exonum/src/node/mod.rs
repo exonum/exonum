@@ -953,7 +953,6 @@ impl Node {
             public_key: *self.state().consensus_public_key(),
             secret_key: self.state().consensus_secret_key().clone(),
             max_message_len: self.max_message_len,
-            connect_list: self.state().connect_list().clone(),
         };
         self.run_handler(&handshake_params)?;
 
