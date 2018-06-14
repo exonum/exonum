@@ -167,7 +167,7 @@ fn test_noise_handshake_errors_es_empty() {
     assert_matches!(
             listener_err,
             Err(ref err) if err.kind() == io::ErrorKind::Other &&
-            err.description() == "WrongMessageLength(0)"
+            err.description().contains("WrongMessageLength(0)")
         );
 }
 
@@ -186,7 +186,7 @@ fn test_noise_handshake_errors_ee_standard() {
     assert_matches!(
             listener_err,
             Err(ref err) if err.kind() == io::ErrorKind::Other &&
-            err.description() == "Decrypt"
+            err.description().contains("Decrypt")
         );
 }
 
@@ -205,7 +205,7 @@ fn test_noise_handshake_errors_es_standard() {
     assert_matches!(
             listener_err,
             Err(ref err) if err.kind() == io::ErrorKind::Other &&
-            err.description() == "Decrypt"
+            err.description().contains("Decrypt")
         );
 }
 
@@ -224,7 +224,7 @@ fn test_noise_handshake_errors_ee_large() {
     assert_matches!(
             listener_err,
             Err(ref err) if err.kind() == io::ErrorKind::UnexpectedEof &&
-            err.description() == "early eof"
+            err.description().contains("early eof")
         );
 }
 
@@ -243,7 +243,7 @@ fn test_noise_handshake_errors_se_large() {
     assert_matches!(
             listener_err,
             Err(ref err) if err.kind() == io::ErrorKind::UnexpectedEof &&
-            err.description() == "early eof"
+            err.description().contains("early eof")
         );
 }
 
