@@ -34,8 +34,9 @@
     },
     data() {
       return {
-        isSpinnerVisible: false,
-        metadata: ''
+        metadata: '',
+        keyPair: {},
+        isSpinnerVisible: false
       }
     },
     methods: {
@@ -54,8 +55,10 @@
       async timestamp() {
         this.isSpinnerVisible = true
 
+        this.keyPair = this.$blockchain.generateKeyPair()
+
         try {
-          await this.$blockchain.createTimestamp(this.hash, this.metadata)
+          await this.$blockchain.createTimestamp(this.keyPair, this.hash, this.metadata)
           this.isSpinnerVisible = false
           this.$nextTick(function() {
             this.$router.push({ name: 'timestamp', params: { hash: this.hash } })
