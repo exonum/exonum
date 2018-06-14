@@ -596,18 +596,18 @@ mod tests {
                     assert_eq!(instance, $type::read(&buffer));
                 }
             }
-        }
+        };
     }
 
     storage_key_for_crypto_types_tests!{Hash, HASH_SIZE,
-        ["326c1da1a00b5b4c85929dac57f3c99ceea82ed2941173d879c57b8f21ae8c78"]
-        => hash_round_trip}
+    ["326c1da1a00b5b4c85929dac57f3c99ceea82ed2941173d879c57b8f21ae8c78"]
+    => hash_round_trip}
     storage_key_for_crypto_types_tests!{PublicKey, PUBLIC_KEY_LENGTH,
-        ["1e38d80b8a9786648a471b11a9624a9519215743df7321938d70bac73dae3b84"]
-        => public_key_round_trip}
+    ["1e38d80b8a9786648a471b11a9624a9519215743df7321938d70bac73dae3b84"]
+    => public_key_round_trip}
     storage_key_for_crypto_types_tests!{Signature, SIGNATURE_LENGTH,
-        ["326c1da1a00b5b4c85929dac57f3c99ceea82ed2941173d879c57b8f21ae8c781e38d80b8a9786648a471b11a9624a9519215743df7321938d70bac73dae3b84"]
-        => signature_round_trip}
+    ["326c1da1a00b5b4c85929dac57f3c99ceea82ed2941173d879c57b8f21ae8c781e38d80b8a9786648a471b11a9624a9519215743df7321938d70bac73dae3b84"]
+    => signature_round_trip}
 
     #[test]
     fn uuid_round_trip() {
