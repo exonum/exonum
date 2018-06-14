@@ -396,21 +396,14 @@ impl SharedNodeState {
     }
     /// Updates internal state, from `State` of a blockchain node.
     pub fn update_node_state(&self, state: &State) {
-        self.state
-            .write()
-            .expect("Expected write lock.")
-            .peers_info
-            .clear();
+        let mut lock = self.state.write().expect("Expected write lock.");
+
+        lock.peers_info.clear();
+        lock.majority_count = state.majority_count();
 
         for (p, c) in state.peers().iter() {
-            self.state
-                .write()
-                .expect("Expected write lock.")
-                .peers_info
-                .insert(c.addr(), *p);
+            lock.peers_info.insert(c.addr(), *p);
         }
-
-        self.update_majority_count(state);
     }
 
     /// Returns the majority count from the current "State"
@@ -420,14 +413,6 @@ impl SharedNodeState {
             .read()
             .expect("Expected read lock.")
             .majority_count
-    }
-
-    /// Updates internal majority count, from `State` of a blockchain node.
-    fn update_majority_count(&self, state: &State) {
-        self.state
-            .write()
-            .expect("Expected write lock.")
-            .majority_count = state.majority_count();
     }
 
     /// Returns a boolean value which indicates whether the node is enabled

@@ -88,8 +88,8 @@ impl SystemApi {
     fn consensus_status_info(self, router: &mut Router) {
         let consensus_status = move |_: &mut Request| -> IronResult<Response> {
             let info = ConsensusStatusInfo {
-                // Increment peers lena due to peers list doesn't include current node address.
-                // So if we really have 4 node, peers has only 3 items
+                // Peers list doesn't include current node address, so we have to increment its length.
+                // E.g. if we have 3 items in peers list, it means that we have 4 nodes overall.
                 status: self.shared_api_state.peers_info().len() + 1
                     >= self.shared_api_state.majority_count(),
             };
