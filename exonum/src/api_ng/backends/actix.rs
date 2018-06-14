@@ -88,7 +88,7 @@ impl ServiceApiBackend for ApiBuilder {
 impl IntoApiBackend for actix_web::Scope<ServiceApiState> {
     fn extend<'a, I>(mut self, items: I) -> Self
     where
-        I: IntoIterator<Item = &'a (String, ServiceApiScope)>,
+        I: IntoIterator<Item = (&'a str, &'a ServiceApiScope)>,
     {
         for mut item in items {
             self = self.nested(&item.0, move |scope| item.1.actix_backend.wire(scope))
