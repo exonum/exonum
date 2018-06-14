@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use byteorder::{ByteOrder, LittleEndian};
 use futures::future::{done, err, Future};
 use tokio_io::{codec::Framed,
                io::{read_exact, write_all},
@@ -44,23 +43,7 @@ pub struct HandshakeParams {
 
 pub trait Handshake {
     fn listen<S: AsyncRead + AsyncWrite + 'static>(self, stream: S) -> HandshakeResult<S>;
-
     fn send<S: AsyncRead + AsyncWrite + 'static>(self, stream: S) -> HandshakeResult<S>;
-
-    fn read_handshake_msg<S: AsyncRead + 'static>(
-        self,
-        stream: S,
-    ) -> Box<Future<Item = (S, Self), Error = io::Error>>;
-
-    fn write_handshake_msg<S: AsyncWrite + 'static>(
-        self,
-        stream: S,
-    ) -> Box<Future<Item = (S, Self), Error = io::Error>>;
-
-    fn finalize<S: AsyncRead + AsyncWrite + 'static>(
-        self,
-        stream: S,
-    ) -> Result<Framed<S, MessagesCodec>, io::Error>;
 }
 
 #[derive(Debug)]
@@ -85,43 +68,25 @@ impl NoiseHandshake {
             max_message_len: params.max_message_len,
         }
     }
-}
-
-impl Handshake for NoiseHandshake {
-    fn listen<S>(self, stream: S) -> HandshakeResult<S>
-    where
-        S: AsyncRead + AsyncWrite + 'static,
-    {
-        listen_handshake(stream, self)
-    }
-
-    fn send<S>(self, stream: S) -> HandshakeResult<S>
-    where
-        S: AsyncRead + AsyncWrite + 'static,
-    {
-        send_handshake(stream, self)
-    }
 
     fn read_handshake_msg<S: AsyncRead + 'static>(
         mut self,
         stream: S,
-    ) -> Box<Future<Item = (S, Self), Error = io::Error>> {
-        Box::new(read(stream).and_then(move |(stream, msg)| {
+    ) -> impl Future<Item = (S, Self), Error = io::Error> {
+        read(stream).and_then(move |(stream, msg)| {
             self.noise.read_handshake_msg(&msg)?;
             Ok((stream, self))
-        }))
+        })
     }
 
     fn write_handshake_msg<S: AsyncWrite + 'static>(
         mut self,
         stream: S,
-    ) -> Box<Future<Item = (S, Self), Error = io::Error>> {
-        Box::new(
-            done(self.noise.write_handshake_msg())
-                .map_err(|e| e.into())
-                .and_then(|(len, buf)| write(stream, &buf, len))
-                .map(move |(stream, _)| (stream, self)),
-        )
+    ) -> impl Future<Item = (S, Self), Error = io::Error> {
+        done(self.noise.write_handshake_msg())
+            .map_err(|e| e.into())
+            .and_then(|(len, buf)| write(stream, &buf, len))
+            .map(move |(stream, _)| (stream, self))
     }
 
     fn finalize<S: AsyncRead + AsyncWrite + 'static>(
@@ -134,34 +99,35 @@ impl Handshake for NoiseHandshake {
     }
 }
 
-fn listen_handshake<S, T>(stream: S, handshake: T) -> HandshakeResult<S>
-where
-    S: AsyncRead + AsyncWrite + 'static,
-    T: Handshake + 'static,
-{
-    let framed = handshake
-        .read_handshake_msg(stream)
-        .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
-        .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
-        .and_then(|(stream, handshake)| handshake.finalize(stream));
-    Box::new(framed)
-}
+impl Handshake for NoiseHandshake {
+    fn listen<S>(self, stream: S) -> HandshakeResult<S>
+    where
+        S: AsyncRead + AsyncWrite + 'static,
+    {
+        let framed = self.read_handshake_msg(stream)
+            .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
+            .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
+            .and_then(|(stream, handshake)| handshake.finalize(stream));
+        Box::new(framed)
+    }
 
-fn send_handshake<S, T>(stream: S, handshake: T) -> HandshakeResult<S>
-where
-    S: AsyncRead + AsyncWrite + 'static,
-    T: Handshake + 'static,
-{
-    let framed = handshake
-        .write_handshake_msg(stream)
-        .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
-        .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
-        .and_then(|(stream, handshake)| handshake.finalize(stream));
-    Box::new(framed)
+    fn send<S>(self, stream: S) -> HandshakeResult<S>
+    where
+        S: AsyncRead + AsyncWrite + 'static,
+    {
+        let framed = self.write_handshake_msg(stream)
+            .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
+            .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
+            .and_then(|(stream, handshake)| handshake.finalize(stream));
+        Box::new(framed)
+    }
 }
 
 fn read<S: AsyncRead + 'static>(sock: S) -> impl Future<Item = (S, Vec<u8>), Error = io::Error> {
     let buf = vec![0u8; HANDSHAKE_HEADER_LENGTH];
+    // First byte of handshake message is payload length, remaining bytes [1; len] is
+    // the handshake payload. Therefore, we need to read first byte and after that
+    // remaining payload.
     read_exact(sock, buf).and_then(|(stream, msg)| read_exact(stream, vec![0u8; msg[0] as usize]))
 }
 
@@ -170,8 +136,6 @@ fn write<S: AsyncWrite + 'static>(
     buf: &[u8],
     len: usize,
 ) -> impl Future<Item = (S, Vec<u8>), Error = io::Error> {
-    let mut message = vec![0u8; HANDSHAKE_HEADER_LENGTH];
-
     if len > NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH {
         return Either::A(err(io::Error::new(
             io::ErrorKind::Other,
@@ -179,7 +143,7 @@ fn write<S: AsyncWrite + 'static>(
         )));
     }
 
-    LittleEndian::write_u16(&mut message, len as u16);
+    let mut message = vec![len as u8; HANDSHAKE_HEADER_LENGTH];
     message.extend_from_slice(&buf[0..len]);
     Either::B(write_all(sock, message))
 }
