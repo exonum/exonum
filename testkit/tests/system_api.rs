@@ -17,14 +17,15 @@ extern crate exonum_testkit;
 #[macro_use]
 extern crate pretty_assertions;
 
-use exonum::{api::{private::NodeInfo, public::{HealthCheckInfo, ConsensusStatusInfo}},
+use exonum::{api::{private::NodeInfo,
+                   public::{ConsensusStatusInfo, HealthCheckInfo}},
              helpers::user_agent,
              messages::PROTOCOL_MAJOR_VERSION};
 use exonum_testkit::{ApiKind, TestKitBuilder};
 
 #[test]
 fn test_healthcheck_connectivity_false() {
-    let testkit = TestKitBuilder::validator().with_validators(2).create();
+    let testkit = TestKitBuilder::validator().create();
     let api = testkit.api();
     let info: HealthCheckInfo = api.get(ApiKind::System, "v1/healthcheck");
     let expected = HealthCheckInfo {
@@ -58,8 +59,6 @@ fn test_consensus_status_false() {
     let testkit = TestKitBuilder::validator().with_validators(1).create();
     let api = testkit.api();
     let info: ConsensusStatusInfo = api.get(ApiKind::System, "v1/consensus_status");
-    let expected = ConsensusStatusInfo {
-        status: true,
-    };
+    let expected = ConsensusStatusInfo { status: true };
     assert_eq!(info, expected);
 }

@@ -409,8 +409,9 @@ impl SharedNodeState {
                 .peers_info
                 .insert(c.addr(), *p);
         }
-    }
 
+        self.update_majority_count(state);
+    }
 
     /// Returns the majority count from the current "State"
     /// of a blockchain node.
@@ -422,13 +423,10 @@ impl SharedNodeState {
     }
 
     /// Updates internal majority count, from `State` of a blockchain node.
-    pub fn update_majority_count(&self, state: &State) {
+    fn update_majority_count(&self, state: &State) {
         let mut majority_count = state.majority_count();
 
-        let peers: Vec<SocketAddr> = self.peers_info()
-            .iter()
-            .map(|(s, _k)| (*s))
-            .collect();
+        let peers: Vec<SocketAddr> = self.peers_info().iter().map(|(s, _k)| (*s)).collect();
         if !peers.contains(&state.our_connect_message().addr()) {
             majority_count -= 1;
         }
