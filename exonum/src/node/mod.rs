@@ -24,11 +24,11 @@ pub use self::{state::{RequestData, State, ValidatorState},
 pub mod state;
 
 use actix;
-use actix_web;
+use actix_web::{self, server::IntoHttpHandler};
 use api_ng;
 use failure;
 use futures::{sync::mpsc, Future, Sink};
-use iron::{Chain, Iron, Listening};
+use iron::Chain;
 use iron_cors::CorsMiddleware;
 use mount::Mount;
 use router::Router;
@@ -904,46 +904,45 @@ impl Node {
     pub fn run(self) -> Result<(), failure::Error> {
         let api_state = self.handler.api_state.clone();
         let blockchain = self.handler.blockchain.clone();
-        let mut api_handlers: Vec<Listening> = Vec::new();
 
         // Start actix-web api.
+        let api_handlers = self.api_options
+            .private_api_address
+            .map(|addr| (addr, api_ng::ApiScope::Private))
+            .into_iter()
+            .chain(
+                self.api_options
+                    .public_api_address
+                    .map(|addr| (addr, api_ng::ApiScope::Public))
+                    .into_iter(),
+            )
+            .collect::<Vec<_>>();
+
         let (tx, rx) = ::std::sync::mpsc::channel();
+        let api_scopes = api_handlers.clone();
         let actix_api_thread = thread::spawn(move || -> Result<(), failure::Error> {
             let sys = actix::System::new("http-server");
 
-            let aggregator = api_ng::ApiAggregator::new(&blockchain, api_state.clone());
+            let aggregator = api_ng::ApiAggregator::new(blockchain, api_state.clone());
 
             let a = aggregator.clone();
-            let b = blockchain.clone();
-            let private_api_factory = move || {
-                let a = a.clone();
-                let b = b.clone();
-                actix_web::App::with_state(api_ng::ServiceApiState::new(b.clone()))
-                    .scope("api", move |scope| a.extend_private_api(scope))
-            };
+            let api_sys_addrs = api_scopes
+                .into_iter()
+                .map(move |(listen_address, api_scope)| {
+                    info!("Starting {} api on {}", api_scope, listen_address);
+                    let a = a.clone();
+                    create_web_server(a, api_scope)
+                        .disable_signals()
+                        .bind(listen_address)
+                        .map(|server| server.start())
+                });
 
-            let a = aggregator.clone();
-            let b = blockchain.clone();
-            let public_api_factory = move || {
-                let a = a.clone();
-                let b = b.clone();
-                actix_web::App::with_state(api_ng::ServiceApiState::new(b.clone()))
-                    .scope("api", move |scope| a.extend_public_api(scope))
-            };
+            for api_sys_addr in api_sys_addrs {
+                tx.send(api_sys_addr?)?;
+            }
 
-            let private_api_addr = actix_web::server::new(private_api_factory)
-                .disable_signals()
-                .bind("localhost:18080")?
-                .start();
-
-            let public_api_addr = actix_web::server::new(public_api_factory)
-                .disable_signals()
-                .bind("localhost:28080")?
-                .start();
-
-            tx.send(private_api_addr)?;
-            tx.send(public_api_addr)?;
             let code = sys.run();
+
             debug!("Actix runtime finished: {}", code);
             if code != 0 {
                 Err(format_err!(
@@ -954,34 +953,19 @@ impl Node {
                 Ok(())
             }
         });
-        let actix_private_api_addr = rx.recv().unwrap();
-        let actix_public_api_addr = rx.recv().unwrap();
 
-        let api_state = self.handler.api_state.clone();
-        let blockchain = self.handler.blockchain.clone();
-        // Start private api.
-        if let Some(listen_address) = self.api_options.private_api_address {
-            let api_sender = self.channel();
-            let handler = create_private_api_handler(
-                blockchain.clone(),
-                api_state.clone(),
-                api_sender,
-                &self.api_options,
-            );
-            let listener = Iron::new(handler).http(listen_address).unwrap();
-            api_handlers.push(listener);
-
-            info!("Private exonum api started on {}", listen_address);
-        };
-
-        // Start public api.
-        if let Some(listen_address) = self.api_options.public_api_address {
-            let handler = create_public_api_handler(blockchain, api_state, &self.api_options);
-            let listener = Iron::new(handler).http(listen_address).unwrap();
-            api_handlers.push(listener);
-
-            info!("Public exonum api started on {}", listen_address);
-        };
+        let api_sys_addrs = api_handlers
+            .into_iter()
+            .map(|(listen_addr, api_scope)| {
+                rx.recv().map_err(|_| {
+                    format_err!(
+                        "Unable to receive actix api sys address for api: listen_addr {}, scope {}",
+                        listen_addr,
+                        api_scope
+                    )
+                })
+            })
+            .collect::<Vec<_>>();
 
         let handshake_params = HandshakeParams {
             public_key: *self.handler().state().consensus_public_key(),
@@ -993,23 +977,22 @@ impl Node {
         debug!("Handler stopped");
 
         // Stop all APIs
-        actix_private_api_addr
-            .send(actix_web::server::StopServer { graceful: true })
-            .wait()?
-            .unwrap();
-        actix_public_api_addr
-            .send(actix_web::server::StopServer { graceful: true })
-            .wait()?
-            .unwrap();
+        for api_sys_addr in api_sys_addrs {
+            api_sys_addr?
+                .send(actix_web::server::StopServer { graceful: true })
+                .wait()?
+                .map_err(|_| format_err!("Unable to send StopServer message"))?;
+        }
+
         debug!("Sent stop signal to the actix system");
-        actix_api_thread.join().unwrap().unwrap();
+        actix_api_thread.join().map_err(|e| {
+            format_err!(
+                "Unable to join actix web api thread, an error occurred: {:?}",
+                e
+            )
+        })??;
 
         debug!("Actix web workers stopped");
-
-        // Stop all api handlers.
-        for mut handler in api_handlers {
-            handler.close().unwrap();
-        }
 
         Ok(())
     }
@@ -1061,6 +1044,15 @@ impl Node {
     pub fn channel(&self) -> ApiSender {
         ApiSender::new(self.channel.api_requests.0.clone())
     }
+}
+
+fn create_web_server(
+    aggregator: api_ng::ApiAggregator,
+    api_scope: api_ng::ApiScope,
+) -> actix_web::server::HttpServer<<api_ng::backends::actix::App as IntoHttpHandler>::Handler> {
+    actix_web::server::new(move || {
+        api_ng::backends::actix::create_app(aggregator.clone(), api_scope)
+    })
 }
 
 /// Public for testing

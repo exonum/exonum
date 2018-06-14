@@ -23,8 +23,8 @@ use std::fmt;
 use std::sync::Arc;
 
 use api_ng::error::Error as ApiError;
-use api_ng::{FutureResult, Immutable, IntoApiBackend, Mutable, NamedWith, Result,
-             ServiceApiBackend, ServiceApiScope, ServiceApiState};
+use api_ng::{ApiAggregator, ApiScope, FutureResult, Immutable, IntoApiBackend, Mutable, NamedWith,
+             Result, ServiceApiBackend, ServiceApiScope, ServiceApiState};
 
 /// Type alias for the concrete API http response.
 pub type FutureResponse = actix_web::FutureResponse<HttpResponse, actix_web::Error>;
@@ -32,6 +32,8 @@ pub type FutureResponse = actix_web::FutureResponse<HttpResponse, actix_web::Err
 pub type HttpRequest = actix_web::HttpRequest<ServiceApiState>;
 /// Type alias for the inner actix-web http requests handler.
 pub type RawHandler = Fn(HttpRequest) -> FutureResponse + 'static + Send + Sync;
+/// Type alias for the actix web App with the ServiceApiState.
+pub type App = actix_web::App<ServiceApiState>;
 
 /// Raw actix-web backend requests handler.
 #[derive(Clone)]
@@ -222,4 +224,13 @@ where
             inner: Arc::from(index) as Arc<RawHandler>,
         }
     }
+}
+
+/// Creates `actix_web::App` for the given aggregator.
+pub(crate) fn create_app(aggregator: ApiAggregator, api_scope: ApiScope) -> App {
+    let state = ServiceApiState::new(aggregator.blockchain.clone());
+    App::with_state(state).scope("api", move |scope| match api_scope {
+        ApiScope::Private => aggregator.extend_private_api(scope),
+        ApiScope::Public => aggregator.extend_public_api(scope),
+    })
 }

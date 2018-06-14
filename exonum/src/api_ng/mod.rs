@@ -146,6 +146,24 @@ impl ServiceApiBuilder {
     }
 }
 
+/// TODO
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ApiScope {
+    /// TODO
+    Public,
+    /// TODO
+    Private,
+}
+
+impl ::std::fmt::Display for ApiScope {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        match *self {
+            ApiScope::Public => f.write_str("public"),
+            ApiScope::Private => f.write_str("private"),
+        }
+    }
+}
+
 pub(crate) trait IntoApiBackend {
     fn extend<'a, I>(self, items: I) -> Self
     where
@@ -154,18 +172,19 @@ pub(crate) trait IntoApiBackend {
 
 #[derive(Debug, Clone)]
 pub(crate) struct ApiAggregator {
+    pub(crate) blockchain: Blockchain,
     inner: BTreeMap<String, ServiceApiBuilder>,
 }
 
 impl ApiAggregator {
-    pub fn new(blockchain: &Blockchain, shared_api_state: SharedNodeState) -> ApiAggregator {
+    pub fn new(blockchain: Blockchain, shared_api_state: SharedNodeState) -> ApiAggregator {
         let mut inner = BTreeMap::new();
         // Adds built-in APIs.
         inner.insert(
             "system".to_owned(),
-            Self::system_api(blockchain, shared_api_state),
+            Self::system_api(&blockchain, shared_api_state),
         );
-        inner.insert("public".to_owned(), Self::explorer_api());
+        inner.insert("explorer".to_owned(), Self::explorer_api());
         // Adds services APIs.
         inner.extend(blockchain.service_map().iter().map(|(_, service)| {
             let mut builder = ServiceApiBuilder::new();
@@ -175,7 +194,7 @@ impl ApiAggregator {
             (prefix, builder)
         }));
 
-        ApiAggregator { inner }
+        ApiAggregator { inner, blockchain }
     }
 
     /// TODO
