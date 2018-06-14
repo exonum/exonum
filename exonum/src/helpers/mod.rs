@@ -27,9 +27,9 @@ use colored::*;
 use env_logger::{Builder, Formatter};
 use log::{Level, Record, SetLoggerError};
 
-use std::env;
-use std::io::{self, Write};
-use std::time::SystemTime;
+use std::{env,
+          io::{self, Write},
+          time::SystemTime};
 
 use blockchain::{GenesisConfig, ValidatorKeys};
 use crypto::gen_keypair;
@@ -98,8 +98,8 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
 fn has_colors() -> bool {
     use atty;
     use std::io;
-    use term::Terminal;
     use term::terminfo::TerminfoTerminal;
+    use term::Terminal;
 
     let out = io::stderr();
     match TerminfoTerminal::new(out) {

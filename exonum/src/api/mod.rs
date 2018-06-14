@@ -21,19 +21,15 @@ use bodyparser;
 use cookie::Cookie as CookiePair;
 use failure::Fail;
 use hyper::header::{ContentType, SetCookie};
-use iron::prelude::*;
-use iron::{status, IronError, headers::Cookie};
+use iron::{headers::Cookie, prelude::*, status, IronError};
 use params;
 use router::Router;
-use serde::de::{self, Deserialize, Deserializer, Visitor};
-use serde::{Serialize, Serializer};
+use serde::{de::{self, Deserialize, Deserializer, Visitor},
+            Serialize,
+            Serializer};
 use serde_json;
 
-use std::collections::BTreeMap;
-use std::marker::PhantomData;
-use std::ops::Deref;
-use std::str::FromStr;
-use std::{fmt, io};
+use std::{collections::BTreeMap, fmt, io, marker::PhantomData, ops::Deref, str::FromStr};
 
 use crypto::{PublicKey, SecretKey};
 use encoding::serialize::{encode_hex, FromHex, FromHexError, ToHex};
@@ -276,7 +272,7 @@ pub trait Api {
         Ok((public_key, secret_key))
     }
 
-    //TODO: Remove duplicate code
+    // TODO: Remove duplicate code. (ECR-1629)
     /// Returns NotFound and some response with cookies.
     fn not_found_response_with_cookies(
         &self,

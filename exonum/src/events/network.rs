@@ -12,26 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use futures::{future, unsync, Future, IntoFuture, Poll, Sink, Stream};
-use futures::{future::Either, sync::mpsc};
-use tokio_core::net::{TcpListener, TcpStream};
-use tokio_core::reactor::Handle;
-use tokio_retry::{Retry, strategy::{jitter, FixedInterval}};
+use futures::{future, future::Either, sync::mpsc, unsync, Future, IntoFuture, Poll, Sink, Stream};
+use tokio_core::{net::{TcpListener, TcpStream},
+                 reactor::Handle};
+use tokio_retry::{strategy::{jitter, FixedInterval},
+                  Retry};
 
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::io;
-use std::net::SocketAddr;
-use std::rc::Rc;
-use std::time::Duration;
+use std::{cell::RefCell, collections::HashMap, io, net::SocketAddr, rc::Rc, time::Duration};
 
-use super::error::{into_other, log_error, other_error, result_ok};
-use super::to_box;
+use super::{error::{into_other, log_error, other_error, result_ok},
+            to_box};
 use helpers::Milliseconds;
 use messages::{Any, Connect, Message, RawMessage};
 
-use events::noise::HandshakeParams;
-use events::noise::NoiseHandshake;
+use events::noise::{HandshakeParams, NoiseHandshake};
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 
@@ -52,7 +46,7 @@ pub enum NetworkRequest {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub struct NetworkConfiguration {
-    // TODO: think more about config parameters (ECR-162)
+    // TODO: Think more about config parameters. (ECR-162)
     pub max_incoming_connections: usize,
     pub max_outgoing_connections: usize,
     pub tcp_nodelay: bool,
@@ -226,7 +220,7 @@ impl NetworkPart {
             cancel_sender,
             handshake_params,
         );
-        // TODO Don't use unwrap here!
+        // TODO Don't use unwrap here! (ECR-1633)
         let server = Listener::bind(
             network_config,
             self.listen_address,
@@ -249,7 +243,7 @@ impl NetworkPart {
 }
 
 struct RequestHandler(
-    // TODO: Replace with concrete type
+    // TODO: Replace with concrete type. (ECR-1634)
     Box<Future<Item = (), Error = io::Error>>,
 );
 

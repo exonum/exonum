@@ -28,12 +28,12 @@ extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
 
-use exonum::api::ApiError;
-use exonum::blockchain::{Transaction, TransactionErrorType as ErrorType};
-use exonum::crypto::{self, CryptoHash, PublicKey};
-use exonum::encoding::serialize::{FromHex, json::ExonumJson};
-use exonum::helpers::Height;
-use exonum::messages::Message;
+use exonum::{api::ApiError,
+             blockchain::{Transaction, TransactionErrorType as ErrorType},
+             crypto::{self, CryptoHash, PublicKey},
+             encoding::serialize::{json::ExonumJson, FromHex},
+             helpers::Height,
+             messages::Message};
 use exonum_testkit::{ApiKind, ComparableSnapshot, TestKit, TestKitApi, TestKitBuilder};
 use serde_json::Value;
 

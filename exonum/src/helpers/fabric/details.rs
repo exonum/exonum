@@ -19,21 +19,23 @@
 
 use toml;
 
-use std::collections::{BTreeMap, HashMap};
-use std::fs;
-use std::net::{IpAddr, SocketAddr};
-use std::path::{Path, PathBuf};
+use std::{collections::{BTreeMap, HashMap},
+          fs,
+          net::{IpAddr, SocketAddr},
+          path::{Path, PathBuf}};
 
-use super::DEFAULT_EXONUM_LISTEN_PORT;
-use super::internal::{CollectedCommand, Command, Feedback};
-use super::keys;
-use super::shared::{AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig,
-                    SharedConfig};
-use super::{Argument, CommandName, Context};
-use blockchain::{GenesisConfig, config::ValidatorKeys};
+use super::{internal::{CollectedCommand, Command, Feedback},
+            keys,
+            shared::{AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig,
+                     SharedConfig},
+            Argument,
+            CommandName,
+            Context,
+            DEFAULT_EXONUM_LISTEN_PORT};
+use blockchain::{config::ValidatorKeys, GenesisConfig};
 use crypto;
-use helpers::{generate_testnet_config, config::ConfigFile};
 use node::ConnectList;
+use helpers::{config::ConfigFile, generate_testnet_config};
 use node::{AllowOrigin, NodeApiConfig, NodeConfig};
 use storage::{Database, DbOptions, RocksDB};
 
@@ -50,11 +52,6 @@ const PRIVATE_ALLOW_ORIGIN: &str = "PRIVATE_ALLOW_ORIGIN";
 pub struct Run;
 
 impl Run {
-    /// Returns the name of the `Run` command.
-    pub fn name() -> CommandName {
-        "run"
-    }
-
     /// Returns created database instance.
     pub fn db_helper(ctx: &Context, options: &DbOptions) -> Box<Database> {
         let path = ctx.arg::<String>(DATABASE_PATH)
@@ -116,7 +113,7 @@ impl Command for Run {
     }
 
     fn name(&self) -> CommandName {
-        Self::name()
+        "run"
     }
 
     fn about(&self) -> &str {
@@ -157,11 +154,6 @@ impl Command for Run {
 pub struct RunDev;
 
 impl RunDev {
-    /// Returns the name of the `Run` command.
-    pub fn name() -> CommandName {
-        "run-dev"
-    }
-
     fn artifacts_directory(ctx: &Context) -> PathBuf {
         let directory = ctx.arg::<String>("ARTIFACTS_DIR")
             .unwrap_or_else(|_| ".exonum".into());
@@ -186,7 +178,7 @@ impl RunDev {
         common_config_ctx.set_arg("COMMON_CONFIG", common_config_path.clone());
         common_config_ctx.set_arg("VALIDATORS_COUNT", validators_count.into());
         let common_config_command = commands
-            .get(GenerateCommonConfig::name())
+            .get(GenerateCommonConfig.name())
             .expect("Expected GenerateCommonConfig in the commands list.");
         common_config_command.execute(commands, common_config_ctx);
 
@@ -196,7 +188,7 @@ impl RunDev {
         node_config_ctx.set_arg("SEC_CONFIG", sec_config_path.clone());
         node_config_ctx.set_arg(PEER_ADDRESS, peer_addr.into());
         let node_config_command = commands
-            .get(GenerateNodeConfig::name())
+            .get(GenerateNodeConfig.name())
             .expect("Expected GenerateNodeConfig in the commands list.");
         node_config_command.execute(commands, node_config_ctx);
 
@@ -205,7 +197,7 @@ impl RunDev {
         finalize_ctx.set_arg("SECRET_CONFIG", sec_config_path.clone());
         finalize_ctx.set_arg("OUTPUT_CONFIG_PATH", output_config_path.clone());
         let finalize_command = commands
-            .get(Finalize::name())
+            .get(Finalize.name())
             .expect("Expected Finalize in the commands list.");
         finalize_command.execute(commands, finalize_ctx);
 
@@ -225,20 +217,18 @@ impl RunDev {
 
 impl Command for RunDev {
     fn args(&self) -> Vec<Argument> {
-        vec![
-            Argument::new_named(
-                "ARTIFACTS_DIR",
-                false,
-                "The path where configuration and db files will be generated.",
-                "a",
-                "artifacts-dir",
-                false,
-            ),
-        ]
+        vec![Argument::new_named(
+            "ARTIFACTS_DIR",
+            false,
+            "The path where configuration and db files will be generated.",
+            "a",
+            "artifacts-dir",
+            false,
+        )]
     }
 
     fn name(&self) -> CommandName {
-        Self::name()
+        "run-dev"
     }
 
     fn about(&self) -> &str {
@@ -260,7 +250,7 @@ impl Command for RunDev {
 
         let new_context = exts(context);
         commands
-            .get(Run::name())
+            .get(Run.name())
             .expect("Expected Run in the commands list.")
             .execute(commands, new_context.clone())
     }
@@ -268,13 +258,6 @@ impl Command for RunDev {
 
 /// Command for the template generation.
 pub struct GenerateCommonConfig;
-
-impl GenerateCommonConfig {
-    /// Returns the name of the `GenerateCommonConfig` command.
-    pub fn name() -> CommandName {
-        "generate-template"
-    }
-}
 
 impl Command for GenerateCommonConfig {
     fn args(&self) -> Vec<Argument> {
@@ -292,7 +275,7 @@ impl Command for GenerateCommonConfig {
     }
 
     fn name(&self) -> CommandName {
-        Self::name()
+        "generate-template"
     }
 
     fn about(&self) -> &str {
@@ -335,11 +318,6 @@ impl Command for GenerateCommonConfig {
 pub struct GenerateNodeConfig;
 
 impl GenerateNodeConfig {
-    /// Returns the name of the `GenerateNodeConfig` command.
-    pub fn name() -> CommandName {
-        "generate-config"
-    }
-
     fn addr(context: &Context) -> (SocketAddr, SocketAddr) {
         let addr_str = &context.arg::<String>(PEER_ADDRESS).unwrap_or_default();
         let error_msg = &format!("Expected an ip address in {}: {:?}", PEER_ADDRESS, addr_str);
@@ -377,7 +355,7 @@ impl Command for GenerateNodeConfig {
     }
 
     fn name(&self) -> CommandName {
-        Self::name()
+        "generate-config"
     }
 
     fn about(&self) -> &str {
@@ -456,11 +434,6 @@ impl Command for GenerateNodeConfig {
 pub struct Finalize;
 
 impl Finalize {
-    /// Returns the name of the `Finalize` command.
-    pub fn name() -> CommandName {
-        "finalize"
-    }
-
     /// Returns `GenesisConfig` from the template.
     fn genesis_from_template(
         template: CommonConfigTemplate,
@@ -563,7 +536,7 @@ impl Command for Finalize {
     }
 
     fn name(&self) -> CommandName {
-        Self::name()
+        "finalize"
     }
 
     fn about(&self) -> &str {
@@ -670,13 +643,6 @@ impl Command for Finalize {
 /// Command for the testnet generation.
 pub struct GenerateTestnet;
 
-impl GenerateTestnet {
-    /// Returns the name of the `GenerateTestnet` command.
-    pub fn name() -> CommandName {
-        "generate-testnet"
-    }
-}
-
 impl Command for GenerateTestnet {
     fn args(&self) -> Vec<Argument> {
         vec![
@@ -701,7 +667,7 @@ impl Command for GenerateTestnet {
     }
 
     fn name(&self) -> CommandName {
-        Self::name()
+        "generate-testnet"
     }
 
     fn about(&self) -> &str {

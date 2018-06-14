@@ -15,10 +15,7 @@
 // These functions transform source error types into other.
 #![cfg_attr(feature="cargo-clippy", allow(needless_pass_by_value))]
 
-use std::error::Error as StdError;
-use std::io;
-
-// Common error helpers (TODO move to helpers)
+use std::{error::Error as StdError, io};
 
 pub fn other_error<S: AsRef<str>>(s: S) -> io::Error {
     io::Error::new(io::ErrorKind::Other, s.as_ref())

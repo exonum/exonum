@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::borrow::Cow;
-use std::error::Error as StdError;
-use std::fmt;
+use std::{borrow::Cow, error::Error as StdError, fmt};
 
 use super::Offset;
 
@@ -22,7 +20,7 @@ use super::Offset;
 /// This structure represent `encoding` specific errors.
 /// This errors returned by function `check` of each `Field`.
 pub enum Error {
-    // TODO: Check this message after refactor buffer (ECR-156).
+    // TODO: Check this message after refactor buffer. (ECR-156)
     /// Payload is short for this message.
     UnexpectedlyShortPayload {
         /// real message size.

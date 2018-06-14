@@ -14,11 +14,14 @@
 
 //! An implementation of array list of items.
 
-use std::cell::Cell;
-use std::marker::PhantomData;
+use std::{cell::Cell, marker::PhantomData};
 
-use super::indexes_metadata::IndexType;
-use super::{BaseIndex, BaseIndexIter, Fork, Snapshot, StorageKey, StorageValue};
+use super::{base_index::{BaseIndex, BaseIndexIter},
+            indexes_metadata::IndexType,
+            Fork,
+            Snapshot,
+            StorageKey,
+            StorageValue};
 
 /// A list of items that implement `StorageValue` trait.
 ///
@@ -360,7 +363,7 @@ where
     /// assert_eq!(3, index.len());
     /// ```
     pub fn truncate(&mut self, len: u64) {
-        // TODO: optimize this (ECR-175)
+        // TODO: Optimize this. (ECR-175)
         while self.len() > len {
             self.pop();
         }

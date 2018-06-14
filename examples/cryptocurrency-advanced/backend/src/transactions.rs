@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::blockchain::{ExecutionError, ExecutionResult, Transaction};
-use exonum::crypto::{CryptoHash, PublicKey};
-use exonum::messages::Message;
-use exonum::storage::Fork;
+use exonum::{blockchain::{ExecutionError, ExecutionResult, Transaction},
+             crypto::{CryptoHash, PublicKey},
+             messages::Message,
+             storage::Fork};
 
-use CRYPTOCURRENCY_SERVICE_ID;
 use schema::CurrencySchema;
+use CRYPTOCURRENCY_SERVICE_ID;
 
 /// Error codes emitted by wallet transactions during execution.
 #[derive(Debug, Fail)]
