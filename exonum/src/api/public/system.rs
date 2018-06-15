@@ -90,7 +90,7 @@ impl SystemApi {
             let info = ConsensusStatusInfo {
                 // Peers list doesn't include current node address, so we have to increment its length.
                 // E.g. if we have 3 items in peers list, it means that we have 4 nodes overall.
-                status: self.shared_api_state.peers_info().len() + 1
+                status: self.shared_api_state.peers_info().len().saturating_add(1)
                     >= self.shared_api_state.majority_count(),
             };
             self.ok_response(&serde_json::to_value(info).unwrap())
