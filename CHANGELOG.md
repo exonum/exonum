@@ -5,6 +5,16 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## 0.8.1 - 2018-06-15
+
+### Internal improvements
+
+#### exonum
+
+- Dependencies versions have been updated:
+  - `exonum_sodiumoxide` to `0.0.19`.
+  - `exonum_rocksdb` to `0.7.4`.
+
 ## 0.8 - 2018-05-31
 
 ### Breaking changes
