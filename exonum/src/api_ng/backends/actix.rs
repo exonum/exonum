@@ -34,9 +34,8 @@ use std::sync::{mpsc, Arc};
 use std::thread::{self, JoinHandle};
 
 use api_ng::error::Error as ApiError;
-use api_ng::{ApiAggregator, ApiScope, FutureResult, Immutable, IntoApiBackend, Mutable, NamedWith,
-             Result, ServiceApiBackend, ServiceApiScope, ServiceApiState};
-use blockchain::SharedNodeState;
+use api_ng::{ApiAccess, ApiAggregator, FutureResult, Immutable, IntoApiBackend, Mutable,
+             NamedWith, Result, ServiceApiBackend, ServiceApiScope, ServiceApiState};
 
 /// Type alias for the concrete API http response.
 pub type FutureResponse = actix_web::FutureResponse<HttpResponse, actix_web::Error>;
@@ -247,36 +246,33 @@ where
 }
 
 /// Creates `actix_web::App` for the given aggregator and runtime configuration.
-pub(crate) fn create_app(aggregator: ApiAggregator, runtime_config: ApiRuntimeConfig) -> App {
+pub(crate) fn create_app(aggregator: &ApiAggregator, runtime_config: ApiRuntimeConfig) -> App {
     let app_config = runtime_config.app_config;
-    let api_scope = runtime_config.api_scope;
+    let access = runtime_config.access;
     let state = ServiceApiState::new(aggregator.blockchain.clone());
-    let mut app = App::with_state(state).scope("api", move |scope| match api_scope {
-        ApiScope::Private => aggregator.extend_private_api(scope),
-        ApiScope::Public => aggregator.extend_public_api(scope),
-    });
+    let mut app = App::with_state(state).scope("api", |scope| aggregator.extend_api(access, scope));
     if let Some(app_config) = app_config {
         app = app_config(app);
     }
     app
 }
 
-/// Configuration parameters for the `App` runtime
+/// Configuration parameters for the `App` runtime.
 #[derive(Clone)]
 pub(crate) struct ApiRuntimeConfig {
     /// The socket address to bind.
     pub listen_address: SocketAddr,
-    /// Api scope.
-    pub api_scope: ApiScope,
+    /// Api access level.
+    pub access: ApiAccess,
     /// Optional App configuration.
     pub app_config: Option<AppConfig>,
 }
 
 impl ApiRuntimeConfig {
-    pub fn new(listen_address: SocketAddr, api_scope: ApiScope) -> ApiRuntimeConfig {
+    pub fn new(listen_address: SocketAddr, access: ApiAccess) -> ApiRuntimeConfig {
         ApiRuntimeConfig {
             listen_address,
-            api_scope,
+            access,
             app_config: Default::default(),
         }
     }
@@ -286,7 +282,7 @@ impl fmt::Debug for ApiRuntimeConfig {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("ApiRuntimeConfig")
             .field("listen_address", &self.listen_address)
-            .field("api_scope", &self.api_scope)
+            .field("access", &self.access)
             .field("app_config", &self.app_config.as_ref().map(drop))
             .finish()
     }
@@ -296,7 +292,6 @@ impl fmt::Debug for ApiRuntimeConfig {
 pub(crate) struct SystemRuntimeConfig {
     pub api_runtimes: Vec<ApiRuntimeConfig>,
     pub api_aggregator: ApiAggregator,
-    pub node_state: SharedNodeState,
 }
 
 /// Actix system runtime handle.
@@ -323,12 +318,12 @@ impl SystemRuntime {
 
             let aggregator = config.api_aggregator.clone();
             let api_handlers = config.api_runtimes.into_iter().map(|runtime_config| {
-                let api_scope = runtime_config.api_scope;
+                let access = runtime_config.access;
                 let listen_address = runtime_config.listen_address;
-                info!("Starting web {} api on {}", api_scope, listen_address);
+                info!("Starting web {} api on {}", access, listen_address);
 
                 let aggregator = aggregator.clone();
-                HttpServer::new(move || create_app(aggregator.clone(), runtime_config.clone()))
+                HttpServer::new(move || create_app(&aggregator, runtime_config.clone()))
                     .disable_signals()
                     .bind(listen_address)
                     .map(|server| server.start())
@@ -360,7 +355,7 @@ impl SystemRuntime {
                     format_err!(
                         "Unable to receive actix api system address for api: listen_addr {}, scope {}",
                         api_runtime.listen_address,
-                        api_runtime.api_scope,
+                        api_runtime.access,
                     )
                 })?;
                 api_runtime_addresses.push(api_runtime_address);

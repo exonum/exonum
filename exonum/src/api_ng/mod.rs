@@ -150,41 +150,46 @@ impl ServiceApiBuilder {
 
 /// TODO
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ApiScope {
+pub enum ApiAccess {
     /// TODO
     Public,
     /// TODO
     Private,
 }
 
-impl ::std::fmt::Display for ApiScope {
+impl ::std::fmt::Display for ApiAccess {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         match *self {
-            ApiScope::Public => f.write_str("public"),
-            ApiScope::Private => f.write_str("private"),
+            ApiAccess::Public => f.write_str("public"),
+            ApiAccess::Private => f.write_str("private"),
         }
     }
 }
 
-pub(crate) trait IntoApiBackend {
+/// API backend extender.
+pub trait IntoApiBackend {
+    /// Extend API backend by the given scopes.
     fn extend<'a, I>(self, items: I) -> Self
     where
         I: IntoIterator<Item = (&'a str, &'a ServiceApiScope)>;
 }
 
+/// Exonum node API aggregator.
 #[derive(Debug, Clone)]
-pub(crate) struct ApiAggregator {
-    pub(crate) blockchain: Blockchain,
+pub struct ApiAggregator {
+    blockchain: Blockchain,
+    node_state: SharedNodeState,
     inner: BTreeMap<String, ServiceApiBuilder>,
 }
 
 impl ApiAggregator {
-    pub fn new(blockchain: Blockchain, shared_api_state: SharedNodeState) -> ApiAggregator {
+    /// Aggregates API for the given blockchain and node state.
+    pub fn new(blockchain: Blockchain, node_state: SharedNodeState) -> ApiAggregator {
         let mut inner = BTreeMap::new();
         // Adds built-in APIs.
         inner.insert(
             "system".to_owned(),
-            Self::system_api(&blockchain, shared_api_state),
+            Self::system_api(&blockchain, node_state.clone()),
         );
         inner.insert("explorer".to_owned(), Self::explorer_api());
         // Adds services APIs.
@@ -196,31 +201,32 @@ impl ApiAggregator {
             (prefix, builder)
         }));
 
-        ApiAggregator { inner, blockchain }
+        ApiAggregator {
+            inner,
+            blockchain,
+            node_state,
+        }
     }
 
     /// TODO
-    pub fn extend_public_api<B>(&self, backend: B) -> B
-    where
-        B: IntoApiBackend,
-    {
-        backend.extend(
-            self.inner
-                .iter()
-                .map(|(name, builder)| (name.as_ref(), &builder.public_scope)),
-        )
+    pub fn blockchain(&self) -> Blockchain {
+        self.blockchain.clone()
     }
 
     /// TODO
-    pub fn extend_private_api<B>(&self, backend: B) -> B
-    where
-        B: IntoApiBackend,
-    {
-        backend.extend(
-            self.inner
-                .iter()
-                .map(|(name, builder)| (name.as_ref(), &builder.private_scope)),
-        )
+    pub fn extend_api<B: IntoApiBackend>(&self, access: ApiAccess, backend: B) -> B {
+        match access {
+            ApiAccess::Public => backend.extend(
+                self.inner
+                    .iter()
+                    .map(|(name, builder)| (name.as_ref(), &builder.public_scope)),
+            ),
+            ApiAccess::Private => backend.extend(
+                self.inner
+                    .iter()
+                    .map(|(name, builder)| (name.as_ref(), &builder.private_scope)),
+            ),
+        }
     }
 
     fn explorer_api() -> ServiceApiBuilder {

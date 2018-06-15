@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+pub use exonum::api_ng::ApiAccess;
+
 use bodyparser;
 use exonum::{api::ApiError,
              blockchain::{SharedNodeState, Transaction},
@@ -41,7 +43,7 @@ use super::TestKit;
 /// `ApiKind` allows to use `get*` and `post*` methods of [`TestKitApi`] more safely.
 ///
 /// [`TestKitApi`]: struct.TestKitApi.html
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum ApiKind {
     /// `api/system` endpoints of the built-in Exonum REST API.
     System,
@@ -49,6 +51,16 @@ pub enum ApiKind {
     Explorer,
     /// Endpoints corresponding to a service with the specified string identifier.
     Service(&'static str),
+}
+
+impl ::fmt::Display for ApiKind {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ApiKind::System => write!(f, "api/system"),
+            ApiKind::Explorer => write!(f, "api/explorer"),
+            ApiKind::Service(name) => write!(f, "api/services/{}", name),
+        }
+    }
 }
 
 impl ApiKind {
@@ -324,21 +336,6 @@ impl TestKitApi {
             status::NotFound => ApiError::NotFound(error(response)),
             s if s.is_server_error() => ApiError::InternalError(error(response).into()),
             s => panic!("Received non-error response status: {}", s.to_u16()),
-        }
-    }
-}
-
-#[derive(Debug)]
-enum ApiAccess {
-    Public,
-    Private,
-}
-
-impl fmt::Display for ApiAccess {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            ApiAccess::Public => formatter.write_str("public"),
-            ApiAccess::Private => formatter.write_str("private"),
         }
     }
 }

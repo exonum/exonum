@@ -124,9 +124,11 @@
 
 #![deny(missing_debug_implementations, missing_docs)]
 
+extern crate actix_web;
 extern crate bodyparser;
 #[cfg_attr(test, macro_use)]
 extern crate exonum;
+extern crate failure;
 extern crate futures;
 extern crate iron;
 extern crate iron_test;
@@ -139,6 +141,7 @@ extern crate serde;
 extern crate serde_derive;
 #[cfg_attr(test, macro_use)]
 extern crate serde_json;
+extern crate serde_urlencoded;
 extern crate tokio_core;
 
 #[cfg(test)]
@@ -176,6 +179,7 @@ use poll_events::poll_events;
 #[macro_use]
 mod macros;
 mod api;
+pub mod api_ng;
 mod checkpoint_db;
 mod handler;
 mod network;

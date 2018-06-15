@@ -16,14 +16,19 @@ extern crate exonum;
 extern crate exonum_testkit;
 #[macro_use]
 extern crate pretty_assertions;
+#[macro_use]
+extern crate log;
 
-use exonum::{api::{private::NodeInfo, public::HealthCheckInfo},
-             helpers::user_agent,
-             messages::PROTOCOL_MAJOR_VERSION};
+use exonum::{
+    api::{private::NodeInfo, public::HealthCheckInfo}, helpers::user_agent,
+    messages::PROTOCOL_MAJOR_VERSION,
+};
 use exonum_testkit::{ApiKind, TestKitBuilder};
 
 #[test]
 fn test_healthcheck_connectivity_false() {
+    let _ = ::exonum::helpers::init_logger();
+
     let testkit = TestKitBuilder::validator().with_validators(2).create();
     let api = testkit.api();
     let info: HealthCheckInfo = api.get(ApiKind::System, "v1/healthcheck");
@@ -31,6 +36,15 @@ fn test_healthcheck_connectivity_false() {
         connectivity: false,
     };
     assert_eq!(info, expected);
+
+    let mut api = exonum_testkit::api_ng::TestKitApi::new(&testkit);
+
+    assert_eq!(
+        api.public(ApiKind::System)
+            .get::<HealthCheckInfo>("v1/healthcheck")
+            .unwrap(),
+        expected
+    );
 }
 
 #[test]

@@ -24,8 +24,8 @@ pub use self::{state::{RequestData, State, ValidatorState},
 pub mod state;
 
 use api_ng::{backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig},
-             ApiAggregator,
-             ApiScope};
+             ApiAccess,
+             ApiAggregator};
 use failure;
 use futures::{sync::mpsc, Future, Sink};
 use iron::Chain;
@@ -907,11 +907,11 @@ impl Node {
             api_runtimes: {
                 let public_api_handler = self.api_options
                     .public_api_address
-                    .map(|address| ApiRuntimeConfig::new(address, ApiScope::Public))
+                    .map(|address| ApiRuntimeConfig::new(address, ApiAccess::Public))
                     .into_iter();
                 let private_api_handler = self.api_options
                     .private_api_address
-                    .map(|address| ApiRuntimeConfig::new(address, ApiScope::Private))
+                    .map(|address| ApiRuntimeConfig::new(address, ApiAccess::Private))
                     .into_iter();
                 public_api_handler
                     .chain(private_api_handler)
@@ -921,7 +921,6 @@ impl Node {
                 self.handler.blockchain.clone(),
                 self.handler.api_state.clone(),
             ),
-            node_state: self.handler.api_state.clone(),
         }.start()?;
 
         // Runs NodeHandler.
