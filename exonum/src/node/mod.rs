@@ -24,8 +24,8 @@ pub use self::{state::{RequestData, State, ValidatorState},
 pub mod state;
 
 use actix;
-use actix_web::{self, server::IntoHttpHandler};
-use api_ng;
+use actix_web::{self, server::HttpServer};
+use api_ng::{backends::actix::create_app, ApiAggregator, ApiScope};
 use failure;
 use futures::{sync::mpsc, Future, Sink};
 use iron::Chain;
@@ -906,45 +906,43 @@ impl Node {
         let blockchain = self.handler.blockchain.clone();
 
         // Start actix-web api.
-        let api_handlers = self.api_options
-            .private_api_address
-            .map(|addr| (addr, api_ng::ApiScope::Private))
-            .into_iter()
-            .chain(
-                self.api_options
-                    .public_api_address
-                    .map(|addr| (addr, api_ng::ApiScope::Public))
-                    .into_iter(),
-            )
-            .collect::<Vec<_>>();
-        let (actix_sys_tx, actix_sys_rx) = ::std::sync::mpsc::channel();
-        let (api_addr_tx, api_addr_rx) = ::std::sync::mpsc::channel();
-        let api_scopes = api_handlers.clone();
+        let web_api_handlers = {
+            let public_api_handler = self.api_options
+                .public_api_address
+                .map(|address| (address, ApiScope::Public))
+                .into_iter();
+            let private_api_handler = self.api_options
+                .private_api_address
+                .map(|address| (address, ApiScope::Private))
+                .into_iter();
+            public_api_handler
+                .chain(private_api_handler)
+                .collect::<Vec<_>>()
+        };
+
+        let (actix_runtime_tx, actix_runtime_rx) = ::std::sync::mpsc::channel();
+        let (web_api_tx, web_api_rx) = ::std::sync::mpsc::channel();
+        let api_scopes = web_api_handlers.clone();
         let actix_api_thread = thread::spawn(move || -> Result<(), failure::Error> {
-            let sys = actix::System::new("http-server");
+            let system = actix::System::new("http-server");
 
-            let aggregator = api_ng::ApiAggregator::new(blockchain, api_state.clone());
+            let aggregator = ApiAggregator::new(blockchain, api_state.clone());
+            let web_api_handlers = api_scopes.into_iter().map(|(listen_address, api_scope)| {
+                info!("Starting web {} api on {}", api_scope, listen_address);
+                let aggregator = aggregator.clone();
+                HttpServer::new(move || create_app(aggregator.clone(), api_scope))
+                    .disable_signals()
+                    .bind(listen_address)
+                    .map(|server| server.start())
+            });
 
-            let a = aggregator.clone();
-            let api_sys_addrs = api_scopes
-                .into_iter()
-                .map(move |(listen_address, api_scope)| {
-                    info!("Starting {} api on {}", api_scope, listen_address);
-                    let a = a.clone();
-                    create_web_server(a, api_scope)
-                        .disable_signals()
-                        .bind(listen_address)
-                        .map(|server| server.start())
-                });
-
-            actix_sys_tx.send(actix::Arbiter::system())?;
-            for api_sys_addr in api_sys_addrs {
-                api_addr_tx.send(api_sys_addr?)?;
+            actix_runtime_tx.send(actix::Arbiter::system())?;
+            for web_api_handler in web_api_handlers {
+                web_api_tx.send(web_api_handler?)?;
             }
 
-            let code = sys.run();
-
-            debug!("Actix runtime finished with code: {}", code);
+            let code = system.run();
+            trace!("Actix runtime finished with code {}", code);
             if code != 0 {
                 Err(format_err!(
                     "Actix runtime finished with the non zero error code: {}",
@@ -955,15 +953,15 @@ impl Node {
             }
         });
 
-        let actix_sys_addr = actix_sys_rx
+        let actix_runtime = actix_runtime_rx
             .recv()
             .map_err(|_| format_err!("Unable to receive actix system address"))?;
-        let api_sys_addrs = api_handlers
+        let web_api_handlers = web_api_handlers
             .into_iter()
             .map(|(listen_addr, api_scope)| {
-                api_addr_rx.recv().map_err(|_| {
+                web_api_rx.recv().map_err(|_| {
                     format_err!(
-                        "Unable to receive actix api sys address for api: listen_addr {}, scope {}",
+                        "Unable to receive actix api system address for api: listen_addr {}, scope {}",
                         listen_addr,
                         api_scope
                     )
@@ -978,18 +976,17 @@ impl Node {
         };
         self.run_handler(&handshake_params)?;
 
-        debug!("Handler stopped");
-
-        // Stop all APIs
-        for api_sys_addr in api_sys_addrs {
-            api_sys_addr?
+        // Stop all actix web servers.
+        for web_api_handler in web_api_handlers {
+            web_api_handler?
                 .send(actix_web::server::StopServer { graceful: true })
                 .wait()?
-                .map_err(|_| format_err!("Unable to send StopServer message"))?;
+                .map_err(|_| {
+                    format_err!("Unable to send `StopServer` message to web api handler")
+                })?;
         }
-        actix_sys_addr.send(actix::msgs::SystemExit(0)).wait()?;
-
-        debug!("Sent stop signal to the actix system");
+        actix_runtime.send(actix::msgs::SystemExit(0)).wait()?;
+        // Stop actix system runtime.
         actix_api_thread.join().map_err(|e| {
             format_err!(
                 "Unable to join actix web api thread, an error occurred: {:?}",
@@ -997,7 +994,7 @@ impl Node {
             )
         })??;
 
-        debug!("Actix web workers stopped");
+        info!("Exonum node stopped");
 
         Ok(())
     }
@@ -1049,15 +1046,6 @@ impl Node {
     pub fn channel(&self) -> ApiSender {
         ApiSender::new(self.channel.api_requests.0.clone())
     }
-}
-
-fn create_web_server(
-    aggregator: api_ng::ApiAggregator,
-    api_scope: api_ng::ApiScope,
-) -> actix_web::server::HttpServer<<api_ng::backends::actix::App as IntoHttpHandler>::Handler> {
-    actix_web::server::new(move || {
-        api_ng::backends::actix::create_app(aggregator.clone(), api_scope)
-    })
 }
 
 /// Public for testing

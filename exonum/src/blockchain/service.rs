@@ -24,6 +24,7 @@ use std::{collections::{HashMap, HashSet},
           sync::{Arc, RwLock}};
 
 use super::transaction::Transaction;
+use api_ng::ServiceApiBuilder;
 use blockchain::{Blockchain, ConsensusConfig, Schema, StoredConfiguration, ValidatorKeys};
 use crypto::{Hash, PublicKey, SecretKey};
 use encoding::Error as MessageError;
@@ -212,8 +213,10 @@ pub trait Service: Send + Sync + 'static {
         None
     }
 
-    /// TODO
-    fn wire_api(&self, _builder: &mut ::api_ng::ServiceApiBuilder) {}
+    /// Extends API by handlers of this service. The request handlers are mounted on the
+    /// the `/api/services/{service_name}` path at the listen address of all
+    /// full nodes in the blockchain network.
+    fn wire_api(&self, _builder: &mut ServiceApiBuilder) {}
 }
 
 /// The current node state on which the blockchain is running, or in other words
