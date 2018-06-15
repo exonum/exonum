@@ -1051,7 +1051,6 @@ mod tests {
     use crypto::gen_keypair;
     use events::EventHandler;
     use helpers;
-    use node::{ExternalMessage, Node};
     use storage::{Database, Fork, MemoryDB};
 
     messages! {
