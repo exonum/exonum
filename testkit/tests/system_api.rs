@@ -17,10 +17,10 @@ extern crate exonum_testkit;
 #[macro_use]
 extern crate pretty_assertions;
 
-use exonum::api::private::NodeInfo;
-use exonum::api::public::HealthCheckInfo;
-use exonum::helpers::user_agent;
-use exonum::messages::PROTOCOL_MAJOR_VERSION;
+use exonum::{api::{private::NodeInfo,
+                   public::{ConsensusStatusInfo, HealthCheckInfo}},
+             helpers::user_agent,
+             messages::PROTOCOL_MAJOR_VERSION};
 use exonum_testkit::{ApiKind, TestKitBuilder};
 
 #[test]
@@ -49,10 +49,16 @@ fn test_network() {
     let api = testkit.api();
     let info: NodeInfo = api.get_private(ApiKind::System, "/v1/network");
 
-    assert_eq!(
-        info.core_version,
-        option_env!("CARGO_PKG_VERSION").map(|ver| ver.to_owned())
-    );
+    assert!(info.core_version.is_some());
     assert_eq!(info.protocol_version, PROTOCOL_MAJOR_VERSION);
     assert!(info.services.is_empty());
+}
+
+#[test]
+fn test_consensus_status() {
+    let testkit = TestKitBuilder::validator().create();
+    let api = testkit.api();
+    let info: ConsensusStatusInfo = api.get(ApiKind::System, "v1/consensus_status");
+    let expected = ConsensusStatusInfo { status: true };
+    assert_eq!(info, expected);
 }

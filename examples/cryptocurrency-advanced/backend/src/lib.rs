@@ -32,21 +32,22 @@ pub mod schema;
 pub mod transactions;
 pub mod wallet;
 
+use exonum::{blockchain::{ApiContext, Service, Transaction, TransactionSet},
+             crypto::Hash,
+             encoding::serialize::json::reexport as serde_json,
+             encoding::Error as EncodingError,
+             helpers::fabric::{self, Context},
+             messages::RawTransaction,
+             storage::Snapshot};
 use iron::Handler;
 use router::Router;
-
-use exonum::blockchain::{ApiContext, Service, Transaction, TransactionSet};
-use exonum::crypto::Hash;
-use exonum::encoding::Error as EncodingError;
-use exonum::encoding::serialize::json::reexport as serde_json;
-use exonum::helpers::fabric::{self, Context};
-use exonum::messages::RawTransaction;
-use exonum::storage::Snapshot;
 
 use transactions::WalletTransactions;
 
 /// Unique service ID.
 const CRYPTOCURRENCY_SERVICE_ID: u16 = 128;
+/// Name of the service.
+pub const SERVICE_NAME: &str = "cryptocurrency";
 /// Initial balance of the wallet.
 const INITIAL_BALANCE: u64 = 100;
 
@@ -56,7 +57,7 @@ pub struct CurrencyService;
 
 impl Service for CurrencyService {
     fn service_name(&self) -> &str {
-        "cryptocurrency"
+        SERVICE_NAME
     }
 
     fn service_id(&self) -> u16 {
@@ -88,6 +89,10 @@ impl Service for CurrencyService {
 pub struct ServiceFactory;
 
 impl fabric::ServiceFactory for ServiceFactory {
+    fn service_name(&self) -> &str {
+        SERVICE_NAME
+    }
+
     fn make_service(&mut self, _: &Context) -> Box<Service> {
         Box::new(CurrencyService)
     }

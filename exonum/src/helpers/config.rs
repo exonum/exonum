@@ -15,12 +15,12 @@
 //! Loading and saving TOML-encoded configurations.
 
 use failure::{Error, ResultExt};
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use toml;
 
-use std::fs::{self, File};
-use std::io::{Read, Write};
-use std::path::Path;
+use std::{fs::{self, File},
+          io::{Read, Write},
+          path::Path};
 
 /// Implements loading and saving TOML-encoded configurations.
 #[derive(Debug)]

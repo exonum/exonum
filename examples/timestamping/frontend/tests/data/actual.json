@@ -1,0 +1,43 @@
+{
+  "config": {
+    "actual_from": 0,
+    "consensus": {
+      "max_message_len": 1048576,
+      "max_propose_timeout": 200,
+      "min_propose_timeout": 10,
+      "peers_timeout": 10000,
+      "propose_timeout_threshold": 500,
+      "round_timeout": 3000,
+      "status_timeout": 5000,
+      "txs_block_limit": 1000
+    },
+    "majority_count": null,
+    "previous_cfg_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "services": {
+      "configuration": null,
+      "exonum_time": null,
+      "timestamping": null
+    },
+    "validator_keys": [
+      {
+        "consensus_key": "1c49bf25f16507caa8fdbf88e5847e8c8b31836837afb3aeefb56907e5ef7b54",
+        "service_key": "07f0d03bdc3c1bde8cbca9b4ebffca6ff4700ab5bca2478d7bffa749dc16d5a8"
+      },
+      {
+        "consensus_key": "70a6d6fb1009721e6a1a87041c4bef6120b2d18c1f804ee1a9b1476923c6cb0e",
+        "service_key": "bc1841ac11a6bcd1a76ebdc9694d6cc0cbbe0be31fd6f7d642bae6214b4fb90b"
+      },
+      {
+        "consensus_key": "7f06a3a26695262392109785f536b4353813979d145cdeac40decabba960aef1",
+        "service_key": "98db1ebf74ee1761aae7073a16755e68c7a13999ceb5573a31801ecc252132fe"
+      },
+      {
+        "consensus_key": "d190fd43888a2e8cf9dc1e9cc3bc014bc514182d1174e208270b9667101812e1",
+        "service_key": "146ab75092d5348b81e4179d481594c1c5e11be428c255aa96f3028ce0af030c"
+      }
+    ]
+  },
+  "hash": "0b42d63644e15b608ee56a0cd968877ede566d0866dea2a160cec84e25d88d52",
+  "propose": null,
+  "votes": null
+}

@@ -74,6 +74,7 @@
       return {
         block: {},
         transactions: [],
+        isSpinnerVisible: false
       }
     },
     computed: {

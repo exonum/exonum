@@ -14,9 +14,9 @@
 
 use std::time::Duration;
 
-use super::sandbox::timestamping_sandbox;
-use super::sandbox_tests_helper::{gen_timestamping_tx, VALIDATOR_0, VALIDATOR_1, VALIDATOR_2,
-                                  VALIDATOR_3, HEIGHT_ONE, ROUND_ONE, ROUND_THREE};
+use super::{sandbox::timestamping_sandbox,
+            sandbox_tests_helper::{gen_timestamping_tx, VALIDATOR_0, VALIDATOR_1, VALIDATOR_2,
+                                   VALIDATOR_3, HEIGHT_ONE, ROUND_ONE, ROUND_THREE}};
 use blockchain::{Block, SCHEMA_MAJOR_VERSION};
 use crypto::{CryptoHash, Hash};
 use helpers::{Height, Round};
@@ -220,18 +220,27 @@ fn test_commit() {
     sandbox.assert_state(HEIGHT_ONE, ROUND_ONE);
 }
 
-// TODO: Remove `#[rustfmt_skip]` after https://github.com/rust-lang-nursery/rustfmt/issues/1777
-// is fixed.
-#[cfg_attr(rustfmt, rustfmt_skip)]
 #[test]
 #[should_panic(expected = "Expected to broadcast the message Consensus(Prevote")]
 fn received_unexpected_propose() {
     let sandbox = timestamping_sandbox();
 
-    let propose = Propose::new(VALIDATOR_1, Height::zero(), ROUND_ONE,
-                               &sandbox.last_hash(), &[], sandbox.s(VALIDATOR_1));
+    let propose = Propose::new(
+        VALIDATOR_1,
+        Height::zero(),
+        ROUND_ONE,
+        &sandbox.last_hash(),
+        &[],
+        sandbox.s(VALIDATOR_1),
+    );
 
     sandbox.recv(&propose);
-    sandbox.broadcast(&Prevote::new(VALIDATOR_0, Height::zero(), ROUND_ONE, &propose.hash(),
-                                   Round::zero(), sandbox.s(VALIDATOR_0)));
+    sandbox.broadcast(&Prevote::new(
+        VALIDATOR_0,
+        Height::zero(),
+        ROUND_ONE,
+        &propose.hash(),
+        Round::zero(),
+        sandbox.s(VALIDATOR_0),
+    ));
 }
