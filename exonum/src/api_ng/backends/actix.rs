@@ -16,7 +16,6 @@
 
 use actix::{msgs::SystemExit, Addr, Arbiter, Syn, System};
 use actix_web::{self,
-                middleware::Middleware,
                 server::{HttpServer, IntoHttpHandler, StopServer},
                 AsyncResponder,
                 FromRequest,
@@ -47,6 +46,9 @@ pub type HttpRequest = actix_web::HttpRequest<ServiceApiState>;
 pub type RawHandler = Fn(HttpRequest) -> FutureResponse + 'static + Send + Sync;
 /// Type alias for the actix web App with the ServiceApiState.
 pub type App = actix_web::App<ServiceApiState>;
+/// Type alias for the actix web App configuration.
+pub type AppConfig = Arc<Fn(App) -> App + 'static + Send + Sync>;
+
 /// Type alias for the actix http server runtime address.
 type HttpServerAddr = Addr<Syn, HttpServer<<App as IntoHttpHandler>::Handler>>;
 /// Type alias for the actix system runtime address.
@@ -244,13 +246,19 @@ where
     }
 }
 
-/// Creates `actix_web::App` for the given aggregator.
-pub(crate) fn create_app(aggregator: ApiAggregator, api_scope: ApiScope) -> App {
+/// Creates `actix_web::App` for the given aggregator and runtime configuration.
+pub(crate) fn create_app(aggregator: ApiAggregator, runtime_config: ApiRuntimeConfig) -> App {
+    let app_config = runtime_config.app_config;
+    let api_scope = runtime_config.api_scope;
     let state = ServiceApiState::new(aggregator.blockchain.clone());
-    App::with_state(state).scope("api", move |scope| match api_scope {
+    let mut app = App::with_state(state).scope("api", move |scope| match api_scope {
         ApiScope::Private => aggregator.extend_private_api(scope),
         ApiScope::Public => aggregator.extend_public_api(scope),
-    })
+    });
+    if let Some(app_config) = app_config {
+        app = app_config(app);
+    }
+    app
 }
 
 /// Configuration parameters for the `App` runtime
@@ -260,9 +268,8 @@ pub(crate) struct ApiRuntimeConfig {
     pub listen_address: SocketAddr,
     /// Api scope.
     pub api_scope: ApiScope,
-    /// List of middlewares.
-    /// TODO
-    pub middlewares: Option<()>,
+    /// Optional App configuration.
+    pub app_config: Option<AppConfig>,
 }
 
 impl ApiRuntimeConfig {
@@ -270,7 +277,7 @@ impl ApiRuntimeConfig {
         ApiRuntimeConfig {
             listen_address,
             api_scope,
-            middlewares: Default::default(),
+            app_config: Default::default(),
         }
     }
 }
@@ -280,6 +287,7 @@ impl fmt::Debug for ApiRuntimeConfig {
         f.debug_struct("ApiRuntimeConfig")
             .field("listen_address", &self.listen_address)
             .field("api_scope", &self.api_scope)
+            .field("app_config", &self.app_config.as_ref().map(drop))
             .finish()
     }
 }
@@ -320,7 +328,7 @@ impl SystemRuntime {
                 info!("Starting web {} api on {}", api_scope, listen_address);
 
                 let aggregator = aggregator.clone();
-                HttpServer::new(move || create_app(aggregator.clone(), api_scope))
+                HttpServer::new(move || create_app(aggregator.clone(), runtime_config.clone()))
                     .disable_signals()
                     .bind(listen_address)
                     .map(|server| server.start())
