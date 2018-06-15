@@ -7,6 +7,14 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## 0.8.1 - 2018-06-15
 
+### New features
+
+#### exonum
+
+- `RunDev` structure has been made public, so it can be extended now.
+
+- `RunDev` command now generates default values for api addresses in the config.
+
 ### Internal improvements
 
 #### exonum
