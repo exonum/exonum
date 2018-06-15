@@ -31,6 +31,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `exonum::crypto::x25519` module to convert from Ed25519 keys to X25519 keys
   has been introduced. (#722)
+
 - Added a public `consensus_status` endpoint. (#736)
 
 ### Bug fixes
