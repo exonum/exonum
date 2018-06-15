@@ -527,12 +527,15 @@ impl State {
         self.renew_validator_id(validator_id);
         trace!("Validator={:#?}", self.validator_state());
 
+        //TODO: update ConnectList
+
         self.config = config;
     }
 
     /// Adds the public key, address, and `Connect` message of a validator.
     pub fn add_peer(&mut self, pubkey: PublicKey, msg: Connect) -> bool {
         self.connections.insert(msg.addr(), pubkey);
+        self.connect_list.peers.insert(msg.addr(), pubkey);
         self.peers.insert(pubkey, msg).is_none()
     }
 
@@ -608,7 +611,6 @@ impl State {
         }
 
         // Find highest non-byzantine round.
-
         // At max we can have (N - 1) / 3 byzantine nodes.
         // It is calculated via rounded up integer division.
         let max_byzantine_count = (self.validators().len() + 2) / 3 - 1;

@@ -4,10 +4,10 @@ use helpers::fabric::NodePublicConfig;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 
-/// doc will be here
+/// Mapping between peers and public keys
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ConnectList {
-    /// doc will be here
+    /// Peers
     pub peers: HashMap<SocketAddr, PublicKey>,
 }
 

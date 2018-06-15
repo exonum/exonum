@@ -186,38 +186,3 @@ impl From<NoiseError> for io::Error {
         io::Error::new(io::ErrorKind::Other, e.message)
     }
 }
-
-#[cfg(test)]
-mod test {
-
-    use crypto::{gen_keypair_from_seed, Seed};
-    use env_logger;
-    use events::tests::TestEvents;
-    use events::tests::connect_message;
-    use node::ConnectList;
-    use std::collections::HashMap;
-    use std::net::SocketAddr;
-
-    #[test]
-    fn test_peer_is_not_in_connect_list() {
-        env_logger::init();
-        let first: SocketAddr = "127.0.0.1:17230".parse().unwrap();
-        let second: SocketAddr = "127.0.0.1:17231".parse().unwrap();
-
-        // Create connect list
-        let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([2; 32]));
-        let connect_list = ConnectList { peers };
-
-        let e1 = TestEvents::with_connect_list(first, connect_list);
-        let e2 = TestEvents::with_addr(second);
-        let c1 = connect_message(first);
-
-        let e1 = e1.spawn();
-        let mut e2 = e2.spawn2(public_key, secret_key);
-
-        e1.connect_with(second);
-
-        assert_eq!(e2.wait_for_connect(), c1);
-    }
-
-}

@@ -21,7 +21,7 @@ use std::{net::SocketAddr,
           time::{self, Duration}};
 
 use blockchain::ConsensusConfig;
-use crypto::{gen_keypair, gen_keypair_from_seed, PublicKey, SecretKey, Seed, Signature};
+use crypto::{gen_keypair, gen_keypair_from_seed, PublicKey, Seed, Signature};
 use events::{error::log_error,
              network::{NetworkConfiguration, NetworkPart},
              noise::HandshakeParams,
@@ -146,36 +146,11 @@ impl TestEvents {
         }
     }
 
-    pub fn with_connect_list(listen_address: SocketAddr, connect_list: ConnectList) -> TestEvents {
-        TestEvents {
-            listen_address,
-            network_config: NetworkConfiguration::default(),
-            events_config: EventsPoolCapacity::default(),
-            connect_list,
-        }
-    }
-
     pub fn spawn(self) -> TestHandler {
         let (mut handler_part, network_part) = self.into_reactor();
         let handle = thread::spawn(move || {
             let mut core = Core::new().unwrap();
             let (public_key, secret_key) = gen_keypair_from_seed(&Seed::new([1; 32]));
-            let handshake_params = HandshakeParams {
-                public_key,
-                secret_key,
-                max_message_len: network_part.max_message_len,
-            };
-            let fut = network_part.run(&core.handle(), &handshake_params);
-            core.run(fut).map_err(log_error).unwrap();
-        });
-        handler_part.handle = Some(handle);
-        handler_part
-    }
-
-    pub fn spawn2(self, public_key: PublicKey, secret_key: SecretKey) -> TestHandler {
-        let (mut handler_part, network_part) = self.into_reactor();
-        let handle = thread::spawn(move || {
-            let mut core = Core::new().unwrap();
             let handshake_params = HandshakeParams {
                 public_key,
                 secret_key,
