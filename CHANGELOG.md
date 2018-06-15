@@ -50,6 +50,24 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   with the corresponding transactions. Due to these changes,
   the block size became significantly smaller. (#664)
 
+## 0.8.1 - 2018-06-15
+
+### New features
+
+#### exonum
+
+- `RunDev` structure has been made public, so it can be extended now.
+
+- `RunDev` command now generates default values for api addresses in the config.
+
+### Internal improvements
+
+#### exonum
+
+- Dependencies versions have been updated:
+  - `exonum_sodiumoxide` to `0.0.19`.
+  - `exonum_rocksdb` to `0.7.4`.
+
 ## 0.8 - 2018-05-31
 
 ### Breaking changes
