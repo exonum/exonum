@@ -16,7 +16,8 @@
 
 pub use self::builder::NodeBuilder;
 pub use self::context_key::ContextKey;
-pub use self::details::{Finalize, GenerateCommonConfig, GenerateNodeConfig, GenerateTestnet, Run};
+pub use self::details::{Finalize, GenerateCommonConfig, GenerateNodeConfig, GenerateTestnet, Run,
+                        RunDev};
 pub use self::maintenance::Maintenance;
 pub use self::shared::{AbstractConfig, CommonConfigTemplate, NodePrivateConfig, NodePublicConfig};
 

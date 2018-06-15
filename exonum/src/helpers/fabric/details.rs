@@ -173,42 +173,52 @@ impl RunDev {
         path.to_str().expect("Expected correct path").into()
     }
 
-    fn generate_config(commands: &HashMap<CommandName, CollectedCommand>, ctx: &Context) -> String {
-        let common_config_path = Self::artifacts_path("common.toml", ctx);
+    fn set_config_command_arguments(ctx: &mut Context) {
+        let common_config_path = Self::artifacts_path("common.toml", &ctx);
         let validators_count = "1";
         let peer_addr = "127.0.0.1";
-        let pub_config_path = Self::artifacts_path("public.toml", ctx);
-        let sec_config_path = Self::artifacts_path("secret.toml", ctx);
-        let output_config_path = Self::artifacts_path("output.toml", ctx);
+        let pub_config_path = Self::artifacts_path("public.toml", &ctx);
+        let sec_config_path = Self::artifacts_path("secret.toml", &ctx);
+        let output_config_path = Self::artifacts_path("output.toml", &ctx);
 
-        let mut common_config_ctx = ctx.clone();
-        common_config_ctx.set_arg("COMMON_CONFIG", common_config_path.clone());
-        common_config_ctx.set_arg("VALIDATORS_COUNT", validators_count.into());
+        // Arguments for common config command.
+        ctx.set_arg("COMMON_CONFIG", common_config_path.clone());
+        ctx.set_arg("VALIDATORS_COUNT", validators_count.into());
+
+        // Arguments for node config command.
+        ctx.set_arg("COMMON_CONFIG", common_config_path.clone());
+        ctx.set_arg("PUB_CONFIG", pub_config_path.clone());
+        ctx.set_arg("SEC_CONFIG", sec_config_path.clone());
+        ctx.set_arg(PEER_ADDRESS, peer_addr.into());
+
+        // Arguments for finalize config command.
+        ctx.set_arg_multiple("PUBLIC_CONFIGS", vec![pub_config_path.clone()]);
+        ctx.set_arg(PUBLIC_API_ADDRESS, "127.0.0.1:8080".to_string());
+        ctx.set_arg(PRIVATE_API_ADDRESS, "127.0.0.1:8081".to_string());
+        ctx.set_arg("SECRET_CONFIG", sec_config_path.clone());
+        ctx.set_arg("OUTPUT_CONFIG_PATH", output_config_path.clone());
+
+        // Arguments for run command.
+        ctx.set_arg(NODE_CONFIG_PATH, output_config_path.clone());
+    }
+
+    fn generate_config(commands: &HashMap<CommandName, CollectedCommand>, ctx: Context) -> Context {
         let common_config_command = commands
             .get(GenerateCommonConfig::name())
             .expect("Expected GenerateCommonConfig in the commands list.");
-        common_config_command.execute(commands, common_config_ctx);
+        common_config_command.execute(commands, ctx.clone());
 
-        let mut node_config_ctx = ctx.clone();
-        node_config_ctx.set_arg("COMMON_CONFIG", common_config_path.clone());
-        node_config_ctx.set_arg("PUB_CONFIG", pub_config_path.clone());
-        node_config_ctx.set_arg("SEC_CONFIG", sec_config_path.clone());
-        node_config_ctx.set_arg(PEER_ADDRESS, peer_addr.into());
         let node_config_command = commands
             .get(GenerateNodeConfig::name())
             .expect("Expected GenerateNodeConfig in the commands list.");
-        node_config_command.execute(commands, node_config_ctx);
+        node_config_command.execute(commands, ctx.clone());
 
-        let mut finalize_ctx = ctx.clone();
-        finalize_ctx.set_arg_multiple("PUBLIC_CONFIGS", vec![pub_config_path.clone()]);
-        finalize_ctx.set_arg("SECRET_CONFIG", sec_config_path.clone());
-        finalize_ctx.set_arg("OUTPUT_CONFIG_PATH", output_config_path.clone());
         let finalize_command = commands
             .get(Finalize::name())
             .expect("Expected Finalize in the commands list.");
-        finalize_command.execute(commands, finalize_ctx);
+        finalize_command.execute(commands, ctx.clone());
 
-        output_config_path
+        ctx
     }
 
     fn cleanup(ctx: &Context) {
@@ -254,14 +264,14 @@ impl Command for RunDev {
         context.set_arg(DATABASE_PATH, db_path);
         Self::cleanup(&context);
 
-        let node_config_path = Self::generate_config(commands, &context);
-        context.set_arg(NODE_CONFIG_PATH, node_config_path);
+        Self::set_config_command_arguments(&mut context);
+        let context = exts(context);
+        let context = Self::generate_config(commands, context);
 
-        let new_context = exts(context);
         commands
             .get(Run::name())
             .expect("Expected Run in the commands list.")
-            .execute(commands, new_context.clone())
+            .execute(commands, context)
     }
 }
 
