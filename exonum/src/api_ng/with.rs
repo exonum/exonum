@@ -46,7 +46,7 @@ pub struct With<Q, I, R, F, K> {
 #[derive(Debug)]
 pub struct NamedWith<Q, I, R, F, K> {
     /// Endpoint name.
-    pub name: &'static str,
+    pub name: String,
     /// Extracted endpoint handler.
     pub inner: With<Q, I, R, F, K>,
 }

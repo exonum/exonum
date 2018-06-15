@@ -39,7 +39,7 @@ pub type App = actix_web::App<ServiceApiState>;
 #[derive(Clone)]
 pub struct RequestHandler {
     /// Endpoint name.
-    pub name: &'static str,
+    pub name: String,
     /// Endpoint http method.
     pub method: actix_web::http::Method,
     /// Inner handler.
@@ -55,7 +55,7 @@ impl fmt::Debug for RequestHandler {
     }
 }
 
-/// API builder for the actix-web backend,
+/// API builder for the actix-web backend.
 #[derive(Debug, Clone, Default)]
 pub struct ApiBuilder {
     handlers: Vec<RequestHandler>,
@@ -79,8 +79,9 @@ impl ServiceApiBackend for ApiBuilder {
 
     fn wire(&self, mut output: Self::Scope) -> Self::Scope {
         for handler in self.handlers.clone() {
-            output = output.route(handler.name, handler.method.clone(), move |request| {
-                (handler.inner)(request)
+            let inner = handler.inner;
+            output = output.route(&handler.name, handler.method.clone(), move |request| {
+                inner(request)
             });
         }
         output

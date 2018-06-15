@@ -40,8 +40,9 @@ pub trait ServiceApiBackend: Sized {
     type Scope;
 
     /// Adds the given endpoint handler to the backend.
-    fn endpoint<Q, I, R, F, E>(&mut self, name: &'static str, endpoint: E) -> &mut Self
+    fn endpoint<N, Q, I, R, F, E>(&mut self, name: N, endpoint: E) -> &mut Self
     where
+        N: Into<String>,
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: for<'r> Fn(&'r ServiceApiState, Q) -> R + 'static + Clone,
@@ -49,15 +50,16 @@ pub trait ServiceApiBackend: Sized {
         Self::Handler: From<NamedWith<Q, I, R, F, Immutable>>,
     {
         let named_with = NamedWith {
-            name,
+            name: name.into(),
             inner: endpoint.into(),
         };
         self.raw_handler(Self::Handler::from(named_with))
     }
 
     /// Adds the given mutable endpoint handler to the backend.
-    fn endpoint_mut<Q, I, R, F, E>(&mut self, name: &'static str, endpoint: E) -> &mut Self
+    fn endpoint_mut<N, Q, I, R, F, E>(&mut self, name: N, endpoint: E) -> &mut Self
     where
+        N: Into<String>,
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: for<'r> Fn(&'r ServiceApiState, Q) -> R + 'static + Clone,
@@ -65,7 +67,7 @@ pub trait ServiceApiBackend: Sized {
         Self::Handler: From<NamedWith<Q, I, R, F, Mutable>>,
     {
         let named_with = NamedWith {
-            name,
+            name: name.into(),
             inner: endpoint.into(),
         };
         self.raw_handler(Self::Handler::from(named_with))
