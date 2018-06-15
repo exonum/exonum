@@ -31,6 +31,14 @@ pub struct HealthCheckInfo {
     pub connectivity: bool,
 }
 
+/// ConsensusStatusInfo shows the possibility to achieve the consensus between validators
+/// in current state.
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+pub struct ConsensusStatusInfo {
+    /// Consensus status: true - if consensus achieved, else - false.
+    pub status: bool,
+}
+
 /// Public system API.
 #[derive(Clone, Debug)]
 pub struct SystemApi {
@@ -76,6 +84,19 @@ impl SystemApi {
         };
         router.get("/v1/user_agent", user_agent, "user_agent");
     }
+
+    fn consensus_status_info(self, router: &mut Router) {
+        let consensus_status = move |_: &mut Request| -> IronResult<Response> {
+            let info = ConsensusStatusInfo {
+                // Peers list doesn't include current node address, so we have to increment its length.
+                // E.g. if we have 3 items in peers list, it means that we have 4 nodes overall.
+                status: self.shared_api_state.peers_info().len().saturating_add(1)
+                    >= self.shared_api_state.majority_count(),
+            };
+            self.ok_response(&serde_json::to_value(info).unwrap())
+        };
+        router.get("/v1/consensus_status", consensus_status, "consensus_status");
+    }
 }
 
 impl Api for SystemApi {
@@ -83,5 +104,6 @@ impl Api for SystemApi {
         self.clone().mempool_info(router);
         self.clone().healthcheck_info(router);
         self.clone().user_agent_info(router);
+        self.clone().consensus_status_info(router);
     }
 }

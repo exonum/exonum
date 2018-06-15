@@ -323,6 +323,7 @@ pub struct ApiNodeState {
     // TODO: Update on event? (ECR-1632)
     peers_info: HashMap<SocketAddr, PublicKey>,
     is_enabled: bool,
+    majority_count: usize,
 }
 
 impl ApiNodeState {
@@ -395,19 +396,23 @@ impl SharedNodeState {
     }
     /// Updates internal state, from `State` of a blockchain node.
     pub fn update_node_state(&self, state: &State) {
-        self.state
-            .write()
-            .expect("Expected write lock.")
-            .peers_info
-            .clear();
+        let mut lock = self.state.write().expect("Expected write lock.");
+
+        lock.peers_info.clear();
+        lock.majority_count = state.majority_count();
 
         for (p, c) in state.peers().iter() {
-            self.state
-                .write()
-                .expect("Expected write lock.")
-                .peers_info
-                .insert(c.addr(), *p);
+            lock.peers_info.insert(c.addr(), *p);
         }
+    }
+
+    /// Returns the majority count from the current "State"
+    /// of a blockchain node.
+    pub fn majority_count(&self) -> usize {
+        self.state
+            .read()
+            .expect("Expected read lock.")
+            .majority_count
     }
 
     /// Returns a boolean value which indicates whether the node is enabled
