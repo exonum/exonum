@@ -15,14 +15,14 @@
 use byteorder::{ByteOrder, LittleEndian};
 use serde_json::value::{Number, Value};
 
-use std::error::Error;
-use std::mem;
+use std::{error::Error, mem};
 
-use super::Error as EncodingError;
-use super::Result as EncodingResult;
-use encoding::serialize::WriteBufferWrapper;
-use encoding::serialize::json::{ExonumJson, ExonumJsonDeserialize};
-use encoding::{CheckedOffset, Field, Offset};
+use super::{Error as EncodingError, Result as EncodingResult};
+use encoding::{serialize::json::{ExonumJson, ExonumJsonDeserialize},
+               serialize::WriteBufferWrapper,
+               CheckedOffset,
+               Field,
+               Offset};
 
 /// Wrapper for the `f32` type that restricts non-finite
 /// (NaN, Infinity, negative zero and subnormal) values.
@@ -284,8 +284,8 @@ impl ExonumJsonDeserialize for F64 {
 mod tests {
     use super::{F32, F64};
     use byteorder::{ByteOrder, LittleEndian};
-    use encoding::Offset;
     use encoding::fields::Field;
+    use encoding::Offset;
     use std::num::FpCategory;
     use std::panic;
     use std::{f32, f64};

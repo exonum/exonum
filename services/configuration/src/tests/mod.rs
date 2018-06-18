@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::blockchain::{Schema, StoredConfiguration, Transaction};
-use exonum::crypto::{hash, CryptoHash, Hash, HASH_SIZE};
-use exonum::helpers::{Height, ValidatorId};
-use exonum::storage::StorageValue;
+use exonum::{blockchain::{Schema, StoredConfiguration, Transaction},
+             crypto::{hash, CryptoHash, Hash, HASH_SIZE},
+             helpers::{Height, ValidatorId},
+             storage::StorageValue};
 use exonum_testkit::{TestKit, TestKitBuilder, TestNode};
 
 use std::str;

@@ -151,24 +151,23 @@ pub use network::{TestNetwork, TestNetworkConfiguration, TestNode};
 
 pub mod compare;
 
-use futures::sync::mpsc;
-use futures::{Future, Stream};
+use futures::{sync::mpsc, Future, Stream};
 use iron::Iron;
 use tokio_core::reactor::Core;
 
-use std::fmt;
-use std::net::SocketAddr;
-use std::sync::{Arc, RwLock};
-use std::thread;
+use std::{fmt,
+          net::SocketAddr,
+          sync::{Arc, RwLock},
+          thread};
 
-use exonum::blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfiguration,
-                         Transaction};
-use exonum::crypto::{self, Hash};
-use exonum::explorer::{BlockWithTransactions, BlockchainExplorer};
-use exonum::helpers::{Height, ValidatorId};
-use exonum::messages::RawMessage;
-use exonum::node::{ApiSender, ExternalMessage, NodeApiConfig, State as NodeState};
-use exonum::storage::{MemoryDB, Patch, Snapshot};
+use exonum::{blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfiguration,
+                          Transaction},
+             crypto::{self, Hash},
+             explorer::{BlockWithTransactions, BlockchainExplorer},
+             helpers::{Height, ValidatorId},
+             messages::RawMessage,
+             node::{ApiSender, ExternalMessage, NodeApiConfig, State as NodeState},
+             storage::{MemoryDB, Patch, Snapshot}};
 
 use checkpoint_db::{CheckpointDb, CheckpointDbHandler};
 use handler::create_testkit_handler;
@@ -766,7 +765,6 @@ impl TestKit {
         let schema = CoreSchema::new(&snapshot);
         let txs = schema.transactions_pool();
         let tx_hashes: Vec<_> = txs.iter().collect();
-        //TODO: every block should contain two merges (ECR-975)
         {
             let blockchain = self.blockchain_mut();
             let fork = blockchain.fork();

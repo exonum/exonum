@@ -15,16 +15,21 @@
 use byteorder::{ByteOrder, LittleEndian};
 use futures::future::{done, Future};
 use tokio_core::net::TcpStream;
-use tokio_io::{AsyncRead, codec::Framed, io::{read_exact, write_all}};
+use tokio_io::{codec::Framed,
+               io::{read_exact, write_all},
+               AsyncRead};
 
 use std::io;
 
 use crypto::{PublicKey, SecretKey};
-use events::codec::MessagesCodec;
-use events::noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH};
+use events::{codec::MessagesCodec,
+             noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH}};
 
 pub mod sodium_resolver;
 pub mod wrapper;
+
+#[cfg(test)]
+mod tests;
 
 type HandshakeResult = Box<Future<Item = Framed<TcpStream, MessagesCodec>, Error = io::Error>>;
 

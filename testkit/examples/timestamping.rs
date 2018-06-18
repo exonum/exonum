@@ -18,12 +18,12 @@ extern crate exonum;
 extern crate exonum_testkit;
 extern crate serde_json;
 
-use exonum::api::public::BlocksRange;
-use exonum::blockchain::{ExecutionResult, Schema, Service, Transaction, TransactionSet};
-use exonum::crypto::{gen_keypair, CryptoHash, Hash, PublicKey};
-use exonum::encoding;
-use exonum::messages::{Message, RawTransaction};
-use exonum::storage::{Fork, Snapshot};
+use exonum::{api::public::BlocksRange,
+             blockchain::{ExecutionResult, Schema, Service, Transaction, TransactionSet},
+             crypto::{gen_keypair, CryptoHash, Hash, PublicKey},
+             encoding,
+             messages::{Message, RawTransaction},
+             storage::{Fork, Snapshot}};
 use exonum_testkit::{ApiKind, TestKitBuilder};
 
 // Simple service implementation.

@@ -14,11 +14,11 @@
 
 //! Transaction definitions for the configuration service.
 
-use exonum::blockchain::{ExecutionResult, Schema as CoreSchema, StoredConfiguration, Transaction};
-use exonum::crypto::{CryptoHash, Hash, PublicKey};
-use exonum::messages::Message;
-use exonum::node::State;
-use exonum::storage::{Fork, Snapshot};
+use exonum::{blockchain::{ExecutionResult, Schema as CoreSchema, StoredConfiguration, Transaction},
+             crypto::{CryptoHash, Hash, PublicKey},
+             messages::Message,
+             node::State,
+             storage::{Fork, Snapshot}};
 
 use errors::Error as ServiceError;
 use schema::{MaybeVote, ProposeData, Schema};
@@ -137,10 +137,10 @@ impl Propose {
 
         let following_config = CoreSchema::new(snapshot).following_configuration();
         if let Some(following) = following_config {
-            Err(AlreadyScheduled(following))?;
+            return Err(AlreadyScheduled(following));
         }
         if validator_index(snapshot, self.from()).is_none() {
-            Err(UnknownSender)?;
+            return Err(UnknownSender);
         }
 
         let config_candidate =
@@ -150,7 +150,7 @@ impl Propose {
         let cfg = StoredConfiguration::from_bytes(self.cfg().as_bytes().into());
         let cfg_hash = CryptoHash::hash(&cfg);
         if let Some(old_propose) = Schema::new(snapshot).propose(&cfg_hash) {
-            Err(AlreadyProposed(old_propose))?;
+            return Err(AlreadyProposed(old_propose));
         }
 
         Ok((cfg, cfg_hash))
@@ -284,25 +284,26 @@ impl<'a> VotingDecisionRef<'a> {
 
         let following_config = CoreSchema::new(snapshot).following_configuration();
         if let Some(following) = following_config {
-            Err(AlreadyScheduled(following))?;
+            return Err(AlreadyScheduled(following));
         }
 
         let schema = Schema::new(snapshot);
+        let propose = schema
+            .propose(self.cfg_hash())
+            .ok_or_else(|| UnknownConfigRef(*self.cfg_hash()))?;
+
         if let Some(validator_id) = validator_index(snapshot, self.sender()) {
             let vote = schema
                 .votes_by_config_hash(self.cfg_hash())
                 .get(validator_id as u64)
-                .unwrap();
+                .expect("Can't get vote for precheck");
+
             if vote.is_some() {
-                Err(AlreadyVoted)?;
+                return Err(AlreadyVoted);
             }
         } else {
-            Err(UnknownSender)?;
+            return Err(UnknownSender);
         }
-
-        let propose = schema
-            .propose(self.cfg_hash())
-            .ok_or_else(|| UnknownConfigRef(*self.cfg_hash()))?;
 
         let parsed = StoredConfiguration::try_deserialize(propose.cfg().as_bytes()).unwrap();
         propose.check_config_candidate(&parsed, snapshot)?;
@@ -408,5 +409,37 @@ impl Transaction for VoteAgainst {
         );
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use exonum_testkit::{TestKit, TestKitBuilder};
+
+    use super::{Hash, VotingDecisionRef};
+    use errors::Error as ServiceError;
+    use tests::{new_tx_config_vote, new_tx_config_vote_against};
+    use Service as ConfigurationService;
+
+    #[test]
+    fn test_vote_without_propose() {
+        let testkit: TestKit = TestKitBuilder::validator()
+            .with_validators(4)
+            .with_service(ConfigurationService {})
+            .create();
+
+        let hash = Hash::default();
+
+        let illegal_vote = new_tx_config_vote(&testkit.network().validators()[3], hash);
+        let vote = VotingDecisionRef::from(&illegal_vote);
+        let vote_result = vote.precheck(testkit.snapshot().as_ref());
+
+        let illegal_vote_against =
+            new_tx_config_vote_against(&testkit.network().validators()[3], hash);
+        let vote_against = VotingDecisionRef::from(&illegal_vote_against);
+        let vote_against_result = vote_against.precheck(testkit.snapshot().as_ref());
+
+        assert_matches!(vote_result, Err(ServiceError::UnknownConfigRef(_)));
+        assert_matches!(vote_against_result, Err(ServiceError::UnknownConfigRef(_)));
     }
 }

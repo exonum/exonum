@@ -12,7 +12,7 @@
                 <div class="col-sm-6">Transactions count</div>
               </div>
             </li>
-            <li v-for="block in blocks" class="list-group-item">
+            <li v-for="block in blocks" :key="block.height" class="list-group-item">
               <div class="row">
                 <div class="col-sm-6">
                   <router-link :to="{ name: 'block', params: { height: block.height } }">{{ block.height }}</router-link>
@@ -40,8 +40,8 @@
     },
     data() {
       return {
-        isSpinnerVisible: false,
-        blocks: []
+        blocks: [],
+        isSpinnerVisible: false
       }
     },
     methods: {

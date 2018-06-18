@@ -9,6 +9,74 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum
 
+- `storage::base_index` module has become private along with `BaseIndex` and
+  `BaseIndexIter` types. (#723)
+
+- `ServiceFactory` trait has been extended with `service_name` function.(#730)
+
+- Method `name` has been removed from `Run`, `GenerateCommonConfig`,
+  `GenerateNodeConfig`, `Finalize`, `GenerateTestnet` and `Maintenance` structures
+  (`helpers/fabric` module). (#731)
+
+### New features
+
+#### exonum
+
+- New kind of CLI commands has been added: `info` command that can be used for
+  getting various information from not running node. (#731)
+  Currently supported sub-commands:
+  - `core-version` - prints Exonum version as a plain string.
+  - `list-services` - prints the list of the services the node is build with in
+    the JSON format.
+
+- `exonum::crypto::x25519` module to convert from Ed25519 keys to X25519 keys
+  has been introduced. (#722)
+
+- Added a public `v1/consensus_status` endpoint. (#736)
+
+### Bug fixes
+
+#### exonum
+
+- Fixed bug with incorrect peer status for turned off node. (#730)
+
+- `handle_consensus` now does not write warning for message from previous
+  height. (#729)
+
+### Internal improvements
+
+- `BlockResponse` sends transactions by `Hash` instead of `RawMessage`.
+  If the node does not have some transactions, requests are created
+  with the corresponding transactions. Due to these changes,
+  the block size became significantly smaller. (#664)
+
+## 0.8.1 - 2018-06-15
+
+### New features
+
+#### exonum
+
+- `RunDev` structure has been made public, so it can be extended now.
+
+- `RunDev` command now generates default values for api addresses in the config.
+
+### Internal improvements
+
+#### exonum
+
+- Dependencies versions have been updated:
+  - `exonum_sodiumoxide` to `0.0.19`.
+  - `exonum_rocksdb` to `0.7.4`.
+
+## 0.8 - 2018-05-31
+
+### Breaking changes
+
+#### exonum
+
+- `handle_commit` method in `Service` trait  has been renamed to
+  `after_commit`. (#715)
+
 - `TimeoutAdjusterConfig` has been removed along with different timeout
   adjusters. Current behavior is similar to the `Dynamic` timeout adjuster and
   can be modified through `min_propose_timeout`, `max_propose_timeout` and
@@ -28,10 +96,18 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   [Noise Protocol](https://noiseprotocol.org/). Nodes compiled with old
   version will not connect to the new ones. Therefore you need to
   update all node instances for the network to work. (#678)
+
 - `storage::Error` constructor has been made private. (#689)
 
 - `ConsensusConfig::validate_configuration` method has been renamed to the
   `warn_if_nonoptimal`. (#690)
+
+#### exonum-time
+
+- The service has been refactored and the following public structs has been
+  moved to separate modules: `TimeSchema` to `exonum_time::schema`,
+  `TimeProvider` and `MockTimeProvider` to `exonum_time::time_provider`,
+  `ValidatorTime` to `exonum_time::api`. (#604)
 
 ### New features
 
@@ -39,14 +115,15 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Private API now support CORS. (#675)
 
-- The `--allow-origin` parameter has been added to the `finalize` command.
+- The `--public-allow-origin` and `--private-allow-origin` parameters have been
+  added to the `finalize` command. (#675)
 
 - IPv6 addressing is now supported. (#615)
 
 - `Field`, `CryptoHash`, `StorageValue` and `ExonumJson` traits have been
   implemented for `chrono::Duration` structure. (#653)
 
-- `execute` method has been added in `Service` trait. (#667)
+- `before_commit` method has been added in `Service` trait. (#667) (#715)
 
 - `Field`, `CryptoHash`, `StorageKey`, `StorageValue` and `ExonumJson` traits
   have been implemented for `rust_decimal::Decimal`. (#671)
@@ -60,9 +137,17 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - A warning for non-optimal `StoredConfiguration::txs_block_limit` value has been
   added. (#690)
 
+- Private api `/v1/network/` endpoint now returns core version in addition to
+  service info. (#701)
+
 #### exonum-timestamping
 
 - Additional service example has been added along with frontend. (#646)
+
+#### exonum-cryptocurrency-advanced
+
+- Advanced cryptocurrency example becomes a public library (is published on
+  crates.io). (#709)
 
 ### Bug fixes
 
@@ -97,10 +182,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   reduce boilerplate. (#639)
 
 - Metrics are now using `chrono::DateTime<Utc>` instead of `SystemTime`. (#620)
-
-#### exonum-time
-
-- Split service components to separate modules. (#604)
 
 #### exonum-configuration
 
