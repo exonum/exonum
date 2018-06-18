@@ -27,8 +27,7 @@ use std::time::Duration;
 use crypto::{gen_keypair, gen_keypair_from_seed, x25519::into_x25519_keypair, Seed,
              PUBLIC_KEY_LENGTH};
 use events::error::into_other;
-use events::noise::{wrapper::NOISE_MAX_MESSAGE_LENGTH, write};
-use events::noise::{Handshake, HandshakeParams, HandshakeResult, NoiseHandshake};
+use events::noise::{write, Handshake, HandshakeParams, HandshakeResult, NoiseHandshake};
 use tokio_io::{AsyncRead, AsyncWrite};
 
 #[test]
@@ -97,6 +96,18 @@ fn test_converted_keys_handshake() {
         .expect("Unable to transition session into transport mode");
 }
 
+#[derive(Debug, Copy, Clone)]
+struct BogusMessage {
+    step: HandshakeStep,
+    message: &'static [u8],
+}
+
+impl BogusMessage {
+    fn new(step: HandshakeStep, message: &'static [u8]) -> Self {
+        BogusMessage { step, message }
+    }
+}
+
 #[derive(Debug, PartialEq, Copy, Clone)]
 enum HandshakeStep {
     EphemeralKeyExchange,
@@ -120,7 +131,6 @@ const MAX_MESSAGE_LEN: usize = 128;
 
 const EMPTY_MESSAGE: &[u8] = &[0; 0];
 const STANDARD_MESSAGE: &[u8] = &[0; MAX_MESSAGE_LEN];
-const LARGE_MESSAGE: &[u8] = &[0; NOISE_MAX_MESSAGE_LENGTH + 1];
 
 impl HandshakeParams {
     fn default_test_params() -> Self {
@@ -136,129 +146,105 @@ impl HandshakeParams {
 #[test]
 fn test_noise_handshake_errors_ee_empty() {
     let addr: SocketAddr = "127.0.0.1:45003".parse().unwrap();
-    let bogus_message = Some((HandshakeStep::EphemeralKeyExchange, EMPTY_MESSAGE));
-    let (sender_err, listener_err) = wait_for_handshake_result(addr, bogus_message);
+    let bogus_message = Some(BogusMessage::new(
+        HandshakeStep::EphemeralKeyExchange,
+        EMPTY_MESSAGE,
+    ));
+    let (_, listener_err) = wait_for_handshake_result(addr, bogus_message, None);
 
-    assert_matches!(
-            sender_err,
-            Err(ref err) if err.kind() == io::ErrorKind::Other &&
-            err.description() == "An error occurred, early eof"
-        );
-
-    assert_matches!(
-            listener_err,
-            Err(ref err) if err.kind() == io::ErrorKind::Other &&
-            err.description() == "WrongMessageLength(0)"
-        );
+    assert!(
+        listener_err
+            .unwrap_err()
+            .description()
+            .contains("WrongMessageLength")
+    );
 }
 
 #[test]
 fn test_noise_handshake_errors_es_empty() {
     let addr: SocketAddr = "127.0.0.1:45004".parse().unwrap();
-    let bogus_message = Some((HandshakeStep::StaticKeyExchange, EMPTY_MESSAGE));
-    let (sender_err, listener_err) = wait_for_handshake_result(addr, bogus_message);
+    let bogus_message = Some(BogusMessage::new(
+        HandshakeStep::StaticKeyExchange,
+        EMPTY_MESSAGE,
+    ));
+    let (_, listener_err) = wait_for_handshake_result(addr, bogus_message, None);
 
-    assert_matches!(
-            sender_err,
-            Err(ref err) if err.kind() == io::ErrorKind::Other &&
-            err.description().contains("HandshakeNotFinished")
-        );
-
-    assert_matches!(
-            listener_err,
-            Err(ref err) if err.kind() == io::ErrorKind::Other &&
-            err.description().contains("WrongMessageLength(0)")
-        );
+    assert!(
+        listener_err
+            .unwrap_err()
+            .description()
+            .contains("WrongMessageLength")
+    );
 }
 
 #[test]
 fn test_noise_handshake_errors_ee_standard() {
     let addr: SocketAddr = "127.0.0.1:45005".parse().unwrap();
-    let bogus_message = Some((HandshakeStep::EphemeralKeyExchange, STANDARD_MESSAGE));
-    let (sender_err, listener_err) = wait_for_handshake_result(addr, bogus_message);
+    let bogus_message = Some(BogusMessage::new(
+        HandshakeStep::EphemeralKeyExchange,
+        STANDARD_MESSAGE,
+    ));
+    let (_, listener_err) = wait_for_handshake_result(addr, bogus_message, None);
 
-    assert_matches!(
-            sender_err,
-            Err(ref err) if err.kind() == io::ErrorKind::Other &&
-            err.description().contains("HandshakeNotFinished")
-        );
-
-    assert_matches!(
-            listener_err,
-            Err(ref err) if err.kind() == io::ErrorKind::Other &&
-            err.description().contains("Decrypt")
-        );
+    assert!(listener_err.unwrap_err().description().contains("Decrypt"));
 }
 
 #[test]
 fn test_noise_handshake_errors_es_standard() {
     let addr: SocketAddr = "127.0.0.1:45006".parse().unwrap();
-    let bogus_message = Some((HandshakeStep::StaticKeyExchange, STANDARD_MESSAGE));
-    let (sender_err, listener_err) = wait_for_handshake_result(addr, bogus_message);
+    let bogus_message = Some(BogusMessage::new(
+        HandshakeStep::StaticKeyExchange,
+        STANDARD_MESSAGE,
+    ));
+    let (_, listener_err) = wait_for_handshake_result(addr, bogus_message, None);
 
-    assert_matches!(
-            sender_err,
-            Err(ref err) if err.kind() == io::ErrorKind::Other &&
-            err.description().contains("HandshakeNotFinished")
-        );
-
-    assert_matches!(
-            listener_err,
-            Err(ref err) if err.kind() == io::ErrorKind::Other &&
-            err.description().contains("Decrypt")
-        );
+    assert!(listener_err.unwrap_err().description().contains("Decrypt"));
 }
 
 #[test]
-fn test_noise_handshake_errors_ee_large() {
+fn test_noise_handshake_errors_ee_empty_listen() {
     let addr: SocketAddr = "127.0.0.1:45007".parse().unwrap();
-    let bogus_message = Some((HandshakeStep::EphemeralKeyExchange, LARGE_MESSAGE));
-    let (sender_err, listener_err) = wait_for_handshake_result(addr, bogus_message);
+    let bogus_message = Some(BogusMessage::new(
+        HandshakeStep::EphemeralKeyExchange,
+        EMPTY_MESSAGE,
+    ));
+    let (sender_err, _) = wait_for_handshake_result(addr, None, bogus_message);
 
-    assert_matches!(
-            sender_err,
-            Err(ref err) if err.kind() == io::ErrorKind::Other &&
-            err.description().contains("Message size exceeds max handshake message size")
-        );
-
-    assert_matches!(
-            listener_err,
-            Err(ref err) if err.kind() == io::ErrorKind::UnexpectedEof &&
-            err.description().contains("early eof")
-        );
+    assert!(
+        sender_err
+            .unwrap_err()
+            .description()
+            .contains("WrongMessageLength")
+    );
 }
 
 #[test]
-fn test_noise_handshake_errors_se_large() {
+fn test_noise_handshake_errors_ee_standard_listen() {
     let addr: SocketAddr = "127.0.0.1:45008".parse().unwrap();
-    let bogus_message = Some((HandshakeStep::StaticKeyExchange, LARGE_MESSAGE));
-    let (sender_err, listener_err) = wait_for_handshake_result(addr, bogus_message);
+    let bogus_message = Some(BogusMessage::new(
+        HandshakeStep::EphemeralKeyExchange,
+        STANDARD_MESSAGE,
+    ));
+    let (sender_err, _) = wait_for_handshake_result(addr, None, bogus_message);
 
-    assert_matches!(
-            sender_err,
-            Err(ref err) if err.kind() == io::ErrorKind::Other &&
-            err.description().contains("Message size exceeds max handshake message size")
-        );
-
-    assert_matches!(
-            listener_err,
-            Err(ref err) if err.kind() == io::ErrorKind::UnexpectedEof &&
-            err.description().contains("early eof")
-        );
+    assert!(sender_err.unwrap_err().description().contains("Decrypt"));
 }
 
 // We need check result from both: sender and responder.
 fn wait_for_handshake_result(
     addr: SocketAddr,
-    bogus_message: Option<(HandshakeStep, &'static [u8])>,
+    sender_message: Option<BogusMessage>,
+    responder_message: Option<BogusMessage>,
 ) -> (IoResult<()>, IoResult<()>) {
     let (err_tx, err_rx) = mpsc::channel::<io::Error>(0);
 
-    thread::spawn(move || run_handshake_listener(&addr, err_tx));
+    let responder_message = responder_message.clone();
+
+    thread::spawn(move || run_handshake_listener(&addr, err_tx, responder_message));
     //TODO: very likely will be removed in [ECR-1664].
     thread::sleep(Duration::from_millis(500));
 
-    let sender_err = send_handshake(&addr, bogus_message);
+    let sender_err = send_handshake(&addr, sender_message);
     let listener_err = err_rx
         .wait()
         .next()
@@ -270,6 +256,7 @@ fn wait_for_handshake_result(
 fn run_handshake_listener(
     addr: &SocketAddr,
     err_sender: Sender<io::Error>,
+    bogus_message: Option<BogusMessage>,
 ) -> Result<(), io::Error> {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
@@ -282,23 +269,26 @@ fn run_handshake_listener(
             .for_each(move |(stream, _)| {
                 let err_sender = err_sender.clone();
 
-                handle.spawn(
-                    NoiseHandshake::responder(&params)
-                        .listen(stream)
+                handle.spawn({
+                    let handshake = match bogus_message {
+                        Some(message) => Either::A(
+                            NoiseErrorHandshake::responder(&params, message).listen(stream),
+                        ),
+                        None => Either::B(NoiseHandshake::responder(&params).listen(stream)),
+                    };
+
+                    handshake
                         .map(|_| ())
                         .or_else(|e| err_sender.send(e).map(|_| ()))
-                        .map_err(|e| panic!("{:?}", e)),
-                );
+                        .map_err(|e| panic!("{:?}", e))
+                });
                 Ok(())
             })
             .map_err(|e| into_other(e)),
     )
 }
 
-fn send_handshake(
-    addr: &SocketAddr,
-    bogus_message: Option<(HandshakeStep, &'static [u8])>,
-) -> Result<(), io::Error> {
+fn send_handshake(addr: &SocketAddr, bogus_message: Option<BogusMessage>) -> Result<(), io::Error> {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
     let params = HandshakeParams::default_test_params();
@@ -306,9 +296,7 @@ fn send_handshake(
     let stream = TcpStream::connect(&addr, &handle)
         .and_then(|sock| match bogus_message {
             None => NoiseHandshake::initiator(&params).send(sock),
-            Some((step, message)) => {
-                NoiseErrorHandshake::initiator(&params, step, message).send(sock)
-            }
+            Some(message) => NoiseErrorHandshake::initiator(&params, message).send(sock),
         })
         .map(|_| ())
         .map_err(into_other);
@@ -318,24 +306,26 @@ fn send_handshake(
 
 #[derive(Debug)]
 struct NoiseErrorHandshake {
-    bogus_message: &'static [u8],
-    bogus_step: HandshakeStep,
+    bogus_message: BogusMessage,
     current_step: HandshakeStep,
     // Option is used in order to be able to move out `inner` from the instance.
     inner: Option<NoiseHandshake>,
 }
 
 impl NoiseErrorHandshake {
-    fn initiator(
-        params: &HandshakeParams,
-        bogus_step: HandshakeStep,
-        bogus_message: &'static [u8],
-    ) -> Self {
+    fn initiator(params: &HandshakeParams, bogus_message: BogusMessage) -> Self {
         NoiseErrorHandshake {
             bogus_message,
-            bogus_step,
             current_step: HandshakeStep::EphemeralKeyExchange,
             inner: Some(NoiseHandshake::initiator(params)),
+        }
+    }
+
+    fn responder(params: &HandshakeParams, bogus_message: BogusMessage) -> Self {
+        NoiseErrorHandshake {
+            bogus_message,
+            current_step: HandshakeStep::EphemeralKeyExchange,
+            inner: Some(NoiseHandshake::responder(params)),
         }
     }
 
@@ -357,8 +347,8 @@ impl NoiseErrorHandshake {
         mut self,
         stream: S,
     ) -> impl Future<Item = (S, Self), Error = io::Error> {
-        if self.current_step == self.bogus_step {
-            let msg = self.bogus_message;
+        if self.current_step == self.bogus_message.step {
+            let msg = self.bogus_message.message;
 
             Either::A(write(stream, msg, msg.len()).map(move |(stream, _)| {
                 self.current_step = self.current_step
@@ -389,7 +379,11 @@ impl Handshake for NoiseErrorHandshake {
     where
         S: AsyncRead + AsyncWrite + 'static,
     {
-        self.inner.unwrap().listen(stream)
+        let framed = self.read_handshake_msg(stream)
+            .and_then(|(stream, handshake)| handshake.write_handshake_msg(stream))
+            .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
+            .and_then(|(stream, handshake)| handshake.inner.unwrap().finalize(stream));
+        Box::new(framed)
     }
 
     fn send<S>(self, stream: S) -> HandshakeResult<S>

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use futures::future::{done, err, Future};
+use futures::future::{done, Future};
 use tokio_io::{codec::Framed,
                io::{read_exact, write_all},
                AsyncRead,
@@ -24,7 +24,6 @@ use crypto::{PublicKey, SecretKey};
 use events::noise::wrapper::NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH;
 use events::{codec::MessagesCodec,
              noise::wrapper::{NoiseWrapper, HANDSHAKE_HEADER_LENGTH}};
-use futures::future::Either;
 
 pub mod wrapper;
 
@@ -136,14 +135,9 @@ fn write<S: AsyncWrite + 'static>(
     buf: &[u8],
     len: usize,
 ) -> impl Future<Item = (S, Vec<u8>), Error = io::Error> {
-    if len > NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH {
-        return Either::A(err(io::Error::new(
-            io::ErrorKind::Other,
-            "Message size exceeds max handshake message size",
-        )));
-    }
+    debug_assert!(len < NOISE_MAX_HANDSHAKE_MESSAGE_LENGTH);
 
     let mut message = vec![len as u8; HANDSHAKE_HEADER_LENGTH];
     message.extend_from_slice(&buf[0..len]);
-    Either::B(write_all(sock, message))
+    write_all(sock, message)
 }

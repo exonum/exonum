@@ -148,9 +148,7 @@ impl ConnectionsPool {
             })
             .and_then(move |sock| {
                 let handshake = NoiseHandshake::initiator(&handshake_params);
-                handshake.send(sock).and_then(|framed|{
-                    Ok(framed)
-                })
+                handshake.send(sock)
             })
             // Connect socket with the outgoing channel
             .and_then(move |stream| {
