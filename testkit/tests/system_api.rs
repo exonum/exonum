@@ -45,9 +45,11 @@ fn test_user_agent_info() {
 
 #[test]
 fn test_network() {
+    let _ = ::exonum::helpers::init_logger();
+
     let testkit = TestKitBuilder::validator().with_validators(2).create();
     let mut api = testkit.api_ng();
-    let info: NodeInfo = api.private(ApiKind::System).get("/v1/network").unwrap();
+    let info: NodeInfo = api.private(ApiKind::System).get("v1/network").unwrap();
 
     assert!(info.core_version.is_some());
     assert_eq!(info.protocol_version, PROTOCOL_MAJOR_VERSION);

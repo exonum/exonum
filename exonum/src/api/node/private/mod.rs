@@ -16,7 +16,7 @@
 
 use std::{collections::HashMap, net::SocketAddr};
 
-use api_ng::{Error as ApiError, ServiceApiScope, ServiceApiState};
+use api::{Error as ApiError, ServiceApiScope, ServiceApiState};
 use blockchain::{Service, SharedNodeState};
 use crypto::PublicKey;
 use messages::PROTOCOL_MAJOR_VERSION;

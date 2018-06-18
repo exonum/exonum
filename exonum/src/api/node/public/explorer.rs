@@ -16,7 +16,7 @@
 
 use std::ops::Range;
 
-use api_ng::{Error as ApiError, ServiceApiScope, ServiceApiState};
+use api::{Error as ApiError, ServiceApiScope, ServiceApiState};
 use blockchain::Block;
 use crypto::Hash;
 use explorer::{BlockchainExplorer, TransactionInfo};

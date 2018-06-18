@@ -36,7 +36,7 @@ pub use self::{block::{Block, BlockProof, SCHEMA_MAJOR_VERSION},
                config::{ConsensusConfig, StoredConfiguration, ValidatorKeys},
                genesis::GenesisConfig,
                schema::{Schema, TxLocation},
-               service::{ApiContext, Service, ServiceContext, SharedNodeState},
+               service::{Service, ServiceContext, SharedNodeState},
                transaction::{ExecutionError, ExecutionResult, Transaction, TransactionError,
                              TransactionErrorType, TransactionResult, TransactionSet}};
 
@@ -44,7 +44,6 @@ pub mod config;
 
 use byteorder::{ByteOrder, LittleEndian};
 use failure;
-use mount::Mount;
 use vec_map::VecMap;
 
 use std::{collections::{BTreeMap, HashMap},
@@ -472,39 +471,6 @@ impl Blockchain {
             service.after_commit(&context);
         }
         Ok(())
-    }
-
-    /// Returns the `Mount` object that aggregates public API handlers.
-    pub fn mount_public_api(&self) -> Mount {
-        let context = self.api_context();
-        let mut mount = Mount::new();
-        for service in self.service_map.values() {
-            if let Some(handler) = service.public_api_handler(&context) {
-                mount.mount(service.service_name(), handler);
-            }
-        }
-        mount
-    }
-
-    /// Returns the `Mount` object that aggregates private API handlers.
-    pub fn mount_private_api(&self) -> Mount {
-        let context = self.api_context();
-        let mut mount = Mount::new();
-        for service in self.service_map.values() {
-            if let Some(handler) = service.private_api_handler(&context) {
-                mount.mount(service.service_name(), handler);
-            }
-        }
-        mount
-    }
-
-    fn api_context(&self) -> ApiContext {
-        ApiContext::from_parts(
-            self,
-            self.api_sender.clone(),
-            &self.service_keypair.0,
-            &self.service_keypair.1,
-        )
     }
 
     /// Saves the `Connect` message from a peer to the cache.

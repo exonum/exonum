@@ -12,307 +12,237 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! `RESTful` API and corresponding utilities.
+//! API and corresponding utilities.
 
-pub mod private;
-pub mod public;
+pub use self::error::Error;
+pub use self::state::ServiceApiState;
+pub use self::with::{FutureResult, Immutable, Mutable, NamedWith, Result, With};
 
-use bodyparser;
-use cookie::Cookie as CookiePair;
-use failure::Fail;
-use hyper::header::{ContentType, SetCookie};
-use iron::{headers::Cookie, prelude::*, status, IronError};
-use params;
-use router::Router;
-use serde::{de::{self, Deserialize, Deserializer, Visitor},
-            Serialize,
-            Serializer};
-use serde_json;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
-use std::{collections::BTreeMap, fmt, io, marker::PhantomData, ops::Deref, str::FromStr};
+use std::collections::BTreeMap;
 
-use crypto::{PublicKey, SecretKey};
-use encoding::serialize::{encode_hex, FromHex, FromHexError, ToHex};
-use storage;
+use self::backends::actix;
+use blockchain::{Blockchain, SharedNodeState};
 
-#[cfg(test)]
-mod tests;
+pub mod backends;
+pub mod error;
+pub mod node;
+mod state;
+mod with;
 
-/// List of possible Api errors.
-#[derive(Fail, Debug)]
-pub enum ApiError {
-    /// Storage error.
-    #[fail(display = "Storage error: {}", _0)]
-    Storage(#[cause] storage::Error),
+/// Trait defines object that could be used as an API backend.
+pub trait ServiceApiBackend: Sized {
+    /// Concrete endpoint handler in the backend.
+    type Handler;
+    /// Concrete output API scope.
+    type Scope;
 
-    /// Input/output error.
-    #[fail(display = "IO error: {}", _0)]
-    Io(#[cause] ::std::io::Error),
-
-    /// Bad request.
-    #[fail(display = "Bad request: {}", _0)]
-    BadRequest(String),
-
-    /// Not found.
-    #[fail(display = "Not found: {}", _0)]
-    NotFound(String),
-
-    /// Internal error.
-    #[fail(display = "Internal server error: {}", _0)]
-    InternalError(Box<::std::error::Error + Send + Sync>),
-
-    /// Unauthorized error.
-    #[fail(display = "Unauthorized")]
-    Unauthorized,
-}
-
-impl From<io::Error> for ApiError {
-    fn from(e: io::Error) -> ApiError {
-        ApiError::Io(e)
-    }
-}
-
-impl From<storage::Error> for ApiError {
-    fn from(e: storage::Error) -> ApiError {
-        ApiError::Storage(e)
-    }
-}
-
-impl From<ApiError> for IronError {
-    fn from(e: ApiError) -> IronError {
-        let code = match e {
-            // Note that `status::Unauthorized` does not fit here, because
-            //
-            // > A server generating a 401 (Unauthorized) response MUST send a
-            // > WWW-Authenticate header field containing at least one challenge.
-            //
-            // https://tools.ietf.org/html/rfc7235#section-4.1
-            ApiError::Unauthorized => status::Forbidden,
-
-            ApiError::BadRequest(..) => status::BadRequest,
-            ApiError::NotFound(..) => status::NotFound,
-
-            ApiError::Storage(..) | ApiError::Io(..) | ApiError::InternalError(..) => {
-                status::InternalServerError
-            }
+    /// Adds the given endpoint handler to the backend.
+    fn endpoint<N, Q, I, R, F, E>(&mut self, name: N, endpoint: E) -> &mut Self
+    where
+        N: Into<String>,
+        Q: DeserializeOwned + 'static,
+        I: Serialize + 'static,
+        F: for<'r> Fn(&'r ServiceApiState, Q) -> R + 'static + Clone,
+        E: Into<With<Q, I, R, F, Immutable>>,
+        Self::Handler: From<NamedWith<Q, I, R, F, Immutable>>,
+    {
+        let named_with = NamedWith {
+            name: name.into(),
+            inner: endpoint.into(),
         };
-        let body = {
-            let mut map = BTreeMap::new();
-            map.insert("debug", format!("{:?}", e));
-            map.insert("description", e.to_string());
-            serde_json::to_string_pretty(&map).unwrap()
+        self.raw_handler(Self::Handler::from(named_with))
+    }
+
+    /// Adds the given mutable endpoint handler to the backend.
+    fn endpoint_mut<N, Q, I, R, F, E>(&mut self, name: N, endpoint: E) -> &mut Self
+    where
+        N: Into<String>,
+        Q: DeserializeOwned + 'static,
+        I: Serialize + 'static,
+        F: for<'r> Fn(&'r ServiceApiState, Q) -> R + 'static + Clone,
+        E: Into<With<Q, I, R, F, Mutable>>,
+        Self::Handler: From<NamedWith<Q, I, R, F, Mutable>>,
+    {
+        let named_with = NamedWith {
+            name: name.into(),
+            inner: endpoint.into(),
         };
-        IronError::new(e.compat(), (code, body))
+        self.raw_handler(Self::Handler::from(named_with))
+    }
+
+    /// Adds the raw endpoint handler for the given backend.
+    fn raw_handler(&mut self, handler: Self::Handler) -> &mut Self;
+
+    /// TODO
+    fn wire(&self, output: Self::Scope) -> Self::Scope;
+}
+
+/// TODO
+#[derive(Debug, Clone, Default)]
+pub struct ServiceApiScope {
+    pub(crate) actix_backend: actix::ApiBuilder,
+}
+
+impl ServiceApiScope {
+    /// Creates a new service api scope.
+    pub fn new() -> ServiceApiScope {
+        ServiceApiScope::default()
+    }
+
+    /// Adds the given endpoint handler to the api scope.
+    pub fn endpoint<Q, I, R, F, E>(&mut self, name: &'static str, endpoint: E) -> &mut Self
+    where
+        Q: DeserializeOwned + 'static,
+        I: Serialize + 'static,
+        F: for<'r> Fn(&'r ServiceApiState, Q) -> R + 'static + Clone,
+        E: Into<With<Q, I, R, F, Immutable>>,
+        actix::RequestHandler: From<NamedWith<Q, I, R, F, Immutable>>,
+    {
+        self.actix_backend.endpoint(name, endpoint);
+        self
+    }
+
+    /// Adds the given mutable endpoint handler to the api scope.
+    pub fn endpoint_mut<Q, I, R, F, E>(&mut self, name: &'static str, endpoint: E) -> &mut Self
+    where
+        Q: DeserializeOwned + 'static,
+        I: Serialize + 'static,
+        F: for<'r> Fn(&'r ServiceApiState, Q) -> R + 'static + Clone,
+        E: Into<With<Q, I, R, F, Mutable>>,
+        actix::RequestHandler: From<NamedWith<Q, I, R, F, Mutable>>,
+    {
+        self.actix_backend.endpoint_mut(name, endpoint);
+        self
+    }
+
+    /// Returns reference to the underlying web backend.
+    pub fn web_backend(&mut self) -> &mut actix::ApiBuilder {
+        &mut self.actix_backend
     }
 }
 
-/// `Field` that is serialized/deserialized from/to hex.
-#[derive(Clone, Debug)]
-struct HexField<T: AsRef<[u8]> + Clone>(pub T);
+/// Service API builder.
+#[derive(Debug, Clone, Default)]
+pub struct ServiceApiBuilder {
+    public_scope: ServiceApiScope,
+    private_scope: ServiceApiScope,
+}
 
-impl<T> Deref for HexField<T>
-where
-    T: AsRef<[u8]> + Clone,
-{
-    type Target = T;
+impl ServiceApiBuilder {
+    /// Creates a new service API builder.
+    pub fn new() -> ServiceApiBuilder {
+        ServiceApiBuilder::default()
+    }
 
-    fn deref(&self) -> &T {
-        &self.0
+    /// Returns reference to the public api scope builder.
+    pub fn public_scope(&mut self) -> &mut ServiceApiScope {
+        &mut self.public_scope
+    }
+
+    /// Returns reference to the private api scope builder.
+    pub fn private_scope(&mut self) -> &mut ServiceApiScope {
+        &mut self.private_scope
     }
 }
 
-impl<T> Serialize for HexField<T>
-where
-    T: AsRef<[u8]> + Clone,
-{
-    fn serialize<S>(&self, ser: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        ser.serialize_str(&encode_hex(&self.0))
-    }
+/// TODO
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ApiAccess {
+    /// TODO
+    Public,
+    /// TODO
+    Private,
 }
 
-struct HexVisitor<T>
-where
-    T: AsRef<[u8]> + Clone + FromHex<Error = FromHexError>,
-{
-    _p: PhantomData<T>,
-}
-
-impl<'v, T> Visitor<'v> for HexVisitor<T>
-where
-    T: AsRef<[u8]> + Clone + FromHex<Error = FromHexError>,
-{
-    type Value = HexField<T>;
-
-    fn expecting(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(fmt, "expected hex represented string")
-    }
-
-    fn visit_str<E>(self, s: &str) -> Result<HexField<T>, E>
-    where
-        E: de::Error,
-    {
-        let v = T::from_hex(s).map_err(|_| de::Error::custom("Invalid hex"))?;
-        Ok(HexField(v))
-    }
-}
-
-impl<'de, T> Deserialize<'de> for HexField<T>
-where
-    T: AsRef<[u8]> + FromHex<Error = FromHexError> + ToHex + Clone,
-{
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_str(HexVisitor { _p: PhantomData })
-    }
-}
-
-/// `Api` trait defines `RESTful` API.
-pub trait Api {
-    /// Deserializes an url fragment as `T`
-    fn url_fragment<T>(&self, request: &Request, name: &str) -> Result<T, ApiError>
-    where
-        T: FromStr,
-        T::Err: fmt::Display,
-    {
-        let params = request.extensions.get::<Router>().unwrap();
-        let fragment = params.find(name).ok_or_else(|| {
-            ApiError::BadRequest(format!("Required parameter '{}' is missing", name))
-        })?;
-        let value = T::from_str(fragment)
-            .map_err(|e| ApiError::BadRequest(format!("Invalid '{}' parameter: {}", name, e)))?;
-        Ok(value)
-    }
-
-    /// Deserializes an optional parameter from request body or get-parameters
-    fn optional_param<T>(&self, request: &mut Request, name: &str) -> Result<Option<T>, ApiError>
-    where
-        T: FromStr,
-        T::Err: fmt::Display,
-    {
-        let map = request.get_ref::<params::Params>().unwrap();
-        let value = match map.find(&[name]) {
-            Some(&params::Value::String(ref param)) => {
-                let value = T::from_str(param).map_err(|e| {
-                    ApiError::BadRequest(format!("Invalid '{}' parameter: {}", name, e))
-                })?;
-                Some(value)
-            }
-            _ => None,
-        };
-        Ok(value)
-    }
-
-    /// Deserializes a required parameter from request body or get-parameters
-    fn required_param<T>(&self, request: &mut Request, name: &str) -> Result<T, ApiError>
-    where
-        T: FromStr,
-        T::Err: fmt::Display,
-    {
-        self.optional_param(request, name)?.ok_or_else(|| {
-            ApiError::BadRequest(format!("Required parameter '{}' is missing", name))
-        })
-    }
-
-    /// Deserializes request's body as a struct of type `T`.
-    fn parse_body<T: 'static>(&self, req: &mut Request) -> Result<T, ApiError>
-    where
-        T: Clone + for<'de> Deserialize<'de>,
-    {
-        match req.get::<bodyparser::Struct<T>>() {
-            Ok(Some(param)) => Ok(param),
-            Ok(None) => Err(ApiError::BadRequest("Body is empty".into())),
-            Err(e) => Err(ApiError::BadRequest(format!("Invalid struct: {}", e))),
+impl ::std::fmt::Display for ApiAccess {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        match *self {
+            ApiAccess::Public => f.write_str("public"),
+            ApiAccess::Private => f.write_str("private"),
         }
     }
+}
 
-    /// Loads hex value from the cookies.
-    fn load_hex_value_from_cookie<'a>(
-        &self,
-        request: &'a Request,
-        key: &str,
-    ) -> storage::Result<Vec<u8>> {
-        if let Some(&Cookie(ref cookies)) = request.headers.get() {
-            for cookie in cookies.iter() {
-                if let Ok(c) = CookiePair::parse(cookie.as_str()) {
-                    if c.name() == key {
-                        if let Ok(value) = FromHex::from_hex(c.value()) {
-                            return Ok(value);
-                        }
-                    }
-                }
-            }
-        }
-        Err(storage::Error::new(format!(
-            "Unable to find value with given key {}",
-            key
-        )))
-    }
+/// API backend extender.
+pub trait IntoApiBackend {
+    /// Extend API backend by the given scopes.
+    fn extend<'a, I>(self, items: I) -> Self
+    where
+        I: IntoIterator<Item = (&'a str, &'a ServiceApiScope)>;
+}
 
-    /// Loads public and secret key from the cookies.
-    fn load_keypair_from_cookies(
-        &self,
-        request: &Request,
-    ) -> Result<(PublicKey, SecretKey), ApiError> {
-        let public_key = PublicKey::from_slice(
-            self.load_hex_value_from_cookie(request, "public_key")?
-                .as_ref(),
+/// Exonum node API aggregator.
+#[derive(Debug, Clone)]
+pub struct ApiAggregator {
+    blockchain: Blockchain,
+    node_state: SharedNodeState,
+    inner: BTreeMap<String, ServiceApiBuilder>,
+}
+
+impl ApiAggregator {
+    /// Aggregates API for the given blockchain and node state.
+    pub fn new(blockchain: Blockchain, node_state: SharedNodeState) -> ApiAggregator {
+        let mut inner = BTreeMap::new();
+        // Adds built-in APIs.
+        inner.insert(
+            "system".to_owned(),
+            Self::system_api(&blockchain, node_state.clone()),
         );
-        let secret_key = SecretKey::from_slice(
-            self.load_hex_value_from_cookie(request, "secret_key")?
-                .as_ref(),
+        inner.insert("explorer".to_owned(), Self::explorer_api());
+        // Adds services APIs.
+        inner.extend(blockchain.service_map().iter().map(|(_, service)| {
+            let mut builder = ServiceApiBuilder::new();
+            service.wire_api(&mut builder);
+            // TODO think about prefixes for non web backends.
+            let prefix = format!("services/{}", service.service_name());
+            (prefix, builder)
+        }));
+
+        ApiAggregator {
+            inner,
+            blockchain,
+            node_state,
+        }
+    }
+
+    /// TODO
+    pub fn blockchain(&self) -> Blockchain {
+        self.blockchain.clone()
+    }
+
+    /// TODO
+    pub fn extend_api<B: IntoApiBackend>(&self, access: ApiAccess, backend: B) -> B {
+        match access {
+            ApiAccess::Public => backend.extend(
+                self.inner
+                    .iter()
+                    .map(|(name, builder)| (name.as_ref(), &builder.public_scope)),
+            ),
+            ApiAccess::Private => backend.extend(
+                self.inner
+                    .iter()
+                    .map(|(name, builder)| (name.as_ref(), &builder.private_scope)),
+            ),
+        }
+    }
+
+    fn explorer_api() -> ServiceApiBuilder {
+        let mut builder = ServiceApiBuilder::new();
+        <ServiceApiState as self::node::public::ExplorerApi>::wire(builder.public_scope());
+        builder
+    }
+
+    fn system_api(blockchain: &Blockchain, shared_api_state: SharedNodeState) -> ServiceApiBuilder {
+        let mut builder = ServiceApiBuilder::new();
+        let node_info = self::node::private::NodeInfo::new(
+            blockchain.service_map().iter().map(|(_, service)| service),
         );
-
-        let public_key = public_key.ok_or(ApiError::Unauthorized)?;
-        let secret_key = secret_key.ok_or(ApiError::Unauthorized)?;
-        Ok((public_key, secret_key))
+        self::node::private::SystemApi::new(node_info, shared_api_state.clone())
+            .wire(builder.private_scope());
+        self::node::public::SystemApi::new(shared_api_state).wire(builder.public_scope());
+        builder
     }
-
-    // TODO: Remove duplicate code. (ECR-1629)
-    /// Returns NotFound and some response with cookies.
-    fn not_found_response_with_cookies(
-        &self,
-        json: &serde_json::Value,
-        cookies: Option<Vec<String>>,
-    ) -> IronResult<Response> {
-        let mut resp = Response::with((
-            status::NotFound,
-            serde_json::to_string_pretty(json).unwrap(),
-        ));
-        resp.headers.set(ContentType::json());
-        if let Some(cookies) = cookies {
-            resp.headers.set(SetCookie(cookies));
-        }
-        Ok(resp)
-    }
-
-    /// Returns OK and some response with cookies.
-    fn ok_response_with_cookies(
-        &self,
-        json: &serde_json::Value,
-        cookies: Option<Vec<String>>,
-    ) -> IronResult<Response> {
-        let mut resp = Response::with((status::Ok, serde_json::to_string_pretty(json).unwrap()));
-        resp.headers.set(ContentType::json());
-        if let Some(cookies) = cookies {
-            resp.headers.set(SetCookie(cookies));
-        }
-        Ok(resp)
-    }
-
-    /// Returns OK and some response.
-    fn ok_response(&self, json: &serde_json::Value) -> IronResult<Response> {
-        self.ok_response_with_cookies(json, None)
-    }
-    /// Returns NotFound and some response.
-    fn not_found_response(&self, json: &serde_json::Value) -> IronResult<Response> {
-        self.not_found_response_with_cookies(json, None)
-    }
-
-    /// Used to extend Api.
-    fn wire<'b>(&self, router: &'b mut Router);
 }

@@ -130,12 +130,8 @@ extern crate bodyparser;
 extern crate exonum;
 extern crate failure;
 extern crate futures;
-extern crate iron;
-extern crate iron_test;
 #[macro_use]
 extern crate log;
-extern crate mount;
-extern crate router;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
@@ -155,8 +151,6 @@ pub use network::{TestNetwork, TestNetworkConfiguration, TestNode};
 pub mod compare;
 
 use futures::{sync::mpsc, Future, Stream};
-use iron::Iron;
-use tokio_core::reactor::Core;
 
 use std::{fmt,
           net::SocketAddr,
@@ -173,15 +167,13 @@ use exonum::{blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfi
              storage::{MemoryDB, Patch, Snapshot}};
 
 use checkpoint_db::{CheckpointDb, CheckpointDbHandler};
-use handler::create_testkit_handler;
 use poll_events::poll_events;
 
 #[macro_use]
 mod macros;
 mod api;
-pub mod api_ng;
 mod checkpoint_db;
-mod handler;
+// mod handler;
 mod network;
 mod poll_events;
 
@@ -452,11 +444,6 @@ impl TestKit {
     /// Creates an instance of `TestKitApi` to test the API provided by services.
     pub fn api(&self) -> TestKitApi {
         TestKitApi::new(self)
-    }
-
-    /// Creates an instance of `TestKitApi` to test the API provided by services.
-    pub fn api_ng(&self) -> api_ng::TestKitApi {
-        api_ng::TestKitApi::new(self)
     }
 
     /// Polls the *existing* events from the event loop until exhaustion. Does not wait
@@ -944,29 +931,31 @@ impl TestKit {
     }
 
     fn run(mut self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
-        let api = self.api();
-        let events_stream = self.remove_events_stream();
-        let testkit_ref = Arc::new(RwLock::new(self));
-        let (public_handler, private_handler) =
-            api.into_handlers(create_testkit_handler(&testkit_ref));
+        unimplemented!();
 
-        let public_api_thread = thread::spawn(move || {
-            Iron::new(public_handler).http(public_api_address).unwrap();
-        });
-        let private_api_thread = thread::spawn(move || {
-            Iron::new(private_handler)
-                .http(private_api_address)
-                .unwrap();
-        });
+        // let api = self.api();
+        // let events_stream = self.remove_events_stream();
+        // let testkit_ref = Arc::new(RwLock::new(self));
+        // let (public_handler, private_handler) =
+        //     api.into_handlers(create_testkit_handler(&testkit_ref));
 
-        // Run the event stream in a separate thread in order to put transactions to mempool
-        // when they are received. Otherwise, a client would need to call a `poll_events` analogue
-        // each time after a transaction is posted.
-        let mut core = Core::new().unwrap();
-        core.run(events_stream).unwrap();
+        // let public_api_thread = thread::spawn(move || {
+        //     Iron::new(public_handler).http(public_api_address).unwrap();
+        // });
+        // let private_api_thread = thread::spawn(move || {
+        //     Iron::new(private_handler)
+        //         .http(private_api_address)
+        //         .unwrap();
+        // });
 
-        public_api_thread.join().unwrap();
-        private_api_thread.join().unwrap();
+        // // Run the event stream in a separate thread in order to put transactions to mempool
+        // // when they are received. Otherwise, a client would need to call a `poll_events` analogue
+        // // each time after a transaction is posted.
+        // let mut core = Core::new().unwrap();
+        // core.run(events_stream).unwrap();
+
+        // public_api_thread.join().unwrap();
+        // private_api_thread.join().unwrap();
     }
 
     /// Extracts the event stream from this testkit, replacing it with `futures::stream::empty()`.

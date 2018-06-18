@@ -2,11 +2,11 @@
 members = [
     "exonum",
     "testkit",
-    "testkit/server",
-    "services/configuration",
+    # "testkit/server",
+    # "services/configuration",
     "services/time",
-    "examples/cryptocurrency",
-    "examples/cryptocurrency-advanced/backend",
-    "examples/timestamping/backend",
+    # "examples/cryptocurrency",
+    # "examples/cryptocurrency-advanced/backend",
+    # "examples/timestamping/backend",
 ]
 exclude = [ "3rdparty", "exonum/fuzz" ]

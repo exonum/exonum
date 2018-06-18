@@ -33,8 +33,8 @@ use std::result;
 use std::sync::{mpsc, Arc};
 use std::thread::{self, JoinHandle};
 
-use api_ng::error::Error as ApiError;
-use api_ng::{ApiAccess, ApiAggregator, FutureResult, Immutable, IntoApiBackend, Mutable,
+use api::error::Error as ApiError;
+use api::{ApiAccess, ApiAggregator, FutureResult, Immutable, IntoApiBackend, Mutable,
              NamedWith, Result, ServiceApiBackend, ServiceApiScope, ServiceApiState};
 
 /// Type alias for the concrete API http response.

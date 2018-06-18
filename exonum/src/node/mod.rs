@@ -23,15 +23,11 @@ pub use self::{state::{RequestData, State, ValidatorState},
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
 pub mod state;
 
-use api_ng::{backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig},
+use api::{backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig},
              ApiAccess,
              ApiAggregator};
 use failure;
 use futures::{sync::mpsc, Future, Sink};
-use iron::Chain;
-use iron_cors::CorsMiddleware;
-use mount::Mount;
-use router::Router;
 use serde::{de, ser};
 use tokio_core::reactor::Core;
 use toml::Value;
@@ -45,7 +41,6 @@ use std::{collections::{BTreeMap, HashSet},
           thread,
           time::{Duration, SystemTime}};
 
-use api::{private, public, Api};
 use blockchain::{Blockchain, GenesisConfig, Schema, Service, SharedNodeState, Transaction};
 use crypto::{self, CryptoHash, Hash, PublicKey, SecretKey};
 use events::{error::{into_other, log_error, other_error, LogError},
@@ -196,17 +191,6 @@ pub enum AllowOrigin {
     Any,
     /// Allow access only from the following hosts.
     Whitelist(Vec<String>),
-}
-
-impl From<AllowOrigin> for CorsMiddleware {
-    fn from(allow_origin: AllowOrigin) -> CorsMiddleware {
-        match allow_origin {
-            AllowOrigin::Any => CorsMiddleware::with_allow_any(),
-            AllowOrigin::Whitelist(hosts) => {
-                CorsMiddleware::with_whitelist(hosts.into_iter().collect())
-            }
-        }
-    }
 }
 
 impl ser::Serialize for AllowOrigin {
@@ -985,59 +969,6 @@ impl Node {
     pub fn channel(&self) -> ApiSender {
         ApiSender::new(self.channel.api_requests.0.clone())
     }
-}
-
-/// Public for testing
-#[doc(hidden)]
-pub fn create_public_api_handler(
-    blockchain: Blockchain,
-    shared_api_state: SharedNodeState,
-    config: &NodeApiConfig,
-) -> Chain {
-    let mut mount = Mount::new();
-    mount.mount("api/services", blockchain.mount_public_api());
-
-    if config.enable_blockchain_explorer {
-        let mut router = Router::new();
-        let explorer_api = public::ExplorerApi::new(blockchain.clone());
-        explorer_api.wire(&mut router);
-        mount.mount("api/explorer", router);
-    }
-
-    let mut router = Router::new();
-    let system_api = public::SystemApi::new(blockchain, shared_api_state);
-    system_api.wire(&mut router);
-    mount.mount("api/system", router);
-
-    let mut chain = Chain::new(mount);
-    if let Some(ref allow_origin) = config.public_allow_origin {
-        chain.link_around(CorsMiddleware::from(allow_origin.clone()));
-    }
-    chain
-}
-
-/// Public for testing
-#[doc(hidden)]
-pub fn create_private_api_handler(
-    blockchain: Blockchain,
-    shared_api_state: SharedNodeState,
-    api_sender: ApiSender,
-    config: &NodeApiConfig,
-) -> Chain {
-    let mut mount = Mount::new();
-    mount.mount("api/services", blockchain.mount_private_api());
-
-    let mut router = Router::new();
-    let node_info = private::NodeInfo::new(blockchain.service_map().iter().map(|(_, s)| s));
-    let system_api = private::SystemApi::new(node_info, blockchain, shared_api_state, api_sender);
-    system_api.wire(&mut router);
-    mount.mount("api/system", router);
-
-    let mut chain = Chain::new(mount);
-    if let Some(ref allow_origin) = config.private_allow_origin {
-        chain.link_around(CorsMiddleware::from(allow_origin.clone()));
-    }
-    chain
 }
 
 #[cfg(test)]

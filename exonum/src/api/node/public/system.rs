@@ -14,7 +14,7 @@
 
 //! Public system API.
 
-use api_ng::{ServiceApiScope, ServiceApiState};
+use api::{ServiceApiScope, ServiceApiState};
 use blockchain::{Schema, SharedNodeState};
 use helpers::user_agent;
 

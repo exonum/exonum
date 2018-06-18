@@ -13,9 +13,7 @@
 // limitations under the License.
 
 use bodyparser;
-use exonum::{api::ApiError, crypto, explorer::BlockchainExplorer};
-use iron::{headers::ContentType, modifiers::Header, prelude::*, status::Status};
-use router::Router;
+use exonum::{api::Error as ApiError, crypto, explorer::BlockchainExplorer};
 use serde::Serialize;
 use serde_json;
 

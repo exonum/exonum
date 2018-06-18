@@ -33,7 +33,6 @@ extern crate chrono;
 #[macro_use(crate_version, crate_authors)]
 extern crate clap;
 extern crate colored;
-extern crate cookie;
 extern crate env_logger;
 #[macro_use]
 extern crate exonum_profiler;
@@ -43,21 +42,14 @@ extern crate exonum_sodiumoxide as sodiumoxide;
 extern crate failure;
 extern crate futures;
 extern crate hex;
-extern crate hyper;
-extern crate iron;
-extern crate iron_cors;
 #[macro_use]
 extern crate log;
-extern crate mount;
 extern crate os_info;
-extern crate params;
 extern crate rand;
-extern crate router;
 extern crate rust_decimal;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-#[macro_use]
 extern crate serde_json;
 extern crate snow;
 extern crate term;
@@ -91,7 +83,6 @@ pub mod storage;
 #[macro_use]
 pub mod blockchain;
 pub mod api;
-pub mod api_ng;
 pub mod explorer;
 
 mod events;
