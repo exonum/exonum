@@ -323,7 +323,9 @@ pub struct ApiNodeState {
     // TODO: Update on event? (ECR-1632)
     peers_info: HashMap<SocketAddr, PublicKey>,
     is_enabled: bool,
-    majority_count: usize,
+    is_validator: bool,
+    majority_count:usize,
+    validators: Vec<ValidatorKeys>,
 }
 
 impl ApiNodeState {
@@ -397,22 +399,41 @@ impl SharedNodeState {
     /// Updates internal state, from `State` of a blockchain node.
     pub fn update_node_state(&self, state: &State) {
         let mut lock = self.state.write().expect("Expected write lock.");
-
         lock.peers_info.clear();
         lock.majority_count = state.majority_count();
+        lock.is_validator = state.is_validator();
+        lock.validators.clear();
 
         for (p, c) in state.peers().iter() {
             lock.peers_info.insert(c.addr(), *p);
         }
+        for v in state.validators().iter() {
+            lock.validators.push(*v);
+        }
     }
 
+    /// Returns a boolean value which indicates whether the consensus is
     /// Returns the majority count from the current "State"
     /// of a blockchain node.
-    pub fn majority_count(&self) -> usize {
-        self.state
-            .read()
-            .expect("Expected read lock.")
-            .majority_count
+    pub fn is_consensus(&self) -> bool {
+        let lock = self.state.read()
+            .expect("Expected read lock.");
+
+        let mut active_validators :usize = 0;
+        for (_s, p) in lock.peers_info.iter() {
+            if lock.validators.iter()
+                .any(|x| x.consensus_key == *p) {
+                active_validators = active_validators.saturating_add(1);
+            }
+        }
+
+        if lock.is_validator {
+            // Peers list doesn't include current node address, so we have to increment its length.
+            // E.g. if we have 3 items in peers list, it means that we have 4 nodes overall.
+            active_validators = active_validators.saturating_add(1);
+        }
+
+        lock.majority_count > 0 && active_validators >= lock.majority_count
     }
 
     /// Returns a boolean value which indicates whether the node is enabled
