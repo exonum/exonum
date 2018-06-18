@@ -46,7 +46,7 @@ pub struct BlockInfo {
 }
 
 /// Blocks in range parameters.
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Default)]
 pub struct BlocksQuery {
     /// The number of blocks to return. Should not be greater than `MAX_BLOCKS_PER_REQUEST`.
     pub count: usize,

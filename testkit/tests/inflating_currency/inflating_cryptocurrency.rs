@@ -12,24 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate bodyparser;
-extern crate iron;
-extern crate router;
 extern crate serde;
 extern crate serde_json;
 
-use exonum::{api::{Api, ApiError},
-             blockchain::{ApiContext, Blockchain, ExecutionResult, Schema as CoreSchema, Service,
-                          Transaction, TransactionSet},
+use exonum::{api,
+             blockchain::{ExecutionResult, Schema as CoreSchema, Service, Transaction,
+                          TransactionSet},
              crypto::{Hash, PublicKey},
-             encoding::{self, serialize::FromHex},
+             encoding,
              helpers::Height,
              messages::{Message, RawTransaction},
              node::{ApiSender, TransactionSend},
              storage::{Fork, MapIndex, Snapshot}};
-
-use self::{iron::{headers::ContentType, prelude::*, status::Status, Handler, IronError},
-           router::Router};
 
 // // // // // // // // // // CONSTANTS // // // // // // // // // //
 
@@ -166,80 +160,47 @@ impl Transaction for TxTransfer {
 
 // // // // // // // // // // REST API // // // // // // // // // //
 
-#[derive(Clone)]
-struct CryptocurrencyApi {
-    channel: ApiSender,
-    blockchain: Blockchain,
-}
+struct CryptocurrencyApi;
 
 /// The structure returned by the REST API.
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TransactionResponse {
     pub tx_hash: Hash,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+struct BalanceQuery {
+    pub_key: PublicKey,
+}
+
 /// Shortcut to get data on wallets.
 impl CryptocurrencyApi {
-    fn wallet(&self, pub_key: &PublicKey) -> Option<Wallet> {
-        let view = self.blockchain.snapshot();
-        let schema = CurrencySchema::new(view);
-        schema.wallet(pub_key)
-    }
-
     /// Endpoint for transactions.
-    fn post_transaction(&self, req: &mut Request) -> IronResult<Response> {
-        match req.get::<bodyparser::Struct<CurrencyTransactions>>() {
-            Ok(Some(transaction)) => {
-                let transaction: Box<Transaction> = transaction.into();
-                let tx_hash = transaction.hash();
-                self.channel.send(transaction).map_err(ApiError::from)?;
-                let json = TransactionResponse { tx_hash };
-                self.ok_response(&serde_json::to_value(&json).unwrap())
-            }
-            Ok(None) => Err(ApiError::BadRequest("Empty request body".into()))?,
-            Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
-        }
+    fn post_transaction(
+        state: &api::ServiceApiState,
+        query: CurrencyTransactions,
+    ) -> api::Result<TransactionResponse> {
+        let transaction: Box<Transaction> = query.into();
+        let tx_hash = transaction.hash();
+        state.sender().send(transaction)?;
+        Ok(TransactionResponse { tx_hash })
     }
 
     /// Endpoint for retrieving a single wallet.
-    fn balance(&self, req: &mut Request) -> IronResult<Response> {
-        use self::iron::modifiers::Header;
-
-        let path = req.url.path();
-        let wallet_key = path.last().unwrap();
-        let public_key = PublicKey::from_hex(wallet_key).map_err(|e| {
-            IronError::new(
-                e,
-                (
-                    Status::BadRequest,
-                    Header(ContentType::json()),
-                    "\"Invalid request param: `pub_key`\"",
-                ),
-            )
-        })?;
-        if let Some(wallet) = self.wallet(&public_key) {
-            let height = CoreSchema::new(self.blockchain.snapshot()).height();
-            self.ok_response(&serde_json::to_value(wallet.actual_balance(height)).unwrap())
-        } else {
-            self.not_found_response(&serde_json::to_value("Wallet not found").unwrap())
-        }
+    fn balance(state: &api::ServiceApiState, query: BalanceQuery) -> api::Result<Option<u64>> {
+        let snapshot = state.blockchain().snapshot();
+        let schema = CurrencySchema::new(&snapshot);
+        Ok(schema.wallet(&query.pub_key).map(|wallet| {
+            let height = CoreSchema::new(&snapshot).height();
+            wallet.actual_balance(height)
+        }))
     }
-}
 
-impl Api for CryptocurrencyApi {
-    fn wire(&self, router: &mut Router) {
-        let self_ = self.clone();
-        let post_transaction = move |req: &mut Request| self_.post_transaction(req);
-        let self_ = self.clone();
-        let balance = move |req: &mut Request| self_.balance(req);
-
-        // Bind the transaction handler to a specific route.
-        router.post(
-            "/v1/wallets/transaction",
-            post_transaction,
-            "post_transaction",
-        );
-        router.get("/v1/balance/:pub_key", balance, "balance");
+    fn wire_api(builder: &mut api::ServiceApiBuilder) {
+        builder
+            .public_scope()
+            .endpoint("v1/balance", Self::balance)
+            .endpoint_mut("v1/wallets/transaction", Self::post_transaction);
     }
 }
 
@@ -268,14 +229,7 @@ impl Service for CurrencyService {
         Ok(tx.into())
     }
 
-    /// Create a REST `Handler` to process web requests to the node.
-    fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
-        let mut router = Router::new();
-        let api = CryptocurrencyApi {
-            channel: ctx.node_channel().clone(),
-            blockchain: ctx.blockchain().clone(),
-        };
-        api.wire(&mut router);
-        Some(Box::new(router))
+    fn wire_api(&self, builder: &mut api::ServiceApiBuilder) {
+        CryptocurrencyApi::wire_api(builder)
     }
 }

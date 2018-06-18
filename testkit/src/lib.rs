@@ -125,7 +125,6 @@
 #![deny(missing_debug_implementations, missing_docs)]
 
 extern crate actix_web;
-extern crate bodyparser;
 #[cfg_attr(test, macro_use)]
 extern crate exonum;
 extern crate failure;

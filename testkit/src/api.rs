@@ -17,17 +17,20 @@
 pub use exonum::api::ApiAccess;
 
 use actix_web::http::Method;
-use actix_web::{test::TestServer, App, HttpMessage};
+use actix_web::{client::SendRequest, test::TestServer, App, HttpMessage};
 use failure;
-use serde_urlencoded;
+use futures::Future;
 use serde_json;
+use serde_urlencoded;
 
 use std::fmt;
+use std::time::Duration;
 
-use exonum::{api::{ApiAggregator, ServiceApiState},
-             blockchain::{SharedNodeState, Transaction},
-             encoding::serialize::reexport::{DeserializeOwned, Serialize},
-             node::{ApiSender, TransactionSend}};
+use exonum::{
+    api::{ApiAggregator, ServiceApiState}, blockchain::{SharedNodeState, Transaction},
+    encoding::serialize::reexport::{DeserializeOwned, Serialize},
+    node::{ApiSender, TransactionSend},
+};
 
 use TestKit;
 
@@ -153,12 +156,13 @@ where
     /// TODO
     pub fn get<R>(&mut self, endpoint: &str) -> Result<R, Error>
     where
-        R: DeserializeOwned + 'static,
+        R: DeserializeOwned + fmt::Debug + 'static,
     {
         let kind = self.kind;
         let access = self.access;
 
-        let params = self.query
+        let params = self
+            .query
             .as_ref()
             .map(|query| serde_urlencoded::to_string(query).expect("Unable to serialize query."))
             .unwrap_or_default();
@@ -166,25 +170,19 @@ where
 
         trace!("GET: {}", self.test_server.url(&path));
 
-        let request = self.test_server
+        let request = self
+            .test_server
             .client(Method::GET, &path)
             .finish()
-            .expect("WTF")
+            .expect("Unable to construct request")
             .send();
-
-        let response = self.test_server.execute(request)?;
-
-        trace!("Response: {:?}", response);
-
-        self.test_server
-            .execute(response.json())
-            .map_err(From::from)
+        self.execute(request)
     }
 
     /// TODO
     pub fn post<R>(&mut self, endpoint: &str) -> Result<R, Error>
     where
-        R: DeserializeOwned + 'static,
+        R: DeserializeOwned + fmt::Debug + 'static,
     {
         let kind = self.kind;
         let access = self.access;
@@ -198,16 +196,27 @@ where
             request.json(query)
         } else {
             request.json(&())
-        }.expect("WTF")
+        }.expect("Unable to construct request")
             .send();
 
-        let response = self.test_server.execute(request)?;
+        self.execute(request)
+    }
 
-        trace!("Response: {:?}", response);
-
-        self.test_server
-            .execute(response.json())
-            .map_err(From::from)
+    fn execute<R>(&mut self, request: SendRequest) -> Result<R, Error>
+    where
+        R: DeserializeOwned + fmt::Debug + 'static,
+    {
+        let request = request
+            .map_err(Error::from)
+            .and_then(|response| {
+                trace!("Response: {:?}", response);
+                response.json().map_err(From::from)
+            })
+            .map(|body| {
+                trace!("Body: {:?}", body);
+                body
+            });
+        self.test_server.execute(request)
     }
 }
 

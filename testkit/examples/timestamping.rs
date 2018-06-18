@@ -18,7 +18,7 @@ extern crate exonum;
 extern crate exonum_testkit;
 extern crate serde_json;
 
-use exonum::{api::public::BlocksRange,
+use exonum::{api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery},
              blockchain::{ExecutionResult, Schema, Service, Transaction, TransactionSet},
              crypto::{gen_keypair, CryptoHash, Hash, PublicKey},
              encoding,
@@ -98,11 +98,18 @@ fn main() {
     assert!(schema.transactions().contains(&tx3.hash()));
 
     // Check results with api.
-    let api = testkit.api();
-    let blocks_range: BlocksRange = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+    let mut api = testkit.api();
+    let blocks_range: BlocksRange = api.public(ApiKind::Explorer)
+        .query(BlocksQuery {
+            count: 10,
+            ..Default::default()
+        })
+        .get("v1/blocks")
+        .unwrap();
     assert_eq!(blocks_range.blocks.len(), 2);
-    api.get::<serde_json::Value>(
-        ApiKind::Explorer,
-        &format!("v1/transactions/{}", tx1.hash().to_string()),
-    );
+
+    api.public(ApiKind::Explorer)
+        .query(TransactionQuery { hash: tx1.hash() })
+        .get::<serde_json::Value>("v1/transactions")
+        .unwrap();
 }

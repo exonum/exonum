@@ -18,13 +18,17 @@ use api::{ServiceApiScope, ServiceApiState};
 use blockchain::{Schema, SharedNodeState};
 use helpers::user_agent;
 
-#[derive(Serialize, Deserialize, PartialEq)]
-struct MemPoolInfo {
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+/// TODO
+pub struct MemPoolInfo {
+    /// TODO
     pub size: usize,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
-struct HealthCheckInfo {
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+/// TODO
+pub struct HealthCheckInfo {
+    /// TODO
     pub connectivity: bool,
 }
 

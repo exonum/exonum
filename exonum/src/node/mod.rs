@@ -24,8 +24,8 @@ pub use self::{state::{RequestData, State, ValidatorState},
 pub mod state;
 
 use api::{backends::actix::{ApiRuntimeConfig, SystemRuntimeConfig},
-             ApiAccess,
-             ApiAggregator};
+          ApiAccess,
+          ApiAggregator};
 use failure;
 use futures::{sync::mpsc, Future, Sink};
 use serde::{de, ser};

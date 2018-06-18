@@ -40,7 +40,7 @@ pub mod time_provider;
 /// Node transactions.
 pub mod transactions;
 
-use exonum::{api::{ServiceApiBuilder},
+use exonum::{api::ServiceApiBuilder,
              blockchain::{Service, ServiceContext, Transaction, TransactionSet},
              crypto::Hash,
              encoding::{self, serialize::json::reexport::Value},

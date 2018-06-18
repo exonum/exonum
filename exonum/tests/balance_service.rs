@@ -14,12 +14,9 @@
 
 //! This is a basic balance service. The only available operation is a wallet balance update.
 //! Regression test for transactions processing is built on a base of this service.
-extern crate bodyparser;
 #[macro_use]
 extern crate exonum;
 extern crate futures;
-extern crate iron;
-extern crate router;
 extern crate serde;
 extern crate serde_json;
 

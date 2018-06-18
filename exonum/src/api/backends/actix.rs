@@ -34,8 +34,8 @@ use std::sync::{mpsc, Arc};
 use std::thread::{self, JoinHandle};
 
 use api::error::Error as ApiError;
-use api::{ApiAccess, ApiAggregator, FutureResult, Immutable, IntoApiBackend, Mutable,
-             NamedWith, Result, ServiceApiBackend, ServiceApiScope, ServiceApiState};
+use api::{ApiAccess, ApiAggregator, FutureResult, Immutable, IntoApiBackend, Mutable, NamedWith,
+          Result, ServiceApiBackend, ServiceApiScope, ServiceApiState};
 
 /// Type alias for the concrete API http response.
 pub type FutureResponse = actix_web::FutureResponse<HttpResponse, actix_web::Error>;
