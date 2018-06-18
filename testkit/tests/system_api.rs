@@ -16,42 +16,29 @@ extern crate exonum;
 extern crate exonum_testkit;
 #[macro_use]
 extern crate pretty_assertions;
-#[macro_use]
-extern crate log;
 
-use exonum::{
-    api::{private::NodeInfo, public::HealthCheckInfo}, helpers::user_agent,
-    messages::PROTOCOL_MAJOR_VERSION,
-};
+use exonum::{api::{private::NodeInfo, public::HealthCheckInfo},
+             helpers::user_agent,
+             messages::PROTOCOL_MAJOR_VERSION};
 use exonum_testkit::{ApiKind, TestKitBuilder};
 
 #[test]
 fn test_healthcheck_connectivity_false() {
-    let _ = ::exonum::helpers::init_logger();
-
     let testkit = TestKitBuilder::validator().with_validators(2).create();
-    let api = testkit.api();
-    let info: HealthCheckInfo = api.get(ApiKind::System, "v1/healthcheck");
+    let mut api = testkit.api_ng();
+
+    let info: HealthCheckInfo = api.public(ApiKind::System).get("v1/healthcheck").unwrap();
     let expected = HealthCheckInfo {
         connectivity: false,
     };
     assert_eq!(info, expected);
-
-    let mut api = exonum_testkit::api_ng::TestKitApi::new(&testkit);
-
-    assert_eq!(
-        api.public(ApiKind::System)
-            .get::<HealthCheckInfo>("v1/healthcheck")
-            .unwrap(),
-        expected
-    );
 }
 
 #[test]
 fn test_user_agent_info() {
     let testkit = TestKitBuilder::validator().with_validators(2).create();
-    let api = testkit.api();
-    let info: String = api.get(ApiKind::System, "v1/user_agent");
+    let mut api = testkit.api_ng();
+    let info: String = api.public(ApiKind::System).get("v1/user_agent").unwrap();
     let expected = user_agent::get();
     assert_eq!(info, expected);
 }
@@ -59,10 +46,25 @@ fn test_user_agent_info() {
 #[test]
 fn test_network() {
     let testkit = TestKitBuilder::validator().with_validators(2).create();
-    let api = testkit.api();
-    let info: NodeInfo = api.get_private(ApiKind::System, "/v1/network");
+    let mut api = testkit.api_ng();
+    let info: NodeInfo = api.private(ApiKind::System).get("/v1/network").unwrap();
 
     assert!(info.core_version.is_some());
     assert_eq!(info.protocol_version, PROTOCOL_MAJOR_VERSION);
     assert!(info.services.is_empty());
+}
+
+#[test]
+fn test_shutdown() {
+    let _ = ::exonum::helpers::init_logger();
+
+    let testkit = TestKitBuilder::validator().with_validators(2).create();
+    let mut api = testkit.api_ng();
+
+    assert_eq!(
+        api.private(ApiKind::System)
+            .post::<()>("v1/shutdown")
+            .unwrap(),
+        ()
+    );
 }

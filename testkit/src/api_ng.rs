@@ -38,14 +38,13 @@ pub type Error = failure::Error;
 fn create_test_server(aggregator: ApiAggregator) -> TestServer {
     let server = TestServer::with_factory(move || {
         let state = ServiceApiState::new(aggregator.blockchain());
-        vec![
-            App::with_state(state.clone()).scope("public/api", |scope| {
+        App::with_state(state.clone())
+            .scope("public/api", |scope| {
                 aggregator.extend_api(ApiAccess::Public, scope)
-            }),
-            App::with_state(state.clone()).scope("private/api", |scope| {
+            })
+            .scope("private/api", |scope| {
                 aggregator.extend_api(ApiAccess::Private, scope)
-            }),
-        ]
+            })
     });
 
     info!("Test server created on {}", server.addr());
@@ -90,20 +89,20 @@ impl TestKitApi {
 
     /// TODO
     pub fn public(&mut self, kind: ApiKind) -> RequestBuilder {
-        RequestBuilder::new(&mut self.test_server, ApiAccess::Public).kind(kind)
+        RequestBuilder::new(&mut self.test_server, ApiAccess::Public, kind)
     }
 
     /// TODO
     pub fn private(&mut self, kind: ApiKind) -> RequestBuilder {
-        RequestBuilder::new(&mut self.test_server, ApiAccess::Private).kind(kind)
-    }    
+        RequestBuilder::new(&mut self.test_server, ApiAccess::Private, kind)
+    }
 }
 
 /// TODO
 pub struct RequestBuilder<'a, Q = ()> {
     test_server: &'a mut TestServer,
     access: ApiAccess,
-    kind: Option<ApiKind>,
+    kind: ApiKind,
     query: Option<Q>,
 }
 
@@ -125,19 +124,13 @@ where
     Q: Serialize,
 {
     /// TODO
-    pub fn new(test_server: &'a mut TestServer, access: ApiAccess) -> Self {
+    pub fn new(test_server: &'a mut TestServer, access: ApiAccess, kind: ApiKind) -> Self {
         RequestBuilder {
             test_server,
             access,
-            kind: None,
+            kind,
             query: None,
         }
-    }
-
-    ///TODO
-    pub fn kind(mut self, kind: ApiKind) -> Self {
-        self.kind = Some(kind);
-        self
     }
 
     ///TODO
@@ -155,14 +148,12 @@ where
     where
         R: DeserializeOwned + 'static,
     {
-        let kind = self.kind.clone().expect("`ApiKind` should be set");
+        let kind = self.kind;
         let access = self.access;
 
         let params = self.query
             .as_ref()
-            .map(|query| {
-                serde_urlencoded::to_string(query).expect("Unable to serialize query.")
-            })
+            .map(|query| serde_urlencoded::to_string(query).expect("Unable to serialize query."))
             .unwrap_or_default();
         let path = format!("{}/{}/{}{}", access, kind, endpoint, params);
 
@@ -172,6 +163,34 @@ where
             .client(Method::GET, &path)
             .finish()
             .expect("WTF")
+            .send();
+
+        let response = self.test_server.execute(request)?;
+
+        trace!("Response: {:?}", response);
+
+        self.test_server
+            .execute(response.json())
+            .map_err(From::from)
+    }
+
+    /// TODO
+    pub fn post<R>(&mut self, endpoint: &str) -> Result<R, Error>
+    where
+        R: DeserializeOwned + 'static,
+    {
+        let kind = self.kind;
+        let access = self.access;
+        let path = format!("{}/{}/{}", access, kind, endpoint);
+
+        trace!("POST: {}", self.test_server.url(&path));
+
+        let mut request = self.test_server.client(Method::POST, &path);
+        let request = if let Some(ref query) = self.query.as_ref() {
+            request.json(query)
+        } else {
+            request.json(&())
+        }.expect("WTF")
             .send();
 
         let response = self.test_server.execute(request)?;

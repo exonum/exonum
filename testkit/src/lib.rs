@@ -454,6 +454,11 @@ impl TestKit {
         TestKitApi::new(self)
     }
 
+    /// Creates an instance of `TestKitApi` to test the API provided by services.
+    pub fn api_ng(&self) -> api_ng::TestKitApi {
+        api_ng::TestKitApi::new(self)
+    }
+
     /// Polls the *existing* events from the event loop until exhaustion. Does not wait
     /// until new events arrive.
     pub fn poll_events(&mut self) {
