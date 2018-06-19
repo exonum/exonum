@@ -1,6 +1,6 @@
 [package]
 name = "exonum"
-version = "0.8.0"
+version = "0.8.1"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 homepage = "https://exonum.com/"
 repository = "https://github.com/exonum/exonum"
@@ -47,8 +47,8 @@ uuid = { version = "=0.6.5", features = ["serde"] }
 snow = "=0.1.12"
 rust_decimal = "=0.9.0"
 
-exonum_rocksdb = "0.7.2"
-exonum_sodiumoxide = "0.0.18"
+exonum_rocksdb = "0.7.4"
+exonum_sodiumoxide = "0.0.19"
 exonum_profiler = { path = "../3rdparty/profiler", version = "0.1.2" }
 exonum_flamer = { path = "../3rdparty/flamer", version = "0.1.6", optional = true }
 

@@ -32,6 +32,14 @@ pub struct HealthCheckInfo {
     pub connectivity: bool,
 }
 
+/// ConsensusStatusInfo shows the possibility to achieve the consensus between validators
+/// in current state.
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+pub struct ConsensusStatusInfo {
+    /// Consensus status: true - if consensus achieved, else - false.
+    pub status: bool,
+}
+
 /// Public system API.
 #[derive(Clone, Debug)]
 pub struct SystemApi {
@@ -42,14 +50,6 @@ impl SystemApi {
     /// Creates a new `public::SystemApi` instance.
     pub fn new(shared_api_state: SharedNodeState) -> SystemApi {
         SystemApi { shared_api_state }
-    }
-
-    /// Adds public system API endpoints to the corresponding scope.
-    pub fn wire(self, api_scope: &mut ServiceApiScope) -> &mut ServiceApiScope {
-        self.handle_mempool_info("v1/mempool", api_scope)
-            .handle_healthcheck_info("v1/healthcheck", api_scope)
-            .handle_user_agent_info("v1/user_agent", api_scope);
-        api_scope
     }
 
     fn handle_mempool_info(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
@@ -78,5 +78,27 @@ impl SystemApi {
             Ok(user_agent::get())
         });
         self
+    }
+
+    fn handle_consensus_status_info(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
+        let self_ = self.clone();
+        api_scope.endpoint(name, move |_state: &ServiceApiState, _query: ()| {
+            Ok(ConsensusStatusInfo {
+                // Peers list doesn't include current node address, so we have to increment its length.
+                // E.g. if we have 3 items in peers list, it means that we have 4 nodes overall.
+                status: self.shared_api_state.peers_info().len().saturating_add(1)
+                    >= self.shared_api_state.majority_count(),
+            })
+        });
+        self_
+    }
+
+    /// Adds public system API endpoints to the corresponding scope.
+    pub fn wire(self, api_scope: &mut ServiceApiScope) -> &mut ServiceApiScope {
+        self.handle_mempool_info("v1/mempool", api_scope)
+            .handle_healthcheck_info("v1/healthcheck", api_scope)
+            .handle_user_agent_info("v1/user_agent", api_scope)
+            .handle_consensus_status_info("v1/consensus_status", api_scope);
+        api_scope
     }
 }

@@ -17,7 +17,7 @@ extern crate exonum_testkit;
 #[macro_use]
 extern crate pretty_assertions;
 
-use exonum::{api::node::{private::NodeInfo, public::system::HealthCheckInfo},
+use exonum::{api::node::{private::NodeInfo, public::system::{HealthCheckInfo, ConsensusStatusInfo}},
              helpers::user_agent,
              messages::PROTOCOL_MAJOR_VERSION};
 use exonum_testkit::{ApiKind, TestKitBuilder};
@@ -38,6 +38,7 @@ fn test_healthcheck_connectivity_false() {
 fn test_user_agent_info() {
     let testkit = TestKitBuilder::validator().with_validators(2).create();
     let api = testkit.api();
+
     let info: String = api.public(ApiKind::System).get("v1/user_agent").unwrap();
     let expected = user_agent::get();
     assert_eq!(info, expected);
@@ -47,11 +48,23 @@ fn test_user_agent_info() {
 fn test_network() {
     let testkit = TestKitBuilder::validator().with_validators(2).create();
     let api = testkit.api();
-    let info: NodeInfo = api.private(ApiKind::System).get("v1/network").unwrap();
 
+    let info: NodeInfo = api.private(ApiKind::System).get("v1/network").unwrap();
     assert!(info.core_version.is_some());
     assert_eq!(info.protocol_version, PROTOCOL_MAJOR_VERSION);
     assert!(info.services.is_empty());
+}
+
+#[test]
+fn test_consensus_status() {
+    let testkit = TestKitBuilder::validator().create();
+    let api = testkit.api();
+
+    let info: ConsensusStatusInfo = api.public(ApiKind::System)
+        .get("v1/consensus_status")
+        .unwrap();
+    let expected = ConsensusStatusInfo { status: true };
+    assert_eq!(info, expected);
 }
 
 #[test]

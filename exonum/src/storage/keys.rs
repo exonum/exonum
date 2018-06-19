@@ -21,7 +21,7 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
-use crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
+use crypto::{Hash, PublicKey, Signature, HASH_SIZE, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
 
 /// A type that can be (de)serialized as a key in the blockchain storage.
 ///
@@ -175,33 +175,27 @@ storage_key_for_ints!{u16, i16, 2, read_u16, write_u16}
 storage_key_for_ints!{u32, i32, 4, read_u32, write_u32}
 storage_key_for_ints!{u64, i64, 8, read_u64, write_u64}
 
-impl StorageKey for Hash {
-    fn size(&self) -> usize {
-        HASH_SIZE
-    }
+macro_rules! storage_key_for_crypto_types {
+    ($type:ident, $size:expr) => {
+        impl StorageKey for $type {
+            fn size(&self) -> usize {
+                $size
+            }
 
-    fn write(&self, buffer: &mut [u8]) {
-        buffer.copy_from_slice(self.as_ref())
-    }
+            fn write(&self, buffer: &mut [u8]) {
+                buffer.copy_from_slice(self.as_ref())
+            }
 
-    fn read(buffer: &[u8]) -> Self::Owned {
-        Hash::from_slice(buffer).unwrap()
-    }
+            fn read(buffer: &[u8]) -> Self {
+                $type::from_slice(buffer).unwrap()
+            }
+        }
+    };
 }
 
-impl StorageKey for PublicKey {
-    fn size(&self) -> usize {
-        PUBLIC_KEY_LENGTH
-    }
-
-    fn write(&self, buffer: &mut [u8]) {
-        buffer.copy_from_slice(self.as_ref())
-    }
-
-    fn read(buffer: &[u8]) -> Self::Owned {
-        PublicKey::from_slice(buffer).unwrap()
-    }
-}
+storage_key_for_crypto_types!{Hash, HASH_SIZE}
+storage_key_for_crypto_types!{PublicKey, PUBLIC_KEY_LENGTH}
+storage_key_for_crypto_types!{Signature, SIGNATURE_LENGTH}
 
 impl StorageKey for Vec<u8> {
     fn size(&self) -> usize {
@@ -588,6 +582,32 @@ mod tests {
             assert_eq!(new_val, *val);
         }
     }
+
+    macro_rules! storage_key_for_crypto_types_tests {
+        ($type:ident, $size:expr, $collection:expr => $test_name:ident) => {
+            #[test]
+            fn $test_name() {
+                let items = $collection;
+
+                let mut buffer = [0u8; $size];
+                for item in items.iter() {
+                    let instance = $type::from_str(item).unwrap();
+                    instance.write(&mut buffer);
+                    assert_eq!(instance, $type::read(&buffer));
+                }
+            }
+        };
+    }
+
+    storage_key_for_crypto_types_tests!{Hash, HASH_SIZE,
+    ["326c1da1a00b5b4c85929dac57f3c99ceea82ed2941173d879c57b8f21ae8c78"]
+    => hash_round_trip}
+    storage_key_for_crypto_types_tests!{PublicKey, PUBLIC_KEY_LENGTH,
+    ["1e38d80b8a9786648a471b11a9624a9519215743df7321938d70bac73dae3b84"]
+    => public_key_round_trip}
+    storage_key_for_crypto_types_tests!{Signature, SIGNATURE_LENGTH,
+    ["326c1da1a00b5b4c85929dac57f3c99ceea82ed2941173d879c57b8f21ae8c781e38d80b8a9786648a471b11a9624a9519215743df7321938d70bac73dae3b84"]
+    => signature_round_trip}
 
     #[test]
     fn uuid_round_trip() {
