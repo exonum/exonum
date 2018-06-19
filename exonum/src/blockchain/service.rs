@@ -403,25 +403,23 @@ impl SharedNodeState {
         lock.peers_info.clear();
         lock.majority_count = state.majority_count();
         lock.is_validator = state.is_validator();
-        lock.validators.clear();
+        lock.validators = state.validators().to_vec();
 
         for (p, c) in state.peers() {
             lock.peers_info.insert(c.addr(), *p);
         }
-        for v in state.validators() {
-            lock.validators.push(*v);
-        }
     }
 
     /// Returns a boolean value which indicates whether the consensus is
-    pub fn is_consensus(&self) -> bool {
-        let lock = self.state.read()
-            .expect("Expected read lock.");
+    pub fn consensus_status(&self) -> bool {
+        let lock = self.state.read().expect("Expected read lock.");
 
         let mut active_validators: usize = 0;
         for peer_key in lock.peers_info.values() {
-            if lock.validators.iter()
-                .any(|validator| validator.consensus_key == *peer_key) {
+            if lock.validators
+                .iter()
+                .any(|validator| validator.consensus_key == *peer_key)
+            {
                 active_validators += 1;
             }
         }
@@ -433,7 +431,7 @@ impl SharedNodeState {
         }
 
         // Just after Node is started (node status isn't updated) majority_count = 0,
-        // and as result is_consensus() will return true.
+        // so we have to check that majority count is greater than 0.
         active_validators >= lock.majority_count && lock.majority_count > 0
     }
 

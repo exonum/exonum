@@ -88,7 +88,7 @@ impl SystemApi {
     fn consensus_status_info(self, router: &mut Router) {
         let consensus_status = move |_: &mut Request| -> IronResult<Response> {
             let info = ConsensusStatusInfo {
-                status: self.shared_api_state.is_consensus(),
+                status: self.shared_api_state.consensus_status(),
             };
             self.ok_response(&serde_json::to_value(info).unwrap())
         };
