@@ -3596,6 +3596,122 @@ fn handle_block_request_with_all_known_transactions() {
     ));
 }
 
+#[test]
+fn received_block_while_there_is_full_propose() {
+    let sandbox = timestamping_sandbox();
+
+    let tx = gen_timestamping_tx();
+
+    let propose = ProposeBuilder::new(&sandbox)
+        .with_height(HEIGHT_ONE)
+        .with_validator(VALIDATOR_2)
+        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
+        .with_tx_hashes(&[tx.hash()])
+        .build();
+
+    let block = BlockBuilder::new(&sandbox)
+        .with_duration_since_sandbox_time(PROPOSE_TIMEOUT)
+        .with_tx_hash(&tx.hash())
+        .with_state_hash(&sandbox.compute_state_hash(&[tx.raw().clone()]))
+        .build();
+
+    sandbox.recv(&Status::new(
+        &sandbox.p(VALIDATOR_3),
+        HEIGHT_TWO,
+        &block.hash(),
+        sandbox.s(VALIDATOR_3),
+    ));
+
+    let precommit_1 = Precommit::new(
+        VALIDATOR_1,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        &block.hash(),
+        sandbox.time().into(),
+        sandbox.s(VALIDATOR_1),
+    );
+    let precommit_2 = Precommit::new(
+        VALIDATOR_2,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        &block.hash(),
+        sandbox.time().into(),
+        sandbox.s(VALIDATOR_2),
+    );
+    let precommit_3 = Precommit::new(
+        VALIDATOR_3,
+        HEIGHT_ONE,
+        ROUND_ONE,
+        &propose.hash(),
+        &block.hash(),
+        sandbox.time().into(),
+        sandbox.s(VALIDATOR_3),
+    );
+
+    sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
+
+    sandbox.send(
+        sandbox.a(VALIDATOR_3),
+        &BlockRequest::new(
+            &sandbox.p(VALIDATOR_0),
+            &sandbox.p(VALIDATOR_3),
+            HEIGHT_ONE,
+            sandbox.s(VALIDATOR_0),
+        ),
+    );
+
+    sandbox.recv(&BlockResponse::new(
+        &sandbox.p(VALIDATOR_3),
+        &sandbox.p(VALIDATOR_0),
+        block.clone(),
+        vec![precommit_1, precommit_2, precommit_3],
+        &[tx.hash()],
+        sandbox.s(VALIDATOR_3),
+    ));
+
+    sandbox.recv(&propose);
+
+    sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
+
+    sandbox.send(
+        sandbox.a(VALIDATOR_2),
+        &TransactionsRequest::new(
+            &sandbox.p(VALIDATOR_0),
+            &sandbox.p(VALIDATOR_2),
+            &[tx.hash()],
+            sandbox.s(VALIDATOR_0),
+        ),
+    );
+
+    sandbox.send(
+        sandbox.a(VALIDATOR_3),
+        &TransactionsRequest::new(
+            &sandbox.p(VALIDATOR_0),
+            &sandbox.p(VALIDATOR_3),
+            &[tx.hash()],
+            sandbox.s(VALIDATOR_0),
+        ),
+    );
+
+    sandbox.recv(&TransactionsResponse::new(
+        &sandbox.p(VALIDATOR_3),
+        &sandbox.p(VALIDATOR_0),
+        vec![tx.raw().clone()],
+        sandbox.s(VALIDATOR_3),
+    ));
+
+    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
+
+    sandbox.broadcast(&Status::new(
+        &sandbox.p(VALIDATOR_0),
+        HEIGHT_TWO,
+        &block.hash(),
+        sandbox.s(VALIDATOR_0),
+    ));
+}
+
 // - ignore existed transaction (in both blockchain and pool)
 /// - idea of test is to receive propose with unknown tx
 /// - receive that tx
