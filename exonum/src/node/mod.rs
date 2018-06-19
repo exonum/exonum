@@ -17,7 +17,7 @@
 //! For details about consensus message handling see messages module documentation.
 // spell-checker:ignore cors
 
-pub use self::{connect_list::ConnectList, state::{RequestData, State, ValidatorState},
+pub use self::{state::{RequestData, State, ValidatorState},
                whitelist::Whitelist};
 
 // TODO: Temporary solution to get access to WAIT constants. (ECR-167)
@@ -62,7 +62,6 @@ use messages::{Connect, Message, RawMessage};
 use storage::{Database, DbOptions};
 
 mod basic;
-mod connect_list;
 mod consensus;
 mod events;
 mod requests;
@@ -422,7 +421,7 @@ impl NodeHandler {
             &config.listener.consensus_secret_key,
         );
 
-        let mut whitelist = config.listener.whitelist;
+        let whitelist = config.listener.whitelist;
         let state = State::new(
             validator_id,
             config.listener.consensus_public_key,
@@ -579,7 +578,7 @@ impl NodeHandler {
         if self.state.whitelist().allow_address(&address) {
             self.send_to_addr(address, connect.raw());
         } else {
-            warn!("Peer {:?} is not in ConnectList!", address);
+            warn!("Peer {:?} is not in the whitelist!", address);
         }
     }
 

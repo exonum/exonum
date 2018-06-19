@@ -12,16 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::BTreeSet;
+use std::collections::HashMap;
+use std::net::SocketAddr;
+use std::collections::BTreeMap;
 
 use crypto::PublicKey;
-use std::collections::HashMap;
 use messages::Connect;
-use std::net::SocketAddr;
 use blockchain::ValidatorKeys;
 use helpers::fabric::NodePublicConfig;
-use std::collections::BTreeMap;
-use failure;
 use node::ConnectInfo;
 
 // TODO: Don't reload whitelisted_peers if path the same. (ECR-172)
@@ -38,7 +36,7 @@ pub struct Whitelist {
 impl Whitelist {
     /// Returns `true` if a peer with the given public key can connect.
     pub fn allow(&self, peer: &PublicKey) -> bool {
-        !self.whitelist_enabled || self.allow_public_key(peer)
+        !self.whitelist_enabled || self.peers.contains_key(peer)
     }
 
     /// Adds peer to the whitelist.
@@ -51,7 +49,7 @@ impl Whitelist {
         self.whitelist_enabled
     }
 
-    /// Create ConnectList from validators_keys and peers.
+    /// Create whitelist from validators_keys and peers.
     pub fn from_validator_keys(validators_keys: &Vec<ValidatorKeys>, peers: &Vec<SocketAddr>) -> Self {
         let peers: BTreeMap<PublicKey, SocketAddr> = peers
             .iter()
@@ -62,7 +60,7 @@ impl Whitelist {
         Whitelist { peers, whitelist_enabled: true }
     }
 
-    /// Create ConnectList from NodePublicConfigs.
+    /// Create whitelist from NodePublicConfigs.
     pub fn from_node_config(list: &Vec<NodePublicConfig>) -> Self {
         let peers: BTreeMap<PublicKey, SocketAddr> = list.iter()
             .map(|config| (config.validator_keys.consensus_key, config.addr))
@@ -73,12 +71,7 @@ impl Whitelist {
 
     /// Check if we allow to connect to `address`.
     pub fn allow_address(&self, address: &SocketAddr) -> bool {
-        self.peers.values().any(|a| a == address)
-    }
-
-    /// Check if we allow to connect to peer with `public_key`.
-    pub fn allow_public_key(&self, public_key: &PublicKey) -> bool {
-        self.peers.contains_key(public_key)
+        !self.whitelist_enabled || self.peers.values().any(|a| a == address)
     }
 
     /// Create from state::peers needed only for testing.

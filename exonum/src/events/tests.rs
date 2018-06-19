@@ -29,7 +29,6 @@ use events::{error::log_error,
              NetworkRequest};
 use helpers::user_agent;
 use messages::{Connect, Message, MessageWriter, RawMessage};
-use node::ConnectList;
 use node::{EventsPoolCapacity, NodeChannel};
 
 #[derive(Debug)]
@@ -133,7 +132,6 @@ pub struct TestEvents {
     pub listen_address: SocketAddr,
     pub network_config: NetworkConfiguration,
     pub events_config: EventsPoolCapacity,
-    pub connect_list: ConnectList,
 }
 
 impl TestEvents {
@@ -142,7 +140,6 @@ impl TestEvents {
             listen_address,
             network_config: NetworkConfiguration::default(),
             events_config: EventsPoolCapacity::default(),
-            connect_list: ConnectList::default(),
         }
     }
 

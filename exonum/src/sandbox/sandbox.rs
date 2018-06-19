@@ -38,6 +38,7 @@ use messages::{Any, Connect, Message, RawMessage, RawTransaction, Status};
 use node::{ApiSender, Configuration, ExternalMessage, ListenerConfig, NodeHandler, NodeSender,
            ServiceConfig, State, SystemStateProvider, Whitelist};
 use storage::{MapProof, MemoryDB};
+use node::ConnectInfo;
 
 pub type SharedTime = Arc<Mutex<SystemTime>>;
 
@@ -634,6 +635,12 @@ impl Sandbox {
     fn node_secret_key(&self) -> SecretKey {
         self.node_state().consensus_secret_key().clone()
     }
+
+    fn add_peer_to_whitelist(&self, addr:SocketAddr, public_key: PublicKey) {
+        self.inner.borrow_mut().handler.state.add_peer_to_whitelist(
+            ConnectInfo { addr, public_key }
+        );
+    }
 }
 
 impl Drop for Sandbox {
@@ -858,7 +865,14 @@ mod tests {
     #[test]
     fn test_sandbox_recv_and_send() {
         let s = timestamping_sandbox();
+        // As far as all validators has connected to each other during
+        // sandbox initialization we need to use connect-message with unknown
+        // keypair.
         let (public, secret) = gen_keypair();
+        // We also need to add public key from this keypair to the whitelist.
+        // Socket address doesn't matter in this case.
+        s.add_peer_to_whitelist(gen_primitive_socket_addr(1), public);
+
         s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_2),
@@ -909,6 +923,7 @@ mod tests {
     #[should_panic(expected = "Expected to send the message")]
     fn test_sandbox_expected_to_send_another_message() {
         let s = timestamping_sandbox();
+        // See comments to `test_sandbox_recv_and_send`.
         let (public, secret) = gen_keypair();
         s.recv(&Connect::new(
             &public,
@@ -933,7 +948,9 @@ mod tests {
     #[should_panic(expected = "Send unexpected message")]
     fn test_sandbox_unexpected_message_when_drop() {
         let s = timestamping_sandbox();
+        // See comments to `test_sandbox_recv_and_send`.
         let (public, secret) = gen_keypair();
+        s.add_peer_to_whitelist(gen_primitive_socket_addr(1), public);
         s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_2),
@@ -947,7 +964,9 @@ mod tests {
     #[should_panic(expected = "Send unexpected message")]
     fn test_sandbox_unexpected_message_when_handle_another_message() {
         let s = timestamping_sandbox();
+        // See comments to `test_sandbox_recv_and_send`.
         let (public, secret) = gen_keypair();
+        s.add_peer_to_whitelist(gen_primitive_socket_addr(1), public);
         s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_2),
@@ -969,7 +988,9 @@ mod tests {
     #[should_panic(expected = "Send unexpected message")]
     fn test_sandbox_unexpected_message_when_time_changed() {
         let s = timestamping_sandbox();
+        // See comments to `test_sandbox_recv_and_send`.
         let (public, secret) = gen_keypair();
+        s.add_peer_to_whitelist(gen_primitive_socket_addr(1), public);
         s.recv(&Connect::new(
             &public,
             s.a(VALIDATOR_2),
