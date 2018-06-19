@@ -704,6 +704,9 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandb
                 service_key: (x.1).0,
             }),
     );
+
+    let whitelist = Whitelist::from_validator_keys(&genesis.validator_keys, &addresses);
+
     blockchain.initialize(genesis).unwrap();
 
     let config = Configuration {

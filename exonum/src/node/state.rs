@@ -29,6 +29,7 @@ use messages::{BlockResponse, Connect, ConsensusMessage, Message, Precommit, Pre
                RawMessage};
 use node::{ConnectList, whitelist::Whitelist};
 use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
+use node::ConnectInfo;
 
 // TODO: Move request timeouts into node configuration. (ECR-171)
 
@@ -522,12 +523,11 @@ impl State {
             .iter()
             .position(|pk| pk.consensus_key == *self.consensus_public_key())
             .map(|id| ValidatorId(id as u16));
-        self.whitelist
-            .set_validators(config.validator_keys.iter().map(|x| x.consensus_key));
+
+        //TODO: update Whitelist also.
+
         self.renew_validator_id(validator_id);
         trace!("Validator={:#?}", self.validator_state());
-
-        //TODO: update ConnectList
 
         self.config = config;
     }

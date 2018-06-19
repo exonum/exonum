@@ -427,7 +427,6 @@ impl NodeHandler {
         );
 
         let mut whitelist = config.listener.whitelist;
-        whitelist.set_validators(stored.validator_keys.iter().map(|x| x.consensus_key));
         let state = State::new(
             validator_id,
             config.listener.consensus_public_key,

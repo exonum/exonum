@@ -22,13 +22,9 @@ use crypto::PublicKey;
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Whitelist {
     whitelist_enabled: bool,
-    #[serde(default)]
-    whitelisted_peers: BTreeSet<PublicKey>,
 
     #[serde(default)]
-    #[serde(skip_serializing)]
-    #[serde(skip_deserializing)]
-    validators_list: BTreeSet<PublicKey>,
+    peers: BTreeMap<PublicKey, SocketAddr>,
 }
 
 impl Whitelist {
@@ -39,24 +35,8 @@ impl Whitelist {
     }
 
     /// Adds peer to the whitelist.
-    pub fn add(&mut self, peer: PublicKey) {
-        self.whitelisted_peers.insert(peer);
-    }
-
-    /// Returns list of whitelisted peers.
-    pub fn collect_allowed(&self) -> Vec<&PublicKey> {
-        self.whitelisted_peers
-            .iter()
-            .chain(self.validators_list.iter())
-            .collect()
-    }
-
-    /// Resets list of validators with the given public keys.
-    pub fn set_validators<I>(&mut self, list: I)
-    where
-        I: IntoIterator<Item = PublicKey>,
-    {
-        self.validators_list = list.into_iter().collect();
+    pub fn add(&mut self, peer: ConnectInfo) {
+        self.peers.insert(peer.public_key, peer.addr);
     }
 
     /// Returns `true` if whitelist is enabled, otherwise everyone can connect.
@@ -65,7 +45,8 @@ impl Whitelist {
     }
 }
 
-#[cfg(test)]
+// TODO: rewrite tests
+#[cfg(whitelist_tests)]
 mod test {
     use super::Whitelist;
     use crypto::PublicKey;

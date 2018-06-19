@@ -583,7 +583,7 @@ impl Command for Finalize {
 
         let (common, list, our) = Self::reduce_configs(public_configs, &secret_config);
 
-        let connect_list = ConnectList::from_node_config(&list);
+        let whitelist = Whitelist::from_node_config(&list);
 
         let validators_count = common
             .general_config

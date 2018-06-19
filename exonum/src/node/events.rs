@@ -74,6 +74,7 @@ impl NodeHandler {
                     return;
                 }
                 info!("Send Connect message to {}", info);
+                self.state.add_peer_to_whitelist(info.clone());
                 self.connect(&info.addr);
             }
             ExternalMessage::Enable(value) => {
