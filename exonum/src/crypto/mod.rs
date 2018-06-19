@@ -851,59 +851,64 @@ impl CryptoHash for Decimal {
 
 #[cfg(test)]
 mod tests {
-    use super::{gen_keypair, hash, Hash, HashStream, PublicKey, SecretKey, Seed, SignStream,
-                Signature, EMPTY_SLICE_HASH};
-    use encoding::serialize::FromHex;
+    use super::*;
+
     use serde_json;
+    use serde::de::DeserializeOwned;
+
+    use encoding::serialize::FromHex;
 
     #[test]
-    fn test_hash() {
-        let h = hash(&[]);
-        let h1 = Hash::from_hex(h.to_hex()).unwrap();
-        assert_eq!(h1, h);
-        let h = Hash::zero();
-        assert_eq!(*h.as_ref(), [0; 32]);
+    fn to_from_hex_hash() {
+        let original = hash(&[]);
+        let from_hex = Hash::from_hex(original.to_hex()).unwrap();
+        assert_eq!(original, from_hex);
     }
 
     #[test]
-    fn test_keys() {
+    fn zero_hash() {
+        let hash = Hash::zero();
+        assert_eq!(hash.as_ref(), [0; 32]);
+    }
+
+    #[test]
+    fn to_from_hex_keys() {
         let (p, s) = gen_keypair();
-        let p1 = PublicKey::from_hex(p.to_hex()).unwrap();
-        let s1 = SecretKey::from_hex(s.to_hex()).unwrap();
-        assert_eq!(p1, p);
-        assert_eq!(s1, s);
+
+        let ph = PublicKey::from_hex(p.to_hex()).unwrap();
+        assert_eq!(p, ph);
+
+        let sh = SecretKey::from_hex(s.to_hex()).unwrap();
+        assert_eq!(s, sh);
     }
 
     #[test]
-    fn test_serialize_deserialize() {
-        let h = Hash::new([207; 32]);
-        let json_h = serde_json::to_string(&h).unwrap();
-        let h1 = serde_json::from_str(&json_h).unwrap();
-        assert_eq!(h, h1);
-
-        let h = PublicKey::new([208; 32]);
-        let json_h = serde_json::to_string(&h).unwrap();
-        let h1 = serde_json::from_str(&json_h).unwrap();
-        assert_eq!(h, h1);
-
-        let h = Signature::new([209; 64]);
-        let json_h = serde_json::to_string(&h).unwrap();
-        let h1 = serde_json::from_str(&json_h).unwrap();
-        assert_eq!(h, h1);
-
-        let h = Seed::new([210; 32]);
-        let json_h = serde_json::to_string(&h).unwrap();
-        let h1 = serde_json::from_str(&json_h).unwrap();
-        assert_eq!(h, h1);
-
-        let h = SecretKey::new([211; 64]);
-        let json_h = serde_json::to_string(&h).unwrap();
-        let h1 = serde_json::from_str(&json_h).unwrap();
-        assert_eq!(h, h1);
+    fn serialize_deserialize_hash() {
+        assert_serialize_deserialize(&Hash::new([207; 32]));
     }
 
     #[test]
-    fn test_debug_format() {
+    fn serialize_deserialize_public_key() {
+        assert_serialize_deserialize(&PublicKey::new([208; 32]));
+    }
+
+    #[test]
+    fn serialize_deserialize_signature() {
+        assert_serialize_deserialize(&Signature::new([209; 64]));
+    }
+
+    #[test]
+    fn serialize_deserialize_seed() {
+        assert_serialize_deserialize(&Seed::new([210; 32]));
+    }
+
+    #[test]
+    fn serialize_deserialize_secret_key() {
+        assert_serialize_deserialize(&SecretKey::new([211; 64]));
+    }
+
+    #[test]
+    fn debug_format() {
         // Check zero padding
         let hash = Hash::new([1; 32]);
         assert_eq!(format!("{:?}", &hash), "Hash(01010101)");
@@ -925,7 +930,7 @@ mod tests {
     }
 
     #[test]
-    fn test_range_sodium() {
+    fn range_sodium() {
         let h = hash(&[]);
         let sub_range = &h[10..20];
         assert_eq!(
@@ -935,7 +940,7 @@ mod tests {
     }
 
     #[test]
-    fn test_hash_streaming_zero() {
+    fn hash_streaming_zero() {
         let h1 = hash(&[]);
         let state = HashStream::new();
         let h2 = state.update(&[]).hash();
@@ -943,7 +948,7 @@ mod tests {
     }
 
     #[test]
-    fn test_hash_streaming_chunks() {
+    fn hash_streaming_chunks() {
         let data: [u8; 10] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
         let h1 = hash(&data);
         let state = HashStream::new();
@@ -952,7 +957,7 @@ mod tests {
     }
 
     #[test]
-    fn test_sign_streaming_zero() {
+    fn sign_streaming_zero() {
         let (pk, sk) = gen_keypair();
         let mut creation_stream = SignStream::new().update(&[]);
         let sig = creation_stream.sign(&sk);
@@ -961,7 +966,7 @@ mod tests {
     }
 
     #[test]
-    fn test_sign_streaming_chunks() {
+    fn sign_streaming_chunks() {
         let data: [u8; 10] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
         let (pk, sk) = gen_keypair();
         let mut creation_stream = SignStream::new().update(&data[..5]).update(&data[5..]);
@@ -971,7 +976,15 @@ mod tests {
     }
 
     #[test]
-    fn test_empty_slice_hash() {
+    fn empty_slice_hash() {
         assert_eq!(EMPTY_SLICE_HASH, hash(&[]));
+    }
+
+    fn assert_serialize_deserialize<T>(original_value: &T)
+        where T: Serialize + for<'de> DeserializeOwned<'de> + PartialEq + fmt::Debug,
+    {
+        let json = serde_json::to_string(original_value).unwrap();
+        let deserialized_value: T = serde_json::from_str(&json).unwrap();
+        assert_eq!(*original_value, deserialized_value);
     }
 }
