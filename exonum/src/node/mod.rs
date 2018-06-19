@@ -149,8 +149,6 @@ pub struct ListenerConfig {
     pub whitelist: Whitelist,
     /// Socket address.
     pub address: SocketAddr,
-    /// Connect list
-    pub connect_list: ConnectList,
 }
 
 /// An api configuration options.
@@ -362,8 +360,6 @@ pub struct NodeConfig {
     /// Optional database configuration.
     #[serde(default)]
     pub database: DbOptions,
-    /// Connect list
-    pub connect_list: ConnectList,
 }
 
 /// Configuration for the `NodeHandler`.
@@ -441,7 +437,6 @@ impl NodeHandler {
             last_hash,
             last_height,
             system_state.current_time(),
-            config.listener.connect_list,
         );
 
         NodeHandler {
@@ -581,7 +576,7 @@ impl NodeHandler {
     pub fn connect(&mut self, address: &SocketAddr) {
         let connect = self.state.our_connect_message().clone();
 
-        if self.state.connect_list().peers.contains_key(&address) {
+        if self.state.whitelist().allow_address(&address) {
             self.send_to_addr(address, connect.raw());
         } else {
             warn!("Peer {:?} is not in ConnectList!", address);
@@ -857,7 +852,6 @@ impl Node {
                 consensus_secret_key: node_cfg.consensus_secret_key,
                 whitelist: node_cfg.whitelist,
                 address: node_cfg.listen_address,
-                connect_list: node_cfg.connect_list,
             },
             service: ServiceConfig {
                 service_public_key: node_cfg.service_public_key,

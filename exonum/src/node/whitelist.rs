@@ -15,6 +15,14 @@
 use std::collections::BTreeSet;
 
 use crypto::PublicKey;
+use std::collections::HashMap;
+use messages::Connect;
+use std::net::SocketAddr;
+use blockchain::ValidatorKeys;
+use helpers::fabric::NodePublicConfig;
+use std::collections::BTreeMap;
+use failure;
+use node::ConnectInfo;
 
 // TODO: Don't reload whitelisted_peers if path the same. (ECR-172)
 
@@ -30,8 +38,7 @@ pub struct Whitelist {
 impl Whitelist {
     /// Returns `true` if a peer with the given public key can connect.
     pub fn allow(&self, peer: &PublicKey) -> bool {
-        !self.whitelist_enabled || self.validators_list.contains(peer)
-            || self.whitelisted_peers.contains(peer)
+        !self.whitelist_enabled || self.allow_public_key(peer)
     }
 
     /// Adds peer to the whitelist.
@@ -42,6 +49,45 @@ impl Whitelist {
     /// Returns `true` if whitelist is enabled, otherwise everyone can connect.
     pub fn is_enabled(&self) -> bool {
         self.whitelist_enabled
+    }
+
+    /// Create ConnectList from validators_keys and peers.
+    pub fn from_validator_keys(validators_keys: &Vec<ValidatorKeys>, peers: &Vec<SocketAddr>) -> Self {
+        let peers: BTreeMap<PublicKey, SocketAddr> = peers
+            .iter()
+            .zip(validators_keys.iter())
+            .map(|(p, v)| (v.consensus_key, *p))
+            .collect();
+
+        Whitelist { peers, whitelist_enabled: true }
+    }
+
+    /// Create ConnectList from NodePublicConfigs.
+    pub fn from_node_config(list: &Vec<NodePublicConfig>) -> Self {
+        let peers: BTreeMap<PublicKey, SocketAddr> = list.iter()
+            .map(|config| (config.validator_keys.consensus_key, config.addr))
+            .collect();
+
+        Whitelist { peers, whitelist_enabled: true }
+    }
+
+    /// Check if we allow to connect to `address`.
+    pub fn allow_address(&self, address: &SocketAddr) -> bool {
+        self.peers.values().any(|a| a == address)
+    }
+
+    /// Check if we allow to connect to peer with `public_key`.
+    pub fn allow_public_key(&self, public_key: &PublicKey) -> bool {
+        self.peers.contains_key(public_key)
+    }
+
+    /// Create from state::peers needed only for testing.
+    pub fn from_peers_for_testing(peers: &HashMap<PublicKey, Connect>) -> Self {
+        let whitelist = Whitelist::default();
+        let peers: BTreeMap<PublicKey, SocketAddr> = peers.iter()
+            .map(|(p, c)| (*p, c.addr()))
+            .collect();
+        Whitelist { peers, ..whitelist}
     }
 }
 

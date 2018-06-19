@@ -34,7 +34,7 @@ use super::{internal::{CollectedCommand, Command, Feedback},
             DEFAULT_EXONUM_LISTEN_PORT};
 use blockchain::{config::ValidatorKeys, GenesisConfig};
 use crypto;
-use node::ConnectList;
+use node::Whitelist;
 use helpers::{config::ConfigFile, generate_testnet_config};
 use node::{AllowOrigin, NodeApiConfig, NodeConfig};
 use storage::{Database, DbOptions, RocksDB};
@@ -609,7 +609,7 @@ impl Command for Finalize {
                 listen_address: secret_config.listen_addr,
                 external_address: our.map(|o| o.addr),
                 network: Default::default(),
-                whitelist: Default::default(),
+                whitelist: whitelist.clone(),
                 peers,
                 consensus_public_key: secret_config.consensus_public_key,
                 consensus_secret_key: secret_config.consensus_secret_key,
@@ -626,8 +626,6 @@ impl Command for Finalize {
                 mempool: Default::default(),
                 services_configs: Default::default(),
                 database: Default::default(),
-                //TODO: Вставить сюда формирование конфига
-                connect_list,
             }
         };
 

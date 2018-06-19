@@ -87,8 +87,6 @@ pub struct State {
     validators_rounds: BTreeMap<ValidatorId, Round>,
 
     incomplete_block: Option<IncompleteBlock>,
-
-    connect_list: ConnectList,
 }
 
 /// State of a validator-node.
@@ -398,7 +396,6 @@ impl State {
         last_hash: Hash,
         last_height: Height,
         height_start_time: SystemTime,
-        connect_list: ConnectList,
     ) -> Self {
         State {
             validator_state: validator_id.map(ValidatorState::new),
@@ -437,7 +434,6 @@ impl State {
             config: stored,
 
             incomplete_block: None,
-            connect_list,
         }
     }
 
@@ -535,7 +531,6 @@ impl State {
     /// Adds the public key, address, and `Connect` message of a validator.
     pub fn add_peer(&mut self, pubkey: PublicKey, msg: Connect) -> bool {
         self.connections.insert(msg.addr(), pubkey);
-        self.connect_list.peers.insert(msg.addr(), pubkey);
         self.peers.insert(pubkey, msg).is_none()
     }
 
@@ -1134,7 +1129,7 @@ impl State {
     }
 
     /// Returns node's connect list.
-    pub fn connect_list(&self) -> &ConnectList {
-        &self.connect_list
+    pub fn add_peer_to_whitelist(&mut self, peer: ConnectInfo) {
+        self.whitelist.add(peer);
     }
 }

@@ -33,7 +33,7 @@ use std::{env,
 
 use blockchain::{GenesisConfig, ValidatorKeys};
 use crypto::gen_keypair;
-use node::ConnectList;
+use node::Whitelist;
 use node::NodeConfig;
 
 mod types;
@@ -69,7 +69,7 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
         })
         .collect::<Vec<_>>();
 
-    let connect_list = ConnectList::from_keys(&genesis.validator_keys, &peers);
+    let whitelist = Whitelist::from_validator_keys(&genesis.validator_keys, &peers);
 
     validators
         .into_iter()
@@ -85,12 +85,11 @@ pub fn generate_testnet_config(count: u8, start_port: u16) -> Vec<NodeConfig> {
             service_public_key: service.0,
             service_secret_key: service.1,
             genesis: genesis.clone(),
-            whitelist: Default::default(),
+            whitelist: whitelist.clone(),
             api: Default::default(),
             mempool: Default::default(),
             services_configs: Default::default(),
             database: Default::default(),
-            connect_list: connect_list.clone(),
         })
         .collect::<Vec<_>>()
 }

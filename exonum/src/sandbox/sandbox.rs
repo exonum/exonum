@@ -36,7 +36,7 @@ use events::{network::NetworkConfiguration, Event, EventHandler, InternalEvent, 
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
 use messages::{Any, Connect, Message, RawMessage, RawTransaction, Status};
 use node::{ApiSender, Configuration, ExternalMessage, ListenerConfig, NodeHandler, NodeSender,
-           ServiceConfig, State, SystemStateProvider};
+           ServiceConfig, State, SystemStateProvider, Whitelist};
 use storage::{MapProof, MemoryDB};
 
 pub type SharedTime = Arc<Mutex<SystemTime>>;
@@ -573,13 +573,14 @@ impl Sandbox {
             api_requests: api_channel.0.clone().wait(),
         };
 
+        let whitelist = Whitelist::from_peers_for_testing(inner.handler.state.peers());
+
         let config = Configuration {
             listener: ListenerConfig {
                 address,
                 consensus_public_key: *inner.handler.state.consensus_public_key(),
                 consensus_secret_key: inner.handler.state.consensus_secret_key().clone(),
-                whitelist: Default::default(),
-                connect_list: Default::default(),
+                whitelist,
             },
             service: ServiceConfig {
                 service_public_key: *inner.handler.state.service_public_key(),
@@ -714,8 +715,7 @@ pub fn sandbox_with_services_uninitialized(services: Vec<Box<Service>>) -> Sandb
             address: addresses[0],
             consensus_public_key: validators[0].0,
             consensus_secret_key: validators[0].1.clone(),
-            whitelist: Default::default(),
-            connect_list: Default::default(),
+            whitelist: whitelist.clone(),
         },
         service: ServiceConfig {
             service_public_key: service_keys[0].0,
