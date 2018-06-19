@@ -55,7 +55,10 @@
     props: ['hash'],
     data() {
       return {
-        isSpinnerVisible: false
+        isSpinnerVisible: false,
+        timestamp: null,
+        transactionHash: '',
+        time: null
       }
     },
     methods: {

@@ -22,10 +22,9 @@ use std::{cell::RefCell, collections::HashMap, io, net::SocketAddr, rc::Rc, time
 
 use super::{error::{into_other, log_error, other_error, result_ok},
             to_box};
+use events::noise::{Handshake, HandshakeParams, NoiseHandshake};
 use helpers::Milliseconds;
 use messages::{Any, Connect, Message, RawMessage};
-
-use events::noise::{HandshakeParams, NoiseHandshake};
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
 
@@ -148,9 +147,8 @@ impl ConnectionsPool {
                 Ok(sock)
             })
             .and_then(move |sock| {
-                NoiseHandshake::send(&handshake_params, sock).and_then(|framed|{
-                    Ok(framed)
-                })
+                let handshake = NoiseHandshake::initiator(&handshake_params);
+                handshake.send(sock)
             })
             // Connect socket with the outgoing channel
             .and_then(move |stream| {
@@ -364,7 +362,8 @@ impl Listener {
             trace!("Accepted incoming connection with peer={}", addr);
             let network_tx = network_tx.clone();
 
-            let stream = NoiseHandshake::listen(&handshake_params, sock).flatten_stream();
+            let handshake = NoiseHandshake::responder(&handshake_params);
+            let stream = handshake.listen(sock).flatten_stream();
 
             let connection_handler = stream
                 .into_future()

@@ -1074,6 +1074,63 @@ pub fn create_private_api_handler(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use blockchain::{ExecutionResult, Schema, Transaction};
+    use crypto::gen_keypair;
+    use events::EventHandler;
+    use helpers;
+    use storage::{Database, Fork, MemoryDB};
+
+    messages! {
+        const SERVICE_ID = 0;
+
+        struct TxSimple {
+            public_key: &PublicKey,
+            msg: &str,
+        }
+    }
+
+    impl Transaction for TxSimple {
+        fn verify(&self) -> bool {
+            true
+        }
+
+        fn execute(&self, _view: &mut Fork) -> ExecutionResult {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_duplicated_transaction() {
+        let (p_key, s_key) = gen_keypair();
+
+        let db = Arc::from(Box::new(MemoryDB::new()) as Box<Database>) as Arc<Database>;
+        let services = vec![];
+        let node_cfg = helpers::generate_testnet_config(1, 16_500)[0].clone();
+
+        let mut node = Node::new(db, services, node_cfg);
+
+        let tx = TxSimple::new(&p_key, "Hello, World!", &s_key);
+
+        // Create original transaction.
+        let tx_orig = Box::new(tx.clone());
+        let event = ExternalMessage::Transaction(tx_orig);
+        node.handler.handle_event(event.into());
+
+        // Initial transaction should be added to the pool.
+        let snapshot = node.blockchain().snapshot();
+        let schema = Schema::new(&snapshot);
+        assert_eq!(schema.transactions_pool_len(), 1);
+
+        // Create duplicated transaction.
+        let tx_copy = Box::new(tx.clone());
+        let event = ExternalMessage::Transaction(tx_copy);
+        node.handler.handle_event(event.into());
+
+        // Duplicated transaction shouldn't be added to the pool.
+        let snapshot = node.blockchain().snapshot();
+        let schema = Schema::new(&snapshot);
+        assert_eq!(schema.transactions_pool_len(), 1);
+    }
 
     #[test]
     fn allow_origin_toml() {

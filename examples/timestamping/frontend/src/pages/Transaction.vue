@@ -5,7 +5,7 @@
         <div class="col-md-6 col-md-offset-3">
           <h1>Transaction</h1>
 
-          <div class="card mt-5">
+          <div v-if="transaction" class="card mt-5">
             <div class="card-header">Transaction</div>
             <ul class="list-group list-group-flush">
               <li class="list-group-item">
@@ -16,7 +16,7 @@
                   </div>
                 </div>
               </li>
-              <li v-if="location.block_height" class="list-group-item">
+              <li class="list-group-item">
                 <div class="row">
                   <div class="col-sm-3"><strong>Block:</strong></div>
                   <div class="col-sm-9">
@@ -96,10 +96,11 @@
     },
     data() {
       return {
-        transaction: {},
+        transaction: null,
         location: {},
         status: {},
-        type: ''
+        type: '',
+        isSpinnerVisible: false
       }
     },
     methods: {

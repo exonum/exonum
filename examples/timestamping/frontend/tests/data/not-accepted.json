@@ -1,0 +1,16 @@
+{
+  "content": {
+    "body": {
+      "content": {
+        "content_hash": "966c80fec91149a85b2a496113aca0d9fefbc0edec6e4b2f8d0b24aaea9445f8",
+        "metadata": "Some contract"
+      },
+      "pub_key": "0fe4d28f33b4c37ea2f6b433cc572f60d02b3f5b1638b0427dda2d7f5c028533"
+    },
+    "message_id": 0,
+    "protocol_version": 0,
+    "service_id": 130,
+    "signature": "c79d59272f2734e65e2b657584025aa26512ba7d3784438f21ea8789c2dd3ffd2ca15be3b0cdff70e92f17bf8a8e9e9d2c582dcad64c46870bc09a4ef2491702"
+  },
+  "type": "in-pool"
+}
