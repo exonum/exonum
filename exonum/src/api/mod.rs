@@ -231,7 +231,7 @@ impl ApiAggregator {
 
     fn explorer_api() -> ServiceApiBuilder {
         let mut builder = ServiceApiBuilder::new();
-        <ServiceApiState as self::node::public::ExplorerApi>::wire(builder.public_scope());
+        self::node::public::ExplorerApi::wire(builder.public_scope());
         builder
     }
 

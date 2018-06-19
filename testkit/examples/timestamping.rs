@@ -98,9 +98,9 @@ fn main() {
     assert!(schema.transactions().contains(&tx3.hash()));
 
     // Check results with api.
-    let mut api = testkit.api();
+    let api = testkit.api();
     let blocks_range: BlocksRange = api.public(ApiKind::Explorer)
-        .query(BlocksQuery {
+        .query(&BlocksQuery {
             count: 10,
             ..Default::default()
         })
@@ -109,7 +109,7 @@ fn main() {
     assert_eq!(blocks_range.blocks.len(), 2);
 
     api.public(ApiKind::Explorer)
-        .query(TransactionQuery { hash: tx1.hash() })
+        .query(&TransactionQuery { hash: tx1.hash() })
         .get::<serde_json::Value>("v1/transactions")
         .unwrap();
 }

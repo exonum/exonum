@@ -25,7 +25,7 @@ use exonum_testkit::{ApiKind, TestKitBuilder};
 #[test]
 fn test_healthcheck_connectivity_false() {
     let testkit = TestKitBuilder::validator().with_validators(2).create();
-    let mut api = testkit.api();
+    let api = testkit.api();
 
     let info: HealthCheckInfo = api.public(ApiKind::System).get("v1/healthcheck").unwrap();
     let expected = HealthCheckInfo {
@@ -37,7 +37,7 @@ fn test_healthcheck_connectivity_false() {
 #[test]
 fn test_user_agent_info() {
     let testkit = TestKitBuilder::validator().with_validators(2).create();
-    let mut api = testkit.api();
+    let api = testkit.api();
     let info: String = api.public(ApiKind::System).get("v1/user_agent").unwrap();
     let expected = user_agent::get();
     assert_eq!(info, expected);
@@ -46,7 +46,7 @@ fn test_user_agent_info() {
 #[test]
 fn test_network() {
     let testkit = TestKitBuilder::validator().with_validators(2).create();
-    let mut api = testkit.api();
+    let api = testkit.api();
     let info: NodeInfo = api.private(ApiKind::System).get("v1/network").unwrap();
 
     assert!(info.core_version.is_some());
@@ -57,7 +57,7 @@ fn test_network() {
 #[test]
 fn test_shutdown() {
     let testkit = TestKitBuilder::validator().with_validators(2).create();
-    let mut api = testkit.api();
+    let api = testkit.api();
 
     assert_eq!(
         api.private(ApiKind::System)

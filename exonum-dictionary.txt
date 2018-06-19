@@ -90,6 +90,7 @@ rebasing
 reddit
 reimplemented
 repr
+reqwest
 RESTful
 roadmap
 rocksdb

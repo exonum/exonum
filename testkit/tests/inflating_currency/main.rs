@@ -43,13 +43,13 @@ fn init_testkit() -> TestKit {
         .create()
 }
 
-fn create_wallet(api: &mut TestKitApi, name: &str) -> (TxCreateWallet, SecretKey) {
+fn create_wallet(api: &TestKitApi, name: &str) -> (TxCreateWallet, SecretKey) {
     let (pubkey, key) = crypto::gen_keypair();
     // Create a pre-signed transaction
     let tx = TxCreateWallet::new(&pubkey, name, &key);
 
     let tx_info: TransactionResponse = api.public(ApiKind::Service("cryptocurrency"))
-        .query(tx.clone())
+        .query(&tx)
         .post("v1/wallets/transaction")
         .unwrap();
     assert_eq!(tx_info.tx_hash, tx.hash());
@@ -57,9 +57,9 @@ fn create_wallet(api: &mut TestKitApi, name: &str) -> (TxCreateWallet, SecretKey
     (tx, key)
 }
 
-fn get_balance(api: &mut TestKitApi, pubkey: &PublicKey) -> u64 {
+fn get_balance(api: &TestKitApi, pubkey: &PublicKey) -> u64 {
     api.public(ApiKind::Service("cryptocurrency"))
-        .get(&format!("v1/balance/{}", pubkey.to_string()))
+        .get(&format!("v1/balance?pub_key={}", pubkey.to_string()))
         .unwrap()
 }
 

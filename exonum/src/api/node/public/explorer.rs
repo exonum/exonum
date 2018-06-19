@@ -14,6 +14,8 @@
 
 //! Exonum blockchain explorer API.
 
+use serde_json;
+
 use std::ops::Range;
 
 use api::{Error as ApiError, ServiceApiScope, ServiceApiState};
@@ -66,6 +68,13 @@ pub struct BlockQuery {
     pub height: Height,
 }
 
+impl BlockQuery {
+    /// Creates a new block query with the given height.
+    pub fn new(height: Height) -> BlockQuery {
+        BlockQuery { height }
+    }
+}
+
 /// Transaction query parameters.
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct TransactionQuery {
@@ -73,35 +82,22 @@ pub struct TransactionQuery {
     pub hash: Hash,
 }
 
-/// Exonum blockchain explorer API.
-pub trait ExplorerApi {
-    /// Corresponding error type for the API implementation.
-    type Error;
-
-    /// Returns the explored range and the corresponding headers. The range specifies the smallest
-    /// and largest heights traversed to collect at most count blocks.
-    fn blocks(&self, query: BlocksQuery) -> Result<BlocksRange, Self::Error>;
-
-    /// Searches for a transaction, either committed or uncommitted, by the hash.
-    fn transaction_info(
-        &self,
-        hash: TransactionQuery,
-    ) -> Result<Option<TransactionInfo>, Self::Error>;
-
-    /// Returns the content for a block of a specific height.
-    fn block(&self, query: BlockQuery) -> Result<Option<BlockInfo>, Self::Error>;
-
-    /// Adds explorer API endpoints to the corresponding scope.
-    fn wire(api_scope: &mut ServiceApiScope) -> &mut ServiceApiScope {
-        api_scope
+impl TransactionQuery {
+    /// Creates a new transaction query with the given height.
+    pub fn new(hash: Hash) -> TransactionQuery {
+        TransactionQuery { hash }
     }
 }
 
-impl ExplorerApi for ServiceApiState {
-    type Error = ApiError;
+/// Exonum blockchain explorer API.
+#[derive(Debug, Clone, Copy)]
+pub struct ExplorerApi;
 
-    fn blocks(&self, query: BlocksQuery) -> Result<BlocksRange, Self::Error> {
-        let explorer = BlockchainExplorer::new(self.blockchain());
+impl ExplorerApi {
+    /// Returns the explored range and the corresponding headers. The range specifies the smallest
+    /// and largest heights traversed to collect at most count blocks.    
+    pub fn blocks(state: &ServiceApiState, query: BlocksQuery) -> Result<BlocksRange, ApiError> {
+        let explorer = BlockchainExplorer::new(state.blockchain());
         if query.count > MAX_BLOCKS_PER_REQUEST {
             return Err(ApiError::BadRequest(format!(
                 "Max block count per request exceeded ({})",
@@ -134,20 +130,32 @@ impl ExplorerApi for ServiceApiState {
         })
     }
 
-    fn block(&self, query: BlockQuery) -> Result<Option<BlockInfo>, Self::Error> {
-        Ok(BlockchainExplorer::new(self.blockchain())
+    /// Searches for a transaction, either committed or uncommitted, by the hash.
+    pub fn block(
+        state: &ServiceApiState,
+        query: BlockQuery,
+    ) -> Result<Option<BlockInfo>, ApiError> {
+        Ok(BlockchainExplorer::new(state.blockchain())
             .block(query.height)
             .map(From::from))
     }
 
-    fn transaction_info(
-        &self,
+    /// Returns the content for a block of a specific height.
+    pub fn transaction_info(
+        state: &ServiceApiState,
         query: TransactionQuery,
-    ) -> Result<Option<TransactionInfo>, Self::Error> {
-        Ok(BlockchainExplorer::new(self.blockchain()).transaction(&query.hash))
+    ) -> Result<TransactionInfo, ApiError> {
+        BlockchainExplorer::new(state.blockchain())
+            .transaction(&query.hash)
+            .ok_or_else(|| {
+                let description = serde_json::to_string(&json!({ "type": "unknown" })).unwrap();
+                debug!("{}", description);
+                ApiError::NotFound(description)
+            })
     }
 
-    fn wire(api_scope: &mut ServiceApiScope) -> &mut ServiceApiScope {
+    /// Adds explorer API endpoints to the corresponding scope.
+    pub fn wire(api_scope: &mut ServiceApiScope) -> &mut ServiceApiScope {
         api_scope
             .endpoint("v1/blocks", Self::blocks)
             .endpoint("v1/block", Self::block)

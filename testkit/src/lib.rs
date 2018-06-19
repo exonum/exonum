@@ -23,10 +23,13 @@
 //! extern crate exonum_testkit;
 //! extern crate serde_json;
 //!
-//! use exonum::api::public::BlocksRange;
+//! use serde_json::Value;
+//!
+//! use exonum::api::node::public::explorer::{BlocksQuery, BlocksRange, TransactionQuery};
 //! use exonum::blockchain::{Block, Schema, Service, Transaction, TransactionSet, ExecutionResult};
 //! use exonum::crypto::{gen_keypair, Hash, PublicKey, CryptoHash};
 //! use exonum::encoding;
+//! use exonum::explorer::TransactionInfo;
 //! use exonum::helpers::Height;
 //! use exonum::messages::{Message, RawTransaction};
 //! use exonum::storage::{Snapshot, Fork};
@@ -109,39 +112,41 @@
 //!
 //!     // Check results with api.
 //!     let api = testkit.api();
-//!     let response: BlocksRange = api.get(ApiKind::Explorer, "v1/blocks?count=10");
+//!     let explorer_api = api.public(ApiKind::Explorer);
+//!     let response: BlocksRange = explorer_api
+//!         .query(&BlocksQuery {
+//!             count: 10,
+//!             ..Default::default()
+//!         })
+//!         .get("v1/blocks")
+//!         .unwrap();
 //!     let (blocks, range) = (response.blocks, response.range);
 //!     assert_eq!(blocks.len(), 3);
 //!     assert_eq!(range.start, Height(0));
 //!     assert_eq!(range.end, Height(3));
 //!
-//!     api.get::<serde_json::Value>(
-//!         ApiKind::Explorer,
-//!         &format!("v1/transactions/{}", tx1.hash().to_string()),
-//!     );
+//!     let info = explorer_api
+//!         .query(&TransactionQuery::new(tx1.hash()))
+//!         .get::<TransactionInfo<Value>>("v1/transactions")
+//!         .unwrap();
 //! }
 //! ```
 
 #![deny(missing_debug_implementations, missing_docs)]
 
 extern crate actix_web;
-#[cfg_attr(test, macro_use)]
 extern crate exonum;
 extern crate failure;
 extern crate futures;
 #[macro_use]
 extern crate log;
+extern crate reqwest;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-#[cfg_attr(test, macro_use)]
 extern crate serde_json;
 extern crate serde_urlencoded;
 extern crate tokio_core;
-
-#[cfg(test)]
-#[macro_use]
-extern crate assert_matches;
 
 pub use api::{ApiKind, TestKitApi};
 pub use compare::ComparableSnapshot;
@@ -151,10 +156,7 @@ pub mod compare;
 
 use futures::{sync::mpsc, Future, Stream};
 
-use std::{fmt,
-          net::SocketAddr,
-          sync::{Arc, RwLock},
-          thread};
+use std::{fmt, net::SocketAddr};
 
 use exonum::{blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfiguration,
                           Transaction},
@@ -162,7 +164,7 @@ use exonum::{blockchain::{Blockchain, Schema as CoreSchema, Service, StoredConfi
              explorer::{BlockWithTransactions, BlockchainExplorer},
              helpers::{Height, ValidatorId},
              messages::RawMessage,
-             node::{ApiSender, ExternalMessage, NodeApiConfig, State as NodeState},
+             node::{ApiSender, ExternalMessage, State as NodeState},
              storage::{MemoryDB, Patch, Snapshot}};
 
 use checkpoint_db::{CheckpointDb, CheckpointDbHandler};
@@ -366,7 +368,6 @@ pub struct TestKit {
     network: TestNetwork,
     api_sender: ApiSender,
     cfg_proposal: Option<ConfigurationProposalState>,
-    api_config: NodeApiConfig,
 }
 
 impl fmt::Debug for TestKit {
@@ -436,7 +437,6 @@ impl TestKit {
             events_stream,
             network,
             cfg_proposal: None,
-            api_config: Default::default(),
         }
     }
 
@@ -929,7 +929,7 @@ impl TestKit {
         self.cfg_proposal = Some(Uncommitted(proposal));
     }
 
-    fn run(mut self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
+    fn run(self, _public_api_address: SocketAddr, _private_api_address: SocketAddr) {
         unimplemented!();
 
         // let api = self.api();
@@ -965,7 +965,7 @@ impl TestKit {
     /// # Returned value
     ///
     /// Future that runs the event stream of this testkit to completion.
-    fn remove_events_stream(&mut self) -> Box<Future<Item = (), Error = ()>> {
+    pub fn remove_events_stream(&mut self) -> Box<Future<Item = (), Error = ()>> {
         let stream = std::mem::replace(&mut self.events_stream, Box::new(futures::stream::empty()));
         Box::new(stream.for_each(|_| Ok(())))
     }

@@ -18,7 +18,7 @@ use exonum::{api,
              crypto::{Hash, PublicKey},
              encoding,
              messages::{Message, RawTransaction},
-             node::{ApiSender, TransactionSend},
+             node::TransactionSend,
              storage::{Entry, Fork, Snapshot}};
 
 pub const SERVICE_ID: u16 = 1;

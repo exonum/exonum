@@ -16,21 +16,17 @@
 
 pub use exonum::api::ApiAccess;
 
-use actix_web::http::Method;
-use actix_web::{client::SendRequest, test::TestServer, App, HttpMessage};
-use failure;
-use futures::Future;
+use actix_web::{middleware::Logger, test::TestServer, App};
+use reqwest::{Client, Response, StatusCode};
 use serde_json;
 use serde_urlencoded;
 
 use std::fmt;
-use std::time::Duration;
 
-use exonum::{
-    api::{ApiAggregator, ServiceApiState}, blockchain::{SharedNodeState, Transaction},
-    encoding::serialize::reexport::{DeserializeOwned, Serialize},
-    node::{ApiSender, TransactionSend},
-};
+use exonum::{api::{self, ApiAggregator, ServiceApiState},
+             blockchain::{SharedNodeState, Transaction},
+             encoding::serialize::reexport::{DeserializeOwned, Serialize},
+             node::{ApiSender, TransactionSend}};
 
 use TestKit;
 
@@ -59,13 +55,11 @@ impl ::fmt::Display for ApiKind {
     }
 }
 
-/// TODO
-pub type Error = failure::Error;
-
 /// API encapsulation for the testkit. Allows to execute and synchronously retrieve results
 /// for REST-ful endpoints of services.
 pub struct TestKitApi {
     test_server: TestServer,
+    test_client: Client,
     api_sender: ApiSender,
 }
 
@@ -83,6 +77,7 @@ impl TestKitApi {
 
         TestKitApi {
             test_server: create_test_server(aggregator),
+            test_client: Client::new(),
             api_sender: testkit.api_sender.clone(),
         }
     }
@@ -98,27 +93,41 @@ impl TestKitApi {
     }
 
     /// TODO
-    pub fn public(&mut self, kind: ApiKind) -> RequestBuilder {
-        RequestBuilder::new(&mut self.test_server, ApiAccess::Public, kind)
+    pub fn public(&self, kind: ApiKind) -> RequestBuilder {
+        RequestBuilder::new(
+            self.test_server.url(""),
+            &self.test_client,
+            ApiAccess::Public,
+            kind,
+        )
     }
 
     /// TODO
-    pub fn private(&mut self, kind: ApiKind) -> RequestBuilder {
-        RequestBuilder::new(&mut self.test_server, ApiAccess::Private, kind)
+    pub fn private(&self, kind: ApiKind) -> RequestBuilder {
+        RequestBuilder::new(
+            self.test_server.url(""),
+            &self.test_client,
+            ApiAccess::Private,
+            kind,
+        )
     }
 }
 
 /// TODO
-pub struct RequestBuilder<'a, Q = ()> {
-    test_server: &'a mut TestServer,
+pub struct RequestBuilder<'a, 'b, Q = ()>
+where
+    Q: 'b,
+{
+    test_server_url: String,
+    test_client: &'a Client,
     access: ApiAccess,
     kind: ApiKind,
-    query: Option<Q>,
+    query: Option<&'b Q>,
 }
 
-impl<'a, Q> fmt::Debug for RequestBuilder<'a, Q>
+impl<'a, 'b, Q> fmt::Debug for RequestBuilder<'a, 'b, Q>
 where
-    Q: fmt::Debug + Serialize,
+    Q: 'b + fmt::Debug + Serialize,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         f.debug_struct("RequestBuilder")
@@ -129,14 +138,19 @@ where
     }
 }
 
-impl<'a, Q> RequestBuilder<'a, Q>
+impl<'a, 'b, Q> RequestBuilder<'a, 'b, Q>
 where
-    Q: Serialize,
+    Q: 'b + Serialize,
 {
-    /// TODO
-    pub fn new(test_server: &'a mut TestServer, access: ApiAccess, kind: ApiKind) -> Self {
+    fn new(
+        test_server_url: String,
+        test_client: &'a Client,
+        access: ApiAccess,
+        kind: ApiKind,
+    ) -> Self {
         RequestBuilder {
-            test_server,
+            test_server_url,
+            test_client,
             access,
             kind,
             query: None,
@@ -144,9 +158,10 @@ where
     }
 
     ///TODO
-    pub fn query<T>(self, query: T) -> RequestBuilder<'a, T> {
+    pub fn query<T>(&'a self, query: &'b T) -> RequestBuilder<'a, 'b, T> {
         RequestBuilder {
-            test_server: self.test_server,
+            test_server_url: self.test_server_url.clone(),
+            test_client: self.test_client,
             access: self.access,
             kind: self.kind,
             query: Some(query),
@@ -154,69 +169,98 @@ where
     }
 
     /// TODO
-    pub fn get<R>(&mut self, endpoint: &str) -> Result<R, Error>
+    pub fn get<R>(&self, endpoint: &str) -> api::Result<R>
     where
         R: DeserializeOwned + fmt::Debug + 'static,
     {
         let kind = self.kind;
         let access = self.access;
 
-        let params = self
-            .query
+        let params = self.query
             .as_ref()
-            .map(|query| serde_urlencoded::to_string(query).expect("Unable to serialize query."))
+            .map(|query| {
+                format!(
+                    "?{}",
+                    serde_urlencoded::to_string(query).expect("Unable to serialize query.")
+                )
+            })
             .unwrap_or_default();
-        let path = format!("{}/{}/{}{}", access, kind, endpoint, params);
+        let url = format!(
+            "{}{}/{}/{}{}",
+            self.test_server_url, access, kind, endpoint, params
+        );
 
-        trace!("GET: {}", self.test_server.url(&path));
+        trace!("GET: {}", url);
 
-        let request = self
-            .test_server
-            .client(Method::GET, &path)
-            .finish()
-            .expect("Unable to construct request")
-            .send();
-        self.execute(request)
+        let response = self.test_client
+            .get(&url)
+            .send()
+            .expect("Unable to send request");
+        Self::response_to_api_result(response)
     }
 
     /// TODO
-    pub fn post<R>(&mut self, endpoint: &str) -> Result<R, Error>
+    pub fn post<R>(&self, endpoint: &str) -> api::Result<R>
     where
         R: DeserializeOwned + fmt::Debug + 'static,
     {
         let kind = self.kind;
         let access = self.access;
-        let path = format!("{}/{}/{}", access, kind, endpoint);
+        let url = format!("{}{}/{}/{}", self.test_server_url, access, kind, endpoint);
 
-        trace!("POST: {}", self.test_server.url(&path));
+        trace!("POST: {}", url);
 
-        let mut request = self.test_server.client(Method::POST, &path);
-        let request = if let Some(ref query) = self.query.as_ref() {
+        let mut builder = self.test_client.post(&url);
+        if let Some(ref query) = self.query.as_ref() {
             trace!("Body: {}", serde_json::to_string_pretty(query).unwrap());
-            request.json(query)
+            builder.json(query)
         } else {
-            request.json(&())
-        }.expect("Unable to construct request")
-            .send();
-
-        self.execute(request)
+            builder.json(&serde_json::Value::Null)
+        };
+        // TODO Error handling
+        let response = builder.send().expect("Unable to send request");
+        Self::response_to_api_result(response)
     }
 
-    fn execute<R>(&mut self, request: SendRequest) -> Result<R, Error>
+    /// Converts reqwest Response to api::Result.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if the response has a non-error response status.
+    fn response_to_api_result<R>(mut response: Response) -> api::Result<R>
     where
         R: DeserializeOwned + fmt::Debug + 'static,
     {
-        let request = request
-            .map_err(Error::from)
-            .and_then(|response| {
-                trace!("Response: {:?}", response);
-                response.json().map_err(From::from)
-            })
-            .map(|body| {
-                trace!("Body: {:?}", body);
-                body
-            });
-        self.test_server.execute(request)
+        debug!("Response: {:?}", response);
+
+        fn extract_description(body: &str) -> Option<String> {
+            match serde_json::from_str::<serde_json::Value>(body).ok()? {
+                serde_json::Value::Object(ref object) if object.contains_key("description") => {
+                    Some(object["description"].as_str()?.to_owned())
+                }
+                serde_json::Value::String(string) => Some(string),
+                _ => None,
+            }
+        }
+
+        fn error(mut response: Response) -> String {
+            let body = response.text().expect("Unable to get response text");
+            trace!("Error body: {}", body);
+            extract_description(&body).unwrap_or(body)
+        }
+
+        match response.status() {
+            StatusCode::Ok => Ok({
+                let body = response.text().expect("Unable to get response text");
+                debug!("Ok body: {}", body);
+                serde_json::from_str(&body).expect("Unable to deserialize body")
+            }),
+            StatusCode::Forbidden => Err(api::Error::Unauthorized),
+            StatusCode::BadRequest => Err(api::Error::BadRequest(error(response))),
+            StatusCode::NotFound => Err(api::Error::NotFound(error(response))),
+            s if s.is_server_error() => Err(api::Error::InternalError(error(response).into())),
+            s => panic!("Received non-error response status: {}", s.as_u16()),
+        }
     }
 }
 
@@ -231,6 +275,7 @@ fn create_test_server(aggregator: ApiAggregator) -> TestServer {
             .scope("private/api", |scope| {
                 aggregator.extend_api(ApiAccess::Private, scope)
             })
+            .middleware(Logger::default())
     });
 
     info!("Test server created on {}", server.addr());

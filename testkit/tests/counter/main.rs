@@ -28,7 +28,8 @@ extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
 
-use exonum::{blockchain::{Transaction, TransactionErrorType as ErrorType},
+use exonum::{api::{node::public::explorer::TransactionQuery, Error as ApiError},
+             blockchain::{Transaction, TransactionErrorType as ErrorType},
              crypto::{self, CryptoHash, PublicKey},
              encoding::serialize::{json::ExonumJson, FromHex},
              helpers::Height,
@@ -46,13 +47,13 @@ fn init_testkit() -> (TestKit, TestKitApi) {
     (testkit, api)
 }
 
-fn inc_count(api: &mut TestKitApi, by: u64) -> TxIncrement {
+fn inc_count(api: &TestKitApi, by: u64) -> TxIncrement {
     let (pubkey, key) = crypto::gen_keypair();
     // Create a pre-signed transaction
     let tx = TxIncrement::new(&pubkey, by, &key);
 
     let tx_info: TransactionResponse = api.public(ApiKind::Service("counter"))
-        .query(tx.clone())
+        .query(&tx)
         .post("count")
         .unwrap();
     assert_eq!(tx_info.tx_hash, tx.hash());
@@ -61,7 +62,7 @@ fn inc_count(api: &mut TestKitApi, by: u64) -> TxIncrement {
 
 #[test]
 fn test_inc_count_create_block() {
-    let (mut testkit, mut api) = init_testkit();
+    let (mut testkit, api) = init_testkit();
     let (pubkey, key) = crypto::gen_keypair();
 
     // Create a pre-signed transaction
@@ -97,8 +98,8 @@ fn test_inc_count_create_block_with_committed_transaction() {
 
 #[test]
 fn test_inc_count_api() {
-    let (mut testkit, mut api) = init_testkit();
-    inc_count(&mut api, 5);
+    let (mut testkit, api) = init_testkit();
+    inc_count(&api, 5);
     testkit.create_block();
 
     // Check that the user indeed is persisted by the service
@@ -110,13 +111,13 @@ fn test_inc_count_api() {
 
 #[test]
 fn test_inc_count_with_multiple_transactions() {
-    let (mut testkit, mut api) = init_testkit();
+    let (mut testkit, api) = init_testkit();
 
     for _ in 0..100 {
-        inc_count(&mut api, 1);
-        inc_count(&mut api, 2);
-        inc_count(&mut api, 3);
-        inc_count(&mut api, 4);
+        inc_count(&api, 1);
+        inc_count(&api, 2);
+        inc_count(&api, 3);
+        inc_count(&api, 4);
 
         testkit.create_block();
     }
@@ -130,9 +131,9 @@ fn test_inc_count_with_multiple_transactions() {
 
 #[test]
 fn test_inc_count_with_manual_tx_control() {
-    let (mut testkit, mut api) = init_testkit();
-    let tx_a = inc_count(&mut api, 5);
-    let tx_b = inc_count(&mut api, 3);
+    let (mut testkit, api) = init_testkit();
+    let tx_a = inc_count(&api, 5);
+    let tx_b = inc_count(&api, 3);
 
     // Empty block
     testkit.create_block_with_tx_hashes(&[]);
@@ -156,9 +157,9 @@ fn test_inc_count_with_manual_tx_control() {
 
 #[test]
 fn test_private_api() {
-    let (mut testkit, mut api) = init_testkit();
-    inc_count(&mut api, 5);
-    inc_count(&mut api, 3);
+    let (mut testkit, api) = init_testkit();
+    inc_count(&api, 5);
+    inc_count(&api, 3);
 
     testkit.create_block();
     let counter: u64 = api.private(ApiKind::Service("counter"))
@@ -173,7 +174,7 @@ fn test_private_api() {
 
     let tx = TxReset::new(&pubkey, &key);
     let tx_info: TransactionResponse = api.private(ApiKind::Service("counter"))
-        .query(tx.clone())
+        .query(&tx)
         .post("reset")
         .unwrap();
     assert_eq!(tx_info.tx_hash, tx.hash());
@@ -187,7 +188,7 @@ fn test_private_api() {
 
 #[test]
 fn test_probe() {
-    let (mut testkit, mut api) = init_testkit();
+    let (mut testkit, api) = init_testkit();
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -214,7 +215,7 @@ fn test_probe() {
 
     // Posting a transaction is not enough to change the blockchain!
     let _: TransactionResponse = api.public(ApiKind::Service("counter"))
-        .query(tx)
+        .query(&tx)
         .post("count")
         .unwrap();
     let snapshot = testkit.probe(other_tx.clone());
@@ -228,16 +229,16 @@ fn test_probe() {
 
 #[test]
 fn test_duplicate_tx() {
-    let (mut testkit, mut api) = init_testkit();
+    let (mut testkit, api) = init_testkit();
 
-    let tx = inc_count(&mut api, 5);
+    let tx = inc_count(&api, 5);
     testkit.create_block();
     let _: TransactionResponse = api.public(ApiKind::Service("counter"))
-        .query(tx.clone())
+        .query(&tx)
         .post("count")
         .unwrap();
     let _: TransactionResponse = api.public(ApiKind::Service("counter"))
-        .query(tx.clone())
+        .query(&tx)
         .post("count")
         .unwrap();
     testkit.create_block();
@@ -249,7 +250,7 @@ fn test_duplicate_tx() {
 
 #[test]
 fn test_probe_advanced() {
-    let (mut testkit, mut api) = init_testkit();
+    let (mut testkit, api) = init_testkit();
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -319,8 +320,8 @@ fn test_probe_advanced() {
 fn test_probe_duplicate_tx() {
     //! Checks that committed transactions do not change the blockchain state when probed.
 
-    let (mut testkit, mut api) = init_testkit();
-    let tx = inc_count(&mut api, 5);
+    let (mut testkit, api) = init_testkit();
+    let tx = inc_count(&api, 5);
 
     let snapshot = testkit.probe(tx.clone());
     let schema = CounterSchema::new(&snapshot);
@@ -333,7 +334,7 @@ fn test_probe_duplicate_tx() {
     assert_eq!(schema.count(), Some(5));
 
     // Check the mixed case, when some probed transactions are committed and some are not
-    let other_tx = inc_count(&mut api, 7);
+    let other_tx = inc_count(&api, 7);
     let snapshot = testkit.probe_all(txvec![tx, other_tx]);
     let schema = CounterSchema::new(&snapshot);
     assert_eq!(schema.count(), Some(12));
@@ -341,7 +342,7 @@ fn test_probe_duplicate_tx() {
 
 #[test]
 fn test_snapshot_comparison() {
-    let (mut testkit, mut api) = init_testkit();
+    let (mut testkit, api) = init_testkit();
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -374,7 +375,7 @@ fn test_snapshot_comparison() {
 #[test]
 #[should_panic(expected = "Counter has increased")]
 fn test_snapshot_comparison_panic() {
-    let (mut testkit, mut api) = init_testkit();
+    let (mut testkit, api) = init_testkit();
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -401,9 +402,7 @@ fn test_explorer_blocks() {
     use exonum::api::node::public::explorer::BlocksRange;
     use exonum::helpers::Height;
 
-    let _ = ::exonum::helpers::init_logger();
-
-    let (mut testkit, mut api) = init_testkit();
+    let (mut testkit, api) = init_testkit();
 
     let response: BlocksRange = api.public(ApiKind::Explorer)
         .get("v1/blocks?count=10")
@@ -583,17 +582,21 @@ fn test_explorer_transaction_info() {
     use exonum::explorer::{BlockchainExplorer, TransactionInfo};
     use exonum::helpers::Height;
 
-    let (mut testkit, mut api) = init_testkit();
+    let (mut testkit, api) = init_testkit();
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
         TxIncrement::new(&pubkey, 5, &key)
     };
 
-    let info: Option<TransactionInfo<Value>> = api.public(ApiKind::Explorer)
-        .get(&format!("v1/transactions?hash={}", &tx.hash().to_string()))
-        .unwrap();
-    assert!(info.is_none());
+    let info = api.public(ApiKind::Explorer)
+        .get::<Value>(&format!("v1/transactions?hash={}", &tx.hash().to_string()))
+        .unwrap_err();
+    let error_body = json!({ "type": "unknown" });
+    assert_matches!(
+        info,
+        ApiError::NotFound(ref body) if serde_json::from_str::<Value>(body).unwrap() == error_body
+    );
 
     api.send(tx.clone());
     testkit.poll_events();
@@ -636,7 +639,7 @@ fn test_explorer_transaction_statuses() {
     use exonum::blockchain::TransactionResult;
     use exonum::explorer::TransactionInfo;
 
-    let (mut testkit, mut api) = init_testkit();
+    let (mut testkit, api) = init_testkit();
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();
@@ -684,7 +687,8 @@ fn test_explorer_transaction_statuses() {
         .iter()
         .map(|hash| {
             let info: TransactionInfo<Value> = api.public(ApiKind::Explorer)
-                .get(&format!("v1/transactions?hash={}", hash))
+                .query(&TransactionQuery::new(*hash))
+                .get("v1/transactions")
                 .unwrap();
             info.as_committed().unwrap().status().map_err(Clone::clone)
         })
@@ -695,7 +699,7 @@ fn test_explorer_transaction_statuses() {
 // Make sure that boxed transaction can be used in the `TestKitApi::send`.
 #[test]
 fn test_boxed_tx() {
-    let (mut testkit, mut api) = init_testkit();
+    let (mut testkit, api) = init_testkit();
 
     let tx = {
         let (pubkey, key) = crypto::gen_keypair();

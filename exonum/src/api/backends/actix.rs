@@ -16,6 +16,7 @@
 
 use actix::{msgs::SystemExit, Addr, Arbiter, Syn, System};
 use actix_web::{self,
+                error::ResponseError,
                 server::{HttpServer, IntoHttpHandler, StopServer},
                 AsyncResponder,
                 FromRequest,
@@ -118,16 +119,17 @@ impl IntoApiBackend for actix_web::Scope<ServiceApiState> {
     }
 }
 
-impl From<ApiError> for actix_web::Error {
-    fn from(e: ApiError) -> Self {
-        use actix_web::error;
-        match e {
-            ApiError::BadRequest(err) => error::ErrorBadRequest(err),
-            ApiError::InternalError(err) => error::ErrorInternalServerError(err),
-            ApiError::Io(err) => error::ErrorInternalServerError(err),
-            ApiError::Storage(err) => error::ErrorInternalServerError(err),
-            ApiError::NotFound(err) => error::ErrorNotFound(err),
-            ApiError::Unauthorized => error::ErrorUnauthorized(""),
+impl ResponseError for ApiError {
+    fn error_response(&self) -> HttpResponse {
+        match self {
+            ApiError::BadRequest(err) => HttpResponse::BadRequest().body(err),
+            ApiError::InternalError(err) => {
+                HttpResponse::InternalServerError().body(err.to_string())
+            }
+            ApiError::Io(err) => HttpResponse::InternalServerError().body(err.to_string()),
+            ApiError::Storage(err) => HttpResponse::InternalServerError().body(err.to_string()),
+            ApiError::NotFound(err) => HttpResponse::NotFound().body(err),
+            ApiError::Unauthorized => HttpResponse::Unauthorized().finish(),
         }
     }
 }

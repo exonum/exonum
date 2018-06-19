@@ -22,7 +22,7 @@ use exonum::{api,
              encoding,
              helpers::Height,
              messages::{Message, RawTransaction},
-             node::{ApiSender, TransactionSend},
+             node::TransactionSend,
              storage::{Fork, MapIndex, Snapshot}};
 
 // // // // // // // // // // CONSTANTS // // // // // // // // // //
@@ -187,13 +187,16 @@ impl CryptocurrencyApi {
     }
 
     /// Endpoint for retrieving a single wallet.
-    fn balance(state: &api::ServiceApiState, query: BalanceQuery) -> api::Result<Option<u64>> {
+    fn balance(state: &api::ServiceApiState, query: BalanceQuery) -> api::Result<u64> {
         let snapshot = state.blockchain().snapshot();
         let schema = CurrencySchema::new(&snapshot);
-        Ok(schema.wallet(&query.pub_key).map(|wallet| {
-            let height = CoreSchema::new(&snapshot).height();
-            wallet.actual_balance(height)
-        }))
+        schema
+            .wallet(&query.pub_key)
+            .map(|wallet| {
+                let height = CoreSchema::new(&snapshot).height();
+                wallet.actual_balance(height)
+            })
+            .ok_or_else(|| api::Error::NotFound("Wallet not found".to_owned()))
     }
 
     fn wire_api(builder: &mut api::ServiceApiBuilder) {
