@@ -97,7 +97,7 @@ impl Dh for SodiumDh25519 {
     fn set(&mut self, privkey: &[u8]) {
         self.privkey = x25519::SecretKey::from_slice(privkey)
             .expect("Can't construct private key for Dh25519");
-        self.pubkey = x25519::scalarmult_base(self.privkey.as_ref());
+        self.pubkey = x25519::scalarmult_base(&self.privkey);
     }
 
     fn generate(&mut self, rng: &mut Random) {
@@ -236,6 +236,23 @@ mod tests {
     use super::*;
     use hex::FromHex;
 
+    // Random data generator.
+    struct MockRandom(u8);
+
+    impl Default for MockRandom {
+        fn default() -> MockRandom {
+            MockRandom(0)
+        }
+    }
+
+    impl Random for MockRandom {
+        fn fill_bytes(&mut self, out: &mut [u8]) {
+            let bytes = vec![self.0; out.len()];
+            self.0 += 1;
+            out.copy_from_slice(bytes.as_slice());
+        }
+    }
+
     #[test]
     fn test_curve25519() {
         // Values are cited from RFC-7748: 5.2.  Test Vectors.
@@ -256,5 +273,27 @@ mod tests {
                 .unwrap()
                 .as_ref()
         );
+    }
+
+    #[test]
+    fn test_curve25519_shared_secret() {
+        let mut rng = MockRandom::default();
+
+        // Create two keypairs.
+        let mut keypair_a = SodiumDh25519::default();
+        keypair_a.generate(&mut rng);
+
+        let mut keypair_b = SodiumDh25519::default();
+        keypair_b.generate(&mut rng);
+
+        // Create shared secrets with public keys of each other.
+        let mut our_shared_secret = [0u8; 32];
+        keypair_a.dh(keypair_b.pubkey(), &mut our_shared_secret);
+
+        let mut remote_shared_secret = [0u8; 32];
+        keypair_b.dh(keypair_a.pubkey(), &mut remote_shared_secret);
+
+        // Results are expected to be the same.
+        assert_eq!(our_shared_secret, remote_shared_secret);
     }
 }
