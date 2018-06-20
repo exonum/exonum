@@ -229,7 +229,7 @@ pub fn init() {
 /// }
 /// let _ = hash_stream.hash();
 /// ```
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Default)]
 pub struct HashStream(HashState);
 
 impl HashStream {
