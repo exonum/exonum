@@ -853,8 +853,8 @@ impl CryptoHash for Decimal {
 mod tests {
     use super::*;
 
-    use serde_json;
     use serde::de::DeserializeOwned;
+    use serde_json;
 
     use encoding::serialize::FromHex;
 
@@ -981,7 +981,8 @@ mod tests {
     }
 
     fn assert_serialize_deserialize<T>(original_value: &T)
-        where T: Serialize + for<'de> DeserializeOwned<'de> + PartialEq + fmt::Debug,
+    where
+        T: Serialize + for<'de> DeserializeOwned<'de> + PartialEq + fmt::Debug,
     {
         let json = serde_json::to_string(original_value).unwrap();
         let deserialized_value: T = serde_json::from_str(&json).unwrap();
