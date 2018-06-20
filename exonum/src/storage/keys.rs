@@ -628,7 +628,7 @@ mod tests {
 
     fn assert_round_trip_eq<T>(values: &[T])
     where
-        T: StorageKey + Clone + PartialEq<<T as ToOwned>::Owned> + Debug,
+        T: StorageKey + PartialEq<<T as ToOwned>::Owned> + Debug,
         <T as ToOwned>::Owned: Debug,
     {
         for original_value in values.iter() {
