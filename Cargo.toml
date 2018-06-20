@@ -7,6 +7,6 @@ members = [
     "services/time",
     # "examples/cryptocurrency",
     # "examples/cryptocurrency-advanced/backend",
-    # "examples/timestamping/backend",
+    "examples/timestamping/backend",
 ]
 exclude = [ "3rdparty", "exonum/fuzz" ]

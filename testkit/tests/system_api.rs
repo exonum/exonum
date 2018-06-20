@@ -17,7 +17,8 @@ extern crate exonum_testkit;
 #[macro_use]
 extern crate pretty_assertions;
 
-use exonum::{api::node::{private::NodeInfo, public::system::{HealthCheckInfo, ConsensusStatusInfo}},
+use exonum::{api::node::{private::NodeInfo,
+                         public::system::{ConsensusStatusInfo, HealthCheckInfo}},
              helpers::user_agent,
              messages::PROTOCOL_MAJOR_VERSION};
 use exonum_testkit::{ApiKind, TestKitBuilder};

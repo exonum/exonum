@@ -80,7 +80,11 @@ impl SystemApi {
         self
     }
 
-    fn handle_consensus_status_info(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
+    fn handle_consensus_status_info(
+        self,
+        name: &'static str,
+        api_scope: &mut ServiceApiScope,
+    ) -> Self {
         let self_ = self.clone();
         api_scope.endpoint(name, move |_state: &ServiceApiState, _query: ()| {
             Ok(ConsensusStatusInfo {

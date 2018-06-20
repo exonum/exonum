@@ -26,7 +26,6 @@ extern crate actix;
 extern crate actix_web;
 extern crate atty;
 extern crate bit_vec;
-extern crate bodyparser;
 extern crate byteorder;
 extern crate bytes;
 extern crate chrono;
