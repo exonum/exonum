@@ -415,13 +415,13 @@ impl SharedNodeState {
         let lock = self.state.read().expect("Expected read lock.");
 
         let mut active_validators = lock.peers_info
-                    .values()
-                    .filter(|peer_key| {
-                            lock.validators
-                                .iter()
-                                .any(|validator| validator.consensus_key == **peer_key)
-                        })
-                    .count();
+            .values()
+            .filter(|peer_key| {
+                lock.validators
+                    .iter()
+                    .any(|validator| validator.consensus_key == **peer_key)
+            })
+            .count();
 
         if lock.is_validator {
             // Peers list doesn't include current node address, so we have to increment its length.
