@@ -14,13 +14,10 @@
 
 //! Cryptocurrency implementation example using [exonum](http://exonum.com/).
 
-extern crate bodyparser;
 #[macro_use]
 extern crate exonum;
 #[macro_use]
 extern crate failure;
-extern crate iron;
-extern crate router;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
@@ -32,15 +29,13 @@ pub mod schema;
 pub mod transactions;
 pub mod wallet;
 
-use exonum::{blockchain::{ApiContext, Service, Transaction, TransactionSet},
+use exonum::{api::ServiceApiBuilder,
+             blockchain::{Service, Transaction, TransactionSet},
              crypto::Hash,
-             encoding::serialize::json::reexport as serde_json,
              encoding::Error as EncodingError,
              helpers::fabric::{self, Context},
              messages::RawTransaction,
              storage::Snapshot};
-use iron::Handler;
-use router::Router;
 
 use transactions::WalletTransactions;
 
@@ -73,16 +68,8 @@ impl Service for CurrencyService {
         WalletTransactions::tx_from_raw(raw).map(Into::into)
     }
 
-    fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
-        let mut router = Router::new();
-        use api;
-        use exonum::api::Api;
-        let api = api::CryptocurrencyApi {
-            channel: ctx.node_channel().clone(),
-            blockchain: ctx.blockchain().clone(),
-        };
-        api.wire(&mut router);
-        Some(Box::new(router))
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        api::CryptocurrencyApi::wire(builder);
     }
 }
 

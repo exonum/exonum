@@ -19,9 +19,6 @@ exonum = { version = "0.8.0", path = "../../../exonum" }
 exonum-configuration = { version = "0.8.0", path = "../../../services/configuration" }
 serde = "1.0.0"
 serde_derive = "1.0.0"
-iron = "=0.6.0"
-bodyparser = "=0.8.0"
-router = "=0.6.0"
 failure = "=0.1.1"
 
 [dev-dependencies]

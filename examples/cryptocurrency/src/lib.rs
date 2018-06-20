@@ -287,7 +287,7 @@ pub mod api {
     /// The structure describes the query parameters for the `get_wallet` endpoint.
     #[derive(Serialize, Deserialize)]
     pub struct WalletQuery {
-        /// Public key of the queried wallet
+        /// Public key of the queried wallet.
         pub pub_key: PublicKey,
     }
 
