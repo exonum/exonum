@@ -73,7 +73,7 @@ impl blockchain::Service for Service {
     }
 
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        PublicApi::wire_api(builder);
+        PublicApi::wire(builder);
     }
 }
 

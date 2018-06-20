@@ -5,7 +5,7 @@ members = [
     # "testkit/server",
     "services/configuration",
     "services/time",
-    # "examples/cryptocurrency",
+    "examples/cryptocurrency",
     # "examples/cryptocurrency-advanced/backend",
     "examples/timestamping/backend",
 ]

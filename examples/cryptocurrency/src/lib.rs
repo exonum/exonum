@@ -25,13 +25,10 @@
 
 #![deny(missing_docs)]
 
-extern crate bodyparser;
 #[macro_use]
 extern crate exonum;
 #[macro_use]
 extern crate failure;
-extern crate iron;
-extern crate router;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
@@ -275,34 +272,23 @@ pub mod contracts {
 
 /// REST API.
 pub mod api {
-    use bodyparser;
-    use exonum::{api::{Api, ApiError},
-                 blockchain::{Blockchain, Transaction},
+    use exonum::{api::{self, ServiceApiBuilder, ServiceApiState},
+                 blockchain::Transaction,
                  crypto::{Hash, PublicKey},
-                 encoding::serialize::FromHex,
-                 node::{ApiSender, TransactionSend}};
-    use iron::{headers::ContentType, modifiers::Header, prelude::*, status::Status};
-    use router::Router;
-    use serde_json;
+                 node::TransactionSend};
 
     use schema::{CurrencySchema, Wallet};
     use transactions::CurrencyTransactions;
 
-    /// Container for the service API.
+    /// Public service API description.
     #[derive(Clone)]
-    pub struct CryptocurrencyApi {
-        channel: ApiSender,
-        blockchain: Blockchain,
-    }
+    pub struct CryptocurrencyApi;
 
-    impl CryptocurrencyApi {
-        /// Method for struct construction.
-        pub fn new(channel: ApiSender, blockchain: Blockchain) -> CryptocurrencyApi {
-            CryptocurrencyApi {
-                channel,
-                blockchain,
-            }
-        }
+    /// The structure describes the query parameters for the `get_wallet` endpoint.
+    #[derive(Serialize, Deserialize)]
+    pub struct WalletQuery {
+        /// Public key of the queried wallet
+        pub pub_key: PublicKey,
     }
 
     /// The structure returned by the REST API.
@@ -314,91 +300,57 @@ pub mod api {
 
     impl CryptocurrencyApi {
         /// Endpoint for getting a single wallet.
-        fn get_wallet(&self, req: &mut Request) -> IronResult<Response> {
-            let path = req.url.path();
-            let wallet_key = path.last().unwrap();
-            let public_key = PublicKey::from_hex(wallet_key).map_err(|e| {
-                IronError::new(
-                    e,
-                    (
-                        Status::BadRequest,
-                        Header(ContentType::json()),
-                        "\"Invalid request param: `pub_key`\"",
-                    ),
-                )
-            })?;
-
-            let snapshot = self.blockchain.snapshot();
+        pub fn get_wallet(state: &ServiceApiState, query: WalletQuery) -> api::Result<Wallet> {
+            let snapshot = state.snapshot();
             let schema = CurrencySchema::new(snapshot);
-
-            if let Some(wallet) = schema.wallet(&public_key) {
-                self.ok_response(&serde_json::to_value(wallet).unwrap())
-            } else {
-                self.not_found_response(&serde_json::to_value("Wallet not found").unwrap())
-            }
+            schema
+                .wallet(&query.pub_key)
+                .ok_or_else(|| api::Error::NotFound("Wallet not found".to_owned()))
         }
 
         /// Endpoint for dumping all wallets from the storage.
-        fn get_wallets(&self, _: &mut Request) -> IronResult<Response> {
-            let snapshot = self.blockchain.snapshot();
+        pub fn get_wallets(state: &ServiceApiState, _query: ()) -> api::Result<Vec<Wallet>> {
+            let snapshot = state.snapshot();
             let schema = CurrencySchema::new(snapshot);
             let idx = schema.wallets();
-            let wallets: Vec<Wallet> = idx.values().collect();
-
-            self.ok_response(&serde_json::to_value(&wallets).unwrap())
+            let wallets = idx.values().collect();
+            Ok(wallets)
         }
 
         /// Common processing for transaction-accepting endpoints.
-        fn post_transaction(&self, req: &mut Request) -> IronResult<Response> {
-            match req.get::<bodyparser::Struct<CurrencyTransactions>>() {
-                Ok(Some(transaction)) => {
-                    let transaction: Box<Transaction> = transaction.into();
-                    let tx_hash = transaction.hash();
-                    self.channel.send(transaction).map_err(ApiError::from)?;
-                    let json = TransactionResponse { tx_hash };
-                    self.ok_response(&serde_json::to_value(&json).unwrap())
-                }
-                Ok(None) => Err(ApiError::BadRequest("Empty request body".into()))?,
-                Err(e) => Err(ApiError::BadRequest(e.to_string()))?,
-            }
+        pub fn post_transaction(
+            state: &ServiceApiState,
+            query: CurrencyTransactions,
+        ) -> api::Result<TransactionResponse> {
+            let transaction: Box<Transaction> = query.into();
+            let tx_hash = transaction.hash();
+            state.sender().send(transaction)?;
+            Ok(TransactionResponse { tx_hash })
         }
-    }
 
-    /// `Api` trait implementation.
-    ///
-    /// `Api` facilitates conversion between transactions/read requests and REST
-    /// endpoints; for example, it parses `POST`ed JSON into the binary transaction
-    /// representation used in Exonum internally.
-    impl Api for CryptocurrencyApi {
-        fn wire(&self, router: &mut Router) {
-            let self_ = self.clone();
-            let post_create_wallet = move |req: &mut Request| self_.post_transaction(req);
-            let self_ = self.clone();
-            let post_transfer = move |req: &mut Request| self_.post_transaction(req);
-            let self_ = self.clone();
-            let get_wallets = move |req: &mut Request| self_.get_wallets(req);
-            let self_ = self.clone();
-            let get_wallet = move |req: &mut Request| self_.get_wallet(req);
-
-            // Bind handlers to specific routes.
-            router.post("/v1/wallets", post_create_wallet, "post_create_wallet");
-            router.post("/v1/wallets/transfer", post_transfer, "post_transfer");
-            router.get("/v1/wallets", get_wallets, "get_wallets");
-            router.get("/v1/wallet/:pub_key", get_wallet, "get_wallet");
+        /// 'ServiceApiBuilder' facilitates conversion between transactions/read requests and REST
+        /// endpoints; for example, it parses `POST`ed JSON into the binary transaction
+        /// representation used in Exonum internally.
+        pub fn wire(builder: &mut ServiceApiBuilder) {
+            // Binds handlers to specific routes.
+            builder
+                .public_scope()
+                .endpoint("v1/wallet", Self::get_wallet)
+                .endpoint("v1/wallets", Self::get_wallets)
+                .endpoint_mut("v1/wallets", Self::post_transaction)
+                .endpoint_mut("v1/wallets/transfer", Self::post_transaction);
         }
     }
 }
 
 /// Service declaration.
 pub mod service {
-    use exonum::{api::Api,
-                 blockchain::{ApiContext, Service, Transaction, TransactionSet},
+    use exonum::{api::ServiceApiBuilder,
+                 blockchain::{Service, Transaction, TransactionSet},
                  crypto::Hash,
                  encoding,
                  messages::RawTransaction,
                  storage::Snapshot};
-    use iron::Handler;
-    use router::Router;
 
     use api::CryptocurrencyApi;
     use transactions::CurrencyTransactions;
@@ -416,7 +368,7 @@ pub mod service {
     ///
     /// ## Retrieve single wallet
     ///
-    /// GET `v1/wallet/:pub_key`
+    /// GET `v1/wallet/?pub_key={hash}`
     ///
     /// Returns information about a wallet with the specified public key (hex-encoded).
     /// If a wallet with the specified pubkey is not in the storage, returns a string
@@ -470,12 +422,9 @@ pub mod service {
             vec![]
         }
 
-        // Create a REST `Handler` to process web requests to the node.
-        fn public_api_handler(&self, ctx: &ApiContext) -> Option<Box<Handler>> {
-            let mut router = Router::new();
-            let api = CryptocurrencyApi::new(ctx.node_channel().clone(), ctx.blockchain().clone());
-            api.wire(&mut router);
-            Some(Box::new(router))
+        // Links the service api implementation to the Exonum.
+        fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+            CryptocurrencyApi::wire(builder);
         }
     }
 }

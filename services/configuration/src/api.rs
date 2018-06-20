@@ -93,7 +93,7 @@ impl FilterQuery {
 
 impl PublicApi {
     fn config_with_proofs(state: &ServiceApiState, config: StoredConfiguration) -> ConfigHashInfo {
-        let propose = Schema::new(state.blockchain().snapshot())
+        let propose = Schema::new(state.snapshot())
             .propose(&config.hash())
             .map(|p| p.hash());
         let votes = Self::votes_for_propose(state, &config.hash());
@@ -106,7 +106,7 @@ impl PublicApi {
     }
 
     fn votes_for_propose(state: &ServiceApiState, config_hash: &Hash) -> VotesInfo {
-        let schema = Schema::new(state.blockchain().snapshot());
+        let schema = Schema::new(state.snapshot());
         if schema.propose_data_by_config_hash().contains(config_hash) {
             Some(schema.votes(config_hash))
         } else {
@@ -116,7 +116,7 @@ impl PublicApi {
 
     #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
     fn proposed_configs(state: &ServiceApiState, filter: &FilterQuery) -> Vec<ProposeHashInfo> {
-        let schema = Schema::new(state.blockchain().snapshot());
+        let schema = Schema::new(state.snapshot());
         let index = schema.config_hash_by_ordinal();
         let proposes_by_hash = schema.propose_data_by_config_hash();
 
@@ -143,7 +143,7 @@ impl PublicApi {
 
     #[cfg_attr(feature = "cargo-clippy", allow(let_and_return))]
     fn committed_configs(state: &ServiceApiState, filter: &FilterQuery) -> Vec<ConfigHashInfo> {
-        let core_schema = CoreSchema::new(state.blockchain().snapshot());
+        let core_schema = CoreSchema::new(state.snapshot());
         let actual_from = core_schema.configs_actual_from();
         let configs = core_schema.configs();
 
@@ -163,7 +163,7 @@ impl PublicApi {
     }
 
     fn handle_actual_config(state: &ServiceApiState, _query: ()) -> api::Result<ConfigHashInfo> {
-        let config = CoreSchema::new(state.blockchain().snapshot()).actual_configuration();
+        let config = CoreSchema::new(state.snapshot()).actual_configuration();
         Ok(Self::config_with_proofs(state, config))
     }
 
@@ -171,7 +171,7 @@ impl PublicApi {
         state: &ServiceApiState,
         _query: (),
     ) -> api::Result<Option<ConfigHashInfo>> {
-        Ok(CoreSchema::new(state.blockchain().snapshot())
+        Ok(CoreSchema::new(state.snapshot())
             .following_configuration()
             .map(|cfg| Self::config_with_proofs(state, cfg)))
     }
@@ -180,7 +180,7 @@ impl PublicApi {
         state: &ServiceApiState,
         query: HashQuery,
     ) -> api::Result<Option<ConfigInfo>> {
-        let snapshot = state.blockchain().snapshot();
+        let snapshot = state.snapshot();
         Ok(CoreSchema::new(&snapshot)
             .configs()
             .get(&query.hash)
@@ -213,7 +213,7 @@ impl PublicApi {
         Ok(Self::committed_configs(state, &query))
     }
 
-    pub fn wire_api(builder: &mut ServiceApiBuilder) {
+    pub fn wire(builder: &mut ServiceApiBuilder) {
         builder
             .public_scope()
             .endpoint("v1/configs/actual", Self::handle_actual_config)
@@ -263,7 +263,7 @@ impl PrivateApi {
         Ok(VoteResponse { tx_hash })
     }
 
-    pub fn wire_api(builder: &mut ServiceApiBuilder) {
+    pub fn wire(builder: &mut ServiceApiBuilder) {
         builder
             .private_scope()
             .endpoint_mut("v1/configs/postpropose", Self::handle_propose)

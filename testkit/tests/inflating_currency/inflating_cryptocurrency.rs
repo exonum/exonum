@@ -188,7 +188,7 @@ impl CryptocurrencyApi {
 
     /// Endpoint for retrieving a single wallet.
     fn balance(state: &api::ServiceApiState, query: BalanceQuery) -> api::Result<u64> {
-        let snapshot = state.blockchain().snapshot();
+        let snapshot = state.snapshot();
         let schema = CurrencySchema::new(&snapshot);
         schema
             .wallet(&query.pub_key)
@@ -199,7 +199,7 @@ impl CryptocurrencyApi {
             .ok_or_else(|| api::Error::NotFound("Wallet not found".to_owned()))
     }
 
-    fn wire_api(builder: &mut api::ServiceApiBuilder) {
+    fn wire(builder: &mut api::ServiceApiBuilder) {
         builder
             .public_scope()
             .endpoint("v1/balance", Self::balance)
@@ -233,6 +233,6 @@ impl Service for CurrencyService {
     }
 
     fn wire_api(&self, builder: &mut api::ServiceApiBuilder) {
-        CryptocurrencyApi::wire_api(builder)
+        CryptocurrencyApi::wire(builder)
     }
 }

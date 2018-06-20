@@ -15,6 +15,7 @@
 use blockchain::Blockchain;
 use crypto::{PublicKey, SecretKey};
 use node::ApiSender;
+use storage::Snapshot;
 
 /// Provides the current blockchain state to API handlers.
 #[derive(Debug, Clone)]
@@ -31,6 +32,11 @@ impl ServiceApiState {
     /// Returns a reference to the blockchain of this node.
     pub fn blockchain(&self) -> &Blockchain {
         &self.blockchain
+    }
+
+    /// Creates a read-only snapshot of the current blockchain state.
+    pub fn snapshot(&self) -> Box<Snapshot> {
+        self.blockchain.snapshot()
     }
 
     /// Returns the public key of the current node.

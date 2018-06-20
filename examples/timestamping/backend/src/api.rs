@@ -57,7 +57,7 @@ impl PublicApi {
         state: &ServiceApiState,
         query: TimestampQuery,
     ) -> api::Result<Option<TimestampEntry>> {
-        let snapshot = state.blockchain().snapshot();
+        let snapshot = state.snapshot();
         let schema = Schema::new(&snapshot);
         Ok(schema.timestamps().get(&query.hash))
     }
@@ -66,7 +66,7 @@ impl PublicApi {
         state: &ServiceApiState,
         query: TimestampQuery,
     ) -> api::Result<TimestampProof> {
-        let snapshot = state.blockchain().snapshot();
+        let snapshot = state.snapshot();
         let (state_proof, block_info) = {
             let core_schema = blockchain::Schema::new(&snapshot);
             let last_block_height = state.blockchain().last_block().height();
@@ -83,7 +83,7 @@ impl PublicApi {
         })
     }
 
-    pub fn wire_api(builder: &mut ServiceApiBuilder) {
+    pub fn wire(builder: &mut ServiceApiBuilder) {
         builder
             .public_scope()
             .endpoint("v1/timestamps/value", Self::handle_timestamp)

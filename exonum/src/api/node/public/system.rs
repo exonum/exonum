@@ -54,7 +54,7 @@ impl SystemApi {
 
     fn handle_mempool_info(self, name: &'static str, api_scope: &mut ServiceApiScope) -> Self {
         api_scope.endpoint(name, move |state: &ServiceApiState, _query: ()| {
-            let snapshot = state.blockchain().snapshot();
+            let snapshot = state.snapshot();
             let schema = Schema::new(&snapshot);
             Ok(MemPoolInfo {
                 size: schema.transactions_pool_len(),

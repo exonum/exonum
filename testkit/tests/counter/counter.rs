@@ -143,7 +143,7 @@ impl CounterApi {
     }
 
     fn count(state: &api::ServiceApiState, _query: ()) -> api::Result<u64> {
-        let snapshot = state.blockchain().snapshot();
+        let snapshot = state.snapshot();
         let schema = CounterSchema::new(&snapshot);
         Ok(schema.count().unwrap_or_default())
     }
@@ -160,7 +160,7 @@ impl CounterApi {
         Ok(TransactionResponse { tx_hash })
     }
 
-    fn wire_api(builder: &mut api::ServiceApiBuilder) {
+    fn wire(builder: &mut api::ServiceApiBuilder) {
         builder
             .private_scope()
             .endpoint("count", Self::count)
@@ -196,6 +196,6 @@ impl Service for CounterService {
     }
 
     fn wire_api(&self, builder: &mut api::ServiceApiBuilder) {
-        CounterApi::wire_api(builder)
+        CounterApi::wire(builder)
     }
 }

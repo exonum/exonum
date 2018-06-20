@@ -39,7 +39,7 @@ impl PublicApi {
         state: &api::ServiceApiState,
         _query: (),
     ) -> api::Result<Option<DateTime<Utc>>> {
-        let view = state.blockchain().snapshot();
+        let view = state.snapshot();
         let schema = TimeSchema::new(&view);
         Ok(schema.time().get())
     }
@@ -62,7 +62,7 @@ impl PrivateApi {
         state: &api::ServiceApiState,
         _query: (),
     ) -> api::Result<Vec<ValidatorTime>> {
-        let view = state.blockchain().snapshot();
+        let view = state.snapshot();
         let schema = TimeSchema::new(&view);
         let idx = schema.validators_times();
 
@@ -81,7 +81,7 @@ impl PrivateApi {
         state: &api::ServiceApiState,
         _query: (),
     ) -> api::Result<Vec<ValidatorTime>> {
-        let view = state.blockchain().snapshot();
+        let view = state.snapshot();
         let validator_keys = Schema::new(&view).actual_configuration().validator_keys;
         let schema = TimeSchema::new(&view);
         let idx = schema.validators_times();
