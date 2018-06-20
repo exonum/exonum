@@ -6,7 +6,10 @@ use snow::{CryptoResolver, DefaultResolver};
 
 use sodiumoxide::crypto::aead::chacha20poly1305 as sodium_chacha20poly1305;
 use sodiumoxide::crypto::hash::sha256 as sodium_sha256;
-use sodiumoxide::crypto::scalarmult::curve25519 as sodium_curve25519;
+
+use crypto::x25519;
+use crypto::{PUBLIC_KEY_LENGTH as SHA256_PUBLIC_KEY_LENGTH,
+             SECRET_KEY_LENGTH as SHA256_SECRET_KEY_LENGTH};
 
 pub struct SodiumResolver {
     parent: DefaultResolver,
@@ -65,15 +68,15 @@ impl Random for SodiumRandom {
 
 // Elliptic curve 25519.
 pub struct SodiumDh25519 {
-    privkey: sodium_curve25519::Scalar,
-    pubkey: sodium_curve25519::GroupElement,
+    privkey: x25519::SecretKey,
+    pubkey: x25519::PublicKey,
 }
 
 impl Default for SodiumDh25519 {
     fn default() -> SodiumDh25519 {
         SodiumDh25519 {
-            privkey: sodium_curve25519::Scalar([0; 32]),
-            pubkey: sodium_curve25519::GroupElement([0; 32]),
+            privkey: x25519::SecretKey::zero(),
+            pubkey: x25519::PublicKey::zero(),
         }
     }
 }
@@ -84,45 +87,47 @@ impl Dh for SodiumDh25519 {
     }
 
     fn pub_len(&self) -> usize {
-        32
+        x25519::PUBLIC_KEY_LENGTH
     }
 
     fn priv_len(&self) -> usize {
-        32
+        x25519::SECRET_KEY_LENGTH
     }
 
     fn set(&mut self, privkey: &[u8]) {
-        self.privkey = sodium_curve25519::Scalar::from_slice(privkey)
+        self.privkey = x25519::SecretKey::from_slice(privkey)
             .expect("Can't construct private key for Dh25519");
-        self.pubkey = sodium_curve25519::scalarmult_base(&self.privkey);
+        self.pubkey = x25519::scalarmult_base(self.privkey.as_ref());
     }
 
     fn generate(&mut self, rng: &mut Random) {
-        let mut privkey_bytes = [0; 32];
+        let mut privkey_bytes = [0; x25519::SECRET_KEY_LENGTH];
         rng.fill_bytes(&mut privkey_bytes);
-        privkey_bytes[0] &= 248;
-        privkey_bytes[31] &= 127;
-        privkey_bytes[31] |= 64;
-        self.privkey = sodium_curve25519::Scalar::from_slice(&privkey_bytes)
-            .expect("Can't construct private key for Dh25519");
-        self.pubkey = sodium_curve25519::scalarmult_base(&self.privkey);
+        x25519::convert_to_private_key(&mut privkey_bytes);
+
+        self.set(&privkey_bytes);
     }
 
     fn pubkey(&self) -> &[u8] {
-        &self.pubkey[0..32]
+        self.pubkey.as_ref()
     }
 
     fn privkey(&self) -> &[u8] {
-        &self.privkey[0..32]
+        &self.privkey.as_ref()
     }
 
     fn dh(&self, pubkey: &[u8], out: &mut [u8]) {
-        let pubkey = sodium_curve25519::GroupElement::from_slice(&pubkey[0..32])
-            .expect("Can't construct public key for Dh25519");
-        let result =
-            sodium_curve25519::scalarmult(&self.privkey, &pubkey).expect("Can't calculate dh");
+        assert_ne!(
+            self.privkey,
+            x25519::SecretKey::zero(),
+            "Private key for SodiumDh25519 is not set."
+        );
 
-        out[..32].copy_from_slice(&result[0..32]);
+        let pubkey = x25519::PublicKey::from_slice(&pubkey[..x25519::PUBLIC_KEY_LENGTH])
+            .expect("Can't construct public key for Dh25519");
+        let result = x25519::scalarmult(&self.privkey, &pubkey).expect("Can't calculate dh");
+
+        out[..self.pub_len()].copy_from_slice(&result[..self.pub_len()]);
     }
 }
 
@@ -145,11 +150,17 @@ impl Cipher for SodiumChaChaPoly {
     }
 
     fn set(&mut self, key: &[u8]) {
-        self.key = sodium_chacha20poly1305::Key::from_slice(&key[0..32])
+        self.key = sodium_chacha20poly1305::Key::from_slice(&key[..32])
             .expect("Can't get key for ChaChaPoly");
     }
 
     fn encrypt(&self, nonce: u64, authtext: &[u8], plaintext: &[u8], out: &mut [u8]) -> usize {
+        assert_ne!(
+            self.key,
+            SodiumChaChaPoly::default().key,
+            "Can't encrypt with default key in SodiumChaChaPoly"
+        );
+
         let mut nonce_bytes = [0u8; 8];
         LittleEndian::write_u64(&mut nonce_bytes[..], nonce);
         let nonce = sodium_chacha20poly1305::Nonce(nonce_bytes);
@@ -167,6 +178,12 @@ impl Cipher for SodiumChaChaPoly {
         ciphertext: &[u8],
         out: &mut [u8],
     ) -> Result<usize, ()> {
+        assert_ne!(
+            self.key,
+            SodiumChaChaPoly::default().key,
+            "Can't dectypt with default key in SodiumChaChaPoly"
+        );
+
         let mut nonce_bytes = [0u8; 8];
         LittleEndian::write_u64(&mut nonce_bytes[..], nonce);
         let nonce = sodium_chacha20poly1305::Nonce(nonce_bytes);
@@ -193,11 +210,11 @@ impl Hash for SodiumSha256 {
     }
 
     fn block_len(&self) -> usize {
-        64
+        SHA256_SECRET_KEY_LENGTH
     }
 
     fn hash_len(&self) -> usize {
-        32
+        SHA256_PUBLIC_KEY_LENGTH
     }
 
     fn reset(&mut self) {
@@ -210,7 +227,7 @@ impl Hash for SodiumSha256 {
 
     fn result(&mut self, out: &mut [u8]) {
         let digest = self.0.clone().finalize();
-        out[..32].copy_from_slice(digest.as_ref());
+        out[..self.hash_len()].copy_from_slice(digest.as_ref());
     }
 }
 
