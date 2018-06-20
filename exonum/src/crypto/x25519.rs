@@ -14,7 +14,6 @@
 
 //! X25519 related types and methods used in Diffie-Hellman key exchange.
 
-// use sodiumoxide::crypto::scalarmult::curve25519 as sodium_curve25519;
 use sodiumoxide::crypto::scalarmult::curve25519::{scalarmult as sodium_scalarmult,
                                                   scalarmult_base as sodium_scalarmult_base,
                                                   GroupElement as Curve25519GroupElement,
