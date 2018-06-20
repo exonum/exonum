@@ -34,8 +34,8 @@ use super::{internal::{CollectedCommand, Command, Feedback},
             DEFAULT_EXONUM_LISTEN_PORT};
 use blockchain::{config::ValidatorKeys, GenesisConfig};
 use crypto;
-use node::Whitelist;
 use helpers::{config::ConfigFile, generate_testnet_config};
+use node::Whitelist;
 use node::{AllowOrigin, NodeApiConfig, NodeConfig};
 use storage::{Database, DbOptions, RocksDB};
 

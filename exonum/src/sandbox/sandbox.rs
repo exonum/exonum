@@ -35,10 +35,10 @@ use events::{network::NetworkConfiguration, Event, EventHandler, InternalEvent, 
              NetworkEvent, NetworkRequest, TimeoutRequest};
 use helpers::{user_agent, Height, Milliseconds, Round, ValidatorId};
 use messages::{Any, Connect, Message, RawMessage, RawTransaction, Status};
+use node::ConnectInfo;
 use node::{ApiSender, Configuration, ExternalMessage, ListenerConfig, NodeHandler, NodeSender,
            ServiceConfig, State, SystemStateProvider, Whitelist};
 use storage::{MapProof, MemoryDB};
-use node::ConnectInfo;
 
 pub type SharedTime = Arc<Mutex<SystemTime>>;
 
@@ -636,10 +636,12 @@ impl Sandbox {
         self.node_state().consensus_secret_key().clone()
     }
 
-    fn add_peer_to_whitelist(&self, addr:SocketAddr, public_key: PublicKey) {
-        self.inner.borrow_mut().handler.state.add_peer_to_whitelist(
-            ConnectInfo { addr, public_key }
-        );
+    fn add_peer_to_whitelist(&self, addr: SocketAddr, public_key: PublicKey) {
+        self.inner
+            .borrow_mut()
+            .handler
+            .state
+            .add_peer_to_whitelist(ConnectInfo { addr, public_key });
     }
 }
 
@@ -866,7 +868,7 @@ mod tests {
     fn test_sandbox_recv_and_send() {
         let s = timestamping_sandbox();
         // As far as all validators has connected to each other during
-        // sandbox initialization we need to use connect-message with unknown
+        // sandbox initialization, we need to use connect-message with unknown
         // keypair.
         let (public, secret) = gen_keypair();
         // We also need to add public key from this keypair to the whitelist.

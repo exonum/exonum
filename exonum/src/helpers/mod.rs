@@ -33,8 +33,8 @@ use std::{env,
 
 use blockchain::{GenesisConfig, ValidatorKeys};
 use crypto::gen_keypair;
-use node::Whitelist;
 use node::NodeConfig;
+use node::Whitelist;
 
 mod types;
 

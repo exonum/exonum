@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::collections::BTreeMap;
 
-use crypto::PublicKey;
-use messages::Connect;
 use blockchain::ValidatorKeys;
+use crypto::PublicKey;
 use helpers::fabric::NodePublicConfig;
+use messages::Connect;
 use node::ConnectInfo;
 
 // TODO: Don't reload whitelisted_peers if path the same. (ECR-172)
@@ -50,23 +50,29 @@ impl Whitelist {
     }
 
     /// Create whitelist from validators_keys and peers.
-    pub fn from_validator_keys(validators_keys: &Vec<ValidatorKeys>, peers: &Vec<SocketAddr>) -> Self {
+    pub fn from_validator_keys(validators_keys: &[ValidatorKeys], peers: &[SocketAddr]) -> Self {
         let peers: BTreeMap<PublicKey, SocketAddr> = peers
             .iter()
             .zip(validators_keys.iter())
             .map(|(p, v)| (v.consensus_key, *p))
             .collect();
 
-        Whitelist { peers, whitelist_enabled: true }
+        Whitelist {
+            peers,
+            whitelist_enabled: true,
+        }
     }
 
     /// Create whitelist from NodePublicConfigs.
-    pub fn from_node_config(list: &Vec<NodePublicConfig>) -> Self {
+    pub fn from_node_config(list: &[NodePublicConfig]) -> Self {
         let peers: BTreeMap<PublicKey, SocketAddr> = list.iter()
             .map(|config| (config.validator_keys.consensus_key, config.addr))
             .collect();
 
-        Whitelist { peers, whitelist_enabled: true }
+        Whitelist {
+            peers,
+            whitelist_enabled: true,
+        }
     }
 
     /// Check if we allow to connect to `address`.
@@ -77,10 +83,9 @@ impl Whitelist {
     /// Create from state::peers needed only for testing.
     pub fn from_peers_for_testing(peers: &HashMap<PublicKey, Connect>) -> Self {
         let whitelist = Whitelist::default();
-        let peers: BTreeMap<PublicKey, SocketAddr> = peers.iter()
-            .map(|(p, c)| (*p, c.addr()))
-            .collect();
-        Whitelist { peers, ..whitelist}
+        let peers: BTreeMap<PublicKey, SocketAddr> =
+            peers.iter().map(|(p, c)| (*p, c.addr())).collect();
+        Whitelist { peers, ..whitelist }
     }
 }
 

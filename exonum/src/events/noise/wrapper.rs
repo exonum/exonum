@@ -14,8 +14,8 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
-use failure;
 use crypto::PUBLIC_KEY_LENGTH;
+use failure;
 use snow::{NoiseBuilder, Session};
 
 use std::{fmt::{self, Error, Formatter},

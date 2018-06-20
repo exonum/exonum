@@ -28,8 +28,8 @@ use helpers::{Height, Milliseconds, Round, ValidatorId};
 use messages::{BlockResponse, Connect, ConsensusMessage, Message, Precommit, Prevote, Propose,
                RawMessage};
 use node::whitelist::Whitelist;
-use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 use node::ConnectInfo;
+use storage::{KeySetIndex, MapIndex, Patch, Snapshot};
 
 // TODO: Move request timeouts into node configuration. (ECR-171)
 
